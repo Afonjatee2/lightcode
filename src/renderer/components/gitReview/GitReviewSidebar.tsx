@@ -884,7 +884,11 @@ export function GitReviewSidebar(props: {
   const showPullFromSource = Boolean(worktreeBranch && worktreePath && sourceBranch && sourceAhead > 0);
   const isPushed = hasTracking && ahead === 0;
   const showCreatePrButton = Boolean(
-    showPrSection && ghAvailable && isPushed && (!prData || prData.state === "closed"),
+    showPrSection &&
+      ghAvailable &&
+      isPushed &&
+      sourceBranch &&
+      (!prData || prData.state === "closed"),
   );
   const [createPrModalOpen, setCreatePrModalOpen] = useState(false);
 
