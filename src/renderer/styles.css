@@ -327,6 +327,21 @@ body {
 .lightcode-provider-icon--attention {
   color: var(--warning);
   filter: drop-shadow(0 0 0.45rem color-mix(in oklab, var(--warning) 48%, transparent));
+  animation: lightcode-attention-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes lightcode-attention-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    filter: drop-shadow(0 0 0.2rem color-mix(in oklab, var(--warning) 25%, transparent))
+      drop-shadow(0 0 0.6rem color-mix(in oklab, var(--warning) 10%, transparent));
+  }
+  50% {
+    opacity: 1;
+    filter: drop-shadow(0 0 0.5rem color-mix(in oklab, var(--warning) 70%, transparent))
+      drop-shadow(0 0 1.6rem color-mix(in oklab, var(--warning) 35%, transparent));
+  }
 }
 
 .lightcode-provider-icon--finished {
