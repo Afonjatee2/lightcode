@@ -33,6 +33,7 @@ interface SharedSettingsState extends SharedSettings {
   setPreventSleepWhileWorking: (value: boolean) => void;
   setThreadRemoveAction: (value: ThreadRemoveAction) => void;
   setNewThreadMode: (value: NewThreadMode) => void;
+  setAutoShowTerminalPanel: (value: boolean) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
 }
 
@@ -151,6 +152,10 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ newThreadMode });
     persistSettings(selectSharedSettings(get()));
   },
+  setAutoShowTerminalPanel: (autoShowTerminalPanel) => {
+    set({ autoShowTerminalPanel });
+    persistSettings(selectSharedSettings(get()));
+  },
   setProviderConfig: (agentKind, config) => {
     const current = get().providerConfigs;
     set({ providerConfigs: { ...current, [agentKind]: config } });
@@ -188,6 +193,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettings {
     preventSleepWhileWorking: state.preventSleepWhileWorking,
     threadRemoveAction: state.threadRemoveAction,
     newThreadMode: state.newThreadMode,
+    autoShowTerminalPanel: state.autoShowTerminalPanel,
     providerConfigs: state.providerConfigs,
   };
 }

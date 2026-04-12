@@ -54,6 +54,7 @@ describe("sharedSettingsFile", () => {
       preventSleepWhileWorking: true,
       threadRemoveAction: "archive",
       newThreadMode: "page",
+      autoShowTerminalPanel: true,
       providerConfigs: {},
     });
 
@@ -86,6 +87,7 @@ describe("sharedSettingsFile", () => {
       preventSleepWhileWorking: true,
       threadRemoveAction: "archive",
       newThreadMode: "page",
+      autoShowTerminalPanel: true,
       providerConfigs: {},
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');

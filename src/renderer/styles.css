@@ -327,8 +327,8 @@ body {
 
 .lightcode-provider-icon--working {
   color: color-mix(in oklab, var(--working-tone) 92%, var(--white));
-  filter: drop-shadow(0 0 0.3rem color-mix(in oklab, var(--working-tone) 45%, transparent))
-    drop-shadow(0 0 1rem color-mix(in oklab, var(--working-tone) 22%, transparent));
+  filter: drop-shadow(0 0 0.25rem color-mix(in oklab, var(--working-tone) 45%, transparent))
+    drop-shadow(0 0 0.5rem color-mix(in oklab, var(--working-tone) 22%, transparent));
 }
 
 .lightcode-provider-icon--error {
@@ -338,7 +338,7 @@ body {
 
 .lightcode-provider-icon--attention {
   color: var(--warning);
-  filter: drop-shadow(0 0 0.45rem color-mix(in oklab, var(--warning) 48%, transparent));
+  filter: drop-shadow(0 0 0.3rem color-mix(in oklab, var(--warning) 48%, transparent));
   animation: lightcode-attention-pulse 1.8s ease-in-out infinite;
 }
 
@@ -346,20 +346,20 @@ body {
   0%,
   100% {
     opacity: 0.55;
-    filter: drop-shadow(0 0 0.2rem color-mix(in oklab, var(--warning) 25%, transparent))
-      drop-shadow(0 0 0.6rem color-mix(in oklab, var(--warning) 10%, transparent));
+    filter: drop-shadow(0 0 0.1rem color-mix(in oklab, var(--warning) 25%, transparent))
+      drop-shadow(0 0 0.2rem color-mix(in oklab, var(--warning) 10%, transparent));
   }
   50% {
     opacity: 1;
-    filter: drop-shadow(0 0 0.5rem color-mix(in oklab, var(--warning) 70%, transparent))
-      drop-shadow(0 0 1.6rem color-mix(in oklab, var(--warning) 35%, transparent));
+    filter: drop-shadow(0 0 0.2rem color-mix(in oklab, var(--warning) 70%, transparent))
+      drop-shadow(0 0 0.4rem color-mix(in oklab, var(--warning) 35%, transparent));
   }
 }
 
 .lightcode-provider-icon--finished {
   color: oklch(0.82 0.12 260);
-  filter: drop-shadow(0 0 0.4rem oklch(0.82 0.12 260 / 0.5))
-    drop-shadow(0 0 1.2rem oklch(0.82 0.12 260 / 0.2));
+  filter: drop-shadow(0 0 0.3rem oklch(0.82 0.12 260 / 0.5))
+    drop-shadow(0 0 0.6rem oklch(0.82 0.12 260 / 0.2));
   animation: lightcode-finished-pulse 1.8s ease-in-out infinite;
 }
 
@@ -367,13 +367,13 @@ body {
   0%,
   100% {
     opacity: 0.55;
-    filter: drop-shadow(0 0 0.2rem oklch(0.82 0.12 260 / 0.25))
-      drop-shadow(0 0 0.6rem oklch(0.82 0.12 260 / 0.1));
+    filter: drop-shadow(0 0 0.1rem oklch(0.82 0.12 260 / 0.25))
+      drop-shadow(0 0 0.2rem oklch(0.82 0.12 260 / 0.1));
   }
   50% {
     opacity: 1;
-    filter: drop-shadow(0 0 0.5rem oklch(0.82 0.12 260 / 0.7))
-      drop-shadow(0 0 1.6rem oklch(0.82 0.12 260 / 0.35));
+    filter: drop-shadow(0 0 0.2rem oklch(0.82 0.12 260 / 0.7))
+      drop-shadow(0 0 0.4rem oklch(0.82 0.12 260 / 0.35));
   }
 }
 

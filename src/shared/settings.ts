@@ -44,6 +44,8 @@ export const sharedSettingsSchema = z.object({
   threadRemoveAction: threadRemoveActionSchema,
   /** Default new-thread behaviour: full page or side-by-side panel. */
   newThreadMode: newThreadModeSchema,
+  /** Automatically show the terminal panel when running commands or creating worktrees. */
+  autoShowTerminalPanel: z.boolean(),
   /** Per-provider last-used draft config (model, effort, mode, etc.). App-wide. */
   providerConfigs: z.record(z.string(), providerDraftConfigSchema),
 });
@@ -78,6 +80,7 @@ export const defaultSharedSettings: SharedSettings = {
   preventSleepWhileWorking: true,
   threadRemoveAction: "archive",
   newThreadMode: "page",
+  autoShowTerminalPanel: true,
   providerConfigs: {},
 };
 
@@ -129,6 +132,8 @@ export function normalizeSharedSettings(value: unknown): SharedSettings {
       parsed.data.preventSleepWhileWorking ?? defaultSharedSettings.preventSleepWhileWorking,
     threadRemoveAction: parsed.data.threadRemoveAction ?? defaultSharedSettings.threadRemoveAction,
     newThreadMode: parsed.data.newThreadMode ?? defaultSharedSettings.newThreadMode,
+    autoShowTerminalPanel:
+      parsed.data.autoShowTerminalPanel ?? defaultSharedSettings.autoShowTerminalPanel,
     providerConfigs: parsed.data.providerConfigs ?? defaultSharedSettings.providerConfigs,
   };
 }

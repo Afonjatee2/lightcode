@@ -14,7 +14,6 @@ import {
   ArchiveRestore,
   ArrowLeft,
   Bot,
-  GitBranch,
   Monitor,
   PanelLeft,
   PanelLeftClose,
@@ -80,7 +79,7 @@ const scrollSpeedOptions = Array.from({ length: 10 }, (_, i) => ({
   label: `${i + 1}x`,
 })) as readonly { id: string; label: string }[];
 
-type SettingsSection = "general" | "ai" | "agents" | "git" | "archived" | `agents:${string}`;
+type SettingsSection = "general" | "ai" | "agents" | "archived" | `agents:${string}`;
 
 function SettingsSidebar(props: {
   activeSection: SettingsSection;
@@ -135,13 +134,6 @@ function SettingsSidebar(props: {
                   onPress={() => onSectionChange(`agents:${agent.kind}`)}
                 />
               ))}
-            <SidebarButton
-              iconOnly
-              icon={<GitBranch className="size-4" />}
-              label="Git"
-              isActive={activeSection === "git"}
-              onPress={() => onSectionChange("git")}
-            />
             <SidebarButton
               iconOnly
               icon={<Archive className="size-4" />}
@@ -205,12 +197,6 @@ function SettingsSidebar(props: {
               </div>
             )}
             <SidebarButton
-              icon={<GitBranch className="size-4" />}
-              label="Git"
-              isActive={activeSection === "git"}
-              onPress={() => onSectionChange("git")}
-            />
-            <SidebarButton
               icon={<Archive className="size-4" />}
               label="Archived Threads"
               isActive={activeSection === "archived"}
@@ -244,6 +230,10 @@ function GeneralSettings() {
   const collapseTerminalComposer = useSharedSettings((state) => state.collapseTerminalComposer);
   const setCollapseTerminalComposer = useSharedSettings(
     (state) => state.setCollapseTerminalComposer,
+  );
+  const autoShowTerminalPanel = useSharedSettings((state) => state.autoShowTerminalPanel);
+  const setAutoShowTerminalPanel = useSharedSettings(
+    (state) => state.setAutoShowTerminalPanel,
   );
   const staleThreadUnloadMinutes = useSharedSettings((state) => state.staleThreadUnloadMinutes);
   const setStaleThreadUnloadMinutes = useSharedSettings(
@@ -302,6 +292,27 @@ function GeneralSettings() {
                 });
               }}
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Auto-show terminal panel</p>
+              <p className="text-xs text-muted">
+                Automatically show the terminal panel when running commands or creating worktrees.
+              </p>
+            </div>
+            <Switch
+              isSelected={autoShowTerminalPanel}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setAutoShowTerminalPanel(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </div>
 
           <div className="flex items-center justify-between gap-4">
@@ -837,18 +848,6 @@ function AgentSettingsEmpty() {
   );
 }
 
-function GitSettings() {
-  return (
-    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
-      <div className="mx-auto max-w-[560px]">
-        <h1 className="mb-6 text-lg font-semibold text-foreground">Git</h1>
-
-        <p className="text-sm text-muted">No git-specific settings yet.</p>
-      </div>
-    </div>
-  );
-}
-
 function ArchivedThreadsSettings() {
   const threads = useAppStore((s) => s.threads);
   const projects = useAppStore((s) => s.projects);
@@ -942,8 +941,6 @@ export function SettingsOverlay(props: { onClose: () => void }) {
           <SingleAgentSettings agentKind={agentKind} />
         ) : activeSection === "agents" ? (
           <AgentSettingsEmpty />
-        ) : activeSection === "git" ? (
-          <GitSettings />
         ) : activeSection === "archived" ? (
           <ArchivedThreadsSettings />
         ) : null

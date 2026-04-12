@@ -694,7 +694,9 @@ function AppContent() {
           const wtLocation = buildWorktreeLocation(project.location, result.path);
           const store = useDevTerminalStore.getState();
           const tab = store.addTab(project.id, "setup", result.path);
-          store.openWorktreePanel(project.id, result.path);
+          if (useSharedSettings.getState().autoShowTerminalPanel) {
+            store.openWorktreePanel(project.id, result.path);
+          }
           store.setActiveTab(tab.id);
           void readBridge().startShell({
             shellId: tab.id,
@@ -1050,10 +1052,12 @@ export function App() {
     const tabLabel = `${action.name}`;
     const tab = store.addTab(projectId, tabLabel, worktreePath);
 
-    if (worktreePath) {
-      store.openWorktreePanel(projectId, worktreePath);
-    } else {
-      store.openPanel(projectId);
+    if (useSharedSettings.getState().autoShowTerminalPanel) {
+      if (worktreePath) {
+        store.openWorktreePanel(projectId, worktreePath);
+      } else {
+        store.openPanel(projectId);
+      }
     }
     store.setActiveTab(tab.id);
 
