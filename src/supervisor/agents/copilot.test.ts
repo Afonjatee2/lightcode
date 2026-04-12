@@ -134,6 +134,20 @@ describe("detectCopilotTerminalStatus", () => {
     expect(result?.status).not.toBe("working");
   });
 
+  it("ignores stale working output deep in history when the recent tail only shows the status bar", () => {
+    const text = [
+      "⊙ Thinking (Esc to cancel)",
+      "x".repeat(2000),
+      "shift+tab switch mode",
+    ].join("\n");
+
+    expect(detectCopilotTerminalStatus(text)).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: false,
+    });
+  });
+
   it("detects model and effort from 'Model changed to' message", () => {
     const text = [
       "● Model changed to: claude-opus-4.6 (medium)",

@@ -959,6 +959,11 @@ const CODEX_STRONG_HINTS: CodexHintEntry[] = [
   { re: /press enter to continue/i, status: "needs_reply", attention: "needs_reply" },
   { re: /\[y\/n\]|\(y\/N\)|allow\s+.*\?/i, status: "needs_approval", attention: "needs_approval" },
   { re: /•\s*working(?:\s*\(|…)?|esc\s+to\s+interrupt/i, status: "working", attention: "working" },
+  {
+    re: /use\s+\/skills\s+to\s+list\s+available\s+skills/i,
+    status: "idle",
+    attention: "none",
+  },
 ];
 
 const CODEX_IDLE_HINTS: CodexHintEntry[] = [

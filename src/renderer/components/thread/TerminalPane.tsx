@@ -1,15 +1,28 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { TerminalSize, ThreadStatus } from "../../../shared/contracts";
 import { XTermSurface, type XTermSurfaceHandle } from "../terminal/XTermSurface";
 
-export function TerminalPane(props: {
-  threadId: string;
-  status: ThreadStatus;
-  onTerminalResize?: (size: TerminalSize) => void;
-}) {
+export interface TerminalPaneHandle {
+  focus(): void;
+}
+
+export const TerminalPane = forwardRef<
+  TerminalPaneHandle,
+  {
+    threadId: string;
+    status: ThreadStatus;
+    onTerminalResize?: (size: TerminalSize) => void;
+  }
+>(function TerminalPane(props, ref) {
   const { threadId, status, onTerminalResize } = props;
   const xtermRef = useRef<XTermSurfaceHandle>(null);
   const prevStatusRef = useRef(status);
+
+  useImperativeHandle(ref, () => ({
+    focus() {
+      xtermRef.current?.focus();
+    },
+  }));
 
   // Auto-focus the terminal when the agent needs user interaction (plan
   // questions, approval prompts) so arrow-key navigation works immediately.
@@ -37,4 +50,4 @@ export function TerminalPane(props: {
       />
     </div>
   );
-}
+});

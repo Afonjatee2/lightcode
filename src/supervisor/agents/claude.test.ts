@@ -43,6 +43,22 @@ describe("detectClaudeTerminalStatus", () => {
     });
   });
 
+  it("detects idle from 'Checking for updates' after the prompt", () => {
+    const text = [
+      "esc to interrupt",
+      "● Previous working output",
+      "❯ ",
+      "0;✳ Add Esc keybinding to close overlays\u0007",
+      "Read 1 file",
+      "Checking for updates",
+    ].join("\n");
+    expect(detectClaudeTerminalStatus(text)).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    });
+  });
+
   it("detects needs_approval from permission prompt", () => {
     const text =
       "Do you want to proceed?\n> 1. Yes\n  2. Yes, and don't ask again\n  3. No\n\nEsc to cancel · Tab to amend · ctrl+e to explain";

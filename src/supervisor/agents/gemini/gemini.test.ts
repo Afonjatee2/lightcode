@@ -129,6 +129,20 @@ describe("detectGeminiTerminalStatus", () => {
     });
   });
 
+  it("ignores stale working output deep in history when only the idle prompt remains in the tail", () => {
+    const text = [
+      "0;✦  Working… (my-project)",
+      "x".repeat(1500),
+      ">   Type your message or @path/to/file",
+    ].join("\n");
+
+    expect(detectGeminiTerminalStatus(text)).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: false,
+    });
+  });
+
   it("detects needs_reply from Action Required with numbered options", () => {
     const text = [
       "Which modules would you like to update?",

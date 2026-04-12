@@ -154,6 +154,15 @@ const UNCORROBORATED_EXTRA_DELAY: Partial<Record<ThreadStatus, number>> = {
   idle: 200, // 300 + 200 = 500ms total for uncorroborated idle
 };
 
+/**
+ * If a TUI session is "working" and the PTY goes silent (no data at all) for
+ * this many milliseconds, the runtime transitions it to "idle".  TUI agent
+ * spinners emit data every ~100 ms, so 2 s of total silence is a very strong
+ * signal that the agent has finished but the TUI didn't render a recognisable
+ * idle prompt (e.g. Copilot skipping the "Type @" placeholder).
+ */
+const WORKING_SILENCE_TIMEOUT = 2000;
+
 interface SessionRuntime {
   instanceId: string;
   threadId: string;
@@ -182,6 +191,8 @@ interface SessionRuntime {
   pendingTerminalPrompt?: string | undefined;
   pendingTerminalSegments?: PromptSegment[] | undefined;
   prevChunk: string;
+  /** Timestamp of the last concrete status transition (via updateState). */
+  lastStatusChangeAt?: number | undefined;
   /** Pending status stabilization — delays low-risk transitions to filter TUI animation noise. */
   pendingStatusHint?:
     | {
@@ -190,6 +201,8 @@ interface SessionRuntime {
         timer: ReturnType<typeof setTimeout>;
       }
     | undefined;
+  /** Watchdog: fires when the PTY goes silent while "working" — transitions to idle. */
+  workingSilenceTimer?: ReturnType<typeof setTimeout> | undefined;
 }
 
 interface ShellSessionRuntime {
@@ -834,6 +847,10 @@ export class SupervisorRuntime {
     if (existing.pendingStatusHint) {
       clearTimeout(existing.pendingStatusHint.timer);
       existing.pendingStatusHint = undefined;
+    }
+    if (existing.workingSilenceTimer) {
+      clearTimeout(existing.workingSilenceTimer);
+      existing.workingSilenceTimer = undefined;
     }
     existing.stopSessionRefWatcher?.();
     existing.stopSessionRefWatcher = undefined;
@@ -1897,8 +1914,15 @@ export class SupervisorRuntime {
       session.pendingStatusHint = undefined;
     }
 
+    // Clear the working-silence watchdog when leaving "working".
+    if (session.workingSilenceTimer && status !== "working") {
+      clearTimeout(session.workingSilenceTimer);
+      session.workingSilenceTimer = undefined;
+    }
+
     session.status = status;
     session.attention = attention;
+    session.lastStatusChangeAt = Date.now();
     this.emitState(session, errorMessage);
   }
 
@@ -2013,7 +2037,22 @@ export class SupervisorRuntime {
             !hint.corroborated && baseDelay > 0
               ? (UNCORROBORATED_EXTRA_DELAY[hint.status] ?? 0)
               : 0;
-          const delay = baseDelay + extraDelay;
+
+          // When the session just settled into "idle" and the detection says
+          // "working", this is almost always a TUI screen-redraw artifact:
+          // partial chunks briefly expose stale "esc to interrupt" text before
+          // the full idle screen is received.  Use a longer delay so the next
+          // idle detection has time to cancel the spurious working hint.
+          const ANTI_BOUNCE_WINDOW = 2000;
+          const ANTI_BOUNCE_DELAY = 800;
+          const recentlyBecameIdle =
+            session.status === "idle" &&
+            hint.status === "working" &&
+            session.lastStatusChangeAt !== undefined &&
+            Date.now() - session.lastStatusChangeAt < ANTI_BOUNCE_WINDOW;
+          const delay = recentlyBecameIdle
+            ? Math.max(baseDelay + extraDelay, ANTI_BOUNCE_DELAY)
+            : baseDelay + extraDelay;
 
           if (delay === 0) {
             if (session.pendingStatusHint) {
@@ -2027,6 +2066,16 @@ export class SupervisorRuntime {
             session.pendingStatusHint.attention === hint.attention
           ) {
             // Same status already pending — keep the existing timer.
+          } else if (
+            session.pendingStatusHint &&
+            session.pendingStatusHint.status !== session.status &&
+            hint.status === session.status
+          ) {
+            // The pending hint represents a real status transition (e.g. working→idle)
+            // while the new hint matches the current status (e.g. still "working" from
+            // a transient TUI redraw).  Replacing the pending timer would produce a
+            // no-op when it fires, silently discarding the transition.  Keep the
+            // existing timer so the status change is not lost.
           } else {
             if (session.pendingStatusHint) {
               clearTimeout(session.pendingStatusHint.timer);
@@ -2052,10 +2101,46 @@ export class SupervisorRuntime {
             session.sessionRefDiscoveryStarted = true;
             this.pollSessionRefDiscovery(session);
           }
-        } else if (configChanged) {
-          this.emitState(session);
+        } else {
+          // The hint matches the current session state (no transition needed).
+          // However, if there's a pending hint for a DIFFERENT status, the
+          // latest detection contradicts it — cancel the stale pending hint.
+          // This handles fast-responding agents: idle → detect "working" →
+          // timer set → agent finishes within the delay → detect "idle" →
+          // session is still "idle" so the outer condition is false, but
+          // the pending "working" timer must be cancelled or it will fire
+          // and set a stale "working" status after the agent is already idle.
+          if (
+            session.pendingStatusHint &&
+            session.pendingStatusHint.status !== hint.status
+          ) {
+            clearTimeout(session.pendingStatusHint.timer);
+            session.pendingStatusHint = undefined;
+          }
+          if (configChanged) {
+            this.emitState(session);
+          }
         }
         this.writeHintLog(session, stripped, hint);
+      }
+
+      // ── Working-silence watchdog ─────────────────────────────────
+      // TUI spinners emit data every ~100 ms while the agent is working.
+      // If the PTY goes completely silent for WORKING_SILENCE_TIMEOUT ms
+      // and the session is still "working", the agent almost certainly
+      // finished but the TUI didn't render a recognisable idle prompt.
+      // Reset the watchdog on every data chunk; fire → transition to idle.
+      if (session.workingSilenceTimer) {
+        clearTimeout(session.workingSilenceTimer);
+        session.workingSilenceTimer = undefined;
+      }
+      if (session.status === "working") {
+        session.workingSilenceTimer = setTimeout(() => {
+          session.workingSilenceTimer = undefined;
+          if (session.status === "working") {
+            this.updateState(session, "idle", "none");
+          }
+        }, WORKING_SILENCE_TIMEOUT);
       }
 
       if (session.pendingLaunchPrompt && session.adapter.isReadyForInitialPrompt?.(strippedData)) {

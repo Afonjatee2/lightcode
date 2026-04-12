@@ -1224,6 +1224,33 @@ export function App() {
     storeHydrated,
   ]);
 
+  // ── View-change reconciliation ─────────────────────────────────
+  // When the user switches threads the active panes change.  Fetch
+  // supervisor snapshots and reconcile so that any status events
+  // missed for non-visible threads are caught promptly.
+  useEffect(() => {
+    if (!storeHydrated || initialLoading) {
+      return;
+    }
+
+    let cancelled = false;
+    void readBridge()
+      .getThreadSnapshots()
+      .then((snapshots) => {
+        if (cancelled || snapshots.length === 0) {
+          return;
+        }
+        for (const snapshot of snapshots) {
+          updateThreadRuntime(snapshot.threadId, snapshot);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [storeHydrated, initialLoading, updateThreadRuntime, view]);
+
   useEffect(() => {
     if (!storeHydrated) {
       return;

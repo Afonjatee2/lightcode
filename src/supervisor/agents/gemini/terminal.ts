@@ -68,13 +68,15 @@ function findBestMatch(
 }
 
 export function detectGeminiTerminalStatus(text: string): TerminalStatusHint | null {
+  const recent = text.slice(-1200);
+
   // Two-tier priority:
   //   1. Strong signals — title-bar indicators, "(esc to cancel" working
   //      prompt, approval prompts, "◇ Ready".  Always authoritative.
   //   2. Fallback idle — "Type your message", "? for shortcuts".
   //      Used only when no strong signal exists.
 
-  const strongBest = findBestMatch(text, GEMINI_STRONG);
+  const strongBest = findBestMatch(recent, GEMINI_STRONG);
   if (strongBest) {
     return {
       status: strongBest.entry.status,
@@ -83,13 +85,13 @@ export function detectGeminiTerminalStatus(text: string): TerminalStatusHint | n
     };
   }
 
-  const fallbackBest = findBestMatch(text, GEMINI_FALLBACK_IDLE);
+  const fallbackBest = findBestMatch(recent, GEMINI_FALLBACK_IDLE);
   if (fallbackBest) {
     // Fallback idle: check if both "Type your message" and "? for shortcuts"
     // are present for corroboration, otherwise mark as uncorroborated.
     const bothPresent =
       GEMINI_FALLBACK_IDLE.length >= 2 &&
-      GEMINI_FALLBACK_IDLE.every((entry) => entry.re.test(text));
+      GEMINI_FALLBACK_IDLE.every((entry) => entry.re.test(recent));
     return {
       status: fallbackBest.entry.status,
       attention: fallbackBest.entry.attention,

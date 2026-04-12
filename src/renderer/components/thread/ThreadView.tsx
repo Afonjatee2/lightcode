@@ -26,7 +26,7 @@ import {
 } from "../composer";
 import { flattenSegments } from "../composer/serializeMentions";
 import { filterHiddenModels } from "./threadComposerOptions";
-import { TerminalPane } from "./TerminalPane";
+import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposer } from "./ThreadComposer";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 
@@ -112,6 +112,7 @@ export function ThreadView(props: {
   const [prompt, setPrompt] = useState("");
   const [hasContent, setHasContent] = useState(false);
   const mentionRef = useRef<MentionInputHandle>(null);
+  const terminalPaneRef = useRef<TerminalPaneHandle>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [terminalSize, setTerminalSize] = useState<TerminalSize | null>(null);
   const attachments = useAttachments();
@@ -122,6 +123,8 @@ export function ThreadView(props: {
   const isTerminalInput = agentStatus?.capabilities.liveInputMode === "terminal";
   const usesTerminalPresentation =
     (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
+  const needsFocusBeforeInput =
+    agentStatus?.capabilities.requiresTerminalFocusBeforeInput === true;
   const activeServerRequest = pendingServerRequests[0];
   const canSubmitServerInput =
     isServerControlled &&
@@ -166,7 +169,17 @@ export function ThreadView(props: {
     const flat = flattenSegments(allSegments);
     if (flat.length === 0 || !canSubmit) return;
     setIsSubmitting(true);
-    void onSubmitInput(flat, allSegments.length > 0 ? allSegments : undefined)
+
+    // Some TUIs (e.g. Copilot) only accept PTY input when the terminal has
+    // focus.  Briefly focus the xterm surface so focus-event reporting fires
+    // before the supervisor writes to the PTY.
+    const focusPromise = needsFocusBeforeInput
+      ? (terminalPaneRef.current?.focus(),
+        new Promise<void>((r) => setTimeout(r, 80)))
+      : Promise.resolve();
+
+    void focusPromise
+      .then(() => onSubmitInput(flat, allSegments.length > 0 ? allSegments : undefined))
       .then(() => {
         mentionRef.current?.clear();
         mentionRef.current?.focus();
@@ -319,6 +332,7 @@ export function ThreadView(props: {
           <div className="relative min-h-0 flex-1 overflow-hidden">
             {usesTerminalPresentation ? (
               <TerminalPane
+                ref={terminalPaneRef}
                 key={thread.id}
                 onTerminalResize={setTerminalSize}
                 status={thread.status}

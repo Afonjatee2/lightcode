@@ -126,6 +126,8 @@ export const agentCapabilitySchema = z.object({
   supportsDirectInput: z.boolean().default(true),
   liveInputMode: liveInputModeSchema.default("terminal"),
   presentationMode: threadPresentationModeSchema.default("terminal"),
+  /** TUI requires terminal focus before PTY writes are accepted (e.g. focus-event reporting). */
+  requiresTerminalFocusBeforeInput: z.boolean().optional(),
   /** Approval policy value that grants the agent full autonomy (no permission prompts). */
   bypassApprovalPolicy: z.string().optional(),
   settingDefs: z.array(agentSettingDefSchema).default([]),

@@ -263,4 +263,22 @@ describe("detectCodexTerminalStatus", () => {
       corroborated: false,
     });
   });
+
+  it("detects idle from the /skills helper even with stale working text above", () => {
+    const text = [
+      "• Working (18s • esc to interrupt)",
+      "",
+      "• Final answer rendered above",
+      "",
+      "› Use /skills to list available skills",
+      "",
+      "gpt-5.4 high · ~/work/lightcode · master · 18% used · 5h 99% · weekly 99% · 950K window",
+    ].join("\n");
+
+    expect(detectCodexTerminalStatus(text)).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    });
+  });
 });

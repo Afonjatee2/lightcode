@@ -41,6 +41,7 @@ const defaultCapabilities: AgentCapability = {
   supportsDirectInput: true,
   liveInputMode: "terminal",
   presentationMode: "terminal",
+  requiresTerminalFocusBeforeInput: true,
   bypassApprovalPolicy: "never",
   settingDefs: [],
 };
@@ -285,8 +286,41 @@ function resolveModelId(rawModel: string, models: Array<{ id: string; label?: st
   return rawModel;
 }
 
+// Copilot's status bar (always at the bottom of the TUI screen).
+// Present in both idle and working states, but "ctrl+q enqueue" only during working.
+const STATUS_BAR_RE = /shift\+tab\s+switch mode/i;
+
+// Active working indicator in the TUI — absent once the agent finishes.
+const ACTIVE_WORKING_RE = /\(Esc to cancel\)/i;
+
 export function detectCopilotTerminalStatus(text: string): TerminalStatusHint | null {
-  const best = findBestHint(text);
+  const recent = text.slice(-1500);
+  const best = findBestHint(recent);
+
+  // Fallback idle detection: the combined buffer can include stale "Esc to cancel"
+  // text from prevChunk when Copilot redraws from row 2 (\x1b[2;1H) instead of
+  // cursor-home (\x1b[H).  In that case findBestHint returns a stale "working"
+  // match.  Additionally, after the agent finishes the TUI may omit the "Type @"
+  // placeholder prompt entirely, causing findBestHint to return null.
+  //
+  // Guard: inspect only the tail of the buffer (the most recently drawn screen
+  // area).  If the status bar is visible there but no active working indicator
+  // is present, the agent has finished and returned to idle.
+  if (!best || best.status === "working") {
+    const tail = text.slice(-500);
+    if (STATUS_BAR_RE.test(tail) && !ACTIVE_WORKING_RE.test(tail)) {
+      const hint: TerminalStatusHint = {
+        status: "idle",
+        attention: "none",
+        corroborated: false,
+      };
+      const modelEffort = detectCopilotModelEffort(text) ?? detectCopilotStatusLineModel(text);
+      if (modelEffort?.rawModel) hint.model = modelEffort.rawModel;
+      if (modelEffort?.effort) hint.effort = modelEffort.effort;
+      return hint;
+    }
+  }
+
   if (!best) {
     return null;
   }
@@ -311,7 +345,7 @@ export function detectCopilotTerminalStatus(text: string): TerminalStatusHint | 
   } else {
     hint.corroborated = COPILOT_HINTS.some(
       (entry) =>
-        entry.strong && entry.status === best.status && entry !== best && entry.re.test(text),
+        entry.strong && entry.status === best.status && entry !== best && entry.re.test(recent),
     );
   }
 

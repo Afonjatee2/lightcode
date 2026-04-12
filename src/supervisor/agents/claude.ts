@@ -302,6 +302,9 @@ const CLAUDE_HINTS: HintEntry[] = [
     approvalPolicy: "default",
     strong: true,
   },
+  // Claude sometimes prints this immediately after returning to the prompt,
+  // which can push the weak ❯ idle cursor outside the tail window.
+  { re: /checking for updates/i, status: "idle", attention: "none", strong: true },
   { re: /plan mode on/i, status: "idle", attention: "none", planMode: true, strong: true },
   {
     re: /accept edits/i,
