@@ -6,6 +6,7 @@ import type {
   AgentStatus,
   Project,
   ProjectDraftConfig,
+  ProviderDraftConfig,
   PromptSegment,
   ThreadConfig,
 } from "../../../shared/contracts";
@@ -189,6 +190,14 @@ export function ThreadDraftView(props: {
   const [branchSelection, setBranchSelection] = useState<BranchSelection | null>(null);
   const lastAppliedAgentKindRef = useRef<AgentStatus["kind"] | undefined>(undefined);
 
+  // --- Per-provider config memory (app-wide via shared settings) ---
+  const updateProjectDraftConfig = useAppStore((s) => s.updateProjectDraftConfig);
+  const setProviderConfig = useSharedSettings((s) => s.setProviderConfig);
+  const providerConfigsRef = useRef<Record<string, ProviderDraftConfig> | null>(null);
+  if (providerConfigsRef.current === null) {
+    providerConfigsRef.current = { ...useSharedSettings.getState().providerConfigs };
+  }
+
   // --- Draft preservation: save on unmount, restore on mount ---
   const saveDraftContent = useAppStore((s) => s.saveDraftContent);
   const clearDraftContent = useAppStore((s) => s.clearDraftContent);
@@ -277,53 +286,82 @@ export function ThreadDraftView(props: {
       return;
     }
 
-    const restoreSavedDraft =
-      lastAppliedAgentKindRef.current === undefined &&
-      lastDraftConfig?.agentKind === effectiveAgentKind;
-    const nextModel = resolveModelValue(
-      selectedAgent,
-      restoreSavedDraft ? lastDraftConfig?.model : undefined,
-    );
+    const saved = providerConfigsRef.current?.[effectiveAgentKind];
+    const preferredModel = saved?.model;
+    const preferredEffort = saved?.effort;
+    const preferredMode = saved?.mode;
+    const preferredApproval = saved?.approvalPolicy;
+    const preferredSandbox = saved?.sandboxMode;
+
+    const nextModel = resolveModelValue(selectedAgent, preferredModel);
+    const nextEffort = resolveEffortValue(selectedAgent, nextModel, preferredEffort);
+    const nextMode = resolveModeValue(selectedAgent, preferredMode) as
+      | "agent"
+      | "plan"
+      | "autopilot";
+    const nextApproval = resolveApprovalPolicyValue(selectedAgent, preferredApproval);
+    const nextSandbox = resolveSandboxModeValue(selectedAgent, preferredSandbox);
 
     setModel(nextModel);
-    setEffort(
-      resolveEffortValue(
-        selectedAgent,
-        nextModel,
-        restoreSavedDraft ? lastDraftConfig?.effort : undefined,
-      ),
-    );
-    setMode(
-      resolveModeValue(selectedAgent, restoreSavedDraft ? lastDraftConfig?.mode : undefined) as
-        | "agent"
-        | "plan"
-        | "autopilot",
-    );
-    setApprovalPolicy(
-      resolveApprovalPolicyValue(
-        selectedAgent,
-        restoreSavedDraft ? lastDraftConfig?.approvalPolicy : undefined,
-      ),
-    );
-    setSandboxMode(
-      resolveSandboxModeValue(
-        selectedAgent,
-        restoreSavedDraft ? lastDraftConfig?.sandboxMode : undefined,
-      ),
-    );
+    setEffort(nextEffort);
+    setMode(nextMode);
+    setApprovalPolicy(nextApproval);
+    setSandboxMode(nextSandbox);
     lastAppliedAgentKindRef.current = effectiveAgentKind;
-  }, [effectiveAgentKind, lastDraftConfig, selectedAgent]);
+
+    // Persist per-provider config app-wide, last-used provider per project
+    const resolved: ProviderDraftConfig = {
+      model: nextModel,
+      effort: nextEffort,
+      mode: nextMode,
+      approvalPolicy: nextApproval,
+      sandboxMode: nextSandbox,
+    };
+    if (providerConfigsRef.current) {
+      providerConfigsRef.current[effectiveAgentKind] = resolved;
+    }
+    setProviderConfig(effectiveAgentKind, resolved);
+    updateProjectDraftConfig(project.id, {
+      agentKind: effectiveAgentKind,
+      model: nextModel,
+      effort: nextEffort,
+      mode: nextMode,
+      approvalPolicy: nextApproval,
+      sandboxMode: nextSandbox,
+      worktreeMode,
+    });
+  }, [effectiveAgentKind, selectedAgent, project.id, worktreeMode, updateProjectDraftConfig, setProviderConfig]);
 
   useEffect(() => {
-    if (!selectedAgent) {
+    if (!selectedAgent || !effectiveAgentKind) {
       return;
     }
 
     const nextEffort = resolveEffortValue(selectedAgent, model, effort);
     if (nextEffort !== effort) {
       setEffort(nextEffort);
+
+      // Persist the corrected effort
+      const corrected: ProviderDraftConfig = {
+        ...providerConfigsRef.current?.[effectiveAgentKind],
+        model,
+        effort: nextEffort,
+      };
+      if (providerConfigsRef.current) {
+        providerConfigsRef.current[effectiveAgentKind] = corrected;
+      }
+      setProviderConfig(effectiveAgentKind, corrected);
+      updateProjectDraftConfig(project.id, {
+        agentKind: effectiveAgentKind,
+        model,
+        effort: nextEffort,
+        mode,
+        approvalPolicy,
+        sandboxMode,
+        worktreeMode,
+      });
     }
-  }, [effort, model, selectedAgent]);
+  }, [effort, model, selectedAgent, effectiveAgentKind, mode, approvalPolicy, sandboxMode, worktreeMode, project.id, updateProjectDraftConfig, setProviderConfig]);
 
   const hiddenModelIds = useSharedSettings((s) =>
     selectedAgent ? s.hiddenModels[selectedAgent.kind] : undefined,
@@ -342,11 +380,41 @@ export function ThreadDraftView(props: {
 
   const factory = getComposerControls(selectedAgent.kind);
   const onConfigPatch = (patch: Partial<ThreadConfig>) => {
+    const nextModel = patch.model ?? model;
+    const nextEffort = patch.effort ?? effort;
+    const nextMode = (patch.mode ?? mode) as "agent" | "plan" | "autopilot";
+    const nextApproval = patch.approvalPolicy ?? approvalPolicy;
+    const nextSandbox = patch.sandboxMode ?? sandboxMode;
+
     if (patch.model !== undefined) setModel(patch.model);
     if (patch.effort !== undefined) setEffort(patch.effort);
-    if (patch.mode !== undefined) setMode(patch.mode as "agent" | "plan" | "autopilot");
+    if (patch.mode !== undefined) setMode(nextMode);
     if (patch.approvalPolicy !== undefined) setApprovalPolicy(patch.approvalPolicy);
     if (patch.sandboxMode !== undefined) setSandboxMode(patch.sandboxMode);
+
+    // Eagerly persist per-provider config (app-wide) + project draft
+    if (effectiveAgentKind) {
+      const updated: ProviderDraftConfig = {
+        model: nextModel,
+        effort: nextEffort,
+        mode: nextMode,
+        approvalPolicy: nextApproval,
+        sandboxMode: nextSandbox,
+      };
+      if (providerConfigsRef.current) {
+        providerConfigsRef.current[effectiveAgentKind] = updated;
+      }
+      setProviderConfig(effectiveAgentKind, updated);
+      updateProjectDraftConfig(project.id, {
+        agentKind: effectiveAgentKind,
+        model: nextModel,
+        effort: nextEffort,
+        mode: nextMode,
+        approvalPolicy: nextApproval,
+        sandboxMode: nextSandbox,
+        worktreeMode,
+      });
+    }
   };
 
   const alignClass =
@@ -448,7 +516,23 @@ export function ThreadDraftView(props: {
                     })),
                     value: selectedAgent.kind,
                     iconOnly: true,
-                    onChange: (value) => setAgentKind(value as AgentStatus["kind"]),
+                    onChange: (value) => {
+                      // Snapshot current provider settings before switching
+                      if (effectiveAgentKind) {
+                        const snapshot: ProviderDraftConfig = {
+                          model,
+                          effort,
+                          mode,
+                          approvalPolicy,
+                          sandboxMode,
+                        };
+                        if (providerConfigsRef.current) {
+                          providerConfigsRef.current[effectiveAgentKind] = snapshot;
+                        }
+                        setProviderConfig(effectiveAgentKind, snapshot);
+                      }
+                      setAgentKind(value as AgentStatus["kind"]);
+                    },
                   },
                   ...(factory
                     ? factory({

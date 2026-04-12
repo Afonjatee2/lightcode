@@ -147,6 +147,15 @@ export const agentStatusSchema = z.object({
 });
 export type AgentStatus = z.infer<typeof agentStatusSchema>;
 
+export const providerDraftConfigSchema = z.object({
+  model: z.string().min(1),
+  effort: z.string().optional(),
+  mode: threadModeSchema.optional(),
+  approvalPolicy: z.string().optional(),
+  sandboxMode: z.string().optional(),
+});
+export type ProviderDraftConfig = z.infer<typeof providerDraftConfigSchema>;
+
 export const projectDraftConfigSchema = z.object({
   agentKind: agentKindSchema,
   model: z.string().min(1),

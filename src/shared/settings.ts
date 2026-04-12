@@ -1,6 +1,7 @@
 import { z } from "zod";
 import {
   newThreadModeSchema,
+  providerDraftConfigSchema,
   terminalPositionSchema,
   themeModeSchema,
   threadRemoveActionSchema,
@@ -43,6 +44,8 @@ export const sharedSettingsSchema = z.object({
   threadRemoveAction: threadRemoveActionSchema,
   /** Default new-thread behaviour: full page or side-by-side panel. */
   newThreadMode: newThreadModeSchema,
+  /** Per-provider last-used draft config (model, effort, mode, etc.). App-wide. */
+  providerConfigs: z.record(z.string(), providerDraftConfigSchema),
 });
 export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 
@@ -75,6 +78,7 @@ export const defaultSharedSettings: SharedSettings = {
   preventSleepWhileWorking: true,
   threadRemoveAction: "archive",
   newThreadMode: "page",
+  providerConfigs: {},
 };
 
 const partialSharedSettingsSchema = sharedSettingsSchema.partial();
@@ -125,5 +129,6 @@ export function normalizeSharedSettings(value: unknown): SharedSettings {
       parsed.data.preventSleepWhileWorking ?? defaultSharedSettings.preventSleepWhileWorking,
     threadRemoveAction: parsed.data.threadRemoveAction ?? defaultSharedSettings.threadRemoveAction,
     newThreadMode: parsed.data.newThreadMode ?? defaultSharedSettings.newThreadMode,
+    providerConfigs: parsed.data.providerConfigs ?? defaultSharedSettings.providerConfigs,
   };
 }

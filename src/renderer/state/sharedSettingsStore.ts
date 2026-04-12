@@ -7,6 +7,7 @@ import {
 } from "../../shared/settings";
 import type {
   NewThreadMode,
+  ProviderDraftConfig,
   TerminalPosition,
   ThemeMode,
   ThreadRemoveAction,
@@ -32,6 +33,7 @@ interface SharedSettingsState extends SharedSettings {
   setPreventSleepWhileWorking: (value: boolean) => void;
   setThreadRemoveAction: (value: ThreadRemoveAction) => void;
   setNewThreadMode: (value: NewThreadMode) => void;
+  setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
 }
 
 function hasBridge(): boolean {
@@ -149,6 +151,11 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ newThreadMode });
     persistSettings(selectSharedSettings(get()));
   },
+  setProviderConfig: (agentKind, config) => {
+    const current = get().providerConfigs;
+    set({ providerConfigs: { ...current, [agentKind]: config } });
+    persistSettings(selectSharedSettings(get()));
+  },
 }));
 
 function selectSharedSettings(state: SharedSettingsState): SharedSettings {
@@ -181,6 +188,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettings {
     preventSleepWhileWorking: state.preventSleepWhileWorking,
     threadRemoveAction: state.threadRemoveAction,
     newThreadMode: state.newThreadMode,
+    providerConfigs: state.providerConfigs,
   };
 }
 
