@@ -11,6 +11,9 @@ const PANEL_DEFAULT_WIDTH = 480;
 const PANEL_BOTTOM_MIN_HEIGHT = 200;
 const PANEL_BOTTOM_MAX_HEIGHT = 500;
 const PANEL_BOTTOM_DEFAULT_HEIGHT = 300;
+const GIT_PANEL_MIN_WIDTH = 280;
+const GIT_PANEL_MAX_WIDTH = 500;
+const GIT_PANEL_DEFAULT_WIDTH = 350;
 
 function readStoredNumber(key: string, fallback: number): number {
   try {
@@ -42,7 +45,7 @@ interface SidebarContextValue {
   expand: () => void;
 }
 
-const SidebarContext = createContext<SidebarContextValue>({
+export const SidebarContext = createContext<SidebarContextValue>({
   isCollapsed: false,
   collapse: () => {},
   expand: () => {},
@@ -57,8 +60,10 @@ export function AppShell(props: {
   content: ReactNode;
   rightPanel?: ReactNode;
   rightPanelOpen?: boolean;
+  gitPanel?: ReactNode;
+  gitPanelOpen?: boolean;
 }) {
-  const { sidebar, content, rightPanel, rightPanelOpen = false } = props;
+  const { sidebar, content, rightPanel, rightPanelOpen = false, gitPanel, gitPanelOpen = false } = props;
   const terminalPosition = useSharedSettings((s) => s.terminalPosition);
 
   const [sidebarWidth, setSidebarWidth] = useState(() =>
@@ -73,7 +78,10 @@ export function AppShell(props: {
   const [isCollapsed, setIsCollapsed] = useState(() =>
     readStoredBoolean("lightcode-sidebar-collapsed", false),
   );
-  const [resizeTarget, setResizeTarget] = useState<"sidebar" | "panel" | "panel-bottom" | null>(
+  const [gitPanelWidth, setGitPanelWidth] = useState(() =>
+    readStoredNumber("lightcode-git-panel-width", GIT_PANEL_DEFAULT_WIDTH),
+  );
+  const [resizeTarget, setResizeTarget] = useState<"sidebar" | "panel" | "panel-bottom" | "git-panel" | null>(
     null,
   );
   const resizeRef = useRef({ startX: 0, startY: 0, startWidth: 0, startHeight: 0 });
@@ -93,6 +101,10 @@ export function AppShell(props: {
   useEffect(() => {
     localStorage.setItem("lightcode-sidebar-collapsed", String(isCollapsed));
   }, [isCollapsed]);
+
+  useEffect(() => {
+    localStorage.setItem("lightcode-git-panel-width", String(gitPanelWidth));
+  }, [gitPanelWidth]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -119,6 +131,13 @@ export function AppShell(props: {
           Math.max(PANEL_BOTTOM_MIN_HEIGHT, resizeRef.current.startHeight + delta),
         );
         setPanelHeight(next);
+      } else if (resizeTarget === "git-panel") {
+        const delta = resizeRef.current.startX - e.clientX;
+        const next = Math.min(
+          GIT_PANEL_MAX_WIDTH,
+          Math.max(GIT_PANEL_MIN_WIDTH, resizeRef.current.startWidth + delta),
+        );
+        setGitPanelWidth(next);
       }
     }
 
@@ -152,12 +171,19 @@ export function AppShell(props: {
     setResizeTarget("panel-bottom");
   }
 
+  function handleGitPanelResizeStart(e: React.MouseEvent) {
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startY: 0, startWidth: gitPanelWidth, startHeight: 0 };
+    setResizeTarget("git-panel");
+  }
+
   const collapse = () => setIsCollapsed(true);
   const expand = () => setIsCollapsed(false);
   const displayWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
   const isResizing = resizeTarget !== null;
   const panelDisplayWidth = rightPanelOpen ? panelWidth : 0;
   const panelDisplayHeight = rightPanelOpen ? panelHeight : 0;
+  const gitPanelDisplayWidth = gitPanelOpen ? gitPanelWidth : 0;
   const isBottom = terminalPosition === "bottom";
 
   return (
@@ -235,6 +261,31 @@ export function AppShell(props: {
             </>
           ) : null}
         </div>
+
+        {gitPanelOpen && (
+          <div
+            className="lightcode-resize-handle -mt-5 h-[calc(100%+0.75rem)]"
+            onMouseDown={handleGitPanelResizeStart}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize git panel"
+          />
+        )}
+        <aside
+          className={`relative min-h-0 overflow-hidden -mt-5 h-[calc(100%+0.75rem)] ${
+            gitPanelDisplayWidth > 0 ? "border-l border-[color:var(--border)]" : ""
+          } ${!isResizing ? "transition-[width,min-width] duration-200" : ""}`}
+          style={{ width: gitPanelDisplayWidth, minWidth: gitPanelDisplayWidth }}
+        >
+          <div
+            className={`h-full transition-[transform,opacity] duration-200 ${
+              gitPanelOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+            }`}
+            style={{ width: gitPanelWidth }}
+          >
+            {gitPanel}
+          </div>
+        </aside>
 
         {isResizing && (
           <div

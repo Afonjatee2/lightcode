@@ -15,6 +15,9 @@ export type ThreadRemoveAction = z.infer<typeof threadRemoveActionSchema>;
 export const newThreadModeSchema = z.enum(["page", "panel"]);
 export type NewThreadMode = z.infer<typeof newThreadModeSchema>;
 
+export const gitReviewModeSchema = z.enum(["panel", "page"]);
+export type GitReviewMode = z.infer<typeof gitReviewModeSchema>;
+
 export const liveInputModeSchema = z.enum(["terminal", "server"]);
 export type LiveInputMode = z.infer<typeof liveInputModeSchema>;
 

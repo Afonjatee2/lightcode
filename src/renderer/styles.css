@@ -2,6 +2,17 @@
 @import "@heroui/styles";
 @import "@xterm/xterm/css/xterm.css";
 
+/* Soften the default HeroUI focus rings globally */
+@utility focus-ring {
+  @apply ring-1 ring-inset ring-focus/50 ring-offset-0 ring-offset-background outline-none;
+  --tw-ring-offset-width: 1px;
+}
+
+@utility focus-field-ring {
+  @apply ring-1 ring-focus/50 ring-offset-0 outline-none;
+  --tw-ring-offset-width: 0px;
+}
+
 /* HeroUI toast: prevent long strings (URLs, paths) from overflowing */
 .toast {
   overflow: hidden;
@@ -150,9 +161,24 @@
   box-sizing: border-box;
 }
 
+/* Global subtle focus outline for any element not styled by HeroUI utilities */
+:focus-visible {
+  outline: 1px solid oklch(from var(--focus) l c h / 0.5);
+  outline-offset: 1px;
+}
+
+/* Let HeroUI's ring-based utilities handle their own focus styling */
+:focus-visible:where([class*="focus-ring"], [class*="focus-field-ring"]) {
+  outline: none;
+}
+
 button,
 [role="button"] {
   cursor: var(--interactive-cursor);
+}
+
+[role="button"]:focus-visible {
+  @apply focus-ring;
 }
 
 html,

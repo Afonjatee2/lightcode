@@ -51,7 +51,7 @@ export function SidebarButton(props: {
         <Tooltip.Trigger>
           <button
             ref={ref as React.Ref<HTMLButtonElement>}
-            className={`flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-3xl transition-colors ${stateClass} ${className ?? ""}`}
+            className={`flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-3xl outline-none transition-colors focus-visible:focus-ring ${stateClass} ${className ?? ""}`}
             disabled={isDisabled}
             onClick={onPress}
             onContextMenu={onContextMenu}
@@ -72,7 +72,7 @@ export function SidebarButton(props: {
       tabIndex={isDisabled ? -1 : 0}
       aria-disabled={isDisabled || undefined}
       aria-grabbed={isDragging}
-      className={`group relative flex w-full cursor-default items-center gap-2 rounded-3xl px-3 py-1.5 text-left text-sm transition-colors ${stateClass} ${className ?? ""}`}
+      className={`group relative flex w-full cursor-default items-center gap-2 rounded-3xl px-3 py-1.5 text-left text-sm outline-none transition-colors ${stateClass} ${className ?? ""}`}
       onClick={isDisabled ? undefined : onPress}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
@@ -115,7 +115,7 @@ function OverflowTooltip(props: { tooltip: React.ReactNode; children: React.Reac
         }
       }}
     >
-      <Tooltip.Trigger className="block">
+      <Tooltip.Trigger className="block" tabIndex={-1} role="none">
         <span ref={labelRef} className="block truncate">
           {props.children}
         </span>

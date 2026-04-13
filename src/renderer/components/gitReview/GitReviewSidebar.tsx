@@ -27,11 +27,8 @@ import {
   ButtonGroup,
   Dropdown,
   Label,
-  ListBox,
   Modal,
-  Select,
   Spinner,
-  Surface,
   toast,
   Tooltip,
 } from "@heroui/react";
@@ -352,6 +349,8 @@ export function GitReviewSidebar(props: {
   onSelectFile: (path: string | null, staged: boolean) => void;
   onClose: () => void;
   onRefresh: () => void;
+  mode?: "overlay" | "panel";
+  onExpandToOverlay?: () => void;
 }) {
   const {
     project,
@@ -365,6 +364,8 @@ export function GitReviewSidebar(props: {
     onSelectFile,
     onClose,
     onRefresh,
+    mode = "overlay",
+    onExpandToOverlay,
   } = props;
   const { isCollapsed, collapse, expand } = useSidebar();
   const agentStatuses = useAppStore((s) => s.agentStatuses);
@@ -906,18 +907,22 @@ export function GitReviewSidebar(props: {
             />
           </div>
           <div className="space-y-1 border-t border-white/6 pt-2 pr-2">
-            <SidebarButton
-              iconOnly
-              icon={<ArrowLeft className="size-4" />}
-              label="Return to app"
-              onPress={onClose}
-            />
-            <SidebarButton
-              iconOnly
-              icon={<PanelLeft className="size-4" />}
-              label="Show sidebar"
-              onPress={expand}
-            />
+            {mode !== "panel" && (
+              <>
+                <SidebarButton
+                  iconOnly
+                  icon={<ArrowLeft className="size-4" />}
+                  label="Return to app"
+                  onPress={onClose}
+                />
+                <SidebarButton
+                  iconOnly
+                  icon={<PanelLeft className="size-4" />}
+                  label="Show sidebar"
+                  onPress={expand}
+                />
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1500,18 +1505,20 @@ export function GitReviewSidebar(props: {
           </div>
         )}
 
-        <div className="space-y-1 border-t border-white/6 pt-2">
-          <SidebarButton
-            icon={<ArrowLeft className="size-4" />}
-            label="Return to app"
-            onPress={onClose}
-          />
-          <SidebarButton
-            icon={<PanelLeftClose className="size-4" />}
-            label="Hide sidebar"
-            onPress={collapse}
-          />
-        </div>
+        {mode !== "panel" && (
+          <div className="space-y-1 border-t border-white/6 pt-2">
+            <SidebarButton
+              icon={<ArrowLeft className="size-4" />}
+              label="Return to app"
+              onPress={onClose}
+            />
+            <SidebarButton
+              icon={<PanelLeftClose className="size-4" />}
+              label="Hide sidebar"
+              onPress={collapse}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -55,6 +55,7 @@ describe("sharedSettingsFile", () => {
       threadRemoveAction: "archive",
       newThreadMode: "page",
       autoShowTerminalPanel: true,
+      gitReviewMode: "panel",
       providerConfigs: {},
     });
 
@@ -88,6 +89,7 @@ describe("sharedSettingsFile", () => {
       threadRemoveAction: "archive",
       newThreadMode: "page",
       autoShowTerminalPanel: true,
+      gitReviewMode: "panel",
       providerConfigs: {},
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');

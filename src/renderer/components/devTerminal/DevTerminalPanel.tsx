@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Columns2, Plus, Trash2 } from "lucide-react";
-import { Tabs } from "@heroui/react";
+import { Columns2, PanelBottomClose, PanelRightClose, Plus, Trash2 } from "lucide-react";
+import { Tabs, Tooltip } from "@heroui/react";
 import type { Project } from "../../../shared/contracts";
 import { readBridge } from "../../bridge";
 import { useDevTerminalStore, type DevTerminalTab } from "../../state/devTerminalStore";
@@ -154,8 +154,8 @@ function TerminalSurfaces(props: {
   );
 }
 
-export function DevTerminalPanel(props: { projects: Project[] }) {
-  const { projects } = props;
+export function DevTerminalPanel(props: { projects: Project[]; hideHeader?: boolean }) {
+  const { projects, hideHeader } = props;
   const tabs = useDevTerminalStore((s) => s.tabs);
   const activeProjectId = useDevTerminalStore((s) => s.activeProjectId);
   const activeWorktreePath = useDevTerminalStore((s) => s.activeWorktreePath);
@@ -359,7 +359,29 @@ export function DevTerminalPanel(props: { projects: Project[] }) {
 
     return (
       <div className="flex h-full min-h-0 bg-[var(--content-background)]" style={fadeStyle}>
-        <div className="w-[140px] shrink-0 overflow-y-auto border-r border-[color:var(--border)] py-1">
+        <div className="flex w-[140px] shrink-0 flex-col overflow-hidden border-r border-[color:var(--border)]">
+          {activeProject && (
+            <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+              <div className="min-w-0">
+                <Tooltip delay={300}>
+                  <Tooltip.Trigger>
+                    <div className="max-w-[80px] truncate text-xs font-medium text-foreground">{activeProject.name}</div>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
+                </Tooltip>
+              </div>
+              <div className="flex-1" />
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted hover:text-foreground"
+                title="Hide terminal"
+                onClick={() => useDevTerminalStore.getState().closePanel()}
+              >
+                <PanelBottomClose className="size-3" />
+              </button>
+            </div>
+          )}
+          <div className="min-h-0 flex-1 overflow-y-auto py-1">
           <Tabs
             className="w-full"
             orientation="vertical"
@@ -416,6 +438,7 @@ export function DevTerminalPanel(props: { projects: Project[] }) {
               </Tabs.List>
             </Tabs.ListContainer>
           </Tabs>
+          </div>
         </div>
 
         <div className="relative min-h-0 min-w-0 flex-1 px-4 pt-2 pb-2">
@@ -435,6 +458,27 @@ export function DevTerminalPanel(props: { projects: Project[] }) {
   // Right position: horizontal tabs on top, terminals below
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]" style={fadeStyle}>
+      {!hideHeader && activeProject && (
+        <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+          <div className="min-w-0">
+            <Tooltip delay={300}>
+              <Tooltip.Trigger>
+                <div className="max-w-[100px] truncate text-xs font-medium text-foreground">{activeProject.name}</div>
+              </Tooltip.Trigger>
+              <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
+            </Tooltip>
+          </div>
+          <div className="flex-1" />
+          <button
+            type="button"
+            className="rounded p-0.5 text-muted hover:text-foreground"
+            title="Hide terminal"
+            onClick={() => useDevTerminalStore.getState().closePanel()}
+          >
+            <PanelRightClose className="size-3" />
+          </button>
+        </div>
+      )}
       <div className="flex shrink-0 items-center gap-0 px-3">
         <Tabs
           className="min-w-0 flex-1 overflow-x-auto rounded-lg"

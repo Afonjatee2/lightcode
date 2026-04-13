@@ -6,6 +6,7 @@ import {
   type SharedSettings,
 } from "../../shared/settings";
 import type {
+  GitReviewMode,
   NewThreadMode,
   ProviderDraftConfig,
   TerminalPosition,
@@ -34,6 +35,7 @@ interface SharedSettingsState extends SharedSettings {
   setThreadRemoveAction: (value: ThreadRemoveAction) => void;
   setNewThreadMode: (value: NewThreadMode) => void;
   setAutoShowTerminalPanel: (value: boolean) => void;
+  setGitReviewMode: (value: GitReviewMode) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
 }
 
@@ -156,6 +158,10 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ autoShowTerminalPanel });
     persistSettings(selectSharedSettings(get()));
   },
+  setGitReviewMode: (gitReviewMode) => {
+    set({ gitReviewMode });
+    persistSettings(selectSharedSettings(get()));
+  },
   setProviderConfig: (agentKind, config) => {
     const current = get().providerConfigs;
     set({ providerConfigs: { ...current, [agentKind]: config } });
@@ -194,6 +200,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettings {
     threadRemoveAction: state.threadRemoveAction,
     newThreadMode: state.newThreadMode,
     autoShowTerminalPanel: state.autoShowTerminalPanel,
+    gitReviewMode: state.gitReviewMode,
     providerConfigs: state.providerConfigs,
   };
 }

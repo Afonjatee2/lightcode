@@ -14,8 +14,10 @@ export function PageLayout(props: {
   content: ReactNode;
   rightPanel?: ReactNode;
   rightPanelOpen?: boolean;
+  gitPanel?: ReactNode;
+  gitPanelOpen?: boolean;
 }) {
-  const { title, onTitleClick, headerChildren, sidebar, content, rightPanel, rightPanelOpen } =
+  const { title, onTitleClick, headerChildren, sidebar, content, rightPanel, rightPanelOpen, gitPanel, gitPanelOpen } =
     props;
 
   return (
@@ -29,6 +31,8 @@ export function PageLayout(props: {
           content={content}
           rightPanel={rightPanel}
           {...(rightPanelOpen != null ? { rightPanelOpen } : {})}
+          gitPanel={gitPanel}
+          {...(gitPanelOpen != null ? { gitPanelOpen } : {})}
         />
       </div>
     </div>

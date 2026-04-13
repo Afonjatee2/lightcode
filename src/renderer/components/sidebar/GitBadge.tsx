@@ -6,6 +6,7 @@ export function GitBadge(props: {
   projectName: string;
   onPress?: () => void;
   worktreePath?: string;
+  isActive?: boolean;
 }) {
   const { isRepo, totalInsertions, totalDeletions } = useGitStore(
     useShallow((s) => {
@@ -25,7 +26,9 @@ export function GitBadge(props: {
       role="button"
       tabIndex={0}
       aria-label={`Git changes for ${props.projectName}`}
-      className="shrink-0 cursor-default rounded px-1 py-0.5 transition-colors text-muted/60 hover:bg-white/[0.04] hover:text-foreground"
+      className={`shrink-0 cursor-default rounded px-1 py-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+        props.isActive ? "bg-accent/15 ring-1 ring-accent/40" : "text-muted/60"
+      }`}
       onClick={(e) => {
         e.stopPropagation();
         props.onPress?.();

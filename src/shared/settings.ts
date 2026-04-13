@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  gitReviewModeSchema,
   newThreadModeSchema,
   providerDraftConfigSchema,
   terminalPositionSchema,
@@ -46,6 +47,8 @@ export const sharedSettingsSchema = z.object({
   newThreadMode: newThreadModeSchema,
   /** Automatically show the terminal panel when running commands or creating worktrees. */
   autoShowTerminalPanel: z.boolean(),
+  /** Open git review as a right-side panel or a full page overlay. */
+  gitReviewMode: gitReviewModeSchema,
   /** Per-provider last-used draft config (model, effort, mode, etc.). App-wide. */
   providerConfigs: z.record(z.string(), providerDraftConfigSchema),
 });
@@ -53,7 +56,7 @@ export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 
 export const defaultSharedSettings: SharedSettings = {
   themeMode: "system",
-  terminalPosition: "right",
+  terminalPosition: "bottom",
   commitGenProvider: "auto",
   commitGenModel: "",
   commitGenEffort: "",
@@ -81,6 +84,7 @@ export const defaultSharedSettings: SharedSettings = {
   threadRemoveAction: "archive",
   newThreadMode: "page",
   autoShowTerminalPanel: true,
+  gitReviewMode: "panel",
   providerConfigs: {},
 };
 
@@ -134,6 +138,7 @@ export function normalizeSharedSettings(value: unknown): SharedSettings {
     newThreadMode: parsed.data.newThreadMode ?? defaultSharedSettings.newThreadMode,
     autoShowTerminalPanel:
       parsed.data.autoShowTerminalPanel ?? defaultSharedSettings.autoShowTerminalPanel,
+    gitReviewMode: parsed.data.gitReviewMode ?? defaultSharedSettings.gitReviewMode,
     providerConfigs: parsed.data.providerConfigs ?? defaultSharedSettings.providerConfigs,
   };
 }

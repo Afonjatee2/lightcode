@@ -27,6 +27,7 @@ import { msg, errorDetail } from "../shared/messages";
 import { isWindows, readBridge } from "./bridge";
 import { ProviderIcon, getStatusTone, generateTitleWithFallback } from "./components/providers";
 import { DevTerminalPanel } from "./components/devTerminal/DevTerminalPanel";
+import { UnifiedRightPanel, type RightPanelTab } from "./components/layout/UnifiedRightPanel";
 import { PageLayout } from "./components/layout/PageLayout";
 import { OverlayShell } from "./components/layout/OverlayShell";
 import { SplitPaneContainer } from "./components/layout/SplitPaneContainer";
@@ -44,6 +45,9 @@ import { ThreadView } from "./components/thread/ThreadView";
 import { AppProvider } from "./components/ui/provider";
 const GitReviewOverlay = lazy(() =>
   import("./components/gitReview/GitReviewOverlay").then((m) => ({ default: m.GitReviewOverlay })),
+);
+const GitReviewPanel = lazy(() =>
+  import("./components/gitReview/GitReviewPanel").then((m) => ({ default: m.GitReviewPanel })),
 );
 
 // Preload heavy chunks after app start so they're ready when needed.
@@ -935,10 +939,47 @@ export function App() {
   }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [projectSettingsId, setProjectSettingsId] = useState<string | null>(null);
-  const [gitReviewContext, setGitReviewContext] = useState<{
+  const [gitReviewContext, setGitReviewContextRaw] = useState<{
     projectId: string;
     worktreePath?: string | undefined;
-  } | null>(null);
+  } | null>(() => {
+    try {
+      const raw = localStorage.getItem("lightcode-git-panel-context");
+      if (raw) return JSON.parse(raw) as { projectId: string; worktreePath?: string };
+    } catch { /* ignore */ }
+    return null;
+  });
+  const [gitReviewAsPanel, setGitReviewAsPanel] = useState(() => gitReviewContext !== null);
+  const [gitOverlayOpen, setGitOverlayOpen] = useState(false);
+  const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>(
+    gitReviewContext !== null ? "git" : "terminal",
+  );
+
+  // Persist git panel context so it reopens on restart.
+  function setGitReviewContext(ctx: { projectId: string; worktreePath?: string | undefined } | null) {
+    setGitReviewContextRaw(ctx);
+    if (ctx) {
+      localStorage.setItem("lightcode-git-panel-context", JSON.stringify(ctx));
+    } else {
+      localStorage.removeItem("lightcode-git-panel-context");
+    }
+  }
+
+  // Clear persisted git panel context if the project no longer exists.
+  if (gitReviewContext && !projects.find((p) => p.id === gitReviewContext.projectId)) {
+    setGitReviewContextRaw(null);
+    localStorage.removeItem("lightcode-git-panel-context");
+  }
+
+  const terminalPosition = useSharedSettings((s) => s.terminalPosition);
+  const isTerminalRight = terminalPosition === "right";
+  const gitPanelOpen = !!gitReviewContext && gitReviewAsPanel;
+  // Keep last valid context so the panel content stays visible during the close animation.
+  const lastGitPanelContextRef = useRef(gitReviewContext);
+  if (gitReviewContext && gitReviewAsPanel) {
+    lastGitPanelContextRef.current = gitReviewContext;
+  }
+  const gitPanelContext = gitPanelOpen ? gitReviewContext : lastGitPanelContextRef.current;
   const [worktreeDeleteDialog, setWorktreeDeleteDialog] = useState<
     | {
         kind: "single-thread";
@@ -1819,9 +1860,40 @@ export function App() {
                 });
               }}
               onOpenSettings={() => setSettingsOpen(true)}
-              onOpenGitReview={(projectId, worktreePath?) =>
-                setGitReviewContext({ projectId, worktreePath })
-              }
+              onOpenGitReview={(projectId, worktreePath?) => {
+                const mode = useSharedSettings.getState().gitReviewMode;
+                if (mode === "panel") {
+                  const isSameContext =
+                    gitPanelOpen &&
+                    gitReviewContext?.projectId === projectId &&
+                    gitReviewContext?.worktreePath === worktreePath;
+
+                  if (isTerminalRight) {
+                    // Unified mode: only close if git tab is already active for same context
+                    if (isSameContext && rightPanelTab === "git") {
+                      setGitReviewContext(null);
+                      useDevTerminalStore.getState().closePanel();
+                      return;
+                    }
+                    // Otherwise open/switch to git tab
+                    setGitReviewContext({ projectId, worktreePath });
+                    setGitReviewAsPanel(true);
+                    setRightPanelTab("git");
+                  } else {
+                    // Standalone: toggle off if same context
+                    if (isSameContext) {
+                      setGitReviewContext(null);
+                      return;
+                    }
+                    setGitReviewContext({ projectId, worktreePath });
+                    setGitReviewAsPanel(true);
+                  }
+                } else {
+                  setGitReviewContext({ projectId, worktreePath });
+                  setGitReviewAsPanel(false);
+                  setGitOverlayOpen(true);
+                }
+              }}
               onGitSync={(projectId, worktreePath?) => {
                 const project = projects.find((p) => p.id === projectId);
                 if (!project) return;
@@ -1929,7 +2001,13 @@ export function App() {
                       sourceBranch,
                     });
                     if (result.conflicting) {
+                      const mode = useSharedSettings.getState().gitReviewMode;
                       setGitReviewContext({ projectId, worktreePath });
+                      if (mode === "panel") {
+                        setGitReviewAsPanel(true);
+                      } else {
+                        setGitOverlayOpen(true);
+                      }
                     }
                   } catch {
                     // ignored — user can open git review for details
@@ -2100,19 +2178,29 @@ export function App() {
                 if (!project) return;
 
                 const store = useDevTerminalStore.getState();
-
-                // Toggle off if already showing project panel for this project.
-                if (
+                const isSameTerminal =
                   store.isOpen &&
                   store.activeProjectId === projectId &&
-                  !store.activeWorktreePath
-                ) {
-                  store.closePanel();
-                  return;
-                }
+                  !store.activeWorktreePath;
 
-                // Open project panel (clears any worktree context).
-                store.openPanel(projectId);
+                if (isTerminalRight) {
+                  // Unified mode: only close if terminal tab is already active for same project
+                  if (isSameTerminal && rightPanelTab === "terminal") {
+                    store.closePanel();
+                    setGitReviewContext(null);
+                    return;
+                  }
+                  // Otherwise open/switch to terminal tab
+                  if (!isSameTerminal) store.openPanel(projectId);
+                  setRightPanelTab("terminal");
+                } else {
+                  // Standalone: toggle off if same terminal
+                  if (isSameTerminal) {
+                    store.closePanel();
+                    return;
+                  }
+                  store.openPanel(projectId);
+                }
 
                 // If the project already has a non-worktree tab, activate it.
                 const existingTab = store.tabs.find(
@@ -2132,19 +2220,27 @@ export function App() {
                 if (!project) return;
 
                 const store = useDevTerminalStore.getState();
-
-                // Toggle off if already showing this worktree's panel.
-                if (
+                const isSameWorktree =
                   store.isOpen &&
                   store.activeProjectId === projectId &&
-                  store.activeWorktreePath === worktreePath
-                ) {
-                  store.closePanel();
-                  return;
-                }
+                  store.activeWorktreePath === worktreePath;
 
-                // Open worktree panel (sets worktree context, separate from project panel).
-                store.openWorktreePanel(projectId, worktreePath);
+                if (isTerminalRight) {
+                  // Unified mode: only close if terminal tab is already active for same worktree
+                  if (isSameWorktree && rightPanelTab === "terminal") {
+                    store.closePanel();
+                    setGitReviewContext(null);
+                    return;
+                  }
+                  if (!isSameWorktree) store.openWorktreePanel(projectId, worktreePath);
+                  setRightPanelTab("terminal");
+                } else {
+                  if (isSameWorktree) {
+                    store.closePanel();
+                    return;
+                  }
+                  store.openWorktreePanel(projectId, worktreePath);
+                }
 
                 // If a tab for this worktree already exists, activate it.
                 const existingTab = store.tabs.find(
@@ -2161,18 +2257,187 @@ export function App() {
                 store.setActiveTab(tab.id);
               }}
               terminalProjectIds={terminalProjectIds}
-              activeTerminalProjectId={devTerminalActiveProjectId}
+              activeTerminalProjectId={
+                isTerminalRight && rightPanelTab !== "terminal" ? null : devTerminalActiveProjectId
+              }
               activeWorktreeTerminalPaths={devTerminalTabs
                 .filter((t) => t.worktreePath)
                 .map((t) => t.worktreePath!)}
               activeWorktreeTerminalPath={
-                devTerminalOpen ? useDevTerminalStore.getState().activeWorktreePath : null
+                isTerminalRight && rightPanelTab !== "terminal"
+                  ? null
+                  : devTerminalOpen ? useDevTerminalStore.getState().activeWorktreePath : null
+              }
+              activeGitPanelProjectId={
+                gitPanelOpen && (!isTerminalRight || rightPanelTab === "git")
+                  ? gitReviewContext?.projectId ?? null
+                  : null
+              }
+              activeGitPanelWorktreePath={
+                gitPanelOpen && (!isTerminalRight || rightPanelTab === "git")
+                  ? gitReviewContext?.worktreePath ?? null
+                  : null
               }
             />
           }
           content={<AppContent />}
-          rightPanel={<DevTerminalPanel projects={projects} />}
-          rightPanelOpen={devTerminalOpen}
+          rightPanel={
+            isTerminalRight ? (
+              <UnifiedRightPanel
+                activeTab={rightPanelTab}
+                onTabChange={setRightPanelTab}
+                terminalContent={<DevTerminalPanel projects={projects} hideHeader />}
+                gitContent={
+                  gitPanelContext && projects.find((p) => p.id === gitPanelContext.projectId) ? (
+                    <Suspense
+                      fallback={
+                        <div className="flex h-full items-center justify-center">
+                          <Spinner size="md" />
+                        </div>
+                      }
+                    >
+                      <GitReviewPanel
+                        project={projects.find((p) => p.id === gitPanelContext.projectId)!}
+                        {...(gitPanelContext.worktreePath
+                          ? {
+                              locationOverride: buildWorktreeLocation(
+                                projects.find((p) => p.id === gitPanelContext.projectId)!.location,
+                                gitPanelContext.worktreePath,
+                              ),
+                              statusKey: gitPanelContext.worktreePath,
+                              worktreePath: gitPanelContext.worktreePath,
+                              worktreeBranch:
+                                resolveWorktreeBranch(
+                                  gitPanelContext.projectId,
+                                  gitPanelContext.worktreePath,
+                                ) ?? undefined,
+                              onMergeAndRemove: () => {
+                                const allThreads = useAppStore.getState().threads;
+                                const reviewProject = projects.find(
+                                  (p) => p.id === gitPanelContext!.projectId,
+                                );
+                                const wtPath = gitPanelContext!.worktreePath;
+                                const wtBranch = wtPath
+                                  ? resolveWorktreeBranch(gitPanelContext!.projectId, wtPath)
+                                  : undefined;
+                                setGitReviewContext(null);
+                                if (reviewProject && wtPath) {
+                                  const siblings = allThreads.filter((t) => t.worktreePath === wtPath);
+                                  for (const sib of siblings) {
+                                    deleteThread(sib.id);
+                                  }
+                                  void (async () => {
+                                    await closeThreads(siblings.map((sib) => sib.id));
+                                    await performWorktreeRemoval(reviewProject, wtPath, wtBranch);
+                                  })();
+                                }
+                              },
+                            }
+                          : {})}
+                        onExpandToOverlay={() => setGitOverlayOpen(true)}
+                        onClose={() => setGitReviewContext(null)}
+                        hideHeader
+                      />
+                    </Suspense>
+                  ) : undefined
+                }
+                showTerminal={devTerminalOpen}
+                showGit={gitPanelOpen}
+                projectName={
+                  (rightPanelTab === "git"
+                    ? projects.find((p) => p.id === gitPanelContext?.projectId)?.name
+                    : projects.find((p) => p.id === useDevTerminalStore.getState().activeProjectId)?.name
+                  ) ?? undefined
+                }
+                onExpandGitToOverlay={() => setGitOverlayOpen(true)}
+                onOpenGit={() => {
+                  // Open git for the current terminal project
+                  const termProjectId = useDevTerminalStore.getState().activeProjectId;
+                  if (termProjectId) {
+                    setGitReviewContext({ projectId: termProjectId });
+                    setGitReviewAsPanel(true);
+                  }
+                }}
+                onOpenTerminal={() => {
+                  const store = useDevTerminalStore.getState();
+                  if (store.activeProjectId) {
+                    store.openPanel(store.activeProjectId);
+                  } else {
+                    const firstProject = projects[0];
+                    if (firstProject) {
+                      store.openPanel(firstProject.id);
+                      const existing = store.tabs.find((t) => t.projectId === firstProject.id && !t.worktreePath);
+                      if (!existing) {
+                        const tab = store.addTab(firstProject.id, firstProject.name);
+                        store.setActiveTab(tab.id);
+                      }
+                    }
+                  }
+                }}
+                onClose={() => {
+                  useDevTerminalStore.getState().closePanel();
+                  setGitReviewContext(null);
+                }}
+              />
+            ) : (
+              <DevTerminalPanel projects={projects} />
+            )
+          }
+          rightPanelOpen={isTerminalRight ? (devTerminalOpen || gitPanelOpen) : devTerminalOpen}
+          gitPanel={
+            !isTerminalRight && gitPanelContext && projects.find((p) => p.id === gitPanelContext.projectId) ? (
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center">
+                    <Spinner size="md" />
+                  </div>
+                }
+              >
+                <GitReviewPanel
+                  project={projects.find((p) => p.id === gitPanelContext.projectId)!}
+                  {...(gitPanelContext.worktreePath
+                    ? {
+                        locationOverride: buildWorktreeLocation(
+                          projects.find((p) => p.id === gitPanelContext.projectId)!.location,
+                          gitPanelContext.worktreePath,
+                        ),
+                        statusKey: gitPanelContext.worktreePath,
+                        worktreePath: gitPanelContext.worktreePath,
+                        worktreeBranch:
+                          resolveWorktreeBranch(
+                            gitPanelContext.projectId,
+                            gitPanelContext.worktreePath,
+                          ) ?? undefined,
+                        onMergeAndRemove: () => {
+                          const allThreads = useAppStore.getState().threads;
+                          const reviewProject = projects.find(
+                            (p) => p.id === gitPanelContext!.projectId,
+                          );
+                          const wtPath = gitPanelContext!.worktreePath;
+                          const wtBranch = wtPath
+                            ? resolveWorktreeBranch(gitPanelContext!.projectId, wtPath)
+                            : undefined;
+                          setGitReviewContext(null);
+                          if (reviewProject && wtPath) {
+                            const siblings = allThreads.filter((t) => t.worktreePath === wtPath);
+                            for (const sib of siblings) {
+                              deleteThread(sib.id);
+                            }
+                            void (async () => {
+                              await closeThreads(siblings.map((sib) => sib.id));
+                              await performWorktreeRemoval(reviewProject, wtPath, wtBranch);
+                            })();
+                          }
+                        },
+                      }
+                    : {})}
+                  onExpandToOverlay={() => setGitOverlayOpen(true)}
+                  onClose={() => setGitReviewContext(null)}
+                />
+              </Suspense>
+            ) : undefined
+          }
+          gitPanelOpen={!isTerminalRight && gitPanelOpen}
         />
       </AppDndProvider>
       <WelcomeOverlay />
@@ -2187,7 +2452,7 @@ export function App() {
           />
         )}
       </OverlayShell>
-      <OverlayShell open={!!gitReviewContext} onExited={() => setGitReviewContext(null)}>
+      <OverlayShell open={gitOverlayOpen} onExited={() => setGitOverlayOpen(false)}>
         {gitReviewContext && (
           <Suspense
             fallback={
@@ -2220,6 +2485,7 @@ export function App() {
                       const wtBranch = wtPath
                         ? resolveWorktreeBranch(gitReviewContext!.projectId, wtPath)
                         : undefined;
+                      setGitOverlayOpen(false);
                       setGitReviewContext(null);
                       if (reviewProject && wtPath) {
                         const siblings = allThreads.filter((t) => t.worktreePath === wtPath);
@@ -2234,7 +2500,10 @@ export function App() {
                     },
                   }
                 : {})}
-              onClose={() => setGitReviewContext(null)}
+              onClose={() => {
+                setGitOverlayOpen(false);
+                if (!gitReviewAsPanel) setGitReviewContext(null);
+              }}
             />
           </Suspense>
         )}

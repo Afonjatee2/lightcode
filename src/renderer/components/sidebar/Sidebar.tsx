@@ -223,6 +223,7 @@ function SortableThreadItem(props: {
   onRunProjectAction: (projectId: string, actionId: string, worktreePath?: string) => void;
   activeWorktreeTerminalPaths: string[];
   activeWorktreeTerminalPath: string | null;
+  activeGitPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
   group: string;
 }) {
@@ -424,9 +425,10 @@ function SortableThreadItem(props: {
                     projectName={thread.worktreeBranch ?? ""}
                     worktreePath={thread.worktreePath}
                     onPress={() => props.onOpenGitReview(thread.projectId, thread.worktreePath)}
+                    isActive={props.activeGitPanelWorktreePath === thread.worktreePath}
                   />
                   <Tooltip delay={150}>
-                    <Tooltip.Trigger>
+                    <Tooltip.Trigger tabIndex={-1} role="none">
                       <div className="flex shrink-0 items-center">
                         <GitFork className="size-3 text-muted/60" />
                       </div>
@@ -514,6 +516,7 @@ function SortableWorktreeGroup(props: {
   onRunProjectAction: (projectId: string, actionId: string, worktreePath?: string) => void;
   activeWorktreeTerminalPaths: string[];
   activeWorktreeTerminalPath: string | null;
+  activeGitPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
   sortableGroup: string;
 }) {
@@ -659,6 +662,7 @@ function SortableWorktreeGroup(props: {
               onRunProjectAction={props.onRunProjectAction}
               activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
               activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
+              activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
               gitMenuIcons={props.gitMenuIcons}
               group={`wt:${group.worktreePath}`}
             />
@@ -757,6 +761,8 @@ function SortableProjectHeader(props: {
   activeTerminalProjectId: string | null;
   activeWorktreeTerminalPaths: string[];
   activeWorktreeTerminalPath: string | null;
+  activeGitPanelProjectId: string | null;
+  activeGitPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
 }) {
   const { project, isProjectCollapsed } = props;
@@ -893,6 +899,7 @@ function SortableProjectHeader(props: {
                 projectId={project.id}
                 projectName={project.name}
                 onPress={() => props.onOpenGitReview(project.id)}
+                isActive={props.activeGitPanelProjectId === project.id && !props.activeGitPanelWorktreePath}
               />
             </>
           }
@@ -947,6 +954,7 @@ function SortableProjectHeader(props: {
                       onRunProjectAction={props.onRunProjectAction}
                       activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
                       activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
+                      activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
                       gitMenuIcons={props.gitMenuIcons}
                       group={`project-entries:${project.id}`}
                     />
@@ -984,6 +992,7 @@ function SortableProjectHeader(props: {
                     onRunProjectAction={props.onRunProjectAction}
                     activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
                     activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
+                    activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
                     gitMenuIcons={props.gitMenuIcons}
                     sortableGroup={`project-entries:${project.id}`}
                   />
@@ -1029,6 +1038,8 @@ export function Sidebar(props: {
   activeTerminalProjectId: string | null;
   activeWorktreeTerminalPaths: string[];
   activeWorktreeTerminalPath: string | null;
+  activeGitPanelProjectId: string | null;
+  activeGitPanelWorktreePath: string | null;
 }) {
   const threads = useAppStore((state) => state.threads);
   const {
@@ -1062,6 +1073,8 @@ export function Sidebar(props: {
     activeTerminalProjectId,
     activeWorktreeTerminalPaths,
     activeWorktreeTerminalPath,
+    activeGitPanelProjectId,
+    activeGitPanelWorktreePath,
   } = props;
 
   const gitMenuIcons = {
@@ -1220,6 +1233,8 @@ export function Sidebar(props: {
                   activeTerminalProjectId={activeTerminalProjectId}
                   activeWorktreeTerminalPaths={activeWorktreeTerminalPaths}
                   activeWorktreeTerminalPath={activeWorktreeTerminalPath}
+                  activeGitPanelProjectId={activeGitPanelProjectId}
+                  activeGitPanelWorktreePath={activeGitPanelWorktreePath}
                   gitMenuIcons={gitMenuIcons}
                 />
               ))}

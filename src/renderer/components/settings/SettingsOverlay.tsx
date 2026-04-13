@@ -25,6 +25,7 @@ import { startTransition, useState } from "react";
 import type {
   AgentSettingDef,
   AgentStatus,
+  GitReviewMode,
   NewThreadMode,
   TerminalPosition,
   ThemeMode,
@@ -72,6 +73,11 @@ const threadRemoveActionOptions = [
 const newThreadModeOptions = [
   { id: "page", label: "Page" },
   { id: "panel", label: "Panel" },
+] as const;
+
+const gitReviewModeOptions = [
+  { id: "panel", label: "Panel" },
+  { id: "page", label: "Page" },
 ] as const;
 
 const scrollSpeedOptions = Array.from({ length: 10 }, (_, i) => ({
@@ -251,6 +257,8 @@ function GeneralSettings() {
   const setThreadRemoveAction = useSharedSettings((state) => state.setThreadRemoveAction);
   const newThreadMode = useSharedSettings((state) => state.newThreadMode);
   const setNewThreadMode = useSharedSettings((state) => state.setNewThreadMode);
+  const gitReviewMode = useSharedSettings((state) => state.gitReviewMode);
+  const setGitReviewMode = useSharedSettings((state) => state.setGitReviewMode);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
@@ -436,6 +444,26 @@ function GeneralSettings() {
               }}
             />
           </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Git review mode</p>
+              <p className="text-xs text-muted">
+                Open git review as a right-side panel or a full page.
+              </p>
+            </div>
+            <Select
+              aria-label="Git review mode"
+              className="w-[160px] shrink-0"
+              options={gitReviewModeOptions}
+              value={gitReviewMode}
+              onChange={(value) => {
+                startTransition(() => {
+                  setGitReviewMode(value as GitReviewMode);
+                });
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -500,7 +528,7 @@ function GenConfigSection(props: {
     <div className="space-y-4">
       {props.defaultsHint ? (
         <Tooltip delay={300}>
-          <Tooltip.Trigger>
+          <Tooltip.Trigger tabIndex={-1} role="none">
             <h2 className="w-fit cursor-default text-sm font-semibold text-muted">{heading}</h2>
           </Tooltip.Trigger>
           <Tooltip.Content className="text-xs">{props.defaultsHint}</Tooltip.Content>
