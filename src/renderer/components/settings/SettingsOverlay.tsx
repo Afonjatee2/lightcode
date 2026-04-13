@@ -14,9 +14,14 @@ import {
   ArchiveRestore,
   ArrowLeft,
   Bot,
+  Download,
+  ExternalLink,
+  Info,
+  Loader2,
   Monitor,
   PanelLeft,
   PanelLeftClose,
+  RefreshCw,
   Settings2,
   Sparkles,
   Trash2,
@@ -41,10 +46,12 @@ import {
   resolveTitleGenConfig,
   resolveConflictResolverConfig,
 } from "../providers";
+import { readBridge } from "../../bridge";
 import { ProviderIcon } from "../providers/ProviderIcon";
 import { Select, SidebarButton, TuxIcon } from "../common";
 import { useSidebar } from "../layout/AppShell";
 import { PageLayout } from "../layout/PageLayout";
+import { useUpdateStore } from "../../state/updateStore";
 
 const themeOptions = [
   { id: "system", label: "System" },
@@ -85,7 +92,7 @@ const scrollSpeedOptions = Array.from({ length: 10 }, (_, i) => ({
   label: `${i + 1}x`,
 })) as readonly { id: string; label: string }[];
 
-type SettingsSection = "general" | "ai" | "agents" | "archived" | `agents:${string}`;
+type SettingsSection = "general" | "ai" | "agents" | "archived" | "about" | `agents:${string}`;
 
 function SettingsSidebar(props: {
   activeSection: SettingsSection;
@@ -147,6 +154,13 @@ function SettingsSidebar(props: {
               isActive={activeSection === "archived"}
               onPress={() => onSectionChange("archived")}
             />
+            <SidebarButton
+              iconOnly
+              icon={<Info className="size-4" />}
+              label="About"
+              isActive={activeSection === "about"}
+              onPress={() => onSectionChange("about")}
+            />
           </div>
           <div className="space-y-1 border-t border-white/6 pt-2 pr-2">
             <SidebarButton
@@ -207,6 +221,12 @@ function SettingsSidebar(props: {
               label="Archived Threads"
               isActive={activeSection === "archived"}
               onPress={() => onSectionChange("archived")}
+            />
+            <SidebarButton
+              icon={<Info className="size-4" />}
+              label="About"
+              isActive={activeSection === "about"}
+              onPress={() => onSectionChange("about")}
             />
           </div>
         </div>
@@ -941,6 +961,127 @@ function ArchivedThreadsSettings() {
   );
 }
 
+import appIconUrl from "../../../../build/icon.png";
+
+const GITHUB_REPO = "https://github.com/nicepkg/lightcode";
+
+function AboutLink(props: { href: string; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+      onClick={() => void readBridge().openExternal(props.href)}
+    >
+      {props.children}
+      <ExternalLink className="size-3" />
+    </button>
+  );
+}
+
+function UpdateButton() {
+  const phase = useUpdateStore((s) => s.phase);
+  const version = useUpdateStore((s) => s.version);
+  const downloadPercent = useUpdateStore((s) => s.downloadPercent);
+
+  if (phase === "checking") {
+    return (
+      <Button size="sm" isDisabled variant="ghost">
+        <Loader2 className="size-3.5 animate-spin" />
+        Checking…
+      </Button>
+    );
+  }
+
+  if (phase === "available") {
+    return (
+      <Button size="sm" variant="ghost" onPress={() => void readBridge().startUpdateDownload()}>
+        <Download className="size-3.5" />
+        Download v{version}
+      </Button>
+    );
+  }
+
+  if (phase === "downloading") {
+    return (
+      <Button size="sm" isDisabled variant="ghost">
+        <Download className="size-3.5 animate-pulse" />
+        Downloading {Math.round(downloadPercent)}%
+      </Button>
+    );
+  }
+
+  if (phase === "downloaded") {
+    return (
+      <Button size="sm" variant="primary" onPress={() => void readBridge().installUpdate()}>
+        <RefreshCw className="size-3.5" />
+        Restart to update
+      </Button>
+    );
+  }
+
+  return (
+    <Button size="sm" variant="ghost" onPress={() => void readBridge().checkForUpdate()}>
+      Check for updates
+    </Button>
+  );
+}
+
+function AboutSettings() {
+  const bridge = readBridge();
+
+  return (
+    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
+      <div className="mx-auto max-w-[560px]">
+        <h1 className="mb-6 text-lg font-semibold text-foreground">About</h1>
+
+        <div className="mb-8 flex items-center gap-4">
+          <img src={appIconUrl} alt="Lightcode" className="size-12 shrink-0 rounded-lg" />
+          <div>
+            <p className="text-lg font-semibold text-foreground">Lightcode</p>
+            <p className="text-xs text-muted">
+              AI agent orchestrator — manage coding agents via Terminal and Native ACP.
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Version</p>
+              <p className="text-xs text-muted">{bridge.appVersion}</p>
+            </div>
+            <UpdateButton />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-medium text-foreground">Electron</p>
+            <p className="text-sm text-muted">{bridge.electronVersion}</p>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-medium text-foreground">License</p>
+            <p className="text-sm text-muted">Apache-2.0</p>
+          </div>
+        </div>
+
+        <div className="mt-8 space-y-3 border-t border-white/6 pt-6">
+          <AboutLink href={GITHUB_REPO}>GitHub Repository</AboutLink>
+          <br />
+          <AboutLink href={`${GITHUB_REPO}/releases`}>Changelog</AboutLink>
+          <br />
+          <AboutLink href={`${GITHUB_REPO}/issues`}>Report an Issue</AboutLink>
+          <br />
+          <AboutLink href={`${GITHUB_REPO}/blob/master/LICENSE`}>License</AboutLink>
+        </div>
+
+        <p className="mt-8 text-xs text-muted">
+          &copy; {new Date().getFullYear()} Serhii Vecherenko. All rights reserved.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export function SettingsOverlay(props: { onClose: () => void }) {
   const { onClose } = props;
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
@@ -971,6 +1112,8 @@ export function SettingsOverlay(props: { onClose: () => void }) {
           <AgentSettingsEmpty />
         ) : activeSection === "archived" ? (
           <ArchivedThreadsSettings />
+        ) : activeSection === "about" ? (
+          <AboutSettings />
         ) : null
       }
     />

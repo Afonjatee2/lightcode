@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Spinner } from "@heroui/react";
-import { ChevronDown, GitBranch, GitFork, Paperclip, X } from "lucide-react";
+import { ChevronDown, CircleCheck, GitBranch, GitFork, Paperclip, X } from "lucide-react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -63,6 +63,7 @@ export function ThreadView(props: {
   thread: Thread;
   agentStatus: AgentStatus | undefined;
   projectLocation: ProjectLocation;
+  projectName?: string;
   pendingLaunchPrompt?: string;
   pendingLaunchSegments?: PromptSegment[];
   isWsl?: boolean;
@@ -76,6 +77,7 @@ export function ThreadView(props: {
   dragHandleRef?: (element: Element | null) => void;
   droppableRef?: React.RefObject<HTMLDivElement | null>;
   onClose?: (() => void) | undefined;
+  onMarkDone?: (() => void) | undefined;
   onConfigChange: (config: ThreadConfig) => void;
   onLaunchConsumed?: (() => void) | undefined;
   onLaunchFailed?: (() => void) | undefined;
@@ -90,6 +92,7 @@ export function ThreadView(props: {
     thread,
     agentStatus,
     projectLocation,
+    projectName,
     pendingLaunchPrompt,
     pendingLaunchSegments,
     isWsl,
@@ -103,6 +106,7 @@ export function ThreadView(props: {
     dragHandleRef,
     droppableRef,
     onClose,
+    onMarkDone,
     onConfigChange,
     onLaunchConsumed,
     onLaunchFailed,
@@ -285,8 +289,27 @@ export function ThreadView(props: {
           />
           <span className="flex-1 truncate text-sm font-medium text-foreground">
             {thread.title}
+            {paneCount > 1 && projectName ? (
+              <span className="text-muted/60">
+                <span className="mx-1 text-muted/40">{"\u2014"}</span>
+                {projectName}
+              </span>
+            ) : null}
           </span>
           {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 text-muted/60" /> : null}
+          {onMarkDone ? (
+            <button
+              type="button"
+              aria-label={thread.done ? "Unmark done" : "Mark done"}
+              className={`shrink-0 rounded p-0.5 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                onMarkDone();
+              }}
+            >
+              <CircleCheck className="size-3.5" />
+            </button>
+          ) : null}
           {showCloseButton ? (
             <button
               type="button"

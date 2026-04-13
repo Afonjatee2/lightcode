@@ -459,3 +459,81 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().pendingServerRequests).toHaveLength(0);
   });
 });
+
+describe("markThreadDone / unmarkThreadDone", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [],
+      threads: [],
+      pendingServerRequests: [],
+      agentStatuses: [],
+      view: { kind: "home" },
+    }));
+  });
+
+  function createTestThread() {
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    return useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "gpt-5.4" },
+      prompt: "hello",
+    });
+  }
+
+  it("createThread initializes done as false", () => {
+    const thread = createTestThread();
+    expect(thread.done).toBe(false);
+  });
+
+  it("markThreadDone sets done to true", () => {
+    const thread = createTestThread();
+    useAppStore.getState().markThreadDone(thread.id);
+    expect(useAppStore.getState().threads[0]?.done).toBe(true);
+  });
+
+  it("unmarkThreadDone sets done to false", () => {
+    const thread = createTestThread();
+    useAppStore.getState().markThreadDone(thread.id);
+    expect(useAppStore.getState().threads[0]?.done).toBe(true);
+    useAppStore.getState().unmarkThreadDone(thread.id);
+    expect(useAppStore.getState().threads[0]?.done).toBe(false);
+  });
+
+  it("markThreadDone is a no-op if already done", () => {
+    const thread = createTestThread();
+    useAppStore.getState().markThreadDone(thread.id);
+    const before = useAppStore.getState().threads[0]?.updatedAt;
+    useAppStore.getState().markThreadDone(thread.id);
+    expect(useAppStore.getState().threads[0]?.updatedAt).toBe(before);
+  });
+
+  it("openThread clears done when thread becomes visible in a pane", () => {
+    const thread = createTestThread();
+    useAppStore.getState().markThreadDone(thread.id);
+    expect(useAppStore.getState().threads[0]?.done).toBe(true);
+
+    useAppStore.getState().openThread(thread.id);
+    expect(useAppStore.getState().threads[0]?.done).toBe(false);
+  });
+
+  it("markThreadExited preserves done flag", () => {
+    const thread = createTestThread();
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "idle",
+      attention: "none",
+      canResumeWithConfig: true,
+    });
+    useAppStore.getState().markThreadDone(thread.id);
+    expect(useAppStore.getState().threads[0]?.done).toBe(true);
+
+    useAppStore.getState().markThreadExited(thread.id);
+    expect(useAppStore.getState().threads[0]?.done).toBe(true);
+    expect(useAppStore.getState().threads[0]?.status).toBe("inactive");
+  });
+});

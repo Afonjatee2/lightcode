@@ -199,6 +199,8 @@ export interface WindowChromePayload {
 
 export interface LightcodeBridge {
   platform: NodeJS.Platform;
+  appVersion: string;
+  electronVersion: string;
   pickFolder(defaultPath?: string): Promise<string | null>;
   pickFiles(options?: {
     title?: string;

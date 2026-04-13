@@ -80,6 +80,8 @@ const CHANNELS = {
 
 const bridge: LightcodeBridge = {
   platform: process.platform,
+  appVersion: process.env.npm_package_version ?? "dev",
+  electronVersion: process.versions.electron ?? "unknown",
   pickFolder: (defaultPath?) => ipcRenderer.invoke(CHANNELS.pickFolder, defaultPath),
   pickFiles: (options?) => ipcRenderer.invoke(CHANNELS.pickFiles, options),
   saveClipboardImage: (payload) => ipcRenderer.invoke(CHANNELS.saveClipboardImage, payload),

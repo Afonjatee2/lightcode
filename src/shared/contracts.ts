@@ -209,6 +209,7 @@ export const threadSchema = z.object({
   worktreeBranch: z.string().optional(),
   prNumber: z.number().optional(),
   archived: z.boolean().default(false),
+  done: z.boolean().default(false),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
 });

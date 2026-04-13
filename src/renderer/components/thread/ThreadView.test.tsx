@@ -55,6 +55,7 @@ describe("ThreadView", () => {
         attention: "none",
         canResumeWithConfig: false,
         archived: false,
+    done: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -128,6 +129,7 @@ describe("ThreadView", () => {
         attention: "none",
         canResumeWithConfig: true,
         archived: false,
+    done: false,
         sessionRef: {
           providerSessionId: "session-1",
           discoveredAt: new Date().toISOString(),
@@ -184,6 +186,7 @@ describe("ThreadView", () => {
         attention: "none",
         canResumeWithConfig: false,
         archived: false,
+    done: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -236,6 +239,7 @@ describe("ThreadView", () => {
         attention: "none",
         canResumeWithConfig: false,
         archived: false,
+    done: false,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       },
@@ -289,6 +293,7 @@ describe("ThreadView", () => {
         attention: "needs_reply",
         canResumeWithConfig: true,
         archived: false,
+    done: false,
         sessionRef: {
           providerSessionId: "session-1",
           discoveredAt: new Date().toISOString(),
@@ -361,6 +366,7 @@ describe("ThreadView", () => {
         attention: "none",
         canResumeWithConfig: true,
         archived: false,
+    done: false,
         sessionRef: {
           providerSessionId: "session-2",
           discoveredAt: new Date().toISOString(),
@@ -417,6 +423,7 @@ describe("ThreadView", () => {
         attention: "none",
         canResumeWithConfig: true,
         archived: false,
+    done: false,
         sessionRef: {
           providerSessionId: "session-gui",
           discoveredAt: new Date().toISOString(),
@@ -473,6 +480,7 @@ describe("ThreadView", () => {
         attention: "none",
         canResumeWithConfig: true,
         archived: false,
+    done: false,
         sessionRef: {
           providerSessionId: "session-3",
           discoveredAt: new Date().toISOString(),

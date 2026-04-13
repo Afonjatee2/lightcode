@@ -123,6 +123,7 @@ readBridge().onUpdateStatus((status) => {
       break;
     case "update-not-available":
       store.setNotAvailable();
+      toast.success("You're on the latest version.");
       break;
     case "downloading":
       store.setDownloading(status.percent);
@@ -422,6 +423,8 @@ function ThreadPane(props: {
   const consumeThreadLaunch = useAppStore((s) => s.consumeThreadLaunch);
   const removeThreadServerRequest = useAppStore((s) => s.removeThreadServerRequest);
   const touchThread = useAppStore((s) => s.touchThread);
+  const markThreadDone = useAppStore((s) => s.markThreadDone);
+  const unmarkThreadDone = useAppStore((s) => s.unmarkThreadDone);
 
   // Pane is draggable (title is the grab handle). Share element ref with droppable.
   const paneElementRef = useRef<HTMLDivElement>(null);
@@ -476,6 +479,7 @@ function ThreadPane(props: {
     <ThreadView
       key={props.threadId}
       thread={thread}
+      projectName={project.name}
       agentStatus={agentStatus}
       isWsl={project.location.kind === "wsl"}
       showCloseButton={props.paneCount > 1}
@@ -487,6 +491,17 @@ function ThreadPane(props: {
       {...(props.paneCount > 1 ? { dragHandleRef: handleRef } : {})}
       droppableRef={paneElementRef}
       onClose={props.onClose}
+      onMarkDone={() => {
+        if (thread.done) {
+          unmarkThreadDone(thread.id);
+        } else {
+          if (thread.status !== "inactive" && thread.sessionRef) {
+            void readBridge().closeThread({ threadId: thread.id });
+            useAppStore.getState().markThreadExited(thread.id);
+          }
+          markThreadDone(thread.id);
+        }
+      }}
       onConfigChange={(config) => updateThreadConfig(thread.id, config)}
       pendingServerRequests={props.pendingServerRequests.filter(
         (request) => request.threadId === thread.id,
@@ -915,6 +930,8 @@ export function App() {
   const openHome = useAppStore((state) => state.openHome);
   const renameThread = useAppStore((state) => state.renameThread);
   const archiveThread = useAppStore((state) => state.archiveThread);
+  const markThreadDone = useAppStore((state) => state.markThreadDone);
+  const unmarkThreadDone = useAppStore((state) => state.unmarkThreadDone);
   const deleteThread = useAppStore((state) => state.deleteThread);
   const deleteProject = useAppStore((state) => state.deleteProject);
   const queueThreadLaunch = useAppStore((state) => state.queueThreadLaunch);
@@ -2058,6 +2075,16 @@ export function App() {
               }}
               onUnloadThread={(threadId) => {
                 void unloadStoredThread(threadId).catch(() => undefined);
+              }}
+              onMarkThreadDone={(threadId) => {
+                const thread = useAppStore.getState().threads.find((t) => t.id === threadId);
+                if (!thread) return;
+                if (thread.done) {
+                  unmarkThreadDone(threadId);
+                } else {
+                  void unloadStoredThread(threadId).catch(() => undefined);
+                  markThreadDone(threadId);
+                }
               }}
               onArchiveThread={(threadId) => {
                 void unloadStoredThread(threadId).catch(() => undefined);

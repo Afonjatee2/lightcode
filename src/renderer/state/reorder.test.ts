@@ -18,6 +18,7 @@ function makeThread(input: {
     attention: "none",
     canResumeWithConfig: false,
     archived: false,
+    done: false,
     createdAt: "2026-03-21T10:00:00.000Z",
     updatedAt: input.updatedAt ?? "2026-03-21T10:00:00.000Z",
   };

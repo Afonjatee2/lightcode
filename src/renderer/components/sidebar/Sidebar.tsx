@@ -4,6 +4,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   ChevronRight,
+  CircleCheck,
   Columns2,
   Download,
   FileDiff,
@@ -209,6 +210,7 @@ function SortableThreadItem(props: {
   onOpenThreadSideBySide: (threadId: string) => void;
   onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
+  onMarkThreadDone: (threadId: string) => void;
   onRenameThread: (threadId: string, title: string) => void;
   onArchiveThread: (threadId: string) => void;
   onDeleteThread: (threadId: string, worktreePath?: string, projectId?: string) => void;
@@ -305,6 +307,11 @@ function SortableThreadItem(props: {
             isDisabled: unloadDisabledReason !== undefined,
             ...(unloadDisabledReason ? { disabledReason: unloadDisabledReason } : {}),
           },
+          {
+            id: "mark-done",
+            label: thread.done ? "Unmark Done" : "Mark Done",
+            icon: <CircleCheck className="size-3.5" />,
+          },
           ...(currentThreadIds.length >= 2
             ? [
                 {
@@ -357,6 +364,7 @@ function SortableThreadItem(props: {
           if (key === "archive") props.onArchiveThread(thread.id);
           if (key === "rename") props.setEditingThreadId(thread.id);
           if (key === "unload") props.onUnloadThread(thread.id);
+          if (key === "mark-done") props.onMarkThreadDone(thread.id);
           if (key === "replace-second") props.onReplaceSecondPane(thread.id);
           if (key === "open-side") props.onOpenThreadSideBySide(thread.id);
           if (key === "delete")
@@ -386,7 +394,7 @@ function SortableThreadItem(props: {
           }
           tooltip={editingThreadId === thread.id ? undefined : thread.title}
           isActive={isCurrentThread}
-          liveText={statusTone !== "inactive"}
+          liveText={statusTone !== "inactive" && statusTone !== "done"}
           className={isDragging ? "opacity-60" : ""}
           onPress={() => props.onOpenThread(thread.id)}
           onDoubleClick={() => props.setEditingThreadId(thread.id)}
@@ -501,6 +509,7 @@ function SortableWorktreeGroup(props: {
   onOpenThreadSideBySide: (threadId: string) => void;
   onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
+  onMarkThreadDone: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
   onRenameThread: (threadId: string, title: string) => void;
   onDeleteThread: (threadId: string, worktreePath?: string, projectId?: string) => void;
@@ -648,6 +657,7 @@ function SortableWorktreeGroup(props: {
               onOpenThreadSideBySide={props.onOpenThreadSideBySide}
               onReplaceSecondPane={props.onReplaceSecondPane}
               onUnloadThread={props.onUnloadThread}
+              onMarkThreadDone={props.onMarkThreadDone}
               onArchiveThread={props.onArchiveThread}
               onRenameThread={props.onRenameThread}
               onDeleteThread={props.onDeleteThread}
@@ -740,6 +750,7 @@ function SortableProjectHeader(props: {
   onOpenThreadSideBySide: (threadId: string) => void;
   onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
+  onMarkThreadDone: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
   onRenameThread: (threadId: string, title: string) => void;
   onDeleteThread: (threadId: string, worktreePath?: string, projectId?: string) => void;
@@ -940,6 +951,7 @@ function SortableProjectHeader(props: {
                       onOpenThreadSideBySide={props.onOpenThreadSideBySide}
                       onReplaceSecondPane={props.onReplaceSecondPane}
                       onUnloadThread={props.onUnloadThread}
+                      onMarkThreadDone={props.onMarkThreadDone}
                       onArchiveThread={props.onArchiveThread}
                       onRenameThread={props.onRenameThread}
                       onDeleteThread={props.onDeleteThread}
@@ -977,6 +989,7 @@ function SortableProjectHeader(props: {
                     onOpenThreadSideBySide={props.onOpenThreadSideBySide}
                     onReplaceSecondPane={props.onReplaceSecondPane}
                     onUnloadThread={props.onUnloadThread}
+                    onMarkThreadDone={props.onMarkThreadDone}
                     onArchiveThread={props.onArchiveThread}
                     onRenameThread={props.onRenameThread}
                     onDeleteThread={props.onDeleteThread}
@@ -1017,6 +1030,7 @@ export function Sidebar(props: {
   onOpenThreadSideBySide: (threadId: string) => void;
   onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
+  onMarkThreadDone: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
   onRenameThread: (threadId: string, title: string) => void;
   onDeleteThread: (threadId: string, worktreePath?: string, projectId?: string) => void;
@@ -1052,6 +1066,7 @@ export function Sidebar(props: {
     onOpenThreadSideBySide,
     onReplaceSecondPane,
     onUnloadThread,
+    onMarkThreadDone,
     onArchiveThread,
     onRenameThread,
     onDeleteThread,
@@ -1139,7 +1154,7 @@ export function Sidebar(props: {
   }, [collapsedProjects]);
 
   const activeThreads = threads.filter(
-    (thread) => thread.status !== "inactive" && !thread.archived,
+    (thread) => (thread.status !== "inactive" || thread.done) && !thread.archived,
   );
 
   return (
@@ -1212,6 +1227,7 @@ export function Sidebar(props: {
                   onOpenThreadSideBySide={onOpenThreadSideBySide}
                   onReplaceSecondPane={onReplaceSecondPane}
                   onUnloadThread={onUnloadThread}
+                  onMarkThreadDone={onMarkThreadDone}
                   onArchiveThread={onArchiveThread}
                   onRenameThread={onRenameThread}
                   onDeleteThread={onDeleteThread}

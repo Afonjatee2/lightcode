@@ -728,6 +728,10 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(CHANNELS.checkForUpdate, async () => {
+    if (isDev) {
+      sendUpdateStatus({ type: "error", message: "Update check is not available in dev mode." });
+      return;
+    }
     await autoUpdater.checkForUpdates();
   });
 

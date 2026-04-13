@@ -47,6 +47,7 @@ export function initDatabase(dbPath: string) {
       worktree_branch TEXT,
       pr_number INTEGER,
       archived INTEGER NOT NULL DEFAULT 0,
+      done INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -59,13 +60,24 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = 2;
 
-  const storedVersion = sqlite
-    .prepare("SELECT value FROM app_state WHERE key = 'schema_version'")
-    .get() as { value: string } | undefined;
+  const storedVersion = Number(
+    (
+      sqlite
+        .prepare("SELECT value FROM app_state WHERE key = 'schema_version'")
+        .get() as { value: string } | undefined
+    )?.value ?? "0",
+  );
 
-  if (Number(storedVersion?.value ?? "0") < SCHEMA_VERSION) {
+  if (storedVersion < 2) {
+    const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!cols.some((c) => c.name === "done")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN done INTEGER NOT NULL DEFAULT 0");
+    }
+  }
+
+  if (storedVersion < SCHEMA_VERSION) {
     sqlite
       .prepare(
         "INSERT INTO app_state (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -147,6 +159,7 @@ function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
     ...(row.worktreeBranch ? { worktreeBranch: row.worktreeBranch } : {}),
     ...(row.prNumber != null ? { prNumber: row.prNumber } : {}),
     archived: row.archived,
+    done: row.done,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -231,6 +244,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       worktreeBranch: thread.worktreeBranch ?? null,
       prNumber: thread.prNumber ?? null,
       archived: thread.archived,
+      done: thread.done,
       sortOrder,
       createdAt: thread.createdAt,
       updatedAt: thread.updatedAt,
@@ -249,6 +263,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         worktreeBranch: thread.worktreeBranch ?? null,
         prNumber: thread.prNumber ?? null,
         archived: thread.archived,
+        done: thread.done,
         sortOrder,
         updatedAt: thread.updatedAt,
       },

@@ -403,6 +403,12 @@ body {
   }
 }
 
+.lightcode-provider-icon--done {
+  color: oklch(0.78 0.1 180);
+  filter: drop-shadow(0 0 0.25rem oklch(0.78 0.1 180 / 0.35))
+    drop-shadow(0 0 0.5rem oklch(0.78 0.1 180 / 0.15));
+}
+
 .lightcode-terminal-pane,
 .lightcode-terminal-pane .xterm,
 .lightcode-terminal-pane .xterm-viewport,
