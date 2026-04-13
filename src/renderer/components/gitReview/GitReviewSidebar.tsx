@@ -46,6 +46,7 @@ import { useAppStore } from "../../state/appStore";
 import { useGitStore } from "../../state/gitStore";
 import { useSharedSettings } from "../../state/sharedSettingsStore";
 import { isLockFile } from "../../../shared/gitUtils";
+import { buildWorktreeLocation } from "../../../shared/worktree";
 import { SidebarButton, TextArea } from "../common";
 import { useSidebar } from "../layout/AppShell";
 import {
@@ -137,7 +138,7 @@ function FileRow(props: {
             <div
               role="button"
               tabIndex={0}
-              className="rounded p-0.5 text-muted hover:text-foreground"
+              className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
               title={file.staged ? "Unstage" : "Stage"}
               onClick={(e) => {
                 e.stopPropagation();
@@ -157,7 +158,7 @@ function FileRow(props: {
               <div
                 role="button"
                 tabIndex={0}
-                className="rounded p-0.5 text-muted hover:text-danger"
+                className="rounded p-0.5 text-muted transition-colors hover:bg-danger/10 hover:text-danger"
                 title="Revert changes"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -200,6 +201,49 @@ function FileRow(props: {
         </AlertDialog.Container>
       </AlertDialog.Backdrop>
     </>
+  );
+}
+
+function ConflictGroup(props: {
+  files: string[];
+}) {
+  const { files } = props;
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div>
+      <div className="flex w-full items-center gap-1 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-warning">
+        <button
+          type="button"
+          className="flex cursor-default items-center gap-1"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+          Merge conflicts
+          <span className="font-normal text-warning/60">({files.length})</span>
+        </button>
+      </div>
+      {expanded && (
+        <div className="space-y-px">
+          {files.map((f) => {
+            const basename = f.split(/[\\/]/).pop() ?? f;
+            const dir = f.includes("/") ? f.slice(0, f.lastIndexOf("/")) : undefined;
+            return (
+              <div
+                key={f}
+                className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-xs text-muted"
+              >
+                <GitMerge className="size-3.5 text-warning" />
+                <span className="min-w-0 flex-1 truncate" title={f}>
+                  <span className="text-foreground">{basename}</span>
+                  {dir && <span className="ml-1 text-muted/60">{dir}</span>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -258,7 +302,7 @@ function FileGroup(props: {
             {staged ? (
               <button
                 type="button"
-                className="rounded p-0.5 text-muted hover:text-foreground"
+                className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
                 title="Unstage all"
                 onClick={() => void handleUnstageAll()}
               >
@@ -268,7 +312,7 @@ function FileGroup(props: {
               <>
                 <button
                   type="button"
-                  className="rounded p-0.5 text-muted hover:text-foreground"
+                  className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
                   title="Stage all"
                   onClick={() => void handleStageAll()}
                 >
@@ -276,7 +320,7 @@ function FileGroup(props: {
                 </button>
                 <button
                   type="button"
-                  className="rounded p-0.5 text-muted hover:text-danger"
+                  className="rounded p-0.5 text-muted transition-colors hover:bg-danger/10 hover:text-danger"
                   title="Revert all"
                   onClick={() => setRevertAllOpen(true)}
                 >
@@ -641,9 +685,8 @@ export function GitReviewSidebar(props: {
   }
 
   function getWorktreeLocation(): ProjectLocation {
-    return project.location.kind === "wsl"
-      ? { ...project.location, linuxPath: worktreePath!, uncPath: worktreePath! }
-      : { ...project.location, path: worktreePath! };
+    if (!worktreePath) return project.location;
+    return buildWorktreeLocation(project.location, worktreePath);
   }
 
   async function handlePullFromSource() {
@@ -697,7 +740,7 @@ export function GitReviewSidebar(props: {
   }
 
   function handleResolveWithAgent() {
-    if (!worktreePath || mergeConflictFiles.length === 0) return;
+    if (mergeConflictFiles.length === 0) return;
 
     // Pick the best available agent for conflict resolution
     const candidates = projectAgentStatuses.filter((a) => a.installed && a.authState !== "missing");
@@ -727,14 +770,13 @@ export function GitReviewSidebar(props: {
         approvalPolicy: provider.capabilities.bypassApprovalPolicy ?? "bypassPermissions",
       },
       prompt,
-      worktreePath,
+      ...(worktreePath ? { worktreePath } : {}),
       ...(worktreeBranch ? { worktreeBranch } : {}),
     });
     store.queueThreadLaunch(thread.id, prompt);
   }
 
   async function handleAbortMerge() {
-    if (!worktreePath) return;
     setIsAbortingMerge(true);
     try {
       await readBridge().gitAbortMerge({
@@ -750,7 +792,6 @@ export function GitReviewSidebar(props: {
   }
 
   async function handleFinishMerge() {
-    if (!worktreePath) return;
     setIsFinishingMerge(true);
     try {
       const result = await readBridge().gitFinishMerge({
@@ -955,25 +996,17 @@ export function GitReviewSidebar(props: {
               onRefresh={onRefresh}
             />
           )}
-          {gitStatus && gitStatus.staged.length === 0 && gitStatus.unstaged.length === 0 && (
+          {mergeConflicting && mergeConflictFiles.length > 0 && (
+            <ConflictGroup files={mergeConflictFiles} />
+          )}
+          {gitStatus && gitStatus.staged.length === 0 && gitStatus.unstaged.length === 0 && !mergeConflicting && (
             <p className="px-2 py-4 text-center text-xs text-muted/60">No changes</p>
           )}
         </div>
 
         {/* Merge Conflict Resolution */}
         {mergeConflicting && mergeConflictFiles.length > 0 && (
-          <div className="space-y-2 border-t border-warning/30 bg-warning/5 px-2 pt-2 pb-2">
-            <p className="text-xs font-medium text-warning">
-              Merge conflicts ({mergeConflictFiles.length} file
-              {mergeConflictFiles.length !== 1 ? "s" : ""})
-            </p>
-            <ul className="max-h-24 space-y-0.5 overflow-y-auto text-xs text-muted">
-              {mergeConflictFiles.map((f) => (
-                <li key={f} className="truncate" title={f}>
-                  {f}
-                </li>
-              ))}
-            </ul>
+          <div className="space-y-2 border-t border-warning/30 px-2 pt-2 pb-2">
             <div className="flex gap-1.5">
               <Button
                 variant="tertiary"

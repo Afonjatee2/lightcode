@@ -3,12 +3,15 @@ import {
   Archive,
   ArrowDownToLine,
   ArrowUpFromLine,
+  ArrowDownUp,
+  CalendarClock,
   ChevronRight,
   CircleCheck,
   Columns2,
   Download,
   FileDiff,
   ExternalLink,
+  GripVertical,
   GitFork,
   GitMerge,
   GitPullRequest,
@@ -43,7 +46,7 @@ import {
   type GitMenuIcons,
   useWorktreeGitItems,
 } from "./useWorktreeActions";
-import { groupThreadsByWorktree, type WorktreeThreadGroup } from "./groupThreadsByWorktree";
+import { groupThreadsByWorktree, type ThreadListEntry, type WorktreeThreadGroup } from "./groupThreadsByWorktree";
 import { WorktreeGroupHeader } from "./WorktreeGroupHeader";
 
 function formatProjectLocation(project: Project): string {
@@ -66,6 +69,31 @@ function formatRelativeTime(iso: string): string {
 
   return `${Math.floor(deltaHours / 24)}d`;
 }
+
+function isRecent(iso: string): boolean {
+  return Date.now() - new Date(iso).getTime() < 24 * 60 * 60 * 1000;
+}
+
+function getEntryDate(entry: ThreadListEntry, field: "updatedAt" | "createdAt"): string {
+  if (entry.kind === "thread") return entry.thread[field];
+  return entry.group.threads.reduce((latest, t) => (t[field] > latest ? t[field] : latest), entry.group.threads[0]![field]);
+}
+
+export type ThreadSortMode = "updated" | "created" | "manual";
+
+export const sortModeOrder: ThreadSortMode[] = ["updated", "created", "manual"];
+
+export const sortModeIcon: Record<ThreadSortMode, typeof ArrowDownUp> = {
+  updated: ArrowDownUp,
+  created: CalendarClock,
+  manual: GripVertical,
+};
+
+export const sortModeLabel: Record<ThreadSortMode, string> = {
+  updated: "Sort by last updated",
+  created: "Sort by created",
+  manual: "Manual order",
+};
 
 function InlineRenameInput(props: {
   initialValue: string;
@@ -228,8 +256,9 @@ function SortableThreadItem(props: {
   activeGitPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
   group: string;
+  sortDisabled?: boolean;
 }) {
-  const { thread, project, showWorktreeBadge, currentThreadIds, editingThreadId } = props;
+  const { thread, project, showWorktreeBadge, currentThreadIds, editingThreadId, sortDisabled = false } = props;
   const worktreeGitItems = useWorktreeGitItems(
     thread.projectId,
     thread.worktreePath ?? "",
@@ -249,7 +278,7 @@ function SortableThreadItem(props: {
     id: `thread:${thread.id}`,
     index: props.threadIndex,
     type: "thread",
-    accept: ["thread", "worktree-group"],
+    accept: sortDisabled ? [] : ["thread", "worktree-group"],
     group: props.group,
     data: {
       type: "thread",
@@ -388,6 +417,8 @@ function SortableThreadItem(props: {
                 }}
                 onCancel={() => props.setEditingThreadId(null)}
               />
+            ) : thread.done ? (
+              <span className="opacity-50 line-through">{thread.title}</span>
             ) : (
               thread.title
             )
@@ -528,8 +559,9 @@ function SortableWorktreeGroup(props: {
   activeGitPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
   sortableGroup: string;
+  sortDisabled?: boolean;
 }) {
-  const { group, project } = props;
+  const { group, project, sortDisabled = false } = props;
   const worktreeGitItems = useWorktreeGitItems(project.id, group.worktreePath, props.gitMenuIcons);
   const groupThreadIds = group.threads.map((t) => t.id);
 
@@ -537,7 +569,7 @@ function SortableWorktreeGroup(props: {
     id: `wt:${group.worktreePath}`,
     index: props.entryIndex,
     type: "worktree-group",
-    accept: "worktree-group",
+    accept: sortDisabled ? [] : "worktree-group",
     group: props.sortableGroup,
     data: {
       type: "worktree-group",
@@ -775,8 +807,9 @@ function SortableProjectHeader(props: {
   activeGitPanelProjectId: string | null;
   activeGitPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
+  sortMode: ThreadSortMode;
 }) {
-  const { project, isProjectCollapsed } = props;
+  const { project, isProjectCollapsed, sortMode } = props;
   const threads = useAppStore((state) => state.threads);
   const projectThreads = threads.filter(
     (thread) => thread.projectId === project.id && !thread.archived,
@@ -931,10 +964,59 @@ function SortableProjectHeader(props: {
 
           <div className="max-h-80 space-y-0.5 overflow-y-auto">
             {(() => {
-              const entries = groupThreadsByWorktree(projectThreads);
+              const isManual = sortMode === "manual";
+              const dndDisabled = !isManual;
+              const dndGroup = `project-entries:${project.id}`;
+
+              // Manual mode: flat list, no worktree grouping, no date sections, DnD enabled
+              if (isManual) {
+                return projectThreads.map((thread, idx) => (
+                  <SortableThreadItem
+                    key={thread.id}
+                    thread={thread}
+                    threadIndex={idx}
+                    project={project}
+                    showWorktreeBadge={true}
+                    currentThreadIds={props.currentThreadIds}
+                    editingThreadId={props.editingThreadId}
+                    setEditingThreadId={props.setEditingThreadId}
+                    onOpenThread={props.onOpenThread}
+                    onOpenThreadSideBySide={props.onOpenThreadSideBySide}
+                    onReplaceSecondPane={props.onReplaceSecondPane}
+                    onUnloadThread={props.onUnloadThread}
+                    onMarkThreadDone={props.onMarkThreadDone}
+                    onArchiveThread={props.onArchiveThread}
+                    onRenameThread={props.onRenameThread}
+                    onDeleteThread={props.onDeleteThread}
+                    onOpenGitReview={props.onOpenGitReview}
+                    onGitSync={props.onGitSync}
+                    onGitPush={props.onGitPush}
+                    onGitPull={props.onGitPull}
+                    onGitMergeToSource={props.onGitMergeToSource}
+                    onGitMergeAndRemove={props.onGitMergeAndRemove}
+                    onGitPullFromSource={props.onGitPullFromSource}
+                    onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
+                    onRunProjectAction={props.onRunProjectAction}
+                    activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
+                    activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
+                    activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
+                    gitMenuIcons={props.gitMenuIcons}
+                    group={dndGroup}
+                  />
+                ));
+              }
+
+              // Date-sorted modes: worktree grouping + Today/Older sections, DnD disabled
+              const dateField = sortMode === "created" ? "createdAt" : "updatedAt";
+              const entries = groupThreadsByWorktree(
+                [...projectThreads].sort((a, b) => b[dateField].localeCompare(a[dateField])),
+              );
+              const recentEntries = entries.filter((e) => isRecent(getEntryDate(e, dateField)));
+              const olderEntries = entries.filter((e) => !isRecent(getEntryDate(e, dateField)));
+              const hasBothSections = recentEntries.length > 0 && olderEntries.length > 0;
               let ungroupedIndex = 0;
 
-              return entries.map((entry, entryIndex) => {
+              const renderEntry = (entry: ThreadListEntry, entryIndex: number) => {
                 if (entry.kind === "thread") {
                   const idx = ungroupedIndex++;
                   return (
@@ -968,7 +1050,8 @@ function SortableProjectHeader(props: {
                       activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
                       activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
                       gitMenuIcons={props.gitMenuIcons}
-                      group={`project-entries:${project.id}`}
+                      group={dndGroup}
+                      sortDisabled={dndDisabled}
                     />
                   );
                 }
@@ -1007,10 +1090,23 @@ function SortableProjectHeader(props: {
                     activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
                     activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
                     gitMenuIcons={props.gitMenuIcons}
-                    sortableGroup={`project-entries:${project.id}`}
+                    sortableGroup={dndGroup}
+                    sortDisabled={dndDisabled}
                   />
                 );
-              });
+              };
+
+              return (
+                <>
+                  {recentEntries.map((entry, i) => renderEntry(entry, i))}
+                  {hasBothSections && (
+                    <div className="px-2 pb-0.5 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted">
+                      Older
+                    </div>
+                  )}
+                  {olderEntries.map((entry, i) => renderEntry(entry, recentEntries.length + i))}
+                </>
+              );
             })()}
           </div>
         </div>
@@ -1054,6 +1150,7 @@ export function Sidebar(props: {
   activeWorktreeTerminalPath: string | null;
   activeGitPanelProjectId: string | null;
   activeGitPanelWorktreePath: string | null;
+  sortMode: ThreadSortMode;
 }) {
   const threads = useAppStore((state) => state.threads);
   const {
@@ -1169,7 +1266,13 @@ export function Sidebar(props: {
                 key={thread.id}
                 iconOnly
                 icon={<ThreadIcon thread={thread} />}
-                label={thread.title}
+                label={
+                  thread.done ? (
+                    <span className="opacity-50 line-through">{thread.title}</span>
+                  ) : (
+                    thread.title
+                  )
+                }
                 isActive={currentThreadIds.includes(thread.id)}
                 onPress={() => onOpenThread(thread.id)}
               />
@@ -1252,6 +1355,7 @@ export function Sidebar(props: {
                   activeGitPanelProjectId={activeGitPanelProjectId}
                   activeGitPanelWorktreePath={activeGitPanelWorktreePath}
                   gitMenuIcons={gitMenuIcons}
+                  sortMode={props.sortMode}
                 />
               ))}
             </div>

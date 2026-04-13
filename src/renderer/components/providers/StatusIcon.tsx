@@ -49,7 +49,19 @@ export function StatusIcon(props: {
         {tone === "working" ? (
           <path className="lightcode-provider-icon__shell" d={path} {...pathProps} />
         ) : null}
-        <path className="lightcode-provider-icon__fill" d={path} {...pathProps} />
+        <path className={`lightcode-provider-icon__fill${tone === "done" ? " opacity-40" : ""}`} d={path} {...pathProps} />
+        {tone === "done" ? (
+          <svg viewBox="0 0 24 24" x={vbW * 0.15} y={vbH * 0.15} width={vbW * 0.7} height={vbH * 0.7} className="text-success">
+            <path
+              d="M5 13l4 4L19 7"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        ) : null}
         {tone === "working" ? (
           <rect
             className="lightcode-provider-icon__scan"

@@ -437,7 +437,7 @@ export function ThreadDraftView(props: {
           >
             <TerminalSquare className="size-3.5 shrink-0 text-muted/60" />
             <span className="flex-1 truncate text-sm font-medium text-muted">
-              New thread — {project.name}
+              New thread {project.name}
             </span>
             {props.showCloseButton && props.onClose && (
               <button

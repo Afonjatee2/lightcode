@@ -77,7 +77,7 @@ export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>
           id: `shell:${crypto.randomUUID()}`,
           projectId,
           ...(worktreePath ? { worktreePath } : {}),
-          title: "",
+          title: projectName,
           createdAt: new Date().toISOString(),
         };
         set((state) => ({ tabs: [...state.tabs, tab] }));
@@ -199,6 +199,9 @@ export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>
         // Extract the basename without extension for a cleaner tab label.
         const segment = rawTitle.split(/[/\\]/).pop() ?? rawTitle;
         const title = segment.replace(/\.[^.]+$/, "") || segment;
+        // ConPTY reports "wsl" as the process title for wsl.exe — skip it
+        // so the initial meaningful title (project/branch name) is preserved.
+        if (title === "wsl") return;
         set((state) => ({
           tabs: state.tabs.map((t) => {
             if (t.id === tabId) return { ...t, title };

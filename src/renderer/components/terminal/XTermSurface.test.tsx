@@ -46,6 +46,7 @@ vi.mock("@xterm/xterm", () => ({
     hasSelection = vi.fn<() => boolean>(() => false);
     getSelection = vi.fn<() => string>(() => "");
     clearSelection = vi.fn<() => void>();
+    registerLinkProvider = vi.fn(() => ({ dispose: vi.fn() }));
     attachCustomKeyEventHandler = vi.fn<(handler: (event: KeyboardEvent) => boolean) => void>();
     unicode = { activeVersion: "6" };
     buffer = { active: { baseY: 0, viewportY: 0 } };
@@ -79,8 +80,8 @@ vi.mock("@xterm/addon-search", () => ({
   SearchAddon: class MockSearchAddon {},
 }));
 
-vi.mock("@xterm/addon-web-links", () => ({
-  WebLinksAddon: class MockWebLinksAddon {},
+vi.mock("./TerminalLinkProvider", () => ({
+  TerminalLinkProvider: class MockTerminalLinkProvider {},
 }));
 
 vi.mock("@xterm/addon-webgl", () => ({

@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { GitBranch, Maximize2, PanelRightClose, RefreshCw } from "lucide-react";
-import { Tooltip } from "@heroui/react";
+import { Archive, GitBranch, Maximize2, PanelRightClose, RefreshCw, Trash2 } from "lucide-react";
+import { toast, Tooltip } from "@heroui/react";
 import type { Project, ProjectLocation, GitStatusResult } from "../../../shared/contracts";
+import { friendlyError } from "../../../shared/messages";
 import { readBridge } from "../../bridge";
 import { useGitStore } from "../../state/gitStore";
+import { useSharedSettings } from "../../state/sharedSettingsStore";
+import { BranchSelector } from "../common";
 import { SidebarContext } from "../layout/AppShell";
 import { GitReviewSidebar } from "./GitReviewSidebar";
 
@@ -16,6 +19,7 @@ export function GitReviewPanel(props: {
   worktreeBranch?: string | undefined;
   worktreePath?: string | undefined;
   onMergeAndRemove?: (() => void) | undefined;
+  onRemove?: (() => void) | undefined;
   onExpandToOverlay: () => void;
   onClose: () => void;
   hideHeader?: boolean;
@@ -27,10 +31,12 @@ export function GitReviewPanel(props: {
     worktreeBranch,
     worktreePath,
     onMergeAndRemove,
+    onRemove,
     onExpandToOverlay,
     onClose,
     hideHeader,
   } = props;
+  const threadRemoveAction = useSharedSettings((s) => s.threadRemoveAction);
   const effectiveLocation = locationOverride ?? project.location;
   const effectiveProject = locationOverride ? { ...project, location: effectiveLocation } : project;
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -70,6 +76,33 @@ export function GitReviewPanel(props: {
     setRefreshKey((k) => k + 1);
   }
 
+  function handleSwitchBranch(branch: string, createNew: boolean) {
+    readBridge()
+      .gitSwitchBranch({
+        projectLocation: effectiveLocation,
+        branch,
+        createNew,
+      })
+      .then((result) => {
+        const store = useGitStore.getState();
+        const status = store.statuses[project.id];
+        if (status) {
+          store.setStatus(project.id, {
+            ...status,
+            branch: result.branch,
+            tracking: result.tracking,
+            ahead: result.ahead,
+            behind: result.behind,
+          });
+        }
+        store.setBranches(project.id, result.branches);
+      })
+      .catch((err: unknown) => {
+        console.error("[git] switch branch failed", err);
+        toast.danger(friendlyError(err));
+      });
+  }
+
   return (
     <SidebarContext.Provider value={alwaysExpanded}>
       <div className="flex h-full min-h-0 flex-col">
@@ -85,15 +118,38 @@ export function GitReviewPanel(props: {
           </div>
           {gitStatus?.branch && (
             <>
-              <GitBranch className="size-3 shrink-0 text-muted/50" />
-              <div className="min-w-0">
-                <Tooltip delay={300}>
-                  <Tooltip.Trigger tabIndex={-1} role="none">
-                    <div className="max-w-[100px] truncate text-xs text-muted">{gitStatus.branch}</div>
-                  </Tooltip.Trigger>
-                  <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
-                </Tooltip>
-              </div>
+              {statusKey ? (
+                <>
+                  <GitBranch className="ml-1 size-3 shrink-0 text-muted/50" />
+                  <div className="min-w-0">
+                    <Tooltip delay={300}>
+                      <Tooltip.Trigger tabIndex={-1} role="none">
+                        <div className="max-w-[100px] truncate text-xs text-muted">{gitStatus.branch}</div>
+                      </Tooltip.Trigger>
+                      <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
+                    </Tooltip>
+                  </div>
+                </>
+              ) : (
+                <BranchSelector
+                  projectId={project.id}
+                  currentBranch={gitStatus.branch}
+                  value={gitStatus.branch}
+                  onSwitchBranch={handleSwitchBranch}
+                  hideWorktreeToggle
+                  popoverPlacement="bottom"
+                  trigger={
+                    <button
+                      type="button"
+                      className="ml-1 flex min-w-0 cursor-pointer items-center gap-1 rounded px-1.5 hover:bg-foreground/5"
+                      aria-label="Switch branch"
+                    >
+                      <GitBranch className="size-3 shrink-0 text-muted/50" />
+                      <span className="max-w-[100px] truncate text-xs text-muted">{gitStatus.branch}</span>
+                    </button>
+                  }
+                />
+              )}
               {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
                 <span className="shrink-0 text-[11px] text-muted/50">
                   ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
@@ -102,9 +158,19 @@ export function GitReviewPanel(props: {
             </>
           )}
           <div className="flex-1" />
+          {onRemove && (
+            <button
+              type="button"
+              className={`rounded p-0.5 text-muted transition-colors ${threadRemoveAction === "archive" ? "hover:bg-warning/10 hover:text-warning" : "hover:bg-danger/10 hover:text-danger"}`}
+              title={threadRemoveAction === "archive" ? "Archive" : "Delete"}
+              onClick={onRemove}
+            >
+              {threadRemoveAction === "archive" ? <Archive className="size-3" /> : <Trash2 className="size-3" />}
+            </button>
+          )}
           <button
             type="button"
-            className="rounded p-0.5 text-muted hover:text-foreground"
+            className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
             title="Refresh"
             onClick={() => void handleRefresh()}
           >
@@ -112,7 +178,7 @@ export function GitReviewPanel(props: {
           </button>
           <button
             type="button"
-            className="rounded p-0.5 text-muted hover:text-foreground"
+            className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
             title="Open as page"
             onClick={onExpandToOverlay}
           >
@@ -120,7 +186,7 @@ export function GitReviewPanel(props: {
           </button>
           <button
             type="button"
-            className="rounded p-0.5 text-muted hover:text-foreground"
+            className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
             title="Hide"
             onClick={onClose}
           >

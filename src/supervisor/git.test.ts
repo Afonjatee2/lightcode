@@ -18,11 +18,13 @@ const { execFileMock, mkdirMock, readWslCommandOutputAsync, rmMock } = vi.hoiste
   rmMock: vi.fn<() => Promise<void>>(),
 }));
 
-vi.mock("./agents/base", () => ({
-  getWslCommand: () => "wsl.exe",
-  readWslCommandOutputAsync,
-  resolveWslShellPathAsync: vi.fn<() => Promise<string>>().mockResolvedValue("/bin/bash"),
-}));
+vi.mock("./agents/base", async () => {
+  const actual = await vi.importActual<typeof import("./agents/base")>("./agents/base");
+  return {
+    ...actual,
+    readWslCommandOutputAsync,
+  };
+});
 
 vi.mock("node:fs/promises", async () => {
   const actual = await vi.importActual<typeof import("node:fs/promises")>("node:fs/promises");
@@ -263,7 +265,7 @@ describe("GitService.commit", () => {
     vi.clearAllMocks();
   });
 
-  it("runs WSL commits through the login shell so multiline messages stay quoted", async () => {
+  it("passes WSL commit messages as direct arguments without shell wrapping", async () => {
     mockGitCommands((args) => {
       if (args[0] === "-d") {
         return { stdout: "[main abc1234] feat(dashboard): add taxonomy filters\n" };
@@ -271,6 +273,8 @@ describe("GitService.commit", () => {
       return { stdout: "" };
     });
 
+    const message =
+      "feat(dashboard): add taxonomy filters\n\n- New `/api/taxonomy-values` endpoint";
     const result = await new GitService().commit(
       {
         kind: "wsl",
@@ -278,27 +282,15 @@ describe("GitService.commit", () => {
         linuxPath: "/home/demo/work/repo",
         uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
       },
-      "feat(dashboard): add taxonomy filters\n\n- New `/api/taxonomy-values` endpoint",
+      message,
       false,
     );
 
     expect(result).toEqual({ hash: "abc1234" });
     expect(execFileMock).toHaveBeenCalledWith(
-      "wsl.exe",
-      expect.arrayContaining([
-        "-d",
-        "Ubuntu",
-        "--cd",
-        "/home/demo/work/repo",
-        "--",
-        "/bin/bash",
-        "-l",
-        "-i",
-        "-c",
-        expect.stringContaining("`/api/taxonomy-values`"),
-      ]),
+      expect.stringContaining("wsl"),
+      ["-d", "Ubuntu", "--cd", "/home/demo/work/repo", "--", "git", "commit", "-m", message],
       expect.objectContaining({
-        env: expect.objectContaining({ GIT_OPTIONAL_LOCKS: "0" }),
         windowsHide: true,
       }),
       expect.any(Function),

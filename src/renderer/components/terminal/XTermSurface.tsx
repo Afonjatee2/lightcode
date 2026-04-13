@@ -3,7 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { ImageAddon } from "@xterm/addon-image";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
-import { WebLinksAddon } from "@xterm/addon-web-links";
+import { TerminalLinkProvider } from "./TerminalLinkProvider";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { Button } from "@heroui/react";
@@ -237,8 +237,8 @@ export const XTermSurface = forwardRef<
 
     terminal.loadAddon(fit);
     terminal.loadAddon(search);
-    terminal.loadAddon(
-      new WebLinksAddon((_event, uri) => {
+    const linkDisposable = terminal.registerLinkProvider(
+      new TerminalLinkProvider(terminal, (_event, uri) => {
         void readBridge().openExternal(uri);
       }),
     );
@@ -389,6 +389,7 @@ export const XTermSurface = forwardRef<
       if (writeTimer !== 0) {
         clearTimeout(writeTimer);
       }
+      linkDisposable.dispose();
       unsubscribe();
       resizeObserver.disconnect();
       terminal.dispose();

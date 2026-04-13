@@ -17,6 +17,7 @@ export function spawnAgent(spec: CommandSpec, input: string, timeoutMs: number):
       windowsHide: true,
       timeout: timeoutMs,
       ...(spec.cwd ? { cwd: spec.cwd } : {}),
+      ...(spec.env ? { env: { ...process.env, ...spec.env } } : {}),
     });
 
     let stdout = "";

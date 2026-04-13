@@ -693,6 +693,32 @@ export async function readWslCommandOutputAsync(
   }
 }
 
+/**
+ * Execute a command inside WSL and return stdout.
+ * Uses direct invocation (no intermediate shell) — arguments are passed as
+ * discrete argv entries through `wsl.exe`, preserving special characters.
+ * Throws on non-zero exit with stderr in the error message.
+ */
+export async function execInWsl(
+  distro: string,
+  linuxCwd: string,
+  command: string,
+  args: string[],
+  options?: { timeout?: number; maxBuffer?: number; env?: NodeJS.ProcessEnv },
+): Promise<string> {
+  const { stdout } = await execFileAsync(
+    getWslCommand(),
+    ["-d", distro, "--cd", linuxCwd, "--", command, ...args],
+    {
+      windowsHide: true,
+      timeout: options?.timeout ?? 10_000,
+      ...(options?.maxBuffer ? { maxBuffer: options.maxBuffer } : {}),
+      ...(options?.env ? { env: options.env } : {}),
+    },
+  );
+  return stdout;
+}
+
 export async function resolveWslHomeDirectoryAsync(distro: string): Promise<string | undefined> {
   const cached = wslHomeCache.get(distro);
   if (cached) {

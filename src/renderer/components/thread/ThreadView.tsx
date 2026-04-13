@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Spinner } from "@heroui/react";
-import { ChevronDown, CircleCheck, GitBranch, GitFork, Paperclip, X } from "lucide-react";
+import { Spinner, Tooltip } from "@heroui/react";
+import { ChevronDown, CircleCheck, GitFork, Paperclip, X } from "lucide-react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -14,7 +14,7 @@ import type {
 import { ProviderIcon, getComposerControls, getStatusTone } from "../providers";
 import type { PendingThreadServerRequest } from "../../state/appStore";
 import { useGitStore } from "../../state/gitStore";
-import { Button, TuxIcon } from "../common";
+import { BranchSelector, type BranchSelection, Button, TuxIcon } from "../common";
 import { useSharedSettings } from "../../state/sharedSettingsStore";
 import { readBridge } from "../../bridge";
 import {
@@ -166,6 +166,39 @@ export function ThreadView(props: {
 
   const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
 
+  function handleSwitchBranch(branch: string, createNew: boolean) {
+    readBridge()
+      .gitSwitchBranch({
+        projectLocation,
+        branch,
+        createNew,
+      })
+      .then((result) => {
+        const store = useGitStore.getState();
+        const status = store.statuses[thread.projectId];
+        if (status) {
+          store.setStatus(thread.projectId, {
+            ...status,
+            branch: result.branch,
+            tracking: result.tracking,
+            ahead: result.ahead,
+            behind: result.behind,
+          });
+        }
+        store.setBranches(thread.projectId, result.branches);
+      })
+      .catch((err: unknown) => {
+        console.error("[git] switch branch failed", err);
+      });
+  }
+
+  function handleBranchSelect(selection: BranchSelection) {
+    // For active non-worktree threads, just switch the branch — no worktree logic
+    if (!selection.isWorktree && selection.branch !== branchName) {
+      handleSwitchBranch(selection.branch, false);
+    }
+  }
+
   function submitPrompt(segments: PromptSegment[]) {
     // Merge attachment segments with the editor segments
     const attachmentSegments = attachments.toSegments();
@@ -290,39 +323,40 @@ export function ThreadView(props: {
           <span className="flex-1 truncate text-sm font-medium text-foreground">
             {thread.title}
           </span>
-          {paneCount > 1 && projectName ? (
-            <span className="shrink-0 text-sm text-muted/60">
-              <span className="mx-1 text-muted/40">{"\u2014"}</span>
-              {projectName}
-            </span>
-          ) : null}
-          {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 text-muted/60" /> : null}
-          {onMarkDone ? (
-            <button
-              type="button"
-              aria-label={thread.done ? "Unmark done" : "Mark done"}
-              className={`shrink-0 rounded p-0.5 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onMarkDone();
-              }}
-            >
-              <CircleCheck className="size-3.5" />
-            </button>
-          ) : null}
-          {showCloseButton ? (
-            <button
-              type="button"
-              aria-label="Close pane"
-              className="shrink-0 rounded p-0.5 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
-              onClick={(e) => {
-                e.stopPropagation();
-                onClose?.();
-              }}
-            >
-              <X className="size-3.5" />
-            </button>
-          ) : null}
+          <div className="flex shrink-0 items-center">
+            {paneCount > 1 && projectName ? (
+              <span className="px-1 text-sm text-muted/60">
+                {projectName}
+              </span>
+            ) : null}
+            {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
+            {onMarkDone ? (
+              <button
+                type="button"
+                aria-label={thread.done ? "Unmark done" : "Mark done"}
+                className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onMarkDone();
+                }}
+              >
+                <CircleCheck className="size-3.5" />
+              </button>
+            ) : null}
+            {showCloseButton ? (
+              <button
+                type="button"
+                aria-label="Close pane"
+                className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClose?.();
+                }}
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
 
@@ -455,17 +489,27 @@ export function ThreadView(props: {
                             <Paperclip className="size-4" />
                           </Button>
                           {branchName ? (
-                            <div className="lightcode-composer-static min-w-0 px-2.5">
-                              {thread.worktreePath ? (
-                                <GitFork className="size-3.5 text-muted" />
-                              ) : (
-                                <GitBranch className="size-3.5 text-muted" />
-                              )}
-                              <span className="truncate">{branchName}</span>
-                              {thread.prNumber ? (
-                                <span className="text-muted/60">PR #{thread.prNumber}</span>
-                              ) : null}
-                            </div>
+                            thread.worktreePath ? (
+                              <Tooltip delay={0}>
+                                <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
+                                  <GitFork className="size-3.5 text-muted" />
+                                  <span className="truncate">{branchName}</span>
+                                  {thread.prNumber ? (
+                                    <span className="shrink-0 text-muted/60">PR #{thread.prNumber}</span>
+                                  ) : null}
+                                </div>
+                                <Tooltip.Content placement="top">{branchName}</Tooltip.Content>
+                              </Tooltip>
+                            ) : (
+                              <BranchSelector
+                                projectId={thread.projectId}
+                                currentBranch={branchName}
+                                value={branchName}
+                                onSelect={handleBranchSelect}
+                                onSwitchBranch={handleSwitchBranch}
+                                hideWorktreeToggle
+                              />
+                            )
                           ) : null}
                         </>
                       }

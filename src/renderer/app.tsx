@@ -33,7 +33,13 @@ import { OverlayShell } from "./components/layout/OverlayShell";
 import { SplitPaneContainer } from "./components/layout/SplitPaneContainer";
 import { ProjectSettingsOverlay } from "./components/settings/ProjectSettingsOverlay";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
-import { Sidebar } from "./components/sidebar/Sidebar";
+import {
+  Sidebar,
+  type ThreadSortMode,
+  sortModeOrder,
+  sortModeIcon,
+  sortModeLabel,
+} from "./components/sidebar/Sidebar";
 import {
   DeleteWorktreeDialog,
   readWorktreeDeletePref,
@@ -955,6 +961,13 @@ export function App() {
     return ids;
   }, []);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [threadSortMode, setThreadSortMode] = useState<ThreadSortMode>(() => {
+    try {
+      const raw = localStorage.getItem("lightcode-thread-sort-mode");
+      if (raw && sortModeOrder.includes(raw as ThreadSortMode)) return raw as ThreadSortMode;
+    } catch { /* ignore */ }
+    return "updated";
+  });
   const [projectSettingsId, setProjectSettingsId] = useState<string | null>(null);
   const [gitReviewContext, setGitReviewContextRaw] = useState<{
     projectId: string;
@@ -1207,6 +1220,33 @@ export function App() {
         .then((branches) => useGitStore.getState().setBranches(project.id, branches))
         .catch(() => undefined);
     }
+  }
+
+  function handleArchiveThread(threadId: string) {
+    void unloadStoredThread(threadId).catch(() => undefined);
+    archiveThread(threadId);
+  }
+
+  function handleDeleteWorktreeGroup(
+    projectId: string,
+    worktreePath: string,
+    threadIds: string[],
+  ) {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const sampleThread = useAppStore
+      .getState()
+      .threads.find((t) => threadIds.includes(t.id) && t.worktreeBranch);
+
+    for (const threadId of threadIds) {
+      deleteThread(threadId);
+    }
+
+    void (async () => {
+      await closeThreads(threadIds);
+      await performWorktreeRemoval(project, worktreePath, sampleThread?.worktreeBranch);
+    })();
   }
 
   useEffect(() => {
@@ -1849,6 +1889,42 @@ export function App() {
                   <FolderPlus className="size-3.5" />
                 </Button>
               )}
+              <Dropdown>
+                <Button
+                  isIconOnly
+                  aria-label="Sort threads"
+                  size="sm"
+                  variant="ghost"
+                  className="size-6 min-w-0 text-muted hover:text-foreground"
+                >
+                  {(() => {
+                    const Icon = sortModeIcon[threadSortMode];
+                    return <Icon className="size-3.5" />;
+                  })()}
+                </Button>
+                <Dropdown.Popover>
+                  <Dropdown.Menu
+                    aria-label="Thread sort order"
+                    selectionMode="single"
+                    selectedKeys={[threadSortMode]}
+                    onAction={(key) => {
+                      const mode = key as ThreadSortMode;
+                      setThreadSortMode(mode);
+                      localStorage.setItem("lightcode-thread-sort-mode", mode);
+                    }}
+                  >
+                    {sortModeOrder.map((mode) => {
+                      const Icon = sortModeIcon[mode];
+                      return (
+                        <Dropdown.Item key={mode} id={mode} textValue={sortModeLabel[mode]}>
+                          <Icon className="size-4 shrink-0 text-muted" />
+                          <Label>{sortModeLabel[mode]}</Label>
+                        </Dropdown.Item>
+                      );
+                    })}
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
             </div>
           }
           sidebar={
@@ -2086,10 +2162,7 @@ export function App() {
                   markThreadDone(threadId);
                 }
               }}
-              onArchiveThread={(threadId) => {
-                void unloadStoredThread(threadId).catch(() => undefined);
-                archiveThread(threadId);
-              }}
+              onArchiveThread={handleArchiveThread}
               onRenameThread={(threadId, title) => {
                 renameThread(threadId, title);
               }}
@@ -2179,23 +2252,7 @@ export function App() {
                   setGitReviewContext(null);
                 }
               }}
-              onDeleteWorktreeGroup={(projectId, worktreePath, threadIds) => {
-                const project = projects.find((p) => p.id === projectId);
-                if (!project) return;
-
-                const sampleThread = useAppStore
-                  .getState()
-                  .threads.find((t) => threadIds.includes(t.id) && t.worktreeBranch);
-
-                for (const threadId of threadIds) {
-                  deleteThread(threadId);
-                }
-
-                void (async () => {
-                  await closeThreads(threadIds);
-                  await performWorktreeRemoval(project, worktreePath, sampleThread?.worktreeBranch);
-                })();
-              }}
+              onDeleteWorktreeGroup={handleDeleteWorktreeGroup}
               onOpenProjectSettings={(projectId) => setProjectSettingsId(projectId)}
               onRunProjectAction={(projectId, actionId, worktreePath) => {
                 runProjectAction(projectId, actionId, worktreePath);
@@ -2305,6 +2362,7 @@ export function App() {
                   ? gitReviewContext?.worktreePath ?? null
                   : null
               }
+              sortMode={threadSortMode}
             />
           }
           content={<AppContent />}
@@ -2357,6 +2415,19 @@ export function App() {
                                     await closeThreads(siblings.map((sib) => sib.id));
                                     await performWorktreeRemoval(reviewProject, wtPath, wtBranch);
                                   })();
+                                }
+                              },
+                              onRemove: () => {
+                                const action = useSharedSettings.getState().threadRemoveAction;
+                                const wtPath = gitPanelContext!.worktreePath;
+                                const projectId = gitPanelContext!.projectId;
+                                setGitReviewContext(null);
+                                if (!wtPath) return;
+                                const siblings = useAppStore.getState().threads.filter((t) => t.worktreePath === wtPath);
+                                if (action === "archive") {
+                                  for (const sib of siblings) handleArchiveThread(sib.id);
+                                } else {
+                                  handleDeleteWorktreeGroup(projectId, wtPath, siblings.map((s) => s.id));
                                 }
                               },
                             }
@@ -2454,6 +2525,19 @@ export function App() {
                               await closeThreads(siblings.map((sib) => sib.id));
                               await performWorktreeRemoval(reviewProject, wtPath, wtBranch);
                             })();
+                          }
+                        },
+                        onRemove: () => {
+                          const action = useSharedSettings.getState().threadRemoveAction;
+                          const wtPath = gitPanelContext!.worktreePath;
+                          const projectId = gitPanelContext!.projectId;
+                          setGitReviewContext(null);
+                          if (!wtPath) return;
+                          const siblings = useAppStore.getState().threads.filter((t) => t.worktreePath === wtPath);
+                          if (action === "archive") {
+                            for (const sib of siblings) handleArchiveThread(sib.id);
+                          } else {
+                            handleDeleteWorktreeGroup(projectId, wtPath, siblings.map((s) => s.id));
                           }
                         },
                       }

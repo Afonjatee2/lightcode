@@ -22,17 +22,13 @@ import type {
   GitRemoteInfo,
   RemoteHostPlatform,
 } from "../shared/contracts";
-import { getWslCommand, readWslCommandOutputAsync, resolveWslShellPathAsync } from "./agents/base";
+import { execInWsl, readWslCommandOutputAsync } from "./agents/base";
 import { resolveLightcodePaths } from "../shared/lightcodePaths";
 import { sanitizeWorktreeBranchName, sanitizeWorktreePathSegment } from "../shared/worktree";
 import { getProjectName } from "../shared/wsl";
 import { msg, errorDetail } from "../shared/messages";
 
 const execFileAsync = promisify(execFile);
-
-function quotePosixShellArg(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
 
 // ── Timeouts ─────────────────────────────────────────────
 
@@ -60,27 +56,22 @@ export async function execGit(
 ): Promise<string> {
   const timeout = options?.timeout ?? GIT_DEFAULT_TIMEOUT;
   const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
-
-  let command: string;
-  let fullArgs: string[];
-  let cwd: string | undefined;
-
-  if (location.kind === "wsl") {
-    command = "wsl.exe";
-    fullArgs = ["-d", location.distro, "--cd", location.linuxPath, "--", "git", ...args];
-    cwd = undefined;
-  } else {
-    command = "git";
-    fullArgs = args;
-    cwd = location.path;
-  }
+  const maxBuffer = 50 * 1024 * 1024; // 50MB for large diffs
 
   try {
-    const { stdout } = await execFileAsync(command, fullArgs, {
-      cwd,
+    if (location.kind === "wsl") {
+      return await execInWsl(location.distro, location.linuxPath, "git", args, {
+        timeout,
+        maxBuffer,
+        env,
+      });
+    }
+
+    const { stdout } = await execFileAsync("git", args, {
+      cwd: location.path,
       env,
       timeout,
-      maxBuffer: 50 * 1024 * 1024, // 50MB for large diffs
+      maxBuffer,
       windowsHide: true,
     });
     return stdout;
@@ -696,43 +687,10 @@ export class GitService {
     addAll: boolean,
   ): Promise<{ hash: string }> {
     if (addAll) await execGit(location, ["add", "."]);
-    const output =
-      location.kind === "wsl"
-        ? await this.execWslCommit(location, message)
-        : await execGit(location, ["commit", "-m", message]);
+    const output = await execGit(location, ["commit", "-m", message]);
     // Extract hash from first line: "[branch hash] message"
     const hashMatch = output.match(/\[.+?\s+([a-f0-9]+)\]/);
     return { hash: hashMatch?.[1] ?? "" };
-  }
-
-  private async execWslCommit(
-    location: Extract<ProjectLocation, { kind: "wsl" }>,
-    message: string,
-  ): Promise<string> {
-    const shellPath = await resolveWslShellPathAsync(location.distro);
-    const script = `exec ${["git", "commit", "-m", message].map(quotePosixShellArg).join(" ")}`;
-    const { stdout } = await execFileAsync(
-      getWslCommand(),
-      [
-        "-d",
-        location.distro,
-        "--cd",
-        location.linuxPath,
-        "--",
-        shellPath,
-        "-l",
-        "-i",
-        "-c",
-        script,
-      ],
-      {
-        env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
-        timeout: GIT_DEFAULT_TIMEOUT,
-        maxBuffer: 50 * 1024 * 1024,
-        windowsHide: true,
-      },
-    );
-    return stdout;
   }
 
   async getStagedDiff(location: ProjectLocation): Promise<string> {

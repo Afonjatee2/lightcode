@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, GitBranch, GitFork, Globe, Loader2, Plus, Search, Trash2 } from "lucide-react";
-import { Checkbox, Header, Label, ListBox, ListLayout, Popover, Virtualizer } from "@heroui/react";
+import { Checkbox, Header, Label, ListBox, ListLayout, Popover, Tooltip, Virtualizer } from "@heroui/react";
 import type { GitBranchInfo } from "../../../shared/contracts";
 import { readBridge } from "../../bridge";
 import { useAppStore } from "../../state/appStore";
@@ -79,11 +79,14 @@ export interface BranchSelectorProps {
   value: string;
   isWorktree?: boolean | undefined;
   baseBranch?: string | undefined;
-  worktreeMode: boolean;
-  onWorktreeModeChange: (value: boolean) => void;
-  onSelect: (selection: BranchSelection) => void;
+  worktreeMode?: boolean;
+  onWorktreeModeChange?: (value: boolean) => void;
+  onSelect?: (selection: BranchSelection) => void;
   onSwitchBranch?: (branch: string, createNew: boolean) => void;
   isDisabled?: boolean;
+  trigger?: ReactNode;
+  hideWorktreeToggle?: boolean;
+  popoverPlacement?: "top" | "bottom";
 }
 
 export function BranchSelector(props: BranchSelectorProps) {
@@ -93,11 +96,14 @@ export function BranchSelector(props: BranchSelectorProps) {
     value,
     isWorktree,
     baseBranch,
-    worktreeMode,
+    worktreeMode = false,
     onWorktreeModeChange,
     onSelect,
     onSwitchBranch,
     isDisabled,
+    trigger,
+    hideWorktreeToggle,
+    popoverPlacement = "top",
   } = props;
   const branchData = useGitStore((s) => s.branches[projectId]);
   const worktrees = useGitStore((s) => s.worktrees[projectId]);
@@ -182,7 +188,7 @@ export function BranchSelector(props: BranchSelectorProps) {
 
   function handleSelectBranch(branch: string) {
     if (worktreeMode) {
-      onSelect({
+      onSelect?.({
         branch,
         baseBranch: branch,
         isWorktree: true,
@@ -190,20 +196,20 @@ export function BranchSelector(props: BranchSelectorProps) {
     } else if (branchWorktreePath.has(branch)) {
       const existingWorktreePath = branchWorktreePath.get(branch);
       if (existingWorktreePath) {
-        onSelect({
+        onSelect?.({
           branch,
           baseBranch: branch,
           isWorktree: true,
           worktreePath: existingWorktreePath,
         });
       } else {
-        onSelect({ branch, isWorktree: false });
+        onSelect?.({ branch, isWorktree: false });
       }
     } else if (branch !== currentBranch && onSwitchBranch) {
       onSwitchBranch(branch, false);
-      onSelect({ branch, isWorktree: false });
+      onSelect?.({ branch, isWorktree: false });
     } else {
-      onSelect({ branch, isWorktree: false });
+      onSelect?.({ branch, isWorktree: false });
     }
     setIsOpen(false);
   }
@@ -211,11 +217,11 @@ export function BranchSelector(props: BranchSelectorProps) {
   function handleCreateBranch() {
     const name = newBranchName.trim();
     if (!name) return;
-    onWorktreeModeChange(false);
+    onWorktreeModeChange?.(false);
     if (onSwitchBranch) {
       onSwitchBranch(name, true);
     }
-    onSelect({ branch: name, isWorktree: false });
+    onSelect?.({ branch: name, isWorktree: false });
     setIsOpen(false);
     setIsCreating(false);
     setNewBranchName("");
@@ -263,23 +269,28 @@ export function BranchSelector(props: BranchSelectorProps) {
       {worktreeMode && <span className="shrink-0 text-xs text-muted">from</span>}
       <Popover isOpen={isOpen} onOpenChange={setIsOpen}>
         <Popover.Trigger>
-          <Button
-            aria-label="Select branch"
-            isDisabled={isDisabled ?? false}
-            size="sm"
-            variant="ghost"
-            className="lightcode-composer-menu min-w-0 px-2.5"
-          >
-            {isWorktree || worktreeMode ? (
-              <GitFork className="size-3.5 text-muted" />
-            ) : (
-              <GitBranch className="size-3.5 text-muted" />
-            )}
-            <span className="truncate">{value}</span>
-            <ChevronDown className="size-3.5 text-muted" />
-          </Button>
+          {trigger ?? (
+            <Tooltip delay={0}>
+              <Button
+                aria-label="Select branch"
+                isDisabled={isDisabled ?? false}
+                size="sm"
+                variant="ghost"
+                className="lightcode-composer-menu min-w-0 max-w-48 px-2.5"
+              >
+                {isWorktree || worktreeMode ? (
+                  <GitFork className="size-3.5 text-muted" />
+                ) : (
+                  <GitBranch className="size-3.5 text-muted" />
+                )}
+                <span className="truncate">{value}</span>
+                <ChevronDown className="size-3.5 text-muted" />
+              </Button>
+              <Tooltip.Content placement="top">{value}</Tooltip.Content>
+            </Tooltip>
+          )}
         </Popover.Trigger>
-        <Popover.Content placement="top" className="w-96 p-0">
+        <Popover.Content placement={popoverPlacement} className="w-96 p-0">
           <Popover.Dialog className="flex max-h-[28rem] flex-col overflow-hidden">
             {/* Search */}
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
@@ -352,7 +363,7 @@ export function BranchSelector(props: BranchSelectorProps) {
                           key={branch.name}
                           id={branch.name}
                           textValue={branch.name}
-                          className="group"
+                          className="group focus-visible:outline-none"
                         >
                           <ListBox.ItemIndicator>
                             {({ isSelected }) => {
@@ -429,7 +440,7 @@ export function BranchSelector(props: BranchSelectorProps) {
                 <ListBox.Item
                   id="create"
                   textValue="Create new branch"
-                  className={isCreating ? "!transform-none !transition-none" : ""}
+                  className={`focus-visible:outline-none ${isCreating ? "!transform-none !transition-none" : ""}`}
                 >
                   {isCreating ? (
                     <>
@@ -466,57 +477,59 @@ export function BranchSelector(props: BranchSelectorProps) {
               </ListBox>
 
               {/* Worktree toggle */}
-              <ListBox
-                aria-label="Options"
-                className="p-1"
-                selectionMode="none"
-                onAction={() => {
-                  const next = !worktreeMode;
-                  onWorktreeModeChange(next);
-                  if (next) {
-                    const base = baseBranch ?? value;
-                    onSelect({ branch: base, baseBranch: base, isWorktree: true });
-                  } else if (isWorktree && baseBranch) {
-                    onSelect({ branch: baseBranch, isWorktree: false });
-                  }
-                }}
-              >
-                <ListBox.Item id="worktree" textValue="New worktree">
-                  <GitFork className="size-3.5 text-muted" />
-                  <Label className="flex-1">New worktree</Label>
-                  <Checkbox
-                    slot={null}
-                    isSelected={worktreeMode}
-                    onChange={(checked) => {
-                      onWorktreeModeChange(checked);
-                      if (checked) {
-                        const base = baseBranch ?? value;
-                        onSelect({
-                          branch: base,
-                          baseBranch: base,
-                          isWorktree: true,
-                        });
-                      } else if (isWorktree && baseBranch) {
-                        const existingWorktreePath = branchWorktreePath.get(baseBranch);
-                        if (existingWorktreePath) {
-                          onSelect({
-                            branch: baseBranch,
-                            baseBranch,
+              {!hideWorktreeToggle && (
+                <ListBox
+                  aria-label="Options"
+                  className="p-1"
+                  selectionMode="none"
+                  onAction={() => {
+                    const next = !worktreeMode;
+                    onWorktreeModeChange?.(next);
+                    if (next) {
+                      const base = baseBranch ?? value;
+                      onSelect?.({ branch: base, baseBranch: base, isWorktree: true });
+                    } else if (isWorktree && baseBranch) {
+                      onSelect?.({ branch: baseBranch, isWorktree: false });
+                    }
+                  }}
+                >
+                  <ListBox.Item id="worktree" textValue="New worktree" className="focus-visible:outline-none">
+                    <GitFork className="size-3.5 text-muted" />
+                    <Label className="flex-1">New worktree</Label>
+                    <Checkbox
+                      slot={null}
+                      isSelected={worktreeMode}
+                      onChange={(checked) => {
+                        onWorktreeModeChange?.(checked);
+                        if (checked) {
+                          const base = baseBranch ?? value;
+                          onSelect?.({
+                            branch: base,
+                            baseBranch: base,
                             isWorktree: true,
-                            ...(existingWorktreePath ? { worktreePath: existingWorktreePath } : {}),
                           });
-                        } else {
-                          onSelect({ branch: baseBranch, isWorktree: false });
+                        } else if (isWorktree && baseBranch) {
+                          const existingWorktreePath = branchWorktreePath.get(baseBranch);
+                          if (existingWorktreePath) {
+                            onSelect?.({
+                              branch: baseBranch,
+                              baseBranch,
+                              isWorktree: true,
+                              ...(existingWorktreePath ? { worktreePath: existingWorktreePath } : {}),
+                            });
+                          } else {
+                            onSelect?.({ branch: baseBranch, isWorktree: false });
+                          }
                         }
-                      }
-                    }}
-                  >
-                    <Checkbox.Control>
-                      <Checkbox.Indicator />
-                    </Checkbox.Control>
-                  </Checkbox>
-                </ListBox.Item>
-              </ListBox>
+                      }}
+                    >
+                      <Checkbox.Control>
+                        <Checkbox.Indicator />
+                      </Checkbox.Control>
+                    </Checkbox>
+                  </ListBox.Item>
+                </ListBox>
+              )}
             </div>
           </Popover.Dialog>
         </Popover.Content>

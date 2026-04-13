@@ -229,7 +229,7 @@ function resolveWslAttachmentDirs(distro: string): { uncDir: string; linuxDir: s
   if (!linuxDir) throw new Error(`Unable to resolve home for WSL distro "${distro}"`);
 
   // Ensure the directory exists inside WSL
-  spawnSync("wsl.exe", ["-d", distro, "--", "mkdir", "-p", linuxDir], { timeout: 5000 });
+  spawnSync(getWslCommand(), ["-d", distro, "--", "mkdir", "-p", linuxDir], { timeout: 5000 });
 
   const uncDir = `\\\\wsl.localhost\\${distro}${linuxDir.replace(/\//g, "\\")}`;
   const entry = { uncDir, linuxDir };
@@ -945,16 +945,26 @@ export class SupervisorRuntime {
     const shellCmd = this.buildShellCommand(payload.projectLocation);
     this.emit({ type: "thread-reset", threadId: payload.shellId });
 
+    // For WSL shells, pass TERM through WSLENV so the Linux shell sees
+    // a proper terminal type and can emit OSC title sequences.
+    const shellEnv: Record<string, string> = {
+      ...process.env as Record<string, string>,
+      TERM: "xterm-256color",
+    };
+    if (payload.projectLocation.kind === "wsl") {
+      const existing = process.env.WSLENV ?? "";
+      if (!existing.split(":").some((v) => v.replace(/\/.*/, "") === "TERM")) {
+        shellEnv.WSLENV = existing ? `${existing}:TERM` : "TERM";
+      }
+    }
+
     console.log(`[supervisor] spawning shell PTY: ${shellCmd.command} ${shellCmd.args.join(" ")}`);
     const pty = spawn(shellCmd.command, shellCmd.args, {
       name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
       cols: 120,
       rows: 30,
       ...(shellCmd.cwd ? { cwd: shellCmd.cwd } : {}),
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-      },
+      env: shellEnv,
     });
 
     const session: ShellSessionRuntime = {
@@ -1580,6 +1590,12 @@ export class SupervisorRuntime {
     });
 
     const agentEnv = this.resolveAgentProcessEnv(input.adapter);
+    // Suppress CLI-initiated browser opening in WSL — Electron's shell.openExternal()
+    // handles URL opening on the Windows side; without this, xdg-open/wslview inside
+    // WSL opens a second browser window.
+    if (input.projectLocation.kind === "wsl") {
+      agentEnv.BROWSER = "/bin/true";
+    }
     // For WSL commands, env vars must be baked into the shell script as exports
     // because wsl.exe does not forward Windows env vars into the Linux distro.
     const command = injectWslEnv(input.command, input.projectLocation, agentEnv);

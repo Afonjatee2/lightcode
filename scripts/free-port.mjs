@@ -101,6 +101,24 @@ function killPid(pid) {
   killPidUnix(pid);
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitForPortFree(port, timeoutMs = 5000) {
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    if (findListeningPids(port).length === 0) {
+      return;
+    }
+
+    await sleep(200);
+  }
+
+  throw new Error(`Port ${port} still in use after ${timeoutMs}ms`);
+}
+
 try {
   const port = parsePort(process.argv[2]);
   const pids = findListeningPids(port);
@@ -117,6 +135,9 @@ try {
   for (const pid of pids) {
     killPid(pid);
   }
+
+  await waitForPortFree(port);
+  console.log(`[lightcode] Port ${port} is now free`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
