@@ -289,13 +289,13 @@ export function ThreadView(props: {
           />
           <span className="flex-1 truncate text-sm font-medium text-foreground">
             {thread.title}
-            {paneCount > 1 && projectName ? (
-              <span className="text-muted/60">
-                <span className="mx-1 text-muted/40">{"\u2014"}</span>
-                {projectName}
-              </span>
-            ) : null}
           </span>
+          {paneCount > 1 && projectName ? (
+            <span className="shrink-0 text-sm text-muted/60">
+              <span className="mx-1 text-muted/40">{"\u2014"}</span>
+              {projectName}
+            </span>
+          ) : null}
           {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 text-muted/60" /> : null}
           {onMarkDone ? (
             <button

@@ -39,6 +39,8 @@ asarUnpack:
 
 publish:
   provider: github
+  owner: SDSLeon
+  repo: lightcode
 
 win:
   target:
@@ -46,6 +48,11 @@ win:
       arch:
         - x64
   icon: build/icon.ico
+  azureSignOptions:
+    publisherName: ${AZURE_SIGNING_PUBLISHER_NAME}
+    endpoint: ${AZURE_SIGNING_ENDPOINT}
+    codeSigningAccountName: ${AZURE_SIGNING_ACCOUNT_NAME}
+    certificateProfileName: ${AZURE_SIGNING_CERT_PROFILE}
 
 nsis:
   oneClick: false

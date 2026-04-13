@@ -11,7 +11,8 @@
       "Bash(npx electron-icon-builder:*)",
       "WebFetch(domain:dndkit.com)",
       "Bash(npx vitest:*)",
-      "Bash(pnpm vitest:*)"
+      "Bash(pnpm vitest:*)",
+      "Bash(xargs basename:*)"
     ]
   }
 }

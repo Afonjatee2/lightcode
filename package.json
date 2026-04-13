@@ -6,7 +6,7 @@
   "description": "Terminal-native AI agents desktop app for Windows and WSL.",
   "repository": {
     "type": "git",
-    "url": "https://github.com/nicepkg/lightcode"
+    "url": "https://github.com/SDSLeon/lightcode"
   },
   "type": "module",
   "main": "dist/main/main.cjs",
@@ -31,7 +31,8 @@
     "lint:fix": "pnpm exec oxlint --type-aware --import-plugin --node-plugin --react-plugin --jsx-a11y-plugin --vitest-plugin --fix src vite.config.ts tsdown.config.ts vitest.config.ts",
     "fmt": "pnpm exec oxfmt --write .",
     "fmt:check": "pnpm exec oxfmt --check .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "update-server": "node scripts/update-server.mjs"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.0",

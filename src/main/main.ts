@@ -407,6 +407,14 @@ function sendUpdateStatus(status: UpdateStatus): void {
 function setupAutoUpdater(): void {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.forceDevUpdateConfig = Boolean(process.env.UPDATE_SERVER_URL);
+
+  // Allow testing updates against a local server:
+  //   set UPDATE_SERVER_URL=http://localhost:5002  (then run scripts/update-server.mjs)
+  const localUpdateUrl = process.env.UPDATE_SERVER_URL;
+  if (localUpdateUrl) {
+    autoUpdater.setFeedURL({ provider: "generic", url: localUpdateUrl });
+  }
 
   autoUpdater.on("checking-for-update", () => {
     sendUpdateStatus({ type: "checking" });
@@ -728,7 +736,7 @@ function registerIpcHandlers(): void {
   );
 
   ipcMain.handle(CHANNELS.checkForUpdate, async () => {
-    if (isDev) {
+    if (isDev && !process.env.UPDATE_SERVER_URL) {
       sendUpdateStatus({ type: "error", message: "Update check is not available in dev mode." });
       return;
     }

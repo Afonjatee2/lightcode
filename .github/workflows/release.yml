@@ -105,10 +105,23 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Install NuGet provider (Windows signing)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+
       - name: Build and package
         run: pnpm run ${{ matrix.dist }}
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Azure Trusted Signing (Windows only — ignored on other platforms)
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_SIGNING_PUBLISHER_NAME: ${{ secrets.AZURE_SIGNING_PUBLISHER_NAME }}
+          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
+          AZURE_SIGNING_CERT_PROFILE: ${{ secrets.AZURE_SIGNING_CERT_PROFILE }}
 
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
