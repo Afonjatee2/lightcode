@@ -167,7 +167,10 @@ export function ThreadDraftView(props: {
     }),
   );
   const [isSyncing, setIsSyncing] = useState(false);
-  const installedAgents = agentStatuses.filter((status) => status.installed);
+  const disabledAgents = useSharedSettings((s) => s.disabledAgents);
+  const installedAgents = agentStatuses.filter(
+    (status) => status.installed && !disabledAgents.includes(status.kind),
+  );
   const preferredAgentKind = resolvePreferredAgentKind(installedAgents, lastDraftConfig);
   const [agentKind, setAgentKind] = useState<AgentStatus["kind"] | undefined>(preferredAgentKind);
   const effectiveAgentKind = installedAgents.some((status) => status.kind === agentKind)
@@ -499,7 +502,7 @@ export function ThreadDraftView(props: {
                     icon: (
                       <ProviderIcon
                         kind={selectedAgent.kind}
-                        tone="inactive"
+                        tone="active"
                         className="size-4 shrink-0"
                       />
                     ),
@@ -509,7 +512,7 @@ export function ThreadDraftView(props: {
                       icon: (
                         <ProviderIcon
                           kind={agent.kind}
-                          tone="inactive"
+                          tone="active"
                           className="size-4 shrink-0"
                         />
                       ),

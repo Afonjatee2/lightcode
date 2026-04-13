@@ -1,6 +1,6 @@
 export * from "./CursorIcon";
 
-import { ClipboardList, ShieldOff } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { CursorIcon } from "./CursorIcon";
 import type { ComposerControl } from "../../thread/ThreadComposer";
 import {
@@ -61,7 +61,7 @@ registerComposerControls("cursor", ({ capabilities, config, isDisabled, onConfig
           {
             kind: "toggle" as const,
             label: "YOLO",
-            icon: <ShieldOff className="size-3.5" />,
+            iconKind: "permission" as const,
             isSelected: (config.approvalPolicy ?? "default") === "never",
             hideLabelOnWrap: true,
             isDisabled,

@@ -1,7 +1,14 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 // Mock child_process.execFile (used by execGit internally)
-const mockExecFile = vi.fn();
+const mockExecFile = vi.fn<
+  (
+    cmd: string,
+    args: string[],
+    opts: unknown,
+    callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
+  ) => void
+>();
 vi.mock("node:child_process", async () => {
   const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
   return {

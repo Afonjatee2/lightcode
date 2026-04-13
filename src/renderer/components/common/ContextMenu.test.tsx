@@ -5,7 +5,7 @@ import { ContextMenu } from "./ContextMenu";
 describe("ContextMenu", () => {
   it("does not wrap its child in an extra DOM element", () => {
     const { container } = render(
-      <ContextMenu items={[]} onAction={vi.fn()}>
+      <ContextMenu items={[]} onAction={vi.fn<(key: string) => void>()}>
         <button type="button">Row</button>
       </ContextMenu>,
     );

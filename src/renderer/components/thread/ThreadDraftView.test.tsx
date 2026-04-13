@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentStatus, Project } from "../../../shared/contracts";
 
 const { composerSpy } = vi.hoisted(() => ({
-  composerSpy: vi.fn(),
+  composerSpy: vi.fn<(props: unknown) => void>(),
 }));
 
 vi.mock("./ThreadComposer", () => ({
@@ -103,7 +103,7 @@ describe("ThreadDraftView", () => {
   });
 
   it("switches to the first installed agent when statuses resolve after mount", async () => {
-    const onStart = vi.fn();
+    const onStart = vi.fn<(input: unknown) => void>();
     const { rerender } = render(
       <ThreadDraftView project={project} agentStatuses={[]} onStart={onStart} />,
     );
@@ -123,7 +123,7 @@ describe("ThreadDraftView", () => {
   });
 
   it("submits codex defaults on first launch", async () => {
-    const onStart = vi.fn();
+    const onStart = vi.fn<(input: unknown) => void>();
 
     render(<ThreadDraftView project={project} agentStatuses={[codexStatus]} onStart={onStart} />);
 

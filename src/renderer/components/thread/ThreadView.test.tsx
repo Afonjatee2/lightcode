@@ -5,9 +5,11 @@ import { ThreadView } from "./ThreadView";
 
 const { bridge } = vi.hoisted(() => ({
   bridge: {
-    startThread: vi.fn().mockResolvedValue(undefined),
-    writeTerminal: vi.fn().mockResolvedValue(undefined),
-    searchProjectFiles: vi.fn().mockResolvedValue({ entries: [], totalIndexed: 0 }),
+    startThread: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    searchProjectFiles: vi
+      .fn<() => Promise<{ entries: unknown[]; totalIndexed: number }>>()
+      .mockResolvedValue({ entries: [], totalIndexed: 0 }),
   },
 }));
 
@@ -40,7 +42,7 @@ describe("ThreadView", () => {
   });
 
   it("starts a queued launch after the terminal reports its first size", async () => {
-    const onLaunchConsumed = vi.fn();
+    const onLaunchConsumed = vi.fn<() => void>();
 
     renderThreadView({
       thread: {

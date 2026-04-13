@@ -1,6 +1,6 @@
 export * from "./CopilotIcon";
 
-import { ClipboardList, ShieldOff, Sparkles } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { CopilotIcon } from "./CopilotIcon";
 import type { ComposerControl } from "../../thread/ThreadComposer";
 import {
@@ -85,7 +85,7 @@ registerComposerControls("copilot", ({ capabilities, config, isDisabled, onConfi
     ...(availableEfforts.length > 0
       ? [
           {
-            icon: <Sparkles className="size-4 text-muted" />,
+            iconKind: "effort" as const,
             options: availableEfforts.map((value) => ({
               id: value,
               label: value.charAt(0).toUpperCase() + value.slice(1),
@@ -114,7 +114,7 @@ registerComposerControls("copilot", ({ capabilities, config, isDisabled, onConfi
     {
       kind: "toggle" as const,
       label: "Bypass Approvals",
-      icon: <ShieldOff className="size-3.5" />,
+      iconKind: "permission" as const,
       isSelected: (config.approvalPolicy ?? "never") === "never",
       hideLabelOnWrap: true,
       isDisabled,

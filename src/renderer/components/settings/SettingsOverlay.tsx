@@ -102,6 +102,7 @@ function SettingsSidebar(props: {
 }) {
   const { activeSection, onSectionChange, onClose, installedAgents } = props;
   const { isCollapsed, collapse, expand } = useSidebar();
+  const disabledAgents = useSharedSettings((s) => s.disabledAgents);
   const isAgentsActive = activeSection === "agents" || activeSection.startsWith("agents:");
 
   const selectFirstAgent = () => {
@@ -141,7 +142,7 @@ function SettingsSidebar(props: {
                 <SidebarButton
                   key={agent.kind}
                   iconOnly
-                  icon={<ProviderIcon kind={agent.kind} className="size-4" />}
+                  icon={<ProviderIcon kind={agent.kind} className={`size-4 ${disabledAgents.includes(agent.kind) ? "opacity-35" : ""}`} />}
                   label={agent.label}
                   isActive={activeSection === `agents:${agent.kind}`}
                   onPress={() => onSectionChange(`agents:${agent.kind}`)}
@@ -205,15 +206,19 @@ function SettingsSidebar(props: {
             />
             {isAgentsActive && (
               <div className="space-y-0.5 pl-4">
-                {installedAgents.map((agent) => (
-                  <SidebarButton
-                    key={agent.kind}
-                    icon={<ProviderIcon kind={agent.kind} className="size-4" />}
-                    label={agent.label}
-                    isActive={activeSection === `agents:${agent.kind}`}
-                    onPress={() => onSectionChange(`agents:${agent.kind}`)}
-                  />
-                ))}
+                {installedAgents.map((agent) => {
+                  const agentDisabled = disabledAgents.includes(agent.kind);
+                  return (
+                    <SidebarButton
+                      key={agent.kind}
+                      icon={<ProviderIcon kind={agent.kind} className={`size-4 ${agentDisabled ? "opacity-35" : ""}`} />}
+                      label={agent.label}
+                      className={agentDisabled ? "opacity-50" : ""}
+                      isActive={activeSection === `agents:${agent.kind}`}
+                      onPress={() => onSectionChange(`agents:${agent.kind}`)}
+                    />
+                  );
+                })}
               </div>
             )}
             <SidebarButton
@@ -841,6 +846,8 @@ function SingleAgentSettings(props: { agentKind: string }) {
   const agentStatuses = useAppStore((s) => s.agentStatuses);
   const platform = navigator.platform.toLowerCase().includes("win") ? "win32" : "posix";
   const agent = agentStatuses.find((a) => a.kind === props.agentKind && a.installed);
+  const isDisabled = useSharedSettings((s) => s.disabledAgents.includes(props.agentKind));
+  const setAgentDisabled = useSharedSettings((s) => s.setAgentDisabled);
 
   if (!agent) {
     return (
@@ -861,25 +868,55 @@ function SingleAgentSettings(props: { agentKind: string }) {
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
       <div className="mx-auto max-w-[560px]">
-        <h1 className="mb-6 text-lg font-semibold text-foreground">{agent.label}</h1>
+        <div className="mb-6">
+          <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
+          {agent.version && (
+            <p className="mt-0.5 text-xs text-muted">v{agent.version}</p>
+          )}
+        </div>
 
-        {defs.length > 0 && (
-          <div className="space-y-4">
-            {defs.map((def) => (
-              <AgentSettingRow key={def.key} agentKind={agent.kind} def={def} />
-            ))}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Enabled</p>
+              <p className="text-xs text-muted">
+                Show this agent in the agent picker when creating threads.
+              </p>
+            </div>
+            <Switch
+              isSelected={!isDisabled}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setAgentDisabled(agent.kind, !selected);
+                });
+                if (selected) {
+                  // Re-enabled — trigger fresh detection so version/auth are up to date.
+                  void readBridge().getAgentStatuses().catch(() => undefined);
+                }
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </div>
-        )}
+        </div>
 
-        {models.length > 0 && (
-          <div className={defs.length > 0 ? "mt-8 space-y-4" : "space-y-4"}>
-            <ModelVisibilityDropdown agentKind={agent.kind} models={models} />
-          </div>
-        )}
+        <div className={`transition-opacity ${isDisabled ? "pointer-events-none opacity-40" : ""}`}>
+          {defs.length > 0 && (
+            <div className="mt-8 space-y-4">
+              {defs.map((def) => (
+                <AgentSettingRow key={def.key} agentKind={agent.kind} def={def} />
+              ))}
+            </div>
+          )}
 
-        {defs.length === 0 && models.length === 0 && (
-          <p className="text-sm text-muted">No settings available for this agent.</p>
-        )}
+          {models.length > 0 && (
+            <div className="mt-8 space-y-4">
+              <ModelVisibilityDropdown agentKind={agent.kind} models={models} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

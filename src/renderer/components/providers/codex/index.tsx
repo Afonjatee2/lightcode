@@ -1,6 +1,6 @@
 export * from "./CodexStatusIcon";
 
-import { ClipboardList, ShieldOff, Sparkles } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { CodexStatusIcon } from "./CodexStatusIcon";
 import {
   registerCommitGenDefaults,
@@ -58,7 +58,7 @@ registerComposerControls("codex", ({ capabilities, config, isDisabled, onConfigC
     ...(availableEfforts.length > 0
       ? [
           {
-            icon: <Sparkles className="size-4 text-muted" />,
+            iconKind: "effort" as const,
             options: availableEfforts.map((value) => ({
               id: value,
               label: value.charAt(0).toUpperCase() + value.slice(1),
@@ -90,7 +90,7 @@ registerComposerControls("codex", ({ capabilities, config, isDisabled, onConfigC
       ? [
           {
             kind: "toggle" as const,
-            icon: <ShieldOff className="size-3.5" />,
+            iconKind: "permission" as const,
             label: "Full Access",
             hideLabelOnWrap: true,
             isSelected: isFullAccess,

@@ -120,12 +120,14 @@ describe("generateCommitMessageWithFallback", () => {
     kind: "windows" as const,
     path: "C:\\repo",
   };
+  type CommitMessageInvoker = (
+    payload: GenerateCommitMessagePayload,
+  ) => Promise<{ message: string }>;
 
   it("falls back to the next auto provider when the first provider fails", async () => {
-    const invoke = vi
-      .fn<(payload: GenerateCommitMessagePayload) => Promise<{ message: string }>>()
-      .mockRejectedValueOnce(new Error("Codex CLI not found: codex"))
-      .mockResolvedValueOnce({ message: "fix(git): restore commit generation" });
+    const invoke = vi.fn<CommitMessageInvoker>();
+    invoke.mockRejectedValueOnce(new Error("Codex CLI not found: codex"));
+    invoke.mockResolvedValueOnce({ message: "fix(git): restore commit generation" });
 
     await expect(
       generateCommitMessageWithFallback({
@@ -153,9 +155,8 @@ describe("generateCommitMessageWithFallback", () => {
   });
 
   it("does not fall back when a specific provider is selected", async () => {
-    const invoke = vi
-      .fn<(payload: GenerateCommitMessagePayload) => Promise<{ message: string }>>()
-      .mockRejectedValueOnce(new Error("Codex CLI not found: codex"));
+    const invoke = vi.fn<CommitMessageInvoker>();
+    invoke.mockRejectedValueOnce(new Error("Codex CLI not found: codex"));
 
     await expect(
       generateCommitMessageWithFallback({

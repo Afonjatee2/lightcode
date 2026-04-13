@@ -292,8 +292,8 @@ export function deriveCodexStructuredState(status: CodexThreadStatus): {
   }
 
   return {
-    status: "idle",
-    attention: "none",
+    status: "working",
+    attention: "working",
   };
 }
 

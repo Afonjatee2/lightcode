@@ -6,11 +6,25 @@ import { useGitStore } from "./state/gitStore";
 
 const { bridge } = vi.hoisted(() => ({
   bridge: {
-    pickFolder: vi.fn().mockResolvedValue(null),
-    listWslDistros: vi.fn().mockResolvedValue([]),
-    getAgentStatuses: vi.fn().mockResolvedValue([]),
-    getThreadSnapshots: vi.fn().mockResolvedValue([]),
-    getGitStatus: vi.fn().mockResolvedValue({
+    pickFolder: vi.fn<() => Promise<null>>().mockResolvedValue(null),
+    listWslDistros: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
+    getAgentStatuses: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+    getThreadSnapshots: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+    getGitStatus: vi.fn<
+      () => Promise<{
+        isRepo: boolean;
+        branch: string;
+        tracking: string;
+        hasRemote: boolean;
+        remoteInfo: null;
+        ahead: number;
+        behind: number;
+        staged: unknown[];
+        unstaged: unknown[];
+        totalInsertions: number;
+        totalDeletions: number;
+      }>
+    >().mockResolvedValue({
       isRepo: true,
       branch: "main",
       tracking: "",
@@ -23,40 +37,48 @@ const { bridge } = vi.hoisted(() => ({
       totalInsertions: 0,
       totalDeletions: 0,
     }),
-    gitListBranches: vi.fn().mockResolvedValue({ current: "main", branches: [] }),
-    gitFetch: vi.fn().mockResolvedValue(undefined),
-    gitListWorktrees: vi.fn().mockResolvedValue({ worktrees: [] }),
-    gitGetWorktreeSourceBranch: vi.fn().mockResolvedValue({
+    gitListBranches: vi
+      .fn<() => Promise<{ current: string; branches: unknown[] }>>()
+      .mockResolvedValue({ current: "main", branches: [] }),
+    gitFetch: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    gitListWorktrees: vi
+      .fn<() => Promise<{ worktrees: unknown[] }>>()
+      .mockResolvedValue({ worktrees: [] }),
+    gitGetWorktreeSourceBranch: vi.fn<
+      () => Promise<{ sourceBranch: string; commitsAhead: number; sourceAhead: number }>
+    >().mockResolvedValue({
       sourceBranch: "master",
       commitsAhead: 1,
       sourceAhead: 0,
     }),
-    gitMergeToSource: vi.fn().mockResolvedValue({
+    gitMergeToSource: vi.fn<
+      () => Promise<{ merged: boolean; fastForward: boolean; newSourceCommit: string }>
+    >().mockResolvedValue({
       merged: true,
       fastForward: false,
       newSourceCommit: "abc123",
     }),
-    gitAddWorktree: vi.fn().mockResolvedValue({
+    gitAddWorktree: vi.fn<() => Promise<{ path: string }>>().mockResolvedValue({
       path: "C:\\Users\\demo\\.lightcode\\worktrees\\repo-12345678\\feature-x",
     }),
-    gitRemoveWorktree: vi.fn().mockResolvedValue(undefined),
-    gitDeleteBranch: vi.fn().mockResolvedValue(undefined),
-    startThread: vi.fn().mockResolvedValue(undefined),
-    sendThreadInput: vi.fn().mockResolvedValue(undefined),
-    writeTerminal: vi.fn().mockResolvedValue(undefined),
-    resizeTerminal: vi.fn().mockResolvedValue(undefined),
-    resolveThreadServerRequest: vi.fn().mockResolvedValue(undefined),
-    closeThread: vi.fn().mockResolvedValue(undefined),
-    setWindowChrome: vi.fn().mockResolvedValue(undefined),
-    onSupervisorEvent: vi.fn(() => () => undefined),
-    startShell: vi.fn().mockResolvedValue(undefined),
-    gitWatchProject: vi.fn().mockResolvedValue(undefined),
-    gitWatchWorktrees: vi.fn().mockResolvedValue(undefined),
-    gitUnwatchProject: vi.fn().mockResolvedValue(undefined),
-    checkForUpdate: vi.fn().mockResolvedValue(undefined),
-    startUpdateDownload: vi.fn().mockResolvedValue(undefined),
-    installUpdate: vi.fn().mockResolvedValue(undefined),
-    onUpdateStatus: vi.fn(() => () => undefined),
+    gitRemoveWorktree: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    gitDeleteBranch: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    startThread: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    sendThreadInput: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    resizeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    resolveThreadServerRequest: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    closeThread: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    setWindowChrome: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    onSupervisorEvent: vi.fn<() => () => void>(() => () => undefined),
+    startShell: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    gitWatchProject: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    gitWatchWorktrees: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    gitUnwatchProject: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    checkForUpdate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    startUpdateDownload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    installUpdate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    onUpdateStatus: vi.fn<() => () => void>(() => () => undefined),
   },
 }));
 
@@ -229,9 +251,9 @@ describe("App", () => {
   });
 
   it("queues launch for the selected stored thread on launch even without a session ref", async () => {
-    useAppStore.persist.hasHydrated = vi.fn(() => true);
-    useAppStore.persist.onHydrate = vi.fn(() => () => undefined);
-    useAppStore.persist.onFinishHydration = vi.fn(() => () => undefined);
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
 
     useAppStore.setState((state) => ({
       ...state,
@@ -284,12 +306,16 @@ describe("App", () => {
     let onHydrate: ((state: ReturnType<typeof useAppStore.getState>) => void) | undefined;
     let onFinishHydration: ((state: ReturnType<typeof useAppStore.getState>) => void) | undefined;
 
-    useAppStore.persist.hasHydrated = vi.fn(() => hydrated);
-    useAppStore.persist.onHydrate = vi.fn((listener) => {
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>(() => hydrated);
+    useAppStore.persist.onHydrate = vi.fn<
+      (listener: (state: ReturnType<typeof useAppStore.getState>) => void) => () => void
+    >((listener) => {
       onHydrate = listener;
       return () => undefined;
     });
-    useAppStore.persist.onFinishHydration = vi.fn((listener) => {
+    useAppStore.persist.onFinishHydration = vi.fn<
+      (listener: (state: ReturnType<typeof useAppStore.getState>) => void) => () => void
+    >((listener) => {
       onFinishHydration = listener;
       return () => undefined;
     });
@@ -347,9 +373,9 @@ describe("App", () => {
   });
 
   it("queues launch for an inactive thread when the user selects it", async () => {
-    useAppStore.persist.hasHydrated = vi.fn(() => true);
-    useAppStore.persist.onHydrate = vi.fn(() => () => undefined);
-    useAppStore.persist.onFinishHydration = vi.fn(() => () => undefined);
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
 
     useAppStore.setState((state) => ({
       ...state,
@@ -399,9 +425,9 @@ describe("App", () => {
   });
 
   it("can unload a resumable thread and queue it again when reopened", async () => {
-    useAppStore.persist.hasHydrated = vi.fn(() => true);
-    useAppStore.persist.onHydrate = vi.fn(() => () => undefined);
-    useAppStore.persist.onFinishHydration = vi.fn(() => () => undefined);
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
 
     useAppStore.setState((state) => ({
       ...state,
@@ -486,9 +512,9 @@ describe("App", () => {
   });
 
   it("sweeps and unloads stale hidden idle threads every 5 minutes", async () => {
-    useAppStore.persist.hasHydrated = vi.fn(() => true);
-    useAppStore.persist.onHydrate = vi.fn(() => () => undefined);
-    useAppStore.persist.onFinishHydration = vi.fn(() => () => undefined);
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
     vi.spyOn(Date, "now").mockReturnValue(new Date("2026-04-06T12:05:00.000Z").getTime());
     const setIntervalSpy = vi.spyOn(globalThis, "setInterval");
 
@@ -601,9 +627,9 @@ describe("App", () => {
   });
 
   it("uses the resolved worktree path returned by the supervisor when starting from a draft", async () => {
-    useAppStore.persist.hasHydrated = vi.fn(() => true);
-    useAppStore.persist.onHydrate = vi.fn(() => () => undefined);
-    useAppStore.persist.onFinishHydration = vi.fn(() => () => undefined);
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
 
     useAppStore.setState((state) => ({
       ...state,
@@ -642,9 +668,9 @@ describe("App", () => {
   });
 
   it("attaches a new thread to an existing worktree without creating another one", async () => {
-    useAppStore.persist.hasHydrated = vi.fn(() => true);
-    useAppStore.persist.onHydrate = vi.fn(() => () => undefined);
-    useAppStore.persist.onFinishHydration = vi.fn(() => () => undefined);
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
 
     useAppStore.setState((state) => ({
       ...state,
@@ -678,9 +704,9 @@ describe("App", () => {
   });
 
   it("uses a sibling thread branch when merge and remove is triggered from a worktree thread without branch metadata", async () => {
-    useAppStore.persist.hasHydrated = vi.fn(() => true);
-    useAppStore.persist.onHydrate = vi.fn(() => () => undefined);
-    useAppStore.persist.onFinishHydration = vi.fn(() => () => undefined);
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
 
     useAppStore.setState((state) => ({
       ...state,

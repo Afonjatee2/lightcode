@@ -365,7 +365,6 @@ export function GitReviewSidebar(props: {
     onClose,
     onRefresh,
     mode = "overlay",
-    onExpandToOverlay,
   } = props;
   const { isCollapsed, collapse, expand } = useSidebar();
   const agentStatuses = useAppStore((s) => s.agentStatuses);

@@ -1,9 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const execFileAsyncMock = vi.hoisted(() => vi.fn());
-const buildAgentCommandMock = vi.hoisted(() => vi.fn());
-const writeFileMock = vi.hoisted(() => vi.fn());
-const unlinkMock = vi.hoisted(() => vi.fn());
+const execFileAsyncMock = vi.hoisted(
+  () => vi.fn<(...args: unknown[]) => Promise<{ stdout: string }>>(),
+);
+const buildAgentCommandMock = vi.hoisted(
+  () =>
+    vi.fn<
+      (
+        location: { kind: "windows"; path: string },
+        command: string,
+        args: string[],
+      ) => { command: string; args: string[] }
+    >(),
+);
+const writeFileMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>());
+const unlinkMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>());
 
 vi.mock("node:child_process", () => {
   const { promisify } = require("node:util") as typeof import("node:util");

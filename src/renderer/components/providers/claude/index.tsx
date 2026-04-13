@@ -1,6 +1,6 @@
 export * from "./ClaudeIcon";
 
-import { ClipboardList, ShieldOff, Sparkles } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { ClaudeIcon } from "./ClaudeIcon";
 import {
   registerCommitGenDefaults,
@@ -44,7 +44,7 @@ registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfig
     ...(availableEfforts.length > 0
       ? [
           {
-            icon: <Sparkles className="size-4 text-muted" />,
+            iconKind: "effort" as const,
             options: availableEfforts.map((value) => ({
               id: value,
               label: value.charAt(0).toUpperCase() + value.slice(1),
@@ -75,7 +75,7 @@ registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfig
     ...(capabilities.approvalPolicies.length > 0 && (config.mode ?? "agent") === "agent"
       ? [
           {
-            icon: <ShieldOff className="size-3.5" />,
+            iconKind: "permission" as const,
             options: capabilities.approvalPolicies,
             hideLabelOnWrap: true,
             value: config.approvalPolicy ?? capabilities.approvalPolicies[0]?.id ?? "default",

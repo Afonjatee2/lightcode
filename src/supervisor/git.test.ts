@@ -3,16 +3,25 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { execFileMock, mkdirMock, readWslCommandOutputAsync, rmMock } = vi.hoisted(() => ({
-  execFileMock: vi.fn(),
-  mkdirMock: vi.fn(),
-  readWslCommandOutputAsync: vi.fn(),
-  rmMock: vi.fn(),
+  execFileMock: vi.fn<
+    (
+      cmd: string,
+      args: string[],
+      opts: unknown,
+      callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
+    ) => void
+  >(),
+  mkdirMock: vi.fn<() => Promise<void>>(),
+  readWslCommandOutputAsync: vi.fn<
+    () => Promise<{ ok: boolean; stdout: string; stderr: string }>
+  >(),
+  rmMock: vi.fn<() => Promise<void>>(),
 }));
 
 vi.mock("./agents/base", () => ({
   getWslCommand: () => "wsl.exe",
   readWslCommandOutputAsync,
-  resolveWslShellPathAsync: vi.fn().mockResolvedValue("/bin/bash"),
+  resolveWslShellPathAsync: vi.fn<() => Promise<string>>().mockResolvedValue("/bin/bash"),
 }));
 
 vi.mock("node:fs/promises", async () => {
@@ -143,7 +152,7 @@ describe("computeDefaultWorktreePath", () => {
         },
         "feature/x",
       ),
-    ).rejects.toThrow('Unable to resolve home directory for WSL distro "Ubuntu".');
+    ).rejects.toThrow('Unable to resolve home directory for WSL distro "Ubuntu"');
   });
 });
 

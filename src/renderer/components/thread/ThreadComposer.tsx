@@ -2,8 +2,13 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { ToggleButton, Tooltip } from "@heroui/react";
 import { Button, OptionMenu, TextArea } from "../common";
+import { EffortIcon } from "../providers/EffortIcon";
+import { PermissionIcon } from "../providers/PermissionIcon";
 
 export type OptionMenuOption = string | { id: string; label: string; hint?: string };
+
+/** Semantic icon kinds resolved automatically by the composer. */
+export type ComposerIconKind = "effort" | "permission";
 
 export type ComposerControl =
   | {
@@ -12,6 +17,7 @@ export type ComposerControl =
       options: readonly OptionMenuOption[];
       onChange?: (value: string) => void;
       icon?: ReactNode;
+      iconKind?: ComposerIconKind;
       iconOnly?: boolean;
       placeholder?: string;
       isDisabled?: boolean;
@@ -21,6 +27,7 @@ export type ComposerControl =
       kind: "toggle";
       label: string;
       icon?: ReactNode;
+      iconKind?: ComposerIconKind;
       isSelected: boolean;
       onChange?: (isSelected: boolean) => void;
       isDisabled?: boolean;
@@ -33,6 +40,29 @@ export type ComposerControl =
       iconOnly?: boolean;
       hideLabelOnWrap?: boolean;
     };
+
+function resolveIcon(control: ComposerControl): ReactNode | undefined {
+  if (control.kind === "static") return control.icon;
+  if (control.icon) return control.icon;
+  const iconKind = control.iconKind;
+  if (!iconKind) return undefined;
+
+  if (iconKind === "effort" && control.kind !== "toggle") {
+    const ids = control.options.map((o) => (typeof o === "string" ? o : o.id));
+    return <EffortIcon className="size-4 text-foreground" effort={control.value} efforts={ids} />;
+  }
+
+  if (iconKind === "permission") {
+    if (control.kind === "toggle") {
+      return <PermissionIcon className="size-4 text-foreground" index={control.isSelected ? 1 : 0} count={2} />;
+    }
+    const ids = control.options.map((o) => (typeof o === "string" ? o : o.id));
+    const idx = ids.indexOf(control.value);
+    return <PermissionIcon className="size-4 text-foreground" index={idx < 0 ? 0 : idx} count={ids.length} />;
+  }
+
+  return undefined;
+}
 
 export function ThreadComposer(props: {
   autoFocus?: boolean;
@@ -163,7 +193,7 @@ export function ThreadComposer(props: {
             variant="ghost"
             onChange={control.onChange ?? (() => undefined)}
           >
-            {control.icon}
+            {resolveIcon(control)}
             <span
               className={
                 control.hideLabelOnWrap && !forceShowLabels
@@ -188,8 +218,9 @@ export function ThreadComposer(props: {
         return toggle;
       }
 
+      const resolvedIcon = resolveIcon(control);
       const optionalProps = {
-        ...(control.icon ? { icon: control.icon } : {}),
+        ...(resolvedIcon ? { icon: resolvedIcon } : {}),
         ...(control.iconOnly ? { iconOnly: control.iconOnly } : {}),
         ...(control.placeholder ? { placeholder: control.placeholder } : {}),
         ...(control.isDisabled !== undefined ? { isDisabled: control.isDisabled } : {}),

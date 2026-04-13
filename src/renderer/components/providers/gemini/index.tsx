@@ -1,6 +1,6 @@
 export * from "./GeminiIcon";
 
-import { ClipboardList, ShieldOff } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { GeminiIcon } from "./GeminiIcon";
 import {
   registerCommitGenDefaults,
@@ -58,7 +58,7 @@ registerComposerControls("gemini", ({ capabilities, config, isDisabled, onConfig
   ...(capabilities.approvalPolicies.length > 0 && (config.mode ?? "agent") === "agent"
     ? [
         {
-          icon: <ShieldOff className="size-3.5" />,
+          iconKind: "permission" as const,
           options: capabilities.approvalPolicies,
           hideLabelOnWrap: true,
           value: config.approvalPolicy ?? capabilities.approvalPolicies[0]?.id ?? "default",

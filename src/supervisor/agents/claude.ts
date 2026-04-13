@@ -236,7 +236,7 @@ export function createClaudeAdapter(): AgentAdapter {
     },
     buildDirectInput(prompt, segments) {
       const attachmentCount = segments?.filter((s) => s.kind === "attachment").length ?? 0;
-      const wait = attachmentCount > 0 ? 500 + (attachmentCount - 1) * 100 : 60;
+      const wait = attachmentCount > 0 ? 800 + (attachmentCount - 1) * 150 : 60;
       return [prompt, `@wait:${wait}`, "\r"];
     },
     formatPromptSegments(segments: PromptSegment[]) {

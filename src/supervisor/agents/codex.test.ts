@@ -32,15 +32,15 @@ describe("deriveCodexStructuredState", () => {
     });
   });
 
-  it("maps active work with no flags to idle", () => {
+  it("maps active work with no flags to working", () => {
     expect(
       deriveCodexStructuredState({
         type: "active",
         activeFlags: [],
       }),
     ).toEqual({
-      status: "idle",
-      attention: "none",
+      status: "working",
+      attention: "working",
     });
   });
 

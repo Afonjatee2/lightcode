@@ -3,10 +3,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectLocation } from "../shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 
-const spawnMock = vi.hoisted(() => vi.fn());
-const buildAgentCommandMock = vi.hoisted(() => vi.fn());
-const getStagedDiffMock = vi.hoisted(() => vi.fn());
-const getAllDiffMock = vi.hoisted(() => vi.fn());
+const spawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
+const buildAgentCommandMock = vi.hoisted(
+  () =>
+    vi.fn<
+      (location: ProjectLocation, command: string, args: string[]) => {
+        command: string;
+        args: string[];
+        cwd?: string;
+      }
+    >(),
+);
+const getStagedDiffMock = vi.hoisted(() => vi.fn<() => Promise<string>>());
+const getAllDiffMock = vi.hoisted(() => vi.fn<() => Promise<string>>());
 
 vi.mock("node:child_process", () => ({
   spawn: spawnMock,
@@ -28,7 +37,7 @@ import { cleanCommitMessage, generateCommitMessage } from "./commitMessageGenera
 type MockChildProcess = EventEmitter & {
   stdout: EventEmitter;
   stderr: EventEmitter;
-  stdin: { end: ReturnType<typeof vi.fn> };
+  stdin: { end: ReturnType<typeof vi.fn<(input?: string) => void>> };
   killed: boolean;
 };
 
@@ -36,7 +45,7 @@ function createMockChildProcess(): MockChildProcess {
   const child = new EventEmitter() as MockChildProcess;
   child.stdout = new EventEmitter();
   child.stderr = new EventEmitter();
-  child.stdin = { end: vi.fn() };
+  child.stdin = { end: vi.fn<(input?: string) => void>() };
   child.killed = false;
   return child;
 }
@@ -137,11 +146,8 @@ describe("generateCommitMessage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     buildAgentCommandMock.mockImplementation(
-      (location: ProjectLocation, command: string, args: string[]) => ({
-        command,
-        args,
-        cwd: location.kind === "wsl" ? undefined : location.path,
-      }),
+      (location: ProjectLocation, command: string, args: string[]) =>
+        location.kind === "wsl" ? { command, args } : { command, args, cwd: location.path },
     );
     getStagedDiffMock.mockResolvedValue("diff --git a/file.ts b/file.ts");
     getAllDiffMock.mockResolvedValue("");

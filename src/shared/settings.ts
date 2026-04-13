@@ -33,6 +33,8 @@ export const sharedSettingsSchema = z.object({
   agentSettings: z.record(z.string(), z.record(z.string(), z.union([z.boolean(), z.string()]))),
   /** Per-agent hidden model IDs keyed by agent kind. */
   hiddenModels: z.record(z.string(), z.array(z.string())),
+  /** Agent kinds that the user has disabled (hidden from the agent picker). */
+  disabledAgents: z.array(z.string()),
   /** When true, the composer in terminal-native threads starts collapsed. */
   collapseTerminalComposer: z.boolean(),
   /** Idle minutes before a hidden resumable thread is unloaded. 0 disables auto-unload. */
@@ -77,6 +79,7 @@ export const defaultSharedSettings: SharedSettings = {
   wslConflictResolverEffort: "",
   agentSettings: {},
   hiddenModels: {},
+  disabledAgents: [],
   collapseTerminalComposer: false,
   staleThreadUnloadMinutes: 20,
   scrollSpeed: 2,
@@ -127,6 +130,7 @@ export function normalizeSharedSettings(value: unknown): SharedSettings {
       parsed.data.wslConflictResolverEffort ?? defaultSharedSettings.wslConflictResolverEffort,
     agentSettings: parsed.data.agentSettings ?? defaultSharedSettings.agentSettings,
     hiddenModels: parsed.data.hiddenModels ?? defaultSharedSettings.hiddenModels,
+    disabledAgents: parsed.data.disabledAgents ?? defaultSharedSettings.disabledAgents,
     collapseTerminalComposer:
       parsed.data.collapseTerminalComposer ?? defaultSharedSettings.collapseTerminalComposer,
     staleThreadUnloadMinutes:

@@ -290,6 +290,7 @@ export async function writeSubmittedPrompt(
 export async function detectWslAgentStatuses(
   adapters: Iterable<AgentAdapter>,
   distros: readonly string[],
+  disabled?: ReadonlySet<string>,
 ): Promise<AgentStatus[]> {
   const adapterList = [...adapters];
   const statuses = await Promise.all(
@@ -297,8 +298,32 @@ export async function detectWslAgentStatuses(
       const ctx: AgentEnvContext = { envKind: "wsl", wslDistro: distro };
       return Promise.all(
         adapterList.map(async (adapter) => {
-          const status = await adapter.detectInstall(ctx);
-          return { ...status, envKind: "wsl" as const, envDistro: distro };
+          if (disabled?.has(adapter.kind)) {
+            return {
+              kind: adapter.kind,
+              label: adapter.label,
+              installed: true,
+              authState: "unknown" as const,
+              capabilities: adapter.capabilities,
+              envKind: "wsl" as const,
+              envDistro: distro,
+            };
+          }
+          try {
+            const status = await adapter.detectInstall(ctx);
+            return { ...status, envKind: "wsl" as const, envDistro: distro };
+          } catch (err) {
+            console.error(`[supervisor] detectInstall(${adapter.kind}, wsl:${distro}): FAILED`, err);
+            return {
+              kind: adapter.kind,
+              label: adapter.label,
+              installed: false,
+              authState: "unknown" as const,
+              capabilities: adapter.capabilities,
+              envKind: "wsl" as const,
+              envDistro: distro,
+            };
+          }
         }),
       );
     }),
@@ -382,6 +407,7 @@ export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
   private readonly logsDir: string;
   private readonly settingsPath: string;
+  private pendingDetection: Promise<void> | undefined;
   private readonly gitService = new GitService();
   private _gitWatcher: GitWatcher | undefined;
   private readonly githubService = new GitHubService();
@@ -487,62 +513,106 @@ export class SupervisorRuntime {
     }
   }
 
-  private detectAllAgentStatusesBackground(wslDistros: readonly string[]): void {
-    const t0 = Date.now();
-
-    // Detect native platform (Windows or POSIX/macOS/Linux) — fast (~500ms), but still non-blocking.
-    const nativePlatform = process.platform === "win32" ? ("windows" as const) : ("posix" as const);
-
-    void Promise.all(
-      [...this.adapters.values()].map(async (adapter) => {
-        const at = Date.now();
-        const status = await adapter.detectInstall();
-        console.log(
-          `[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): ${Date.now() - at}ms`,
-        );
-        return { ...status, envKind: nativePlatform };
-      }),
-    )
-      .then((nativeStatuses) => {
-        console.log(`[supervisor] ${nativePlatform} agent statuses: done (${Date.now() - t0}ms)`);
-        if (nativePlatform === "windows") {
-          this.emit({ type: "windows-agent-statuses", statuses: nativeStatuses });
-        }
-        this.detectWslAndWriteCache(nativeStatuses, wslDistros);
-      })
-      .catch(() => undefined);
+  private readDisabledAgents(): Set<string> {
+    try {
+      const raw = readFileSync(this.settingsPath, "utf8");
+      const settings = normalizeSharedSettings(JSON.parse(raw));
+      return new Set(settings.disabledAgents);
+    } catch {
+      return new Set();
+    }
   }
 
-  private detectWslAndWriteCache(
-    windowsStatuses: AgentStatus[],
-    wslDistros: readonly string[],
-  ): void {
-    const t0 = Date.now();
-    const distros = [...new Set(wslDistros)];
-    if (distros.length === 0) {
-      console.log(
-        `[supervisor] wsl agent statuses: skipped (no project distros) (${Date.now() - t0}ms)`,
-      );
-      this.emit({ type: "wsl-agent-statuses", statuses: [] });
-      this.writeDiskCache(windowsStatuses, []);
+  private detectAllAgentStatusesBackground(wslDistros: readonly string[]): void {
+    if (this.pendingDetection) {
+      console.log("[supervisor] agent detection already in progress, skipping");
       return;
     }
 
-    void detectWslAgentStatuses(this.adapters.values(), distros)
-      .then((wslStatuses) => {
-        const installedByDistro = new Map<string, number>();
-        for (const status of wslStatuses) {
-          const distro = status.envDistro;
-          if (!distro || !status.installed) continue;
-          installedByDistro.set(distro, (installedByDistro.get(distro) ?? 0) + 1);
+    const run = this.runDetection(wslDistros);
+    this.pendingDetection = run;
+    run.finally(() => {
+      this.pendingDetection = undefined;
+    });
+  }
+
+  private async runDetection(wslDistros: readonly string[]): Promise<void> {
+    const t0 = Date.now();
+    const disabled = this.readDisabledAgents();
+    const nativePlatform = process.platform === "win32" ? ("windows" as const) : ("posix" as const);
+
+    // Native detection — runs detectInstall() on all adapters in parallel.
+    const nativePromise = Promise.all(
+      [...this.adapters.values()].map(async (adapter) => {
+        if (disabled.has(adapter.kind)) {
+          console.log(`[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): skipped (disabled)`);
+          return {
+            kind: adapter.kind,
+            label: adapter.label,
+            installed: true,
+            authState: "unknown" as const,
+            capabilities: adapter.capabilities,
+            envKind: nativePlatform,
+          };
         }
-        console.log(
-          `[supervisor] wsl agent statuses: done (${Date.now() - t0}ms) ${distros.join(", ")} ${JSON.stringify(Object.fromEntries(installedByDistro))}`,
-        );
-        this.emit({ type: "wsl-agent-statuses", statuses: wslStatuses });
-        this.writeDiskCache(windowsStatuses, wslStatuses);
-      })
-      .catch(() => undefined);
+        const at = Date.now();
+        try {
+          const status = await adapter.detectInstall();
+          console.log(
+            `[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): ${Date.now() - at}ms`,
+          );
+          return { ...status, envKind: nativePlatform };
+        } catch (err) {
+          console.error(
+            `[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): FAILED after ${Date.now() - at}ms`,
+            err,
+          );
+          return {
+            kind: adapter.kind,
+            label: adapter.label,
+            installed: false,
+            authState: "unknown" as const,
+            capabilities: adapter.capabilities,
+            envKind: nativePlatform,
+          };
+        }
+      }),
+    ).then((nativeStatuses) => {
+      console.log(`[supervisor] ${nativePlatform} agent statuses: done (${Date.now() - t0}ms)`);
+      if (nativePlatform === "windows") {
+        this.emit({ type: "windows-agent-statuses", statuses: nativeStatuses });
+      }
+      return nativeStatuses;
+    });
+
+    // WSL detection — runs in parallel with native detection.
+    const distros = [...new Set(wslDistros)];
+    const wslPromise =
+      distros.length > 0
+        ? detectWslAgentStatuses(this.adapters.values(), distros, disabled).then((wslStatuses) => {
+            const installedByDistro = new Map<string, number>();
+            for (const status of wslStatuses) {
+              const distro = status.envDistro;
+              if (!distro || !status.installed) continue;
+              installedByDistro.set(distro, (installedByDistro.get(distro) ?? 0) + 1);
+            }
+            console.log(
+              `[supervisor] wsl agent statuses: done (${Date.now() - t0}ms) ${distros.join(", ")} ${JSON.stringify(Object.fromEntries(installedByDistro))}`,
+            );
+            this.emit({ type: "wsl-agent-statuses", statuses: wslStatuses });
+            return wslStatuses;
+          })
+        : Promise.resolve([] as AgentStatus[]);
+
+    // Wait for both to settle, then persist disk cache.
+    const [nativeResult, wslResult] = await Promise.allSettled([nativePromise, wslPromise]);
+    const nativeStatuses = nativeResult.status === "fulfilled" ? nativeResult.value : [];
+    const wslStatuses = wslResult.status === "fulfilled" ? wslResult.value : [];
+
+    if (distros.length === 0) {
+      this.emit({ type: "wsl-agent-statuses", statuses: [] });
+    }
+    this.writeDiskCache(nativeStatuses, wslStatuses);
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
@@ -2011,7 +2081,22 @@ export class SupervisorRuntime {
         return;
       }
 
-      const hint = session.adapter.detectTerminalStatus?.(stripped) ?? null;
+      let hint = session.adapter.detectTerminalStatus?.(stripped) ?? null;
+      const suppressWeakStructuredIdle =
+        session.agentKind === "codex" &&
+        session.structuredSession !== undefined &&
+        session.status === "working" &&
+        hint?.status === "idle" &&
+        !hint.corroborated;
+
+      if (suppressWeakStructuredIdle) {
+        if (session.pendingStatusHint?.status === "idle") {
+          clearTimeout(session.pendingStatusHint.timer);
+          session.pendingStatusHint = undefined;
+        }
+        hint = null;
+      }
+
       if (hint) {
         const nextConfig = session.adapter.syncConfigFromTerminalState?.({
           config: session.config,

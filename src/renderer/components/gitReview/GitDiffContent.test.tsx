@@ -4,9 +4,13 @@ import type { GitStatusResult, Project } from "../../../shared/contracts";
 
 const { bridge } = vi.hoisted(() => ({
   bridge: {
-    getGitDiff: vi.fn().mockResolvedValue({ diff: "" }),
-    getGitFileContent: vi.fn().mockResolvedValue({ oldContent: "", newContent: "" }),
-    getGitDiffBatch: vi.fn().mockResolvedValue({
+    getGitDiff: vi.fn<() => Promise<{ diff: string }>>().mockResolvedValue({ diff: "" }),
+    getGitFileContent: vi
+      .fn<() => Promise<{ oldContent: string; newContent: string }>>()
+      .mockResolvedValue({ oldContent: "", newContent: "" }),
+    getGitDiffBatch: vi.fn<
+      () => Promise<{ staged: Record<string, string>; unstaged: Record<string, string> }>
+    >().mockResolvedValue({
       staged: {},
       unstaged: {
         "src/worktree-only.ts": `diff --git a/src/worktree-only.ts b/src/worktree-only.ts

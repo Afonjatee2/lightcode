@@ -4,7 +4,7 @@ import { PromptOptions } from "./PromptOptions";
 
 describe("PromptOptions", () => {
   it("submits submitInput instead of the display key when provided", () => {
-    const onSelect = vi.fn();
+    const onSelect = vi.fn<(value: string) => void>();
 
     render(
       <PromptOptions
@@ -25,7 +25,7 @@ describe("PromptOptions", () => {
   });
 
   it("falls back to the visible key when no submitInput is provided", () => {
-    const onSelect = vi.fn();
+    const onSelect = vi.fn<(value: string) => void>();
 
     render(
       <PromptOptions
@@ -45,7 +45,7 @@ describe("PromptOptions", () => {
   });
 
   it("uses the option's submitInput when selected by number shortcut", () => {
-    const onSelect = vi.fn();
+    const onSelect = vi.fn<(value: string) => void>();
 
     render(
       <PromptOptions

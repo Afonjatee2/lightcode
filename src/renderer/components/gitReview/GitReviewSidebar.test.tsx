@@ -4,16 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitStatusResult, Project } from "../../../shared/contracts";
 
 const bridgeMock = vi.hoisted(() => ({
-  gitStage: vi.fn(),
-  gitUnstage: vi.fn(),
-  gitRevert: vi.fn(),
-  gitStageAll: vi.fn(),
-  gitUnstageAll: vi.fn(),
-  gitRevertAll: vi.fn(),
-  gitCommit: vi.fn(),
-  gitFetch: vi.fn(),
-  gitGetWorktreeSourceBranch: vi.fn(),
-  generateCommitMessage: vi.fn(),
+  gitStage: vi.fn<() => Promise<void>>(),
+  gitUnstage: vi.fn<() => Promise<void>>(),
+  gitRevert: vi.fn<() => Promise<void>>(),
+  gitStageAll: vi.fn<() => Promise<void>>(),
+  gitUnstageAll: vi.fn<() => Promise<void>>(),
+  gitRevertAll: vi.fn<() => Promise<void>>(),
+  gitCommit: vi.fn<() => Promise<void>>(),
+  gitFetch: vi.fn<() => Promise<void>>(),
+  gitGetWorktreeSourceBranch: vi.fn<
+    () => Promise<{ sourceBranch: string | null; commitsAhead: number; sourceAhead: number }>
+  >(),
+  generateCommitMessage: vi.fn<() => Promise<{ message: string }>>(),
 }));
 
 vi.mock("@heroui/react", () => {
@@ -92,7 +94,7 @@ vi.mock("@heroui/react", () => {
     Spinner: () => <span>spinner</span>,
     Surface: Wrapper,
     Tooltip,
-    toast: { danger: vi.fn() },
+    toast: { danger: vi.fn<() => void>() },
   };
 });
 
@@ -162,9 +164,11 @@ vi.mock("../layout/AppShell", () => ({
 }));
 
 vi.mock("../providers", () => ({
-  generateCommitMessageWithFallback: vi.fn(),
-  getCommitGenCandidates: vi.fn().mockReturnValue([]),
-  resolveCommitGenConfig: vi.fn().mockReturnValue({ model: "", effort: "", availableEfforts: [] }),
+  generateCommitMessageWithFallback: vi.fn<() => Promise<string>>(),
+  getCommitGenCandidates: vi.fn<() => unknown[]>().mockReturnValue([]),
+  resolveCommitGenConfig: vi
+    .fn<() => { model: string; effort: string; availableEfforts: string[] }>()
+    .mockReturnValue({ model: "", effort: "", availableEfforts: [] }),
 }));
 
 import { useGitStore } from "../../state/gitStore";

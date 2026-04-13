@@ -8,9 +8,11 @@ const { state } = vi.hoisted(() => ({
     terminal: null as null | Record<string, ReturnType<typeof vi.fn>>,
     eventListeners: [] as Array<(e: SupervisorEvent) => void>,
     bridge: {
-      writeTerminal: vi.fn().mockResolvedValue(undefined),
-      resizeTerminal: vi.fn().mockResolvedValue(undefined),
-      onSupervisorEvent: vi.fn(),
+      writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      resizeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      onSupervisorEvent: vi.fn<
+        (listener: (e: SupervisorEvent) => void) => () => void
+      >(),
     },
   },
 }));
@@ -18,21 +20,33 @@ const { state } = vi.hoisted(() => ({
 // ── xterm mocks ──────────────────────────────────────────────────
 vi.mock("@xterm/xterm", () => ({
   Terminal: class MockTerminal {
-    open = vi.fn();
-    loadAddon = vi.fn();
-    write = vi.fn();
-    reset = vi.fn();
-    dispose = vi.fn();
-    onData = vi.fn(() => ({ dispose: vi.fn() }));
-    onWriteParsed = vi.fn(() => ({ dispose: vi.fn() }));
-    onBell = vi.fn(() => ({ dispose: vi.fn() }));
-    onTitleChange = vi.fn(() => ({ dispose: vi.fn() }));
-    onScroll = vi.fn(() => ({ dispose: vi.fn() }));
-    onSelectionChange = vi.fn(() => ({ dispose: vi.fn() }));
-    hasSelection = vi.fn(() => false);
-    getSelection = vi.fn(() => "");
-    clearSelection = vi.fn();
-    attachCustomKeyEventHandler = vi.fn();
+    open = vi.fn<(element: Element) => void>();
+    loadAddon = vi.fn<(addon: unknown) => void>();
+    write = vi.fn<(data: string) => void>();
+    reset = vi.fn<() => void>();
+    dispose = vi.fn<() => void>();
+    onData = vi.fn<(handler: (data: string) => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
+    onWriteParsed = vi.fn<(handler: () => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
+    onBell = vi.fn<(handler: () => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
+    onTitleChange = vi.fn<(handler: (title: string) => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
+    onScroll = vi.fn<(handler: () => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
+    onSelectionChange = vi.fn<(handler: () => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
+    hasSelection = vi.fn<() => boolean>(() => false);
+    getSelection = vi.fn<() => string>(() => "");
+    clearSelection = vi.fn<() => void>();
+    attachCustomKeyEventHandler = vi.fn<(handler: (event: KeyboardEvent) => boolean) => void>();
     unicode = { activeVersion: "6" };
     buffer = { active: { baseY: 0, viewportY: 0 } };
     cols = 80;
@@ -45,7 +59,7 @@ vi.mock("@xterm/xterm", () => ({
 
 vi.mock("@xterm/addon-fit", () => ({
   FitAddon: class MockFitAddon {
-    fit = vi.fn();
+    fit = vi.fn<() => void>();
   },
 }));
 
@@ -71,7 +85,9 @@ vi.mock("@xterm/addon-web-links", () => ({
 
 vi.mock("@xterm/addon-webgl", () => ({
   WebglAddon: class MockWebglAddon {
-    onContextLoss = vi.fn(() => ({ dispose: vi.fn() }));
+    onContextLoss = vi.fn<(handler: () => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
   },
 }));
 
@@ -204,7 +220,7 @@ describe("XTermSurface", () => {
   });
 
   it("resets terminal and calls onReset on thread-reset", async () => {
-    const onReset = vi.fn();
+    const onReset = vi.fn<() => void>();
     render(<XTermSurface terminalId="test-1" onReset={onReset} />);
 
     act(() => {
@@ -216,7 +232,7 @@ describe("XTermSurface", () => {
   });
 
   it("calls onExited on thread-exited", async () => {
-    const onExited = vi.fn();
+    const onExited = vi.fn<(exitCode: number | null) => void>();
     render(<XTermSurface terminalId="test-1" onExited={onExited} />);
 
     act(() => {
@@ -251,7 +267,7 @@ describe("XTermSurface", () => {
   // ── Activity / bell / title callbacks ───────────────────────────
 
   it("calls onActivity when onWriteParsed fires", () => {
-    const onActivity = vi.fn();
+    const onActivity = vi.fn<() => void>();
     render(<XTermSurface terminalId="test-1" onActivity={onActivity} />);
 
     // onWriteParsed is called twice: once for activity tracking, once for scroll tracking.
@@ -264,7 +280,7 @@ describe("XTermSurface", () => {
   });
 
   it("calls onBell when bell fires", () => {
-    const onBell = vi.fn();
+    const onBell = vi.fn<() => void>();
     render(<XTermSurface terminalId="test-1" onBell={onBell} />);
 
     expect(terminal().onBell).toHaveBeenCalledTimes(1);
@@ -275,7 +291,7 @@ describe("XTermSurface", () => {
   });
 
   it("calls onTitleChange when title changes", () => {
-    const onTitleChange = vi.fn();
+    const onTitleChange = vi.fn<(title: string) => void>();
     render(<XTermSurface terminalId="test-1" onTitleChange={onTitleChange} />);
 
     expect(terminal().onTitleChange).toHaveBeenCalledTimes(1);

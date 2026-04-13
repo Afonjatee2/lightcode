@@ -28,6 +28,7 @@ interface SharedSettingsState extends SharedSettings {
   setAgentSetting: (agentKind: string, key: string, value: boolean | string) => void;
   setModelHidden: (agentKind: string, modelId: string, hidden: boolean) => void;
   setHiddenModels: (agentKind: string, hiddenIds: string[]) => void;
+  setAgentDisabled: (agentKind: string, disabled: boolean) => void;
   setCollapseTerminalComposer: (value: boolean) => void;
   setStaleThreadUnloadMinutes: (value: number) => void;
   setScrollSpeed: (value: number) => void;
@@ -130,6 +131,14 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ hiddenModels: { ...current, [agentKind]: hiddenIds } });
     persistSettings(selectSharedSettings(get()));
   },
+  setAgentDisabled: (agentKind, disabled) => {
+    const current = get().disabledAgents;
+    const next = disabled
+      ? [...new Set([...current, agentKind])]
+      : current.filter((k) => k !== agentKind);
+    set({ disabledAgents: next });
+    persistSettings(selectSharedSettings(get()));
+  },
   setCollapseTerminalComposer: (collapseTerminalComposer) => {
     set({ collapseTerminalComposer });
     persistSettings(selectSharedSettings(get()));
@@ -193,6 +202,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettings {
     wslConflictResolverEffort: state.wslConflictResolverEffort,
     agentSettings: state.agentSettings,
     hiddenModels: state.hiddenModels,
+    disabledAgents: state.disabledAgents,
     collapseTerminalComposer: state.collapseTerminalComposer,
     staleThreadUnloadMinutes: state.staleThreadUnloadMinutes,
     scrollSpeed: state.scrollSpeed,

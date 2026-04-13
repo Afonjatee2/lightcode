@@ -585,18 +585,33 @@ export function readWslCommandOutput(
 // These use execFile instead of spawnSync so the event loop stays free
 // for IPC messages (git status, thread snapshots, etc.) during detection.
 
+const execPathCache = new Map<string, { path: string | undefined; ts: number }>();
+const EXEC_CACHE_TTL_MS = 60_000;
+
+export function clearExecutablePathCache(): void {
+  execPathCache.clear();
+}
+
 export async function resolveExecutablePathAsync(command: string): Promise<string | undefined> {
+  const cached = execPathCache.get(command);
+  if (cached && Date.now() - cached.ts < EXEC_CACHE_TTL_MS) {
+    return cached.path;
+  }
+
   const locator = process.platform === "win32" ? "where.exe" : "which";
   try {
     const { stdout } = await execFileAsync(locator, [command], {
       windowsHide: true,
       timeout: 5_000,
     });
-    return stdout
+    const resolved = stdout
       .split(/\r?\n/g)
       .find((line) => line.trim().length > 0)
       ?.trim();
+    execPathCache.set(command, { path: resolved, ts: Date.now() });
+    return resolved;
   } catch {
+    execPathCache.set(command, { path: undefined, ts: Date.now() });
     return undefined;
   }
 }

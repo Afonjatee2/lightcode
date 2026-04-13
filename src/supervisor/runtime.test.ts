@@ -4,8 +4,8 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveLightcodePaths } from "../shared/lightcodePaths";
 
-const taskkillSpawnSyncMock = vi.hoisted(() => vi.fn());
-const ptySpawnMock = vi.hoisted(() => vi.fn());
+const taskkillSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
+const ptySpawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
 
 vi.mock("node:child_process", async (importActual) => {
   const actual = await importActual<typeof import("node:child_process")>();
@@ -48,13 +48,13 @@ function createMockPty() {
 
   return {
     pid: 4242,
-    write: vi.fn(),
-    resize: vi.fn(),
-    kill: vi.fn(),
-    onData: vi.fn((handler: (data: string) => void) => {
+    write: vi.fn<(data: string) => void>(),
+    resize: vi.fn<(cols: number, rows: number) => void>(),
+    kill: vi.fn<() => void>(),
+    onData: vi.fn<(handler: (data: string) => void) => void>((handler) => {
       onDataHandler = handler;
     }),
-    onExit: vi.fn((handler: (event: { exitCode: number | null }) => void) => {
+    onExit: vi.fn<(handler: (event: { exitCode: number | null }) => void) => void>((handler) => {
       onExitHandler = handler;
     }),
     emitData(data: string) {
@@ -87,9 +87,9 @@ function createRuntimeSession(overrides: Record<string, unknown> = {}) {
       },
     },
     pty: {
-      write: vi.fn(),
-      resize: vi.fn(),
-      kill: vi.fn(),
+      write: vi.fn<(data: string) => void>(),
+      resize: vi.fn<(cols: number, rows: number) => void>(),
+      kill: vi.fn<() => void>(),
     },
     projectLocation: {
       kind: "windows",
@@ -109,11 +109,11 @@ function createRuntimeSession(overrides: Record<string, unknown> = {}) {
     outputLength: 0,
     structuredSession: {
       launchOptions: {},
-      activate: vi.fn().mockResolvedValue(undefined),
-      startTurn: vi.fn().mockResolvedValue(undefined),
-      resolveServerRequest: vi.fn().mockResolvedValue(undefined),
-      setListener: vi.fn(),
-      dispose: vi.fn().mockResolvedValue(undefined),
+      activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      startTurn: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      resolveServerRequest: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      setListener: vi.fn<(listener: unknown) => void>(),
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     },
     ...overrides,
   };
@@ -184,16 +184,16 @@ describe("writeSubmittedPrompt", () => {
     const session = createRuntimeSession({
       structuredSession: {
         launchOptions: {},
-        activate: vi.fn().mockResolvedValue(undefined),
-        startTurn: vi.fn(
+        activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        startTurn: vi.fn<() => Promise<void>>(
           () =>
             new Promise<void>((resolve) => {
               resolveStartTurn = resolve;
             }),
         ),
-        resolveServerRequest: vi.fn().mockResolvedValue(undefined),
-        setListener: vi.fn(),
-        dispose: vi.fn().mockResolvedValue(undefined),
+        resolveServerRequest: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        setListener: vi.fn<(listener: unknown) => void>(),
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       },
     });
 
@@ -232,11 +232,11 @@ describe("writeSubmittedPrompt", () => {
     const session = createRuntimeSession({
       structuredSession: {
         launchOptions: {},
-        activate: vi.fn().mockResolvedValue(undefined),
-        startTurn: vi.fn().mockRejectedValue(new Error("request failed")),
-        resolveServerRequest: vi.fn().mockResolvedValue(undefined),
-        setListener: vi.fn(),
-        dispose: vi.fn().mockResolvedValue(undefined),
+        activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        startTurn: vi.fn<() => Promise<void>>().mockRejectedValue(new Error("request failed")),
+        resolveServerRequest: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        setListener: vi.fn<(listener: unknown) => void>(),
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       },
     });
 
@@ -310,9 +310,9 @@ describe("writeSubmittedPrompt", () => {
       shellId: "shell-1",
       pty: {
         pid: 4242,
-        kill: vi.fn(),
-        write: vi.fn(),
-        resize: vi.fn(),
+        kill: vi.fn<() => void>(),
+        write: vi.fn<(data: string) => void>(),
+        resize: vi.fn<(cols: number, rows: number) => void>(),
       },
       logPath: "shell.log",
       outputLength: 0,
@@ -365,7 +365,7 @@ describe("writeSubmittedPrompt", () => {
       emitted.push(event);
     });
     const pty = createMockPty();
-    const startTurn = vi.fn().mockResolvedValue(undefined);
+    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -402,9 +402,11 @@ describe("writeSubmittedPrompt", () => {
           liveInputMode: "server",
           presentationMode: "terminal",
         },
-        createInitialSessionRef: vi.fn(),
-        buildLaunchCommand: vi.fn(),
-        buildResumeCommand: vi.fn(),
+        createInitialSessionRef: vi
+          .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+          .mockReturnValue(undefined),
+        buildLaunchCommand: vi.fn<() => void>(),
+        buildResumeCommand: vi.fn<() => void>(),
         isReadyForInitialPrompt: (text: string) =>
           text.includes("OpenAI Codex") &&
           text.includes("directory:") &&
@@ -428,8 +430,8 @@ describe("writeSubmittedPrompt", () => {
       },
       structuredSession: {
         launchOptions: {},
-        setListener: vi.fn(),
-        dispose: vi.fn().mockResolvedValue(undefined),
+        setListener: vi.fn<(listener: unknown) => void>(),
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
         startTurn,
       },
       pendingLaunchPrompt: "hi",
@@ -453,10 +455,10 @@ describe("writeSubmittedPrompt", () => {
   it("does not eagerly start a queued Codex turn during thread startup", async () => {
     const runtime = new SupervisorRuntime(() => undefined);
     const pty = createMockPty();
-    const startTurn = vi.fn().mockResolvedValue(undefined);
-    const activate = vi.fn().mockResolvedValue(undefined);
-    const openThread = vi.fn().mockResolvedValue("session-1");
-    const ensureResumeArtifacts = vi.fn().mockResolvedValue(undefined);
+    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const activate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const openThread = vi.fn<() => Promise<string>>().mockResolvedValue("session-1");
+    const ensureResumeArtifacts = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -475,23 +477,25 @@ describe("writeSubmittedPrompt", () => {
         liveInputMode: "server" as const,
         presentationMode: "terminal" as const,
       },
-      detectInstall: vi.fn(),
-      buildLaunchCommand: vi.fn(() => ({
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchCommand: vi.fn<() => { command: string; args: string[] }>(() => ({
         command: "codex",
         args: ["resume", "session-1"],
       })),
-      buildResumeCommand: vi.fn(),
-      createInitialSessionRef: vi.fn(),
-      createStructuredSession: vi.fn().mockResolvedValue({
+      buildResumeCommand: vi.fn<() => void>(),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+      createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
         launchOptions: {},
         activate,
         openThread,
         ensureResumeArtifacts,
         startTurn,
-        setListener: vi.fn(),
-        dispose: vi.fn().mockResolvedValue(undefined),
+        setListener: vi.fn<(listener: unknown) => void>(),
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       }),
-      isReadyForInitialPrompt: vi.fn(() => false),
+      isReadyForInitialPrompt: vi.fn<(text: string) => boolean>(() => false),
     };
 
     (
@@ -534,9 +538,9 @@ describe("writeSubmittedPrompt", () => {
   it("skips TUI parsing hooks for server-backed GUI presentation", () => {
     const runtime = new SupervisorRuntime(() => undefined);
     const pty = createMockPty();
-    const detectAutoResponse = vi.fn(() => null);
-    const isReadyForInitialPrompt = vi.fn(() => false);
-    const detectTerminalStatus = vi.fn(() => null);
+    const detectAutoResponse = vi.fn<(text: string) => unknown>(() => null);
+    const isReadyForInitialPrompt = vi.fn<(text: string) => boolean>(() => false);
+    const detectTerminalStatus = vi.fn<(text: string) => unknown>(() => null);
 
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -571,9 +575,11 @@ describe("writeSubmittedPrompt", () => {
           liveInputMode: "server",
           presentationMode: "gui",
         },
-        createInitialSessionRef: vi.fn(),
-        buildLaunchCommand: vi.fn(),
-        buildResumeCommand: vi.fn(),
+        createInitialSessionRef: vi
+          .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+          .mockReturnValue(undefined),
+        buildLaunchCommand: vi.fn<() => void>(),
+        buildResumeCommand: vi.fn<() => void>(),
         detectAutoResponse,
         isReadyForInitialPrompt,
         detectTerminalStatus,
@@ -713,7 +719,29 @@ describe("detectWslAgentStatuses", () => {
   });
 
   it("detects statuses for every adapter in every distro", async () => {
-    const detectInstall = vi.fn(
+    const detectInstall = vi.fn<
+      (
+        ctx?: { envKind: "windows" | "wsl"; wslDistro?: string },
+      ) => Promise<{
+        kind: "codex";
+        label: string;
+        installed: boolean;
+        authState: "unknown";
+        capabilities: {
+          models: [];
+          efforts: [];
+          modelEfforts: {};
+          modes: [];
+          approvalPolicies: [];
+          sandboxModes: [];
+          supportsResume: true;
+          supportsDirectInput: true;
+          liveInputMode: "server";
+          presentationMode: "terminal";
+          settingDefs: [];
+        };
+      }>
+    >(
       async (ctx?: { envKind: "windows" | "wsl"; wslDistro?: string }) => ({
         kind: "codex" as const,
         label: `Codex ${ctx?.wslDistro ?? "windows"}`,
@@ -754,9 +782,15 @@ describe("detectWslAgentStatuses", () => {
             settingDefs: [],
           },
           detectInstall,
-          buildLaunchCommand: vi.fn(),
-          buildResumeCommand: vi.fn(),
-          createInitialSessionRef: vi.fn(),
+          buildLaunchCommand: vi
+            .fn<() => { command: string; args: string[] }>()
+            .mockReturnValue({ command: "codex", args: [] }),
+          buildResumeCommand: vi
+            .fn<() => { command: string; args: string[] }>()
+            .mockReturnValue({ command: "codex", args: [] }),
+          createInitialSessionRef: vi
+            .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+            .mockReturnValue(undefined),
         },
       ],
       ["Ubuntu", "Debian"],
