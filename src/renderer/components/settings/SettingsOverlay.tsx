@@ -51,6 +51,7 @@ import { ProviderIcon } from "../providers/ProviderIcon";
 import { Select, SidebarButton, TuxIcon } from "../common";
 import { useSidebar } from "../layout/AppShell";
 import { PageLayout } from "../layout/PageLayout";
+import { formatBytes } from "../../../shared/formatBytes";
 import { useUpdateStore } from "../../state/updateStore";
 
 const themeOptions = [
@@ -1025,6 +1026,9 @@ function UpdateButton() {
   const phase = useUpdateStore((s) => s.phase);
   const version = useUpdateStore((s) => s.version);
   const downloadPercent = useUpdateStore((s) => s.downloadPercent);
+  const transferred = useUpdateStore((s) => s.downloadTransferred);
+  const total = useUpdateStore((s) => s.downloadTotal);
+  const bytesPerSecond = useUpdateStore((s) => s.downloadBytesPerSecond);
 
   if (phase === "checking") {
     return (
@@ -1035,29 +1039,40 @@ function UpdateButton() {
     );
   }
 
-  if (phase === "available") {
-    return (
-      <Button size="sm" variant="ghost" onPress={() => void readBridge().startUpdateDownload()}>
-        <Download className="size-3.5" />
-        Download v{version}
-      </Button>
-    );
-  }
-
   if (phase === "downloading") {
+    const v = version ? ` v${version}` : "";
+    const byteLine =
+      transferred != null && total != null && total > 0
+        ? `${formatBytes(transferred)} / ${formatBytes(total)}`
+        : null;
+    const speedLine =
+      bytesPerSecond != null && bytesPerSecond > 0 ? `${formatBytes(bytesPerSecond)}/s` : null;
+
     return (
-      <Button size="sm" isDisabled variant="ghost">
-        <Download className="size-3.5 animate-pulse" />
-        Downloading {Math.round(downloadPercent)}%
-      </Button>
+      <div className="flex min-w-0 max-w-[min(100%,280px)] flex-col items-stretch gap-2 text-left">
+        <div className="flex items-center gap-2 text-sm text-foreground">
+          <Download className="size-3.5 shrink-0 animate-pulse" />
+          <span className="min-w-0 truncate">
+            Downloading{v} — {Math.round(downloadPercent)}%{speedLine ? ` · ${speedLine}` : ""}
+          </span>
+        </div>
+        {byteLine ? <p className="text-xs text-muted">{byteLine}</p> : null}
+        <div className="h-1 w-full rounded-full bg-white/10">
+          <div
+            className="h-1 rounded-full bg-accent transition-[width] duration-300"
+            style={{ width: `${Math.round(downloadPercent)}%` }}
+          />
+        </div>
+      </div>
     );
   }
 
   if (phase === "downloaded") {
+    const label = version ? `Install v${version}` : "Install update";
     return (
       <Button size="sm" variant="primary" onPress={() => void readBridge().installUpdate()}>
         <RefreshCw className="size-3.5" />
-        Restart to update
+        {label}
       </Button>
     );
   }
@@ -1088,12 +1103,14 @@ function AboutSettings() {
         </div>
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between gap-4">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">Version</p>
               <p className="text-xs text-muted">{bridge.appVersion}</p>
             </div>
-            <UpdateButton />
+            <div className="shrink-0">
+              <UpdateButton />
+            </div>
           </div>
 
           <div className="flex items-center justify-between gap-4">

@@ -78,9 +78,24 @@ const CHANNELS = {
   installUpdate: "lightcode:install-update",
 } as const;
 
+function resolveAppVersion(): string {
+  const prefix = "--lc-app-version=";
+  for (const arg of process.argv) {
+    if (arg.startsWith(prefix)) {
+      const raw = arg.slice(prefix.length);
+      try {
+        return decodeURIComponent(raw);
+      } catch {
+        return raw;
+      }
+    }
+  }
+  return process.env.npm_package_version ?? "dev";
+}
+
 const bridge: LightcodeBridge = {
   platform: process.platform,
-  appVersion: process.env.npm_package_version ?? "dev",
+  appVersion: resolveAppVersion(),
   electronVersion: process.versions.electron ?? "unknown",
   pickFolder: (defaultPath?) => ipcRenderer.invoke(CHANNELS.pickFolder, defaultPath),
   pickFiles: (options?) => ipcRenderer.invoke(CHANNELS.pickFiles, options),

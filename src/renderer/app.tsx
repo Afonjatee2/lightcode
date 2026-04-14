@@ -125,14 +125,18 @@ readBridge().onUpdateStatus((status) => {
       store.setChecking();
       break;
     case "update-available":
-      store.setAvailable(status.version);
+      store.beginUpdateDownload(status.version);
       break;
     case "update-not-available":
       store.setNotAvailable();
       toast.success("You're on the latest version.");
       break;
     case "downloading":
-      store.setDownloading(status.percent);
+      store.setDownloading(status.percent, {
+        transferred: status.transferred,
+        total: status.total,
+        bytesPerSecond: status.bytesPerSecond,
+      });
       break;
     case "downloaded":
       store.setDownloaded(status.version);

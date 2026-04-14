@@ -7,10 +7,10 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  FileDiff,
-  FileMinus2,
-  FilePlus2,
+  CircleMinus,
+  CirclePlus,
   ExternalLink,
+  FileDiff,
   GitMerge,
   GitPullRequest,
   Lock,
@@ -48,6 +48,7 @@ import { useSharedSettings } from "../../state/sharedSettingsStore";
 import { isLockFile } from "../../../shared/gitUtils";
 import { buildWorktreeLocation } from "../../../shared/worktree";
 import { SidebarButton, TextArea } from "../common";
+import { getFileIconUrl } from "../common/fileIcons";
 import { useSidebar } from "../layout/AppShell";
 import {
   generateCommitMessageWithFallback,
@@ -61,16 +62,21 @@ import { StackedFileCard } from "./GitStackedDiff";
 
 const EMPTY_BRANCHES: readonly GitBranchInfo[] = [];
 
-function FileStatusIcon(props: { status: string; className?: string }) {
-  const cls = `size-3.5 ${props.className ?? ""}`;
+function FileIcon(props: { path: string }) {
+  const name = props.path.split(/[\\/]/).pop() ?? props.path;
+  return <img src={getFileIconUrl(name)} alt="" className="size-4 shrink-0" />;
+}
+
+function FileStatusBadge(props: { status: string }) {
+  const cls = "ml-1 inline-block size-3 align-[-0.15em]";
   switch (props.status) {
     case "A":
     case "?":
-      return <FilePlus2 className={`${cls} text-success`} />;
+      return <CirclePlus className={`${cls} text-success`} />;
     case "D":
-      return <FileMinus2 className={`${cls} text-danger`} />;
+      return <CircleMinus className={`${cls} text-danger`} />;
     default:
-      return <FileDiff className={`${cls} text-warning`} />;
+      return null;
   }
 }
 
@@ -122,13 +128,13 @@ function FileRow(props: {
         }`}
         onClick={onSelect}
       >
-        <FileStatusIcon status={file.status} />
+        <FileIcon path={file.path} />
         <span className="min-w-0 flex-1 truncate" title={file.path}>
           <span className="text-foreground">{basename}</span>
           {isLockFile(file.path) && <Lock className="ml-1 inline-block size-2 text-muted/40" />}
           {dir && <span className="ml-1 text-muted/60">{dir}</span>}
+          <FileStatusBadge status={file.status} />
         </span>
-
         <span className="relative w-14 shrink-0">
           <span className="flex items-center justify-end text-[10px] font-medium transition-opacity group-hover:opacity-0">
             {file.insertions > 0 && <span className="text-success">+{file.insertions}</span>}

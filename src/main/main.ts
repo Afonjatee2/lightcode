@@ -245,6 +245,9 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Preload cannot call `app.getVersion()`; pass it so About shows the real semver (not "dev"
+      // when npm_package_version is unset — e.g. `electron .` without npm injecting env).
+      additionalArguments: [`--lc-app-version=${encodeURIComponent(app.getVersion())}`],
     },
   });
 
@@ -386,10 +389,14 @@ function callSupervisor<TRequest extends SupervisorRequest, TResult = unknown>(
           return;
         }
         pendingRequests.delete(id);
+        // EPIPE means the supervisor process is already gone (e.g. during
+        // quit-and-install). Not a real error — just discard the request.
+        if ((error as NodeJS.ErrnoException).code === "EPIPE") return;
         reject(error);
       });
     } catch (error) {
       pendingRequests.delete(id);
+      if ((error as NodeJS.ErrnoException).code === "EPIPE") return;
       reject(error);
     }
   });
@@ -400,8 +407,8 @@ function sendUpdateStatus(status: UpdateStatus): void {
 }
 
 function setupAutoUpdater(): void {
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.forceDevUpdateConfig = Boolean(process.env.UPDATE_SERVER_URL);
 
   // Allow testing updates against a local server:
@@ -739,11 +746,19 @@ function registerIpcHandlers(): void {
   });
 
   ipcMain.handle(CHANNELS.startUpdateDownload, async () => {
-    await autoUpdater.downloadUpdate();
+    try {
+      await autoUpdater.downloadUpdate();
+    } catch (err: unknown) {
+      // EPIPE from Electron's net session is harmless — the file was written
+      // before the stream teardown error fires.
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === "EPIPE") return;
+      throw err;
+    }
   });
 
   ipcMain.handle(CHANNELS.installUpdate, () => {
-    autoUpdater.quitAndInstall(false, true);
+    autoUpdater.quitAndInstall(process.platform === "win32", true);
   });
 }
 
@@ -829,6 +844,9 @@ if (!hasSingleInstanceLock) {
 
 app.on("before-quit", () => {
   supervisor?.kill();
+});
+
+app.on("will-quit", () => {
   closeDatabase();
 });
 

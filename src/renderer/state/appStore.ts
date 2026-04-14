@@ -641,9 +641,7 @@ export const useAppStore = create<AppStoreState>()(
           const thread = state.threads.find((t) => t.id === threadId);
           if (!thread || thread.done) return {};
 
-          const threads = state.threads.map((t) =>
-            t.id === threadId ? { ...t, done: true, updatedAt: new Date().toISOString() } : t,
-          );
+          const threads = state.threads.map((t) => (t.id === threadId ? { ...t, done: true } : t));
 
           let nextView = state.view;
           if (state.view.kind === "thread") {
@@ -661,9 +659,7 @@ export const useAppStore = create<AppStoreState>()(
           const thread = state.threads.find((t) => t.id === threadId);
           if (!thread || !thread.done) return {};
           return {
-            threads: state.threads.map((t) =>
-              t.id === threadId ? { ...t, done: false, updatedAt: new Date().toISOString() } : t,
-            ),
+            threads: state.threads.map((t) => (t.id === threadId ? { ...t, done: false } : t)),
           };
         }),
       purgeStaleArchivedThreads: (maxAgeDays) =>

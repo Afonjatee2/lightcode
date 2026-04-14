@@ -35,6 +35,7 @@ import { useDndContext, type DragSourceData } from "../../dnd";
 import { ContextMenu, SidebarButton } from "../common";
 import { useSidebar } from "../layout/AppShell";
 import { isWindows, readBridge } from "../../bridge";
+import { formatBytes } from "../../../shared/formatBytes";
 import { useUpdateStore } from "../../state/updateStore";
 import { useSharedSettings } from "../../state/sharedSettingsStore";
 import { ProviderIcon, getStatusTone } from "../providers";
@@ -156,27 +157,23 @@ function UpdateButtons(props: { iconOnly?: boolean }) {
   const updatePhase = useUpdateStore((s) => s.phase);
   const updateVersion = useUpdateStore((s) => s.version);
   const downloadPercent = useUpdateStore((s) => s.downloadPercent);
+  const transferred = useUpdateStore((s) => s.downloadTransferred);
+  const total = useUpdateStore((s) => s.downloadTotal);
+  const bytesPerSecond = useUpdateStore((s) => s.downloadBytesPerSecond);
 
-  if (
-    updatePhase !== "available" &&
-    updatePhase !== "downloading" &&
-    updatePhase !== "downloaded"
-  ) {
+  if (updatePhase !== "downloading" && updatePhase !== "downloaded") {
     return null;
   }
 
-  if (updatePhase === "available") {
-    return (
-      <SidebarButton
-        iconOnly={iconOnly}
-        icon={<Download className="size-4 text-accent" />}
-        label={`Update to v${updateVersion}`}
-        onPress={() => void readBridge().startUpdateDownload()}
-      />
-    );
-  }
-
   if (updatePhase === "downloading") {
+    const versionLabel = updateVersion ? ` v${updateVersion}` : "";
+    const byteLine =
+      transferred != null && total != null && total > 0
+        ? `${formatBytes(transferred)} / ${formatBytes(total)}`
+        : null;
+    const speedLine =
+      bytesPerSecond != null && bytesPerSecond > 0 ? `${formatBytes(bytesPerSecond)}/s` : null;
+
     if (iconOnly) {
       return (
         <Tooltip delay={150}>
@@ -186,7 +183,9 @@ function UpdateButtons(props: { iconOnly?: boolean }) {
             </div>
           </Tooltip.Trigger>
           <Tooltip.Content placement="right">
-            Downloading {Math.round(downloadPercent)}%
+            Downloading{versionLabel} — {Math.round(downloadPercent)}%
+            {byteLine ? ` · ${byteLine}` : ""}
+            {speedLine ? ` · ${speedLine}` : ""}
           </Tooltip.Content>
         </Tooltip>
       );
@@ -196,7 +195,11 @@ function UpdateButtons(props: { iconOnly?: boolean }) {
       <div className="flex w-full items-center gap-2 rounded-3xl px-3 py-1.5 text-sm text-muted">
         <Download className="size-4 shrink-0 animate-pulse text-accent" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="truncate">Downloading update…</span>
+          <span className="truncate">
+            Downloading{versionLabel} — {Math.round(downloadPercent)}%
+            {speedLine ? ` · ${speedLine}` : ""}
+          </span>
+          {byteLine ? <span className="truncate text-xs opacity-80">{byteLine}</span> : null}
           <div className="h-1 w-full rounded-full bg-white/10">
             <div
               className="h-1 rounded-full bg-accent transition-[width] duration-300"
@@ -213,7 +216,7 @@ function UpdateButtons(props: { iconOnly?: boolean }) {
     <SidebarButton
       iconOnly={iconOnly}
       icon={<RefreshCw className="size-4 text-accent" />}
-      label="Restart to update"
+      label={updateVersion ? `Install v${updateVersion}` : "Install update"}
       onPress={() => void readBridge().installUpdate()}
     />
   );
