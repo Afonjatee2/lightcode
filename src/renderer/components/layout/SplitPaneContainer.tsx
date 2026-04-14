@@ -23,8 +23,23 @@ export function SplitPaneContainer(props: { children: ReactNode }) {
     )
     .join(",");
 
+  // Track previous count+keys to detect changes synchronously (no useEffect lag)
+  const prevRef = useRef({ count, childKeys });
+
+  // Compute sizes synchronously: if count or keys changed, reset to equal sizes
+  // immediately so the first render already has correct flex-basis values.
+  let activeSizes = sizes;
+  if (prevRef.current.count !== count || prevRef.current.childKeys !== childKeys) {
+    activeSizes = equalSizes(count);
+    prevRef.current = { count, childKeys };
+  }
+
+  // Sync React state to match (fires after paint, but layout is already correct)
   useEffect(() => {
-    setSizes(equalSizes(count));
+    setSizes((prev) => {
+      if (prev.length !== count) return equalSizes(count);
+      return prev;
+    });
   }, [count, childKeys]);
 
   useEffect(() => {
@@ -66,8 +81,8 @@ export function SplitPaneContainer(props: { children: ReactNode }) {
     e.preventDefault();
     dragRef.current = {
       startX: e.clientX,
-      leftStart: sizes[index]!,
-      rightStart: sizes[index + 1]!,
+      leftStart: activeSizes[index]!,
+      rightStart: activeSizes[index + 1]!,
       index,
     };
     setResizingIndex(index);
@@ -75,20 +90,22 @@ export function SplitPaneContainer(props: { children: ReactNode }) {
 
   const { paneIndicator } = useDndContext();
 
-  if (count <= 1) {
-    return <>{items[0]}</>;
-  }
-
   return (
     <div
       ref={containerRef}
       className={`flex h-full min-h-0 w-full ${resizingIndex !== null ? "select-none" : ""}`}
     >
       {items.map((child, i) => (
-        <React.Fragment key={i}>
+        <React.Fragment
+          key={
+            typeof child === "object" && child !== null && "key" in child
+              ? (child as React.ReactElement).key
+              : i
+          }
+        >
           <div
             className="h-full min-h-0 min-w-0 overflow-hidden"
-            style={{ flexBasis: `${sizes[i]}%`, flexGrow: 0, flexShrink: 1 }}
+            style={{ flexBasis: `${activeSizes[i] ?? 100 / count}%`, flexGrow: 0, flexShrink: 1 }}
           >
             {child}
           </div>

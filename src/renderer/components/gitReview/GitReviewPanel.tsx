@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Archive, GitBranch, Maximize2, PanelRightClose, RefreshCw, Trash2 } from "lucide-react";
+import { Archive, GitBranch, Maximize2, PanelRightClose, RefreshCw, Trash2, WrapText } from "lucide-react";
 import { toast, Tooltip } from "@heroui/react";
 import type { Project, ProjectLocation, GitStatusResult } from "../../../shared/contracts";
 import { friendlyError } from "../../../shared/messages";
@@ -42,6 +42,7 @@ export function GitReviewPanel(props: {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedStaged, setSelectedStaged] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [wrapLines, setWrapLines] = useState(false);
   const gitStatus = useGitStore((s) =>
     statusKey ? s.worktreeStatuses[statusKey] : s.statuses[project.id],
   ) as GitStatusResult | undefined;
@@ -170,6 +171,14 @@ export function GitReviewPanel(props: {
           )}
           <button
             type="button"
+            className={`rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${wrapLines ? "text-foreground" : "text-muted"}`}
+            title={wrapLines ? "No wrap" : "Wrap lines"}
+            onClick={() => setWrapLines((v) => !v)}
+          >
+            <WrapText className="size-3" />
+          </button>
+          <button
+            type="button"
             className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
             title="Refresh"
             onClick={() => void handleRefresh()}
@@ -209,6 +218,7 @@ export function GitReviewPanel(props: {
             refreshKey={refreshKey}
             onRefresh={() => void handleRefresh()}
             mode="panel"
+            wrapLines={wrapLines}
           />
         </div>
       </div>

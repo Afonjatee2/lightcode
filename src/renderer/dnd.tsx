@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, useMemo } from 
 import { DragDropProvider, PointerSensor, KeyboardSensor } from "@dnd-kit/react";
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { isSortable } from "@dnd-kit/react/sortable";
+import { makeDraftPaneId } from "../shared/paneId";
 
 // ── Drag source types ──────────────────────────────────────────
 export type DragSourceData =
@@ -162,6 +163,16 @@ export function AppDndProvider(props: {
             targetType === "pane-drop-zone" &&
             (data.type === "thread" || data.type === "pane" || data.type === "new-thread")
           ) {
+            // Block drop if this project's draft pane already exists
+            if (data.type === "new-thread") {
+              const draftId = makeDraftPaneId(data.projectId);
+              if (paneThreadIdsRef.current.includes(draftId)) {
+                activePaneTarget.current = null;
+                setPaneIndicator(null);
+                paneIndicatorRef.current = null;
+                return;
+              }
+            }
             const paneIndex = targetData?.paneIndex as number;
             const el = target.element;
             if (el) {

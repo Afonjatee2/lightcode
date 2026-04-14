@@ -16,8 +16,10 @@ export function StatusIcon(props: {
   const gradientId = `${baseId}-gradient`;
 
   const [, , vbW, vbH] = viewBox.split(" ").map(Number);
-  const scanWidth = (vbW ?? 16) * 2;
-  const scanHeight = (vbH ?? 16) + 4;
+  const viewBoxWidth = vbW ?? 16;
+  const viewBoxHeight = vbH ?? 16;
+  const scanWidth = viewBoxWidth * 2;
+  const scanHeight = viewBoxHeight + 4;
 
   const pathProps = fillRule ? ({ clipRule: fillRule, fillRule } as const) : {};
 
@@ -51,7 +53,14 @@ export function StatusIcon(props: {
         ) : null}
         <path className={`lightcode-provider-icon__fill${tone === "done" ? " opacity-40" : ""}`} d={path} {...pathProps} />
         {tone === "done" ? (
-          <svg viewBox="0 0 24 24" x={vbW * 0.15} y={vbH * 0.15} width={vbW * 0.7} height={vbH * 0.7} className="text-success">
+          <svg
+            viewBox="0 0 24 24"
+            x={viewBoxWidth * 0.15}
+            y={viewBoxHeight * 0.15}
+            width={viewBoxWidth * 0.7}
+            height={viewBoxHeight * 0.7}
+            className="text-success"
+          >
             <path
               d="M5 13l4 4L19 7"
               fill="none"
@@ -77,7 +86,7 @@ export function StatusIcon(props: {
               dur="1.45s"
               from={-scanWidth}
               repeatCount="indefinite"
-              to={vbW}
+              to={viewBoxWidth}
             />
           </rect>
         ) : null}

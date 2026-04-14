@@ -444,7 +444,7 @@ function ThreadPane(props: {
   // Same element is also a drop target (for pane-to-pane and sidebar-to-pane)
   useDroppable({
     id: `pane-drop:${props.paneIndex}`,
-    accept: ["pane", "thread"],
+    accept: ["pane", "thread", "new-thread"],
     data: { type: "pane-drop-zone", paneIndex: props.paneIndex },
     element: paneElementRef,
   });
@@ -947,6 +947,7 @@ export function App() {
   const _reorderThreadBlock = useAppStore((state) => state.reorderThreadBlock);
   const reorderPanes = useAppStore((state) => state.reorderPanes);
   const insertPaneAtIndex = useAppStore((state) => state.insertPaneAtIndex);
+  const replacePaneId = useAppStore((state) => state.replacePaneId);
   const updateThreadRuntime = useAppStore((state) => state.updateThreadRuntime);
   const devTerminalOpen = useDevTerminalStore((s) => s.isOpen);
   const devTerminalActiveProjectId = useDevTerminalStore((s) => {
@@ -1777,7 +1778,12 @@ export function App() {
         if (target.kind === "insert") {
           insertPaneAtIndex(draftPaneId, target.index);
         } else {
-          openDraftSideBySide(source.projectId);
+          const oldPaneId = panes[target.paneIndex];
+          if (oldPaneId) {
+            replacePaneId(oldPaneId, draftPaneId);
+          } else {
+            openDraftSideBySide(source.projectId);
+          }
         }
       });
     }

@@ -324,7 +324,7 @@ export function ThreadView(props: {
             {thread.title}
           </span>
           <div className="flex shrink-0 items-center">
-            {paneCount > 1 && projectName ? (
+            {projectName ? (
               <span className="px-1 text-sm text-muted/60">
                 {projectName}
               </span>

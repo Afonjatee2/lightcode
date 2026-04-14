@@ -17,10 +17,10 @@ import type { Terminal, ILinkProvider, ILink, IBufferLine } from "@xterm/xterm";
 // Copied from @xterm/addon-web-links v0.12.0 (MIT license).
 // Matches http(s):// URLs, excluding unsafe/bracket characters as finals.
 const strictUrlRegex =
-  /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\\^<>`]*[^\s"':,.!?{}|\\\^~\[\]`()<>]/;
+  /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\^<>`]*[^\s"':,.!?{}|\\^~[\]`()<>]/;
 
 /** Characters that are legal inside a URL path/query/fragment. */
-const URL_LEGAL_TAIL = /[^\s"'!*(){}|\\\^<>`]+$/;
+const URL_LEGAL_TAIL = /[^\s"'!*(){}|\\^<>`]+$/;
 
 function isUrl(text: string): boolean {
   try {

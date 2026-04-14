@@ -56,6 +56,8 @@ import {
 } from "../providers";
 import { getConflictResolverDefaults } from "../providers/ProviderIcon";
 import { msg, friendlyError } from "../../../shared/messages";
+import { useDiffTheme } from "./diffBuildClient";
+import { StackedFileCard } from "./GitStackedDiff";
 
 const EMPTY_BRANCHES: readonly GitBranchInfo[] = [];
 
@@ -256,10 +258,14 @@ function FileGroup(props: {
   selectedFile: string | null;
   onSelectFile: (path: string, staged: boolean) => void;
   onRefresh: () => void;
+  mode?: "overlay" | "panel";
+  diffTheme?: "light" | "dark";
+  wrapLines?: boolean;
 }) {
-  const { title, count, staged, files, project, selectedFile, onSelectFile, onRefresh } = props;
+  const { title, count, staged, files, project, selectedFile, onSelectFile, onRefresh, mode, diffTheme, wrapLines } = props;
   const [expanded, setExpanded] = useState(true);
   const [revertAllOpen, setRevertAllOpen] = useState(false);
+  const inlineDiffs = mode === "panel";
 
   async function handleStageAll() {
     await readBridge().gitStageAll({ projectLocation: project.location });
@@ -276,6 +282,16 @@ function FileGroup(props: {
     setRevertAllOpen(false);
     onRefresh();
   }
+
+  const sorted = files.toSorted((a, b) => {
+    const aDir = a.path.substring(0, a.path.lastIndexOf("/"));
+    const bDir = b.path.substring(0, b.path.lastIndexOf("/"));
+    const dirCmp = aDir.localeCompare(bDir, undefined, { sensitivity: "base" });
+    if (dirCmp !== 0) return dirCmp;
+    const aName = a.path.substring(a.path.lastIndexOf("/") + 1);
+    const bName = b.path.substring(b.path.lastIndexOf("/") + 1);
+    return aName.localeCompare(bName, undefined, { sensitivity: "base" });
+  });
 
   return (
     <div>
@@ -356,25 +372,28 @@ function FileGroup(props: {
         </AlertDialog.Backdrop>
       )}
       {expanded && (
-        <div className="space-y-px">
-          {files.toSorted((a, b) => {
-            const aDir = a.path.substring(0, a.path.lastIndexOf("/"));
-            const bDir = b.path.substring(0, b.path.lastIndexOf("/"));
-            const dirCmp = aDir.localeCompare(bDir, undefined, { sensitivity: "base" });
-            if (dirCmp !== 0) return dirCmp;
-            const aName = a.path.substring(a.path.lastIndexOf("/") + 1);
-            const bName = b.path.substring(b.path.lastIndexOf("/") + 1);
-            return aName.localeCompare(bName, undefined, { sensitivity: "base" });
-          }).map((file) => (
-            <FileRow
-              key={`${file.staged ? "s" : "u"}:${file.path}`}
-              file={file}
-              project={project}
-              isSelected={selectedFile === file.path}
-              onSelect={() => onSelectFile(file.path, file.staged)}
-              onRefresh={onRefresh}
-            />
-          ))}
+        <div className={inlineDiffs ? "space-y-1" : "space-y-px"}>
+          {inlineDiffs
+            ? sorted.map((file) => (
+                <StackedFileCard
+                  key={`${file.staged ? "s" : "u"}:${file.path}`}
+                  file={file}
+                  project={project}
+                  theme={diffTheme ?? "dark"}
+                  wrapLines={wrapLines ?? false}
+                  onRefresh={onRefresh}
+                />
+              ))
+            : sorted.map((file) => (
+                <FileRow
+                  key={`${file.staged ? "s" : "u"}:${file.path}`}
+                  file={file}
+                  project={project}
+                  isSelected={selectedFile === file.path}
+                  onSelect={() => onSelectFile(file.path, file.staged)}
+                  onRefresh={onRefresh}
+                />
+              ))}
         </div>
       )}
     </div>
@@ -394,6 +413,7 @@ export function GitReviewSidebar(props: {
   onClose: () => void;
   onRefresh: () => void;
   mode?: "overlay" | "panel";
+  wrapLines?: boolean;
   onExpandToOverlay?: () => void;
 }) {
   const {
@@ -409,8 +429,10 @@ export function GitReviewSidebar(props: {
     onClose,
     onRefresh,
     mode = "overlay",
+    wrapLines = false,
   } = props;
   const { isCollapsed, collapse, expand } = useSidebar();
+  const diffTheme = useDiffTheme();
   const agentStatuses = useAppStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAppStore((s) => s.wslAgentStatuses);
   const isWsl = project.location.kind === "wsl";
@@ -982,6 +1004,9 @@ export function GitReviewSidebar(props: {
               selectedFile={selectedStaged ? selectedFile : null}
               onSelectFile={onSelectFile}
               onRefresh={onRefresh}
+              mode={mode}
+              diffTheme={diffTheme}
+              wrapLines={wrapLines}
             />
           )}
           {gitStatus && gitStatus.unstaged.length > 0 && (
@@ -994,6 +1019,9 @@ export function GitReviewSidebar(props: {
               selectedFile={!selectedStaged ? selectedFile : null}
               onSelectFile={onSelectFile}
               onRefresh={onRefresh}
+              mode={mode}
+              diffTheme={diffTheme}
+              wrapLines={wrapLines}
             />
           )}
           {mergeConflicting && mergeConflictFiles.length > 0 && (

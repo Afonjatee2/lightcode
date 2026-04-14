@@ -46,7 +46,9 @@ vi.mock("@xterm/xterm", () => ({
     hasSelection = vi.fn<() => boolean>(() => false);
     getSelection = vi.fn<() => string>(() => "");
     clearSelection = vi.fn<() => void>();
-    registerLinkProvider = vi.fn(() => ({ dispose: vi.fn() }));
+    registerLinkProvider = vi
+      .fn<() => { dispose: () => void }>()
+      .mockReturnValue({ dispose: vi.fn<() => void>() });
     attachCustomKeyEventHandler = vi.fn<(handler: (event: KeyboardEvent) => boolean) => void>();
     unicode = { activeVersion: "6" };
     buffer = { active: { baseY: 0, viewportY: 0 } };

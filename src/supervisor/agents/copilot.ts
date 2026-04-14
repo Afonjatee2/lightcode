@@ -598,7 +598,7 @@ export function createCopilotAdapter(): AgentAdapter {
     const sessionCwd = location.kind === "wsl" ? location.linuxPath : location.path;
     const probe = await probeAcpCapabilities(spec.command, spec.args, sessionCwd, {
       ...(spec.cwd ? { processCwd: spec.cwd } : {}),
-      timeoutMs: 8_000,
+      timeoutMs: 15_000,
       label:
         location.kind === "wsl" ? `copilot:wsl:${location.distro}` : `copilot:${location.kind}`,
     });

@@ -1,5 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { createCursorAdapter, detectCursorTerminalStatus, sortCursorModels } from "./cursor";
+import {
+  buildCursorProbeSpec,
+  createCursorAdapter,
+  detectCursorTerminalStatus,
+  sortCursorModels,
+} from "./cursor";
+
+function decodePowerShellEncodedCommand(encoded: string): string {
+  return Buffer.from(encoded, "base64").toString("utf16le");
+}
+
+function parseWindowsSpec(spec: { args: string[] }): { cmd: string; cmdArgs: string[] } {
+  if (spec.args[0] === "-NoLogo") {
+    const script = decodePowerShellEncodedCommand(spec.args[3]!);
+    const cmd = script.match(/\$cmd = '((?:[^']|'')*)'/)?.[1]?.replaceAll("''", "'") ?? "";
+    const argsStr = script.match(/\$args = @\((.*)\)/)?.[1] ?? "";
+    const cmdArgs = argsStr
+      ? argsStr.split(", ").map((a) => a.replace(/^'|'$/g, "").replaceAll("''", "'"))
+      : [];
+    return { cmd, cmdArgs };
+  }
+  return { cmd: spec.args[3]!, cmdArgs: spec.args.slice(4) };
+}
 
 describe("createCursorAdapter capabilities", () => {
   it("exposes non-empty approvalPolicies for the YOLO toggle", () => {
@@ -230,4 +252,22 @@ describe("sortCursorModels", () => {
       "GPT-5.1 Codex Max Low",
     ]);
   });
+});
+
+describe("buildCursorProbeSpec", () => {
+  it.skipIf(process.platform !== "win32")(
+    "routes Windows probes through the same wrapped command path as real launches",
+    () => {
+      const spec = buildCursorProbeSpec(
+        "C:\\Users\\demo\\AppData\\Local\\cursor-agent\\cursor-agent.cmd",
+        ["--list-models"],
+        "C:\\Users\\demo\\project",
+      );
+
+      expect(spec.cwd).toBe("C:\\Users\\demo\\project");
+      const { cmd, cmdArgs } = parseWindowsSpec(spec);
+      expect(cmd).toBe("C:\\Users\\demo\\AppData\\Local\\cursor-agent\\cursor-agent.cmd");
+      expect(cmdArgs).toEqual(["--list-models"]);
+    },
+  );
 });

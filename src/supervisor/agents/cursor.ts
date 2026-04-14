@@ -7,20 +7,23 @@ import type {
   PromptSegment,
   ThreadConfig,
 } from "../../shared/contracts";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
+import { promisify } from "node:util";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,
   createKnownSessionRef,
-  readCommandOutputAsync,
   readWslCommandOutputAsync,
   resolveExecutablePathAsync,
   resolveWslExecutablePath,
   type AgentAdapter,
   type AgentEnvContext,
+  type CommandSpec,
   type TerminalStatusHint,
 } from "./base";
 import { stripAnsi } from "../../shared/ansi";
+
+const execFileAsync = promisify(execFile);
 
 const CURSOR_ATTENTION_RE = /Run this command\?|Suggested Plan|Waiting for approval/i;
 const CURSOR_WORKING_RE = /ctrl\+c to stop|\b(?:Generating|Reading|Globbing|Thinking)\b/i;
@@ -87,6 +90,44 @@ function buildCursorArgs(config: ThreadConfig, prompt: string, resumeSessionId?:
 }
 
 const MODEL_LINE_RE = /^([^\s-]+(?:-[^\s-]+)*)\s+-\s+(.+)$/;
+
+export function buildCursorProbeSpec(
+  executablePath: string,
+  args: string[],
+  cwd = process.cwd(),
+): CommandSpec {
+  const location: ProjectLocation =
+    process.platform === "win32" ? { kind: "windows", path: cwd } : { kind: "posix", path: cwd };
+  return buildAgentCommand(location, executablePath, args);
+}
+
+async function readCommandSpecOutputAsync(
+  spec: CommandSpec,
+): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  try {
+    const { stdout, stderr } = await execFileAsync(spec.command, spec.args, {
+      windowsHide: true,
+      timeout: 10_000,
+      ...(spec.cwd ? { cwd: spec.cwd } : {}),
+      ...(spec.env ? { env: { ...process.env, ...spec.env } } : {}),
+    });
+    return { ok: true, stdout: (stdout ?? "").trim(), stderr: (stderr ?? "").trim() };
+  } catch (error: unknown) {
+    const err = error as { stdout?: string; stderr?: string } | undefined;
+    return {
+      ok: false,
+      stdout: (err?.stdout ?? "").trim(),
+      stderr: (err?.stderr ?? "").trim(),
+    };
+  }
+}
+
+async function readCursorProbeOutputAsync(
+  executablePath: string,
+  args: string[],
+): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  return readCommandSpecOutputAsync(buildCursorProbeSpec(executablePath, args));
+}
 
 export function parseCursorModels(output: string): LabeledOption[] {
   const models: LabeledOption[] = [];
@@ -362,9 +403,11 @@ export function createCursorAdapter(): AgentAdapter {
 
       const executablePath = await resolveExecutablePathAsync("cursor-agent");
       const [versionResult, statusResult, modelsResult] = await Promise.all([
-        executablePath ? readCommandOutputAsync("cursor-agent", ["--version"]) : undefined,
-        executablePath ? readCommandOutputAsync("cursor-agent", ["status"]) : undefined,
-        executablePath ? readCommandOutputAsync("cursor-agent", ["--list-models"]) : undefined,
+        executablePath ? readCursorProbeOutputAsync(executablePath, ["--version"]) : undefined,
+        executablePath ? readCursorProbeOutputAsync(executablePath, ["status"]) : undefined,
+        executablePath
+          ? readCursorProbeOutputAsync(executablePath, ["--list-models"])
+          : undefined,
       ]);
 
       if (modelsResult?.ok) {

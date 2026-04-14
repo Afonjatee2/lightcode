@@ -952,9 +952,9 @@ export class SupervisorRuntime {
       TERM: "xterm-256color",
     };
     if (payload.projectLocation.kind === "wsl") {
-      const existing = process.env.WSLENV ?? "";
-      if (!existing.split(":").some((v) => v.replace(/\/.*/, "") === "TERM")) {
-        shellEnv.WSLENV = existing ? `${existing}:TERM` : "TERM";
+      const existingWslEnv = process.env.WSLENV ?? "";
+      if (!existingWslEnv.split(":").some((v) => v.replace(/\/.*/, "") === "TERM")) {
+        shellEnv.WSLENV = existingWslEnv ? `${existingWslEnv}:TERM` : "TERM";
       }
     }
 
