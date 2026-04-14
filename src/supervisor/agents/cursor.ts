@@ -405,9 +405,7 @@ export function createCursorAdapter(): AgentAdapter {
       const [versionResult, statusResult, modelsResult] = await Promise.all([
         executablePath ? readCursorProbeOutputAsync(executablePath, ["--version"]) : undefined,
         executablePath ? readCursorProbeOutputAsync(executablePath, ["status"]) : undefined,
-        executablePath
-          ? readCursorProbeOutputAsync(executablePath, ["--list-models"])
-          : undefined,
+        executablePath ? readCursorProbeOutputAsync(executablePath, ["--list-models"]) : undefined,
       ]);
 
       if (modelsResult?.ok) {

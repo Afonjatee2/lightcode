@@ -365,7 +365,9 @@ export function DevTerminalPanel(props: { projects: Project[]; hideHeader?: bool
               <div className="min-w-0">
                 <Tooltip delay={300}>
                   <Tooltip.Trigger>
-                    <div className="max-w-[80px] truncate text-xs font-medium text-foreground">{activeProject.name}</div>
+                    <div className="max-w-[80px] truncate text-xs font-medium text-foreground">
+                      {activeProject.name}
+                    </div>
                   </Tooltip.Trigger>
                   <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
                 </Tooltip>
@@ -382,62 +384,62 @@ export function DevTerminalPanel(props: { projects: Project[]; hideHeader?: bool
             </div>
           )}
           <div className="min-h-0 flex-1 overflow-y-auto py-1">
-          <Tabs
-            className="w-full"
-            orientation="vertical"
-            variant="secondary"
-            selectedKey={selectedTabId}
-            onSelectionChange={handleSelectionChange}
-          >
-            <Tabs.ListContainer className="w-full p-0">
-              <Tabs.List aria-label="Terminal tabs" className="w-full *:h-6">
-                {tabRows.map(({ id, tab, isSplit }) => {
-                  const parentSelected = selectedTabId === tab.id;
-                  return (
-                    <Tabs.Tab
-                      key={id}
-                      id={id}
-                      className={`group w-full gap-0 pl-3 pr-1 text-xs ${isSplit && parentSelected ? "text-foreground" : ""}`}
-                    >
-                      <ContextMenu
-                        items={getTabContextItems(tab)}
-                        onAction={(key) => handleTabContextAction(tab, key)}
+            <Tabs
+              className="w-full"
+              orientation="vertical"
+              variant="secondary"
+              selectedKey={selectedTabId}
+              onSelectionChange={handleSelectionChange}
+            >
+              <Tabs.ListContainer className="w-full p-0">
+                <Tabs.List aria-label="Terminal tabs" className="w-full *:h-6">
+                  {tabRows.map(({ id, tab, isSplit }) => {
+                    const parentSelected = selectedTabId === tab.id;
+                    return (
+                      <Tabs.Tab
+                        key={id}
+                        id={id}
+                        className={`group w-full gap-0 pl-3 pr-1 text-xs ${isSplit && parentSelected ? "text-foreground" : ""}`}
                       >
-                        <span className="flex min-w-0 flex-1 items-center gap-1">
-                          <span
-                            className="truncate"
-                            title={isSplit ? (tab.splitTitle ?? tab.title) : tab.title}
-                          >
-                            {isSplit ? (tab.splitTitle ?? tab.title) : tab.title}
+                        <ContextMenu
+                          items={getTabContextItems(tab)}
+                          onAction={(key) => handleTabContextAction(tab, key)}
+                        >
+                          <span className="flex min-w-0 flex-1 items-center gap-1">
+                            <span
+                              className="truncate"
+                              title={isSplit ? (tab.splitTitle ?? tab.title) : tab.title}
+                            >
+                              {isSplit ? (tab.splitTitle ?? tab.title) : tab.title}
+                            </span>
+                            {isSplit ? <Columns2 className="size-3 shrink-0 text-accent" /> : null}
                           </span>
-                          {isSplit ? <Columns2 className="size-3 shrink-0 text-accent" /> : null}
-                        </span>
-                      </ContextMenu>
-                      <button
-                        className="ml-auto flex size-4 shrink-0 items-center justify-center rounded opacity-0 transition hover:text-danger group-hover:opacity-100"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          if (isSplit) handleCloseSplit(tab);
-                          else handleCloseTab(tab);
-                        }}
-                        tabIndex={-1}
-                        type="button"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                      <Tabs.Indicator />
-                    </Tabs.Tab>
-                  );
-                })}
-                <Tabs.Tab id="__add__" className="min-w-8 max-w-8 px-0">
-                  <Plus className="size-3.5 text-muted" />
-                  <Tabs.Indicator className="invisible" />
-                </Tabs.Tab>
-              </Tabs.List>
-            </Tabs.ListContainer>
-          </Tabs>
+                        </ContextMenu>
+                        <button
+                          className="ml-auto flex size-4 shrink-0 items-center justify-center rounded opacity-0 transition hover:text-danger group-hover:opacity-100"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            if (isSplit) handleCloseSplit(tab);
+                            else handleCloseTab(tab);
+                          }}
+                          tabIndex={-1}
+                          type="button"
+                        >
+                          <Trash2 className="size-3" />
+                        </button>
+                        <Tabs.Indicator />
+                      </Tabs.Tab>
+                    );
+                  })}
+                  <Tabs.Tab id="__add__" className="min-w-8 max-w-8 px-0">
+                    <Plus className="size-3.5 text-muted" />
+                    <Tabs.Indicator className="invisible" />
+                  </Tabs.Tab>
+                </Tabs.List>
+              </Tabs.ListContainer>
+            </Tabs>
           </div>
         </div>
 
@@ -463,7 +465,9 @@ export function DevTerminalPanel(props: { projects: Project[]; hideHeader?: bool
           <div className="min-w-0">
             <Tooltip delay={300}>
               <Tooltip.Trigger>
-                <div className="max-w-[100px] truncate text-xs font-medium text-foreground">{activeProject.name}</div>
+                <div className="max-w-[100px] truncate text-xs font-medium text-foreground">
+                  {activeProject.name}
+                </div>
               </Tooltip.Trigger>
               <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
             </Tooltip>

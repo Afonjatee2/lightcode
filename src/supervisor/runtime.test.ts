@@ -720,9 +720,7 @@ describe("detectWslAgentStatuses", () => {
 
   it("detects statuses for every adapter in every distro", async () => {
     const detectInstall = vi.fn<
-      (
-        ctx?: { envKind: "windows" | "wsl"; wslDistro?: string },
-      ) => Promise<{
+      (ctx?: { envKind: "windows" | "wsl"; wslDistro?: string }) => Promise<{
         kind: "codex";
         label: string;
         installed: boolean;
@@ -741,27 +739,25 @@ describe("detectWslAgentStatuses", () => {
           settingDefs: [];
         };
       }>
-    >(
-      async (ctx?: { envKind: "windows" | "wsl"; wslDistro?: string }) => ({
-        kind: "codex" as const,
-        label: `Codex ${ctx?.wslDistro ?? "windows"}`,
-        installed: ctx?.wslDistro === "Ubuntu",
-        authState: "unknown" as const,
-        capabilities: {
-          models: [],
-          efforts: [],
-          modelEfforts: {},
-          modes: [],
-          approvalPolicies: [],
-          sandboxModes: [],
-          supportsResume: true,
-          supportsDirectInput: true,
-          liveInputMode: "server" as const,
-          presentationMode: "terminal" as const,
-          settingDefs: [],
-        },
-      }),
-    );
+    >(async (ctx?: { envKind: "windows" | "wsl"; wslDistro?: string }) => ({
+      kind: "codex" as const,
+      label: `Codex ${ctx?.wslDistro ?? "windows"}`,
+      installed: ctx?.wslDistro === "Ubuntu",
+      authState: "unknown" as const,
+      capabilities: {
+        models: [],
+        efforts: [],
+        modelEfforts: {},
+        modes: [],
+        approvalPolicies: [],
+        sandboxModes: [],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "server" as const,
+        presentationMode: "terminal" as const,
+        settingDefs: [],
+      },
+    }));
 
     const statuses = await detectWslAgentStatuses(
       [

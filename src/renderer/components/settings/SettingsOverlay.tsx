@@ -142,7 +142,12 @@ function SettingsSidebar(props: {
                 <SidebarButton
                   key={agent.kind}
                   iconOnly
-                  icon={<ProviderIcon kind={agent.kind} className={`size-4 ${disabledAgents.includes(agent.kind) ? "opacity-35" : ""}`} />}
+                  icon={
+                    <ProviderIcon
+                      kind={agent.kind}
+                      className={`size-4 ${disabledAgents.includes(agent.kind) ? "opacity-35" : ""}`}
+                    />
+                  }
                   label={agent.label}
                   isActive={activeSection === `agents:${agent.kind}`}
                   onPress={() => onSectionChange(`agents:${agent.kind}`)}
@@ -211,7 +216,12 @@ function SettingsSidebar(props: {
                   return (
                     <SidebarButton
                       key={agent.kind}
-                      icon={<ProviderIcon kind={agent.kind} className={`size-4 ${agentDisabled ? "opacity-35" : ""}`} />}
+                      icon={
+                        <ProviderIcon
+                          kind={agent.kind}
+                          className={`size-4 ${agentDisabled ? "opacity-35" : ""}`}
+                        />
+                      }
                       label={agent.label}
                       className={agentDisabled ? "opacity-50" : ""}
                       isActive={activeSection === `agents:${agent.kind}`}
@@ -263,18 +273,14 @@ function GeneralSettings() {
     (state) => state.setCollapseTerminalComposer,
   );
   const autoShowTerminalPanel = useSharedSettings((state) => state.autoShowTerminalPanel);
-  const setAutoShowTerminalPanel = useSharedSettings(
-    (state) => state.setAutoShowTerminalPanel,
-  );
+  const setAutoShowTerminalPanel = useSharedSettings((state) => state.setAutoShowTerminalPanel);
   const staleThreadUnloadMinutes = useSharedSettings((state) => state.staleThreadUnloadMinutes);
   const setStaleThreadUnloadMinutes = useSharedSettings(
     (state) => state.setStaleThreadUnloadMinutes,
   );
   const scrollSpeed = useSharedSettings((state) => state.scrollSpeed);
   const setScrollSpeed = useSharedSettings((state) => state.setScrollSpeed);
-  const preventSleepWhileWorking = useSharedSettings(
-    (state) => state.preventSleepWhileWorking,
-  );
+  const preventSleepWhileWorking = useSharedSettings((state) => state.preventSleepWhileWorking);
   const setPreventSleepWhileWorking = useSharedSettings(
     (state) => state.setPreventSleepWhileWorking,
   );
@@ -870,9 +876,7 @@ function SingleAgentSettings(props: { agentKind: string }) {
       <div className="mx-auto max-w-[560px]">
         <div className="mb-6">
           <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
-          {agent.version && (
-            <p className="mt-0.5 text-xs text-muted">v{agent.version}</p>
-          )}
+          {agent.version && <p className="mt-0.5 text-xs text-muted">v{agent.version}</p>}
         </div>
 
         <div className="space-y-4">
@@ -891,7 +895,9 @@ function SingleAgentSettings(props: { agentKind: string }) {
                 });
                 if (selected) {
                   // Re-enabled — trigger fresh detection so version/auth are up to date.
-                  void readBridge().getAgentStatuses().catch(() => undefined);
+                  void readBridge()
+                    .getAgentStatuses()
+                    .catch(() => undefined);
                 }
               }}
             >

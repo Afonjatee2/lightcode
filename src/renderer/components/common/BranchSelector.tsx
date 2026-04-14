@@ -1,6 +1,25 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, GitBranch, GitFork, Globe, Loader2, Plus, Search, Trash2 } from "lucide-react";
-import { Checkbox, Header, Label, ListBox, ListLayout, Popover, Tooltip, Virtualizer } from "@heroui/react";
+import {
+  Check,
+  ChevronDown,
+  GitBranch,
+  GitFork,
+  Globe,
+  Loader2,
+  Plus,
+  Search,
+  Trash2,
+} from "lucide-react";
+import {
+  Checkbox,
+  Header,
+  Label,
+  ListBox,
+  ListLayout,
+  Popover,
+  Tooltip,
+  Virtualizer,
+} from "@heroui/react";
 import type { GitBranchInfo } from "../../../shared/contracts";
 import { readBridge } from "../../bridge";
 import { useAppStore } from "../../state/appStore";
@@ -107,9 +126,7 @@ export function BranchSelector(props: BranchSelectorProps) {
   } = props;
   const branchData = useGitStore((s) => s.branches[projectId]);
   const worktrees = useGitStore((s) => s.worktrees[projectId]);
-  const projectLocation = useAppStore(
-    (s) => s.projects.find((p) => p.id === projectId)?.location,
-  );
+  const projectLocation = useAppStore((s) => s.projects.find((p) => p.id === projectId)?.location);
   const threads = useAppStore((s) => s.threads);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -356,8 +373,7 @@ export function BranchSelector(props: BranchSelectorProps) {
                       }
                       const { branch } = item;
                       const canDelete =
-                        branch.name !== currentBranch &&
-                        !activeWorktreeBranches.has(branch.name);
+                        branch.name !== currentBranch && !activeWorktreeBranches.has(branch.name);
                       return (
                         <ListBox.Item
                           key={branch.name}
@@ -373,9 +389,7 @@ export function BranchSelector(props: BranchSelectorProps) {
                               }
                               return canDelete ? (
                                 <>
-                                  {isSelected && (
-                                    <Check className="size-3 group-hover:hidden" />
-                                  )}
+                                  {isSelected && <Check className="size-3 group-hover:hidden" />}
                                   <div
                                     role="button"
                                     tabIndex={0}
@@ -411,10 +425,9 @@ export function BranchSelector(props: BranchSelectorProps) {
                           {branch.name === currentBranch && (
                             <span className="text-[10px] text-muted">current</span>
                           )}
-                          {worktreeBranches.has(branch.name) &&
-                            branch.name !== currentBranch && (
-                              <span className="text-[10px] text-muted">worktree</span>
-                            )}
+                          {worktreeBranches.has(branch.name) && branch.name !== currentBranch && (
+                            <span className="text-[10px] text-muted">worktree</span>
+                          )}
                         </ListBox.Item>
                       );
                     }}
@@ -493,7 +506,11 @@ export function BranchSelector(props: BranchSelectorProps) {
                     }
                   }}
                 >
-                  <ListBox.Item id="worktree" textValue="New worktree" className="focus-visible:outline-none">
+                  <ListBox.Item
+                    id="worktree"
+                    textValue="New worktree"
+                    className="focus-visible:outline-none"
+                  >
                     <GitFork className="size-3.5 text-muted" />
                     <Label className="flex-1">New worktree</Label>
                     <Checkbox
@@ -515,7 +532,9 @@ export function BranchSelector(props: BranchSelectorProps) {
                               branch: baseBranch,
                               baseBranch,
                               isWorktree: true,
-                              ...(existingWorktreePath ? { worktreePath: existingWorktreePath } : {}),
+                              ...(existingWorktreePath
+                                ? { worktreePath: existingWorktreePath }
+                                : {}),
                             });
                           } else {
                             onSelect?.({ branch: baseBranch, isWorktree: false });

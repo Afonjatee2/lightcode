@@ -8,27 +8,27 @@ const { bridge } = vi.hoisted(() => ({
     getGitFileContent: vi
       .fn<() => Promise<{ oldContent: string; newContent: string }>>()
       .mockResolvedValue({ oldContent: "", newContent: "" }),
-    getGitDiffBatch: vi.fn<
-      () => Promise<{ staged: Record<string, string>; unstaged: Record<string, string> }>
-    >().mockResolvedValue({
-      staged: {},
-      unstaged: {
-        "src/worktree-only.ts": `diff --git a/src/worktree-only.ts b/src/worktree-only.ts
+    getGitDiffBatch: vi
+      .fn<() => Promise<{ staged: Record<string, string>; unstaged: Record<string, string> }>>()
+      .mockResolvedValue({
+        staged: {},
+        unstaged: {
+          "src/worktree-only.ts": `diff --git a/src/worktree-only.ts b/src/worktree-only.ts
 --- a/src/worktree-only.ts
 +++ b/src/worktree-only.ts
 @@ -1 +1 @@
 -old
 +new
 `,
-        "docs/untracked.md": `diff --git a/docs/untracked.md b/docs/untracked.md
+          "docs/untracked.md": `diff --git a/docs/untracked.md b/docs/untracked.md
 new file mode 100644
 --- /dev/null
 +++ b/docs/untracked.md
 @@ -0,0 +1 @@
 +hello
 `,
-      },
-    }),
+        },
+      }),
   },
 }));
 

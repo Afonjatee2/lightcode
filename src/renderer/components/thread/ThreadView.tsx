@@ -127,8 +127,7 @@ export function ThreadView(props: {
   const isTerminalInput = agentStatus?.capabilities.liveInputMode === "terminal";
   const usesTerminalPresentation =
     (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
-  const needsFocusBeforeInput =
-    agentStatus?.capabilities.requiresTerminalFocusBeforeInput === true;
+  const needsFocusBeforeInput = agentStatus?.capabilities.requiresTerminalFocusBeforeInput === true;
   const activeServerRequest = pendingServerRequests[0];
   const canSubmitServerInput =
     isServerControlled &&
@@ -211,8 +210,7 @@ export function ThreadView(props: {
     // focus.  Briefly focus the xterm surface so focus-event reporting fires
     // before the supervisor writes to the PTY.
     const focusPromise = needsFocusBeforeInput
-      ? (terminalPaneRef.current?.focus(),
-        new Promise<void>((r) => setTimeout(r, 80)))
+      ? (terminalPaneRef.current?.focus(), new Promise<void>((r) => setTimeout(r, 80)))
       : Promise.resolve();
 
     void focusPromise
@@ -324,11 +322,7 @@ export function ThreadView(props: {
             {thread.title}
           </span>
           <div className="flex shrink-0 items-center">
-            {projectName ? (
-              <span className="px-1 text-sm text-muted/60">
-                {projectName}
-              </span>
-            ) : null}
+            {projectName ? <span className="px-1 text-sm text-muted/60">{projectName}</span> : null}
             {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
             {onMarkDone ? (
               <button
@@ -495,7 +489,9 @@ export function ThreadView(props: {
                                   <GitFork className="size-3.5 text-muted" />
                                   <span className="truncate">{branchName}</span>
                                   {thread.prNumber ? (
-                                    <span className="shrink-0 text-muted/60">PR #{thread.prNumber}</span>
+                                    <span className="shrink-0 text-muted/60">
+                                      PR #{thread.prNumber}
+                                    </span>
                                   ) : null}
                                 </div>
                                 <Tooltip.Content placement="top">{branchName}</Tooltip.Content>

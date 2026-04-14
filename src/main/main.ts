@@ -29,10 +29,7 @@ import {
   initDatabase,
 } from "./db";
 import { cleanupOrphanedAttachments, prepareLightcodeDataRoot } from "./lightcodeData";
-import {
-  readSharedSettingsFile,
-  writeSharedSettingsFile,
-} from "./sharedSettingsFile";
+import { readSharedSettingsFile, writeSharedSettingsFile } from "./sharedSettingsFile";
 import type {
   SupervisorEvent,
   SupervisorReply,
@@ -149,9 +146,7 @@ let powerSaveBlockerId: number | null = null;
 const workingThreads = new Set<string>();
 
 function updatePowerSaveBlocker(): void {
-  const settings = lightcodePaths
-    ? readSharedSettingsFile(lightcodePaths.settingsPath)
-    : null;
+  const settings = lightcodePaths ? readSharedSettingsFile(lightcodePaths.settingsPath) : null;
   const enabled = settings?.preventSleepWhileWorking ?? true;
   const shouldBlock = enabled && workingThreads.size > 0;
 
@@ -789,7 +784,9 @@ if (!hasSingleInstanceLock) {
       return net.fetch(pathToFileURL(filePath).href);
     });
 
-    lightcodePaths = prepareLightcodeDataRoot(isDev ? join(homedir(), ".lightcode-dev") : undefined);
+    lightcodePaths = prepareLightcodeDataRoot(
+      isDev ? join(homedir(), ".lightcode-dev") : undefined,
+    );
     initDatabase(lightcodePaths.dbPath);
     registerIpcHandlers();
     startSupervisor(lightcodePaths.baseDir);

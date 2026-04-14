@@ -333,7 +333,14 @@ export function ThreadDraftView(props: {
       sandboxMode: nextSandbox,
       worktreeMode,
     });
-  }, [effectiveAgentKind, selectedAgent, project.id, worktreeMode, updateProjectDraftConfig, setProviderConfig]);
+  }, [
+    effectiveAgentKind,
+    selectedAgent,
+    project.id,
+    worktreeMode,
+    updateProjectDraftConfig,
+    setProviderConfig,
+  ]);
 
   useEffect(() => {
     if (!selectedAgent || !effectiveAgentKind) {
@@ -364,7 +371,19 @@ export function ThreadDraftView(props: {
         worktreeMode,
       });
     }
-  }, [effort, model, selectedAgent, effectiveAgentKind, mode, approvalPolicy, sandboxMode, worktreeMode, project.id, updateProjectDraftConfig, setProviderConfig]);
+  }, [
+    effort,
+    model,
+    selectedAgent,
+    effectiveAgentKind,
+    mode,
+    approvalPolicy,
+    sandboxMode,
+    worktreeMode,
+    project.id,
+    updateProjectDraftConfig,
+    setProviderConfig,
+  ]);
 
   const hiddenModelIds = useSharedSettings((s) =>
     selectedAgent ? s.hiddenModels[selectedAgent.kind] : undefined,
@@ -470,159 +489,110 @@ export function ThreadDraftView(props: {
           />
         )}
         {props.dropIndicator === "insert-right" &&
-          (props.paneIndex === undefined ||
-            props.paneIndex === (props.paneCount ?? 1) - 1) && (
+          (props.paneIndex === undefined || props.paneIndex === (props.paneCount ?? 1) - 1) && (
             <div
               aria-hidden="true"
               className="pointer-events-none absolute top-0 bottom-0 -right-1 z-20 w-0.5 rounded-full bg-accent"
             />
           )}
-          {/* Center area — logo */}
-          <div className="flex flex-1 flex-col items-center justify-center">
-            <div className="w-full max-w-[920px] overflow-visible pb-[0.32em] text-center">
-              <h1 className={`inline-flex items-baseline gap-3 leading-[1.22] font-semibold tracking-[-0.06em] ${props.compact ? "text-[clamp(1.75rem,5vw,3rem)]" : "text-[clamp(3.25rem,8vw,6.25rem)]"}`}>
-                <span className="pr-[0.04em] pb-[0.04em] text-transparent [background-image:linear-gradient(135deg,var(--foreground)_0%,color-mix(in_oklab,var(--accent)_60%,var(--foreground))_52%,var(--muted)_100%)] [background-size:100%_100%] bg-clip-text">
-                  Lightcode
-                </span>
-                <TerminalSquare className="translate-y-[-0.04em] size-[0.48em] shrink-0 text-[color:color-mix(in_oklab,var(--accent)_58%,var(--foreground))] opacity-90" />
-              </h1>
-              <p className={`mx-auto mt-1 max-w-full truncate leading-snug font-medium tracking-tight text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono ${props.compact ? "text-[clamp(0.75rem,2vw,1.125rem)]" : "text-[clamp(1.25rem,3vw,2rem)]"}`}>
-                {project.name}
-              </p>
-            </div>
+        {/* Center area — logo */}
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <div className="w-full max-w-[920px] overflow-visible pb-[0.32em] text-center">
+            <h1
+              className={`inline-flex items-baseline gap-3 leading-[1.22] font-semibold tracking-[-0.06em] ${props.compact ? "text-[clamp(1.75rem,5vw,3rem)]" : "text-[clamp(3.25rem,8vw,6.25rem)]"}`}
+            >
+              <span className="pr-[0.04em] pb-[0.04em] text-transparent [background-image:linear-gradient(135deg,var(--foreground)_0%,color-mix(in_oklab,var(--accent)_60%,var(--foreground))_52%,var(--muted)_100%)] [background-size:100%_100%] bg-clip-text">
+                Lightcode
+              </span>
+              <TerminalSquare className="translate-y-[-0.04em] size-[0.48em] shrink-0 text-[color:color-mix(in_oklab,var(--accent)_58%,var(--foreground))] opacity-90" />
+            </h1>
+            <p
+              className={`mx-auto mt-1 max-w-full truncate leading-snug font-medium tracking-tight text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono ${props.compact ? "text-[clamp(0.75rem,2vw,1.125rem)]" : "text-[clamp(1.25rem,3vw,2rem)]"}`}
+            >
+              {project.name}
+            </p>
           </div>
+        </div>
 
-          {/* Composer at bottom */}
-          <div className={`${props.compact ? alignClass : "mx-auto"} w-full max-w-[920px]`}>
-              <ThreadComposer
+        {/* Composer at bottom */}
+        <div className={`${props.compact ? alignClass : "mx-auto"} w-full max-w-[920px]`}>
+          <ThreadComposer
+            autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
+            compact={props.compact ?? false}
+            controls={[
+              {
+                icon: (
+                  <ProviderIcon
+                    kind={selectedAgent.kind}
+                    tone="active"
+                    className="size-4 shrink-0"
+                  />
+                ),
+                options: installedAgents.map((agent) => ({
+                  id: agent.kind,
+                  label: agent.label,
+                  icon: (
+                    <ProviderIcon kind={agent.kind} tone="active" className="size-4 shrink-0" />
+                  ),
+                })),
+                value: selectedAgent.kind,
+                iconOnly: true,
+                onChange: (value) => {
+                  // Snapshot current provider settings before switching
+                  if (effectiveAgentKind) {
+                    const snapshot: ProviderDraftConfig = {
+                      model,
+                      effort,
+                      mode,
+                      approvalPolicy,
+                      sandboxMode,
+                    };
+                    if (providerConfigsRef.current) {
+                      providerConfigsRef.current[effectiveAgentKind] = snapshot;
+                    }
+                    setProviderConfig(effectiveAgentKind, snapshot);
+                  }
+                  setAgentKind(value as AgentStatus["kind"]);
+                },
+              },
+              ...(factory
+                ? factory({
+                    capabilities: filterHiddenModels(selectedAgent.capabilities, hiddenModelIds),
+                    config: { model, effort, mode, approvalPolicy, sandboxMode },
+                    isDisabled: false,
+                    onConfigChange: onConfigPatch,
+                  })
+                : []),
+            ]}
+            attachmentBar={
+              <AttachmentBar
+                attachments={attachments.attachments}
+                onRemove={attachments.removeAttachment}
+                onPreviewImage={(att) => {
+                  const idx = imageAttachments.findIndex((a) => a.id === att.id);
+                  if (idx >= 0) setLightboxIndex(idx);
+                }}
+              />
+            }
+            inputContent={
+              <MentionInput
+                ref={mentionRef}
                 autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                 compact={props.compact ?? false}
-                controls={[
-                  {
-                    icon: (
-                      <ProviderIcon
-                        kind={selectedAgent.kind}
-                        tone="active"
-                        className="size-4 shrink-0"
-                      />
-                    ),
-                    options: installedAgents.map((agent) => ({
-                      id: agent.kind,
-                      label: agent.label,
-                      icon: (
-                        <ProviderIcon
-                          kind={agent.kind}
-                          tone="active"
-                          className="size-4 shrink-0"
-                        />
-                      ),
-                    })),
-                    value: selectedAgent.kind,
-                    iconOnly: true,
-                    onChange: (value) => {
-                      // Snapshot current provider settings before switching
-                      if (effectiveAgentKind) {
-                        const snapshot: ProviderDraftConfig = {
-                          model,
-                          effort,
-                          mode,
-                          approvalPolicy,
-                          sandboxMode,
-                        };
-                        if (providerConfigsRef.current) {
-                          providerConfigsRef.current[effectiveAgentKind] = snapshot;
-                        }
-                        setProviderConfig(effectiveAgentKind, snapshot);
-                      }
-                      setAgentKind(value as AgentStatus["kind"]);
-                    },
-                  },
-                  ...(factory
-                    ? factory({
-                        capabilities: filterHiddenModels(
-                          selectedAgent.capabilities,
-                          hiddenModelIds,
-                        ),
-                        config: { model, effort, mode, approvalPolicy, sandboxMode },
-                        isDisabled: false,
-                        onConfigChange: onConfigPatch,
-                      })
-                    : []),
-                ]}
-                attachmentBar={
-                  <AttachmentBar
-                    attachments={attachments.attachments}
-                    onRemove={attachments.removeAttachment}
-                    onPreviewImage={(att) => {
-                      const idx = imageAttachments.findIndex((a) => a.id === att.id);
-                      if (idx >= 0) setLightboxIndex(idx);
-                    }}
-                  />
-                }
-                inputContent={
-                  <MentionInput
-                    ref={mentionRef}
-                    autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
-                    compact={props.compact ?? false}
-                    placeholder="Ask LightCode anything, @ to add files, / for commands"
-                    projectLocation={project.location}
-                    onTextChange={(hasText) => {
-                      setHasContent(hasText);
-                      latestSegmentsRef.current =
-                        mentionRef.current?.serializeSegments() ?? [];
-                    }}
-                    onPasteImage={(file) => {
-                      // Draft view uses project.id as threadId for temp storage
-                      void attachments.addClipboardImage(file, `draft:${project.id}`);
-                    }}
-                    onSubmit={(segments) => {
-                      const allSegments = [...attachments.toSegments(), ...segments];
-                      const useWorktree = branchSelection?.isWorktree ?? worktreeMode;
-                      resetDraftRefs();
-                      onStart({
-                        agentKind: selectedAgent.kind,
-                        config: {
-                          model,
-                          ...(effort ? { effort } : {}),
-                          ...(mode ? { mode } : {}),
-                          ...(approvalPolicy ? { approvalPolicy } : {}),
-                          ...(sandboxMode ? { sandboxMode } : {}),
-                        },
-                        prompt: flattenSegments(allSegments),
-                        segments: allSegments,
-                        ...(useWorktree
-                          ? branchSelection?.worktreePath
-                            ? {
-                                existingWorktreePath: branchSelection.worktreePath,
-                                worktreeBranch: branchSelection.branch,
-                              }
-                            : {
-                                worktreeBranch: generateWorktreeBranch(),
-                                ...(branchSelection?.baseBranch
-                                  ? { worktreeBaseBranch: branchSelection.baseBranch }
-                                  : {}),
-                                worktreeIsNewBranch: true,
-                              }
-                          : {}),
-                      });
-                      attachments.clearAll();
-                    }}
-                  />
-                }
                 placeholder="Ask LightCode anything, @ to add files, / for commands"
-                prompt={prompt}
-                submitDisabled={!(hasContent || attachments.attachments.length > 0)}
-                submitLabel="Launch thread"
-                onPromptChange={setPrompt}
-                onSubmit={() => {
-                  const segments = mentionRef.current?.serializeSegments() ?? [];
+                projectLocation={project.location}
+                onTextChange={(hasText) => {
+                  setHasContent(hasText);
+                  latestSegmentsRef.current = mentionRef.current?.serializeSegments() ?? [];
+                }}
+                onPasteImage={(file) => {
+                  // Draft view uses project.id as threadId for temp storage
+                  void attachments.addClipboardImage(file, `draft:${project.id}`);
+                }}
+                onSubmit={(segments) => {
                   const allSegments = [...attachments.toSegments(), ...segments];
-                  const flatPrompt = flattenSegments(allSegments) || prompt.trim();
-                  if (flatPrompt.length === 0) return;
-                  // Clear refs so unmount effect won't re-save a stale draft.
-                  latestSegmentsRef.current = [];
-                  attachmentsRef.current = [];
                   const useWorktree = branchSelection?.isWorktree ?? worktreeMode;
+                  resetDraftRefs();
                   onStart({
                     agentKind: selectedAgent.kind,
                     config: {
@@ -632,8 +602,8 @@ export function ThreadDraftView(props: {
                       ...(approvalPolicy ? { approvalPolicy } : {}),
                       ...(sandboxMode ? { sandboxMode } : {}),
                     },
-                    prompt: flatPrompt,
-                    ...(allSegments.length > 0 ? { segments: allSegments } : {}),
+                    prompt: flattenSegments(allSegments),
+                    segments: allSegments,
                     ...(useWorktree
                       ? branchSelection?.worktreePath
                         ? {
@@ -651,87 +621,131 @@ export function ThreadDraftView(props: {
                   });
                   attachments.clearAll();
                 }}
-                afterControls={
-                  <>
-                    <Button
-                      isIconOnly
-                      aria-label="Attach files"
-                      className="lightcode-composer-menu min-w-9 px-2"
-                      size="sm"
-                      variant="ghost"
-                      onPress={() => {
-                        void readBridge()
-                          .pickFiles()
-                          .then((paths) => {
-                            if (paths) attachments.addFiles(paths);
-                          });
-                      }}
-                    >
-                      <Paperclip className="size-4" />
-                    </Button>
-                    {gitBranch ? (
-                      <div className="flex items-center gap-0.5">
-                        <BranchSelector
-                          projectId={project.id}
-                          currentBranch={gitBranch}
-                          value={branchSelection?.branch ?? gitBranch}
-                          isWorktree={branchSelection?.isWorktree}
-                          baseBranch={branchSelection?.baseBranch}
-                          worktreeMode={worktreeMode}
-                          onWorktreeModeChange={setWorktreeMode}
-                          onSelect={setBranchSelection}
-                          onSwitchBranch={handleSwitchBranch}
-                        />
-                        {gitHasRemote && (
-                          <Tooltip delay={0}>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="lightcode-composer-menu min-w-9 px-2"
-                              isDisabled={isSyncing}
-                              isPending={isSyncing}
-                              onPress={() => {
-                                setIsSyncing(true);
-                                const needsPush = gitHasTracking
-                                  ? gitAhead > 0 && gitBehind === 0
-                                  : true;
-                                const op = needsPush
-                                  ? readBridge().gitPush({
-                                      projectLocation: project.location,
-                                      setUpstream: !gitHasTracking,
-                                    })
-                                  : readBridge().gitSync({ projectLocation: project.location });
-                                void op.finally(() => setIsSyncing(false));
-                              }}
-                            >
-                              {({ isPending }) =>
-                                isPending ? (
-                                  <Spinner color="current" size="sm" />
-                                ) : (
-                                  <span className="text-sm">
-                                    {gitHasTracking ? `${gitBehind}↓ ${gitAhead}↑` : "↑"}
-                                  </span>
-                                )
-                              }
-                            </Button>
-                            <Tooltip.Content>
-                              {!gitHasTracking
-                                ? "Push"
-                                : gitBehind > 0
-                                  ? `Sync (↓${gitBehind}${gitAhead > 0 ? ` ↑${gitAhead}` : ""})`
-                                  : gitAhead > 0
-                                    ? `Push ↑${gitAhead}`
-                                    : "Sync"}
-                            </Tooltip.Content>
-                          </Tooltip>
-                        )}
-                      </div>
-                    ) : null}
-                  </>
-                }
               />
-            </div>
-          </div>
+            }
+            placeholder="Ask LightCode anything, @ to add files, / for commands"
+            prompt={prompt}
+            submitDisabled={!(hasContent || attachments.attachments.length > 0)}
+            submitLabel="Launch thread"
+            onPromptChange={setPrompt}
+            onSubmit={() => {
+              const segments = mentionRef.current?.serializeSegments() ?? [];
+              const allSegments = [...attachments.toSegments(), ...segments];
+              const flatPrompt = flattenSegments(allSegments) || prompt.trim();
+              if (flatPrompt.length === 0) return;
+              // Clear refs so unmount effect won't re-save a stale draft.
+              latestSegmentsRef.current = [];
+              attachmentsRef.current = [];
+              const useWorktree = branchSelection?.isWorktree ?? worktreeMode;
+              onStart({
+                agentKind: selectedAgent.kind,
+                config: {
+                  model,
+                  ...(effort ? { effort } : {}),
+                  ...(mode ? { mode } : {}),
+                  ...(approvalPolicy ? { approvalPolicy } : {}),
+                  ...(sandboxMode ? { sandboxMode } : {}),
+                },
+                prompt: flatPrompt,
+                ...(allSegments.length > 0 ? { segments: allSegments } : {}),
+                ...(useWorktree
+                  ? branchSelection?.worktreePath
+                    ? {
+                        existingWorktreePath: branchSelection.worktreePath,
+                        worktreeBranch: branchSelection.branch,
+                      }
+                    : {
+                        worktreeBranch: generateWorktreeBranch(),
+                        ...(branchSelection?.baseBranch
+                          ? { worktreeBaseBranch: branchSelection.baseBranch }
+                          : {}),
+                        worktreeIsNewBranch: true,
+                      }
+                  : {}),
+              });
+              attachments.clearAll();
+            }}
+            afterControls={
+              <>
+                <Button
+                  isIconOnly
+                  aria-label="Attach files"
+                  className="lightcode-composer-menu min-w-9 px-2"
+                  size="sm"
+                  variant="ghost"
+                  onPress={() => {
+                    void readBridge()
+                      .pickFiles()
+                      .then((paths) => {
+                        if (paths) attachments.addFiles(paths);
+                      });
+                  }}
+                >
+                  <Paperclip className="size-4" />
+                </Button>
+                {gitBranch ? (
+                  <div className="flex items-center gap-0.5">
+                    <BranchSelector
+                      projectId={project.id}
+                      currentBranch={gitBranch}
+                      value={branchSelection?.branch ?? gitBranch}
+                      isWorktree={branchSelection?.isWorktree}
+                      baseBranch={branchSelection?.baseBranch}
+                      worktreeMode={worktreeMode}
+                      onWorktreeModeChange={setWorktreeMode}
+                      onSelect={setBranchSelection}
+                      onSwitchBranch={handleSwitchBranch}
+                    />
+                    {gitHasRemote && (
+                      <Tooltip delay={0}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="lightcode-composer-menu min-w-9 px-2"
+                          isDisabled={isSyncing}
+                          isPending={isSyncing}
+                          onPress={() => {
+                            setIsSyncing(true);
+                            const needsPush = gitHasTracking
+                              ? gitAhead > 0 && gitBehind === 0
+                              : true;
+                            const op = needsPush
+                              ? readBridge().gitPush({
+                                  projectLocation: project.location,
+                                  setUpstream: !gitHasTracking,
+                                })
+                              : readBridge().gitSync({ projectLocation: project.location });
+                            void op.finally(() => setIsSyncing(false));
+                          }}
+                        >
+                          {({ isPending }) =>
+                            isPending ? (
+                              <Spinner color="current" size="sm" />
+                            ) : (
+                              <span className="text-sm">
+                                {gitHasTracking ? `${gitBehind}↓ ${gitAhead}↑` : "↑"}
+                              </span>
+                            )
+                          }
+                        </Button>
+                        <Tooltip.Content>
+                          {!gitHasTracking
+                            ? "Push"
+                            : gitBehind > 0
+                              ? `Sync (↓${gitBehind}${gitAhead > 0 ? ` ↑${gitAhead}` : ""})`
+                              : gitAhead > 0
+                                ? `Push ↑${gitAhead}`
+                                : "Sync"}
+                        </Tooltip.Content>
+                      </Tooltip>
+                    )}
+                  </div>
+                ) : null}
+              </>
+            }
+          />
+        </div>
+      </div>
       {lightboxIndex !== null && imageAttachments.length > 0 ? (
         <ImageLightbox
           images={imageAttachments}

@@ -42,11 +42,12 @@ import { resolveActionIcon } from "../settings/ProjectSettingsOverlay";
 import { useGitStore } from "../../state/gitStore";
 import { GitBadge } from "./GitBadge";
 import { SyncBadge } from "./SyncBadge";
+import { type GitMenuIcons, useWorktreeGitItems } from "./useWorktreeActions";
 import {
-  type GitMenuIcons,
-  useWorktreeGitItems,
-} from "./useWorktreeActions";
-import { groupThreadsByWorktree, type ThreadListEntry, type WorktreeThreadGroup } from "./groupThreadsByWorktree";
+  groupThreadsByWorktree,
+  type ThreadListEntry,
+  type WorktreeThreadGroup,
+} from "./groupThreadsByWorktree";
 import { WorktreeGroupHeader } from "./WorktreeGroupHeader";
 
 function formatProjectLocation(project: Project): string {
@@ -76,7 +77,10 @@ function isRecent(iso: string): boolean {
 
 function getEntryDate(entry: ThreadListEntry, field: "updatedAt" | "createdAt"): string {
   if (entry.kind === "thread") return entry.thread[field];
-  return entry.group.threads.reduce((latest, t) => (t[field] > latest ? t[field] : latest), entry.group.threads[0]![field]);
+  return entry.group.threads.reduce(
+    (latest, t) => (t[field] > latest ? t[field] : latest),
+    entry.group.threads[0]![field],
+  );
 }
 
 export type ThreadSortMode = "updated" | "created" | "manual";
@@ -258,7 +262,14 @@ function SortableThreadItem(props: {
   group: string;
   sortDisabled?: boolean;
 }) {
-  const { thread, project, showWorktreeBadge, currentThreadIds, editingThreadId, sortDisabled = false } = props;
+  const {
+    thread,
+    project,
+    showWorktreeBadge,
+    currentThreadIds,
+    editingThreadId,
+    sortDisabled = false,
+  } = props;
   const worktreeGitItems = useWorktreeGitItems(
     thread.projectId,
     thread.worktreePath ?? "",
@@ -755,9 +766,7 @@ function NewThreadButton(props: {
         isDraggingAnything={props.isDraggingAnything}
         onPress={props.onPress}
         suffix={
-          props.hasDraft ? (
-            <span className="size-1.5 shrink-0 rounded-full bg-accent" />
-          ) : undefined
+          props.hasDraft ? <span className="size-1.5 shrink-0 rounded-full bg-accent" /> : undefined
         }
       />
     </ContextMenu>
@@ -943,7 +952,9 @@ function SortableProjectHeader(props: {
                 projectId={project.id}
                 projectName={project.name}
                 onPress={() => props.onOpenGitReview(project.id)}
-                isActive={props.activeGitPanelProjectId === project.id && !props.activeGitPanelWorktreePath}
+                isActive={
+                  props.activeGitPanelProjectId === project.id && !props.activeGitPanelWorktreePath
+                }
               />
             </>
           }

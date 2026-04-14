@@ -3,18 +3,18 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { execFileMock, mkdirMock, readWslCommandOutputAsync, rmMock } = vi.hoisted(() => ({
-  execFileMock: vi.fn<
-    (
-      cmd: string,
-      args: string[],
-      opts: unknown,
-      callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
-    ) => void
-  >(),
+  execFileMock:
+    vi.fn<
+      (
+        cmd: string,
+        args: string[],
+        opts: unknown,
+        callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
+      ) => void
+    >(),
   mkdirMock: vi.fn<() => Promise<void>>(),
-  readWslCommandOutputAsync: vi.fn<
-    () => Promise<{ ok: boolean; stdout: string; stderr: string }>
-  >(),
+  readWslCommandOutputAsync:
+    vi.fn<() => Promise<{ ok: boolean; stdout: string; stderr: string }>>(),
   rmMock: vi.fn<() => Promise<void>>(),
 }));
 

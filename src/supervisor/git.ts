@@ -155,9 +155,7 @@ async function ensureWorktreeParentExists(
     const parentPath = posix.dirname(worktreePath);
     const result = await readWslCommandOutputAsync(location.distro, "mkdir", ["-p", parentPath]);
     if (!result.ok) {
-      throw new Error(
-        result.stderr || msg("git.wsl.mkdirFailed", { path: parentPath }),
-      );
+      throw new Error(result.stderr || msg("git.wsl.mkdirFailed", { path: parentPath }));
     }
     return;
   }
@@ -652,9 +650,7 @@ export class GitService {
         execGit(location, ["show", `HEAD:${filePath}`], { timeout: GIT_DIFF_TIMEOUT }).catch(
           () => "",
         ),
-        execGit(location, ["show", `:${filePath}`], { timeout: GIT_DIFF_TIMEOUT }).catch(
-          () => "",
-        ),
+        execGit(location, ["show", `:${filePath}`], { timeout: GIT_DIFF_TIMEOUT }).catch(() => ""),
       ]);
       return { oldContent, newContent };
     }
@@ -701,21 +697,13 @@ export class GitService {
     return execGit(location, ["diff"], { timeout: GIT_DIFF_TIMEOUT });
   }
 
-  async getLogRange(
-    location: ProjectLocation,
-    base: string,
-    head: string,
-  ): Promise<string> {
+  async getLogRange(location: ProjectLocation, base: string, head: string): Promise<string> {
     return execGit(location, ["log", "--oneline", `${base}..${head}`], {
       timeout: GIT_DIFF_TIMEOUT,
     });
   }
 
-  async getDiffRange(
-    location: ProjectLocation,
-    base: string,
-    head: string,
-  ): Promise<string> {
+  async getDiffRange(location: ProjectLocation, base: string, head: string): Promise<string> {
     return execGit(location, ["diff", `${base}...${head}`], { timeout: GIT_DIFF_TIMEOUT });
   }
 
@@ -725,11 +713,7 @@ export class GitService {
     location: ProjectLocation,
     includeRemote: boolean,
   ): Promise<GitBranchListResult> {
-    const args = [
-      "branch",
-      "--format=%(refname)\t%(objectname:short)\t%(HEAD)",
-      "--sort=-HEAD",
-    ];
+    const args = ["branch", "--format=%(refname)\t%(objectname:short)\t%(HEAD)", "--sort=-HEAD"];
     if (includeRemote) args.push("-a");
     const output = await execGit(location, args);
 
@@ -898,14 +882,21 @@ export class GitService {
         });
       }
     } catch (error) {
-      console.log(`[supervisor] git worktree remove failed for ${path}, checking if unregistered: ${error}`);
-      
+      console.log(
+        `[supervisor] git worktree remove failed for ${path}, checking if unregistered: ${error}`,
+      );
+
       if (await this.shouldRetryResidualWorktreeCleanup(location, path, error)) {
         // Worktree is unregistered from Git, so we can clean up the branch now
         if (branchToDelete) {
-          console.log(`[supervisor] worktree unregistered despite error, deleting branch ${branchToDelete}`);
+          console.log(
+            `[supervisor] worktree unregistered despite error, deleting branch ${branchToDelete}`,
+          );
           await this.deleteBranch(location, branchToDelete, force).catch((err) => {
-            console.warn(`[supervisor] best-effort branch delete failed for ${branchToDelete}:`, err);
+            console.warn(
+              `[supervisor] best-effort branch delete failed for ${branchToDelete}:`,
+              err,
+            );
           });
         }
 
@@ -921,7 +912,11 @@ export class GitService {
     }
   }
 
-  async deleteRemoteBranch(location: ProjectLocation, remote: string, branch: string): Promise<void> {
+  async deleteRemoteBranch(
+    location: ProjectLocation,
+    remote: string,
+    branch: string,
+  ): Promise<void> {
     await execGit(location, ["push", remote, "--delete", branch], { timeout: GIT_NETWORK_TIMEOUT });
   }
 
@@ -946,7 +941,14 @@ export class GitService {
     location: ProjectLocation,
     branch: string,
     createNew: boolean,
-  ): Promise<{ branch: string; created: boolean; tracking: string; ahead: number; behind: number; branches: GitBranchListResult }> {
+  ): Promise<{
+    branch: string;
+    created: boolean;
+    tracking: string;
+    ahead: number;
+    behind: number;
+    branches: GitBranchListResult;
+  }> {
     const args = ["switch"];
     if (createNew) {
       args.push("-c", branch);
@@ -1278,7 +1280,9 @@ export class GitService {
         throw error;
       }
 
-      console.log(`[supervisor] git branch delete failed, pruning worktrees and retrying: ${message}`);
+      console.log(
+        `[supervisor] git branch delete failed, pruning worktrees and retrying: ${message}`,
+      );
       await execGit(location, ["worktree", "prune"]).catch(() => {});
       try {
         await execGit(location, args);
@@ -1433,10 +1437,7 @@ export class GitService {
     );
   }
 
-  async pruneWorktrees(
-    location: ProjectLocation,
-    activeWorktreePaths: string[],
-  ): Promise<void> {
+  async pruneWorktrees(location: ProjectLocation, activeWorktreePaths: string[]): Promise<void> {
     // 1. Git's internal prune for broken/missing worktrees
     await execGit(location, ["worktree", "prune"]);
 

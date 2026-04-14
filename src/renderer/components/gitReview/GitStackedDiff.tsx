@@ -19,12 +19,7 @@ import {
 import type { GitFileChange, Project } from "../../../shared/contracts";
 import { isLockFile } from "../../../shared/gitUtils";
 import { readBridge } from "../../bridge";
-import {
-  buildInWorker,
-  diffFileFromBundle,
-  extractDiffNames,
-  getLang,
-} from "./diffBuildClient";
+import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang } from "./diffBuildClient";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -151,8 +146,7 @@ export function StackedFileCard(props: {
     onRefresh();
   }
 
-  const isNewFile =
-    file.deletions === 0 && file.status !== "M" && file.status !== "D";
+  const isNewFile = file.deletions === 0 && file.status !== "M" && file.status !== "D";
 
   return (
     <>
@@ -178,9 +172,7 @@ export function StackedFileCard(props: {
           <FileStatusIcon status={file.status} />
           <span className="min-w-0 flex-1 truncate" title={file.path}>
             <span className="font-medium text-foreground">{basename}</span>
-            {isLockFile(file.path) && (
-              <Lock className="ml-1 inline-block size-2 text-muted/40" />
-            )}
+            {isLockFile(file.path) && <Lock className="ml-1 inline-block size-2 text-muted/40" />}
             {dir && <span className="ml-1 text-muted/60">{dir}</span>}
           </span>
 
@@ -188,9 +180,7 @@ export function StackedFileCard(props: {
             {/* Stats — visible when not hovering */}
             <span className="flex items-center justify-end text-[10px] font-medium transition-opacity group-hover:opacity-0">
               {file.insertions > 0 && <span className="text-success">+{file.insertions}</span>}
-              {file.deletions > 0 && (
-                <span className="ml-0.5 text-danger">-{file.deletions}</span>
-              )}
+              {file.deletions > 0 && <span className="ml-0.5 text-danger">-{file.deletions}</span>}
             </span>
             {/* Action buttons — visible on hover */}
             <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">

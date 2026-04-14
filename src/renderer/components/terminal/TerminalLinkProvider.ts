@@ -16,8 +16,7 @@ import type { Terminal, ILinkProvider, ILink, IBufferLine } from "@xterm/xterm";
 
 // Copied from @xterm/addon-web-links v0.12.0 (MIT license).
 // Matches http(s):// URLs, excluding unsafe/bracket characters as finals.
-const strictUrlRegex =
-  /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\^<>`]*[^\s"':,.!?{}|\\^~[\]`()<>]/;
+const strictUrlRegex = /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\^<>`]*[^\s"':,.!?{}|\\^~[\]`()<>]/;
 
 /** Characters that are legal inside a URL path/query/fragment. */
 const URL_LEGAL_TAIL = /[^\s"'!*(){}|\\^<>`]+$/;
@@ -43,10 +42,7 @@ export class TerminalLinkProvider implements ILinkProvider {
     private readonly _handler: (event: MouseEvent, uri: string) => void,
   ) {}
 
-  provideLinks(
-    bufferLineNumber: number,
-    callback: (links: ILink[] | undefined) => void,
-  ): void {
+  provideLinks(bufferLineNumber: number, callback: (links: ILink[] | undefined) => void): void {
     const links = this._computeLinks(bufferLineNumber);
     callback(links.length > 0 ? links : undefined);
   }
@@ -114,11 +110,7 @@ export class TerminalLinkProvider implements ILinkProvider {
 
     // ── Expand downward through soft-wrapped lines ───────────────
     length = 0;
-    while (
-      (line = buf.getLine(++bottomIdx)) &&
-      line.isWrapped &&
-      length < 2048
-    ) {
+    while ((line = buf.getLine(++bottomIdx)) && line.isWrapped && length < 2048) {
       content = line.translateToString(true);
       length += content.length;
       lines.push(content);
@@ -139,9 +131,7 @@ export class TerminalLinkProvider implements ILinkProvider {
       if (!content || /^\s/.test(content)) break;
 
       // Take only the URL-legal prefix of the continuation line.
-      const continuationMatch = URL_LEGAL_TAIL.exec(
-        content.split(/\s/)[0] ?? "",
-      );
+      const continuationMatch = URL_LEGAL_TAIL.exec(content.split(/\s/)[0] ?? "");
       if (!continuationMatch || continuationMatch[0].length === 0) break;
 
       lines.push(continuationMatch[0]);
@@ -172,11 +162,7 @@ export class TerminalLinkProvider implements ILinkProvider {
    *
    * Adapted from @xterm/addon-web-links (MIT).
    */
-  private _mapStrIdx(
-    lineIndex: number,
-    rowIndex: number,
-    stringIndex: number,
-  ): [number, number] {
+  private _mapStrIdx(lineIndex: number, rowIndex: number, stringIndex: number): [number, number] {
     const buf = this._terminal.buffer.active;
     const cell = buf.getNullCell();
     let start = rowIndex;

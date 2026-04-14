@@ -18,7 +18,10 @@ export type DiffBuildResponse = {
   id: number;
   results: Array<{
     key: string;
-    data: { newFile: { fileName: string; fileLang: string; content: string | null }; hunks: string[] };
+    data: {
+      newFile: { fileName: string; fileLang: string; content: string | null };
+      hunks: string[];
+    };
     bundle: ReturnType<DiffFile["_getFullBundle"]> | null;
   }>;
 };
@@ -27,13 +30,21 @@ self.onmessage = (e: MessageEvent<DiffBuildRequest>) => {
   const { id, items, theme = "dark" } = e.data;
   const results = items.map((item) => {
     const data = {
-      newFile: { fileName: item.newName, fileLang: item.fileLang, content: item.newContent ?? null },
+      newFile: {
+        fileName: item.newName,
+        fileLang: item.fileLang,
+        content: item.newContent ?? null,
+      },
       hunks: [item.diff],
     };
     if (!item.diff.trim()) return { key: item.key, data, bundle: null };
     try {
       const instance = DiffFile.createInstance({
-        oldFile: { fileName: item.oldName, fileLang: item.fileLang, content: item.oldContent ?? null },
+        oldFile: {
+          fileName: item.oldName,
+          fileLang: item.fileLang,
+          content: item.oldContent ?? null,
+        },
         ...data,
       });
       instance.initTheme(theme);

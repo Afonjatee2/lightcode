@@ -125,9 +125,7 @@ function FileRow(props: {
         <FileStatusIcon status={file.status} />
         <span className="min-w-0 flex-1 truncate" title={file.path}>
           <span className="text-foreground">{basename}</span>
-          {isLockFile(file.path) && (
-            <Lock className="ml-1 inline-block size-2 text-muted/40" />
-          )}
+          {isLockFile(file.path) && <Lock className="ml-1 inline-block size-2 text-muted/40" />}
           {dir && <span className="ml-1 text-muted/60">{dir}</span>}
         </span>
 
@@ -206,9 +204,7 @@ function FileRow(props: {
   );
 }
 
-function ConflictGroup(props: {
-  files: string[];
-}) {
+function ConflictGroup(props: { files: string[] }) {
   const { files } = props;
   const [expanded, setExpanded] = useState(true);
 
@@ -262,7 +258,19 @@ function FileGroup(props: {
   diffTheme?: "light" | "dark";
   wrapLines?: boolean;
 }) {
-  const { title, count, staged, files, project, selectedFile, onSelectFile, onRefresh, mode, diffTheme, wrapLines } = props;
+  const {
+    title,
+    count,
+    staged,
+    files,
+    project,
+    selectedFile,
+    onSelectFile,
+    onRefresh,
+    mode,
+    diffTheme,
+    wrapLines,
+  } = props;
   const [expanded, setExpanded] = useState(true);
   const [revertAllOpen, setRevertAllOpen] = useState(false);
   const inlineDiffs = mode === "panel";
@@ -569,7 +577,15 @@ export function GitReviewSidebar(props: {
     return () => {
       isActive = false;
     };
-  }, [worktreePath, isGitHub, ghAvailable, effectiveBranch, effectivePrKey, project.location, refreshKey]);
+  }, [
+    worktreePath,
+    isGitHub,
+    ghAvailable,
+    effectiveBranch,
+    effectivePrKey,
+    project.location,
+    refreshKey,
+  ]);
 
   const projectAgentStatuses = getProjectAgentStatuses(
     project.location,
@@ -944,14 +960,16 @@ export function GitReviewSidebar(props: {
   const showMergeSection = Boolean(
     worktreeBranch && worktreePath && !hasAnyChanges && (sourceBranchLoading || commitsAhead > 0),
   );
-  const showPullFromSource = Boolean(worktreeBranch && worktreePath && sourceBranch && sourceAhead > 0);
+  const showPullFromSource = Boolean(
+    worktreeBranch && worktreePath && sourceBranch && sourceAhead > 0,
+  );
   const isPushed = hasTracking && ahead === 0;
   const showCreatePrButton = Boolean(
     showPrSection &&
-      ghAvailable &&
-      isPushed &&
-      sourceBranch &&
-      (!prData || prData.state === "closed"),
+    ghAvailable &&
+    isPushed &&
+    sourceBranch &&
+    (!prData || prData.state === "closed"),
   );
   const [createPrModalOpen, setCreatePrModalOpen] = useState(false);
 
@@ -1027,9 +1045,12 @@ export function GitReviewSidebar(props: {
           {mergeConflicting && mergeConflictFiles.length > 0 && (
             <ConflictGroup files={mergeConflictFiles} />
           )}
-          {gitStatus && gitStatus.staged.length === 0 && gitStatus.unstaged.length === 0 && !mergeConflicting && (
-            <p className="px-2 py-4 text-center text-xs text-muted/60">No changes</p>
-          )}
+          {gitStatus &&
+            gitStatus.staged.length === 0 &&
+            gitStatus.unstaged.length === 0 &&
+            !mergeConflicting && (
+              <p className="px-2 py-4 text-center text-xs text-muted/60">No changes</p>
+            )}
         </div>
 
         {/* Merge Conflict Resolution */}
@@ -1089,9 +1110,7 @@ export function GitReviewSidebar(props: {
           <div className="space-y-2 border-t border-white/6 px-0.5 pt-2">
             {mergeConflicting && mergeConflictFiles.length === 0 ? (
               <>
-                <p className="text-xs font-medium text-success">
-                  All conflicts resolved
-                </p>
+                <p className="text-xs font-medium text-success">All conflicts resolved</p>
                 <Button
                   variant="primary"
                   className="w-full"

@@ -324,7 +324,9 @@ function HomeView() {
   const threads = useAppStore((state) => state.threads);
   const openDraft = useAppStore((state) => state.openDraft);
   const openThread = useAppStore((state) => state.openThread);
-  const recentThreads = threads.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
+  const recentThreads = threads
+    .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 8);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -808,9 +810,7 @@ function AppContent() {
             agentStatuses={agentStatuses}
             wslAgentStatuses={wslAgentStatuses}
             onClose={() => closePane(paneId)}
-            onStart={(project, input) =>
-              void handleDraftStart(project, input, paneId)
-            }
+            onStart={(project, input) => void handleDraftStart(project, input, paneId)}
           />
         );
       }
@@ -966,7 +966,9 @@ export function App() {
     try {
       const raw = localStorage.getItem("lightcode-thread-sort-mode");
       if (raw && sortModeOrder.includes(raw as ThreadSortMode)) return raw as ThreadSortMode;
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return "updated";
   });
   const [projectSettingsId, setProjectSettingsId] = useState<string | null>(null);
@@ -977,7 +979,9 @@ export function App() {
     try {
       const raw = localStorage.getItem("lightcode-git-panel-context");
       if (raw) return JSON.parse(raw) as { projectId: string; worktreePath?: string };
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return null;
   });
   const [gitReviewAsPanel, setGitReviewAsPanel] = useState(() => gitReviewContext !== null);
@@ -987,7 +991,9 @@ export function App() {
   );
 
   // Persist git panel context so it reopens on restart.
-  function setGitReviewContext(ctx: { projectId: string; worktreePath?: string | undefined } | null) {
+  function setGitReviewContext(
+    ctx: { projectId: string; worktreePath?: string | undefined } | null,
+  ) {
     setGitReviewContextRaw(ctx);
     if (ctx) {
       localStorage.setItem("lightcode-git-panel-context", JSON.stringify(ctx));
@@ -1146,11 +1152,7 @@ export function App() {
     worktreePath: string,
     worktreeBranch?: string,
   ) {
-    const resolvedWorktreeBranch = resolveWorktreeBranch(
-      project.id,
-      worktreePath,
-      worktreeBranch,
-    );
+    const resolvedWorktreeBranch = resolveWorktreeBranch(project.id, worktreePath, worktreeBranch);
 
     // Run cleanup script before teardown so it can remove generated files
     // without racing the worktree deletion itself.
@@ -1228,11 +1230,7 @@ export function App() {
     archiveThread(threadId);
   }
 
-  function handleDeleteWorktreeGroup(
-    projectId: string,
-    worktreePath: string,
-    threadIds: string[],
-  ) {
+  function handleDeleteWorktreeGroup(projectId: string, worktreePath: string, threadIds: string[]) {
     const project = projects.find((p) => p.id === projectId);
     if (!project) return;
 
@@ -2223,7 +2221,8 @@ export function App() {
                     resolveWorktreeBranch(projectId!, worktreePath, thread?.worktreeBranch) ??
                     worktreePath.split(/[/\\]/).pop() ??
                     worktreePath,
-                });              }}
+                });
+              }}
               onDeleteProject={(projectId) => {
                 const projectThreadIds = useAppStore
                   .getState()
@@ -2269,9 +2268,7 @@ export function App() {
 
                 const store = useDevTerminalStore.getState();
                 const isSameTerminal =
-                  store.isOpen &&
-                  store.activeProjectId === projectId &&
-                  !store.activeWorktreePath;
+                  store.isOpen && store.activeProjectId === projectId && !store.activeWorktreePath;
 
                 if (isTerminalRight) {
                   // Unified mode: only close if terminal tab is already active for same project
@@ -2356,16 +2353,18 @@ export function App() {
               activeWorktreeTerminalPath={
                 isTerminalRight && rightPanelTab !== "terminal"
                   ? null
-                  : devTerminalOpen ? useDevTerminalStore.getState().activeWorktreePath : null
+                  : devTerminalOpen
+                    ? useDevTerminalStore.getState().activeWorktreePath
+                    : null
               }
               activeGitPanelProjectId={
                 gitPanelOpen && (!isTerminalRight || rightPanelTab === "git")
-                  ? gitReviewContext?.projectId ?? null
+                  ? (gitReviewContext?.projectId ?? null)
                   : null
               }
               activeGitPanelWorktreePath={
                 gitPanelOpen && (!isTerminalRight || rightPanelTab === "git")
-                  ? gitReviewContext?.worktreePath ?? null
+                  ? (gitReviewContext?.worktreePath ?? null)
                   : null
               }
               sortMode={threadSortMode}
@@ -2413,7 +2412,9 @@ export function App() {
                                   : undefined;
                                 setGitReviewContext(null);
                                 if (reviewProject && wtPath) {
-                                  const siblings = allThreads.filter((t) => t.worktreePath === wtPath);
+                                  const siblings = allThreads.filter(
+                                    (t) => t.worktreePath === wtPath,
+                                  );
                                   for (const sib of siblings) {
                                     deleteThread(sib.id);
                                   }
@@ -2429,11 +2430,17 @@ export function App() {
                                 const projectId = gitPanelContext!.projectId;
                                 setGitReviewContext(null);
                                 if (!wtPath) return;
-                                const siblings = useAppStore.getState().threads.filter((t) => t.worktreePath === wtPath);
+                                const siblings = useAppStore
+                                  .getState()
+                                  .threads.filter((t) => t.worktreePath === wtPath);
                                 if (action === "archive") {
                                   for (const sib of siblings) handleArchiveThread(sib.id);
                                 } else {
-                                  handleDeleteWorktreeGroup(projectId, wtPath, siblings.map((s) => s.id));
+                                  handleDeleteWorktreeGroup(
+                                    projectId,
+                                    wtPath,
+                                    siblings.map((s) => s.id),
+                                  );
                                 }
                               },
                             }
@@ -2450,8 +2457,8 @@ export function App() {
                 projectName={
                   (rightPanelTab === "git"
                     ? projects.find((p) => p.id === gitPanelContext?.projectId)?.name
-                    : projects.find((p) => p.id === useDevTerminalStore.getState().activeProjectId)?.name
-                  ) ?? undefined
+                    : projects.find((p) => p.id === useDevTerminalStore.getState().activeProjectId)
+                        ?.name) ?? undefined
                 }
                 onExpandGitToOverlay={() => setGitOverlayOpen(true)}
                 onOpenGit={() => {
@@ -2470,7 +2477,9 @@ export function App() {
                     const firstProject = projects[0];
                     if (firstProject) {
                       store.openPanel(firstProject.id);
-                      const existing = store.tabs.find((t) => t.projectId === firstProject.id && !t.worktreePath);
+                      const existing = store.tabs.find(
+                        (t) => t.projectId === firstProject.id && !t.worktreePath,
+                      );
                       if (!existing) {
                         const tab = store.addTab(firstProject.id, firstProject.name);
                         store.setActiveTab(tab.id);
@@ -2487,9 +2496,11 @@ export function App() {
               <DevTerminalPanel projects={projects} />
             )
           }
-          rightPanelOpen={isTerminalRight ? (devTerminalOpen || gitPanelOpen) : devTerminalOpen}
+          rightPanelOpen={isTerminalRight ? devTerminalOpen || gitPanelOpen : devTerminalOpen}
           gitPanel={
-            !isTerminalRight && gitPanelContext && projects.find((p) => p.id === gitPanelContext.projectId) ? (
+            !isTerminalRight &&
+            gitPanelContext &&
+            projects.find((p) => p.id === gitPanelContext.projectId) ? (
               <Suspense
                 fallback={
                   <div className="flex h-full items-center justify-center">
@@ -2539,11 +2550,17 @@ export function App() {
                           const projectId = gitPanelContext!.projectId;
                           setGitReviewContext(null);
                           if (!wtPath) return;
-                          const siblings = useAppStore.getState().threads.filter((t) => t.worktreePath === wtPath);
+                          const siblings = useAppStore
+                            .getState()
+                            .threads.filter((t) => t.worktreePath === wtPath);
                           if (action === "archive") {
                             for (const sib of siblings) handleArchiveThread(sib.id);
                           } else {
-                            handleDeleteWorktreeGroup(projectId, wtPath, siblings.map((s) => s.id));
+                            handleDeleteWorktreeGroup(
+                              projectId,
+                              wtPath,
+                              siblings.map((s) => s.id),
+                            );
                           }
                         },
                       }

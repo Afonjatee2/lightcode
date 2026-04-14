@@ -12,9 +12,10 @@ const bridgeMock = vi.hoisted(() => ({
   gitRevertAll: vi.fn<() => Promise<void>>(),
   gitCommit: vi.fn<() => Promise<void>>(),
   gitFetch: vi.fn<() => Promise<void>>(),
-  gitGetWorktreeSourceBranch: vi.fn<
-    () => Promise<{ sourceBranch: string | null; commitsAhead: number; sourceAhead: number }>
-  >(),
+  gitGetWorktreeSourceBranch:
+    vi.fn<
+      () => Promise<{ sourceBranch: string | null; commitsAhead: number; sourceAhead: number }>
+    >(),
   generateCommitMessage: vi.fn<() => Promise<{ message: string }>>(),
 }));
 

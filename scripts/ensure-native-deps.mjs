@@ -36,6 +36,7 @@ function ensureNodePty() {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
       `[lightcode] node-pty is unavailable: ${message}. If pnpm blocked native build scripts, run 'pnpm approve-builds' and reinstall.`,
+      { cause: error },
     );
   }
 }
@@ -47,6 +48,7 @@ function ensureBetterSqlite3() {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
       `[lightcode] better-sqlite3 is unavailable: ${message}. If pnpm blocked native build scripts, run 'pnpm approve-builds' and reinstall.`,
+      { cause: error },
     );
   }
 }

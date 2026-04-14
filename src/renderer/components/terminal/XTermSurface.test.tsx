@@ -10,9 +10,7 @@ const { state } = vi.hoisted(() => ({
     bridge: {
       writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       resizeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-      onSupervisorEvent: vi.fn<
-        (listener: (e: SupervisorEvent) => void) => () => void
-      >(),
+      onSupervisorEvent: vi.fn<(listener: (e: SupervisorEvent) => void) => () => void>(),
     },
   },
 }));

@@ -51,7 +51,11 @@ export function StatusIcon(props: {
         {tone === "working" ? (
           <path className="lightcode-provider-icon__shell" d={path} {...pathProps} />
         ) : null}
-        <path className={`lightcode-provider-icon__fill${tone === "done" ? " opacity-40" : ""}`} d={path} {...pathProps} />
+        <path
+          className={`lightcode-provider-icon__fill${tone === "done" ? " opacity-40" : ""}`}
+          d={path}
+          {...pathProps}
+        />
         {tone === "done" ? (
           <svg
             viewBox="0 0 24 24"

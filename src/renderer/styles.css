@@ -161,10 +161,13 @@
   box-sizing: border-box;
 }
 
-/* Global subtle focus outline for any element not styled by HeroUI utilities */
-:focus-visible {
-  outline: 1px solid oklch(from var(--focus) l c h / 0.5);
-  outline-offset: 1px;
+/* Global subtle focus ring for interactive elements not styled by HeroUI utilities */
+:focus-visible:not(
+  [data-focus-visible="true"],
+  [class*="focus-ring"],
+  [class*="focus-field-ring"]
+) {
+  @apply focus-ring;
 }
 
 /* Let HeroUI's ring-based utilities handle their own focus styling */
@@ -175,10 +178,6 @@
 button,
 [role="button"] {
   cursor: var(--interactive-cursor);
-}
-
-[role="button"]:focus-visible {
-  @apply focus-ring;
 }
 
 html,

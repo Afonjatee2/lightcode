@@ -42,173 +42,169 @@ interface DevTerminalActions {
   updateTabTitle: (tabId: string, title: string) => void;
 }
 
-export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>()(
-    (set, get) => ({
-      isOpen: false,
-      activeProjectId: null,
-      activeWorktreePath: null,
-      tabs: [],
-      activeTabId: null,
-      tabActivity: {},
+export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>()((set, get) => ({
+  isOpen: false,
+  activeProjectId: null,
+  activeWorktreePath: null,
+  tabs: [],
+  activeTabId: null,
+  tabActivity: {},
 
-      openPanel: (projectId) =>
-        set({ isOpen: true, activeProjectId: projectId, activeWorktreePath: null }),
-      openWorktreePanel: (projectId, worktreePath) =>
-        set({ isOpen: true, activeProjectId: projectId, activeWorktreePath: worktreePath }),
-      closePanel: () => set({ isOpen: false, activeProjectId: null, activeWorktreePath: null }),
-      togglePanel: (projectId) =>
-        set((state) => {
-          if (state.isOpen && state.activeProjectId === projectId) {
-            return { isOpen: false, activeWorktreePath: null };
-          }
-          return { isOpen: true, activeProjectId: projectId ?? state.activeProjectId };
-        }),
-
-      setActiveProject: (projectId) => {
-        const tabs = get().tabs.filter((t) => t.projectId === projectId);
-        set({
-          activeProjectId: projectId,
-          activeTabId: tabs[0]?.id ?? null,
-        });
-      },
-
-      addTab: (projectId, projectName, worktreePath?) => {
-        const tab: DevTerminalTab = {
-          id: `shell:${crypto.randomUUID()}`,
-          projectId,
-          ...(worktreePath ? { worktreePath } : {}),
-          title: projectName,
-          createdAt: new Date().toISOString(),
-        };
-        set((state) => ({ tabs: [...state.tabs, tab] }));
-        return tab;
-      },
-
-      removeTab: (tabId) =>
-        set((state) => {
-          const removed = state.tabs.find((t) => t.id === tabId);
-          const tabs = state.tabs.filter((t) => t.id !== tabId);
-          let { activeTabId } = state;
-          if (activeTabId === tabId) {
-            const projectTabs = removed
-              ? tabs.filter((t) => t.projectId === removed.projectId)
-              : tabs;
-            activeTabId = projectTabs.at(-1)?.id ?? null;
-          }
-          const tabActivity = { ...state.tabActivity };
-          delete tabActivity[tabId];
-          if (removed?.splitId) delete tabActivity[removed.splitId];
-          return { tabs, activeTabId, tabActivity };
-        }),
-
-      setActiveTab: (tabId) => {
-        const { tabActivity } = get();
-        if (tabActivity[tabId]) {
-          const next = { ...tabActivity };
-          delete next[tabId];
-          return set({ activeTabId: tabId, tabActivity: next });
-        }
-        set({ activeTabId: tabId });
-      },
-
-      removeTabsForProject: (projectId: string) => {
-        const removedTabs = get().tabs.filter((t) => t.projectId === projectId);
-        const removed = removedTabs.map((t) => t.id);
-        if (removed.length === 0) return removed;
-
-        // Also collect split shell IDs for cleanup
-        const splitIds = removedTabs.filter((t) => t.splitId).map((t) => t.splitId!);
-
-        set((state) => {
-          const tabs = state.tabs.filter((t) => t.projectId !== projectId);
-          let { activeTabId } = state;
-          if (activeTabId && removed.includes(activeTabId)) {
-            activeTabId = tabs.at(-1)?.id ?? null;
-          }
-          const tabActivity = { ...state.tabActivity };
-          for (const id of removed) delete tabActivity[id];
-          for (const id of splitIds) delete tabActivity[id];
-          return { tabs, activeTabId, tabActivity };
-        });
-        return [...removed, ...splitIds];
-      },
-
-      removeTabsForWorktree: (worktreePath: string) => {
-        const removedTabs = get().tabs.filter((t) => t.worktreePath === worktreePath);
-        const removed = removedTabs.map((t) => t.id);
-        if (removed.length === 0) return removed;
-
-        const splitIds = removedTabs.filter((t) => t.splitId).map((t) => t.splitId!);
-
-        set((state) => {
-          const tabs = state.tabs.filter((t) => t.worktreePath !== worktreePath);
-          let { activeTabId } = state;
-          if (activeTabId && removed.includes(activeTabId)) {
-            activeTabId = tabs.at(-1)?.id ?? null;
-          }
-          const tabActivity = { ...state.tabActivity };
-          for (const id of removed) delete tabActivity[id];
-          for (const id of splitIds) delete tabActivity[id];
-          return { tabs, activeTabId, tabActivity };
-        });
-        return [...removed, ...splitIds];
-      },
-
-      splitTab: (tabId) => {
-        const splitId = `shell:${crypto.randomUUID()}`;
-        set((state) => ({
-          tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, splitId } : t)),
-        }));
-        return splitId;
-      },
-
-      closeSplit: (tabId) => {
-        const tab = get().tabs.find((t) => t.id === tabId);
-        const splitId = tab?.splitId;
-        if (!splitId) return undefined;
-        set((state) => {
-          const tabs: DevTerminalTab[] = state.tabs.map((t) => {
-            if (t.id !== tabId) return t;
-            const { splitId: _, ...rest } = t;
-            return rest;
-          });
-          const tabActivity = { ...state.tabActivity };
-          delete tabActivity[splitId];
-          return { tabs, tabActivity };
-        });
-        return splitId;
-      },
-
-      markTabActive: (tabId) => {
-        const { activeTabId, tabActivity } = get();
-        if (tabId === activeTabId) return;
-        if (tabActivity[tabId]) return;
-        set({ tabActivity: { ...tabActivity, [tabId]: true } });
-      },
-
-      clearTabActivity: (tabId) => {
-        const { tabActivity } = get();
-        if (!tabActivity[tabId]) return;
-        const next = { ...tabActivity };
-        delete next[tabId];
-        set({ tabActivity: next });
-      },
-
-      updateTabTitle: (tabId, rawTitle) => {
-        // Shell titles are often full paths (e.g. "C:\Windows\System32\cmd.exe").
-        // Extract the basename without extension for a cleaner tab label.
-        const segment = rawTitle.split(/[/\\]/).pop() ?? rawTitle;
-        const title = segment.replace(/\.[^.]+$/, "") || segment;
-        // ConPTY reports "wsl" as the process title for wsl.exe — skip it
-        // so the initial meaningful title (project/branch name) is preserved.
-        if (title === "wsl") return;
-        set((state) => ({
-          tabs: state.tabs.map((t) => {
-            if (t.id === tabId) return { ...t, title };
-            if (t.splitId === tabId) return { ...t, splitTitle: title };
-            return t;
-          }),
-        }));
-      },
+  openPanel: (projectId) =>
+    set({ isOpen: true, activeProjectId: projectId, activeWorktreePath: null }),
+  openWorktreePanel: (projectId, worktreePath) =>
+    set({ isOpen: true, activeProjectId: projectId, activeWorktreePath: worktreePath }),
+  closePanel: () => set({ isOpen: false, activeProjectId: null, activeWorktreePath: null }),
+  togglePanel: (projectId) =>
+    set((state) => {
+      if (state.isOpen && state.activeProjectId === projectId) {
+        return { isOpen: false, activeWorktreePath: null };
+      }
+      return { isOpen: true, activeProjectId: projectId ?? state.activeProjectId };
     }),
-);
+
+  setActiveProject: (projectId) => {
+    const tabs = get().tabs.filter((t) => t.projectId === projectId);
+    set({
+      activeProjectId: projectId,
+      activeTabId: tabs[0]?.id ?? null,
+    });
+  },
+
+  addTab: (projectId, projectName, worktreePath?) => {
+    const tab: DevTerminalTab = {
+      id: `shell:${crypto.randomUUID()}`,
+      projectId,
+      ...(worktreePath ? { worktreePath } : {}),
+      title: projectName,
+      createdAt: new Date().toISOString(),
+    };
+    set((state) => ({ tabs: [...state.tabs, tab] }));
+    return tab;
+  },
+
+  removeTab: (tabId) =>
+    set((state) => {
+      const removed = state.tabs.find((t) => t.id === tabId);
+      const tabs = state.tabs.filter((t) => t.id !== tabId);
+      let { activeTabId } = state;
+      if (activeTabId === tabId) {
+        const projectTabs = removed ? tabs.filter((t) => t.projectId === removed.projectId) : tabs;
+        activeTabId = projectTabs.at(-1)?.id ?? null;
+      }
+      const tabActivity = { ...state.tabActivity };
+      delete tabActivity[tabId];
+      if (removed?.splitId) delete tabActivity[removed.splitId];
+      return { tabs, activeTabId, tabActivity };
+    }),
+
+  setActiveTab: (tabId) => {
+    const { tabActivity } = get();
+    if (tabActivity[tabId]) {
+      const next = { ...tabActivity };
+      delete next[tabId];
+      return set({ activeTabId: tabId, tabActivity: next });
+    }
+    set({ activeTabId: tabId });
+  },
+
+  removeTabsForProject: (projectId: string) => {
+    const removedTabs = get().tabs.filter((t) => t.projectId === projectId);
+    const removed = removedTabs.map((t) => t.id);
+    if (removed.length === 0) return removed;
+
+    // Also collect split shell IDs for cleanup
+    const splitIds = removedTabs.filter((t) => t.splitId).map((t) => t.splitId!);
+
+    set((state) => {
+      const tabs = state.tabs.filter((t) => t.projectId !== projectId);
+      let { activeTabId } = state;
+      if (activeTabId && removed.includes(activeTabId)) {
+        activeTabId = tabs.at(-1)?.id ?? null;
+      }
+      const tabActivity = { ...state.tabActivity };
+      for (const id of removed) delete tabActivity[id];
+      for (const id of splitIds) delete tabActivity[id];
+      return { tabs, activeTabId, tabActivity };
+    });
+    return [...removed, ...splitIds];
+  },
+
+  removeTabsForWorktree: (worktreePath: string) => {
+    const removedTabs = get().tabs.filter((t) => t.worktreePath === worktreePath);
+    const removed = removedTabs.map((t) => t.id);
+    if (removed.length === 0) return removed;
+
+    const splitIds = removedTabs.filter((t) => t.splitId).map((t) => t.splitId!);
+
+    set((state) => {
+      const tabs = state.tabs.filter((t) => t.worktreePath !== worktreePath);
+      let { activeTabId } = state;
+      if (activeTabId && removed.includes(activeTabId)) {
+        activeTabId = tabs.at(-1)?.id ?? null;
+      }
+      const tabActivity = { ...state.tabActivity };
+      for (const id of removed) delete tabActivity[id];
+      for (const id of splitIds) delete tabActivity[id];
+      return { tabs, activeTabId, tabActivity };
+    });
+    return [...removed, ...splitIds];
+  },
+
+  splitTab: (tabId) => {
+    const splitId = `shell:${crypto.randomUUID()}`;
+    set((state) => ({
+      tabs: state.tabs.map((t) => (t.id === tabId ? { ...t, splitId } : t)),
+    }));
+    return splitId;
+  },
+
+  closeSplit: (tabId) => {
+    const tab = get().tabs.find((t) => t.id === tabId);
+    const splitId = tab?.splitId;
+    if (!splitId) return undefined;
+    set((state) => {
+      const tabs: DevTerminalTab[] = state.tabs.map((t) => {
+        if (t.id !== tabId) return t;
+        const { splitId: _, ...rest } = t;
+        return rest;
+      });
+      const tabActivity = { ...state.tabActivity };
+      delete tabActivity[splitId];
+      return { tabs, tabActivity };
+    });
+    return splitId;
+  },
+
+  markTabActive: (tabId) => {
+    const { activeTabId, tabActivity } = get();
+    if (tabId === activeTabId) return;
+    if (tabActivity[tabId]) return;
+    set({ tabActivity: { ...tabActivity, [tabId]: true } });
+  },
+
+  clearTabActivity: (tabId) => {
+    const { tabActivity } = get();
+    if (!tabActivity[tabId]) return;
+    const next = { ...tabActivity };
+    delete next[tabId];
+    set({ tabActivity: next });
+  },
+
+  updateTabTitle: (tabId, rawTitle) => {
+    // Shell titles are often full paths (e.g. "C:\Windows\System32\cmd.exe").
+    // Extract the basename without extension for a cleaner tab label.
+    const segment = rawTitle.split(/[/\\]/).pop() ?? rawTitle;
+    const title = segment.replace(/\.[^.]+$/, "") || segment;
+    // ConPTY reports "wsl" as the process title for wsl.exe — skip it
+    // so the initial meaningful title (project/branch name) is preserved.
+    if (title === "wsl") return;
+    set((state) => ({
+      tabs: state.tabs.map((t) => {
+        if (t.id === tabId) return { ...t, title };
+        if (t.splitId === tabId) return { ...t, splitTitle: title };
+        return t;
+      }),
+    }));
+  },
+}));

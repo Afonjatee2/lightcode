@@ -63,7 +63,14 @@ export function AppShell(props: {
   gitPanel?: ReactNode;
   gitPanelOpen?: boolean;
 }) {
-  const { sidebar, content, rightPanel, rightPanelOpen = false, gitPanel, gitPanelOpen = false } = props;
+  const {
+    sidebar,
+    content,
+    rightPanel,
+    rightPanelOpen = false,
+    gitPanel,
+    gitPanelOpen = false,
+  } = props;
   const terminalPosition = useSharedSettings((s) => s.terminalPosition);
 
   const [sidebarWidth, setSidebarWidth] = useState(() =>
@@ -81,9 +88,9 @@ export function AppShell(props: {
   const [gitPanelWidth, setGitPanelWidth] = useState(() =>
     readStoredNumber("lightcode-git-panel-width", GIT_PANEL_DEFAULT_WIDTH),
   );
-  const [resizeTarget, setResizeTarget] = useState<"sidebar" | "panel" | "panel-bottom" | "git-panel" | null>(
-    null,
-  );
+  const [resizeTarget, setResizeTarget] = useState<
+    "sidebar" | "panel" | "panel-bottom" | "git-panel" | null
+  >(null);
   const resizeRef = useRef({ startX: 0, startY: 0, startWidth: 0, startHeight: 0 });
 
   useEffect(() => {

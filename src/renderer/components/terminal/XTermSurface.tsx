@@ -281,7 +281,8 @@ export const XTermSurface = forwardRef<
       scrollCheckPending = true;
       requestAnimationFrame(() => {
         scrollCheckPending = false;
-        const scrolledUp = terminal.buffer.active.baseY - terminal.buffer.active.viewportY > SCROLL_THRESHOLD;
+        const scrolledUp =
+          terminal.buffer.active.baseY - terminal.buffer.active.viewportY > SCROLL_THRESHOLD;
         if (scrolledUp !== wasScrolledUp) {
           wasScrolledUp = scrolledUp;
           setShowScrollDown(scrolledUp);

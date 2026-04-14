@@ -12,8 +12,7 @@ const messages = {
   "git.commandFailed": "Git {command} failed: {detail}",
 
   // ── Git: branch / switch ──────────────────────────────────
-  "git.switch.dirtyWorktree":
-    "Cannot switch branches — commit or stash your changes first",
+  "git.switch.dirtyWorktree": "Cannot switch branches — commit or stash your changes first",
 
   // ── Git: commit ───────────────────────────────────────────
   "git.commit.failed": "Commit failed: {detail}",
@@ -36,18 +35,14 @@ const messages = {
   "git.mergetool.failed": "Merge tool failed to resolve conflicts",
 
   // ── Git: worktree ─────────────────────────────────────────
-  "git.worktree.noBranch":
-    "Cannot create a default worktree path without a branch name",
+  "git.worktree.noBranch": "Cannot create a default worktree path without a branch name",
   "git.worktree.dirtySource":
     "Branch '{branch}' has uncommitted changes in '{path}' — commit or stash them before merging",
-  "git.worktree.cleanupFailed":
-    "{original}\nWorktree cleanup also failed: {cleanup}",
+  "git.worktree.cleanupFailed": "{original}\nWorktree cleanup also failed: {cleanup}",
 
   // ── Git: WSL ──────────────────────────────────────────────
-  "git.wsl.homeNotFound":
-    "Unable to resolve home directory for WSL distro \"{distro}\"",
-  "git.wsl.mkdirFailed":
-    "Unable to create WSL worktree directory \"{path}\"",
+  "git.wsl.homeNotFound": 'Unable to resolve home directory for WSL distro "{distro}"',
+  "git.wsl.mkdirFailed": 'Unable to create WSL worktree directory "{path}"',
 
   // ── Git: PR ───────────────────────────────────────────────
   "git.pr.createFailed": "Failed to create pull request: {detail}",
@@ -55,8 +50,7 @@ const messages = {
   "git.pr.closeFailed": "Failed to close pull request: {detail}",
 
   // ── Git: generate message ─────────────────────────────────
-  "git.generateMessage.failed":
-    "Could not generate commit message: {detail}",
+  "git.generateMessage.failed": "Could not generate commit message: {detail}",
 
   // ── Supervisor ────────────────────────────────────────────
   "supervisor.restarted": "Background process restarted",
@@ -80,10 +74,7 @@ export type MessageKey = keyof typeof messages;
  * // → "Merge has conflicts:\nsrc/index.ts\nREADME.md"
  * ```
  */
-export function msg(
-  key: MessageKey,
-  params?: Record<string, string | number>,
-): string {
+export function msg(key: MessageKey, params?: Record<string, string | number>): string {
   let text: string = messages[key];
   if (params) {
     for (const [k, v] of Object.entries(params)) {

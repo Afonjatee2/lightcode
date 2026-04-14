@@ -1,17 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const execFileAsyncMock = vi.hoisted(
-  () => vi.fn<(...args: unknown[]) => Promise<{ stdout: string }>>(),
+const execFileAsyncMock = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => Promise<{ stdout: string }>>(),
 );
-const buildAgentCommandMock = vi.hoisted(
-  () =>
-    vi.fn<
-      (
-        location: { kind: "windows"; path: string },
-        command: string,
-        args: string[],
-      ) => { command: string; args: string[] }
-    >(),
+const buildAgentCommandMock = vi.hoisted(() =>
+  vi.fn<
+    (
+      location: { kind: "windows"; path: string },
+      command: string,
+      args: string[],
+    ) => { command: string; args: string[] }
+  >(),
 );
 const writeFileMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>());
 const unlinkMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>());

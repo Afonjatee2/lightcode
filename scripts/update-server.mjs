@@ -59,7 +59,9 @@ const server = createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`\n  Update server running at http://localhost:${PORT}`);
   console.log(`  Serving files from: ${releaseDir}\n`);
-  const files = readdirSync(releaseDir).filter((f) => /\.(yml|yaml|exe|dmg|AppImage|deb|blockmap)$/i.test(f));
+  const files = readdirSync(releaseDir).filter((f) =>
+    /\.(yml|yaml|exe|dmg|AppImage|deb|blockmap)$/i.test(f),
+  );
   for (const f of files) {
     const size = (statSync(join(releaseDir, f)).size / 1024 / 1024).toFixed(1);
     console.log(`    ${f}  (${size} MB)`);

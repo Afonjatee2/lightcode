@@ -64,9 +64,9 @@ export function initDatabase(dbPath: string) {
 
   const storedVersion = Number(
     (
-      sqlite
-        .prepare("SELECT value FROM app_state WHERE key = 'schema_version'")
-        .get() as { value: string } | undefined
+      sqlite.prepare("SELECT value FROM app_state WHERE key = 'schema_version'").get() as
+        | { value: string }
+        | undefined
     )?.value ?? "0",
   );
 

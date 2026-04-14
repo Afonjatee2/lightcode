@@ -39,7 +39,9 @@ export function UnifiedRightPanel(props: {
           <div className="min-w-0">
             <Tooltip delay={300}>
               <Tooltip.Trigger>
-                <div className="max-w-[100px] truncate text-xs font-medium text-foreground">{projectName}</div>
+                <div className="max-w-[100px] truncate text-xs font-medium text-foreground">
+                  {projectName}
+                </div>
               </Tooltip.Trigger>
               <Tooltip.Content placement="bottom">{projectName}</Tooltip.Content>
             </Tooltip>

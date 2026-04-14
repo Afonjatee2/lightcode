@@ -54,11 +54,23 @@ function resolveIcon(control: ComposerControl): ReactNode | undefined {
 
   if (iconKind === "permission") {
     if (control.kind === "toggle") {
-      return <PermissionIcon className="size-4 text-foreground" index={control.isSelected ? 1 : 0} count={2} />;
+      return (
+        <PermissionIcon
+          className="size-4 text-foreground"
+          index={control.isSelected ? 1 : 0}
+          count={2}
+        />
+      );
     }
     const ids = control.options.map((o) => (typeof o === "string" ? o : o.id));
     const idx = ids.indexOf(control.value);
-    return <PermissionIcon className="size-4 text-foreground" index={idx < 0 ? 0 : idx} count={ids.length} />;
+    return (
+      <PermissionIcon
+        className="size-4 text-foreground"
+        index={idx < 0 ? 0 : idx}
+        count={ids.length}
+      />
+    );
   }
 
   return undefined;

@@ -16,9 +16,7 @@ const SHIELD =
  *
  * For binary toggles pass `index={isProtected ? 0 : 1}` and `count={2}`.
  */
-export function PermissionIcon(
-  props: SVGProps<SVGSVGElement> & { index: number; count: number },
-) {
+export function PermissionIcon(props: SVGProps<SVGSVGElement> & { index: number; count: number }) {
   const { index, count, ...svgProps } = props;
 
   // Map index → 1..4 level (4 = most protected, 1 = least)

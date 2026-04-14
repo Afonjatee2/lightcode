@@ -1,5 +1,9 @@
 import { DiffFile, highlighter, getLang } from "@git-diff-view/react";
-import type { DiffBuildItem, DiffBuildRequest, DiffBuildResponse } from "../../workers/diffBuildWorker";
+import type {
+  DiffBuildItem,
+  DiffBuildRequest,
+  DiffBuildResponse,
+} from "../../workers/diffBuildWorker";
 import { useSharedSettings } from "../../state/sharedSettingsStore";
 
 export type { DiffBuildItem };

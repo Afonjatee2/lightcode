@@ -239,11 +239,8 @@ export const useAppStore = create<AppStoreState>()(
           if (state.view.kind === "draft" && state.view.projectId === projectId) {
             nextView = { kind: "home" };
           } else if (state.view.kind === "thread") {
-            const remaining = state.view.panes.filter(
-              (id) =>
-                isDraftPaneId(id)
-                  ? parseDraftProjectId(id) !== projectId
-                  : !projectThreadIds.has(id),
+            const remaining = state.view.panes.filter((id) =>
+              isDraftPaneId(id) ? parseDraftProjectId(id) !== projectId : !projectThreadIds.has(id),
             );
             nextView =
               remaining.length === 0
@@ -525,8 +522,7 @@ export const useAppStore = create<AppStoreState>()(
       updateThreadRuntime: (threadId, input) =>
         set((state) => {
           let changed = false;
-          const isVisible =
-            state.view.kind === "thread" && state.view.panes.includes(threadId);
+          const isVisible = state.view.kind === "thread" && state.view.panes.includes(threadId);
 
           const threads: Thread[] = state.threads.map((thread): Thread => {
             if (thread.id !== threadId) {
@@ -838,7 +834,7 @@ export const useAppStore = create<AppStoreState>()(
       storage: createDbStorage(),
       merge: (persistedState, currentState) => {
         const state =
-          (persistedState as Partial<AppStoreState> & { threads?: Thread[] } | undefined) ??
+          (persistedState as (Partial<AppStoreState> & { threads?: Thread[] }) | undefined) ??
           ({} as Partial<AppStoreState>);
 
         return {

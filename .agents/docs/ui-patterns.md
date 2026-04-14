@@ -68,14 +68,19 @@ Vite 8 (Rolldown) splits renderer output into manual chunks: `xterm`, `git-diff`
 3. **Static imports within lazy boundaries** — child modules (e.g. `GitDiffContent` inside `GitReviewOverlay`) use normal static imports. They load automatically when the parent chunk loads.
 
 Pattern in `app.tsx`:
+
 ```tsx
-const MyOverlay = lazy(() => import("./MyOverlay").then(m => ({ default: m.MyOverlay })));
+const MyOverlay = lazy(() => import("./MyOverlay").then((m) => ({ default: m.MyOverlay })));
 
 // Preload during idle so it's ready when needed
 if (typeof requestIdleCallback === "function") {
-  requestIdleCallback(() => { import("./MyOverlay"); });
+  requestIdleCallback(() => {
+    import("./MyOverlay");
+  });
 } else {
-  setTimeout(() => { import("./MyOverlay"); }, 1000);
+  setTimeout(() => {
+    import("./MyOverlay");
+  }, 1000);
 }
 ```
 

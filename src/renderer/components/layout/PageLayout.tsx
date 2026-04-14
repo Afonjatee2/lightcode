@@ -17,8 +17,17 @@ export function PageLayout(props: {
   gitPanel?: ReactNode;
   gitPanelOpen?: boolean;
 }) {
-  const { title, onTitleClick, headerChildren, sidebar, content, rightPanel, rightPanelOpen, gitPanel, gitPanelOpen } =
-    props;
+  const {
+    title,
+    onTitleClick,
+    headerChildren,
+    sidebar,
+    content,
+    rightPanel,
+    rightPanelOpen,
+    gitPanel,
+    gitPanelOpen,
+  } = props;
 
   return (
     <div className="flex h-full min-h-0 flex-col">

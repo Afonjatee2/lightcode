@@ -4,15 +4,18 @@ import type { ProjectLocation } from "../shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 
 const spawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
-const buildAgentCommandMock = vi.hoisted(
-  () =>
-    vi.fn<
-      (location: ProjectLocation, command: string, args: string[]) => {
-        command: string;
-        args: string[];
-        cwd?: string;
-      }
-    >(),
+const buildAgentCommandMock = vi.hoisted(() =>
+  vi.fn<
+    (
+      location: ProjectLocation,
+      command: string,
+      args: string[],
+    ) => {
+      command: string;
+      args: string[];
+      cwd?: string;
+    }
+  >(),
 );
 const getStagedDiffMock = vi.hoisted(() => vi.fn<() => Promise<string>>());
 const getAllDiffMock = vi.hoisted(() => vi.fn<() => Promise<string>>());

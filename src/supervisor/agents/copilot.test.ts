@@ -135,11 +135,9 @@ describe("detectCopilotTerminalStatus", () => {
   });
 
   it("ignores stale working output deep in history when the recent tail only shows the status bar", () => {
-    const text = [
-      "⊙ Thinking (Esc to cancel)",
-      "x".repeat(2000),
-      "shift+tab switch mode",
-    ].join("\n");
+    const text = ["⊙ Thinking (Esc to cancel)", "x".repeat(2000), "shift+tab switch mode"].join(
+      "\n",
+    );
 
     expect(detectCopilotTerminalStatus(text)).toEqual({
       status: "idle",

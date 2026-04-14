@@ -136,5 +136,13 @@ export function useAttachments() {
     setAttachments(saved);
   }
 
-  return { attachments, addFiles, addClipboardImage, removeAttachment, clearAll, toSegments, restore };
+  return {
+    attachments,
+    addFiles,
+    addClipboardImage,
+    removeAttachment,
+    clearAll,
+    toSegments,
+    restore,
+  };
 }

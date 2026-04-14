@@ -10,33 +10,35 @@ const { bridge } = vi.hoisted(() => ({
     listWslDistros: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
     getAgentStatuses: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
     getThreadSnapshots: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
-    getGitStatus: vi.fn<
-      () => Promise<{
-        isRepo: boolean;
-        branch: string;
-        tracking: string;
-        hasRemote: boolean;
-        remoteInfo: null;
-        ahead: number;
-        behind: number;
-        staged: unknown[];
-        unstaged: unknown[];
-        totalInsertions: number;
-        totalDeletions: number;
-      }>
-    >().mockResolvedValue({
-      isRepo: true,
-      branch: "main",
-      tracking: "",
-      hasRemote: false,
-      remoteInfo: null,
-      ahead: 0,
-      behind: 0,
-      staged: [],
-      unstaged: [],
-      totalInsertions: 0,
-      totalDeletions: 0,
-    }),
+    getGitStatus: vi
+      .fn<
+        () => Promise<{
+          isRepo: boolean;
+          branch: string;
+          tracking: string;
+          hasRemote: boolean;
+          remoteInfo: null;
+          ahead: number;
+          behind: number;
+          staged: unknown[];
+          unstaged: unknown[];
+          totalInsertions: number;
+          totalDeletions: number;
+        }>
+      >()
+      .mockResolvedValue({
+        isRepo: true,
+        branch: "main",
+        tracking: "",
+        hasRemote: false,
+        remoteInfo: null,
+        ahead: 0,
+        behind: 0,
+        staged: [],
+        unstaged: [],
+        totalInsertions: 0,
+        totalDeletions: 0,
+      }),
     gitListBranches: vi
       .fn<() => Promise<{ current: string; branches: unknown[] }>>()
       .mockResolvedValue({ current: "main", branches: [] }),
@@ -44,20 +46,20 @@ const { bridge } = vi.hoisted(() => ({
     gitListWorktrees: vi
       .fn<() => Promise<{ worktrees: unknown[] }>>()
       .mockResolvedValue({ worktrees: [] }),
-    gitGetWorktreeSourceBranch: vi.fn<
-      () => Promise<{ sourceBranch: string; commitsAhead: number; sourceAhead: number }>
-    >().mockResolvedValue({
-      sourceBranch: "master",
-      commitsAhead: 1,
-      sourceAhead: 0,
-    }),
-    gitMergeToSource: vi.fn<
-      () => Promise<{ merged: boolean; fastForward: boolean; newSourceCommit: string }>
-    >().mockResolvedValue({
-      merged: true,
-      fastForward: false,
-      newSourceCommit: "abc123",
-    }),
+    gitGetWorktreeSourceBranch: vi
+      .fn<() => Promise<{ sourceBranch: string; commitsAhead: number; sourceAhead: number }>>()
+      .mockResolvedValue({
+        sourceBranch: "master",
+        commitsAhead: 1,
+        sourceAhead: 0,
+      }),
+    gitMergeToSource: vi
+      .fn<() => Promise<{ merged: boolean; fastForward: boolean; newSourceCommit: string }>>()
+      .mockResolvedValue({
+        merged: true,
+        fastForward: false,
+        newSourceCommit: "abc123",
+      }),
     gitAddWorktree: vi.fn<() => Promise<{ path: string }>>().mockResolvedValue({
       path: "C:\\Users\\demo\\.lightcode\\worktrees\\repo-12345678\\feature-x",
     }),
@@ -556,7 +558,7 @@ describe("App", () => {
             attention: "none",
             canResumeWithConfig: true,
             archived: false,
-          done: false,
+            done: false,
             sessionRef: {
               providerSessionId: "session-1",
               discoveredAt: "2026-03-22T00:00:00.000Z",
@@ -576,7 +578,7 @@ describe("App", () => {
             attention: "none",
             canResumeWithConfig: true,
             archived: false,
-          done: false,
+            done: false,
             sessionRef: {
               providerSessionId: "session-3",
               discoveredAt: "2026-03-22T00:00:00.000Z",
@@ -596,7 +598,7 @@ describe("App", () => {
             attention: "none",
             canResumeWithConfig: true,
             archived: false,
-          done: false,
+            done: false,
             sessionRef: {
               providerSessionId: "session-2",
               discoveredAt: "2026-03-22T00:00:00.000Z",

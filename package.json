@@ -2,8 +2,8 @@
   "name": "lightcode",
   "version": "0.1.1",
   "private": true,
-  "license": "Apache-2.0",
   "description": "Terminal-native AI agents desktop app for Windows and WSL.",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/SDSLeon/lightcode"
@@ -27,12 +27,11 @@
     "dist:mac": "pnpm run build && electron-builder --mac",
     "typecheck": "pnpm exec tsgo --noEmit -p tsconfig.json",
     "typecheck:compat": "tsc --noEmit -p tsconfig.json",
-    "lint": "pnpm exec oxlint --type-aware --import-plugin --node-plugin --react-plugin --jsx-a11y-plugin --vitest-plugin --deny-warnings src vite.config.ts tsdown.config.ts vitest.config.ts",
-    "lint:fix": "pnpm exec oxlint --type-aware --import-plugin --node-plugin --react-plugin --jsx-a11y-plugin --vitest-plugin --fix src vite.config.ts tsdown.config.ts vitest.config.ts",
-    "fmt": "pnpm exec oxfmt --write .",
-    "fmt:check": "pnpm exec oxfmt --check .",
+    "lint": "oxlint --type-aware --deny-warnings . && oxfmt --check .",
+    "lint:fix": "oxlint --type-aware --fix . && oxfmt --write .",
     "test": "vitest run",
-    "update-server": "node scripts/update-server.mjs"
+    "update-server": "node scripts/update-server.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.0",
@@ -86,6 +85,7 @@
     "electron": "^41.1.0",
     "electron-builder": "^26.8.1",
     "electronmon": "^2.0.4",
+    "husky": "^9.1.7",
     "jsdom": "^29.0.1",
     "oxfmt": "^0.42.0",
     "oxlint": "^1.57.0",

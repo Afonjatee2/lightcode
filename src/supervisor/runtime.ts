@@ -313,7 +313,10 @@ export async function detectWslAgentStatuses(
             const status = await adapter.detectInstall(ctx);
             return { ...status, envKind: "wsl" as const, envDistro: distro };
           } catch (err) {
-            console.error(`[supervisor] detectInstall(${adapter.kind}, wsl:${distro}): FAILED`, err);
+            console.error(
+              `[supervisor] detectInstall(${adapter.kind}, wsl:${distro}): FAILED`,
+              err,
+            );
             return {
               kind: adapter.kind,
               label: adapter.label,
@@ -357,9 +360,7 @@ function migrateSettingDef(d: Record<string, unknown>): Record<string, unknown> 
  */
 const cachedAgentStatusSchema = agentStatusSchema.extend({
   capabilities: agentCapabilitySchema.extend({
-    settingDefs: z
-      .array(agentSettingDefSchema)
-      .catch([]),
+    settingDefs: z.array(agentSettingDefSchema).catch([]),
   }),
 });
 
@@ -375,7 +376,9 @@ function parseCachedStatuses(entries: unknown[] | undefined): AgentStatus[] {
         const c = cap as Record<string, unknown>;
         if (Array.isArray(c.settingDefs)) {
           c.settingDefs = c.settingDefs.map((d: unknown) =>
-            d != null && typeof d === "object" ? migrateSettingDef(d as Record<string, unknown>) : d,
+            d != null && typeof d === "object"
+              ? migrateSettingDef(d as Record<string, unknown>)
+              : d,
           );
         }
       }
@@ -545,7 +548,9 @@ export class SupervisorRuntime {
     const nativePromise = Promise.all(
       [...this.adapters.values()].map(async (adapter) => {
         if (disabled.has(adapter.kind)) {
-          console.log(`[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): skipped (disabled)`);
+          console.log(
+            `[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): skipped (disabled)`,
+          );
           return {
             kind: adapter.kind,
             label: adapter.label,
@@ -948,7 +953,7 @@ export class SupervisorRuntime {
     // For WSL shells, pass TERM through WSLENV so the Linux shell sees
     // a proper terminal type and can emit OSC title sequences.
     const shellEnv: Record<string, string> = {
-      ...process.env as Record<string, string>,
+      ...(process.env as Record<string, string>),
       TERM: "xterm-256color",
     };
     if (payload.projectLocation.kind === "wsl") {
@@ -1089,9 +1094,7 @@ export class SupervisorRuntime {
     return { title };
   }
 
-  async generatePrSummary(
-    payload: GeneratePrSummaryPayload,
-  ): Promise<GeneratePrSummaryResult> {
+  async generatePrSummary(payload: GeneratePrSummaryPayload): Promise<GeneratePrSummaryResult> {
     const adapter = this.requireAdapter(payload.agentKind);
     return generatePrSummary(
       payload.projectLocation,
@@ -1171,17 +1174,17 @@ export class SupervisorRuntime {
 
   async gitDeleteBranch(payload: GitDeleteBranchPayload): Promise<void> {
     if (payload.remote) {
-      return this.gitService.deleteRemoteBranch(payload.projectLocation, payload.remote, payload.branch);
+      return this.gitService.deleteRemoteBranch(
+        payload.projectLocation,
+        payload.remote,
+        payload.branch,
+      );
     }
     return this.gitService.deleteBranch(payload.projectLocation, payload.branch, payload.force);
   }
 
   async gitSwitchBranch(payload: GitSwitchBranchPayload): Promise<GitSwitchBranchResult> {
-    return this.gitService.switchBranch(
-      payload.projectLocation,
-      payload.branch,
-      payload.createNew,
-    );
+    return this.gitService.switchBranch(payload.projectLocation, payload.branch, payload.createNew);
   }
 
   async gitPull(payload: GitPullPayload): Promise<void> {
@@ -2211,10 +2214,7 @@ export class SupervisorRuntime {
           // session is still "idle" so the outer condition is false, but
           // the pending "working" timer must be cancelled or it will fire
           // and set a stale "working" status after the agent is already idle.
-          if (
-            session.pendingStatusHint &&
-            session.pendingStatusHint.status !== hint.status
-          ) {
+          if (session.pendingStatusHint && session.pendingStatusHint.status !== hint.status) {
             clearTimeout(session.pendingStatusHint.timer);
             session.pendingStatusHint = undefined;
           }

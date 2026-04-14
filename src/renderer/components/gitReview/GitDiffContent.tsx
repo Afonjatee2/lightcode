@@ -18,7 +18,13 @@ import type { DiffBuildItem } from "../../workers/diffBuildWorker";
   };
 }
 import { readBridge } from "../../bridge";
-import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang, useDiffTheme } from "./diffBuildClient";
+import {
+  buildInWorker,
+  diffFileFromBundle,
+  extractDiffNames,
+  getLang,
+  useDiffTheme,
+} from "./diffBuildClient";
 
 /** Skip rendering diffs larger than this many lines changed */
 const LARGE_DIFF_THRESHOLD = 500;
@@ -77,7 +83,6 @@ function buildGitStatusKey(gitStatus: GitStatusResult | undefined): string {
   ].join("\n---\n");
 }
 
-
 function buildEntry(
   filePath: string,
   staged: boolean,
@@ -125,11 +130,7 @@ function skeletonEntry(
 
 // ── Components ───────────────────────────────────────────────
 
-function FileHeader(props: {
-  entry: DiffEntry;
-  collapsed: boolean;
-  onToggleCollapse: () => void;
-}) {
+function FileHeader(props: { entry: DiffEntry; collapsed: boolean; onToggleCollapse: () => void }) {
   const { entry, collapsed, onToggleCollapse } = props;
   return (
     <div
@@ -225,7 +226,19 @@ function DiffSection(props: {
     return () => {
       cancelled = true;
     };
-  }, [mounted, entry.diffFile, entry.filePath, entry.staged, entry.loading, entry.tooLarge, entry.rawDiff, entry.oldName, entry.newName, entry.fileLang, projectLocation]);
+  }, [
+    mounted,
+    entry.diffFile,
+    entry.filePath,
+    entry.staged,
+    entry.loading,
+    entry.tooLarge,
+    entry.rawDiff,
+    entry.oldName,
+    entry.newName,
+    entry.fileLang,
+    projectLocation,
+  ]);
 
   // Signal ready after content DiffFile is loaded (expand buttons ready, no layout shift).
   // For entries without a diff (tooLarge, loading, empty), signal immediately when mounted.
@@ -421,9 +434,7 @@ export function GitDiffContent(props: {
         setLoading(true);
         const skeletons = [
           ...gitStatus.staged.map((f) => skeletonEntry(f.path, true, f.insertions, f.deletions)),
-          ...gitStatus.unstaged.map((f) =>
-            skeletonEntry(f.path, false, f.insertions, f.deletions),
-          ),
+          ...gitStatus.unstaged.map((f) => skeletonEntry(f.path, false, f.insertions, f.deletions)),
         ];
         if (!cancelled) setEntries(skeletons);
       }
@@ -550,7 +561,6 @@ export function GitDiffContent(props: {
               theme={theme}
               projectLocation={project.location}
               mountDelay={i * 4}
-
               onMounted={onSectionMounted}
             />
           ))}
