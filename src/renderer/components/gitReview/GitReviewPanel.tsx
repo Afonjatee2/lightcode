@@ -117,11 +117,11 @@ export function GitReviewPanel(props: {
       <div className="flex h-full min-h-0 flex-col">
         {/* Header */}
         {!hideHeader && (
-          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3 text-xs leading-none">
             <div className="min-w-0">
               <Tooltip delay={300}>
                 <Tooltip.Trigger tabIndex={-1} role="none">
-                  <div className="max-w-[100px] truncate text-xs font-medium text-foreground">
+                  <div className="max-w-[100px] truncate font-medium text-foreground">
                     {project.name}
                   </div>
                 </Tooltip.Trigger>
@@ -136,7 +136,7 @@ export function GitReviewPanel(props: {
                     <div className="min-w-0">
                       <Tooltip delay={300}>
                         <Tooltip.Trigger tabIndex={-1} role="none">
-                          <div className="max-w-[100px] truncate text-xs text-muted">
+                          <div className="max-w-[100px] truncate text-muted">
                             {gitStatus.branch}
                           </div>
                         </Tooltip.Trigger>
@@ -159,7 +159,7 @@ export function GitReviewPanel(props: {
                         aria-label="Switch branch"
                       >
                         <GitBranch className="size-3 shrink-0 text-muted/50" />
-                        <span className="max-w-[100px] truncate text-xs text-muted">
+                        <span className="max-w-[100px] truncate text-muted">
                           {gitStatus.branch}
                         </span>
                       </button>
@@ -167,7 +167,7 @@ export function GitReviewPanel(props: {
                   />
                 )}
                 {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
-                  <span className="shrink-0 text-[11px] text-muted/50">
+                  <span className="shrink-0 text-muted/50">
                     ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
                   </span>
                 )}
