@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, ChevronDown, Columns2, GitBranch, RefreshCw, Rows2 } from "lucide-react";
-import { Button, Dropdown, Label } from "@heroui/react";
+import { Button, Dropdown, Label, toast, Tooltip } from "@heroui/react";
 import type { Selection } from "@heroui/react";
 import type { Project, ProjectLocation, GitStatusResult } from "../../../shared/contracts";
+import { friendlyError } from "../../../shared/messages";
 import { readBridge } from "../../bridge";
 import { useGitStore } from "../../state/gitStore";
+import { BranchSelector } from "../common";
 import { PageLayout } from "../layout/PageLayout";
 import { GitReviewSidebar } from "./GitReviewSidebar";
 import { GitDiffContent, type DiffFilter } from "./GitDiffContent";
@@ -85,6 +87,33 @@ export function GitReviewOverlay(props: {
     setSelectedStaged(staged);
   }
 
+  function handleSwitchBranch(branch: string, createNew: boolean) {
+    readBridge()
+      .gitSwitchBranch({
+        projectLocation: effectiveLocation,
+        branch,
+        createNew,
+      })
+      .then((result) => {
+        const store = useGitStore.getState();
+        const status = store.statuses[project.id];
+        if (status) {
+          store.setStatus(project.id, {
+            ...status,
+            branch: result.branch,
+            tracking: result.tracking,
+            ahead: result.ahead,
+            behind: result.behind,
+          });
+        }
+        store.setBranches(project.id, result.branches);
+      })
+      .catch((err: unknown) => {
+        console.error("[git] switch branch failed", err);
+        toast.danger(friendlyError(err));
+      });
+  }
+
   async function handleRefresh() {
     await fetchStatus();
     setRefreshKey((k) => k + 1);
@@ -96,9 +125,37 @@ export function GitReviewOverlay(props: {
       headerChildren={
         <>
           {gitStatus?.branch && (
-            <div className="flex items-center gap-1 text-xs text-muted">
-              <GitBranch className="size-3" />
-              <span className="truncate">{gitStatus.branch}</span>
+            <div className="lightcode-overlay-header__controls flex items-center gap-1 text-xs text-muted">
+              {statusKey ? (
+                <>
+                  <GitBranch className="size-3 shrink-0 text-muted/50" />
+                  <Tooltip delay={300}>
+                    <Tooltip.Trigger tabIndex={-1} role="none">
+                      <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
+                  </Tooltip>
+                </>
+              ) : (
+                <BranchSelector
+                  projectId={project.id}
+                  currentBranch={gitStatus.branch}
+                  value={gitStatus.branch}
+                  onSwitchBranch={handleSwitchBranch}
+                  hideWorktreeToggle
+                  popoverPlacement="bottom"
+                  trigger={
+                    <button
+                      type="button"
+                      className="flex min-w-0 cursor-pointer items-center gap-1 rounded px-1.5 hover:bg-foreground/5"
+                      aria-label="Switch branch"
+                    >
+                      <GitBranch className="size-3 shrink-0 text-muted/50" />
+                      <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
+                    </button>
+                  }
+                />
+              )}
               {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
                 <span className="text-muted/60">
                   ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}

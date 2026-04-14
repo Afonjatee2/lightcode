@@ -324,7 +324,7 @@ function HomeView() {
   const threads = useAppStore((state) => state.threads);
   const openDraft = useAppStore((state) => state.openDraft);
   const openThread = useAppStore((state) => state.openThread);
-  const recentThreads = threads.slice(0, 8);
+  const recentThreads = threads.toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 8);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
