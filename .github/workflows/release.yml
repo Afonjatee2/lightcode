@@ -111,10 +111,16 @@ jobs:
         run: Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
 
       - name: Build and package
-        run: pnpm run ${{ matrix.dist }}
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            pnpm run build && electron-builder --win --config electron-builder.yml --config build/signing.yml
+          else
+            pnpm run ${{ matrix.dist }}
+          fi
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Azure Trusted Signing (Windows only — ignored on other platforms)
+          # Azure Trusted Signing (Windows only)
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
           AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
           AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
