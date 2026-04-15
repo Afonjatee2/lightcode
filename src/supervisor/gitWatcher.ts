@@ -2,6 +2,7 @@ import { watch, type FSWatcher } from "node:fs";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import type { ProjectLocation } from "../shared/contracts";
+import { terminateChildProcessTree } from "../shared/processTree";
 import { getWslCommand } from "./agents/base";
 
 const DEBOUNCE_MS = 300;
@@ -206,7 +207,9 @@ export class GitWatcher {
       if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
       entry.gitWatcher?.close();
       entry.workTreeWatcher?.close();
-      entry.wslProcess?.kill();
+      if (entry.wslProcess) {
+        terminateChildProcessTree(entry.wslProcess);
+      }
       this.watchers.delete(projectId);
     }
 
@@ -249,7 +252,9 @@ export class GitWatcher {
     if (!entry) return;
     if (entry.debounceTimer) clearTimeout(entry.debounceTimer);
     entry.watcher?.close();
-    entry.wslProcess?.kill();
+    if (entry.wslProcess) {
+      terminateChildProcessTree(entry.wslProcess);
+    }
     this.worktreeWatchers.delete(path);
   }
 

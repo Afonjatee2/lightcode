@@ -22,7 +22,7 @@ import type {
   GitRemoteInfo,
   RemoteHostPlatform,
 } from "../shared/contracts";
-import { execInWsl, readWslCommandOutputAsync } from "./agents/base";
+import { buildAgentCommand, readWslCommandOutputAsync } from "./agents/base";
 import { resolveLightcodePaths } from "../shared/lightcodePaths";
 import { sanitizeWorktreeBranchName, sanitizeWorktreePathSegment } from "../shared/worktree";
 import { getProjectName } from "../shared/wsl";
@@ -55,18 +55,22 @@ export async function execGit(
   options?: { timeout?: number; allowNonZeroExit?: boolean },
 ): Promise<string> {
   const timeout = options?.timeout ?? GIT_DEFAULT_TIMEOUT;
-  const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
   const maxBuffer = 50 * 1024 * 1024; // 50MB for large diffs
 
   try {
     if (location.kind === "wsl") {
-      return await execInWsl(location.distro, location.linuxPath, "git", args, {
+      const spec = buildAgentCommand(location, "git", args, undefined, {
+        GIT_OPTIONAL_LOCKS: "0",
+      });
+      const { stdout } = await execFileAsync(spec.command, spec.args, {
+        windowsHide: true,
         timeout,
         maxBuffer,
-        env,
       });
+      return stdout;
     }
 
+    const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
     const { stdout } = await execFileAsync("git", args, {
       cwd: location.path,
       env,
@@ -947,7 +951,6 @@ export class GitService {
     tracking: string;
     ahead: number;
     behind: number;
-    branches: GitBranchListResult;
   }> {
     const args = ["switch"];
     if (createNew) {
@@ -957,12 +960,11 @@ export class GitService {
     }
     await execGit(location, args);
 
-    // Quick status + branch list in parallel — avoids the expensive
-    // diff/numstat/untracked-file expansion that full getStatus does.
-    const [statusOutput, branchList] = await Promise.all([
-      execGit(location, ["status", "--porcelain=v2", "-b"], { timeout: GIT_STATUS_TIMEOUT }),
-      this.listBranches(location, true),
-    ]);
+    // Quick status only — branch list is already cached in the renderer store
+    // and the file watcher will trigger a full refresh shortly.
+    const statusOutput = await execGit(location, ["status", "--porcelain=v2", "-b"], {
+      timeout: GIT_STATUS_TIMEOUT,
+    });
     const parsed = parseStatusPorcelainV2(statusOutput);
     return {
       branch,
@@ -970,7 +972,6 @@ export class GitService {
       tracking: parsed.tracking,
       ahead: parsed.ahead,
       behind: parsed.behind,
-      branches: branchList,
     };
   }
 

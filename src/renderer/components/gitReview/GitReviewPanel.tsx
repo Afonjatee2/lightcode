@@ -104,7 +104,6 @@ export function GitReviewPanel(props: {
             behind: result.behind,
           });
         }
-        store.setBranches(project.id, result.branches);
       })
       .catch((err: unknown) => {
         console.error("[git] switch branch failed", err);
@@ -115,8 +114,87 @@ export function GitReviewPanel(props: {
   return (
     <SidebarContext.Provider value={alwaysExpanded}>
       <div className="flex h-full min-h-0 flex-col">
-        {/* Header */}
-        {!hideHeader && (
+        {/* Header — full when standalone, slim git-actions-only bar when parent provides its own header */}
+        {hideHeader ? (
+          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3 text-xs leading-none">
+            {gitStatus?.branch && (
+              <>
+                {statusKey ? (
+                  <>
+                    <GitBranch className="size-3 shrink-0 text-muted/50" />
+                    <div className="min-w-0">
+                      <Tooltip delay={300}>
+                        <Tooltip.Trigger tabIndex={-1} role="none">
+                          <div className="max-w-[100px] truncate text-muted">
+                            {gitStatus.branch}
+                          </div>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
+                      </Tooltip>
+                    </div>
+                  </>
+                ) : (
+                  <BranchSelector
+                    projectId={project.id}
+                    currentBranch={gitStatus.branch}
+                    value={gitStatus.branch}
+                    onSwitchBranch={handleSwitchBranch}
+                    hideWorktreeToggle
+                    popoverPlacement="bottom"
+                    trigger={
+                      <button
+                        type="button"
+                        className="flex min-w-0 cursor-pointer items-center gap-1 rounded px-1.5 py-1 hover:bg-foreground/5"
+                        aria-label="Switch branch"
+                      >
+                        <GitBranch className="size-3 shrink-0 text-muted/50" />
+                        <span className="max-w-[100px] truncate text-muted">
+                          {gitStatus.branch}
+                        </span>
+                      </button>
+                    }
+                  />
+                )}
+                {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
+                  <span className="shrink-0 text-muted/50">
+                    ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
+                  </span>
+                )}
+              </>
+            )}
+            <div className="flex-1" />
+            {onRemove && (
+              <button
+                type="button"
+                className={`rounded p-1 text-muted transition-colors ${threadRemoveAction === "archive" ? "hover:bg-warning/10 hover:text-warning" : "hover:bg-danger/10 hover:text-danger"}`}
+                title={threadRemoveAction === "archive" ? "Archive" : "Delete"}
+                onClick={onRemove}
+              >
+                {threadRemoveAction === "archive" ? (
+                  <Archive className="size-3" />
+                ) : (
+                  <Trash2 className="size-3" />
+                )}
+              </button>
+            )}
+            <button
+              type="button"
+              className={`rounded p-1 transition-colors hover:bg-white/[0.04] hover:text-foreground ${wrapLines ? "text-foreground" : "text-muted"}`}
+              title={wrapLines ? "No wrap" : "Wrap lines"}
+              onClick={() => setWrapLines((v) => !v)}
+            >
+              <WrapText className="size-3" />
+            </button>
+            <button
+              type="button"
+              className="rounded p-1 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+              title="Refresh"
+              onClick={() => void handleRefresh()}
+            >
+              <RefreshCw className="size-3" />
+            </button>
+          </div>
+        ) : (
           <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3 text-xs leading-none">
             <div className="min-w-0">
               <Tooltip delay={300}>

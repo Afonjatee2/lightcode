@@ -1,20 +1,24 @@
 import { type ReactNode } from "react";
-import { FileDiff, Maximize2, PanelRightClose, TerminalSquare } from "lucide-react";
+import { FileDiff, FolderOpen, Maximize2, PanelRightClose, TerminalSquare } from "lucide-react";
 import { Tooltip } from "@heroui/react";
 
-export type RightPanelTab = "terminal" | "git";
+export type RightPanelTab = "terminal" | "git" | "files";
 
 export function UnifiedRightPanel(props: {
   activeTab: RightPanelTab;
   onTabChange: (tab: RightPanelTab) => void;
   terminalContent: ReactNode;
   gitContent: ReactNode;
+  filesContent: ReactNode;
   showTerminal: boolean;
   showGit: boolean;
+  showFiles: boolean;
   projectName: string | undefined;
   onExpandGitToOverlay?: () => void;
+  onExpandFilesToOverlay?: () => void;
   onOpenGit?: () => void;
   onOpenTerminal?: () => void;
+  onOpenFiles?: () => void;
   onClose: () => void;
 }) {
   const {
@@ -22,12 +26,16 @@ export function UnifiedRightPanel(props: {
     onTabChange,
     terminalContent,
     gitContent,
+    filesContent,
     showTerminal,
     showGit,
+    showFiles,
     projectName,
     onExpandGitToOverlay,
+    onExpandFilesToOverlay,
     onOpenGit,
     onOpenTerminal,
+    onOpenFiles,
     onClose,
   } = props;
 
@@ -59,6 +67,16 @@ export function UnifiedRightPanel(props: {
             <Maximize2 className="size-3" />
           </button>
         )}
+        {activeTab === "files" && onExpandFilesToOverlay && (
+          <button
+            type="button"
+            className="rounded p-0.5 text-muted hover:text-foreground"
+            title="Open as page"
+            onClick={onExpandFilesToOverlay}
+          >
+            <Maximize2 className="size-3" />
+          </button>
+        )}
         {/* Tab icons */}
         <div className="mx-0.5 h-3 w-px bg-border" />
         <button
@@ -73,6 +91,19 @@ export function UnifiedRightPanel(props: {
           }}
         >
           <TerminalSquare className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          className={`rounded p-0.5 transition-colors ${
+            activeTab === "files" ? "text-accent" : "text-muted hover:text-foreground"
+          }`}
+          title="Files"
+          onClick={() => {
+            onTabChange("files");
+            if (!showFiles) onOpenFiles?.();
+          }}
+        >
+          <FolderOpen className="size-3.5" />
         </button>
         <button
           type="button"
@@ -104,6 +135,9 @@ export function UnifiedRightPanel(props: {
         </div>
         <div className={`absolute inset-0 ${activeTab === "git" ? "" : "invisible"}`}>
           {gitContent}
+        </div>
+        <div className={`absolute inset-0 ${activeTab === "files" ? "" : "invisible"}`}>
+          {filesContent}
         </div>
       </div>
     </div>

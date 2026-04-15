@@ -9,12 +9,13 @@ import type {
   PromptSegment,
   ThreadConfig,
 } from "../../shared/contracts";
+import { terminateChildProcessTree } from "../../shared/processTree";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,
   createKnownSessionRef,
   readCommandOutputAsync,
-  readWslCommandOutputAsync,
+  readWslLoginShellCommandOutputAsync,
   resolveExecutablePathAsync,
   resolveWslExecutablePath,
   type AgentAdapter,
@@ -583,7 +584,7 @@ export function createCopilotAdapter(): AgentAdapter {
       return {};
     } finally {
       try {
-        child.kill();
+        terminateChildProcessTree(child);
       } catch {
         // Ignore cleanup races.
       }
@@ -651,7 +652,9 @@ export function createCopilotAdapter(): AgentAdapter {
         const executablePath = whichResult?.ok ? whichResult.stdout : undefined;
         detectedWslExecPaths.set(ctx.wslDistro!, executablePath);
         const versionResult = executablePath
-          ? await readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["--version"])
+          ? await readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+              "--version",
+            ])
           : undefined;
 
         if (executablePath) {

@@ -1,5 +1,7 @@
 import type {
   CloseThreadPayload,
+  CreateProjectEntryPayload,
+  DeleteProjectEntryPayload,
   GenerateCommitMessagePayload,
   GenerateTitlePayload,
   GeneratePrSummaryPayload,
@@ -30,8 +32,13 @@ import type {
   GitStagePayload,
   GitSyncPayload,
   GitUnstageAllPayload,
+  ListProjectTreePayload,
+  MoveProjectEntryPayload,
+  ReadProjectFilePayload,
   DetectSetupScriptPayload,
+  RenameProjectEntryPayload,
   SearchProjectFilesPayload,
+  SearchProjectTreePayload,
   GitUnstagePayload,
   GitUnwatchProjectPayload,
   GitWatchProjectPayload,
@@ -48,10 +55,13 @@ import type {
   StartShellPayload,
   StartThreadPayload,
   WriteTerminalPayload,
+  WriteProjectFilePayload,
 } from "../shared/contracts";
 import type { SupervisorReply, SupervisorRequest } from "../shared/ipc";
 import {
   closeThreadPayloadSchema,
+  createProjectEntryPayloadSchema,
+  deleteProjectEntryPayloadSchema,
   getAgentStatusesPayloadSchema,
   getGitBranchesPayloadSchema,
   getGitDiffBatchPayloadSchema,
@@ -78,8 +88,13 @@ import {
   gitWatchProjectPayloadSchema,
   gitWatchWorktreesPayloadSchema,
   gitUnwatchProjectPayloadSchema,
+  listProjectTreePayloadSchema,
   detectSetupScriptPayloadSchema,
+  moveProjectEntryPayloadSchema,
+  readProjectFilePayloadSchema,
+  renameProjectEntryPayloadSchema,
   searchProjectFilesPayloadSchema,
+  searchProjectTreePayloadSchema,
   ghCreatePrPayloadSchema,
   ghGetPrForBranchPayloadSchema,
   ghMergePrPayloadSchema,
@@ -101,6 +116,7 @@ import {
   sendThreadInputPayloadSchema,
   startShellPayloadSchema,
   startThreadPayloadSchema,
+  writeProjectFilePayloadSchema,
   writeTerminalPayloadSchema,
 } from "../shared/contracts";
 import { SupervisorRuntime } from "./runtime";
@@ -108,6 +124,18 @@ import { SupervisorRuntime } from "./runtime";
 const runtime = new SupervisorRuntime((event) => {
   process.send?.(event);
 });
+
+let isShuttingDown = false;
+
+function shutdownSupervisor(exitCode = 0): void {
+  if (isShuttingDown) {
+    return;
+  }
+
+  isShuttingDown = true;
+  runtime.dispose();
+  process.exit(exitCode);
+}
 
 async function handleRequest(request: SupervisorRequest): Promise<unknown> {
   switch (request.type) {
@@ -275,6 +303,38 @@ async function handleRequest(request: SupervisorRequest): Promise<unknown> {
       return runtime.searchProjectFiles(
         searchProjectFilesPayloadSchema.parse(request.payload) as SearchProjectFilesPayload,
       );
+    case "listProjectTree":
+      return runtime.listProjectTree(
+        listProjectTreePayloadSchema.parse(request.payload) as ListProjectTreePayload,
+      );
+    case "searchProjectTree":
+      return runtime.searchProjectTree(
+        searchProjectTreePayloadSchema.parse(request.payload) as SearchProjectTreePayload,
+      );
+    case "readProjectFile":
+      return runtime.readProjectFile(
+        readProjectFilePayloadSchema.parse(request.payload) as ReadProjectFilePayload,
+      );
+    case "writeProjectFile":
+      return runtime.writeProjectFile(
+        writeProjectFilePayloadSchema.parse(request.payload) as WriteProjectFilePayload,
+      );
+    case "createProjectEntry":
+      return runtime.createProjectEntry(
+        createProjectEntryPayloadSchema.parse(request.payload) as CreateProjectEntryPayload,
+      );
+    case "renameProjectEntry":
+      return runtime.renameProjectEntry(
+        renameProjectEntryPayloadSchema.parse(request.payload) as RenameProjectEntryPayload,
+      );
+    case "moveProjectEntry":
+      return runtime.moveProjectEntry(
+        moveProjectEntryPayloadSchema.parse(request.payload) as MoveProjectEntryPayload,
+      );
+    case "deleteProjectEntry":
+      return runtime.deleteProjectEntry(
+        deleteProjectEntryPayloadSchema.parse(request.payload) as DeleteProjectEntryPayload,
+      );
     case "detectSetupScript":
       return runtime.detectSetupScript(
         detectSetupScriptPayloadSchema.parse(request.payload) as DetectSetupScriptPayload,
@@ -303,6 +363,12 @@ async function handleRequest(request: SupervisorRequest): Promise<unknown> {
       return runtime.ghGetPrChecks(
         ghGetPrChecksPayloadSchema.parse(request.payload) as GhGetPrChecksPayload,
       );
+    case "lspStart":
+      return runtime.lspStart(request.payload);
+    case "lspStop":
+      return runtime.lspStop(request.payload);
+    case "lspMessage":
+      return runtime.lspSendMessage(request.payload);
     default: {
       const exhaustive: never = request;
       return exhaustive;
@@ -331,8 +397,15 @@ process.on("message", async (message: SupervisorRequest) => {
 });
 
 process.on("disconnect", () => {
-  runtime.dispose();
-  process.exit(0);
+  shutdownSupervisor(0);
+});
+
+process.on("SIGINT", () => {
+  shutdownSupervisor(0);
+});
+
+process.on("SIGTERM", () => {
+  shutdownSupervisor(0);
 });
 
 process.on("uncaughtException", (error) => {

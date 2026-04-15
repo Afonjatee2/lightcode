@@ -3,6 +3,7 @@ import type {
   CloseThreadPayload,
   DetectSetupScriptPayload,
   DetectSetupScriptResult,
+  DeleteProjectEntryPayload,
   GenerateCommitMessagePayload,
   GenerateCommitMessageResult,
   GenerateTitlePayload,
@@ -59,8 +60,18 @@ import type {
   GhGetPrChecksPayload,
   GhGetPrChecksResult,
   PrData,
+  CreateProjectEntryPayload,
+  ListProjectTreePayload,
+  ListProjectTreeResult,
+  MoveProjectEntryPayload,
   SearchProjectFilesPayload,
   SearchProjectFilesResult,
+  SearchProjectTreePayload,
+  SearchProjectTreeResult,
+  ReadProjectFilePayload,
+  ReadProjectFileResult,
+  RenameProjectEntryPayload,
+  RevealProjectEntryPayload,
   GitUnstageAllPayload,
   GitUnstagePayload,
   GitUnwatchProjectPayload,
@@ -68,6 +79,8 @@ import type {
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
   ProjectLocation,
+  WriteProjectFilePayload,
+  WriteProjectFileResult,
   ResizeTerminalPayload,
   ResolveThreadServerRequestPayload,
   SendThreadInputPayload,
@@ -82,6 +95,7 @@ import type {
   ThreadStatus,
   WriteTerminalPayload,
 } from "./contracts";
+import type { LspStartPayload, LspStopPayload, LspMessagePayload, LspSessionStatus } from "./lsp";
 import type { SharedSettings } from "./settings";
 
 export type SupervisorRequest =
@@ -134,6 +148,14 @@ export type SupervisorRequest =
   | { id: string; type: "gitWatchWorktrees"; payload: GitWatchWorktreesPayload }
   | { id: string; type: "gitUnwatchProject"; payload: GitUnwatchProjectPayload }
   | { id: string; type: "searchProjectFiles"; payload: SearchProjectFilesPayload }
+  | { id: string; type: "listProjectTree"; payload: ListProjectTreePayload }
+  | { id: string; type: "searchProjectTree"; payload: SearchProjectTreePayload }
+  | { id: string; type: "readProjectFile"; payload: ReadProjectFilePayload }
+  | { id: string; type: "writeProjectFile"; payload: WriteProjectFilePayload }
+  | { id: string; type: "createProjectEntry"; payload: CreateProjectEntryPayload }
+  | { id: string; type: "renameProjectEntry"; payload: RenameProjectEntryPayload }
+  | { id: string; type: "moveProjectEntry"; payload: MoveProjectEntryPayload }
+  | { id: string; type: "deleteProjectEntry"; payload: DeleteProjectEntryPayload }
   | { id: string; type: "detectSetupScript"; payload: DetectSetupScriptPayload }
   | { id: string; type: "ghCheckAvailable"; payload: GetGitStatusPayload }
   | { id: string; type: "ghCreatePr"; payload: GhCreatePrPayload }
@@ -141,7 +163,10 @@ export type SupervisorRequest =
   | { id: string; type: "ghMergePr"; payload: GhMergePrPayload }
   | { id: string; type: "ghClosePr"; payload: GhClosePrPayload }
   | { id: string; type: "ghReopenPr"; payload: GhReopenPrPayload }
-  | { id: string; type: "ghGetPrChecks"; payload: GhGetPrChecksPayload };
+  | { id: string; type: "ghGetPrChecks"; payload: GhGetPrChecksPayload }
+  | { id: string; type: "lspStart"; payload: LspStartPayload }
+  | { id: string; type: "lspStop"; payload: LspStopPayload }
+  | { id: string; type: "lspMessage"; payload: LspMessagePayload };
 
 export type SupervisorReply =
   | { replyTo: string; ok: true; data: unknown }
@@ -176,7 +201,15 @@ export type SupervisorEvent =
     }
   | { type: "windows-agent-statuses"; statuses: AgentStatus[] }
   | { type: "wsl-agent-statuses"; statuses: AgentStatus[] }
-  | { type: "git-changed"; projectId: string };
+  | { type: "git-changed"; projectId: string }
+  | { type: "lsp-message"; sessionId: string; message: unknown }
+  | {
+      type: "lsp-status";
+      sessionId: string;
+      status: LspSessionStatus;
+      languageId: string;
+      error?: string;
+    };
 
 export type UpdateStatus =
   | { type: "checking" }
@@ -260,6 +293,15 @@ export interface LightcodeBridge {
   gitWatchWorktrees(payload: GitWatchWorktreesPayload): Promise<void>;
   gitUnwatchProject(payload: GitUnwatchProjectPayload): Promise<void>;
   searchProjectFiles(payload: SearchProjectFilesPayload): Promise<SearchProjectFilesResult>;
+  listProjectTree(payload: ListProjectTreePayload): Promise<ListProjectTreeResult>;
+  searchProjectTree(payload: SearchProjectTreePayload): Promise<SearchProjectTreeResult>;
+  readProjectFile(payload: ReadProjectFilePayload): Promise<ReadProjectFileResult>;
+  writeProjectFile(payload: WriteProjectFilePayload): Promise<WriteProjectFileResult>;
+  createProjectEntry(payload: CreateProjectEntryPayload): Promise<void>;
+  renameProjectEntry(payload: RenameProjectEntryPayload): Promise<void>;
+  moveProjectEntry(payload: MoveProjectEntryPayload): Promise<void>;
+  deleteProjectEntry(payload: DeleteProjectEntryPayload): Promise<void>;
+  revealProjectEntry(payload: RevealProjectEntryPayload): Promise<void>;
   detectSetupScript(payload: DetectSetupScriptPayload): Promise<DetectSetupScriptResult>;
   // GitHub PR
   ghCheckAvailable(payload: GetGitStatusPayload): Promise<GhCheckAvailableResult>;
@@ -273,6 +315,9 @@ export interface LightcodeBridge {
   getSharedSettings(): Promise<SharedSettings>;
   setSharedSettings(settings: SharedSettings): Promise<void>;
   setWindowChrome(payload: WindowChromePayload): Promise<void>;
+  lspStart(payload: LspStartPayload): Promise<void>;
+  lspStop(payload: LspStopPayload): Promise<void>;
+  lspSendMessage(payload: LspMessagePayload): Promise<void>;
   onSupervisorEvent(listener: (event: SupervisorEvent) => void): () => void;
   checkForUpdate(): Promise<void>;
   startUpdateDownload(): Promise<void>;

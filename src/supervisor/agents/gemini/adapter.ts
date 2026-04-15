@@ -14,7 +14,7 @@ import {
   createKnownSessionRef,
   readCommandOutputAsync,
   resolveWslHomeDirectory,
-  readWslCommandOutputAsync,
+  readWslLoginShellCommandOutputAsync,
   resolveExecutablePathAsync,
   resolveWslExecutablePath,
   type AgentAdapter,
@@ -87,11 +87,11 @@ export function createGeminiAdapter(): AgentAdapter {
     let output: string | undefined;
     if (location.kind === "wsl") {
       const executablePath = resolveWslExecPath(location) ?? "gemini";
-      const result = await readWslCommandOutputAsync(
+      const result = await readWslLoginShellCommandOutputAsync(
         location.distro,
+        location.linuxPath,
         executablePath,
         ["--list-sessions"],
-        { cwd: location.linuxPath },
       );
       if (!result.ok) console.log("[gemini] --list-sessions (wsl) failed: %s", result.stderr);
       output = result.ok ? result.stdout : undefined;
@@ -165,7 +165,9 @@ export function createGeminiAdapter(): AgentAdapter {
         const executablePath = whichResult?.ok ? whichResult.stdout : undefined;
         detectedWslExecPaths.set(ctx.wslDistro!, executablePath);
         const versionResult = executablePath
-          ? await readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["--version"])
+          ? await readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+              "--version",
+            ])
           : undefined;
 
         const hasApiKey = apiKeyResult?.ok && apiKeyResult.stdout.trim().length > 0;

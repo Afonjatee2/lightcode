@@ -12,6 +12,7 @@
 import { createServer } from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { ProjectLocation } from "../../../shared/contracts";
+import { terminateChildProcessTree } from "../../../shared/processTree";
 import { buildAgentCommand, type CommandSpec } from "../base";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -440,7 +441,7 @@ export async function probeCodexCapabilities(
   } finally {
     client?.dispose();
     if (appServer && !appServer.killed) {
-      appServer.kill();
+      terminateChildProcessTree(appServer);
     }
   }
 }

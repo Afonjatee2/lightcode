@@ -135,6 +135,11 @@ export interface AgentAdapter {
   detectInvalidSessionRef?(text: string): boolean;
   /** Detect TUI prompts that should be auto-dismissed and return the key to send, or null. */
   detectAutoResponse?(text: string): string | null;
+  /**
+   * Optional PTY-silence fallback (ms) while the agent is marked working.
+   * Set to null to disable the fallback for TUIs that can stay quiet mid-turn.
+   */
+  workingSilenceTimeoutMs?: number | null;
   /** Discover the session ID after PTY spawn (e.g. by querying the CLI). */
   discoverSessionRef?(location: ProjectLocation): Promise<SessionRef | undefined>;
   /** Optional delay before the first session discovery attempt. */
@@ -682,6 +687,43 @@ export async function readWslCommandOutputAsync(
         timeout: 10_000,
       },
     );
+    return { ok: true, stdout: (stdout ?? "").trim(), stderr: (stderr ?? "").trim() };
+  } catch (error: unknown) {
+    const err = error as { stdout?: string; stderr?: string } | undefined;
+    return {
+      ok: false,
+      stdout: (err?.stdout ?? "").trim(),
+      stderr: (err?.stderr ?? "").trim(),
+    };
+  }
+}
+
+export async function readWslLoginShellCommandOutputAsync(
+  distro: string,
+  linuxCwd: string,
+  command: string,
+  args: string[],
+  options?: { timeout?: number; maxBuffer?: number; env?: Record<string, string> },
+): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  const spec = buildAgentCommand(
+    {
+      kind: "wsl",
+      distro,
+      linuxPath: linuxCwd,
+      uncPath: `\\\\wsl.localhost\\${distro}${linuxCwd.replace(/\//g, "\\")}`,
+    },
+    command,
+    args,
+    undefined,
+    options?.env,
+  );
+
+  try {
+    const { stdout, stderr } = await execFileAsync(spec.command, spec.args, {
+      windowsHide: true,
+      timeout: options?.timeout ?? 10_000,
+      ...(options?.maxBuffer ? { maxBuffer: options.maxBuffer } : {}),
+    });
     return { ok: true, stdout: (stdout ?? "").trim(), stderr: (stderr ?? "").trim() };
   } catch (error: unknown) {
     const err = error as { stdout?: string; stderr?: string } | undefined;

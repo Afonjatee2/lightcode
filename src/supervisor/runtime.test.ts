@@ -303,6 +303,203 @@ describe("writeSubmittedPrompt", () => {
     expect(emitted).toHaveLength(0);
   });
 
+  it("keeps a working thread active when the last corroborated terminal hint is still working", async () => {
+    vi.useFakeTimers();
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const session = createRuntimeSession({
+      status: "working",
+      attention: "working",
+      prevChunk: "",
+      adapter: {
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          models: [],
+          efforts: [],
+          modes: [],
+          approvalPolicies: [],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+        },
+        detectTerminalStatus: (text: string) =>
+          text.includes("Working (3m 38s")
+            ? {
+                status: "working" as const,
+                attention: "working" as const,
+                corroborated: true,
+              }
+            : null,
+      },
+    });
+
+    (
+      runtime as unknown as {
+        handlePtyData: (session: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(session, "Working (3m 38s • esc to interrupt)");
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(session.status).toBe("working");
+    expect(
+      emitted.filter((event) => event.type === "thread-state" && event.status === "idle"),
+    ).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
+  it("promotes Codex question screens to needs_reply before silence can mark them idle", async () => {
+    vi.useFakeTimers();
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const session = createRuntimeSession({
+      status: "working",
+      attention: "working",
+      prevChunk: "",
+      adapter: {
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          models: [],
+          efforts: [],
+          modes: [],
+          approvalPolicies: [],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+        },
+        detectTerminalStatus: (text: string) =>
+          text.includes("enter to submit answer")
+            ? {
+                status: "needs_reply" as const,
+                attention: "needs_reply" as const,
+                corroborated: true,
+              }
+            : null,
+      },
+    });
+
+    (
+      runtime as unknown as {
+        handlePtyData: (session: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(
+      session,
+      [
+        "Question 1/2 (2 unanswered)",
+        "For the project tree search, what should v1 search across?",
+        "",
+        "tab to add notes | enter to submit answer | ←/→ to navigate questions | esc to interrupt",
+      ].join("\n"),
+    );
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(session.status).toBe("needs_reply");
+    expect(session.attention).toBe("needs_reply");
+    expect(
+      emitted.filter((event) => event.type === "thread-state" && event.status === "idle"),
+    ).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
+  it("still falls back to idle after silence when no strong terminal hint remains", async () => {
+    vi.useFakeTimers();
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const session = createRuntimeSession({
+      status: "working",
+      attention: "working",
+      prevChunk: "",
+      adapter: {
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          models: [],
+          efforts: [],
+          modes: [],
+          approvalPolicies: [],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+        },
+        detectTerminalStatus: () => null,
+      },
+    });
+
+    (
+      runtime as unknown as {
+        handlePtyData: (session: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(session, "Partial output without a strong status marker");
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(session.status).toBe("idle");
+    expect(
+      emitted.filter((event) => event.type === "thread-state" && event.status === "idle"),
+    ).toHaveLength(1);
+    vi.useRealTimers();
+  });
+
+  it("does not fall back to idle when the adapter disables the silence watchdog", async () => {
+    vi.useFakeTimers();
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const session = createRuntimeSession({
+      agentKind: "claude",
+      status: "working",
+      attention: "working",
+      prevChunk: "",
+      adapter: {
+        kind: "claude",
+        label: "Claude Code",
+        capabilities: {
+          models: [],
+          efforts: [],
+          modes: [],
+          approvalPolicies: [],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+        },
+        detectTerminalStatus: () => null,
+        workingSilenceTimeoutMs: null,
+      },
+    });
+
+    (
+      runtime as unknown as {
+        handlePtyData: (session: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(session, "Puttering… (1m 34s · ↑ 3.4k tokens · thinking with high effort)");
+
+    await vi.advanceTimersByTimeAsync(2000);
+
+    expect(session.status).toBe("working");
+    expect(
+      emitted.filter((event) => event.type === "thread-state" && event.status === "idle"),
+    ).toHaveLength(0);
+    vi.useRealTimers();
+  });
+
   it("uses taskkill instead of pty.kill when closing a Windows shell session", async () => {
     const runtime = new SupervisorRuntime(() => undefined);
     const shell = {

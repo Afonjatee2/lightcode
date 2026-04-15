@@ -37,10 +37,13 @@ import type {
   UpdateStatus,
   WindowChromePayload,
 } from "../shared/ipc";
+import type { ProjectLocation, RevealProjectEntryPayload } from "../shared/contracts";
 import type { SharedSettings } from "../shared/settings";
 import type { LightcodePaths } from "../shared/lightcodePaths";
 import { getAppName } from "../shared/appName";
 import { msg } from "../shared/messages";
+import { terminateChildProcessTree } from "../shared/processTree";
+import { WindowsJobObjectManager } from "./windowsJobObject";
 
 const CHANNELS = {
   pickFolder: "lightcode:pick-folder",
@@ -91,6 +94,15 @@ const CHANNELS = {
   gitWatchWorktrees: "lightcode:git-watch-worktrees",
   gitUnwatchProject: "lightcode:git-unwatch-project",
   searchProjectFiles: "lightcode:search-project-files",
+  listProjectTree: "lightcode:list-project-tree",
+  searchProjectTree: "lightcode:search-project-tree",
+  readProjectFile: "lightcode:read-project-file",
+  writeProjectFile: "lightcode:write-project-file",
+  createProjectEntry: "lightcode:create-project-entry",
+  renameProjectEntry: "lightcode:rename-project-entry",
+  moveProjectEntry: "lightcode:move-project-entry",
+  deleteProjectEntry: "lightcode:delete-project-entry",
+  revealProjectEntry: "lightcode:reveal-project-entry",
   detectSetupScript: "lightcode:detect-setup-script",
   ghCheckAvailable: "lightcode:gh-check-available",
   ghCreatePr: "lightcode:gh-create-pr",
@@ -99,6 +111,9 @@ const CHANNELS = {
   ghClosePr: "lightcode:gh-close-pr",
   ghReopenPr: "lightcode:gh-reopen-pr",
   ghGetPrChecks: "lightcode:gh-get-pr-checks",
+  lspStart: "lightcode:lsp-start",
+  lspStop: "lightcode:lsp-stop",
+  lspMessage: "lightcode:lsp-message",
   openExternal: "lightcode:open-external",
   getSharedSettings: "lightcode:get-shared-settings",
   setSharedSettings: "lightcode:set-shared-settings",
@@ -133,6 +148,7 @@ const WINDOW_CHROME_HEIGHT = 32;
 let mainWindow: BrowserWindow | null = null;
 let supervisor: ChildProcess | null = null;
 let lightcodePaths: LightcodePaths | null = null;
+let windowsJobObjectManager: WindowsJobObjectManager | null = null;
 const pendingRequests = new Map<
   string,
   {
@@ -301,16 +317,43 @@ function requireLightcodePaths(): LightcodePaths {
   return lightcodePaths;
 }
 
-function startSupervisor(baseDir: string): void {
-  supervisor?.kill();
+function getProjectRootPath(location: ProjectLocation): string {
+  if (location.kind === "wsl") return location.uncPath;
+  return location.path;
+}
 
+function resolveProjectFsPath(payload: RevealProjectEntryPayload): string {
+  const rootPath = getProjectRootPath(payload.projectLocation);
+  if (!payload.path) return rootPath;
+  return join(rootPath, ...payload.path.split("/").filter(Boolean));
+}
+
+function rejectPendingRequests(error: Error): void {
   for (const [id, pending] of pendingRequests) {
-    pending.reject(new Error(msg("supervisor.restarted")));
+    pending.reject(error);
     pendingRequests.delete(id);
   }
+}
 
+function resetSupervisorState(error: Error): void {
+  rejectPendingRequests(error);
   workingThreads.clear();
   updatePowerSaveBlocker();
+}
+
+function stopSupervisor(error: Error): void {
+  const child = supervisor;
+  if (!child) {
+    return;
+  }
+
+  supervisor = null;
+  resetSupervisorState(error);
+  terminateChildProcessTree(child);
+}
+
+function startSupervisor(baseDir: string): void {
+  stopSupervisor(new Error(msg("supervisor.restarted")));
 
   const child = fork(join(__dirname, "supervisor.cjs"), [], {
     stdio: ["inherit", "inherit", "inherit", "ipc"],
@@ -321,6 +364,14 @@ function startSupervisor(baseDir: string): void {
   });
 
   supervisor = child;
+  if (typeof child.pid === "number") {
+    void windowsJobObjectManager?.assignPid(child.pid).catch((error) => {
+      console.error(
+        "[lightcode] failed to assign supervisor to Windows Job Object:",
+        error instanceof Error ? error.message : String(error),
+      );
+    });
+  }
 
   child.on("message", (message: SupervisorReply | SupervisorEvent) => {
     if (isSupervisorReply(message)) {
@@ -345,10 +396,7 @@ function startSupervisor(baseDir: string): void {
   child.on("exit", (code) => {
     if (supervisor === child) {
       supervisor = null;
-      for (const [id, pending] of pendingRequests) {
-        pending.reject(new Error(msg("supervisor.exited")));
-        pendingRequests.delete(id);
-      }
+      resetSupervisorState(new Error(msg("supervisor.exited")));
 
       if (code !== 0 && lightcodePaths) {
         console.error(`[lightcode] supervisor exited with code ${code}, restarting…`);
@@ -656,6 +704,36 @@ function registerIpcHandlers(): void {
   ipcMain.handle(CHANNELS.searchProjectFiles, async (_event, payload) =>
     callSupervisor("searchProjectFiles", payload),
   );
+  ipcMain.handle(CHANNELS.listProjectTree, async (_event, payload) =>
+    callSupervisor("listProjectTree", payload),
+  );
+  ipcMain.handle(CHANNELS.searchProjectTree, async (_event, payload) =>
+    callSupervisor("searchProjectTree", payload),
+  );
+  ipcMain.handle(CHANNELS.readProjectFile, async (_event, payload) =>
+    callSupervisor("readProjectFile", payload),
+  );
+  ipcMain.handle(CHANNELS.writeProjectFile, async (_event, payload) =>
+    callSupervisor("writeProjectFile", payload),
+  );
+  ipcMain.handle(CHANNELS.createProjectEntry, async (_event, payload) =>
+    callSupervisor("createProjectEntry", payload),
+  );
+  ipcMain.handle(CHANNELS.renameProjectEntry, async (_event, payload) =>
+    callSupervisor("renameProjectEntry", payload),
+  );
+  ipcMain.handle(CHANNELS.moveProjectEntry, async (_event, payload) =>
+    callSupervisor("moveProjectEntry", payload),
+  );
+  ipcMain.handle(CHANNELS.deleteProjectEntry, async (_event, payload) =>
+    callSupervisor("deleteProjectEntry", payload),
+  );
+  ipcMain.handle(
+    CHANNELS.revealProjectEntry,
+    async (_event, payload: RevealProjectEntryPayload) => {
+      shell.showItemInFolder(resolveProjectFsPath(payload));
+    },
+  );
   ipcMain.handle(CHANNELS.detectSetupScript, async (_event, payload) =>
     callSupervisor("detectSetupScript", payload),
   );
@@ -681,6 +759,11 @@ function registerIpcHandlers(): void {
   );
   ipcMain.handle(CHANNELS.ghGetPrChecks, async (_event, payload) =>
     callSupervisor("ghGetPrChecks", payload),
+  );
+  ipcMain.handle(CHANNELS.lspStart, async (_event, payload) => callSupervisor("lspStart", payload));
+  ipcMain.handle(CHANNELS.lspStop, async (_event, payload) => callSupervisor("lspStop", payload));
+  ipcMain.handle(CHANNELS.lspMessage, async (_event, payload) =>
+    callSupervisor("lspMessage", payload),
   );
   ipcMain.handle(CHANNELS.openExternal, async (_event, url: string) => {
     await shell.openExternal(url);
@@ -785,7 +868,7 @@ if (!hasSingleInstanceLock) {
     mainWindow.focus();
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     // Serve local files via lightcode-local:// protocol (used for attachment thumbnails).
     // Renderer encodes the absolute path as a URL path component, so we decode it
     // and convert to a proper file:// URL using pathToFileURL to handle Windows paths.
@@ -802,6 +885,18 @@ if (!hasSingleInstanceLock) {
     lightcodePaths = prepareLightcodeDataRoot(
       isDev ? join(homedir(), ".lightcode-dev") : undefined,
     );
+    if (process.platform === "win32") {
+      windowsJobObjectManager = new WindowsJobObjectManager();
+      try {
+        await windowsJobObjectManager.start();
+      } catch (error) {
+        console.error(
+          "[lightcode] Windows Job Object helper unavailable:",
+          error instanceof Error ? error.message : String(error),
+        );
+        windowsJobObjectManager = null;
+      }
+    }
     initDatabase(lightcodePaths.dbPath);
     registerIpcHandlers();
     startSupervisor(lightcodePaths.baseDir);
@@ -843,7 +938,9 @@ if (!hasSingleInstanceLock) {
 }
 
 app.on("before-quit", () => {
-  supervisor?.kill();
+  stopSupervisor(new Error(msg("supervisor.exited")));
+  windowsJobObjectManager?.dispose();
+  windowsJobObjectManager = null;
 });
 
 app.on("will-quit", () => {

@@ -121,7 +121,7 @@ function FileRow(props: {
     <>
       <button
         type="button"
-        className={`group flex w-full cursor-default items-center gap-1.5 rounded px-2 py-1 text-left text-xs transition-colors ${
+        className={`group flex w-full cursor-default items-center gap-1.5 rounded px-3 py-1 text-left text-xs transition-colors ${
           isSelected
             ? "bg-white/[0.08] text-foreground"
             : "text-muted hover:bg-white/[0.04] hover:text-foreground"
@@ -216,7 +216,7 @@ function ConflictGroup(props: { files: string[] }) {
 
   return (
     <div>
-      <div className="flex w-full items-center gap-1 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-warning">
+      <div className="flex w-full items-center gap-1 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-warning">
         <button
           type="button"
           className="flex cursor-default items-center gap-1"
@@ -235,7 +235,7 @@ function ConflictGroup(props: { files: string[] }) {
             return (
               <div
                 key={f}
-                className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-xs text-muted"
+                className="flex w-full items-center gap-1.5 rounded px-3 py-1 text-xs text-muted"
               >
                 <GitMerge className="size-3.5 text-warning" />
                 <span className="min-w-0 flex-1 truncate" title={f}>
@@ -309,7 +309,7 @@ function FileGroup(props: {
 
   return (
     <div>
-      <div className="group/header flex w-full items-center gap-1 px-2 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+      <div className="group/header flex w-full items-center gap-1 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
         <button
           type="button"
           className="flex cursor-default items-center gap-1"
@@ -386,7 +386,7 @@ function FileGroup(props: {
         </AlertDialog.Backdrop>
       )}
       {expanded && (
-        <div className={inlineDiffs ? "space-y-1" : "space-y-px"}>
+        <div className={inlineDiffs ? "min-w-0 divide-y divide-border" : "space-y-px"}>
           {inlineDiffs
             ? sorted.map((file) => (
                 <StackedFileCard
@@ -1015,9 +1015,9 @@ export function GitReviewSidebar(props: {
 
       {/* Expanded sidebar */}
       <div
-        className={`flex h-full min-h-0 flex-col gap-3 px-3 pb-1 pt-0 transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
+        className={`flex h-full min-h-0 flex-col gap-3 pb-1 pt-0 transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
       >
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-0.5">
+        <div className="min-h-0 min-w-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto">
           {gitStatus && gitStatus.staged.length > 0 && (
             <FileGroup
               title="Staged"
@@ -1055,13 +1055,13 @@ export function GitReviewSidebar(props: {
             gitStatus.staged.length === 0 &&
             gitStatus.unstaged.length === 0 &&
             !mergeConflicting && (
-              <p className="px-2 py-4 text-center text-xs text-muted/60">No changes</p>
+              <p className="px-3 py-4 text-center text-xs text-muted/60">No changes</p>
             )}
         </div>
 
         {/* Merge Conflict Resolution */}
         {mergeConflicting && mergeConflictFiles.length > 0 && (
-          <div className="space-y-2 border-t border-warning/30 px-2 pt-2 pb-2">
+          <div className="space-y-2 border-t border-warning/30 px-3 pt-2 pb-2">
             <div className="flex gap-1.5">
               <Button
                 variant="tertiary"
@@ -1113,7 +1113,7 @@ export function GitReviewSidebar(props: {
 
         {/* Commit / Sync Panel */}
         {(hasAnyChanges || hasRemote || (mergeConflicting && mergeConflictFiles.length === 0)) && (
-          <div className="space-y-2 border-t border-white/6 px-0.5 pt-2">
+          <div className="space-y-2 border-t border-white/6 px-3 pt-2">
             {mergeConflicting && mergeConflictFiles.length === 0 ? (
               <>
                 <p className="text-xs font-medium text-success">All conflicts resolved</p>
@@ -1288,20 +1288,32 @@ export function GitReviewSidebar(props: {
 
         {/* Pull Request — existing PR */}
         {showPrSection && ghAvailable && prData && prData.state !== "closed" && (
-          <div className="space-y-2 border-t border-white/6 px-0.5 pt-2">
-            <div className="flex items-center gap-2 px-0.5">
+          <div className="space-y-2 border-t border-white/6 px-3 pt-2">
+            <div className="flex items-center gap-2">
               <span
                 className={`size-2 shrink-0 rounded-full ${
                   prData.state === "merged"
                     ? "bg-purple-400"
                     : prData.state === "draft"
                       ? "bg-gray-400"
-                      : "bg-green-400"
+                      : prData.checksStatus === "FAILURE" || prData.checksStatus === "ERROR"
+                        ? "bg-danger"
+                        : prData.checksStatus === "PENDING"
+                          ? "bg-warning"
+                          : "bg-success"
                 }`}
               />
-              <span className="truncate text-xs text-foreground">
-                PR #{prData.number} ·{" "}
-                {prData.state === "draft" ? "Draft" : prData.state === "merged" ? "Merged" : "Open"}
+              <span
+                className="min-w-0 truncate text-xs text-foreground"
+                title={prData.title || undefined}
+              >
+                <span className="text-muted">#{prData.number}</span>{" "}
+                {prData.title ||
+                  (prData.state === "draft"
+                    ? "Draft"
+                    : prData.state === "merged"
+                      ? "Merged"
+                      : "Open")}
               </span>
             </div>
             <Button
@@ -1376,7 +1388,7 @@ export function GitReviewSidebar(props: {
 
         {/* Create PR button (only after push, no existing PR) */}
         {showCreatePrButton && (
-          <div className="space-y-2 border-t border-white/6 px-0.5 pt-2">
+          <div className="space-y-2 border-t border-white/6 px-3 pt-2">
             <Button
               variant="tertiary"
               className="w-full"
@@ -1527,7 +1539,7 @@ export function GitReviewSidebar(props: {
 
         {/* Merge to Source */}
         {showMergeSection && (
-          <div className="space-y-2 border-t border-white/6 px-0.5 pt-2">
+          <div className="space-y-2 border-t border-white/6 px-3 pt-2">
             {sourceBranchLoading ? (
               <div className="flex items-center justify-center py-2">
                 <Spinner color="current" size="sm" />

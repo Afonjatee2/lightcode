@@ -10,6 +10,7 @@ import {
   Columns2,
   Download,
   FileDiff,
+  FolderOpen,
   ExternalLink,
   GripVertical,
   GitFork,
@@ -238,6 +239,7 @@ function SortableThreadItem(props: {
   threadIndex: number;
   project: Project;
   showWorktreeBadge: boolean;
+  showWorktreeFilesButton?: boolean;
   currentThreadIds: string[];
   editingThreadId: string | null;
   setEditingThreadId: (id: string | null) => void;
@@ -249,6 +251,7 @@ function SortableThreadItem(props: {
   onRenameThread: (threadId: string, title: string) => void;
   onArchiveThread: (threadId: string) => void;
   onDeleteThread: (threadId: string, worktreePath?: string, projectId?: string) => void;
+  onOpenFiles: (projectId: string, worktreePath?: string) => void;
   onOpenGitReview: (projectId: string, worktreePath?: string) => void;
   onGitSync: (projectId: string, worktreePath?: string) => void;
   onGitPush: (projectId: string, worktreePath: string) => void;
@@ -261,6 +264,7 @@ function SortableThreadItem(props: {
   activeWorktreeTerminalPaths: string[];
   activeWorktreeTerminalPath: string | null;
   activeGitPanelWorktreePath: string | null;
+  activeFilesPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
   group: string;
   sortDisabled?: boolean;
@@ -269,6 +273,7 @@ function SortableThreadItem(props: {
     thread,
     project,
     showWorktreeBadge,
+    showWorktreeFilesButton = false,
     currentThreadIds,
     editingThreadId,
     sortDisabled = false,
@@ -448,6 +453,30 @@ function SortableThreadItem(props: {
             <>
               {showWorktreeBadge && thread.worktreePath && (
                 <>
+                  {showWorktreeFilesButton ? (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Files for ${thread.worktreeBranch ?? thread.title}`}
+                      className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+                        props.activeFilesPanelWorktreePath === thread.worktreePath
+                          ? "text-accent"
+                          : "text-muted/60 opacity-0 group-hover:opacity-100"
+                      }`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        props.onOpenFiles(thread.projectId, thread.worktreePath);
+                      }}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.stopPropagation();
+                          props.onOpenFiles(thread.projectId, thread.worktreePath);
+                        }
+                      }}
+                    >
+                      <FolderOpen className="size-3.5" />
+                    </div>
+                  ) : null}
                   <div
                     role="button"
                     tabIndex={0}
@@ -559,6 +588,7 @@ function SortableWorktreeGroup(props: {
   onRenameThread: (threadId: string, title: string) => void;
   onDeleteThread: (threadId: string, worktreePath?: string, projectId?: string) => void;
   onDeleteWorktreeGroup: (projectId: string, worktreePath: string, threadIds: string[]) => void;
+  onOpenFiles: (projectId: string, worktreePath?: string) => void;
   onOpenGitReview: (projectId: string, worktreePath?: string) => void;
   onGitSync: (projectId: string, worktreePath?: string) => void;
   onGitPush: (projectId: string, worktreePath: string) => void;
@@ -571,6 +601,7 @@ function SortableWorktreeGroup(props: {
   activeWorktreeTerminalPaths: string[];
   activeWorktreeTerminalPath: string | null;
   activeGitPanelWorktreePath: string | null;
+  activeFilesPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
   sortableGroup: string;
   sortDisabled?: boolean;
@@ -675,12 +706,14 @@ function SortableWorktreeGroup(props: {
           isCollapsed={isGroupCollapsed}
           hasTerminal={props.activeWorktreeTerminalPaths.includes(group.worktreePath)}
           isActiveTerminal={props.activeWorktreeTerminalPath === group.worktreePath}
+          isActiveFiles={props.activeFilesPanelWorktreePath === group.worktreePath}
           onToggleCollapse={() =>
             props.setCollapsedWorktrees((prev) => ({
               ...prev,
               [group.worktreePath]: !isGroupCollapsed,
             }))
           }
+          onOpenFiles={() => props.onOpenFiles(project.id, group.worktreePath)}
           onOpenGitReview={() => props.onOpenGitReview(project.id, group.worktreePath)}
           onOpenTerminal={() => props.onOpenWorktreeTerminal(project.id, group.worktreePath)}
           isDragging={isDragging}
@@ -696,6 +729,7 @@ function SortableWorktreeGroup(props: {
               threadIndex={threadIdx}
               project={project}
               showWorktreeBadge={false}
+              showWorktreeFilesButton={false}
               currentThreadIds={props.currentThreadIds}
               editingThreadId={props.editingThreadId}
               setEditingThreadId={props.setEditingThreadId}
@@ -707,6 +741,7 @@ function SortableWorktreeGroup(props: {
               onArchiveThread={props.onArchiveThread}
               onRenameThread={props.onRenameThread}
               onDeleteThread={props.onDeleteThread}
+              onOpenFiles={props.onOpenFiles}
               onOpenGitReview={props.onOpenGitReview}
               onGitSync={props.onGitSync}
               onGitPush={props.onGitPush}
@@ -719,6 +754,7 @@ function SortableWorktreeGroup(props: {
               activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
               activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
               activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
+              activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
               gitMenuIcons={props.gitMenuIcons}
               group={`wt:${group.worktreePath}`}
             />
@@ -801,6 +837,7 @@ function SortableProjectHeader(props: {
   onDeleteProject: (projectId: string) => void;
   onDeleteWorktreeGroup: (projectId: string, worktreePath: string, threadIds: string[]) => void;
   onOpenSettings: () => void;
+  onOpenFiles: (projectId: string, worktreePath?: string) => void;
   onOpenTerminal: (projectId: string) => void;
   onOpenWorktreeTerminal: (projectId: string, worktreePath: string) => void;
   onOpenGitReview: (projectId: string, worktreePath?: string) => void;
@@ -818,6 +855,8 @@ function SortableProjectHeader(props: {
   activeWorktreeTerminalPath: string | null;
   activeGitPanelProjectId: string | null;
   activeGitPanelWorktreePath: string | null;
+  activeFilesPanelProjectId: string | null;
+  activeFilesPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
   sortMode: ThreadSortMode;
 }) {
@@ -929,6 +968,29 @@ function SortableProjectHeader(props: {
               <div
                 role="button"
                 tabIndex={0}
+                aria-label={`Files for ${project.name}`}
+                className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+                  props.activeFilesPanelProjectId === project.id &&
+                  !props.activeFilesPanelWorktreePath
+                    ? "text-accent"
+                    : "text-muted/60 opacity-0 group-hover:opacity-100"
+                }`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  props.onOpenFiles(project.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.stopPropagation();
+                    props.onOpenFiles(project.id);
+                  }
+                }}
+              >
+                <FolderOpen className="size-3.5" />
+              </div>
+              <div
+                role="button"
+                tabIndex={0}
                 aria-label={`Terminal for ${project.name}`}
                 className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
                   props.activeTerminalProjectId === project.id
@@ -991,6 +1053,7 @@ function SortableProjectHeader(props: {
                     threadIndex={idx}
                     project={project}
                     showWorktreeBadge={true}
+                    showWorktreeFilesButton={!!thread.worktreePath}
                     currentThreadIds={props.currentThreadIds}
                     editingThreadId={props.editingThreadId}
                     setEditingThreadId={props.setEditingThreadId}
@@ -1002,6 +1065,7 @@ function SortableProjectHeader(props: {
                     onArchiveThread={props.onArchiveThread}
                     onRenameThread={props.onRenameThread}
                     onDeleteThread={props.onDeleteThread}
+                    onOpenFiles={props.onOpenFiles}
                     onOpenGitReview={props.onOpenGitReview}
                     onGitSync={props.onGitSync}
                     onGitPush={props.onGitPush}
@@ -1014,6 +1078,7 @@ function SortableProjectHeader(props: {
                     activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
                     activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
                     activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
+                    activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                     gitMenuIcons={props.gitMenuIcons}
                     group={dndGroup}
                   />
@@ -1040,6 +1105,7 @@ function SortableProjectHeader(props: {
                       threadIndex={idx}
                       project={project}
                       showWorktreeBadge={true}
+                      showWorktreeFilesButton={!!entry.thread.worktreePath}
                       currentThreadIds={props.currentThreadIds}
                       editingThreadId={props.editingThreadId}
                       setEditingThreadId={props.setEditingThreadId}
@@ -1051,6 +1117,7 @@ function SortableProjectHeader(props: {
                       onArchiveThread={props.onArchiveThread}
                       onRenameThread={props.onRenameThread}
                       onDeleteThread={props.onDeleteThread}
+                      onOpenFiles={props.onOpenFiles}
                       onOpenGitReview={props.onOpenGitReview}
                       onGitSync={props.onGitSync}
                       onGitPush={props.onGitPush}
@@ -1063,6 +1130,7 @@ function SortableProjectHeader(props: {
                       activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
                       activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
                       activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
+                      activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                       gitMenuIcons={props.gitMenuIcons}
                       group={dndGroup}
                       sortDisabled={dndDisabled}
@@ -1091,6 +1159,7 @@ function SortableProjectHeader(props: {
                     onRenameThread={props.onRenameThread}
                     onDeleteThread={props.onDeleteThread}
                     onDeleteWorktreeGroup={props.onDeleteWorktreeGroup}
+                    onOpenFiles={props.onOpenFiles}
                     onOpenGitReview={props.onOpenGitReview}
                     onGitSync={props.onGitSync}
                     onGitPush={props.onGitPush}
@@ -1103,6 +1172,7 @@ function SortableProjectHeader(props: {
                     activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
                     activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
                     activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
+                    activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                     gitMenuIcons={props.gitMenuIcons}
                     sortableGroup={dndGroup}
                     sortDisabled={dndDisabled}
@@ -1147,6 +1217,7 @@ export function Sidebar(props: {
   onDeleteProject: (projectId: string) => void;
   onDeleteWorktreeGroup: (projectId: string, worktreePath: string, threadIds: string[]) => void;
   onOpenSettings: () => void;
+  onOpenFiles: (projectId: string, worktreePath?: string) => void;
   onOpenTerminal: (projectId: string) => void;
   onOpenWorktreeTerminal: (projectId: string, worktreePath: string) => void;
   onOpenGitReview: (projectId: string, worktreePath?: string) => void;
@@ -1164,6 +1235,8 @@ export function Sidebar(props: {
   activeWorktreeTerminalPath: string | null;
   activeGitPanelProjectId: string | null;
   activeGitPanelWorktreePath: string | null;
+  activeFilesPanelProjectId: string | null;
+  activeFilesPanelWorktreePath: string | null;
   sortMode: ThreadSortMode;
 }) {
   const threads = useAppStore((state) => state.threads);
@@ -1184,6 +1257,7 @@ export function Sidebar(props: {
     onDeleteProject,
     onDeleteWorktreeGroup,
     onOpenSettings,
+    onOpenFiles,
     onOpenTerminal,
     onOpenWorktreeTerminal,
     onOpenGitReview,
@@ -1201,6 +1275,8 @@ export function Sidebar(props: {
     activeWorktreeTerminalPath,
     activeGitPanelProjectId,
     activeGitPanelWorktreePath,
+    activeFilesPanelProjectId,
+    activeFilesPanelWorktreePath,
   } = props;
 
   const gitMenuIcons = {
@@ -1351,6 +1427,7 @@ export function Sidebar(props: {
                   onDeleteProject={onDeleteProject}
                   onDeleteWorktreeGroup={onDeleteWorktreeGroup}
                   onOpenSettings={onOpenSettings}
+                  onOpenFiles={onOpenFiles}
                   onOpenTerminal={onOpenTerminal}
                   onOpenWorktreeTerminal={onOpenWorktreeTerminal}
                   onOpenGitReview={onOpenGitReview}
@@ -1368,6 +1445,8 @@ export function Sidebar(props: {
                   activeWorktreeTerminalPath={activeWorktreeTerminalPath}
                   activeGitPanelProjectId={activeGitPanelProjectId}
                   activeGitPanelWorktreePath={activeGitPanelWorktreePath}
+                  activeFilesPanelProjectId={activeFilesPanelProjectId}
+                  activeFilesPanelWorktreePath={activeFilesPanelWorktreePath}
                   gitMenuIcons={gitMenuIcons}
                   sortMode={props.sortMode}
                 />

@@ -75,11 +75,19 @@ export function StackedFileCard(props: {
 
     async function load() {
       try {
-        const result = await readBridge().getGitDiff({
-          projectLocation: project.location,
-          filePath: file.path,
-          staged: file.staged,
-        });
+        // Fetch diff and file content in parallel — they're independent
+        const [result, { oldContent, newContent }] = await Promise.all([
+          readBridge().getGitDiff({
+            projectLocation: project.location,
+            filePath: file.path,
+            staged: file.staged,
+          }),
+          readBridge().getGitFileContent({
+            projectLocation: project.location,
+            filePath: file.path,
+            staged: file.staged,
+          }),
+        ]);
         if (cancelled) return;
 
         const rawDiff = result.diff;
@@ -90,13 +98,6 @@ export function StackedFileCard(props: {
 
         const { oldName, newName } = extractDiffNames(rawDiff);
         const fileLang = getLang(newName || file.path);
-
-        const { oldContent, newContent } = await readBridge().getGitFileContent({
-          projectLocation: project.location,
-          filePath: file.path,
-          staged: file.staged,
-        });
-        if (cancelled) return;
 
         const results = await buildInWorker(
           [
@@ -155,12 +156,12 @@ export function StackedFileCard(props: {
 
   return (
     <>
-      <div className="rounded border border-border">
+      <div className="min-w-0">
         {/* File header */}
         <div
           role="button"
           tabIndex={0}
-          className="group flex cursor-pointer select-none items-center gap-1.5 px-2 py-1 text-xs transition-colors hover:bg-white/[0.04]"
+          className="group flex cursor-pointer select-none items-center gap-1.5 px-3 py-1 text-xs transition-colors hover:bg-white/[0.04]"
           onClick={() => setExpanded((v) => !v)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {

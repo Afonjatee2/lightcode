@@ -13,7 +13,7 @@ import {
   batchWslCommandsAsync,
   buildAgentCommand,
   createKnownSessionRef,
-  readWslCommandOutputAsync,
+  readWslLoginShellCommandOutputAsync,
   resolveExecutablePathAsync,
   resolveWslExecutablePath,
   type AgentAdapter,
@@ -372,13 +372,19 @@ export function createCursorAdapter(): AgentAdapter {
         detectedWslExecPaths.set(ctx.wslDistro!, executablePath);
         const [versionResult, statusResult, modelsResult] = await Promise.all([
           executablePath
-            ? readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["--version"])
+            ? readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+                "--version",
+              ])
             : undefined,
           executablePath
-            ? readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["status"])
+            ? readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+                "status",
+              ])
             : undefined,
           executablePath
-            ? readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["--list-models"])
+            ? readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+                "--list-models",
+              ])
             : undefined,
         ]);
 

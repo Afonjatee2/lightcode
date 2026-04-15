@@ -37,6 +37,7 @@ interface SharedSettingsState extends SharedSettings {
   setNewThreadMode: (value: NewThreadMode) => void;
   setAutoShowTerminalPanel: (value: boolean) => void;
   setGitReviewMode: (value: GitReviewMode) => void;
+  setEditorLspEnabled: (value: boolean) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
 }
 
@@ -56,17 +57,24 @@ function loadFallbackSettings(): SharedSettings {
   }
 }
 
+/**
+ * Whether the authoritative settings have been loaded from the main process.
+ * Until this is true we skip writing to the settings file so that early
+ * useEffect-triggered persists (e.g. setProviderConfig on mount) don't
+ * clobber the file with default values before the real settings are loaded.
+ */
+let initialLoadDone = !hasBridge();
+
 function persistSettings(settings: SharedSettings): void {
   if (typeof window === "undefined") {
     return;
   }
 
-  if (hasBridge()) {
-    void readBridge().setSharedSettings(settings);
-    return;
-  }
-
   localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+
+  if (hasBridge() && initialLoadDone) {
+    void readBridge().setSharedSettings(settings);
+  }
 }
 
 const initialSettings = loadFallbackSettings();
@@ -171,7 +179,14 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ gitReviewMode });
     persistSettings(selectSharedSettings(get()));
   },
+  setEditorLspEnabled: (editorLspEnabled) => {
+    set({ editorLspEnabled });
+    persistSettings(selectSharedSettings(get()));
+  },
   setProviderConfig: (agentKind, config) => {
+    if (!config.model.trim()) {
+      return;
+    }
     const current = get().providerConfigs;
     set({ providerConfigs: { ...current, [agentKind]: config } });
     persistSettings(selectSharedSettings(get()));
@@ -212,6 +227,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettings {
     autoShowTerminalPanel: state.autoShowTerminalPanel,
     gitReviewMode: state.gitReviewMode,
     providerConfigs: state.providerConfigs,
+    editorLspEnabled: state.editorLspEnabled,
   };
 }
 
@@ -219,10 +235,15 @@ if (hasBridge()) {
   void readBridge()
     .getSharedSettings()
     .then((settings) => {
+      const normalized = normalizeSharedSettings(settings);
       useSharedSettings.setState((state) => ({
         ...state,
-        ...normalizeSharedSettings(settings),
+        ...normalized,
       }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+      initialLoadDone = true;
     })
-    .catch(() => undefined);
+    .catch(() => {
+      initialLoadDone = true;
+    });
 }

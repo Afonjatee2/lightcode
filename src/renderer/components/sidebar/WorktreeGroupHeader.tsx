@@ -1,4 +1,4 @@
-import { GitFork, TerminalSquare } from "lucide-react";
+import { FolderOpen, GitFork, TerminalSquare } from "lucide-react";
 import { SidebarButton } from "../common";
 import { GitBadge } from "./GitBadge";
 import { PrBadge } from "./PrBadge";
@@ -12,7 +12,9 @@ export function WorktreeGroupHeader(props: {
   isCollapsed: boolean;
   hasTerminal: boolean;
   isActiveTerminal: boolean;
+  isActiveFiles?: boolean;
   onToggleCollapse: () => void;
+  onOpenFiles: () => void;
   onOpenGitReview: () => void;
   onOpenTerminal: () => void;
   isDragging?: boolean;
@@ -40,6 +42,28 @@ export function WorktreeGroupHeader(props: {
         : {})}
       suffix={
         <>
+          <div
+            role="button"
+            tabIndex={0}
+            aria-label={`Files for ${props.worktreeBranch}`}
+            className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+              props.isActiveFiles
+                ? "text-accent"
+                : "text-muted/60 opacity-0 group-hover:opacity-100"
+            }`}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onOpenFiles();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.stopPropagation();
+                props.onOpenFiles();
+              }
+            }}
+          >
+            <FolderOpen className="size-3.5" />
+          </div>
           <div
             role="button"
             tabIndex={0}

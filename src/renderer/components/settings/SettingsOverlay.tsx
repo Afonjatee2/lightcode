@@ -291,6 +291,8 @@ function GeneralSettings() {
   const setNewThreadMode = useSharedSettings((state) => state.setNewThreadMode);
   const gitReviewMode = useSharedSettings((state) => state.gitReviewMode);
   const setGitReviewMode = useSharedSettings((state) => state.setGitReviewMode);
+  const editorLspEnabled = useSharedSettings((state) => state.editorLspEnabled);
+  const setEditorLspEnabled = useSharedSettings((state) => state.setEditorLspEnabled);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
@@ -495,6 +497,28 @@ function GeneralSettings() {
                 });
               }}
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Editor LSP</p>
+              <p className="text-xs text-muted">
+                Enable language server support for type checking, completions, and diagnostics.
+                Requires a language server installed (e.g. typescript-language-server).
+              </p>
+            </div>
+            <Switch
+              isSelected={editorLspEnabled}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setEditorLspEnabled(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </div>
         </div>
       </div>

@@ -407,6 +407,13 @@ body {
   color: var(--muted);
 }
 
+/* Monaco editor — opaque backgrounds for overlaid elements (sticky scroll, etc.)
+   The editor itself uses a transparent background so var(--content-background) shows through. */
+.monaco-editor .sticky-widget,
+.monaco-editor .sticky-widget .monaco-editor-background {
+  background-color: var(--content-background) !important;
+}
+
 .lightcode-terminal-pane,
 .lightcode-terminal-pane .xterm,
 .lightcode-terminal-pane .xterm-viewport,
@@ -603,6 +610,7 @@ body {
   outline: none;
   white-space: pre-wrap;
   word-break: break-word;
+  cursor: text;
 }
 
 .lightcode-mention-input--compact {
@@ -945,4 +953,129 @@ body {
   --diff-add-content--: transparent;
   --diff-add-lineNumber--: transparent;
   --diff-add-content-highlight--: transparent;
+}
+
+/* ── Markdown Preview ─────────────────────────────────────── */
+
+.lightcode-markdown-preview {
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: var(--foreground);
+}
+
+.lightcode-markdown-preview h1,
+.lightcode-markdown-preview h2,
+.lightcode-markdown-preview h3,
+.lightcode-markdown-preview h4,
+.lightcode-markdown-preview h5,
+.lightcode-markdown-preview h6 {
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+  line-height: 1.3;
+}
+
+.lightcode-markdown-preview h1 {
+  font-size: 1.5rem;
+  border-bottom: 1px solid var(--separator);
+  padding-bottom: 0.3em;
+}
+.lightcode-markdown-preview h2 {
+  font-size: 1.25rem;
+  border-bottom: 1px solid var(--separator);
+  padding-bottom: 0.2em;
+}
+.lightcode-markdown-preview h3 {
+  font-size: 1.1rem;
+}
+.lightcode-markdown-preview h4 {
+  font-size: 1rem;
+}
+
+.lightcode-markdown-preview p {
+  margin: 0.75em 0;
+}
+
+.lightcode-markdown-preview a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.lightcode-markdown-preview code {
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.85em;
+  padding: 0.15em 0.35em;
+  border-radius: 0.25rem;
+  background: var(--surface-secondary);
+}
+
+.lightcode-markdown-preview pre {
+  margin: 1em 0;
+  padding: 0.85em 1em;
+  border-radius: 0.5rem;
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.lightcode-markdown-preview pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.lightcode-markdown-preview ul,
+.lightcode-markdown-preview ol {
+  margin: 0.5em 0;
+  padding-left: 1.5em;
+}
+
+.lightcode-markdown-preview li {
+  margin: 0.25em 0;
+}
+.lightcode-markdown-preview li::marker {
+  color: var(--muted);
+}
+
+.lightcode-markdown-preview blockquote {
+  margin: 0.75em 0;
+  padding: 0.25em 1em;
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+}
+
+.lightcode-markdown-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1em 0;
+  font-size: 0.8125rem;
+}
+
+.lightcode-markdown-preview th,
+.lightcode-markdown-preview td {
+  padding: 0.4em 0.75em;
+  border: 1px solid var(--border);
+  text-align: left;
+}
+
+.lightcode-markdown-preview th {
+  font-weight: 600;
+  background: var(--surface-secondary);
+}
+
+.lightcode-markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--separator);
+  margin: 1.5em 0;
+}
+
+.lightcode-markdown-preview img {
+  max-width: 100%;
+  border-radius: 0.5rem;
+}
+
+.lightcode-markdown-preview input[type="checkbox"] {
+  margin-right: 0.4em;
+  vertical-align: middle;
 }

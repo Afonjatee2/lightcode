@@ -14,6 +14,7 @@ import type {
   ThreadServerRequestId,
   ThreadStatus,
 } from "../../shared/contracts";
+import { terminateChildProcessTree } from "../../shared/processTree";
 import { toWslUncPath } from "../../shared/wsl";
 import {
   batchWslCommandsAsync,
@@ -23,7 +24,7 @@ import {
   readCommandOutputAsync,
   resolveWslHomeDirectory,
   readWslCommandOutput,
-  readWslCommandOutputAsync,
+  readWslLoginShellCommandOutputAsync,
   resolveExecutablePathAsync,
   resolveWslExecutablePath,
   type AgentAdapter,
@@ -648,7 +649,7 @@ class CodexStructuredSession implements StructuredSessionHandle {
     this.pendingRequests.clear();
 
     if (!this.appServer.killed) {
-      this.appServer.kill();
+      terminateChildProcessTree(this.appServer);
     }
   }
 
@@ -947,6 +948,9 @@ const CODEX_DIRECTORY_RE = /directory\s*:/i;
 const CODEX_MODEL_RE = new RegExp("\\/model\\s+to\\s+change", "i");
 const CODEX_PROMPT_RE = /(?:^|\n)›(?:\s|\u00a0).*/m;
 const CODEX_TITLE_RE = /0;([^\r\n]+)/g;
+const CODEX_QUESTION_HEADER_RE = /(?:^|\n)Question\s+\d+\/\d+\b/i;
+const CODEX_QUESTION_CONTROL_RE =
+  /enter\s+to\s+submit\s+answer|tab\s+to\s+add\s+notes|navigate\s+questions/i;
 
 type CodexHintEntry = {
   re: RegExp;
@@ -1044,6 +1048,10 @@ function findLastTitleIndex(text: string): number {
   return findLastMatchIndex(text, CODEX_TITLE_RE);
 }
 
+function detectCodexQuestionnaire(text: string): boolean {
+  return CODEX_QUESTION_HEADER_RE.test(text) && CODEX_QUESTION_CONTROL_RE.test(text);
+}
+
 export function detectCodexTerminalStatus(text: string): TerminalStatusHint | null {
   const recent = text.slice(-1200);
 
@@ -1054,6 +1062,10 @@ export function detectCodexTerminalStatus(text: string): TerminalStatusHint | nu
   if (detectCodexReadyForInitialPrompt(recent) || detectCodexReadyForInitialPrompt(text)) {
     // Ready-for-initial-prompt requires three independent signals (ready + directory + model).
     return { status: "idle", attention: "none", corroborated: true };
+  }
+
+  if (detectCodexQuestionnaire(recent)) {
+    return { status: "needs_reply", attention: "needs_reply", corroborated: true };
   }
 
   const strongHint = findBestCodexHint(recent, CODEX_STRONG_HINTS);
@@ -1291,7 +1303,9 @@ export function createCodexAdapter(): AgentAdapter {
         const executablePath = whichResult?.ok ? whichResult.stdout : undefined;
         detectedWslExecPaths.set(ctx.wslDistro!, executablePath);
         const versionResult = executablePath
-          ? await readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["--version"])
+          ? await readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+              "--version",
+            ])
           : undefined;
 
         if (executablePath) {

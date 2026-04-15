@@ -47,6 +47,10 @@ export default defineConfig({
             return "git-diff";
           }
 
+          if (id.includes("monaco-editor") || id.includes("@monaco-editor")) {
+            return "monaco";
+          }
+
           if (
             id.includes("@heroui") ||
             id.includes("react-aria") ||

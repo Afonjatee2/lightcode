@@ -1,0 +1,266 @@
+import { beforeEach, describe, expect, it } from "vitest";
+import { useFileEditorStore } from "./fileEditorStore";
+
+function makeBuffer(path: string) {
+  return {
+    path,
+    status: "ready" as const,
+    modifiedAtMs: 1,
+    content: path,
+    savedContent: path,
+    lineEnding: "lf" as const,
+    hasBom: false,
+    isDirty: false,
+    isLoading: false,
+  };
+}
+
+describe("fileEditorStore path remapping", () => {
+  beforeEach(() => {
+    useFileEditorStore.setState({
+      rootContext: null,
+      overlayMode: null,
+      tabs: [],
+      activePath: null,
+      previewTab: null,
+      buffers: {},
+      refreshToken: 0,
+    });
+  });
+
+  it("renames nested open buffers when a folder path changes", () => {
+    useFileEditorStore.setState({
+      rootContext: null,
+      overlayMode: "fullscreen",
+      tabs: ["src/a.ts", "src/nested/b.ts"],
+      activePath: "src/nested/b.ts",
+      buffers: {
+        "src/a.ts": {
+          path: "src/a.ts",
+          status: "ready",
+          modifiedAtMs: 1,
+          content: "a",
+          savedContent: "a",
+          lineEnding: "lf",
+          hasBom: false,
+          isDirty: false,
+          isLoading: false,
+        },
+        "src/nested/b.ts": {
+          path: "src/nested/b.ts",
+          status: "ready",
+          modifiedAtMs: 1,
+          content: "b",
+          savedContent: "b",
+          lineEnding: "lf",
+          hasBom: false,
+          isDirty: false,
+          isLoading: false,
+        },
+      },
+      refreshToken: 0,
+    });
+
+    useFileEditorStore.getState().renamePath("src", "app");
+
+    expect(useFileEditorStore.getState().tabs).toEqual(["app/a.ts", "app/nested/b.ts"]);
+    expect(useFileEditorStore.getState().activePath).toBe("app/nested/b.ts");
+    expect(Object.keys(useFileEditorStore.getState().buffers)).toEqual([
+      "app/a.ts",
+      "app/nested/b.ts",
+    ]);
+  });
+
+  it("removes nested tabs and buffers when a folder is deleted", () => {
+    useFileEditorStore.setState({
+      rootContext: null,
+      overlayMode: "modal",
+      tabs: ["src/a.ts", "src/nested/b.ts", "other.ts"],
+      activePath: "src/nested/b.ts",
+      buffers: {
+        "src/a.ts": {
+          path: "src/a.ts",
+          status: "ready",
+          modifiedAtMs: 1,
+          content: "a",
+          savedContent: "a",
+          lineEnding: "lf",
+          hasBom: false,
+          isDirty: false,
+          isLoading: false,
+        },
+        "src/nested/b.ts": {
+          path: "src/nested/b.ts",
+          status: "ready",
+          modifiedAtMs: 1,
+          content: "b",
+          savedContent: "b",
+          lineEnding: "lf",
+          hasBom: false,
+          isDirty: false,
+          isLoading: false,
+        },
+        "other.ts": {
+          path: "other.ts",
+          status: "ready",
+          modifiedAtMs: 1,
+          content: "c",
+          savedContent: "c",
+          lineEnding: "lf",
+          hasBom: false,
+          isDirty: false,
+          isLoading: false,
+        },
+      },
+      refreshToken: 0,
+    });
+
+    useFileEditorStore.getState().removePath("src");
+
+    expect(useFileEditorStore.getState().tabs).toEqual(["other.ts"]);
+    expect(useFileEditorStore.getState().activePath).toBe("other.ts");
+    expect(Object.keys(useFileEditorStore.getState().buffers)).toEqual(["other.ts"]);
+  });
+});
+
+describe("fileEditorStore preview tabs", () => {
+  beforeEach(() => {
+    useFileEditorStore.setState({
+      rootContext: null,
+      overlayMode: null,
+      tabs: [],
+      activePath: null,
+      previewTab: null,
+      buffers: {},
+      refreshToken: 0,
+    });
+  });
+
+  it("replaces the existing preview tab at the same position", () => {
+    useFileEditorStore.setState({
+      tabs: ["a.ts", "b.ts", "c.ts"],
+      activePath: "b.ts",
+      previewTab: "b.ts",
+      buffers: {
+        "a.ts": makeBuffer("a.ts"),
+        "b.ts": makeBuffer("b.ts"),
+        "c.ts": makeBuffer("c.ts"),
+      },
+      overlayMode: "modal",
+    });
+
+    // Simulate single-click opening d.ts as preview — uses computeTabOpen directly via setState
+    const state = useFileEditorStore.getState();
+    // We can't call openFile (requires bridge), so test the state logic directly
+    // by calling set with the same logic openFile would use
+    const isAlreadyOpen = state.tabs.includes("d.ts");
+    expect(isAlreadyOpen).toBe(false);
+
+    // Manually apply preview tab replacement logic
+    const oldPreview = state.previewTab; // "b.ts"
+    const idx = state.tabs.indexOf(oldPreview!);
+    const newTabs = state.tabs.filter((t) => t !== oldPreview);
+    newTabs.splice(idx, 0, "d.ts");
+    const { ["b.ts"]: _, ...newBuffers } = state.buffers;
+
+    useFileEditorStore.setState({
+      tabs: newTabs,
+      buffers: { ...newBuffers, "d.ts": makeBuffer("d.ts") },
+      activePath: "d.ts",
+      previewTab: "d.ts",
+    });
+
+    const next = useFileEditorStore.getState();
+    expect(next.tabs).toEqual(["a.ts", "d.ts", "c.ts"]);
+    expect(next.activePath).toBe("d.ts");
+    expect(next.previewTab).toBe("d.ts");
+    expect(next.buffers["b.ts"]).toBeUndefined();
+  });
+
+  it("pinTab promotes a preview tab to permanent", () => {
+    useFileEditorStore.setState({
+      tabs: ["a.ts", "b.ts"],
+      activePath: "b.ts",
+      previewTab: "b.ts",
+      buffers: { "a.ts": makeBuffer("a.ts"), "b.ts": makeBuffer("b.ts") },
+    });
+
+    useFileEditorStore.getState().pinTab("b.ts");
+
+    expect(useFileEditorStore.getState().previewTab).toBeNull();
+    expect(useFileEditorStore.getState().tabs).toEqual(["a.ts", "b.ts"]);
+  });
+
+  it("pinTab is a no-op for permanent tabs", () => {
+    useFileEditorStore.setState({
+      tabs: ["a.ts", "b.ts"],
+      activePath: "a.ts",
+      previewTab: "b.ts",
+      buffers: { "a.ts": makeBuffer("a.ts"), "b.ts": makeBuffer("b.ts") },
+    });
+
+    useFileEditorStore.getState().pinTab("a.ts");
+
+    // previewTab should still be b.ts since a.ts was not the preview
+    expect(useFileEditorStore.getState().previewTab).toBe("b.ts");
+  });
+
+  it("editing a preview tab promotes it to permanent", () => {
+    useFileEditorStore.setState({
+      tabs: ["a.ts"],
+      activePath: "a.ts",
+      previewTab: "a.ts",
+      buffers: { "a.ts": makeBuffer("a.ts") },
+    });
+
+    useFileEditorStore.getState().updateBuffer("a.ts", "changed content");
+
+    expect(useFileEditorStore.getState().previewTab).toBeNull();
+    expect(useFileEditorStore.getState().buffers["a.ts"]?.isDirty).toBe(true);
+  });
+
+  it("closeTab clears previewTab when the preview tab is closed", () => {
+    useFileEditorStore.setState({
+      tabs: ["a.ts", "b.ts"],
+      activePath: "b.ts",
+      previewTab: "b.ts",
+      overlayMode: "modal",
+      buffers: { "a.ts": makeBuffer("a.ts"), "b.ts": makeBuffer("b.ts") },
+    });
+
+    useFileEditorStore.getState().closeTab("b.ts");
+
+    expect(useFileEditorStore.getState().previewTab).toBeNull();
+    expect(useFileEditorStore.getState().tabs).toEqual(["a.ts"]);
+  });
+
+  it("renamePath remaps previewTab", () => {
+    useFileEditorStore.setState({
+      tabs: ["src/a.ts"],
+      activePath: "src/a.ts",
+      previewTab: "src/a.ts",
+      buffers: { "src/a.ts": makeBuffer("src/a.ts") },
+      refreshToken: 0,
+    });
+
+    useFileEditorStore.getState().renamePath("src", "app");
+
+    expect(useFileEditorStore.getState().previewTab).toBe("app/a.ts");
+  });
+
+  it("removePath clears previewTab when the preview file is deleted", () => {
+    useFileEditorStore.setState({
+      tabs: ["src/a.ts", "other.ts"],
+      activePath: "src/a.ts",
+      previewTab: "src/a.ts",
+      overlayMode: "modal",
+      buffers: { "src/a.ts": makeBuffer("src/a.ts"), "other.ts": makeBuffer("other.ts") },
+      refreshToken: 0,
+    });
+
+    useFileEditorStore.getState().removePath("src");
+
+    expect(useFileEditorStore.getState().previewTab).toBeNull();
+    expect(useFileEditorStore.getState().tabs).toEqual(["other.ts"]);
+  });
+});

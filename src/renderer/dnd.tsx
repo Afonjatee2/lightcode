@@ -3,6 +3,7 @@ import { DragDropProvider, PointerSensor, KeyboardSensor } from "@dnd-kit/react"
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { isSortable } from "@dnd-kit/react/sortable";
 import { makeDraftPaneId } from "../shared/paneId";
+import { useFileEditorStore } from "./state/fileEditorStore";
 
 // ── Drag source types ──────────────────────────────────────────
 export type DragSourceData =
@@ -10,7 +11,8 @@ export type DragSourceData =
   | { type: "thread"; threadId: string; projectId: string; worktreePath?: string }
   | { type: "worktree-group"; worktreePath: string; projectId: string; threadIds: string[] }
   | { type: "pane"; paneId: string }
-  | { type: "new-thread"; projectId: string };
+  | { type: "new-thread"; projectId: string }
+  | { type: "editor-tab"; path: string };
 
 // ── Pane drop indicator ────────────────────────────────────────
 export type PaneDropIndicator =
@@ -208,6 +210,8 @@ export function AppDndProvider(props: {
               paneIndicatorRef.current
             ) {
               props.onPaneDrop(data, paneIndicatorRef.current);
+            } else if (data.type === "editor-tab" && src && isSortable(src)) {
+              useFileEditorStore.getState().reorderTabs(src.initialIndex, src.index);
             } else if (src && isSortable(src) && data.type !== "pane") {
               props.onSidebarSortEnd(
                 data,

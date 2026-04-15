@@ -12,7 +12,7 @@ import {
   buildAgentCommand,
   createKnownSessionRef,
   readCommandOutputAsync,
-  readWslCommandOutputAsync,
+  readWslLoginShellCommandOutputAsync,
   resolveExecutablePathAsync,
   resolveWslExecutablePath,
   type AgentEnvContext,
@@ -185,10 +185,15 @@ export function createClaudeAdapter(): AgentAdapter {
         detectedWslExecPaths.set(ctx.wslDistro!, executablePath);
         const [versionResult, authResult] = await Promise.all([
           executablePath
-            ? readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["--version"])
+            ? readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+                "--version",
+              ])
             : undefined,
           executablePath
-            ? readWslCommandOutputAsync(ctx.wslDistro!, executablePath, ["auth", "status"])
+            ? readWslLoginShellCommandOutputAsync(ctx.wslDistro!, "/tmp", executablePath, [
+                "auth",
+                "status",
+              ])
             : undefined,
         ]);
         return {
@@ -250,6 +255,7 @@ export function createClaudeAdapter(): AgentAdapter {
       return attachmentLines ? `${restStr}\n\n${attachmentLines} ` : restStr;
     },
     detectTerminalStatus: detectClaudeTerminalStatus,
+    workingSilenceTimeoutMs: null,
     syncConfigFromTerminalState: syncClaudeConfigFromTerminalState,
     defaultOneShotModel: "haiku",
     buildOneShotCommand(model, effort) {

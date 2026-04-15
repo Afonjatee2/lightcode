@@ -28,9 +28,19 @@ import { isWindows, readBridge } from "./bridge";
 import { ProviderIcon, getStatusTone, generateTitleWithFallback } from "./components/providers";
 import { DevTerminalPanel } from "./components/devTerminal/DevTerminalPanel";
 import { UnifiedRightPanel, type RightPanelTab } from "./components/layout/UnifiedRightPanel";
+import { ProjectSidebarPanel } from "./components/layout/ProjectSidebarPanel";
 import { PageLayout } from "./components/layout/PageLayout";
 import { OverlayShell } from "./components/layout/OverlayShell";
 import { SplitPaneContainer } from "./components/layout/SplitPaneContainer";
+const FileEditorPanel = lazy(() =>
+  import("./components/fileEditor/FileEditorPanel").then((m) => ({ default: m.FileEditorPanel })),
+);
+const FileEditorOverlay = lazy(() =>
+  import("./components/fileEditor/FileEditorOverlay").then((m) => ({
+    default: m.FileEditorOverlay,
+  })),
+);
+import { ProjectFilesPanel } from "./components/fileEditor/ProjectFilesPanel";
 import { ProjectSettingsOverlay } from "./components/settings/ProjectSettingsOverlay";
 import { SettingsOverlay } from "./components/settings/SettingsOverlay";
 import {
@@ -57,15 +67,21 @@ const GitReviewPanel = lazy(() =>
 );
 
 // Preload heavy chunks after app start so they're ready when needed.
-// GitReviewOverlay pulls in @git-diff-view/react + highlight.js (~300KB).
 if (typeof requestIdleCallback === "function") {
   requestIdleCallback(() => {
     import("./components/gitReview/GitReviewOverlay");
+    // Monaco editor (~5MB) — preload after git-diff so it doesn't compete
+    requestIdleCallback(() => {
+      import("./components/fileEditor/FileEditorPanel");
+    });
   });
 } else {
   setTimeout(() => {
     import("./components/gitReview/GitReviewOverlay");
   }, 1000);
+  setTimeout(() => {
+    import("./components/fileEditor/FileEditorPanel");
+  }, 2000);
 }
 
 import { useAppStore, makeThreadTitle } from "./state/appStore";
@@ -74,6 +90,7 @@ import { useThread } from "./state/useThread";
 import { useDevTerminalStore } from "./state/devTerminalStore";
 import { useGitStore } from "./state/gitStore";
 import { useUpdateStore } from "./state/updateStore";
+import { useFileEditorStore, type FileEditorRootContext } from "./state/fileEditorStore";
 import { useDraggable, useDroppable } from "@dnd-kit/react";
 import { AppDndProvider, useDndContext, type DragSourceData, type PaneDropIndicator } from "./dnd";
 
@@ -169,6 +186,29 @@ function resolveWorktreeBranch(
   if (gitBranch) return gitBranch;
 
   return fallbackBranch;
+}
+
+function buildFileEditorContext(
+  project: Project,
+  worktreePath?: string,
+  worktreeBranch?: string,
+): FileEditorRootContext {
+  if (!worktreePath) {
+    return {
+      projectId: project.id,
+      projectName: project.name,
+      projectLocation: project.location,
+      rootLabel: project.name,
+    };
+  }
+
+  return {
+    projectId: project.id,
+    projectName: project.name,
+    projectLocation: buildWorktreeLocation(project.location, worktreePath),
+    rootLabel: worktreeBranch ?? worktreePath.split(/[/\\]/).pop() ?? project.name,
+    worktreePath,
+  };
 }
 
 // ── Async title generation ──────────────────────────────────
@@ -953,6 +993,11 @@ export function App() {
   const insertPaneAtIndex = useAppStore((state) => state.insertPaneAtIndex);
   const replacePaneId = useAppStore((state) => state.replacePaneId);
   const updateThreadRuntime = useAppStore((state) => state.updateThreadRuntime);
+  const fileEditorRootContext = useFileEditorStore((state) => state.rootContext);
+  const fileEditorOverlayMode = useFileEditorStore((state) => state.overlayMode);
+  const setFileEditorRootContext = useFileEditorStore((state) => state.setRootContext);
+  const setFileEditorOverlayMode = useFileEditorStore((state) => state.setOverlayMode);
+  const clearFileEditorSession = useFileEditorStore((state) => state.clearSession);
   const devTerminalOpen = useDevTerminalStore((s) => s.isOpen);
   const devTerminalActiveProjectId = useDevTerminalStore((s) => {
     if (!s.isOpen || !s.activeProjectId) return null;
@@ -990,6 +1035,7 @@ export function App() {
   });
   const [gitReviewAsPanel, setGitReviewAsPanel] = useState(() => gitReviewContext !== null);
   const [gitOverlayOpen, setGitOverlayOpen] = useState(false);
+  const [filesPanelContext, setFilesPanelContext] = useState<FileEditorRootContext | null>(null);
   const [rightPanelTab, setRightPanelTab] = useState<RightPanelTab>(
     gitReviewContext !== null ? "git" : "terminal",
   );
@@ -1011,16 +1057,35 @@ export function App() {
     setGitReviewContextRaw(null);
     localStorage.removeItem("lightcode-git-panel-context");
   }
+  if (filesPanelContext && !projects.find((p) => p.id === filesPanelContext.projectId)) {
+    setFilesPanelContext(null);
+    clearFileEditorSession();
+  }
 
   const terminalPosition = useSharedSettings((s) => s.terminalPosition);
   const isTerminalRight = terminalPosition === "right";
   const gitPanelOpen = !!gitReviewContext && gitReviewAsPanel;
+  const filesPanelOpen = filesPanelContext !== null;
+
+  /** Close the entire unified panel — git, files, and terminal. */
+  function closeAllPanels() {
+    setGitReviewContext(null);
+    setFilesPanelContext(null);
+    useDevTerminalStore.getState().closePanel();
+  }
   // Keep last valid context so the panel content stays visible during the close animation.
   const lastGitPanelContextRef = useRef(gitReviewContext);
   if (gitReviewContext && gitReviewAsPanel) {
     lastGitPanelContextRef.current = gitReviewContext;
   }
   const gitPanelContext = gitPanelOpen ? gitReviewContext : lastGitPanelContextRef.current;
+  const lastFilesPanelContextRef = useRef(filesPanelContext);
+  if (filesPanelContext) {
+    lastFilesPanelContextRef.current = filesPanelContext;
+  }
+  const resolvedFilesPanelContext = filesPanelOpen
+    ? filesPanelContext
+    : lastFilesPanelContextRef.current;
   const [worktreeDeleteDialog, setWorktreeDeleteDialog] = useState<
     | {
         kind: "single-thread";
@@ -1151,6 +1216,45 @@ export function App() {
     writeScriptToShell(tab.id, action.command);
   }
 
+  function openFilesPanel(projectId: string, worktreePath?: string) {
+    const project = projects.find((item) => item.id === projectId);
+    if (!project) return;
+
+    const context = buildFileEditorContext(
+      project,
+      worktreePath,
+      worktreePath ? resolveWorktreeBranch(projectId, worktreePath) : undefined,
+    );
+    const currentRoot = useFileEditorStore.getState().rootContext;
+    const hasDirtyBuffers = Object.values(useFileEditorStore.getState().buffers).some(
+      (buffer) => buffer.status === "ready" && buffer.isDirty,
+    );
+    const isSameContext =
+      currentRoot?.projectId === context.projectId &&
+      currentRoot?.worktreePath === context.worktreePath;
+
+    if (!isSameContext && hasDirtyBuffers && !window.confirm("Discard unsaved editor changes?")) {
+      return;
+    }
+
+    if (!isSameContext) {
+      setFileEditorRootContext(context);
+    }
+
+    if (
+      isSameContext &&
+      filesPanelContext?.projectId === context.projectId &&
+      filesPanelContext?.worktreePath === context.worktreePath &&
+      rightPanelTab === "files"
+    ) {
+      closeAllPanels();
+      return;
+    }
+
+    setFilesPanelContext(context);
+    setRightPanelTab("files");
+  }
+
   async function performWorktreeRemoval(
     project: Project,
     worktreePath: string,
@@ -1176,6 +1280,10 @@ export function App() {
 
     if (gitReviewContext?.worktreePath === worktreePath) {
       setGitReviewContext(null);
+    }
+    if (filesPanelContext?.worktreePath === worktreePath) {
+      setFilesPanelContext(null);
+      clearFileEditorSession();
     }
 
     try {
@@ -1609,6 +1717,11 @@ export function App() {
       if (event.type !== "git-changed") return;
       const project = projects.find((p) => p.id === event.projectId);
       if (project) void refreshProject(project);
+      // Also refresh the file tree if it's showing this project
+      const editorRoot = useFileEditorStore.getState().rootContext;
+      if (editorRoot && editorRoot.projectId === event.projectId) {
+        useFileEditorStore.getState().bumpRefreshToken();
+      }
     });
 
     // Initial refresh for all projects
@@ -1961,6 +2074,9 @@ export function App() {
                 });
               }}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenFiles={(projectId, worktreePath?) => {
+                openFilesPanel(projectId, worktreePath);
+              }}
               onOpenGitReview={(projectId, worktreePath?) => {
                 const mode = useSharedSettings.getState().gitReviewMode;
                 if (mode === "panel") {
@@ -1969,26 +2085,15 @@ export function App() {
                     gitReviewContext?.projectId === projectId &&
                     gitReviewContext?.worktreePath === worktreePath;
 
-                  if (isTerminalRight) {
-                    // Unified mode: only close if git tab is already active for same context
-                    if (isSameContext && rightPanelTab === "git") {
-                      setGitReviewContext(null);
-                      useDevTerminalStore.getState().closePanel();
-                      return;
-                    }
-                    // Otherwise open/switch to git tab
-                    setGitReviewContext({ projectId, worktreePath });
-                    setGitReviewAsPanel(true);
-                    setRightPanelTab("git");
-                  } else {
-                    // Standalone: toggle off if same context
-                    if (isSameContext) {
-                      setGitReviewContext(null);
-                      return;
-                    }
-                    setGitReviewContext({ projectId, worktreePath });
-                    setGitReviewAsPanel(true);
+                  // Active git tab for same context → close entire panel
+                  if (isSameContext && rightPanelTab === "git") {
+                    closeAllPanels();
+                    return;
                   }
+                  // Otherwise open/switch to git tab
+                  setGitReviewContext({ projectId, worktreePath });
+                  setGitReviewAsPanel(true);
+                  setRightPanelTab("git");
                 } else {
                   setGitReviewContext({ projectId, worktreePath });
                   setGitReviewAsPanel(false);
@@ -2260,6 +2365,10 @@ export function App() {
                 if (gitReviewContext?.projectId === projectId) {
                   setGitReviewContext(null);
                 }
+                if (filesPanelContext?.projectId === projectId) {
+                  setFilesPanelContext(null);
+                  clearFileEditorSession();
+                }
               }}
               onDeleteWorktreeGroup={handleDeleteWorktreeGroup}
               onOpenProjectSettings={(projectId) => setProjectSettingsId(projectId)}
@@ -2274,24 +2383,14 @@ export function App() {
                 const isSameTerminal =
                   store.isOpen && store.activeProjectId === projectId && !store.activeWorktreePath;
 
-                if (isTerminalRight) {
-                  // Unified mode: only close if terminal tab is already active for same project
-                  if (isSameTerminal && rightPanelTab === "terminal") {
-                    store.closePanel();
-                    setGitReviewContext(null);
-                    return;
-                  }
-                  // Otherwise open/switch to terminal tab
-                  if (!isSameTerminal) store.openPanel(projectId);
-                  setRightPanelTab("terminal");
-                } else {
-                  // Standalone: toggle off if same terminal
-                  if (isSameTerminal) {
-                    store.closePanel();
-                    return;
-                  }
-                  store.openPanel(projectId);
+                // Active terminal tab for same project → close entire panel
+                if (isSameTerminal && rightPanelTab === "terminal") {
+                  closeAllPanels();
+                  return;
                 }
+                // Otherwise open/switch to terminal tab
+                if (!isSameTerminal) store.openPanel(projectId);
+                setRightPanelTab("terminal");
 
                 // If the project already has a non-worktree tab, activate it.
                 const existingTab = store.tabs.find(
@@ -2316,22 +2415,14 @@ export function App() {
                   store.activeProjectId === projectId &&
                   store.activeWorktreePath === worktreePath;
 
-                if (isTerminalRight) {
-                  // Unified mode: only close if terminal tab is already active for same worktree
-                  if (isSameWorktree && rightPanelTab === "terminal") {
-                    store.closePanel();
-                    setGitReviewContext(null);
-                    return;
-                  }
-                  if (!isSameWorktree) store.openWorktreePanel(projectId, worktreePath);
-                  setRightPanelTab("terminal");
-                } else {
-                  if (isSameWorktree) {
-                    store.closePanel();
-                    return;
-                  }
-                  store.openWorktreePanel(projectId, worktreePath);
+                // Active terminal tab for same worktree → close entire panel
+                if (isSameWorktree && rightPanelTab === "terminal") {
+                  closeAllPanels();
+                  return;
                 }
+                // Otherwise open/switch to terminal tab
+                if (!isSameWorktree) store.openWorktreePanel(projectId, worktreePath);
+                setRightPanelTab("terminal");
 
                 // If a tab for this worktree already exists, activate it.
                 const existingTab = store.tabs.find(
@@ -2371,10 +2462,27 @@ export function App() {
                   ? (gitReviewContext?.worktreePath ?? null)
                   : null
               }
+              activeFilesPanelProjectId={
+                filesPanelOpen && rightPanelTab === "files"
+                  ? (filesPanelContext?.projectId ?? null)
+                  : null
+              }
+              activeFilesPanelWorktreePath={
+                filesPanelOpen && rightPanelTab === "files"
+                  ? (filesPanelContext?.worktreePath ?? null)
+                  : null
+              }
               sortMode={threadSortMode}
             />
           }
-          content={<AppContent />}
+          content={
+            <>
+              <AppContent />
+              <Suspense>
+                <FileEditorPanel />
+              </Suspense>
+            </>
+          }
           rightPanel={
             isTerminalRight ? (
               <UnifiedRightPanel
@@ -2456,21 +2564,55 @@ export function App() {
                     </Suspense>
                   ) : undefined
                 }
+                filesContent={
+                  filesPanelOpen && resolvedFilesPanelContext ? (
+                    <ProjectFilesPanel rootContext={resolvedFilesPanelContext} />
+                  ) : undefined
+                }
                 showTerminal={devTerminalOpen}
                 showGit={gitPanelOpen}
+                showFiles={filesPanelOpen}
                 projectName={
                   (rightPanelTab === "git"
                     ? projects.find((p) => p.id === gitPanelContext?.projectId)?.name
-                    : projects.find((p) => p.id === useDevTerminalStore.getState().activeProjectId)
-                        ?.name) ?? undefined
+                    : rightPanelTab === "files"
+                      ? resolvedFilesPanelContext?.rootLabel
+                      : projects.find(
+                          (p) => p.id === useDevTerminalStore.getState().activeProjectId,
+                        )?.name) ?? undefined
                 }
                 onExpandGitToOverlay={() => setGitOverlayOpen(true)}
+                onExpandFilesToOverlay={() => setFileEditorOverlayMode("fullscreen")}
                 onOpenGit={() => {
                   // Open git for the current terminal project
                   const termProjectId = useDevTerminalStore.getState().activeProjectId;
                   if (termProjectId) {
                     setGitReviewContext({ projectId: termProjectId });
                     setGitReviewAsPanel(true);
+                    setRightPanelTab("git");
+                  }
+                }}
+                onOpenFiles={() => {
+                  if (resolvedFilesPanelContext) {
+                    setFilesPanelContext(resolvedFilesPanelContext);
+                    setRightPanelTab("files");
+                    return;
+                  }
+                  const terminalStore = useDevTerminalStore.getState();
+                  if (terminalStore.activeProjectId) {
+                    openFilesPanel(
+                      terminalStore.activeProjectId,
+                      terminalStore.activeWorktreePath ?? undefined,
+                    );
+                    return;
+                  }
+                  if (gitPanelContext) {
+                    openFilesPanel(gitPanelContext.projectId, gitPanelContext.worktreePath);
+                    return;
+                  }
+                  const firstProject = projects[0];
+                  if (firstProject) {
+                    openFilesPanel(firstProject.id);
                   }
                 }}
                 onOpenTerminal={() => {
@@ -2491,91 +2633,154 @@ export function App() {
                     }
                   }
                 }}
-                onClose={() => {
-                  useDevTerminalStore.getState().closePanel();
-                  setGitReviewContext(null);
-                }}
+                onClose={closeAllPanels}
               />
             ) : (
               <DevTerminalPanel projects={projects} />
             )
           }
-          rightPanelOpen={isTerminalRight ? devTerminalOpen || gitPanelOpen : devTerminalOpen}
+          rightPanelOpen={
+            isTerminalRight ? devTerminalOpen || gitPanelOpen || filesPanelOpen : devTerminalOpen
+          }
           gitPanel={
-            !isTerminalRight &&
-            gitPanelContext &&
-            projects.find((p) => p.id === gitPanelContext.projectId) ? (
-              <Suspense
-                fallback={
-                  <div className="flex h-full items-center justify-center">
-                    <Spinner size="md" />
-                  </div>
-                }
-              >
-                <GitReviewPanel
-                  project={projects.find((p) => p.id === gitPanelContext.projectId)!}
-                  {...(gitPanelContext.worktreePath
-                    ? {
-                        locationOverride: buildWorktreeLocation(
-                          projects.find((p) => p.id === gitPanelContext.projectId)!.location,
-                          gitPanelContext.worktreePath,
-                        ),
-                        statusKey: gitPanelContext.worktreePath,
-                        worktreePath: gitPanelContext.worktreePath,
-                        worktreeBranch:
-                          resolveWorktreeBranch(
-                            gitPanelContext.projectId,
-                            gitPanelContext.worktreePath,
-                          ) ?? undefined,
-                        onMergeAndRemove: () => {
-                          const allThreads = useAppStore.getState().threads;
-                          const reviewProject = projects.find(
-                            (p) => p.id === gitPanelContext!.projectId,
-                          );
-                          const wtPath = gitPanelContext!.worktreePath;
-                          const wtBranch = wtPath
-                            ? resolveWorktreeBranch(gitPanelContext!.projectId, wtPath)
-                            : undefined;
-                          setGitReviewContext(null);
-                          if (reviewProject && wtPath) {
-                            const siblings = allThreads.filter((t) => t.worktreePath === wtPath);
-                            for (const sib of siblings) {
-                              deleteThread(sib.id);
-                            }
-                            void (async () => {
-                              await closeThreads(siblings.map((sib) => sib.id));
-                              await performWorktreeRemoval(reviewProject, wtPath, wtBranch);
-                            })();
-                          }
-                        },
-                        onRemove: () => {
-                          const action = useSharedSettings.getState().threadRemoveAction;
-                          const wtPath = gitPanelContext!.worktreePath;
-                          const projectId = gitPanelContext!.projectId;
-                          setGitReviewContext(null);
-                          if (!wtPath) return;
-                          const siblings = useAppStore
-                            .getState()
-                            .threads.filter((t) => t.worktreePath === wtPath);
-                          if (action === "archive") {
-                            for (const sib of siblings) handleArchiveThread(sib.id);
-                          } else {
-                            handleDeleteWorktreeGroup(
-                              projectId,
-                              wtPath,
-                              siblings.map((s) => s.id),
-                            );
-                          }
-                        },
+            !isTerminalRight && (gitPanelOpen || filesPanelOpen) ? (
+              <ProjectSidebarPanel
+                activeTab={rightPanelTab === "files" ? "files" : "git"}
+                onTabChange={(tab) => setRightPanelTab(tab)}
+                gitContent={
+                  gitPanelContext && projects.find((p) => p.id === gitPanelContext.projectId) ? (
+                    <Suspense
+                      fallback={
+                        <div className="flex h-full items-center justify-center">
+                          <Spinner size="md" />
+                        </div>
                       }
-                    : {})}
-                  onExpandToOverlay={() => setGitOverlayOpen(true)}
-                  onClose={() => setGitReviewContext(null)}
-                />
-              </Suspense>
+                    >
+                      <GitReviewPanel
+                        project={projects.find((p) => p.id === gitPanelContext.projectId)!}
+                        {...(gitPanelContext.worktreePath
+                          ? {
+                              locationOverride: buildWorktreeLocation(
+                                projects.find((p) => p.id === gitPanelContext.projectId)!.location,
+                                gitPanelContext.worktreePath,
+                              ),
+                              statusKey: gitPanelContext.worktreePath,
+                              worktreePath: gitPanelContext.worktreePath,
+                              worktreeBranch:
+                                resolveWorktreeBranch(
+                                  gitPanelContext.projectId,
+                                  gitPanelContext.worktreePath,
+                                ) ?? undefined,
+                              onMergeAndRemove: () => {
+                                const allThreads = useAppStore.getState().threads;
+                                const reviewProject = projects.find(
+                                  (p) => p.id === gitPanelContext!.projectId,
+                                );
+                                const wtPath = gitPanelContext!.worktreePath;
+                                const wtBranch = wtPath
+                                  ? resolveWorktreeBranch(gitPanelContext!.projectId, wtPath)
+                                  : undefined;
+                                setGitReviewContext(null);
+                                if (reviewProject && wtPath) {
+                                  const siblings = allThreads.filter(
+                                    (t) => t.worktreePath === wtPath,
+                                  );
+                                  for (const sib of siblings) {
+                                    deleteThread(sib.id);
+                                  }
+                                  void (async () => {
+                                    await closeThreads(siblings.map((sib) => sib.id));
+                                    await performWorktreeRemoval(reviewProject, wtPath, wtBranch);
+                                  })();
+                                }
+                              },
+                              onRemove: () => {
+                                const action = useSharedSettings.getState().threadRemoveAction;
+                                const wtPath = gitPanelContext!.worktreePath;
+                                const projectId = gitPanelContext!.projectId;
+                                setGitReviewContext(null);
+                                if (!wtPath) return;
+                                const siblings = useAppStore
+                                  .getState()
+                                  .threads.filter((t) => t.worktreePath === wtPath);
+                                if (action === "archive") {
+                                  for (const sib of siblings) handleArchiveThread(sib.id);
+                                } else {
+                                  handleDeleteWorktreeGroup(
+                                    projectId,
+                                    wtPath,
+                                    siblings.map((s) => s.id),
+                                  );
+                                }
+                              },
+                            }
+                          : {})}
+                        onExpandToOverlay={() => setGitOverlayOpen(true)}
+                        onClose={() => setGitReviewContext(null)}
+                        hideHeader
+                      />
+                    </Suspense>
+                  ) : undefined
+                }
+                filesContent={
+                  filesPanelOpen && resolvedFilesPanelContext ? (
+                    <ProjectFilesPanel rootContext={resolvedFilesPanelContext} />
+                  ) : undefined
+                }
+                showGit={gitPanelOpen}
+                showFiles={filesPanelOpen}
+                projectName={
+                  rightPanelTab === "files"
+                    ? resolvedFilesPanelContext?.rootLabel
+                    : projects.find((p) => p.id === gitPanelContext?.projectId)?.name
+                }
+                onExpandGitToOverlay={() => setGitOverlayOpen(true)}
+                onExpandFilesToOverlay={() => setFileEditorOverlayMode("fullscreen")}
+                onOpenGit={() => {
+                  if (gitPanelContext) {
+                    setGitReviewContext(gitPanelContext);
+                    setGitReviewAsPanel(true);
+                    setRightPanelTab("git");
+                    return;
+                  }
+                  if (resolvedFilesPanelContext) {
+                    setGitReviewContext({
+                      projectId: resolvedFilesPanelContext.projectId,
+                      ...(resolvedFilesPanelContext.worktreePath
+                        ? { worktreePath: resolvedFilesPanelContext.worktreePath }
+                        : {}),
+                    });
+                    setGitReviewAsPanel(true);
+                    setRightPanelTab("git");
+                    return;
+                  }
+                  const firstProject = projects[0];
+                  if (firstProject) {
+                    setGitReviewContext({ projectId: firstProject.id });
+                    setGitReviewAsPanel(true);
+                    setRightPanelTab("git");
+                  }
+                }}
+                onOpenFiles={() => {
+                  if (resolvedFilesPanelContext) {
+                    setFilesPanelContext(resolvedFilesPanelContext);
+                    setRightPanelTab("files");
+                    return;
+                  }
+                  if (gitPanelContext) {
+                    openFilesPanel(gitPanelContext.projectId, gitPanelContext.worktreePath);
+                    return;
+                  }
+                  const firstProject = projects[0];
+                  if (firstProject) {
+                    openFilesPanel(firstProject.id);
+                  }
+                }}
+                onClose={closeAllPanels}
+              />
             ) : undefined
           }
-          gitPanelOpen={!isTerminalRight && gitPanelOpen}
+          gitPanelOpen={!isTerminalRight && (gitPanelOpen || filesPanelOpen)}
         />
       </AppDndProvider>
       <WelcomeOverlay />
@@ -2645,6 +2850,13 @@ export function App() {
             />
           </Suspense>
         )}
+      </OverlayShell>
+      <OverlayShell open={fileEditorOverlayMode === "fullscreen"}>
+        {fileEditorRootContext ? (
+          <Suspense>
+            <FileEditorOverlay onClose={() => setFileEditorOverlayMode(null)} />
+          </Suspense>
+        ) : null}
       </OverlayShell>
       {worktreeDeleteDialog?.kind === "single-thread" && (
         <DeleteWorktreeDialog

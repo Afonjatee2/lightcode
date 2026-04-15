@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -58,6 +58,7 @@ describe("sharedSettingsFile", () => {
       autoShowTerminalPanel: true,
       gitReviewMode: "panel",
       providerConfigs: {},
+      editorLspEnabled: false,
     });
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
@@ -93,7 +94,34 @@ describe("sharedSettingsFile", () => {
       autoShowTerminalPanel: true,
       gitReviewMode: "panel",
       providerConfigs: {},
+      editorLspEnabled: false,
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
+  });
+
+  it("preserves valid settings when provider configs contain invalid entries", () => {
+    const settingsPath = join(makeTempDir(), "settings.json");
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        themeMode: "dark",
+        terminalPosition: "right",
+        autoShowTerminalPanel: false,
+        providerConfigs: {
+          codex: {
+            model: "",
+            effort: "high",
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    expect(readSharedSettingsFile(settingsPath)).toMatchObject({
+      themeMode: "dark",
+      terminalPosition: "right",
+      autoShowTerminalPanel: false,
+      providerConfigs: {},
+    });
   });
 });

@@ -190,6 +190,24 @@ describe("detectCodexTerminalStatus", () => {
     });
   });
 
+  it("treats the question flow as needs_reply even when esc to interrupt is visible", () => {
+    const text = [
+      "Question 1/2 (2 unanswered)",
+      "For the project tree search, what should v1 search across?",
+      "",
+      "1. Path names only (Recommended)",
+      "2. Contents only",
+      "",
+      "tab to add notes | enter to submit answer | ←/→ to navigate questions | esc to interrupt",
+    ].join("\n");
+
+    expect(detectCodexTerminalStatus(text)).toEqual({
+      status: "needs_reply",
+      attention: "needs_reply",
+      corroborated: true,
+    });
+  });
+
   it("detects working from the visible Codex status line", () => {
     const text = [
       "• Hi.",
@@ -199,6 +217,26 @@ describe("detectCodexTerminalStatus", () => {
       "› Explain this codebase",
       "",
       "gpt-5.4 medium · ~\\work\\lightcode · master",
+    ].join("\n");
+
+    expect(detectCodexTerminalStatus(text)).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: true,
+    });
+  });
+
+  it("keeps answered-question summaries in working when the active status line is still visible", () => {
+    const text = [
+      "Two product choices still affect the scope quite a bit, so I want to lock them before I write the implementation plan.",
+      "",
+      "Questions 2/2 answered",
+      "For the project tree search, what should v1 search across?",
+      "answer: Path names only (Recommended)",
+      "Where should the sidebar folder icon appear?",
+      "answer: Project + worktree headers (Recommended)",
+      "",
+      "Working (3m 38s • esc to interrupt)",
     ].join("\n");
 
     expect(detectCodexTerminalStatus(text)).toEqual({

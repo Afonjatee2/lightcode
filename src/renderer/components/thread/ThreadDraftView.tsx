@@ -237,7 +237,6 @@ export function ThreadDraftView(props: {
             behind: result.behind,
           });
         }
-        store.setBranches(project.id, result.branches);
       })
       .catch((err: unknown) => {
         console.error("[git] switch branch failed", err);

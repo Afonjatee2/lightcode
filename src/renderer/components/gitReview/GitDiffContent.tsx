@@ -315,8 +315,9 @@ function SingleFileDiff(props: {
   filePath: string;
   staged: boolean;
   diffMode: number;
+  refreshKey: number;
 }) {
-  const { project, filePath, staged, diffMode } = props;
+  const { project, filePath, staged, diffMode, refreshKey } = props;
   const theme = useDiffTheme();
   const [diffFile, setDiffFile] = useState<DiffFile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -358,7 +359,7 @@ function SingleFileDiff(props: {
     return () => {
       cancelled = true;
     };
-  }, [filePath, staged, project.id, project.location]);
+  }, [filePath, staged, project.id, project.location, refreshKey]);
 
   return (
     <div className="absolute inset-0 z-10 overflow-y-auto bg-background px-4">
@@ -409,10 +410,13 @@ export function GitDiffContent(props: {
   const [panelReady, setPanelReady] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const statusKeyRef = useRef<string | null>(null);
+  const refreshKeyRef = useRef(refreshKey);
 
   // Load batch diffs, then build DiffFile instances in a Web Worker
   useEffect(() => {
     let cancelled = false;
+    const forceRefresh = refreshKeyRef.current !== refreshKey;
+    refreshKeyRef.current = refreshKey;
 
     async function loadDiffs() {
       if (!gitStatus?.isRepo) {
@@ -425,7 +429,7 @@ export function GitDiffContent(props: {
       }
 
       const statusKey = buildGitStatusKey(gitStatus);
-      if (statusKeyRef.current === statusKey) {
+      if (!forceRefresh && statusKeyRef.current === statusKey) {
         return;
       }
 
@@ -574,6 +578,7 @@ export function GitDiffContent(props: {
           filePath={selectedFile}
           staged={selectedStaged}
           diffMode={diffMode}
+          refreshKey={refreshKey}
         />
       )}
     </div>

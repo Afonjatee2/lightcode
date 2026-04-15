@@ -265,7 +265,7 @@ describe("GitService.commit", () => {
     vi.clearAllMocks();
   });
 
-  it("passes WSL commit messages as direct arguments without shell wrapping", async () => {
+  it("runs WSL commits through a login shell so hooks see the Linux toolchain", async () => {
     mockGitCommands((args) => {
       if (args[0] === "-d") {
         return { stdout: "[main abc1234] feat(dashboard): add taxonomy filters\n" };
@@ -287,13 +287,35 @@ describe("GitService.commit", () => {
     );
 
     expect(result).toEqual({ hash: "abc1234" });
-    expect(execFileMock).toHaveBeenCalledWith(
-      expect.stringContaining("wsl"),
-      ["-d", "Ubuntu", "--cd", "/home/demo/work/repo", "--", "git", "commit", "-m", message],
+    const commitCall = execFileMock.mock.calls.find(
+      (call: unknown[]) =>
+        String(call[0]).includes("wsl") &&
+        Array.isArray(call[1]) &&
+        (call[1] as string[])[0] === "-d" &&
+        (call[1] as string[])[1] === "Ubuntu",
+    );
+    expect(commitCall).toBeDefined();
+    expect(commitCall![1]).toEqual(
+      expect.arrayContaining([
+        "-d",
+        "Ubuntu",
+        "--cd",
+        "/home/demo/work/repo",
+        "--",
+        "-l",
+        "-i",
+        "-c",
+      ]),
+    );
+    const commandArgs = commitCall![1] as string[];
+    expect(commandArgs[4]).toBe("--");
+    expect(commandArgs[commandArgs.length - 1]).toBe(
+      `export GIT_OPTIONAL_LOCKS='0'; exec 'git' 'commit' '-m' '${message.replaceAll("'", "'\\''")}'`,
+    );
+    expect(commitCall![2]).toEqual(
       expect.objectContaining({
         windowsHide: true,
       }),
-      expect.any(Function),
     );
   });
 });

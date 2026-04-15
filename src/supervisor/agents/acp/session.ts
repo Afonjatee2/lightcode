@@ -34,6 +34,7 @@ import type {
   ThreadServerRequestId,
   ThreadStatus,
 } from "../../../shared/contracts";
+import { terminateChildProcessTree } from "../../../shared/processTree";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,
@@ -507,7 +508,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     // and the connection may already be closing. Just kill the process.
 
     if (!this.child.killed) {
-      this.child.kill();
+      terminateChildProcessTree(this.child);
     }
   }
 

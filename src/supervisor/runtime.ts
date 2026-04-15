@@ -20,6 +20,9 @@ import {
   agentCapabilitySchema,
   agentSettingDefSchema,
 } from "../shared/contracts";
+import { terminateProcessTree } from "../shared/processTree";
+import type { LspStartPayload, LspStopPayload, LspMessagePayload } from "../shared/lsp";
+import { LanguageServerManager } from "./lsp";
 import { z } from "zod";
 import type {
   AgentKind,
@@ -53,6 +56,7 @@ import type {
   GitSyncResult,
   DetectSetupScriptPayload,
   DetectSetupScriptResult,
+  DeleteProjectEntryPayload,
   GhCheckAvailableResult,
   GhCreatePrPayload,
   GhGetPrForBranchPayload,
@@ -64,6 +68,11 @@ import type {
   PrData,
   SearchProjectFilesPayload,
   SearchProjectFilesResult,
+  SearchProjectTreePayload,
+  SearchProjectTreeResult,
+  ReadProjectFilePayload,
+  ReadProjectFileResult,
+  RenameProjectEntryPayload,
   GitAddWorktreePayload,
   GitPruneWorktreesPayload,
   GitBranchListResult,
@@ -92,6 +101,10 @@ import type {
   GitWorktreeListResult,
   GetGitBranchesPayload,
   ProjectLocation,
+  CreateProjectEntryPayload,
+  ListProjectTreePayload,
+  ListProjectTreeResult,
+  MoveProjectEntryPayload,
   ResizeTerminalPayload,
   ResolveThreadServerRequestPayload,
   SendThreadInputPayload,
@@ -106,6 +119,8 @@ import type {
   ThreadStatus,
   WriteTerminalPayload,
   PromptSegment,
+  WriteProjectFilePayload,
+  WriteProjectFileResult,
 } from "../shared/contracts";
 import type { SupervisorEvent } from "../shared/ipc";
 import { stripAnsiPreservingLayout } from "../shared/ansi";
@@ -119,6 +134,7 @@ import {
   type AgentEnvContext,
   type CommandSpec,
   type StructuredSessionHandle,
+  type TerminalStatusHint,
   defaultFormatPromptSegments,
   getWslCommand,
   injectWslEnv,
@@ -132,6 +148,7 @@ import { GitService } from "./git";
 import { GitWatcher } from "./gitWatcher";
 import { GitHubService } from "./github";
 import { FileIndexService } from "./fileIndex";
+import { ProjectTreeService } from "./projectTree";
 import { detectWindowsShell, type WindowsShellPreference } from "./shellPreference";
 
 /**
@@ -161,7 +178,7 @@ const UNCORROBORATED_EXTRA_DELAY: Partial<Record<ThreadStatus, number>> = {
  * signal that the agent has finished but the TUI didn't render a recognisable
  * idle prompt (e.g. Copilot skipping the "Type @" placeholder).
  */
-const WORKING_SILENCE_TIMEOUT = 2000;
+const DEFAULT_WORKING_SILENCE_TIMEOUT = 2000;
 
 interface SessionRuntime {
   instanceId: string;
@@ -415,6 +432,7 @@ export class SupervisorRuntime {
   private _gitWatcher: GitWatcher | undefined;
   private readonly githubService = new GitHubService();
   private readonly fileIndexService = new FileIndexService();
+  private readonly projectTreeService = new ProjectTreeService();
   private readonly adapters = new Map(
     createAgentRegistry().map((adapter) => [adapter.kind, adapter]),
   );
@@ -423,6 +441,7 @@ export class SupervisorRuntime {
   private readonly startLocks = new Map<string, Promise<void>>();
   private readonly windowsShell: WindowsShellPreference;
   private readonly statusCachePath: string;
+  private readonly lspManager: LanguageServerManager;
 
   /** Lazy-initialized on first watch request — no cost if git features aren't used during startup. */
   private get gitWatcher(): GitWatcher {
@@ -442,6 +461,7 @@ export class SupervisorRuntime {
     this.statusCachePath = paths.statusCachePath;
     mkdirSync(paths.cacheDir, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
+    this.lspManager = new LanguageServerManager(emit);
 
     // Only detect Windows shell on Windows platform
     if (process.platform === "win32") {
@@ -1312,6 +1332,38 @@ export class SupervisorRuntime {
     return this.fileIndexService.searchProjectFiles(payload);
   }
 
+  async listProjectTree(payload: ListProjectTreePayload): Promise<ListProjectTreeResult> {
+    return this.projectTreeService.listProjectTree(payload);
+  }
+
+  async searchProjectTree(payload: SearchProjectTreePayload): Promise<SearchProjectTreeResult> {
+    return this.projectTreeService.searchProjectTree(payload);
+  }
+
+  async readProjectFile(payload: ReadProjectFilePayload): Promise<ReadProjectFileResult> {
+    return this.projectTreeService.readProjectFile(payload);
+  }
+
+  async writeProjectFile(payload: WriteProjectFilePayload): Promise<WriteProjectFileResult> {
+    return this.projectTreeService.writeProjectFile(payload);
+  }
+
+  async createProjectEntry(payload: CreateProjectEntryPayload): Promise<void> {
+    return this.projectTreeService.createProjectEntry(payload);
+  }
+
+  async renameProjectEntry(payload: RenameProjectEntryPayload): Promise<void> {
+    return this.projectTreeService.renameProjectEntry(payload);
+  }
+
+  async moveProjectEntry(payload: MoveProjectEntryPayload): Promise<void> {
+    return this.projectTreeService.moveProjectEntry(payload);
+  }
+
+  async deleteProjectEntry(payload: DeleteProjectEntryPayload): Promise<void> {
+    return this.projectTreeService.deleteProjectEntry(payload);
+  }
+
   async detectSetupScript(payload: DetectSetupScriptPayload): Promise<DetectSetupScriptResult> {
     // Lock files in priority order — first match wins.
     const candidates: { file: string; command: string }[] = [
@@ -1366,7 +1418,20 @@ export class SupervisorRuntime {
     await session.structuredSession.resolveServerRequest(payload.requestId, payload.response);
   }
 
+  async lspStart(payload: LspStartPayload): Promise<void> {
+    await this.lspManager.start(payload);
+  }
+
+  async lspStop(payload: LspStopPayload): Promise<void> {
+    await this.lspManager.stop(payload);
+  }
+
+  async lspSendMessage(payload: LspMessagePayload): Promise<unknown> {
+    return this.lspManager.sendMessage(payload);
+  }
+
   dispose(): void {
+    this.lspManager.dispose();
     this._gitWatcher?.dispose();
 
     for (const session of this.sessions.values()) {
@@ -1388,7 +1453,7 @@ export class SupervisorRuntime {
       return;
     }
     if (process.platform === "win32") {
-      this.terminateWindowsProcessTree(session.pty.pid);
+      terminateProcessTree(session.pty.pid);
       return;
     }
     try {
@@ -1406,7 +1471,7 @@ export class SupervisorRuntime {
       return;
     }
     if (process.platform === "win32") {
-      this.terminateWindowsProcessTree(session.pty.pid);
+      terminateProcessTree(session.pty.pid);
       return;
     }
     try {
@@ -1415,33 +1480,6 @@ export class SupervisorRuntime {
       return;
     }
     session.pty.kill();
-  }
-
-  private terminateWindowsProcessTree(pid: number): void {
-    if (!Number.isInteger(pid) || pid <= 0) {
-      return;
-    }
-    try {
-      process.kill(pid, 0);
-    } catch {
-      return;
-    }
-
-    // Avoid node-pty's ConPTY kill path on Windows. It forks a console-list
-    // agent that can throw AttachConsole errors during shutdown.
-    const result = spawnSync("taskkill", ["/PID", String(pid), "/T", "/F"], {
-      stdio: "ignore",
-      windowsHide: true,
-    });
-    if (!result.error && result.status === 0) {
-      return;
-    }
-
-    try {
-      process.kill(pid);
-    } catch {
-      // Best effort — the process may already be gone.
-    }
   }
 
   private buildShellCommand(location: ProjectLocation): {
@@ -1983,6 +2021,18 @@ export class SupervisorRuntime {
     });
   }
 
+  private getLatestTerminalStatusHint(session: SessionRuntime): TerminalStatusHint | null {
+    if (
+      session.adapter.capabilities.presentationMode !== "terminal" ||
+      !session.adapter.detectTerminalStatus ||
+      session.prevChunk.length === 0
+    ) {
+      return null;
+    }
+
+    return session.adapter.detectTerminalStatus(stripAnsiPreservingLayout(session.prevChunk));
+  }
+
   private updateState(
     session: SessionRuntime,
     status: ThreadStatus,
@@ -2226,22 +2276,33 @@ export class SupervisorRuntime {
       }
 
       // ── Working-silence watchdog ─────────────────────────────────
-      // TUI spinners emit data every ~100 ms while the agent is working.
-      // If the PTY goes completely silent for WORKING_SILENCE_TIMEOUT ms
-      // and the session is still "working", the agent almost certainly
-      // finished but the TUI didn't render a recognisable idle prompt.
+      // TUI spinners usually emit data every ~100 ms while the agent is working.
+      // Some TUIs can legitimately stay quiet mid-turn, so the silence fallback
+      // is adapter-configurable and can be disabled when it is unreliable.
       // Reset the watchdog on every data chunk; fire → transition to idle.
       if (session.workingSilenceTimer) {
         clearTimeout(session.workingSilenceTimer);
         session.workingSilenceTimer = undefined;
       }
-      if (session.status === "working") {
+      const workingSilenceTimeoutMs =
+        session.adapter.workingSilenceTimeoutMs === undefined
+          ? DEFAULT_WORKING_SILENCE_TIMEOUT
+          : session.adapter.workingSilenceTimeoutMs;
+      if (
+        session.status === "working" &&
+        workingSilenceTimeoutMs !== null &&
+        workingSilenceTimeoutMs > 0
+      ) {
         session.workingSilenceTimer = setTimeout(() => {
           session.workingSilenceTimer = undefined;
           if (session.status === "working") {
+            const latestHint = this.getLatestTerminalStatusHint(session);
+            if (latestHint && latestHint.status !== "idle" && latestHint.corroborated !== false) {
+              return;
+            }
             this.updateState(session, "idle", "none");
           }
-        }, WORKING_SILENCE_TIMEOUT);
+        }, workingSilenceTimeoutMs);
       }
 
       if (session.pendingLaunchPrompt && session.adapter.isReadyForInitialPrompt?.(strippedData)) {

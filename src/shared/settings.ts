@@ -53,6 +53,8 @@ export const sharedSettingsSchema = z.object({
   gitReviewMode: gitReviewModeSchema,
   /** Per-provider last-used draft config (model, effort, mode, etc.). App-wide. */
   providerConfigs: z.record(z.string(), providerDraftConfigSchema),
+  /** Enable LSP language servers for the file editor (type checking, completions, etc.). */
+  editorLspEnabled: z.boolean(),
 });
 export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 
@@ -89,60 +91,183 @@ export const defaultSharedSettings: SharedSettings = {
   autoShowTerminalPanel: true,
   gitReviewMode: "panel",
   providerConfigs: {},
+  editorLspEnabled: false,
 };
 
-const partialSharedSettingsSchema = sharedSettingsSchema.partial();
+function parseSettingOrDefault<T>(schema: z.ZodType<T>, value: unknown, fallback: T): T {
+  const parsed = schema.safeParse(value);
+  return parsed.success ? parsed.data : fallback;
+}
 
 export function normalizeSharedSettings(value: unknown): SharedSettings {
-  const parsed = partialSharedSettingsSchema.safeParse(value);
-  if (!parsed.success) {
-    return { ...defaultSharedSettings };
-  }
+  const parsed = z.record(z.string(), z.unknown()).safeParse(value);
+  const data = parsed.success ? parsed.data : {};
 
   return {
-    themeMode: parsed.data.themeMode ?? defaultSharedSettings.themeMode,
-    terminalPosition: parsed.data.terminalPosition ?? defaultSharedSettings.terminalPosition,
-    commitGenProvider: parsed.data.commitGenProvider ?? defaultSharedSettings.commitGenProvider,
-    commitGenModel: parsed.data.commitGenModel ?? defaultSharedSettings.commitGenModel,
-    commitGenEffort: parsed.data.commitGenEffort ?? defaultSharedSettings.commitGenEffort,
-    titleGenProvider: parsed.data.titleGenProvider ?? defaultSharedSettings.titleGenProvider,
-    titleGenModel: parsed.data.titleGenModel ?? defaultSharedSettings.titleGenModel,
-    titleGenEffort: parsed.data.titleGenEffort ?? defaultSharedSettings.titleGenEffort,
-    conflictResolverProvider:
-      parsed.data.conflictResolverProvider ?? defaultSharedSettings.conflictResolverProvider,
-    conflictResolverModel:
-      parsed.data.conflictResolverModel ?? defaultSharedSettings.conflictResolverModel,
-    conflictResolverEffort:
-      parsed.data.conflictResolverEffort ?? defaultSharedSettings.conflictResolverEffort,
-    wslCommitGenProvider:
-      parsed.data.wslCommitGenProvider ?? defaultSharedSettings.wslCommitGenProvider,
-    wslCommitGenModel: parsed.data.wslCommitGenModel ?? defaultSharedSettings.wslCommitGenModel,
-    wslCommitGenEffort: parsed.data.wslCommitGenEffort ?? defaultSharedSettings.wslCommitGenEffort,
-    wslTitleGenProvider:
-      parsed.data.wslTitleGenProvider ?? defaultSharedSettings.wslTitleGenProvider,
-    wslTitleGenModel: parsed.data.wslTitleGenModel ?? defaultSharedSettings.wslTitleGenModel,
-    wslTitleGenEffort: parsed.data.wslTitleGenEffort ?? defaultSharedSettings.wslTitleGenEffort,
-    wslConflictResolverProvider:
-      parsed.data.wslConflictResolverProvider ?? defaultSharedSettings.wslConflictResolverProvider,
-    wslConflictResolverModel:
-      parsed.data.wslConflictResolverModel ?? defaultSharedSettings.wslConflictResolverModel,
-    wslConflictResolverEffort:
-      parsed.data.wslConflictResolverEffort ?? defaultSharedSettings.wslConflictResolverEffort,
-    agentSettings: parsed.data.agentSettings ?? defaultSharedSettings.agentSettings,
-    hiddenModels: parsed.data.hiddenModels ?? defaultSharedSettings.hiddenModels,
-    disabledAgents: parsed.data.disabledAgents ?? defaultSharedSettings.disabledAgents,
-    collapseTerminalComposer:
-      parsed.data.collapseTerminalComposer ?? defaultSharedSettings.collapseTerminalComposer,
-    staleThreadUnloadMinutes:
-      parsed.data.staleThreadUnloadMinutes ?? defaultSharedSettings.staleThreadUnloadMinutes,
-    scrollSpeed: parsed.data.scrollSpeed ?? defaultSharedSettings.scrollSpeed,
-    preventSleepWhileWorking:
-      parsed.data.preventSleepWhileWorking ?? defaultSharedSettings.preventSleepWhileWorking,
-    threadRemoveAction: parsed.data.threadRemoveAction ?? defaultSharedSettings.threadRemoveAction,
-    newThreadMode: parsed.data.newThreadMode ?? defaultSharedSettings.newThreadMode,
-    autoShowTerminalPanel:
-      parsed.data.autoShowTerminalPanel ?? defaultSharedSettings.autoShowTerminalPanel,
-    gitReviewMode: parsed.data.gitReviewMode ?? defaultSharedSettings.gitReviewMode,
-    providerConfigs: parsed.data.providerConfigs ?? defaultSharedSettings.providerConfigs,
+    themeMode: parseSettingOrDefault(
+      sharedSettingsSchema.shape.themeMode,
+      data.themeMode,
+      defaultSharedSettings.themeMode,
+    ),
+    terminalPosition: parseSettingOrDefault(
+      sharedSettingsSchema.shape.terminalPosition,
+      data.terminalPosition,
+      defaultSharedSettings.terminalPosition,
+    ),
+    commitGenProvider: parseSettingOrDefault(
+      sharedSettingsSchema.shape.commitGenProvider,
+      data.commitGenProvider,
+      defaultSharedSettings.commitGenProvider,
+    ),
+    commitGenModel: parseSettingOrDefault(
+      sharedSettingsSchema.shape.commitGenModel,
+      data.commitGenModel,
+      defaultSharedSettings.commitGenModel,
+    ),
+    commitGenEffort: parseSettingOrDefault(
+      sharedSettingsSchema.shape.commitGenEffort,
+      data.commitGenEffort,
+      defaultSharedSettings.commitGenEffort,
+    ),
+    titleGenProvider: parseSettingOrDefault(
+      sharedSettingsSchema.shape.titleGenProvider,
+      data.titleGenProvider,
+      defaultSharedSettings.titleGenProvider,
+    ),
+    titleGenModel: parseSettingOrDefault(
+      sharedSettingsSchema.shape.titleGenModel,
+      data.titleGenModel,
+      defaultSharedSettings.titleGenModel,
+    ),
+    titleGenEffort: parseSettingOrDefault(
+      sharedSettingsSchema.shape.titleGenEffort,
+      data.titleGenEffort,
+      defaultSharedSettings.titleGenEffort,
+    ),
+    conflictResolverProvider: parseSettingOrDefault(
+      sharedSettingsSchema.shape.conflictResolverProvider,
+      data.conflictResolverProvider,
+      defaultSharedSettings.conflictResolverProvider,
+    ),
+    conflictResolverModel: parseSettingOrDefault(
+      sharedSettingsSchema.shape.conflictResolverModel,
+      data.conflictResolverModel,
+      defaultSharedSettings.conflictResolverModel,
+    ),
+    conflictResolverEffort: parseSettingOrDefault(
+      sharedSettingsSchema.shape.conflictResolverEffort,
+      data.conflictResolverEffort,
+      defaultSharedSettings.conflictResolverEffort,
+    ),
+    wslCommitGenProvider: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslCommitGenProvider,
+      data.wslCommitGenProvider,
+      defaultSharedSettings.wslCommitGenProvider,
+    ),
+    wslCommitGenModel: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslCommitGenModel,
+      data.wslCommitGenModel,
+      defaultSharedSettings.wslCommitGenModel,
+    ),
+    wslCommitGenEffort: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslCommitGenEffort,
+      data.wslCommitGenEffort,
+      defaultSharedSettings.wslCommitGenEffort,
+    ),
+    wslTitleGenProvider: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslTitleGenProvider,
+      data.wslTitleGenProvider,
+      defaultSharedSettings.wslTitleGenProvider,
+    ),
+    wslTitleGenModel: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslTitleGenModel,
+      data.wslTitleGenModel,
+      defaultSharedSettings.wslTitleGenModel,
+    ),
+    wslTitleGenEffort: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslTitleGenEffort,
+      data.wslTitleGenEffort,
+      defaultSharedSettings.wslTitleGenEffort,
+    ),
+    wslConflictResolverProvider: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslConflictResolverProvider,
+      data.wslConflictResolverProvider,
+      defaultSharedSettings.wslConflictResolverProvider,
+    ),
+    wslConflictResolverModel: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslConflictResolverModel,
+      data.wslConflictResolverModel,
+      defaultSharedSettings.wslConflictResolverModel,
+    ),
+    wslConflictResolverEffort: parseSettingOrDefault(
+      sharedSettingsSchema.shape.wslConflictResolverEffort,
+      data.wslConflictResolverEffort,
+      defaultSharedSettings.wslConflictResolverEffort,
+    ),
+    agentSettings: parseSettingOrDefault(
+      sharedSettingsSchema.shape.agentSettings,
+      data.agentSettings,
+      defaultSharedSettings.agentSettings,
+    ),
+    hiddenModels: parseSettingOrDefault(
+      sharedSettingsSchema.shape.hiddenModels,
+      data.hiddenModels,
+      defaultSharedSettings.hiddenModels,
+    ),
+    disabledAgents: parseSettingOrDefault(
+      sharedSettingsSchema.shape.disabledAgents,
+      data.disabledAgents,
+      defaultSharedSettings.disabledAgents,
+    ),
+    collapseTerminalComposer: parseSettingOrDefault(
+      sharedSettingsSchema.shape.collapseTerminalComposer,
+      data.collapseTerminalComposer,
+      defaultSharedSettings.collapseTerminalComposer,
+    ),
+    staleThreadUnloadMinutes: parseSettingOrDefault(
+      sharedSettingsSchema.shape.staleThreadUnloadMinutes,
+      data.staleThreadUnloadMinutes,
+      defaultSharedSettings.staleThreadUnloadMinutes,
+    ),
+    scrollSpeed: parseSettingOrDefault(
+      sharedSettingsSchema.shape.scrollSpeed,
+      data.scrollSpeed,
+      defaultSharedSettings.scrollSpeed,
+    ),
+    preventSleepWhileWorking: parseSettingOrDefault(
+      sharedSettingsSchema.shape.preventSleepWhileWorking,
+      data.preventSleepWhileWorking,
+      defaultSharedSettings.preventSleepWhileWorking,
+    ),
+    threadRemoveAction: parseSettingOrDefault(
+      sharedSettingsSchema.shape.threadRemoveAction,
+      data.threadRemoveAction,
+      defaultSharedSettings.threadRemoveAction,
+    ),
+    newThreadMode: parseSettingOrDefault(
+      sharedSettingsSchema.shape.newThreadMode,
+      data.newThreadMode,
+      defaultSharedSettings.newThreadMode,
+    ),
+    autoShowTerminalPanel: parseSettingOrDefault(
+      sharedSettingsSchema.shape.autoShowTerminalPanel,
+      data.autoShowTerminalPanel,
+      defaultSharedSettings.autoShowTerminalPanel,
+    ),
+    gitReviewMode: parseSettingOrDefault(
+      sharedSettingsSchema.shape.gitReviewMode,
+      data.gitReviewMode,
+      defaultSharedSettings.gitReviewMode,
+    ),
+    providerConfigs: parseSettingOrDefault(
+      sharedSettingsSchema.shape.providerConfigs,
+      data.providerConfigs,
+      defaultSharedSettings.providerConfigs,
+    ),
+    editorLspEnabled: parseSettingOrDefault(
+      sharedSettingsSchema.shape.editorLspEnabled,
+      data.editorLspEnabled,
+      defaultSharedSettings.editorLspEnabled,
+    ),
   };
 }

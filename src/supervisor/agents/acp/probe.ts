@@ -18,6 +18,7 @@ import {
   type SessionMode,
 } from "@agentclientprotocol/sdk";
 import type { ThreadMode } from "../../../shared/contracts";
+import { terminateChildProcessTree } from "../../../shared/processTree";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -299,7 +300,7 @@ export async function probeAcpCapabilities(
       } catch {
         /* ignore */
       }
-      child.kill();
+      terminateChildProcessTree(child);
     }
   }
 }
