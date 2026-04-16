@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "./state/appStore";
@@ -105,10 +105,37 @@ vi.mock("./components/layout/AppShell", () => ({
 }));
 
 vi.mock("./components/layout/SplitPaneContainer", () => ({
-  SplitPaneContainer: (props: { children: ReactNode }) => <div>{props.children}</div>,
+  SplitPaneContainer: (props: {
+    layout: { kind: "leaf"; paneId: string } | { kind: "split"; children: unknown[] };
+    renderPane: (paneId: string) => ReactNode;
+  }) => {
+    const renderAll = (
+      layout: { kind: "leaf"; paneId: string } | { kind: "split"; children: unknown[] },
+    ): ReactNode =>
+      layout.kind === "leaf"
+        ? props.renderPane(layout.paneId)
+        : (
+            layout.children as (
+              | { kind: "leaf"; paneId: string }
+              | { kind: "split"; children: unknown[] }
+            )[]
+          ).map((child, index) => <Fragment key={index}>{renderAll(child)}</Fragment>);
+    return <div>{renderAll(props.layout)}</div>;
+  },
 }));
 
 vi.mock("./components/sidebar/Sidebar", () => ({
+  sortModeOrder: ["updated", "created", "manual"],
+  sortModeIcon: {
+    updated: (props: { className?: string }) => <span {...props}>u</span>,
+    created: (props: { className?: string }) => <span {...props}>c</span>,
+    manual: (props: { className?: string }) => <span {...props}>m</span>,
+  },
+  sortModeLabel: {
+    updated: "Updated",
+    created: "Created",
+    manual: "Manual",
+  },
   Sidebar: (props: {
     onOpenThread?: (threadId: string) => void;
     onOpenThreadSideBySide?: (threadId: string) => void;

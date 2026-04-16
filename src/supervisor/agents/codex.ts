@@ -1400,12 +1400,12 @@ export function createCodexAdapter(): AgentAdapter {
     },
     buildTerminalPreInputs(config) {
       if (config.mode === "plan") {
-        return [["/plan", "@wait:80", "\r"]];
+        return [["/plan", "@wait:160", "\r"]];
       }
       return undefined;
     },
     buildDirectInput(prompt) {
-      return [prompt, "@wait:80", "\r"];
+      return [prompt, "@wait:160", "\r"];
     },
     isReadyForInitialPrompt(text) {
       return detectCodexReadyForInitialPrompt(text);

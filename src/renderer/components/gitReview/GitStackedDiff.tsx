@@ -161,7 +161,7 @@ export function StackedFileCard(props: {
         <div
           role="button"
           tabIndex={0}
-          className="group flex cursor-pointer select-none items-center gap-1.5 px-3 py-1 text-xs transition-colors hover:bg-white/[0.04]"
+          className="sticky top-0 z-10 bg-background group flex cursor-pointer select-none items-center gap-1.5 px-3 py-1 text-xs transition-colors hover:bg-content2"
           onClick={() => setExpanded((v) => !v)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {

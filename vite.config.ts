@@ -79,7 +79,7 @@ export default defineConfig({
   server: {
     forwardConsole: true,
     host: "127.0.0.1",
-    port: 5173,
+    port: 3100,
     strictPort: true,
   },
 });

@@ -136,7 +136,13 @@ export function ThreadDraftView(props: {
   paneAlign?: "left" | "center" | "right";
   showCloseButton?: boolean;
   isDragging?: boolean;
-  dropIndicator?: false | "replace" | "insert-left" | "insert-right";
+  dropIndicator?:
+    | false
+    | "replace"
+    | "insert-left"
+    | "insert-right"
+    | "insert-top"
+    | "insert-bottom";
   paneIndex?: number;
   paneCount?: number;
   droppableRef?: React.RefObject<HTMLDivElement | null>;
@@ -481,19 +487,30 @@ export function ThreadDraftView(props: {
             className="pointer-events-none absolute inset-0 z-20 rounded-2xl bg-accent/10 ring-1 ring-inset ring-accent/30"
           />
         )}
-        {props.dropIndicator === "insert-left" && props.paneIndex === 0 && (
+        {props.dropIndicator === "insert-left" && (
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute top-0 bottom-0 -left-1 z-20 w-0.5 rounded-full bg-accent"
+            className="pointer-events-none absolute top-0 bottom-0 left-0 z-20 w-0.5 rounded-full bg-accent"
           />
         )}
-        {props.dropIndicator === "insert-right" &&
-          (props.paneIndex === undefined || props.paneIndex === (props.paneCount ?? 1) - 1) && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute top-0 bottom-0 -right-1 z-20 w-0.5 rounded-full bg-accent"
-            />
-          )}
+        {props.dropIndicator === "insert-right" && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 right-0 bottom-0 z-20 w-0.5 rounded-full bg-accent"
+          />
+        )}
+        {props.dropIndicator === "insert-top" && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 right-0 left-0 z-20 h-0.5 rounded-full bg-accent"
+          />
+        )}
+        {props.dropIndicator === "insert-bottom" && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute right-0 bottom-0 left-0 z-20 h-0.5 rounded-full bg-accent"
+          />
+        )}
         {/* Center area — logo */}
         <div className="flex flex-1 flex-col items-center justify-center">
           <div className="w-full max-w-[920px] overflow-visible pb-[0.32em] text-center">

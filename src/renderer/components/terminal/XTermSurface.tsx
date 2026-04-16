@@ -322,6 +322,13 @@ export const XTermSurface = forwardRef<
         return false;
       }
 
+      // ── Close pane: Ctrl+W / Cmd+W ─────────────────────────────
+      // Let the event bubble to the window handler instead of
+      // being consumed as terminal word-erase.
+      if (event.code === "KeyW") {
+        return false;
+      }
+
       // ── Copy: Ctrl+C / Cmd+C ───────────────────────────────────
       if (event.code === "KeyC") {
         if (terminal.hasSelection()) {

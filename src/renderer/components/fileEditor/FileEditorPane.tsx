@@ -7,7 +7,7 @@ import type { editor as MonacoEditor } from "monaco-editor";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { useSharedSettings } from "../../state/sharedSettingsStore";
 import { useFileEditorStore } from "../../state/fileEditorStore";
-import { useDndContext, type DragSourceData } from "../../dnd";
+import { useIsDraggingEditorTab, type DragSourceData } from "../../dnd";
 import { lspOrchestrator } from "../../lsp";
 
 const LANG_MAP: Record<string, string> = {
@@ -166,8 +166,7 @@ function SortableTab(props: {
     data: { type: "editor-tab", path: props.path } satisfies DragSourceData,
   });
 
-  const { source } = useDndContext();
-  const isDragging = source?.type === "editor-tab" && source.path === props.path;
+  const isDragging = useIsDraggingEditorTab(props.path);
 
   return (
     <div

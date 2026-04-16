@@ -1,66 +1,148 @@
-import React, { Children, type ReactNode, useEffect, useRef, useState } from "react";
-import { useDndContext } from "../../dnd";
+import React, { useEffect, useRef, useState } from "react";
+import { useDroppable } from "@dnd-kit/react";
+import type { PaneLayout, PaneLayoutAxis } from "../../../shared/paneLayout";
+import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "../../dnd";
 
 const MIN_PANE_PERCENT = 15;
+const ROOT_INSERT_ZONE_SIZE = 12;
+const ROOT_INSERT_ZONE_INSET = ROOT_INSERT_ZONE_SIZE / 2;
 
 function equalSizes(count: number): number[] {
   return Array.from({ length: count }, () => 100 / count);
 }
 
-export function SplitPaneContainer(props: { children: ReactNode }) {
-  const items = Children.toArray(props.children).filter(Boolean);
-  const count = items.length;
+function SplitDivider(props: {
+  path: number[];
+  axis: PaneLayoutAxis;
+  index: number;
+  onPointerDown: (event: React.MouseEvent) => void;
+}) {
+  const zoneId = `split-divider:${props.axis}:${props.path.join("-")}:${props.index}`;
+  const elementRef = useRef<HTMLDivElement>(null);
+  useDroppable({
+    id: `pane-insert:${props.axis}:${props.path.join("-")}:${props.index}`,
+    accept: ["pane", "thread", "new-thread"],
+    data: {
+      type: "pane-insert-zone",
+      path: props.path,
+      axis: props.axis,
+      index: props.index,
+      zoneId,
+    },
+    element: elementRef,
+  });
+  const isHighlighted = useIsInsertSplitHighlighted(zoneId);
+
+  return (
+    <div
+      ref={elementRef}
+      className={`${
+        props.axis === "vertical" ? "lightcode-pane-divider" : "lightcode-pane-divider-horizontal"
+      } ${isHighlighted ? "is-highlighted" : ""}`}
+      onMouseDown={props.onPointerDown}
+      role="separator"
+      aria-orientation={props.axis === "vertical" ? "vertical" : "horizontal"}
+      aria-label={props.axis === "vertical" ? "Resize column" : "Resize row"}
+    />
+  );
+}
+
+function RootInsertZone(props: {
+  axis: PaneLayoutAxis;
+  index: number;
+  side: "top" | "right" | "bottom" | "left";
+}) {
+  const zoneId = `root-insert:${props.side}`;
+  const elementRef = useRef<HTMLDivElement>(null);
+  useDroppable({
+    id: `pane-root-insert:${props.side}`,
+    accept: ["pane", "thread", "new-thread"],
+    data: {
+      type: "pane-insert-zone",
+      path: [],
+      axis: props.axis,
+      index: props.index,
+      zoneId,
+    },
+    element: elementRef,
+  });
+  const isHighlighted = useIsRootInsertHighlighted(zoneId);
+
+  const edgeClass =
+    props.side === "top"
+      ? "top-0 right-0 left-0 cursor-row-resize"
+      : props.side === "bottom"
+        ? "right-0 bottom-0 left-0 cursor-row-resize"
+        : props.side === "left"
+          ? "top-0 bottom-0 left-0 cursor-col-resize"
+          : "top-0 right-0 bottom-0 cursor-col-resize";
+
+  const edgeStyle =
+    props.side === "top" || props.side === "bottom"
+      ? { height: `${ROOT_INSERT_ZONE_INSET}px` }
+      : { width: `${ROOT_INSERT_ZONE_INSET}px` };
+
+  const lineClass =
+    props.side === "top"
+      ? "top-0 right-0 left-0 h-0.5"
+      : props.side === "bottom"
+        ? "right-0 bottom-0 left-0 h-0.5"
+        : props.side === "left"
+          ? "top-0 bottom-0 left-0 w-0.5"
+          : "top-0 right-0 bottom-0 w-0.5";
+
+  return (
+    <div ref={elementRef} className={`absolute z-10 ${edgeClass}`} style={edgeStyle}>
+      {isHighlighted ? (
+        <div
+          aria-hidden="true"
+          className={`pointer-events-none absolute rounded-full bg-accent ${lineClass}`}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function SplitGroup(props: {
+  layout: Extract<PaneLayout, { kind: "split" }>;
+  path: number[];
+  renderPane: (paneId: string) => React.ReactNode;
+}) {
+  const count = props.layout.children.length;
   const [sizes, setSizes] = useState(() => equalSizes(count));
   const [resizingIndex, setResizingIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef({ startX: 0, leftStart: 0, rightStart: 0, index: 0 });
+  const dragRef = useRef({ start: 0, beforeStart: 0, afterStart: 0, index: 0 });
+  const prevKey = useRef(`${props.layout.axis}:${count}`);
 
-  const childKeys = items
-    .map((child) =>
-      typeof child === "object" && child !== null && "key" in child
-        ? (child as React.ReactElement).key
-        : null,
-    )
-    .join(",");
-
-  // Track previous count+keys to detect changes synchronously (no useEffect lag)
-  const prevRef = useRef({ count, childKeys });
-
-  // Compute sizes synchronously: if count or keys changed, reset to equal sizes
-  // immediately so the first render already has correct flex-basis values.
+  const layoutKey = `${props.layout.axis}:${count}`;
   let activeSizes = sizes;
-  if (prevRef.current.count !== count || prevRef.current.childKeys !== childKeys) {
+  if (prevKey.current !== layoutKey) {
     activeSizes = equalSizes(count);
-    prevRef.current = { count, childKeys };
+    prevKey.current = layoutKey;
   }
 
-  // Sync React state to match (fires after paint, but layout is already correct)
   useEffect(() => {
-    setSizes((prev) => {
-      if (prev.length !== count) return equalSizes(count);
-      return prev;
-    });
-  }, [count, childKeys]);
+    setSizes((prev) => (prev.length !== count ? equalSizes(count) : prev));
+  }, [count]);
 
   useEffect(() => {
     if (resizingIndex === null) return;
 
-    function onMouseMove(e: MouseEvent) {
+    function onMouseMove(event: MouseEvent) {
       const container = containerRef.current;
       if (!container) return;
-      const totalWidth = container.offsetWidth;
-      const deltaPx = e.clientX - dragRef.current.startX;
-      const deltaPercent = (deltaPx / totalWidth) * 100;
-
-      const newLeft = dragRef.current.leftStart + deltaPercent;
-      const newRight = dragRef.current.rightStart - deltaPercent;
-
-      if (newLeft < MIN_PANE_PERCENT || newRight < MIN_PANE_PERCENT) return;
-
+      const isVertical = props.layout.axis === "vertical";
+      const deltaPx = (isVertical ? event.clientX : event.clientY) - dragRef.current.start;
+      const containerSize = isVertical ? container.offsetWidth : container.offsetHeight;
+      const deltaPercent = (deltaPx / containerSize) * 100;
+      const newBefore = dragRef.current.beforeStart + deltaPercent;
+      const newAfter = dragRef.current.afterStart - deltaPercent;
+      if (newBefore < MIN_PANE_PERCENT || newAfter < MIN_PANE_PERCENT) return;
       setSizes((prev) => {
         const next = [...prev];
-        next[dragRef.current.index] = newLeft;
-        next[dragRef.current.index + 1] = newRight;
+        next[dragRef.current.index] = newBefore;
+        next[dragRef.current.index + 1] = newAfter;
         return next;
       });
     }
@@ -75,52 +157,105 @@ export function SplitPaneContainer(props: { children: ReactNode }) {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };
-  }, [resizingIndex]);
+  }, [props.layout.axis, resizingIndex]);
 
-  function handleResizeStart(e: React.MouseEvent, index: number) {
-    e.preventDefault();
+  function handleResizeStart(event: React.MouseEvent, index: number) {
+    event.preventDefault();
     dragRef.current = {
-      startX: e.clientX,
-      leftStart: activeSizes[index]!,
-      rightStart: activeSizes[index + 1]!,
+      start: props.layout.axis === "vertical" ? event.clientX : event.clientY,
+      beforeStart: activeSizes[index]!,
+      afterStart: activeSizes[index + 1]!,
       index,
     };
     setResizingIndex(index);
   }
 
-  const { paneIndicator } = useDndContext();
-
   return (
     <div
       ref={containerRef}
-      className={`flex h-full min-h-0 w-full ${resizingIndex !== null ? "select-none" : ""}`}
+      className={`flex h-full min-h-0 w-full ${
+        props.layout.axis === "vertical" ? "flex-row" : "flex-col"
+      } ${resizingIndex !== null ? "select-none" : ""}`}
     >
-      {items.map((child, i) => (
-        <React.Fragment
-          key={
-            typeof child === "object" && child !== null && "key" in child
-              ? (child as React.ReactElement).key
-              : i
-          }
-        >
+      {props.layout.children.map((child, index) => (
+        <React.Fragment key={`${props.path.join("-")}:${index}`}>
           <div
-            className="h-full min-h-0 min-w-0 overflow-hidden"
-            style={{ flexBasis: `${activeSizes[i] ?? 100 / count}%`, flexGrow: 0, flexShrink: 1 }}
+            className="min-h-0 min-w-0 overflow-hidden"
+            style={{
+              flexBasis: `${activeSizes[index] ?? 100 / count}%`,
+              flexGrow: 0,
+              flexShrink: 1,
+            }}
           >
-            {child}
-          </div>
-          {i < count - 1 && (
-            <div
-              className={`lightcode-pane-divider ${paneIndicator?.kind === "insert" && paneIndicator.index === i + 1 ? "is-highlighted" : ""}`}
-              onMouseDown={(e) => handleResizeStart(e, i)}
-              role="separator"
-              aria-orientation="vertical"
-              aria-label="Resize pane"
+            <PaneLayoutNode
+              layout={child}
+              path={[...props.path, index]}
+              renderPane={props.renderPane}
             />
-          )}
+          </div>
+          {index < props.layout.children.length - 1 ? (
+            <SplitDivider
+              path={props.path}
+              axis={props.layout.axis}
+              index={index + 1}
+              onPointerDown={(event) => handleResizeStart(event, index)}
+            />
+          ) : null}
         </React.Fragment>
       ))}
-      {resizingIndex !== null && <div className="fixed inset-0 z-50 cursor-col-resize" />}
+      {resizingIndex !== null ? (
+        <div
+          className={`fixed inset-0 z-50 ${
+            props.layout.axis === "vertical" ? "cursor-col-resize" : "cursor-row-resize"
+          }`}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function PaneLayoutNode(props: {
+  layout: PaneLayout;
+  path: number[];
+  renderPane: (paneId: string) => React.ReactNode;
+}) {
+  if (props.layout.kind === "leaf") {
+    return <>{props.renderPane(props.layout.paneId)}</>;
+  }
+
+  return <SplitGroup layout={props.layout} path={props.path} renderPane={props.renderPane} />;
+}
+
+export function SplitPaneContainer(props: {
+  layout: PaneLayout;
+  renderPane: (paneId: string) => React.ReactNode;
+}) {
+  const rightIndex =
+    props.layout.kind === "split" && props.layout.axis === "vertical"
+      ? props.layout.children.length
+      : 1;
+  const bottomIndex =
+    props.layout.kind === "split" && props.layout.axis === "horizontal"
+      ? props.layout.children.length
+      : 1;
+
+  return (
+    <div className="relative h-full min-h-0 w-full">
+      <RootInsertZone axis="horizontal" index={0} side="top" />
+      <RootInsertZone axis="horizontal" index={bottomIndex} side="bottom" />
+      <RootInsertZone axis="vertical" index={0} side="left" />
+      <RootInsertZone axis="vertical" index={rightIndex} side="right" />
+      <div
+        className="h-full min-h-0 w-full"
+        style={{
+          paddingTop: ROOT_INSERT_ZONE_INSET,
+          paddingRight: ROOT_INSERT_ZONE_INSET,
+          paddingBottom: ROOT_INSERT_ZONE_INSET,
+          paddingLeft: ROOT_INSERT_ZONE_INSET,
+        }}
+      >
+        <PaneLayoutNode layout={props.layout} path={[]} renderPane={props.renderPane} />
+      </div>
     </div>
   );
 }

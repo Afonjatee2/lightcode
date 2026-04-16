@@ -32,7 +32,13 @@ import { useDraggable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import type { Project, Thread } from "../../../shared/contracts";
 import { useAppStore } from "../../state/appStore";
-import { useDndContext, type DragSourceData } from "../../dnd";
+import {
+  useDragSource,
+  useIsDraggingProject,
+  useIsDraggingThread,
+  useIsDraggingWorktreeGroup,
+  type DragSourceData,
+} from "../../dnd";
 import { ContextMenu, SidebarButton } from "../common";
 import { useSidebar } from "../layout/AppShell";
 import { isWindows, readBridge } from "../../bridge";
@@ -307,8 +313,7 @@ function SortableThreadItem(props: {
     } satisfies DragSourceData,
   });
 
-  const { source } = useDndContext();
-  const isDragging = source?.type === "thread" && source.threadId === thread.id;
+  const isDragging = useIsDraggingThread(thread.id);
 
   const isCurrentThread = currentThreadIds.includes(thread.id);
   const statusTone = getStatusTone(thread);
@@ -624,9 +629,8 @@ function SortableWorktreeGroup(props: {
     } satisfies DragSourceData,
   });
 
-  const { source } = useDndContext();
-  const isDragging =
-    source?.type === "worktree-group" && source.worktreePath === group.worktreePath;
+  const source = useDragSource();
+  const isDragging = useIsDraggingWorktreeGroup(group.worktreePath);
   const isGroupCollapsed = props.isCollapsed;
 
   return (
@@ -876,8 +880,8 @@ function SortableProjectHeader(props: {
     data: { type: "project", projectId: project.id } satisfies DragSourceData,
   });
 
-  const { source } = useDndContext();
-  const isDragging = source?.type === "project" && source.projectId === project.id;
+  const source = useDragSource();
+  const isDragging = useIsDraggingProject(project.id);
 
   return (
     <section ref={ref} className={`relative space-y-0.5 ${isDragging ? "opacity-60" : ""}`}>

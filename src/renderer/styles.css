@@ -313,6 +313,33 @@ body {
   background: var(--accent);
 }
 
+.lightcode-pane-divider-horizontal {
+  height: 8px;
+  cursor: row-resize;
+  position: relative;
+  z-index: 5;
+}
+
+.lightcode-pane-divider-horizontal::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  transform: translateY(-50%);
+  background: var(--separator);
+  transition:
+    background 0.15s,
+    height 0.15s;
+}
+
+.lightcode-pane-divider-horizontal:hover::after,
+.lightcode-pane-divider-horizontal.is-highlighted::after {
+  height: 2px;
+  background: var(--accent);
+}
+
 /* --- Unified provider icon styles --- */
 .lightcode-provider-icon {
   display: inline-flex;

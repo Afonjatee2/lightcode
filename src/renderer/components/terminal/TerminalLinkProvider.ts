@@ -13,10 +13,13 @@
  */
 
 import type { Terminal, ILinkProvider, ILink, IBufferLine } from "@xterm/xterm";
+import { stripAnsi } from "../../../shared/ansi";
 
 // Copied from @xterm/addon-web-links v0.12.0 (MIT license).
 // Matches http(s):// URLs, excluding unsafe/bracket characters as finals.
-const strictUrlRegex = /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\^<>`]*[^\s"':,.!?{}|\\^~[\]`()<>]/;
+// oxlint-disable-next-line no-control-regex -- intentional: exclude C0 control chars and DEL from URL matches
+const strictUrlRegex =
+  /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\^<>`\x00-\x1f\x7f]*[^\s"':,.!?{}|\\^~[\]`()<>\x00-\x1f\x7f]/;
 
 /** Characters that are legal inside a URL path/query/fragment. */
 const URL_LEGAL_TAIL = /[^\s"'!*(){}|\\^<>`]+$/;
@@ -56,7 +59,7 @@ export class TerminalLinkProvider implements ILinkProvider {
     const result: ILink[] = [];
 
     while ((match = rex.exec(line))) {
-      const text = match[0];
+      const text = stripAnsi(match[0]);
       if (!isUrl(text)) continue;
 
       const [startY, startX] = this._mapStrIdx(startLineIndex, 0, match.index);
@@ -91,13 +94,13 @@ export class TerminalLinkProvider implements ILinkProvider {
 
     if (!(line = buf.getLine(lineIndex))) return [[], lineIndex];
 
-    const currentContent = line.translateToString(true);
+    const currentContent = stripAnsi(line.translateToString(true));
 
     // ── Expand upward through soft-wrapped lines ─────────────────
     if (line.isWrapped && currentContent[0] !== " ") {
       length = 0;
       while ((line = buf.getLine(--topIdx)) && length < 2048) {
-        content = line.translateToString(true);
+        content = stripAnsi(line.translateToString(true));
         length += content.length;
         lines.push(content);
         if (!line.isWrapped || content.indexOf(" ") !== -1) break;
@@ -111,7 +114,7 @@ export class TerminalLinkProvider implements ILinkProvider {
     // ── Expand downward through soft-wrapped lines ───────────────
     length = 0;
     while ((line = buf.getLine(++bottomIdx)) && line.isWrapped && length < 2048) {
-      content = line.translateToString(true);
+      content = stripAnsi(line.translateToString(true));
       length += content.length;
       lines.push(content);
       if (content.indexOf(" ") !== -1) break;
@@ -127,7 +130,7 @@ export class TerminalLinkProvider implements ILinkProvider {
       const nextLine = buf.getLine(bottomIdx);
       if (!nextLine) break;
 
-      content = nextLine.translateToString(true);
+      content = stripAnsi(nextLine.translateToString(true));
       if (!content || /^\s/.test(content)) break;
 
       // Take only the URL-legal prefix of the continuation line.

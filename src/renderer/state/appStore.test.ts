@@ -177,13 +177,13 @@ describe("appStore runtime config sync", () => {
     });
   });
 
-  it("openThreadSideBySide caps at 3 panes", () => {
+  it("openThreadSideBySide allows more than 3 panes", () => {
     const project = useAppStore.getState().addProject({
       kind: "windows",
       path: "C:\\repo",
     });
     const ids: string[] = [];
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       ids.push(
         useAppStore.getState().createThread({
           projectId: project.id,
@@ -194,17 +194,22 @@ describe("appStore runtime config sync", () => {
       );
     }
 
-    // Last created is ids[3], set up 3 panes manually
+    // Set up 3 panes manually, then add a 4th and 5th
     useAppStore.setState((s) => ({
       ...s,
       view: { kind: "thread", panes: [ids[0]!, ids[1]!, ids[2]!] as [string, ...string[]] },
     }));
 
     useAppStore.getState().openThreadSideBySide(ids[3]!);
-    const view = useAppStore.getState().view;
-    expect(view).toEqual({
+    expect(useAppStore.getState().view).toEqual({
       kind: "thread",
-      panes: [ids[0], ids[1], ids[3]],
+      panes: [ids[0], ids[1], ids[2], ids[3]],
+    });
+
+    useAppStore.getState().openThreadSideBySide(ids[4]!);
+    expect(useAppStore.getState().view).toEqual({
+      kind: "thread",
+      panes: [ids[0], ids[1], ids[2], ids[3], ids[4]],
     });
   });
 
@@ -535,5 +540,267 @@ describe("markThreadDone / unmarkThreadDone", () => {
     useAppStore.getState().markThreadExited(thread.id);
     expect(useAppStore.getState().threads[0]?.done).toBe(true);
     expect(useAppStore.getState().threads[0]?.status).toBe("inactive");
+  });
+});
+
+describe("grid layout actions", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [],
+      threads: [],
+      pendingServerRequests: [],
+      agentStatuses: [],
+      view: { kind: "home" },
+    }));
+  });
+
+  function createThreads(count: number) {
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const ids: string[] = [];
+    for (let i = 0; i < count; i++) {
+      ids.push(
+        useAppStore.getState().createThread({
+          projectId: project.id,
+          agentKind: "codex",
+          config: { model: "m" },
+          prompt: `t${i}`,
+        }).id,
+      );
+    }
+    return ids;
+  }
+
+  it("replacePaneAtIndex replaces pane at any index", () => {
+    const ids = createThreads(4);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!] as [string, ...string[]],
+      },
+    }));
+
+    useAppStore.getState().replacePaneAtIndex(ids[3]!, 1);
+    const view = useAppStore.getState().view;
+    expect(view).toEqual({ kind: "thread", panes: [ids[0], ids[3], ids[2]] });
+  });
+
+  it("movePaneToIndex reorders pane position", () => {
+    const ids = createThreads(4);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!, ids[3]!] as [string, ...string[]],
+      },
+    }));
+
+    useAppStore.getState().movePaneToIndex(ids[0]!, 4);
+    const view = useAppStore.getState().view;
+    expect(view).toEqual({
+      kind: "thread",
+      panes: [ids[1], ids[2], ids[3], ids[0]],
+    });
+  });
+
+  it("insertPaneAtIndex with left/right edge adds to existing row", () => {
+    const ids = createThreads(3);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!] as [string, ...string[]],
+      },
+    }));
+
+    // Insert right → stays in same row
+    useAppStore.getState().insertPaneAtIndex(ids[1]!, 1, "right");
+    const view1 = useAppStore.getState().view;
+    expect(view1).toEqual({ kind: "thread", panes: [ids[0], ids[1]] });
+    // No rowLayout set yet (single row default)
+  });
+
+  it("insertPaneAtIndex with top/bottom edge creates new row", () => {
+    const ids = createThreads(3);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!] as [string, ...string[]],
+      },
+    }));
+
+    // Insert bottom → creates 2 rows
+    useAppStore.getState().insertPaneAtIndex(ids[1]!, 1, "bottom");
+    const view1 = useAppStore.getState().view;
+    expect(view1.kind === "thread" && view1.rowLayout).toEqual([1, 1]);
+    expect(view1.kind === "thread" && view1.panes).toEqual([ids[0], ids[1]]);
+
+    // Insert right of top pane → row 0 grows to 2 cols
+    useAppStore.getState().insertPaneAtIndex(ids[2]!, 1, "right");
+    const view2 = useAppStore.getState().view;
+    expect(view2.kind === "thread" && view2.rowLayout).toEqual([2, 1]);
+    expect(view2.kind === "thread" && view2.panes).toEqual([ids[0], ids[2], ids[1]]);
+  });
+
+  it("closePane removes from correct row in rowLayout", () => {
+    const ids = createThreads(3);
+    // rowLayout [2, 1] = Row 0: [A,B], Row 1: [C]
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!] as [string, ...string[]],
+        rowLayout: [2, 1],
+      },
+    }));
+
+    // Close B (index 1) from row 0 → row 0 shrinks to 1 col
+    useAppStore.getState().closePane(ids[1]!);
+    const view = useAppStore.getState().view;
+    expect(view.kind === "thread" && view.rowLayout).toEqual([1, 1]);
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[2]]);
+  });
+
+  it("closePane removes empty rows from rowLayout", () => {
+    const ids = createThreads(2);
+    // rowLayout [1, 1] = 2 rows
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!] as [string, ...string[]],
+        rowLayout: [1, 1],
+      },
+    }));
+
+    useAppStore.getState().closePane(ids[0]!);
+    const view = useAppStore.getState().view;
+    // Row 0 removed, only row 1 remains
+    expect(view.kind === "thread" && view.rowLayout).toEqual([1]);
+    expect(view.kind === "thread" && view.panes).toEqual([ids[1]]);
+  });
+
+  it("openThreadSideBySide preserves rowLayout", () => {
+    const ids = createThreads(4);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!] as [string, ...string[]],
+        rowLayout: [1, 1],
+      },
+    }));
+
+    // Appends to last row
+    useAppStore.getState().openThreadSideBySide(ids[2]!);
+    const view = useAppStore.getState().view;
+    expect(view.kind === "thread" && view.rowLayout).toEqual([1, 2]);
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[1], ids[2]]);
+  });
+
+  it("movePaneToIndex can split a full-width row into two columns", () => {
+    const ids = createThreads(4);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!, ids[3]!] as [string, ...string[]],
+        rowLayout: [3, 1],
+      },
+    }));
+
+    useAppStore.getState().movePaneToIndex(ids[1]!, 3, "left");
+    const view = useAppStore.getState().view;
+    expect(view.kind === "thread" && view.rowLayout).toEqual([2, 2]);
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[2], ids[1], ids[3]]);
+  });
+
+  it("movePaneToIndex can insert a row between two existing rows", () => {
+    const ids = createThreads(4);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!, ids[3]!] as [string, ...string[]],
+        rowLayout: [2, 2],
+      },
+    }));
+
+    useAppStore.getState().movePaneToIndex(ids[3]!, 2, "top");
+    const view = useAppStore.getState().view;
+    expect(view.kind === "thread" && view.rowLayout).toEqual([2, 1, 1]);
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[1], ids[3], ids[2]]);
+  });
+
+  it("splitPaneById can split only the middle pane into two rows", () => {
+    const ids = createThreads(4);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!] as [string, ...string[]],
+      },
+    }));
+
+    useAppStore.getState().splitPaneById(ids[3]!, ids[1]!, "bottom");
+    const view = useAppStore.getState().view;
+    expect(view.kind).toBe("thread");
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[1], ids[3], ids[2]]);
+    expect(view.kind === "thread" && view.paneLayout).toEqual({
+      kind: "split",
+      axis: "vertical",
+      children: [
+        { kind: "leaf", paneId: ids[0] },
+        {
+          kind: "split",
+          axis: "horizontal",
+          children: [
+            { kind: "leaf", paneId: ids[1] },
+            { kind: "leaf", paneId: ids[3] },
+          ],
+        },
+        { kind: "leaf", paneId: ids[2] },
+      ],
+    });
+  });
+
+  it("insertPaneAtLayoutTarget can create a global second row", () => {
+    const ids = createThreads(4);
+    useAppStore.setState((s) => ({
+      ...s,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!] as [string, ...string[]],
+      },
+    }));
+
+    useAppStore
+      .getState()
+      .insertPaneAtLayoutTarget(ids[3]!, { path: [], axis: "horizontal", index: 1 });
+    const view = useAppStore.getState().view;
+    expect(view.kind).toBe("thread");
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[1], ids[2], ids[3]]);
+    expect(view.kind === "thread" && view.paneLayout).toEqual({
+      kind: "split",
+      axis: "horizontal",
+      children: [
+        {
+          kind: "split",
+          axis: "vertical",
+          children: [
+            { kind: "leaf", paneId: ids[0] },
+            { kind: "leaf", paneId: ids[1] },
+            { kind: "leaf", paneId: ids[2] },
+          ],
+        },
+        { kind: "leaf", paneId: ids[3] },
+      ],
+    });
   });
 });

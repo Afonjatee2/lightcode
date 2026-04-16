@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PaneLayout } from "./paneLayout";
 
 export const themeModeSchema = z.enum(["system", "light", "dark"]);
 export type ThemeMode = z.infer<typeof themeModeSchema>;
@@ -891,4 +892,4 @@ export interface GhGetPrChecksResult {
 export type AppView =
   | { kind: "home" }
   | { kind: "draft"; projectId: string }
-  | { kind: "thread"; panes: [string, ...string[]] };
+  | { kind: "thread"; panes: [string, ...string[]]; rowLayout?: number[]; paneLayout?: PaneLayout };

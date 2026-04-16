@@ -18,11 +18,11 @@ import type {
   PromptSegment,
 } from "../shared/contracts";
 import { getProjectAgentStatuses } from "../shared/agentStatus";
-import type { PendingThreadServerRequest } from "./state/appStore";
 import { parseWslUncPath } from "../shared/wsl";
 import { buildWorktreeLocation } from "../shared/worktree";
 import { getAppName } from "../shared/appName";
 import { isDraftPaneId, makeDraftPaneId, parseDraftProjectId } from "../shared/paneId";
+import { buildPaneLayoutFromLegacy, findPaneAlign } from "../shared/paneLayout";
 import { msg, errorDetail } from "../shared/messages";
 import { isWindows, readBridge } from "./bridge";
 import { ProviderIcon, getStatusTone, generateTitleWithFallback } from "./components/providers";
@@ -86,13 +86,20 @@ if (typeof requestIdleCallback === "function") {
 
 import { useAppStore, makeThreadTitle } from "./state/appStore";
 import { useSharedSettings } from "./state/sharedSettingsStore";
-import { useThread } from "./state/useThread";
+import { useProject, useThread } from "./state/useThread";
 import { useDevTerminalStore } from "./state/devTerminalStore";
 import { useGitStore } from "./state/gitStore";
 import { useUpdateStore } from "./state/updateStore";
 import { useFileEditorStore, type FileEditorRootContext } from "./state/fileEditorStore";
 import { useDraggable, useDroppable } from "@dnd-kit/react";
-import { AppDndProvider, useDndContext, type DragSourceData, type PaneDropIndicator } from "./dnd";
+import { useShallow } from "zustand/shallow";
+import {
+  AppDndProvider,
+  useIsDraggingPane,
+  usePaneDropIndicatorState,
+  type DragSourceData,
+  type PaneDropIndicator,
+} from "./dnd";
 
 // ── Module-level IPC listener ───────────────────────────────────
 // Subscribes to supervisor events as soon as the module loads,
@@ -459,17 +466,25 @@ function HomeView() {
 
 function ThreadPane(props: {
   threadId: string;
-  paneIndex: number;
   paneCount: number;
-  projects: Project[];
-  agentStatuses: AgentStatus[];
-  wslAgentStatuses: AgentStatus[];
-  pendingServerRequests: PendingThreadServerRequest[];
-  pendingLaunchPrompt: string | undefined;
-  pendingLaunchSegments: PromptSegment[] | undefined;
+  paneAlign: "left" | "center" | "right";
   onClose: () => void;
 }) {
   const thread = useThread(props.threadId);
+  const project = useProject(thread?.projectId);
+  const agentStatus = useAppStore((s) => {
+    if (!thread || !project) return undefined;
+    return getProjectAgentStatuses(project.location, s.agentStatuses, s.wslAgentStatuses).find(
+      (status) => status.kind === thread.agentKind,
+    );
+  });
+  const pendingServerRequests = useAppStore(
+    useShallow((s) =>
+      s.pendingServerRequests.filter((request) => request.threadId === props.threadId),
+    ),
+  );
+  const pendingLaunchPrompt = useAppStore((s) => s.pendingThreadLaunches[props.threadId]);
+  const pendingLaunchSegments = useAppStore((s) => s.pendingLaunchSegments[props.threadId]);
   const updateThreadConfig = useAppStore((s) => s.updateThreadConfig);
   const updateThreadRuntime = useAppStore((s) => s.updateThreadRuntime);
   const consumeThreadLaunch = useAppStore((s) => s.consumeThreadLaunch);
@@ -489,44 +504,17 @@ function ThreadPane(props: {
   });
   // Same element is also a drop target (for pane-to-pane and sidebar-to-pane)
   useDroppable({
-    id: `pane-drop:${props.paneIndex}`,
+    id: `pane-drop:${props.threadId}`,
     accept: ["pane", "thread", "new-thread"],
-    data: { type: "pane-drop-zone", paneIndex: props.paneIndex },
+    data: { type: "pane-drop-zone", paneId: props.threadId },
     element: paneElementRef,
   });
 
-  const { source, paneIndicator } = useDndContext();
-  const isDragging = source?.type === "pane" && source.paneId === props.threadId;
-
-  const dropIndicator: false | "replace" | "insert-left" | "insert-right" =
-    paneIndicator?.kind === "replace" && paneIndicator.paneIndex === props.paneIndex
-      ? "replace"
-      : paneIndicator?.kind === "insert" && paneIndicator.index === props.paneIndex
-        ? "insert-left"
-        : paneIndicator?.kind === "insert" && paneIndicator.index === props.paneIndex + 1
-          ? "insert-right"
-          : false;
+  const isDragging = useIsDraggingPane(props.threadId);
+  const dropIndicator = usePaneDropIndicatorState(props.threadId);
 
   if (!thread) return null;
-
-  const project = props.projects.find((item) => item.id === thread.projectId);
   if (!project) return null;
-
-  const projectAgentStatuses = getProjectAgentStatuses(
-    project.location,
-    props.agentStatuses,
-    props.wslAgentStatuses,
-  );
-  const agentStatus = projectAgentStatuses.find((status) => status.kind === thread.agentKind);
-  const paneAlign =
-    props.paneCount <= 1
-      ? ("center" as const)
-      : props.paneIndex === 0
-        ? ("right" as const)
-        : props.paneIndex === props.paneCount - 1
-          ? ("left" as const)
-          : ("center" as const);
-
   return (
     <ThreadView
       key={props.threadId}
@@ -535,10 +523,9 @@ function ThreadPane(props: {
       agentStatus={agentStatus}
       isWsl={project.location.kind === "wsl"}
       showCloseButton={props.paneCount > 1}
-      paneAlign={paneAlign}
+      paneAlign={props.paneAlign}
       isDragging={isDragging}
       dropIndicator={dropIndicator}
-      paneIndex={props.paneIndex}
       paneCount={props.paneCount}
       {...(props.paneCount > 1 ? { dragHandleRef: handleRef } : {})}
       droppableRef={paneElementRef}
@@ -555,9 +542,7 @@ function ThreadPane(props: {
         }
       }}
       onConfigChange={(config) => updateThreadConfig(thread.id, config)}
-      pendingServerRequests={props.pendingServerRequests.filter(
-        (request) => request.threadId === thread.id,
-      )}
+      pendingServerRequests={pendingServerRequests}
       projectLocation={
         thread.worktreePath
           ? buildWorktreeLocation(project.location, thread.worktreePath)
@@ -584,12 +569,8 @@ function ThreadPane(props: {
         removeThreadServerRequest(thread.id, requestId);
         touchThread(thread.id);
       }}
-      {...(props.pendingLaunchPrompt !== undefined
-        ? { pendingLaunchPrompt: props.pendingLaunchPrompt }
-        : {})}
-      {...(props.pendingLaunchSegments
-        ? { pendingLaunchSegments: props.pendingLaunchSegments }
-        : {})}
+      {...(pendingLaunchPrompt !== undefined ? { pendingLaunchPrompt } : {})}
+      {...(pendingLaunchSegments ? { pendingLaunchSegments } : {})}
       onSubmitInput={async (prompt, segments) => {
         await readBridge().sendThreadInput({
           threadId: thread.id,
@@ -606,11 +587,8 @@ function ThreadPane(props: {
 function DraftPane(props: {
   paneId: string;
   projectId: string;
-  paneIndex: number;
   paneCount: number;
-  projects: Project[];
-  agentStatuses: AgentStatus[];
-  wslAgentStatuses: AgentStatus[];
+  paneAlign: "left" | "center" | "right";
   onClose: () => void;
   onStart: (
     project: Project,
@@ -626,7 +604,10 @@ function DraftPane(props: {
     },
   ) => void;
 }) {
-  const project = props.projects.find((item) => item.id === props.projectId);
+  const project = useProject(props.projectId);
+  const projectAgentStatuses = useAppStore((s) =>
+    project ? getProjectAgentStatuses(project.location, s.agentStatuses, s.wslAgentStatuses) : [],
+  );
 
   const paneElementRef = useRef<HTMLDivElement>(null);
   const { handleRef } = useDraggable({
@@ -637,50 +618,25 @@ function DraftPane(props: {
     element: paneElementRef,
   });
   useDroppable({
-    id: `pane-drop:${props.paneIndex}`,
+    id: `pane-drop:${props.paneId}`,
     accept: ["pane", "thread", "new-thread"],
-    data: { type: "pane-drop-zone", paneIndex: props.paneIndex },
+    data: { type: "pane-drop-zone", paneId: props.paneId },
     element: paneElementRef,
   });
 
-  const { source, paneIndicator } = useDndContext();
-  const isDragging = source?.type === "pane" && source.paneId === props.paneId;
-
-  const dropIndicator: false | "replace" | "insert-left" | "insert-right" =
-    paneIndicator?.kind === "replace" && paneIndicator.paneIndex === props.paneIndex
-      ? "replace"
-      : paneIndicator?.kind === "insert" && paneIndicator.index === props.paneIndex
-        ? "insert-left"
-        : paneIndicator?.kind === "insert" && paneIndicator.index === props.paneIndex + 1
-          ? "insert-right"
-          : false;
+  const isDragging = useIsDraggingPane(props.paneId);
+  const dropIndicator = usePaneDropIndicatorState(props.paneId);
 
   if (!project) return null;
-
-  const projectAgentStatuses = getProjectAgentStatuses(
-    project.location,
-    props.agentStatuses,
-    props.wslAgentStatuses,
-  );
-  const paneAlign =
-    props.paneCount <= 1
-      ? ("center" as const)
-      : props.paneIndex === 0
-        ? ("right" as const)
-        : props.paneIndex === props.paneCount - 1
-          ? ("left" as const)
-          : ("center" as const);
-
   return (
     <ThreadDraftView
       project={project}
       agentStatuses={projectAgentStatuses}
       compact
-      paneAlign={paneAlign}
+      paneAlign={props.paneAlign}
       showCloseButton={props.paneCount > 1}
       isDragging={isDragging}
       dropIndicator={dropIndicator}
-      paneIndex={props.paneIndex}
       paneCount={props.paneCount}
       droppableRef={paneElementRef}
       onClose={props.onClose}
@@ -694,11 +650,6 @@ function DraftPane(props: {
 function AppContent() {
   const view = useAppStore((state) => state.view);
   const projects = useAppStore((state) => state.projects);
-  const pendingServerRequests = useAppStore((state) => state.pendingServerRequests);
-  const pendingThreadLaunches = useAppStore((state) => state.pendingThreadLaunches);
-  const pendingLaunchSegments = useAppStore((state) => state.pendingLaunchSegments);
-  const agentStatuses = useAppStore((state) => state.agentStatuses);
-  const wslAgentStatuses = useAppStore((state) => state.wslAgentStatuses);
   const createThread = useAppStore((state) => state.createThread);
   const queueThreadLaunch = useAppStore((state) => state.queueThreadLaunch);
   const updateProjectDraftConfig = useAppStore((state) => state.updateProjectDraftConfig);
@@ -782,6 +733,7 @@ function AppContent() {
       }
     }
 
+    const { agentStatuses, wslAgentStatuses } = useAppStore.getState();
     const projectAgentStatuses = getProjectAgentStatuses(
       project.location,
       agentStatuses,
@@ -811,6 +763,7 @@ function AppContent() {
     if (!project) {
       return <HomeView />;
     }
+    const { agentStatuses, wslAgentStatuses } = useAppStore.getState();
     const projectAgentStatuses = getProjectAgentStatuses(
       project.location,
       agentStatuses,
@@ -831,6 +784,7 @@ function AppContent() {
   if (view.kind === "thread") {
     const closePane = useAppStore.getState().closePane;
     const paneCount = view.panes.length;
+    const paneLayout = view.paneLayout ?? buildPaneLayoutFromLegacy(view.panes, view.rowLayout);
 
     if (!hasValidPanes) {
       return (
@@ -840,44 +794,43 @@ function AppContent() {
       );
     }
 
-    const paneElements = view.panes.map((paneId, paneIndex) => {
+    function renderPane(paneId: string) {
       const draftProjectId = parseDraftProjectId(paneId);
-      if (draftProjectId) {
-        return (
-          <DraftPane
-            key={paneId}
-            paneId={paneId}
-            projectId={draftProjectId}
-            paneIndex={paneIndex}
-            paneCount={paneCount}
-            projects={projects}
-            agentStatuses={agentStatuses}
-            wslAgentStatuses={wslAgentStatuses}
-            onClose={() => closePane(paneId)}
-            onStart={(project, input) => void handleDraftStart(project, input, paneId)}
-          />
-        );
-      }
-      return (
+      const paneAlign = findPaneAlign(paneLayout, paneId);
+      const paneContent = draftProjectId ? (
+        <DraftPane
+          key={paneId}
+          paneId={paneId}
+          projectId={draftProjectId}
+          paneCount={paneCount}
+          paneAlign={paneAlign}
+          onClose={() => closePane(paneId)}
+          onStart={(project, input) => void handleDraftStart(project, input, paneId)}
+        />
+      ) : (
         <ThreadPane
           key={paneId}
           threadId={paneId}
-          paneIndex={paneIndex}
           paneCount={paneCount}
-          projects={projects}
-          agentStatuses={agentStatuses}
-          wslAgentStatuses={wslAgentStatuses}
-          pendingServerRequests={pendingServerRequests}
-          pendingLaunchPrompt={pendingThreadLaunches[paneId]}
-          pendingLaunchSegments={pendingLaunchSegments[paneId]}
+          paneAlign={paneAlign}
           onClose={() => closePane(paneId)}
         />
       );
-    });
+      return (
+        <div
+          key={paneId}
+          className="h-full outline-none"
+          tabIndex={-1}
+          onFocusCapture={() => useAppStore.getState().setFocusedPane(paneId)}
+        >
+          {paneContent}
+        </div>
+      );
+    }
 
     return (
       <div className="h-full">
-        <SplitPaneContainer>{paneElements}</SplitPaneContainer>
+        <SplitPaneContainer layout={paneLayout} renderPane={renderPane} />
       </div>
     );
   }
@@ -989,9 +942,11 @@ export function App() {
   const reorderProjects = useAppStore((state) => state.reorderProjects);
   const reorderThreads = useAppStore((state) => state.reorderThreads);
   const _reorderThreadBlock = useAppStore((state) => state.reorderThreadBlock);
-  const reorderPanes = useAppStore((state) => state.reorderPanes);
-  const insertPaneAtIndex = useAppStore((state) => state.insertPaneAtIndex);
-  const replacePaneId = useAppStore((state) => state.replacePaneId);
+  const replacePaneById = useAppStore((state) => state.replacePaneById);
+  const splitPaneById = useAppStore((state) => state.splitPaneById);
+  const insertPaneAtLayoutTarget = useAppStore((state) => state.insertPaneAtLayoutTarget);
+  const movePaneToLayoutTarget = useAppStore((state) => state.movePaneToLayoutTarget);
+  const swapPanes = useAppStore((state) => state.swapPanes);
   const updateThreadRuntime = useAppStore((state) => state.updateThreadRuntime);
   const fileEditorRootContext = useFileEditorStore((state) => state.rootContext);
   const fileEditorOverlayMode = useFileEditorStore((state) => state.overlayMode);
@@ -1512,6 +1467,23 @@ export function App() {
         e.preventDefault();
         useDevTerminalStore.getState().togglePanel();
       }
+
+      // Ctrl/Cmd+W: close focused thread pane (when file editor has no active tab)
+      if ((e.ctrlKey || e.metaKey) && e.key === "w") {
+        // Let the FileEditorPane handler close its tab first
+        if (useFileEditorStore.getState().activePath) return;
+
+        const state = useAppStore.getState();
+        if (state.view.kind === "thread") {
+          e.preventDefault();
+          const { panes } = state.view;
+          const target =
+            state.focusedPaneId && panes.includes(state.focusedPaneId)
+              ? state.focusedPaneId
+              : panes.at(-1)!;
+          state.closePane(target);
+        }
+      }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -1864,42 +1836,34 @@ export function App() {
     const panes = currentView.panes;
 
     if (source.type === "thread") {
-      // Sidebar thread → pane
       const threadId = source.threadId;
       if (panes.includes(threadId)) return;
       startTransition(() => {
-        if (target.kind === "replace") {
-          if (target.paneIndex === 0) openThread(threadId);
-          else if (target.paneIndex === 1) replaceSecondPane(threadId);
-          else openThreadSideBySide(threadId);
-        } else if (target.kind === "insert") {
-          insertPaneAtIndex(threadId, target.index);
-        }
+        if (target.kind === "replace") replacePaneById(threadId, target.paneId);
+        else if (target.kind === "split-pane") splitPaneById(threadId, target.paneId, target.edge);
+        else insertPaneAtLayoutTarget(threadId, target.target);
       });
-    } else if (source.type === "pane" && target.kind === "replace") {
-      // Pane-to-pane reorder
+    } else if (source.type === "pane") {
       const sourcePaneId = source.paneId;
-      const targetPaneId = panes[target.paneIndex];
-      if (!targetPaneId || sourcePaneId === targetPaneId) return;
-      const sourceIdx = panes.indexOf(sourcePaneId);
-      const targetIdx = target.paneIndex;
-      const placement = sourceIdx < targetIdx ? ("after" as const) : ("before" as const);
-      startTransition(() => reorderPanes(sourcePaneId, targetPaneId, placement));
+      if (target.kind === "replace") {
+        if (sourcePaneId === target.paneId) return;
+        startTransition(() => swapPanes(sourcePaneId, target.paneId));
+      } else if (target.kind === "split-pane") {
+        if (sourcePaneId === target.paneId) return;
+        startTransition(() =>
+          movePaneToLayoutTarget(sourcePaneId, { paneId: target.paneId, edge: target.edge }),
+        );
+      } else {
+        startTransition(() => movePaneToLayoutTarget(sourcePaneId, target.target));
+      }
     } else if (source.type === "new-thread") {
-      // Sidebar "New thread" → pane
       const draftPaneId = makeDraftPaneId(source.projectId);
       if (panes.includes(draftPaneId)) return;
       startTransition(() => {
-        if (target.kind === "insert") {
-          insertPaneAtIndex(draftPaneId, target.index);
-        } else {
-          const oldPaneId = panes[target.paneIndex];
-          if (oldPaneId) {
-            replacePaneId(oldPaneId, draftPaneId);
-          } else {
-            openDraftSideBySide(source.projectId);
-          }
-        }
+        if (target.kind === "replace") replacePaneById(draftPaneId, target.paneId);
+        else if (target.kind === "split-pane")
+          splitPaneById(draftPaneId, target.paneId, target.edge);
+        else insertPaneAtLayoutTarget(draftPaneId, target.target);
       });
     }
   }
@@ -1911,6 +1875,11 @@ export function App() {
         onSidebarSortEnd={handleSortEnd}
         onPaneDrop={handlePaneDrop}
         paneThreadIds={paneThreadIds}
+        paneLayout={
+          view.kind === "thread"
+            ? (view.paneLayout ?? buildPaneLayoutFromLegacy(view.panes, view.rowLayout))
+            : buildPaneLayoutFromLegacy(["__placeholder__"])
+        }
       >
         <PageLayout
           title={getAppName(import.meta.env.DEV)}

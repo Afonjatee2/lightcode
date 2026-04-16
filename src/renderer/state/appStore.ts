@@ -19,6 +19,23 @@ import type {
 } from "../../shared/contracts";
 import type { Attachment } from "../components/composer/useAttachments";
 import { isDraftPaneId, makeDraftPaneId, parseDraftProjectId } from "../../shared/paneId";
+import type { PaneLayoutInsertTarget } from "../../shared/paneLayout";
+import {
+  adjustInsertTargetForRemoval,
+  buildPaneLayoutFromLegacy,
+  collectPaneIds,
+  insertPaneInLayout,
+  removePaneFromLayout,
+  replacePaneIdInLayout,
+  splitPaneInLayout,
+  swapPaneIdsInLayout,
+} from "../../shared/paneLayout";
+import {
+  paneIndexToRowCol,
+  addToRowLayout,
+  insertRowInLayout,
+  removeIndicesFromRowLayout,
+} from "../../shared/rowLayout";
 import { getProjectName } from "../../shared/wsl";
 import {
   reorderIds,
@@ -68,6 +85,106 @@ function clearFinishedAndDone(threads: Thread[], panes: string[]): Thread[] | nu
   return changed ? result : null;
 }
 
+/** Compute the next rowLayout after removing panes at the given flat indices. */
+function rowLayoutAfterRemove(
+  view: { rowLayout?: number[]; panes: string[] },
+  removedIndices: Set<number>,
+): number[] | undefined {
+  if (!view.rowLayout) return undefined;
+  const result = removeIndicesFromRowLayout(view.rowLayout, removedIndices);
+  return result.length > 0 ? result : undefined;
+}
+
+function rowLayoutAfterInsert(
+  rowLayout: number[] | undefined,
+  paneCountBeforeInsert: number,
+  insertIndex: number,
+  edge?: "left" | "right" | "top" | "bottom",
+): number[] | undefined {
+  if (!edge) {
+    return rowLayout;
+  }
+
+  const clampedIndex = Math.max(0, Math.min(paneCountBeforeInsert, insertIndex));
+  const baseLayout = rowLayout ?? (paneCountBeforeInsert > 1 ? [paneCountBeforeInsert] : undefined);
+
+  if (baseLayout) {
+    if (edge === "top" || edge === "bottom") {
+      const targetIndex = Math.min(clampedIndex, paneCountBeforeInsert - 1);
+      const { row } = paneIndexToRowCol(baseLayout, targetIndex);
+      return insertRowInLayout(baseLayout, edge === "top" ? row : row + 1);
+    }
+
+    const targetPaneIndex = edge === "right" ? Math.max(0, clampedIndex - 1) : clampedIndex;
+    return addToRowLayout(baseLayout, Math.min(targetPaneIndex, paneCountBeforeInsert - 1));
+  }
+
+  if (edge === "top" || edge === "bottom") {
+    return [1, 1];
+  }
+
+  return undefined;
+}
+
+/** Build the view update for pane removals, preserving rowLayout. */
+function viewAfterPaneRemoval(
+  view: { kind: "thread"; panes: [string, ...string[]]; rowLayout?: number[] },
+  remaining: string[],
+  removedIndices: Set<number>,
+): AppView {
+  if (remaining.length === 0) return { kind: "home" as const };
+  const rl = rowLayoutAfterRemove(view, removedIndices);
+  return {
+    ...view,
+    panes: remaining as [string, ...string[]],
+    ...(rl ? { rowLayout: rl } : {}),
+  };
+}
+
+function currentPaneLayout(view: Extract<AppView, { kind: "thread" }>) {
+  return view.paneLayout ?? buildPaneLayoutFromLegacy(view.panes, view.rowLayout);
+}
+
+function viewFromPaneLayout(layout: ReturnType<typeof removePaneFromLayout>): AppView {
+  if (!layout) return { kind: "home" };
+  return {
+    kind: "thread",
+    panes: collectPaneIds(layout),
+    paneLayout: layout,
+  };
+}
+
+function replacePaneInView(
+  view: Extract<AppView, { kind: "thread" }>,
+  oldPaneId: string,
+  newPaneId: string,
+): Extract<AppView, { kind: "thread" }> {
+  if (!view.paneLayout) {
+    const panes = [...view.panes] as [string, ...string[]];
+    const idx = panes.indexOf(oldPaneId);
+    if (idx !== -1) panes[idx] = newPaneId;
+    return { ...view, panes };
+  }
+
+  const layout = replacePaneIdInLayout(currentPaneLayout(view), oldPaneId, newPaneId);
+  return {
+    kind: "thread",
+    panes: collectPaneIds(layout),
+    paneLayout: layout,
+  };
+}
+
+function removePaneFromView(view: Extract<AppView, { kind: "thread" }>, paneId: string): AppView {
+  if (view.paneLayout) {
+    return viewFromPaneLayout(removePaneFromLayout(view.paneLayout, paneId));
+  }
+
+  const idx = view.panes.indexOf(paneId);
+  const remaining = view.panes.filter((id) => id !== paneId);
+  if (remaining.length === 0) return { kind: "home" };
+  return viewAfterPaneRemoval(view, remaining, new Set(idx !== -1 ? [idx] : []));
+}
+
 export interface PendingThreadServerRequest {
   threadId: string;
   requestId: ThreadServerRequestId;
@@ -91,6 +208,8 @@ interface AppStoreState {
   agentStatuses: AgentStatus[];
   wslAgentStatuses: AgentStatus[];
   view: AppView;
+  focusedPaneId: string | null;
+  setFocusedPane: (paneId: string) => void;
   setAgentStatuses: (statuses: AgentStatus[]) => void;
   setWslAgentStatuses: (statuses: AgentStatus[]) => void;
   markThreadsInactiveOnLaunch: () => void;
@@ -105,7 +224,29 @@ interface AppStoreState {
   openThread: (threadId: string) => void;
   openThreadSideBySide: (threadId: string) => void;
   replaceSecondPane: (threadId: string) => void;
-  insertPaneAtIndex: (threadId: string, index: number) => void;
+  replacePaneAtIndex: (threadId: string, index: number) => void;
+  insertPaneAtIndex: (
+    threadId: string,
+    index: number,
+    edge?: "left" | "right" | "top" | "bottom",
+  ) => void;
+  movePaneToIndex: (
+    paneId: string,
+    targetIndex: number,
+    edge?: "left" | "right" | "top" | "bottom",
+  ) => void;
+  replacePaneById: (threadId: string, targetPaneId: string) => void;
+  splitPaneById: (
+    threadId: string,
+    targetPaneId: string,
+    edge: "left" | "right" | "top" | "bottom",
+  ) => void;
+  insertPaneAtLayoutTarget: (threadId: string, target: PaneLayoutInsertTarget) => void;
+  movePaneToLayoutTarget: (
+    paneId: string,
+    target: PaneLayoutInsertTarget | { paneId: string; edge: "left" | "right" | "top" | "bottom" },
+  ) => void;
+  swapPanes: (firstPaneId: string, secondPaneId: string) => void;
   closePane: (threadId: string) => void;
   replacePaneId: (oldId: string, newId: string) => void;
   createThread: (input: {
@@ -168,6 +309,8 @@ export const useAppStore = create<AppStoreState>()(
       agentStatuses: [],
       wslAgentStatuses: [],
       view: { kind: "home" },
+      focusedPaneId: null,
+      setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
       setAgentStatuses: (agentStatuses) => set({ agentStatuses }),
       setWslAgentStatuses: (wslAgentStatuses) => set({ wslAgentStatuses }),
       markThreadsInactiveOnLaunch: () =>
@@ -239,13 +382,13 @@ export const useAppStore = create<AppStoreState>()(
           if (state.view.kind === "draft" && state.view.projectId === projectId) {
             nextView = { kind: "home" };
           } else if (state.view.kind === "thread") {
-            const remaining = state.view.panes.filter((id) =>
-              isDraftPaneId(id) ? parseDraftProjectId(id) !== projectId : !projectThreadIds.has(id),
-            );
-            nextView =
-              remaining.length === 0
-                ? { kind: "home" as const }
-                : { kind: "thread" as const, panes: remaining as [string, ...string[]] };
+            nextView = state.view.panes.reduce<AppView>((view, paneId) => {
+              if (view.kind !== "thread") return view;
+              const shouldRemove = isDraftPaneId(paneId)
+                ? parseDraftProjectId(paneId) === projectId
+                : projectThreadIds.has(paneId);
+              return shouldRemove ? removePaneFromView(view, paneId) : view;
+            }, state.view);
           }
 
           return {
@@ -287,18 +430,35 @@ export const useAppStore = create<AppStoreState>()(
           if (existing.includes(draftPaneId)) {
             return {};
           }
-          if (existing.length >= 3) {
+          if (state.view.paneLayout) {
+            const layout = insertPaneInLayout(
+              state.view.paneLayout,
+              {
+                path: [],
+                axis: "vertical",
+                index:
+                  state.view.paneLayout.kind === "split" &&
+                  state.view.paneLayout.axis === "vertical"
+                    ? state.view.paneLayout.children.length
+                    : 1,
+              },
+              draftPaneId,
+            );
             return {
               view: {
                 kind: "thread",
-                panes: [existing[0]!, existing[1]!, draftPaneId],
+                panes: collectPaneIds(layout),
+                paneLayout: layout,
               },
             };
           }
+          const rl = state.view.rowLayout;
+          const newRl = rl ? [...rl.slice(0, -1), rl[rl.length - 1]! + 1] : undefined;
           return {
             view: {
-              kind: "thread",
+              ...state.view,
               panes: [...existing, draftPaneId] as [string, ...string[]],
+              ...(newRl ? { rowLayout: newRl } : {}),
             },
           };
         }),
@@ -310,8 +470,8 @@ export const useAppStore = create<AppStoreState>()(
               const cleared = clearFinishedAndDone(state.threads, [threadId]);
               return cleared ? { threads: cleared } : {};
             }
-            const nextPanes = [threadId, ...state.view.panes.slice(1)] as [string, ...string[]];
-            const nextView: AppView = { kind: "thread", panes: nextPanes };
+            const nextView = replacePaneInView(state.view, state.view.panes[0]!, threadId);
+            const nextPanes = nextView.kind === "thread" ? nextView.panes : [threadId];
             const cleared = clearFinishedAndDone(state.threads, nextPanes);
             return cleared ? { view: nextView, threads: cleared } : { view: nextView };
           }
@@ -321,22 +481,43 @@ export const useAppStore = create<AppStoreState>()(
         }),
       openThreadSideBySide: (threadId) =>
         set((state) => {
-          let nextPanes: [string, ...string[]];
           if (state.view.kind !== "thread") {
-            nextPanes = [threadId];
-          } else {
-            const existing = state.view.panes;
-            if (existing.includes(threadId)) {
-              const cleared = clearFinishedAndDone(state.threads, [threadId]);
-              return cleared ? { threads: cleared } : {};
-            }
-            if (existing.length >= 3) {
-              nextPanes = [existing[0]!, existing[1]!, threadId];
-            } else {
-              nextPanes = [...existing, threadId] as [string, ...string[]];
-            }
+            const nextView: AppView = { kind: "thread", panes: [threadId] };
+            const cleared = clearFinishedAndDone(state.threads, [threadId]);
+            return cleared ? { view: nextView, threads: cleared } : { view: nextView };
           }
-          const nextView: AppView = { kind: "thread", panes: nextPanes };
+          const existing = state.view.panes;
+          if (existing.includes(threadId)) {
+            const cleared = clearFinishedAndDone(state.threads, [threadId]);
+            return cleared ? { threads: cleared } : {};
+          }
+          if (state.view.paneLayout) {
+            const layout = insertPaneInLayout(
+              state.view.paneLayout,
+              {
+                path: [],
+                axis: "vertical",
+                index:
+                  state.view.paneLayout.kind === "split" &&
+                  state.view.paneLayout.axis === "vertical"
+                    ? state.view.paneLayout.children.length
+                    : 1,
+              },
+              threadId,
+            );
+            const panes = collectPaneIds(layout);
+            const nextView: AppView = { kind: "thread", panes, paneLayout: layout };
+            const cleared = clearFinishedAndDone(state.threads, panes);
+            return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+          }
+          const nextPanes = [...existing, threadId] as [string, ...string[]];
+          const rl = state.view.rowLayout;
+          const newRl = rl ? [...rl.slice(0, -1), rl[rl.length - 1]! + 1] : undefined;
+          const nextView: AppView = {
+            ...state.view,
+            panes: nextPanes,
+            ...(newRl ? { rowLayout: newRl } : {}),
+          };
           const cleared = clearFinishedAndDone(state.threads, nextPanes);
           return cleared ? { view: nextView, threads: cleared } : { view: nextView };
         }),
@@ -348,13 +529,12 @@ export const useAppStore = create<AppStoreState>()(
           if (state.view.panes.includes(threadId)) {
             return {};
           }
-          const nextPanes = [...state.view.panes] as [string, ...string[]];
-          nextPanes[1] = threadId;
-          const nextView: AppView = { kind: "thread", panes: nextPanes };
+          const nextView = replacePaneInView(state.view, state.view.panes[1]!, threadId);
+          const nextPanes = nextView.kind === "thread" ? nextView.panes : [threadId];
           const cleared = clearFinishedAndDone(state.threads, nextPanes);
           return cleared ? { view: nextView, threads: cleared } : { view: nextView };
         }),
-      insertPaneAtIndex: (threadId, index) =>
+      replacePaneAtIndex: (threadId, index) =>
         set((state) => {
           if (state.view.kind !== "thread") {
             const nextView: AppView = { kind: "thread", panes: [threadId] };
@@ -362,27 +542,177 @@ export const useAppStore = create<AppStoreState>()(
             return cleared ? { view: nextView, threads: cleared } : { view: nextView };
           }
           const existing = state.view.panes;
-          if (existing.includes(threadId) || existing.length >= 3) {
+          if (existing.includes(threadId) || index < 0 || index >= existing.length) {
             return {};
           }
-          const nextPanes = [...existing];
-          nextPanes.splice(Math.max(0, Math.min(nextPanes.length, index)), 0, threadId);
-          const nextView: AppView = { kind: "thread", panes: nextPanes as [string, ...string[]] };
+          const nextPanes = [...existing] as [string, ...string[]];
+          nextPanes[index] = threadId;
+          const nextView: AppView = { ...state.view, panes: nextPanes };
           const cleared = clearFinishedAndDone(state.threads, nextPanes);
           return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+        }),
+      insertPaneAtIndex: (threadId, index, edge) =>
+        set((state) => {
+          if (state.view.kind !== "thread") {
+            const nextView: AppView = { kind: "thread", panes: [threadId] };
+            const cleared = clearFinishedAndDone(state.threads, [threadId]);
+            return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+          }
+          const existing = state.view.panes;
+          if (existing.includes(threadId)) {
+            return {};
+          }
+          const clampedIndex = Math.max(0, Math.min(existing.length, index));
+          const nextPanes = [...existing];
+          nextPanes.splice(clampedIndex, 0, threadId);
+          const newRl = rowLayoutAfterInsert(
+            state.view.rowLayout,
+            existing.length,
+            clampedIndex,
+            edge,
+          );
+
+          const nextView: AppView = {
+            ...state.view,
+            panes: nextPanes as [string, ...string[]],
+            ...(newRl ? { rowLayout: newRl } : {}),
+          };
+          const cleared = clearFinishedAndDone(state.threads, nextPanes);
+          return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+        }),
+      movePaneToIndex: (paneId, targetIndex, edge) =>
+        set((state) => {
+          if (state.view.kind !== "thread") return {};
+          const existing = state.view.panes;
+          const sourceIndex = existing.indexOf(paneId);
+          if (sourceIndex === -1) return {};
+          const nextPanes = [...existing];
+          nextPanes.splice(sourceIndex, 1);
+          const adjustedIndex = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+          const clampedIndex = Math.max(0, Math.min(nextPanes.length, adjustedIndex));
+          nextPanes.splice(clampedIndex, 0, paneId);
+          const remainingLayout = rowLayoutAfterRemove(state.view, new Set([sourceIndex]));
+          const nextRowLayout = rowLayoutAfterInsert(
+            remainingLayout,
+            nextPanes.length - 1,
+            clampedIndex,
+            edge,
+          );
+          return {
+            view: {
+              ...state.view,
+              panes: nextPanes as [string, ...string[]],
+              ...(nextRowLayout ? { rowLayout: nextRowLayout } : {}),
+            },
+          };
+        }),
+      replacePaneById: (threadId, targetPaneId) =>
+        set((state) => {
+          if (state.view.kind !== "thread") {
+            const nextView: AppView = { kind: "thread", panes: [threadId] };
+            const cleared = clearFinishedAndDone(state.threads, [threadId]);
+            return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+          }
+          if (state.view.panes.includes(threadId) || !state.view.panes.includes(targetPaneId)) {
+            return {};
+          }
+          const nextView = replacePaneInView(state.view, targetPaneId, threadId);
+          const panes = nextView.kind === "thread" ? nextView.panes : [threadId];
+          const cleared = clearFinishedAndDone(state.threads, panes);
+          return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+        }),
+      splitPaneById: (threadId, targetPaneId, edge) =>
+        set((state) => {
+          if (state.view.kind !== "thread") {
+            const nextView: AppView = { kind: "thread", panes: [threadId] };
+            const cleared = clearFinishedAndDone(state.threads, [threadId]);
+            return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+          }
+          if (state.view.panes.includes(threadId) || !state.view.panes.includes(targetPaneId)) {
+            return {};
+          }
+          const layout = splitPaneInLayout(
+            currentPaneLayout(state.view),
+            targetPaneId,
+            threadId,
+            edge,
+          );
+          const panes = collectPaneIds(layout);
+          const nextView: AppView = { kind: "thread", panes, paneLayout: layout };
+          const cleared = clearFinishedAndDone(state.threads, panes);
+          return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+        }),
+      insertPaneAtLayoutTarget: (threadId, target) =>
+        set((state) => {
+          if (state.view.kind !== "thread") {
+            const nextView: AppView = { kind: "thread", panes: [threadId] };
+            const cleared = clearFinishedAndDone(state.threads, [threadId]);
+            return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+          }
+          if (state.view.panes.includes(threadId)) return {};
+          const layout = insertPaneInLayout(currentPaneLayout(state.view), target, threadId);
+          const panes = collectPaneIds(layout);
+          const nextView: AppView = { kind: "thread", panes, paneLayout: layout };
+          const cleared = clearFinishedAndDone(state.threads, panes);
+          return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+        }),
+      movePaneToLayoutTarget: (paneId, target) =>
+        set((state) => {
+          if (state.view.kind !== "thread") return {};
+          if (!state.view.panes.includes(paneId)) return {};
+          if ("paneId" in target && target.paneId === paneId) return {};
+
+          const layout = currentPaneLayout(state.view);
+          const layoutWithoutPane = removePaneFromLayout(layout, paneId);
+          if (!layoutWithoutPane) {
+            return {};
+          }
+
+          const nextLayout =
+            "paneId" in target
+              ? splitPaneInLayout(layoutWithoutPane, target.paneId, paneId, target.edge)
+              : insertPaneInLayout(
+                  layoutWithoutPane,
+                  adjustInsertTargetForRemoval(layout, paneId, target),
+                  paneId,
+                );
+          return {
+            view: {
+              kind: "thread",
+              panes: collectPaneIds(nextLayout),
+              paneLayout: nextLayout,
+            },
+          };
+        }),
+      swapPanes: (firstPaneId, secondPaneId) =>
+        set((state) => {
+          if (state.view.kind !== "thread") return {};
+          if (
+            !state.view.panes.includes(firstPaneId) ||
+            !state.view.panes.includes(secondPaneId) ||
+            firstPaneId === secondPaneId
+          ) {
+            return {};
+          }
+          const layout = swapPaneIdsInLayout(
+            currentPaneLayout(state.view),
+            firstPaneId,
+            secondPaneId,
+          );
+          return {
+            view: {
+              kind: "thread",
+              panes: collectPaneIds(layout),
+              paneLayout: layout,
+            },
+          };
         }),
       closePane: (threadId) =>
         set((state) => {
           if (state.view.kind !== "thread") {
             return {};
           }
-          const remaining = state.view.panes.filter((id) => id !== threadId);
-          if (remaining.length === 0) {
-            return { view: { kind: "home" } };
-          }
-          return {
-            view: { kind: "thread", panes: remaining as [string, ...string[]] },
-          };
+          return { view: removePaneFromView(state.view, threadId) };
         }),
       replacePaneId: (oldId, newId) =>
         set((state) => {
@@ -391,9 +721,8 @@ export const useAppStore = create<AppStoreState>()(
           }
           const idx = state.view.panes.indexOf(oldId);
           if (idx === -1) return {};
-          const nextPanes = [...state.view.panes] as [string, ...string[]];
-          nextPanes[idx] = newId;
-          const nextView: AppView = { kind: "thread", panes: nextPanes };
+          const nextView = replacePaneInView(state.view, oldId, newId);
+          const nextPanes = nextView.kind === "thread" ? nextView.panes : [newId];
           const cleared = clearFinishedAndDone(state.threads, nextPanes);
           return cleared ? { view: nextView, threads: cleared } : { view: nextView };
         }),
@@ -429,9 +758,7 @@ export const useAppStore = create<AppStoreState>()(
           if (replacePaneIdParam && state.view.kind === "thread") {
             const idx = state.view.panes.indexOf(replacePaneIdParam);
             if (idx !== -1) {
-              const panes = [...state.view.panes];
-              panes[idx] = thread.id;
-              nextView = { kind: "thread", panes: panes as [string, ...string[]] };
+              nextView = replacePaneInView(state.view, replacePaneIdParam, thread.id);
             } else {
               nextView = { kind: "thread", panes: [thread.id] };
             }
@@ -478,11 +805,7 @@ export const useAppStore = create<AppStoreState>()(
 
           let nextView = state.view;
           if (state.view.kind === "thread") {
-            const remaining = state.view.panes.filter((id) => id !== threadId);
-            nextView =
-              remaining.length === 0
-                ? { kind: "home" as const }
-                : { kind: "thread" as const, panes: remaining as [string, ...string[]] };
+            nextView = removePaneFromView(state.view, threadId);
           }
 
           return {
@@ -614,11 +937,7 @@ export const useAppStore = create<AppStoreState>()(
 
           let nextView = state.view;
           if (state.view.kind === "thread") {
-            const remaining = state.view.panes.filter((id) => id !== threadId);
-            nextView =
-              remaining.length === 0
-                ? { kind: "home" as const }
-                : { kind: "thread" as const, panes: remaining as [string, ...string[]] };
+            nextView = removePaneFromView(state.view, threadId);
           }
 
           return { threads, view: nextView };
@@ -645,11 +964,7 @@ export const useAppStore = create<AppStoreState>()(
 
           let nextView = state.view;
           if (state.view.kind === "thread") {
-            const remaining = state.view.panes.filter((id) => id !== threadId);
-            nextView =
-              remaining.length === 0
-                ? { kind: "home" as const }
-                : { kind: "thread" as const, panes: remaining as [string, ...string[]] };
+            nextView = removePaneFromView(state.view, threadId);
           }
 
           return { threads, view: nextView };
@@ -811,7 +1126,7 @@ export const useAppStore = create<AppStoreState>()(
           if (state.view.kind !== "thread") return {};
           const reordered = reorderIds(state.view.panes, sourceId, targetId, placement);
           if (reordered === state.view.panes) return {};
-          return { view: { kind: "thread", panes: reordered as [string, ...string[]] } };
+          return { view: { ...state.view, panes: reordered as [string, ...string[]] } };
         }),
       saveDraftContent: (projectId, content) =>
         set((state) => ({
