@@ -928,8 +928,6 @@ export function App() {
   const openDraft = useAppStore((state) => state.openDraft);
   const openDraftSideBySide = useAppStore((state) => state.openDraftSideBySide);
   const openThread = useAppStore((state) => state.openThread);
-  const openThreadSideBySide = useAppStore((state) => state.openThreadSideBySide);
-  const replaceSecondPane = useAppStore((state) => state.replaceSecondPane);
   const openHome = useAppStore((state) => state.openHome);
   const renameThread = useAppStore((state) => state.renameThread);
   const archiveThread = useAppStore((state) => state.archiveThread);
@@ -2197,34 +2195,6 @@ export function App() {
 
                 startTransition(() => {
                   openThread(threadId);
-                });
-
-                if (storeHydrated && thread?.status === "inactive" && project) {
-                  reopenStoredThread(threadId);
-                }
-              }}
-              onOpenThreadSideBySide={(threadId) => {
-                const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
-                const project = thread
-                  ? projects.find((item) => item.id === thread.projectId)
-                  : undefined;
-
-                startTransition(() => {
-                  openThreadSideBySide(threadId);
-                });
-
-                if (storeHydrated && thread?.status === "inactive" && project) {
-                  reopenStoredThread(threadId);
-                }
-              }}
-              onReplaceSecondPane={(threadId) => {
-                const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
-                const project = thread
-                  ? projects.find((item) => item.id === thread.projectId)
-                  : undefined;
-
-                startTransition(() => {
-                  replaceSecondPane(threadId);
                 });
 
                 if (storeHydrated && thread?.status === "inactive" && project) {

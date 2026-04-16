@@ -17,8 +17,8 @@ import { stripAnsi } from "../../../shared/ansi";
 
 // Copied from @xterm/addon-web-links v0.12.0 (MIT license).
 // Matches http(s):// URLs, excluding unsafe/bracket characters as finals.
-// oxlint-disable-next-line no-control-regex -- intentional: exclude C0 control chars and DEL from URL matches
 const strictUrlRegex =
+  // eslint-disable-next-line no-control-regex -- intentional: exclude C0 control chars and DEL from URL matches
   /(https?|HTTPS?):[/]{2}[^\s"'!*(){}|\\^<>`\x00-\x1f\x7f]*[^\s"':,.!?{}|\\^~[\]`()<>\x00-\x1f\x7f]/;
 
 /** Characters that are legal inside a URL path/query/fragment. */

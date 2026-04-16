@@ -1,5 +1,7 @@
+import type { Dirent, Stats } from "node:fs";
 import { readdir, readFile, rename, rm, stat, writeFile, mkdir } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { readWslCommandOutputAsync } from "./agents/base";
 import type {
   CreateProjectEntryPayload,
   DeleteProjectEntryPayload,
@@ -101,24 +103,32 @@ export class ProjectTreeService {
     const directoryPath = normalizeRelativePath(payload.directoryPath);
     const fullPath = this.resolveEntryPath(payload.projectLocation, directoryPath);
     const entries = await readdir(fullPath, { withFileTypes: true });
+    const visible = entries.filter((entry) => entry.name !== ".git");
+
+    // Batch-classify symlinks so we don't spawn one wsl.exe per symlink.
+    const symlinkDirs = await this.classifySymlinks(
+      payload.projectLocation,
+      directoryPath,
+      visible,
+    );
 
     const visibleEntries = await Promise.all(
-      entries
-        .filter((entry) => entry.name !== ".git")
-        .map(async (entry): Promise<ProjectTreeEntry> => {
-          const path = joinRelativePath(directoryPath, entry.name);
-          if (entry.isDirectory()) {
-            return {
-              path,
-              name: entry.name,
-              type: "directory",
-              hasChildren: await this.directoryHasVisibleChildren(
-                this.resolveEntryPath(payload.projectLocation, path),
-              ),
-            };
-          }
-          return { path, name: entry.name, type: "file" };
-        }),
+      visible.map(async (entry): Promise<ProjectTreeEntry> => {
+        const path = joinRelativePath(directoryPath, entry.name);
+        const isDir = entry.isDirectory() || symlinkDirs.has(entry.name);
+
+        if (isDir) {
+          return {
+            path,
+            name: entry.name,
+            type: "directory",
+            hasChildren: await this.directoryHasVisibleChildren(
+              this.resolveEntryPath(payload.projectLocation, path),
+            ),
+          };
+        }
+        return { path, name: entry.name, type: "file" };
+      }),
     );
 
     return {
@@ -139,8 +149,10 @@ export class ProjectTreeService {
 
   async readProjectFile(payload: ReadProjectFilePayload): Promise<ReadProjectFileResult> {
     const path = normalizeRelativePath(payload.path);
-    const fullPath = this.resolveEntryPath(payload.projectLocation, path);
-    const fileStat = await stat(fullPath);
+    const { fullPath, fileStat } = await this.statFollowingWslSymlinks(
+      payload.projectLocation,
+      path,
+    );
     if (!fileStat.isFile()) {
       throw new Error("Only files can be opened in the editor.");
     }
@@ -176,8 +188,10 @@ export class ProjectTreeService {
 
   async writeProjectFile(payload: WriteProjectFilePayload): Promise<WriteProjectFileResult> {
     const path = normalizeRelativePath(payload.path);
-    const fullPath = this.resolveEntryPath(payload.projectLocation, path);
-    const fileStat = await stat(fullPath);
+    const { fullPath, fileStat } = await this.statFollowingWslSymlinks(
+      payload.projectLocation,
+      path,
+    );
     if (!fileStat.isFile()) {
       throw new Error("Only files can be saved from the editor.");
     }
@@ -251,11 +265,12 @@ export class ProjectTreeService {
     const currentName = path.split("/").at(-1);
     if (!currentName) throw new Error("Invalid path.");
 
-    const sourceFullPath = this.resolveEntryPath(payload.projectLocation, path);
+    const { fullPath: sourceFullPath, fileStat: entryStat } = await this.statFollowingWslSymlinks(
+      payload.projectLocation,
+      path,
+    );
     const nextPath = joinRelativePath(nextParentPath, currentName);
     if (nextPath === path) return;
-
-    const entryStat = await stat(sourceFullPath);
     if (
       entryStat.isDirectory() &&
       (nextParentPath === path || nextParentPath.startsWith(`${path}/`))
@@ -364,6 +379,106 @@ export class ProjectTreeService {
       throw new Error("Path escapes the project root.");
     }
     return candidatePath;
+  }
+
+  /**
+   * Determine which symlink entries point to directories.
+   * For WSL projects this runs a single batched `wsl.exe` command instead of
+   * spawning one process per symlink (~800-1000ms each).
+   * Returns a Set of entry names whose symlink targets are directories.
+   */
+  private async classifySymlinks(
+    location: ProjectLocation,
+    directoryPath: string,
+    entries: Dirent[],
+  ): Promise<Set<string>> {
+    const symlinks = entries.filter((e) => e.isSymbolicLink());
+    if (symlinks.length === 0) return new Set();
+
+    if (location.kind === "wsl") {
+      return this.classifyWslSymlinks(location, directoryPath, symlinks);
+    }
+
+    // Non-WSL: stat each symlink locally (fast syscall, follows symlinks).
+    const dirNames = new Set<string>();
+    await Promise.all(
+      symlinks.map(async (entry) => {
+        try {
+          const path = joinRelativePath(directoryPath, entry.name);
+          const full = this.resolveEntryPath(location, path);
+          if ((await stat(full)).isDirectory()) dirNames.add(entry.name);
+        } catch {
+          // broken symlink
+        }
+      }),
+    );
+    return dirNames;
+  }
+
+  /** Batch-classify WSL symlinks via a single `wsl.exe` invocation. */
+  private async classifyWslSymlinks(
+    location: Extract<ProjectLocation, { kind: "wsl" }>,
+    directoryPath: string,
+    symlinks: Dirent[],
+  ): Promise<Set<string>> {
+    const linuxDir = directoryPath ? `${location.linuxPath}/${directoryPath}` : location.linuxPath;
+
+    // Build a POSIX script that outputs 'd' or 'f' per symlink, one per line.
+    const tests = symlinks
+      .map((e) => {
+        const escaped = e.name.replace(/'/g, "'\\''");
+        return `test -d '${linuxDir}/${escaped}' && printf 'd\\n' || printf 'f\\n'`;
+      })
+      .join(";");
+
+    const result = await readWslCommandOutputAsync(location.distro, "sh", ["-c", tests]);
+
+    const dirNames = new Set<string>();
+    if (result.ok) {
+      const lines = result.stdout.split("\n");
+      for (let i = 0; i < symlinks.length; i++) {
+        if (lines[i]?.trim() === "d") dirNames.add(symlinks[i]!.name);
+      }
+    }
+    return dirNames;
+  }
+
+  /**
+   * `stat()` a project entry, following WSL symlinks when necessary.
+   * Returns both the resolved path and the Stats object so callers never
+   * need a redundant second `stat()`.
+   *
+   * The Windows 9P bridge cannot follow Linux symlinks over UNC paths, so
+   * when `stat` fails with ENOENT on a WSL location we resolve the real
+   * path via `realpath` inside the distro and rebuild the UNC path.
+   */
+  private async statFollowingWslSymlinks(
+    location: ProjectLocation,
+    relativePath: string,
+  ): Promise<{ fullPath: string; fileStat: Stats }> {
+    const fullPath = this.resolveEntryPath(location, relativePath);
+    try {
+      return { fullPath, fileStat: await stat(fullPath) };
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code !== "ENOENT" || location.kind !== "wsl") throw err;
+    }
+
+    // UNC stat failed — the path likely contains Linux symlinks.
+    // Ask WSL to resolve the real path inside the distro.
+    const linuxTarget = relativePath ? `${location.linuxPath}/${relativePath}` : location.linuxPath;
+    const result = await readWslCommandOutputAsync(location.distro, "realpath", [
+      "-e",
+      linuxTarget,
+    ]);
+    if (!result.ok) {
+      throw Object.assign(new Error(`ENOENT: no such file or directory, stat '${fullPath}'`), {
+        code: "ENOENT",
+        syscall: "stat",
+        path: fullPath,
+      });
+    }
+    const resolved = `\\\\wsl.localhost\\${location.distro}${result.stdout.replace(/\//g, "\\")}`;
+    return { fullPath: resolved, fileStat: await stat(resolved) };
   }
 
   private async directoryHasVisibleChildren(fullPath: string): Promise<boolean> {

@@ -138,7 +138,6 @@ vi.mock("./components/sidebar/Sidebar", () => ({
   },
   Sidebar: (props: {
     onOpenThread?: (threadId: string) => void;
-    onOpenThreadSideBySide?: (threadId: string) => void;
     onUnloadThread?: (threadId: string) => void;
     onGitMergeAndRemove?: (projectId: string, worktreePath: string) => void;
   }) => (

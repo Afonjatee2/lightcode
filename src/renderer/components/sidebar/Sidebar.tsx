@@ -250,8 +250,6 @@ function SortableThreadItem(props: {
   editingThreadId: string | null;
   setEditingThreadId: (id: string | null) => void;
   onOpenThread: (threadId: string) => void;
-  onOpenThreadSideBySide: (threadId: string) => void;
-  onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
   onMarkThreadDone: (threadId: string) => void;
   onRenameThread: (threadId: string, title: string) => void;
@@ -365,22 +363,6 @@ function SortableThreadItem(props: {
             label: thread.done ? "Unmark Done" : "Mark Done",
             icon: <CircleCheck className="size-3.5" />,
           },
-          ...(currentThreadIds.length >= 2
-            ? [
-                {
-                  id: "replace-second",
-                  label: "Replace 2nd",
-                  icon: <Columns2 className="size-3.5" />,
-                  isDisabled: currentThreadIds.includes(thread.id),
-                },
-              ]
-            : []),
-          {
-            id: "open-side",
-            label: currentThreadIds.length >= 2 ? "Open 3rd" : "Open Side by Side",
-            icon: <Columns2 className="size-3.5" />,
-            isDisabled: currentThreadIds.includes(thread.id) || currentThreadIds.length >= 3,
-          },
           { type: "separator" as const },
           {
             id: "archive",
@@ -418,8 +400,6 @@ function SortableThreadItem(props: {
           if (key === "rename") props.setEditingThreadId(thread.id);
           if (key === "unload") props.onUnloadThread(thread.id);
           if (key === "mark-done") props.onMarkThreadDone(thread.id);
-          if (key === "replace-second") props.onReplaceSecondPane(thread.id);
-          if (key === "open-side") props.onOpenThreadSideBySide(thread.id);
           if (key === "delete")
             props.onDeleteThread(thread.id, thread.worktreePath, thread.projectId);
           if (key.startsWith("action:")) {
@@ -585,8 +565,6 @@ function SortableWorktreeGroup(props: {
   editingThreadId: string | null;
   setEditingThreadId: (id: string | null) => void;
   onOpenThread: (threadId: string) => void;
-  onOpenThreadSideBySide: (threadId: string) => void;
-  onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
   onMarkThreadDone: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
@@ -738,8 +716,6 @@ function SortableWorktreeGroup(props: {
               editingThreadId={props.editingThreadId}
               setEditingThreadId={props.setEditingThreadId}
               onOpenThread={props.onOpenThread}
-              onOpenThreadSideBySide={props.onOpenThreadSideBySide}
-              onReplaceSecondPane={props.onReplaceSecondPane}
               onUnloadThread={props.onUnloadThread}
               onMarkThreadDone={props.onMarkThreadDone}
               onArchiveThread={props.onArchiveThread}
@@ -831,8 +807,6 @@ function SortableProjectHeader(props: {
   onOpenNewThread: (projectId?: string) => void;
   onOpenNewThreadSideBySide: (projectId: string) => void;
   onOpenThread: (threadId: string) => void;
-  onOpenThreadSideBySide: (threadId: string) => void;
-  onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
   onMarkThreadDone: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
@@ -1062,8 +1036,6 @@ function SortableProjectHeader(props: {
                     editingThreadId={props.editingThreadId}
                     setEditingThreadId={props.setEditingThreadId}
                     onOpenThread={props.onOpenThread}
-                    onOpenThreadSideBySide={props.onOpenThreadSideBySide}
-                    onReplaceSecondPane={props.onReplaceSecondPane}
                     onUnloadThread={props.onUnloadThread}
                     onMarkThreadDone={props.onMarkThreadDone}
                     onArchiveThread={props.onArchiveThread}
@@ -1114,8 +1086,6 @@ function SortableProjectHeader(props: {
                       editingThreadId={props.editingThreadId}
                       setEditingThreadId={props.setEditingThreadId}
                       onOpenThread={props.onOpenThread}
-                      onOpenThreadSideBySide={props.onOpenThreadSideBySide}
-                      onReplaceSecondPane={props.onReplaceSecondPane}
                       onUnloadThread={props.onUnloadThread}
                       onMarkThreadDone={props.onMarkThreadDone}
                       onArchiveThread={props.onArchiveThread}
@@ -1155,8 +1125,6 @@ function SortableProjectHeader(props: {
                     editingThreadId={props.editingThreadId}
                     setEditingThreadId={props.setEditingThreadId}
                     onOpenThread={props.onOpenThread}
-                    onOpenThreadSideBySide={props.onOpenThreadSideBySide}
-                    onReplaceSecondPane={props.onReplaceSecondPane}
                     onUnloadThread={props.onUnloadThread}
                     onMarkThreadDone={props.onMarkThreadDone}
                     onArchiveThread={props.onArchiveThread}
@@ -1211,8 +1179,6 @@ export function Sidebar(props: {
   onOpenNewThread: (projectId?: string) => void;
   onOpenNewThreadSideBySide: (projectId: string) => void;
   onOpenThread: (threadId: string) => void;
-  onOpenThreadSideBySide: (threadId: string) => void;
-  onReplaceSecondPane: (threadId: string) => void;
   onUnloadThread: (threadId: string) => void;
   onMarkThreadDone: (threadId: string) => void;
   onArchiveThread: (threadId: string) => void;
@@ -1251,8 +1217,6 @@ export function Sidebar(props: {
     onOpenNewThread,
     onOpenNewThreadSideBySide,
     onOpenThread,
-    onOpenThreadSideBySide,
-    onReplaceSecondPane,
     onUnloadThread,
     onMarkThreadDone,
     onArchiveThread,
@@ -1421,8 +1385,6 @@ export function Sidebar(props: {
                   onOpenNewThread={onOpenNewThread}
                   onOpenNewThreadSideBySide={onOpenNewThreadSideBySide}
                   onOpenThread={onOpenThread}
-                  onOpenThreadSideBySide={onOpenThreadSideBySide}
-                  onReplaceSecondPane={onReplaceSecondPane}
                   onUnloadThread={onUnloadThread}
                   onMarkThreadDone={onMarkThreadDone}
                   onArchiveThread={onArchiveThread}
