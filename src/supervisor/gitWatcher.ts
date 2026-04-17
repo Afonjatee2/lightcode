@@ -40,7 +40,6 @@ function isIgnoredWorkTreeFile(name: string): boolean {
 
 const INOTIFYWAIT_EXCLUDE =
   "(node_modules|\\.next|dist|build|__pycache__|\\.venv|\\.git/objects|\\.git/logs|\\.git/FETCH_HEAD)";
-const WSL_WATCHER_LOG_PREFIX = "[git-watcher:wsl]";
 
 /**
  * Deploy the @parcel/watcher native binary + helper script into a WSL distro.
@@ -292,11 +291,6 @@ export class GitWatcher {
   private ensureWslWatcherDeployed(distro: string): void {
     if (this.deployedDistros.has(distro)) return;
     const watcherPath = deployWslWatcher(distro);
-    if (watcherPath) {
-      console.log(`${WSL_WATCHER_LOG_PREFIX} deployed distro=${distro} dir=${watcherPath}`);
-    } else {
-      console.warn(`${WSL_WATCHER_LOG_PREFIX} deploy failed distro=${distro}`);
-    }
     this.deployedDistros.set(distro, watcherPath);
   }
 
@@ -324,13 +318,9 @@ export class GitWatcher {
     const parcelBlock = watcherDir
       ? [
           "if ! command -v node >/dev/null 2>&1; then",
-          `  echo "${WSL_WATCHER_LOG_PREFIX} parcel-unavailable reason=node-missing"`,
           `elif [ ! -f '${watcherDir}/watcher.node' ]; then`,
-          `  echo "${WSL_WATCHER_LOG_PREFIX} parcel-unavailable reason=binary-missing dir=${watcherDir}"`,
           `elif ! node -e "require('${watcherDir}/watcher.node')" >/dev/null 2>&1; then`,
-          `  echo "${WSL_WATCHER_LOG_PREFIX} parcel-unavailable reason=load-failed dir=${watcherDir}"`,
           "else",
-          `  echo "${WSL_WATCHER_LOG_PREFIX} backend=parcel"`,
           `  exec node "${watcherDir}/wsl-watcher.cjs" .git .`,
           "fi",
         ]
@@ -339,18 +329,12 @@ export class GitWatcher {
     const script = [
       ...parcelBlock,
       "if command -v inotifywait >/dev/null 2>&1; then",
-      `  echo "${WSL_WATCHER_LOG_PREFIX} backend=inotifywait"`,
       "  exec inotifywait -m -r -q -e modify,create,delete,move .git . \\",
       `    --exclude '${INOTIFYWAIT_EXCLUDE}'`,
       "else",
-      `  echo "${WSL_WATCHER_LOG_PREFIX} backend=poll interval=30s"`,
       "  while true; do echo poll; sleep 30; done",
       "fi",
     ].join("\n");
-
-    console.log(
-      `${WSL_WATCHER_LOG_PREFIX} starting distro=${distro} path=${linuxPath} watcherDir=${watcherDir ?? "(none)"}`,
-    );
 
     const child = spawn(
       getWslCommand(),
@@ -370,26 +354,19 @@ export class GitWatcher {
       for (const rawLine of lines) {
         const line = rawLine.trim();
         if (!line) continue;
-        if (line.startsWith(WSL_WATCHER_LOG_PREFIX)) {
-          console.log(`${line} distro=${distro} path=${linuxPath}`);
-          continue;
-        }
         if (line === "changed" || line.startsWith("changed:")) {
           const parts = line.split(":");
           const scope = line === "changed" ? "unknown" : (parts[1] ?? "unknown");
           const pathsJson = parts.length >= 3 ? parts[2] : undefined;
-          const totalCount = parts.length >= 4 ? parts[3] : undefined;
           let parsedPaths: string[] = [];
-          let paths = "";
           if (pathsJson) {
             try {
               const parsed = JSON.parse(pathsJson);
               if (Array.isArray(parsed) && parsed.length > 0) {
                 parsedPaths = parsed.filter((value): value is string => typeof value === "string");
-                paths = ` paths=${JSON.stringify(parsed)}`;
               }
             } catch {
-              // best-effort debug logging
+              // best-effort parse for watcher metadata
             }
           }
           const isKnownGitNoise =
@@ -404,43 +381,21 @@ export class GitWatcher {
                 value.startsWith("objects/"),
             );
           if (scope === "git" && (parsedPaths.length === 0 || isKnownGitNoise)) {
-            console.log(
-              `${WSL_WATCHER_LOG_PREFIX} event=ignored scope=git paths=${JSON.stringify(parsedPaths)} distro=${distro} path=${linuxPath}`,
-            );
             continue;
           }
-          const count = totalCount ? ` sampleCount=${totalCount}` : "";
-          console.log(
-            `${WSL_WATCHER_LOG_PREFIX} event=fs backend=parcel scope=${scope}${paths}${count} distro=${distro} path=${linuxPath}`,
-          );
           onEvent();
           continue;
         }
         if (line === "poll") {
-          console.log(
-            `${WSL_WATCHER_LOG_PREFIX} event=poll-tick distro=${distro} path=${linuxPath}`,
-          );
           onEvent();
           continue;
         }
-        console.log(
-          `${WSL_WATCHER_LOG_PREFIX} event=fs backend=inotifywait raw=${JSON.stringify(line)} distro=${distro} path=${linuxPath}`,
-        );
         onEvent();
       }
     });
 
-    child.on("error", (error) => {
-      console.error(
-        `${WSL_WATCHER_LOG_PREFIX} child-error distro=${distro} path=${linuxPath}:`,
-        error,
-      );
+    child.on("error", () => {
       // wsl.exe could not be started — degrade to no watching
-    });
-    child.on("exit", (code, signal) => {
-      console.log(
-        `${WSL_WATCHER_LOG_PREFIX} exited distro=${distro} path=${linuxPath} code=${code ?? "null"} signal=${signal ?? "null"}`,
-      );
     });
 
     return child;
