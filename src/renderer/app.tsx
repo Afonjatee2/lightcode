@@ -2129,6 +2129,7 @@ export function App() {
         <PageLayout
           title={getAppName(import.meta.env.DEV)}
           onTitleClick={() => startTransition(() => openHome())}
+          onRequestClosePanels={closeAllPanels}
           sidebarHeaderChildren={
             <div className="lightcode-overlay-header__controls">
               {isWindows() ? (

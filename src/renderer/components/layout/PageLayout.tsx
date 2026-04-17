@@ -17,6 +17,7 @@ export function PageLayout(props: {
   rightPanelOpen?: boolean;
   gitPanel?: ReactNode;
   gitPanelOpen?: boolean;
+  onRequestClosePanels?: () => void;
 }) {
   const {
     title,
@@ -29,6 +30,7 @@ export function PageLayout(props: {
     rightPanelOpen,
     gitPanel,
     gitPanelOpen,
+    onRequestClosePanels,
   } = props;
 
   const sidebarHeader = (
@@ -62,6 +64,7 @@ export function PageLayout(props: {
       {...(rightPanelOpen != null ? { rightPanelOpen } : {})}
       gitPanel={gitPanel}
       {...(gitPanelOpen != null ? { gitPanelOpen } : {})}
+      {...(onRequestClosePanels != null ? { onRequestClosePanels } : {})}
     />
   );
 }

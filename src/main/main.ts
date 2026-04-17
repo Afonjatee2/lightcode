@@ -244,7 +244,7 @@ function createWindow(): BrowserWindow {
     width: saved?.width ?? 1460,
     height: saved?.height ?? 920,
     ...(saved?.x != null && saved?.y != null ? { x: saved.x, y: saved.y } : {}),
-    minWidth: 1080,
+    minWidth: 540,
     minHeight: 720,
     backgroundColor: "#1c1f24",
     autoHideMenuBar: true,

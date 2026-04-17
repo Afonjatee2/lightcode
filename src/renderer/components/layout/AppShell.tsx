@@ -14,6 +14,7 @@ const PANEL_BOTTOM_DEFAULT_HEIGHT = 300;
 const GIT_PANEL_MIN_WIDTH = 280;
 const GIT_PANEL_MAX_WIDTH = 500;
 const GIT_PANEL_DEFAULT_WIDTH = 350;
+const CONTENT_MIN_WIDTH = 540;
 
 function readStoredNumber(key: string, fallback: number): number {
   try {
@@ -64,6 +65,7 @@ export function AppShell(props: {
   rightPanelOpen?: boolean;
   gitPanel?: ReactNode;
   gitPanelOpen?: boolean;
+  onRequestClosePanels?: () => void;
 }) {
   const {
     sidebar,
@@ -74,6 +76,7 @@ export function AppShell(props: {
     rightPanelOpen = false,
     gitPanel,
     gitPanelOpen = false,
+    onRequestClosePanels,
   } = props;
   const terminalPosition = useSharedSettings((s) => s.terminalPosition);
 
@@ -96,6 +99,8 @@ export function AppShell(props: {
     "sidebar" | "panel" | "panel-bottom" | "git-panel" | null
   >(null);
   const resizeRef = useRef({ startX: 0, startY: 0, startWidth: 0, startHeight: 0 });
+  const mainRef = useRef<HTMLElement>(null);
+  const didAutoHideRef = useRef<"panels" | "sidebar" | null>(null);
 
   useEffect(() => {
     localStorage.setItem("lightcode-sidebar-width", String(sidebarWidth));
@@ -116,6 +121,32 @@ export function AppShell(props: {
   useEffect(() => {
     localStorage.setItem("lightcode-git-panel-width", String(gitPanelWidth));
   }, [gitPanelWidth]);
+
+  useEffect(() => {
+    const el = mainRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const width = entry.contentRect.width;
+      if (width < CONTENT_MIN_WIDTH) {
+        if (didAutoHideRef.current) return;
+        if (rightPanelOpen || gitPanelOpen) {
+          didAutoHideRef.current = "panels";
+          onRequestClosePanels?.();
+        } else if (!isCollapsed) {
+          didAutoHideRef.current = "sidebar";
+          setIsCollapsed(true);
+        }
+      } else {
+        didAutoHideRef.current = null;
+      }
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [rightPanelOpen, gitPanelOpen, isCollapsed, onRequestClosePanels]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -264,7 +295,10 @@ export function AppShell(props: {
             <div
               className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${isBottom && rightPanel ? "flex-col" : ""}`}
             >
-              <main className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
+              <main
+                ref={mainRef}
+                className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden"
+              >
                 <div className="relative h-full min-h-0">{content}</div>
               </main>
 
