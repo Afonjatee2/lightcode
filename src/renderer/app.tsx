@@ -387,6 +387,7 @@ function HomeView() {
   const openDraft = useAppStore((state) => state.openDraft);
   const openThread = useAppStore((state) => state.openThread);
   const recentThreads = threads
+    .filter((t) => !t.done)
     .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
     .slice(0, 8);
 
