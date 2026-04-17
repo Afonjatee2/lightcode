@@ -315,6 +315,7 @@ export function GitReviewPanel(props: {
             onClose={onClose}
             refreshKey={refreshKey}
             onRefresh={() => void handleRefresh()}
+            statusKey={statusKey}
             mode="panel"
             wrapLines={wrapLines}
           />

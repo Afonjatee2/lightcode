@@ -1,11 +1,12 @@
 import type { SVGProps } from "react";
 
 /**
- * 4-bar signal icon using thin stroked lines. Active bars use `currentColor`,
+ * Signal-bar icon using thin stroked lines. Active bars use `currentColor`,
  * inactive bars are drawn at low opacity so the full scale is always visible.
  *
- * Uses the effort's position within the available list so the icon scales
- * correctly regardless of which subset of levels a provider exposes.
+ * Renders 4 or 5 bars depending on how many effort levels the provider
+ * exposes. The effort's position within the list determines how many bars
+ * are lit.
  */
 export function EffortIcon(
   props: SVGProps<SVGSVGElement> & { effort: string; efforts: readonly string[] },
@@ -13,23 +14,33 @@ export function EffortIcon(
   const { effort, efforts, ...svgProps } = props;
   const index = efforts.indexOf(effort);
   const count = efforts.length;
+  const totalBars = count >= 5 ? 5 : 4;
 
-  // Map index → 1..4 active bars, distributing evenly across the scale
   let active: number;
   if (count <= 1) {
-    active = 4;
+    active = totalBars;
   } else {
-    active = Math.min(4, Math.max(1, Math.round((index / (count - 1)) * 3) + 1));
+    active = Math.min(
+      totalBars,
+      Math.max(1, Math.round((index / (count - 1)) * (totalBars - 1)) + 1),
+    );
   }
 
-  // 4 vertical lines, left-to-right, increasing height
-  // x positions spread across viewbox, bottom-aligned at y=20
-  const bars = [
-    { x: 5, y1: 20, y2: 16 },
-    { x: 9.5, y1: 20, y2: 12 },
-    { x: 14, y1: 20, y2: 8 },
-    { x: 18.5, y1: 20, y2: 4 },
-  ];
+  const bars =
+    totalBars === 5
+      ? [
+          { x: 3.5, y1: 20, y2: 17 },
+          { x: 7.25, y1: 20, y2: 14 },
+          { x: 11, y1: 20, y2: 10 },
+          { x: 14.75, y1: 20, y2: 6 },
+          { x: 18.5, y1: 20, y2: 3 },
+        ]
+      : [
+          { x: 5, y1: 20, y2: 16 },
+          { x: 9.5, y1: 20, y2: 12 },
+          { x: 14, y1: 20, y2: 8 },
+          { x: 18.5, y1: 20, y2: 4 },
+        ];
 
   return (
     <svg

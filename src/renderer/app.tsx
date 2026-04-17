@@ -7,15 +7,18 @@ import {
   useRef,
   useState,
 } from "react";
-import { ArrowRight, FolderOpen, FolderPlus, Monitor, Plus, TerminalSquare } from "lucide-react";
-import { Button, Dropdown, Label, Spinner, toast } from "@heroui/react";
-import { TuxIcon } from "./components/common/TuxIcon";
+import { ArrowRight, FolderOpen, FolderPlus, Monitor, Plus, TerminalSquare, X } from "lucide-react";
+import { Button, Dropdown, Label, toast } from "@heroui/react";
+import { PixelLoader, TuxIcon } from "./components/common";
 import type {
   AgentStatus,
   PrData,
+  ExtractContextResult,
   Project,
   ProjectLocation,
   PromptSegment,
+  Thread,
+  ThreadConfig,
 } from "../shared/contracts";
 import { getProjectAgentStatuses } from "../shared/agentStatus";
 import { parseWslUncPath } from "../shared/wsl";
@@ -101,13 +104,16 @@ import {
   type PaneDropIndicator,
 } from "./dnd";
 
-// ── Module-level IPC listener ───────────────────────────────────
+// ── Module-level IPC listeners ──────────────────────────────────
 // Subscribes to supervisor events as soon as the module loads,
 // completely outside React's lifecycle.  This guarantees events are
 // never missed due to useEffect timing, StrictMode double-mounts,
 // or startTransition batching.
-readBridge().onSupervisorEvent((event) => {
-  // Shell sessions use a "shell:" prefix — skip appStore updates for them.
+//
+// Both subscribe calls return unsubscribe functions which we store
+// so that Vite HMR can tear them down before re-executing the module.
+
+const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
   if ("threadId" in event && event.threadId.startsWith("shell:")) {
     return;
   }
@@ -139,10 +145,7 @@ readBridge().onSupervisorEvent((event) => {
   }
 });
 
-// ── Module-level update status listener ──────────────────────────
-// Subscribes to auto-update events from the main process,
-// forwarding them to the Zustand update store.
-readBridge().onUpdateStatus((status) => {
+const unsubUpdate = readBridge().onUpdateStatus((status) => {
   const store = useUpdateStore.getState();
   switch (status.type) {
     case "checking":
@@ -171,6 +174,13 @@ readBridge().onUpdateStatus((status) => {
       break;
   }
 });
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    unsubSupervisor();
+    unsubUpdate();
+  });
+}
 
 function resolveWorktreeBranch(
   projectId: string,
@@ -469,9 +479,19 @@ function ThreadPane(props: {
   paneCount: number;
   paneAlign: "left" | "center" | "right";
   onClose: () => void;
+  onContinueInProvider?: (
+    sourceThread: Thread,
+    targetKind: string,
+    targetConfig: ThreadConfig,
+    closeOriginal: boolean,
+    extractedContext: ExtractContextResult | null,
+  ) => void;
 }) {
   const thread = useThread(props.threadId);
   const project = useProject(thread?.projectId);
+  const installedAgents = useAppStore(
+    useShallow((s) => s.agentStatuses.filter((a) => a.installed)),
+  );
   const agentStatus = useAppStore((s) => {
     if (!thread || !project) return undefined;
     return getProjectAgentStatuses(project.location, s.agentStatuses, s.wslAgentStatuses).find(
@@ -522,7 +542,7 @@ function ThreadPane(props: {
       projectName={project.name}
       agentStatus={agentStatus}
       isWsl={project.location.kind === "wsl"}
-      showCloseButton={props.paneCount > 1}
+      showCloseButton
       paneAlign={props.paneAlign}
       isDragging={isDragging}
       dropIndicator={dropIndicator}
@@ -580,6 +600,14 @@ function ThreadPane(props: {
         });
         touchThread(thread.id);
       }}
+      installedAgents={installedAgents}
+      onContinueInProvider={
+        props.onContinueInProvider
+          ? (targetKind, tConfig, closeOrig, ctx) => {
+              props.onContinueInProvider?.(thread, targetKind, tConfig, closeOrig, ctx);
+            }
+          : undefined
+      }
     />
   );
 }
@@ -605,8 +633,10 @@ function DraftPane(props: {
   ) => void;
 }) {
   const project = useProject(props.projectId);
-  const projectAgentStatuses = useAppStore((s) =>
-    project ? getProjectAgentStatuses(project.location, s.agentStatuses, s.wslAgentStatuses) : [],
+  const projectAgentStatuses = useAppStore(
+    useShallow((s) =>
+      project ? getProjectAgentStatuses(project.location, s.agentStatuses, s.wslAgentStatuses) : [],
+    ),
   );
 
   const paneElementRef = useRef<HTMLDivElement>(null);
@@ -634,7 +664,7 @@ function DraftPane(props: {
       agentStatuses={projectAgentStatuses}
       compact
       paneAlign={props.paneAlign}
-      showCloseButton={props.paneCount > 1}
+      showCloseButton
       isDragging={isDragging}
       dropIndicator={dropIndicator}
       paneCount={props.paneCount}
@@ -653,6 +683,12 @@ function AppContent() {
   const createThread = useAppStore((state) => state.createThread);
   const queueThreadLaunch = useAppStore((state) => state.queueThreadLaunch);
   const updateProjectDraftConfig = useAppStore((state) => state.updateProjectDraftConfig);
+  const activeGroupName = useAppStore((s) => {
+    const v = s.view;
+    if (v.kind !== "thread" || !v.activeGroupId) return undefined;
+    const match = s.threads.find((t) => t.groupId === v.activeGroupId);
+    return match?.groupName ?? match?.title ?? "Group";
+  });
   const hasValidPanes = useAppStore(
     (s) =>
       s.view.kind === "thread" &&
@@ -746,6 +782,18 @@ function AppContent() {
           .join("")
           .trim() || prompt
       : prompt;
+    // If in group view, new threads join the active group
+    const currentView = useAppStore.getState().view;
+    const activeGroup =
+      currentView.kind === "thread" && currentView.activeGroupId
+        ? {
+            groupId: currentView.activeGroupId,
+            groupName: useAppStore
+              .getState()
+              .threads.find((t) => t.groupId === currentView.activeGroupId)?.groupName,
+          }
+        : undefined;
+
     const thread = createThread({
       projectId: project.id,
       agentKind,
@@ -753,9 +801,84 @@ function AppContent() {
       prompt: titlePrompt,
       ...(worktreePath ? { worktreePath, worktreeBranch } : {}),
       ...(replacePaneIdParam ? { replacePaneId: replacePaneIdParam } : {}),
+      ...(activeGroup?.groupId ? { groupId: activeGroup.groupId } : {}),
+      ...(activeGroup?.groupName ? { groupName: activeGroup.groupName } : {}),
     });
     queueThreadLaunch(thread.id, prompt, segments);
     generateTitleAsync(thread.id, project.location, projectAgentStatuses, titlePrompt);
+  }
+
+  async function handleContinueInProvider(
+    sourceThread: Thread,
+    targetAgentKind: string,
+    targetConfig: ThreadConfig,
+    closeOriginal: boolean,
+    extractedContext: ExtractContextResult | null,
+  ) {
+    const storeProjects = useAppStore.getState().projects;
+    const project = storeProjects.find((p) => p.id === sourceThread.projectId);
+    if (!project) return;
+
+    // Assign groupId + groupName
+    const groupId = sourceThread.groupId ?? crypto.randomUUID();
+    const groupName = sourceThread.groupName ?? sourceThread.title;
+    if (!sourceThread.groupId) {
+      useAppStore.setState((state) => ({
+        threads: state.threads.map((t) =>
+          t.id === sourceThread.id ? { ...t, groupId, groupName } : t,
+        ),
+      }));
+    }
+
+    // Create new thread first (need the ID for the handoff file path)
+    const thread = createThread({
+      projectId: project.id,
+      agentKind: targetAgentKind,
+      config: targetConfig,
+      prompt: extractedContext ? "Continuing task from another provider..." : sourceThread.title,
+      ...(sourceThread.worktreePath ? { worktreePath: sourceThread.worktreePath } : {}),
+      ...(sourceThread.worktreeBranch ? { worktreeBranch: sourceThread.worktreeBranch } : {}),
+      groupId,
+      groupName,
+    });
+
+    if (extractedContext) {
+      try {
+        const filePath = await readBridge().saveHandoffContext({
+          threadId: thread.id,
+          content: extractedContext.summary,
+        });
+        const prompt = `This task was handed off from a ${extractedContext.sourceProvider} session. Read the attached context file and understand it. Wait for instructions.`;
+        const segments: PromptSegment[] = [
+          { kind: "text", content: prompt },
+          { kind: "attachment", path: filePath },
+        ];
+        queueThreadLaunch(thread.id, prompt, segments);
+      } catch {
+        const prompt = `[Context from previous ${extractedContext.sourceProvider} session]\n\n${extractedContext.summary}\n\nUnderstand the context and wait for instructions.`;
+        queueThreadLaunch(thread.id, prompt);
+      }
+    }
+
+    if (closeOriginal) {
+      // Move: close original, open new thread
+      readBridge()
+        .closeThread({ threadId: sourceThread.id })
+        .catch(() => {});
+      useAppStore.getState().openThread(thread.id);
+    } else {
+      // Clone: open both side by side
+      useAppStore.getState().openThreadSideBySide(thread.id);
+    }
+
+    // Generate title from source thread's title
+    const { agentStatuses, wslAgentStatuses } = useAppStore.getState();
+    const agents = getProjectAgentStatuses(project.location, agentStatuses, wslAgentStatuses);
+    generateTitleAsync(thread.id, project.location, agents, sourceThread.title);
+
+    // Toast
+    const targetLabel = agents.find((a) => a.kind === targetAgentKind)?.label ?? targetAgentKind;
+    toast.success(`Context transferred to ${targetLabel}`);
   }
 
   if (view.kind === "draft") {
@@ -814,6 +937,7 @@ function AppContent() {
           paneCount={paneCount}
           paneAlign={paneAlign}
           onClose={() => closePane(paneId)}
+          onContinueInProvider={handleContinueInProvider}
         />
       );
       return (
@@ -828,9 +952,26 @@ function AppContent() {
       );
     }
 
+    const activeGroupId = view.activeGroupId;
+
     return (
-      <div className="h-full">
-        <SplitPaneContainer layout={paneLayout} renderPane={renderPane} />
+      <div className="flex h-full flex-col">
+        {activeGroupId && activeGroupName && (
+          <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.06] px-4 py-1">
+            <span className="truncate text-xs font-medium text-muted">{activeGroupName}</span>
+            <button
+              type="button"
+              aria-label="Close group"
+              className="shrink-0 rounded p-0.5 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+              onClick={() => useAppStore.getState().closeGroupView()}
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
+        <div className="min-h-0 flex-1">
+          <SplitPaneContainer layout={paneLayout} renderPane={renderPane} />
+        </div>
       </div>
     );
   }
@@ -946,6 +1087,9 @@ export function App() {
   const movePaneToLayoutTarget = useAppStore((state) => state.movePaneToLayoutTarget);
   const swapPanes = useAppStore((state) => state.swapPanes);
   const updateThreadRuntime = useAppStore((state) => state.updateThreadRuntime);
+  const sidebarInstalledAgents = useAppStore(
+    useShallow((s) => s.agentStatuses.filter((a) => a.installed)),
+  );
   const fileEditorRootContext = useFileEditorStore((state) => state.rootContext);
   const fileEditorOverlayMode = useFileEditorStore((state) => state.overlayMode);
   const setFileEditorRootContext = useFileEditorStore((state) => state.setRootContext);
@@ -1687,10 +1831,11 @@ export function App() {
       if (event.type !== "git-changed") return;
       const project = projects.find((p) => p.id === event.projectId);
       if (project) void refreshProject(project);
-      // Also refresh the file tree if it's showing this project
+      // Also refresh the file tree and open buffers if showing this project
       const editorRoot = useFileEditorStore.getState().rootContext;
       if (editorRoot && editorRoot.projectId === event.projectId) {
         useFileEditorStore.getState().bumpRefreshToken();
+        void useFileEditorStore.getState().refreshOpenBuffers();
       }
     });
 
@@ -1788,7 +1933,7 @@ export function App() {
       <AppProvider>
         <div className="flex h-screen w-screen items-center justify-center bg-background text-foreground">
           <div className="flex flex-col items-center gap-4">
-            <Spinner size="lg" />
+            <PixelLoader size="lg" />
             <p className="text-sm text-muted">Loading&hellip;</p>
           </div>
         </div>
@@ -1840,6 +1985,25 @@ export function App() {
         if (target.kind === "replace") replacePaneById(threadId, target.paneId);
         else if (target.kind === "split-pane") splitPaneById(threadId, target.paneId, target.edge);
         else insertPaneAtLayoutTarget(threadId, target.target);
+
+        // If in group view, add dropped thread to the group
+        if (currentView.activeGroupId) {
+          const match = useAppStore
+            .getState()
+            .threads.find((t) => t.groupId === currentView.activeGroupId);
+          const groupName = match?.groupName ?? match?.title;
+          useAppStore.setState((state) => ({
+            threads: state.threads.map((t) =>
+              t.id === threadId
+                ? {
+                    ...t,
+                    groupId: currentView.activeGroupId,
+                    ...(groupName ? { groupName } : {}),
+                  }
+                : t,
+            ),
+          }));
+        }
       });
     } else if (source.type === "pane") {
       const sourcePaneId = source.paneId;
@@ -1882,7 +2046,7 @@ export function App() {
         <PageLayout
           title={getAppName(import.meta.env.DEV)}
           onTitleClick={() => startTransition(() => openHome())}
-          headerChildren={
+          sidebarHeaderChildren={
             <div className="lightcode-overlay-header__controls">
               {isWindows() ? (
                 <Dropdown>
@@ -2412,6 +2576,11 @@ export function App() {
                   : null
               }
               sortMode={threadSortMode}
+              installedAgents={sidebarInstalledAgents}
+              onContinueInProvider={(threadId) => {
+                // Navigate to thread — dialog opens via header button
+                useAppStore.getState().openThread(threadId);
+              }}
             />
           }
           content={
@@ -2433,7 +2602,7 @@ export function App() {
                     <Suspense
                       fallback={
                         <div className="flex h-full items-center justify-center">
-                          <Spinner size="md" />
+                          <PixelLoader size="md" />
                         </div>
                       }
                     >
@@ -2591,7 +2760,7 @@ export function App() {
                     <Suspense
                       fallback={
                         <div className="flex h-full items-center justify-center">
-                          <Spinner size="md" />
+                          <PixelLoader size="md" />
                         </div>
                       }
                     >
@@ -2739,7 +2908,7 @@ export function App() {
           <Suspense
             fallback={
               <div className="flex flex-1 items-center justify-center">
-                <Spinner size="lg" />
+                <PixelLoader size="lg" />
               </div>
             }
           >

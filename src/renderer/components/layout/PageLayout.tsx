@@ -1,15 +1,16 @@
 import type { ReactNode } from "react";
+import { isMac } from "../../bridge";
 import { AppShell } from "./AppShell";
-import { OverlayHeader } from "./OverlayHeader";
 
 /**
- * Shared page layout: header bar + AppShell body.
- * Used by the main app, git review overlay, and settings overlay.
+ * Shared page layout: split header (sidebar + content) + AppShell body.
+ * Used by the main app, git review overlay, settings overlay, and file editor.
  */
 export function PageLayout(props: {
   title: string;
   onTitleClick?: () => void;
-  headerChildren?: ReactNode;
+  sidebarHeaderChildren?: ReactNode;
+  contentHeaderChildren?: ReactNode;
   sidebar: ReactNode;
   content: ReactNode;
   rightPanel?: ReactNode;
@@ -20,7 +21,8 @@ export function PageLayout(props: {
   const {
     title,
     onTitleClick,
-    headerChildren,
+    sidebarHeaderChildren,
+    contentHeaderChildren,
     sidebar,
     content,
     rightPanel,
@@ -29,21 +31,37 @@ export function PageLayout(props: {
     gitPanelOpen,
   } = props;
 
+  const sidebarHeader = (
+    <>
+      {isMac() && <div className="w-[60px] shrink-0" />}
+      {onTitleClick ? (
+        <button
+          type="button"
+          className="lightcode-overlay-header__controls text-xs font-semibold uppercase tracking-[0.12em] text-muted hover:text-foreground transition-colors"
+          onClick={onTitleClick}
+        >
+          {title}
+        </button>
+      ) : (
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">{title}</p>
+      )}
+      {sidebarHeaderChildren}
+      <div className="flex-1" />
+    </>
+  );
+
+  const contentHeader = <>{contentHeaderChildren}</>;
+
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <OverlayHeader title={title} {...(onTitleClick ? { onTitleClick } : {})}>
-        {headerChildren}
-      </OverlayHeader>
-      <div className="lightcode-overlay-body min-h-0 flex-1">
-        <AppShell
-          sidebar={sidebar}
-          content={content}
-          rightPanel={rightPanel}
-          {...(rightPanelOpen != null ? { rightPanelOpen } : {})}
-          gitPanel={gitPanel}
-          {...(gitPanelOpen != null ? { gitPanelOpen } : {})}
-        />
-      </div>
-    </div>
+    <AppShell
+      sidebarHeader={sidebarHeader}
+      contentHeader={contentHeader}
+      sidebar={sidebar}
+      content={content}
+      rightPanel={rightPanel}
+      {...(rightPanelOpen != null ? { rightPanelOpen } : {})}
+      gitPanel={gitPanel}
+      {...(gitPanelOpen != null ? { gitPanelOpen } : {})}
+    />
   );
 }

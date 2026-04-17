@@ -92,7 +92,7 @@ vi.mock("@heroui/react", () => {
     Label: (props: { children: ReactNode }) => <span>{props.children}</span>,
     ListBox,
     Select,
-    Spinner: () => <span>spinner</span>,
+
     Surface: Wrapper,
     Tooltip,
     toast: { danger: vi.fn<() => void>() },

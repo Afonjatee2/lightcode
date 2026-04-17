@@ -121,51 +121,51 @@ export function GitReviewOverlay(props: {
   return (
     <PageLayout
       title="Git Review"
-      headerChildren={
+      sidebarHeaderChildren={
+        gitStatus?.branch ? (
+          <div className="lightcode-overlay-header__controls flex items-center gap-1 text-xs text-muted">
+            {statusKey ? (
+              <>
+                <GitBranch className="size-3 shrink-0 text-muted/50" />
+                <Tooltip delay={300}>
+                  <Tooltip.Trigger tabIndex={-1} role="none">
+                    <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
+                  </Tooltip.Trigger>
+                  <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
+                </Tooltip>
+              </>
+            ) : (
+              <BranchSelector
+                projectId={project.id}
+                currentBranch={gitStatus.branch}
+                value={gitStatus.branch}
+                onSwitchBranch={handleSwitchBranch}
+                hideWorktreeToggle
+                popoverPlacement="bottom"
+                trigger={
+                  <button
+                    type="button"
+                    className="flex min-w-0 cursor-pointer items-center gap-1 rounded px-1.5 hover:bg-foreground/5"
+                    aria-label="Switch branch"
+                  >
+                    <GitBranch className="size-3 shrink-0 text-muted/50" />
+                    <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
+                  </button>
+                }
+              />
+            )}
+            {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
+              <span className="text-muted/60">
+                ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
+              </span>
+            )}
+          </div>
+        ) : undefined
+      }
+      contentHeaderChildren={
         <>
-          {gitStatus?.branch && (
-            <div className="lightcode-overlay-header__controls flex items-center gap-1 text-xs text-muted">
-              {statusKey ? (
-                <>
-                  <GitBranch className="size-3 shrink-0 text-muted/50" />
-                  <Tooltip delay={300}>
-                    <Tooltip.Trigger tabIndex={-1} role="none">
-                      <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
-                  </Tooltip>
-                </>
-              ) : (
-                <BranchSelector
-                  projectId={project.id}
-                  currentBranch={gitStatus.branch}
-                  value={gitStatus.branch}
-                  onSwitchBranch={handleSwitchBranch}
-                  hideWorktreeToggle
-                  popoverPlacement="bottom"
-                  trigger={
-                    <button
-                      type="button"
-                      className="flex min-w-0 cursor-pointer items-center gap-1 rounded px-1.5 hover:bg-foreground/5"
-                      aria-label="Switch branch"
-                    >
-                      <GitBranch className="size-3 shrink-0 text-muted/50" />
-                      <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
-                    </button>
-                  }
-                />
-              )}
-              {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
-                <span className="text-muted/60">
-                  ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
-                </span>
-              )}
-            </div>
-          )}
-
           {selectedFile && (
             <div className="lightcode-overlay-header__controls flex items-center gap-3">
-              <div className="h-3 w-px bg-border" />
               <button
                 type="button"
                 className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs text-muted hover:text-foreground"
@@ -264,6 +264,7 @@ export function GitReviewOverlay(props: {
           onClose={onClose}
           refreshKey={refreshKey}
           onRefresh={() => void handleRefresh()}
+          statusKey={statusKey}
         />
       }
       content={

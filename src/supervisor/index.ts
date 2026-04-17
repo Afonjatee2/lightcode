@@ -2,6 +2,7 @@ import type {
   CloseThreadPayload,
   CreateProjectEntryPayload,
   DeleteProjectEntryPayload,
+  ExtractContextPayload,
   GenerateCommitMessagePayload,
   GenerateTitlePayload,
   GeneratePrSummaryPayload,
@@ -102,6 +103,7 @@ import {
   ghReopenPrPayloadSchema,
   ghGetPrChecksPayloadSchema,
   getGitStatusPayloadSchema as ghCheckAvailablePayloadSchema,
+  extractContextPayloadSchema,
   generateCommitMessagePayloadSchema,
   generateTitlePayloadSchema,
   generatePrSummaryPayloadSchema,
@@ -225,6 +227,14 @@ async function handleRequest(request: SupervisorRequest): Promise<unknown> {
       return runtime.generatePrSummary(
         generatePrSummaryPayloadSchema.parse(request.payload) as GeneratePrSummaryPayload,
       );
+    case "extractContext":
+      return runtime.extractContext(
+        extractContextPayloadSchema.parse(request.payload) as ExtractContextPayload,
+      );
+    case "cancelExtractContext":
+      return runtime.cancelExtractContext((request.payload as { threadId: string }).threadId);
+    case "readTerminalScrollback":
+      return runtime.readTerminalScrollback((request.payload as { threadId: string }).threadId);
     case "gitListBranches":
       return runtime.gitListBranches(
         getGitBranchesPayloadSchema.parse(request.payload) as GetGitBranchesPayload,

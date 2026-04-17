@@ -2,6 +2,7 @@ import { Tooltip } from "@heroui/react";
 import {
   Archive,
   ArrowDownToLine,
+  ArrowRightLeft,
   ArrowUpFromLine,
   ArrowDownUp,
   CalendarClock,
@@ -30,7 +31,7 @@ import { TuxIcon } from "../common/TuxIcon";
 import { useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
-import type { Project, Thread } from "../../../shared/contracts";
+import type { AgentStatus, Project, Thread } from "../../../shared/contracts";
 import { useAppStore } from "../../state/appStore";
 import {
   useDragSource,
@@ -51,11 +52,7 @@ import { useGitStore } from "../../state/gitStore";
 import { GitBadge } from "./GitBadge";
 import { SyncBadge } from "./SyncBadge";
 import { type GitMenuIcons, useWorktreeGitItems } from "./useWorktreeActions";
-import {
-  groupThreadsByWorktree,
-  type ThreadListEntry,
-  type WorktreeThreadGroup,
-} from "./groupThreadsByWorktree";
+import { groupThreads, type ThreadListEntry, type WorktreeThreadGroup } from "./groupThreads";
 import { WorktreeGroupHeader } from "./WorktreeGroupHeader";
 
 function formatProjectLocation(project: Project): string {
@@ -270,6 +267,8 @@ function SortableThreadItem(props: {
   activeGitPanelWorktreePath: string | null;
   activeFilesPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
+  installedAgents: AgentStatus[];
+  onContinueInProvider: (threadId: string) => void;
   group: string;
   sortDisabled?: boolean;
 }) {
@@ -363,6 +362,41 @@ function SortableThreadItem(props: {
             label: thread.done ? "Unmark Done" : "Mark Done",
             icon: <CircleCheck className="size-3.5" />,
           },
+          {
+            id: "continue-in",
+            label: "Continue in...",
+            icon: <ArrowRightLeft className="size-3.5" />,
+            isDisabled:
+              !thread.sessionRef ||
+              props.installedAgents.filter((a) => a.kind !== thread.agentKind).length === 0,
+            ...(!thread.sessionRef ||
+            props.installedAgents.filter((a) => a.kind !== thread.agentKind).length === 0
+              ? {
+                  disabledReason: !thread.sessionRef
+                    ? "No active session"
+                    : "No other agents installed",
+                }
+              : {}),
+          },
+          ...(thread.groupId
+            ? [
+                {
+                  id: "ungroup",
+                  label: "Remove from group",
+                },
+              ]
+            : []),
+          ...(props.currentThreadIds.length >= 2 &&
+          props.currentThreadIds.includes(thread.id) &&
+          !thread.groupId
+            ? [
+                {
+                  id: "group-open-threads",
+                  label: "Group open threads",
+                  icon: <Columns2 className="size-3.5" />,
+                },
+              ]
+            : []),
           { type: "separator" as const },
           {
             id: "archive",
@@ -396,6 +430,48 @@ function SortableThreadItem(props: {
             if (pr?.url) void readBridge().openExternal(pr.url);
           }
           if (key === "create-pr") props.onOpenGitReview(thread.projectId, thread.worktreePath);
+          if (key === "continue-in") props.onContinueInProvider(thread.id);
+          if (key === "group-open-threads") {
+            const state = useAppStore.getState();
+            if (state.view.kind !== "thread") return;
+            const openThreads = state.threads.filter(
+              (t) => state.view.kind === "thread" && state.view.panes.includes(t.id),
+            );
+            // Only group if all from the same project
+            const projectId = openThreads[0]?.projectId;
+            if (!projectId || !openThreads.every((t) => t.projectId === projectId)) return;
+            const groupId = crypto.randomUUID();
+            const groupName = thread.title;
+            useAppStore.setState((s) => ({
+              threads: s.threads.map((t) =>
+                s.view.kind === "thread" && s.view.panes.includes(t.id)
+                  ? { ...t, groupId, groupName }
+                  : t,
+              ),
+              view: s.view.kind === "thread" ? { ...s.view, activeGroupId: groupId } : s.view,
+            }));
+          }
+          if (key === "ungroup") {
+            useAppStore.setState((state) => {
+              let updatedThreads = state.threads.map((t) =>
+                t.id === thread.id ? { ...t, groupId: undefined, groupName: undefined } : t,
+              );
+              // If only 1 thread left in the group, dissolve it
+              const remaining = updatedThreads.filter((t) => t.groupId === thread.groupId);
+              if (remaining.length === 1) {
+                updatedThreads = updatedThreads.map((t) =>
+                  t.id === remaining[0]!.id
+                    ? { ...t, groupId: undefined, groupName: undefined }
+                    : t,
+                );
+              }
+              const view =
+                state.view.kind === "thread" && state.view.activeGroupId === thread.groupId
+                  ? { kind: "thread" as const, panes: [state.view.panes[0]] as [string] }
+                  : state.view;
+              return { threads: updatedThreads, view };
+            });
+          }
           if (key === "archive") props.onArchiveThread(thread.id);
           if (key === "rename") props.setEditingThreadId(thread.id);
           if (key === "unload") props.onUnloadThread(thread.id);
@@ -586,6 +662,8 @@ function SortableWorktreeGroup(props: {
   activeGitPanelWorktreePath: string | null;
   activeFilesPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
+  installedAgents: AgentStatus[];
+  onContinueInProvider: (threadId: string) => void;
   sortableGroup: string;
   sortDisabled?: boolean;
 }) {
@@ -736,6 +814,8 @@ function SortableWorktreeGroup(props: {
               activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
               activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
               gitMenuIcons={props.gitMenuIcons}
+              installedAgents={props.installedAgents}
+              onContinueInProvider={props.onContinueInProvider}
               group={`wt:${group.worktreePath}`}
             />
           ))}
@@ -836,6 +916,8 @@ function SortableProjectHeader(props: {
   activeFilesPanelProjectId: string | null;
   activeFilesPanelWorktreePath: string | null;
   gitMenuIcons: GitMenuIcons;
+  installedAgents: AgentStatus[];
+  onContinueInProvider: (threadId: string) => void;
   sortMode: ThreadSortMode;
 }) {
   const { project, isProjectCollapsed, sortMode } = props;
@@ -1056,6 +1138,8 @@ function SortableProjectHeader(props: {
                     activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
                     activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                     gitMenuIcons={props.gitMenuIcons}
+                    installedAgents={props.installedAgents}
+                    onContinueInProvider={props.onContinueInProvider}
                     group={dndGroup}
                   />
                 ));
@@ -1063,7 +1147,7 @@ function SortableProjectHeader(props: {
 
               // Date-sorted modes: worktree grouping + Today/Older sections, DnD disabled
               const dateField = sortMode === "created" ? "createdAt" : "updatedAt";
-              const entries = groupThreadsByWorktree(
+              const entries = groupThreads(
                 [...projectThreads].sort((a, b) => b[dateField].localeCompare(a[dateField])),
               );
               const recentEntries = entries.filter((e) => isRecent(getEntryDate(e, dateField)));
@@ -1106,49 +1190,201 @@ function SortableProjectHeader(props: {
                       activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
                       activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                       gitMenuIcons={props.gitMenuIcons}
+                      installedAgents={props.installedAgents}
+                      onContinueInProvider={props.onContinueInProvider}
                       group={dndGroup}
                       sortDisabled={dndDisabled}
                     />
                   );
                 }
 
+                if (entry.kind === "worktree-group") {
+                  return (
+                    <SortableWorktreeGroup
+                      key={entry.group.worktreePath}
+                      group={entry.group}
+                      entryIndex={entryIndex}
+                      project={project}
+                      isCollapsed={props.collapsedWorktrees[entry.group.worktreePath] ?? false}
+                      collapsedWorktrees={props.collapsedWorktrees}
+                      setCollapsedWorktrees={props.setCollapsedWorktrees}
+                      currentThreadIds={props.currentThreadIds}
+                      editingThreadId={props.editingThreadId}
+                      setEditingThreadId={props.setEditingThreadId}
+                      onOpenThread={props.onOpenThread}
+                      onUnloadThread={props.onUnloadThread}
+                      onMarkThreadDone={props.onMarkThreadDone}
+                      onArchiveThread={props.onArchiveThread}
+                      onRenameThread={props.onRenameThread}
+                      onDeleteThread={props.onDeleteThread}
+                      onDeleteWorktreeGroup={props.onDeleteWorktreeGroup}
+                      onOpenFiles={props.onOpenFiles}
+                      onOpenGitReview={props.onOpenGitReview}
+                      onGitSync={props.onGitSync}
+                      onGitPush={props.onGitPush}
+                      onGitPull={props.onGitPull}
+                      onGitMergeToSource={props.onGitMergeToSource}
+                      onGitMergeAndRemove={props.onGitMergeAndRemove}
+                      onGitPullFromSource={props.onGitPullFromSource}
+                      onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
+                      onRunProjectAction={props.onRunProjectAction}
+                      activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
+                      activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
+                      activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
+                      activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
+                      gitMenuIcons={props.gitMenuIcons}
+                      installedAgents={props.installedAgents}
+                      onContinueInProvider={props.onContinueInProvider}
+                      sortableGroup={dndGroup}
+                      sortDisabled={dndDisabled}
+                    />
+                  );
+                }
+
+                // thread-group: continuation group (threads sharing a groupId)
+                const groupKey = entry.group.groupId;
+                const isGroupCollapsed = props.collapsedWorktrees[`group:${groupKey}`] ?? false;
+                const activeThreads = entry.group.threads.filter((t) => !t.done);
+                const isRenamingGroup = props.editingThreadId === `group:${groupKey}`;
                 return (
-                  <SortableWorktreeGroup
-                    key={entry.group.worktreePath}
-                    group={entry.group}
-                    entryIndex={entryIndex}
-                    project={project}
-                    isCollapsed={props.collapsedWorktrees[entry.group.worktreePath] ?? false}
-                    collapsedWorktrees={props.collapsedWorktrees}
-                    setCollapsedWorktrees={props.setCollapsedWorktrees}
-                    currentThreadIds={props.currentThreadIds}
-                    editingThreadId={props.editingThreadId}
-                    setEditingThreadId={props.setEditingThreadId}
-                    onOpenThread={props.onOpenThread}
-                    onUnloadThread={props.onUnloadThread}
-                    onMarkThreadDone={props.onMarkThreadDone}
-                    onArchiveThread={props.onArchiveThread}
-                    onRenameThread={props.onRenameThread}
-                    onDeleteThread={props.onDeleteThread}
-                    onDeleteWorktreeGroup={props.onDeleteWorktreeGroup}
-                    onOpenFiles={props.onOpenFiles}
-                    onOpenGitReview={props.onOpenGitReview}
-                    onGitSync={props.onGitSync}
-                    onGitPush={props.onGitPush}
-                    onGitPull={props.onGitPull}
-                    onGitMergeToSource={props.onGitMergeToSource}
-                    onGitMergeAndRemove={props.onGitMergeAndRemove}
-                    onGitPullFromSource={props.onGitPullFromSource}
-                    onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
-                    onRunProjectAction={props.onRunProjectAction}
-                    activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
-                    activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
-                    activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
-                    activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
-                    gitMenuIcons={props.gitMenuIcons}
-                    sortableGroup={dndGroup}
-                    sortDisabled={dndDisabled}
-                  />
+                  <div key={`group:${groupKey}`} className="space-y-0.5">
+                    <ContextMenu
+                      items={[
+                        {
+                          id: "open-all",
+                          label: "Open All",
+                          icon: <Columns2 className="size-3.5" />,
+                          isDisabled: activeThreads.length < 2,
+                        },
+                        {
+                          id: "rename-group",
+                          label: "Rename Group",
+                          icon: <Pencil className="size-3.5" />,
+                        },
+                        { type: "separator" as const },
+                        { id: "ungroup-all", label: "Ungroup All", variant: "warning" },
+                      ]}
+                      onAction={(key) => {
+                        if (key === "open-all") {
+                          useAppStore.getState().openGroupView(entry.group.groupId);
+                        }
+                        if (key === "rename-group") {
+                          props.setEditingThreadId(`group:${groupKey}`);
+                        }
+                        if (key === "ungroup-all") {
+                          useAppStore.setState((state) => {
+                            const updatedThreads = state.threads.map((t) =>
+                              t.groupId === groupKey
+                                ? { ...t, groupId: undefined, groupName: undefined }
+                                : t,
+                            );
+                            // Clear group view if this group is currently active
+                            const view =
+                              state.view.kind === "thread" && state.view.activeGroupId === groupKey
+                                ? {
+                                    kind: "thread" as const,
+                                    panes: [state.view.panes[0]] as [string],
+                                  }
+                                : state.view;
+                            return { threads: updatedThreads, view };
+                          });
+                        }
+                      }}
+                    >
+                      <div className="flex w-full items-center gap-1 rounded px-2 py-1">
+                        <button
+                          type="button"
+                          className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-medium text-muted transition-colors hover:text-foreground"
+                          onClick={() =>
+                            props.setCollapsedWorktrees((prev) => ({
+                              ...prev,
+                              [`group:${groupKey}`]: !isGroupCollapsed,
+                            }))
+                          }
+                        >
+                          <ChevronRight
+                            className={`size-3 shrink-0 transition-transform ${isGroupCollapsed ? "" : "rotate-90"}`}
+                          />
+                          {isRenamingGroup ? (
+                            <InlineRenameInput
+                              initialValue={entry.group.groupName}
+                              onCommit={(newName) => {
+                                useAppStore.setState((state) => ({
+                                  threads: state.threads.map((t) =>
+                                    t.groupId === groupKey ? { ...t, groupName: newName } : t,
+                                  ),
+                                }));
+                                props.setEditingThreadId(null);
+                              }}
+                              onCancel={() => props.setEditingThreadId(null)}
+                            />
+                          ) : (
+                            <>
+                              <span className="truncate">{entry.group.groupName}</span>
+                              <span className="shrink-0 text-muted/60">
+                                {entry.group.threads.length}
+                              </span>
+                            </>
+                          )}
+                        </button>
+                        {!isRenamingGroup && activeThreads.length >= 2 && (
+                          <Tooltip delay={300}>
+                            <button
+                              type="button"
+                              className="shrink-0 rounded p-0.5 text-muted/40 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                              onClick={() => {
+                                useAppStore.getState().openGroupView(entry.group.groupId);
+                              }}
+                            >
+                              <Columns2 className="size-3" />
+                            </button>
+                            <Tooltip.Content>Open all in group</Tooltip.Content>
+                          </Tooltip>
+                        )}
+                      </div>
+                    </ContextMenu>
+                    {!isGroupCollapsed && (
+                      <div className="space-y-0.5 pl-2">
+                        {entry.group.threads.map((thread, threadIdx) => (
+                          <SortableThreadItem
+                            key={thread.id}
+                            thread={thread}
+                            threadIndex={threadIdx}
+                            project={project}
+                            showWorktreeBadge={!!thread.worktreePath}
+                            currentThreadIds={props.currentThreadIds}
+                            editingThreadId={props.editingThreadId}
+                            setEditingThreadId={props.setEditingThreadId}
+                            onOpenThread={props.onOpenThread}
+                            onUnloadThread={props.onUnloadThread}
+                            onMarkThreadDone={props.onMarkThreadDone}
+                            onArchiveThread={props.onArchiveThread}
+                            onRenameThread={props.onRenameThread}
+                            onDeleteThread={props.onDeleteThread}
+                            onOpenFiles={props.onOpenFiles}
+                            onOpenGitReview={props.onOpenGitReview}
+                            onGitSync={props.onGitSync}
+                            onGitPush={props.onGitPush}
+                            onGitPull={props.onGitPull}
+                            onGitMergeToSource={props.onGitMergeToSource}
+                            onGitMergeAndRemove={props.onGitMergeAndRemove}
+                            onGitPullFromSource={props.onGitPullFromSource}
+                            onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
+                            onRunProjectAction={props.onRunProjectAction}
+                            activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
+                            activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
+                            activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
+                            activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
+                            gitMenuIcons={props.gitMenuIcons}
+                            installedAgents={props.installedAgents}
+                            onContinueInProvider={props.onContinueInProvider}
+                            group={`group:${groupKey}`}
+                            sortDisabled={dndDisabled}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               };
 
@@ -1207,6 +1443,8 @@ export function Sidebar(props: {
   activeGitPanelWorktreePath: string | null;
   activeFilesPanelProjectId: string | null;
   activeFilesPanelWorktreePath: string | null;
+  installedAgents: AgentStatus[];
+  onContinueInProvider: (threadId: string) => void;
   sortMode: ThreadSortMode;
 }) {
   const threads = useAppStore((state) => state.threads);
@@ -1414,6 +1652,8 @@ export function Sidebar(props: {
                   activeFilesPanelProjectId={activeFilesPanelProjectId}
                   activeFilesPanelWorktreePath={activeFilesPanelWorktreePath}
                   gitMenuIcons={gitMenuIcons}
+                  installedAgents={props.installedAgents}
+                  onContinueInProvider={props.onContinueInProvider}
                   sortMode={props.sortMode}
                 />
               ))}

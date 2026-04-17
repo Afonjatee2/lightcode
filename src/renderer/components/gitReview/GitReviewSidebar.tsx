@@ -28,7 +28,6 @@ import {
   Dropdown,
   Label,
   Modal,
-  Spinner,
   toast,
   Tooltip,
 } from "@heroui/react";
@@ -47,7 +46,7 @@ import { useGitStore } from "../../state/gitStore";
 import { useSharedSettings } from "../../state/sharedSettingsStore";
 import { isLockFile } from "../../../shared/gitUtils";
 import { buildWorktreeLocation } from "../../../shared/worktree";
-import { SidebarButton, TextArea } from "../common";
+import { PixelLoader, SidebarButton, TextArea } from "../common";
 import { getFileIconUrl } from "../common/fileIcons";
 import { useSidebar } from "../layout/AppShell";
 import {
@@ -86,26 +85,28 @@ function FileRow(props: {
   isSelected: boolean;
   onSelect: () => void;
   onRefresh: () => void;
+  storeKey: string;
+  isWorktree: boolean;
 }) {
-  const { file, project, isSelected, onSelect, onRefresh } = props;
+  const { file, project, isSelected, onSelect, onRefresh, storeKey, isWorktree } = props;
   const [revertOpen, setRevertOpen] = useState(false);
 
   const basename = file.path.split(/[\\/]/).pop() ?? file.path;
   const dir = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : undefined;
 
   async function handleStageToggle() {
+    const store = useGitStore.getState();
     if (file.staged) {
-      await readBridge().gitUnstage({
-        projectLocation: project.location,
-        filePath: file.path,
-      });
+      store.optimisticUnstageFile(storeKey, file.path, isWorktree);
+      await readBridge()
+        .gitUnstage({ projectLocation: project.location, filePath: file.path })
+        .catch(() => onRefresh());
     } else {
-      await readBridge().gitStage({
-        projectLocation: project.location,
-        filePath: file.path,
-      });
+      store.optimisticStageFile(storeKey, file.path, isWorktree);
+      await readBridge()
+        .gitStage({ projectLocation: project.location, filePath: file.path })
+        .catch(() => onRefresh());
     }
-    onRefresh();
   }
 
   async function handleRevert() {
@@ -260,6 +261,8 @@ function FileGroup(props: {
   selectedFile: string | null;
   onSelectFile: (path: string, staged: boolean) => void;
   onRefresh: () => void;
+  storeKey: string;
+  isWorktree: boolean;
   mode?: "overlay" | "panel";
   diffTheme?: "light" | "dark";
   wrapLines?: boolean;
@@ -273,6 +276,8 @@ function FileGroup(props: {
     selectedFile,
     onSelectFile,
     onRefresh,
+    storeKey,
+    isWorktree,
     mode,
     diffTheme,
     wrapLines,
@@ -282,13 +287,17 @@ function FileGroup(props: {
   const inlineDiffs = mode === "panel";
 
   async function handleStageAll() {
-    await readBridge().gitStageAll({ projectLocation: project.location });
-    onRefresh();
+    useGitStore.getState().optimisticStageAll(storeKey, isWorktree);
+    await readBridge()
+      .gitStageAll({ projectLocation: project.location })
+      .catch(() => onRefresh());
   }
 
   async function handleUnstageAll() {
-    await readBridge().gitUnstageAll({ projectLocation: project.location });
-    onRefresh();
+    useGitStore.getState().optimisticUnstageAll(storeKey, isWorktree);
+    await readBridge()
+      .gitUnstageAll({ projectLocation: project.location })
+      .catch(() => onRefresh());
   }
 
   async function handleRevertAll() {
@@ -396,6 +405,8 @@ function FileGroup(props: {
                   theme={diffTheme ?? "dark"}
                   wrapLines={wrapLines ?? false}
                   onRefresh={onRefresh}
+                  storeKey={storeKey}
+                  isWorktree={isWorktree}
                 />
               ))
             : sorted.map((file) => (
@@ -406,6 +417,8 @@ function FileGroup(props: {
                   isSelected={selectedFile === file.path}
                   onSelect={() => onSelectFile(file.path, file.staged)}
                   onRefresh={onRefresh}
+                  storeKey={storeKey}
+                  isWorktree={isWorktree}
                 />
               ))}
         </div>
@@ -426,6 +439,8 @@ export function GitReviewSidebar(props: {
   onSelectFile: (path: string | null, staged: boolean) => void;
   onClose: () => void;
   onRefresh: () => void;
+  /** Store key for optimistic updates — worktree statusKey or project.id */
+  statusKey?: string | undefined;
   mode?: "overlay" | "panel";
   wrapLines?: boolean;
   onExpandToOverlay?: () => void;
@@ -442,9 +457,12 @@ export function GitReviewSidebar(props: {
     onSelectFile,
     onClose,
     onRefresh,
+    statusKey,
     mode = "overlay",
     wrapLines = false,
   } = props;
+  const storeKey = statusKey ?? project.id;
+  const isWorktreeStatus = Boolean(statusKey);
   const { isCollapsed, collapse, expand } = useSidebar();
   const diffTheme = useDiffTheme();
   const agentStatuses = useAppStore((s) => s.agentStatuses);
@@ -1028,6 +1046,8 @@ export function GitReviewSidebar(props: {
               selectedFile={selectedStaged ? selectedFile : null}
               onSelectFile={onSelectFile}
               onRefresh={onRefresh}
+              storeKey={storeKey}
+              isWorktree={isWorktreeStatus}
               mode={mode}
               diffTheme={diffTheme}
               wrapLines={wrapLines}
@@ -1043,6 +1063,8 @@ export function GitReviewSidebar(props: {
               selectedFile={!selectedStaged ? selectedFile : null}
               onSelectFile={onSelectFile}
               onRefresh={onRefresh}
+              storeKey={storeKey}
+              isWorktree={isWorktreeStatus}
               mode={mode}
               diffTheme={diffTheme}
               wrapLines={wrapLines}
@@ -1083,11 +1105,7 @@ export function GitReviewSidebar(props: {
               >
                 {({ isPending }) => (
                   <>
-                    {isPending ? (
-                      <Spinner color="current" size="sm" />
-                    ) : (
-                      <GitMerge className="size-3.5" />
-                    )}
+                    {isPending ? <PixelLoader size="sm" /> : <GitMerge className="size-3.5" />}
                     Mergetool
                   </>
                 )}
@@ -1103,7 +1121,7 @@ export function GitReviewSidebar(props: {
             >
               {({ isPending }) => (
                 <>
-                  {isPending && <Spinner color="current" size="sm" />}
+                  {isPending && <PixelLoader size="sm" />}
                   Abort Merge
                 </>
               )}
@@ -1126,11 +1144,7 @@ export function GitReviewSidebar(props: {
                 >
                   {({ isPending }) => (
                     <>
-                      {isPending ? (
-                        <Spinner color="current" size="sm" />
-                      ) : (
-                        <Check className="size-3.5" />
-                      )}
+                      {isPending ? <PixelLoader size="sm" /> : <Check className="size-3.5" />}
                       Finish Merge
                     </>
                   )}
@@ -1144,7 +1158,7 @@ export function GitReviewSidebar(props: {
                 >
                   {({ isPending }) => (
                     <>
-                      {isPending && <Spinner color="current" size="sm" />}
+                      {isPending && <PixelLoader size="sm" />}
                       Abort Merge
                     </>
                   )}
@@ -1186,11 +1200,7 @@ export function GitReviewSidebar(props: {
                         onPress={() => void handleGenerateMessage()}
                       >
                         {({ isPending }) =>
-                          isPending ? (
-                            <Spinner color="current" size="sm" />
-                          ) : (
-                            <Sparkles className="size-3.5" />
-                          )
+                          isPending ? <PixelLoader size="sm" /> : <Sparkles className="size-3.5" />
                         }
                       </Button>
                       <Tooltip.Content>Generate commit message</Tooltip.Content>
@@ -1208,11 +1218,7 @@ export function GitReviewSidebar(props: {
                   >
                     {({ isPending }) => (
                       <>
-                        {isPending ? (
-                          <Spinner color="current" size="sm" />
-                        ) : (
-                          <Lock className="size-3.5" />
-                        )}
+                        {isPending ? <PixelLoader size="sm" /> : <Lock className="size-3.5" />}
                         Commit
                       </>
                     )}
@@ -1267,7 +1273,7 @@ export function GitReviewSidebar(props: {
                   {({ isPending }) => (
                     <>
                       {isPending ? (
-                        <Spinner color="current" size="sm" />
+                        <PixelLoader size="sm" />
                       ) : needsPush ? (
                         <ArrowUp className="size-3.5" />
                       ) : (
@@ -1335,11 +1341,7 @@ export function GitReviewSidebar(props: {
                 >
                   {({ isPending }) => (
                     <>
-                      {isPending ? (
-                        <Spinner color="current" size="sm" />
-                      ) : (
-                        <GitMerge className="size-3.5" />
-                      )}
+                      {isPending ? <PixelLoader size="sm" /> : <GitMerge className="size-3.5" />}
                       Merge PR
                     </>
                   )}
@@ -1466,7 +1468,7 @@ export function GitReviewSidebar(props: {
                         className="mt-0.5 shrink-0"
                       >
                         {isGeneratingPr ? (
-                          <Spinner color="current" size="sm" />
+                          <PixelLoader size="sm" />
                         ) : (
                           <Sparkles className="size-3.5" />
                         )}
@@ -1498,7 +1500,7 @@ export function GitReviewSidebar(props: {
                     {({ isPending }) => (
                       <>
                         {isPending ? (
-                          <Spinner color="current" size="sm" />
+                          <PixelLoader size="sm" />
                         ) : (
                           <GitPullRequest className="size-3.5" />
                         )}
@@ -1542,7 +1544,7 @@ export function GitReviewSidebar(props: {
           <div className="space-y-2 border-t border-white/6 px-3 pt-2">
             {sourceBranchLoading ? (
               <div className="flex items-center justify-center py-2">
-                <Spinner color="current" size="sm" />
+                <PixelLoader size="sm" />
               </div>
             ) : sourceBranch ? (
               <>
@@ -1556,11 +1558,7 @@ export function GitReviewSidebar(props: {
                   >
                     {({ isPending }) => (
                       <>
-                        {isPending ? (
-                          <Spinner color="current" size="sm" />
-                        ) : (
-                          <GitMerge className="size-3.5" />
-                        )}
+                        {isPending ? <PixelLoader size="sm" /> : <GitMerge className="size-3.5" />}
                         Merge & Remove Worktree
                       </>
                     )}

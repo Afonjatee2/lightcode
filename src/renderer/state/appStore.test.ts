@@ -804,3 +804,99 @@ describe("grid layout actions", () => {
     });
   });
 });
+
+describe("group view layout restore", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [],
+      threads: [],
+      pendingServerRequests: [],
+      agentStatuses: [],
+      groupLayouts: {},
+      view: { kind: "home" },
+    }));
+  });
+
+  it("restores the saved pane layout after closing and reopening a reordered group", () => {
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const groupId = "group-1";
+    const ids = Array.from(
+      { length: 4 },
+      (_, index) =>
+        useAppStore.getState().createThread({
+          projectId: project.id,
+          agentKind: "codex",
+          config: { model: "m" },
+          prompt: `t${index}`,
+          groupId,
+          groupName: "Group 1",
+        }).id,
+    );
+
+    useAppStore.setState((state) => ({
+      ...state,
+      view: {
+        kind: "thread",
+        panes: [ids[0]!, ids[1]!, ids[2]!, ids[3]!] as [string, ...string[]],
+        paneLayout: {
+          kind: "split",
+          axis: "horizontal",
+          children: [
+            {
+              kind: "split",
+              axis: "vertical",
+              children: [
+                { kind: "leaf", paneId: ids[0]! },
+                { kind: "leaf", paneId: ids[1]! },
+              ],
+            },
+            {
+              kind: "split",
+              axis: "vertical",
+              children: [
+                { kind: "leaf", paneId: ids[2]! },
+                { kind: "leaf", paneId: ids[3]! },
+              ],
+            },
+          ],
+        },
+        activeGroupId: groupId,
+      },
+    }));
+
+    useAppStore.getState().reorderThreads(ids[3]!, ids[0]!, "before");
+    useAppStore.getState().closeGroupView();
+    useAppStore.getState().openGroupView(groupId);
+
+    const view = useAppStore.getState().view;
+    expect(view.kind).toBe("thread");
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[1], ids[2], ids[3]]);
+    expect(view.kind === "thread" && view.paneLayout).toEqual({
+      kind: "split",
+      axis: "horizontal",
+      children: [
+        {
+          kind: "split",
+          axis: "vertical",
+          children: [
+            { kind: "leaf", paneId: ids[0] },
+            { kind: "leaf", paneId: ids[1] },
+          ],
+        },
+        {
+          kind: "split",
+          axis: "vertical",
+          children: [
+            { kind: "leaf", paneId: ids[2] },
+            { kind: "leaf", paneId: ids[3] },
+          ],
+        },
+      ],
+    });
+  });
+});

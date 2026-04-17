@@ -73,6 +73,10 @@ const CHANNELS = {
   generateCommitMessage: "lightcode:generate-commit-message",
   generateTitle: "lightcode:generate-title",
   generatePrSummary: "lightcode:generate-pr-summary",
+  extractContext: "lightcode:extract-context",
+  cancelExtractContext: "lightcode:cancel-extract-context",
+  readTerminalScrollback: "lightcode:read-terminal-scrollback",
+  saveHandoffContext: "lightcode:save-handoff-context",
   gitListBranches: "lightcode:git-list-branches",
   gitFetch: "lightcode:git-fetch",
   gitListWorktrees: "lightcode:git-list-worktrees",
@@ -355,11 +359,16 @@ function stopSupervisor(error: Error): void {
 function startSupervisor(baseDir: string): void {
   stopSupervisor(new Error(msg("supervisor.restarted")));
 
+  const wslWatcherDir = app.isPackaged
+    ? join(process.resourcesPath, "wsl-watcher")
+    : join(__dirname, "..", "..", "resources", "wsl-watcher");
+
   const child = fork(join(__dirname, "supervisor.cjs"), [], {
     stdio: ["inherit", "inherit", "inherit", "ipc"],
     env: {
       ...process.env,
       LIGHTCODE_DATA_DIR: baseDir,
+      LIGHTCODE_WSL_WATCHER_DIR: wslWatcherDir,
     },
   });
 
@@ -548,6 +557,21 @@ function registerIpcHandlers(): void {
     },
   );
 
+  ipcMain.handle(
+    CHANNELS.saveHandoffContext,
+    (_event, payload: { threadId: string; content: string }) => {
+      const paths = requireLightcodePaths();
+      const threadDir = join(
+        paths.attachmentsDir,
+        payload.threadId.replace(/:/g, "-").slice(0, 12),
+      );
+      mkdirSync(threadDir, { recursive: true });
+      const filePath = join(threadDir, "handoff-context.md");
+      writeFileSync(filePath, payload.content, "utf-8");
+      return filePath;
+    },
+  );
+
   ipcMain.handle(CHANNELS.listWslDistros, async () =>
     callSupervisor<SupervisorRequest, string[]>("listWslDistros", {}),
   );
@@ -637,6 +661,16 @@ function registerIpcHandlers(): void {
 
   ipcMain.handle(CHANNELS.generatePrSummary, async (_event, payload) =>
     callSupervisor("generatePrSummary", payload),
+  );
+
+  ipcMain.handle(CHANNELS.extractContext, async (_event, payload) =>
+    callSupervisor("extractContext", payload),
+  );
+  ipcMain.handle(CHANNELS.cancelExtractContext, async (_event, payload) =>
+    callSupervisor("cancelExtractContext", payload),
+  );
+  ipcMain.handle(CHANNELS.readTerminalScrollback, async (_event, payload) =>
+    callSupervisor("readTerminalScrollback", payload),
   );
 
   ipcMain.handle(CHANNELS.gitListBranches, async (_event, payload) =>

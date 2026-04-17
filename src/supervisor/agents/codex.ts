@@ -1505,5 +1505,9 @@ export function createCodexAdapter(): AgentAdapter {
       args.push("-");
       return { command: "codex", args };
     },
+    buildContextExtractionCommand(_sessionRef, _location, _model) {
+      // Codex doesn't support --resume in exec mode; rely on scrollback fallback
+      return undefined;
+    },
   };
 }

@@ -209,6 +209,8 @@ export const threadSchema = z.object({
   worktreePath: z.string().optional(),
   worktreeBranch: z.string().optional(),
   prNumber: z.number().optional(),
+  groupId: z.string().optional(),
+  groupName: z.string().optional(),
   archived: z.boolean().default(false),
   done: z.boolean().default(false),
   createdAt: z.string().min(1),
@@ -473,6 +475,27 @@ export type GeneratePrSummaryPayload = z.infer<typeof generatePrSummaryPayloadSc
 export interface GeneratePrSummaryResult {
   title: string;
   description: string;
+}
+
+// ── Context Extraction ──────────────────────────────────
+
+export const extractContextPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  agentKind: agentKindSchema,
+  sessionRef: sessionRefSchema,
+  projectLocation: projectLocationSchema,
+  worktreePath: z.string().optional(),
+  model: z.string().optional(),
+  effort: z.string().optional(),
+});
+export type ExtractContextPayload = z.infer<typeof extractContextPayloadSchema>;
+
+export interface ExtractContextResult {
+  summary: string;
+  sourceProvider: string;
+  sourceSessionId: string;
+  worktreePath?: string;
+  extractedAt: string;
 }
 
 // ── Branch & Worktree ───────────────────────────────────
@@ -892,4 +915,10 @@ export interface GhGetPrChecksResult {
 export type AppView =
   | { kind: "home" }
   | { kind: "draft"; projectId: string }
-  | { kind: "thread"; panes: [string, ...string[]]; rowLayout?: number[]; paneLayout?: PaneLayout };
+  | {
+      kind: "thread";
+      panes: [string, ...string[]];
+      rowLayout?: number[];
+      paneLayout?: PaneLayout;
+      activeGroupId?: string;
+    };

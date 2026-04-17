@@ -4,6 +4,8 @@ import type {
   DetectSetupScriptPayload,
   DetectSetupScriptResult,
   DeleteProjectEntryPayload,
+  ExtractContextPayload,
+  ExtractContextResult,
   GenerateCommitMessagePayload,
   GenerateCommitMessageResult,
   GenerateTitlePayload,
@@ -123,6 +125,9 @@ export type SupervisorRequest =
   | { id: string; type: "generateCommitMessage"; payload: GenerateCommitMessagePayload }
   | { id: string; type: "generateTitle"; payload: GenerateTitlePayload }
   | { id: string; type: "generatePrSummary"; payload: GeneratePrSummaryPayload }
+  | { id: string; type: "extractContext"; payload: ExtractContextPayload }
+  | { id: string; type: "cancelExtractContext"; payload: { threadId: string } }
+  | { id: string; type: "readTerminalScrollback"; payload: { threadId: string } }
   | { id: string; type: "gitListBranches"; payload: GetGitBranchesPayload }
   | { id: string; type: "gitFetch"; payload: GitFetchPayload }
   | { id: string; type: "gitListWorktrees"; payload: GitListWorktreesPayload }
@@ -270,6 +275,10 @@ export interface LightcodeBridge {
   ): Promise<GenerateCommitMessageResult>;
   generateTitle(payload: GenerateTitlePayload): Promise<GenerateTitleResult>;
   generatePrSummary(payload: GeneratePrSummaryPayload): Promise<GeneratePrSummaryResult>;
+  extractContext(payload: ExtractContextPayload): Promise<ExtractContextResult>;
+  cancelExtractContext(payload: { threadId: string }): Promise<void>;
+  readTerminalScrollback(payload: { threadId: string }): Promise<string>;
+  saveHandoffContext(payload: { threadId: string; content: string }): Promise<string>;
   gitListBranches(payload: GetGitBranchesPayload): Promise<GitBranchListResult>;
   gitFetch(payload: GitFetchPayload): Promise<void>;
   gitListWorktrees(payload: GitListWorktreesPayload): Promise<GitWorktreeListResult>;

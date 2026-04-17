@@ -471,5 +471,19 @@ export function createCursorAdapter(): AgentAdapter {
       }
       return { command: "cursor-agent", args };
     },
+    buildContextExtractionCommand(sessionRef, _location, model) {
+      const args = [
+        "--print",
+        "--force",
+        "--trust",
+        `--resume=${sessionRef.providerSessionId}`,
+        "--output-format",
+        "json",
+      ];
+      if (model && model !== "auto") {
+        args.push("--model", model);
+      }
+      return { command: "cursor-agent", args };
+    },
   };
 }

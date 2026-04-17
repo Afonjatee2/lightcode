@@ -34,7 +34,7 @@ export function WorktreeGroupHeader(props: {
       }
       label={<span className="text-xs font-medium text-foreground/80">{props.worktreeBranch}</span>}
       tooltip={`Worktree: ${props.worktreeBranch}`}
-      className={props.isDragging ? "opacity-60" : ""}
+      className={`h-8 ${props.isDragging ? "opacity-60" : ""}`}
       onPress={props.onToggleCollapse}
       {...(props.isDragging != null ? { isDragging: props.isDragging } : {})}
       {...(props.isDraggingAnything != null

@@ -1,15 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Check,
-  ChevronDown,
-  GitBranch,
-  GitFork,
-  Globe,
-  Loader2,
-  Plus,
-  Search,
-  Trash2,
-} from "lucide-react";
+import { Check, ChevronDown, GitBranch, GitFork, Globe, Plus, Search, Trash2 } from "lucide-react";
+import { PixelLoader } from "./PixelLoader";
 import {
   Checkbox,
   Header,
@@ -385,7 +376,7 @@ export function BranchSelector(props: BranchSelectorProps) {
                             {({ isSelected }) => {
                               const isDeleting = deletingBranch === branch.name;
                               if (isDeleting) {
-                                return <Loader2 className="size-3.5 animate-spin text-muted" />;
+                                return <PixelLoader size="sm" className="text-muted" />;
                               }
                               return canDelete ? (
                                 <>

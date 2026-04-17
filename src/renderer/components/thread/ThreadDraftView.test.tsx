@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentStatus, Project } from "../../../shared/contracts";
+import { useSharedSettings } from "../../state/sharedSettingsStore";
 
 const { composerSpy } = vi.hoisted(() => ({
   composerSpy: vi.fn<(props: unknown) => void>(),
@@ -100,6 +101,11 @@ const geminiStatus: AgentStatus = {
 describe("ThreadDraftView", () => {
   beforeEach(() => {
     composerSpy.mockClear();
+    useSharedSettings.setState({
+      providerConfigs: {},
+      hiddenModels: {},
+      disabledAgents: [],
+    });
   });
 
   it("switches to the first installed agent when statuses resolve after mount", async () => {
@@ -154,6 +160,37 @@ describe("ThreadDraftView", () => {
         sandboxMode: "danger-full-access",
       },
       prompt: "hello world",
+    });
+  });
+
+  it("applies a saved codex effort after shared settings load", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(<ThreadDraftView project={project} agentStatuses={[codexStatus]} onStart={onStart} />);
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as { controls: Array<{ value?: string }> };
+      expect(props.controls[2]?.value).toBe("high");
+    });
+
+    act(() => {
+      useSharedSettings.setState({
+        providerConfigs: {
+          codex: {
+            model: "gpt-5.4",
+            effort: "medium",
+            mode: "agent",
+            approvalPolicy: "never",
+            sandboxMode: "danger-full-access",
+          },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as { controls: Array<{ value?: string }> };
+      expect(props.controls[1]?.value).toBe("gpt-5.4");
+      expect(props.controls[2]?.value).toBe("medium");
     });
   });
 });

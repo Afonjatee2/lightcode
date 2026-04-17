@@ -42,7 +42,7 @@ export function UnifiedRightPanel(props: {
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]">
       {/* Header bar */}
-      <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+      <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
         {projectName && (
           <div className="min-w-0">
             <Tooltip delay={300}>

@@ -54,6 +54,7 @@ interface FileEditorStoreState {
   renamePath: (oldPath: string, nextPath: string) => void;
   removePath: (path: string) => void;
   bumpRefreshToken: () => void;
+  refreshOpenBuffers: () => Promise<void>;
 }
 
 function buildBuffer(result: ReadProjectFileResult): FileEditorBuffer {
@@ -413,4 +414,47 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       };
     }),
   bumpRefreshToken: () => set((state) => ({ refreshToken: state.refreshToken + 1 })),
+  async refreshOpenBuffers() {
+    const { rootContext, buffers } = get();
+    if (!rootContext) return;
+
+    const paths = Object.entries(buffers)
+      .filter(([, buf]) => buf.status === "ready" && !buf.isDirty && !buf.isLoading)
+      .map(([p]) => p);
+
+    if (paths.length === 0) return;
+
+    const results = await Promise.allSettled(
+      paths.map((path) =>
+        readBridge()
+          .readProjectFile({ projectLocation: rootContext.projectLocation, path })
+          .then((result) => ({ path, result })),
+      ),
+    );
+
+    set((state) => {
+      let changed = false;
+      const nextBuffers = { ...state.buffers };
+
+      for (const entry of results) {
+        if (entry.status !== "fulfilled") continue;
+        const { path, result } = entry.value;
+        const current = nextBuffers[path];
+        // Skip if the buffer was modified by the user while we were reading
+        if (!current || current.isDirty || current.status !== "ready") continue;
+        // Skip if content hasn't actually changed
+        if (
+          result.status === "ready" &&
+          result.content === current.savedContent &&
+          result.modifiedAtMs === current.modifiedAtMs
+        )
+          continue;
+
+        nextBuffers[path] = buildBuffer(result);
+        changed = true;
+      }
+
+      return changed ? { buffers: nextBuffers } : {};
+    });
+  },
 }));

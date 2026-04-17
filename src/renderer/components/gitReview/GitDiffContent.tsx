@@ -4,7 +4,7 @@ import "@git-diff-view/react/styles/diff-view.css";
 
 // Must match worker setting — enables pre-rendered HTML templates (dangerouslySetInnerHTML)
 setEnableFastDiffTemplate(true);
-import { Spinner } from "@heroui/react";
+import { PixelLoader } from "../common";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { Project, GitStatusResult } from "../../../shared/contracts";
 import type { DiffBuildItem } from "../../workers/diffBuildWorker";
@@ -362,7 +362,7 @@ function SingleFileDiff(props: {
   }, [filePath, staged, project.id, project.location, refreshKey]);
 
   return (
-    <div className="absolute inset-0 z-10 overflow-y-auto bg-background px-4">
+    <div className="absolute inset-0 z-10 overflow-y-auto bg-[var(--content-background)] px-4">
       {loading && (
         <div className="flex items-center justify-center py-8 text-sm text-muted">
           Loading diff...
@@ -544,8 +544,8 @@ export function GitDiffContent(props: {
     <div className="relative h-full min-h-0">
       {/* Full-panel loader — diffs mount behind it */}
       {showLoader && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center bg-background">
-          <Spinner size="lg" />
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--content-background)]">
+          <PixelLoader size="lg" />
         </div>
       )}
 

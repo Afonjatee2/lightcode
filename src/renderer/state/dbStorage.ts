@@ -68,8 +68,18 @@ async function loadAppStore(): Promise<string | null> {
     }
   }
 
+  let groupLayouts: Record<string, unknown> = {};
+  const groupLayoutsJson = await readBridge().dbGetState("groupLayouts");
+  if (groupLayoutsJson) {
+    try {
+      groupLayouts = JSON.parse(groupLayoutsJson) as Record<string, unknown>;
+    } catch {
+      // corrupt — ignore
+    }
+  }
+
   return JSON.stringify({
-    state: { projects, threads, view },
+    state: { projects, threads, view, groupLayouts },
     version: 4,
   });
 }
@@ -78,7 +88,12 @@ async function loadAppStore(): Promise<string | null> {
 async function saveAppStore(value: string): Promise<void> {
   try {
     const parsed = JSON.parse(value) as {
-      state?: { projects?: Project[]; threads?: Thread[]; view?: AppView };
+      state?: {
+        projects?: Project[];
+        threads?: Thread[];
+        view?: AppView;
+        groupLayouts?: Record<string, unknown>;
+      };
     };
     const state = parsed.state;
     if (!state) return;
@@ -88,6 +103,9 @@ async function saveAppStore(value: string): Promise<void> {
       state.threads ?? [],
       JSON.stringify(state.view ?? { kind: "home" }),
     );
+    if (state.groupLayouts) {
+      void readBridge().dbSetState("groupLayouts", JSON.stringify(state.groupLayouts));
+    }
   } catch {
     // If parsing fails, skip the write.
   }

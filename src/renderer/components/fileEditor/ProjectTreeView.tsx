@@ -1,5 +1,5 @@
 import { useEffect, useEffectEvent, useRef, useState } from "react";
-import { Button, Spinner, Tooltip, toast } from "@heroui/react";
+import { Button, Tooltip, toast } from "@heroui/react";
 import {
   ChevronRight,
   ChevronsDownUp,
@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import type { ProjectLocation, ProjectTreeEntry } from "../../../shared/contracts";
 import { readBridge } from "../../bridge";
-import { ContextMenu } from "../common";
+import { ContextMenu, PixelLoader } from "../common";
 import { getEntryIconUrl } from "../common/fileIcons";
 import { useFileEditorStore, type FileEditorRootContext } from "../../state/fileEditorStore";
 
@@ -324,6 +324,7 @@ export function ProjectTreeView(props: {
         await reloadPaths(
           Object.keys(directoryEntries).length > 0 ? Object.keys(directoryEntries) : [""],
         );
+        void useFileEditorStore.getState().refreshOpenBuffers();
       }
     } catch (error) {
       toast.danger(error instanceof Error ? error.message : String(error));
@@ -519,7 +520,7 @@ export function ProjectTreeView(props: {
                       className="flex items-center gap-1.5 px-2 py-0.5 text-xs text-muted"
                       style={{ paddingLeft: `${(depth + 1) * 14 + 8}px` }}
                     >
-                      <Spinner size="sm" />
+                      <PixelLoader size="sm" />
                       Loading…
                     </div>
                   ) : (
@@ -613,7 +614,7 @@ export function ProjectTreeView(props: {
           {searchQuery.trim() ? (
             searchLoading ? (
               <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted">
-                <Spinner size="sm" />
+                <PixelLoader size="sm" />
                 Searching…
               </div>
             ) : searchResults.length > 0 ? (
@@ -654,7 +655,7 @@ export function ProjectTreeView(props: {
             <div>
               {loadingPaths[""] && !("" in directoryEntries) ? (
                 <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted">
-                  <Spinner size="sm" />
+                  <PixelLoader size="sm" />
                   Loading…
                 </div>
               ) : (

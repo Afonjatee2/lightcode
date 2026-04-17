@@ -34,6 +34,8 @@ import type {
   GenerateTitleResult,
   GeneratePrSummaryPayload,
   GeneratePrSummaryResult,
+  ExtractContextPayload,
+  ExtractContextResult,
   GetAgentStatusesPayload,
   GetGitDiffBatchPayload,
   GetGitDiffPayload,
@@ -144,6 +146,10 @@ import {
 import { generateCommitMessage } from "./commitMessageGenerator";
 import { generateTitle } from "./titleGenerator";
 import { generatePrSummary } from "./prSummaryGenerator";
+import {
+  extractContext as extractContextFn,
+  extractContextFromScrollback,
+} from "./contextExtractor";
 import { GitService } from "./git";
 import { GitWatcher } from "./gitWatcher";
 import { GitHubService } from "./github";
@@ -220,6 +226,8 @@ interface SessionRuntime {
     | undefined;
   /** Watchdog: fires when the PTY goes silent while "working" — transitions to idle. */
   workingSilenceTimer?: ReturnType<typeof setTimeout> | undefined;
+  /** Rolling buffer of PTY output text for scrollback-based context extraction. */
+  outputHistory?: string | undefined;
 }
 
 interface ShellSessionRuntime {
@@ -1124,6 +1132,78 @@ export class SupervisorRuntime {
       payload.model,
       payload.effort,
     );
+  }
+
+  // ── Context Extraction ──────────────────────────────────
+
+  private extractionAbortControllers = new Map<string, AbortController>();
+
+  async extractContext(payload: ExtractContextPayload): Promise<ExtractContextResult> {
+    const adapter = this.requireAdapter(payload.agentKind);
+    const abortController = new AbortController();
+    this.extractionAbortControllers.set(payload.threadId, abortController);
+
+    try {
+      // Primary: adapter-specific extraction (--resume + print mode)
+      try {
+        return await extractContextFn(
+          payload.projectLocation,
+          adapter,
+          payload.sessionRef,
+          payload.worktreePath,
+          payload.model,
+          payload.effort,
+          abortController.signal,
+        );
+      } catch {
+        // Fall through to scrollback fallback
+      }
+
+      // Fallback: scrollback extraction
+      const scrollback = this.readTerminalScrollbackInternal(payload.threadId);
+      if (scrollback) {
+        return await extractContextFromScrollback(
+          payload.projectLocation,
+          adapter,
+          scrollback,
+          payload.agentKind,
+          payload.sessionRef.providerSessionId,
+          payload.worktreePath,
+          payload.model,
+          payload.effort,
+          abortController.signal,
+        );
+      }
+
+      throw new Error(
+        `Cannot extract context from ${adapter.label}: no session resume or scrollback available`,
+      );
+    } finally {
+      this.extractionAbortControllers.delete(payload.threadId);
+    }
+  }
+
+  cancelExtractContext(threadId: string): void {
+    const controller = this.extractionAbortControllers.get(threadId);
+    if (controller) {
+      controller.abort();
+      this.extractionAbortControllers.delete(threadId);
+    }
+  }
+
+  readTerminalScrollback(threadId: string): string {
+    return this.readTerminalScrollbackInternal(threadId);
+  }
+
+  private readTerminalScrollbackInternal(threadId: string): string {
+    const session = this.sessions.get(threadId);
+    if (!session?.outputHistory) return "";
+    // Truncate to last ~100K chars
+    const full = session.outputHistory;
+    if (full.length > 100_000) {
+      return full.slice(-100_000);
+    }
+    return full;
   }
 
   // ── Branch & Worktree ───────────────────────────────────
@@ -2080,6 +2160,8 @@ export class SupervisorRuntime {
 
   private handlePtyData(session: SessionRuntime, data: string): void {
     session.outputLength += data.length;
+    // Accumulate scrollback for context extraction (cap at ~200K to bound memory)
+    session.outputHistory = ((session.outputHistory ?? "") + data).slice(-200_000);
     if (this.isDev) {
       try {
         appendFileSync(this.resolveLogPath(session.threadId), data);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Spinner, Tooltip } from "@heroui/react";
-import { ChevronDown, CircleCheck, GitFork, Paperclip, X } from "lucide-react";
+import { Tooltip } from "@heroui/react";
+import { ArrowRightLeft, ChevronDown, CircleCheck, GitFork, Paperclip, X } from "lucide-react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -12,9 +12,9 @@ import type {
 } from "../../../shared/contracts";
 
 import { ProviderIcon, getComposerControls, getStatusTone } from "../providers";
-import type { PendingThreadServerRequest } from "../../state/appStore";
+import { useAppStore, type PendingThreadServerRequest } from "../../state/appStore";
 import { useGitStore } from "../../state/gitStore";
-import { BranchSelector, type BranchSelection, Button, TuxIcon } from "../common";
+import { BranchSelector, type BranchSelection, Button, PixelLoader, TuxIcon } from "../common";
 import { useSharedSettings } from "../../state/sharedSettingsStore";
 import { readBridge } from "../../bridge";
 import {
@@ -28,6 +28,7 @@ import { flattenSegments } from "../composer/serializeMentions";
 import { filterHiddenModels } from "./threadComposerOptions";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposer } from "./ThreadComposer";
+import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 
 const DEFAULT_HIDDEN_TERMINAL_SIZE: TerminalSize = { cols: 120, rows: 30 };
@@ -63,6 +64,7 @@ function ThreadComposerSection(props: {
   thread: Thread;
   agentStatus: AgentStatus | undefined;
   projectLocation: ProjectLocation;
+  paneCount: number;
   pendingServerRequests: PendingThreadServerRequest[];
   terminalPaneRef: React.RefObject<TerminalPaneHandle | null>;
   onConfigChange: (config: ThreadConfig) => void;
@@ -73,7 +75,7 @@ function ThreadComposerSection(props: {
   }) => Promise<void>;
   onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
 }) {
-  const { thread, agentStatus, projectLocation, pendingServerRequests } = props;
+  const { thread, agentStatus, projectLocation, paneCount, pendingServerRequests } = props;
   const [prompt, setPrompt] = useState("");
   const [hasContent, setHasContent] = useState(false);
   const mentionRef = useRef<MentionInputHandle>(null);
@@ -218,7 +220,7 @@ function ThreadComposerSection(props: {
                 }}
               >
                 <ThreadComposer
-                  autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
+                  autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                   compact
                   attachmentBar={
                     <AttachmentBar
@@ -233,7 +235,7 @@ function ThreadComposerSection(props: {
                   inputContent={
                     <MentionInput
                       ref={mentionRef}
-                      autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
+                      autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                       compact
                       disabled={!(showServerComposer || showTerminalComposer)}
                       placeholder={
@@ -366,6 +368,15 @@ export function ThreadView(props: {
   droppableRef?: React.RefObject<HTMLDivElement | null>;
   onClose?: (() => void) | undefined;
   onMarkDone?: (() => void) | undefined;
+  installedAgents?: AgentStatus[];
+  onContinueInProvider?:
+    | ((
+        targetKind: string,
+        targetConfig: ThreadConfig,
+        closeOriginal: boolean,
+        extractedContext: import("../../../shared/contracts").ExtractContextResult | null,
+      ) => void)
+    | undefined;
   onConfigChange: (config: ThreadConfig) => void;
   onLaunchConsumed?: (() => void) | undefined;
   onLaunchFailed?: (() => void) | undefined;
@@ -390,11 +401,13 @@ export function ThreadView(props: {
     isDragging,
     dropIndicator,
     paneIndex: _paneIndex,
-    paneCount: _paneCount = 1,
+    paneCount = 1,
     dragHandleRef,
     droppableRef,
     onClose,
     onMarkDone,
+    installedAgents,
+    onContinueInProvider,
     onConfigChange,
     onLaunchConsumed,
     onLaunchFailed,
@@ -403,6 +416,7 @@ export function ThreadView(props: {
   } = props;
   const terminalPaneRef = useRef<TerminalPaneHandle>(null);
   const [terminalSize, setTerminalSize] = useState<TerminalSize | null>(null);
+  const [continueDialogOpen, setContinueDialogOpen] = useState(false);
   const launchRequestRef = useRef<string | null>(null);
   const usesTerminalPresentation =
     (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
@@ -466,126 +480,166 @@ export function ThreadView(props: {
   const paddingClass = "px-2";
 
   return (
-    <div
-      ref={droppableRef}
-      className={`relative flex h-full min-h-0 flex-col ${isDragging ? "opacity-50" : ""}`}
-    >
-      {/* Header bar */}
-      <div className={`${paddingClass} px-4`}>
-        <div
-          ref={dragHandleRef}
-          className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1.5 ${dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
-        >
-          <ProviderIcon
-            kind={thread.agentKind}
-            tone={getStatusTone(thread)}
-            className="size-3.5 shrink-0"
-          />
-          <span className="flex-1 truncate text-sm font-medium text-foreground">
-            {thread.title}
-          </span>
-          <div className="flex shrink-0 items-center">
-            {projectName ? <span className="px-1 text-sm text-muted/60">{projectName}</span> : null}
-            {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
-            {onMarkDone ? (
-              <button
-                type="button"
-                aria-label={thread.done ? "Unmark done" : "Mark done"}
-                className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onMarkDone();
-                }}
-              >
-                <CircleCheck className="size-3.5" />
-              </button>
-            ) : null}
-            {showCloseButton ? (
-              <button
-                type="button"
-                aria-label="Close pane"
-                className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onClose?.();
-                }}
-              >
-                <X className="size-3.5" />
-              </button>
-            ) : null}
-          </div>
-        </div>
-      </div>
-
+    <>
       <div
-        className={`${alignClass} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-4 pb-4`}
+        ref={droppableRef}
+        className={`relative flex h-full min-h-0 flex-col ${isDragging ? "opacity-50" : ""}`}
       >
-        {dropIndicator === "replace" && (
+        {/* Header bar */}
+        <div className={`${paddingClass} px-4`}>
           <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-20 rounded-2xl bg-accent/10 ring-1 ring-inset ring-accent/30"
-          />
-        )}
-        {dropIndicator === "insert-left" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 bottom-0 left-0 z-20 w-0.5 rounded-full bg-accent"
-          />
-        )}
-        {dropIndicator === "insert-right" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 right-0 bottom-0 z-20 w-0.5 rounded-full bg-accent"
-          />
-        )}
-        {dropIndicator === "insert-top" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 right-0 left-0 z-20 h-0.5 rounded-full bg-accent"
-          />
-        )}
-        {dropIndicator === "insert-bottom" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute right-0 bottom-0 left-0 z-20 h-0.5 rounded-full bg-accent"
-          />
-        )}
+            ref={dragHandleRef}
+            className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1.5 ${dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
+          >
+            <ProviderIcon
+              kind={thread.agentKind}
+              tone={getStatusTone(thread)}
+              className="size-3.5 shrink-0"
+            />
+            <span className="flex-1 truncate text-sm font-medium text-foreground">
+              {thread.title}
+            </span>
+            <div className="flex shrink-0 items-center">
+              {projectName ? (
+                <span className="px-1 text-sm text-muted/60">{projectName}</span>
+              ) : null}
+              {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
+              {onContinueInProvider &&
+              installedAgents &&
+              installedAgents.filter((a) => a.kind !== thread.agentKind).length > 0 &&
+              thread.sessionRef ? (
+                <Tooltip delay={0}>
+                  <button
+                    type="button"
+                    aria-label="Continue in another provider"
+                    className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setContinueDialogOpen(true);
+                    }}
+                  >
+                    <ArrowRightLeft className="size-3.5" />
+                  </button>
+                  <Tooltip.Content>Continue in another provider</Tooltip.Content>
+                </Tooltip>
+              ) : null}
+              {onMarkDone ? (
+                <button
+                  type="button"
+                  aria-label={thread.done ? "Unmark done" : "Mark done"}
+                  className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onMarkDone();
+                  }}
+                >
+                  <CircleCheck className="size-3.5" />
+                </button>
+              ) : null}
+              {showCloseButton ? (
+                <button
+                  type="button"
+                  aria-label="Close pane"
+                  className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClose?.();
+                  }}
+                >
+                  <X className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </div>
 
         <div
-          className={`${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col gap-2 pt-2`}
+          className={`${alignClass} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-4 pb-4`}
         >
-          <div className="relative min-h-0 flex-1 overflow-hidden">
-            {usesTerminalPresentation ? (
-              <TerminalPane
-                ref={terminalPaneRef}
-                key={thread.id}
-                onTerminalResize={setTerminalSize}
-                status={thread.status}
-                threadId={thread.id}
-              />
-            ) : null}
-            {thread.status === "launching" ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="flex items-center gap-2.5">
-                  <Spinner size="sm" />
-                  <span className="text-sm text-muted">Starting thread…</span>
-                </div>
-              </div>
-            ) : null}
-          </div>
+          {dropIndicator === "replace" && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0 z-20 rounded-2xl bg-accent/10 ring-1 ring-inset ring-accent/30"
+            />
+          )}
+          {dropIndicator === "insert-left" && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-0 bottom-0 left-0 z-20 w-0.5 rounded-full bg-accent"
+            />
+          )}
+          {dropIndicator === "insert-right" && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-0 right-0 bottom-0 z-20 w-0.5 rounded-full bg-accent"
+            />
+          )}
+          {dropIndicator === "insert-top" && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute top-0 right-0 left-0 z-20 h-0.5 rounded-full bg-accent"
+            />
+          )}
+          {dropIndicator === "insert-bottom" && (
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute right-0 bottom-0 left-0 z-20 h-0.5 rounded-full bg-accent"
+            />
+          )}
 
-          <ThreadComposerSection
-            thread={thread}
-            agentStatus={agentStatus}
-            projectLocation={projectLocation}
-            pendingServerRequests={pendingServerRequests}
-            terminalPaneRef={terminalPaneRef}
-            onConfigChange={onConfigChange}
-            onResolveServerRequest={onResolveServerRequest}
-            onSubmitInput={onSubmitInput}
-          />
+          <div
+            className={`${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col gap-2 pt-2`}
+          >
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              {usesTerminalPresentation ? (
+                <TerminalPane
+                  ref={terminalPaneRef}
+                  key={thread.id}
+                  onTerminalResize={setTerminalSize}
+                  status={thread.status}
+                  threadId={thread.id}
+                />
+              ) : null}
+              {thread.status === "launching" ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <PixelLoader size="md" />
+                </div>
+              ) : null}
+            </div>
+
+            <ThreadComposerSection
+              thread={thread}
+              agentStatus={agentStatus}
+              projectLocation={projectLocation}
+              paneCount={paneCount}
+              pendingServerRequests={pendingServerRequests}
+              terminalPaneRef={terminalPaneRef}
+              onConfigChange={onConfigChange}
+              onResolveServerRequest={onResolveServerRequest}
+              onSubmitInput={onSubmitInput}
+            />
+          </div>
         </div>
       </div>
-    </div>
+      {onContinueInProvider && installedAgents && continueDialogOpen ? (
+        <ContinueInProviderDialog
+          isOpen
+          thread={thread}
+          projectLocation={projectLocation}
+          installedAgents={installedAgents}
+          {...(() => {
+            const cfg = useAppStore
+              .getState()
+              .projects.find((p) => p.id === thread.projectId)?.lastDraftConfig;
+            return cfg ? { lastDraftConfig: cfg } : {};
+          })()}
+          onClose={() => setContinueDialogOpen(false)}
+          onContinue={(targetKind, targetConfig, closeOrig, ctx) => {
+            setContinueDialogOpen(false);
+            onContinueInProvider(targetKind, targetConfig, closeOrig, ctx);
+          }}
+        />
+      ) : null}
+    </>
   );
 }

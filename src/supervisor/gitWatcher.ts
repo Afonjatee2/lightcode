@@ -1,5 +1,5 @@
-import { watch, type FSWatcher } from "node:fs";
-import { spawn, type ChildProcess } from "node:child_process";
+import { copyFileSync, existsSync, mkdirSync, watch, type FSWatcher } from "node:fs";
+import { execSync, spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import type { ProjectLocation } from "../shared/contracts";
 import { terminateChildProcessTree } from "../shared/processTree";
@@ -38,6 +38,41 @@ function isIgnoredWorkTreeFile(name: string): boolean {
   return IGNORED_PREFIXES.some((p) => name.startsWith(p));
 }
 
+const INOTIFYWAIT_EXCLUDE =
+  "(node_modules|\\.next|dist|build|__pycache__|\\.venv|\\.git/objects|\\.git/logs|\\.git/FETCH_HEAD)";
+
+/**
+ * Deploy the @parcel/watcher native binary + helper script into a WSL distro.
+ * Files are written to `~/.lightcode/watcher/` via UNC path.
+ * Returns the Linux-side directory path on success, or null.
+ */
+function deployWslWatcher(distro: string): string | null {
+  const srcDir = process.env.LIGHTCODE_WSL_WATCHER_DIR;
+  if (!srcDir) return null;
+
+  const srcBinary = join(srcDir, "watcher.node");
+  const srcScript = join(srcDir, "wsl-watcher.cjs");
+  if (!existsSync(srcBinary) || !existsSync(srcScript)) return null;
+
+  try {
+    const home = execSync(`"${getWslCommand()}" -d ${distro} -- sh -c "echo $HOME"`, {
+      encoding: "utf-8",
+      timeout: 5000,
+      windowsHide: true,
+    }).trim();
+
+    const uncHome = `\\\\wsl.localhost\\${distro}${home.replaceAll("/", "\\")}`;
+    const destDir = join(uncHome, ".lightcode", "watcher");
+    mkdirSync(destDir, { recursive: true });
+    copyFileSync(srcBinary, join(destDir, "watcher.node"));
+    copyFileSync(srcScript, join(destDir, "wsl-watcher.cjs"));
+
+    return `${home}/.lightcode/watcher`;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Watches git repositories for changes and emits debounced notifications.
  *
@@ -51,13 +86,18 @@ function isIgnoredWorkTreeFile(name: string): boolean {
  *
  * Both are debounced into a single callback per project.
  *
- * WSL projects use a spawned `inotifywait` process inside the WSL distro
- * (with a polling fallback) because Node's `fs.watch` does not work on
- * WSL UNC paths.
+ * WSL projects use a three-tier fallback strategy:
+ * 1. @parcel/watcher native binary (deployed to ~/.lightcode/watcher/)
+ * 2. inotifywait (if inotify-tools is installed)
+ * 3. 30-second polling
+ *
+ * Node's `fs.watch` does not work on WSL UNC paths, so all WSL watching
+ * is done from inside the distro via `wsl.exe`.
  */
 export class GitWatcher {
   private readonly watchers = new Map<string, WatcherEntry>();
   private readonly worktreeWatchers = new Map<string, WorktreeWatcherEntry>();
+  private readonly deployedDistros = new Map<string, string | null>();
 
   constructor(private readonly onChanged: (projectId: string) => void) {}
 
@@ -87,6 +127,7 @@ export class GitWatcher {
     };
 
     if (location.kind === "wsl") {
+      this.ensureWslWatcherDeployed(location.distro);
       entry.wslProcess = this.spawnWslWatcher(location.distro, location.linuxPath, scheduleNotify);
       this.watchers.set(projectId, entry);
       return;
@@ -247,6 +288,12 @@ export class GitWatcher {
     }
   }
 
+  private ensureWslWatcherDeployed(distro: string): void {
+    if (this.deployedDistros.has(distro)) return;
+    const watcherPath = deployWslWatcher(distro);
+    this.deployedDistros.set(distro, watcherPath);
+  }
+
   private closeWorktreeWatcher(path: string): void {
     const entry = this.worktreeWatchers.get(path);
     if (!entry) return;
@@ -259,18 +306,32 @@ export class GitWatcher {
   }
 
   /**
-   * Spawn a `wsl.exe` process running `inotifywait` (or a polling fallback)
-   * inside the given WSL distro. Calls `onEvent` on each stdout line.
+   * Spawn a `wsl.exe` process that watches for filesystem changes inside the
+   * given WSL distro. Uses a three-tier fallback:
+   *   1. @parcel/watcher (native inotify, shipped with the app)
+   *   2. inotifywait (requires inotify-tools)
+   *   3. 30s polling (last resort)
    */
   private spawnWslWatcher(distro: string, linuxPath: string, onEvent: () => void): ChildProcess {
-    // Try inotifywait for native inotify events; fall back to 5s polling
-    // if inotify-tools is not installed.
+    const watcherDir = this.deployedDistros.get(distro);
+
+    const parcelBlock = watcherDir
+      ? [
+          `WATCHER_DIR="${watcherDir}"`,
+          'if command -v node >/dev/null 2>&1 && [ -f "$WATCHER_DIR/watcher.node" ] \\',
+          `   && node -e "require('$WATCHER_DIR/watcher.node')" 2>/dev/null; then`,
+          `  exec node "$WATCHER_DIR/wsl-watcher.cjs" .git .`,
+          "fi",
+        ]
+      : [];
+
     const script = [
+      ...parcelBlock,
       "if command -v inotifywait >/dev/null 2>&1; then",
-      "  inotifywait -m -r -q -e modify,create,delete,move .git . \\",
-      "    --exclude '(node_modules|\\.next|dist|build|__pycache__|\\.venv|\\.git/objects|\\.git/logs|\\.git/FETCH_HEAD)'",
+      "  exec inotifywait -m -r -q -e modify,create,delete,move .git . \\",
+      `    --exclude '${INOTIFYWAIT_EXCLUDE}'`,
       "else",
-      "  while true; do echo poll; sleep 5; done",
+      "  while true; do echo poll; sleep 30; done",
       "fi",
     ].join("\n");
 

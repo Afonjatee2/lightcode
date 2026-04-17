@@ -6,6 +6,7 @@ import {
   detectCodexUpdatePrompt,
   parseCodexSocketMessage,
 } from "./codex";
+import { mapCodexModels } from "./codex/probe";
 
 describe("deriveCodexStructuredState", () => {
   it("maps active approval state to needs_approval", () => {
@@ -317,6 +318,31 @@ describe("detectCodexTerminalStatus", () => {
       status: "idle",
       attention: "none",
       corroborated: true,
+    });
+  });
+});
+
+describe("mapCodexModels", () => {
+  it("prefers high as the default effort when the default model supports it", () => {
+    expect(
+      mapCodexModels([
+        {
+          id: "gpt-5.4",
+          model: "gpt-5.4",
+          displayName: "gpt-5.4",
+          hidden: false,
+          isDefault: true,
+          defaultReasoningEffort: "medium",
+          supportedReasoningEfforts: [
+            { reasoningEffort: "low", description: "Low" },
+            { reasoningEffort: "medium", description: "Medium" },
+            { reasoningEffort: "high", description: "High" },
+          ],
+        },
+      ]),
+    ).toMatchObject({
+      defaultEffort: "high",
+      efforts: ["low", "medium", "high"],
     });
   });
 });

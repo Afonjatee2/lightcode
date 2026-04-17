@@ -19,7 +19,7 @@ import type {
 } from "../../shared/contracts";
 import type { Attachment } from "../components/composer/useAttachments";
 import { isDraftPaneId, makeDraftPaneId, parseDraftProjectId } from "../../shared/paneId";
-import type { PaneLayoutInsertTarget } from "../../shared/paneLayout";
+import type { PaneLayout, PaneLayoutInsertTarget } from "../../shared/paneLayout";
 import {
   adjustInsertTargetForRemoval,
   buildPaneLayoutFromLegacy,
@@ -145,12 +145,30 @@ function currentPaneLayout(view: Extract<AppView, { kind: "thread" }>) {
   return view.paneLayout ?? buildPaneLayoutFromLegacy(view.panes, view.rowLayout);
 }
 
-function viewFromPaneLayout(layout: ReturnType<typeof removePaneFromLayout>): AppView {
+function saveGroupLayout(state: {
+  view: AppView;
+  groupLayouts: Record<string, SavedGroupLayout>;
+}): Record<string, SavedGroupLayout> {
+  if (state.view.kind !== "thread" || !state.view.activeGroupId) return state.groupLayouts;
+  return {
+    ...state.groupLayouts,
+    [state.view.activeGroupId]: {
+      panes: [...state.view.panes],
+      ...(state.view.paneLayout ? { paneLayout: state.view.paneLayout } : {}),
+    },
+  };
+}
+
+function viewFromPaneLayout(
+  layout: ReturnType<typeof removePaneFromLayout>,
+  activeGroupId?: string,
+): AppView {
   if (!layout) return { kind: "home" };
   return {
     kind: "thread",
     panes: collectPaneIds(layout),
     paneLayout: layout,
+    ...(activeGroupId ? { activeGroupId } : {}),
   };
 }
 
@@ -171,12 +189,13 @@ function replacePaneInView(
     kind: "thread",
     panes: collectPaneIds(layout),
     paneLayout: layout,
+    ...(view.activeGroupId ? { activeGroupId: view.activeGroupId } : {}),
   };
 }
 
 function removePaneFromView(view: Extract<AppView, { kind: "thread" }>, paneId: string): AppView {
   if (view.paneLayout) {
-    return viewFromPaneLayout(removePaneFromLayout(view.paneLayout, paneId));
+    return viewFromPaneLayout(removePaneFromLayout(view.paneLayout, paneId), view.activeGroupId);
   }
 
   const idx = view.panes.indexOf(paneId);
@@ -198,6 +217,11 @@ export interface DraftContent {
   attachments: Attachment[];
 }
 
+export interface SavedGroupLayout {
+  panes: string[];
+  paneLayout?: PaneLayout;
+}
+
 interface AppStoreState {
   projects: Project[];
   threads: Thread[];
@@ -205,6 +229,7 @@ interface AppStoreState {
   pendingThreadLaunches: Record<string, string>;
   pendingLaunchSegments: Record<string, PromptSegment[]>;
   draftContents: Record<string, DraftContent>;
+  groupLayouts: Record<string, SavedGroupLayout>;
   agentStatuses: AgentStatus[];
   wslAgentStatuses: AgentStatus[];
   view: AppView;
@@ -223,6 +248,8 @@ interface AppStoreState {
   openHome: () => void;
   openThread: (threadId: string) => void;
   openThreadSideBySide: (threadId: string) => void;
+  openGroupView: (groupId: string) => void;
+  closeGroupView: () => void;
   replaceSecondPane: (threadId: string) => void;
   replacePaneAtIndex: (threadId: string, index: number) => void;
   insertPaneAtIndex: (
@@ -256,6 +283,8 @@ interface AppStoreState {
     prompt: string;
     worktreePath?: string;
     worktreeBranch?: string;
+    groupId?: string;
+    groupName?: string;
     replacePaneId?: string;
   }) => Thread;
   queueThreadLaunch: (threadId: string, prompt: string, segments?: PromptSegment[]) => void;
@@ -306,13 +335,44 @@ export const useAppStore = create<AppStoreState>()(
       pendingThreadLaunches: {},
       pendingLaunchSegments: {},
       draftContents: {},
+      groupLayouts: {},
       agentStatuses: [],
       wslAgentStatuses: [],
       view: { kind: "home" },
       focusedPaneId: null,
       setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
-      setAgentStatuses: (agentStatuses) => set({ agentStatuses }),
-      setWslAgentStatuses: (wslAgentStatuses) => set({ wslAgentStatuses }),
+      setAgentStatuses: (incoming) =>
+        set((prev) => {
+          if (
+            prev.agentStatuses.length === incoming.length &&
+            prev.agentStatuses.every(
+              (a, i) =>
+                a.kind === incoming[i]!.kind &&
+                a.installed === incoming[i]!.installed &&
+                a.version === incoming[i]!.version &&
+                a.authState === incoming[i]!.authState,
+            )
+          ) {
+            return prev;
+          }
+          return { agentStatuses: incoming };
+        }),
+      setWslAgentStatuses: (incoming) =>
+        set((prev) => {
+          if (
+            prev.wslAgentStatuses.length === incoming.length &&
+            prev.wslAgentStatuses.every(
+              (a, i) =>
+                a.kind === incoming[i]!.kind &&
+                a.installed === incoming[i]!.installed &&
+                a.version === incoming[i]!.version &&
+                a.authState === incoming[i]!.authState,
+            )
+          ) {
+            return prev;
+          }
+          return { wslAgentStatuses: incoming };
+        }),
       markThreadsInactiveOnLaunch: () =>
         set((state) => {
           let changed = false;
@@ -425,6 +485,10 @@ export const useAppStore = create<AppStoreState>()(
           if (state.view.kind !== "thread") {
             return { view: { kind: "draft", projectId } };
           }
+          // Exit group view — save layout, new thread replaces the group
+          if (state.view.activeGroupId) {
+            return { groupLayouts: saveGroupLayout(state), view: { kind: "draft", projectId } };
+          }
           const draftPaneId = makeDraftPaneId(projectId);
           const existing = state.view.panes;
           if (existing.includes(draftPaneId)) {
@@ -465,6 +529,75 @@ export const useAppStore = create<AppStoreState>()(
       openHome: () => set({ view: { kind: "home" } }),
       openThread: (threadId) =>
         set((state) => {
+          // If in group view, check if the thread belongs to the active group
+          if (state.view.kind === "thread" && state.view.activeGroupId) {
+            const thread = state.threads.find((t) => t.id === threadId);
+            if (thread?.groupId === state.view.activeGroupId) {
+              // Same group: add to panes if not already there
+              if (state.view.panes.includes(threadId)) {
+                const cleared = clearFinishedAndDone(state.threads, [threadId]);
+                return cleared ? { threads: cleared } : {};
+              }
+              const layout = currentPaneLayout(state.view);
+              const insertTarget =
+                layout.kind === "split" && layout.axis === "vertical"
+                  ? {
+                      path: [] as number[],
+                      axis: "vertical" as const,
+                      index: layout.children.length,
+                    }
+                  : { path: [] as number[], axis: "vertical" as const, index: 1 };
+              const newLayout = insertPaneInLayout(layout, insertTarget, threadId);
+              const nextView: AppView = {
+                kind: "thread",
+                panes: collectPaneIds(newLayout),
+                paneLayout: newLayout,
+                activeGroupId: state.view.activeGroupId,
+              };
+              const cleared = clearFinishedAndDone(state.threads, nextView.panes);
+              return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+            }
+            // Different group or no group: save layout and exit group view
+            const nextView: AppView = { kind: "thread", panes: [threadId] };
+            const cleared = clearFinishedAndDone(state.threads, [threadId]);
+            const gl = saveGroupLayout(state);
+            return cleared
+              ? { groupLayouts: gl, view: nextView, threads: cleared }
+              : { groupLayouts: gl, view: nextView };
+          }
+
+          // If thread belongs to a group, open the whole group
+          const clickedThread = state.threads.find((t) => t.id === threadId);
+          if (clickedThread?.groupId) {
+            const gl = state.view.kind === "thread" ? saveGroupLayout(state) : state.groupLayouts;
+            const groupId = clickedThread.groupId;
+            const groupThreads = state.threads.filter(
+              (t) => t.groupId === groupId && !t.done && !t.archived,
+            );
+            if (groupThreads.length >= 2) {
+              const saved = gl[groupId];
+              let paneIds: [string, ...string[]];
+              if (saved) {
+                const validIds = new Set(groupThreads.map((t) => t.id));
+                const restored = saved.panes.filter((id) => validIds.has(id));
+                for (const t of groupThreads) {
+                  if (!restored.includes(t.id)) restored.push(t.id);
+                }
+                paneIds = (restored.length > 0 ? restored : groupThreads.map((t) => t.id)) as [
+                  string,
+                  ...string[],
+                ];
+              } else {
+                paneIds = groupThreads.map((t) => t.id) as [string, ...string[]];
+              }
+              const nextView: AppView = { kind: "thread", panes: paneIds, activeGroupId: groupId };
+              const cleared = clearFinishedAndDone(state.threads, paneIds);
+              return cleared
+                ? { groupLayouts: gl, view: nextView, threads: cleared }
+                : { groupLayouts: gl, view: nextView };
+            }
+          }
+
           if (state.view.kind === "thread") {
             if (state.view.panes.includes(threadId)) {
               const cleared = clearFinishedAndDone(state.threads, [threadId]);
@@ -506,7 +639,12 @@ export const useAppStore = create<AppStoreState>()(
               threadId,
             );
             const panes = collectPaneIds(layout);
-            const nextView: AppView = { kind: "thread", panes, paneLayout: layout };
+            const nextView: AppView = {
+              kind: "thread",
+              panes,
+              paneLayout: layout,
+              ...(state.view.activeGroupId ? { activeGroupId: state.view.activeGroupId } : {}),
+            };
             const cleared = clearFinishedAndDone(state.threads, panes);
             return cleared ? { view: nextView, threads: cleared } : { view: nextView };
           }
@@ -520,6 +658,93 @@ export const useAppStore = create<AppStoreState>()(
           };
           const cleared = clearFinishedAndDone(state.threads, nextPanes);
           return cleared ? { view: nextView, threads: cleared } : { view: nextView };
+        }),
+      openGroupView: (groupId) =>
+        set((state) => {
+          // Save current group layout if switching from another group
+          const gl = saveGroupLayout(state);
+
+          const groupThreads = state.threads.filter(
+            (t) => t.groupId === groupId && !t.done && !t.archived,
+          );
+          if (groupThreads.length === 0) return {};
+
+          // Restore saved layout if available
+          const saved = gl[groupId] ?? state.groupLayouts[groupId];
+          if (saved) {
+            // Filter saved panes to only include threads still in the group
+            const validIds = new Set(groupThreads.map((t) => t.id));
+            const restoredPanes = saved.panes.filter((id) => validIds.has(id));
+            // Add any new group threads not in the saved layout
+            for (const t of groupThreads) {
+              if (!restoredPanes.includes(t.id)) restoredPanes.push(t.id);
+            }
+            if (restoredPanes.length > 0) {
+              let paneLayout = saved.paneLayout;
+              if (paneLayout) {
+                const savedPaneIds = collectPaneIds(paneLayout);
+                for (const paneId of savedPaneIds) {
+                  if (validIds.has(paneId)) continue;
+                  const nextLayout = removePaneFromLayout(paneLayout, paneId);
+                  if (!nextLayout) {
+                    paneLayout = undefined;
+                    break;
+                  }
+                  paneLayout = nextLayout;
+                }
+
+                if (paneLayout) {
+                  const layoutPaneIds = new Set(collectPaneIds(paneLayout));
+                  for (const paneId of restoredPanes) {
+                    if (layoutPaneIds.has(paneId)) continue;
+                    paneLayout = insertPaneInLayout(
+                      paneLayout,
+                      paneLayout.kind === "split" && paneLayout.axis === "vertical"
+                        ? {
+                            path: [],
+                            axis: "vertical",
+                            index: paneLayout.children.length,
+                          }
+                        : { path: [], axis: "vertical", index: 1 },
+                      paneId,
+                    );
+                    layoutPaneIds.add(paneId);
+                  }
+
+                  const paneIds = collectPaneIds(paneLayout);
+                  const nextView: AppView = {
+                    kind: "thread",
+                    panes: paneIds,
+                    paneLayout,
+                    activeGroupId: groupId,
+                  };
+                  const cleared = clearFinishedAndDone(state.threads, paneIds);
+                  return cleared
+                    ? { groupLayouts: gl, view: nextView, threads: cleared }
+                    : { groupLayouts: gl, view: nextView };
+                }
+              }
+
+              const paneIds = restoredPanes as [string, ...string[]];
+              const nextView: AppView = { kind: "thread", panes: paneIds, activeGroupId: groupId };
+              const cleared = clearFinishedAndDone(state.threads, paneIds);
+              return cleared
+                ? { groupLayouts: gl, view: nextView, threads: cleared }
+                : { groupLayouts: gl, view: nextView };
+            }
+          }
+
+          const paneIds = groupThreads.map((t) => t.id) as [string, ...string[]];
+          const nextView: AppView = { kind: "thread", panes: paneIds, activeGroupId: groupId };
+          const cleared = clearFinishedAndDone(state.threads, paneIds);
+          return cleared
+            ? { groupLayouts: gl, view: nextView, threads: cleared }
+            : { groupLayouts: gl, view: nextView };
+        }),
+      closeGroupView: () =>
+        set((state) => {
+          if (state.view.kind !== "thread" || !state.view.activeGroupId) return {};
+          return { groupLayouts: saveGroupLayout(state), view: { kind: "home" } };
         }),
       replaceSecondPane: (threadId) =>
         set((state) => {
@@ -638,7 +863,12 @@ export const useAppStore = create<AppStoreState>()(
             edge,
           );
           const panes = collectPaneIds(layout);
-          const nextView: AppView = { kind: "thread", panes, paneLayout: layout };
+          const nextView: AppView = {
+            kind: "thread",
+            panes,
+            paneLayout: layout,
+            ...(state.view.activeGroupId ? { activeGroupId: state.view.activeGroupId } : {}),
+          };
           const cleared = clearFinishedAndDone(state.threads, panes);
           return cleared ? { view: nextView, threads: cleared } : { view: nextView };
         }),
@@ -652,7 +882,12 @@ export const useAppStore = create<AppStoreState>()(
           if (state.view.panes.includes(threadId)) return {};
           const layout = insertPaneInLayout(currentPaneLayout(state.view), target, threadId);
           const panes = collectPaneIds(layout);
-          const nextView: AppView = { kind: "thread", panes, paneLayout: layout };
+          const nextView: AppView = {
+            kind: "thread",
+            panes,
+            paneLayout: layout,
+            ...(state.view.activeGroupId ? { activeGroupId: state.view.activeGroupId } : {}),
+          };
           const cleared = clearFinishedAndDone(state.threads, panes);
           return cleared ? { view: nextView, threads: cleared } : { view: nextView };
         }),
@@ -681,6 +916,7 @@ export const useAppStore = create<AppStoreState>()(
               kind: "thread",
               panes: collectPaneIds(nextLayout),
               paneLayout: nextLayout,
+              ...(state.view.activeGroupId ? { activeGroupId: state.view.activeGroupId } : {}),
             },
           };
         }),
@@ -704,6 +940,7 @@ export const useAppStore = create<AppStoreState>()(
               kind: "thread",
               panes: collectPaneIds(layout),
               paneLayout: layout,
+              ...(state.view.activeGroupId ? { activeGroupId: state.view.activeGroupId } : {}),
             },
           };
         }),
@@ -711,6 +948,30 @@ export const useAppStore = create<AppStoreState>()(
         set((state) => {
           if (state.view.kind !== "thread") {
             return {};
+          }
+          // In group view, closing a pane removes the thread from the group
+          const activeGid = state.view.activeGroupId;
+          if (activeGid) {
+            const threads = state.threads.map((t) =>
+              t.id === threadId && t.groupId === activeGid
+                ? { ...t, groupId: undefined, groupName: undefined }
+                : t,
+            );
+            const nextView = removePaneFromView(state.view, threadId);
+            // If only 1 pane left, dissolve group — clear groupId on remaining thread too
+            if (nextView.kind === "thread" && nextView.panes.length <= 1) {
+              const lastId = nextView.panes[0];
+              const dissolvedThreads = threads.map((t) =>
+                t.id === lastId && t.groupId === activeGid
+                  ? { ...t, groupId: undefined, groupName: undefined }
+                  : t,
+              );
+              return {
+                threads: dissolvedThreads,
+                view: { kind: "thread" as const, panes: nextView.panes } satisfies AppView,
+              };
+            }
+            return { threads, view: nextView };
           }
           return { view: removePaneFromView(state.view, threadId) };
         }),
@@ -733,6 +994,8 @@ export const useAppStore = create<AppStoreState>()(
         prompt,
         worktreePath,
         worktreeBranch,
+        groupId,
+        groupName,
         replacePaneId: replacePaneIdParam,
       }) => {
         const now = new Date().toISOString();
@@ -749,6 +1012,8 @@ export const useAppStore = create<AppStoreState>()(
           done: false,
           ...(worktreePath ? { worktreePath } : {}),
           ...(worktreeBranch ? { worktreeBranch } : {}),
+          ...(groupId ? { groupId } : {}),
+          ...(groupName ? { groupName } : {}),
           createdAt: now,
           updatedAt: now,
         };
@@ -1161,6 +1426,7 @@ export const useAppStore = create<AppStoreState>()(
         projects: state.projects,
         threads: state.threads,
         view: state.view,
+        groupLayouts: state.groupLayouts,
       }),
     },
   ),

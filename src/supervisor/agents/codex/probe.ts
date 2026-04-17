@@ -132,9 +132,14 @@ export function mapCodexModels(
     (a, b) => (EFFORT_ORDER[a] ?? 99) - (EFFORT_ORDER[b] ?? 99),
   );
 
-  // Default effort from the default model, or first model
+  // Prefer high for Codex threads when the default model supports it.
+  // The CLI may report medium as its built-in default, but Lightcode's
+  // Codex UX should start at high unless the model can't use it.
   const defaultModel = visible.find((m) => m.isDefault) ?? visible[0]!;
-  const defaultEffort = defaultModel.defaultReasoningEffort;
+  const defaultModelEfforts = perModelEfforts.get(defaultModel.id) ?? [];
+  const defaultEffort = defaultModelEfforts.includes("high")
+    ? "high"
+    : defaultModel.defaultReasoningEffort;
 
   // modelEfforts: only include models whose efforts differ from global list
   const globalKey = sortedEfforts.join(",");

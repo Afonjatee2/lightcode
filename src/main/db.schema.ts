@@ -32,6 +32,8 @@ export const threads = sqliteTable("threads", {
   worktreePath: text("worktree_path"),
   worktreeBranch: text("worktree_branch"),
   prNumber: integer("pr_number"),
+  groupId: text("group_id"),
+  groupName: text("group_name"),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
   sortOrder: integer("sort_order").notNull().default(0),

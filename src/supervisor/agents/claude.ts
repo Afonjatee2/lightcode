@@ -28,7 +28,7 @@ const capabilities: AgentCapability = {
     { id: "sonnet", label: "Sonnet" },
     { id: "haiku", label: "Haiku" },
   ],
-  efforts: ["low", "medium", "high", "max"],
+  efforts: ["low", "medium", "high", "xHigh", "max"],
   defaultEffort: "high",
   modelEfforts: {
     haiku: [],
@@ -265,6 +265,10 @@ export function createClaudeAdapter(): AgentAdapter {
       }
       return { command: "claude", args };
     },
+    buildContextExtractionCommand(sessionRef, _location, model) {
+      const args = ["-p", "--resume", sessionRef.providerSessionId, "--model", model ?? "haiku"];
+      return { command: "claude", args };
+    },
   };
 }
 
@@ -419,7 +423,9 @@ const CLAUDE_MODEL_MAP: [RegExp, string][] = [
   [/sonnet/i, "sonnet"],
 ];
 
-const KNOWN_EFFORTS = new Set(["low", "medium", "high", "max"]);
+const KNOWN_EFFORTS_MAP = new Map(
+  ["low", "medium", "high", "xHigh", "max"].map((e) => [e.toLowerCase(), e]),
+);
 
 export function detectClaudeModelEffort(text: string): { model?: string; effort?: string } | null {
   const re = /Set model to (.+?)(?:\s+with (\w+) effort)?\s*$/gm;
@@ -443,7 +449,7 @@ export function detectClaudeModelEffort(text: string): { model?: string; effort?
     }
   }
 
-  const effort = rawEffort && KNOWN_EFFORTS.has(rawEffort) ? rawEffort : undefined;
+  const effort = rawEffort ? KNOWN_EFFORTS_MAP.get(rawEffort) : undefined;
 
   if (!model && !effort) return null;
   const result: { model?: string; effort?: string } = {};

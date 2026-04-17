@@ -335,5 +335,17 @@ export function createGeminiAdapter(): AgentAdapter {
     buildOneShotCommand(model, _effort) {
       return { command: "gemini", args: ["-p", "--model", model] };
     },
+    buildContextExtractionCommand(sessionRef, _location, model) {
+      return {
+        command: "gemini",
+        args: [
+          "-p",
+          "--resume",
+          sessionRef.providerSessionId,
+          "--model",
+          model ?? "gemini-2.5-flash",
+        ],
+      };
+    },
   };
 }

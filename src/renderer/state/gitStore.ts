@@ -43,6 +43,14 @@ interface GitActions {
   setPrDataBatch: (entries: Record<string, PrData | null>) => void;
   setWorktreeSourceInfo: (worktreePath: string, info: WorktreeSourceInfo) => void;
   setWorktreeSourceInfoBatch: (entries: Record<string, WorktreeSourceInfo>) => void;
+  /** Optimistically move a single file from unstaged to staged. */
+  optimisticStageFile: (key: string, filePath: string, isWorktree: boolean) => void;
+  /** Optimistically move a single file from staged to unstaged. */
+  optimisticUnstageFile: (key: string, filePath: string, isWorktree: boolean) => void;
+  /** Optimistically move all files from unstaged to staged. */
+  optimisticStageAll: (key: string, isWorktree: boolean) => void;
+  /** Optimistically move all files from staged to unstaged. */
+  optimisticUnstageAll: (key: string, isWorktree: boolean) => void;
 }
 
 function areStringArraysEqual(a: readonly string[] | undefined, b: readonly string[] | undefined) {
@@ -330,5 +338,77 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
         next[worktreePath] = info;
       }
       return changed ? { worktreeSourceInfo: next } : state;
+    }),
+
+  optimisticStageFile: (key, filePath, isWorktree) =>
+    set((state) => {
+      const bucket = isWorktree ? "worktreeStatuses" : "statuses";
+      const status = state[bucket][key];
+      if (!status) return state;
+      const file = status.unstaged.find((f) => f.path === filePath);
+      if (!file) return state;
+      const moved = { ...file, staged: true, status: file.status === "?" ? "A" : file.status };
+      return {
+        [bucket]: {
+          ...state[bucket],
+          [key]: {
+            ...status,
+            staged: [...status.staged, moved],
+            unstaged: status.unstaged.filter((f) => f.path !== filePath),
+          },
+        },
+      };
+    }),
+
+  optimisticUnstageFile: (key, filePath, isWorktree) =>
+    set((state) => {
+      const bucket = isWorktree ? "worktreeStatuses" : "statuses";
+      const status = state[bucket][key];
+      if (!status) return state;
+      const file = status.staged.find((f) => f.path === filePath);
+      if (!file) return state;
+      const moved = { ...file, staged: false };
+      return {
+        [bucket]: {
+          ...state[bucket],
+          [key]: {
+            ...status,
+            staged: status.staged.filter((f) => f.path !== filePath),
+            unstaged: [...status.unstaged, moved],
+          },
+        },
+      };
+    }),
+
+  optimisticStageAll: (key, isWorktree) =>
+    set((state) => {
+      const bucket = isWorktree ? "worktreeStatuses" : "statuses";
+      const status = state[bucket][key];
+      if (!status || status.unstaged.length === 0) return state;
+      const moved = status.unstaged.map((f) => ({
+        ...f,
+        staged: true,
+        status: f.status === "?" ? "A" : f.status,
+      }));
+      return {
+        [bucket]: {
+          ...state[bucket],
+          [key]: { ...status, staged: [...status.staged, ...moved], unstaged: [] },
+        },
+      };
+    }),
+
+  optimisticUnstageAll: (key, isWorktree) =>
+    set((state) => {
+      const bucket = isWorktree ? "worktreeStatuses" : "statuses";
+      const status = state[bucket][key];
+      if (!status || status.staged.length === 0) return state;
+      const moved = status.staged.map((f) => ({ ...f, staged: false }));
+      return {
+        [bucket]: {
+          ...state[bucket],
+          [key]: { ...status, staged: [], unstaged: [...status.unstaged, ...moved] },
+        },
+      };
     }),
 }));

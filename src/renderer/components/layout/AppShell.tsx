@@ -58,6 +58,8 @@ export function useSidebar() {
 export function AppShell(props: {
   sidebar: ReactNode;
   content: ReactNode;
+  sidebarHeader?: ReactNode;
+  contentHeader?: ReactNode;
   rightPanel?: ReactNode;
   rightPanelOpen?: boolean;
   gitPanel?: ReactNode;
@@ -66,6 +68,8 @@ export function AppShell(props: {
   const {
     sidebar,
     content,
+    sidebarHeader,
+    contentHeader,
     rightPanel,
     rightPanelOpen = false,
     gitPanel,
@@ -193,25 +197,48 @@ export function AppShell(props: {
   const gitPanelDisplayWidth = gitPanelOpen ? gitPanelWidth : 0;
   const isBottom = terminalPosition === "bottom";
 
+  const hasHeaders = sidebarHeader != null || contentHeader != null;
+
   return (
     <SidebarContext.Provider value={{ isCollapsed, collapse, expand }}>
       <div
         className={`lightcode-shell flex h-full min-h-0 overflow-hidden bg-background text-foreground ${isResizing ? "select-none" : ""}`}
+        style={hasHeaders ? { paddingTop: 0 } : undefined}
       >
-        <div aria-hidden="true" className="lightcode-drag-region" />
+        {!hasHeaders && <div aria-hidden="true" className="lightcode-drag-region" />}
 
         <aside
-          className={`relative min-h-0 border-r border-[color:var(--border)] -mt-5 h-[calc(100%+0.75rem)] overflow-hidden ${
-            !isResizing ? "transition-[width,min-width] duration-200" : ""
-          }`}
+          className={`relative flex min-h-0 flex-col overflow-hidden ${
+            !hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)] border-r border-[color:var(--border)]" : ""
+          } ${!isResizing ? "transition-[width,min-width] duration-200" : ""}`}
           style={{ width: displayWidth, minWidth: displayWidth }}
         >
-          {sidebar}
+          {sidebarHeader && (
+            <div
+              className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-4"
+              style={{ height: "env(titlebar-area-height, 32px)" }}
+            >
+              {sidebarHeader}
+            </div>
+          )}
+          <div
+            className={`min-h-0 flex-1 overflow-hidden ${hasHeaders ? "mb-2 border-r border-[color:var(--border)]" : ""}`}
+          >
+            {sidebar}
+          </div>
         </aside>
 
         {!isCollapsed && (
           <div
-            className="lightcode-resize-handle -mt-5 h-[calc(100%+0.75rem)]"
+            className={`lightcode-resize-handle ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`}
+            style={
+              hasHeaders
+                ? {
+                    marginTop: "env(titlebar-area-height, 32px)",
+                    marginBottom: "0.5rem",
+                  }
+                : undefined
+            }
             onMouseDown={handleSidebarResizeStart}
             role="separator"
             aria-orientation="vertical"
@@ -219,80 +246,97 @@ export function AppShell(props: {
           />
         )}
 
-        <div
-          className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${isBottom && rightPanel ? "flex-col" : ""}`}
-        >
-          <main className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
-            <div className="relative h-full min-h-0">{content}</div>
-          </main>
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          {contentHeader && (
+            <div
+              className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-4"
+              style={{
+                height: "env(titlebar-area-height, 32px)",
+                paddingRight:
+                  "calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))",
+              }}
+            >
+              {contentHeader}
+            </div>
+          )}
 
-          {rightPanel ? (
-            <>
-              {rightPanelOpen &&
-                (isBottom ? (
-                  <div
-                    className="lightcode-resize-handle-horizontal"
-                    onMouseDown={handlePanelBottomResizeStart}
-                    role="separator"
-                    aria-orientation="horizontal"
-                    aria-label="Resize terminal panel"
-                  />
-                ) : (
-                  <div
-                    className="lightcode-resize-handle -mt-5 h-[calc(100%+0.75rem)]"
-                    onMouseDown={handlePanelResizeStart}
-                    role="separator"
-                    aria-orientation="vertical"
-                    aria-label="Resize terminal panel"
-                  />
-                ))}
-              <aside
-                className={`relative overflow-hidden ${
-                  isBottom
-                    ? `min-w-0 border-t border-[color:var(--border)] ${!isResizing ? "transition-[height,min-height,opacity] duration-200" : ""}`
-                    : `min-h-0 border-l border-[color:var(--border)] -mt-5 h-[calc(100%+0.75rem)] ${!isResizing ? "transition-[width,min-width,opacity] duration-200" : ""}`
-                } ${rightPanelOpen ? "opacity-100" : "opacity-0"}`}
-                style={
-                  isBottom
-                    ? { height: panelDisplayHeight, minHeight: panelDisplayHeight }
-                    : { width: panelDisplayWidth, minWidth: panelDisplayWidth }
-                }
+          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+            <div
+              className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${isBottom && rightPanel ? "flex-col" : ""}`}
+            >
+              <main className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
+                <div className="relative h-full min-h-0">{content}</div>
+              </main>
+
+              {rightPanel ? (
+                <>
+                  {rightPanelOpen &&
+                    (isBottom ? (
+                      <div
+                        className="lightcode-resize-handle-horizontal"
+                        onMouseDown={handlePanelBottomResizeStart}
+                        role="separator"
+                        aria-orientation="horizontal"
+                        aria-label="Resize terminal panel"
+                      />
+                    ) : (
+                      <div
+                        className="lightcode-resize-handle mb-2"
+                        onMouseDown={handlePanelResizeStart}
+                        role="separator"
+                        aria-orientation="vertical"
+                        aria-label="Resize terminal panel"
+                      />
+                    ))}
+                  <aside
+                    className={`relative overflow-hidden ${
+                      isBottom
+                        ? `min-w-0 border-t border-[color:var(--border)] ${!isResizing ? "transition-[height,min-height,opacity] duration-200" : ""}`
+                        : `mb-2 min-h-0 border-l border-[color:var(--border)] ${!isResizing ? "transition-[width,min-width,opacity] duration-200" : ""}`
+                    } ${rightPanelOpen ? "opacity-100" : "opacity-0"}`}
+                    style={
+                      isBottom
+                        ? { height: panelDisplayHeight, minHeight: panelDisplayHeight }
+                        : { width: panelDisplayWidth, minWidth: panelDisplayWidth }
+                    }
+                  >
+                    <div
+                      className={isBottom ? "h-full w-full" : "h-full"}
+                      style={isBottom ? { height: panelHeight } : { width: panelWidth }}
+                    >
+                      {rightPanel}
+                    </div>
+                  </aside>
+                </>
+              ) : null}
+            </div>
+
+            {gitPanelOpen && (
+              <div
+                className="lightcode-resize-handle mb-2"
+                onMouseDown={handleGitPanelResizeStart}
+                role="separator"
+                aria-orientation="vertical"
+                aria-label="Resize git panel"
+              />
+            )}
+            <aside
+              className={`relative mb-2 min-h-0 overflow-hidden ${
+                gitPanelDisplayWidth > 0 ? "border-l border-[color:var(--border)]" : ""
+              } ${!isResizing ? "transition-[width,min-width] duration-200" : ""}`}
+              style={{ width: gitPanelDisplayWidth, minWidth: gitPanelDisplayWidth }}
+            >
+              <div
+                className={`h-full transition-[transform,opacity] duration-200 ${
+                  gitPanelOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
+                }`}
+                style={{ width: gitPanelWidth }}
               >
-                <div
-                  className={isBottom ? "h-full w-full" : "h-full"}
-                  style={isBottom ? { height: panelHeight } : { width: panelWidth }}
-                >
-                  {rightPanel}
-                </div>
-              </aside>
-            </>
-          ) : null}
-        </div>
-
-        {gitPanelOpen && (
-          <div
-            className="lightcode-resize-handle -mt-5 h-[calc(100%+0.75rem)]"
-            onMouseDown={handleGitPanelResizeStart}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize git panel"
-          />
-        )}
-        <aside
-          className={`relative min-h-0 overflow-hidden -mt-5 h-[calc(100%+0.75rem)] ${
-            gitPanelDisplayWidth > 0 ? "border-l border-[color:var(--border)]" : ""
-          } ${!isResizing ? "transition-[width,min-width] duration-200" : ""}`}
-          style={{ width: gitPanelDisplayWidth, minWidth: gitPanelDisplayWidth }}
-        >
-          <div
-            className={`h-full transition-[transform,opacity] duration-200 ${
-              gitPanelOpen ? "translate-x-0 opacity-100" : "translate-x-full opacity-0"
-            }`}
-            style={{ width: gitPanelWidth }}
-          >
-            {gitPanel}
+                {gitPanel}
+              </div>
+            </aside>
           </div>
-        </aside>
+        </div>
 
         {isResizing && (
           <div

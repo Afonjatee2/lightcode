@@ -4,7 +4,8 @@ import "@git-diff-view/react/styles/diff-view.css";
 
 setEnableFastDiffTemplate(true);
 
-import { AlertDialog, Button, Spinner } from "@heroui/react";
+import { AlertDialog, Button } from "@heroui/react";
+import { PixelLoader } from "../common";
 import {
   ChevronDown,
   ChevronRight,
@@ -19,6 +20,7 @@ import type { GitFileChange, Project } from "../../../shared/contracts";
 import { isLockFile } from "../../../shared/gitUtils";
 import { getFileIconUrl } from "../common/fileIcons";
 import { readBridge } from "../../bridge";
+import { useGitStore } from "../../state/gitStore";
 import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang } from "./diffBuildClient";
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -51,8 +53,10 @@ export function StackedFileCard(props: {
   theme: "light" | "dark";
   wrapLines: boolean;
   onRefresh: () => void;
+  storeKey?: string;
+  isWorktree?: boolean;
 }) {
-  const { file, project, theme, wrapLines, onRefresh } = props;
+  const { file, project, theme, wrapLines, onRefresh, storeKey, isWorktree } = props;
   const [expanded, setExpanded] = useState(false);
   const [revertOpen, setRevertOpen] = useState(false);
 
@@ -133,12 +137,23 @@ export function StackedFileCard(props: {
 
   async function handleStageToggle(e: React.MouseEvent) {
     e.stopPropagation();
-    if (file.staged) {
-      await readBridge().gitUnstage({ projectLocation: project.location, filePath: file.path });
-    } else {
-      await readBridge().gitStage({ projectLocation: project.location, filePath: file.path });
+    if (storeKey) {
+      const store = useGitStore.getState();
+      if (file.staged) {
+        store.optimisticUnstageFile(storeKey, file.path, isWorktree ?? false);
+      } else {
+        store.optimisticStageFile(storeKey, file.path, isWorktree ?? false);
+      }
     }
-    onRefresh();
+    if (file.staged) {
+      await readBridge()
+        .gitUnstage({ projectLocation: project.location, filePath: file.path })
+        .catch(() => onRefresh());
+    } else {
+      await readBridge()
+        .gitStage({ projectLocation: project.location, filePath: file.path })
+        .catch(() => onRefresh());
+    }
   }
 
   function handleRevertClick(e: React.MouseEvent) {
@@ -161,7 +176,7 @@ export function StackedFileCard(props: {
         <div
           role="button"
           tabIndex={0}
-          className="sticky top-0 z-10 bg-background group flex cursor-pointer select-none items-center gap-1.5 px-3 py-1 text-xs transition-colors hover:bg-content2"
+          className="sticky top-0 z-10 bg-[var(--content-background)] group flex cursor-pointer select-none items-center gap-1.5 px-3 py-1 text-xs transition-colors hover:bg-content2"
           onClick={() => setExpanded((v) => !v)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
@@ -233,7 +248,7 @@ export function StackedFileCard(props: {
           <div className="border-t border-border">
             {loading && (
               <div className="flex items-center justify-center py-6">
-                <Spinner size="sm" />
+                <PixelLoader size="sm" />
               </div>
             )}
             {!loading && tooLarge && (

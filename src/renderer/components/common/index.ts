@@ -5,6 +5,7 @@ export * from "./Chip";
 export * from "./ContextMenu";
 export * from "./Input";
 export * from "./OptionMenu";
+export * from "./PixelLoader";
 export * from "./PromptOptions";
 export * from "./Select";
 export * from "./Separator";

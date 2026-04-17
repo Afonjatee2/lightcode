@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import { PixelLoader } from "../common";
 import { Tooltip } from "@heroui/react";
 import { useShallow } from "zustand/shallow";
 import { useGitStore } from "../../state/gitStore";
@@ -115,7 +115,7 @@ export function SyncBadge(props: { projectId: string; worktreePath?: string }) {
         >
           <span className="flex items-center text-[10px] font-medium">
             {isSyncing ? (
-              <Loader2 className="size-2.5 animate-spin" />
+              <PixelLoader size="sm" />
             ) : (
               <>
                 {behind > 0 && <span className="text-accent">↓{behind}</span>}

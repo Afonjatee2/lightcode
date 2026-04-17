@@ -60,7 +60,7 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 2;
+  const SCHEMA_VERSION = 4;
 
   const storedVersion = Number(
     (
@@ -74,6 +74,20 @@ export function initDatabase(dbPath: string) {
     const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
     if (!cols.some((c) => c.name === "done")) {
       sqlite.exec("ALTER TABLE threads ADD COLUMN done INTEGER NOT NULL DEFAULT 0");
+    }
+  }
+
+  if (storedVersion < 3) {
+    const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!cols.some((c) => c.name === "group_id")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN group_id TEXT");
+    }
+  }
+
+  if (storedVersion < 4) {
+    const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!cols.some((c) => c.name === "group_name")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN group_name TEXT");
     }
   }
 
@@ -158,6 +172,8 @@ function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
     ...(row.worktreePath ? { worktreePath: row.worktreePath } : {}),
     ...(row.worktreeBranch ? { worktreeBranch: row.worktreeBranch } : {}),
     ...(row.prNumber != null ? { prNumber: row.prNumber } : {}),
+    ...(row.groupId ? { groupId: row.groupId } : {}),
+    ...(row.groupName ? { groupName: row.groupName } : {}),
     archived: row.archived,
     done: row.done,
     createdAt: row.createdAt,
@@ -243,6 +259,8 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       worktreePath: thread.worktreePath ?? null,
       worktreeBranch: thread.worktreeBranch ?? null,
       prNumber: thread.prNumber ?? null,
+      groupId: thread.groupId ?? null,
+      groupName: thread.groupName ?? null,
       archived: thread.archived,
       done: thread.done,
       sortOrder,
@@ -262,6 +280,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         worktreePath: thread.worktreePath ?? null,
         worktreeBranch: thread.worktreeBranch ?? null,
         prNumber: thread.prNumber ?? null,
+        groupId: thread.groupId ?? null,
         archived: thread.archived,
         done: thread.done,
         sortOrder,

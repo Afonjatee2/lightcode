@@ -30,7 +30,7 @@ export function FileEditorOverlay(props: { onClose: () => void }) {
   return (
     <PageLayout
       title="Editor"
-      headerChildren={
+      contentHeaderChildren={
         <div className="lightcode-overlay-header__controls min-w-0 truncate text-xs text-muted">
           {rootContext.rootLabel}
         </div>

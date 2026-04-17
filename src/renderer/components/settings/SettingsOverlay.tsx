@@ -17,7 +17,6 @@ import {
   Download,
   ExternalLink,
   Info,
-  Loader2,
   Monitor,
   PanelLeft,
   PanelLeftClose,
@@ -48,7 +47,7 @@ import {
 } from "../providers";
 import { readBridge } from "../../bridge";
 import { ProviderIcon } from "../providers/ProviderIcon";
-import { Select, SidebarButton, TuxIcon } from "../common";
+import { PixelLoader, Select, SidebarButton, TuxIcon } from "../common";
 import { useSidebar } from "../layout/AppShell";
 import { PageLayout } from "../layout/PageLayout";
 import { formatBytes } from "../../../shared/formatBytes";
@@ -1057,7 +1056,7 @@ function UpdateButton() {
   if (phase === "checking") {
     return (
       <Button size="sm" isDisabled variant="ghost">
-        <Loader2 className="size-3.5 animate-spin" />
+        <PixelLoader size="sm" />
         Checking…
       </Button>
     );

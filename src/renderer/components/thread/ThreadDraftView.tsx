@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Paperclip, TerminalSquare, X } from "lucide-react";
-import { Button, Spinner, toast, Tooltip } from "@heroui/react";
+import { Button, toast, Tooltip } from "@heroui/react";
 import { useShallow } from "zustand/shallow";
 import type {
   AgentStatus,
@@ -13,7 +13,12 @@ import type {
 import { readBridge } from "../../bridge";
 import { ProviderIcon, getComposerControls } from "../providers";
 import { useGitStore } from "../../state/gitStore";
-import { BranchSelector, generateWorktreeBranch, type BranchSelection } from "../common";
+import {
+  BranchSelector,
+  generateWorktreeBranch,
+  type BranchSelection,
+  PixelLoader,
+} from "../common";
 import {
   MentionInput,
   type MentionInputHandle,
@@ -202,10 +207,9 @@ export function ThreadDraftView(props: {
   // --- Per-provider config memory (app-wide via shared settings) ---
   const updateProjectDraftConfig = useAppStore((s) => s.updateProjectDraftConfig);
   const setProviderConfig = useSharedSettings((s) => s.setProviderConfig);
-  const providerConfigsRef = useRef<Record<string, ProviderDraftConfig> | null>(null);
-  if (providerConfigsRef.current === null) {
-    providerConfigsRef.current = { ...useSharedSettings.getState().providerConfigs };
-  }
+  const providerConfigs = useSharedSettings((s) => s.providerConfigs);
+  const providerConfigsRef = useRef<Record<string, ProviderDraftConfig>>({});
+  providerConfigsRef.current = { ...providerConfigs };
 
   // --- Draft preservation: save on unmount, restore on mount ---
   const saveDraftContent = useAppStore((s) => s.saveDraftContent);
@@ -390,6 +394,82 @@ export function ThreadDraftView(props: {
     setProviderConfig,
   ]);
 
+  useEffect(() => {
+    if (!selectedAgent || !effectiveAgentKind) {
+      return;
+    }
+
+    const saved = providerConfigs[effectiveAgentKind];
+    if (!saved) {
+      return;
+    }
+
+    const nextModel = resolveModelValue(selectedAgent, saved.model);
+    const nextEffort = resolveEffortValue(selectedAgent, nextModel, saved.effort);
+    const nextMode = resolveModeValue(selectedAgent, saved.mode) as "agent" | "plan" | "autopilot";
+    const nextApproval = resolveApprovalPolicyValue(selectedAgent, saved.approvalPolicy);
+    const nextSandbox = resolveSandboxModeValue(selectedAgent, saved.sandboxMode);
+
+    if (
+      nextModel === model &&
+      nextEffort === effort &&
+      nextMode === mode &&
+      nextApproval === approvalPolicy &&
+      nextSandbox === sandboxMode
+    ) {
+      return;
+    }
+
+    setModel(nextModel);
+    setEffort(nextEffort);
+    setMode(nextMode);
+    setApprovalPolicy(nextApproval);
+    setSandboxMode(nextSandbox);
+    lastAppliedAgentKindRef.current = effectiveAgentKind;
+
+    const resolved: ProviderDraftConfig = {
+      model: nextModel,
+      effort: nextEffort,
+      mode: nextMode,
+      approvalPolicy: nextApproval,
+      sandboxMode: nextSandbox,
+    };
+
+    if (
+      saved.model !== nextModel ||
+      saved.effort !== nextEffort ||
+      saved.mode !== nextMode ||
+      saved.approvalPolicy !== nextApproval ||
+      saved.sandboxMode !== nextSandbox
+    ) {
+      providerConfigsRef.current[effectiveAgentKind] = resolved;
+      setProviderConfig(effectiveAgentKind, resolved);
+    }
+
+    updateProjectDraftConfig(project.id, {
+      agentKind: effectiveAgentKind,
+      model: nextModel,
+      effort: nextEffort,
+      mode: nextMode,
+      approvalPolicy: nextApproval,
+      sandboxMode: nextSandbox,
+      worktreeMode,
+    });
+  }, [
+    providerConfigs,
+    selectedAgent,
+    effectiveAgentKind,
+    model,
+    effort,
+    mode,
+    approvalPolicy,
+    sandboxMode,
+    project.id,
+    worktreeMode,
+    updateProjectDraftConfig,
+    setProviderConfig,
+  ]);
+
   const hiddenModelIds = useSharedSettings((s) =>
     selectedAgent ? s.hiddenModels[selectedAgent.kind] : undefined,
   );
@@ -533,7 +613,7 @@ export function ThreadDraftView(props: {
         {/* Composer at bottom */}
         <div className={`${props.compact ? alignClass : "mx-auto"} w-full max-w-[920px]`}>
           <ThreadComposer
-            autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
+            autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
             compact={props.compact ?? false}
             controls={[
               {
@@ -593,7 +673,7 @@ export function ThreadDraftView(props: {
             inputContent={
               <MentionInput
                 ref={mentionRef}
-                autoFocus // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
+                autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                 compact={props.compact ?? false}
                 placeholder="Ask LightCode anything, @ to add files, / for commands"
                 projectLocation={project.location}
@@ -736,7 +816,7 @@ export function ThreadDraftView(props: {
                         >
                           {({ isPending }) =>
                             isPending ? (
-                              <Spinner color="current" size="sm" />
+                              <PixelLoader size="sm" />
                             ) : (
                               <span className="text-sm">
                                 {gitHasTracking ? `${gitBehind}↓ ${gitAhead}↑` : "↑"}

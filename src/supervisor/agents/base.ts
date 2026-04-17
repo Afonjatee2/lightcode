@@ -165,6 +165,16 @@ export interface AgentAdapter {
     effort?: string,
     prompt?: string,
   ): { command: string; args: string[]; stdin?: string } | undefined;
+  /**
+   * Build a command that extracts a context summary from an active session.
+   * Used by "Continue in Other Provider" to hand off conversation context.
+   * Typically combines print mode with --resume to load the full session.
+   */
+  buildContextExtractionCommand?(
+    sessionRef: SessionRef,
+    location: ProjectLocation,
+    model?: string,
+  ): { command: string; args: string[]; stdin?: string } | undefined;
 }
 
 export interface TerminalStatusHint {

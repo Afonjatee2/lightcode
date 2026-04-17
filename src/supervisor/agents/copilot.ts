@@ -806,5 +806,21 @@ export function createCopilotAdapter(): AgentAdapter {
 
       return { command: "copilot", args, stdin: "" };
     },
+    buildContextExtractionCommand(sessionRef, _location, model) {
+      // Copilot's -p flag takes the prompt inline as an arg.
+      // The orchestrator pipes the extraction prompt via stdin,
+      // so we pass a brief directive via -p and let stdin carry the full prompt.
+      const args = [
+        "-p",
+        "Summarize this conversation for handoff to another AI assistant. Reply with only the summary.",
+        `--resume=${sessionRef.providerSessionId}`,
+        "-s",
+        "--allow-all-tools",
+      ];
+      if (model) {
+        args.push("--model", model);
+      }
+      return { command: "copilot", args, stdin: "" };
+    },
   };
 }

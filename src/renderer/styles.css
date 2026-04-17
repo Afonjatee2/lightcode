@@ -176,6 +176,16 @@
   outline: none;
 }
 
+/* Remove focus rings from inputs and textareas */
+input:focus,
+input:focus-visible,
+textarea:focus,
+textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+}
+
 button,
 [role="button"] {
   cursor: var(--interactive-cursor);
@@ -203,9 +213,7 @@ body {
   position: relative;
   box-sizing: border-box;
   padding-top: env(titlebar-area-height, 0px);
-  background:
-    radial-gradient(circle at bottom left, rgba(133, 95, 69, 0.09), transparent 22%),
-    var(--content-background);
+  background: var(--content-background);
 }
 
 /* macOS: add padding for traffic lights when titlebar-area-height is not available */
@@ -942,20 +950,6 @@ body {
 .lightcode-overlay-header__controls {
   -webkit-app-region: no-drag;
   app-region: no-drag;
-}
-
-.lightcode-overlay-body .lightcode-shell {
-  padding-top: 2px;
-}
-
-.lightcode-overlay-body aside,
-.lightcode-overlay-body .lightcode-resize-handle {
-  margin-top: 0;
-  height: calc(100% - 0.5rem);
-}
-
-.lightcode-overlay-body .lightcode-drag-region {
-  height: 0;
 }
 
 .xterm .xterm-scrollable-element > .scrollbar.vertical {

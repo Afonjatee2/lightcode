@@ -274,8 +274,8 @@ describe("ThreadView", () => {
       onSubmitInput: async () => undefined,
     });
 
-    expect(screen.getByText("Starting thread\u2026")).toBeInTheDocument();
-    // Composer is not rendered during launching — only the spinner overlay is visible.
+    expect(screen.getByRole("img", { name: "Loading" })).toBeInTheDocument();
+    // Composer is not rendered during launching — only the loader overlay is visible.
     expect(
       screen.queryByPlaceholderText("Ask Codex anything about this workspace"),
     ).not.toBeInTheDocument();
