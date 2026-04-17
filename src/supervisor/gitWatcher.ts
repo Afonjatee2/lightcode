@@ -318,8 +318,11 @@ export class GitWatcher {
     const parcelBlock = watcherDir
       ? [
           "if ! command -v node >/dev/null 2>&1; then",
+          "  :",
           `elif [ ! -f '${watcherDir}/watcher.node' ]; then`,
+          "  :",
           `elif ! node -e "require('${watcherDir}/watcher.node')" >/dev/null 2>&1; then`,
+          "  :",
           "else",
           `  exec node "${watcherDir}/wsl-watcher.cjs" .git .`,
           "fi",
