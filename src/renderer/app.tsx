@@ -278,7 +278,6 @@ function generateTitleAsync(
 }
 
 const EMPTY_PANES: string[] = [];
-const GIT_WATCHER_REFRESH_DEBOUNCE_MS = 1_000;
 const GIT_FETCH_PRIORITY_INTERVAL_MS = 180_000;
 const GIT_FETCH_BACKGROUND_INTERVAL_MS = 720_000;
 const STALE_THREAD_SWEEP_INTERVAL_MS = 5 * 60_000;
@@ -1640,8 +1639,8 @@ export function App() {
 
     let isActive = true;
     const refreshingProjects = new Set<string>();
+    const pendingWatcherRefreshProjects = new Set<string>();
     const watchedWorktreePaths = new Map<string, string>();
-    const watcherRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
     const lastFetchTimes = new Map<string, number>();
     let previousPriorityProjectIds = new Set<string>();
     type GitRefreshReason = "initial" | "watcher" | "fetch";
@@ -1652,6 +1651,9 @@ export function App() {
     ) {
       if (!isActive) return;
       if (refreshingProjects.has(project.id)) {
+        if (reason === "watcher") {
+          pendingWatcherRefreshProjects.add(project.id);
+        }
         console.log(`[git-refresh] skip project=${project.id} reason=${reason} inFlight=true`);
         return;
       }
@@ -1833,18 +1835,16 @@ export function App() {
           `[git-refresh] done project=${project.id} reason=${reason} durationMs=${Date.now() - startedAt}`,
         );
         refreshingProjects.delete(project.id);
+        if (pendingWatcherRefreshProjects.delete(project.id)) {
+          console.log(`[git-refresh] rerun project=${project.id} reason=watcher`);
+          void refreshProject(project, "watcher");
+        }
       }
     }
 
     function scheduleWatcherRefresh(project: { id: string; location: ProjectLocation }) {
-      const existingTimer = watcherRefreshTimers.get(project.id);
-      if (existingTimer) clearTimeout(existingTimer);
-      const timer = setTimeout(() => {
-        watcherRefreshTimers.delete(project.id);
-        if (!isActive) return;
-        void refreshProject(project, "watcher");
-      }, GIT_WATCHER_REFRESH_DEBOUNCE_MS);
-      watcherRefreshTimers.set(project.id, timer);
+      if (!isActive) return;
+      void refreshProject(project, "watcher");
     }
 
     function getPriorityProjectIds(): Set<string> {
@@ -1960,9 +1960,6 @@ export function App() {
       isActive = false;
       clearInterval(fetchIntervalId);
       unsubWatcher();
-      for (const timer of watcherRefreshTimers.values()) {
-        clearTimeout(timer);
-      }
       for (const project of projects) {
         readBridge()
           .gitUnwatchProject({ projectId: project.id })
