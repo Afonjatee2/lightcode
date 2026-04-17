@@ -20,18 +20,54 @@ const IGNORE_DIRS = [
   ".venv",
   ".git/objects",
   ".git/logs",
+  ".git/FETCH_HEAD",
 ];
+
+function normalizeRelativePath(root, eventPath) {
+  if (!eventPath || typeof eventPath !== "string") return "";
+  const relative = path.relative(root, eventPath).replace(/\\/g, "/");
+  return relative || ".";
+}
 
 async function main() {
   for (const dir of dirs) {
     const resolved = path.resolve(dir);
     const ignore = IGNORE_DIRS.map((name) => path.join(resolved, name));
+    const scope = path.basename(resolved) === ".git" ? "git" : "worktree";
+
+    // Match VS Code's split watcher model more closely:
+    // - the repository root watcher should ignore the entire .git subtree
+    // - a dedicated .git watcher handles git metadata changes separately
+    if (path.basename(resolved) !== ".git") {
+      ignore.push(path.join(resolved, ".git"));
+    }
 
     await binding.subscribe(
       resolved,
-      (err, _events) => {
+      (err, events) => {
         if (err) return;
-        process.stdout.write("changed\n");
+        const relevantEvents = Array.isArray(events) ? events : [];
+        const relativePaths = relevantEvents
+          .map((event) => normalizeRelativePath(resolved, event && event.path))
+          .filter(Boolean);
+
+        const filteredPaths =
+          scope === "worktree"
+            ? relativePaths.filter(
+                (relativePath) => relativePath !== ".git" && !relativePath.startsWith(".git/"),
+              )
+            : relativePaths;
+
+        if (scope === "worktree" && filteredPaths.length === 0 && relativePaths.length > 0) {
+          return;
+        }
+
+        const samples = (filteredPaths.length > 0 ? filteredPaths : relativePaths).slice(0, 5);
+        const suffix =
+          samples.length > 0
+            ? `:${JSON.stringify(samples)}${filteredPaths.length > 5 ? `:${filteredPaths.length}` : ""}`
+            : "";
+        process.stdout.write(`changed:${scope}${suffix}\n`);
       },
       { backend: "inotify", ignore },
     );

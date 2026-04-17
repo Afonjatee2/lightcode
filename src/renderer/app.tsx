@@ -278,7 +278,9 @@ function generateTitleAsync(
 }
 
 const EMPTY_PANES: string[] = [];
-const GIT_FETCH_INTERVAL_MS = 60_000;
+const GIT_WATCHER_REFRESH_DEBOUNCE_MS = 1_000;
+const GIT_FETCH_PRIORITY_INTERVAL_MS = 180_000;
+const GIT_FETCH_BACKGROUND_INTERVAL_MS = 720_000;
 const STALE_THREAD_SWEEP_INTERVAL_MS = 5 * 60_000;
 
 function formatRelativeTime(iso: string): string {
@@ -1639,10 +1641,22 @@ export function App() {
     let isActive = true;
     const refreshingProjects = new Set<string>();
     const watchedWorktreePaths = new Map<string, string>();
-    let lastFetchTime = 0;
+    const watcherRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const lastFetchTimes = new Map<string, number>();
+    let previousPriorityProjectIds = new Set<string>();
+    type GitRefreshReason = "initial" | "watcher" | "fetch";
 
-    async function refreshProject(project: { id: string; location: ProjectLocation }) {
-      if (!isActive || refreshingProjects.has(project.id)) return;
+    async function refreshProject(
+      project: { id: string; location: ProjectLocation },
+      reason: GitRefreshReason,
+    ) {
+      if (!isActive) return;
+      if (refreshingProjects.has(project.id)) {
+        console.log(`[git-refresh] skip project=${project.id} reason=${reason} inFlight=true`);
+        return;
+      }
+      const startedAt = Date.now();
+      console.log(`[git-refresh] start project=${project.id} reason=${reason}`);
       refreshingProjects.add(project.id);
       try {
         const [statusResult, branchesResult, worktreesResult] = await Promise.allSettled([
@@ -1815,8 +1829,50 @@ export function App() {
           }
         }
       } finally {
+        console.log(
+          `[git-refresh] done project=${project.id} reason=${reason} durationMs=${Date.now() - startedAt}`,
+        );
         refreshingProjects.delete(project.id);
       }
+    }
+
+    function scheduleWatcherRefresh(project: { id: string; location: ProjectLocation }) {
+      const existingTimer = watcherRefreshTimers.get(project.id);
+      if (existingTimer) clearTimeout(existingTimer);
+      const timer = setTimeout(() => {
+        watcherRefreshTimers.delete(project.id);
+        if (!isActive) return;
+        void refreshProject(project, "watcher");
+      }, GIT_WATCHER_REFRESH_DEBOUNCE_MS);
+      watcherRefreshTimers.set(project.id, timer);
+    }
+
+    function getPriorityProjectIds(): Set<string> {
+      const state = useAppStore.getState();
+      const priorityProjectIds = new Set<string>();
+
+      if (state.view.kind === "draft" && state.view.projectId) {
+        priorityProjectIds.add(state.view.projectId);
+        return priorityProjectIds;
+      }
+
+      if (state.view.kind !== "thread") {
+        return priorityProjectIds;
+      }
+
+      for (const paneId of state.view.panes) {
+        const draftProjectId = parseDraftProjectId(paneId);
+        if (draftProjectId) {
+          priorityProjectIds.add(draftProjectId);
+          continue;
+        }
+        const threadProjectId = state.threads.find((thread) => thread.id === paneId)?.projectId;
+        if (threadProjectId) {
+          priorityProjectIds.add(threadProjectId);
+        }
+      }
+
+      return priorityProjectIds;
     }
 
     // Register file watchers in the supervisor for each project
@@ -1829,8 +1885,9 @@ export function App() {
     // Listen for git-changed events from the file watcher
     const unsubWatcher = readBridge().onSupervisorEvent((event) => {
       if (event.type !== "git-changed") return;
+      console.log(`[git-refresh] watcher-event project=${event.projectId}`);
       const project = projects.find((p) => p.id === event.projectId);
-      if (project) void refreshProject(project);
+      if (project) scheduleWatcherRefresh(project);
       // Also refresh the file tree and open buffers if showing this project
       const editorRoot = useFileEditorStore.getState().rootContext;
       if (editorRoot && editorRoot.projectId === event.projectId) {
@@ -1841,20 +1898,43 @@ export function App() {
 
     // Initial refresh for all projects
     for (const project of projects) {
-      void refreshProject(project);
+      void refreshProject(project, "initial");
     }
 
     // Periodic remote fetch (every 60s) to keep ahead/behind counts fresh.
     // The file watcher can't detect remote changes — only a fetch can.
     async function fetchRemotes() {
       if (!isActive) return;
+      if (typeof document !== "undefined" && !document.hasFocus()) {
+        console.log("[git-refresh] fetch-skip windowFocused=false");
+        return;
+      }
       const now = Date.now();
-      if (now - lastFetchTime < GIT_FETCH_INTERVAL_MS) return;
-      lastFetchTime = now;
+      const priorityProjectIds = getPriorityProjectIds();
+      const promotedProjectIds = new Set(
+        [...priorityProjectIds].filter((projectId) => !previousPriorityProjectIds.has(projectId)),
+      );
+      const projectsToFetch = projects.filter((project) => {
+        const isPriority = priorityProjectIds.has(project.id);
+        const interval = isPriority
+          ? GIT_FETCH_PRIORITY_INTERVAL_MS
+          : GIT_FETCH_BACKGROUND_INTERVAL_MS;
+        const lastFetchedAt = lastFetchTimes.get(project.id) ?? 0;
+        const becamePriority = promotedProjectIds.has(project.id);
+        return becamePriority || now - lastFetchedAt >= interval;
+      });
+      previousPriorityProjectIds = priorityProjectIds;
+      if (projectsToFetch.length === 0) return;
 
       await Promise.all(
-        projects.map(async (project) => {
+        projectsToFetch.map(async (project) => {
           if (!isActive) return;
+          const isPriority = priorityProjectIds.has(project.id);
+          const promoted = promotedProjectIds.has(project.id);
+          console.log(
+            `[git-refresh] fetch-start project=${project.id} priority=${isPriority} promoted=${promoted}`,
+          );
+          lastFetchTimes.set(project.id, now);
           try {
             await readBridge().gitFetch({
               projectLocation: project.location,
@@ -1865,18 +1945,24 @@ export function App() {
             // ignore — remote may be unreachable
           }
           // After fetch, refresh to pick up new ahead/behind counts
-          if (isActive) void refreshProject(project);
+          if (isActive) void refreshProject(project, "fetch");
         }),
       );
     }
 
     void fetchRemotes();
-    const fetchIntervalId = setInterval(() => void fetchRemotes(), GIT_FETCH_INTERVAL_MS);
+    const fetchIntervalId = setInterval(
+      () => void fetchRemotes(),
+      Math.min(GIT_FETCH_PRIORITY_INTERVAL_MS, GIT_FETCH_BACKGROUND_INTERVAL_MS),
+    );
 
     return () => {
       isActive = false;
       clearInterval(fetchIntervalId);
       unsubWatcher();
+      for (const timer of watcherRefreshTimers.values()) {
+        clearTimeout(timer);
+      }
       for (const project of projects) {
         readBridge()
           .gitUnwatchProject({ projectId: project.id })
