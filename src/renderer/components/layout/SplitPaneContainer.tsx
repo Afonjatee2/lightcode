@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/react";
-import type { PaneLayout, PaneLayoutAxis } from "../../../shared/paneLayout";
+import { leadPaneId, type PaneLayout, type PaneLayoutAxis } from "../../../shared/paneLayout";
 import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "../../dnd";
 
 const MIN_PANE_PERCENT = 15;
@@ -104,18 +104,20 @@ function RootInsertZone(props: {
 }
 
 function SplitGroup(props: {
-  layout: Extract<PaneLayout, { kind: "split" }>;
+  layout: PaneLayout;
   path: number[];
   renderPane: (paneId: string) => React.ReactNode;
 }) {
-  const count = props.layout.children.length;
+  const children = props.layout.kind === "split" ? props.layout.children : [props.layout];
+  const axis = props.layout.kind === "split" ? props.layout.axis : "vertical";
+  const count = children.length;
   const [sizes, setSizes] = useState(() => equalSizes(count));
   const [resizingIndex, setResizingIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef({ start: 0, beforeStart: 0, afterStart: 0, index: 0 });
-  const prevKey = useRef(`${props.layout.axis}:${count}`);
+  const prevKey = useRef(`${axis}:${count}`);
 
-  const layoutKey = `${props.layout.axis}:${count}`;
+  const layoutKey = `${axis}:${count}`;
   let activeSizes = sizes;
   if (prevKey.current !== layoutKey) {
     activeSizes = equalSizes(count);
@@ -132,7 +134,7 @@ function SplitGroup(props: {
     function onMouseMove(event: MouseEvent) {
       const container = containerRef.current;
       if (!container) return;
-      const isVertical = props.layout.axis === "vertical";
+      const isVertical = axis === "vertical";
       const deltaPx = (isVertical ? event.clientX : event.clientY) - dragRef.current.start;
       const containerSize = isVertical ? container.offsetWidth : container.offsetHeight;
       const deltaPercent = (deltaPx / containerSize) * 100;
@@ -157,12 +159,12 @@ function SplitGroup(props: {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };
-  }, [props.layout.axis, resizingIndex]);
+  }, [axis, resizingIndex]);
 
   function handleResizeStart(event: React.MouseEvent, index: number) {
     event.preventDefault();
     dragRef.current = {
-      start: props.layout.axis === "vertical" ? event.clientX : event.clientY,
+      start: axis === "vertical" ? event.clientX : event.clientY,
       beforeStart: activeSizes[index]!,
       afterStart: activeSizes[index + 1]!,
       index,
@@ -174,11 +176,11 @@ function SplitGroup(props: {
     <div
       ref={containerRef}
       className={`flex h-full min-h-0 w-full ${
-        props.layout.axis === "vertical" ? "flex-row" : "flex-col"
+        axis === "vertical" ? "flex-row" : "flex-col"
       } ${resizingIndex !== null ? "select-none" : ""}`}
     >
-      {props.layout.children.map((child, index) => (
-        <React.Fragment key={`${props.path.join("-")}:${index}`}>
+      {children.map((child, index) => (
+        <React.Fragment key={leadPaneId(child)}>
           <div
             className="min-h-0 min-w-0 overflow-hidden"
             style={{
@@ -193,10 +195,10 @@ function SplitGroup(props: {
               renderPane={props.renderPane}
             />
           </div>
-          {index < props.layout.children.length - 1 ? (
+          {index < children.length - 1 ? (
             <SplitDivider
               path={props.path}
-              axis={props.layout.axis}
+              axis={axis}
               index={index + 1}
               onPointerDown={(event) => handleResizeStart(event, index)}
             />
@@ -206,7 +208,7 @@ function SplitGroup(props: {
       {resizingIndex !== null ? (
         <div
           className={`fixed inset-0 z-50 ${
-            props.layout.axis === "vertical" ? "cursor-col-resize" : "cursor-row-resize"
+            axis === "vertical" ? "cursor-col-resize" : "cursor-row-resize"
           }`}
         />
       ) : null}
@@ -224,6 +226,13 @@ function PaneLayoutNode(props: {
   }
 
   return <SplitGroup layout={props.layout} path={props.path} renderPane={props.renderPane} />;
+}
+
+function RootPaneLayout(props: {
+  layout: PaneLayout;
+  renderPane: (paneId: string) => React.ReactNode;
+}) {
+  return <SplitGroup layout={props.layout} path={[]} renderPane={props.renderPane} />;
 }
 
 export function SplitPaneContainer(props: {
@@ -254,7 +263,7 @@ export function SplitPaneContainer(props: {
           paddingLeft: ROOT_INSERT_ZONE_INSET,
         }}
       >
-        <PaneLayoutNode layout={props.layout} path={[]} renderPane={props.renderPane} />
+        <RootPaneLayout layout={props.layout} renderPane={props.renderPane} />
       </div>
     </div>
   );

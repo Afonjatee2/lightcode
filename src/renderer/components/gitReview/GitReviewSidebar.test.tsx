@@ -154,6 +154,7 @@ vi.mock("../common", () => ({
       onChange={(event) => props.onChange?.({ target: { value: event.target.value } })}
     />
   ),
+  PixelLoader: () => <span>spinner</span>,
 }));
 
 vi.mock("../layout/AppShell", () => ({

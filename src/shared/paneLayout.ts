@@ -42,6 +42,12 @@ export function collectPaneIds(layout: PaneLayout): [string, ...string[]] {
   return ids as [string, ...string[]];
 }
 
+export function leadPaneId(layout: PaneLayout): string {
+  let node = layout;
+  while (node.kind === "split") node = node.children[0];
+  return node.paneId;
+}
+
 export function replacePaneIdInLayout(
   layout: PaneLayout,
   oldPaneId: string,
