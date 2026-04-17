@@ -1,5 +1,5 @@
-import type { SupervisorEvent } from "../../shared/ipc";
-import type { LspMessagePayload } from "../../shared/lsp";
+import type { SupervisorEvent } from "@/shared/ipc";
+import type { LspMessagePayload } from "@/shared/lsp";
 import { readBridge } from "../bridge";
 
 /**

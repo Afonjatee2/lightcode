@@ -28,11 +28,11 @@ import {
   Zap,
 } from "lucide-react";
 import { Popover } from "@heroui/react";
-import type { ProjectAction, ProjectScripts } from "../../../shared/contracts";
-import { useAppStore } from "../../state/appStore";
-import { Button, Input, SidebarButton, TextArea } from "../common";
-import { useSidebar } from "../layout/AppShell";
-import { PageLayout } from "../layout/PageLayout";
+import type { ProjectAction, ProjectScripts } from "@/shared/contracts";
+import { useAppStore } from "@/renderer/state/appStore";
+import { Button, Input, SidebarButton, TextArea } from "@/renderer/components/common";
+import { useSidebar } from "@/renderer/components/layout/AppShell";
+import { PageLayout } from "@/renderer/components/layout/PageLayout";
 
 const ACTION_ICONS: { name: string; Icon: LucideIcon }[] = [
   { name: "play", Icon: Play },

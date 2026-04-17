@@ -4,7 +4,7 @@ import {
   defaultSharedSettings,
   normalizeSharedSettings,
   type SharedSettings,
-} from "../../shared/settings";
+} from "@/shared/settings";
 import type {
   GitReviewMode,
   NewThreadMode,
@@ -12,7 +12,7 @@ import type {
   TerminalPosition,
   ThemeMode,
   ThreadRemoveAction,
-} from "../../shared/contracts";
+} from "@/shared/contracts";
 
 const STORAGE_KEY = "lightcode-shared-settings";
 

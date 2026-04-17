@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Thread } from "../../shared/contracts";
+import type { Thread } from "@/shared/contracts";
 import { isReorderNoOp, reorderIds, reorderThreadsInProject } from "./reorder";
 
 function makeThread(input: {

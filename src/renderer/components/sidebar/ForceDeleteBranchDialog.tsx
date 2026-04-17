@@ -1,5 +1,5 @@
 import { AlertDialog } from "@heroui/react";
-import { Button } from "../common/Button";
+import { Button } from "@/renderer/components/common/Button";
 
 export function ForceDeleteBranchDialog(props: {
   isOpen: boolean;

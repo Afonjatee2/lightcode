@@ -4,7 +4,7 @@ import {
   defaultSharedSettings,
   normalizeSharedSettings,
   type SharedSettings,
-} from "../shared/settings";
+} from "@/shared/settings";
 
 function serializeSharedSettings(settings: SharedSettings): string {
   return `${JSON.stringify(settings, null, 2)}\n`;

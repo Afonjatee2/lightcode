@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import type { FileEntry, ProjectLocation, PromptSegment } from "../../../shared/contracts";
+import type { FileEntry, ProjectLocation, PromptSegment } from "@/shared/contracts";
 import { createChipElement, type FileMentionData } from "./FileMentionChip";
 import { fileNameFromPath } from "./useAttachments";
 import { MentionPopover } from "./MentionPopover";

@@ -57,8 +57,8 @@ import type {
   StartThreadPayload,
   WriteTerminalPayload,
   WriteProjectFilePayload,
-} from "../shared/contracts";
-import type { SupervisorReply, SupervisorRequest } from "../shared/ipc";
+} from "@/shared/contracts";
+import type { SupervisorReply, SupervisorRequest } from "@/shared/ipc";
 import {
   closeThreadPayloadSchema,
   createProjectEntryPayloadSchema,
@@ -120,7 +120,7 @@ import {
   startThreadPayloadSchema,
   writeProjectFilePayloadSchema,
   writeTerminalPayloadSchema,
-} from "../shared/contracts";
+} from "@/shared/contracts";
 import { SupervisorRuntime } from "./runtime";
 
 const runtime = new SupervisorRuntime((event) => {

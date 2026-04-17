@@ -1,6 +1,6 @@
 import { Button, Modal, toast } from "@heroui/react";
 import { Maximize2, X } from "lucide-react";
-import { useFileEditorStore } from "../../state/fileEditorStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { FileEditorPane } from "./FileEditorPane";
 import { ProjectTreeView } from "./ProjectTreeView";
 

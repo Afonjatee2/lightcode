@@ -1,5 +1,5 @@
 import { spawn as spawnChild } from "node:child_process";
-import type { ProjectLocation } from "../shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import { buildAgentCommand, type CommandSpec } from "./agents/base";
 
 export function buildOneShotSpec(

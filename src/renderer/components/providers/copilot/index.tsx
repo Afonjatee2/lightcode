@@ -2,7 +2,7 @@ export * from "./CopilotIcon";
 
 import { ClipboardList } from "lucide-react";
 import { CopilotIcon } from "./CopilotIcon";
-import type { ComposerControl } from "../../thread/ThreadComposer";
+import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
@@ -10,7 +10,7 @@ import {
   registerProviderIcon,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
-import { withCurrentModel } from "../../thread/threadComposerOptions";
+import { withCurrentModel } from "@/renderer/components/thread/threadComposerOptions";
 
 /**
  * Hardcoded premium request cost multipliers for Copilot models.

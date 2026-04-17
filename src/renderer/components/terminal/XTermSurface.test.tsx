@@ -1,6 +1,6 @@
 import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { SupervisorEvent } from "../../../shared/ipc";
+import type { SupervisorEvent } from "@/shared/ipc";
 
 // ── Hoisted state shared between mock factories and test code ────
 const { state } = vi.hoisted(() => ({

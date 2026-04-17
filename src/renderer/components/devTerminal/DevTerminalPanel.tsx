@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Columns2, PanelBottomClose, PanelRightClose, Plus, Trash2 } from "lucide-react";
 import { Tabs, Tooltip } from "@heroui/react";
-import type { Project } from "../../../shared/contracts";
-import { readBridge } from "../../bridge";
-import { useDevTerminalStore, type DevTerminalTab } from "../../state/devTerminalStore";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { XTermSurface } from "../terminal/XTermSurface";
-import { buildWorktreeLocation } from "../../../shared/worktree";
-import { ContextMenu } from "../common";
+import type { Project } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { XTermSurface } from "@/renderer/components/terminal/XTermSurface";
+import { buildWorktreeLocation } from "@/shared/worktree";
+import { ContextMenu } from "@/renderer/components/common";
 
 const SPLIT_MIN_PERCENT = 15;
 const SPLIT_DEFAULT_PERCENT = 50;

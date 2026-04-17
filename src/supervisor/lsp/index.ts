@@ -1,5 +1,5 @@
-import type { SupervisorEvent } from "../../shared/ipc";
-import type { LspStartPayload, LspStopPayload, LspMessagePayload } from "../../shared/lsp";
+import type { SupervisorEvent } from "@/shared/ipc";
+import type { LspStartPayload, LspStopPayload, LspMessagePayload } from "@/shared/lsp";
 import { getConfigForLanguage } from "./serverRegistry";
 import { ServerInstance } from "./serverInstance";
 

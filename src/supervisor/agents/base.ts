@@ -6,7 +6,7 @@ import { execFile, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-import type { OscNotification } from "../../shared/osc";
+import type { OscNotification } from "@/shared/osc";
 import type {
   AgentCapability,
   AgentKind,
@@ -19,7 +19,7 @@ import type {
   ThreadAttention,
   ThreadConfig,
   ThreadStatus,
-} from "../../shared/contracts";
+} from "@/shared/contracts";
 
 export interface CommandSpec {
   command: string;

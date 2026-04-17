@@ -1,8 +1,8 @@
 import { copyFileSync, existsSync, mkdirSync, watch, type FSWatcher } from "node:fs";
 import { execSync, spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
-import type { ProjectLocation } from "../shared/contracts";
-import { terminateChildProcessTree } from "../shared/processTree";
+import type { ProjectLocation } from "@/shared/contracts";
+import { terminateChildProcessTree } from "@/shared/processTree";
 import { getWslCommand } from "./agents/base";
 
 const DEBOUNCE_MS = 300;

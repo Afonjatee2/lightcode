@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { DragDropProvider, KeyboardSensor, PointerSensor } from "@dnd-kit/react";
 import { isSortable } from "@dnd-kit/react/sortable";
-import { makeDraftPaneId } from "../shared/paneId";
-import type { PaneLayout, PaneLayoutAxis, PaneLayoutInsertTarget } from "../shared/paneLayout";
-import { findPanePath } from "../shared/paneLayout";
+import { makeDraftPaneId } from "@/shared/paneId";
+import type { PaneLayout, PaneLayoutAxis, PaneLayoutInsertTarget } from "@/shared/paneLayout";
+import { findPanePath } from "@/shared/paneLayout";
 import { useFileEditorStore } from "./state/fileEditorStore";
 
 export type DragSourceData =

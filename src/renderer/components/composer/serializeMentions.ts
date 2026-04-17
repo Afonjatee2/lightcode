@@ -1,4 +1,4 @@
-import type { PromptSegment } from "../../../shared/contracts";
+import type { PromptSegment } from "@/shared/contracts";
 
 /**
  * Walk a contentEditable container and produce structured prompt segments.

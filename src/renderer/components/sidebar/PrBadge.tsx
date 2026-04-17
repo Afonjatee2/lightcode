@@ -1,7 +1,7 @@
 import { Tooltip } from "@heroui/react";
 import { useShallow } from "zustand/shallow";
-import { useGitStore } from "../../state/gitStore";
-import { readBridge } from "../../bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
+import { readBridge } from "@/renderer/bridge";
 
 const STATE_COLORS: Record<string, string> = {
   open: "bg-green-400",

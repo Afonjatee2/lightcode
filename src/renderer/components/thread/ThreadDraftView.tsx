@@ -9,28 +9,28 @@ import type {
   ProviderDraftConfig,
   PromptSegment,
   ThreadConfig,
-} from "../../../shared/contracts";
-import { readBridge } from "../../bridge";
-import { ProviderIcon, getComposerControls } from "../providers";
-import { useGitStore } from "../../state/gitStore";
+} from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import { ProviderIcon, getComposerControls } from "@/renderer/components/providers";
+import { useGitStore } from "@/renderer/state/gitStore";
 import {
   BranchSelector,
   generateWorktreeBranch,
   type BranchSelection,
   PixelLoader,
-} from "../common";
+} from "@/renderer/components/common";
 import {
   MentionInput,
   type MentionInputHandle,
   AttachmentBar,
   ImageLightbox,
   useAttachments,
-} from "../composer";
-import { flattenSegments } from "../composer/serializeMentions";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { useAppStore } from "../../state/appStore";
+} from "@/renderer/components/composer";
+import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { useAppStore } from "@/renderer/state/appStore";
 import { filterHiddenModels } from "./threadComposerOptions";
-import { friendlyError } from "../../../shared/messages";
+import { friendlyError } from "@/shared/messages";
 import { ThreadComposer } from "./ThreadComposer";
 
 function resolvePreferredAgentKind(

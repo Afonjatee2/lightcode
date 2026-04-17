@@ -13,9 +13,9 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
   ThreadStatus,
-} from "../../shared/contracts";
-import { terminateChildProcessTree } from "../../shared/processTree";
-import { toWslUncPath } from "../../shared/wsl";
+} from "@/shared/contracts";
+import { terminateChildProcessTree } from "@/shared/processTree";
+import { toWslUncPath } from "@/shared/wsl";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,

@@ -33,8 +33,8 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
   ThreadStatus,
-} from "../../../shared/contracts";
-import { terminateChildProcessTree } from "../../../shared/processTree";
+} from "@/shared/contracts";
+import { terminateChildProcessTree } from "@/shared/processTree";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,

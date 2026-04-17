@@ -9,22 +9,28 @@ import type {
   Thread,
   ThreadConfig,
   ThreadServerRequestId,
-} from "../../../shared/contracts";
+} from "@/shared/contracts";
 
-import { ProviderIcon, getComposerControls, getStatusTone } from "../providers";
-import { useAppStore, type PendingThreadServerRequest } from "../../state/appStore";
-import { useGitStore } from "../../state/gitStore";
-import { BranchSelector, type BranchSelection, Button, PixelLoader, TuxIcon } from "../common";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { readBridge } from "../../bridge";
+import { ProviderIcon, getComposerControls, getStatusTone } from "@/renderer/components/providers";
+import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
+import { useGitStore } from "@/renderer/state/gitStore";
+import {
+  BranchSelector,
+  type BranchSelection,
+  Button,
+  PixelLoader,
+  TuxIcon,
+} from "@/renderer/components/common";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { readBridge } from "@/renderer/bridge";
 import {
   MentionInput,
   type MentionInputHandle,
   AttachmentBar,
   ImageLightbox,
   useAttachments,
-} from "../composer";
-import { flattenSegments } from "../composer/serializeMentions";
+} from "@/renderer/components/composer";
+import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import { filterHiddenModels } from "./threadComposerOptions";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposer } from "./ThreadComposer";

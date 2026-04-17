@@ -13,7 +13,7 @@
  */
 
 import type { Terminal, ILinkProvider, ILink, IBufferLine } from "@xterm/xterm";
-import { stripAnsi } from "../../../shared/ansi";
+import { stripAnsi } from "@/shared/ansi";
 
 // Copied from @xterm/addon-web-links v0.12.0 (MIT license).
 // Matches http(s):// URLs, excluding unsafe/bracket characters as finals.

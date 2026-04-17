@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { readBridge } from "../../bridge";
-import type { PromptSegment } from "../../../shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import type { PromptSegment } from "@/shared/contracts";
 
 /**
  * Convert an absolute filesystem path to a lightcode-local:// URL

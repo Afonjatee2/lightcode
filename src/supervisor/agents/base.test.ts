@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectLocation } from "../../shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import { buildBatchWslScript, getWslCommand, injectWslEnv, wrapWslCommand } from "./base";
 
 const wslProject: ProjectLocation = {

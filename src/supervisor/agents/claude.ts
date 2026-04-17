@@ -6,7 +6,7 @@ import type {
   ProjectLocation,
   PromptSegment,
   ThreadConfig,
-} from "../../shared/contracts";
+} from "@/shared/contracts";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,

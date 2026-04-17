@@ -1,6 +1,6 @@
 import { act, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { useGitStore } from "../../state/gitStore";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { type GitMenuIcons, useWorktreeGitItems } from "./useWorktreeActions";
 
 const WORKTREE_PATH = "C:\\repo\\wt";

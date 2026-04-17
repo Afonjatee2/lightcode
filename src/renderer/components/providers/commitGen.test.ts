@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { AgentStatus, GenerateCommitMessagePayload } from "../../../shared/contracts";
+import type { AgentStatus, GenerateCommitMessagePayload } from "@/shared/contracts";
 import { getCommitGenDefaultsHint } from "./ProviderIcon";
 import {
   generateCommitMessageWithFallback,

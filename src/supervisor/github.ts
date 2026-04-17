@@ -10,7 +10,7 @@ import type {
   PrCheck,
   GhCheckAvailableResult,
   GhGetPrChecksResult,
-} from "../shared/contracts";
+} from "@/shared/contracts";
 import { buildAgentCommand } from "./agents/base";
 
 const execFileAsync = promisify(execFile);

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import type { ThreadServerRequestId } from "../../../shared/contracts";
-import type { PendingThreadServerRequest } from "../../state/appStore";
+import type { ThreadServerRequestId } from "@/shared/contracts";
+import type { PendingThreadServerRequest } from "@/renderer/state/appStore";
 import {
   Button,
   Card,
@@ -12,7 +12,7 @@ import {
   Input,
   Select,
   TextArea,
-} from "../common";
+} from "@/renderer/components/common";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;

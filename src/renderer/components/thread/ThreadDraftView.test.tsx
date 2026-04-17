@@ -1,7 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentStatus, Project } from "../../../shared/contracts";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
+import type { AgentStatus, Project } from "@/shared/contracts";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const { composerSpy } = vi.hoisted(() => ({
   composerSpy: vi.fn<(props: unknown) => void>(),

@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { getEntryIconUrl } from "../common/fileIcons";
+import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
 import { toLocalFileUrl, type Attachment } from "./useAttachments";
 
 function AttachmentChip(props: {

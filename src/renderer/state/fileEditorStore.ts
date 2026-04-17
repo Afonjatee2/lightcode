@@ -3,7 +3,7 @@ import type {
   ProjectFileReadStatus,
   ProjectLocation,
   ReadProjectFileResult,
-} from "../../shared/contracts";
+} from "@/shared/contracts";
 import { readBridge } from "../bridge";
 
 export type FileEditorOverlayMode = "modal" | "fullscreen";

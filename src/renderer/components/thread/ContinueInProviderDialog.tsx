@@ -7,15 +7,15 @@ import type {
   ProjectLocation,
   Thread,
   ThreadConfig,
-} from "../../../shared/contracts";
-import { Button, OptionMenu, PixelLoader } from "../common";
-import { ProviderIcon, getComposerControls } from "../providers";
-import { EffortIcon } from "../providers/EffortIcon";
-import { PermissionIcon } from "../providers/PermissionIcon";
-import { readBridge } from "../../bridge";
+} from "@/shared/contracts";
+import { Button, OptionMenu, PixelLoader } from "@/renderer/components/common";
+import { ProviderIcon, getComposerControls } from "@/renderer/components/providers";
+import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
+import { PermissionIcon } from "@/renderer/components/providers/PermissionIcon";
+import { readBridge } from "@/renderer/bridge";
 import type { ComposerControl } from "./ThreadComposer";
 import { filterHiddenModels } from "./threadComposerOptions";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 type Phase = "select" | "extracting" | "error";
 

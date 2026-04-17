@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { isMac } from "../../bridge";
+import { isMac } from "@/renderer/bridge";
 
 /**
  * Shared header bar for overlay-style layouts (main app, git review, settings).

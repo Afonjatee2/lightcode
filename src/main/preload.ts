@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { LightcodeBridge, SupervisorEvent, UpdateStatus } from "../shared/ipc";
+import type { LightcodeBridge, SupervisorEvent, UpdateStatus } from "@/shared/ipc";
 
 const CHANNELS = {
   pickFolder: "lightcode:pick-folder",

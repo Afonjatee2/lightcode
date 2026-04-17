@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 500;

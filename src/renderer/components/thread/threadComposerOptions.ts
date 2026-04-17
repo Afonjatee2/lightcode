@@ -1,4 +1,4 @@
-import type { AgentCapability, LabeledOption } from "../../../shared/contracts";
+import type { AgentCapability, LabeledOption } from "@/shared/contracts";
 
 const DEFAULT_LABEL = (id: string) => id.replace(/\b\w/g, (c) => c.toUpperCase());
 

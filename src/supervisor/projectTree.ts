@@ -17,7 +17,7 @@ import type {
   SearchProjectTreeResult,
   WriteProjectFilePayload,
   WriteProjectFileResult,
-} from "../shared/contracts";
+} from "@/shared/contracts";
 import { getLocationIdentity } from "./git";
 
 const BOM = Buffer.from([0xef, 0xbb, 0xbf]);

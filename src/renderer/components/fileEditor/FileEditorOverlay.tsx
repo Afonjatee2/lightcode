@@ -1,10 +1,10 @@
 import { toast } from "@heroui/react";
 import { ArrowLeft } from "lucide-react";
-import { PageLayout } from "../layout/PageLayout";
-import { useFileEditorStore } from "../../state/fileEditorStore";
+import { PageLayout } from "@/renderer/components/layout/PageLayout";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { ProjectTreeView } from "./ProjectTreeView";
 import { FileEditorPane } from "./FileEditorPane";
-import { SidebarButton } from "../common";
+import { SidebarButton } from "@/renderer/components/common";
 
 export function FileEditorOverlay(props: { onClose: () => void }) {
   const rootContext = useFileEditorStore((state) => state.rootContext);

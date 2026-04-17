@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, mkdirSync, writeFileSync, readFileSync, existsSync
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
-import type { ProjectLocation } from "../shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import { ProjectTreeService } from "./projectTree";
 
 describe("ProjectTreeService", () => {

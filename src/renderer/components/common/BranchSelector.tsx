@@ -11,10 +11,10 @@ import {
   Tooltip,
   Virtualizer,
 } from "@heroui/react";
-import type { GitBranchInfo } from "../../../shared/contracts";
-import { readBridge } from "../../bridge";
-import { useAppStore } from "../../state/appStore";
-import { useGitStore } from "../../state/gitStore";
+import type { GitBranchInfo } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import { useAppStore } from "@/renderer/state/appStore";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { Button } from "./Button";
 
 export interface BranchSelection {

@@ -7,9 +7,9 @@ import {
   type ReactNode,
 } from "react";
 import { Toast } from "@heroui/react";
-import { resolveThemeMode } from "../../../shared/themeMode";
-import { readBridge } from "../../bridge";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
+import { resolveThemeMode } from "@/shared/themeMode";
+import { readBridge } from "@/renderer/bridge";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const AppearanceContext = createContext<"light" | "dark">("dark");
 

@@ -1,6 +1,6 @@
 import { createJSONStorage } from "zustand/middleware";
 import { readBridge } from "../bridge";
-import type { Project, Thread, AppView } from "../../shared/contracts";
+import type { Project, Thread, AppView } from "@/shared/contracts";
 
 /**
  * Raw string-level storage backend backed by SQLite via IPC.

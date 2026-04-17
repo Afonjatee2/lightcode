@@ -3,8 +3,8 @@ import type {
   DiffBuildItem,
   DiffBuildRequest,
   DiffBuildResponse,
-} from "../../workers/diffBuildWorker";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
+} from "@/renderer/workers/diffBuildWorker";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 export type { DiffBuildItem };
 export type DiffBuildResult = DiffBuildResponse["results"][number];

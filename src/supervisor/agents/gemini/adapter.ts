@@ -7,7 +7,7 @@ import type {
   ProjectLocation,
   PromptSegment,
   ThreadConfig,
-} from "../../../shared/contracts";
+} from "@/shared/contracts";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,
@@ -22,7 +22,7 @@ import {
 } from "../base";
 import { probeAcpCapabilities } from "../acp";
 import { detectGeminiTerminalStatus } from "./terminal";
-import { toWslUncPath } from "../../../shared/wsl";
+import { toWslUncPath } from "@/shared/wsl";
 
 const defaultCapabilities: AgentCapability = {
   models: [],

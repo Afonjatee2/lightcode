@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useFileEditorStore } from "../../state/fileEditorStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { FileEditorPane } from "./FileEditorPane";
 
 /**

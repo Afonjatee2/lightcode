@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import type { FileEntry, ProjectLocation } from "../../../shared/contracts";
-import { readBridge } from "../../bridge";
+import type { FileEntry, ProjectLocation } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
 
 export function useDebouncedFileSearch(
   projectLocation: ProjectLocation | undefined,

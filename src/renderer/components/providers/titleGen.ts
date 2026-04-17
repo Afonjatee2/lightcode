@@ -3,7 +3,7 @@ import type {
   GenerateTitlePayload,
   GenerateTitleResult,
   ProjectLocation,
-} from "../../../shared/contracts";
+} from "@/shared/contracts";
 import { getTitleGenDefaults } from "./ProviderIcon";
 
 function resolveTitleGenModel(agent: AgentStatus): string {

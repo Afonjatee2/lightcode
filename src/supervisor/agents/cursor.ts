@@ -6,7 +6,7 @@ import type {
   ProjectLocation,
   PromptSegment,
   ThreadConfig,
-} from "../../shared/contracts";
+} from "@/shared/contracts";
 import { execFile, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import {
@@ -21,7 +21,7 @@ import {
   type CommandSpec,
   type TerminalStatusHint,
 } from "./base";
-import { stripAnsi } from "../../shared/ansi";
+import { stripAnsi } from "@/shared/ansi";
 
 const execFileAsync = promisify(execFile);
 

@@ -24,8 +24,8 @@ export function ProviderIcon(props: { kind: string; tone?: StatusTone; className
 
 // --- Composer controls registry ---
 
-import type { ComposerControl } from "../thread/ThreadComposer";
-import type { AgentCapability, ThreadConfig } from "../../../shared/contracts";
+import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
+import type { AgentCapability, ThreadConfig } from "@/shared/contracts";
 
 export interface ComposerControlsInput {
   capabilities: AgentCapability;

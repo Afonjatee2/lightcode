@@ -12,11 +12,11 @@ import {
   Trash2,
   FilePlus,
 } from "lucide-react";
-import type { ProjectLocation, ProjectTreeEntry } from "../../../shared/contracts";
-import { readBridge } from "../../bridge";
-import { ContextMenu, PixelLoader } from "../common";
-import { getEntryIconUrl } from "../common/fileIcons";
-import { useFileEditorStore, type FileEditorRootContext } from "../../state/fileEditorStore";
+import type { ProjectLocation, ProjectTreeEntry } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import { ContextMenu, PixelLoader } from "@/renderer/components/common";
+import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
+import { useFileEditorStore, type FileEditorRootContext } from "@/renderer/state/fileEditorStore";
 
 interface TreeDraftState {
   mode: "create" | "rename";

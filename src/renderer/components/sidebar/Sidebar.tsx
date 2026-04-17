@@ -27,28 +27,28 @@ import {
   TerminalSquare,
   Trash2,
 } from "lucide-react";
-import { TuxIcon } from "../common/TuxIcon";
+import { TuxIcon } from "@/renderer/components/common/TuxIcon";
 import { useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
-import type { AgentStatus, Project, Thread } from "../../../shared/contracts";
-import { useAppStore } from "../../state/appStore";
+import type { AgentStatus, Project, Thread } from "@/shared/contracts";
+import { useAppStore } from "@/renderer/state/appStore";
 import {
   useDragSource,
   useIsDraggingProject,
   useIsDraggingThread,
   useIsDraggingWorktreeGroup,
   type DragSourceData,
-} from "../../dnd";
-import { ContextMenu, SidebarButton } from "../common";
-import { useSidebar } from "../layout/AppShell";
-import { isWindows, readBridge } from "../../bridge";
-import { formatBytes } from "../../../shared/formatBytes";
-import { useUpdateStore } from "../../state/updateStore";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { ProviderIcon, getStatusTone } from "../providers";
-import { resolveActionIcon } from "../settings/ProjectSettingsOverlay";
-import { useGitStore } from "../../state/gitStore";
+} from "@/renderer/dnd";
+import { ContextMenu, SidebarButton } from "@/renderer/components/common";
+import { useSidebar } from "@/renderer/components/layout/AppShell";
+import { isWindows, readBridge } from "@/renderer/bridge";
+import { formatBytes } from "@/shared/formatBytes";
+import { useUpdateStore } from "@/renderer/state/updateStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { ProviderIcon, getStatusTone } from "@/renderer/components/providers";
+import { resolveActionIcon } from "@/renderer/components/settings/ProjectSettingsOverlay";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { GitBadge } from "./GitBadge";
 import { SyncBadge } from "./SyncBadge";
 import { type GitMenuIcons, useWorktreeGitItems } from "./useWorktreeActions";

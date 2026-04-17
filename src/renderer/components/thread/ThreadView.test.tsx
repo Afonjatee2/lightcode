@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { AppProvider } from "../ui/provider";
+import { AppProvider } from "@/renderer/components/ui/provider";
 import { ThreadView } from "./ThreadView";
 
 const { bridge } = vi.hoisted(() => ({

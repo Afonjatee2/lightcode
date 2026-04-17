@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GitStatusResult, Project } from "../../../shared/contracts";
+import type { GitStatusResult, Project } from "@/shared/contracts";
 
 const bridgeMock = vi.hoisted(() => ({
   gitStage: vi.fn<() => Promise<void>>(),
@@ -173,7 +173,7 @@ vi.mock("../providers", () => ({
     .mockReturnValue({ model: "", effort: "", availableEfforts: [] }),
 }));
 
-import { useGitStore } from "../../state/gitStore";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { GitReviewSidebar } from "./GitReviewSidebar";
 
 describe("GitReviewSidebar", () => {

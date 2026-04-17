@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProjectLocation, SessionRef, ThreadConfig } from "../../shared/contracts";
+import type { ProjectLocation, SessionRef, ThreadConfig } from "@/shared/contracts";
 import { buildWindowsCommand, getWslCommand } from "./base";
 import { createClaudeAdapter } from "./claude";
 import { createCopilotAdapter } from "./copilot";

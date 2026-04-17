@@ -1,4 +1,4 @@
-import type { ExtractContextResult, ProjectLocation, SessionRef } from "../shared/contracts";
+import type { ExtractContextResult, ProjectLocation, SessionRef } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 import { buildOneShotSpec, spawnAgent } from "./oneShotSpawn";
 

@@ -5,7 +5,7 @@ import "@git-diff-view/react/styles/diff-view.css";
 setEnableFastDiffTemplate(true);
 
 import { AlertDialog, Button } from "@heroui/react";
-import { PixelLoader } from "../common";
+import { PixelLoader } from "@/renderer/components/common";
 import {
   ChevronDown,
   ChevronRight,
@@ -16,11 +16,11 @@ import {
   Plus,
   Undo2,
 } from "lucide-react";
-import type { GitFileChange, Project } from "../../../shared/contracts";
-import { isLockFile } from "../../../shared/gitUtils";
-import { getFileIconUrl } from "../common/fileIcons";
-import { readBridge } from "../../bridge";
-import { useGitStore } from "../../state/gitStore";
+import type { GitFileChange, Project } from "@/shared/contracts";
+import { isLockFile } from "@/shared/gitUtils";
+import { getFileIconUrl } from "@/renderer/components/common/fileIcons";
+import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang } from "./diffBuildClient";
 
 // ── Helpers ──────────────────────────────────────────────────

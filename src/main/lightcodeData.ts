@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { resolveLightcodePaths, type LightcodePaths } from "../shared/lightcodePaths";
+import { resolveLightcodePaths, type LightcodePaths } from "@/shared/lightcodePaths";
 
 function ensureBaseDirectories(paths: LightcodePaths): void {
   mkdirSync(paths.baseDir, { recursive: true });

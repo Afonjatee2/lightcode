@@ -3,7 +3,7 @@ import type {
   ProjectLocation,
   SearchProjectFilesPayload,
   SearchProjectFilesResult,
-} from "../shared/contracts";
+} from "@/shared/contracts";
 import { execGit, getLocationIdentity } from "./git";
 
 const MAX_INDEX_SIZE = 25_000;

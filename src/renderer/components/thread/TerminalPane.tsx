@@ -1,6 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import type { TerminalSize, ThreadStatus } from "../../../shared/contracts";
-import { XTermSurface, type XTermSurfaceHandle } from "../terminal/XTermSurface";
+import type { TerminalSize, ThreadStatus } from "@/shared/contracts";
+import { XTermSurface, type XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
 
 export interface TerminalPaneHandle {
   focus(): void;

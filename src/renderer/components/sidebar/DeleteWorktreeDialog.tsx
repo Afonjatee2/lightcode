@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AlertDialog, Checkbox } from "@heroui/react";
-import { Button } from "../common/Button";
+import { Button } from "@/renderer/components/common/Button";
 
 const PREF_KEY = "lightcode-delete-worktree-pref";
 

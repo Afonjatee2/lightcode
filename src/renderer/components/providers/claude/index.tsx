@@ -9,7 +9,7 @@ import {
   registerProviderIcon,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
-import { withCurrentModel } from "../../thread/threadComposerOptions";
+import { withCurrentModel } from "@/renderer/components/thread/threadComposerOptions";
 
 registerProviderIcon("claude", ClaudeIcon);
 registerCommitGenDefaults("claude", { label: "Claude", hint: "Haiku", model: "haiku", effort: "" });

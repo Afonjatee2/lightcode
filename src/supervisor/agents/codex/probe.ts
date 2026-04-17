@@ -11,8 +11,8 @@
 
 import { createServer } from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
-import type { ProjectLocation } from "../../../shared/contracts";
-import { terminateChildProcessTree } from "../../../shared/processTree";
+import type { ProjectLocation } from "@/shared/contracts";
+import { terminateChildProcessTree } from "@/shared/processTree";
 import { buildAgentCommand, type CommandSpec } from "../base";
 
 // ── Types ────────────────────────────────────────────────────────

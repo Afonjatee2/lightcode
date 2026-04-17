@@ -3,7 +3,7 @@ import {
   useFileEditorStore,
   type FileEditorOverlayMode,
   type FileEditorRootContext,
-} from "../../state/fileEditorStore";
+} from "@/renderer/state/fileEditorStore";
 import { ProjectTreeView } from "./ProjectTreeView";
 
 export function ProjectFilesPanel(props: { rootContext: FileEditorRootContext }) {

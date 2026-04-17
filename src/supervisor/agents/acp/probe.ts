@@ -17,8 +17,8 @@ import {
   type ModelInfo,
   type SessionMode,
 } from "@agentclientprotocol/sdk";
-import type { ThreadMode } from "../../../shared/contracts";
-import { terminateChildProcessTree } from "../../../shared/processTree";
+import type { ThreadMode } from "@/shared/contracts";
+import { terminateChildProcessTree } from "@/shared/processTree";
 
 // ── Types ────────────────────────────────────────────────────────
 

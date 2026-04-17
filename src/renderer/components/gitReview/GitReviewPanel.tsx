@@ -9,13 +9,13 @@ import {
   WrapText,
 } from "lucide-react";
 import { toast, Tooltip } from "@heroui/react";
-import type { Project, ProjectLocation, GitStatusResult } from "../../../shared/contracts";
-import { friendlyError } from "../../../shared/messages";
-import { readBridge } from "../../bridge";
-import { useGitStore } from "../../state/gitStore";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { BranchSelector } from "../common";
-import { SidebarContext } from "../layout/AppShell";
+import type { Project, ProjectLocation, GitStatusResult } from "@/shared/contracts";
+import { friendlyError } from "@/shared/messages";
+import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { BranchSelector } from "@/renderer/components/common";
+import { SidebarContext } from "@/renderer/components/layout/AppShell";
 import { GitReviewSidebar } from "./GitReviewSidebar";
 
 const alwaysExpanded = { isCollapsed: false, collapse: () => {}, expand: () => {} };

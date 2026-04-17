@@ -19,9 +19,9 @@ import {
   agentStatusSchema,
   agentCapabilitySchema,
   agentSettingDefSchema,
-} from "../shared/contracts";
-import { terminateProcessTree } from "../shared/processTree";
-import type { LspStartPayload, LspStopPayload, LspMessagePayload } from "../shared/lsp";
+} from "@/shared/contracts";
+import { terminateProcessTree } from "@/shared/processTree";
+import type { LspStartPayload, LspStopPayload, LspMessagePayload } from "@/shared/lsp";
 import { LanguageServerManager } from "./lsp";
 import { z } from "zod";
 import type {
@@ -123,13 +123,13 @@ import type {
   PromptSegment,
   WriteProjectFilePayload,
   WriteProjectFileResult,
-} from "../shared/contracts";
-import type { SupervisorEvent } from "../shared/ipc";
-import { stripAnsiPreservingLayout } from "../shared/ansi";
-import { extractOscNotifications } from "../shared/osc";
-import { resolveLightcodePaths } from "../shared/lightcodePaths";
-import { normalizeSharedSettings, defaultSharedSettings } from "../shared/settings";
-import { normalizeWslListOutput } from "../shared/wsl";
+} from "@/shared/contracts";
+import type { SupervisorEvent } from "@/shared/ipc";
+import { stripAnsiPreservingLayout } from "@/shared/ansi";
+import { extractOscNotifications } from "@/shared/osc";
+import { resolveLightcodePaths } from "@/shared/lightcodePaths";
+import { normalizeSharedSettings, defaultSharedSettings } from "@/shared/settings";
+import { normalizeWslListOutput } from "@/shared/wsl";
 import { createAgentRegistry } from "./agents/registry";
 import {
   type AgentAdapter,

@@ -6,9 +6,9 @@ import {
   StreamMessageWriter,
   type MessageConnection,
 } from "vscode-jsonrpc/node";
-import type { ProjectLocation } from "../../shared/contracts";
-import type { LspSessionStatus } from "../../shared/lsp";
-import { terminateChildProcessTree } from "../../shared/processTree";
+import type { ProjectLocation } from "@/shared/contracts";
+import type { LspSessionStatus } from "@/shared/lsp";
+import { terminateChildProcessTree } from "@/shared/processTree";
 import type { LanguageServerConfig } from "./serverRegistry";
 
 function getProjectRootPath(location: ProjectLocation): string {

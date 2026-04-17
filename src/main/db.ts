@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { asc, eq } from "drizzle-orm";
-import type { ProjectLocation, Project, Thread } from "../shared/contracts";
+import type { ProjectLocation, Project, Thread } from "@/shared/contracts";
 import * as schema from "./db.schema";
 
 let _db: ReturnType<typeof drizzle> | undefined;

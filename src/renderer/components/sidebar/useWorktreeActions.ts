@@ -1,5 +1,5 @@
 import { useShallow } from "zustand/shallow";
-import { useGitStore } from "../../state/gitStore";
+import { useGitStore } from "@/renderer/state/gitStore";
 
 /**
  * Which remote action to show in the git menu:

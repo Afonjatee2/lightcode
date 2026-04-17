@@ -19,14 +19,14 @@ import type {
   PromptSegment,
   Thread,
   ThreadConfig,
-} from "../shared/contracts";
-import { getProjectAgentStatuses } from "../shared/agentStatus";
-import { parseWslUncPath } from "../shared/wsl";
-import { buildWorktreeLocation } from "../shared/worktree";
-import { getAppName } from "../shared/appName";
-import { isDraftPaneId, makeDraftPaneId, parseDraftProjectId } from "../shared/paneId";
-import { buildPaneLayoutFromLegacy, findPaneAlign } from "../shared/paneLayout";
-import { msg, errorDetail } from "../shared/messages";
+} from "@/shared/contracts";
+import { getProjectAgentStatuses } from "@/shared/agentStatus";
+import { parseWslUncPath } from "@/shared/wsl";
+import { buildWorktreeLocation } from "@/shared/worktree";
+import { getAppName } from "@/shared/appName";
+import { isDraftPaneId, makeDraftPaneId, parseDraftProjectId } from "@/shared/paneId";
+import { buildPaneLayoutFromLegacy, findPaneAlign } from "@/shared/paneLayout";
+import { msg, errorDetail } from "@/shared/messages";
 import { isWindows, readBridge } from "./bridge";
 import { ProviderIcon, getStatusTone, generateTitleWithFallback } from "./components/providers";
 import { DevTerminalPanel } from "./components/devTerminal/DevTerminalPanel";

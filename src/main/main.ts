@@ -36,13 +36,13 @@ import type {
   SupervisorRequest,
   UpdateStatus,
   WindowChromePayload,
-} from "../shared/ipc";
-import type { ProjectLocation, RevealProjectEntryPayload } from "../shared/contracts";
-import type { SharedSettings } from "../shared/settings";
-import type { LightcodePaths } from "../shared/lightcodePaths";
-import { getAppName } from "../shared/appName";
-import { msg } from "../shared/messages";
-import { terminateChildProcessTree } from "../shared/processTree";
+} from "@/shared/ipc";
+import type { ProjectLocation, RevealProjectEntryPayload } from "@/shared/contracts";
+import type { SharedSettings } from "@/shared/settings";
+import type { LightcodePaths } from "@/shared/lightcodePaths";
+import { getAppName } from "@/shared/appName";
+import { msg } from "@/shared/messages";
+import { terminateChildProcessTree } from "@/shared/processTree";
 import { WindowsJobObjectManager } from "./windowsJobObject";
 
 const CHANNELS = {

@@ -8,8 +8,8 @@ import type {
   ProjectLocation,
   PromptSegment,
   ThreadConfig,
-} from "../../shared/contracts";
-import { terminateChildProcessTree } from "../../shared/processTree";
+} from "@/shared/contracts";
+import { terminateChildProcessTree } from "@/shared/processTree";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,

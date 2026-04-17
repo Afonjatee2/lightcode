@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { GitStatusResult, Project } from "../../../shared/contracts";
+import type { GitStatusResult, Project } from "@/shared/contracts";
 
 const { bridge } = vi.hoisted(() => ({
   bridge: {

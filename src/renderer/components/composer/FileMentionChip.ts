@@ -1,4 +1,4 @@
-import { getEntryIconUrl } from "../common/fileIcons";
+import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
 
 export interface FileMentionData {
   path: string;

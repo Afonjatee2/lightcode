@@ -1,4 +1,4 @@
-import { useGitStore } from "../../state/gitStore";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { useShallow } from "zustand/shallow";
 
 export function GitBadge(props: {

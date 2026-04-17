@@ -16,11 +16,11 @@ import {
   useState,
   type RefObject,
 } from "react";
-import type { TerminalSize } from "../../../shared/contracts";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { isMac, readBridge } from "../../bridge";
-import { ContextMenu, type ContextMenuItem } from "../common";
-import { useResolvedAppearance } from "../ui/provider";
+import type { TerminalSize } from "@/shared/contracts";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { isMac, readBridge } from "@/renderer/bridge";
+import { ContextMenu, type ContextMenuItem } from "@/renderer/components/common";
+import { useResolvedAppearance } from "@/renderer/components/ui/provider";
 
 export interface XTermSurfaceHandle {
   focus(): void;

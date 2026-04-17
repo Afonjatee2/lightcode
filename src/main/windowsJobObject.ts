@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface, type Interface } from "node:readline";
-import { terminateChildProcessTree } from "../shared/processTree";
+import { terminateChildProcessTree } from "@/shared/processTree";
 
 interface PendingAssignment {
   resolve: () => void;

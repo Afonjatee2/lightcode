@@ -1,5 +1,5 @@
 import { FolderOpen, GitFork, TerminalSquare } from "lucide-react";
-import { SidebarButton } from "../common";
+import { SidebarButton } from "@/renderer/components/common";
 import { GitBadge } from "./GitBadge";
 import { PrBadge } from "./PrBadge";
 import { SyncBadge } from "./SyncBadge";

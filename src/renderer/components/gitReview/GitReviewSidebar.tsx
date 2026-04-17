@@ -38,24 +38,24 @@ import type {
   GitStatusResult,
   PrData,
   ProjectLocation,
-} from "../../../shared/contracts";
-import { getProjectAgentStatuses } from "../../../shared/agentStatus";
-import { readBridge } from "../../bridge";
-import { useAppStore } from "../../state/appStore";
-import { useGitStore } from "../../state/gitStore";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { isLockFile } from "../../../shared/gitUtils";
-import { buildWorktreeLocation } from "../../../shared/worktree";
-import { PixelLoader, SidebarButton, TextArea } from "../common";
-import { getFileIconUrl } from "../common/fileIcons";
-import { useSidebar } from "../layout/AppShell";
+} from "@/shared/contracts";
+import { getProjectAgentStatuses } from "@/shared/agentStatus";
+import { readBridge } from "@/renderer/bridge";
+import { useAppStore } from "@/renderer/state/appStore";
+import { useGitStore } from "@/renderer/state/gitStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { isLockFile } from "@/shared/gitUtils";
+import { buildWorktreeLocation } from "@/shared/worktree";
+import { PixelLoader, SidebarButton, TextArea } from "@/renderer/components/common";
+import { getFileIconUrl } from "@/renderer/components/common/fileIcons";
+import { useSidebar } from "@/renderer/components/layout/AppShell";
 import {
   generateCommitMessageWithFallback,
   getCommitGenCandidates,
   resolveCommitGenConfig,
-} from "../providers";
-import { getConflictResolverDefaults } from "../providers/ProviderIcon";
-import { msg, friendlyError } from "../../../shared/messages";
+} from "@/renderer/components/providers";
+import { getConflictResolverDefaults } from "@/renderer/components/providers/ProviderIcon";
+import { msg, friendlyError } from "@/shared/messages";
 import { useDiffTheme } from "./diffBuildClient";
 import { StackedFileCard } from "./GitStackedDiff";
 

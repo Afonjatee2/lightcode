@@ -5,10 +5,10 @@ import { MarkdownPreview } from "./MarkdownPreview";
 import { Editor, type BeforeMount, type OnMount, type Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
 import { useSortable } from "@dnd-kit/react/sortable";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
-import { useFileEditorStore } from "../../state/fileEditorStore";
-import { useIsDraggingEditorTab, type DragSourceData } from "../../dnd";
-import { lspOrchestrator } from "../../lsp";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import { useIsDraggingEditorTab, type DragSourceData } from "@/renderer/dnd";
+import { lspOrchestrator } from "@/renderer/lsp";
 
 const LANG_MAP: Record<string, string> = {
   ts: "typescript",

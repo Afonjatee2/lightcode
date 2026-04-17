@@ -2,7 +2,7 @@ export * from "./CursorIcon";
 
 import { ClipboardList } from "lucide-react";
 import { CursorIcon } from "./CursorIcon";
-import type { ComposerControl } from "../../thread/ThreadComposer";
+import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
@@ -10,7 +10,7 @@ import {
   registerProviderIcon,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
-import { withCurrentModel } from "../../thread/threadComposerOptions";
+import { withCurrentModel } from "@/renderer/components/thread/threadComposerOptions";
 
 registerProviderIcon("cursor", CursorIcon);
 registerCommitGenDefaults("cursor", {

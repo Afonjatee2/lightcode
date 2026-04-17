@@ -14,6 +14,7 @@ export default defineConfig({
         extends: true,
         resolve: {
           alias: {
+            "@": resolve(__dirname, "src"),
             "~file-icons": resolve(__dirname, "node_modules/material-icon-theme/icons"),
           },
         },
@@ -26,6 +27,11 @@ export default defineConfig({
       },
       {
         extends: true,
+        resolve: {
+          alias: {
+            "@": resolve(__dirname, "src"),
+          },
+        },
         test: {
           name: "node",
           include: ["src/**/*.test.{ts,tsx}"],

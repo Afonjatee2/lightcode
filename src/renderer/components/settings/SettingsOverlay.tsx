@@ -34,9 +34,9 @@ import type {
   TerminalPosition,
   ThemeMode,
   ThreadRemoveAction,
-} from "../../../shared/contracts";
-import { useAppStore } from "../../state/appStore";
-import { useSharedSettings } from "../../state/sharedSettingsStore";
+} from "@/shared/contracts";
+import { useAppStore } from "@/renderer/state/appStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import {
   getCommitGenDefaultsHint,
   getConflictResolverDefaultsHint,
@@ -44,14 +44,14 @@ import {
   resolveCommitGenConfig,
   resolveTitleGenConfig,
   resolveConflictResolverConfig,
-} from "../providers";
-import { readBridge } from "../../bridge";
-import { ProviderIcon } from "../providers/ProviderIcon";
-import { PixelLoader, Select, SidebarButton, TuxIcon } from "../common";
-import { useSidebar } from "../layout/AppShell";
-import { PageLayout } from "../layout/PageLayout";
-import { formatBytes } from "../../../shared/formatBytes";
-import { useUpdateStore } from "../../state/updateStore";
+} from "@/renderer/components/providers";
+import { readBridge } from "@/renderer/bridge";
+import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import { PixelLoader, Select, SidebarButton, TuxIcon } from "@/renderer/components/common";
+import { useSidebar } from "@/renderer/components/layout/AppShell";
+import { PageLayout } from "@/renderer/components/layout/PageLayout";
+import { formatBytes } from "@/shared/formatBytes";
+import { useUpdateStore } from "@/renderer/state/updateStore";
 
 const themeOptions = [
   { id: "system", label: "System" },

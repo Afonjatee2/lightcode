@@ -1,4 +1,4 @@
-import type { Thread } from "../../../shared/contracts";
+import type { Thread } from "@/shared/contracts";
 
 export interface WorktreeThreadGroup {
   worktreePath: string;

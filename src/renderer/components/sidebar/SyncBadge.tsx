@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { PixelLoader } from "../common";
+import { PixelLoader } from "@/renderer/components/common";
 import { Tooltip } from "@heroui/react";
 import { useShallow } from "zustand/shallow";
-import { useGitStore } from "../../state/gitStore";
-import { useAppStore } from "../../state/appStore";
-import { readBridge } from "../../bridge";
-import { buildWorktreeLocation } from "../../../shared/worktree";
+import { useGitStore } from "@/renderer/state/gitStore";
+import { useAppStore } from "@/renderer/state/appStore";
+import { readBridge } from "@/renderer/bridge";
+import { buildWorktreeLocation } from "@/shared/worktree";
 import type { SyncAction } from "./useWorktreeActions";
 
 function deriveSyncAction(hasTracking: boolean, ahead: number, behind: number): SyncAction {

@@ -21,12 +21,12 @@ import type {
   GitPullFromSourceResult,
   GitRemoteInfo,
   RemoteHostPlatform,
-} from "../shared/contracts";
+} from "@/shared/contracts";
 import { buildAgentCommand, readWslCommandOutputAsync } from "./agents/base";
-import { resolveLightcodePaths } from "../shared/lightcodePaths";
-import { sanitizeWorktreeBranchName, sanitizeWorktreePathSegment } from "../shared/worktree";
-import { getProjectName } from "../shared/wsl";
-import { msg, errorDetail } from "../shared/messages";
+import { resolveLightcodePaths } from "@/shared/lightcodePaths";
+import { sanitizeWorktreeBranchName, sanitizeWorktreePathSegment } from "@/shared/worktree";
+import { getProjectName } from "@/shared/wsl";
+import { msg, errorDetail } from "@/shared/messages";
 
 const execFileAsync = promisify(execFile);
 

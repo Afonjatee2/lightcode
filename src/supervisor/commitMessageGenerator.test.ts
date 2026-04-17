@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProjectLocation } from "../shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 
 const spawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());

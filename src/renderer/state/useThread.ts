@@ -1,6 +1,6 @@
 import { useShallow } from "zustand/shallow";
 import { useAppStore } from "./appStore";
-import type { Project, Thread } from "../../shared/contracts";
+import type { Project, Thread } from "@/shared/contracts";
 
 const threadMapCache = new WeakMap<Thread[], Map<string, Thread>>();
 const projectMapCache = new WeakMap<Project[], Map<string, Project>>();

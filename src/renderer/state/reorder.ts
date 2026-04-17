@@ -1,4 +1,4 @@
-import type { Thread } from "../../shared/contracts";
+import type { Thread } from "@/shared/contracts";
 
 export type ReorderPlacement = "before" | "after";
 

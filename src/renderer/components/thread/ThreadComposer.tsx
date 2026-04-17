@@ -1,9 +1,9 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { ToggleButton, Tooltip } from "@heroui/react";
-import { Button, OptionMenu, TextArea } from "../common";
-import { EffortIcon } from "../providers/EffortIcon";
-import { PermissionIcon } from "../providers/PermissionIcon";
+import { Button, OptionMenu, TextArea } from "@/renderer/components/common";
+import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
+import { PermissionIcon } from "@/renderer/components/providers/PermissionIcon";
 
 export type OptionMenuOption = string | { id: string; label: string; hint?: string };
 

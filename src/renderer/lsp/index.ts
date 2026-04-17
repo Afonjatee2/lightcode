@@ -1,5 +1,5 @@
 import type { Monaco } from "@monaco-editor/react";
-import type { ProjectLocation } from "../../shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import { readBridge } from "../bridge";
 import { getLanguageFromPath } from "../components/fileEditor/FileEditorPane";
 import { LspIpcTransport } from "./ipcTransport";

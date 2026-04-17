@@ -1,4 +1,4 @@
-import type { ProjectLocation } from "../shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 import { buildOneShotSpec, spawnAgent } from "./oneShotSpawn";
 

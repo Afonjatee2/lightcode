@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { useGitStore } from "./gitStore";
-import type { GitStatusResult } from "../../shared/contracts";
+import type { GitStatusResult } from "@/shared/contracts";
 
 // For non-hook testing, access store state directly
 function getProjectCaps(projectId: string) {

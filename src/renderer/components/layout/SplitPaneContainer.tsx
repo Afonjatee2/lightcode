@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/react";
-import { leadPaneId, type PaneLayout, type PaneLayoutAxis } from "../../../shared/paneLayout";
-import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "../../dnd";
+import { leadPaneId, type PaneLayout, type PaneLayoutAxis } from "@/shared/paneLayout";
+import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "@/renderer/dnd";
 
 const MIN_PANE_PERCENT = 15;
 const ROOT_INSERT_ZONE_SIZE = 12;

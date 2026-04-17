@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
 import "./styles.css";
-import { getAppName } from "../shared/appName";
+import { getAppName } from "@/shared/appName";
 
 document.title = getAppName(import.meta.env.DEV);
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import type { FileEntry } from "../../../shared/contracts";
-import { getEntryIconUrl } from "../common/fileIcons";
+import type { FileEntry } from "@/shared/contracts";
+import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
 
 function getParentDir(path: string): string {
   const lastSlash = path.lastIndexOf("/");

@@ -3,7 +3,7 @@ import type {
   GenerateCommitMessagePayload,
   GenerateCommitMessageResult,
   ProjectLocation,
-} from "../../../shared/contracts";
+} from "@/shared/contracts";
 import { getCommitGenDefaults } from "./ProviderIcon";
 
 function resolveCommitGenModel(agent: AgentStatus): string {

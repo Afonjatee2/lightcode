@@ -4,10 +4,10 @@ import "@git-diff-view/react/styles/diff-view.css";
 
 // Must match worker setting — enables pre-rendered HTML templates (dangerouslySetInnerHTML)
 setEnableFastDiffTemplate(true);
-import { PixelLoader } from "../common";
+import { PixelLoader } from "@/renderer/components/common";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import type { Project, GitStatusResult } from "../../../shared/contracts";
-import type { DiffBuildItem } from "../../workers/diffBuildWorker";
+import type { Project, GitStatusResult } from "@/shared/contracts";
+import type { DiffBuildItem } from "@/renderer/workers/diffBuildWorker";
 
 // Suppress noisy dev-only warnings from @git-diff-view/core
 {
@@ -17,7 +17,7 @@ import type { DiffBuildItem } from "../../workers/diffBuildWorker";
     origWarn.apply(console, args);
   };
 }
-import { readBridge } from "../../bridge";
+import { readBridge } from "@/renderer/bridge";
 import {
   buildInWorker,
   diffFileFromBundle,

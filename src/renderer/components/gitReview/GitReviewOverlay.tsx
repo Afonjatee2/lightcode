@@ -2,12 +2,12 @@ import { useEffect, useState } from "react";
 import { ArrowLeft, ChevronDown, Columns2, GitBranch, RefreshCw, Rows2 } from "lucide-react";
 import { Button, Dropdown, Label, toast, Tooltip } from "@heroui/react";
 import type { Selection } from "@heroui/react";
-import type { Project, ProjectLocation, GitStatusResult } from "../../../shared/contracts";
-import { friendlyError } from "../../../shared/messages";
-import { readBridge } from "../../bridge";
-import { useGitStore } from "../../state/gitStore";
-import { BranchSelector } from "../common";
-import { PageLayout } from "../layout/PageLayout";
+import type { Project, ProjectLocation, GitStatusResult } from "@/shared/contracts";
+import { friendlyError } from "@/shared/messages";
+import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
+import { BranchSelector } from "@/renderer/components/common";
+import { PageLayout } from "@/renderer/components/layout/PageLayout";
 import { GitReviewSidebar } from "./GitReviewSidebar";
 import { GitDiffContent, type DiffFilter } from "./GitDiffContent";
 

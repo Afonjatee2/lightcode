@@ -4,7 +4,7 @@ import type {
   GitStatusResult,
   GitWorktreeInfo,
   PrData,
-} from "../../shared/contracts";
+} from "@/shared/contracts";
 
 export interface WorktreeSourceInfo {
   sourceBranch: string | null;

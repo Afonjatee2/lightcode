@@ -16,10 +16,10 @@ import type {
   ThreadServerRequestId,
   ThreadRuntimeSnapshot,
   ThreadStatus,
-} from "../../shared/contracts";
+} from "@/shared/contracts";
 import type { Attachment } from "../components/composer/useAttachments";
-import { isDraftPaneId, makeDraftPaneId, parseDraftProjectId } from "../../shared/paneId";
-import type { PaneLayout, PaneLayoutInsertTarget } from "../../shared/paneLayout";
+import { isDraftPaneId, makeDraftPaneId, parseDraftProjectId } from "@/shared/paneId";
+import type { PaneLayout, PaneLayoutInsertTarget } from "@/shared/paneLayout";
 import {
   adjustInsertTargetForRemoval,
   buildPaneLayoutFromLegacy,
@@ -29,14 +29,14 @@ import {
   replacePaneIdInLayout,
   splitPaneInLayout,
   swapPaneIdsInLayout,
-} from "../../shared/paneLayout";
+} from "@/shared/paneLayout";
 import {
   paneIndexToRowCol,
   addToRowLayout,
   insertRowInLayout,
   removeIndicesFromRowLayout,
-} from "../../shared/rowLayout";
-import { getProjectName } from "../../shared/wsl";
+} from "@/shared/rowLayout";
+import { getProjectName } from "@/shared/wsl";
 import {
   reorderIds,
   reorderThreadBlockInProject,

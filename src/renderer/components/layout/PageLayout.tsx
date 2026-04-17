@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { isMac } from "../../bridge";
+import { isMac } from "@/renderer/bridge";
 import { AppShell } from "./AppShell";
 
 /**
