@@ -18,7 +18,12 @@ import { BranchSelector } from "@/renderer/components/common";
 import { SidebarContext } from "@/renderer/components/layout/AppShell";
 import { GitReviewSidebar } from "./GitReviewSidebar";
 
-const alwaysExpanded = { isCollapsed: false, collapse: () => {}, expand: () => {} };
+const alwaysExpanded = {
+  isCollapsed: false,
+  isOverlay: false,
+  collapse: () => {},
+  expand: () => {},
+};
 
 export function GitReviewPanel(props: {
   project: Project;

@@ -160,6 +160,7 @@ vi.mock("../common", () => ({
 vi.mock("../layout/AppShell", () => ({
   useSidebar: () => ({
     isCollapsed: false,
+    isOverlay: false,
     collapse: () => undefined,
     expand: () => undefined,
   }),

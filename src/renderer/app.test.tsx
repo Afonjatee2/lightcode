@@ -101,7 +101,12 @@ vi.mock("./components/layout/AppShell", () => ({
       <div>{props.content}</div>
     </div>
   ),
-  useSidebar: () => ({ isCollapsed: false, collapse: () => {}, expand: () => {} }),
+  useSidebar: () => ({
+    isCollapsed: false,
+    isOverlay: false,
+    collapse: () => {},
+    expand: () => {},
+  }),
 }));
 
 vi.mock("./components/layout/SplitPaneContainer", () => ({

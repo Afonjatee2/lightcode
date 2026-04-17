@@ -42,12 +42,14 @@ function readStoredBoolean(key: string, fallback: boolean): boolean {
 
 interface SidebarContextValue {
   isCollapsed: boolean;
+  isOverlay: boolean;
   collapse: () => void;
   expand: () => void;
 }
 
 export const SidebarContext = createContext<SidebarContextValue>({
   isCollapsed: false,
+  isOverlay: false,
   collapse: () => {},
   expand: () => {},
 });
@@ -60,6 +62,7 @@ export function AppShell(props: {
   sidebar: ReactNode;
   content: ReactNode;
   sidebarHeader?: ReactNode;
+  collapsedSidebarHeader?: ReactNode;
   contentHeader?: ReactNode;
   rightPanel?: ReactNode;
   rightPanelOpen?: boolean;
@@ -71,6 +74,7 @@ export function AppShell(props: {
     sidebar,
     content,
     sidebarHeader,
+    collapsedSidebarHeader,
     contentHeader,
     rightPanel,
     rightPanelOpen = false,
@@ -100,7 +104,12 @@ export function AppShell(props: {
   >(null);
   const resizeRef = useRef({ startX: 0, startY: 0, startWidth: 0, startHeight: 0 });
   const mainRef = useRef<HTMLElement>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
   const didAutoHideRef = useRef<"panels" | "sidebar" | null>(null);
+  const skipTransitionRef = useRef(false);
+  const [isNarrow, setIsNarrow] = useState(false);
+  const [closingOverlay, setClosingOverlay] = useState(false);
+  const [overlayReady, setOverlayReady] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("lightcode-sidebar-width", String(sidebarWidth));
@@ -123,6 +132,18 @@ export function AppShell(props: {
   }, [gitPanelWidth]);
 
   useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      setIsNarrow(entry.contentRect.width < CONTENT_MIN_WIDTH + sidebarWidth);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [sidebarWidth]);
+
+  useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
 
@@ -135,7 +156,7 @@ export function AppShell(props: {
         if (rightPanelOpen || gitPanelOpen) {
           didAutoHideRef.current = "panels";
           onRequestClosePanels?.();
-        } else if (!isCollapsed) {
+        } else if (!isCollapsed && !isNarrow) {
           didAutoHideRef.current = "sidebar";
           setIsCollapsed(true);
         }
@@ -146,7 +167,7 @@ export function AppShell(props: {
 
     ro.observe(el);
     return () => ro.disconnect();
-  }, [rightPanelOpen, gitPanelOpen, isCollapsed, onRequestClosePanels]);
+  }, [rightPanelOpen, gitPanelOpen, isCollapsed, isNarrow, onRequestClosePanels]);
 
   useEffect(() => {
     if (!resizeTarget) return;
@@ -219,7 +240,42 @@ export function AppShell(props: {
     setResizeTarget("git-panel");
   }
 
-  const collapse = () => setIsCollapsed(true);
+  const shouldOverlay = !isCollapsed && isNarrow;
+  const isOverlay = shouldOverlay || closingOverlay;
+
+  useEffect(() => {
+    if (!shouldOverlay) {
+      setOverlayReady(false);
+      return;
+    }
+    let cancelled = false;
+    requestAnimationFrame(() => {
+      if (cancelled) return;
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        setOverlayReady(true);
+      });
+    });
+    return () => {
+      cancelled = true;
+      setOverlayReady(false);
+    };
+  }, [shouldOverlay]);
+  const collapse = () => {
+    if (shouldOverlay) {
+      setClosingOverlay(true);
+      setTimeout(() => {
+        skipTransitionRef.current = true;
+        setClosingOverlay(false);
+        setIsCollapsed(true);
+        requestAnimationFrame(() => {
+          skipTransitionRef.current = false;
+        });
+      }, 200);
+    } else {
+      setIsCollapsed(true);
+    }
+  };
   const expand = () => setIsCollapsed(false);
   const displayWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
   const isResizing = resizeTarget !== null;
@@ -231,35 +287,53 @@ export function AppShell(props: {
   const hasHeaders = sidebarHeader != null || contentHeader != null;
 
   return (
-    <SidebarContext.Provider value={{ isCollapsed, collapse, expand }}>
+    <SidebarContext.Provider value={{ isCollapsed, isOverlay, collapse, expand }}>
       <div
+        ref={shellRef}
         className={`lightcode-shell flex h-full min-h-0 overflow-hidden bg-background text-foreground ${isResizing ? "select-none" : ""}`}
         style={hasHeaders ? { paddingTop: 0 } : undefined}
       >
         {!hasHeaders && <div aria-hidden="true" className="lightcode-drag-region" />}
 
+        {isOverlay && (
+          <div
+            className={`fixed inset-0 z-30 bg-black/50 transition-opacity duration-200 ${closingOverlay ? "opacity-0" : "opacity-100"}`}
+            onClick={collapse}
+            aria-hidden="true"
+          />
+        )}
+
+        {isOverlay && (
+          <div
+            className={`shrink-0 ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`}
+            style={{ width: SIDEBAR_COLLAPSED_WIDTH, minWidth: SIDEBAR_COLLAPSED_WIDTH }}
+          />
+        )}
+
         <aside
-          className={`relative flex min-h-0 flex-col overflow-hidden ${
-            !hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)] border-r border-[color:var(--border)]" : ""
-          } ${!isResizing ? "transition-[width,min-width] duration-200" : ""}`}
+          className={`flex min-h-0 flex-col overflow-hidden ${
+            isOverlay
+              ? `fixed inset-y-0 left-0 z-40 border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${closingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"}`
+              : `relative ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)] border-r border-[color:var(--border)]" : ""}`
+          } ${!isResizing && !isOverlay && !skipTransitionRef.current ? "transition-[width,min-width] duration-200" : ""}`}
           style={{ width: displayWidth, minWidth: displayWidth }}
         >
           {sidebarHeader && (
             <div
-              className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-4"
+              className={`lightcode-overlay-header flex shrink-0 items-center gap-3 px-4 ${isOverlay ? "bg-background" : "bg-[var(--content-background)]"}`}
               style={{ height: "env(titlebar-area-height, 32px)" }}
             >
-              {sidebarHeader}
+              {isCollapsed && !closingOverlay ? collapsedSidebarHeader : sidebarHeader}
             </div>
           )}
           <div
-            className={`min-h-0 flex-1 overflow-hidden ${hasHeaders ? "mb-2 border-r border-[color:var(--border)]" : ""}`}
+            className={`min-h-0 flex-1 overflow-hidden ${hasHeaders ? `mb-2 ${!isOverlay ? "border-r border-[color:var(--border)]" : ""}` : ""}`}
           >
             {sidebar}
           </div>
         </aside>
 
-        {!isCollapsed && (
+        {!isCollapsed && !isOverlay && (
           <div
             className={`lightcode-resize-handle ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`}
             style={
