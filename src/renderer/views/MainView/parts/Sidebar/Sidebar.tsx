@@ -1536,7 +1536,7 @@ export function Sidebar() {
   }, [collapsedProjects]);
 
   const activeThreads = threads.filter(
-    (thread) => (thread.status !== "inactive" || thread.done) && !thread.archived,
+    (thread) => thread.status !== "inactive" && !thread.done && !thread.archived,
   );
 
   return (
