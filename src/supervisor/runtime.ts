@@ -1,441 +1,128 @@
-import {
-  appendFileSync,
-  copyFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { execFile, spawnSync } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
-import { randomUUID } from "node:crypto";
-import { setTimeout as sleep } from "node:timers/promises";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, join } from "node:path";
-import { spawn, type IPty } from "node-pty";
-import {
-  agentStatusSchema,
-  agentCapabilitySchema,
-  agentSettingDefSchema,
-} from "@/shared/contracts";
-import { terminateProcessTree } from "@/shared/processTree";
-import type { LspStartPayload, LspStopPayload, LspMessagePayload } from "@/shared/lsp";
-import { LanguageServerManager } from "./lsp";
-import { z } from "zod";
+import { join } from "node:path";
 import type {
   AgentKind,
-  AgentStatus,
+  AgentStatusesResponse,
   CloseThreadPayload,
-  GenerateCommitMessagePayload,
-  GenerateCommitMessageResult,
-  GenerateTitlePayload,
-  GenerateTitleResult,
-  GeneratePrSummaryPayload,
-  GeneratePrSummaryResult,
+  CreateProjectEntryPayload,
+  DeleteProjectEntryPayload,
+  DetectSetupScriptPayload,
+  DetectSetupScriptResult,
   ExtractContextPayload,
   ExtractContextResult,
+  GenerateCommitMessagePayload,
+  GenerateCommitMessageResult,
+  GeneratePrSummaryPayload,
+  GeneratePrSummaryResult,
+  GenerateTitlePayload,
+  GenerateTitleResult,
   GetAgentStatusesPayload,
+  GetGitBranchesPayload,
   GetGitDiffBatchPayload,
   GetGitDiffPayload,
   GetGitFileContentPayload,
   GetGitStatusPayload,
-  GitAddWorktreeResult,
-  GitCommitPayload,
-  GitCommitResult,
-  GitDiffBatchResult,
-  GitDiffResult,
-  GitFileContentResult,
-  GitPullPayload,
-  GitPushPayload,
-  GitRevertAllPayload,
-  GitRevertPayload,
-  GitStageAllPayload,
-  GitStagePayload,
-  GitStatusResult,
-  GitSyncPayload,
-  GitSyncResult,
-  DetectSetupScriptPayload,
-  DetectSetupScriptResult,
-  DeleteProjectEntryPayload,
   GhCheckAvailableResult,
   GhCreatePrPayload,
+  GhGetPrChecksPayload,
+  GhGetPrChecksResult,
   GhGetPrForBranchPayload,
   GhMergePrPayload,
   GhClosePrPayload,
   GhReopenPrPayload,
-  GhGetPrChecksPayload,
-  GhGetPrChecksResult,
-  PrData,
-  SearchProjectFilesPayload,
-  SearchProjectFilesResult,
-  SearchProjectTreePayload,
-  SearchProjectTreeResult,
-  ReadProjectFilePayload,
-  ReadProjectFileResult,
-  RenameProjectEntryPayload,
+  GitAbortMergePayload,
   GitAddWorktreePayload,
-  GitPruneWorktreesPayload,
+  GitAddWorktreeResult,
   GitBranchListResult,
-  GitFetchPayload,
-  GitListWorktreesPayload,
+  GitCommitPayload,
+  GitCommitResult,
   GitDeleteBranchPayload,
-  GitSwitchBranchPayload,
-  GitSwitchBranchResult,
+  GitDiffBatchResult,
+  GitDiffResult,
+  GitFetchPayload,
+  GitFileContentResult,
+  GitFinishMergePayload,
+  GitFinishMergeResult,
   GitGetWorktreeSourceBranchPayload,
   GitGetWorktreeSourceBranchResult,
+  GitListWorktreesPayload,
   GitMergeToSourcePayload,
   GitMergeToSourceResult,
   GitPullFromSourcePayload,
   GitPullFromSourceResult,
-  GitAbortMergePayload,
+  GitPullPayload,
+  GitPruneWorktreesPayload,
+  GitPushPayload,
+  GitRemoveWorktreePayload,
+  GitRevertAllPayload,
+  GitRevertPayload,
   GitRunMergetoolPayload,
   GitRunMergetoolResult,
-  GitFinishMergePayload,
-  GitFinishMergeResult,
-  GitRemoveWorktreePayload,
+  GitStageAllPayload,
+  GitStagePayload,
+  GitStatusResult,
+  GitSwitchBranchPayload,
+  GitSwitchBranchResult,
+  GitSyncPayload,
+  GitSyncResult,
   GitUnstageAllPayload,
+  GitUnstagePayload,
   GitUnwatchProjectPayload,
   GitWatchProjectPayload,
   GitWatchWorktreesPayload,
-  GitUnstagePayload,
   GitWorktreeListResult,
-  GetGitBranchesPayload,
-  ProjectLocation,
-  CreateProjectEntryPayload,
   ListProjectTreePayload,
   ListProjectTreeResult,
   MoveProjectEntryPayload,
+  PrData,
+  ReadProjectFilePayload,
+  ReadProjectFileResult,
+  RenameProjectEntryPayload,
   ResizeTerminalPayload,
   ResolveThreadServerRequestPayload,
+  SearchProjectFilesPayload,
+  SearchProjectFilesResult,
+  SearchProjectTreePayload,
+  SearchProjectTreeResult,
   SendThreadInputPayload,
-  SessionRef,
   StartShellPayload,
   StartThreadPayload,
   StartThreadResult,
-  TerminalSize,
-  ThreadAttention,
-  ThreadConfig,
   ThreadRuntimeSnapshot,
-  ThreadStatus,
-  WriteTerminalPayload,
-  PromptSegment,
   WriteProjectFilePayload,
   WriteProjectFileResult,
+  WriteTerminalPayload,
 } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
-import { stripAnsiPreservingLayout } from "@/shared/ansi";
-import { extractOscNotifications } from "@/shared/osc";
+import type { LspMessagePayload, LspStartPayload, LspStopPayload } from "@/shared/lsp";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
-import { normalizeSharedSettings, defaultSharedSettings } from "@/shared/settings";
-import { normalizeWslListOutput } from "@/shared/wsl";
 import { createAgentRegistry } from "./agents/registry";
-import {
-  type AgentAdapter,
-  type AgentEnvContext,
-  type CommandSpec,
-  type StructuredSessionHandle,
-  type TerminalStatusHint,
-  defaultFormatPromptSegments,
-  getWslCommand,
-  injectWslEnv,
-  resolveWslHomeDirectory,
-  readWslCommandOutputAsync,
-} from "./agents/base";
+import { readWslCommandOutputAsync } from "./agents/base";
 import { generateCommitMessage } from "./commitMessageGenerator";
-import { generateTitle } from "./titleGenerator";
-import { generatePrSummary } from "./prSummaryGenerator";
 import {
   extractContext as extractContextFn,
   extractContextFromScrollback,
 } from "./contextExtractor";
-import { GitService } from "./git";
-import { GitWatcher } from "./gitWatcher";
-import { GitHubService } from "./github";
 import { FileIndexService } from "./fileIndex";
+import { GitService } from "./git";
+import { GitHubService } from "./github";
+import { GitWatcher } from "./gitWatcher";
+import { LanguageServerManager } from "./lsp";
 import { ProjectTreeService } from "./projectTree";
+import { generatePrSummary } from "./prSummaryGenerator";
 import { detectWindowsShell, type WindowsShellPreference } from "./shellPreference";
+import { generateTitle } from "./titleGenerator";
+import { AgentStatusService, detectWslAgentStatuses } from "./runtime/agentStatusService";
+import { type SessionRuntime, type ShellSessionRuntime } from "./runtime/sessionTypes";
+import { ThreadSessionManager, writeSubmittedPrompt } from "./runtime/threadSessionManager";
 
-/**
- * Stabilization delays (ms) for terminal-derived status transitions.
- * High-priority statuses (needs_approval, needs_reply, error) are immediate.
- * Lower-priority statuses wait to filter out TUI animation artifacts.
- */
-const STATUS_STABILIZATION_DELAY: Partial<Record<ThreadStatus, number>> = {
-  working: 150,
-  idle: 300,
-};
-
-/**
- * Extra delay (ms) applied to uncorroborated status transitions.
- * When a hint is NOT backed by multiple independent signals (dual-pattern
- * validation), the runtime extends the stabilization window to guard against
- * false positives from partial TUI redraws.
- */
-const UNCORROBORATED_EXTRA_DELAY: Partial<Record<ThreadStatus, number>> = {
-  idle: 200, // 300 + 200 = 500ms total for uncorroborated idle
-};
-
-/**
- * If a TUI session is "working" and the PTY goes silent (no data at all) for
- * this many milliseconds, the runtime transitions it to "idle".  TUI agent
- * spinners emit data every ~100 ms, so 2 s of total silence is a very strong
- * signal that the agent has finished but the TUI didn't render a recognisable
- * idle prompt (e.g. Copilot skipping the "Type @" placeholder).
- */
-const DEFAULT_WORKING_SILENCE_TIMEOUT = 2000;
-
-interface SessionRuntime {
-  instanceId: string;
-  threadId: string;
-  agentKind: AgentKind;
-  adapter: AgentAdapter;
-  pty: IPty;
-  projectLocation: ProjectLocation;
-  config: ThreadConfig;
-  sessionRef?: SessionRef;
-  status: ThreadStatus;
-  attention: ThreadAttention;
-  canResumeWithConfig: boolean;
-  terminalSize: TerminalSize;
-  launchPrompt: string;
-  outputLength: number;
-  structuredSession?: StructuredSessionHandle;
-  ignoreExit?: boolean;
-  invalidSessionRecoveryStarted?: boolean;
-  ptyExited?: boolean;
-  autoResponseEmitted?: boolean;
-  sessionRefDiscoveryStarted?: boolean;
-  stopSessionRefWatcher?: (() => void) | undefined;
-  pendingLaunchPrompt?: string | undefined;
-  pendingTerminalPreInputs?: string[][] | undefined;
-  pendingTerminalWriteInFlight?: boolean | undefined;
-  pendingTerminalPrompt?: string | undefined;
-  pendingTerminalSegments?: PromptSegment[] | undefined;
-  prevChunk: string;
-  /** Timestamp of the last concrete status transition (via updateState). */
-  lastStatusChangeAt?: number | undefined;
-  /** Pending status stabilization — delays low-risk transitions to filter TUI animation noise. */
-  pendingStatusHint?:
-    | {
-        status: ThreadStatus;
-        attention: ThreadAttention;
-        timer: ReturnType<typeof setTimeout>;
-      }
-    | undefined;
-  /** Watchdog: fires when the PTY goes silent while "working" — transitions to idle. */
-  workingSilenceTimer?: ReturnType<typeof setTimeout> | undefined;
-  /** Rolling buffer of PTY output text for scrollback-based context extraction. */
-  outputHistory?: string | undefined;
-}
-
-interface ShellSessionRuntime {
-  instanceId: string;
-  shellId: string;
-  pty: IPty;
-  outputLength: number;
-  worktreePath?: string;
-  ptyExited?: boolean;
-  ignoreExit?: boolean;
-}
-
-/**
- * Resolve both the UNC and absolute Linux paths for ~/.lightcode/attachments
- * inside a WSL distro. Cached per distro to avoid repeated wsl.exe spawns.
- */
-const wslAttachmentDirCache = new Map<string, { uncDir: string; linuxDir: string }>();
-function resolveWslAttachmentDirs(distro: string): { uncDir: string; linuxDir: string } {
-  const cached = wslAttachmentDirCache.get(distro);
-  if (cached) return cached;
-
-  const homeDir = resolveWslHomeDirectory(distro);
-  const linuxDir = homeDir ? `${homeDir}/.lightcode/attachments` : undefined;
-  if (!linuxDir) throw new Error(`Unable to resolve home for WSL distro "${distro}"`);
-
-  // Ensure the directory exists inside WSL
-  spawnSync(getWslCommand(), ["-d", distro, "--", "mkdir", "-p", linuxDir], { timeout: 5000 });
-
-  const uncDir = `\\\\wsl.localhost\\${distro}${linuxDir.replace(/\//g, "\\")}`;
-  const entry = { uncDir, linuxDir };
-  wslAttachmentDirCache.set(distro, entry);
-  return entry;
-}
-
-/**
- * For WSL sessions, copy attachment/file segments into ~/.lightcode/attachments
- * inside the WSL distro so agents can access them.
- * Returns segments with full absolute Linux paths (not ~, since not all CLIs expand it).
- */
-function rewriteSegmentsForWsl(
-  segments: PromptSegment[],
-  location: ProjectLocation,
-): PromptSegment[] {
-  if (location.kind !== "wsl") return segments;
-
-  let dirs: { uncDir: string; linuxDir: string } | undefined;
-
-  return segments.map((seg) => {
-    if ((seg.kind !== "attachment" && seg.kind !== "file") || !seg.path) return seg;
-    if (!/^[A-Za-z]:[\\/]/.test(seg.path)) return seg;
-
-    dirs ??= resolveWslAttachmentDirs(location.distro);
-
-    const fileName = basename(seg.path);
-    const dest = join(dirs.uncDir, fileName);
-    try {
-      copyFileSync(seg.path, dest);
-    } catch (err) {
-      console.warn(`[wsl-attach] failed to copy ${seg.path} → ${dest}:`, err);
-      return seg;
-    }
-    return { ...seg, path: `${dirs.linuxDir}/${fileName}` };
-  });
-}
-
-export async function writeSubmittedPrompt(
-  pty: Pick<IPty, "write">,
-  chunks: readonly string[],
-): Promise<void> {
-  for (const chunk of chunks) {
-    // @wait:N — pause for N ms without writing anything to the PTY.
-    const waitMatch = chunk.match(/^@wait:(\d+)$/);
-    if (waitMatch) {
-      await sleep(Number(waitMatch[1]));
-      continue;
-    }
-    // Terminal input uses \r for line breaks. On Windows ConPTY, \n in the
-    // input stream gets translated to \r\n, which TUIs interpret as two
-    // newlines (double-spaced text). Normalize to \r to avoid extra blanks.
-    pty.write(chunk.replace(/\r?\n/g, "\r"));
-    await sleep(8);
-  }
-}
-
-export async function detectWslAgentStatuses(
-  adapters: Iterable<AgentAdapter>,
-  distros: readonly string[],
-  disabled?: ReadonlySet<string>,
-): Promise<AgentStatus[]> {
-  const adapterList = [...adapters];
-  const statuses = await Promise.all(
-    distros.map(async (distro) => {
-      const ctx: AgentEnvContext = { envKind: "wsl", wslDistro: distro };
-      return Promise.all(
-        adapterList.map(async (adapter) => {
-          if (disabled?.has(adapter.kind)) {
-            return {
-              kind: adapter.kind,
-              label: adapter.label,
-              installed: true,
-              authState: "unknown" as const,
-              capabilities: adapter.capabilities,
-              envKind: "wsl" as const,
-              envDistro: distro,
-            };
-          }
-          try {
-            const status = await adapter.detectInstall(ctx);
-            return { ...status, envKind: "wsl" as const, envDistro: distro };
-          } catch (err) {
-            console.error(
-              `[supervisor] detectInstall(${adapter.kind}, wsl:${distro}): FAILED`,
-              err,
-            );
-            return {
-              kind: adapter.kind,
-              label: adapter.label,
-              installed: false,
-              authState: "unknown" as const,
-              capabilities: adapter.capabilities,
-              envKind: "wsl" as const,
-              envDistro: distro,
-            };
-          }
-        }),
-      );
-    }),
-  );
-
-  return statuses.flat();
-}
-
-/**
- * Migrate a single settingDef from the old cache format (no `type`, `envVar`
- * string) to the current schema (`type: "toggle"`, `env` record).
- */
-function migrateSettingDef(d: Record<string, unknown>): Record<string, unknown> {
-  if (d.type === "toggle" || d.type === "select") return d;
-  if (typeof d.default === "boolean") {
-    const env =
-      typeof d.envVar === "string"
-        ? { [d.envVar]: "1" }
-        : typeof d.env === "object" && d.env !== null
-          ? d.env
-          : {};
-    return { ...d, type: "toggle", env };
-  }
-  return d;
-}
-
-/**
- * Lenient schema for reading cached agent statuses.
- * Uses .catch([]) on settingDefs so entries that can't be migrated
- * don't cause the entire agent to be dropped from the cache.
- */
-const cachedAgentStatusSchema = agentStatusSchema.extend({
-  capabilities: agentCapabilitySchema.extend({
-    settingDefs: z.array(agentSettingDefSchema).catch([]),
-  }),
-});
-
-/** Validate cached agent statuses through Zod, migrating stale fields first. */
-function parseCachedStatuses(entries: unknown[] | undefined): AgentStatus[] {
-  if (!entries) return [];
-  const results: AgentStatus[] = [];
-  for (const entry of entries) {
-    // Migrate stale settingDefs before Zod validation.
-    if (entry != null && typeof entry === "object") {
-      const cap = (entry as Record<string, unknown>).capabilities;
-      if (cap != null && typeof cap === "object") {
-        const c = cap as Record<string, unknown>;
-        if (Array.isArray(c.settingDefs)) {
-          c.settingDefs = c.settingDefs.map((d: unknown) =>
-            d != null && typeof d === "object"
-              ? migrateSettingDef(d as Record<string, unknown>)
-              : d,
-          );
-        }
-      }
-    }
-    const parsed = cachedAgentStatusSchema.safeParse(entry);
-    if (parsed.success) results.push(parsed.data);
-  }
-  return results;
-}
-
-function filterWslStatusesForDistros(
-  statuses: readonly AgentStatus[],
-  distros: readonly string[],
-): AgentStatus[] {
-  if (distros.length === 0) {
-    return [];
-  }
-
-  const distroSet = new Set(distros);
-  return statuses.filter((status) => {
-    if (status.envDistro === undefined) {
-      return true;
-    }
-    return distroSet.has(status.envDistro);
-  });
-}
+export { detectWslAgentStatuses, writeSubmittedPrompt };
 
 export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
   private readonly logsDir: string;
   private readonly settingsPath: string;
-  private pendingDetection: Promise<void> | undefined;
   private readonly gitService = new GitService();
   private _gitWatcher: GitWatcher | undefined;
   private readonly githubService = new GitHubService();
@@ -444,14 +131,15 @@ export class SupervisorRuntime {
   private readonly adapters = new Map(
     createAgentRegistry().map((adapter) => [adapter.kind, adapter]),
   );
-  private readonly sessions = new Map<string, SessionRuntime>();
-  private readonly shellSessions = new Map<string, ShellSessionRuntime>();
-  private readonly startLocks = new Map<string, Promise<void>>();
   private readonly windowsShell: WindowsShellPreference;
-  private readonly statusCachePath: string;
+  private readonly agentStatusService: AgentStatusService;
+  private readonly threadSessionManager: ThreadSessionManager;
   private readonly lspManager: LanguageServerManager;
+  private extractionAbortControllers = new Map<string, AbortController>();
 
-  /** Lazy-initialized on first watch request — no cost if git features aren't used during startup. */
+  readonly sessions: Map<string, SessionRuntime>;
+  readonly shellSessions: Map<string, ShellSessionRuntime>;
+
   private get gitWatcher(): GitWatcher {
     if (!this._gitWatcher) {
       this._gitWatcher = new GitWatcher((projectId) => {
@@ -466,582 +154,75 @@ export class SupervisorRuntime {
     const paths = resolveLightcodePaths(baseDir);
     this.logsDir = paths.terminalLogsDir;
     this.settingsPath = paths.settingsPath;
-    this.statusCachePath = paths.statusCachePath;
     mkdirSync(paths.cacheDir, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
-    this.lspManager = new LanguageServerManager(emit);
 
-    // Only detect Windows shell on Windows platform
-    if (process.platform === "win32") {
-      this.windowsShell = detectWindowsShell();
-      console.log(
-        `[supervisor] detected shell: ${this.windowsShell.kind} (${this.windowsShell.shell})`,
-      );
-    } else {
-      // Default value for non-Windows platforms (unused but TypeScript needs it)
-      this.windowsShell = { shell: "/bin/bash", kind: "cmd", args: [] };
-      console.log(`[supervisor] using default shell: ${process.env.SHELL || "/bin/bash"}`);
-    }
+    this.lspManager = new LanguageServerManager(emit);
+    this.windowsShell =
+      process.platform === "win32"
+        ? detectWindowsShell()
+        : { shell: process.env.SHELL || "/bin/bash", kind: "cmd", args: [] };
+
+    this.agentStatusService = new AgentStatusService({
+      adapters: this.adapters,
+      settingsPath: this.settingsPath,
+      statusCachePath: paths.statusCachePath,
+      emit,
+    });
+    this.threadSessionManager = new ThreadSessionManager({
+      emit,
+      isDev: this.isDev,
+      logsDir: this.logsDir,
+      settingsPath: this.settingsPath,
+      adapters: this.adapters,
+      windowsShell: this.windowsShell,
+    });
+    this.sessions = this.threadSessionManager.sessions;
+    this.shellSessions = this.threadSessionManager.shellSessions;
   }
 
   async listWslDistros(): Promise<string[]> {
-    const t0 = Date.now();
-    try {
-      const { stdout } = await execFileAsync(getWslCommand(), ["-l", "-q"], {
-        encoding: "utf8",
-        windowsHide: true,
-        timeout: 5_000,
-      });
-      console.log(`[supervisor] listWslDistros: ${Date.now() - t0}ms`);
-      return normalizeWslListOutput(stdout ?? "");
-    } catch {
-      console.log(`[supervisor] listWslDistros: failed (${Date.now() - t0}ms)`);
-      return [];
-    }
+    return this.agentStatusService.listWslDistros();
   }
 
-  async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatus[]> {
-    const wslDistros = [...new Set(payload.wslDistros)];
-
-    // Emit cached results from disk immediately (if available).
-    this.emitCachedStatuses(wslDistros);
-
-    this.detectAllAgentStatusesBackground(wslDistros);
-
-    // Return empty — results arrive via events.
-    return [];
-  }
-
-  private emitCachedStatuses(wslDistros: readonly string[]): void {
-    try {
-      if (!existsSync(this.statusCachePath)) return;
-      const raw = readFileSync(this.statusCachePath, "utf8");
-      const cache = JSON.parse(raw) as {
-        windows?: unknown[];
-        wsl?: unknown[];
-      };
-      const windows = parseCachedStatuses(cache.windows);
-      if (windows.length > 0) {
-        console.log("[supervisor] agent statuses: emitting from disk cache (windows)");
-        this.emit({ type: "windows-agent-statuses", statuses: windows });
-      }
-      const wsl = parseCachedStatuses(cache.wsl);
-      const filteredWsl = filterWslStatusesForDistros(wsl, wslDistros);
-      if (filteredWsl.length > 0) {
-        console.log("[supervisor] agent statuses: emitting from disk cache (wsl)");
-        this.emit({ type: "wsl-agent-statuses", statuses: filteredWsl });
-      }
-    } catch {
-      // Cache corrupt or missing — ignore, fresh detection will run.
-    }
-  }
-
-  private writeDiskCache(windows: AgentStatus[], wsl: AgentStatus[]): void {
-    try {
-      writeFileSync(this.statusCachePath, JSON.stringify({ windows, wsl, updatedAt: Date.now() }));
-    } catch {
-      // best-effort
-    }
-  }
-
-  private readDisabledAgents(): Set<string> {
-    try {
-      const raw = readFileSync(this.settingsPath, "utf8");
-      const settings = normalizeSharedSettings(JSON.parse(raw));
-      return new Set(settings.disabledAgents);
-    } catch {
-      return new Set();
-    }
-  }
-
-  private detectAllAgentStatusesBackground(wslDistros: readonly string[]): void {
-    if (this.pendingDetection) {
-      console.log("[supervisor] agent detection already in progress, skipping");
-      return;
-    }
-
-    const run = this.runDetection(wslDistros);
-    this.pendingDetection = run;
-    run.finally(() => {
-      this.pendingDetection = undefined;
-    });
-  }
-
-  private async runDetection(wslDistros: readonly string[]): Promise<void> {
-    const t0 = Date.now();
-    const disabled = this.readDisabledAgents();
-    const nativePlatform = process.platform === "win32" ? ("windows" as const) : ("posix" as const);
-
-    // Native detection — runs detectInstall() on all adapters in parallel.
-    const nativePromise = Promise.all(
-      [...this.adapters.values()].map(async (adapter) => {
-        if (disabled.has(adapter.kind)) {
-          console.log(
-            `[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): skipped (disabled)`,
-          );
-          return {
-            kind: adapter.kind,
-            label: adapter.label,
-            installed: true,
-            authState: "unknown" as const,
-            capabilities: adapter.capabilities,
-            envKind: nativePlatform,
-          };
-        }
-        const at = Date.now();
-        try {
-          const status = await adapter.detectInstall();
-          console.log(
-            `[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): ${Date.now() - at}ms`,
-          );
-          return { ...status, envKind: nativePlatform };
-        } catch (err) {
-          console.error(
-            `[supervisor] detectInstall(${adapter.kind}, ${nativePlatform}): FAILED after ${Date.now() - at}ms`,
-            err,
-          );
-          return {
-            kind: adapter.kind,
-            label: adapter.label,
-            installed: false,
-            authState: "unknown" as const,
-            capabilities: adapter.capabilities,
-            envKind: nativePlatform,
-          };
-        }
-      }),
-    ).then((nativeStatuses) => {
-      console.log(`[supervisor] ${nativePlatform} agent statuses: done (${Date.now() - t0}ms)`);
-      if (nativePlatform === "windows") {
-        this.emit({ type: "windows-agent-statuses", statuses: nativeStatuses });
-      }
-      return nativeStatuses;
-    });
-
-    // WSL detection — runs in parallel with native detection.
-    const distros = [...new Set(wslDistros)];
-    const wslPromise =
-      distros.length > 0
-        ? detectWslAgentStatuses(this.adapters.values(), distros, disabled).then((wslStatuses) => {
-            const installedByDistro = new Map<string, number>();
-            for (const status of wslStatuses) {
-              const distro = status.envDistro;
-              if (!distro || !status.installed) continue;
-              installedByDistro.set(distro, (installedByDistro.get(distro) ?? 0) + 1);
-            }
-            console.log(
-              `[supervisor] wsl agent statuses: done (${Date.now() - t0}ms) ${distros.join(", ")} ${JSON.stringify(Object.fromEntries(installedByDistro))}`,
-            );
-            this.emit({ type: "wsl-agent-statuses", statuses: wslStatuses });
-            return wslStatuses;
-          })
-        : Promise.resolve([] as AgentStatus[]);
-
-    // Wait for both to settle, then persist disk cache.
-    const [nativeResult, wslResult] = await Promise.allSettled([nativePromise, wslPromise]);
-    const nativeStatuses = nativeResult.status === "fulfilled" ? nativeResult.value : [];
-    const wslStatuses = wslResult.status === "fulfilled" ? wslResult.value : [];
-
-    if (distros.length === 0) {
-      this.emit({ type: "wsl-agent-statuses", statuses: [] });
-    }
-    this.writeDiskCache(nativeStatuses, wslStatuses);
+  async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
+    return this.agentStatusService.getAgentStatuses(payload);
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
-    return [...this.sessions.values()].map((session) => ({
-      threadId: session.threadId,
-      status: session.status,
-      attention: session.attention,
-      config: session.config,
-      ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
-      canResumeWithConfig: session.canResumeWithConfig,
-    }));
+    return this.threadSessionManager.getThreadSnapshots();
   }
 
   async startThread(payload: StartThreadPayload): Promise<StartThreadResult> {
-    const threadId = payload.threadId ?? randomUUID();
-    console.log("[supervisor] startThread", threadId, payload.agentKind);
-
-    // Serialize starts for the same thread to prevent double app-server spawns.
-    const pending = this.startLocks.get(threadId);
-    if (pending) {
-      console.log("[supervisor] startThread skipped (already starting)", threadId);
-      return { threadId };
-    }
-
-    const resolvedPayload = { ...payload, threadId };
-    const run = this.startThreadInner(resolvedPayload);
-    this.startLocks.set(
-      threadId,
-      run.then(
-        () => {},
-        () => {},
-      ),
-    );
-    try {
-      return await run;
-    } finally {
-      this.startLocks.delete(threadId);
-    }
-  }
-
-  private async startThreadInner(
-    payload: StartThreadPayload & { threadId: string },
-  ): Promise<StartThreadResult> {
-    const t0 = Date.now();
-    const elapsed = () => `${Date.now() - t0}ms`;
-
-    await this.closeThread({ threadId: payload.threadId });
-    console.log(`[supervisor] [${elapsed()}] closeThread done`);
-
-    const adapter = this.requireAdapter(payload.agentKind);
-    const isServerControlled = adapter.capabilities.liveInputMode === "server";
-    const usesTerminalPresentation = adapter.capabilities.presentationMode === "terminal";
-    const effectiveConfig = payload.config;
-    const effectiveSessionRef = payload.sessionRef;
-    // Resolve structured segments for the initial prompt, same as sendThreadInput
-    const effectiveSegments = payload.segments
-      ? rewriteSegmentsForWsl(payload.segments, payload.projectLocation)
-      : undefined;
-    const initialPrompt =
-      effectiveSegments && effectiveSegments.length > 0
-        ? (adapter.formatPromptSegments?.(effectiveSegments) ??
-          defaultFormatPromptSegments(effectiveSegments))
-        : payload.prompt.trim();
-    const shouldQueueInitialPrompt =
-      !effectiveSessionRef &&
-      isServerControlled &&
-      usesTerminalPresentation &&
-      initialPrompt.length > 0 &&
-      adapter.isReadyForInitialPrompt !== undefined;
-    const structuredSession = await this.createStructuredSession(
-      adapter,
-      payload.threadId,
-      payload.projectLocation,
-      effectiveConfig,
-      effectiveSessionRef,
-    );
-    console.log(`[supervisor] [${elapsed()}] createStructuredSession done`);
-
-    // Phase 1: initialize + create thread + send initial message on the server.
-    if (structuredSession?.activate) {
-      try {
-        await structuredSession.activate();
-        console.log(`[supervisor] [${elapsed()}] activate done`);
-      } catch (error) {
-        await structuredSession.dispose();
-        throw error;
-      }
-    }
-
-    if (structuredSession?.openThread) {
-      try {
-        await structuredSession.openThread(effectiveConfig, effectiveSessionRef);
-        console.log(`[supervisor] [${elapsed()}] openThread done`);
-      } catch (error) {
-        await structuredSession.dispose();
-        throw error;
-      }
-    }
-
-    // For new threads: fire turn/start so the rollout file gets created.
-    // For resumed threads: rollout file already exists, skip this.
-    // The rollout file wait is non-blocking — the PTY-backed presentation process is spawned immediately
-    // with resumeThreadId and picks up output as it arrives.
-    if (
-      !effectiveSessionRef &&
-      isServerControlled &&
-      initialPrompt.length > 0 &&
-      !shouldQueueInitialPrompt &&
-      structuredSession?.startTurn
-    ) {
-      void structuredSession.startTurn(initialPrompt, effectiveConfig).catch((error) => {
-        console.error("[supervisor] initial turn failed:", error);
-      });
-    }
-
-    if (shouldQueueInitialPrompt) {
-      await structuredSession?.ensureResumeArtifacts?.();
-    }
-
-    // Phase 2: spawn the PTY-backed presentation process with resume.
-    // When attachments are present the formatted prompt contains @ paths
-    // that are unsafe as CLI args (PowerShell interprets @() as array).
-    // Defer to buildDirectInput after the TUI reaches idle.
-    const hasAttachments = payload.segments?.some((s) => s.kind === "attachment") ?? false;
-    const deferToTerminal =
-      hasAttachments || (adapter.shouldDeferPromptToTerminal?.(effectiveConfig) ?? false);
-    const launchPrompt = isServerControlled || deferToTerminal ? "" : payload.prompt;
-    const command = effectiveSessionRef
-      ? adapter.buildResumeCommand(
-          payload.projectLocation,
-          effectiveConfig,
-          launchPrompt,
-          effectiveSessionRef,
-          structuredSession?.launchOptions,
-        )
-      : adapter.buildLaunchCommand(
-          payload.projectLocation,
-          effectiveConfig,
-          launchPrompt,
-          effectiveSessionRef,
-          structuredSession?.launchOptions,
-        );
-    console.log(`[supervisor] [${elapsed()}] command built, spawning PTY…`);
-
-    // When the TUI owns all interaction (liveInputMode === "terminal"),
-    // the ACP session was only used for setup (create session, set mode/model/effort).
-    // Dispose it before spawning the PTY so both aren't connected simultaneously.
-    const keepStructuredSession = structuredSession && isServerControlled;
-    if (structuredSession && !keepStructuredSession) {
-      await structuredSession.dispose();
-    }
-
-    const resolvedSessionRef = effectiveSessionRef ?? command.sessionRef;
-    this.spawnThread({
-      threadId: payload.threadId,
-      adapter,
-      agentKind: payload.agentKind,
-      projectLocation: payload.projectLocation,
-      config: effectiveConfig,
-      initialSize: payload.initialSize,
-      launchPrompt,
-      command,
-      ...(keepStructuredSession ? { structuredSession } : {}),
-      ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
-      ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
-      ...(deferToTerminal && !isServerControlled
-        ? (() => {
-            const preInputs = adapter.buildTerminalPreInputs?.(effectiveConfig);
-            return {
-              ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
-              pendingTerminalPrompt: initialPrompt,
-              ...(payload.segments ? { pendingTerminalSegments: payload.segments } : {}),
-            };
-          })()
-        : {}),
-    });
-    console.log(`[supervisor] [${elapsed()}] PTY spawned`);
-
-    return { threadId: payload.threadId };
+    return this.threadSessionManager.startThread(payload);
   }
 
   async sendThreadInput(payload: SendThreadInputPayload): Promise<void> {
-    const session = this.requireSession(payload.threadId);
-    if (session.status === "inactive") {
-      if (session.sessionRef) {
-        await this.restartThread(session, payload.prompt, payload.config);
-        return;
-      }
-      throw new Error("This thread exited before a resumable session id was discovered.");
-    }
-
-    // Resolve structured segments into a prompt string via the adapter.
-    // Each adapter formats file references its own way (Claude: @path, etc.).
-    const effectiveSegments = payload.segments
-      ? rewriteSegmentsForWsl(payload.segments, session.projectLocation)
-      : undefined;
-    const prompt =
-      effectiveSegments && effectiveSegments.length > 0
-        ? (session.adapter.formatPromptSegments?.(effectiveSegments) ??
-          defaultFormatPromptSegments(effectiveSegments))
-        : payload.prompt;
-
-    const isServerControlled = session.adapter.capabilities.liveInputMode === "server";
-
-    // If the supervisor auto-cleared plan mode from terminal detection but the renderer
-    // hasn't caught up yet, adopt the session's mode to avoid a spurious relaunch.
-    const effectiveConfig =
-      payload.config.mode === "plan" && session.config.mode === undefined
-        ? { ...payload.config, mode: undefined }
-        : payload.config;
-
-    const shouldRelaunch =
-      !isServerControlled &&
-      session.canResumeWithConfig &&
-      JSON.stringify(session.config) !== JSON.stringify(effectiveConfig);
-
-    if (shouldRelaunch && session.sessionRef) {
-      await this.restartThread(session, prompt, effectiveConfig);
-      return;
-    }
-
-    session.config = effectiveConfig;
-    if (
-      session.adapter.capabilities.liveInputMode === "server" &&
-      session.structuredSession?.startTurn
-    ) {
-      void session.structuredSession
-        .startTurn(prompt, payload.config, payload.segments)
-        .catch((error) => {
-          if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-            return;
-          }
-
-          this.updateState(
-            session,
-            "error",
-            "error",
-            error instanceof Error ? error.message : String(error),
-          );
-        });
-      return;
-    }
-
-    await writeSubmittedPrompt(
-      session.pty,
-      session.adapter.buildDirectInput?.(prompt, payload.segments, session.config) ?? [
-        prompt,
-        "\r",
-      ],
-    );
-
-    // Claude CLI may show a "[Pasted text" confirmation instead of submitting.
-    // Wait briefly, then re-send Enter if that prompt is detected.
-    await sleep(300);
-    if (session.prevChunk.includes("[Pasted text")) {
-      session.pty.write("\r");
-    }
+    return this.threadSessionManager.sendThreadInput(payload);
   }
 
   async writeTerminal(payload: WriteTerminalPayload): Promise<void> {
-    const shell = this.shellSessions.get(payload.threadId);
-    if (shell) {
-      shell.pty.write(payload.data);
-      return;
-    }
-    const session = this.requireSession(payload.threadId);
-    session.pty.write(payload.data);
+    return this.threadSessionManager.writeTerminal(payload);
   }
 
   async resizeTerminal(payload: ResizeTerminalPayload): Promise<void> {
-    const shell = this.shellSessions.get(payload.threadId);
-    if (shell) {
-      shell.pty.resize(payload.cols, payload.rows);
-      return;
-    }
-    const session = this.sessions.get(payload.threadId);
-    if (!session) {
-      return;
-    }
-    session.terminalSize = {
-      cols: payload.cols,
-      rows: payload.rows,
-    };
-    session.pty.resize(payload.cols, payload.rows);
+    return this.threadSessionManager.resizeTerminal(payload);
   }
 
   async closeThread(payload: CloseThreadPayload): Promise<void> {
-    const shell = this.shellSessions.get(payload.threadId);
-    if (shell) {
-      shell.ignoreExit = true;
-      this.shellSessions.delete(payload.threadId);
-      this.safeShellPtyKill(shell);
-      return;
-    }
-
-    const existing = this.sessions.get(payload.threadId);
-    if (!existing) {
-      return;
-    }
-
-    existing.ignoreExit = true;
-    if (existing.pendingStatusHint) {
-      clearTimeout(existing.pendingStatusHint.timer);
-      existing.pendingStatusHint = undefined;
-    }
-    if (existing.workingSilenceTimer) {
-      clearTimeout(existing.workingSilenceTimer);
-      existing.workingSilenceTimer = undefined;
-    }
-    existing.stopSessionRefWatcher?.();
-    existing.stopSessionRefWatcher = undefined;
-    this.sessions.delete(payload.threadId);
-    await existing.structuredSession?.dispose();
-    // Yield so the PTY exit event can fire before we force-kill.
-    if (existing.structuredSession) {
-      await sleep(150);
-    }
-    this.safePtyKill(existing);
+    return this.threadSessionManager.closeThread(payload);
   }
 
   async startShell(payload: StartShellPayload): Promise<void> {
-    // Clean up any prior shell with the same ID.
-    const existing = this.shellSessions.get(payload.shellId);
-    if (existing) {
-      existing.ignoreExit = true;
-      this.shellSessions.delete(payload.shellId);
-      this.safeShellPtyKill(existing);
-    }
+    return this.threadSessionManager.startShell(payload);
+  }
 
-    const shellCmd = this.buildShellCommand(payload.projectLocation);
-    this.emit({ type: "thread-reset", threadId: payload.shellId });
+  async resolveThreadServerRequest(payload: ResolveThreadServerRequestPayload): Promise<void> {
+    return this.threadSessionManager.resolveThreadServerRequest(payload);
+  }
 
-    // For WSL shells, pass TERM through WSLENV so the Linux shell sees
-    // a proper terminal type and can emit OSC title sequences.
-    const shellEnv: Record<string, string> = {
-      ...(process.env as Record<string, string>),
-      TERM: "xterm-256color",
-    };
-    if (payload.projectLocation.kind === "wsl") {
-      const existingWslEnv = process.env.WSLENV ?? "";
-      if (!existingWslEnv.split(":").some((v) => v.replace(/\/.*/, "") === "TERM")) {
-        shellEnv.WSLENV = existingWslEnv ? `${existingWslEnv}:TERM` : "TERM";
-      }
-    }
-
-    console.log(`[supervisor] spawning shell PTY: ${shellCmd.command} ${shellCmd.args.join(" ")}`);
-    const pty = spawn(shellCmd.command, shellCmd.args, {
-      name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
-      cols: 120,
-      rows: 30,
-      ...(shellCmd.cwd ? { cwd: shellCmd.cwd } : {}),
-      env: shellEnv,
-    });
-
-    const session: ShellSessionRuntime = {
-      instanceId: randomUUID(),
-      shellId: payload.shellId,
-      pty,
-      outputLength: 0,
-      ...(payload.worktreePath ? { worktreePath: payload.worktreePath } : {}),
-    };
-
-    this.shellSessions.set(payload.shellId, session);
-
-    pty.onData((data) => {
-      if (this.shellSessions.get(payload.shellId)?.instanceId !== session.instanceId) {
-        return;
-      }
-      session.outputLength += data.length;
-      if (this.isDev) {
-        try {
-          appendFileSync(this.resolveLogPath(payload.shellId.replace(/:/g, "_")), data);
-        } catch {
-          // best-effort debug log
-        }
-      }
-      this.emit({
-        type: "thread-output",
-        threadId: payload.shellId,
-        data,
-        outputLength: session.outputLength,
-      });
-    });
-
-    pty.onExit(({ exitCode }) => {
-      session.ptyExited = true;
-      if (session.ignoreExit) {
-        return;
-      }
-      this.shellSessions.delete(payload.shellId);
-      this.emit({
-        type: "thread-exited",
-        threadId: payload.shellId,
-        exitCode: exitCode ?? null,
-      });
-    });
+  readTerminalScrollback(threadId: string): string {
+    return this.threadSessionManager.readTerminalScrollback(threadId);
   }
 
   async getGitStatus(payload: GetGitStatusPayload): Promise<GitStatusResult> {
@@ -1101,25 +282,27 @@ export class SupervisorRuntime {
     payload: GenerateCommitMessagePayload,
   ): Promise<GenerateCommitMessageResult> {
     const adapter = this.requireAdapter(payload.agentKind);
-    const message = await generateCommitMessage(
-      payload.projectLocation,
-      adapter,
-      payload.model,
-      payload.effort,
-    );
-    return { message };
+    return {
+      message: await generateCommitMessage(
+        payload.projectLocation,
+        adapter,
+        payload.model,
+        payload.effort,
+      ),
+    };
   }
 
   async generateTitle(payload: GenerateTitlePayload): Promise<GenerateTitleResult> {
     const adapter = this.requireAdapter(payload.agentKind);
-    const title = await generateTitle(
-      payload.projectLocation,
-      adapter,
-      payload.prompt,
-      payload.model,
-      payload.effort,
-    );
-    return { title };
+    return {
+      title: await generateTitle(
+        payload.projectLocation,
+        adapter,
+        payload.prompt,
+        payload.model,
+        payload.effort,
+      ),
+    };
   }
 
   async generatePrSummary(payload: GeneratePrSummaryPayload): Promise<GeneratePrSummaryResult> {
@@ -1134,17 +317,12 @@ export class SupervisorRuntime {
     );
   }
 
-  // ── Context Extraction ──────────────────────────────────
-
-  private extractionAbortControllers = new Map<string, AbortController>();
-
   async extractContext(payload: ExtractContextPayload): Promise<ExtractContextResult> {
     const adapter = this.requireAdapter(payload.agentKind);
     const abortController = new AbortController();
     this.extractionAbortControllers.set(payload.threadId, abortController);
 
     try {
-      // Primary: adapter-specific extraction (--resume + print mode)
       try {
         return await extractContextFn(
           payload.projectLocation,
@@ -1156,28 +334,24 @@ export class SupervisorRuntime {
           abortController.signal,
         );
       } catch {
-        // Fall through to scrollback fallback
-      }
-
-      // Fallback: scrollback extraction
-      const scrollback = this.readTerminalScrollbackInternal(payload.threadId);
-      if (scrollback) {
-        return await extractContextFromScrollback(
-          payload.projectLocation,
-          adapter,
-          scrollback,
-          payload.agentKind,
-          payload.sessionRef.providerSessionId,
-          payload.worktreePath,
-          payload.model,
-          payload.effort,
-          abortController.signal,
+        const scrollback = this.readTerminalScrollback(payload.threadId);
+        if (scrollback) {
+          return extractContextFromScrollback(
+            payload.projectLocation,
+            adapter,
+            scrollback,
+            payload.agentKind,
+            payload.sessionRef.providerSessionId,
+            payload.worktreePath,
+            payload.model,
+            payload.effort,
+            abortController.signal,
+          );
+        }
+        throw new Error(
+          `Cannot extract context from ${adapter.label}: no session resume or scrollback available`,
         );
       }
-
-      throw new Error(
-        `Cannot extract context from ${adapter.label}: no session resume or scrollback available`,
-      );
     } finally {
       this.extractionAbortControllers.delete(payload.threadId);
     }
@@ -1190,23 +364,6 @@ export class SupervisorRuntime {
       this.extractionAbortControllers.delete(threadId);
     }
   }
-
-  readTerminalScrollback(threadId: string): string {
-    return this.readTerminalScrollbackInternal(threadId);
-  }
-
-  private readTerminalScrollbackInternal(threadId: string): string {
-    const session = this.sessions.get(threadId);
-    if (!session?.outputHistory) return "";
-    // Truncate to last ~100K chars
-    const full = session.outputHistory;
-    if (full.length > 100_000) {
-      return full.slice(-100_000);
-    }
-    return full;
-  }
-
-  // ── Branch & Worktree ───────────────────────────────────
 
   async gitListBranches(payload: GetGitBranchesPayload): Promise<GitBranchListResult> {
     return this.gitService.listBranches(payload.projectLocation, payload.includeRemote);
@@ -1231,35 +388,25 @@ export class SupervisorRuntime {
   }
 
   async gitRemoveWorktree(payload: GitRemoveWorktreePayload): Promise<void> {
-    const targetPath = payload.path;
-    const normalizedTarget = targetPath.replace(/\\/g, "/").toLowerCase();
+    const normalizedTarget = payload.path.replace(/\\/g, "/").toLowerCase();
 
-    // 1. Stop any active agent sessions running in this worktree
     for (const [threadId, session] of this.sessions) {
       const sessionPath =
         session.projectLocation.kind === "wsl"
           ? session.projectLocation.uncPath
           : session.projectLocation.path;
       if (sessionPath.replace(/\\/g, "/").toLowerCase() === normalizedTarget) {
-        console.log(`[supervisor] stopping session for thread ${threadId} before worktree removal`);
-        await this.closeThread({ threadId }).catch(() => {});
+        await this.closeThread({ threadId }).catch(() => undefined);
       }
     }
 
-    // 2. Stop any shell sessions (tabs) running in this worktree
     for (const [threadId, shell] of this.shellSessions) {
-      if (shell.worktreePath) {
-        const shellPath = shell.worktreePath.replace(/\\/g, "/").toLowerCase();
-        if (shellPath === normalizedTarget) {
-          console.log(`[supervisor] stopping shell for thread ${threadId} before worktree removal`);
-          await this.closeThread({ threadId }).catch(() => {});
-        }
+      if (shell.worktreePath?.replace(/\\/g, "/").toLowerCase() === normalizedTarget) {
+        await this.closeThread({ threadId }).catch(() => undefined);
       }
     }
 
-    // 3. Stop watcher before removal to release potential file locks
     this.gitWatcher.unwatchWorktree(payload.path);
-
     return this.gitService.removeWorktree(
       payload.projectLocation,
       payload.path,
@@ -1303,8 +450,6 @@ export class SupervisorRuntime {
   async gitSync(payload: GitSyncPayload): Promise<GitSyncResult> {
     const location = payload.projectLocation;
     const remote = payload.remote ?? "origin";
-
-    // Fetch first so ahead/behind counts are accurate
     await this.gitService.fetch(location, remote, false);
 
     const status = await this.gitService.getStatus(location);
@@ -1316,7 +461,6 @@ export class SupervisorRuntime {
       pulled = true;
     }
 
-    // Re-check after pull — ahead count may have changed
     const afterPull = pulled ? await this.gitService.getStatus(location) : status;
     if (afterPull.ahead > 0) {
       await this.gitService.push(location, remote);
@@ -1344,8 +488,6 @@ export class SupervisorRuntime {
   async gitPullFromSource(payload: GitPullFromSourcePayload): Promise<GitPullFromSourceResult> {
     return this.gitService.pullFromSource(payload.worktreeLocation, payload.sourceBranch);
   }
-
-  // ── GitHub PR ──────────────────────────────────────────
 
   async ghCheckAvailable(payload: GetGitStatusPayload): Promise<GhCheckAvailableResult> {
     return this.githubService.checkGhAvailable(payload.projectLocation);
@@ -1393,8 +535,6 @@ export class SupervisorRuntime {
   async gitFinishMerge(payload: GitFinishMergePayload): Promise<GitFinishMergeResult> {
     return this.gitService.finishMerge(payload.worktreeLocation);
   }
-
-  // ── Git watcher ────────────────────────────────────────
 
   async gitWatchProject(payload: GitWatchProjectPayload): Promise<void> {
     this.gitWatcher.watch(payload.projectId, payload.projectLocation);
@@ -1445,7 +585,6 @@ export class SupervisorRuntime {
   }
 
   async detectSetupScript(payload: DetectSetupScriptPayload): Promise<DetectSetupScriptResult> {
-    // Lock files in priority order — first match wins.
     const candidates: { file: string; command: string }[] = [
       { file: "pnpm-lock.yaml", command: "pnpm install" },
       { file: "bun.lockb", command: "bun install" },
@@ -1462,24 +601,25 @@ export class SupervisorRuntime {
     ];
 
     const location = payload.projectLocation;
-
     if (location.kind === "wsl") {
-      // Check files via a single WSL command for efficiency.
       const checks = candidates.map(
-        (c) => `test -f "${location.linuxPath}/${c.file}" && echo yes || echo no`,
+        (candidate) => `test -f "${location.linuxPath}/${candidate.file}" && echo yes || echo no`,
       );
-      const script = checks.join(" && echo '---' && ");
-      const result = await readWslCommandOutputAsync(location.distro, "sh", ["-c", script]);
+      const result = await readWslCommandOutputAsync(location.distro, "sh", [
+        "-c",
+        checks.join(" && echo '---' && "),
+      ]);
       if (result.ok) {
-        const answers = result.stdout.split("---").map((s) => s.trim());
-        for (let i = 0; i < candidates.length; i++) {
-          if (answers[i] === "yes") return { setupScript: candidates[i]!.command };
+        const answers = result.stdout.split("---").map((value) => value.trim());
+        for (let index = 0; index < candidates.length; index += 1) {
+          if (answers[index] === "yes") {
+            return { setupScript: candidates[index]!.command };
+          }
         }
       }
       return {};
     }
 
-    // Native filesystem check (Windows / POSIX).
     const dir = location.path;
     for (const candidate of candidates) {
       if (existsSync(join(dir, candidate.file))) {
@@ -1487,15 +627,6 @@ export class SupervisorRuntime {
       }
     }
     return {};
-  }
-
-  async resolveThreadServerRequest(payload: ResolveThreadServerRequestPayload): Promise<void> {
-    const session = this.requireSession(payload.threadId);
-    if (!session.structuredSession?.resolveServerRequest) {
-      throw new Error(`Thread ${payload.threadId} does not support server request resolution.`);
-    }
-
-    await session.structuredSession.resolveServerRequest(payload.requestId, payload.response);
   }
 
   async lspStart(payload: LspStartPayload): Promise<void> {
@@ -1513,143 +644,10 @@ export class SupervisorRuntime {
   dispose(): void {
     this.lspManager.dispose();
     this._gitWatcher?.dispose();
-
-    for (const session of this.sessions.values()) {
-      session.ignoreExit = true;
-      void session.structuredSession?.dispose();
-      this.safePtyKill(session);
-    }
-    this.sessions.clear();
-
-    for (const shell of this.shellSessions.values()) {
-      shell.ignoreExit = true;
-      this.safeShellPtyKill(shell);
-    }
-    this.shellSessions.clear();
+    this.threadSessionManager.dispose();
   }
 
-  private safePtyKill(session: SessionRuntime): void {
-    if (session.ptyExited) {
-      return;
-    }
-    if (process.platform === "win32") {
-      terminateProcessTree(session.pty.pid);
-      return;
-    }
-    try {
-      process.kill(session.pty.pid, 0);
-    } catch {
-      // Shell process already exited — skip pty.kill() to avoid
-      // ConPTY's AttachConsole failure in its forked agent process.
-      return;
-    }
-    session.pty.kill();
-  }
-
-  private safeShellPtyKill(session: ShellSessionRuntime): void {
-    if (session.ptyExited) {
-      return;
-    }
-    if (process.platform === "win32") {
-      terminateProcessTree(session.pty.pid);
-      return;
-    }
-    try {
-      process.kill(session.pty.pid, 0);
-    } catch {
-      return;
-    }
-    session.pty.kill();
-  }
-
-  private buildShellCommand(location: ProjectLocation): {
-    command: string;
-    args: string[];
-    cwd?: string;
-  } {
-    if (location.kind === "wsl") {
-      // Use WSL's default shell directly — same speed as typing `wsl` in PowerShell.
-      return {
-        command: getWslCommand(),
-        args: ["-d", location.distro, "--cd", location.linuxPath],
-      };
-    }
-
-    if (process.platform === "win32") {
-      // Use the cached Windows shell preference (detected once at startup).
-      return {
-        command: this.windowsShell.shell,
-        args: [...this.windowsShell.args],
-        cwd: location.path,
-      };
-    }
-
-    // macOS/Linux: use the user's default shell from $SHELL, or fallback to /bin/bash
-    const shell = process.env.SHELL || "/bin/bash";
-    return {
-      command: shell,
-      args: ["-l"],
-      cwd: location.path,
-    };
-  }
-
-  private resolveLogPath(threadId: string): string {
-    return join(this.logsDir, `${threadId}.log`);
-  }
-
-  private resolveAgentProcessEnv(adapter: AgentAdapter): Record<string, string> {
-    const settingDefs = adapter.capabilities.settingDefs ?? [];
-    if (settingDefs.length === 0) return {};
-
-    let settings = defaultSharedSettings;
-    try {
-      const raw = readFileSync(this.settingsPath, "utf8");
-      settings = normalizeSharedSettings(JSON.parse(raw));
-    } catch {
-      /* use defaults */
-    }
-
-    const agentValues = settings.agentSettings[adapter.kind] ?? {};
-    const env: Record<string, string> = {};
-    for (const def of settingDefs) {
-      if (def.platforms && !def.platforms.includes(process.platform)) continue;
-      const value = agentValues[def.key] ?? def.default;
-      if (def.type === "toggle") {
-        if (value) {
-          Object.assign(env, def.env);
-        }
-      } else if (def.type === "select") {
-        env[def.envVar] = String(value);
-      }
-    }
-    return env;
-  }
-
-  private resolveHintLogPath(threadId: string): string {
-    return join(this.logsDir, `${threadId}.hints.log`);
-  }
-
-  private writeHintLog(
-    session: SessionRuntime,
-    stripped: string,
-    hint: { status: string; attention: string } | null,
-  ): void {
-    if (!this.isDev) return;
-    const tail = stripped.slice(-300);
-    const ts = new Date().toISOString();
-    const entry = [
-      `--- ${ts} status=${session.status} hint=${hint?.status ?? "null"} ---`,
-      tail,
-      "",
-    ].join("\n");
-    try {
-      appendFileSync(this.resolveHintLogPath(session.threadId), entry);
-    } catch {
-      // best-effort
-    }
-  }
-
-  private requireAdapter(kind: AgentKind): AgentAdapter {
+  private requireAdapter(kind: AgentKind) {
     const adapter = this.adapters.get(kind);
     if (!adapter) {
       throw new Error(`Unsupported agent adapter: ${kind}`);
@@ -1657,771 +655,26 @@ export class SupervisorRuntime {
     return adapter;
   }
 
-  private requireSession(threadId: string): SessionRuntime {
-    const session = this.sessions.get(threadId);
-    if (!session) {
-      throw new Error(`Unknown thread session: ${threadId}`);
-    }
-    return session;
-  }
-
-  private async createStructuredSession(
-    adapter: AgentAdapter,
-    threadId: string,
-    projectLocation: ProjectLocation,
-    config: ThreadConfig,
-    sessionRef?: SessionRef,
-  ): Promise<StructuredSessionHandle | undefined> {
-    if (!adapter.createStructuredSession) {
-      return undefined;
-    }
-
-    try {
-      return await adapter.createStructuredSession({
-        threadId,
-        projectLocation,
-        config,
-        ...(sessionRef ? { sessionRef } : {}),
-      });
-    } catch (error) {
-      console.error("[supervisor] structured session creation failed:", error);
-      return undefined;
-    }
-  }
-
-  private spawnThread(input: {
-    threadId: string;
-    agentKind: AgentKind;
-    adapter: AgentAdapter;
-    projectLocation: ProjectLocation;
-    config: ThreadConfig;
-    initialSize: TerminalSize;
-    launchPrompt: string;
-    command: CommandSpec;
-    structuredSession?: StructuredSessionHandle;
-    sessionRef?: SessionRef;
-    pendingLaunchPrompt?: string;
-    pendingTerminalPreInputs?: string[][];
-    pendingTerminalPrompt?: string;
-    pendingTerminalSegments?: PromptSegment[];
-  }): SessionRuntime {
-    this.emit({
-      type: "thread-reset",
-      threadId: input.threadId,
-    });
-
-    const agentEnv = this.resolveAgentProcessEnv(input.adapter);
-    // Suppress CLI-initiated browser opening in WSL — Electron's shell.openExternal()
-    // handles URL opening on the Windows side; without this, xdg-open/wslview inside
-    // WSL opens a second browser window.
-    if (input.projectLocation.kind === "wsl") {
-      agentEnv.BROWSER = "/bin/true";
-    }
-    // For WSL commands, env vars must be baked into the shell script as exports
-    // because wsl.exe does not forward Windows env vars into the Linux distro.
-    const command = injectWslEnv(input.command, input.projectLocation, agentEnv);
-    console.log(`[supervisor] spawning PTY: ${command.command} ${command.args.join(" ")}`);
-    const pty = spawn(command.command, command.args, {
-      name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
-      cols: input.initialSize.cols,
-      rows: input.initialSize.rows,
-      cwd: command.cwd ?? process.cwd(),
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-        ...agentEnv,
-      },
-    });
-
-    const session: SessionRuntime = {
-      instanceId: randomUUID(),
-      threadId: input.threadId,
-      agentKind: input.agentKind,
-      adapter: input.adapter,
-      pty,
-      projectLocation: input.projectLocation,
-      config: input.config,
-      terminalSize: input.initialSize,
-      launchPrompt: input.launchPrompt,
-      ...(input.sessionRef ? { sessionRef: input.sessionRef } : {}),
-      status: "launching",
-      attention: "none",
-      canResumeWithConfig: input.sessionRef !== undefined,
-      outputLength: 0,
-      pendingLaunchPrompt: input.pendingLaunchPrompt,
-      pendingTerminalPreInputs: input.pendingTerminalPreInputs,
-      pendingTerminalPrompt: input.pendingTerminalPrompt,
-      pendingTerminalSegments: input.pendingTerminalSegments,
-      prevChunk: "",
-      ...(input.structuredSession ? { structuredSession: input.structuredSession } : {}),
-    };
-
-    // Register the session before attaching the listener so that the
-    // setListener re-emit (for already-activated structured sessions)
-    // passes the instanceId guard.
-    this.sessions.set(input.threadId, session);
-    this.emitState(session);
-
-    input.structuredSession?.setListener({
-      onClose: () => {
-        if (
-          this.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-        this.handleStructuredSessionClosed(session);
-      },
-      onError: (errorMessage) => {
-        if (
-          this.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-        this.updateState(session, "error", "error", errorMessage);
-      },
-      onServerRequest: (request) => {
-        if (
-          this.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-
-        this.emit({
-          type: "thread-server-request",
-          threadId: session.threadId,
-          requestId: request.requestId,
-          method: request.method,
-          params: request.params,
-        });
-      },
-      onUpdate: (update) => {
-        if (
-          this.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-
-        if (update.sessionRef) {
-          session.sessionRef = update.sessionRef;
-          session.canResumeWithConfig = true;
-        }
-
-        const configChanged =
-          update.config !== undefined &&
-          JSON.stringify(session.config) !== JSON.stringify(update.config);
-        const stateChanged =
-          session.status !== update.status ||
-          session.attention !== update.attention ||
-          update.errorMessage !== undefined;
-        if (update.config) {
-          session.config = update.config;
-        }
-
-        this.updateState(session, update.status, update.attention, update.errorMessage);
-        if (configChanged && !stateChanged && update.errorMessage === undefined) {
-          this.emitState(session);
-        }
-      },
-    });
-
-    pty.onData((data) => {
-      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-
-      try {
-        this.handlePtyData(session, data);
-      } catch (error) {
-        console.error(
-          `[supervisor] uncaught error in onData for thread ${session.threadId}:`,
-          error,
-        );
-      }
-    });
-
-    pty.onExit((event) => {
-      session.ptyExited = true;
-      if (session.ignoreExit) {
-        return;
-      }
-      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-
-      void session.structuredSession?.dispose();
-      this.updateState(session, "inactive", "none");
-      this.emit({
-        type: "thread-exited",
-        threadId: session.threadId,
-        exitCode: event.exitCode,
-      });
-    });
-
-    return session;
-  }
-
-  private pollSessionRefDiscovery(session: SessionRuntime): void {
-    let attempt = 0;
-    let polling = false;
-    // Collect session IDs already assigned to other threads to avoid duplicates.
-    const existingIds = new Set<string>();
-    for (const s of this.sessions.values()) {
-      if (s.sessionRef && s.threadId !== session.threadId) {
-        existingIds.add(s.sessionRef.providerSessionId);
-      }
-    }
-
-    const poll = async () => {
-      if (polling || session.sessionRef || session.status === "inactive" || attempt >= 5) return;
-      polling = true;
-      attempt++;
-      try {
-        console.log(
-          "[supervisor] sessionRef discovery attempt %d for %s (%s) status=%s",
-          attempt,
-          session.threadId,
-          session.agentKind,
-          session.status,
-        );
-        const ref = await session.adapter.discoverSessionRef?.(session.projectLocation);
-        if (ref && !session.sessionRef && !existingIds.has(ref.providerSessionId)) {
-          session.sessionRef = ref;
-          session.canResumeWithConfig = true;
-          session.stopSessionRefWatcher?.();
-          session.stopSessionRefWatcher = undefined;
-          console.log(
-            "[supervisor] sessionRef discovered for %s: %s",
-            session.threadId,
-            ref.providerSessionId,
-          );
-          this.emitState(session);
-          return;
-        }
-        if (ref && existingIds.has(ref.providerSessionId)) {
-          console.log(
-            "[supervisor] sessionRef candidate for %s ignored because it is already attached to another thread: %s",
-            session.threadId,
-            ref.providerSessionId,
-          );
-        }
-        if (!ref) {
-          console.log("[supervisor] no sessionRef discovered yet for %s", session.threadId);
-        }
-      } catch {
-        // Ignore — will retry
-      } finally {
-        polling = false;
-      }
-      setTimeout(() => void poll(), 3000);
-    };
-    session.stopSessionRefWatcher = session.adapter.watchSessionRef?.(
-      session.projectLocation,
-      () => void poll(),
-    );
-    const initialDelay = session.adapter.initialSessionRefDiscoveryDelayMs ?? 0;
-    if (initialDelay > 0) {
-      console.log(
-        "[supervisor] delaying first sessionRef discovery for %s by %dms",
-        session.threadId,
-        initialDelay,
-      );
-      setTimeout(() => void poll(), initialDelay);
-      return;
-    }
-    void poll();
-  }
-
-  private async restartThread(
-    session: SessionRuntime,
-    prompt: string,
-    config: ThreadConfig,
-  ): Promise<void> {
-    if (!session.sessionRef) {
-      throw new Error("Session cannot be restarted without a known session reference.");
-    }
-
-    const isServerControlled = session.adapter.capabilities.liveInputMode === "server";
-
-    session.ignoreExit = true;
-    await session.structuredSession?.dispose();
-    if (session.structuredSession) {
-      await sleep(150);
-    }
-    this.safePtyKill(session);
-
-    const effectiveConfig = config;
-    const effectiveSessionRef = session.sessionRef;
-    const structuredSession = await this.createStructuredSession(
-      session.adapter,
-      session.threadId,
-      session.projectLocation,
-      effectiveConfig,
-      effectiveSessionRef,
-    );
-
-    // Initialize + resume thread on the server.
-    if (structuredSession?.activate) {
-      try {
-        await structuredSession.activate();
-      } catch (error) {
-        await structuredSession.dispose();
-        throw error;
-      }
-    }
-
-    if (structuredSession?.openThread) {
-      try {
-        await structuredSession.openThread(effectiveConfig, effectiveSessionRef);
-      } catch (error) {
-        await structuredSession.dispose();
-        throw error;
-      }
-    }
-
-    // Spawn the PTY-backed presentation process with resume — rollout file already exists for saved threads.
-    const launchPrompt = isServerControlled ? "" : prompt;
-    const command = session.adapter.buildResumeCommand(
-      session.projectLocation,
-      effectiveConfig,
-      launchPrompt,
-      session.sessionRef,
-      structuredSession?.launchOptions,
-    );
-
-    const keepStructuredSession = structuredSession && isServerControlled;
-    if (structuredSession && !keepStructuredSession) {
-      await structuredSession.dispose();
-    }
-
-    this.spawnThread({
-      threadId: session.threadId,
-      agentKind: session.agentKind,
-      adapter: session.adapter,
-      projectLocation: session.projectLocation,
-      config: effectiveConfig,
-      initialSize: session.terminalSize,
-      launchPrompt,
-      command,
-      ...(keepStructuredSession ? { structuredSession } : {}),
-      sessionRef: effectiveSessionRef,
-    });
-  }
-
-  private recoverInvalidSessionRef(session: SessionRuntime): void {
-    if (session.invalidSessionRecoveryStarted || !session.sessionRef) {
-      return;
-    }
-
-    session.invalidSessionRecoveryStarted = true;
-    const staleSessionId = session.sessionRef.providerSessionId;
-    console.log(
-      `[supervisor] invalid session ref for ${session.agentKind}; relaunching without resume: ${staleSessionId}`,
-    );
-
-    void (async () => {
-      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-
-      session.ignoreExit = true;
-      session.stopSessionRefWatcher?.();
-      session.stopSessionRefWatcher = undefined;
-      await session.structuredSession?.dispose();
-      if (session.structuredSession) {
-        await sleep(150);
-      }
-      this.safePtyKill(session);
-
-      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-
-      const command = session.adapter.buildLaunchCommand(
-        session.projectLocation,
-        session.config,
-        session.launchPrompt,
-      );
-
-      this.spawnThread({
-        threadId: session.threadId,
-        agentKind: session.agentKind,
-        adapter: session.adapter,
-        projectLocation: session.projectLocation,
-        config: session.config,
-        initialSize: session.terminalSize,
-        launchPrompt: session.launchPrompt,
-        command,
-      });
-    })();
-  }
-
-  private handleStructuredSessionClosed(session: SessionRuntime): void {
-    if (session.status === "inactive") {
-      return;
-    }
-
-    this.updateState(session, "inactive", "none");
-    this.emit({
-      type: "thread-exited",
-      threadId: session.threadId,
-      exitCode: null,
-    });
-
-    session.ignoreExit = true;
-    session.stopSessionRefWatcher?.();
-    session.stopSessionRefWatcher = undefined;
-    // Defer the kill so the PTY has time to exit naturally after the
-    // structured session closes.  safePtyKill checks process liveness
-    // before invoking node-pty's kill.
-    setTimeout(() => this.safePtyKill(session), 150);
-  }
-
-  private startQueuedLaunchPrompt(session: SessionRuntime): void {
-    if (!session.pendingLaunchPrompt || !session.structuredSession?.startTurn) {
-      return;
-    }
-
-    const prompt = session.pendingLaunchPrompt;
-    session.pendingLaunchPrompt = undefined;
-    void session.structuredSession.startTurn(prompt, session.config).catch((error) => {
-      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-
-      this.updateState(
-        session,
-        "error",
-        "error",
-        error instanceof Error ? error.message : String(error),
-      );
-    });
-  }
-
-  private getLatestTerminalStatusHint(session: SessionRuntime): TerminalStatusHint | null {
-    if (
-      session.adapter.capabilities.presentationMode !== "terminal" ||
-      !session.adapter.detectTerminalStatus ||
-      session.prevChunk.length === 0
-    ) {
-      return null;
-    }
-
-    return session.adapter.detectTerminalStatus(stripAnsiPreservingLayout(session.prevChunk));
-  }
-
-  private updateState(
-    session: SessionRuntime,
-    status: ThreadStatus,
-    attention: ThreadAttention,
-    errorMessage?: string,
-  ): void {
-    if (
-      session.status === status &&
-      session.attention === attention &&
-      errorMessage === undefined
-    ) {
-      return;
-    }
-
-    // Any concrete state transition cancels a pending stabilization.
-    if (session.pendingStatusHint) {
-      clearTimeout(session.pendingStatusHint.timer);
-      session.pendingStatusHint = undefined;
-    }
-
-    // Clear the working-silence watchdog when leaving "working".
-    if (session.workingSilenceTimer && status !== "working") {
-      clearTimeout(session.workingSilenceTimer);
-      session.workingSilenceTimer = undefined;
-    }
-
-    session.status = status;
-    session.attention = attention;
-    session.lastStatusChangeAt = Date.now();
-    this.emitState(session, errorMessage);
-  }
-
-  private emitState(session: SessionRuntime, errorMessage?: string): void {
-    this.emit({
-      type: "thread-state",
-      threadId: session.threadId,
-      status: session.status,
-      attention: session.attention,
-      config: session.config,
-      ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
-      canResumeWithConfig: session.canResumeWithConfig,
-      ...(errorMessage ? { errorMessage } : {}),
-    });
-  }
-
   private handlePtyData(session: SessionRuntime, data: string): void {
-    session.outputLength += data.length;
-    // Accumulate scrollback for context extraction (cap at ~200K to bound memory)
-    session.outputHistory = ((session.outputHistory ?? "") + data).slice(-200_000);
-    if (this.isDev) {
-      try {
-        appendFileSync(this.resolveLogPath(session.threadId), data);
-      } catch {
-        // best-effort debug log
+    this.threadSessionManager.handlePtyDataForTests(session, data);
+  }
+
+  private spawnThread(input: unknown): unknown {
+    return (
+      this.threadSessionManager as unknown as { spawnThread: (value: unknown) => unknown }
+    ).spawnThread(input);
+  }
+
+  /**
+   * Test-only accessor for the private cache reader on the agent status
+   * service.  Runtime callers should use `getAgentStatuses()` instead, which
+   * returns the cached payload from the RPC promise.
+   */
+  private readCachedStatuses(wslDistros: readonly string[]): AgentStatusesResponse {
+    return (
+      this.agentStatusService as unknown as {
+        readCachedStatuses: (distros: readonly string[]) => AgentStatusesResponse;
       }
-    }
-    this.emit({
-      type: "thread-output",
-      threadId: session.threadId,
-      data,
-      outputLength: session.outputLength,
-    });
-
-    const { cleaned: dataAfterOsc, notifications } = extractOscNotifications(data);
-
-    for (const notification of notifications) {
-      this.emit({
-        type: "thread-osc-notification",
-        threadId: session.threadId,
-        title: notification.title,
-        body: notification.body,
-      });
-
-      const oscHint = session.adapter.handleOscNotification?.(notification);
-      if (oscHint) {
-        this.updateState(session, oscHint.status, oscHint.attention);
-      }
-    }
-
-    if (session.status === "launching") {
-      this.updateState(session, "idle", "none");
-    }
-
-    const strippedData = stripAnsiPreservingLayout(dataAfterOsc);
-    const usesTerminalPresentation = session.adapter.capabilities.presentationMode === "terminal";
-
-    if (
-      usesTerminalPresentation &&
-      session.adapter.detectAutoResponse &&
-      !session.autoResponseEmitted
-    ) {
-      const key = session.adapter.detectAutoResponse(strippedData);
-      if (key) {
-        session.autoResponseEmitted = true;
-        session.pty.write(key);
-      }
-    }
-
-    if (
-      usesTerminalPresentation &&
-      (session.adapter.isReadyForInitialPrompt || session.adapter.detectTerminalStatus)
-    ) {
-      const lastHome = Math.max(
-        dataAfterOsc.lastIndexOf("\x1b[H"),
-        dataAfterOsc.lastIndexOf("\x1b[1;1H"),
-      );
-      const combined =
-        lastHome >= 0 ? dataAfterOsc.slice(lastHome) : session.prevChunk + dataAfterOsc;
-      session.prevChunk = combined.length > 8192 ? combined.slice(-8192) : combined;
-      const stripped = stripAnsiPreservingLayout(combined);
-      if (
-        session.status === "launching" &&
-        session.sessionRef &&
-        session.adapter.detectInvalidSessionRef?.(stripped)
-      ) {
-        this.recoverInvalidSessionRef(session);
-        return;
-      }
-
-      let hint = session.adapter.detectTerminalStatus?.(stripped) ?? null;
-      const suppressWeakStructuredIdle =
-        session.agentKind === "codex" &&
-        session.structuredSession !== undefined &&
-        session.status === "working" &&
-        hint?.status === "idle" &&
-        !hint.corroborated;
-
-      if (suppressWeakStructuredIdle) {
-        if (session.pendingStatusHint?.status === "idle") {
-          clearTimeout(session.pendingStatusHint.timer);
-          session.pendingStatusHint = undefined;
-        }
-        hint = null;
-      }
-
-      if (hint) {
-        const nextConfig = session.adapter.syncConfigFromTerminalState?.({
-          config: session.config,
-          previousStatus: session.status,
-          previousAttention: session.attention,
-          hint,
-        });
-        const configChanged =
-          nextConfig !== undefined && JSON.stringify(nextConfig) !== JSON.stringify(session.config);
-
-        if (configChanged) {
-          session.config = nextConfig!;
-        }
-
-        const suppressHint = session.pendingTerminalPrompt && hint.status !== "idle";
-
-        if (
-          !suppressHint &&
-          (session.status !== hint.status || session.attention !== hint.attention)
-        ) {
-          const baseDelay = STATUS_STABILIZATION_DELAY[hint.status] ?? 0;
-          const extraDelay =
-            !hint.corroborated && baseDelay > 0
-              ? (UNCORROBORATED_EXTRA_DELAY[hint.status] ?? 0)
-              : 0;
-
-          // When the session just settled into "idle" and the detection says
-          // "working", this is almost always a TUI screen-redraw artifact:
-          // partial chunks briefly expose stale "esc to interrupt" text before
-          // the full idle screen is received.  Use a longer delay so the next
-          // idle detection has time to cancel the spurious working hint.
-          const ANTI_BOUNCE_WINDOW = 2000;
-          const ANTI_BOUNCE_DELAY = 800;
-          const recentlyBecameIdle =
-            session.status === "idle" &&
-            hint.status === "working" &&
-            session.lastStatusChangeAt !== undefined &&
-            Date.now() - session.lastStatusChangeAt < ANTI_BOUNCE_WINDOW;
-          const delay = recentlyBecameIdle
-            ? Math.max(baseDelay + extraDelay, ANTI_BOUNCE_DELAY)
-            : baseDelay + extraDelay;
-
-          if (delay === 0) {
-            if (session.pendingStatusHint) {
-              clearTimeout(session.pendingStatusHint.timer);
-              session.pendingStatusHint = undefined;
-            }
-            this.updateState(session, hint.status, hint.attention);
-          } else if (
-            session.pendingStatusHint &&
-            session.pendingStatusHint.status === hint.status &&
-            session.pendingStatusHint.attention === hint.attention
-          ) {
-            // Same status already pending — keep the existing timer.
-          } else if (
-            session.pendingStatusHint &&
-            session.pendingStatusHint.status !== session.status &&
-            hint.status === session.status
-          ) {
-            // The pending hint represents a real status transition (e.g. working→idle)
-            // while the new hint matches the current status (e.g. still "working" from
-            // a transient TUI redraw).  Replacing the pending timer would produce a
-            // no-op when it fires, silently discarding the transition.  Keep the
-            // existing timer so the status change is not lost.
-          } else {
-            if (session.pendingStatusHint) {
-              clearTimeout(session.pendingStatusHint.timer);
-            }
-            session.pendingStatusHint = {
-              status: hint.status,
-              attention: hint.attention,
-              timer: setTimeout(() => {
-                session.pendingStatusHint = undefined;
-                if (session.status !== hint.status || session.attention !== hint.attention) {
-                  this.updateState(session, hint.status, hint.attention);
-                }
-              }, delay),
-            };
-          }
-
-          if (
-            session.adapter.discoverSessionRef &&
-            !session.sessionRef &&
-            !session.sessionRefDiscoveryStarted &&
-            !session.pendingTerminalPrompt
-          ) {
-            session.sessionRefDiscoveryStarted = true;
-            this.pollSessionRefDiscovery(session);
-          }
-        } else {
-          // The hint matches the current session state (no transition needed).
-          // However, if there's a pending hint for a DIFFERENT status, the
-          // latest detection contradicts it — cancel the stale pending hint.
-          // This handles fast-responding agents: idle → detect "working" →
-          // timer set → agent finishes within the delay → detect "idle" →
-          // session is still "idle" so the outer condition is false, but
-          // the pending "working" timer must be cancelled or it will fire
-          // and set a stale "working" status after the agent is already idle.
-          if (session.pendingStatusHint && session.pendingStatusHint.status !== hint.status) {
-            clearTimeout(session.pendingStatusHint.timer);
-            session.pendingStatusHint = undefined;
-          }
-          if (configChanged) {
-            this.emitState(session);
-          }
-        }
-        this.writeHintLog(session, stripped, hint);
-      }
-
-      // ── Working-silence watchdog ─────────────────────────────────
-      // TUI spinners usually emit data every ~100 ms while the agent is working.
-      // Some TUIs can legitimately stay quiet mid-turn, so the silence fallback
-      // is adapter-configurable and can be disabled when it is unreliable.
-      // Reset the watchdog on every data chunk; fire → transition to idle.
-      if (session.workingSilenceTimer) {
-        clearTimeout(session.workingSilenceTimer);
-        session.workingSilenceTimer = undefined;
-      }
-      const workingSilenceTimeoutMs =
-        session.adapter.workingSilenceTimeoutMs === undefined
-          ? DEFAULT_WORKING_SILENCE_TIMEOUT
-          : session.adapter.workingSilenceTimeoutMs;
-      if (
-        session.status === "working" &&
-        workingSilenceTimeoutMs !== null &&
-        workingSilenceTimeoutMs > 0
-      ) {
-        session.workingSilenceTimer = setTimeout(() => {
-          session.workingSilenceTimer = undefined;
-          if (session.status === "working") {
-            const latestHint = this.getLatestTerminalStatusHint(session);
-            if (latestHint && latestHint.status !== "idle" && latestHint.corroborated !== false) {
-              return;
-            }
-            this.updateState(session, "idle", "none");
-          }
-        }, workingSilenceTimeoutMs);
-      }
-
-      if (session.pendingLaunchPrompt && session.adapter.isReadyForInitialPrompt?.(strippedData)) {
-        this.startQueuedLaunchPrompt(session);
-      }
-
-      if (
-        hint?.status === "idle" &&
-        session.pendingTerminalPreInputs?.length &&
-        !session.pendingTerminalWriteInFlight
-      ) {
-        const chunks = session.pendingTerminalPreInputs.shift()!;
-        if (!session.pendingTerminalPreInputs.length) {
-          session.pendingTerminalPreInputs = undefined;
-        }
-        session.pendingTerminalWriteInFlight = true;
-        void sleep(500)
-          .then(() => writeSubmittedPrompt(session.pty, chunks))
-          .then(() => {
-            session.pendingTerminalWriteInFlight = false;
-          });
-      } else if (
-        session.pendingTerminalPrompt &&
-        hint?.status === "idle" &&
-        !session.pendingTerminalWriteInFlight
-      ) {
-        const prompt = session.pendingTerminalPrompt;
-        const segments = session.pendingTerminalSegments;
-        session.pendingTerminalPrompt = undefined;
-        session.pendingTerminalSegments = undefined;
-        void sleep(500).then(() =>
-          writeSubmittedPrompt(
-            session.pty,
-            session.adapter.buildDirectInput?.(prompt, segments, session.config) ?? [prompt, "\r"],
-          ),
-        );
-      }
-    }
+    ).readCachedStatuses(wslDistros);
   }
 }

@@ -9,7 +9,6 @@ describe("appStore runtime config sync", () => {
       projects: [],
       threads: [],
       pendingServerRequests: [],
-      agentStatuses: [],
       view: { kind: "home" },
     }));
   });
@@ -473,7 +472,6 @@ describe("markThreadDone / unmarkThreadDone", () => {
       projects: [],
       threads: [],
       pendingServerRequests: [],
-      agentStatuses: [],
       view: { kind: "home" },
     }));
   });
@@ -551,7 +549,6 @@ describe("grid layout actions", () => {
       projects: [],
       threads: [],
       pendingServerRequests: [],
-      agentStatuses: [],
       view: { kind: "home" },
     }));
   });
@@ -813,7 +810,6 @@ describe("group view layout restore", () => {
       projects: [],
       threads: [],
       pendingServerRequests: [],
-      agentStatuses: [],
       groupLayouts: {},
       view: { kind: "home" },
     }));

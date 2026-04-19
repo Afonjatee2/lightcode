@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
+import { handleKeyActivate } from "@/renderer/utils/a11y";
 
 export function SidebarButton(props: {
   ref?: React.Ref<HTMLDivElement>;
@@ -77,10 +78,8 @@ export function SidebarButton(props: {
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
       onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !isDisabled) {
-          e.preventDefault();
-          onPress?.();
-        }
+        if (isDisabled) return;
+        handleKeyActivate(e, () => onPress?.());
       }}
     >
       {icon}

@@ -1,0 +1,43 @@
+import { z } from "zod";
+import { agentKindSchema, threadModeSchema } from "./common";
+
+const threadConfigShape = {
+  model: z.string().min(1),
+  effort: z.string().optional(),
+  mode: threadModeSchema.optional(),
+  approvalPolicy: z.string().optional(),
+  sandboxMode: z.string().optional(),
+} as const;
+
+export const threadConfigBaseSchema = z.object(threadConfigShape);
+
+export const threadConfigSchema = threadConfigBaseSchema;
+export type ThreadConfig = z.infer<typeof threadConfigSchema>;
+
+export const providerDraftConfigSchema = threadConfigBaseSchema;
+export type ProviderDraftConfig = z.infer<typeof providerDraftConfigSchema>;
+
+export const projectDraftConfigSchema = threadConfigBaseSchema.extend({
+  agentKind: agentKindSchema,
+  worktreeMode: z.boolean().optional(),
+});
+export type ProjectDraftConfig = z.infer<typeof projectDraftConfigSchema>;
+
+export function isThreadConfigEqual(
+  left: ThreadConfig | undefined,
+  right: ThreadConfig | undefined,
+): boolean {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.model === right.model &&
+    left.effort === right.effort &&
+    left.mode === right.mode &&
+    left.approvalPolicy === right.approvalPolicy &&
+    left.sandboxMode === right.sandboxMode
+  );
+}

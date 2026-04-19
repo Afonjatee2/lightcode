@@ -6,6 +6,9 @@ import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 
 const taskkillSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
 const ptySpawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
+const appendFileMock = vi.hoisted(() =>
+  vi.fn<(path: string, data: string, encoding: string) => Promise<void>>(),
+);
 
 vi.mock("node:child_process", async (importActual) => {
   const actual = await importActual<typeof import("node:child_process")>();
@@ -17,6 +20,22 @@ vi.mock("node:child_process", async (importActual) => {
       }
       return actual.spawnSync(command, args, options);
     }) as typeof actual.spawnSync,
+  };
+});
+
+vi.mock("node:fs/promises", async (importActual) => {
+  const actual = await importActual<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    appendFile: appendFileMock,
+  };
+});
+
+vi.mock("node:fs/promises", async (importActual) => {
+  const actual = await importActual<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    appendFile: appendFileMock,
   };
 });
 
@@ -124,6 +143,7 @@ describe("writeSubmittedPrompt", () => {
     vi.useRealTimers();
     taskkillSpawnSyncMock.mockReset();
     ptySpawnMock.mockReset();
+    appendFileMock.mockReset();
   });
 
   it("writes direct-input chunks sequentially with delays between them", async () => {
@@ -301,6 +321,63 @@ describe("writeSubmittedPrompt", () => {
 
     expect(session.pty.write).toHaveBeenCalledWith("hello\r");
     expect(emitted).toHaveLength(0);
+  });
+
+  it("keeps terminal scrollback in a capped transcript buffer", () => {
+    const runtime = new SupervisorRuntime(() => undefined);
+    const session = createRuntimeSession({ prevChunk: "" });
+
+    (runtime as unknown as { sessions: Map<string, typeof session> }).sessions.set(
+      session.threadId,
+      session,
+    );
+
+    (
+      runtime as unknown as {
+        handlePtyData: (runtimeSession: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(session, "a".repeat(120_000));
+    (
+      runtime as unknown as {
+        handlePtyData: (runtimeSession: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(session, "b".repeat(120_000));
+
+    const scrollback = runtime.readTerminalScrollback(session.threadId);
+    expect(scrollback).toHaveLength(100_000);
+    expect(scrollback.startsWith("b")).toBe(true);
+  });
+
+  it("buffers dev PTY log writes instead of writing each chunk synchronously", async () => {
+    vi.useFakeTimers();
+    process.env.VITE_DEV_SERVER_URL = "http://localhost:5173";
+    const tempDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = tempDir;
+    const runtime = new SupervisorRuntime(() => undefined);
+    const session = createRuntimeSession({ prevChunk: "" });
+
+    (runtime as unknown as { sessions: Map<string, typeof session> }).sessions.set(
+      session.threadId,
+      session,
+    );
+
+    (
+      runtime as unknown as {
+        handlePtyData: (runtimeSession: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(session, "first");
+    (
+      runtime as unknown as {
+        handlePtyData: (runtimeSession: Record<string, unknown>, data: string) => void;
+      }
+    ).handlePtyData(session, "second");
+
+    expect(appendFileMock).not.toHaveBeenCalled();
+    await vi.runAllTimersAsync();
+    expect(appendFileMock).toHaveBeenCalledTimes(1);
+    expect(appendFileMock.mock.calls[0]?.[1]).toBe("firstsecond");
+    delete process.env.VITE_DEV_SERVER_URL;
+    vi.useRealTimers();
   });
 
   it("keeps a working thread active when the last corroborated terminal hint is still working", async () => {
@@ -602,8 +679,8 @@ describe("writeSubmittedPrompt", () => {
         createInitialSessionRef: vi
           .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
           .mockReturnValue(undefined),
-        buildLaunchCommand: vi.fn<() => void>(),
-        buildResumeCommand: vi.fn<() => void>(),
+        buildLaunchArgv: vi.fn<() => void>(),
+        buildResumeArgv: vi.fn<() => void>(),
         isReadyForInitialPrompt: (text: string) =>
           text.includes("OpenAI Codex") &&
           text.includes("directory:") &&
@@ -675,11 +752,11 @@ describe("writeSubmittedPrompt", () => {
         presentationMode: "terminal" as const,
       },
       detectInstall: vi.fn<() => void>(),
-      buildLaunchCommand: vi.fn<() => { command: string; args: string[] }>(() => ({
-        command: "codex",
+      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "codex",
         args: ["resume", "session-1"],
       })),
-      buildResumeCommand: vi.fn<() => void>(),
+      buildResumeArgv: vi.fn<() => void>(),
       createInitialSessionRef: vi
         .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
         .mockReturnValue(undefined),
@@ -722,14 +799,20 @@ describe("writeSubmittedPrompt", () => {
     expect(openThread).toHaveBeenCalledTimes(1);
     expect(ensureResumeArtifacts).toHaveBeenCalledTimes(1);
     expect(startTurn).not.toHaveBeenCalled();
-    expect(ptySpawnMock).toHaveBeenCalledWith(
-      "codex",
-      ["resume", "session-1"],
-      expect.objectContaining({
-        cols: 132,
-        rows: 42,
-      }),
-    );
+    expect(ptySpawnMock).toHaveBeenCalledTimes(1);
+    const [, spawnArgs, spawnOpts] = ptySpawnMock.mock.calls[0] as [
+      string,
+      string[],
+      { cols: number; rows: number },
+    ];
+    // argv is wrapped by resolveLaunchSpec (PowerShell on Windows);
+    // the binary name and resume arg appear inside the encoded script.
+    const encoded = spawnArgs.includes("-EncodedCommand")
+      ? Buffer.from(spawnArgs.at(-1)!, "base64").toString("utf16le")
+      : spawnArgs.join(" ");
+    expect(encoded).toContain("codex");
+    expect(encoded).toContain("session-1");
+    expect(spawnOpts).toMatchObject({ cols: 132, rows: 42 });
   });
 
   it("skips TUI parsing hooks for server-backed GUI presentation", () => {
@@ -775,8 +858,8 @@ describe("writeSubmittedPrompt", () => {
         createInitialSessionRef: vi
           .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
           .mockReturnValue(undefined),
-        buildLaunchCommand: vi.fn<() => void>(),
-        buildResumeCommand: vi.fn<() => void>(),
+        buildLaunchArgv: vi.fn<() => void>(),
+        buildResumeArgv: vi.fn<() => void>(),
         detectAutoResponse,
         isReadyForInitialPrompt,
         detectTerminalStatus,
@@ -862,57 +945,63 @@ describe("detectWslAgentStatuses", () => {
       emitted.push(event);
     });
 
-    (
+    const cached = (
       runtime as unknown as {
-        emitCachedStatuses: (wslDistros: readonly string[]) => void;
+        readCachedStatuses: (wslDistros: readonly string[]) => {
+          windows: unknown[];
+          wsl: unknown[];
+          fromCache: boolean;
+        };
       }
-    ).emitCachedStatuses([]);
+    ).readCachedStatuses([]);
 
     // Old-format entry is migrated (type: "toggle", envVar → env record).
     // Already-valid entry passes through unchanged.
-    expect(emitted).toEqual([
-      {
-        type: "windows-agent-statuses",
-        statuses: [
-          {
-            kind: "claude",
-            label: "Claude Code",
-            installed: true,
-            authState: "unknown",
-            capabilities: {
-              models: [{ id: "sonnet", label: "Sonnet" }],
-              efforts: [],
-              modelEfforts: {},
-              modes: [],
-              approvalPolicies: [],
-              sandboxModes: [],
-              supportsResume: true,
-              supportsDirectInput: true,
-              liveInputMode: "terminal",
-              presentationMode: "terminal",
-              settingDefs: [
-                {
-                  key: "legacy-toggle",
-                  type: "toggle",
-                  env: { CLAUDE_LEGACY_TOGGLE: "1" },
-                  label: "Legacy toggle",
-                  description: "Old format: no type, envVar string",
-                  default: true,
-                },
-                {
-                  key: "verbose-logging",
-                  type: "toggle",
-                  env: { CLAUDE_VERBOSE_LOGGING: "1" },
-                  label: "Verbose logging",
-                  description: "Already current format",
-                  default: false,
-                },
-              ],
-            },
+    // Cache is returned from the RPC instead of emitted as an event, so the
+    // renderer can hydrate synchronously on resolve.
+    expect(emitted).toEqual([]);
+    expect(cached).toEqual({
+      fromCache: true,
+      windows: [
+        {
+          kind: "claude",
+          label: "Claude Code",
+          installed: true,
+          authState: "unknown",
+          capabilities: {
+            models: [{ id: "sonnet", label: "Sonnet" }],
+            efforts: [],
+            modelEfforts: {},
+            modes: [],
+            approvalPolicies: [],
+            sandboxModes: [],
+            supportsResume: true,
+            supportsDirectInput: true,
+            liveInputMode: "terminal",
+            presentationMode: "terminal",
+            settingDefs: [
+              {
+                key: "legacy-toggle",
+                type: "toggle",
+                env: { CLAUDE_LEGACY_TOGGLE: "1" },
+                label: "Legacy toggle",
+                description: "Old format: no type, envVar string",
+                default: true,
+              },
+              {
+                key: "verbose-logging",
+                type: "toggle",
+                env: { CLAUDE_VERBOSE_LOGGING: "1" },
+                label: "Verbose logging",
+                description: "Already current format",
+                default: false,
+              },
+            ],
           },
-        ],
-      },
-    ]);
+        },
+      ],
+      wsl: [],
+    });
   });
 
   it("detects statuses for every adapter in every distro", async () => {
@@ -975,12 +1064,12 @@ describe("detectWslAgentStatuses", () => {
             settingDefs: [],
           },
           detectInstall,
-          buildLaunchCommand: vi
-            .fn<() => { command: string; args: string[] }>()
-            .mockReturnValue({ command: "codex", args: [] }),
-          buildResumeCommand: vi
-            .fn<() => { command: string; args: string[] }>()
-            .mockReturnValue({ command: "codex", args: [] }),
+          buildLaunchArgv: vi
+            .fn<() => { binary: string; args: string[] }>()
+            .mockReturnValue({ binary: "codex", args: [] }),
+          buildResumeArgv: vi
+            .fn<() => { binary: string; args: string[] }>()
+            .mockReturnValue({ binary: "codex", args: [] }),
           createInitialSessionRef: vi
             .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
             .mockReturnValue(undefined),

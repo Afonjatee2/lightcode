@@ -1,0 +1,118 @@
+import { PanelRightClose, Plus, Trash2 } from "lucide-react";
+import { Tabs, Tooltip } from "@heroui/react";
+import type { Project } from "@/shared/contracts";
+import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
+import { TerminalSurfaces } from "./TerminalSurfaces";
+
+export function RightTerminalLayout(props: {
+  tabs: DevTerminalTab[];
+  projectTabs: DevTerminalTab[];
+  activeProject: Project | undefined;
+  selectedTabId: string;
+  activeTab: DevTerminalTab | undefined;
+  markTabActive: (tabId: string) => void;
+  updateTabTitle: (tabId: string, title: string) => void;
+  fadeStyle: { opacity: number; transition: string };
+  emptyState: React.ReactNode;
+  hideHeader: boolean | undefined;
+  handleCloseTab: (tab: DevTerminalTab) => void;
+  handleSelectionChange: (key: string | number) => void;
+}) {
+  const {
+    tabs,
+    projectTabs,
+    activeProject,
+    selectedTabId,
+    activeTab,
+    markTabActive,
+    updateTabTitle,
+    fadeStyle,
+    emptyState,
+    hideHeader,
+    handleCloseTab,
+    handleSelectionChange,
+  } = props;
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]" style={fadeStyle}>
+      {!hideHeader && activeProject && (
+        <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+          <div className="min-w-0">
+            <Tooltip delay={300}>
+              <Tooltip.Trigger>
+                <div className="max-w-[100px] truncate text-xs font-medium text-foreground">
+                  {activeProject.name}
+                </div>
+              </Tooltip.Trigger>
+              <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
+            </Tooltip>
+          </div>
+          <div className="flex-1" />
+          <button
+            type="button"
+            className="rounded p-0.5 text-muted hover:text-foreground"
+            title="Hide terminal"
+            onClick={() => useDevTerminalStore.getState().closePanel()}
+          >
+            <PanelRightClose className="size-3" />
+          </button>
+        </div>
+      )}
+      <div className="flex shrink-0 items-center gap-0 px-3">
+        <Tabs
+          className="min-w-0 flex-1 overflow-x-auto rounded-lg"
+          variant="secondary"
+          selectedKey={selectedTabId}
+          onSelectionChange={handleSelectionChange}
+        >
+          <Tabs.ListContainer className="w-fit p-0.5">
+            <Tabs.List aria-label="Terminal tabs" className="*:h-6">
+              {projectTabs.map((tab) => (
+                <Tabs.Tab
+                  key={tab.id}
+                  id={tab.id}
+                  className="group w-[120px] gap-0 pl-3 pr-1 text-xs"
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-1">
+                    <span className="truncate" title={tab.title}>
+                      {tab.title}
+                    </span>
+                  </span>
+                  <button
+                    className="ml-auto flex size-4 shrink-0 items-center justify-center rounded opacity-0 transition hover:text-danger group-hover:opacity-100"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      handleCloseTab(tab);
+                    }}
+                    tabIndex={-1}
+                    type="button"
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+              ))}
+              <Tabs.Tab id="__add__" className="min-w-8 max-w-8 px-0">
+                <Plus className="size-3.5 text-muted" />
+                <Tabs.Indicator className="invisible" />
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+        </Tabs>
+      </div>
+
+      <div className="relative min-h-0 flex-1 px-6 pt-2 pb-2">
+        <TerminalSurfaces
+          tabs={tabs}
+          selectedTabId={selectedTabId}
+          activeTab={activeTab}
+          markTabActive={markTabActive}
+          updateTabTitle={updateTabTitle}
+        />
+        {emptyState}
+      </div>
+    </div>
+  );
+}

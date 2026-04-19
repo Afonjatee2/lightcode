@@ -1,0 +1,353 @@
+import { useState } from "react";
+import { Modal, ToggleButton, Tooltip } from "@heroui/react";
+import type {
+  AgentStatus,
+  ExtractContextResult,
+  ProjectDraftConfig,
+  ProjectLocation,
+  Thread,
+  ThreadConfig,
+} from "@/shared/contracts";
+import { Button, OptionMenu, PixelLoader } from "@/renderer/components/common";
+import { ProviderIcon, getComposerControls } from "@/renderer/components/providers";
+import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
+import { PermissionIcon } from "@/renderer/components/providers/PermissionIcon";
+import { readBridge } from "@/renderer/bridge";
+import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
+import { filterHiddenModels } from "@/renderer/components/thread/threadComposerOptions";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+
+type Phase = "select" | "extracting" | "error";
+
+function renderComposerControl(control: ComposerControl, index: number) {
+  if (control.kind === "static") return null;
+
+  if (control.kind === "toggle") {
+    const icon =
+      control.iconKind === "permission" ? (
+        <PermissionIcon
+          className="size-4 text-foreground"
+          index={control.isSelected ? 1 : 0}
+          count={2}
+        />
+      ) : (
+        control.icon
+      );
+    return (
+      <Tooltip key={`toggle-${index}`}>
+        <ToggleButton
+          className="lightcode-composer-toggle min-w-0 px-2.5"
+          isDisabled={control.isDisabled ?? false}
+          isSelected={control.isSelected}
+          size="sm"
+          variant="ghost"
+          onChange={control.onChange ?? (() => undefined)}
+        >
+          {icon}
+          <span>{control.label}</span>
+        </ToggleButton>
+        <Tooltip.Content placement="top">{control.label}</Tooltip.Content>
+      </Tooltip>
+    );
+  }
+
+  // Menu control
+  const effortIds =
+    control.iconKind === "effort"
+      ? control.options.map((o) => (typeof o === "string" ? o : o.id))
+      : undefined;
+  const permissionIds =
+    control.iconKind === "permission"
+      ? control.options.map((o) => (typeof o === "string" ? o : o.id))
+      : undefined;
+  const icon = effortIds ? (
+    <EffortIcon className="size-4 text-foreground" effort={control.value} efforts={effortIds} />
+  ) : permissionIds ? (
+    <PermissionIcon
+      className="size-4 text-foreground"
+      index={permissionIds.indexOf(control.value)}
+      count={permissionIds.length}
+    />
+  ) : (
+    control.icon
+  );
+
+  return (
+    <OptionMenu
+      key={`menu-${index}`}
+      buttonVariant="ghost"
+      className="lightcode-composer-menu min-w-0 px-2.5"
+      options={control.options}
+      value={control.value}
+      onChange={control.onChange ?? (() => undefined)}
+      icon={icon}
+    />
+  );
+}
+
+function resolveDefaultConfig(agent: AgentStatus, savedConfig?: ProjectDraftConfig): ThreadConfig {
+  const models = agent.capabilities.models;
+  const savedModel =
+    savedConfig?.agentKind === agent.kind && savedConfig.model ? savedConfig.model : undefined;
+  const model =
+    savedModel && models.some((m) => m.id === savedModel) ? savedModel : (models[0]?.id ?? "");
+
+  const efforts = agent.capabilities.modelEfforts?.[model] ?? agent.capabilities.efforts ?? [];
+  const savedEffort = savedConfig?.agentKind === agent.kind ? savedConfig.effort : undefined;
+  const effort =
+    savedEffort && efforts.includes(savedEffort)
+      ? savedEffort
+      : agent.capabilities.defaultEffort && efforts.includes(agent.capabilities.defaultEffort)
+        ? agent.capabilities.defaultEffort
+        : efforts[0];
+
+  const policies = agent.capabilities.approvalPolicies;
+  const savedApproval =
+    savedConfig?.agentKind === agent.kind ? savedConfig.approvalPolicy : undefined;
+  const approvalPolicy =
+    savedApproval && policies.some((p) => p.id === savedApproval) ? savedApproval : policies[0]?.id;
+
+  return {
+    model,
+    ...(effort ? { effort } : {}),
+    ...(approvalPolicy ? { approvalPolicy } : {}),
+  };
+}
+
+export function ContinueInProviderDialog(props: {
+  isOpen: boolean;
+  thread: Thread;
+  projectLocation: ProjectLocation;
+  installedAgents: AgentStatus[];
+  lastDraftConfig?: ProjectDraftConfig;
+  onClose: () => void;
+  onContinue: (
+    targetAgentKind: string,
+    targetConfig: ThreadConfig,
+    closeOriginal: boolean,
+    extractedContext: ExtractContextResult | null,
+  ) => void;
+}) {
+  const { thread, installedAgents, onClose, onContinue } = props;
+
+  const otherAgents = installedAgents.filter((a) => a.kind !== thread.agentKind);
+  const [selectedKind, setSelectedKind] = useState<string>(otherAgents[0]?.kind ?? "");
+  const [phase, setPhase] = useState<Phase>("select");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [pendingCloseOriginal, setPendingCloseOriginal] = useState(false);
+
+  const sourceAgent = installedAgents.find((a) => a.kind === thread.agentKind);
+  const selectedAgent = otherAgents.find((a) => a.kind === selectedKind);
+
+  // --- Target provider config ---
+  const [targetConfig, setTargetConfig] = useState<ThreadConfig>(() =>
+    selectedAgent ? resolveDefaultConfig(selectedAgent, props.lastDraftConfig) : { model: "" },
+  );
+
+  function handleProviderChange(kind: string) {
+    setSelectedKind(kind);
+    const agent = otherAgents.find((a) => a.kind === kind);
+    if (agent) {
+      setTargetConfig(resolveDefaultConfig(agent, props.lastDraftConfig));
+    }
+  }
+
+  const hiddenTargetModelIds = useSharedSettings((s) => s.hiddenModels[selectedKind]);
+  const targetControls = (
+    selectedAgent
+      ? (getComposerControls(selectedKind)?.({
+          capabilities: filterHiddenModels(selectedAgent.capabilities, hiddenTargetModelIds),
+          config: targetConfig,
+          isDisabled: false,
+          onConfigChange: (patch) => setTargetConfig((prev) => ({ ...prev, ...patch })),
+        }) ?? [])
+      : []
+  ).filter((c) => !(c.kind === "toggle" && c.label === "Plan"));
+
+  // --- Extraction config (source provider) ---
+  const models = sourceAgent?.capabilities.models ?? [];
+  const [extractModel, setExtractModel] = useState(thread.config.model || models[0]?.id || "");
+  const [extractEffort, setExtractEffort] = useState("low");
+
+  const hiddenModelIds = useSharedSettings((s) => s.hiddenModels[thread.agentKind]);
+  const extractionControls =
+    sourceAgent && thread.sessionRef
+      ? (getComposerControls(thread.agentKind)?.({
+          capabilities: filterHiddenModels(sourceAgent.capabilities, hiddenModelIds),
+          config: { model: extractModel, effort: extractEffort },
+          isDisabled: false,
+          onConfigChange: (patch) => {
+            if (patch.model !== undefined) setExtractModel(patch.model);
+            if (patch.effort !== undefined) setExtractEffort(patch.effort);
+          },
+        }) ?? [])
+      : [];
+
+  // Only model and effort for extraction
+  const modelEffortControls = extractionControls.filter((c) => {
+    if (c.kind === "toggle" || c.kind === "static") return false;
+    return c.iconKind === "effort" || (!c.iconKind && c.options.length > 0);
+  });
+
+  async function handleAction(closeOriginal: boolean) {
+    setPendingCloseOriginal(closeOriginal);
+
+    if (!thread.sessionRef) {
+      onContinue(selectedKind, targetConfig, closeOriginal, null);
+      return;
+    }
+
+    setPhase("extracting");
+    try {
+      const result = await readBridge().extractContext({
+        threadId: thread.id,
+        agentKind: thread.agentKind,
+        sessionRef: thread.sessionRef,
+        projectLocation: props.projectLocation,
+        ...(thread.worktreePath ? { worktreePath: thread.worktreePath } : {}),
+        ...(extractModel ? { model: extractModel } : {}),
+        ...(extractEffort ? { effort: extractEffort } : {}),
+      });
+      onContinue(selectedKind, targetConfig, closeOriginal, result);
+    } catch (err) {
+      setPhase("error");
+      setErrorMessage(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function handleCancel() {
+    if (phase === "extracting") {
+      readBridge()
+        .cancelExtractContext({ threadId: thread.id })
+        .catch(() => {});
+    }
+    setPhase("select");
+    setErrorMessage("");
+    onClose();
+  }
+
+  function handleStartWithoutContext() {
+    onContinue(selectedKind, targetConfig, pendingCloseOriginal, null);
+  }
+
+  return (
+    <Modal.Backdrop isOpen={props.isOpen} onOpenChange={(open) => !open && handleCancel()}>
+      <Modal.Container>
+        <Modal.Dialog className="sm:max-w-[540px]">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Heading>Continue in another provider</Modal.Heading>
+          </Modal.Header>
+
+          <Modal.Body className="px-5 pb-5 pt-2">
+            {phase === "select" && (
+              <div className="flex flex-col gap-4">
+                {/* Target provider + config */}
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-medium text-muted">Target provider</span>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <OptionMenu
+                      buttonVariant="ghost"
+                      className="lightcode-composer-menu min-w-0 px-2.5"
+                      iconOnly
+                      value={selectedKind}
+                      options={otherAgents.map((a) => ({
+                        id: a.kind,
+                        label: a.label,
+                        icon: (
+                          <ProviderIcon kind={a.kind} tone="active" className="size-3.5 shrink-0" />
+                        ),
+                      }))}
+                      onChange={handleProviderChange}
+                      icon={
+                        selectedAgent ? (
+                          <ProviderIcon
+                            kind={selectedAgent.kind}
+                            tone="active"
+                            className="size-3.5 shrink-0"
+                          />
+                        ) : undefined
+                      }
+                    />
+                    {targetControls.map((control, index) => renderComposerControl(control, index))}
+                  </div>
+                </div>
+
+                {/* Context extraction model/effort */}
+                {modelEffortControls.length > 0 && (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs font-medium text-muted">
+                      Context extraction ({sourceAgent?.label ?? thread.agentKind})
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1">
+                      {modelEffortControls.map((control, index) =>
+                        renderComposerControl(control, index),
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {phase === "extracting" && (
+              <div className="flex items-center gap-3 py-2">
+                <PixelLoader size="sm" />
+                <p className="text-sm text-muted">
+                  Extracting context from {sourceAgent?.label ?? thread.agentKind}...
+                </p>
+              </div>
+            )}
+
+            {phase === "error" && (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm">Could not extract context.</p>
+                {errorMessage && (
+                  <p className="max-h-20 overflow-y-auto text-xs text-muted">{errorMessage}</p>
+                )}
+              </div>
+            )}
+          </Modal.Body>
+
+          <Modal.Footer>
+            {phase === "select" && (
+              <>
+                <Button slot="close" variant="tertiary">
+                  Cancel
+                </Button>
+                <Button
+                  variant="secondary"
+                  isDisabled={!selectedKind}
+                  onPress={() => handleAction(false)}
+                >
+                  Clone
+                </Button>
+                <Button
+                  variant="primary"
+                  isDisabled={!selectedKind}
+                  onPress={() => handleAction(true)}
+                >
+                  Move
+                </Button>
+              </>
+            )}
+            {phase === "extracting" && (
+              <Button variant="tertiary" onPress={handleCancel}>
+                Cancel
+              </Button>
+            )}
+            {phase === "error" && (
+              <>
+                <Button variant="tertiary" onPress={handleCancel}>
+                  Cancel
+                </Button>
+                <Button variant="secondary" onPress={handleStartWithoutContext}>
+                  Start Without Context
+                </Button>
+              </>
+            )}
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+  );
+}

@@ -3,12 +3,15 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "./state/appStore";
 import { useGitStore } from "./state/gitStore";
+import { useSidebarActions } from "@/renderer/views/MainView/parts/Sidebar/parts/SidebarActionsContext";
 
 const { bridge } = vi.hoisted(() => ({
   bridge: {
     pickFolder: vi.fn<() => Promise<null>>().mockResolvedValue(null),
     listWslDistros: vi.fn<() => Promise<string[]>>().mockResolvedValue([]),
-    getAgentStatuses: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+    getAgentStatuses: vi
+      .fn<() => Promise<{ windows: unknown[]; wsl: unknown[]; fromCache: boolean }>>()
+      .mockResolvedValue({ windows: [], wsl: [], fromCache: false }),
     getThreadSnapshots: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
     getGitStatus: vi
       .fn<
@@ -94,7 +97,7 @@ vi.mock("./components/ui/provider", () => ({
   AppProvider: (props: { children: ReactNode }) => props.children,
 }));
 
-vi.mock("./components/layout/AppShell", () => ({
+vi.mock("./views/MainView/parts/AppShell/AppShell", () => ({
   AppShell: (props: { sidebar: ReactNode; content: ReactNode }) => (
     <div>
       <div>{props.sidebar}</div>
@@ -129,7 +132,7 @@ vi.mock("./components/layout/SplitPaneContainer", () => ({
   },
 }));
 
-vi.mock("./components/sidebar/Sidebar", () => ({
+vi.mock("./views/MainView/parts/Sidebar/Sidebar", () => ({
   sortModeOrder: ["updated", "created", "manual"],
   sortModeIcon: {
     updated: (props: { className?: string }) => <span {...props}>u</span>,
@@ -141,35 +144,34 @@ vi.mock("./components/sidebar/Sidebar", () => ({
     created: "Created",
     manual: "Manual",
   },
-  Sidebar: (props: {
-    onOpenThread?: (threadId: string) => void;
-    onUnloadThread?: (threadId: string) => void;
-    onGitMergeAndRemove?: (projectId: string, worktreePath: string) => void;
-  }) => (
-    <div>
-      sidebar
-      <button onClick={() => props.onOpenThread?.("thread-1")} type="button">
-        open-thread-1
-      </button>
-      <button onClick={() => props.onUnloadThread?.("thread-1")} type="button">
-        unload-thread-1
-      </button>
-      <button
-        onClick={() =>
-          props.onGitMergeAndRemove?.(
-            "project-1",
-            "C:\\Users\\demo\\.lightcode\\worktrees\\repo-12345678\\feature-x",
-          )
-        }
-        type="button"
-      >
-        merge-remove-worktree
-      </button>
-    </div>
-  ),
+  Sidebar: () => {
+    const actions = useSidebarActions();
+    return (
+      <div>
+        sidebar
+        <button onClick={() => actions.onOpenThread("thread-1")} type="button">
+          open-thread-1
+        </button>
+        <button onClick={() => actions.onUnloadThread("thread-1")} type="button">
+          unload-thread-1
+        </button>
+        <button
+          onClick={() =>
+            actions.onGitMergeAndRemove(
+              "project-1",
+              "C:\\Users\\demo\\.lightcode\\worktrees\\repo-12345678\\feature-x",
+            )
+          }
+          type="button"
+        >
+          merge-remove-worktree
+        </button>
+      </div>
+    );
+  },
 }));
 
-vi.mock("./components/thread/ThreadDraftView", () => ({
+vi.mock("@/renderer/components/thread/ThreadDraftView", () => ({
   ThreadDraftView: (props: {
     onStart: (input: {
       agentKind: "codex";
@@ -217,7 +219,7 @@ vi.mock("./components/thread/ThreadDraftView", () => ({
   ),
 }));
 
-vi.mock("./components/thread/ThreadView", () => ({
+vi.mock("@/renderer/components/thread/ThreadView", () => ({
   ThreadView: (props: {
     thread: { id: string; title: string; status: string };
     pendingLaunchPrompt?: string;
@@ -268,8 +270,6 @@ describe("App", () => {
       pendingServerRequests: [],
       pendingThreadLaunches: {},
       pendingLaunchSegments: {},
-      agentStatuses: [],
-      wslAgentStatuses: [],
       view: { kind: "home" },
     }));
     useGitStore.setState({

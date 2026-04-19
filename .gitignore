@@ -14,4 +14,5 @@ build/icons/
 .spec-workflow/
 **/worktrees/
 .cursor/
+.recovery/
 resources/wsl-watcher/watcher.node

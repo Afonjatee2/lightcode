@@ -8,8 +8,9 @@ Every supported agent implements the `AgentAdapter` interface (`src/supervisor/a
 
 - `kind` / `label` — Provider identifier and display name.
 - `capabilities` — Declares models, efforts, modes, approval policies, sandbox modes, resume/direct-input support, live input mode (terminal | server), presentation mode (terminal | gui).
-- `detectInstall(ctx?)` — Check CLI installation and auth state per environment (Windows or WSL distro).
-- `buildLaunchCommand()` / `buildResumeCommand()` — Shell command specs for spawning the agent.
+- `spawnEnv?` — Optional `{ native?, wsl? }` env records the runtime merges into the PTY spawn (e.g. `BROWSER=/bin/true` under WSL for OAuth-flow providers). Runtime owns no provider-specific env.
+- `detectInstall(ctx?)` — Typically one line: `return detectAgentInstall(ctx, spec)`. Declare a `DetectionSpec` (binary, capabilities, versionArgs?, authProbes?, capabilitiesProbe?) and let the engine own the WSL vs native probe + binary resolution + version + auth/capability merge.
+- `buildLaunchArgv()` / `buildResumeArgv()` — Return an `AgentArgvSpec` (`{ binary, args, env?, sessionRef? }`). The runtime wraps it through `resolveLaunchSpec` which owns WSL login-shell, Windows PowerShell encoding, and env injection. **Adapters must never call `buildAgentCommand` on the main launch path** — the contract is structurally argv-only.
 - `createInitialSessionRef()` — Generate a session ID on first launch (or `undefined` if the CLI generates its own).
 
 ### Optional — Terminal Heuristics
@@ -36,11 +37,25 @@ Every supported agent implements the `AgentAdapter` interface (`src/supervisor/a
 
 ## Current Providers
 
-| Provider | Adapter File                                      | Models                                                              | Efforts                  | Live Input | Structured Session |
-| -------- | ------------------------------------------------- | ------------------------------------------------------------------- | ------------------------ | ---------- | ------------------ |
-| Claude   | `agents/claude.ts`                                | opus-4-6[1m], sonnet, haiku                                         | low, medium, high, max   | terminal   | No                 |
-| Codex    | `agents/codex.ts`                                 | gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2-codex, etc.           | low, medium, high, xhigh | server     | Yes (WebSocket)    |
-| Gemini   | `agents/gemini/adapter.ts` + `gemini/terminal.ts` | auto, gemini-3.1-pro-preview, gemini-2.5-pro/flash/flash-lite, etc. | (none)                   | terminal   | No                 |
+Every provider is a folder under `src/supervisor/agents/<kind>/` with the same internal layout:
+
+- `index.ts` — composes the adapter; holds closure state (capabilities, pre-spawn snapshots).
+- `argv.ts` — `buildXxxArgs` and any argv helpers.
+- `detection.ts` — `DetectionSpec`, default capabilities, auth/capability probes.
+- `terminal.ts` — hint table + `detectXxxTerminalStatus` + related parsers.
+- `session.ts` — (optional) session ID discovery, rollout scanning, watch-path resolution.
+- `acp.ts` — (optional) structured-session / ACP wiring.
+- `*.test.ts` — colocated.
+
+Opening two provider folders side-by-side answers "what does this provider do differently" by file-name alignment alone.
+
+| Provider | Models                                                              | Efforts                  | Live Input | Structured Session |
+| -------- | ------------------------------------------------------------------- | ------------------------ | ---------- | ------------------ |
+| Claude   | opus-4-6[1m], sonnet, haiku                                         | low, medium, high, max   | terminal   | No                 |
+| Codex    | gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2-codex, etc.           | low, medium, high, xhigh | server     | Yes (WebSocket)    |
+| Gemini   | auto, gemini-3.1-pro-preview, gemini-2.5-pro/flash/flash-lite, etc. | (none)                   | terminal   | No                 |
+| Copilot  | (probed via ACP)                                                    | low, medium, high, xhigh | terminal   | Yes (ACP)          |
+| Cursor   | auto, composer-\*, GPT/Opus/Sonnet variants                         | (embedded in model name) | terminal   | No                 |
 
 ## Plugin Architecture
 

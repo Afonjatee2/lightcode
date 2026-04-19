@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Button, Popover } from "@heroui/react";
 import { EllipsisVertical } from "lucide-react";
 import { isMac } from "@/renderer/bridge";
-import { AppShell } from "./AppShell";
+import { AppShell } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 
 /**
  * Shared page layout: split header (sidebar + content) + AppShell body.
@@ -16,9 +16,7 @@ export function PageLayout(props: {
   sidebar: ReactNode;
   content: ReactNode;
   rightPanel?: ReactNode;
-  rightPanelOpen?: boolean;
   gitPanel?: ReactNode;
-  gitPanelOpen?: boolean;
   onRequestClosePanels?: () => void;
 }) {
   const {
@@ -29,9 +27,7 @@ export function PageLayout(props: {
     sidebar,
     content,
     rightPanel,
-    rightPanelOpen,
     gitPanel,
-    gitPanelOpen,
     onRequestClosePanels,
   } = props;
 
@@ -83,9 +79,7 @@ export function PageLayout(props: {
       sidebar={sidebar}
       content={content}
       rightPanel={rightPanel}
-      {...(rightPanelOpen != null ? { rightPanelOpen } : {})}
       gitPanel={gitPanel}
-      {...(gitPanelOpen != null ? { gitPanelOpen } : {})}
       {...(onRequestClosePanels != null ? { onRequestClosePanels } : {})}
     />
   );

@@ -128,6 +128,19 @@ describe("ThreadDraftView", () => {
     });
   });
 
+  it("shows the detecting state while agents are still loading", () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+    render(
+      <ThreadDraftView project={project} agentStatuses={[]} isDetectingAgents onStart={onStart} />,
+    );
+
+    // While detection is in flight we suppress the "no agents installed"
+    // message so the renderer doesn't flash it before the cache or detection
+    // events hydrate the store.
+    expect(screen.getByText(/detecting agents/i)).toBeInTheDocument();
+    expect(screen.queryByText("No supported agents detected")).not.toBeInTheDocument();
+  });
+
   it("submits codex defaults on first launch", async () => {
     const onStart = vi.fn<(input: unknown) => void>();
 

@@ -1,0 +1,395 @@
+import type {
+  AppView,
+  SessionRef,
+  Thread,
+  ThreadAttention,
+  ThreadConfig,
+  ThreadRuntimeSnapshot,
+  ThreadServerRequestId,
+  ThreadStatus,
+} from "@/shared/contracts";
+import {
+  reorderThreadBlockInProject,
+  reorderThreadsInProject,
+  type ReorderPlacement,
+} from "../reorder";
+import { makeThreadTitle, removePaneFromView, replacePaneInView } from "./helpers";
+import type { SliceCreator } from "./shared";
+
+export interface ThreadSlice {
+  threads: Thread[];
+  markThreadsInactiveOnLaunch: () => void;
+  createThread: (input: {
+    projectId: string;
+    agentKind: Thread["agentKind"];
+    config: ThreadConfig;
+    prompt: string;
+    worktreePath?: string;
+    worktreeBranch?: string;
+    groupId?: string;
+    groupName?: string;
+    replacePaneId?: string;
+  }) => Thread;
+  deleteThread: (threadId: string) => void;
+  renameThread: (threadId: string, title: string) => void;
+  updateThreadConfig: (threadId: string, config: ThreadConfig) => void;
+  updateThreadRuntime: (
+    threadId: string,
+    input: {
+      status: ThreadStatus;
+      attention: ThreadAttention;
+      config?: ThreadConfig;
+      sessionRef?: SessionRef;
+      canResumeWithConfig: boolean;
+    },
+  ) => void;
+  archiveThread: (threadId: string) => void;
+  unarchiveThread: (threadId: string) => void;
+  markThreadDone: (threadId: string) => void;
+  unmarkThreadDone: (threadId: string) => void;
+  purgeStaleArchivedThreads: (maxAgeDays: number) => void;
+  markThreadExited: (threadId: string) => void;
+  touchThread: (threadId: string) => void;
+  reconcileRuntimeSnapshots: (snapshots: ThreadRuntimeSnapshot[]) => void;
+  reorderThreads: (sourceId: string, targetId: string, placement: ReorderPlacement) => void;
+  reorderThreadBlock: (blockIds: string[], targetId: string, placement: ReorderPlacement) => void;
+}
+
+export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
+  threads: [],
+  markThreadsInactiveOnLaunch: () =>
+    set((state) => {
+      let changed = false;
+
+      const threads = state.threads.map((thread) => {
+        if (thread.status === "inactive" || thread.status === "error") {
+          return thread;
+        }
+
+        changed = true;
+        return {
+          ...thread,
+          status: "inactive" as ThreadStatus,
+          attention: "none" as ThreadAttention,
+        };
+      });
+
+      return changed ? { threads } : {};
+    }),
+  createThread: ({
+    projectId,
+    agentKind,
+    config,
+    prompt,
+    worktreePath,
+    worktreeBranch,
+    groupId,
+    groupName,
+    replacePaneId: replacePaneIdParam,
+  }) => {
+    const now = new Date().toISOString();
+    const thread: Thread = {
+      id: crypto.randomUUID(),
+      projectId,
+      title: makeThreadTitle(prompt),
+      agentKind,
+      config,
+      status: "launching",
+      attention: "none",
+      canResumeWithConfig: false,
+      archived: false,
+      done: false,
+      ...(worktreePath ? { worktreePath } : {}),
+      ...(worktreeBranch ? { worktreeBranch } : {}),
+      ...(groupId ? { groupId } : {}),
+      ...(groupName ? { groupName } : {}),
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    set((state) => {
+      let nextView: AppView;
+      if (replacePaneIdParam && state.view.kind === "thread") {
+        const idx = state.view.panes.indexOf(replacePaneIdParam);
+        if (idx !== -1) {
+          nextView = replacePaneInView(state.view, replacePaneIdParam, thread.id);
+        } else {
+          nextView = { kind: "thread", panes: [thread.id] };
+        }
+      } else {
+        nextView = { kind: "thread", panes: [thread.id] };
+      }
+      return { threads: [thread, ...state.threads], view: nextView };
+    });
+
+    return thread;
+  },
+  deleteThread: (threadId) =>
+    set((state) => {
+      const nextThreads = state.threads.filter((thread) => thread.id !== threadId);
+
+      if (nextThreads.length === state.threads.length) {
+        return {};
+      }
+
+      let nextView = state.view;
+      if (state.view.kind === "thread") {
+        nextView = removePaneFromView(state.view, threadId);
+      }
+
+      return {
+        threads: nextThreads,
+        pendingServerRequests: state.pendingServerRequests.filter(
+          (request) => request.threadId !== threadId,
+        ),
+        pendingThreadLaunches: Object.fromEntries(
+          Object.entries(state.pendingThreadLaunches).filter(([id]) => id !== threadId),
+        ),
+        pendingLaunchSegments: Object.fromEntries(
+          Object.entries(state.pendingLaunchSegments).filter(([id]) => id !== threadId),
+        ),
+        view: nextView,
+      };
+    }),
+  renameThread: (threadId, title) =>
+    set((state) => ({
+      threads: state.threads.map((thread) =>
+        thread.id === threadId ? { ...thread, title, updatedAt: new Date().toISOString() } : thread,
+      ),
+    })),
+  updateThreadConfig: (threadId, config) =>
+    set((state) => ({
+      threads: state.threads.map((thread) =>
+        thread.id === threadId
+          ? {
+              ...thread,
+              config,
+              updatedAt: new Date().toISOString(),
+            }
+          : thread,
+      ),
+    })),
+  updateThreadRuntime: (threadId, input) =>
+    set((state) => {
+      let changed = false;
+      const isVisible = state.view.kind === "thread" && state.view.panes.includes(threadId);
+
+      const threads: Thread[] = state.threads.map((thread): Thread => {
+        if (thread.id !== threadId) {
+          return thread;
+        }
+
+        let effectiveStatus = input.status;
+        if (
+          input.status === "idle" &&
+          (thread.status === "working" || thread.status === "finished") &&
+          !isVisible
+        ) {
+          effectiveStatus = "finished";
+        }
+
+        const sessionRefChanged =
+          input.sessionRef !== undefined &&
+          (thread.sessionRef?.providerSessionId !== input.sessionRef.providerSessionId ||
+            thread.sessionRef?.discoveredAt !== input.sessionRef.discoveredAt);
+
+        if (
+          thread.status === effectiveStatus &&
+          thread.attention === input.attention &&
+          JSON.stringify(thread.config) === JSON.stringify(input.config ?? thread.config) &&
+          thread.canResumeWithConfig === input.canResumeWithConfig &&
+          !sessionRefChanged
+        ) {
+          return thread;
+        }
+
+        changed = true;
+        return {
+          ...thread,
+          status: effectiveStatus,
+          attention: input.attention,
+          config: input.config ?? thread.config,
+          canResumeWithConfig: input.canResumeWithConfig,
+          ...(input.sessionRef ? { sessionRef: input.sessionRef } : {}),
+          ...(input.status === "working" && thread.status !== "working"
+            ? { updatedAt: new Date().toISOString() }
+            : {}),
+        };
+      });
+
+      return changed ? { threads } : {};
+    }),
+  archiveThread: (threadId) =>
+    set((state) => {
+      const thread = state.threads.find((t) => t.id === threadId);
+      if (!thread || thread.archived) return {};
+
+      const threads = state.threads.map((t) =>
+        t.id === threadId ? { ...t, archived: true, updatedAt: new Date().toISOString() } : t,
+      );
+
+      let nextView = state.view;
+      if (state.view.kind === "thread") {
+        nextView = removePaneFromView(state.view, threadId);
+      }
+
+      return { threads, view: nextView };
+    }),
+  unarchiveThread: (threadId) =>
+    set((state) => {
+      const thread = state.threads.find((t) => t.id === threadId);
+      if (!thread || !thread.archived) return {};
+
+      return {
+        threads: state.threads.map((t) =>
+          t.id === threadId ? { ...t, archived: false, updatedAt: new Date().toISOString() } : t,
+        ),
+      };
+    }),
+  markThreadDone: (threadId) =>
+    set((state) => {
+      const thread = state.threads.find((t) => t.id === threadId);
+      if (!thread || thread.done) return {};
+
+      const threads = state.threads.map((t) => (t.id === threadId ? { ...t, done: true } : t));
+
+      let nextView = state.view;
+      if (state.view.kind === "thread") {
+        nextView = removePaneFromView(state.view, threadId);
+      }
+
+      return { threads, view: nextView };
+    }),
+  unmarkThreadDone: (threadId) =>
+    set((state) => {
+      const thread = state.threads.find((t) => t.id === threadId);
+      if (!thread || !thread.done) return {};
+      return {
+        threads: state.threads.map((t) => (t.id === threadId ? { ...t, done: false } : t)),
+      };
+    }),
+  purgeStaleArchivedThreads: (maxAgeDays) =>
+    set((state) => {
+      const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+      const nextThreads = state.threads.filter(
+        (t) => !t.archived || new Date(t.updatedAt).getTime() > cutoff,
+      );
+      if (nextThreads.length === state.threads.length) return {};
+      return { threads: nextThreads };
+    }),
+  markThreadExited: (threadId) =>
+    set((state) => {
+      let changed = false;
+
+      const threads: Thread[] = state.threads.map((thread): Thread => {
+        if (thread.id !== threadId) {
+          return thread;
+        }
+
+        if (thread.status === "inactive" && thread.attention === "none") {
+          return thread;
+        }
+
+        changed = true;
+        return {
+          ...thread,
+          status: "inactive",
+          attention: "none",
+        };
+      });
+
+      return changed
+        ? {
+            threads,
+            pendingServerRequests: state.pendingServerRequests.filter(
+              (request) => request.threadId !== threadId,
+            ),
+          }
+        : {
+            pendingServerRequests: state.pendingServerRequests.filter(
+              (request) => request.threadId !== threadId,
+            ),
+          };
+    }),
+  touchThread: (threadId) =>
+    set((state) => ({
+      threads: state.threads.map((thread) =>
+        thread.id === threadId ? { ...thread, updatedAt: new Date().toISOString() } : thread,
+      ),
+    })),
+  reconcileRuntimeSnapshots: (snapshots) =>
+    set((state) => {
+      const snapshotsById = new Map(snapshots.map((snapshot) => [snapshot.threadId, snapshot]));
+      let changed = false;
+
+      const threads = state.threads.map((thread) => {
+        const snapshot = snapshotsById.get(thread.id);
+
+        if (snapshot) {
+          const sessionRefChanged =
+            (thread.sessionRef?.providerSessionId ?? "") !==
+              (snapshot.sessionRef?.providerSessionId ?? "") ||
+            (thread.sessionRef?.discoveredAt ?? "") !== (snapshot.sessionRef?.discoveredAt ?? "");
+
+          if (
+            thread.status === snapshot.status &&
+            thread.attention === snapshot.attention &&
+            JSON.stringify(thread.config) === JSON.stringify(snapshot.config ?? thread.config) &&
+            thread.canResumeWithConfig === snapshot.canResumeWithConfig &&
+            !sessionRefChanged
+          ) {
+            return thread;
+          }
+
+          changed = true;
+          return {
+            ...thread,
+            status: snapshot.status,
+            attention: snapshot.attention,
+            config: snapshot.config ?? thread.config,
+            canResumeWithConfig: snapshot.canResumeWithConfig,
+            ...(snapshot.sessionRef ? { sessionRef: snapshot.sessionRef } : {}),
+          };
+        }
+
+        if (
+          thread.status === "inactive" ||
+          thread.status === "error" ||
+          thread.status === "launching"
+        ) {
+          return thread;
+        }
+
+        changed = true;
+        return {
+          ...thread,
+          status: "inactive" as ThreadStatus,
+          attention: "none" as ThreadAttention,
+        };
+      });
+
+      return changed ? { threads } : {};
+    }),
+  reorderThreads: (sourceId, targetId, placement) =>
+    set((state) => {
+      const threads = reorderThreadsInProject(state.threads, sourceId, targetId, placement);
+
+      if (threads === state.threads) {
+        return {};
+      }
+
+      return { threads };
+    }),
+  reorderThreadBlock: (blockIds, targetId, placement) =>
+    set((state) => {
+      const threads = reorderThreadBlockInProject(state.threads, blockIds, targetId, placement);
+
+      if (threads === state.threads) {
+        return {};
+      }
+
+      return { threads };
+    }),
+});
+
+export type { ThreadServerRequestId };

@@ -1,0 +1,115 @@
+import { useEffect, useState } from "react";
+import type { ProjectLocation } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
+
+export function useSourceBranchData(params: {
+  project: { location: ProjectLocation };
+  effectiveBranch: string | undefined;
+  effectivePrKey: string | undefined;
+  worktreePath: string | undefined;
+  isGitHub: boolean;
+  ghAvailable: boolean;
+  refreshKey: number;
+}) {
+  const {
+    project,
+    effectiveBranch,
+    effectivePrKey,
+    worktreePath,
+    isGitHub,
+    ghAvailable,
+    refreshKey,
+  } = params;
+
+  const projectLocationKind = project.location.kind;
+  const projectLocationPath =
+    project.location.kind === "wsl" ? project.location.linuxPath : project.location.path;
+  const projectLocationDistro = project.location.kind === "wsl" ? project.location.distro : null;
+  const projectLocationUncPath = project.location.kind === "wsl" ? project.location.uncPath : null;
+
+  const [sourceBranchLoading, setSourceBranchLoading] = useState(false);
+
+  useEffect(() => {
+    if (!effectiveBranch || !effectivePrKey) {
+      setSourceBranchLoading(false);
+      return;
+    }
+    let isActive = true;
+    const sourceProjectLocation: ProjectLocation =
+      projectLocationKind === "wsl"
+        ? {
+            kind: "wsl",
+            distro: projectLocationDistro!,
+            linuxPath: projectLocationPath,
+            uncPath: projectLocationUncPath!,
+          }
+        : projectLocationKind === "posix"
+          ? { kind: "posix", path: projectLocationPath }
+          : { kind: "windows", path: projectLocationPath };
+    setSourceBranchLoading(true);
+    readBridge()
+      .gitGetWorktreeSourceBranch({
+        projectLocation: sourceProjectLocation,
+        branch: effectiveBranch,
+      })
+      .then((result) => {
+        if (!isActive) return;
+        useGitStore.getState().setWorktreeSourceInfo(effectivePrKey, {
+          sourceBranch: result.sourceBranch,
+          commitsAhead: result.commitsAhead,
+          sourceAhead: result.sourceAhead,
+        });
+      })
+      .catch(() => {
+        if (!isActive) return;
+        useGitStore.getState().setWorktreeSourceInfo(effectivePrKey, {
+          sourceBranch: null,
+          commitsAhead: 0,
+          sourceAhead: 0,
+        });
+      })
+      .finally(() => {
+        if (isActive) {
+          setSourceBranchLoading(false);
+        }
+      });
+    return () => {
+      isActive = false;
+    };
+  }, [
+    effectiveBranch,
+    effectivePrKey,
+    projectLocationDistro,
+    projectLocationKind,
+    projectLocationPath,
+    projectLocationUncPath,
+    refreshKey,
+  ]);
+
+  // Fetch PR data for non-worktree mode (worktree PR data is polled elsewhere)
+  useEffect(() => {
+    if (worktreePath || !isGitHub || !ghAvailable || !effectiveBranch || !effectivePrKey) return;
+    let isActive = true;
+    readBridge()
+      .ghGetPrForBranch({ projectLocation: project.location, branch: effectiveBranch })
+      .then((pr) => {
+        if (!isActive) return;
+        useGitStore.getState().setPrData(effectivePrKey, pr);
+      })
+      .catch(() => {});
+    return () => {
+      isActive = false;
+    };
+  }, [
+    worktreePath,
+    isGitHub,
+    ghAvailable,
+    effectiveBranch,
+    effectivePrKey,
+    project.location,
+    refreshKey,
+  ]);
+
+  return { sourceBranchLoading };
+}

@@ -1,0 +1,272 @@
+import { useEffect, useRef, useState } from "react";
+import { toast } from "@heroui/react";
+import { MarkdownPreview } from "../MarkdownPreview";
+import { Editor, type BeforeMount, type OnMount, type Monaco } from "@monaco-editor/react";
+import type { editor as MonacoEditor } from "monaco-editor";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import {
+  useActiveBufferContent,
+  useActiveBufferStatus,
+  useIsActiveBufferDirty,
+  useTabPaths,
+} from "@/renderer/state/fileEditorSelectors";
+import { getBasename } from "@/shared/pathUtils";
+import { getLanguageFromPath, isMarkdownFile } from "./parts/langMap";
+import { defineAppThemes, useResolvedTheme } from "./parts/monacoThemes";
+import { SortableTab } from "./parts/SortableTab";
+import { EditorToolbar } from "./parts/EditorToolbar";
+import { useLspSync } from "./parts/useLspSync";
+
+export { getLanguageFromPath } from "./parts/langMap";
+
+export function FileEditorPane(props: {
+  showTabs: boolean;
+  onOpenFullscreen?: () => void;
+  onClose?: () => void;
+}) {
+  const activePath = useFileEditorStore((state) => state.activePath);
+  const isDirty = useIsActiveBufferDirty();
+  const bufferStatus = useActiveBufferStatus();
+  const monacoRef = useRef<Monaco | null>(null);
+  const theme = useResolvedTheme();
+
+  const [showPreview, setShowPreview] = useState(false);
+
+  const isMarkdown = activePath ? isMarkdownFile(activePath) : false;
+
+  const { notifyDidSave } = useLspSync({ monacoRef, activePath, bufferStatus });
+
+  useEffect(() => {
+    setShowPreview(false);
+  }, [activePath]);
+
+  async function handleSave(path: string) {
+    try {
+      await useFileEditorStore.getState().saveFile(path);
+      notifyDidSave(path);
+    } catch (error) {
+      toast.danger(error instanceof Error ? error.message : String(error));
+    }
+  }
+
+  function handleCloseTab(path: string) {
+    const store = useFileEditorStore.getState();
+    const tabBuffer = store.buffers[path];
+    if (tabBuffer?.status === "ready" && tabBuffer.isDirty) {
+      if (!window.confirm(`Discard unsaved changes in ${path}?`)) {
+        return;
+      }
+      store.discardFileChanges(path);
+    }
+    store.closeTab(path);
+  }
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "w") {
+        const path = useFileEditorStore.getState().activePath;
+        if (path) {
+          e.preventDefault();
+          handleCloseTab(path);
+        }
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s" && showPreview) {
+        const path = useFileEditorStore.getState().activePath;
+        if (path) {
+          e.preventDefault();
+          void handleSave(path);
+        }
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
+  const monacoTheme = theme === "dark" ? "lightcode-dark" : "lightcode-light";
+
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]">
+      {props.showTabs ? (
+        <TabStripHeader
+          isDirty={isDirty}
+          isMarkdown={isMarkdown}
+          showPreview={showPreview}
+          setShowPreview={setShowPreview}
+          activePath={activePath}
+          onSave={handleSave}
+          handleCloseTab={handleCloseTab}
+          {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
+          {...(props.onClose ? { onClose: props.onClose } : {})}
+        />
+      ) : null}
+
+      {activePath && bufferStatus ? (
+        <>
+          {!props.showTabs ? (
+            <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+              <span className="min-w-0 truncate text-xs font-medium text-foreground">
+                {getBasename(activePath)}
+                {isDirty ? " *" : ""}
+              </span>
+              <div className="flex-1" />
+              <EditorToolbar
+                isMarkdown={isMarkdown}
+                showPreview={showPreview}
+                setShowPreview={setShowPreview}
+                isDirty={isDirty}
+                activePath={activePath}
+                onSave={() => void handleSave(activePath)}
+                {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
+                {...(props.onClose ? { onClose: props.onClose } : {})}
+              />
+            </div>
+          ) : null}
+
+          <EditorBody
+            activePath={activePath}
+            bufferStatus={bufferStatus}
+            monacoTheme={monacoTheme}
+            monacoRef={monacoRef}
+            showPreview={showPreview}
+            isMarkdown={isMarkdown}
+            onSave={handleSave}
+          />
+        </>
+      ) : (
+        <div className="flex h-full items-center justify-center px-8 text-center text-sm text-muted">
+          Select a file to start editing.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function TabStripHeader(props: {
+  isDirty: boolean;
+  isMarkdown: boolean;
+  showPreview: boolean;
+  setShowPreview: React.Dispatch<React.SetStateAction<boolean>>;
+  activePath: string | null;
+  onSave: (path: string) => void;
+  handleCloseTab: (path: string) => void;
+  onOpenFullscreen?: () => void;
+  onClose?: () => void;
+}) {
+  const paths = useTabPaths();
+  if (paths.length === 0) return null;
+
+  return (
+    <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1 pr-3">
+      <div
+        className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
+        role="tablist"
+        aria-label="Editor tabs"
+      >
+        {paths.map((path, index) => (
+          <SortableTab
+            key={path}
+            path={path}
+            index={index}
+            onSelect={() => useFileEditorStore.getState().setActivePath(path)}
+            onClose={() => props.handleCloseTab(path)}
+            onDoubleClick={() => useFileEditorStore.getState().pinTab(path)}
+          />
+        ))}
+      </div>
+
+      <div className="flex-1" />
+      <EditorToolbar
+        isMarkdown={props.isMarkdown}
+        showPreview={props.showPreview}
+        setShowPreview={props.setShowPreview}
+        isDirty={props.isDirty}
+        activePath={props.activePath}
+        onSave={() => props.activePath && props.onSave(props.activePath)}
+        {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
+        {...(props.onClose ? { onClose: props.onClose } : {})}
+      />
+    </div>
+  );
+}
+
+function EditorBody(props: {
+  activePath: string;
+  bufferStatus: NonNullable<ReturnType<typeof useActiveBufferStatus>>;
+  monacoTheme: string;
+  monacoRef: React.MutableRefObject<Monaco | null>;
+  showPreview: boolean;
+  isMarkdown: boolean;
+  onSave: (path: string) => void;
+}) {
+  const { activePath, bufferStatus, monacoTheme, monacoRef, showPreview, isMarkdown } = props;
+  const content = useActiveBufferContent();
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+
+  const handleBeforeMount: BeforeMount = (monaco) => {
+    defineAppThemes(monaco);
+  };
+
+  const handleEditorMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+    // eslint-disable-next-line no-bitwise -- Monaco uses bitmask key combos
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      const path = useFileEditorStore.getState().activePath;
+      if (path) props.onSave(path);
+    });
+  };
+
+  return (
+    <div className="min-h-0 flex-1 overflow-hidden">
+      {bufferStatus === "ready" && showPreview && isMarkdown ? (
+        <MarkdownPreview content={content ?? ""} />
+      ) : bufferStatus === "ready" ? (
+        <Editor
+          path={activePath}
+          language={getLanguageFromPath(activePath)}
+          theme={monacoTheme}
+          value={content ?? ""}
+          onChange={(value) => {
+            if (value !== undefined) useFileEditorStore.getState().updateBuffer(activePath, value);
+          }}
+          beforeMount={handleBeforeMount}
+          onMount={handleEditorMount}
+          options={{
+            fontSize: 13,
+            lineHeight: 20,
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
+            automaticLayout: true,
+            padding: { top: 4, bottom: 4 },
+            renderLineHighlightOnlyWhenFocus: true,
+            overviewRulerLanes: 0,
+            hideCursorInOverviewRuler: true,
+            overviewRulerBorder: false,
+            scrollbar: {
+              verticalScrollbarSize: 10,
+              horizontalScrollbarSize: 10,
+              verticalSliderSize: 8,
+              horizontalSliderSize: 8,
+            },
+            contextmenu: true,
+            tabSize: 2,
+          }}
+          loading={
+            <div className="flex h-full items-center justify-center text-sm text-muted">
+              Loading editor…
+            </div>
+          }
+        />
+      ) : (
+        <div className="flex h-full items-center justify-center px-8 text-center text-sm text-muted">
+          {bufferStatus === "binary"
+            ? "Binary files can't be edited here."
+            : bufferStatus === "too_large"
+              ? "This file is too large for the built-in editor."
+              : "This file uses an unsupported encoding."}
+        </div>
+      )}
+    </div>
+  );
+}

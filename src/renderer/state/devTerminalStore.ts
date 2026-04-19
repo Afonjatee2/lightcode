@@ -199,12 +199,22 @@ export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>
     // ConPTY reports "wsl" as the process title for wsl.exe — skip it
     // so the initial meaningful title (project/branch name) is preserved.
     if (title === "wsl") return;
-    set((state) => ({
-      tabs: state.tabs.map((t) => {
-        if (t.id === tabId) return { ...t, title };
-        if (t.splitId === tabId) return { ...t, splitTitle: title };
+    set((state) => {
+      let changed = false;
+      const tabs = state.tabs.map((t) => {
+        if (t.id === tabId) {
+          if (t.title === title) return t;
+          changed = true;
+          return { ...t, title };
+        }
+        if (t.splitId === tabId) {
+          if (t.splitTitle === title) return t;
+          changed = true;
+          return { ...t, splitTitle: title };
+        }
         return t;
-      }),
-    }));
+      });
+      return changed ? { tabs } : {};
+    });
   },
 }));

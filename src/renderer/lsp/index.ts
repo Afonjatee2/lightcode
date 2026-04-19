@@ -1,7 +1,7 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { ProjectLocation } from "@/shared/contracts";
 import { readBridge } from "../bridge";
-import { getLanguageFromPath } from "../components/fileEditor/FileEditorPane";
+import { getLanguageFromPath } from "../views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane";
 import { LspIpcTransport } from "./ipcTransport";
 import { registerLspProviders } from "./monacoProviders";
 import { DocumentSyncManager } from "./documentSync";

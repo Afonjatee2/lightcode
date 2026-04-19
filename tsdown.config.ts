@@ -11,7 +11,7 @@ const shared = {
   dts: false,
   minify: isProd ? ({ compress: { dropConsole: true, dropDebugger: true } } as const) : false,
   deps: {
-    alwaysBundle: ["electron-updater", "simple-git"],
+    alwaysBundle: ["electron-updater", "simple-git", "zod"],
     onlyBundle: false as const,
     neverBundle: ["electron", "node-pty", "better-sqlite3"],
   },

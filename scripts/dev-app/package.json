@@ -1,0 +1,4 @@
+{
+  "name": "lightcode-dev",
+  "main": "../../dist/main/main.cjs"
+}

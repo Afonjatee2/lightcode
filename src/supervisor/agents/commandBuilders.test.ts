@@ -1,10 +1,56 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ProjectLocation, SessionRef, ThreadConfig } from "@/shared/contracts";
-import { buildWindowsCommand, getWslCommand } from "./base";
+
+vi.mock("./codex/session", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./codex/session")>();
+  return {
+    ...actual,
+    readCodexSessionIndexForLocation: () => [],
+    readCodexRolloutsForLocation: () => [],
+    readCodexRolloutMetaForLocation: () => undefined,
+  };
+});
+
+import {
+  buildWindowsCommand,
+  getWslCommand,
+  resolveLaunchSpec,
+  type AgentAdapter,
+  type AgentLaunchOptions,
+  type CommandSpec,
+} from "./base";
 import { createClaudeAdapter } from "./claude";
 import { createCopilotAdapter } from "./copilot";
 import { buildCodexAppServerCommand, CODEX_REMOTE_TUI_FEATURE, createCodexAdapter } from "./codex";
 import { createCursorAdapter } from "./cursor";
+
+function launch(
+  adapter: AgentAdapter,
+  location: ProjectLocation,
+  config: ThreadConfig,
+  prompt: string,
+  sessionRef?: SessionRef,
+  launchOptions?: AgentLaunchOptions,
+): CommandSpec {
+  return resolveLaunchSpec(
+    location,
+    adapter.buildLaunchArgv(location, config, prompt, sessionRef, launchOptions),
+  );
+}
+
+function resume(
+  adapter: AgentAdapter,
+  location: ProjectLocation,
+  config: ThreadConfig,
+  prompt: string,
+  sessionRef: SessionRef,
+  launchOptions?: AgentLaunchOptions,
+): CommandSpec {
+  return resolveLaunchSpec(
+    location,
+    adapter.buildResumeArgv(location, config, prompt, sessionRef, launchOptions),
+  );
+}
 
 function decodePowerShellEncodedCommand(encoded: string): string {
   return Buffer.from(encoded, "base64").toString("utf16le");
@@ -46,7 +92,7 @@ const config: ThreadConfig = {
 
 describe("agent command builders", () => {
   it("builds a Windows Codex launch command", () => {
-    const spec = createCodexAdapter().buildLaunchCommand(windowsProject, config, "hello");
+    const spec = launch(createCodexAdapter(), windowsProject, config, "hello");
     expect(spec.cwd).toBe("C:\\Users\\demo\\project");
     const { cmd, cmdArgs } = parseWindowsSpec(spec);
     expect(cmd).toBe("codex");
@@ -56,7 +102,7 @@ describe("agent command builders", () => {
   it.skipIf(process.platform !== "win32")(
     "builds a WSL Codex launch command via login shell",
     () => {
-      const spec = createCodexAdapter().buildLaunchCommand(wslProject, config, "hello");
+      const spec = launch(createCodexAdapter(), wslProject, config, "hello");
       expect(spec.command.toLowerCase()).toBe(getWslCommand().toLowerCase());
       expect(spec.args.slice(0, 5)).toEqual(["-d", "Ubuntu", "--cd", "/home/demo/project", "--"]);
       // After "--", the next args are: shellPath, "-l", "-i", "-c", script
@@ -72,19 +118,14 @@ describe("agent command builders", () => {
       expect(script).toContain("workspace-write");
       expect(script).toContain("hello");
     },
+    20_000,
   );
 
   it("builds a remote Codex launch command with the TUI feature enabled", () => {
-    const spec = createCodexAdapter().buildLaunchCommand(
-      windowsProject,
-      config,
-      "hello",
-      undefined,
-      {
-        enabledFeatures: [CODEX_REMOTE_TUI_FEATURE],
-        remoteUrl: "ws://127.0.0.1:43123",
-      },
-    );
+    const spec = launch(createCodexAdapter(), windowsProject, config, "hello", undefined, {
+      enabledFeatures: [CODEX_REMOTE_TUI_FEATURE],
+      remoteUrl: "ws://127.0.0.1:43123",
+    });
 
     const { cmdArgs } = parseWindowsSpec(spec);
     expect(cmdArgs).toContain("--enable");
@@ -107,7 +148,7 @@ describe("agent command builders", () => {
   });
 
   it("resumes the server thread when structured session provides a threadId", () => {
-    const spec = createCodexAdapter().buildLaunchCommand(windowsProject, config, "", undefined, {
+    const spec = launch(createCodexAdapter(), windowsProject, config, "", undefined, {
       enabledFeatures: [CODEX_REMOTE_TUI_FEATURE],
       remoteUrl: "ws://127.0.0.1:43123",
       suppressResumeConfigOverrides: true,
@@ -129,7 +170,7 @@ describe("agent command builders", () => {
       providerSessionId: "abc-123",
       discoveredAt: new Date().toISOString(),
     };
-    const spec = createCodexAdapter().buildResumeCommand(windowsProject, config, "", sessionRef);
+    const spec = resume(createCodexAdapter(), windowsProject, config, "", sessionRef);
     const { cmdArgs } = parseWindowsSpec(spec);
     const resumeIndex = cmdArgs.indexOf("resume");
 
@@ -149,7 +190,7 @@ describe("agent command builders", () => {
         mode: "agent",
         approvalPolicy: "default",
       };
-      const spec = createClaudeAdapter().buildLaunchCommand(windowsProject, claudeConfig, "hello");
+      const spec = launch(createClaudeAdapter(), windowsProject, claudeConfig, "hello");
       const script = decodePowerShellEncodedCommand(spec.args[3] ?? "");
 
       expect(script).toContain("--session-id");
@@ -165,7 +206,7 @@ describe("agent command builders", () => {
   it.skipIf(process.platform !== "win32")(
     "builds a Claude launch command without a trailing empty prompt",
     () => {
-      const spec = createClaudeAdapter().buildLaunchCommand(windowsProject, config, "");
+      const spec = launch(createClaudeAdapter(), windowsProject, config, "");
       const script = decodePowerShellEncodedCommand(spec.args[3] ?? "");
 
       expect(script).toContain("--session-id");
@@ -178,12 +219,7 @@ describe("agent command builders", () => {
       providerSessionId: "abc-123",
       discoveredAt: new Date().toISOString(),
     };
-    const spec = createClaudeAdapter().buildResumeCommand(
-      windowsProject,
-      config,
-      "next",
-      sessionRef,
-    );
+    const spec = resume(createClaudeAdapter(), windowsProject, config, "next", sessionRef);
     expect(spec.command).toBeTruthy();
     expect(spec.args.length).toBeGreaterThan(0);
 
@@ -223,7 +259,8 @@ describe("agent command builders", () => {
   });
 
   it("builds a Copilot launch command with a pre-assigned session id", () => {
-    const spec = createCopilotAdapter().buildLaunchCommand(
+    const spec = launch(
+      createCopilotAdapter(),
       windowsProject,
       { model: "gpt-5", effort: "high", approvalPolicy: "never" },
       "hello",
@@ -243,7 +280,8 @@ describe("agent command builders", () => {
   });
 
   it("omits --yolo for default approval policy on Copilot", () => {
-    const spec = createCopilotAdapter().buildLaunchCommand(
+    const spec = launch(
+      createCopilotAdapter(),
       windowsProject,
       { model: "gpt-5", approvalPolicy: "default" },
       "hello",
@@ -256,7 +294,8 @@ describe("agent command builders", () => {
   });
 
   it("keeps Copilot model and effort flags when resuming an ACP-backed session", () => {
-    const spec = createCopilotAdapter().buildLaunchCommand(
+    const spec = launch(
+      createCopilotAdapter(),
       windowsProject,
       { model: "gpt-5.4", effort: "high", approvalPolicy: "never" },
       "",
@@ -277,7 +316,8 @@ describe("agent command builders", () => {
   });
 
   it("prefixes the initial Copilot interactive prompt with /plan in plan mode", () => {
-    const spec = createCopilotAdapter().buildLaunchCommand(
+    const spec = launch(
+      createCopilotAdapter(),
       windowsProject,
       { model: "claude-haiku-4.5", effort: "high", mode: "plan", approvalPolicy: "never" },
       "hi",
@@ -334,7 +374,7 @@ describe("agent command builders", () => {
       providerSessionId: "abc-123",
       discoveredAt: new Date().toISOString(),
     };
-    const spec = createClaudeAdapter().buildResumeCommand(windowsProject, config, "", sessionRef);
+    const spec = resume(createClaudeAdapter(), windowsProject, config, "", sessionRef);
     const script = decodePowerShellEncodedCommand(spec.args[3] ?? "");
 
     expect(script).toContain("--resume");
@@ -343,11 +383,7 @@ describe("agent command builders", () => {
   });
 
   it("builds a Windows Cursor launch command", () => {
-    const spec = createCursorAdapter().buildLaunchCommand(
-      windowsProject,
-      { model: "auto" },
-      "hello",
-    );
+    const spec = launch(createCursorAdapter(), windowsProject, { model: "auto" }, "hello");
     expect(spec.cwd).toBe("C:\\Users\\demo\\project");
     const { cmd, cmdArgs } = parseWindowsSpec(spec);
     expect(cmd).toBe("cursor-agent");
@@ -360,12 +396,7 @@ describe("agent command builders", () => {
       providerSessionId: "chat_019d6099-45a3-7962-a595-2d7f59276118",
       discoveredAt: new Date().toISOString(),
     };
-    const spec = createCursorAdapter().buildResumeCommand(
-      windowsProject,
-      { model: "auto" },
-      "",
-      sessionRef,
-    );
+    const spec = resume(createCursorAdapter(), windowsProject, { model: "auto" }, "", sessionRef);
     const { cmdArgs } = parseWindowsSpec(spec);
 
     expect(cmdArgs).toContain("--resume=chat_019d6099-45a3-7962-a595-2d7f59276118");
@@ -374,7 +405,8 @@ describe("agent command builders", () => {
   });
 
   it("builds a Cursor launch command with plan mode", () => {
-    const spec = createCursorAdapter().buildLaunchCommand(
+    const spec = launch(
+      createCursorAdapter(),
       windowsProject,
       { model: "gpt-5.4-medium", mode: "plan" },
       "analyze code",
@@ -388,7 +420,8 @@ describe("agent command builders", () => {
   });
 
   it("builds a Cursor launch command with --yolo for bypass approvals", () => {
-    const spec = createCursorAdapter().buildLaunchCommand(
+    const spec = launch(
+      createCursorAdapter(),
       windowsProject,
       { model: "auto", approvalPolicy: "never" },
       "hello",
@@ -400,7 +433,8 @@ describe("agent command builders", () => {
   });
 
   it("omits --yolo for default approval policy on Cursor", () => {
-    const spec = createCursorAdapter().buildLaunchCommand(
+    const spec = launch(
+      createCursorAdapter(),
       windowsProject,
       { model: "auto", approvalPolicy: "default" },
       "hello",

@@ -2,21 +2,24 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { execFileMock, mkdirMock, readWslCommandOutputAsync, rmMock } = vi.hoisted(() => ({
-  execFileMock:
-    vi.fn<
-      (
-        cmd: string,
-        args: string[],
-        opts: unknown,
-        callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
-      ) => void
-    >(),
-  mkdirMock: vi.fn<() => Promise<void>>(),
-  readWslCommandOutputAsync:
-    vi.fn<() => Promise<{ ok: boolean; stdout: string; stderr: string }>>(),
-  rmMock: vi.fn<() => Promise<void>>(),
-}));
+const { execFileMock, mkdirMock, readFileMock, readWslCommandOutputAsync, rmMock, statMock } =
+  vi.hoisted(() => ({
+    execFileMock:
+      vi.fn<
+        (
+          cmd: string,
+          args: string[],
+          opts: unknown,
+          callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
+        ) => void
+      >(),
+    mkdirMock: vi.fn<() => Promise<void>>(),
+    readFileMock: vi.fn<() => Promise<string>>(),
+    readWslCommandOutputAsync:
+      vi.fn<() => Promise<{ ok: boolean; stdout: string; stderr: string }>>(),
+    rmMock: vi.fn<() => Promise<void>>(),
+    statMock: vi.fn<() => Promise<{ isFile(): boolean; size: number; mtimeMs: number }>>(),
+  }));
 
 vi.mock("./agents/base", async () => {
   const actual = await vi.importActual<typeof import("./agents/base")>("./agents/base");
@@ -31,7 +34,9 @@ vi.mock("node:fs/promises", async () => {
   return {
     ...actual,
     mkdir: mkdirMock,
+    readFile: readFileMock,
     rm: rmMock,
+    stat: statMock,
   };
 });
 
@@ -866,6 +871,97 @@ describe("GitService.abortMerge", () => {
     );
     expect(mergeCall).toBeDefined();
     expect(mergeCall![1]).toContain("--abort");
+  });
+});
+
+describe("GitService.getStatus", () => {
+  const location = {
+    kind: "windows" as const,
+    path: "C:\\Users\\demo\\work\\lightcode",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    statMock.mockResolvedValue({
+      isFile: () => true,
+      size: 12,
+      mtimeMs: 100,
+    });
+    readFileMock.mockResolvedValue("line-1\nline-2");
+  });
+
+  it("expands untracked entries via git ls-files instead of directory recursion", async () => {
+    mockGitCommands((args) => {
+      if (args[0] === "rev-parse") return { stdout: "true\n" };
+      if (args[0] === "status")
+        return {
+          stdout: ["# branch.head main", "# branch.ab +0 -0", "? src"].join("\n"),
+        };
+      if (args[0] === "remote") return { stdout: "" };
+      if (args[0] === "diff") return { stdout: "" };
+      if (args[0] === "ls-files") return { stdout: "src/a.ts\0src/b.ts\0" };
+      return { stdout: "" };
+    });
+
+    const status = await new GitService().getStatus(location);
+
+    expect(status.unstaged).toEqual([
+      expect.objectContaining({ path: "src/a.ts", status: "?", insertions: 2, deletions: 0 }),
+      expect.objectContaining({ path: "src/b.ts", status: "?", insertions: 2, deletions: 0 }),
+    ]);
+    expect(readFileMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("reuses cached untracked file stats when size and mtime are unchanged", async () => {
+    mockGitCommands((args) => {
+      if (args[0] === "rev-parse") return { stdout: "true\n" };
+      if (args[0] === "status")
+        return {
+          stdout: ["# branch.head main", "# branch.ab +0 -0", "? src"].join("\n"),
+        };
+      if (args[0] === "remote") return { stdout: "" };
+      if (args[0] === "diff") return { stdout: "" };
+      if (args[0] === "ls-files") return { stdout: "src/a.ts\0" };
+      return { stdout: "" };
+    });
+
+    const service = new GitService();
+    await service.getStatus(location);
+    await service.getStatus(location);
+
+    expect(readFileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes cached untracked file stats when file metadata changes", async () => {
+    statMock
+      .mockResolvedValueOnce({
+        isFile: () => true,
+        size: 12,
+        mtimeMs: 100,
+      })
+      .mockResolvedValueOnce({
+        isFile: () => true,
+        size: 14,
+        mtimeMs: 200,
+      });
+
+    mockGitCommands((args) => {
+      if (args[0] === "rev-parse") return { stdout: "true\n" };
+      if (args[0] === "status")
+        return {
+          stdout: ["# branch.head main", "# branch.ab +0 -0", "? src"].join("\n"),
+        };
+      if (args[0] === "remote") return { stdout: "" };
+      if (args[0] === "diff") return { stdout: "" };
+      if (args[0] === "ls-files") return { stdout: "src/a.ts\0" };
+      return { stdout: "" };
+    });
+
+    const service = new GitService();
+    await service.getStatus(location);
+    await service.getStatus(location);
+
+    expect(readFileMock).toHaveBeenCalledTimes(2);
   });
 });
 

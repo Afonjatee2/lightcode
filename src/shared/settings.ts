@@ -99,175 +99,22 @@ function parseSettingOrDefault<T>(schema: z.ZodType<T>, value: unknown, fallback
   return parsed.success ? parsed.data : fallback;
 }
 
-export function normalizeSharedSettings(value: unknown): SharedSettings {
+function normalizeObjectFromSchema<
+  TShape extends z.ZodRawShape,
+  TOutput extends z.infer<z.ZodObject<TShape>>,
+>(shape: TShape, defaults: TOutput, value: unknown): TOutput {
   const parsed = z.record(z.string(), z.unknown()).safeParse(value);
   const data = parsed.success ? parsed.data : {};
+  const normalized = {} as TOutput;
 
-  return {
-    themeMode: parseSettingOrDefault(
-      sharedSettingsSchema.shape.themeMode,
-      data.themeMode,
-      defaultSharedSettings.themeMode,
-    ),
-    terminalPosition: parseSettingOrDefault(
-      sharedSettingsSchema.shape.terminalPosition,
-      data.terminalPosition,
-      defaultSharedSettings.terminalPosition,
-    ),
-    commitGenProvider: parseSettingOrDefault(
-      sharedSettingsSchema.shape.commitGenProvider,
-      data.commitGenProvider,
-      defaultSharedSettings.commitGenProvider,
-    ),
-    commitGenModel: parseSettingOrDefault(
-      sharedSettingsSchema.shape.commitGenModel,
-      data.commitGenModel,
-      defaultSharedSettings.commitGenModel,
-    ),
-    commitGenEffort: parseSettingOrDefault(
-      sharedSettingsSchema.shape.commitGenEffort,
-      data.commitGenEffort,
-      defaultSharedSettings.commitGenEffort,
-    ),
-    titleGenProvider: parseSettingOrDefault(
-      sharedSettingsSchema.shape.titleGenProvider,
-      data.titleGenProvider,
-      defaultSharedSettings.titleGenProvider,
-    ),
-    titleGenModel: parseSettingOrDefault(
-      sharedSettingsSchema.shape.titleGenModel,
-      data.titleGenModel,
-      defaultSharedSettings.titleGenModel,
-    ),
-    titleGenEffort: parseSettingOrDefault(
-      sharedSettingsSchema.shape.titleGenEffort,
-      data.titleGenEffort,
-      defaultSharedSettings.titleGenEffort,
-    ),
-    conflictResolverProvider: parseSettingOrDefault(
-      sharedSettingsSchema.shape.conflictResolverProvider,
-      data.conflictResolverProvider,
-      defaultSharedSettings.conflictResolverProvider,
-    ),
-    conflictResolverModel: parseSettingOrDefault(
-      sharedSettingsSchema.shape.conflictResolverModel,
-      data.conflictResolverModel,
-      defaultSharedSettings.conflictResolverModel,
-    ),
-    conflictResolverEffort: parseSettingOrDefault(
-      sharedSettingsSchema.shape.conflictResolverEffort,
-      data.conflictResolverEffort,
-      defaultSharedSettings.conflictResolverEffort,
-    ),
-    wslCommitGenProvider: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslCommitGenProvider,
-      data.wslCommitGenProvider,
-      defaultSharedSettings.wslCommitGenProvider,
-    ),
-    wslCommitGenModel: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslCommitGenModel,
-      data.wslCommitGenModel,
-      defaultSharedSettings.wslCommitGenModel,
-    ),
-    wslCommitGenEffort: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslCommitGenEffort,
-      data.wslCommitGenEffort,
-      defaultSharedSettings.wslCommitGenEffort,
-    ),
-    wslTitleGenProvider: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslTitleGenProvider,
-      data.wslTitleGenProvider,
-      defaultSharedSettings.wslTitleGenProvider,
-    ),
-    wslTitleGenModel: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslTitleGenModel,
-      data.wslTitleGenModel,
-      defaultSharedSettings.wslTitleGenModel,
-    ),
-    wslTitleGenEffort: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslTitleGenEffort,
-      data.wslTitleGenEffort,
-      defaultSharedSettings.wslTitleGenEffort,
-    ),
-    wslConflictResolverProvider: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslConflictResolverProvider,
-      data.wslConflictResolverProvider,
-      defaultSharedSettings.wslConflictResolverProvider,
-    ),
-    wslConflictResolverModel: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslConflictResolverModel,
-      data.wslConflictResolverModel,
-      defaultSharedSettings.wslConflictResolverModel,
-    ),
-    wslConflictResolverEffort: parseSettingOrDefault(
-      sharedSettingsSchema.shape.wslConflictResolverEffort,
-      data.wslConflictResolverEffort,
-      defaultSharedSettings.wslConflictResolverEffort,
-    ),
-    agentSettings: parseSettingOrDefault(
-      sharedSettingsSchema.shape.agentSettings,
-      data.agentSettings,
-      defaultSharedSettings.agentSettings,
-    ),
-    hiddenModels: parseSettingOrDefault(
-      sharedSettingsSchema.shape.hiddenModels,
-      data.hiddenModels,
-      defaultSharedSettings.hiddenModels,
-    ),
-    disabledAgents: parseSettingOrDefault(
-      sharedSettingsSchema.shape.disabledAgents,
-      data.disabledAgents,
-      defaultSharedSettings.disabledAgents,
-    ),
-    collapseTerminalComposer: parseSettingOrDefault(
-      sharedSettingsSchema.shape.collapseTerminalComposer,
-      data.collapseTerminalComposer,
-      defaultSharedSettings.collapseTerminalComposer,
-    ),
-    staleThreadUnloadMinutes: parseSettingOrDefault(
-      sharedSettingsSchema.shape.staleThreadUnloadMinutes,
-      data.staleThreadUnloadMinutes,
-      defaultSharedSettings.staleThreadUnloadMinutes,
-    ),
-    scrollSpeed: parseSettingOrDefault(
-      sharedSettingsSchema.shape.scrollSpeed,
-      data.scrollSpeed,
-      defaultSharedSettings.scrollSpeed,
-    ),
-    preventSleepWhileWorking: parseSettingOrDefault(
-      sharedSettingsSchema.shape.preventSleepWhileWorking,
-      data.preventSleepWhileWorking,
-      defaultSharedSettings.preventSleepWhileWorking,
-    ),
-    threadRemoveAction: parseSettingOrDefault(
-      sharedSettingsSchema.shape.threadRemoveAction,
-      data.threadRemoveAction,
-      defaultSharedSettings.threadRemoveAction,
-    ),
-    newThreadMode: parseSettingOrDefault(
-      sharedSettingsSchema.shape.newThreadMode,
-      data.newThreadMode,
-      defaultSharedSettings.newThreadMode,
-    ),
-    autoShowTerminalPanel: parseSettingOrDefault(
-      sharedSettingsSchema.shape.autoShowTerminalPanel,
-      data.autoShowTerminalPanel,
-      defaultSharedSettings.autoShowTerminalPanel,
-    ),
-    gitReviewMode: parseSettingOrDefault(
-      sharedSettingsSchema.shape.gitReviewMode,
-      data.gitReviewMode,
-      defaultSharedSettings.gitReviewMode,
-    ),
-    providerConfigs: parseSettingOrDefault(
-      sharedSettingsSchema.shape.providerConfigs,
-      data.providerConfigs,
-      defaultSharedSettings.providerConfigs,
-    ),
-    editorLspEnabled: parseSettingOrDefault(
-      sharedSettingsSchema.shape.editorLspEnabled,
-      data.editorLspEnabled,
-      defaultSharedSettings.editorLspEnabled,
-    ),
-  };
+  for (const key of Object.keys(defaults) as (keyof TOutput)[]) {
+    const schema = shape[key as string] as z.ZodType<TOutput[typeof key]>;
+    normalized[key] = parseSettingOrDefault(schema, data[key as string], defaults[key]);
+  }
+
+  return normalized;
+}
+
+export function normalizeSharedSettings(value: unknown): SharedSettings {
+  return normalizeObjectFromSchema(sharedSettingsSchema.shape, defaultSharedSettings, value);
 }

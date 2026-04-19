@@ -136,6 +136,13 @@ function formatAgentList(names: string[]): string {
 export function ThreadDraftView(props: {
   project: Project;
   agentStatuses: AgentStatus[];
+  /**
+   * True when the supervisor hasn't yet returned agent statuses for this
+   * project's environment (first launch, no cache).  The composer shows a
+   * "Detecting agents…" placeholder instead of the "No supported agents"
+   * prompt while this is true.
+   */
+  isDetectingAgents?: boolean;
   lastDraftConfig?: ProjectDraftConfig;
   compact?: boolean;
   paneAlign?: "left" | "center" | "right";
@@ -475,6 +482,14 @@ export function ThreadDraftView(props: {
   );
 
   if (!selectedAgent) {
+    if (props.isDetectingAgents) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
+          <PixelLoader size="md" />
+          <p className="text-sm text-muted">Detecting agents&hellip;</p>
+        </div>
+      );
+    }
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight">No supported agents detected</h1>

@@ -1,9 +1,10 @@
-import { existsSync } from "node:fs";
+import { existsSync, watch as fsWatch } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFile, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
+import { toWslUncPath } from "@/shared/wsl";
 
 const execFileAsync = promisify(execFile);
 import type { OscNotification } from "@/shared/osc";
@@ -20,6 +21,7 @@ import type {
   ThreadConfig,
   ThreadStatus,
 } from "@/shared/contracts";
+import { primeAgentBinaryPath, resolveAgentBinaryPath } from "./binaryResolver";
 
 export interface CommandSpec {
   command: string;
@@ -86,29 +88,92 @@ export interface CreateStructuredSessionInput {
   sessionRef?: SessionRef;
 }
 
-export interface AgentAdapter {
+/**
+ * Provider launch description: what to run, not how to run it.
+ * Adapters return this from `buildLaunchArgv` / `buildResumeArgv`; the runtime
+ * passes it to `resolveLaunchSpec` which handles WSL wrapping, login-shell,
+ * env injection, and Windows/POSIX quoting uniformly.
+ */
+export interface AgentArgvSpec {
+  binary: string;
+  args: string[];
+  env?: Record<string, string>;
+  sessionRef?: SessionRef;
+}
+
+/**
+ * Context passed to detection probes (auth/capability). Probes run AFTER the
+ * engine has resolved the executable path; a missing `executablePath` means
+ * the binary is not installed — most probes should return `undefined` then.
+ */
+export interface DetectProbeCtx {
+  location: ProjectLocation;
+  executablePath: string | undefined;
+}
+
+export type AuthProbe = (ctx: DetectProbeCtx) => Promise<AuthState | undefined>;
+
+/**
+ * Declarative install-detection for a provider. Replaces the WSL vs native
+ * branching + `command -v` probe + version fetch + auth/capability probe
+ * scaffolding that each adapter used to reimplement.
+ *
+ * `authProbes` run in order; the first to return `"authenticated"` wins.
+ * `"unknown"` and `"missing"` are recorded but let later probes override
+ * with `"authenticated"`. `undefined` skips the probe.
+ *
+ * `capabilitiesProbe` returns a partial merged on top of `capabilities`.
+ */
+export interface DetectionSpec {
+  kind: AgentKind;
+  label: string;
+  binary: string;
+  capabilities: AgentCapability;
+  versionArgs?: string[];
+  authProbes?: AuthProbe[];
+  capabilitiesProbe?: (ctx: DetectProbeCtx) => Promise<Partial<AgentCapability> | undefined>;
+}
+
+// Slice interfaces — composed into AgentAdapter below. Consumers can accept
+// the narrow slice they need (e.g. one-shot runners don't need the launcher).
+
+export interface AgentMetadata {
   kind: AgentKind;
   label: string;
   capabilities: AgentCapability;
-  detectInstall(ctx?: AgentEnvContext): Promise<AgentStatus>;
-  buildLaunchCommand(
+  /**
+   * Extra process env the runtime should merge into the PTY spawn. Static —
+   * the runtime reads this before spawn; adapters declare per-platform needs
+   * (e.g. `BROWSER=/bin/true` for providers that open OAuth flows under WSL).
+   */
+  spawnEnv?: {
+    native?: Record<string, string>;
+    wsl?: Record<string, string>;
+  };
+}
+
+export interface AgentLauncher {
+  buildLaunchArgv(
     location: ProjectLocation,
     config: ThreadConfig,
     prompt: string,
     sessionRef?: SessionRef,
     launchOptions?: AgentLaunchOptions,
-  ): CommandSpec;
-  buildResumeCommand(
+  ): AgentArgvSpec;
+  buildResumeArgv(
     location: ProjectLocation,
     config: ThreadConfig,
     prompt: string,
     sessionRef: SessionRef,
     launchOptions?: AgentLaunchOptions,
-  ): CommandSpec;
-  createInitialSessionRef(): SessionRef | undefined;
-  createStructuredSession?(
-    input: CreateStructuredSessionInput,
-  ): Promise<StructuredSessionHandle | undefined>;
+  ): AgentArgvSpec;
+}
+
+export interface AgentDetector {
+  detectInstall(ctx?: AgentEnvContext): Promise<AgentStatus>;
+}
+
+export interface AgentPromptFormatter {
   /**
    * Return true when the initial prompt must be typed into the TUI after idle
    * rather than passed as a CLI argument (e.g. Codex plan mode needs `/plan`
@@ -129,6 +194,9 @@ export interface AgentAdapter {
    * If not implemented, the runtime uses a default `@path` flattening.
    */
   formatPromptSegments?(segments: PromptSegment[]): string;
+}
+
+export interface AgentTerminalObserver {
   /** Detect when the PTY is ready to accept an initial queued launch prompt. */
   isReadyForInitialPrompt?(text: string): boolean;
   detectTerminalStatus?(text: string): TerminalStatusHint | null;
@@ -140,12 +208,6 @@ export interface AgentAdapter {
    * Set to null to disable the fallback for TUIs that can stay quiet mid-turn.
    */
   workingSilenceTimeoutMs?: number | null;
-  /** Discover the session ID after PTY spawn (e.g. by querying the CLI). */
-  discoverSessionRef?(location: ProjectLocation): Promise<SessionRef | undefined>;
-  /** Optional delay before the first session discovery attempt. */
-  initialSessionRefDiscoveryDelayMs?: number;
-  /** Optional fast-path watcher that triggers when session discovery should retry. */
-  watchSessionRef?(location: ProjectLocation, onChanged: () => void): (() => void) | undefined;
   /**
    * Handle an OSC notification extracted from the PTY stream.
    * Return a status hint if the notification maps to a known agent state,
@@ -154,6 +216,22 @@ export interface AgentAdapter {
   handleOscNotification?(notification: OscNotification): TerminalStatusHint | null;
   /** Allow the adapter to reconcile config from TUI-derived state transitions it owns. */
   syncConfigFromTerminalState?(input: SyncConfigFromTerminalStateInput): ThreadConfig | undefined;
+}
+
+export interface AgentSessionTracker {
+  createInitialSessionRef(): SessionRef | undefined;
+  createStructuredSession?(
+    input: CreateStructuredSessionInput,
+  ): Promise<StructuredSessionHandle | undefined>;
+  /** Discover the session ID after PTY spawn (e.g. by querying the CLI). */
+  discoverSessionRef?(location: ProjectLocation): Promise<SessionRef | undefined>;
+  /** Optional delay before the first session discovery attempt. */
+  initialSessionRefDiscoveryDelayMs?: number;
+  /** Optional fast-path watcher that triggers when session discovery should retry. */
+  watchSessionRef?(location: ProjectLocation, onChanged: () => void): (() => void) | undefined;
+}
+
+export interface AgentOneShotRunner {
   /** Default model for lightweight one-shot tasks like commit message generation. */
   defaultOneShotModel?: string;
   /**
@@ -176,6 +254,16 @@ export interface AgentAdapter {
     model?: string,
   ): { command: string; args: string[]; stdin?: string } | undefined;
 }
+
+export interface AgentAdapter
+  extends
+    AgentMetadata,
+    AgentLauncher,
+    AgentDetector,
+    AgentPromptFormatter,
+    AgentTerminalObserver,
+    AgentSessionTracker,
+    AgentOneShotRunner {}
 
 export interface TerminalStatusHint {
   status: ThreadStatus;
@@ -367,6 +455,357 @@ export function buildAgentCommand(
 }
 
 /**
+ * Turn an adapter's `AgentArgvSpec` into a platform-ready `CommandSpec`.
+ * Resolves the WSL binary path (cached), wraps through `buildAgentCommand`,
+ * and forwards the optional `sessionRef`. Adapters stay free of WSL/shell
+ * concerns — all platform branching lives here.
+ */
+export function resolveLaunchSpec(location: ProjectLocation, argv: AgentArgvSpec): CommandSpec {
+  const wslExecPath = resolveAgentBinaryPath(location, argv.binary);
+  const spec = buildAgentCommand(location, argv.binary, argv.args, wslExecPath, argv.env);
+  if (argv.sessionRef) {
+    spec.sessionRef = argv.sessionRef;
+  }
+  return spec;
+}
+
+// ── Install-detection engine ───────────────────────────────────────
+
+/**
+ * Reads an env var on the provider's native side — either WSL (`printf %s
+ * "$NAME"` inside the distro so we see the user's login-shell env, not the
+ * Windows host env) or the host process's `process.env`.
+ * Returns "authenticated" if any listed name is set and non-empty.
+ */
+export function envVarAuthProbe(names: string[]): AuthProbe {
+  return async (ctx) => {
+    if (ctx.location.kind === "wsl") {
+      const results = await batchWslCommandsAsync(
+        ctx.location.distro,
+        names.map((n) => `printf %s "$${n}"`),
+      );
+      const any = results.some((r) => r.ok && r.stdout.trim().length > 0);
+      return any ? "authenticated" : "unknown";
+    }
+    const any = names.some((n) => {
+      const value = process.env[n];
+      return typeof value === "string" && value.trim().length > 0;
+    });
+    return any ? "authenticated" : "unknown";
+  };
+}
+
+/**
+ * Existence-check for a config file whose path depends on the environment.
+ * Return `undefined` from the resolver to skip the probe (e.g. WSL-only or
+ * native-only detection). Returns "authenticated" when the file exists,
+ * "missing" when the path resolved but the file is absent.
+ */
+export function configFileAuthProbe(
+  resolvePath: (location: ProjectLocation) => string | undefined,
+): AuthProbe {
+  return async (ctx) => {
+    const path = resolvePath(ctx.location);
+    if (!path) return undefined;
+    return existsSync(path) ? "authenticated" : "missing";
+  };
+}
+
+/**
+ * Runs the resolved executable with a subcommand (e.g. `["auth", "status"]`)
+ * and treats exit-0 as "authenticated", anything else as "unknown". Skipped
+ * when the executable itself is missing.
+ */
+export function cliSubcommandAuthProbe(args: string[]): AuthProbe {
+  return async (ctx) => {
+    if (!ctx.executablePath) return undefined;
+    if (ctx.location.kind === "wsl") {
+      const result = await readWslLoginShellCommandOutputAsync(
+        ctx.location.distro,
+        "/tmp",
+        ctx.executablePath,
+        args,
+      );
+      return result.ok ? "authenticated" : "unknown";
+    }
+    const result = await readCommandOutputAsync(ctx.executablePath, args);
+    return result.ok ? "authenticated" : "unknown";
+  };
+}
+
+const PROBE_WSL_LINUX_PATH = "/tmp";
+
+function detectProbeLocation(ctx: AgentEnvContext | undefined): ProjectLocation {
+  if (ctx?.envKind === "wsl" && ctx.wslDistro) {
+    return {
+      kind: "wsl",
+      distro: ctx.wslDistro,
+      linuxPath: PROBE_WSL_LINUX_PATH,
+      uncPath: "\\\\wsl$",
+    };
+  }
+  if (process.platform === "win32") {
+    return { kind: "windows", path: homedir() };
+  }
+  return { kind: "posix", path: homedir() };
+}
+
+async function resolveDetectedBinary(
+  ctx: AgentEnvContext | undefined,
+  binary: string,
+): Promise<string | undefined> {
+  if (ctx?.envKind === "wsl" && ctx.wslDistro) {
+    const [result] = await batchWslCommandsAsync(ctx.wslDistro, [`command -v ${binary}`]);
+    const path = result?.ok ? result.stdout : undefined;
+    primeAgentBinaryPath(ctx.wslDistro, binary, path);
+    return path;
+  }
+  return resolveExecutablePathAsync(binary);
+}
+
+async function readDetectedVersion(
+  location: ProjectLocation,
+  binary: string,
+  executablePath: string | undefined,
+  versionArgs: string[],
+): Promise<string | undefined> {
+  if (!executablePath) return undefined;
+  if (location.kind === "wsl") {
+    const result = await readWslLoginShellCommandOutputAsync(
+      location.distro,
+      PROBE_WSL_LINUX_PATH,
+      executablePath,
+      versionArgs,
+    );
+    return result.ok ? result.stdout : undefined;
+  }
+  const result = await readCommandOutputAsync(binary, versionArgs);
+  return result.ok ? result.stdout : undefined;
+}
+
+// ── Terminal hint sweeping / config reconciliation ────────────────────────
+
+/**
+ * Shape that any provider hint entry must share: a regex + an optional
+ * `strong` marker. "Strong" entries are self-corroborating and matched
+ * anywhere in the buffer; "weak" entries (e.g. a bare `>` prompt) can be
+ * restricted to a tail window via `opts.weakTailWindow` so stale matches
+ * from chat scrollback don't outrank the current status indicator.
+ */
+export interface HintEntry {
+  re: RegExp;
+  strong?: boolean;
+}
+
+export interface FindBestHintOptions {
+  weakTailWindow?: number;
+}
+
+/**
+ * Sweep a list of hint entries across the text and return the entry whose
+ * LAST match has the highest index (i.e. the pattern appearing closest to
+ * the tail). Replaces the identical-shape `findBestCodexHint` /
+ * `findBestHint` (copilot) / Claude's inline loop.
+ */
+export function findBestHint<T extends HintEntry>(
+  text: string,
+  entries: readonly T[],
+  opts?: FindBestHintOptions,
+): T | null {
+  const weakWindow = opts?.weakTailWindow;
+  const weakStart =
+    weakWindow !== undefined && text.length > weakWindow ? text.length - weakWindow : 0;
+
+  let best: { index: number; entry: T } | null = null;
+  for (const entry of entries) {
+    const globalRe = new RegExp(
+      entry.re.source,
+      entry.re.flags.includes("g") ? entry.re.flags : entry.re.flags + "g",
+    );
+    let last: RegExpExecArray | null = null;
+    let match: RegExpExecArray | null;
+    while ((match = globalRe.exec(text)) !== null) {
+      if (entry.strong || match.index >= weakStart) {
+        last = match;
+      }
+    }
+    if (last && (best === null || last.index > best.index)) {
+      best = { index: last.index, entry };
+    }
+  }
+  return best?.entry ?? null;
+}
+
+/**
+ * Reconcile a `TerminalStatusHint` into a `ThreadConfig`. Returns a new
+ * config when any field changed, `undefined` otherwise. This is the exact
+ * merge logic that Claude and Copilot had duplicated — consolidated here so
+ * new providers get the same semantics for free.
+ *
+ * Rules:
+ * - Enter plan mode when the TUI signals it and config doesn't already agree.
+ * - Exit plan mode when TUI no longer signals it AND the turn has landed
+ *   (idle, or working after a needs_reply/needs_approval) — this guards
+ *   against flicker during a single turn.
+ * - Approval policy / model / effort: adopt the hint value when it differs
+ *   from the current config.
+ */
+export function applyTerminalHintToConfig(
+  input: SyncConfigFromTerminalStateInput,
+): ThreadConfig | undefined {
+  let next: ThreadConfig | undefined;
+
+  if (input.hint.planMode && input.config.mode !== "plan") {
+    next = { ...(next ?? input.config), mode: "plan" };
+  } else if (
+    !input.hint.planMode &&
+    input.config.mode === "plan" &&
+    (input.hint.status === "idle" ||
+      (input.hint.status === "working" &&
+        (input.previousStatus === "needs_reply" || input.previousStatus === "needs_approval")))
+  ) {
+    next = { ...(next ?? input.config), mode: undefined };
+  }
+
+  if (input.hint.approvalPolicy !== undefined) {
+    const currentPolicy = input.config.approvalPolicy ?? "default";
+    if (input.hint.approvalPolicy !== currentPolicy) {
+      next = { ...(next ?? input.config), approvalPolicy: input.hint.approvalPolicy };
+    }
+  }
+
+  if (input.hint.model !== undefined && input.hint.model !== input.config.model) {
+    next = { ...(next ?? input.config), model: input.hint.model };
+  }
+
+  if (input.hint.effort !== undefined && input.hint.effort !== input.config.effort) {
+    next = { ...(next ?? input.config), effort: input.hint.effort };
+  }
+
+  return next;
+}
+
+// ── Session helpers (shared across providers with session-dir watchers) ───
+
+/**
+ * Resolve a path inside the user's home directory, correctly across native
+ * (`os.homedir()`) and WSL (UNC path against the distro's home, looked up via
+ * `resolveWslHomeDirectory`). Returns `undefined` when the WSL home is
+ * unavailable. Replaces per-provider platform branching like
+ * `~/.codex/sessions` or `~/.gemini/tmp/<project>`.
+ */
+export function resolveAgentHomeSubpath(
+  location: ProjectLocation,
+  subpath: string,
+): string | undefined {
+  if (location.kind === "wsl") {
+    const home = resolveWslHomeDirectory(location.distro);
+    if (!home) return undefined;
+    const trimmed = subpath.replace(/^[\\/]+/, "");
+    return toWslUncPath(location.distro, `${home}/${trimmed}`);
+  }
+  return join(homedir(), ...subpath.split(/[\\/]/).filter((s) => s.length > 0));
+}
+
+/**
+ * Recursive `fs.watch` wrapper with uniform error-swallow / cleanup semantics.
+ * Returns an undo handle or `undefined` when the watcher could not be
+ * established (unsupported platform, missing path, etc.). `label` goes into
+ * log output so two providers don't have to reimplement the same boilerplate.
+ */
+export function createRecursiveDirWatcher(
+  watchPath: string,
+  onChanged: () => void,
+  label: string,
+): (() => void) | undefined {
+  try {
+    const watcher = fsWatch(watchPath, { recursive: true }, () => onChanged());
+    watcher.on("error", () => {
+      try {
+        watcher.close();
+      } catch {
+        // Ignore watcher teardown races.
+      }
+    });
+    console.log("[%s] session watcher active at %s", label, watchPath);
+    return () => {
+      try {
+        watcher.close();
+      } catch {
+        // Ignore watcher teardown races.
+      }
+    };
+  } catch (error) {
+    console.log(
+      "[%s] session watcher unavailable at %s: %s",
+      label,
+      watchPath,
+      error instanceof Error ? error.message : String(error),
+    );
+    return undefined;
+  }
+}
+
+/**
+ * Run the shared install-detection flow for an adapter.
+ *
+ * Steps:
+ *   1. Resolve the executable path (WSL `command -v` or native `which`/`where`).
+ *      Primes the shared `BinaryResolver` cache so the eventual launch reuses
+ *      this lookup instead of probing again.
+ *   2. Fetch the version via `spec.versionArgs` (default `["--version"]`).
+ *   3. Run `capabilitiesProbe` and merge its partial into `spec.capabilities`.
+ *   4. Run `authProbes` in order; first `"authenticated"` wins.
+ *   5. Assemble the `AgentStatus`.
+ */
+export async function detectAgentInstall(
+  ctx: AgentEnvContext | undefined,
+  spec: DetectionSpec,
+): Promise<AgentStatus> {
+  const location = detectProbeLocation(ctx);
+  const executablePath = await resolveDetectedBinary(ctx, spec.binary);
+
+  const versionArgs = spec.versionArgs ?? ["--version"];
+  const version = await readDetectedVersion(location, spec.binary, executablePath, versionArgs);
+
+  let capabilities = spec.capabilities;
+  if (executablePath && spec.capabilitiesProbe) {
+    const partial = await spec.capabilitiesProbe({ location, executablePath });
+    if (partial) {
+      capabilities = { ...capabilities, ...partial };
+    }
+  }
+
+  let authState: AuthState;
+  if (!executablePath) {
+    authState = "missing";
+  } else {
+    authState = "unknown";
+    const probeCtx: DetectProbeCtx = { location, executablePath };
+    for (const probe of spec.authProbes ?? []) {
+      const result = await probe(probeCtx);
+      if (result === "authenticated") {
+        authState = "authenticated";
+        break;
+      }
+      if (result !== undefined) {
+        authState = result;
+      }
+    }
+  }
+
+  return {
+    kind: spec.kind,
+    label: spec.label,
+    installed: executablePath !== undefined,
+    ...(executablePath ? { executablePath } : {}),
+    ...(version ? { version } : {}),
+    authState,
+    capabilities,
+  };
+}
+
+/**
  * @deprecated Use buildAgentCommand() instead. This is kept for backward compatibility.
  */
 export function wrapWslCommand(
@@ -450,7 +889,7 @@ export function resolveWslShellPath(distro: string): string {
         encoding: "utf8",
         shell: false,
         windowsHide: true,
-        timeout: 5_000,
+        timeout: 1_000,
       },
     );
     if (!result.error && result.status === 0) {
@@ -481,7 +920,7 @@ export async function resolveWslShellPathAsync(distro: string): Promise<string> 
       ["-d", distro, "--", "sh", "-lc", 'getent passwd "$(id -un)" | cut -d: -f7'],
       {
         windowsHide: true,
-        timeout: 5_000,
+        timeout: 1_000,
       },
     );
     const shellPath = parseCommandOutputLine(stdout ?? "");

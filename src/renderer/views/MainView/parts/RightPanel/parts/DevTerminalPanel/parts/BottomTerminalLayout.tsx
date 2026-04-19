@@ -1,0 +1,149 @@
+import { Columns2, PanelBottomClose, Plus, Trash2 } from "lucide-react";
+import { Tabs, Tooltip } from "@heroui/react";
+import type { Project } from "@/shared/contracts";
+import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
+import { ContextMenu } from "@/renderer/components/common";
+import { TerminalSurfaces } from "./TerminalSurfaces";
+
+export function BottomTerminalLayout(props: {
+  tabs: DevTerminalTab[];
+  projectTabs: DevTerminalTab[];
+  activeProject: Project | undefined;
+  selectedTabId: string;
+  activeTab: DevTerminalTab | undefined;
+  markTabActive: (tabId: string) => void;
+  updateTabTitle: (tabId: string, title: string) => void;
+  fadeStyle: { opacity: number; transition: string };
+  emptyState: React.ReactNode;
+  handleCloseTab: (tab: DevTerminalTab) => void;
+  handleCloseSplit: (tab: DevTerminalTab) => void;
+  handleSelectionChange: (key: string | number) => void;
+  getTabContextItems: (
+    tab: DevTerminalTab,
+  ) => { id: string; label: string; icon: React.ReactNode }[];
+  handleTabContextAction: (tab: DevTerminalTab, key: string) => void;
+}) {
+  const {
+    tabs,
+    projectTabs,
+    activeProject,
+    selectedTabId,
+    activeTab,
+    markTabActive,
+    updateTabTitle,
+    fadeStyle,
+    emptyState,
+    handleCloseTab,
+    handleCloseSplit,
+    handleSelectionChange,
+    getTabContextItems,
+    handleTabContextAction,
+  } = props;
+
+  // Build flat entries: primary tabs + their split children
+  type TabRow = { id: string; tab: DevTerminalTab; isSplit: boolean };
+  const tabRows: TabRow[] = [];
+  for (const tab of projectTabs) {
+    tabRows.push({ id: tab.id, tab, isSplit: false });
+    if (tab.splitId) tabRows.push({ id: tab.splitId, tab, isSplit: true });
+  }
+
+  return (
+    <div className="flex h-full min-h-0 bg-[var(--content-background)]" style={fadeStyle}>
+      <div className="flex w-[140px] shrink-0 flex-col overflow-hidden border-r border-[color:var(--border)]">
+        {activeProject && (
+          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+            <div className="min-w-0">
+              <Tooltip delay={300}>
+                <Tooltip.Trigger>
+                  <div className="max-w-[80px] truncate text-xs font-medium text-foreground">
+                    {activeProject.name}
+                  </div>
+                </Tooltip.Trigger>
+                <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
+              </Tooltip>
+            </div>
+            <div className="flex-1" />
+            <button
+              type="button"
+              className="rounded p-0.5 text-muted hover:text-foreground"
+              title="Hide terminal"
+              onClick={() => useDevTerminalStore.getState().closePanel()}
+            >
+              <PanelBottomClose className="size-3" />
+            </button>
+          </div>
+        )}
+        <div className="min-h-0 flex-1 overflow-y-auto py-1">
+          <Tabs
+            className="w-full"
+            orientation="vertical"
+            variant="secondary"
+            selectedKey={selectedTabId}
+            onSelectionChange={handleSelectionChange}
+          >
+            <Tabs.ListContainer className="w-full p-0">
+              <Tabs.List aria-label="Terminal tabs" className="w-full *:h-6">
+                {tabRows.map(({ id, tab, isSplit }) => {
+                  const parentSelected = selectedTabId === tab.id;
+                  return (
+                    <Tabs.Tab
+                      key={id}
+                      id={id}
+                      className={`group w-full gap-0 pl-3 pr-1 text-xs ${isSplit && parentSelected ? "text-foreground" : ""}`}
+                    >
+                      <ContextMenu
+                        items={getTabContextItems(tab)}
+                        onAction={(key) => handleTabContextAction(tab, key)}
+                      >
+                        <span className="flex min-w-0 flex-1 items-center gap-1">
+                          <span
+                            className="truncate"
+                            title={isSplit ? (tab.splitTitle ?? tab.title) : tab.title}
+                          >
+                            {isSplit ? (tab.splitTitle ?? tab.title) : tab.title}
+                          </span>
+                          {isSplit ? <Columns2 className="size-3 shrink-0 text-accent" /> : null}
+                        </span>
+                      </ContextMenu>
+                      <button
+                        className="ml-auto flex size-4 shrink-0 items-center justify-center rounded opacity-0 transition hover:text-danger group-hover:opacity-100"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          if (isSplit) handleCloseSplit(tab);
+                          else handleCloseTab(tab);
+                        }}
+                        tabIndex={-1}
+                        type="button"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                      <Tabs.Indicator />
+                    </Tabs.Tab>
+                  );
+                })}
+                <Tabs.Tab id="__add__" className="min-w-8 max-w-8 px-0">
+                  <Plus className="size-3.5 text-muted" />
+                  <Tabs.Indicator className="invisible" />
+                </Tabs.Tab>
+              </Tabs.List>
+            </Tabs.ListContainer>
+          </Tabs>
+        </div>
+      </div>
+
+      <div className="relative min-h-0 min-w-0 flex-1 px-4 pt-2 pb-2">
+        <TerminalSurfaces
+          tabs={tabs}
+          selectedTabId={selectedTabId}
+          activeTab={activeTab}
+          markTabActive={markTabActive}
+          updateTabTitle={updateTabTitle}
+        />
+        {emptyState}
+      </div>
+    </div>
+  );
+}

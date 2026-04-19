@@ -1,0 +1,183 @@
+import { useState } from "react";
+import { AlertDialog, Button } from "@heroui/react";
+import { ChevronDown, ChevronRight, Minus, Plus, Undo2 } from "lucide-react";
+import type { GitFileChange, Project } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
+import { StackedFileCard } from "../../GitStackedDiff";
+import { FileRow } from "./FileRow";
+
+export function FileGroup(props: {
+  title: string;
+  count: number;
+  staged: boolean;
+  files: GitFileChange[];
+  project: Project;
+  selectedFile: string | null;
+  onSelectFile: (path: string, staged: boolean) => void;
+  onRefresh: () => void;
+  storeKey: string;
+  isWorktree: boolean;
+  mode?: "overlay" | "panel";
+  diffTheme?: "light" | "dark";
+  wrapLines?: boolean;
+}) {
+  const {
+    title,
+    count,
+    staged,
+    files,
+    project,
+    selectedFile,
+    onSelectFile,
+    onRefresh,
+    storeKey,
+    isWorktree,
+    mode,
+    diffTheme,
+    wrapLines,
+  } = props;
+  const [expanded, setExpanded] = useState(true);
+  const [revertAllOpen, setRevertAllOpen] = useState(false);
+  const inlineDiffs = mode === "panel";
+
+  async function handleStageAll() {
+    useGitStore.getState().optimisticStageAll(storeKey, isWorktree);
+    await readBridge()
+      .gitStageAll({ projectLocation: project.location })
+      .catch(() => onRefresh());
+  }
+
+  async function handleUnstageAll() {
+    useGitStore.getState().optimisticUnstageAll(storeKey, isWorktree);
+    await readBridge()
+      .gitUnstageAll({ projectLocation: project.location })
+      .catch(() => onRefresh());
+  }
+
+  async function handleRevertAll() {
+    await readBridge().gitRevertAll({ projectLocation: project.location });
+    setRevertAllOpen(false);
+    onRefresh();
+  }
+
+  const sorted = files.toSorted((a, b) => {
+    const aDir = a.path.substring(0, a.path.lastIndexOf("/"));
+    const bDir = b.path.substring(0, b.path.lastIndexOf("/"));
+    const dirCmp = aDir.localeCompare(bDir, undefined, { sensitivity: "base" });
+    if (dirCmp !== 0) return dirCmp;
+    const aName = a.path.substring(a.path.lastIndexOf("/") + 1);
+    const bName = b.path.substring(b.path.lastIndexOf("/") + 1);
+    return aName.localeCompare(bName, undefined, { sensitivity: "base" });
+  });
+
+  return (
+    <div>
+      <div className="group/header flex w-full items-center gap-1 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+        <button
+          type="button"
+          className="flex cursor-default items-center gap-1"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
+          {title}
+          <span className="font-normal text-muted/60">({count})</span>
+        </button>
+        <span className="ml-auto flex items-center gap-0.5">
+          <span className="flex items-center gap-0.5 text-[10px] font-medium font-normal group-hover/header:hidden">
+            {files.reduce((s, f) => s + f.insertions, 0) > 0 && (
+              <span className="text-success">+{files.reduce((s, f) => s + f.insertions, 0)}</span>
+            )}
+            {files.reduce((s, f) => s + f.deletions, 0) > 0 && (
+              <span className="text-danger">-{files.reduce((s, f) => s + f.deletions, 0)}</span>
+            )}
+          </span>
+          <span className="hidden items-center gap-0.5 group-hover/header:flex">
+            {staged ? (
+              <button
+                type="button"
+                className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                title="Unstage all"
+                onClick={() => void handleUnstageAll()}
+              >
+                <Minus className="size-3" />
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                  title="Stage all"
+                  onClick={() => void handleStageAll()}
+                >
+                  <Plus className="size-3" />
+                </button>
+                <button
+                  type="button"
+                  className="rounded p-0.5 text-muted transition-colors hover:bg-danger/10 hover:text-danger"
+                  title="Revert all"
+                  onClick={() => setRevertAllOpen(true)}
+                >
+                  <Undo2 className="size-3" />
+                </button>
+              </>
+            )}
+          </span>
+        </span>
+      </div>
+
+      {!staged && (
+        <AlertDialog.Backdrop isOpen={revertAllOpen} onOpenChange={setRevertAllOpen}>
+          <AlertDialog.Container>
+            <AlertDialog.Dialog>
+              <AlertDialog.Header>
+                <AlertDialog.Icon status="danger" />
+                <AlertDialog.Heading>Revert all changes</AlertDialog.Heading>
+              </AlertDialog.Header>
+              <AlertDialog.Body>
+                Are you sure you want to revert all unstaged changes? This cannot be undone.
+              </AlertDialog.Body>
+              <AlertDialog.Footer>
+                <Button slot="close" variant="tertiary">
+                  Cancel
+                </Button>
+                <Button variant="danger" onPress={() => void handleRevertAll()}>
+                  Revert all
+                </Button>
+              </AlertDialog.Footer>
+            </AlertDialog.Dialog>
+          </AlertDialog.Container>
+        </AlertDialog.Backdrop>
+      )}
+      {expanded && (
+        <div className={inlineDiffs ? "min-w-0 divide-y divide-border" : "space-y-px"}>
+          {inlineDiffs
+            ? sorted.map((file) => (
+                <StackedFileCard
+                  key={`${file.staged ? "s" : "u"}:${file.path}`}
+                  file={file}
+                  project={project}
+                  theme={diffTheme ?? "dark"}
+                  wrapLines={wrapLines ?? false}
+                  onRefresh={onRefresh}
+                  storeKey={storeKey}
+                  isWorktree={isWorktree}
+                />
+              ))
+            : sorted.map((file) => (
+                <FileRow
+                  key={`${file.staged ? "s" : "u"}:${file.path}`}
+                  path={file.path}
+                  project={project}
+                  isSelected={selectedFile === file.path}
+                  onSelect={() => onSelectFile(file.path, file.staged)}
+                  onRefresh={onRefresh}
+                  storeKey={storeKey}
+                  isWorktree={isWorktree}
+                />
+              ))}
+        </div>
+      )}
+    </div>
+  );
+}

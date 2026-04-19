@@ -1,0 +1,312 @@
+import { startTransition } from "react";
+import { Switch } from "@heroui/react";
+import type {
+  GitReviewMode,
+  NewThreadMode,
+  TerminalPosition,
+  ThemeMode,
+  ThreadRemoveAction,
+} from "@/shared/contracts";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { Select } from "@/renderer/components/common";
+
+const themeOptions = [
+  { id: "system", label: "System" },
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+] as const;
+
+const terminalPositionOptions = [
+  { id: "right", label: "Right" },
+  { id: "bottom", label: "Bottom" },
+] as const;
+
+const staleThreadUnloadOptions = [
+  { id: "0", label: "Disabled" },
+  { id: "10", label: "10 minutes" },
+  { id: "20", label: "20 minutes" },
+  { id: "30", label: "30 minutes" },
+  { id: "60", label: "1 hour" },
+] as const;
+
+const threadRemoveActionOptions = [
+  { id: "archive", label: "Archive" },
+  { id: "delete", label: "Delete" },
+] as const;
+
+const newThreadModeOptions = [
+  { id: "page", label: "Page" },
+  { id: "panel", label: "Panel" },
+] as const;
+
+const gitReviewModeOptions = [
+  { id: "panel", label: "Panel" },
+  { id: "page", label: "Page" },
+] as const;
+
+const scrollSpeedOptions = Array.from({ length: 10 }, (_, i) => ({
+  id: String(i + 1),
+  label: `${i + 1}x`,
+})) as readonly { id: string; label: string }[];
+
+export function GeneralSettings() {
+  const themeMode = useSharedSettings((state) => state.themeMode);
+  const setThemeMode = useSharedSettings((state) => state.setThemeMode);
+  const terminalPosition = useSharedSettings((state) => state.terminalPosition);
+  const setTerminalPosition = useSharedSettings((state) => state.setTerminalPosition);
+  const collapseTerminalComposer = useSharedSettings((state) => state.collapseTerminalComposer);
+  const setCollapseTerminalComposer = useSharedSettings(
+    (state) => state.setCollapseTerminalComposer,
+  );
+  const autoShowTerminalPanel = useSharedSettings((state) => state.autoShowTerminalPanel);
+  const setAutoShowTerminalPanel = useSharedSettings((state) => state.setAutoShowTerminalPanel);
+  const staleThreadUnloadMinutes = useSharedSettings((state) => state.staleThreadUnloadMinutes);
+  const setStaleThreadUnloadMinutes = useSharedSettings(
+    (state) => state.setStaleThreadUnloadMinutes,
+  );
+  const scrollSpeed = useSharedSettings((state) => state.scrollSpeed);
+  const setScrollSpeed = useSharedSettings((state) => state.setScrollSpeed);
+  const preventSleepWhileWorking = useSharedSettings((state) => state.preventSleepWhileWorking);
+  const setPreventSleepWhileWorking = useSharedSettings(
+    (state) => state.setPreventSleepWhileWorking,
+  );
+  const threadRemoveAction = useSharedSettings((state) => state.threadRemoveAction);
+  const setThreadRemoveAction = useSharedSettings((state) => state.setThreadRemoveAction);
+  const newThreadMode = useSharedSettings((state) => state.newThreadMode);
+  const setNewThreadMode = useSharedSettings((state) => state.setNewThreadMode);
+  const gitReviewMode = useSharedSettings((state) => state.gitReviewMode);
+  const setGitReviewMode = useSharedSettings((state) => state.setGitReviewMode);
+  const editorLspEnabled = useSharedSettings((state) => state.editorLspEnabled);
+  const setEditorLspEnabled = useSharedSettings((state) => state.setEditorLspEnabled);
+
+  return (
+    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
+      <div className="mx-auto max-w-[560px]">
+        <h1 className="mb-6 text-lg font-semibold text-foreground">General</h1>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Theme</p>
+              <p className="text-xs text-muted">Choose how Lightcode looks.</p>
+            </div>
+            <Select
+              aria-label="Theme"
+              className="w-[160px] shrink-0"
+              options={themeOptions}
+              value={themeMode}
+              onChange={(value) => {
+                startTransition(() => {
+                  setThemeMode(value as ThemeMode);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Terminal position</p>
+              <p className="text-xs text-muted">Where the terminal panel appears.</p>
+            </div>
+            <Select
+              aria-label="Terminal position"
+              className="w-[160px] shrink-0"
+              options={terminalPositionOptions}
+              value={terminalPosition}
+              onChange={(value) => {
+                startTransition(() => {
+                  setTerminalPosition(value as TerminalPosition);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Auto-show terminal panel</p>
+              <p className="text-xs text-muted">
+                Automatically show the terminal panel when running commands or creating worktrees.
+              </p>
+            </div>
+            <Switch
+              isSelected={autoShowTerminalPanel}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setAutoShowTerminalPanel(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Collapse terminal composer</p>
+              <p className="text-xs text-muted">
+                Hide the composer by default in terminal-native threads.
+              </p>
+            </div>
+            <Switch
+              isSelected={collapseTerminalComposer}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setCollapseTerminalComposer(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Unload idle threads after</p>
+              <p className="text-xs text-muted">
+                Hidden resumable threads are swept every 5 minutes and unloaded after this idle age.
+              </p>
+            </div>
+            <Select
+              aria-label="Unload idle threads after"
+              className="w-[160px] shrink-0"
+              options={staleThreadUnloadOptions}
+              value={String(staleThreadUnloadMinutes)}
+              onChange={(value) => {
+                startTransition(() => {
+                  setStaleThreadUnloadMinutes(Number.parseInt(value, 10) || 0);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Terminal scroll speed</p>
+              <p className="text-xs text-muted">
+                Scroll speed multiplier for the terminal scrollback buffer.
+              </p>
+            </div>
+            <Select
+              aria-label="Terminal scroll speed"
+              className="w-[160px] shrink-0"
+              options={scrollSpeedOptions}
+              value={String(scrollSpeed)}
+              onChange={(value) => {
+                startTransition(() => {
+                  setScrollSpeed(Number.parseInt(value, 10) || 2);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Prevent sleep while working</p>
+              <p className="text-xs text-muted">
+                Keep the system awake while any thread is actively working.
+              </p>
+            </div>
+            <Switch
+              isSelected={preventSleepWhileWorking}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setPreventSleepWhileWorking(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Default thread removal</p>
+              <p className="text-xs text-muted">
+                Action for the quick-remove button on sidebar threads.
+              </p>
+            </div>
+            <Select
+              aria-label="Default thread removal"
+              className="w-[160px] shrink-0"
+              options={threadRemoveActionOptions}
+              value={threadRemoveAction}
+              onChange={(value) => {
+                startTransition(() => {
+                  setThreadRemoveAction(value as ThreadRemoveAction);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Default new thread</p>
+              <p className="text-xs text-muted">
+                Open new threads as a full page or a side-by-side panel.
+              </p>
+            </div>
+            <Select
+              aria-label="Default new thread"
+              className="w-[160px] shrink-0"
+              options={newThreadModeOptions}
+              value={newThreadMode}
+              onChange={(value) => {
+                startTransition(() => {
+                  setNewThreadMode(value as NewThreadMode);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Git review mode</p>
+              <p className="text-xs text-muted">
+                Open git review as a right-side panel or a full page.
+              </p>
+            </div>
+            <Select
+              aria-label="Git review mode"
+              className="w-[160px] shrink-0"
+              options={gitReviewModeOptions}
+              value={gitReviewMode}
+              onChange={(value) => {
+                startTransition(() => {
+                  setGitReviewMode(value as GitReviewMode);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Editor LSP</p>
+              <p className="text-xs text-muted">
+                Enable language server support for type checking, completions, and diagnostics.
+                Requires a language server installed (e.g. typescript-language-server).
+              </p>
+            </div>
+            <Switch
+              isSelected={editorLspEnabled}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setEditorLspEnabled(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

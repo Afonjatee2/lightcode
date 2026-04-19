@@ -1,6 +1,6 @@
 import type { editor as MonacoEditor } from "monaco-editor";
 import type { LspIpcTransport } from "./ipcTransport";
-import { getLanguageFromPath } from "../components/fileEditor/FileEditorPane";
+import { getLanguageFromPath } from "../views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane";
 
 type IDisposable = { dispose(): void };
 

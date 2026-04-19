@@ -15,17 +15,24 @@ The preload bridge (`window.lightcode`) wraps all IPC into typed async methods d
 
 ## State Management
 
-Five Zustand stores in `src/renderer/state/`:
+Zustand stores in `src/renderer/state/`. Each cross-cutting UI domain owns its own store — do not broaden an existing store to cover a new concern.
 
-| Store                 | Persisted | Purpose                                                                         |
-| --------------------- | --------- | ------------------------------------------------------------------------------- |
-| `appStore`            | SQLite    | Projects, threads, panes, agent statuses, pending server requests, draft config |
-| `gitStore`            | No        | Per-project git status, worktree info, branch lists                             |
-| `devTerminalStore`    | SQLite    | Shell session tabs, active project, activity tracking                           |
-| `sharedSettingsStore` | SQLite    | Theme mode, commit generation provider/model/effort                             |
-| `updateStore`         | No        | Auto-update phase, version, download progress                                   |
+| Store                 | Persisted | Purpose                                                                                  |
+| --------------------- | --------- | ---------------------------------------------------------------------------------------- |
+| `appStore`            | SQLite    | Projects, threads, panes, agent statuses, pending server requests, draft config          |
+| `gitStore`            | No        | Per-project/per-worktree git status, PR data, branch lists, source info                  |
+| `devTerminalStore`    | SQLite    | Shell session tabs, active project/worktree, per-tab activity tracking                   |
+| `panelStore`          | Local     | Settings/project-settings open state, git+files side-panel context, right-panel tab      |
+| `fileEditorStore`     | No        | Editor tabs, active path, preview tab, dirty buffers                                     |
+| `projectTreeStore`    | No        | File tree expanded/loading paths, directory entries cache, drop target, committed search |
+| `sharedSettingsStore` | SQLite    | Theme mode, commit generation provider/model/effort                                      |
+| `agentStatusesStore`  | No        | Per-environment (Windows/WSL) agent install + auth status                                |
+| `updateStore`         | No        | Auto-update phase, version, download progress                                            |
+| `worktreeDeleteStore` | No        | Ephemeral UI state for worktree delete confirmation                                      |
 
-Components connect to stores directly — avoid prop drilling.
+Components connect to stores directly — avoid prop drilling. Subscriptions must be **narrow and primitive-returning** (see `editing-rules.md` → Store Subscriptions & Render Isolation). Per-entity boolean/string hooks (`useIsTabActive(path)`, `usePrState(key)`, `useIsPathExpanded(path)`) are the default pattern; whole-object subscriptions are banned on hot paths.
+
+Companion selector modules (`fileEditorSelectors.ts`, `gitSelectors.ts`, `hooks/uiSelectors.ts`) house WeakMap-cached derivations keyed on store-array identity — first caller builds O(N), subsequent callers are O(1) until the store replaces the array.
 
 ## Build Pipeline
 

@@ -1,5 +1,16 @@
 # UI Patterns & Component Reuse
 
+## Component Decomposition
+
+Keep components narrowly scoped to what they render. A "GOD component" — one that renders a tab strip, editor body, toolbar, and status row from a single top-level subscription — cascades re-renders through every subtree on any update. Split it into subcomponents and let each subscribe to its own slice.
+
+- **Row/entry components take an identifier, not the entity payload.** `<FileRow path={p} />`, `<TreeEntryRow path={p} />`, `<PrSection prKey={k} />` — not `<FileRow file={...} />` with `isSelected` computed by the parent.
+- **Subcomponents own their subscriptions.** A row reads its own "active / dirty / expanded / loading / drop-target" flags via per-entity hooks. Parent iterators only subscribe to the list of ids.
+- **No prop drilling of store state.** If a child needs a store value, the child calls a hook. Intermediate components stay out of the subscription path.
+- **No callback hell.** A row that needs to stage/close/toggle calls the store action directly (or uses a hook that does). Don't thread 6 handler props through every layer.
+
+See `.agents/docs/editing-rules.md` → Store Subscriptions & Render Isolation for the mechanical rules (primitive selectors, WeakMap caches, equality gates, split-by-subscription).
+
 ## Component Reuse
 
 Before creating a new component, check if an existing one handles the use case.

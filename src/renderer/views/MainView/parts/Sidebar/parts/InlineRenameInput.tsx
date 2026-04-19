@@ -1,0 +1,53 @@
+import { useEffect, useRef, useState } from "react";
+
+export function InlineRenameInput(props: {
+  initialValue: string;
+  onCommit: (value: string) => void;
+  onCancel: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(props.initialValue);
+  const committedRef = useRef(false);
+
+  useEffect(() => {
+    const el = inputRef.current;
+    if (el) {
+      el.focus();
+      el.select();
+    }
+  }, []);
+
+  function commit() {
+    if (committedRef.current) return;
+    committedRef.current = true;
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== props.initialValue) {
+      props.onCommit(trimmed);
+    } else {
+      props.onCancel();
+    }
+  }
+
+  return (
+    <input
+      ref={inputRef}
+      aria-label="Rename thread"
+      className="block w-full bg-transparent text-[inherit] leading-[inherit] outline-none"
+      value={value}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          commit();
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          committedRef.current = true;
+          props.onCancel();
+        }
+      }}
+      onClick={(e) => e.stopPropagation()}
+    />
+  );
+}

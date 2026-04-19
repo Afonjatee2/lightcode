@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { detectGeminiInvalidSessionRef } from "./adapter";
+import { detectGeminiInvalidSessionRef } from "./session";
 import { detectGeminiTerminalStatus } from "./terminal";
 
 describe("detectGeminiTerminalStatus", () => {

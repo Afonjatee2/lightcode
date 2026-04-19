@@ -1,0 +1,174 @@
+import { ChevronDown, GitPullRequest, Sparkles } from "lucide-react";
+import { Button, ButtonGroup, Dropdown, Label, Modal, Tooltip } from "@heroui/react";
+import type { GitBranchInfo } from "@/shared/contracts";
+import { PixelLoader, TextArea } from "@/renderer/components/common";
+
+export function CreatePrModal(props: {
+  isOpen: boolean;
+  onOpenChange: (open: boolean) => void;
+  effectiveBranch: string | undefined;
+  sourceBranch: string | null;
+  prTitle: string;
+  setPrTitle: (title: string) => void;
+  prBody: string;
+  setPrBody: (body: string) => void;
+  prTargetBranch: string | null;
+  setPrTargetBranch: (branch: string | null) => void;
+  prLoading: boolean;
+  isGeneratingPr: boolean;
+  canGenerateMessage: boolean;
+  branchList: readonly GitBranchInfo[];
+  handleCreatePr: (isDraft: boolean) => Promise<void>;
+  handleGeneratePrSummary: () => Promise<void>;
+}) {
+  const {
+    isOpen,
+    onOpenChange,
+    effectiveBranch,
+    sourceBranch,
+    prTitle,
+    setPrTitle,
+    prBody,
+    setPrBody,
+    prTargetBranch,
+    setPrTargetBranch,
+    prLoading,
+    isGeneratingPr,
+    canGenerateMessage,
+    branchList,
+    handleCreatePr,
+    handleGeneratePrSummary,
+  } = props;
+
+  return (
+    <Modal.Backdrop isOpen={isOpen} onOpenChange={onOpenChange}>
+      <Modal.Container>
+        <Modal.Dialog className="sm:max-w-[600px]">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Heading>Create Pull Request</Modal.Heading>
+            <div className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+              <span className="truncate">{effectiveBranch}</span>
+              <span className="shrink-0">→</span>
+              <Dropdown>
+                <Button variant="tertiary" className="h-5 min-w-0 px-1.5 text-xs">
+                  {prTargetBranch || sourceBranch || "..."}
+                  <ChevronDown className="size-3 text-muted/60" />
+                </Button>
+                <Dropdown.Popover placement="bottom start" className="max-h-60">
+                  <Dropdown.Menu
+                    aria-label="Target branch"
+                    selectionMode="single"
+                    selectedKeys={new Set([prTargetBranch || sourceBranch || ""])}
+                    onSelectionChange={(keys) => {
+                      const key = Array.from(keys)[0] as string;
+                      setPrTargetBranch(key === sourceBranch ? null : key);
+                    }}
+                  >
+                    {branchList
+                      .filter((b) => !b.isRemote && b.name !== effectiveBranch)
+                      .map((b) => (
+                        <Dropdown.Item key={b.name} id={b.name} textValue={b.name}>
+                          <Label>{b.name}</Label>
+                        </Dropdown.Item>
+                      ))}
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
+            </div>
+          </Modal.Header>
+          <Modal.Body className="p-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start gap-2">
+                <TextArea
+                  fullWidth
+                  autoSize
+                  placeholder="PR title *"
+                  rows={1}
+                  maxRows={3}
+                  value={prTitle}
+                  onChange={(e) => setPrTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                      e.preventDefault();
+                      void handleCreatePr(false).then(() => onOpenChange(false));
+                    }
+                  }}
+                />
+                <Tooltip delay={0}>
+                  <Button
+                    isIconOnly
+                    variant="tertiary"
+                    aria-label="Generate PR summary"
+                    isDisabled={isGeneratingPr || !canGenerateMessage}
+                    isPending={isGeneratingPr}
+                    onPress={() => void handleGeneratePrSummary()}
+                    className="mt-0.5 shrink-0"
+                  >
+                    {isGeneratingPr ? <PixelLoader size="sm" /> : <Sparkles className="size-3.5" />}
+                  </Button>
+                  <Tooltip.Content>Generate with AI</Tooltip.Content>
+                </Tooltip>
+              </div>
+              <TextArea
+                fullWidth
+                placeholder="Description (optional)"
+                rows={8}
+                value={prBody}
+                onChange={(e) => setPrBody(e.target.value)}
+              />
+            </div>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button slot="close" variant="tertiary">
+              Cancel
+            </Button>
+            <ButtonGroup>
+              <Button
+                isDisabled={prLoading || !prTitle.trim()}
+                isPending={prLoading}
+                onPress={() => void handleCreatePr(false).then(() => onOpenChange(false))}
+              >
+                {({ isPending }) => (
+                  <>
+                    {isPending ? (
+                      <PixelLoader size="sm" />
+                    ) : (
+                      <GitPullRequest className="size-3.5" />
+                    )}
+                    Create PR
+                  </>
+                )}
+              </Button>
+              <Dropdown>
+                <Button
+                  isIconOnly
+                  aria-label="More PR options"
+                  isDisabled={prLoading || !prTitle.trim()}
+                >
+                  <ButtonGroup.Separator />
+                  <ChevronDown className="size-3.5" />
+                </Button>
+                <Dropdown.Popover placement="top end">
+                  <Dropdown.Menu
+                    aria-label="PR options"
+                    onAction={(key) => {
+                      if (key === "draft") {
+                        void handleCreatePr(true).then(() => onOpenChange(false));
+                      }
+                    }}
+                  >
+                    <Dropdown.Item id="draft" textValue="Create Draft PR">
+                      <GitPullRequest className="size-3.5 opacity-60" />
+                      <Label>Create Draft PR</Label>
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
+            </ButtonGroup>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+  );
+}
