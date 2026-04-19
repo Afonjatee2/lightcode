@@ -1,6 +1,6 @@
 import { createContext, type ReactNode, useContext, useRef } from "react";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
-import { useResizablePanels } from "./parts/useResizablePanels";
+import { SIDEBAR_MIN_WIDTH, useResizablePanels } from "./parts/useResizablePanels";
 import { SIDEBAR_COLLAPSED_WIDTH, useSidebarOverlay } from "./parts/useSidebarOverlay";
 import { RightAsideSlot } from "./parts/RightAsideSlot";
 import { GitAsideSlot } from "./parts/GitAsideSlot";
@@ -127,7 +127,10 @@ export function AppShell(props: {
           {sidebarHeader && (
             <div
               className={`lightcode-overlay-header flex shrink-0 items-center gap-3 px-4 ${isOverlay ? "bg-background" : "bg-[var(--content-background)]"}`}
-              style={{ height: "env(titlebar-area-height, 32px)" }}
+              style={{
+                height: "env(titlebar-area-height, 32px)",
+                ...(isCollapsed && !closingOverlay ? {} : { minWidth: SIDEBAR_MIN_WIDTH }),
+              }}
             >
               {isCollapsed && !closingOverlay ? collapsedSidebarHeader : sidebarHeader}
             </div>

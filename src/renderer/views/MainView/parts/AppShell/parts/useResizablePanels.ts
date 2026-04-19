@@ -3,7 +3,7 @@ import type { RefObject } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { readStoredNumber } from "@/renderer/utils/localStorage";
 
-const SIDEBAR_MIN_WIDTH = 220;
+export const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 500;
 const SIDEBAR_DEFAULT_WIDTH = 350;
 const PANEL_MIN_WIDTH = 320;

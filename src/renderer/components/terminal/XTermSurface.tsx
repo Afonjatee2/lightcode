@@ -125,7 +125,15 @@ export const XTermSurface = forwardRef<
     let isActive = true;
     let lastCols = -1;
     let lastRows = -1;
+    let lastFitWidth = -1;
+    let lastFitHeight = -1;
     let resizeFrame = 0;
+    let ptyResizeTimer = 0;
+    let lastPtyResizeAt = 0;
+    // Fit the canvas immediately; throttle (leading + trailing) the PTY resize
+    // RPC so the agent sees cols updates ~40×/s during a drag — not only after
+    // the user releases — while still coalescing rapid mount-time transitions.
+    const PTY_RESIZE_THROTTLE_MS = 25;
 
     // ── Write batching ───────────────────────────────────────────
     // Full-screen TUIs (e.g. Gemini CLI) send screen redraws as
@@ -183,6 +191,26 @@ export const XTermSurface = forwardRef<
     terminalRef.current = terminal;
     fitRef.current = fit;
 
+    const flushPtyResize = () => {
+      ptyResizeTimer = 0;
+      if (!isActive) return;
+      const cols = terminal.cols;
+      const rows = terminal.rows;
+      if (cols === lastCols && rows === lastRows) return;
+      if (cols < 20 || rows < 5) return;
+
+      lastCols = cols;
+      lastRows = rows;
+
+      onTerminalResizeRef.current?.({ cols, rows });
+
+      void readBridge()
+        .resizeTerminal({ threadId: terminalId, cols, rows })
+        .catch(() => {
+          // Ignore errors.
+        });
+    };
+
     const doFit = () => {
       if (!isActive || !mount) return;
 
@@ -193,38 +221,29 @@ export const XTermSurface = forwardRef<
         return;
       }
 
+      if (width === lastFitWidth && height === lastFitHeight) {
+        return;
+      }
+      lastFitWidth = width;
+      lastFitHeight = height;
+
       fit.fit();
 
-      if (terminal.cols !== lastCols || terminal.rows !== lastRows) {
-        lastCols = terminal.cols;
-        lastRows = terminal.rows;
-
-        if (terminal.cols >= 20 && terminal.rows >= 5) {
-          onTerminalResizeRef.current?.({
-            cols: terminal.cols,
-            rows: terminal.rows,
-          });
-
-          void readBridge()
-            .resizeTerminal({
-              threadId: terminalId,
-              cols: terminal.cols,
-              rows: terminal.rows,
-            })
-            .catch(() => {
-              // Ignore errors.
-            });
-        }
+      const now = performance.now();
+      const elapsed = now - lastPtyResizeAt;
+      if (elapsed >= PTY_RESIZE_THROTTLE_MS) {
+        lastPtyResizeAt = now;
+        flushPtyResize();
+      } else if (ptyResizeTimer === 0) {
+        ptyResizeTimer = window.setTimeout(() => {
+          lastPtyResizeAt = performance.now();
+          flushPtyResize();
+        }, PTY_RESIZE_THROTTLE_MS - elapsed) as unknown as number;
       }
     };
 
     const scheduleResize = () => {
-      if (!isActive) return;
-
-      if (resizeFrame !== 0) {
-        cancelAnimationFrame(resizeFrame);
-      }
-
+      if (!isActive || resizeFrame !== 0) return;
       resizeFrame = requestAnimationFrame(() => {
         resizeFrame = 0;
         if (!isActive) return;
@@ -393,6 +412,9 @@ export const XTermSurface = forwardRef<
       isActive = false;
       if (resizeFrame !== 0) {
         cancelAnimationFrame(resizeFrame);
+      }
+      if (ptyResizeTimer !== 0) {
+        clearTimeout(ptyResizeTimer);
       }
       if (writeTimer !== 0) {
         clearTimeout(writeTimer);

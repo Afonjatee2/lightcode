@@ -12,7 +12,11 @@
       "WebFetch(domain:dndkit.com)",
       "Bash(npx vitest:*)",
       "Bash(pnpm vitest:*)",
-      "Bash(xargs basename:*)"
+      "Bash(xargs basename:*)",
+      "Bash(pnpm typecheck *)",
+      "WebSearch",
+      "Bash(git checkout *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

@@ -51,6 +51,7 @@ import {
 } from "@/renderer/dnd";
 import { ContextMenu, SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
+import { SIDEBAR_MIN_WIDTH } from "@/renderer/views/MainView/parts/AppShell/parts/useResizablePanels";
 import { isWindows, readBridge } from "@/renderer/bridge";
 import { formatBytes } from "@/shared/formatBytes";
 import { useUpdateStore } from "@/renderer/state/updateStore";
@@ -1543,9 +1544,9 @@ export function Sidebar() {
     <div className="relative h-full">
       {/* Collapsed icon rail overlay — width 48px, icons centered at 24px (pl-2 + w-8/2) */}
       {isCollapsed && (
-        <div className="absolute inset-0 z-10 flex h-full min-h-0 flex-col items-start gap-3 pl-2 pb-1 pt-0">
+        <div className="absolute inset-y-0 left-0 z-10 flex h-full min-h-0 w-12 flex-col items-start gap-3 pl-2 pb-1 pt-0">
           {/* Thread icons — only active threads */}
-          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+          <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
             {activeThreads.map((thread) => (
               <SidebarButton
                 key={thread.id}
@@ -1565,7 +1566,7 @@ export function Sidebar() {
           </div>
 
           {/* Footer icons */}
-          <div className="space-y-1 border-t border-white/6 pt-2 pr-2">
+          <div className="flex flex-col gap-1 border-t border-white/6 pt-2 pr-2">
             <UpdateButtons iconOnly />
             <SidebarButton
               iconOnly
@@ -1585,7 +1586,8 @@ export function Sidebar() {
 
       {/* Full expanded sidebar — icons centered at 24px (branding px-3 + w-6/2, buttons px-4 + w-4/2) */}
       <div
-        className={`flex h-full min-h-0 flex-col gap-3 px-3 pb-1 pt-0 transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
+        className={`flex h-full min-h-0 flex-col gap-3 px-3 pb-1 pt-0 ${isCollapsed ? "invisible" : ""}`}
+        style={{ minWidth: SIDEBAR_MIN_WIDTH }}
       >
         <div
           className={`min-h-0 flex-1 overflow-y-auto px-0 -mr-3 [scrollbar-gutter:stable] ${!isWindows() ? "pr-3" : ""}`}

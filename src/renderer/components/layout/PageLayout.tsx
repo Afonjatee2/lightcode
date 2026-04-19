@@ -51,22 +51,24 @@ export function PageLayout(props: {
   );
 
   const collapsedSidebarHeader = sidebarHeaderChildren ? (
-    <Popover>
-      <Button
-        isIconOnly
-        size="sm"
-        variant="ghost"
-        aria-label="Sidebar actions"
-        className="lightcode-overlay-header__controls h-8 w-8 min-w-8 text-muted hover:text-foreground"
-      >
-        <EllipsisVertical className="size-3.5" />
-      </Button>
-      <Popover.Content placement="right" className="w-auto p-0">
-        <Popover.Dialog className="flex items-center gap-1 p-2">
-          {sidebarHeaderChildren}
-        </Popover.Dialog>
-      </Popover.Content>
-    </Popover>
+    <div className="flex w-full justify-center">
+      <Popover>
+        <Button
+          isIconOnly
+          size="sm"
+          variant="ghost"
+          aria-label="Sidebar actions"
+          className="lightcode-overlay-header__controls size-6 min-w-0 text-muted hover:text-foreground"
+        >
+          <EllipsisVertical className="size-3.5" />
+        </Button>
+        <Popover.Content placement="right" className="w-auto p-0">
+          <Popover.Dialog className="flex items-center gap-1 p-2">
+            {sidebarHeaderChildren}
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
+    </div>
   ) : undefined;
 
   const contentHeader = <>{contentHeaderChildren}</>;
