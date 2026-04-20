@@ -1,0 +1,399 @@
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
+import {
+  type AgentHookSupportEntry,
+  defaultSharedSettings,
+  normalizeSharedSettings,
+} from "@/shared/settings";
+import type { AgentKind, ProjectLocation } from "@/shared/contracts";
+import {
+  type AgentAdapter,
+  type AgentEnvContext,
+  type AgentCliHookPluginSupport,
+} from "../agents/base";
+import type { WslHookBridgeManager } from "../wsl/bridge";
+import { isLightcodeHookDebug } from "./hookDebug";
+import { HookIngress, type HookIngressBootInfo } from "./hookIngress";
+
+export interface CliHookPluginCoordinatorOptions {
+  adapters: Map<AgentKind, AgentAdapter>;
+  settingsPath: string;
+  /** TCP port preference; falls back to ephemeral on collision. */
+  preferredPort?: number;
+  /** Cache TTL for the CLI hook plugin install verdict — defaults to 7 days. */
+  cacheTtlMs?: number;
+  /** Pluggable env-context resolver (mainly for tests). */
+  envContext?: (agentKind: AgentKind, projectLocation?: ProjectLocation) => AgentEnvContext;
+  /**
+   * Optional WSL hook bridge manager. When provided, WSL spawns are routed
+   * through a per-distro `bridge.mjs` (see `WslHookBridgeManager`) instead
+   * of the Windows-host `HookIngress`, which a WSL2 NAT loopback would not
+   * reach.
+   */
+  wslHookBridge?: WslHookBridgeManager;
+}
+
+const DEFAULT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Provider-agnostic orchestrator for **CLI hook plugin** status detection
+ * (accurate lifecycle events from the agent CLI via HTTP hooks). The
+ * supervisor instantiates a single coordinator at boot:
+ *
+ *   1. It owns the singleton `HookIngress` (HTTP server on 127.0.0.1) used
+ *      by Windows / macOS / Linux agent processes.
+ *   2. It optionally owns a `WslHookBridgeManager` for routing WSL spawns
+ *      through an in-distro `bridge.mjs` (WSL2 loopback can't reach the
+ *      Windows-host ingress).
+ *   3. It iterates installed adapters and asks any that implement
+ *      `AgentCliHookPluginSupport` to install/refresh their plugin.
+ *   4. It maintains a per-AgentKind + per-environment cache in shared
+ *      settings keyed by the agent binary version + plugin version +
+ *      protocol version + platform, so subsequent supervisor runs skip the
+ *      install probe entirely. The env-key segment ensures a "hook plugin
+ *      unsupported" verdict for one distro doesn't poison the entry for the
+ *      Windows-side install (or vice versa).
+ *   5. It exposes `resolvePluginEnvForSpawn` which the
+ *      `ThreadSessionManager` calls per spawn to obtain the env vars + extra
+ *      args the agent process needs to load the plugin.
+ *
+ * The runtime never branches on `agentKind`. Add a new provider with a plugin
+ * by simply implementing the `AgentCliHookPluginSupport` slice on its adapter.
+ */
+export class CliHookPluginCoordinator {
+  private readonly ingress: HookIngress;
+  private readonly cacheTtlMs: number;
+  private readonly envContext: (
+    agentKind: AgentKind,
+    projectLocation?: ProjectLocation,
+  ) => AgentEnvContext;
+  private readonly installPromises = new Map<string, Promise<InstallOutcome>>();
+  private wslHookBridge: WslHookBridgeManager | undefined;
+
+  constructor(
+    private readonly options: CliHookPluginCoordinatorOptions,
+    onEvent: import("./hookIngress").HookEventReceiver,
+  ) {
+    this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
+    this.envContext = options.envContext ?? defaultEnvContext;
+    this.wslHookBridge = options.wslHookBridge;
+    const ingressOptions: import("./hookIngress").HookIngressOptions = {
+      onEvent,
+      onError: (message, error) => {
+        if (isLightcodeHookDebug()) {
+          console.warn(`[supervisor] hook-debug: ${message}`, error);
+        }
+      },
+    };
+    if (options.preferredPort !== undefined) {
+      ingressOptions.preferredPort = options.preferredPort;
+    }
+    this.ingress = new HookIngress(ingressOptions);
+  }
+
+  /**
+   * Synchronously expose the supervisor's hook bearer secret. Used by the
+   * supervisor when constructing the optional WSL hook bridge so both
+   * transports authenticate against the same token.
+   */
+  getHookSecret(): string {
+    return this.ingress.getSecret();
+  }
+
+  /** Synchronously expose the protocol version the ingress was built with. */
+  getProtocolVersion(): number {
+    return this.ingress.getProtocolVersion();
+  }
+
+  /**
+   * Late-bind the WSL hook bridge. Call once during supervisor boot after
+   * constructing the bridge with this coordinator's hook secret. Replacing
+   * a previously-set bridge is a programming error and is ignored.
+   */
+  setWslHookBridge(bridge: WslHookBridgeManager): void {
+    if (this.wslHookBridge && this.wslHookBridge !== bridge) {
+      throw new Error("CliHookPluginCoordinator already has a WslHookBridgeManager");
+    }
+    this.wslHookBridge = bridge;
+  }
+
+  /** Begin listening as a background task. Safe to call from supervisor boot. */
+  startIngress(): void {
+    this.ingress.start();
+    void this.ingress.ready
+      .then((info) => {
+        if (isLightcodeHookDebug()) {
+          console.log(`[supervisor] hook-debug: HookIngress listening ${info.url}`);
+        }
+      })
+      .catch((error) => {
+        console.warn("[supervisor] hook ingress failed to start:", error);
+      });
+  }
+
+  /** Wait for the ingress to be ready (used at thread-spawn time). */
+  ready(): Promise<HookIngressBootInfo> {
+    return this.ingress.ready;
+  }
+
+  async dispose(): Promise<void> {
+    await this.ingress.dispose();
+    if (this.wslHookBridge) {
+      await this.wslHookBridge.dispose();
+    }
+  }
+
+  /**
+   * Resolve the env + extra args to inject into a thread's PTY so the agent
+   * picks up the CLI hook plugin. Returns `undefined` when the agent has no
+   * hook-plugin support, the cache says it failed to install on this machine,
+   * or the required transport (HookIngress for native, WslHookBridge for WSL)
+   * isn't available — the caller falls back to terminal parsing (L2) silently.
+   */
+  async resolvePluginEnvForSpawn(input: {
+    threadId: string;
+    agentKind: AgentKind;
+    projectLocation?: ProjectLocation;
+  }): Promise<{ env: Record<string, string>; extraArgs: string[] } | undefined> {
+    const adapter = this.options.adapters.get(input.agentKind);
+    const slice = adapter ? toCliHookPluginSlice(adapter) : undefined;
+    if (!adapter || !slice) {
+      return undefined;
+    }
+
+    // CLI hook plugins apply only to terminal-driven agents. ACP/SDK/server-controlled
+    // agents already emit structured status over their control channel, so
+    // injecting a second signal would double-count turns and confuse the
+    // dispatcher. A server-controlled adapter short-circuits here before we
+    // pay the install/transport cost.
+    if (!isTerminalLiveInput(adapter)) {
+      return undefined;
+    }
+
+    const ctx = this.envContext(input.agentKind, input.projectLocation);
+    const outcome = await this.ensureInstalled(adapter, slice, ctx);
+    if (!outcome.ok) {
+      return undefined;
+    }
+
+    const transport = await this.resolveTransport(ctx);
+    if (!transport) {
+      return undefined;
+    }
+
+    const launchExtras = (await slice.pluginLaunchExtras?.(ctx)) ?? {};
+
+    const env: Record<string, string> = {
+      LIGHTCODE_HOOK_URL: transport.url,
+      LIGHTCODE_HOOK_SECRET: transport.secret,
+      LIGHTCODE_HOOK_PROTOCOL_VERSION: String(transport.protocolVersion),
+      LIGHTCODE_THREAD_ID: input.threadId,
+      LIGHTCODE_AGENT_KIND: input.agentKind,
+      ...(launchExtras.env ?? {}),
+    };
+    return { env, extraArgs: launchExtras.args ?? [] };
+  }
+
+  /**
+   * Install (or confirm install of) every adapter's NATIVE plugin. WSL
+   * installs are deferred to first use because they need a per-distro
+   * context that the boot path doesn't have. Errors are recorded in the
+   * cache and never thrown.
+   */
+  async installAll(): Promise<void> {
+    const tasks = [...this.options.adapters.values()].map(async (adapter) => {
+      const slice = toCliHookPluginSlice(adapter);
+      if (!slice) return;
+      // Skip server-controlled adapters entirely — see the matching check
+      // in `resolvePluginEnvForSpawn`. Installing their plugin would be
+      // wasted I/O because the runtime never injects the env/args for them.
+      if (!isTerminalLiveInput(adapter)) return;
+      const ctx = this.envContext(adapter.kind);
+      await this.ensureInstalled(adapter, slice, ctx);
+    });
+    await Promise.allSettled(tasks);
+  }
+
+  private async resolveTransport(
+    ctx: AgentEnvContext,
+  ): Promise<{ url: string; secret: string; protocolVersion: number } | undefined> {
+    if (ctx.envKind === "wsl") {
+      if (!this.wslHookBridge || !ctx.wslDistro) return undefined;
+      const handle = await this.wslHookBridge.ensureBridge(ctx.wslDistro);
+      if (!handle) return undefined;
+      // Bridge inherits the supervisor's secret + protocol via spawn env.
+      const info = await this.ingress.ready;
+      return { url: handle.url, secret: info.secret, protocolVersion: info.protocolVersion };
+    }
+    const info = await this.ingress.ready;
+    return { url: info.url, secret: info.secret, protocolVersion: info.protocolVersion };
+  }
+
+  private ensureInstalled(
+    adapter: AgentAdapter,
+    slice: AgentCliHookPluginSupport,
+    ctx: AgentEnvContext,
+  ): Promise<InstallOutcome> {
+    const key = composeCacheKey(adapter.kind, ctx);
+    const existing = this.installPromises.get(key);
+    if (existing) return existing;
+    const task = this.runInstall(adapter, slice, ctx, key).catch(
+      (error): InstallOutcome => ({ ok: false, reason: errorMessage(error) }),
+    );
+    this.installPromises.set(key, task);
+    return task;
+  }
+
+  private async runInstall(
+    adapter: AgentAdapter,
+    slice: AgentCliHookPluginSupport,
+    ctx: AgentEnvContext,
+    cacheKey: string,
+  ): Promise<InstallOutcome> {
+    const supported = (await slice.isPluginSupported?.(ctx)) ?? true;
+    if (!supported) {
+      this.writeCacheEntry(cacheKey, {
+        agentBinaryVersion: "n/a",
+        pluginVersion: slice.pluginVersion,
+        protocolVersion: slice.minProtocolVersion,
+        platform: process.platform,
+        verifiedAt: new Date().toISOString(),
+        supportsL1: false,
+      });
+      return { ok: false, reason: "unsupported environment" };
+    }
+
+    const settings = readSharedSettings(this.options.settingsPath);
+    const cached = settings.agentHookSupport[cacheKey];
+
+    if (
+      cached &&
+      cached.platform === process.platform &&
+      cached.pluginVersion === slice.pluginVersion &&
+      cached.protocolVersion === slice.minProtocolVersion &&
+      Date.now() - Date.parse(cached.verifiedAt) < this.cacheTtlMs
+    ) {
+      // Cache hit. Still verify the staged files exist before honouring the
+      // cached `supportsL1=true` verdict — a user could have cleaned out
+      // ~/.lightcode/agent-plugins/.
+      if (!cached.supportsL1) return { ok: false, reason: "cached: unsupported" };
+      const installed = await slice.isPluginInstalled(ctx);
+      if (installed.installed)
+        return { ok: true, version: installed.version ?? cached.pluginVersion };
+    }
+
+    const installed = await slice.isPluginInstalled(ctx);
+    let installedVersion = installed.version;
+    if (!installed.installed || installedVersion !== slice.pluginVersion) {
+      const result = await slice.installPlugin(ctx);
+      if (!result.ok) {
+        this.writeCacheEntry(cacheKey, {
+          agentBinaryVersion: "n/a",
+          pluginVersion: slice.pluginVersion,
+          protocolVersion: slice.minProtocolVersion,
+          platform: process.platform,
+          verifiedAt: new Date().toISOString(),
+          supportsL1: false,
+        });
+        return result;
+      }
+      installedVersion = result.version;
+    }
+
+    this.writeCacheEntry(cacheKey, {
+      agentBinaryVersion: "n/a",
+      pluginVersion: installedVersion ?? slice.pluginVersion,
+      protocolVersion: slice.minProtocolVersion,
+      platform: process.platform,
+      verifiedAt: new Date().toISOString(),
+      supportsL1: true,
+    });
+    return { ok: true, version: installedVersion ?? slice.pluginVersion };
+  }
+
+  private writeCacheEntry(cacheKey: string, entry: AgentHookSupportEntry): void {
+    const settings = readSharedSettings(this.options.settingsPath);
+    const next = {
+      ...settings,
+      agentHookSupport: { ...settings.agentHookSupport, [cacheKey]: entry },
+    };
+    try {
+      mkdirSync(dirname(this.options.settingsPath), { recursive: true });
+      writeFileSync(this.options.settingsPath, JSON.stringify(next, null, 2), "utf8");
+    } catch (error) {
+      console.warn("[supervisor] failed to persist agentHookSupport cache:", error);
+    }
+  }
+}
+
+type InstallOutcome = { ok: true; version: string } | { ok: false; reason: string };
+
+/**
+ * Compose the per-environment cache key. Native (windows/posix) keeps the
+ * bare `AgentKind` so existing on-disk cache entries continue to be valid.
+ * WSL gets a per-distro suffix so a verdict for `Ubuntu` doesn't shadow
+ * one for `Debian` — Node availability and plugin install state can differ
+ * between distros on the same host.
+ */
+function composeCacheKey(kind: AgentKind, ctx: AgentEnvContext): string {
+  if (ctx.envKind === "wsl" && ctx.wslDistro) {
+    return `${kind}::wsl::${ctx.wslDistro}`;
+  }
+  return kind;
+}
+
+function defaultEnvContext(
+  _agentKind: AgentKind,
+  projectLocation?: ProjectLocation,
+): AgentEnvContext {
+  if (projectLocation?.kind === "wsl") {
+    return { envKind: "wsl", wslDistro: projectLocation.distro };
+  }
+  if (projectLocation?.kind === "windows") {
+    return { envKind: "windows" };
+  }
+  if (projectLocation?.kind === "posix") {
+    return { envKind: "posix" };
+  }
+  return process.platform === "win32" ? { envKind: "windows" } : { envKind: "posix" };
+}
+
+/**
+ * Guard against enabling CLI hook plugins for server-controlled agents (ACP, SDK,
+ * vendor daemons). Those adapters surface status through their own control
+ * channel — layering a hook plugin on top only produces duplicate events.
+ * A missing `liveInputMode` defaults to terminal for backward compatibility
+ * with older adapter fixtures in tests.
+ */
+function isTerminalLiveInput(adapter: AgentAdapter): boolean {
+  const mode = adapter.capabilities?.liveInputMode;
+  return mode === undefined || mode === "terminal";
+}
+
+function toCliHookPluginSlice(adapter: AgentAdapter): AgentCliHookPluginSupport | undefined {
+  if (
+    !adapter.installPlugin ||
+    !adapter.isPluginInstalled ||
+    !adapter.pluginId ||
+    !adapter.pluginVersion
+  ) {
+    return undefined;
+  }
+  // The slice fields are all `Partial`'d on `AgentAdapter`; once the required
+  // ones are present we can safely treat the adapter as the full interface.
+  return adapter as unknown as AgentCliHookPluginSupport;
+}
+
+function readSharedSettings(path: string) {
+  if (!existsSync(path)) return { ...defaultSharedSettings };
+  try {
+    const raw = readFileSync(path, "utf8");
+    return normalizeSharedSettings(JSON.parse(raw));
+  } catch {
+    return { ...defaultSharedSettings };
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

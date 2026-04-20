@@ -35,9 +35,21 @@ import {
 } from "../agents/base";
 import type { WindowsShellPreference } from "../shellPreference";
 import { BufferedLogWriter } from "./bufferedLogWriter";
+import { hookDebugSpawn } from "./hookDebug";
 import type { SessionRuntime, ShellSessionRuntime } from "./sessionTypes";
 import { ThreadOutputPipeline } from "./threadOutputPipeline";
 import { rewriteSegmentsForWsl } from "./threadAttachments";
+
+function hookDebugProjectLabel(loc: ProjectLocation): string {
+  switch (loc.kind) {
+    case "wsl":
+      return `wsl:${loc.distro}`;
+    case "windows":
+      return `windows:${loc.path}`;
+    case "posix":
+      return `posix:${loc.path}`;
+  }
+}
 
 export async function writeSubmittedPrompt(
   pty: Pick<IPty, "write">,
@@ -54,6 +66,37 @@ export async function writeSubmittedPrompt(
   }
 }
 
+/**
+ * Grace window before the local fallback commits to `idle` after detecting a
+ * user-interrupt keystroke. Long enough for a legitimate
+ * `PostToolUseFailure { is_interrupt: true }` hook to land and take over,
+ * short enough that the UI doesn't feel stuck.
+ */
+export const USER_INTERRUPT_RECOVERY_GRACE_MS = 1200;
+
+/**
+ * True iff the user keystroke payload represents an interrupt intent the
+ * user expects to unblock the agent. Matches:
+ *   - `\x03`   (Ctrl+C)     — always an interrupt
+ *   - exactly `\x1b` (Esc)  — standalone Esc press
+ * Does NOT match CSI sequences like `\x1b[A` (arrows) or `\x1bO...` (fn keys),
+ * or alt+<char> (`\x1b<letter>`), so menu navigation inside the permission
+ * dialog does not trigger the fallback.
+ */
+export function isUserInterruptKeystroke(data: string): boolean {
+  if (data.includes("\x03")) return true;
+  if (data === "\x1b") return true;
+  return false;
+}
+
+/**
+ * True iff the current thread status is "busy" from the user's point of view —
+ * i.e. pressing Esc / Ctrl+C in this state is expected to unblock the UI.
+ */
+function isInterruptibleBusyStatus(status: SessionRuntime["status"]): boolean {
+  return status === "working" || status === "needs_approval" || status === "needs_reply";
+}
+
 export interface ThreadSessionManagerOptions {
   emit(event: SupervisorEvent): void;
   isDev: boolean;
@@ -61,11 +104,24 @@ export interface ThreadSessionManagerOptions {
   settingsPath: string;
   adapters: Map<AgentKind, AgentAdapter>;
   windowsShell: WindowsShellPreference;
+  /**
+   * Optional: provides CLI hook plugin ingress env vars + extra CLI args injected
+   * into every agent PTY spawn. The supervisor boots a single
+   * `HookIngress` and exposes this hook so the manager doesn't depend on
+   * `node:http` itself.
+   */
+  resolvePluginEnvForSpawn?(input: {
+    threadId: string;
+    agentKind: AgentKind;
+    projectLocation: ProjectLocation;
+  }): Promise<{ env: Record<string, string>; extraArgs: string[] } | undefined>;
 }
 
 export class ThreadSessionManager {
   readonly sessions = new Map<string, SessionRuntime>();
   readonly shellSessions = new Map<string, ShellSessionRuntime>();
+  /** Reverse index: agent-native session id → SessionRuntime, for CLI hook routing fallback. */
+  readonly sessionsBySessionId = new Map<string, SessionRuntime>();
   private readonly startLocks = new Map<string, Promise<void>>();
   private readonly logWriter = new BufferedLogWriter();
   private readonly outputPipeline: ThreadOutputPipeline;
@@ -92,6 +148,61 @@ export class ThreadSessionManager {
       ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
       canResumeWithConfig: session.canResumeWithConfig,
     }));
+  }
+
+  /**
+   * Look up the live `SessionRuntime` for a CLI hook plugin envelope. Routing
+   * precedence is `threadId` (PTY env, primary) → `sessionId`
+   * (`providerSessionId` discovered after spawn, fallback for nested shells).
+   */
+  findSessionForCliHookPlugin(input: {
+    threadId?: string;
+    sessionId?: string;
+  }): SessionRuntime | undefined {
+    if (input.threadId) {
+      const direct = this.sessions.get(input.threadId);
+      if (direct) return direct;
+    }
+    if (input.sessionId) {
+      const indexed = this.sessionsBySessionId.get(input.sessionId);
+      if (indexed) return indexed;
+      // Fallback: scan for late-arriving `sessionRef`s that haven't been
+      // indexed yet (race between hook SessionStart and provider sessionRef
+      // discovery). Sessions count is small; linear scan is fine.
+      for (const session of this.sessions.values()) {
+        if (session.sessionRef?.providerSessionId === input.sessionId) {
+          this.sessionsBySessionId.set(input.sessionId, session);
+          return session;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /** Apply a CLI hook plugin state change resolved by the dispatcher. */
+  applyCliHookPluginState(
+    session: SessionRuntime,
+    change: {
+      status: import("@/shared/contracts").ThreadStatus;
+      attention: import("@/shared/contracts").ThreadAttention;
+    },
+  ): void {
+    this.outputPipeline.applyCliHookPluginState(session, change);
+  }
+
+  /**
+   * Update the `sessionsBySessionId` index when a session's `sessionRef`
+   * changes. Idempotent — clears any stale id mapping before writing the new
+   * one. Call from anywhere that mutates `session.sessionRef`.
+   */
+  private indexSessionRef(session: SessionRuntime, prevId: string | undefined): void {
+    if (prevId && this.sessionsBySessionId.get(prevId) === session) {
+      this.sessionsBySessionId.delete(prevId);
+    }
+    const nextId = session.sessionRef?.providerSessionId;
+    if (nextId) {
+      this.sessionsBySessionId.set(nextId, session);
+    }
   }
 
   async startThread(payload: StartThreadPayload): Promise<StartThreadResult> {
@@ -191,7 +302,36 @@ export class ThreadSessionManager {
       shell.pty.write(payload.data);
       return;
     }
-    this.requireSession(payload.threadId).pty.write(payload.data);
+    const session = this.requireSession(payload.threadId);
+    session.pty.write(payload.data);
+    this.maybeArmUserInterruptRecovery(session, payload.data);
+  }
+
+  /**
+   * Fallback for Claude's hook-gap around user interrupts: arm a grace timer
+   * when the user presses Esc / Ctrl+C while hooks are active and the session
+   * is in a busy status. If no hook event flips state within the grace window
+   * (it won't, for plain-text interrupts or permission-dialog dismiss), treat
+   * it as a local idle transition. Hook-driven state changes cancel the timer
+   * from `applyCliHookPluginState`.
+   */
+  private maybeArmUserInterruptRecovery(session: SessionRuntime, data: string): void {
+    if (!session.hasCliHookPluginActivity) return;
+    if (!isInterruptibleBusyStatus(session.status)) return;
+    if (!isUserInterruptKeystroke(data)) return;
+
+    if (session.userInterruptRecoveryTimer) {
+      clearTimeout(session.userInterruptRecoveryTimer);
+    }
+    session.userInterruptRecoveryTimer = setTimeout(() => {
+      session.userInterruptRecoveryTimer = undefined;
+      if (!session.hasCliHookPluginActivity) return;
+      if (!isInterruptibleBusyStatus(session.status)) return;
+      this.outputPipeline.applyCliHookPluginState(session, {
+        status: "idle",
+        attention: "none",
+      });
+    }, USER_INTERRUPT_RECOVERY_GRACE_MS);
   }
 
   async resizeTerminal(payload: ResizeTerminalPayload): Promise<void> {
@@ -227,6 +367,9 @@ export class ThreadSessionManager {
     existing.stopSessionRefWatcher?.();
     existing.stopSessionRefWatcher = undefined;
     this.sessions.delete(payload.threadId);
+    if (existing.sessionRef?.providerSessionId) {
+      this.sessionsBySessionId.delete(existing.sessionRef.providerSessionId);
+    }
     await existing.structuredSession?.dispose();
     if (existing.structuredSession) {
       await sleep(150);
@@ -326,6 +469,7 @@ export class ThreadSessionManager {
       this.safePtyKill(session);
     }
     this.sessions.clear();
+    this.sessionsBySessionId.clear();
 
     for (const shell of this.shellSessions.values()) {
       shell.ignoreExit = true;
@@ -349,6 +493,93 @@ export class ThreadSessionManager {
       throw new Error(`Unknown thread session: ${threadId}`);
     }
     return session;
+  }
+
+  /**
+   * Resolve the CLI hook plugin env + extra agent args that should be injected for
+   * the given thread. Always returns a value so callers can splat
+   * unconditionally; missing config produces an empty record/array.
+   */
+  private async resolveCliHookPluginExtras(
+    threadId: string,
+    agentKind: AgentKind,
+    projectLocation: ProjectLocation,
+  ): Promise<{ env: Record<string, string>; extraArgs: string[] }> {
+    const adapter = this.options.adapters.get(agentKind);
+    const liveInputMode = adapter?.capabilities.liveInputMode ?? "terminal";
+
+    if (!this.options.resolvePluginEnvForSpawn) {
+      hookDebugSpawn({
+        threadId,
+        agentKind,
+        project: hookDebugProjectLabel(projectLocation),
+        mode: "L2",
+        label: "terminal TUI parse only (no hook coordinator wired)",
+        liveInputMode,
+      });
+      return { env: {}, extraArgs: [] };
+    }
+    try {
+      const resolved = await this.options.resolvePluginEnvForSpawn({
+        threadId,
+        agentKind,
+        projectLocation,
+      });
+      const merged = resolved ?? { env: {}, extraArgs: [] };
+      const hookUrl = merged.env.LIGHTCODE_HOOK_URL;
+      const hasHookEnv = Boolean(hookUrl);
+
+      if (liveInputMode === "server") {
+        hookDebugSpawn({
+          threadId,
+          agentKind,
+          project: hookDebugProjectLabel(projectLocation),
+          mode: "L2",
+          label: "structured / ACP–style agent (status from control channel, not CLI hook plugin)",
+          liveInputMode,
+          hookEnvInjected: hasHookEnv,
+        });
+      } else if (hasHookEnv) {
+        const viaWslBridge = projectLocation.kind === "wsl";
+        hookDebugSpawn({
+          threadId,
+          agentKind,
+          project: hookDebugProjectLabel(projectLocation),
+          mode: "L1",
+          label: viaWslBridge
+            ? "CLI hook plugin → in-distro HTTP bridge (WSL) → supervisor"
+            : "CLI hook plugin → host HookIngress → supervisor",
+          liveInputMode,
+          hookUrl,
+          extraCliArgs: merged.extraArgs.length,
+        });
+      } else {
+        hookDebugSpawn({
+          threadId,
+          agentKind,
+          project: hookDebugProjectLabel(projectLocation),
+          mode: "L2",
+          label:
+            "CLI hook plugin inactive for this spawn (install/cache/transport/node in WSL, or not a hook-capable agent)",
+          liveInputMode,
+          extraCliArgs: merged.extraArgs.length,
+        });
+      }
+
+      return merged;
+    } catch (error) {
+      console.warn("[supervisor] CLI hook plugin env resolution failed:", error);
+      hookDebugSpawn({
+        threadId,
+        agentKind,
+        project: hookDebugProjectLabel(projectLocation),
+        mode: "L2",
+        label: "resolvePluginEnvForSpawn threw; falling back to terminal parse only",
+        liveInputMode,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return { env: {}, extraArgs: [] };
+    }
   }
 
   private async startThreadInner(
@@ -435,6 +666,22 @@ export class ThreadSessionManager {
           payload.sessionRef,
           structuredSession?.launchOptions,
         );
+
+    // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
+    // (`LIGHTCODE_HOOK_URL`, `LIGHTCODE_HOOK_SECRET`, `LIGHTCODE_THREAD_ID`,
+    // `LIGHTCODE_AGENT_KIND`, `LIGHTCODE_HOOK_PROTOCOL_VERSION`) flow through
+    // `spawnThread` → `agentEnv` so they end up in the PTY env on every
+    // platform (WSL, win32, posix). Failure to resolve plugin extras silently
+    // degrades to L2 — the supervisor must never block thread creation on
+    // the hook-plugin plumbing.
+    const cliHookExtras = await this.resolveCliHookPluginExtras(
+      payload.threadId,
+      payload.agentKind,
+      payload.projectLocation,
+    );
+    if (cliHookExtras.extraArgs.length > 0) {
+      argv.args = [...argv.args, ...cliHookExtras.extraArgs];
+    }
     const command = resolveLaunchSpec(payload.projectLocation, argv);
 
     const keepStructuredSession = structuredSession && isServerControlled;
@@ -452,6 +699,7 @@ export class ThreadSessionManager {
       initialSize: payload.initialSize,
       launchPrompt,
       command,
+      ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
       ...(keepStructuredSession ? { structuredSession } : {}),
       ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
       ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
@@ -502,6 +750,12 @@ export class ThreadSessionManager {
     initialSize: TerminalSize;
     launchPrompt: string;
     command: CommandSpec;
+    /**
+     * Extra env injected into the agent PTY (merged on top of agentEnv +
+     * provider spawnEnv). Currently used by the CLI hook ingress to ferry
+     * `LIGHTCODE_HOOK_URL` / `LIGHTCODE_HOOK_SECRET` / `LIGHTCODE_THREAD_ID` etc.
+     */
+    extraEnv?: Record<string, string>;
     structuredSession?: StructuredSessionHandle;
     sessionRef?: SessionRef;
     pendingLaunchPrompt?: string;
@@ -518,6 +772,9 @@ export class ThreadSessionManager {
         : input.adapter.spawnEnv?.native;
     if (providerEnv) {
       Object.assign(agentEnv, providerEnv);
+    }
+    if (input.extraEnv) {
+      Object.assign(agentEnv, input.extraEnv);
     }
     const command = injectWslEnv(input.command, input.projectLocation, agentEnv);
     const pty = spawn(command.command, command.args, {
@@ -556,6 +813,9 @@ export class ThreadSessionManager {
     };
 
     this.sessions.set(input.threadId, session);
+    if (session.sessionRef?.providerSessionId) {
+      this.sessionsBySessionId.set(session.sessionRef.providerSessionId, session);
+    }
     this.outputPipeline.emitState(session);
 
     input.structuredSession?.setListener({
@@ -600,8 +860,10 @@ export class ThreadSessionManager {
           return;
         }
         if (update.sessionRef) {
+          const prevId = session.sessionRef?.providerSessionId;
           session.sessionRef = update.sessionRef;
           session.canResumeWithConfig = true;
+          this.indexSessionRef(session, prevId);
         }
 
         const configChanged =
@@ -649,7 +911,12 @@ export class ThreadSessionManager {
         return;
       }
       void session.structuredSession?.dispose();
+      this.outputPipeline.clearSessionTimers(session);
       this.outputPipeline.updateState(session, "inactive", "none");
+      session.hasCliHookPluginActivity = false;
+      if (session.sessionRef?.providerSessionId) {
+        this.sessionsBySessionId.delete(session.sessionRef.providerSessionId);
+      }
       this.options.emit({
         type: "thread-exited",
         threadId: session.threadId,
@@ -681,6 +948,7 @@ export class ThreadSessionManager {
         if (ref && !session.sessionRef && !existingIds.has(ref.providerSessionId)) {
           session.sessionRef = ref;
           session.canResumeWithConfig = true;
+          this.indexSessionRef(session, undefined);
           session.stopSessionRefWatcher?.();
           session.stopSessionRefWatcher = undefined;
           this.outputPipeline.emitState(session);
@@ -750,16 +1018,22 @@ export class ThreadSessionManager {
     }
 
     const launchPrompt = isServerControlled ? "" : prompt;
-    const command = resolveLaunchSpec(
+    const cliHookExtras = await this.resolveCliHookPluginExtras(
+      session.threadId,
+      session.agentKind,
       session.projectLocation,
-      session.adapter.buildResumeArgv(
-        session.projectLocation,
-        config,
-        launchPrompt,
-        session.sessionRef,
-        structuredSession?.launchOptions,
-      ),
     );
+    const argv = session.adapter.buildResumeArgv(
+      session.projectLocation,
+      config,
+      launchPrompt,
+      session.sessionRef,
+      structuredSession?.launchOptions,
+    );
+    if (cliHookExtras.extraArgs.length > 0) {
+      argv.args = [...argv.args, ...cliHookExtras.extraArgs];
+    }
+    const command = resolveLaunchSpec(session.projectLocation, argv);
 
     const keepStructuredSession = structuredSession && isServerControlled;
     if (structuredSession && !keepStructuredSession) {
@@ -775,6 +1049,7 @@ export class ThreadSessionManager {
       initialSize: session.terminalSize,
       launchPrompt,
       command,
+      ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
       ...(keepStructuredSession ? { structuredSession } : {}),
       sessionRef: session.sessionRef,
     });
@@ -803,14 +1078,20 @@ export class ThreadSessionManager {
         return;
       }
 
-      const command = resolveLaunchSpec(
+      const cliHookExtras = await this.resolveCliHookPluginExtras(
+        session.threadId,
+        session.agentKind,
         session.projectLocation,
-        session.adapter.buildLaunchArgv(
-          session.projectLocation,
-          session.config,
-          session.launchPrompt,
-        ),
       );
+      const argv = session.adapter.buildLaunchArgv(
+        session.projectLocation,
+        session.config,
+        session.launchPrompt,
+      );
+      if (cliHookExtras.extraArgs.length > 0) {
+        argv.args = [...argv.args, ...cliHookExtras.extraArgs];
+      }
+      const command = resolveLaunchSpec(session.projectLocation, argv);
 
       this.spawnThread({
         threadId: session.threadId,
@@ -821,6 +1102,7 @@ export class ThreadSessionManager {
         initialSize: session.terminalSize,
         launchPrompt: session.launchPrompt,
         command,
+        ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
       });
     })();
   }

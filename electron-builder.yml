@@ -30,8 +30,8 @@ files:
   - node_modules/.pnpm/tiny-typed-emitter@*/node_modules/**/*
 
 extraResources:
-  - from: resources/wsl-watcher
-    to: wsl-watcher
+  - from: resources/wsl-helpers
+    to: wsl-helpers
     filter:
       - "**/*"
 

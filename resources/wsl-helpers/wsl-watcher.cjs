@@ -1,5 +1,11 @@
 "use strict";
 
+// Bumped when wsl-watcher.cjs behaviour changes (ignore list, event shape,
+// stdout protocol, etc.). The Windows-side `gitWatcher` reads this same
+// constant via regex (anchored to start-of-line) so it can detect a stale
+// copy still running in WSL and surface the mismatch in logs.
+const WATCHER_VERSION = "1.0.0";
+
 const path = require("path");
 
 const binding = require(path.join(__dirname, "watcher.node"));
@@ -9,6 +15,11 @@ if (dirs.length === 0) {
   process.stderr.write("Usage: node wsl-watcher.cjs <dir> [<dir>...]\n");
   process.exit(1);
 }
+
+// Announce ourselves so the supervisor can compare against the bundled
+// version it just deployed. Emitted before any `changed:` lines so the
+// watcher's consumer only has to peek at the first line to discover it.
+process.stdout.write(`boot:${WATCHER_VERSION}\n`);
 
 const IGNORE_DIRS = [
   "node_modules",

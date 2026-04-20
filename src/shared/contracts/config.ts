@@ -17,10 +17,15 @@ export type ThreadConfig = z.infer<typeof threadConfigSchema>;
 export const providerDraftConfigSchema = threadConfigBaseSchema;
 export type ProviderDraftConfig = z.infer<typeof providerDraftConfigSchema>;
 
-export const projectDraftConfigSchema = threadConfigBaseSchema.extend({
-  agentKind: agentKindSchema,
-  worktreeMode: z.boolean().optional(),
-});
+/** Saved draft state may not have a chosen model yet. */
+export const projectDraftConfigSchema = threadConfigBaseSchema
+  .extend({
+    agentKind: agentKindSchema,
+    worktreeMode: z.boolean().optional(),
+  })
+  .extend({
+    model: z.string(),
+  });
 export type ProjectDraftConfig = z.infer<typeof projectDraftConfigSchema>;
 
 export function isThreadConfigEqual(

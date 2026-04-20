@@ -3,6 +3,22 @@ import { App } from "./app";
 import "./styles.css";
 import { getAppName } from "@/shared/appName";
 
+if (import.meta.env.DEV) {
+  const warn = console.warn.bind(console);
+  console.warn = (...args: unknown[]) => {
+    const head = args[0];
+    if (
+      typeof head === "string" &&
+      (head.startsWith("<Focusable>") || head.startsWith("<Pressable>")) &&
+      head.includes("interactive ARIA role") &&
+      (head.includes('Got "none"') || head.includes('Got "presentation"'))
+    ) {
+      return;
+    }
+    warn(...args);
+  };
+}
+
 document.title = getAppName(import.meta.env.DEV);
 
 const root = document.getElementById("root");

@@ -20,6 +20,7 @@ describe("lightcodePaths", () => {
       terminalLogsDir: join(baseDir, "logs", "terminal"),
       cacheDir: join(baseDir, "cache"),
       statusCachePath: join(baseDir, "cache", "agent-status-cache.json"),
+      agentPluginsDir: join(baseDir, "agent-plugins"),
     });
   });
 });

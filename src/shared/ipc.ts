@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { LspMessagePayload, LspSessionStatus, LspStartPayload, LspStopPayload } from "./lsp";
-import type { SharedSettings } from "./settings";
+import type { SharedSettings, SharedSettingsInput } from "./settings";
 import {
   closeThreadPayloadSchema,
   createProjectEntryPayloadSchema,
@@ -661,10 +661,10 @@ export const groupedIpcProcedures = {
       "getSharedSettings",
       "main-local",
     ),
-    setSharedSettings: definePayloadProcedure<SharedSettings, void, "main-local">(
+    setSharedSettings: definePayloadProcedure<SharedSettingsInput, void, "main-local">(
       "setSharedSettings",
       "main-local",
-      z.custom<SharedSettings>(),
+      z.custom<SharedSettingsInput>(),
     ),
     setWindowChrome: definePayloadProcedure<WindowChromePayload, void, "main-local">(
       "setWindowChrome",

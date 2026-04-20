@@ -8,6 +8,25 @@ import {
   threadRemoveActionSchema,
 } from "./contracts";
 
+/**
+ * Cache entry recording whether a given agent supports the **CLI hook plugin**
+ * path for status detection on this machine. Keyed by `AgentKind` (and for
+ * WSL, by distro) in `agentHookSupport`. The cache is invalidated when ANY of
+ * `agentBinaryVersion` / `pluginVersion` / `protocolVersion` change, or when
+ * `process.platform` differs from the last recorded value (avoids carrying a
+ * stale `supportsL1=true` verdict to a machine where the plugin isn't
+ * installed). The JSON field name `supportsL1` is historical.
+ */
+export const agentHookSupportEntrySchema = z.object({
+  agentBinaryVersion: z.string(),
+  pluginVersion: z.string(),
+  protocolVersion: z.number().int().min(1),
+  platform: z.string(),
+  verifiedAt: z.string(),
+  supportsL1: z.boolean(),
+});
+export type AgentHookSupportEntry = z.infer<typeof agentHookSupportEntrySchema>;
+
 export const sharedSettingsSchema = z.object({
   themeMode: themeModeSchema,
   terminalPosition: terminalPositionSchema,
@@ -55,8 +74,17 @@ export const sharedSettingsSchema = z.object({
   providerConfigs: z.record(z.string(), providerDraftConfigSchema),
   /** Enable LSP language servers for the file editor (type checking, completions, etc.). */
   editorLspEnabled: z.boolean(),
+  /** Per-agent CLI hook plugin support cache. Keyed by AgentKind (and WSL distro when applicable). */
+  agentHookSupport: z.record(z.string(), agentHookSupportEntrySchema),
 });
 export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
+
+/**
+ * Settings as written by the renderer / IPC consumer. Excludes
+ * supervisor-only fields (`agentHookSupport`) that the renderer never
+ * manages and that the main process re-merges from disk on write.
+ */
+export type SharedSettingsInput = Omit<SharedSettings, "agentHookSupport">;
 
 export const defaultSharedSettings: SharedSettings = {
   themeMode: "system",
@@ -92,6 +120,7 @@ export const defaultSharedSettings: SharedSettings = {
   gitReviewMode: "panel",
   providerConfigs: {},
   editorLspEnabled: false,
+  agentHookSupport: {},
 };
 
 function parseSettingOrDefault<T>(schema: z.ZodType<T>, value: unknown, fallback: T): T {

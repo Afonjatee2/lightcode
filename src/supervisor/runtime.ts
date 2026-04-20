@@ -116,6 +116,11 @@ import { generateTitle } from "./titleGenerator";
 import { AgentStatusService, detectWslAgentStatuses } from "./runtime/agentStatusService";
 import { type SessionRuntime, type ShellSessionRuntime } from "./runtime/sessionTypes";
 import { ThreadSessionManager, writeSubmittedPrompt } from "./runtime/threadSessionManager";
+import { CliHookPluginCoordinator } from "./runtime/cliHookPluginCoordinator";
+import { dispatchAgentEvent } from "./runtime/agentEventDispatcher";
+import { hookDebugEnvelope, isLightcodeHookDebug } from "./runtime/hookDebug";
+import { WslHookBridgeManager } from "./wsl/bridge";
+import { resolveWslHelpersDir } from "./wsl/wslDeploy";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
 
@@ -135,6 +140,8 @@ export class SupervisorRuntime {
   private readonly agentStatusService: AgentStatusService;
   private readonly threadSessionManager: ThreadSessionManager;
   private readonly lspManager: LanguageServerManager;
+  private readonly cliHookPluginCoordinator: CliHookPluginCoordinator;
+  private wslHookBridge: WslHookBridgeManager | undefined;
   private extractionAbortControllers = new Map<string, AbortController>();
 
   readonly sessions: Map<string, SessionRuntime>;
@@ -169,6 +176,73 @@ export class SupervisorRuntime {
       statusCachePath: paths.statusCachePath,
       emit,
     });
+
+    // Boot the CLI hook plugin coordinator BEFORE the thread session manager so
+    // the manager can pull `resolvePluginEnvForSpawn` off it. The coordinator
+    // owns the singleton hook ingress; `startIngress()` is non-blocking — the
+    // Electron window opens regardless of how long `listen()` takes.
+    const runHookDispatch = (
+      envelope: import("@/shared/contracts").AgentEventEnvelope,
+      source: "hook-ingress" | "wsl-bridge",
+    ): void => {
+      hookDebugEnvelope(source, envelope);
+      dispatchAgentEvent(envelope, {
+        lookupSession: (input) => this.threadSessionManager.findSessionForCliHookPlugin(input),
+        applyCliHookPluginState: (session, change) =>
+          this.threadSessionManager.applyCliHookPluginState(session, change),
+        onUnroutable: (env) => {
+          if (isLightcodeHookDebug()) {
+            console.warn(
+              `[supervisor] hook-debug: envelope NOT ROUTED (no live thread) ← ${source}`,
+              {
+                threadId: env.threadId,
+                sessionId: env.sessionId,
+                intent: env.intent,
+                agentKind: env.agentKind,
+              },
+            );
+          }
+        },
+      });
+    };
+    const dispatchEnvelope = (envelope: import("@/shared/contracts").AgentEventEnvelope): void =>
+      runHookDispatch(envelope, "hook-ingress");
+
+    this.cliHookPluginCoordinator = new CliHookPluginCoordinator(
+      {
+        adapters: this.adapters,
+        settingsPath: this.settingsPath,
+        ...(process.env.LIGHTCODE_HOOK_PORT
+          ? { preferredPort: Number(process.env.LIGHTCODE_HOOK_PORT) }
+          : {}),
+      },
+      dispatchEnvelope,
+    );
+
+    // Construct the WSL hook bridge manager only when bundled helpers are
+    // available. Plugins inside a WSL distro can't reach the host
+    // `HookIngress` over WSL2 NAT loopback; the bridge stages and runs
+    // `bridge.mjs` inside the distro instead, sharing the supervisor's
+    // bearer secret + protocol version. Native (Windows / macOS / Linux)
+    // spawns continue to use the HookIngress directly.
+    if (process.platform === "win32" && resolveWslHelpersDir()) {
+      const bridge = new WslHookBridgeManager({
+        onEvent: (envelope) => runHookDispatch(envelope, "wsl-bridge"),
+        onError: (message, error) => {
+          if (isLightcodeHookDebug()) {
+            console.warn(`[supervisor] hook-debug: ${message}`, error);
+          }
+        },
+        secret: this.cliHookPluginCoordinator.getHookSecret(),
+        protocolVersion: this.cliHookPluginCoordinator.getProtocolVersion(),
+      });
+      this.wslHookBridge = bridge;
+      this.cliHookPluginCoordinator.setWslHookBridge(bridge);
+    }
+
+    this.cliHookPluginCoordinator.startIngress();
+    void this.cliHookPluginCoordinator.installAll();
+
     this.threadSessionManager = new ThreadSessionManager({
       emit,
       isDev: this.isDev,
@@ -176,6 +250,8 @@ export class SupervisorRuntime {
       settingsPath: this.settingsPath,
       adapters: this.adapters,
       windowsShell: this.windowsShell,
+      resolvePluginEnvForSpawn: (input) =>
+        this.cliHookPluginCoordinator.resolvePluginEnvForSpawn(input),
     });
     this.sessions = this.threadSessionManager.sessions;
     this.shellSessions = this.threadSessionManager.shellSessions;
@@ -645,6 +721,7 @@ export class SupervisorRuntime {
     this.lspManager.dispose();
     this._gitWatcher?.dispose();
     this.threadSessionManager.dispose();
+    void this.cliHookPluginCoordinator.dispose();
   }
 
   private requireAdapter(kind: AgentKind) {

@@ -11,6 +11,7 @@ export interface LightcodePaths {
   terminalLogsDir: string;
   cacheDir: string;
   statusCachePath: string;
+  agentPluginsDir: string;
 }
 
 export function resolveLightcodeBaseDir(homeDir: string = homedir()): string {
@@ -30,5 +31,6 @@ export function resolveLightcodePaths(baseDir: string = resolveLightcodeBaseDir(
     terminalLogsDir: join(logsDir, "terminal"),
     cacheDir,
     statusCachePath: join(cacheDir, "agent-status-cache.json"),
+    agentPluginsDir: join(baseDir, "agent-plugins"),
   };
 }

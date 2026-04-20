@@ -1,9 +1,15 @@
-import { copyFileSync, existsSync, mkdirSync, watch, type FSWatcher } from "node:fs";
-import { execSync, spawn, type ChildProcess } from "node:child_process";
+import { watch, type FSWatcher } from "node:fs";
 import { join } from "node:path";
+import { type ChildProcess } from "node:child_process";
 import type { ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import { getWslCommand } from "./agents/base";
+import {
+  deployFilesToWslHome,
+  readBundledHelperVersion,
+  resolveWslHelpersDir,
+} from "./wsl/wslDeploy";
+import { spawnWslLineChild } from "./wsl/wslChild";
+import { isLightcodeHookDebug } from "./runtime/hookDebug";
 
 const DEBOUNCE_MS = 300;
 
@@ -42,35 +48,22 @@ const INOTIFYWAIT_EXCLUDE =
   "(node_modules|\\.next|dist|build|__pycache__|\\.venv|\\.git/objects|\\.git/logs|\\.git/FETCH_HEAD)";
 
 /**
- * Deploy the @parcel/watcher native binary + helper script into a WSL distro.
- * Files are written to `~/.lightcode/watcher/` via UNC path.
- * Returns the Linux-side directory path on success, or null.
+ * Stage the @parcel/watcher native binary + helper script into a WSL distro
+ * via the shared `deployFilesToWslHome` primitive (UNC copy under
+ * `~/.lightcode/watcher/`). Returns the Linux-side directory path on
+ * success, or `null` when the resources dir is unset, the staged files are
+ * missing, or the copy failed.
  */
 function deployWslWatcher(distro: string): string | null {
-  const srcDir = process.env.LIGHTCODE_WSL_WATCHER_DIR;
+  const srcDir = resolveWslHelpersDir();
   if (!srcDir) return null;
 
-  const srcBinary = join(srcDir, "watcher.node");
-  const srcScript = join(srcDir, "wsl-watcher.cjs");
-  if (!existsSync(srcBinary) || !existsSync(srcScript)) return null;
-
-  try {
-    const home = execSync(`"${getWslCommand()}" -d ${distro} -- sh -c "echo $HOME"`, {
-      encoding: "utf-8",
-      timeout: 5000,
-      windowsHide: true,
-    }).trim();
-
-    const uncHome = `\\\\wsl.localhost\\${distro}${home.replaceAll("/", "\\")}`;
-    const destDir = join(uncHome, ".lightcode", "watcher");
-    mkdirSync(destDir, { recursive: true });
-    copyFileSync(srcBinary, join(destDir, "watcher.node"));
-    copyFileSync(srcScript, join(destDir, "wsl-watcher.cjs"));
-
-    return `${home}/.lightcode/watcher`;
-  } catch {
-    return null;
-  }
+  const result = deployFilesToWslHome(distro, [
+    { src: join(srcDir, "watcher.node"), relDest: "watcher/watcher.node" },
+    { src: join(srcDir, "wsl-watcher.cjs"), relDest: "watcher/wsl-watcher.cjs" },
+  ]);
+  if (!result) return null;
+  return `${result.linuxBaseDir}/watcher`;
 }
 
 /**
@@ -339,24 +332,40 @@ export class GitWatcher {
       "fi",
     ].join("\n");
 
-    const child = spawn(
-      getWslCommand(),
+    // Cached so we only do the fs read + regex once per bridged spawn.
+    let bootSeen = false;
+    return spawnWslLineChild({
+      distro,
+      cwd: linuxPath,
       // Use a login shell so Node installed via nvm is visible on PATH.
-      ["-d", distro, "--cd", linuxPath, "--", "bash", "-lc", script],
-      {
-        stdio: ["ignore", "pipe", "ignore"],
-        windowsHide: true,
-      },
-    );
-
-    let buf = "";
-    child.stdout!.on("data", (chunk: Buffer) => {
-      buf += chunk.toString();
-      const lines = buf.split("\n");
-      buf = lines.pop()!;
-      for (const rawLine of lines) {
-        const line = rawLine.trim();
-        if (!line) continue;
+      argv: ["bash", "-lc", script],
+      onLine: (line) => {
+        if (!bootSeen && line.startsWith("boot:")) {
+          bootSeen = true;
+          const reported = line.slice("boot:".length).trim();
+          const expected = readBundledHelperVersion("wsl-watcher.cjs", "WATCHER_VERSION");
+          if (expected && reported && reported !== expected) {
+            // Unlike the hook bridge, we don't auto-restart here: the
+            // watcher owns an inotify subscription and a mid-flight
+            // restart can drop events during the gap. The stale copy
+            // will be replaced on the next supervisor launch (deploy
+            // overwrites the file on disk; the old process dies with
+            // this supervisor). Surface the drift so it's visible.
+            console.log("[supervisor] wsl-watcher version mismatch (stale copy in distro)", {
+              distro,
+              linuxPath,
+              expected,
+              reported,
+            });
+          } else if (isLightcodeHookDebug()) {
+            console.log("[supervisor] wsl-watcher booted in distro", {
+              distro,
+              linuxPath,
+              version: reported || "(unversioned)",
+            });
+          }
+          return;
+        }
         if (line === "changed" || line.startsWith("changed:")) {
           const parts = line.split(":");
           const scope = line === "changed" ? "unknown" : (parts[1] ?? "unknown");
@@ -384,23 +393,19 @@ export class GitWatcher {
                 value.startsWith("objects/"),
             );
           if (scope === "git" && (parsedPaths.length === 0 || isKnownGitNoise)) {
-            continue;
+            return;
           }
           onEvent();
-          continue;
+          return;
         }
         if (line === "poll") {
           onEvent();
-          continue;
+          return;
         }
         onEvent();
-      }
+      },
+      // wsl.exe could not be started — degrade to no watching.
+      onError: () => undefined,
     });
-
-    child.on("error", () => {
-      // wsl.exe could not be started — degrade to no watching
-    });
-
-    return child;
   }
 }

@@ -255,6 +255,61 @@ export interface AgentOneShotRunner {
   ): { command: string; args: string[]; stdin?: string } | undefined;
 }
 
+/**
+ * **CLI hook plugin** support — the provider ships an in-process plugin that
+ * the agent CLI loads, which forwards lifecycle events out of band (HTTP POST
+ * to the supervisor's hook ingress) instead of forcing the supervisor to
+ * scrape TUI output.
+ *
+ * Adapters that don't have a plugin simply leave this slice unimplemented;
+ * the runtime treats them as terminal-parse-only (L2 / regex) and never
+ * prompts the user about plugin installation.
+ *
+ * The runtime only knows the interface — it never branches on `agentKind` to
+ * decide whether hook plugins are available, what to install, or how to verify
+ * it.
+ */
+export interface AgentCliHookPluginSupport {
+  /** Stable id for cache + telemetry, e.g. `lightcode-status@claude`. */
+  readonly pluginId: string;
+  /** Plugin semver, sourced from the plugin's `plugin.json` at build. */
+  readonly pluginVersion: string;
+  /** Earliest hook protocol the provider's forwarder script can produce. */
+  readonly minProtocolVersion: number;
+
+  /**
+   * Quick gate before doing any IO. Return false to short-circuit the install
+   * path (e.g. unsupported platform/runtime). The default behaviour when this
+   * method is omitted is "always supported".
+   */
+  isPluginSupported?(ctx: AgentEnvContext): Promise<boolean>;
+  /**
+   * Returns whether the plugin is currently installed on disk (no probe via
+   * the agent CLI). Used by the cache layer to decide whether to skip
+   * `installPlugin`.
+   */
+  isPluginInstalled(ctx: AgentEnvContext): Promise<{ installed: boolean; version?: string }>;
+  /**
+   * Synchronise the provider's plugin assets (forward script, hooks config)
+   * to a stable location the agent CLI will load. Must be idempotent.
+   */
+  installPlugin(
+    ctx: AgentEnvContext,
+  ): Promise<{ ok: true; version: string } | { ok: false; reason: string }>;
+  /** Optional teardown for tests / uninstall flows. */
+  uninstallPlugin?(ctx: AgentEnvContext): Promise<void>;
+
+  /**
+   * Optional CLI args / env additions that wire the agent process to the
+   * installed plugin (e.g. Claude needs `--settings <generated-hooks.json>`).
+   * Returned record is merged on top of `AgentArgvSpec.env` and the args are
+   * appended verbatim.
+   */
+  pluginLaunchExtras?(
+    ctx: AgentEnvContext,
+  ): Promise<{ args?: string[]; env?: Record<string, string> } | undefined>;
+}
+
 export interface AgentAdapter
   extends
     AgentMetadata,
@@ -263,7 +318,8 @@ export interface AgentAdapter
     AgentPromptFormatter,
     AgentTerminalObserver,
     AgentSessionTracker,
-    AgentOneShotRunner {}
+    AgentOneShotRunner,
+    Partial<AgentCliHookPluginSupport> {}
 
 export interface TerminalStatusHint {
   status: ThreadStatus;

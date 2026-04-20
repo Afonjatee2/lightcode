@@ -64,7 +64,15 @@ export function createLocalIpcHandlers(
     },
     getSharedSettings: () => readSharedSettingsFile(options.requireLightcodePaths().settingsPath),
     setSharedSettings: (settings) => {
-      writeSharedSettingsFile(options.requireLightcodePaths().settingsPath, settings);
+      const settingsPath = options.requireLightcodePaths().settingsPath;
+      // Preserve supervisor-only fields (e.g. `agentHookSupport`) so the
+      // renderer's persist cycle doesn't clobber the CLI hook plugin cache that
+      // the supervisor writes out-of-band.
+      const onDisk = readSharedSettingsFile(settingsPath);
+      writeSharedSettingsFile(settingsPath, {
+        ...settings,
+        agentHookSupport: onDisk.agentHookSupport,
+      });
       options.updatePowerSaveBlocker();
     },
     setWindowChrome: async (payload: WindowChromePayload) => {

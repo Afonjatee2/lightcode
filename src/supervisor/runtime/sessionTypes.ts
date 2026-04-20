@@ -50,6 +50,25 @@ export interface SessionRuntime {
     | undefined;
   workingSilenceTimer?: ReturnType<typeof setTimeout> | undefined;
   outputTranscript?: TranscriptBuffer | undefined;
+  /**
+   * Set the first time we receive a CLI hook plugin event (hook POST) for this
+   * session. Once true, terminal status from TUI parsing (L2 /
+   * `detectTerminalStatus`) is disabled — hooks own thread status. Cleared on
+   * PTY exit.
+   */
+  hasCliHookPluginActivity?: boolean;
+  /** Timestamp of the last CLI hook plugin event — diagnostic / cache freshness. */
+  lastCliHookPluginActivityAt?: number;
+  /**
+   * Armed when the user sends an interrupt keystroke (Esc alone, or Ctrl+C)
+   * while hooks are active and the session is in a busy status. Claude Code
+   * emits no hook on user interrupts (`Stop` is suppressed on user interrupt
+   * per docs; `PostToolUseFailure` only fires if a tool was executing), so
+   * without this fallback the UI stays stuck. If no hook event flips state
+   * within the grace window, we transition to `idle` locally.
+   * Cleared by `applyCliHookPluginState`, PTY exit, and `clearSessionTimers`.
+   */
+  userInterruptRecoveryTimer?: ReturnType<typeof setTimeout> | undefined;
 }
 
 export interface ShellSessionRuntime {

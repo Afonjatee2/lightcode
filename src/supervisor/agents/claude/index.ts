@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { PromptSegment } from "@/shared/contracts";
 import {
   applyTerminalHintToConfig,
+  batchWslCommandsAsync,
   createKnownSessionRef,
   detectAgentInstall,
   shortenHomePath,
@@ -11,8 +12,20 @@ import {
 import { buildClaudeArgs } from "./argv";
 import { claudeCapabilities, claudeDetectionSpec } from "./detection";
 import { detectClaudeTerminalStatus } from "./terminal";
+import {
+  getClaudePluginPaths,
+  installClaudePlugin,
+  isClaudePluginInstalled,
+  readBundledClaudePluginVersion,
+} from "./plugin/install";
 
 export { detectClaudeTerminalStatus, detectClaudeModelEffort } from "./terminal";
+
+// Semver comes only from plugin/plugin.json (forward.mjs reads that file too).
+// Bump `MIN_PROTOCOL_VERSION` in src/shared/contracts/agentEvent.ts when the
+// envelope shape changes.
+const CLAUDE_PLUGIN_VERSION = readBundledClaudePluginVersion();
+const CLAUDE_MIN_PROTOCOL_VERSION = 1;
 
 export function createClaudeAdapter(): AgentAdapter {
   return {
@@ -23,6 +36,31 @@ export function createClaudeAdapter(): AgentAdapter {
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },
     detectInstall(ctx) {
       return detectAgentInstall(ctx, claudeDetectionSpec);
+    },
+    // ── CLI hook plugin support ──────────────────────────────────────────
+    pluginId: "lightcode-status@claude",
+    pluginVersion: CLAUDE_PLUGIN_VERSION,
+    minProtocolVersion: CLAUDE_MIN_PROTOCOL_VERSION,
+    async isPluginSupported(ctx) {
+      // The forwarder runs `node`, so we need a Node runtime to be available.
+      // For native Windows/macOS/Linux Claude this is implicit (the supervisor
+      // itself ships with Node). For WSL we have to actually probe the distro
+      // — common, but not guaranteed.
+      if (ctx.envKind !== "wsl" || !ctx.wslDistro) return true;
+      const [result] = await batchWslCommandsAsync(ctx.wslDistro, ["command -v node"]);
+      return Boolean(result?.ok && result.stdout.trim().length > 0);
+    },
+    async isPluginInstalled(ctx) {
+      return isClaudePluginInstalled(ctx);
+    },
+    async installPlugin(ctx) {
+      const result = installClaudePlugin(ctx);
+      if (!result.ok) return result;
+      return { ok: true, version: result.version };
+    },
+    async pluginLaunchExtras(ctx) {
+      const paths = getClaudePluginPaths(ctx);
+      return { args: ["--settings", paths.settingsPath] };
     },
     buildLaunchArgv(_location, config, prompt, _sessionRef, _launchOptions) {
       const assignedId = randomUUID();

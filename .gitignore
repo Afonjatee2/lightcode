@@ -15,4 +15,5 @@ build/icons/
 **/worktrees/
 .cursor/
 .recovery/
-resources/wsl-watcher/watcher.node
+resources/wsl-helpers/watcher.node
+resources/wsl-helpers/bridge.mjs

@@ -4,6 +4,7 @@ import {
   defaultSharedSettings,
   normalizeSharedSettings,
   type SharedSettings,
+  type SharedSettingsInput,
 } from "@/shared/settings";
 import type {
   GitReviewMode,
@@ -65,7 +66,7 @@ function loadFallbackSettings(): SharedSettings {
  */
 let initialLoadDone = !hasBridge();
 
-function persistSettings(settings: SharedSettings): void {
+function persistSettings(settings: SharedSettingsInput): void {
   if (typeof window === "undefined") {
     return;
   }
@@ -193,7 +194,7 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
   },
 }));
 
-function selectSharedSettings(state: SharedSettingsState): SharedSettings {
+function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
   return {
     themeMode: state.themeMode,
     terminalPosition: state.terminalPosition,

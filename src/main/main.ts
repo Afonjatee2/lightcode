@@ -114,13 +114,13 @@ if (!hasSingleInstanceLock) {
     initDatabase(lightcodePaths.dbPath);
 
     const supervisorPath = join(__dirname, "supervisor.cjs");
-    const wslWatcherDir = app.isPackaged
-      ? join(process.resourcesPath, "wsl-watcher")
-      : join(__dirname, "..", "..", "resources", "wsl-watcher");
+    const wslHelpersDir = app.isPackaged
+      ? join(process.resourcesPath, "wsl-helpers")
+      : join(__dirname, "..", "..", "resources", "wsl-helpers");
 
     const supervisorClient = new SupervisorClient({
       supervisorPath,
-      wslWatcherDir,
+      wslHelpersDir,
       assignPid: async (pid) => {
         await windowsJobObjectManager?.assignPid(pid);
       },
@@ -162,6 +162,15 @@ if (!hasSingleInstanceLock) {
     });
 
     await jobObjectReady;
+
+    const hookDebugOn =
+      Boolean(process.env.LIGHTCODE_HOOK_DEBUG) && process.env.LIGHTCODE_HOOK_DEBUG !== "0";
+    if (hookDebugOn) {
+      console.log(
+        "[lightcode] LIGHTCODE_HOOK_DEBUG is on — watch for [supervisor] hook-debug lines (HookIngress, WSL bridge, L1/L2 spawn, envelopes).",
+      );
+    }
+
     supervisorClient.start(lightcodePaths.baseDir);
 
     mainWindow.once("ready-to-show", () => {

@@ -1,4 +1,5 @@
 import { fork, type ChildProcess } from "node:child_process";
+import type { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import type {
@@ -14,9 +15,32 @@ function isSupervisorReply(message: unknown): message is SupervisorReply {
   return typeof message === "object" && message !== null && "replyTo" in message;
 }
 
+/**
+ * Electron / Windows: a forked supervisor with stdio "inherit" often does
+ * not surface `console.log` in the same dev terminal as the main process.
+ * Pipe stdout/stderr and write through the parent's stdio so hook-debug and
+ * other supervisor logs are visible next to `[db]` / main-process lines.
+ */
+function pipeSupervisorStreamsToParent(child: ChildProcess): void {
+  const pipeTo = (stream: Readable | null | undefined, out: NodeJS.WriteStream): void => {
+    if (!stream) return;
+    stream.on("data", (chunk: string | Buffer) => {
+      out.write(chunk);
+    });
+  };
+  pipeTo(child.stdout, process.stdout);
+  pipeTo(child.stderr, process.stderr);
+}
+
 export interface SupervisorClientOptions {
   supervisorPath: string;
-  wslWatcherDir: string;
+  /**
+   * Directory containing the in-WSL helpers shipped with the app
+   * (`watcher.node`, `wsl-watcher.cjs`, `bridge.mjs`). Forwarded to the
+   * supervisor via `LIGHTCODE_WSL_HELPERS_DIR` so both the git watcher and
+   * the CLI hook bridge can stage assets into running distros.
+   */
+  wslHelpersDir: string;
   assignPid?(pid: number): Promise<void>;
   onEvent(event: SupervisorEvent): void;
   onReset(): void;
@@ -60,13 +84,19 @@ export class SupervisorClient {
     this.stop(new Error("Supervisor restarting"));
 
     const child = fork(this.options.supervisorPath, [], {
-      stdio: ["inherit", "inherit", "inherit", "ipc"],
+      stdio: ["ignore", "pipe", "pipe", "ipc"],
       env: {
         ...process.env,
         LIGHTCODE_DATA_DIR: baseDir,
-        LIGHTCODE_WSL_WATCHER_DIR: this.options.wslWatcherDir,
+        LIGHTCODE_WSL_HELPERS_DIR: this.options.wslHelpersDir,
+        // Back-compat for one release; older supervisor builds still read
+        // the legacy var. Safe to drop once min supported supervisor knows
+        // about LIGHTCODE_WSL_HELPERS_DIR.
+        LIGHTCODE_WSL_WATCHER_DIR: this.options.wslHelpersDir,
       },
     });
+
+    pipeSupervisorStreamsToParent(child);
 
     this.child = child;
     if (typeof child.pid === "number") {

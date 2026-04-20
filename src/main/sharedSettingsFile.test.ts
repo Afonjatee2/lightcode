@@ -59,6 +59,7 @@ describe("sharedSettingsFile", () => {
       gitReviewMode: "panel",
       providerConfigs: {},
       editorLspEnabled: false,
+      agentHookSupport: {},
     });
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
@@ -95,6 +96,7 @@ describe("sharedSettingsFile", () => {
       gitReviewMode: "panel",
       providerConfigs: {},
       editorLspEnabled: false,
+      agentHookSupport: {},
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
   });

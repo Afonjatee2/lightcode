@@ -40,10 +40,15 @@ export class ThreadOutputPipeline {
       clearTimeout(session.workingSilenceTimer);
       session.workingSilenceTimer = undefined;
     }
+    if (session.userInterruptRecoveryTimer) {
+      clearTimeout(session.userInterruptRecoveryTimer);
+      session.userInterruptRecoveryTimer = undefined;
+    }
   }
 
   getLatestTerminalStatusHint(session: SessionRuntime): TerminalStatusHint | null {
     if (
+      session.hasCliHookPluginActivity ||
       session.adapter.capabilities.presentationMode !== "terminal" ||
       !session.adapter.detectTerminalStatus ||
       session.prevChunk.length === 0
@@ -97,6 +102,67 @@ export class ThreadOutputPipeline {
     session.attention = attention;
     session.lastStatusChangeAt = Date.now();
     this.emitState(session, errorMessage);
+  }
+
+  /**
+   * Apply a CLI hook plugin state transition. Hook events are treated as 100%
+   * authoritative — we bypass L2 stabilization timers and emit immediately.
+   * When the plugin has posted at least once (`hasCliHookPluginActivity`), L2
+   * does not run, so idle-gated terminal writes are flushed here on hook idle.
+   */
+  applyCliHookPluginState(
+    session: SessionRuntime,
+    change: { status: ThreadStatus; attention: ThreadAttention },
+  ): void {
+    // A real hook event beat the user-interrupt fallback — cancel it.
+    if (session.userInterruptRecoveryTimer) {
+      clearTimeout(session.userInterruptRecoveryTimer);
+      session.userInterruptRecoveryTimer = undefined;
+    }
+    const statusChanged =
+      session.status !== change.status || session.attention !== change.attention;
+    this.updateState(session, change.status, change.attention);
+    if (change.status === "idle") {
+      this.flushPendingTerminalWritesIfIdle(session);
+    }
+    if (
+      statusChanged &&
+      session.adapter.discoverSessionRef &&
+      !session.sessionRef &&
+      !session.sessionRefDiscoveryStarted &&
+      !session.pendingTerminalPrompt
+    ) {
+      session.sessionRefDiscoveryStarted = true;
+      this.options.onStartSessionRefDiscovery(session);
+    }
+  }
+
+  private flushPendingTerminalWritesIfIdle(session: SessionRuntime): void {
+    if (session.pendingTerminalPreInputs?.length && !session.pendingTerminalWriteInFlight) {
+      const chunks = session.pendingTerminalPreInputs.shift()!;
+      if (!session.pendingTerminalPreInputs.length) {
+        session.pendingTerminalPreInputs = undefined;
+      }
+      session.pendingTerminalWriteInFlight = true;
+      void sleep(500)
+        .then(() => writeSubmittedPrompt(session.pty, chunks))
+        .then(() => {
+          session.pendingTerminalWriteInFlight = false;
+        });
+      return;
+    }
+    if (session.pendingTerminalPrompt && !session.pendingTerminalWriteInFlight) {
+      const prompt = session.pendingTerminalPrompt;
+      const segments = session.pendingTerminalSegments;
+      session.pendingTerminalPrompt = undefined;
+      session.pendingTerminalSegments = undefined;
+      void sleep(500).then(() =>
+        writeSubmittedPrompt(
+          session.pty,
+          session.adapter.buildDirectInput?.(prompt, segments, session.config) ?? [prompt, "\r"],
+        ),
+      );
+    }
   }
 
   handlePtyData(session: SessionRuntime, data: string): void {
@@ -153,6 +219,45 @@ export class ThreadOutputPipeline {
       usesTerminalPresentation &&
       (session.adapter.isReadyForInitialPrompt || session.adapter.detectTerminalStatus)
     ) {
+      // Hook-active fast path: keep streaming + launch-queue + invalid session ref
+      // recovery only — skip prevChunk merge, second stripAnsi pass, and all L2
+      // hint timers (major PTY hot-path savings on busy TUIs).
+      if (session.hasCliHookPluginActivity) {
+        if (session.workingSilenceTimer) {
+          clearTimeout(session.workingSilenceTimer);
+          session.workingSilenceTimer = undefined;
+        }
+        if (session.pendingStatusHint) {
+          clearTimeout(session.pendingStatusHint.timer);
+          session.pendingStatusHint = undefined;
+        }
+        if (
+          session.pendingLaunchPrompt &&
+          session.adapter.isReadyForInitialPrompt?.(strippedData)
+        ) {
+          this.options.onStartQueuedLaunchPrompt(session);
+        }
+        if (
+          session.status === "launching" &&
+          session.sessionRef &&
+          session.adapter.detectInvalidSessionRef
+        ) {
+          const lastHome = Math.max(
+            dataAfterOsc.lastIndexOf("\x1b[H"),
+            dataAfterOsc.lastIndexOf("\x1b[1;1H"),
+          );
+          const combined =
+            lastHome >= 0 ? dataAfterOsc.slice(lastHome) : session.prevChunk + dataAfterOsc;
+          session.prevChunk = combined.length > 8192 ? combined.slice(-8192) : combined;
+          const stripped = stripAnsiPreservingLayout(combined);
+          if (session.adapter.detectInvalidSessionRef?.(stripped)) {
+            this.options.onRecoverInvalidSessionRef(session);
+            return;
+          }
+        }
+        return;
+      }
+
       const lastHome = Math.max(
         dataAfterOsc.lastIndexOf("\x1b[H"),
         dataAfterOsc.lastIndexOf("\x1b[1;1H"),
@@ -180,8 +285,9 @@ export class ThreadOutputPipeline {
         !hint.corroborated;
 
       if (suppressWeakStructuredIdle) {
-        if (session.pendingStatusHint?.status === "idle") {
-          clearTimeout(session.pendingStatusHint.timer);
+        const pending = session.pendingStatusHint;
+        if (pending && pending.status === hint?.status) {
+          clearTimeout(pending.timer);
           session.pendingStatusHint = undefined;
         }
         hint = null;
@@ -306,36 +412,8 @@ export class ThreadOutputPipeline {
         this.options.onStartQueuedLaunchPrompt(session);
       }
 
-      if (
-        hint?.status === "idle" &&
-        session.pendingTerminalPreInputs?.length &&
-        !session.pendingTerminalWriteInFlight
-      ) {
-        const chunks = session.pendingTerminalPreInputs.shift()!;
-        if (!session.pendingTerminalPreInputs.length) {
-          session.pendingTerminalPreInputs = undefined;
-        }
-        session.pendingTerminalWriteInFlight = true;
-        void sleep(500)
-          .then(() => writeSubmittedPrompt(session.pty, chunks))
-          .then(() => {
-            session.pendingTerminalWriteInFlight = false;
-          });
-      } else if (
-        session.pendingTerminalPrompt &&
-        hint?.status === "idle" &&
-        !session.pendingTerminalWriteInFlight
-      ) {
-        const prompt = session.pendingTerminalPrompt;
-        const segments = session.pendingTerminalSegments;
-        session.pendingTerminalPrompt = undefined;
-        session.pendingTerminalSegments = undefined;
-        void sleep(500).then(() =>
-          writeSubmittedPrompt(
-            session.pty,
-            session.adapter.buildDirectInput?.(prompt, segments, session.config) ?? [prompt, "\r"],
-          ),
-        );
+      if (hint?.status === "idle") {
+        this.flushPendingTerminalWritesIfIdle(session);
       }
     }
   }
