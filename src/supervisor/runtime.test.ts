@@ -55,7 +55,17 @@ function makeTempDir(): string {
 }
 
 afterEach(() => {
-  process.env.LIGHTCODE_DATA_DIR = lightcodeDataDirBeforeTests;
+  // Restoring an env var to `undefined` coerces it to the literal string
+  // "undefined" (Node stringifies anything assigned to `process.env.X`).
+  // That bug used to cause the supervisor to resolve its baseDir as the
+  // string "undefined" and create `./undefined/settings.json` in cwd on
+  // the next `SupervisorRuntime` construction. Use `delete` when the
+  // original value was absent; assign otherwise.
+  if (lightcodeDataDirBeforeTests === undefined) {
+    delete process.env.LIGHTCODE_DATA_DIR;
+  } else {
+    process.env.LIGHTCODE_DATA_DIR = lightcodeDataDirBeforeTests;
+  }
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }

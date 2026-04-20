@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import type {
   AgentKind,
   AgentStatusesResponse,
@@ -157,7 +157,15 @@ export class SupervisorRuntime {
   }
 
   constructor(private readonly emit: (event: SupervisorEvent) => void) {
-    const baseDir = process.env.LIGHTCODE_DATA_DIR?.trim() || join(homedir(), ".lightcode");
+    // Defensive: `process.env.X = undefined` coerces to the literal string
+    // "undefined" in Node, and we've been bitten by that path creating
+    // `./undefined/settings.json` in cwd. Also reject bare relative paths —
+    // the supervisor must always operate out of an absolute baseDir so
+    // writes land somewhere predictable regardless of cwd at spawn time.
+    const rawBaseDir = process.env.LIGHTCODE_DATA_DIR?.trim();
+    const envBaseDir =
+      rawBaseDir && rawBaseDir !== "undefined" && isAbsolute(rawBaseDir) ? rawBaseDir : undefined;
+    const baseDir = envBaseDir ?? join(homedir(), ".lightcode");
     const paths = resolveLightcodePaths(baseDir);
     this.logsDir = paths.terminalLogsDir;
     this.settingsPath = paths.settingsPath;
