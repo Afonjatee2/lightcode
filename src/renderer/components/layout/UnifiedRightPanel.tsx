@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import { type CSSProperties, type ReactNode } from "react";
 import { FileDiff, FolderOpen, Maximize2, PanelRightClose, TerminalSquare } from "lucide-react";
 import { Tooltip } from "@heroui/react";
 
@@ -38,6 +38,17 @@ export function UnifiedRightPanel(props: {
     onOpenFiles,
     onClose,
   } = props;
+
+  /** Inline opacity/transition so animation is not dropped if Tailwind misses dynamic class strings. */
+  const tabLayerStyle = (tab: RightPanelTab): CSSProperties => {
+    const on = activeTab === tab;
+    return {
+      opacity: on ? 1 : 0,
+      zIndex: on ? 10 : 0,
+      pointerEvents: on ? "auto" : "none",
+      transition: "opacity 120ms ease-out",
+    };
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]">
@@ -128,15 +139,15 @@ export function UnifiedRightPanel(props: {
         </button>
       </div>
 
-      {/* Content */}
+      {/* Content — stacked layers cross-fade on tab change */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <div className={`absolute inset-0 ${activeTab === "terminal" ? "" : "invisible"}`}>
+        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("terminal")}>
           {terminalContent}
         </div>
-        <div className={`absolute inset-0 ${activeTab === "git" ? "" : "invisible"}`}>
+        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("git")}>
           {gitContent}
         </div>
-        <div className={`absolute inset-0 ${activeTab === "files" ? "" : "invisible"}`}>
+        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("files")}>
           {filesContent}
         </div>
       </div>

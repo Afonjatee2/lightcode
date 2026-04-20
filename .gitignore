@@ -17,3 +17,4 @@ build/icons/
 .recovery/
 resources/wsl-helpers/watcher.node
 resources/wsl-helpers/bridge.mjs
+resources/agent-plugins/

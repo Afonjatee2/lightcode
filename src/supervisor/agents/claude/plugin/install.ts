@@ -51,24 +51,40 @@ interface PluginManifest {
 const ASSET_FILES = ["plugin.json", "forward.mjs"] as const;
 
 function resolveSourceDir(): string {
-  // In dev (tsdown watch) and prod (bundled CJS), the supervisor is built to
-  // dist/main/supervisor.cjs. The plugin assets live in src/supervisor/agents/
-  // claude/plugin and are NOT bundled — we copy them to a stable location at
-  // install time. We compute the source dir relative to the bundled file:
-  //   dev:  <repo>/dist/main/supervisor.cjs   → ../../src/supervisor/agents/claude/plugin
-  //   prod: <app>/resources/app.asar.unpacked/dist/main/supervisor.cjs → uses extraResources
-  // We try a small list of candidates; the first that exists wins.
+  // The supervisor is bundled to dist/main/supervisor.cjs. The plugin assets
+  // (plugin.json + forward.mjs) are NOT bundled — they must exist as real
+  // files on disk because Claude spawns `forward.mjs` as a Node child
+  // (asar-trapped paths aren't readable from external processes).
+  //
+  // Layout by runtime:
+  //   dev:    <repo>/dist/main/supervisor.cjs
+  //           → plugin assets at <repo>/src/supervisor/agents/claude/plugin
+  //   prod:   <app>/resources/app.asar/dist/main/supervisor.cjs  (inside asar)
+  //           → plugin assets staged by prepare-agent-plugins.mjs and
+  //             bundled as extraResources at
+  //             process.resourcesPath/agent-plugins/claude
+  //
+  // We try the packaged location first (via process.resourcesPath when it's
+  // set — Electron sets it for main and all forked/child Electron processes
+  // including the supervisor fork), then fall back to dev-relative paths.
   const candidates: string[] = [];
+  const override = process.env.LIGHTCODE_CLAUDE_PLUGIN_SOURCE;
+  if (override) candidates.push(resolve(override));
+  if (typeof process.resourcesPath === "string" && process.resourcesPath.length > 0) {
+    candidates.push(join(process.resourcesPath, "agent-plugins", "claude"));
+  }
   const here =
     typeof __dirname !== "undefined"
       ? __dirname
       : dirname(fileURLToPath(import.meta.url ?? "file://"));
+  // Prod fallback when process.resourcesPath isn't set: walk up from
+  // `<resources>/app.asar/dist/main/` (or `app.asar.unpacked/…`) to
+  // `<resources>/agent-plugins/claude`.
+  candidates.push(resolve(here, "../../../agent-plugins/claude"));
   candidates.push(resolve(here, "../../src/supervisor/agents/claude/plugin"));
   candidates.push(resolve(here, "../../../src/supervisor/agents/claude/plugin"));
   candidates.push(resolve(here, "../../resources/agent-plugins/claude"));
   candidates.push(resolve(here, "../resources/agent-plugins/claude"));
-  const override = process.env.LIGHTCODE_CLAUDE_PLUGIN_SOURCE;
-  if (override) candidates.unshift(resolve(override));
   for (const candidate of candidates) {
     if (existsSync(join(candidate, "plugin.json"))) return candidate;
   }

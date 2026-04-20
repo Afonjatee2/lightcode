@@ -34,6 +34,10 @@ extraResources:
     to: wsl-helpers
     filter:
       - "**/*"
+  - from: resources/agent-plugins
+    to: agent-plugins
+    filter:
+      - "**/*"
 
 extraMetadata:
   main: dist/main/main.cjs
