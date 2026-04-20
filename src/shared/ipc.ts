@@ -159,6 +159,7 @@ import type {
   ThreadConfig,
   ThreadRuntimeSnapshot,
   ThreadStatus,
+  ThreadStatusSource,
   CloseThreadPayload,
   WriteProjectFilePayload,
   WriteProjectFileResult,
@@ -973,6 +974,8 @@ export type SupervisorEvent =
       sessionRef?: { providerSessionId: string; discoveredAt: string };
       canResumeWithConfig: boolean;
       errorMessage?: string;
+      /** Terminal: structured CLI hook (L1) vs terminal parsing (L2); server agents: `server`. */
+      threadStatusSource?: ThreadStatusSource;
     }
   | { type: "thread-exited"; threadId: string; exitCode: number | null }
   | {

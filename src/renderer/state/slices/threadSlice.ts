@@ -7,6 +7,7 @@ import type {
   ThreadRuntimeSnapshot,
   ThreadServerRequestId,
   ThreadStatus,
+  ThreadStatusSource,
 } from "@/shared/contracts";
 import {
   reorderThreadBlockInProject,
@@ -41,6 +42,7 @@ export interface ThreadSlice {
       config?: ThreadConfig;
       sessionRef?: SessionRef;
       canResumeWithConfig: boolean;
+      threadStatusSource?: ThreadStatusSource;
     },
   ) => void;
   archiveThread: (threadId: string) => void;
@@ -193,11 +195,16 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           (thread.sessionRef?.providerSessionId !== input.sessionRef.providerSessionId ||
             thread.sessionRef?.discoveredAt !== input.sessionRef.discoveredAt);
 
+        const statusSourceMatch =
+          input.threadStatusSource === undefined ||
+          thread.threadStatusSource === input.threadStatusSource;
+
         if (
           thread.status === effectiveStatus &&
           thread.attention === input.attention &&
           JSON.stringify(thread.config) === JSON.stringify(input.config ?? thread.config) &&
           thread.canResumeWithConfig === input.canResumeWithConfig &&
+          statusSourceMatch &&
           !sessionRefChanged
         ) {
           return thread;
@@ -210,6 +217,9 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           attention: input.attention,
           config: input.config ?? thread.config,
           canResumeWithConfig: input.canResumeWithConfig,
+          ...(input.threadStatusSource !== undefined
+            ? { threadStatusSource: input.threadStatusSource }
+            : {}),
           ...(input.sessionRef ? { sessionRef: input.sessionRef } : {}),
           ...(input.status === "working" && thread.status !== "working"
             ? { updatedAt: new Date().toISOString() }
@@ -295,6 +305,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           ...thread,
           status: "inactive",
           attention: "none",
+          threadStatusSource: undefined,
         };
       });
 
@@ -336,6 +347,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
             thread.attention === snapshot.attention &&
             JSON.stringify(thread.config) === JSON.stringify(snapshot.config ?? thread.config) &&
             thread.canResumeWithConfig === snapshot.canResumeWithConfig &&
+            thread.threadStatusSource === snapshot.threadStatusSource &&
             !sessionRefChanged
           ) {
             return thread;
@@ -348,6 +360,9 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
             attention: snapshot.attention,
             config: snapshot.config ?? thread.config,
             canResumeWithConfig: snapshot.canResumeWithConfig,
+            ...(snapshot.threadStatusSource !== undefined
+              ? { threadStatusSource: snapshot.threadStatusSource }
+              : {}),
             ...(snapshot.sessionRef ? { sessionRef: snapshot.sessionRef } : {}),
           };
         }

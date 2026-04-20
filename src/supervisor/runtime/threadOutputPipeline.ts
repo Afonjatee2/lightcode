@@ -1,6 +1,6 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { stripAnsiPreservingLayout } from "@/shared/ansi";
-import type { ThreadAttention, ThreadStatus } from "@/shared/contracts";
+import type { ThreadAttention, ThreadStatus, ThreadStatusSource } from "@/shared/contracts";
 import { extractOscNotifications } from "@/shared/osc";
 import { isThreadConfigEqual } from "@/shared/contracts";
 import type { TerminalStatusHint } from "../agents/base";
@@ -26,6 +26,16 @@ export interface ThreadOutputPipelineOptions extends ThreadOutputPipelineCallbac
   logWriter: BufferedLogWriter;
   resolveLogPath(threadId: string): string;
   resolveHintLogPath(threadId: string): string;
+}
+
+export function resolveThreadStatusSource(session: SessionRuntime): ThreadStatusSource {
+  if (session.adapter.capabilities.presentationMode !== "terminal") {
+    return "server";
+  }
+  if (session.hasCliHookPluginActivity || session.cliHookEnvInjected) {
+    return "cli_hook";
+  }
+  return "terminal_parse";
 }
 
 export class ThreadOutputPipeline {
@@ -74,6 +84,7 @@ export class ThreadOutputPipeline {
       config: session.config,
       ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
       canResumeWithConfig: session.canResumeWithConfig,
+      threadStatusSource: resolveThreadStatusSource(session),
       ...(errorMessage ? { errorMessage } : {}),
     });
   }

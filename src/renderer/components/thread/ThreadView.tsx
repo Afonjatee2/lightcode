@@ -9,6 +9,7 @@ import type {
   Thread,
   ThreadConfig,
   ThreadServerRequestId,
+  ThreadStatusSource,
 } from "@/shared/contracts";
 
 import { ProviderIcon, getComposerControls, getStatusTone } from "@/renderer/components/providers";
@@ -38,6 +39,88 @@ import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 
 const DEFAULT_HIDDEN_TERMINAL_SIZE: TerminalSize = { cols: 120, rows: 30 };
+
+function threadRuntimeStatusLabel(thread: Thread): string {
+  const { status, attention } = thread;
+  if (status === "launching") return "Launching…";
+  if (status === "inactive") return "Inactive";
+  if (status === "error") return "Error";
+  if (status === "finished") return "Finished";
+  if (status === "needs_approval" || attention === "needs_approval") return "Needs approval";
+  if (status === "needs_reply" || attention === "needs_reply") return "Needs reply";
+  if (status === "working" || attention === "working") return "Working";
+  if (status === "idle") return "Idle";
+  return status;
+}
+
+/** Third line of the header status tooltip — detail only, no duplicate labels. */
+function activeSupportLabel(source: ThreadStatusSource | undefined): string {
+  switch (source) {
+    case "cli_hook":
+      return "Enhanced (Hooks)";
+    case "terminal_parse":
+      return "Basic (CLI)";
+    case "server":
+      return "ACP";
+    default:
+      return "Basic (CLI)";
+  }
+}
+
+function threadStatusSupportDetail(source: ThreadStatusSource | undefined): string {
+  switch (source) {
+    case "cli_hook":
+      return "Status updates come from the CLI hook plugin (structured L1 events).";
+    case "terminal_parse":
+      return "Status is inferred from terminal output (L2). Install the hook plugin in settings for structured updates.";
+    case "server":
+      return "This thread uses the agent server protocol (ACP-style); terminal hooks do not apply.";
+    default:
+      return "Support mode appears once the session connects.";
+  }
+}
+
+/** Dot next to Support — encodes how status is sourced, not runtime state (so Basic ≠ “idle green”). */
+function supportSourceDotClass(source: ThreadStatusSource | undefined): string {
+  switch (source) {
+    case "cli_hook":
+      return "bg-[oklch(0.72_0.12_145)]";
+    case "terminal_parse":
+      return "bg-[oklch(0.72_0.11_75)]";
+    case "server":
+      return "bg-[oklch(0.68_0.12_265)]";
+    default:
+      return "bg-muted/70";
+  }
+}
+
+function ThreadHeaderStatusTooltipBody(props: { thread: Thread }) {
+  const { thread } = props;
+  const runtime = threadRuntimeStatusLabel(thread);
+  const source = thread.threadStatusSource;
+
+  return (
+    <div className="w-[min(22rem,calc(100vw-2rem))] space-y-3 py-3 pl-2 pr-5 [overflow-wrap:break-word] [word-break:normal] hyphens-none">
+      <div className="space-y-2.5">
+        <p className="text-sm leading-snug">
+          <span className="text-muted">Status: </span>
+          <span className="font-semibold text-foreground">{runtime}</span>
+        </p>
+        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
+          <span className="text-muted">Support:</span>
+          <span
+            className={`relative top-px size-1.5 shrink-0 rounded-full ring-1 ring-white/10 ${supportSourceDotClass(source)}`}
+            aria-hidden
+          />
+          <span className="font-semibold text-foreground">{activeSupportLabel(source)}</span>
+        </p>
+      </div>
+      <p className="border-t border-border/60 pt-2.5 text-xs leading-snug text-muted [overflow-wrap:break-word] [word-break:normal] hyphens-none">
+        {threadStatusSupportDetail(source)}
+      </p>
+    </div>
+  );
+}
 
 function buildControls(
   thread: Thread,
@@ -284,15 +367,17 @@ function ThreadComposerSection(props: {
                       {branchName ? (
                         thread.worktreePath ? (
                           <Tooltip delay={0}>
-                            <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
-                              <GitFork className="size-3.5 text-muted" />
-                              <span className="truncate">{branchName}</span>
-                              {thread.prNumber ? (
-                                <span className="shrink-0 text-muted/60">
-                                  PR #{thread.prNumber}
-                                </span>
-                              ) : null}
-                            </div>
+                            <Tooltip.Trigger tabIndex={-1} role="none">
+                              <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
+                                <GitFork className="size-3.5 text-muted" />
+                                <span className="truncate">{branchName}</span>
+                                {thread.prNumber ? (
+                                  <span className="shrink-0 text-muted/60">
+                                    PR #{thread.prNumber}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </Tooltip.Trigger>
                             <Tooltip.Content placement="top">{branchName}</Tooltip.Content>
                           </Tooltip>
                         ) : (
@@ -491,70 +576,95 @@ export function ThreadView(props: {
         ref={droppableRef}
         className={`relative flex h-full min-h-0 flex-col ${isDragging ? "opacity-50" : ""}`}
       >
-        {/* Header bar */}
+        {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
         <div className={`${paddingClass} px-4`}>
-          <div
-            ref={dragHandleRef}
-            className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1.5 ${dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
-          >
-            <ProviderIcon
-              kind={thread.agentKind}
-              tone={getStatusTone(thread)}
-              className="size-3.5 shrink-0"
-            />
-            <span className="flex-1 truncate text-sm font-medium text-foreground">
-              {thread.title}
-            </span>
-            <div className="flex shrink-0 items-center">
-              {projectName ? (
-                <span className="px-1 text-sm text-muted/60">{projectName}</span>
-              ) : null}
-              {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
-              {onContinueInProvider &&
-              installedAgents &&
-              installedAgents.filter((a) => a.kind !== thread.agentKind).length > 0 &&
-              thread.sessionRef ? (
-                <Tooltip delay={0}>
+          <div className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1.5`}>
+            <Tooltip delay={0}>
+              <Tooltip.Trigger>
+                <button
+                  type="button"
+                  className="inline-flex shrink-0 rounded-sm p-0.5 outline-offset-2 hover:bg-white/[0.06]"
+                  aria-label={`${agentStatus?.label ?? thread.agentKind}: ${threadRuntimeStatusLabel(thread)}. Hover for status details.`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                >
+                  <ProviderIcon
+                    kind={thread.agentKind}
+                    tone={getStatusTone(thread)}
+                    className="size-3.5 shrink-0"
+                  />
+                </button>
+              </Tooltip.Trigger>
+              <Tooltip.Content
+                placement="bottom start"
+                offset={8}
+                showArrow
+                className="max-w-[min(22rem,calc(100vw-2rem))] text-left [overflow-wrap:break-word] [word-break:normal] hyphens-none"
+              >
+                <ThreadHeaderStatusTooltipBody thread={thread} />
+              </Tooltip.Content>
+            </Tooltip>
+            <div
+              ref={dragHandleRef}
+              className={`flex min-w-0 flex-1 items-center gap-2 ${dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
+            >
+              <span className="flex-1 truncate text-sm font-medium text-foreground">
+                {thread.title}
+              </span>
+              <div className="flex shrink-0 items-center">
+                {projectName ? (
+                  <span className="px-1 text-sm text-muted/60">{projectName}</span>
+                ) : null}
+                {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
+                {onContinueInProvider &&
+                installedAgents &&
+                installedAgents.filter((a) => a.kind !== thread.agentKind).length > 0 &&
+                thread.sessionRef ? (
+                  <Tooltip delay={0}>
+                    <Tooltip.Trigger>
+                      <button
+                        type="button"
+                        aria-label="Continue in another provider"
+                        className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setContinueDialogOpen(true);
+                        }}
+                      >
+                        <ArrowRightLeft className="size-3.5" />
+                      </button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>Continue in another provider</Tooltip.Content>
+                  </Tooltip>
+                ) : null}
+                {onMarkDone ? (
                   <button
                     type="button"
-                    aria-label="Continue in another provider"
+                    aria-label={thread.done ? "Unmark done" : "Mark done"}
+                    className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkDone();
+                    }}
+                  >
+                    <CircleCheck className="size-3.5" />
+                  </button>
+                ) : null}
+                {showCloseButton ? (
+                  <button
+                    type="button"
+                    aria-label="Close pane"
                     className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setContinueDialogOpen(true);
+                      onClose?.();
                     }}
                   >
-                    <ArrowRightLeft className="size-3.5" />
+                    <X className="size-3.5" />
                   </button>
-                  <Tooltip.Content>Continue in another provider</Tooltip.Content>
-                </Tooltip>
-              ) : null}
-              {onMarkDone ? (
-                <button
-                  type="button"
-                  aria-label={thread.done ? "Unmark done" : "Mark done"}
-                  className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onMarkDone();
-                  }}
-                >
-                  <CircleCheck className="size-3.5" />
-                </button>
-              ) : null}
-              {showCloseButton ? (
-                <button
-                  type="button"
-                  aria-label="Close pane"
-                  className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onClose?.();
-                  }}
-                >
-                  <X className="size-3.5" />
-                </button>
-              ) : null}
+                ) : null}
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ThreadOutputPipeline } from "./threadOutputPipeline";
+import { ThreadOutputPipeline, resolveThreadStatusSource } from "./threadOutputPipeline";
 import type { SessionRuntime } from "./sessionTypes";
 
 function pipeline() {
@@ -14,6 +14,44 @@ function pipeline() {
     onStartSessionRefDiscovery: vi.fn<() => void>(),
   });
 }
+
+describe("resolveThreadStatusSource", () => {
+  it("returns server when presentation is not terminal", () => {
+    expect(
+      resolveThreadStatusSource({
+        adapter: { capabilities: { presentationMode: "gui" } },
+      } as never),
+    ).toBe("server");
+  });
+
+  it("returns cli_hook when the CLI hook plugin has posted", () => {
+    expect(
+      resolveThreadStatusSource({
+        hasCliHookPluginActivity: true,
+        adapter: { capabilities: { presentationMode: "terminal" } },
+      } as never),
+    ).toBe("cli_hook");
+  });
+
+  it("returns terminal_parse for terminal without hook activity", () => {
+    expect(
+      resolveThreadStatusSource({
+        hasCliHookPluginActivity: false,
+        adapter: { capabilities: { presentationMode: "terminal" } },
+      } as never),
+    ).toBe("terminal_parse");
+  });
+
+  it("returns cli_hook when LIGHTCODE_HOOK_URL was injected at spawn (before any hook POST)", () => {
+    expect(
+      resolveThreadStatusSource({
+        cliHookEnvInjected: true,
+        hasCliHookPluginActivity: false,
+        adapter: { capabilities: { presentationMode: "terminal" } },
+      } as never),
+    ).toBe("cli_hook");
+  });
+});
 
 describe("ThreadOutputPipeline / CLI hook disables L2", () => {
   it("getLatestTerminalStatusHint returns null without calling detectTerminalStatus when hook is active", () => {

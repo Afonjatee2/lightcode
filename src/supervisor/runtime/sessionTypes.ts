@@ -51,6 +51,13 @@ export interface SessionRuntime {
   workingSilenceTimer?: ReturnType<typeof setTimeout> | undefined;
   outputTranscript?: TranscriptBuffer | undefined;
   /**
+   * True when `LIGHTCODE_HOOK_URL` (and related vars) were injected into the
+   * agent PTY at spawn (L1 path: host or WSL bridge → HookIngress). Used so the
+   * UI can show Enhanced (Hooks) before the first routed hook event; L2 parsing
+   * still waits for {@link hasCliHookPluginActivity}. Cleared on PTY exit.
+   */
+  cliHookEnvInjected?: boolean;
+  /**
    * Set the first time we receive a CLI hook plugin event (hook POST) for this
    * session. Once true, terminal status from TUI parsing (L2 /
    * `detectTerminalStatus`) is disabled — hooks own thread status. Cleared on

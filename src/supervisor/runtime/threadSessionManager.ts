@@ -37,7 +37,7 @@ import type { WindowsShellPreference } from "../shellPreference";
 import { BufferedLogWriter } from "./bufferedLogWriter";
 import { hookDebugSpawn } from "./hookDebug";
 import type { SessionRuntime, ShellSessionRuntime } from "./sessionTypes";
-import { ThreadOutputPipeline } from "./threadOutputPipeline";
+import { ThreadOutputPipeline, resolveThreadStatusSource } from "./threadOutputPipeline";
 import { rewriteSegmentsForWsl } from "./threadAttachments";
 
 function hookDebugProjectLabel(loc: ProjectLocation): string {
@@ -147,6 +147,7 @@ export class ThreadSessionManager {
       config: session.config,
       ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
       canResumeWithConfig: session.canResumeWithConfig,
+      threadStatusSource: resolveThreadStatusSource(session),
     }));
   }
 
@@ -789,6 +790,7 @@ export class ThreadSessionManager {
       },
     });
 
+    const cliHookEnvInjected = Boolean(input.extraEnv?.LIGHTCODE_HOOK_URL);
     const session: SessionRuntime = {
       instanceId: randomUUID(),
       threadId: input.threadId,
@@ -809,6 +811,7 @@ export class ThreadSessionManager {
       pendingTerminalPrompt: input.pendingTerminalPrompt,
       pendingTerminalSegments: input.pendingTerminalSegments,
       prevChunk: "",
+      ...(cliHookEnvInjected ? { cliHookEnvInjected: true } : {}),
       ...(input.structuredSession ? { structuredSession: input.structuredSession } : {}),
     };
 
@@ -914,6 +917,7 @@ export class ThreadSessionManager {
       this.outputPipeline.clearSessionTimers(session);
       this.outputPipeline.updateState(session, "inactive", "none");
       session.hasCliHookPluginActivity = false;
+      session.cliHookEnvInjected = false;
       if (session.sessionRef?.providerSessionId) {
         this.sessionsBySessionId.delete(session.sessionRef.providerSessionId);
       }

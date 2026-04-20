@@ -8,6 +8,10 @@ import {
 } from "./common";
 import { threadConfigSchema } from "./config";
 
+/** How thread status/attention is derived for terminal agents (supervisor → renderer). */
+export const threadStatusSourceSchema = z.enum(["cli_hook", "terminal_parse", "server"]);
+export type ThreadStatusSource = z.infer<typeof threadStatusSourceSchema>;
+
 export const threadSchema = z.object({
   id: z.string().min(1),
   projectId: z.string().min(1),
@@ -27,6 +31,8 @@ export const threadSchema = z.object({
   done: z.boolean().default(false),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  /** Set by supervisor `thread-state`; not user-editable. */
+  threadStatusSource: threadStatusSourceSchema.optional(),
 });
 export type Thread = z.infer<typeof threadSchema>;
 
@@ -38,6 +44,7 @@ export interface ThreadRuntimeSnapshot {
   sessionRef?: z.infer<typeof sessionRefSchema>;
   canResumeWithConfig: boolean;
   errorMessage?: string;
+  threadStatusSource?: ThreadStatusSource;
 }
 
 export const terminalSizeSchema = z.object({
