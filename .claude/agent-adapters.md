@@ -39,7 +39,7 @@ Every supported agent implements the `AgentAdapter` interface (`src/supervisor/a
 
 | Provider | Adapter File                                      | Models                                                              | Efforts                  | Live Input | Structured Session |
 | -------- | ------------------------------------------------- | ------------------------------------------------------------------- | ------------------------ | ---------- | ------------------ |
-| Claude   | `agents/claude.ts`                                | opus-4-6[1m], sonnet, haiku                                         | low, medium, high, max   | terminal   | No                 |
+| Claude   | `agents/claude.ts`                                | opus-4-7, opus-4-6[1m], sonnet, haiku                               | low, medium, high, max   | terminal   | No                 |
 | Codex    | `agents/codex.ts`                                 | gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2-codex, etc.           | low, medium, high, xhigh | server     | Yes (WebSocket)    |
 | Gemini   | `agents/gemini/adapter.ts` + `gemini/terminal.ts` | auto, gemini-3.1-pro-preview, gemini-2.5-pro/flash/flash-lite, etc. | (none)                   | terminal   | No                 |
 

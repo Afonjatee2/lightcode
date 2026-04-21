@@ -51,7 +51,7 @@ Opening two provider folders side-by-side answers "what does this provider do di
 
 | Provider | Models                                                              | Efforts                  | Live Input | Structured Session |
 | -------- | ------------------------------------------------------------------- | ------------------------ | ---------- | ------------------ |
-| Claude   | opus-4-6[1m], sonnet, haiku                                         | low, medium, high, max   | terminal   | No                 |
+| Claude   | opus-4-7, opus-4-6[1m], sonnet, haiku                               | low, medium, high, max   | terminal   | No                 |
 | Codex    | gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2-codex, etc.           | low, medium, high, xhigh | server     | Yes (WebSocket)    |
 | Gemini   | auto, gemini-3.1-pro-preview, gemini-2.5-pro/flash/flash-lite, etc. | (none)                   | terminal   | No                 |
 | Copilot  | (probed via ACP)                                                    | low, medium, high, xhigh | terminal   | Yes (ACP)          |

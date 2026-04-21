@@ -21,6 +21,21 @@ interface AgentStatusesStore {
   hydrateFromCache: (cached: { windows: AgentStatus[]; wsl: AgentStatus[] }) => void;
 }
 
+function capabilitiesEqual(
+  a: AgentStatus["capabilities"],
+  b: AgentStatus["capabilities"],
+): boolean {
+  if (a.models.length !== b.models.length) return false;
+  if (a.efforts.length !== b.efforts.length) return false;
+  for (let i = 0; i < a.models.length; i++) {
+    if (a.models[i]!.id !== b.models[i]!.id) return false;
+  }
+  for (let i = 0; i < a.efforts.length; i++) {
+    if (a.efforts[i] !== b.efforts[i]) return false;
+  }
+  return true;
+}
+
 function statusesEqual(a: AgentStatus[], b: AgentStatus[]): boolean {
   if (a.length !== b.length) return false;
   return a.every(
@@ -28,7 +43,8 @@ function statusesEqual(a: AgentStatus[], b: AgentStatus[]): boolean {
       x.kind === b[i]!.kind &&
       x.installed === b[i]!.installed &&
       x.version === b[i]!.version &&
-      x.authState === b[i]!.authState,
+      x.authState === b[i]!.authState &&
+      capabilitiesEqual(x.capabilities, b[i]!.capabilities),
   );
 }
 

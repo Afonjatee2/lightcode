@@ -46,13 +46,15 @@ const claudeStatus: AgentStatus = {
   authState: "authenticated",
   capabilities: {
     models: [
-      { id: "claude-opus-4-6[1m]", label: "Opus 1M" },
+      { id: "claude-opus-4-7[1m]", label: "Opus 4.7" },
+      { id: "claude-opus-4-6[1m]", label: "Opus 4.6" },
       { id: "sonnet", label: "Sonnet" },
       { id: "haiku", label: "Haiku" },
     ],
-    efforts: ["low", "medium", "high", "max"],
+    efforts: ["low", "medium", "high", "xHigh", "max"],
     defaultEffort: "high",
     modelEfforts: {
+      "claude-opus-4-6[1m]": ["low", "medium", "high", "max"],
       haiku: [],
       sonnet: ["low", "medium", "high"],
     },

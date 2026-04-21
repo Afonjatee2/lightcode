@@ -16,20 +16,30 @@ registerCommitGenDefaults("claude", { label: "Claude", hint: "Haiku", model: "ha
 registerTitleGenDefaults("claude", { label: "Claude", hint: "Haiku", model: "haiku", effort: "" });
 registerConflictResolverDefaults("claude", {
   label: "Claude",
-  hint: "Opus",
-  model: "claude-opus-4-6[1m]",
+  hint: "Opus 4.7",
+  model: "claude-opus-4-7[1m]",
   effort: "",
 });
 
+const MODEL_ALIASES: Record<string, string> = {
+  "claude-opus-4-7": "claude-opus-4-7[1m]",
+  "claude-opus-4-6": "claude-opus-4-6[1m]",
+};
+
+function normalizeModel(id: string, models: readonly { id: string }[]): string {
+  if (models.some((m) => m.id === id)) return id;
+  return MODEL_ALIASES[id] ?? id;
+}
+
 registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfigChange }) => {
-  const availableEfforts =
-    capabilities.modelEfforts?.[config.model ?? ""] ?? capabilities.efforts ?? [];
+  const model = normalizeModel(config.model ?? "", capabilities.models);
+  const availableEfforts = capabilities.modelEfforts?.[model] ?? capabilities.efforts ?? [];
 
   return [
     // Model
     {
-      options: withCurrentModel(capabilities.models, config.model),
-      value: config.model,
+      options: withCurrentModel(capabilities.models, model),
+      value: model,
       isDisabled,
       onChange: (value: string) => {
         const nextEfforts = capabilities.modelEfforts?.[value] ?? capabilities.efforts ?? [];

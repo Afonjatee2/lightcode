@@ -105,6 +105,7 @@ export function detectClaudeTerminalStatus(text: string): TerminalStatusHint | n
 // ── Model / effort detection from "Set model to …" messages ─────────
 
 const CLAUDE_MODEL_MAP: [RegExp, string][] = [
+  [/opus.*4\.7/i, "claude-opus-4-7[1m]"],
   [/opus/i, "claude-opus-4-6[1m]"],
   [/haiku/i, "haiku"],
   [/sonnet/i, "sonnet"],

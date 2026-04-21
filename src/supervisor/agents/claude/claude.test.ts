@@ -202,7 +202,15 @@ describe("detectClaudeTerminalStatus", () => {
 // ── Model / effort detection ──────────────────────────────
 
 describe("detectClaudeModelEffort", () => {
-  it("detects Opus model with max effort", () => {
+  it("detects Opus 4.7 model with max effort", () => {
+    const text = "Set model to Opus 4.7 (default) with max effort";
+    expect(detectClaudeModelEffort(text)).toEqual({
+      model: "claude-opus-4-7[1m]",
+      effort: "max",
+    });
+  });
+
+  it("detects Opus 4.6 model with max effort", () => {
     const text = "Set model to Opus 4.6 (1M context) (default) with max effort";
     expect(detectClaudeModelEffort(text)).toEqual({
       model: "claude-opus-4-6[1m]",
@@ -269,7 +277,21 @@ describe("detectClaudeTerminalStatus with model/effort", () => {
     expect(result?.effort).toBe("medium");
   });
 
-  it("includes model from buffer with accept edits mode", () => {
+  it("includes Opus 4.7 model from buffer with accept edits mode", () => {
+    const text = [
+      "Set model to Opus 4.7 (default) with max effort",
+      "● Ready",
+      "❯ ",
+      "▶▶ accept edits on (shift+tab to cycle)",
+    ].join("\n");
+    const result = detectClaudeTerminalStatus(text);
+    expect(result?.status).toBe("idle");
+    expect(result?.approvalPolicy).toBe("acceptEdits");
+    expect(result?.model).toBe("claude-opus-4-7[1m]");
+    expect(result?.effort).toBe("max");
+  });
+
+  it("includes Opus 4.6 model from buffer with accept edits mode", () => {
     const text = [
       "Set model to Opus 4.6 (1M context) (default) with max effort",
       "● Ready",
