@@ -110,6 +110,15 @@ export function ThreadComposer(props: {
   const [isWrapping, setIsWrapping] = useState(false);
   const controlsRef = useRef<HTMLDivElement>(null);
   const rulerRef = useRef<HTMLDivElement>(null);
+  const editorHostRef = useRef<HTMLDivElement>(null);
+
+  const returnFocusToInput = () => {
+    const el = editorHostRef.current?.querySelector<HTMLElement>(
+      'textarea, [contenteditable="true"], input:not([type="hidden"])',
+    );
+    // rAF lets MenuTrigger's own focus-return run first, then we override it.
+    if (el) requestAnimationFrame(() => el.focus());
+  };
 
   // Use a ref to track the current wrapping state to avoid unnecessary state updates
   const isWrappingRef = useRef(false);
@@ -255,6 +264,9 @@ export function ThreadComposer(props: {
           options={control.options}
           value={control.value}
           onChange={control.onChange ?? (() => undefined)}
+          onOpenChange={(open) => {
+            if (!open) returnFocusToInput();
+          }}
           {...optionalProps}
         />
       );
@@ -325,7 +337,7 @@ export function ThreadComposer(props: {
     <div>
       <div className="lightcode-composer-shell overflow-hidden">
         {attachmentBar}
-        {renderEditor()}
+        <div ref={editorHostRef}>{renderEditor()}</div>
         <div className={toolbarClassName}>
           {renderControls()}
           <div className="flex items-end gap-2">

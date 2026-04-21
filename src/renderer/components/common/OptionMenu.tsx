@@ -16,6 +16,7 @@ export interface OptionMenuProps {
   hideLabelOnWrap?: boolean;
   iconOnly?: boolean;
   tooltip?: string | undefined;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export function OptionMenu(props: OptionMenuProps) {
@@ -31,6 +32,7 @@ export function OptionMenu(props: OptionMenuProps) {
     hideLabelOnWrap = false,
     iconOnly = false,
     tooltip,
+    onOpenChange,
   } = props;
   const normalizedOptions = options.map((option) =>
     typeof option === "string"
@@ -70,8 +72,10 @@ export function OptionMenu(props: OptionMenuProps) {
     </Button>
   );
 
+  const dropdownProps = onOpenChange ? { onOpenChange } : {};
+
   return (
-    <Dropdown>
+    <Dropdown {...dropdownProps}>
       {effectiveTooltip ? (
         <Tooltip>
           {button}
