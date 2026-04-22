@@ -25,6 +25,17 @@ function buildCodexArgs(
 
   args.push("--no-alt-screen");
 
+  // OSC 9 TUI notifications — L2 status when hooks are unavailable (always-on).
+  // `tui.notifications = true` enables all notification event types; array = allowlist only.
+  args.push(
+    "-c",
+    "tui.notifications=true",
+    "-c",
+    'tui.notification_method="osc9"',
+    "-c",
+    "suppress_unstable_features_warning=true",
+  );
+
   if (!launchOptions?.suppressResumeConfigOverrides) {
     if (config.model) {
       args.push("-m", config.model);

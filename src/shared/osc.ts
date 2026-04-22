@@ -148,3 +148,40 @@ export function extractOscNotifications(data: string): OscExtractionResult {
 
   return { cleaned, notifications };
 }
+
+/** Defensive cap so a pathological PTY line cannot grow memory without bound. */
+const MAX_PTY_OSC_CARRY = 64 * 1024;
+
+/**
+ * If `cleaned` ends with a notification OSC (9 / 777 / 99) that has no ST/BEL
+ * terminator yet, split it off for the next PTY read — sequences are often
+ * split across `node-pty` chunks (notably on Windows / ConPTY).
+ */
+function takeTrailingIncompleteNotificationOsc(s: string): { head: string; carry: string } {
+  const last = s.lastIndexOf("\x1b]");
+  if (last < 0) return { head: s, carry: "" };
+  const tail = s.slice(last);
+  const afterIntroducer = tail.slice(2); // drop the leading ESC + ']'
+  if (!/^(?:9;|777;notify;|99;)/.test(afterIntroducer)) return { head: s, carry: "" };
+  if (tail.includes("\x07") || tail.includes("\x1b\\")) return { head: s, carry: "" };
+  return { head: s.slice(0, last), carry: tail };
+}
+
+/**
+ * Reassemble split OSC notification sequences across multiple PTY reads, then
+ * extract the same `OscNotification` list as {@link extractOscNotifications}.
+ * Pass the previous return `carryOut` as the next `carryIn`.
+ */
+export function extractOscNotificationsFromPtyStream(
+  carryIn: string | undefined,
+  chunk: string,
+): { carryOut: string; notifications: OscNotification[]; cleaned: string } {
+  let carry = carryIn ?? "";
+  if (carry.length > MAX_PTY_OSC_CARRY) {
+    carry = "";
+  }
+  const combined = carry + chunk;
+  const { cleaned, notifications } = extractOscNotifications(combined);
+  const { head, carry: tailCarry } = takeTrailingIncompleteNotificationOsc(cleaned);
+  return { carryOut: tailCarry, notifications, cleaned: head };
+}

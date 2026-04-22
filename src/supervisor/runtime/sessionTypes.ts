@@ -40,6 +40,27 @@ export interface SessionRuntime {
   pendingTerminalPrompt?: string | undefined;
   pendingTerminalSegments?: PromptSegment[] | undefined;
   prevChunk: string;
+  /**
+   * ANSI-stripped text from the **latest** PTY `data` chunk (post OSC extract).
+   * Used for `detectTerminalStatus` / `getLatestTerminalStatusHint` so L2 never
+   * scans merged scrollback from `prevChunk`.
+   */
+  lastStrippedPtyChunk: string;
+  /**
+   * Bytes held between PTY `data` events when an OSC 9/777/99 sequence is
+   * split across reads (no BEL/ST yet in this chunk).
+   */
+  ptyOscCarry?: string;
+  /**
+   * ANSI-stripped tail of the transcript captured at the moment of the last
+   * authoritative `idle` transition. L2 `detectTerminalStatus` compares its
+   * matched TUI line (e.g. `● Working (1s • esc to interrupt)`) against this
+   * snapshot to reject repaints of the just-finished turn — the baked-in
+   * scrollback marker persists in subsequent PTY chunks and otherwise re-flips
+   * the thread back to `working` after hook-driven idle. Cleared on transition
+   * to `working`.
+   */
+  idleStrippedTail?: string | undefined;
   lastStatusChangeAt?: number | undefined;
   pendingStatusHint?:
     | {

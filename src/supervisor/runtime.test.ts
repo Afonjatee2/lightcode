@@ -95,6 +95,12 @@ function createMockPty() {
   };
 }
 
+function decodeSpawnCommand(spawnArgs: string[]): string {
+  return spawnArgs.includes("-EncodedCommand")
+    ? Buffer.from(spawnArgs.at(-1)!, "base64").toString("utf16le")
+    : spawnArgs.join(" ");
+}
+
 function createRuntimeSession(overrides: Record<string, unknown> = {}) {
   return {
     instanceId: "instance-1",
@@ -136,6 +142,8 @@ function createRuntimeSession(overrides: Record<string, unknown> = {}) {
     },
     logPath: "thread.log",
     outputLength: 0,
+    prevChunk: "",
+    lastStrippedPtyChunk: "",
     structuredSession: {
       launchOptions: {},
       activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -823,6 +831,163 @@ describe("writeSubmittedPrompt", () => {
     expect(encoded).toContain("codex");
     expect(encoded).toContain("session-1");
     expect(spawnOpts).toMatchObject({ cols: 132, rows: 42 });
+  });
+
+  it("inserts Codex hook enable flags before the positional prompt", async () => {
+    const runtime = new SupervisorRuntime(() => undefined);
+    const pty = createMockPty();
+
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    const adapter = {
+      kind: "codex" as const,
+      label: "Codex",
+      capabilities: {
+        models: [{ id: "gpt-5.4", label: "5.4" }],
+        efforts: ["high"],
+        modelEfforts: {},
+        modes: ["agent"],
+        approvalPolicies: [{ id: "on-request", label: "On Request" }],
+        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "terminal" as const,
+        presentationMode: "terminal" as const,
+      },
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "codex",
+        args: ["--no-alt-screen", "hello"],
+      })),
+      buildResumeArgv: vi.fn<() => void>(),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+    };
+
+    (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+      "codex",
+      adapter,
+    );
+    (
+      runtime as unknown as {
+        cliHookPluginCoordinator: {
+          resolvePluginEnvForSpawn: (input: unknown) => Promise<{
+            env: Record<string, string>;
+            extraArgs: string[];
+          }>;
+        };
+      }
+    ).cliHookPluginCoordinator.resolvePluginEnvForSpawn = vi.fn<
+      (input: unknown) => Promise<{ env: Record<string, string>; extraArgs: string[] }>
+    >(async () => ({
+      env: { LIGHTCODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event" },
+      extraArgs: ["--enable", "codex_hooks"],
+    }));
+
+    await runtime.startThread({
+      threadId: "thread-hook-order",
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      agentKind: "codex",
+      config: {
+        model: "gpt-5.4",
+      },
+      prompt: "hello",
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+    });
+
+    const [, spawnArgs] = ptySpawnMock.mock.calls[0] as [string, string[]];
+    const command = decodeSpawnCommand(spawnArgs);
+    expect(command.indexOf("'--enable'")).toBeGreaterThan(-1);
+    expect(command.indexOf("'codex_hooks'")).toBeGreaterThan(command.indexOf("'--enable'"));
+    expect(command.indexOf("'hello'")).toBeGreaterThan(command.indexOf("'codex_hooks'"));
+  });
+
+  it("inserts Codex hook enable flags before the resume session id", async () => {
+    const runtime = new SupervisorRuntime(() => undefined);
+    const pty = createMockPty();
+
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    const adapter = {
+      kind: "codex" as const,
+      label: "Codex",
+      capabilities: {
+        models: [{ id: "gpt-5.4", label: "5.4" }],
+        efforts: ["high"],
+        modelEfforts: {},
+        modes: ["agent"],
+        approvalPolicies: [{ id: "on-request", label: "On Request" }],
+        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "terminal" as const,
+        presentationMode: "terminal" as const,
+      },
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchArgv: vi.fn<() => void>(),
+      buildResumeArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "codex",
+        args: ["resume", "--no-alt-screen", "session-123", "next prompt"],
+      })),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+    };
+
+    (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+      "codex",
+      adapter,
+    );
+    (
+      runtime as unknown as {
+        cliHookPluginCoordinator: {
+          resolvePluginEnvForSpawn: (input: unknown) => Promise<{
+            env: Record<string, string>;
+            extraArgs: string[];
+          }>;
+        };
+      }
+    ).cliHookPluginCoordinator.resolvePluginEnvForSpawn = vi.fn<
+      (input: unknown) => Promise<{ env: Record<string, string>; extraArgs: string[] }>
+    >(async () => ({
+      env: { LIGHTCODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event" },
+      extraArgs: ["--enable", "codex_hooks"],
+    }));
+
+    await runtime.startThread({
+      threadId: "thread-hook-resume-order",
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      agentKind: "codex",
+      config: {
+        model: "gpt-5.4",
+      },
+      sessionRef: {
+        providerSessionId: "session-123",
+        discoveredAt: new Date().toISOString(),
+      },
+      prompt: "next prompt",
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+    });
+
+    const [, spawnArgs] = ptySpawnMock.mock.calls[0] as [string, string[]];
+    const command = decodeSpawnCommand(spawnArgs);
+    expect(command.indexOf("'--enable'")).toBeGreaterThan(-1);
+    expect(command.indexOf("'codex_hooks'")).toBeGreaterThan(command.indexOf("'--enable'"));
+    expect(command.indexOf("'session-123'")).toBeGreaterThan(command.indexOf("'codex_hooks'"));
+    expect(command.indexOf("'next prompt'")).toBeGreaterThan(command.indexOf("'session-123'"));
   });
 
   it("skips TUI parsing hooks for server-backed GUI presentation", () => {

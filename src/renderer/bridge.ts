@@ -11,3 +11,7 @@ export function isWindows(): boolean {
 export function isMac(): boolean {
   return readBridge().platform === "darwin";
 }
+
+export function isDevApp(): boolean {
+  return readBridge().isDev === true;
+}

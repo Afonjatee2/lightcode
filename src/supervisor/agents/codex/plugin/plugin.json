@@ -1,0 +1,7 @@
+{
+  "name": "lightcode-status",
+  "version": "1.0.0",
+  "description": "Forward Codex CLI lifecycle hooks to Lightcode for sidebar status detection.",
+  "author": "Lightcode",
+  "license": "Apache-2.0"
+}

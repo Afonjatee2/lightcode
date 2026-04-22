@@ -22,9 +22,20 @@ function resolveAppVersion(): string {
   return process.env.npm_package_version ?? "dev";
 }
 
+function resolveIsDev(): boolean {
+  const prefix = "--lc-is-dev=";
+  for (const arg of process.argv) {
+    if (arg.startsWith(prefix)) {
+      return arg.slice(prefix.length) === "1";
+    }
+  }
+  return false;
+}
+
 const bridge: LightcodeBridge = {
   platform: process.platform,
   appVersion: resolveAppVersion(),
+  isDev: resolveIsDev(),
   electronVersion: process.versions.electron ?? "unknown",
   ...createInvokeBridge((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
   onSupervisorEvent(listener) {

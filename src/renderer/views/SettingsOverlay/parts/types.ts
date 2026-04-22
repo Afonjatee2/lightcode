@@ -4,4 +4,5 @@ export type SettingsSection =
   | "agents"
   | "archived"
   | "about"
+  | "dev"
   | `agents:${string}`;

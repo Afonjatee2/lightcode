@@ -497,6 +497,43 @@ export class ThreadSessionManager {
   }
 
   /**
+   * Hook-launch flags must stay in the option section of the argv. Appending
+   * them after positional session ids / prompts makes Codex treat
+   * `--enable codex_hooks` as trailing user input instead of a real flag.
+   */
+  private mergeCliHookExtraArgs(
+    adapter: AgentAdapter,
+    args: string[],
+    extraArgs: string[],
+    prompt: string,
+    sessionRef?: SessionRef,
+  ): string[] {
+    if (extraArgs.length === 0) {
+      return args;
+    }
+
+    switch (adapter.kind) {
+      case "codex": {
+        let trailingPositionals = 0;
+        if (args[0] === "resume" || sessionRef) {
+          trailingPositionals += 1;
+        }
+        if (prompt.trim().length > 0) {
+          trailingPositionals += 1;
+        }
+        const insertAt = Math.max(args.length - trailingPositionals, args[0] === "resume" ? 1 : 0);
+        return [...args.slice(0, insertAt), ...extraArgs, ...args.slice(insertAt)];
+      }
+      case "claude": {
+        const insertAt = prompt.trim().length > 0 ? args.length - 1 : args.length;
+        return [...args.slice(0, insertAt), ...extraArgs, ...args.slice(insertAt)];
+      }
+      default:
+        return [...args, ...extraArgs];
+    }
+  }
+
+  /**
    * Resolve the CLI hook plugin env + extra agent args that should be injected for
    * the given thread. Always returns a value so callers can splat
    * unconditionally; missing config produces an empty record/array.
@@ -681,7 +718,13 @@ export class ThreadSessionManager {
       payload.projectLocation,
     );
     if (cliHookExtras.extraArgs.length > 0) {
-      argv.args = [...argv.args, ...cliHookExtras.extraArgs];
+      argv.args = this.mergeCliHookExtraArgs(
+        adapter,
+        argv.args,
+        cliHookExtras.extraArgs,
+        launchPrompt,
+        payload.sessionRef,
+      );
     }
     const command = resolveLaunchSpec(payload.projectLocation, argv);
 
@@ -811,6 +854,8 @@ export class ThreadSessionManager {
       pendingTerminalPrompt: input.pendingTerminalPrompt,
       pendingTerminalSegments: input.pendingTerminalSegments,
       prevChunk: "",
+      lastStrippedPtyChunk: "",
+      ptyOscCarry: "",
       ...(cliHookEnvInjected ? { cliHookEnvInjected: true } : {}),
       ...(input.structuredSession ? { structuredSession: input.structuredSession } : {}),
     };
@@ -1035,7 +1080,13 @@ export class ThreadSessionManager {
       structuredSession?.launchOptions,
     );
     if (cliHookExtras.extraArgs.length > 0) {
-      argv.args = [...argv.args, ...cliHookExtras.extraArgs];
+      argv.args = this.mergeCliHookExtraArgs(
+        session.adapter,
+        argv.args,
+        cliHookExtras.extraArgs,
+        launchPrompt,
+        session.sessionRef,
+      );
     }
     const command = resolveLaunchSpec(session.projectLocation, argv);
 
@@ -1093,7 +1144,12 @@ export class ThreadSessionManager {
         session.launchPrompt,
       );
       if (cliHookExtras.extraArgs.length > 0) {
-        argv.args = [...argv.args, ...cliHookExtras.extraArgs];
+        argv.args = this.mergeCliHookExtraArgs(
+          session.adapter,
+          argv.args,
+          cliHookExtras.extraArgs,
+          session.launchPrompt,
+        );
       }
       const command = resolveLaunchSpec(session.projectLocation, argv);
 

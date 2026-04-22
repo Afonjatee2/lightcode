@@ -74,6 +74,12 @@ export const sharedSettingsSchema = z.object({
   providerConfigs: z.record(z.string(), providerDraftConfigSchema),
   /** Enable LSP language servers for the file editor (type checking, completions, etc.). */
   editorLspEnabled: z.boolean(),
+  /**
+   * Dev-only: force agents off the CLI hook plugin path (L1) so they fall back
+   * to L2 terminal parsing. The UI toggle is only visible in the dev build;
+   * the field is always present so the supervisor can read it unconditionally.
+   */
+  disableCliHookPlugin: z.boolean(),
   /** Per-agent CLI hook plugin support cache. Keyed by AgentKind (and WSL distro when applicable). */
   agentHookSupport: z.record(z.string(), agentHookSupportEntrySchema),
 });
@@ -120,6 +126,7 @@ export const defaultSharedSettings: SharedSettings = {
   gitReviewMode: "panel",
   providerConfigs: {},
   editorLspEnabled: false,
+  disableCliHookPlugin: false,
   agentHookSupport: {},
 };
 

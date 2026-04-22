@@ -888,6 +888,8 @@ export type LightcodeInvokeBridge = {
 export type LightcodeBridge = LightcodeInvokeBridge & {
   platform: NodeJS.Platform;
   appVersion: string;
+  /** True in the `pnpm dev` build; false in packaged releases. */
+  isDev: boolean;
   electronVersion: string;
   onSupervisorEvent(listener: (event: SupervisorEvent) => void): () => void;
   onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;

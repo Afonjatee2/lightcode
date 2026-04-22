@@ -36,6 +36,16 @@ export interface CliHookPluginCoordinatorOptions {
 const DEFAULT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
+ * Placeholder `pluginVersion` returned by `readBundled*PluginVersion()` when
+ * the plugin manifest cannot be resolved at module load. Entries written with
+ * this version are artifacts of a half-initialized environment (e.g. the
+ * plugin source tree didn't exist yet) — not real negative verdicts. We treat
+ * cached entries bearing it as stale on read, and refuse to write new ones so
+ * the next app session gets a clean retry.
+ */
+const PLUGIN_VERSION_UNKNOWN = "0.0.0";
+
+/**
  * Provider-agnostic orchestrator for **CLI hook plugin** status detection
  * (accurate lifecycle events from the agent CLI via HTTP hooks). The
  * supervisor instantiates a single coordinator at boot:
@@ -155,6 +165,20 @@ export class CliHookPluginCoordinator {
     agentKind: AgentKind;
     projectLocation?: ProjectLocation;
   }): Promise<{ env: Record<string, string>; extraArgs: string[] } | undefined> {
+    // Dev toggle — forces L2 terminal parsing for every spawn by refusing to
+    // inject the hook plugin env. Read from disk each call so flipping the
+    // switch in Settings affects the very next thread without a restart.
+    if (readSharedSettings(this.options.settingsPath).disableCliHookPlugin) {
+      if (isLightcodeHookDebug()) {
+        console.log("[supervisor] hook-debug: resolvePluginEnvForSpawn skipped", {
+          threadId: input.threadId,
+          agentKind: input.agentKind,
+          reason: "disableCliHookPlugin setting is on (dev override)",
+        });
+      }
+      return undefined;
+    }
+
     const adapter = this.options.adapters.get(input.agentKind);
     const slice = adapter ? toCliHookPluginSlice(adapter) : undefined;
     if (!adapter || !slice) {
@@ -229,14 +253,22 @@ export class CliHookPluginCoordinator {
     return { url: info.url, secret: info.secret, protocolVersion: info.protocolVersion };
   }
 
-  private ensureInstalled(
+  private async ensureInstalled(
     adapter: AgentAdapter,
     slice: AgentCliHookPluginSupport,
     ctx: AgentEnvContext,
   ): Promise<InstallOutcome> {
     const key = composeCacheKey(adapter.kind, ctx);
     const existing = this.installPromises.get(key);
-    if (existing) return existing;
+    if (existing) {
+      const outcome = await existing;
+      if (outcome.ok) return outcome;
+      // Last attempt failed. Always drop the in-memory failure and re-check on
+      // the next spawn: the environment may have changed since boot (for
+      // example, the user upgraded the CLI inside WSL), and a stale failed
+      // promise should not pin the whole session to L2 until restart.
+      this.installPromises.delete(key);
+    }
     const task = this.runInstall(adapter, slice, ctx, key).catch(
       (error): InstallOutcome => ({ ok: false, reason: errorMessage(error) }),
     );
@@ -252,14 +284,7 @@ export class CliHookPluginCoordinator {
   ): Promise<InstallOutcome> {
     const supported = (await slice.isPluginSupported?.(ctx)) ?? true;
     if (!supported) {
-      this.writeCacheEntry(cacheKey, {
-        agentBinaryVersion: "n/a",
-        pluginVersion: slice.pluginVersion,
-        protocolVersion: slice.minProtocolVersion,
-        platform: process.platform,
-        verifiedAt: new Date().toISOString(),
-        supportsL1: false,
-      });
+      this.writeNegativeCacheEntry(cacheKey, slice, "unsupported environment");
       return { ok: false, reason: "unsupported environment" };
     }
 
@@ -270,16 +295,27 @@ export class CliHookPluginCoordinator {
       cached &&
       cached.platform === process.platform &&
       cached.pluginVersion === slice.pluginVersion &&
+      cached.pluginVersion !== PLUGIN_VERSION_UNKNOWN &&
       cached.protocolVersion === slice.minProtocolVersion &&
       Date.now() - Date.parse(cached.verifiedAt) < this.cacheTtlMs
     ) {
-      // Cache hit. Still verify the staged files exist before honouring the
-      // cached `supportsL1=true` verdict — a user could have cleaned out
-      // ~/.lightcode/agent-plugins/.
-      if (!cached.supportsL1) return { ok: false, reason: "cached: unsupported" };
       const installed = await slice.isPluginInstalled(ctx);
-      if (installed.installed)
+      // Cache hit. For both positive and negative entries, re-check the staged
+      // files before trusting the cache: the user may have repaired or removed
+      // ~/.lightcode/agent-plugins/ and ~/.codex/hooks.json out of band.
+      if (installed.installed) {
+        if (!cached.supportsL1) {
+          this.writeCacheEntry(cacheKey, {
+            agentBinaryVersion: "n/a",
+            pluginVersion: installed.version ?? cached.pluginVersion,
+            protocolVersion: slice.minProtocolVersion,
+            platform: process.platform,
+            verifiedAt: new Date().toISOString(),
+            supportsL1: true,
+          });
+        }
         return { ok: true, version: installed.version ?? cached.pluginVersion };
+      }
     }
 
     const installed = await slice.isPluginInstalled(ctx);
@@ -287,14 +323,7 @@ export class CliHookPluginCoordinator {
     if (!installed.installed || installedVersion !== slice.pluginVersion) {
       const result = await slice.installPlugin(ctx);
       if (!result.ok) {
-        this.writeCacheEntry(cacheKey, {
-          agentBinaryVersion: "n/a",
-          pluginVersion: slice.pluginVersion,
-          protocolVersion: slice.minProtocolVersion,
-          platform: process.platform,
-          verifiedAt: new Date().toISOString(),
-          supportsL1: false,
-        });
+        this.writeNegativeCacheEntry(cacheKey, slice, result.reason);
         return result;
       }
       installedVersion = result.version;
@@ -309,6 +338,38 @@ export class CliHookPluginCoordinator {
       supportsL1: true,
     });
     return { ok: true, version: installedVersion ?? slice.pluginVersion };
+  }
+
+  /**
+   * Write a `supportsL1: false` cache entry, or skip when the slice's
+   * `pluginVersion` is the `"0.0.0"` sentinel — those verdicts reflect a
+   * transient "manifest unreadable at module load" state, not a real negative,
+   * and would otherwise block hook install until the next cache TTL expiry.
+   */
+  private writeNegativeCacheEntry(
+    cacheKey: string,
+    slice: AgentCliHookPluginSupport,
+    reason: string,
+  ): void {
+    if (slice.pluginVersion === PLUGIN_VERSION_UNKNOWN) {
+      console.warn(
+        `[supervisor] not caching hook install failure for ${cacheKey} ` +
+          `(reason: ${reason}): plugin manifest not readable — will retry next session`,
+      );
+      return;
+    }
+    console.warn(
+      `[supervisor] hook install for ${cacheKey} failed (reason: ${reason}); ` +
+        `thread will fall back to L2 terminal parsing`,
+    );
+    this.writeCacheEntry(cacheKey, {
+      agentBinaryVersion: "n/a",
+      pluginVersion: slice.pluginVersion,
+      protocolVersion: slice.minProtocolVersion,
+      platform: process.platform,
+      verifiedAt: new Date().toISOString(),
+      supportsL1: false,
+    });
   }
 
   private writeCacheEntry(cacheKey: string, entry: AgentHookSupportEntry): void {

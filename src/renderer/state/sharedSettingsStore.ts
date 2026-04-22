@@ -39,6 +39,7 @@ interface SharedSettingsState extends SharedSettings {
   setAutoShowTerminalPanel: (value: boolean) => void;
   setGitReviewMode: (value: GitReviewMode) => void;
   setEditorLspEnabled: (value: boolean) => void;
+  setDisableCliHookPlugin: (value: boolean) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
 }
 
@@ -184,6 +185,10 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ editorLspEnabled });
     persistSettings(selectSharedSettings(get()));
   },
+  setDisableCliHookPlugin: (disableCliHookPlugin) => {
+    set({ disableCliHookPlugin });
+    persistSettings(selectSharedSettings(get()));
+  },
   setProviderConfig: (agentKind, config) => {
     if (!config.model.trim()) {
       return;
@@ -229,6 +234,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     gitReviewMode: state.gitReviewMode,
     providerConfigs: state.providerConfigs,
     editorLspEnabled: state.editorLspEnabled,
+    disableCliHookPlugin: state.disableCliHookPlugin,
   };
 }
 

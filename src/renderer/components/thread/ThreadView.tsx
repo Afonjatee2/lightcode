@@ -70,7 +70,7 @@ function activeSupportLabel(source: ThreadStatusSource | undefined): string {
 function threadStatusSupportDetail(source: ThreadStatusSource | undefined): string {
   switch (source) {
     case "cli_hook":
-      return "Status updates come from the CLI hook plugin (structured L1 events).";
+      return "Status updates come from the CLI hook plugin.";
     case "terminal_parse":
       return "Status is inferred from terminal output (L2). Install the hook plugin in settings for structured updates.";
     case "server":

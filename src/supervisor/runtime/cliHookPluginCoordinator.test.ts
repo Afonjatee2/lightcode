@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -274,6 +274,217 @@ describe("CliHookPluginCoordinator install cache", () => {
     expect(resolved).toBeUndefined();
   });
 
+  it("recovers from cached unsupported when the plugin is now installed", async () => {
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        agentHookSupport: {
+          codex: {
+            agentBinaryVersion: "n/a",
+            pluginVersion: "1.0.0",
+            protocolVersion: 1,
+            platform: process.platform,
+            verifiedAt: new Date().toISOString(),
+            supportsL1: false,
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const stub = makeStubAdapter("codex");
+    stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const resolved = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "thread-codex-recovered",
+      agentKind: "codex",
+    });
+
+    expect(resolved).toBeDefined();
+    expect(stub.installPlugin).not.toHaveBeenCalled();
+    expect(readCache(settingsPath)["codex"]).toMatchObject({
+      pluginVersion: "1.0.0",
+      supportsL1: true,
+    });
+  });
+
+  it("retries install when cached unsupported becomes supported later", async () => {
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        agentHookSupport: {
+          "codex::wsl::Ubuntu": {
+            agentBinaryVersion: "n/a",
+            pluginVersion: "1.0.0",
+            protocolVersion: 1,
+            platform: process.platform,
+            verifiedAt: new Date().toISOString(),
+            supportsL1: false,
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const stub = makeStubAdapter("codex");
+    stub.isPluginInstalled.mockResolvedValue({ installed: false });
+    stub.installPlugin.mockResolvedValue({ ok: true as const, version: "1.0.0" });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "wsl", wslDistro: "Ubuntu" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const resolved = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "thread-codex-wsl-recovered",
+      agentKind: "codex",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/u/x",
+        uncPath: "\\\\wsl$\\Ubuntu\\home\\u\\x",
+      },
+    });
+
+    expect(stub.installPlugin).toHaveBeenCalledTimes(1);
+    expect(resolved).toBeUndefined();
+    expect(readCache(settingsPath)["codex::wsl::Ubuntu"]).toMatchObject({
+      pluginVersion: "1.0.0",
+      supportsL1: true,
+    });
+  });
+
+  it("drops a stale failed in-memory promise when the persisted cache is later repaired", async () => {
+    const stub = makeStubAdapter("codex");
+    let installAttempt = 0;
+    stub.isPluginInstalled.mockImplementation(async () => ({
+      installed: installAttempt > 0,
+      version: "1.0.0",
+    }));
+    stub.installPlugin.mockImplementation(async () => {
+      installAttempt += 1;
+      return installAttempt === 1
+        ? { ok: false as const, reason: "transient install error" }
+        : { ok: true as const, version: "1.0.0" };
+    });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const first = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "t1",
+      agentKind: "codex",
+    });
+    expect(first).toBeUndefined();
+    expect(stub.installPlugin).toHaveBeenCalledTimes(1);
+
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        agentHookSupport: {
+          codex: {
+            agentBinaryVersion: "n/a",
+            pluginVersion: "1.0.0",
+            protocolVersion: 1,
+            platform: process.platform,
+            verifiedAt: new Date().toISOString(),
+            supportsL1: true,
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const second = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "t2",
+      agentKind: "codex",
+    });
+    expect(stub.installPlugin).toHaveBeenCalledTimes(1);
+    expect(second).toBeDefined();
+    expect(second!.env).toMatchObject({
+      LIGHTCODE_THREAD_ID: "t2",
+      LIGHTCODE_AGENT_KIND: "codex",
+    });
+  });
+
+  it("retries support/install after a failed attempt when the environment changes in-session", async () => {
+    const stub = makeStubAdapter("codex");
+    let supported = false;
+    let installed = false;
+    stub.isPluginSupported.mockImplementation(async () => supported);
+    stub.isPluginInstalled.mockImplementation(async () => ({
+      installed,
+      version: installed ? "1.0.0" : undefined,
+    }));
+    stub.installPlugin.mockImplementation(async () => {
+      installed = true;
+      return { ok: true as const, version: "1.0.0" };
+    });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "wsl", wslDistro: "Ubuntu" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const first = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "t1",
+      agentKind: "codex",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/u/x",
+        uncPath: "\\\\wsl$\\Ubuntu\\home\\u\\x",
+      },
+    });
+    expect(first).toBeUndefined();
+    expect(stub.installPlugin).not.toHaveBeenCalled();
+
+    supported = true;
+
+    const second = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "t2",
+      agentKind: "codex",
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/u/x",
+        uncPath: "\\\\wsl$\\Ubuntu\\home\\u\\x",
+      },
+    });
+    expect(stub.installPlugin).toHaveBeenCalledTimes(1);
+    expect(second).toBeUndefined();
+    expect(readCache(settingsPath)["codex::wsl::Ubuntu"]).toMatchObject({
+      supportsL1: true,
+    });
+  });
+
   it("resolves env vars for spawn when the CLI hook plugin path is healthy", async () => {
     const stub = makeStubAdapter("claude");
     stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
@@ -504,7 +715,6 @@ describe("CliHookPluginCoordinator install cache", () => {
 
     // Cache must stay empty — a future version bump of the adapter
     // shouldn't trigger a re-probe for a mode it doesn't support.
-    const { existsSync } = await import("node:fs");
     // If the settings file wasn't written at all, that's equivalent to
     // an empty cache (the coordinator had no keys worth persisting).
     const cacheForAssertion = existsSync(settingsPath) ? readCache(settingsPath) : {};
@@ -530,5 +740,178 @@ describe("CliHookPluginCoordinator install cache", () => {
       agentKind: "fake-agent",
     });
     expect(resolved).toBeUndefined();
+  });
+
+  it("runs installPlugin once for codex and writes a cache entry", async () => {
+    const stub = makeStubAdapter("codex");
+    let installCalls = 0;
+    stub.isPluginInstalled.mockImplementation(async () => ({
+      installed: installCalls > 0,
+      version: "1.0.0",
+    }));
+    stub.installPlugin.mockImplementation(async () => {
+      installCalls += 1;
+      return { ok: true as const, version: "1.0.0" };
+    });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }) as AgentEnvContext,
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+    await coordinator.installAll();
+
+    expect(stub.installPlugin).toHaveBeenCalledTimes(1);
+    const entry = readCache(settingsPath)["codex"] as Record<string, unknown>;
+    expect(entry).toMatchObject({
+      pluginVersion: "1.0.0",
+      protocolVersion: 1,
+      platform: process.platform,
+      supportsL1: true,
+    });
+  });
+
+  it("resolves Codex spawn env with LIGHTCODE_AGENT_KIND=codex", async () => {
+    const stub = makeStubAdapter("codex");
+    stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const resolved = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "thread-codex",
+      agentKind: "codex",
+    });
+
+    expect(resolved).toBeDefined();
+    expect(resolved!.env).toMatchObject({
+      LIGHTCODE_THREAD_ID: "thread-codex",
+      LIGHTCODE_AGENT_KIND: "codex",
+      LIGHTCODE_HOOK_PROTOCOL_VERSION: "1",
+    });
+    expect(resolved!.extraArgs).toEqual(["--codex-marker"]);
+  });
+
+  it("does not persist a cache entry when install fails with the 0.0.0 sentinel", async () => {
+    // Sentinel pluginVersion means `readBundled*PluginVersion()` couldn't
+    // resolve the manifest at module load — an artifact of a half-initialized
+    // environment, not a real negative verdict. The coordinator must skip the
+    // cache write so the next app session retries with the correct version.
+    const stub = makeStubAdapter("codex", { pluginVersion: "0.0.0" });
+    stub.installPlugin.mockResolvedValue({
+      ok: false as const,
+      reason: "codex plugin source dir not found",
+    });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    await coordinator.installAll();
+
+    const cacheForAssertion = existsSync(settingsPath) ? readCache(settingsPath) : {};
+    expect(cacheForAssertion["codex"]).toBeUndefined();
+  });
+
+  it("retries install on the next spawn when a prior attempt failed and cache is empty", async () => {
+    // Self-heal scenario: the first attempt hit the 0.0.0 sentinel (no cache
+    // write), then the manifest became resolvable (e.g. tsdown rebuild). The
+    // next spawn must NOT return the stale in-memory failure — it must rerun
+    // install so hooks activate without a supervisor restart.
+    const stub = makeStubAdapter("codex", { pluginVersion: "0.0.0" });
+    let attempt = 0;
+    stub.installPlugin.mockImplementation(async () => {
+      attempt += 1;
+      return attempt === 1
+        ? { ok: false as const, reason: "codex plugin source dir not found" }
+        : { ok: true as const, version: "1.0.0" };
+    });
+    stub.isPluginInstalled.mockResolvedValue({ installed: false });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    // Boot-time install: hits the sentinel skip → no cache write, in-memory
+    // promise resolves to { ok: false }.
+    await coordinator.installAll();
+    expect(stub.installPlugin).toHaveBeenCalledTimes(1);
+    const afterBoot = existsSync(settingsPath) ? readCache(settingsPath) : {};
+    expect(afterBoot["codex"]).toBeUndefined();
+
+    // Subsequent spawn: cache is still empty → coordinator drops the stale
+    // failed promise and retries. This attempt succeeds.
+    const resolved = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "thread-codex-retry",
+      agentKind: "codex",
+    });
+    expect(stub.installPlugin).toHaveBeenCalledTimes(2);
+    expect(resolved).toBeDefined();
+    expect(resolved!.env.LIGHTCODE_HOOK_URL).toMatch(/^http:\/\//);
+  });
+
+  it("treats cached 0.0.0 entries as stale and re-runs installPlugin", async () => {
+    // A prior session wrote a poisoned cache entry with the sentinel version
+    // (e.g. plugin.json wasn't resolvable at that moment). On next boot with
+    // the same sentinel, the entry must NOT satisfy the cache hit check; the
+    // coordinator must attempt install again instead of short-circuiting.
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        agentHookSupport: {
+          codex: {
+            agentBinaryVersion: "n/a",
+            pluginVersion: "0.0.0",
+            protocolVersion: 1,
+            platform: process.platform,
+            verifiedAt: new Date().toISOString(),
+            supportsL1: false,
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const stub = makeStubAdapter("codex", { pluginVersion: "0.0.0" });
+    stub.installPlugin.mockResolvedValue({ ok: true as const, version: "1.0.0" });
+    stub.isPluginInstalled.mockResolvedValue({ installed: false });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["codex", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    await coordinator.installAll();
+
+    expect(stub.installPlugin).toHaveBeenCalledTimes(1);
+    const entry = readCache(settingsPath)["codex"] as Record<string, unknown>;
+    expect(entry).toMatchObject({
+      pluginVersion: "1.0.0",
+      supportsL1: true,
+    });
   });
 });

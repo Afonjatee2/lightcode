@@ -2,6 +2,7 @@ import {
   Archive,
   ArrowLeft,
   Bot,
+  FlaskConical,
   Info,
   PanelLeft,
   PanelLeftClose,
@@ -13,6 +14,7 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
+import { isDevApp } from "@/renderer/bridge";
 import type { SettingsSection } from "./types";
 
 export function SettingsSidebar(props: {
@@ -25,6 +27,7 @@ export function SettingsSidebar(props: {
   const { isCollapsed, collapse, expand } = useSidebar();
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
   const isAgentsActive = activeSection === "agents" || activeSection.startsWith("agents:");
+  const devMode = isDevApp();
 
   const selectFirstAgent = () => {
     const first = installedAgents[0];
@@ -87,6 +90,15 @@ export function SettingsSidebar(props: {
               isActive={activeSection === "about"}
               onPress={() => onSectionChange("about")}
             />
+            {devMode && (
+              <SidebarButton
+                iconOnly
+                icon={<FlaskConical className="size-4" />}
+                label="Dev"
+                isActive={activeSection === "dev"}
+                onPress={() => onSectionChange("dev")}
+              />
+            )}
           </div>
           <div className="space-y-1 border-t border-white/6 pt-2 pr-2">
             <SidebarButton
@@ -162,6 +174,14 @@ export function SettingsSidebar(props: {
               isActive={activeSection === "about"}
               onPress={() => onSectionChange("about")}
             />
+            {devMode && (
+              <SidebarButton
+                icon={<FlaskConical className="size-4" />}
+                label="Dev"
+                isActive={activeSection === "dev"}
+                onPress={() => onSectionChange("dev")}
+              />
+            )}
           </div>
         </div>
 

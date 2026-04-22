@@ -1,55 +1,58 @@
-import { findBestHint, type HintEntry, type TerminalStatusHint } from "../base";
-import { detectRateLimitPrompt } from "./rateLimitPrompt";
+// Bulletproof Codex detection patterns for spawn orchestration (ready screen).
+//
+// Codex status layering:
+//   L1 — CLI hooks (authoritative): UserPromptSubmit → working,
+//        turn-complete → idle, approval events → needs_approval.
+//   L2:
+//     * OSC 9/777/99 — `handleOscNotification` in index.ts: idle + needs_approval
+//       (notify-as-turn-done, plan-mode prompt, approval keywords). Hooks own
+//       L1; OSC is fallback when not deferred.
+//     * Terminal heuristics — this file: `detectCodexTerminalStatus` returns only
+//       `working` (cheap TUI patterns). It never infers idle / needs_approval.
+//
+// Working detection uses a **trailing** window (`takeTail`) so a single long
+// chunk / frame does not re-match “Working” / “esc” from finished turns above
+// the live status row. L2 `detectTerminalStatus` is also fed per-PTY-chunk
+// data in the pipeline (not merged 8k scrollback). And — critically — when the
+// pipeline passes `context.idleStrippedTail` (the scrollback snapshot captured
+// at the last idle transition), we reject any matched TUI line that is already
+// in that snapshot: Codex bakes a static `● Working (Xs • esc to interrupt)`
+// marker into scrollback for completed turns, so subsequent TUI repaints would
+// otherwise re-flip the thread to `working` forever.
 
-// Bulletproof Codex detection patterns
-// - Case-insensitive matching
-// - Handles emoji prefixes (✨, etc.)
-// - Handles various whitespace and formatting
-// - Works across chunk boundaries
+import { takeTail } from "@/shared/ansi";
+import type { DetectTerminalStatusContext, TerminalStatusHint } from "../base";
+
+/** Only the recent tail of a chunk: status row + co-located TUI, not full scrollback. */
+const CODEX_WORKING_LOOKBACK_CHARS = 2048;
 
 const CODEX_UPDATE_RE = /(?:[✨⚡]\s*)?update\s+available/i;
 const CODEX_READY_RE = /openai\s+codex/i;
 const CODEX_DIRECTORY_RE = /directory\s*:/i;
 const CODEX_MODEL_RE = new RegExp("\\/model\\s+to\\s+change", "i");
-const CODEX_PROMPT_RE = /(?:^|\n)›(?:\s|\u00a0).*/m;
-const CODEX_TITLE_RE = /0;([^\r\n]+)/g;
-const CODEX_QUESTION_HEADER_RE = /(?:^|\n)Question\s+\d+\/\d+\b/i;
-const CODEX_QUESTION_CONTROL_RE =
-  /enter\s+to\s+submit\s+answer|tab\s+to\s+add\s+notes|navigate\s+questions/i;
 
-interface CodexHintEntry extends HintEntry {
-  status: TerminalStatusHint["status"];
-  attention: TerminalStatusHint["attention"];
-}
-
-const CODEX_STRONG_HINTS: CodexHintEntry[] = [
-  { re: /enter\s+to\s+select/i, status: "needs_reply", attention: "needs_reply" },
-  { re: /press enter to continue/i, status: "needs_reply", attention: "needs_reply" },
-  { re: /\[y\/n\]|\(y\/N\)|allow\s+.*\?/i, status: "needs_approval", attention: "needs_approval" },
-  { re: /•\s*working(?:\s*\(|…)?|esc\s+to\s+interrupt/i, status: "working", attention: "working" },
-  {
-    re: /use\s+\/skills\s+to\s+list\s+available\s+skills/i,
-    status: "idle",
-    attention: "none",
-  },
-];
-
-const CODEX_IDLE_HINTS: CodexHintEntry[] = [
-  { re: CODEX_PROMPT_RE, status: "idle", attention: "none" },
+/**
+ * TUI lines that indicate Codex is actively working. Each regex captures the
+ * full matched line (bounded by newlines on both sides) so the pipeline can
+ * compare it byte-for-byte against the idle-time scrollback snapshot to reject
+ * repaints of the just-finished turn.
+ *
+ * Order matters: most specific first. We return on the last successful match
+ * so that a repaint containing both a stale line and a fresh one still picks
+ * the fresh one when it appears later in the tail.
+ */
+const CODEX_WORKING_LINE_PATTERNS: RegExp[] = [
+  /[^\r\n]*Working\s*\(\s*\d[^\r\n]*/g,
+  /[^\r\n]*\besc to (?:interrupt|cancel)\b[^\r\n]*/gi,
+  /[^\r\n]*\(esc to cancel\)[^\r\n]*/gi,
+  /[^\r\n>]*\b(?:thinking|reasoning|planning)\b[^\r\n]*/gi,
 ];
 
 /**
  * Detect a Codex TUI "Update available!" interactive prompt from
  * ANSI-stripped PTY output.
- *
- * Bulletproof against:
- * - Emoji prefixes (✨, ⚡, etc.)
- * - Case variations
- * - Extra whitespace
- * - Partial matches across chunks
  */
 export function detectCodexUpdatePrompt(text: string): boolean {
-  // Normalize: remove emoji, normalize whitespace, make case-insensitive
   const normalized = text
     .replace(/[✨⚡💡]\s*/gu, "")
     .replace(/\s+/g, " ")
@@ -58,15 +61,12 @@ export function detectCodexUpdatePrompt(text: string): boolean {
 }
 
 export function detectCodexReadyForInitialPrompt(text: string): boolean {
-  // Early exit if update prompt is detected (takes precedence)
   if (detectCodexUpdatePrompt(text)) {
     return false;
   }
 
-  // Normalize for case-insensitive matching
   const normalized = text.toLowerCase().replace(/\s+/g, " ");
 
-  // All three patterns must be present, but order doesn't matter
   const hasReady = CODEX_READY_RE.test(normalized);
   const hasDirectory = CODEX_DIRECTORY_RE.test(normalized);
   const hasModel = CODEX_MODEL_RE.test(normalized);
@@ -74,63 +74,46 @@ export function detectCodexReadyForInitialPrompt(text: string): boolean {
   return hasReady && hasDirectory && hasModel;
 }
 
-function findLastMatchIndex(text: string, re: RegExp): number {
-  const globalRe = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
-  let lastIndex = -1;
-  let match: RegExpExecArray | null;
-  while ((match = globalRe.exec(text)) !== null) {
-    lastIndex = match.index;
-  }
-  return lastIndex;
-}
-
-function findLastTitleIndex(text: string): number {
-  return findLastMatchIndex(text, CODEX_TITLE_RE);
-}
-
-function detectCodexQuestionnaire(text: string): boolean {
-  return CODEX_QUESTION_HEADER_RE.test(text) && CODEX_QUESTION_CONTROL_RE.test(text);
-}
-
-export function detectCodexTerminalStatus(text: string): TerminalStatusHint | null {
-  const recent = text.slice(-1200);
-
-  if (detectCodexUpdatePrompt(recent) || detectRateLimitPrompt(recent)) {
-    return { status: "needs_reply", attention: "needs_reply", corroborated: true };
-  }
-
-  if (detectCodexReadyForInitialPrompt(recent) || detectCodexReadyForInitialPrompt(text)) {
-    // Ready-for-initial-prompt requires three independent signals (ready + directory + model).
-    return { status: "idle", attention: "none", corroborated: true };
-  }
-
-  if (detectCodexQuestionnaire(recent)) {
-    return { status: "needs_reply", attention: "needs_reply", corroborated: true };
-  }
-
-  const strongHint = findBestHint(recent, CODEX_STRONG_HINTS);
-  if (strongHint) {
-    const lastWorkingIndex = findLastMatchIndex(
-      recent,
-      /•\s*working(?:\s*\(|…)?|esc\s+to\s+interrupt/i,
-    );
-    const lastTitleIndex = findLastTitleIndex(recent);
-    const lastPromptIndex = findLastMatchIndex(recent, CODEX_PROMPT_RE);
-    const hasIdleRedraw =
-      strongHint.status === "working" &&
-      lastTitleIndex > lastWorkingIndex &&
-      lastPromptIndex > lastTitleIndex;
-
-    if (!hasIdleRedraw) {
-      return { status: strongHint.status, attention: strongHint.attention, corroborated: true };
+/** Last (rightmost) match of any working-indicator pattern, or null. */
+function findLatestWorkingLine(text: string): string | null {
+  let best: { line: string; index: number } | null = null;
+  for (const re of CODEX_WORKING_LINE_PATTERNS) {
+    re.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      const line = m[0].trim();
+      if (line.length === 0) continue;
+      if (!best || m.index > best.index) {
+        best = { line, index: m.index };
+      }
     }
   }
+  return best?.line ?? null;
+}
 
-  const idleHint = findBestHint(recent, CODEX_IDLE_HINTS);
-  if (idleHint) {
-    // Prompt cursor alone is a weak idle signal — not corroborated.
-    return { status: idleHint.status, attention: idleHint.attention, corroborated: false };
+/**
+ * L2: infer **working** from an ANSI-stripped **PTY data chunk** (and its tail
+ * window for large writes). Returns **only** `working` or `null` — never
+ * `idle` / `needs_approval` (use OSC + hooks for those).
+ *
+ * When `context.idleStrippedTail` is supplied, any matched TUI line that is
+ * also present in the snapshot is treated as a stale repaint and ignored.
+ * A truly new turn writes a fresh `Working (0s …)` line not present in the
+ * snapshot, so `idle → working` still fires promptly on fresh activity.
+ */
+export function detectCodexTerminalStatus(
+  text: string,
+  context?: DetectTerminalStatusContext,
+): TerminalStatusHint | null {
+  if (detectCodexUpdatePrompt(text) || detectCodexReadyForInitialPrompt(text)) {
+    return null;
   }
-
-  return null;
+  const recent = takeTail(text, CODEX_WORKING_LOOKBACK_CHARS);
+  const line = findLatestWorkingLine(recent);
+  if (!line) return null;
+  const snapshot = context?.idleStrippedTail;
+  if (snapshot && snapshot.length > 0 && snapshot.includes(line)) {
+    return null;
+  }
+  return { status: "working", attention: "working", corroborated: false };
 }

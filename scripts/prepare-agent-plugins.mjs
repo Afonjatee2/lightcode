@@ -13,6 +13,7 @@
  *
  * Currently registered:
  *   - claude: plugin.json, forward.mjs
+ *   - codex: plugin.json, forward.mjs
  *
  * The script is idempotent: each asset is only copied when missing or stale
  * (size/mtime mismatch).
@@ -32,6 +33,11 @@ const PLUGINS = [
     kind: "claude",
     assets: ["plugin.json", "forward.mjs"],
     srcDir: join(repoRoot, "src", "supervisor", "agents", "claude", "plugin"),
+  },
+  {
+    kind: "codex",
+    assets: ["plugin.json", "forward.mjs"],
+    srcDir: join(repoRoot, "src", "supervisor", "agents", "codex", "plugin"),
   },
 ];
 

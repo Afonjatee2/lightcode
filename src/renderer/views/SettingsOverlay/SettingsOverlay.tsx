@@ -5,6 +5,7 @@ import { GeneralSettings } from "./parts/GeneralSettings";
 import { AISettings } from "./parts/AISettings";
 import { ArchivedThreadsSettings } from "./parts/ArchivedThreadsSettings";
 import { AboutSettings } from "./parts/AboutSettings";
+import { DevSettings } from "./parts/DevSettings";
 import { SettingsSidebar } from "./parts/SettingsSidebar";
 import { AgentSettingsEmpty, SingleAgentSettings } from "./parts/SingleAgentSettings";
 import type { SettingsSection } from "./parts/types";
@@ -41,6 +42,8 @@ export function SettingsOverlay(props: { onClose: () => void }) {
           <ArchivedThreadsSettings />
         ) : activeSection === "about" ? (
           <AboutSettings />
+        ) : activeSection === "dev" ? (
+          <DevSettings />
         ) : null
       }
     />

@@ -27,6 +27,13 @@ export { detectClaudeTerminalStatus, detectClaudeModelEffort } from "./terminal"
 const CLAUDE_PLUGIN_VERSION = readBundledClaudePluginVersion();
 const CLAUDE_MIN_PROTOCOL_VERSION = 1;
 
+if (CLAUDE_PLUGIN_VERSION === "0.0.0") {
+  console.warn(
+    "[claude] plugin manifest not found at module load — CLI hooks disabled for this session. " +
+      "If you just added the plugin files, restart the app to enable hooks.",
+  );
+}
+
 export function createClaudeAdapter(): AgentAdapter {
   return {
     kind: "claude",

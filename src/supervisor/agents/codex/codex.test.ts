@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  createCodexAdapter,
   deriveCodexStructuredState,
   detectCodexReadyForInitialPrompt,
   detectCodexTerminalStatus,
   detectCodexUpdatePrompt,
   parseCodexSocketMessage,
 } from "./index";
+import type { OscNotification } from "@/shared/osc";
+import { codexIntentFor } from "./plugin/intentMap";
 import { mapCodexModels } from "./probe";
 
 describe("deriveCodexStructuredState", () => {
@@ -152,173 +155,210 @@ describe("detectCodexReadyForInitialPrompt", () => {
 });
 
 describe("detectCodexTerminalStatus", () => {
-  it("treats the Codex home screen as idle", () => {
-    const text = [
+  it("returns working for the Codex 0.122+ `esc to interrupt` marker", () => {
+    expect(detectCodexTerminalStatus("⠸ Working (5s  esc to interrupt)")).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: false,
+    });
+  });
+
+  it("returns working for the `Working (Ns` timer when esc text is in a later chunk", () => {
+    // Same TUI line as 0.122+, but PTY can split before `esc to interrupt` arrives.
+    expect(detectCodexTerminalStatus("⠴ Working (0s")).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: false,
+    });
+  });
+
+  it("returns working for the legacy `Esc to cancel` marker", () => {
+    expect(detectCodexTerminalStatus("⊙ Thinking (Esc to cancel)")).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: false,
+    });
+  });
+
+  it("returns working for thinking / reasoning / planning style lines (historical TUI parse)", () => {
+    expect(detectCodexTerminalStatus("\n  Reasoning…")).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: false,
+    });
+    expect(detectCodexTerminalStatus("\n⊙ Thinking about it")).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: false,
+    });
+  });
+
+  it("returns null on the home / idle bar", () => {
+    const home = [
       "OpenAI Codex (v0.116.0)",
       "model: gpt-5.4-mini high /model to change",
       "directory: ~/work/site-search-ui",
     ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "idle",
-      attention: "none",
-      corroborated: true,
-    });
+    expect(detectCodexTerminalStatus(home)).toBeNull();
   });
 
-  it("treats the update prompt as needs_reply", () => {
-    const text = [
-      "Update available! 0.116.0 -> 0.117.0",
-      "> 1. Update now",
-      "  2. Skip",
-      "Press enter to continue",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "needs_reply",
-      attention: "needs_reply",
-      corroborated: true,
-    });
+  it("returns null while the update prompt is visible", () => {
+    expect(detectCodexTerminalStatus("Update available! 0.116.0 -> 0.117.0")).toBeNull();
   });
 
-  it("treats confirmation prompts as needs_approval", () => {
-    const text = "Allow codex to run this command? [y/n]";
+  it("returns null for prose with `working on` (not the status line)", () => {
+    expect(
+      detectCodexTerminalStatus("I am working on the refactor. Working on it now."),
+    ).toBeNull();
+  });
 
-    expect(detectCodexTerminalStatus(text)).toEqual({
+  it("returns null when working markers are only in scrollback, not in the recent tail", () => {
+    // Full-frame PTY strings keep finished-turn lines above the live footer; the
+    // last ~2k chars should be idle-only, so we must not match earlier "Working" rows.
+    const oldStatus = "⠸ Working (0s  esc to interrupt)";
+    const idleBottom = "gpt-5.4 low · ~\\work · master · Context 2% used · 5h 90%";
+    const padding = "a".repeat(5000);
+    expect(detectCodexTerminalStatus(`${oldStatus}\n${padding}${idleBottom}`)).toBeNull();
+  });
+
+  it("returns null when the matched Working line is verbatim in the idle snapshot", () => {
+    // Codex bakes a static `● Working (Xs • esc to interrupt)` line into
+    // scrollback on turn completion; subsequent TUI repaints re-emit it and
+    // would otherwise re-flip the thread to `working` forever.
+    const stale = "● Working (1s • esc to interrupt)";
+    expect(
+      detectCodexTerminalStatus(`some repaint\n${stale}\nbottom bar`, {
+        idleStrippedTail: `prior turn output\n${stale}\n`,
+      }),
+    ).toBeNull();
+  });
+
+  it("still returns working for a fresh Working line not in the idle snapshot", () => {
+    const stale = "● Working (5s • esc to interrupt)";
+    const fresh = "⠸ Working (0s • esc to interrupt)";
+    expect(
+      detectCodexTerminalStatus(`prev turn\n${stale}\nlive status: ${fresh}`, {
+        idleStrippedTail: `prior turn output\n${stale}\n`,
+      }),
+    ).toEqual({ status: "working", attention: "working", corroborated: false });
+  });
+
+  it("ignores the idle snapshot when it is empty or undefined", () => {
+    const live = "⠸ Working (0s • esc to interrupt)";
+    expect(detectCodexTerminalStatus(live, { idleStrippedTail: "" })).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: false,
+    });
+    expect(detectCodexTerminalStatus(live, {})).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: false,
+    });
+  });
+});
+
+function osc(body: string, title = ""): OscNotification {
+  return { code: 9, title, body, payload: undefined };
+}
+
+describe("createCodexAdapter handleOscNotification", () => {
+  const adapter = createCodexAdapter();
+
+  it("maps approval notifications to needs_approval", () => {
+    expect(adapter.handleOscNotification?.(osc("approval-requested"))).toEqual({
       status: "needs_approval",
       attention: "needs_approval",
       corroborated: true,
     });
   });
 
-  it("treats the question flow as needs_reply even when esc to interrupt is visible", () => {
-    const text = [
-      "Question 1/2 (2 unanswered)",
-      "For the project tree search, what should v1 search across?",
-      "",
-      "1. Path names only (Recommended)",
-      "2. Contents only",
-      "",
-      "tab to add notes | enter to submit answer | ←/→ to navigate questions | esc to interrupt",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "needs_reply",
-      attention: "needs_reply",
-      corroborated: true,
-    });
-  });
-
-  it("detects working from the visible Codex status line", () => {
-    const text = [
-      "• Hi.",
-      "",
-      "• Working (1s • esc to interrupt)",
-      "",
-      "› Explain this codebase",
-      "",
-      "gpt-5.4 medium · ~\\work\\lightcode · master",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: true,
-    });
-  });
-
-  it("keeps answered-question summaries in working when the active status line is still visible", () => {
-    const text = [
-      "Two product choices still affect the scope quite a bit, so I want to lock them before I write the implementation plan.",
-      "",
-      "Questions 2/2 answered",
-      "For the project tree search, what should v1 search across?",
-      "answer: Path names only (Recommended)",
-      "Where should the sidebar folder icon appear?",
-      "answer: Project + worktree headers (Recommended)",
-      "",
-      "Working (3m 38s • esc to interrupt)",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: true,
-    });
-  });
-
-  it("treats the prompt as idle when no strong Codex hint is present", () => {
-    const text = [
-      "• Here. What do you want to test?",
-      "",
-      "› Explain this codebase",
-      "",
-      "gpt-5.4 medium · ~\\work\\lightcode · master",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "idle",
-      attention: "none",
-      corroborated: false,
-    });
-  });
-
-  it("prioritizes working over the prompt when both are visible", () => {
-    const text = [
-      "• Working (1s • esc to interrupt)",
-      "",
-      "› Explain this codebase",
-      "",
-      "gpt-5.4 medium · ~\\work\\lightcode · master",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: true,
-    });
-  });
-
-  it("detects idle after a plain title update and prompt redraw", () => {
-    const text = [
-      "• Fine. What do you need?",
-      "",
-      "• Working (2s • esc to interrupt)",
-      "",
-      "› Run /review on my current changes",
-      "",
-      "gpt-5.4 medium · ~\\work\\lightcode · master",
-      "",
-      "0;lightcode",
-      "",
-      "› Run /review on my current changes",
-      "",
-      "gpt-5.4 medium · ~\\work\\lightcode · master",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
-      status: "idle",
-      attention: "none",
-      corroborated: false,
-    });
-  });
-
-  it("detects idle from the /skills helper even with stale working text above", () => {
-    const text = [
-      "• Working (18s • esc to interrupt)",
-      "",
-      "• Final answer rendered above",
-      "",
-      "› Use /skills to list available skills",
-      "",
-      "gpt-5.4 high · ~/work/lightcode · master · 18% used · 5h 99% · weekly 99% · 950K window",
-    ].join("\n");
-
-    expect(detectCodexTerminalStatus(text)).toEqual({
+  it("maps agent-turn-complete to idle", () => {
+    expect(adapter.handleOscNotification?.(osc("agent-turn-complete"))).toEqual({
       status: "idle",
       attention: "none",
       corroborated: true,
     });
+  });
+
+  it("maps generic turn complete phrasing to idle", () => {
+    expect(adapter.handleOscNotification?.(osc("Turn complete"))).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    });
+  });
+
+  it("maps plan-mode prompt OSC notify to needs_approval", () => {
+    // Codex emits OSC 9 with body "Plan mode prompt: <title>" when it has
+    // presented a plan and is waiting on the user to approve / edit / reject.
+    expect(adapter.handleOscNotification?.(osc("Plan mode prompt: Plan Target"))).toEqual({
+      status: "needs_approval",
+      attention: "needs_approval",
+      corroborated: true,
+    });
+  });
+
+  it("maps non-approval OSC notify (notify-as-turn-complete) to idle", () => {
+    // Codex 0.122+ emits OSC 9 per Growl/notify semantics: the body is the
+    // assistant's response text (e.g. "Hi."), not a lifecycle keyword. Any
+    // such notification corresponds to turn-complete → idle.
+    expect(adapter.handleOscNotification?.(osc("Hi."))).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    });
+    expect(adapter.handleOscNotification?.(osc("Hi! What should we work on?"))).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    });
+  });
+
+  it("returns null for empty OSC bodies", () => {
+    expect(adapter.handleOscNotification?.(osc(""))).toBeNull();
+  });
+
+  it("maps status from JSON payload slugs in OSC body", () => {
+    const n9: OscNotification = {
+      code: 9,
+      title: "",
+      body: '{"type":"agent_turn_complete","v":1}',
+      payload: { type: "agent_turn_complete", v: 1 },
+    };
+    expect(adapter.handleOscNotification?.(n9)).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    });
+    const nOk: OscNotification = {
+      code: 9,
+      title: "",
+      body: '{"event":"exec_approval_requested"}',
+      payload: { event: "exec_approval_requested" },
+    };
+    expect(adapter.handleOscNotification?.(nOk)?.status).toBe("needs_approval");
+  });
+});
+
+describe("codexIntentFor", () => {
+  it("maps hook events to Lightcode intents", () => {
+    expect(codexIntentFor("SessionStart", { hook_event_name: "SessionStart" }, false)).toBe(
+      "session.started",
+    );
+    expect(codexIntentFor("UserPromptSubmit", { hook_event_name: "UserPromptSubmit" }, false)).toBe(
+      "session.turn_started",
+    );
+    expect(
+      codexIntentFor("PermissionRequest", { hook_event_name: "PermissionRequest" }, false),
+    ).toBe("session.needs_approval");
+    expect(codexIntentFor("Stop", { hook_event_name: "Stop" }, false)).toBe(
+      "session.turn_finished",
+    );
+    expect(codexIntentFor("PreToolUse", { hook_event_name: "PreToolUse" }, false)).toBeUndefined();
+    expect(codexIntentFor("PreToolUse", { hook_event_name: "PreToolUse" }, true)).toBe(
+      "session.turn_started",
+    );
   });
 });
 

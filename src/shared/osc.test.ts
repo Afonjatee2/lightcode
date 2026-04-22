@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractOscNotifications } from "./osc";
+import { extractOscNotifications, extractOscNotificationsFromPtyStream } from "./osc";
 
 describe("extractOscNotifications", () => {
   it("returns empty notifications and unchanged data when no OSC sequences present", () => {
@@ -161,6 +161,19 @@ describe("extractOscNotifications", () => {
       const result = extractOscNotifications("");
       expect(result.notifications).toEqual([]);
       expect(result.cleaned).toBe("");
+    });
+
+    it("reconstructs OSC 9 split across two PTY chunks (carry buffer)", () => {
+      const a = "before\x1b]9;agent-tur";
+      const b = "n-complete\x07after";
+      const r1 = extractOscNotificationsFromPtyStream("", a);
+      expect(r1.notifications).toEqual([]);
+      expect(r1.carryOut.startsWith("\x1b]9;")).toBe(true);
+      const r2 = extractOscNotificationsFromPtyStream(r1.carryOut, b);
+      expect(r2.notifications).toHaveLength(1);
+      expect(r2.notifications[0]!.code).toBe(9);
+      expect(r2.notifications[0]!.body).toBe("agent-turn-complete");
+      expect(r1.cleaned + r2.cleaned).toBe("beforeafter");
     });
 
     it("does not parse JSON arrays as payload", () => {

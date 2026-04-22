@@ -176,7 +176,14 @@ describe("agent command builders", () => {
 
     expect(resumeIndex).toBeGreaterThan(-1);
     expect(cmdArgs[resumeIndex + 1]).toBe("--no-alt-screen");
-    expect(cmdArgs[resumeIndex + 2]).toBe("-m");
+    // OSC 9 notifications (always-on) precede model / config flags.
+    expect(cmdArgs[resumeIndex + 2]).toBe("-c");
+    expect(cmdArgs[resumeIndex + 3]).toBe("tui.notifications=true");
+    expect(cmdArgs[resumeIndex + 4]).toBe("-c");
+    expect(cmdArgs[resumeIndex + 5]).toBe('tui.notification_method="osc9"');
+    expect(cmdArgs[resumeIndex + 6]).toBe("-c");
+    expect(cmdArgs[resumeIndex + 7]).toBe("suppress_unstable_features_warning=true");
+    expect(cmdArgs[resumeIndex + 8]).toBe("-m");
     expect(cmdArgs).toContain("abc-123");
     expect(cmdArgs).not.toContain("");
   });
