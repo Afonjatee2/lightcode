@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { PromptSegment } from "@/shared/contracts";
+import type { OscTitle } from "@/shared/osc";
 import {
   applyTerminalHintToConfig,
   batchWslCommandsAsync,
@@ -8,6 +9,7 @@ import {
   detectAgentInstall,
   shortenHomePath,
   type AgentAdapter,
+  type TerminalStatusHint,
 } from "../base";
 import { buildClaudeArgs } from "./argv";
 import { claudeCapabilities, claudeDetectionSpec } from "./detection";
@@ -34,6 +36,18 @@ if (CLAUDE_PLUGIN_VERSION === "0.0.0") {
   );
 }
 
+// Claude Code animates its working-state spinner in the terminal title via
+// OSC 0/2 with a leading braille glyph (U+2800–U+28FF). Real sessions observed
+// the 2-frame animation `⠂` / `⠐` prefixed onto the thread title. Matching
+// only at the start of the title avoids misfiring on braille glyphs that
+// happen to appear inside the user-visible task name.
+const BRAILLE_PREFIX_RE = /^[⠀-⣿]/;
+
+function claudeOscTitleHint(title: OscTitle): TerminalStatusHint | null {
+  if (!BRAILLE_PREFIX_RE.test(title.text)) return null;
+  return { status: "working", attention: "working", corroborated: true };
+}
+
 export function createClaudeAdapter(): AgentAdapter {
   return {
     kind: "claude",
@@ -58,15 +72,15 @@ export function createClaudeAdapter(): AgentAdapter {
       return Boolean(result?.ok && result.stdout.trim().length > 0);
     },
     async isPluginInstalled(ctx) {
-      return isClaudePluginInstalled(ctx);
+      return isClaudePluginInstalled(ctx, ctx.baseDir);
     },
     async installPlugin(ctx) {
-      const result = installClaudePlugin(ctx);
+      const result = installClaudePlugin(ctx, ctx.baseDir);
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },
     async pluginLaunchExtras(ctx) {
-      const paths = getClaudePluginPaths(ctx);
+      const paths = getClaudePluginPaths(ctx, ctx.baseDir);
       return { args: ["--settings", paths.settingsPath] };
     },
     buildLaunchArgv(_location, config, prompt, _sessionRef, _launchOptions) {
@@ -101,6 +115,8 @@ export function createClaudeAdapter(): AgentAdapter {
       return attachmentLines ? `${restStr}\n\n${attachmentLines} ` : restStr;
     },
     detectTerminalStatus: detectClaudeTerminalStatus,
+    handleOscTitle: claudeOscTitleHint,
+    oscHintsDeferToHookPlugin: true,
     workingSilenceTimeoutMs: null,
     syncConfigFromTerminalState: applyTerminalHintToConfig,
     defaultOneShotModel: "haiku",

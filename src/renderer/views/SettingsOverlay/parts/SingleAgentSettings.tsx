@@ -1,7 +1,7 @@
 import { startTransition } from "react";
 import { Button, Dropdown, Label, Switch } from "@heroui/react";
 import type { Selection } from "@heroui/react";
-import type { AgentSettingDef } from "@/shared/contracts";
+import type { AgentSettingDef, AgentStatus } from "@/shared/contracts";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
@@ -100,10 +100,19 @@ function ModelVisibilityDropdown(props: {
   );
 }
 
+function envLabel(status: AgentStatus): string {
+  if (status.envKind === "wsl") return status.envDistro ? `WSL (${status.envDistro})` : "WSL";
+  if (status.envKind === "windows") return "Windows";
+  return "";
+}
+
 export function SingleAgentSettings(props: { agentKind: string }) {
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
+  const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
   const platform = navigator.platform.toLowerCase().includes("win") ? "win32" : "posix";
-  const agent = agentStatuses.find((a) => a.kind === props.agentKind && a.installed);
+  const installedHere = agentStatuses.filter((a) => a.kind === props.agentKind && a.installed);
+  const installedWsl = wslAgentStatuses.filter((a) => a.kind === props.agentKind && a.installed);
+  const agent = installedHere[0] ?? installedWsl[0];
   const isDisabled = useSharedSettings((s) => s.disabledAgents.includes(props.agentKind));
   const setAgentDisabled = useSharedSettings((s) => s.setAgentDisabled);
 
@@ -123,12 +132,29 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   );
   const models = agent.capabilities.models.filter((m) => m.id !== "auto");
 
+  const versionRows: { label: string; version: string | undefined }[] = [];
+  if (platform === "win32") {
+    for (const s of installedHere) versionRows.push({ label: envLabel(s), version: s.version });
+    for (const s of installedWsl) versionRows.push({ label: envLabel(s), version: s.version });
+  }
+
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
       <div className="mx-auto max-w-[560px]">
         <div className="mb-6">
           <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
-          {agent.version && <p className="mt-0.5 text-xs text-muted">v{agent.version}</p>}
+          {versionRows.length > 0 ? (
+            <div className="mt-1 space-y-0.5">
+              {versionRows.map((row, i) => (
+                <div key={`${row.label}-${i}`} className="flex gap-2 text-xs text-muted">
+                  <span className="w-[120px] shrink-0">{row.label}</span>
+                  <span className="tabular-nums">{row.version ? `v${row.version}` : "—"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            agent.version && <p className="mt-0.5 text-xs text-muted">v{agent.version}</p>
+          )}
         </div>
 
         <div className="space-y-4">

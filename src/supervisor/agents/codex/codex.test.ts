@@ -3,11 +3,10 @@ import {
   createCodexAdapter,
   deriveCodexStructuredState,
   detectCodexReadyForInitialPrompt,
-  detectCodexTerminalStatus,
   detectCodexUpdatePrompt,
   parseCodexSocketMessage,
 } from "./index";
-import type { OscNotification } from "@/shared/osc";
+import type { OscNotification, OscTitle } from "@/shared/osc";
 import { codexIntentFor } from "./plugin/intentMap";
 import { mapCodexModels } from "./probe";
 
@@ -154,107 +153,44 @@ describe("detectCodexReadyForInitialPrompt", () => {
   });
 });
 
-describe("detectCodexTerminalStatus", () => {
-  it("returns working for the Codex 0.122+ `esc to interrupt` marker", () => {
-    expect(detectCodexTerminalStatus("⠸ Working (5s  esc to interrupt)")).toEqual({
+function oscTitle(text: string, code: 0 | 1 | 2 = 0): OscTitle {
+  return { code, text };
+}
+
+describe("createCodexAdapter handleOscTitle", () => {
+  const adapter = createCodexAdapter();
+
+  it("maps braille-prefixed titles to working (Codex spinner glyphs)", () => {
+    expect(adapter.handleOscTitle?.(oscTitle("⠋ Working (5s • esc to interrupt)"))).toEqual({
       status: "working",
       attention: "working",
-      corroborated: false,
+      corroborated: true,
+    });
+    expect(adapter.handleOscTitle?.(oscTitle("⠸ Thinking"))).toEqual({
+      status: "working",
+      attention: "working",
+      corroborated: true,
     });
   });
 
-  it("returns working for the `Working (Ns` timer when esc text is in a later chunk", () => {
-    // Same TUI line as 0.122+, but PTY can split before `esc to interrupt` arrives.
-    expect(detectCodexTerminalStatus("⠴ Working (0s")).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: false,
-    });
+  it("accepts any glyph in the braille range (U+2800–U+28FF)", () => {
+    for (const glyph of ["⠀", "⠁", "⠂", "⠐", "⣾", "⣿"]) {
+      expect(adapter.handleOscTitle?.(oscTitle(`${glyph} anything`))?.status).toBe("working");
+    }
   });
 
-  it("returns working for the legacy `Esc to cancel` marker", () => {
-    expect(detectCodexTerminalStatus("⊙ Thinking (Esc to cancel)")).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: false,
-    });
+  it("returns null for the idle title with no spinner prefix", () => {
+    expect(adapter.handleOscTitle?.(oscTitle("codex"))).toBeNull();
+    expect(adapter.handleOscTitle?.(oscTitle("Codex"))).toBeNull();
   });
 
-  it("returns working for thinking / reasoning / planning style lines (historical TUI parse)", () => {
-    expect(detectCodexTerminalStatus("\n  Reasoning…")).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: false,
-    });
-    expect(detectCodexTerminalStatus("\n⊙ Thinking about it")).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: false,
-    });
+  it("returns null when the braille glyph is not leading", () => {
+    // A braille glyph mid-string is not Codex's working spinner — don't match.
+    expect(adapter.handleOscTitle?.(oscTitle("codex ⠸"))).toBeNull();
   });
 
-  it("returns null on the home / idle bar", () => {
-    const home = [
-      "OpenAI Codex (v0.116.0)",
-      "model: gpt-5.4-mini high /model to change",
-      "directory: ~/work/site-search-ui",
-    ].join("\n");
-    expect(detectCodexTerminalStatus(home)).toBeNull();
-  });
-
-  it("returns null while the update prompt is visible", () => {
-    expect(detectCodexTerminalStatus("Update available! 0.116.0 -> 0.117.0")).toBeNull();
-  });
-
-  it("returns null for prose with `working on` (not the status line)", () => {
-    expect(
-      detectCodexTerminalStatus("I am working on the refactor. Working on it now."),
-    ).toBeNull();
-  });
-
-  it("returns null when working markers are only in scrollback, not in the recent tail", () => {
-    // Full-frame PTY strings keep finished-turn lines above the live footer; the
-    // last ~2k chars should be idle-only, so we must not match earlier "Working" rows.
-    const oldStatus = "⠸ Working (0s  esc to interrupt)";
-    const idleBottom = "gpt-5.4 low · ~\\work · master · Context 2% used · 5h 90%";
-    const padding = "a".repeat(5000);
-    expect(detectCodexTerminalStatus(`${oldStatus}\n${padding}${idleBottom}`)).toBeNull();
-  });
-
-  it("returns null when the matched Working line is verbatim in the idle snapshot", () => {
-    // Codex bakes a static `● Working (Xs • esc to interrupt)` line into
-    // scrollback on turn completion; subsequent TUI repaints re-emit it and
-    // would otherwise re-flip the thread to `working` forever.
-    const stale = "● Working (1s • esc to interrupt)";
-    expect(
-      detectCodexTerminalStatus(`some repaint\n${stale}\nbottom bar`, {
-        idleStrippedTail: `prior turn output\n${stale}\n`,
-      }),
-    ).toBeNull();
-  });
-
-  it("still returns working for a fresh Working line not in the idle snapshot", () => {
-    const stale = "● Working (5s • esc to interrupt)";
-    const fresh = "⠸ Working (0s • esc to interrupt)";
-    expect(
-      detectCodexTerminalStatus(`prev turn\n${stale}\nlive status: ${fresh}`, {
-        idleStrippedTail: `prior turn output\n${stale}\n`,
-      }),
-    ).toEqual({ status: "working", attention: "working", corroborated: false });
-  });
-
-  it("ignores the idle snapshot when it is empty or undefined", () => {
-    const live = "⠸ Working (0s • esc to interrupt)";
-    expect(detectCodexTerminalStatus(live, { idleStrippedTail: "" })).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: false,
-    });
-    expect(detectCodexTerminalStatus(live, {})).toEqual({
-      status: "working",
-      attention: "working",
-      corroborated: false,
-    });
+  it("returns null for OSC 1 (icon name) with a plain app name", () => {
+    expect(adapter.handleOscTitle?.(oscTitle("codex", 1))).toBeNull();
   });
 });
 

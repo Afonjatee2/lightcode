@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { toWslUncPath } from "@/shared/wsl";
 
 const execFileAsync = promisify(execFile);
-import type { OscNotification } from "@/shared/osc";
+import type { OscNotification, OscTitle } from "@/shared/osc";
 import type {
   AgentCapability,
   AgentKind,
@@ -39,6 +39,13 @@ export interface CommandSpec {
 export interface AgentEnvContext {
   envKind: "windows" | "wsl" | "posix";
   wslDistro?: string;
+  /**
+   * Lightcode data base dir for native (non-WSL) plugin staging. Populated by
+   * the supervisor so dev runs (`~/.lightcode-dev`) stage plugins separately
+   * from prod (`~/.lightcode`). WSL plugin installs ignore this and stage
+   * into the distro's `$HOME/.lightcode/` via `resolveWslHomeDirectory`.
+   */
+  baseDir?: string;
 }
 
 export interface AgentLaunchOptions {
@@ -199,26 +206,7 @@ export interface AgentPromptFormatter {
 export interface AgentTerminalObserver {
   /** Detect when the PTY is ready to accept an initial queued launch prompt. */
   isReadyForInitialPrompt?(text: string): boolean;
-  detectTerminalStatus?(
-    text: string,
-    context?: DetectTerminalStatusContext,
-  ): TerminalStatusHint | null;
-  /**
-   * While `hasCliHookPluginActivity` is set, the PTY hot path normally skips
-   * L2 `detectTerminalStatus` (merged buffer + stabilization). Set to `true` only
-   * if this adapter's `detectTerminalStatus` is safe and cheap to run on each
-   * ANSI-stripped **chunk** of PTY data (e.g. working-only TUI heuristics).
-   */
-  detectTerminalStatusOnHookPluginPtyData?: boolean;
-  /**
-   * Drop a TUI-derived hint when other signals (e.g. structured session) should
-   * win for this frame (used to ignore weak uncorroborated `idle` during work).
-   */
-  shouldIgnoreTerminalStatusHint?(input: {
-    hint: TerminalStatusHint;
-    status: ThreadStatus;
-    hasStructuredSession: boolean;
-  }): boolean;
+  detectTerminalStatus?(text: string): TerminalStatusHint | null;
   detectInvalidSessionRef?(text: string): boolean;
   /** Detect TUI prompts that should be auto-dismissed and return the key to send, or null. */
   detectAutoResponse?(text: string): string | null;
@@ -233,6 +221,13 @@ export interface AgentTerminalObserver {
    * or null to ignore it. Hints returned here are always treated as corroborated.
    */
   handleOscNotification?(notification: OscNotification): TerminalStatusHint | null;
+  /**
+   * Handle an OSC 0/1/2 title sequence extracted from the PTY stream.
+   * Both Codex and Claude Code animate their working-state spinner inside the
+   * terminal title (braille range U+2800–U+28FF), which gives us a structured
+   * L2 `working` signal without TUI text parsing. Return a status hint or null.
+   */
+  handleOscTitle?(title: OscTitle): TerminalStatusHint | null;
   /**
    * Treat OSC-derived hints as **L2 fallback**: suppress them while the CLI
    * hook plugin is active (hooks own status). Notifications are still emitted
@@ -370,14 +365,6 @@ export interface SyncConfigFromTerminalStateInput {
   previousStatus: ThreadStatus;
   previousAttention: ThreadAttention;
   hint: TerminalStatusHint;
-}
-
-/**
- * Extra runtime state available to `detectTerminalStatus` so adapters can
- * reject stale repaints of pre-idle scrollback (see `SessionRuntime.idleStrippedTail`).
- */
-export interface DetectTerminalStatusContext {
-  idleStrippedTail?: string | undefined;
 }
 
 export function buildWindowsCmdCommand(cwd: string, command: string, args: string[]): CommandSpec {
@@ -655,6 +642,12 @@ async function resolveDetectedBinary(
   return resolveExecutablePathAsync(binary);
 }
 
+function extractSemverFromVersionOutput(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const match = raw.match(/\b\d+\.\d+(?:\.\d+)?(?:[-+][\w.]+)?\b/);
+  return match ? match[0] : raw.trim() || undefined;
+}
+
 async function readDetectedVersion(
   location: ProjectLocation,
   binary: string,
@@ -669,10 +662,15 @@ async function readDetectedVersion(
       executablePath,
       versionArgs,
     );
-    return result.ok ? result.stdout : undefined;
+    return result.ok ? extractSemverFromVersionOutput(result.stdout) : undefined;
   }
-  const result = await readCommandOutputAsync(binary, versionArgs);
-  return result.ok ? result.stdout : undefined;
+  const spec = buildAgentCommand(location, binary, versionArgs);
+  const result = await readCommandOutputAsync(
+    spec.command,
+    spec.args,
+    spec.cwd ? { cwd: spec.cwd } : undefined,
+  );
+  return result.ok ? extractSemverFromVersionOutput(result.stdout) : undefined;
 }
 
 // ── Terminal hint sweeping / config reconciliation ────────────────────────

@@ -185,6 +185,14 @@ export const XTermSurface = forwardRef<
       fontSize: 13,
       fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
       theme: getTerminalTheme(appearance),
+      // OSC 8 hyperlinks (e.g. Next.js' "Local: http://localhost:3000" in WSL
+      // emits \x1b]8;;URL\x07...\x1b]8;;\x07). Without a handler, xterm falls
+      // back to a browser confirm() dialog; we route to the default browser.
+      linkHandler: {
+        activate: (_event, uri) => {
+          void readBridge().openExternal(uri);
+        },
+      },
     });
     const fit = new FitAddon();
 

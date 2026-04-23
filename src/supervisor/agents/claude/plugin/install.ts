@@ -336,6 +336,14 @@ interface ClaudeHookEntry {
 
 interface ClaudeSettings {
   hooks: Record<string, ClaudeHookEntry[]>;
+  /**
+   * Opt into iTerm2-style OSC 9 notifications for "needs input" moments.
+   * Claude Code only emits OSC 9 when this setting is active; we force it on
+   * for sessions lightcode launches so L2 can read `needs_reply` / idle edges
+   * from structured OSC instead of fragile TUI text parsing. See
+   * `claudeOscHint` in ../index.ts.
+   */
+  preferredNotifChannel: "iterm2";
 }
 
 /**
@@ -415,7 +423,7 @@ function renderClaudeSettings(pluginDir: string, target: "native" | "wsl"): Clau
     }
     hooks[spec.event] = [entry];
   }
-  return { hooks };
+  return { hooks, preferredNotifChannel: "iterm2" };
 }
 
 function quoteCommandArg(value: string, target: "native" | "wsl"): string {

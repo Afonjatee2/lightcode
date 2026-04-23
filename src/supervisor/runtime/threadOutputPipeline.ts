@@ -1,7 +1,7 @@
 import { setTimeout as sleep } from "node:timers/promises";
 import { stripAnsiPreservingLayout } from "@/shared/ansi";
 import type { ThreadAttention, ThreadStatus, ThreadStatusSource } from "@/shared/contracts";
-import { extractOscNotificationsFromPtyStream } from "@/shared/osc";
+import { extractOscEventsFromPtyStream } from "@/shared/osc";
 import { isThreadConfigEqual } from "@/shared/contracts";
 import type { TerminalStatusHint } from "../agents/base";
 import { BufferedLogWriter } from "./bufferedLogWriter";
@@ -70,9 +70,7 @@ export class ThreadOutputPipeline {
     ) {
       return null;
     }
-    return session.adapter.detectTerminalStatus(session.lastStrippedPtyChunk, {
-      idleStrippedTail: session.idleStrippedTail,
-    });
+    return session.adapter.detectTerminalStatus(session.lastStrippedPtyChunk);
   }
 
   readTerminalScrollback(session: SessionRuntime | undefined): string {
@@ -116,34 +114,10 @@ export class ThreadOutputPipeline {
       session.workingSilenceTimer = undefined;
     }
 
-    if (status === "idle" && session.status !== "idle") {
-      session.idleStrippedTail = this.snapshotIdleStrippedTail(session);
-    } else if (status === "working") {
-      session.idleStrippedTail = undefined;
-    }
-
     session.status = status;
     session.attention = attention;
     session.lastStatusChangeAt = Date.now();
     this.emitState(session, errorMessage);
-  }
-
-  /**
-   * Capture the ANSI-stripped tail of the transcript at the moment of idle,
-   * so `detectTerminalStatus` can reject repaints of the just-finished turn.
-   * Codex bakes a static `● Working (Xs • esc to interrupt)` line into
-   * scrollback on turn completion; subsequent TUI chunks re-emit it.
-   */
-  private snapshotIdleStrippedTail(session: SessionRuntime): string | undefined {
-    if (session.adapter.capabilities.presentationMode !== "terminal") {
-      return undefined;
-    }
-    if (!session.adapter.detectTerminalStatus) {
-      return undefined;
-    }
-    const raw = session.outputTranscript?.readTail(8192) ?? session.lastStrippedPtyChunk ?? "";
-    if (raw.length === 0) return undefined;
-    return stripAnsiPreservingLayout(raw);
   }
 
   /**
@@ -233,11 +207,19 @@ export class ThreadOutputPipeline {
     const {
       carryOut,
       notifications,
+      titles,
       cleaned: dataAfterOsc,
-    } = extractOscNotificationsFromPtyStream(ptyCarryIn, data);
+    } = extractOscEventsFromPtyStream(ptyCarryIn, data);
     session.ptyOscCarry = carryOut;
 
-    const escInChunk = data.includes("\x1b]");
+    const applyOscHint = (hint: TerminalStatusHint): void => {
+      const oscIsL2Fallback =
+        session.hasCliHookPluginActivity && session.adapter.oscHintsDeferToHookPlugin === true;
+      if (!oscIsL2Fallback) {
+        this.updateState(session, hint.status, hint.attention);
+      }
+    };
+
     for (const notification of notifications) {
       this.options.emit({
         type: "thread-osc-notification",
@@ -260,20 +242,29 @@ export class ThreadOutputPipeline {
         );
       }
       if (oscHint) {
-        const oscIsL2Fallback =
-          session.hasCliHookPluginActivity && session.adapter.oscHintsDeferToHookPlugin === true;
-        if (!oscIsL2Fallback) {
-          this.updateState(session, oscHint.status, oscHint.attention);
-        }
+        applyOscHint(oscHint);
       }
     }
-    if (isLightcodeOscDebugEnabled()) {
-      if (escInChunk && notifications.length === 0 && !carryOut && !ptyCarryIn) {
+
+    for (const title of titles) {
+      const titleHint = session.adapter.handleOscTitle?.(title);
+      if (isLightcodeOscDebugEnabled()) {
+        const j = (s: string, max: number) =>
+          s.length <= max ? JSON.stringify(s) : `${JSON.stringify(s.slice(0, max))}…`;
+        const hintText = titleHint
+          ? `hint=${titleHint.status}/${titleHint.attention}`
+          : "hint=(null — title not mapped)";
         console.log(
           `[lightcode-osc] PTY thread=${session.threadId} kind=${session.agentKind} ` +
-            `chunkBytes=${data.length} ESC] in chunk but 0 notification OSC (often OSC 0 title / 7 cwd / 133 prompt mark)`,
+            `titleCode=${title.code} text=${j(title.text, 160)} ${hintText}`,
         );
       }
+      if (titleHint) {
+        applyOscHint(titleHint);
+      }
+    }
+
+    if (isLightcodeOscDebugEnabled()) {
       if ((ptyCarryIn && ptyCarryIn.length > 0) || (carryOut && carryOut.length > 0)) {
         console.log(
           `[lightcode-osc] PTY thread=${session.threadId} kind=${session.agentKind} ` +
@@ -342,18 +333,6 @@ export class ThreadOutputPipeline {
             return;
           }
         }
-        if (
-          session.adapter.detectTerminalStatusOnHookPluginPtyData &&
-          session.adapter.detectTerminalStatus &&
-          (session.status === "idle" || session.status === "working")
-        ) {
-          const workingOnly = session.adapter.detectTerminalStatus(strippedData, {
-            idleStrippedTail: session.idleStrippedTail,
-          });
-          if (workingOnly?.status === "working") {
-            this.updateState(session, "working", "working");
-          }
-        }
         return;
       }
 
@@ -378,25 +357,7 @@ export class ThreadOutputPipeline {
       // L2 `detectTerminalStatus` must see only this `data` chunk — not
       // `stripped` from merged `prevChunk` + chunk, or old "Working" rows in
       // scrollback re-flip `working` after idle.
-      let hint =
-        session.adapter.detectTerminalStatus?.(strippedData, {
-          idleStrippedTail: session.idleStrippedTail,
-        }) ?? null;
-      if (
-        hint &&
-        session.adapter.shouldIgnoreTerminalStatusHint?.({
-          hint,
-          status: session.status,
-          hasStructuredSession: session.structuredSession !== undefined,
-        })
-      ) {
-        const pending = session.pendingStatusHint;
-        if (pending && pending.status === hint.status) {
-          clearTimeout(pending.timer);
-          session.pendingStatusHint = undefined;
-        }
-        hint = null;
-      }
+      const hint = session.adapter.detectTerminalStatus?.(strippedData) ?? null;
 
       if (hint) {
         const nextConfig = session.adapter.syncConfigFromTerminalState?.({

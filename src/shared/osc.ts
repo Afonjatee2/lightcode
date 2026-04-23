@@ -6,6 +6,7 @@
  * sequences to signal state changes without relying on fragile TUI output parsing.
  *
  * Supported protocols:
+ * - OSC 0/1/2 — window/icon title: \x1b]0;<text>\x07 (also 1, 2 same shape)
  * - OSC 9   — simple notification: \x1b]9;<text>\x07
  * - OSC 777 — RXVT notify:         \x1b]777;notify;<title>;<body>\x07
  * - OSC 99  — Kitty notify:         \x1b]99;...;p=<key>:<value>\x1b\\
@@ -22,20 +23,28 @@ export interface OscNotification {
   payload: Record<string, unknown> | undefined;
 }
 
+export interface OscTitle {
+  /** 0 = icon + window title, 1 = icon, 2 = window title. */
+  code: 0 | 1 | 2;
+  /** The title text (everything after `<code>;` up to the terminator). */
+  text: string;
+}
+
 export interface OscExtractionResult {
-  /** The raw data with OSC notification sequences removed. */
+  /** The raw data with all extracted OSC sequences removed. */
   cleaned: string;
   /** Extracted notifications (empty array if none found). */
   notifications: OscNotification[];
+  /** Extracted window/icon titles (empty array if none found). */
+  titles: OscTitle[];
 }
 
-// OSC 9: \x1b]9;<text>ST
-// OSC 777: \x1b]777;notify;<title>;<body>ST
-// OSC 99: \x1b]99;<params>ST  (Kitty notification protocol)
-//
-// Combined regex to extract all three in a single pass.
-// Each branch is a named group for easy identification.
-const OSC_NOTIFY_RE = new RegExp(
+// Combined regex to extract notifications (9 / 777 / 99) and titles (0 / 1 / 2)
+// in a single pass. Leftmost alternative wins; `9;` vs `99;` / `777;` don't
+// conflict (they diverge after the first digit) and neither does `(0|1|2);`
+// with anything else (single digit followed by `;`, so `133`/`1337`/`11` all
+// skip it).
+const OSC_EVENT_RE = new RegExp(
   // eslint-disable-next-line no-control-regex
   `\\x1b\\](?:` +
     `9;([^\\x07\\x1b]*)(?:\\x07|\\x1b\\\\)` + // OSC 9: group 1 = text
@@ -43,6 +52,8 @@ const OSC_NOTIFY_RE = new RegExp(
     `777;notify;([^;\\x07\\x1b]*);([^\\x07\\x1b]*)(?:\\x07|\\x1b\\\\)` + // OSC 777: group 2 = title, group 3 = body
     `|` +
     `99;([^\\x07\\x1b]*)(?:\\x07|\\x1b\\\\)` + // OSC 99: group 4 = params
+    `|` +
+    `(0|1|2);([^\\x07\\x1b]*)(?:\\x07|\\x1b\\\\)` + // OSC 0/1/2: group 5 = code, group 6 = title text
     `)`,
   "g",
 );
@@ -98,19 +109,20 @@ function parseKittyParams(raw: string): { title: string; body: string } | null {
 }
 
 /**
- * Extract OSC notification sequences from raw PTY data.
+ * Extract OSC notification and title sequences from raw PTY data.
  *
- * Returns the cleaned data (with notification sequences removed) and
- * an array of parsed notifications. The cleaned data can then be passed
- * to `stripAnsiPreservingLayout` for normal status detection.
+ * Returns the cleaned data (with extracted sequences removed) and
+ * arrays of parsed notifications and titles. The cleaned data can then be
+ * passed to `stripAnsiPreservingLayout` for normal status detection.
  */
-export function extractOscNotifications(data: string): OscExtractionResult {
+export function extractOscEvents(data: string): OscExtractionResult {
   const notifications: OscNotification[] = [];
+  const titles: OscTitle[] = [];
 
   // Reset lastIndex for global regex reuse across calls
-  OSC_NOTIFY_RE.lastIndex = 0;
+  OSC_EVENT_RE.lastIndex = 0;
 
-  const cleaned = data.replace(OSC_NOTIFY_RE, (_match, g1, g2, g3, g4) => {
+  const cleaned = data.replace(OSC_EVENT_RE, (_match, g1, g2, g3, g4, g5, g6) => {
     if (g1 !== undefined) {
       // OSC 9 — simple notification
       const body = g1 as string;
@@ -141,47 +153,57 @@ export function extractOscNotifications(data: string): OscExtractionResult {
           payload: tryParseJson(parsed.body),
         });
       }
+    } else if (g5 !== undefined) {
+      // OSC 0/1/2 — window/icon title
+      const code = Number(g5) as 0 | 1 | 2;
+      const text = (g6 as string | undefined) ?? "";
+      titles.push({ code, text });
     }
     // Remove the sequence from the output
     return "";
   });
 
-  return { cleaned, notifications };
+  return { cleaned, notifications, titles };
 }
 
 /** Defensive cap so a pathological PTY line cannot grow memory without bound. */
 const MAX_PTY_OSC_CARRY = 64 * 1024;
 
 /**
- * If `cleaned` ends with a notification OSC (9 / 777 / 99) that has no ST/BEL
- * terminator yet, split it off for the next PTY read — sequences are often
- * split across `node-pty` chunks (notably on Windows / ConPTY).
+ * If `cleaned` ends with a handled OSC (0 / 1 / 2 / 9 / 777 / 99) that has no
+ * ST/BEL terminator yet, split it off for the next PTY read — sequences are
+ * often split across `node-pty` chunks (notably on Windows / ConPTY).
  */
-function takeTrailingIncompleteNotificationOsc(s: string): { head: string; carry: string } {
+function takeTrailingIncompleteOsc(s: string): { head: string; carry: string } {
   const last = s.lastIndexOf("\x1b]");
   if (last < 0) return { head: s, carry: "" };
   const tail = s.slice(last);
   const afterIntroducer = tail.slice(2); // drop the leading ESC + ']'
-  if (!/^(?:9;|777;notify;|99;)/.test(afterIntroducer)) return { head: s, carry: "" };
+  if (!/^(?:0;|1;|2;|9;|777;notify;|99;)/.test(afterIntroducer)) return { head: s, carry: "" };
   if (tail.includes("\x07") || tail.includes("\x1b\\")) return { head: s, carry: "" };
   return { head: s.slice(0, last), carry: tail };
 }
 
 /**
- * Reassemble split OSC notification sequences across multiple PTY reads, then
- * extract the same `OscNotification` list as {@link extractOscNotifications}.
- * Pass the previous return `carryOut` as the next `carryIn`.
+ * Reassemble split OSC sequences across multiple PTY reads, then extract the
+ * same event lists as {@link extractOscEvents}. Pass the previous return's
+ * `carryOut` as the next `carryIn`.
  */
-export function extractOscNotificationsFromPtyStream(
+export function extractOscEventsFromPtyStream(
   carryIn: string | undefined,
   chunk: string,
-): { carryOut: string; notifications: OscNotification[]; cleaned: string } {
+): {
+  carryOut: string;
+  notifications: OscNotification[];
+  titles: OscTitle[];
+  cleaned: string;
+} {
   let carry = carryIn ?? "";
   if (carry.length > MAX_PTY_OSC_CARRY) {
     carry = "";
   }
   const combined = carry + chunk;
-  const { cleaned, notifications } = extractOscNotifications(combined);
-  const { head, carry: tailCarry } = takeTrailingIncompleteNotificationOsc(cleaned);
-  return { carryOut: tailCarry, notifications, cleaned: head };
+  const { cleaned, notifications, titles } = extractOscEvents(combined);
+  const { head, carry: tailCarry } = takeTrailingIncompleteOsc(cleaned);
+  return { carryOut: tailCarry, notifications, titles, cleaned: head };
 }

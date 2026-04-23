@@ -1,5 +1,5 @@
-import type { AgentCapability, ProjectLocation, ThreadStatus } from "@/shared/contracts";
-import type { OscNotification } from "@/shared/osc";
+import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
+import type { OscNotification, OscTitle } from "@/shared/osc";
 import {
   batchWslCommandsAsync,
   createKnownSessionRef,
@@ -28,15 +28,11 @@ import {
   resolveCodexSessionsWatchPath,
 } from "./session";
 import type { CodexRolloutMeta } from "./sessionFiles";
-import { detectCodexReadyForInitialPrompt, detectCodexTerminalStatus } from "./terminal";
+import { detectCodexReadyForInitialPrompt } from "./terminal";
 
 export { buildCodexAppServerCommand, CODEX_REMOTE_TUI_FEATURE } from "./argv";
 export { deriveCodexStructuredState, parseCodexSocketMessage } from "./acp";
-export {
-  detectCodexReadyForInitialPrompt,
-  detectCodexTerminalStatus,
-  detectCodexUpdatePrompt,
-} from "./terminal";
+export { detectCodexReadyForInitialPrompt, detectCodexUpdatePrompt } from "./terminal";
 
 const CODEX_PLUGIN_VERSION = readBundledCodexPluginVersion();
 const CODEX_MIN_PROTOCOL_VERSION = 1;
@@ -99,18 +95,14 @@ function codexOscHint(notification: OscNotification): TerminalStatusHint | null 
   return null;
 }
 
-/** Ignore uncorroborated TUI `idle` while ACP says we're still working. */
-function shouldIgnoreCodexWeakTerminalIdle(input: {
-  hint: TerminalStatusHint;
-  status: ThreadStatus;
-  hasStructuredSession: boolean;
-}): boolean {
-  return (
-    input.hasStructuredSession &&
-    input.status === "working" &&
-    input.hint.status === "idle" &&
-    !input.hint.corroborated
-  );
+// Codex animates its working-state spinner inside the window title via OSC 0/2
+// using braille glyphs (U+2800–U+28FF). First braille-prefixed title after an
+// idle→working edge flips us to `working`; idle comes from OSC 9 / hooks.
+const BRAILLE_PREFIX_RE = /^[⠀-⣿]/;
+
+function codexOscTitleHint(title: OscTitle): TerminalStatusHint | null {
+  if (!BRAILLE_PREFIX_RE.test(title.text)) return null;
+  return { status: "working", attention: "working", corroborated: true };
 }
 
 export function createCodexAdapter(): AgentAdapter {
@@ -160,10 +152,10 @@ export function createCodexAdapter(): AgentAdapter {
       return isCodexVersionSupportedForHooks();
     },
     isPluginInstalled(ctx) {
-      return isCodexPluginInstalled(ctx);
+      return isCodexPluginInstalled(ctx, ctx.baseDir);
     },
     async installPlugin(ctx) {
-      const result = installCodexPlugin(ctx);
+      const result = installCodexPlugin(ctx, ctx.baseDir);
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },
@@ -171,10 +163,8 @@ export function createCodexAdapter(): AgentAdapter {
       return { args: ["--enable", "codex_hooks"] };
     },
     handleOscNotification: codexOscHint,
+    handleOscTitle: codexOscTitleHint,
     oscHintsDeferToHookPlugin: true,
-    detectTerminalStatus: detectCodexTerminalStatus,
-    detectTerminalStatusOnHookPluginPtyData: true,
-    shouldIgnoreTerminalStatusHint: shouldIgnoreCodexWeakTerminalIdle,
     workingSilenceTimeoutMs: null,
     async detectInstall(ctx) {
       const status = await detectAgentInstall(ctx, codexDetectionSpec);

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { detectClaudeTerminalStatus, detectClaudeModelEffort } from "./index";
+import { createClaudeAdapter, detectClaudeTerminalStatus, detectClaudeModelEffort } from "./index";
+import type { OscTitle } from "@/shared/osc";
 
 describe("detectClaudeTerminalStatus", () => {
   it("detects working state when 'esc to interrupt' is in the last lines", () => {
@@ -390,5 +391,43 @@ describe("detectClaudeTerminalStatus corroboration", () => {
       "Some output\n" + "─".repeat(80) + "\n❯ \n" + "─".repeat(80) + "\n  ⏵⏵ bypass permissions on";
     const result = detectClaudeTerminalStatus(text);
     expect(result?.status).toBe("idle");
+  });
+});
+
+function oscTitle(text: string, code: 0 | 1 | 2 = 0): OscTitle {
+  return { code, text };
+}
+
+describe("createClaudeAdapter handleOscTitle", () => {
+  const adapter = createClaudeAdapter();
+
+  // Observed from real dev sessions (~/.lightcode/logs/terminal/*.log):
+  //   124× "⠂ <task title>"  /  121× "⠐ <task title>"  /  10× "✳ <task title>"
+  // The braille 2-frame animation (⠂ / ⠐, U+2802 / U+2810) is the stable
+  // "working" signal; ✳ appeared rarely and was classified as an artifact.
+  it("maps Claude's 2-frame braille spinner (⠂ / ⠐) to working", () => {
+    for (const glyph of ["⠂", "⠐"]) {
+      expect(adapter.handleOscTitle?.(oscTitle(`${glyph} Add jump to bottom button`))).toEqual({
+        status: "working",
+        attention: "working",
+        corroborated: true,
+      });
+    }
+  });
+
+  it("accepts any glyph in the braille range (U+2800–U+28FF)", () => {
+    for (const glyph of ["⠀", "⠁", "⠄", "⣾", "⣿"]) {
+      expect(adapter.handleOscTitle?.(oscTitle(`${glyph} task`))?.status).toBe("working");
+    }
+  });
+
+  it("returns null for Claude's idle titles (no spinner prefix)", () => {
+    // At startup Claude sets these; they are NOT a working signal.
+    expect(adapter.handleOscTitle?.(oscTitle("claude"))).toBeNull();
+    expect(adapter.handleOscTitle?.(oscTitle("Claude Code"))).toBeNull();
+  });
+
+  it("returns null when the braille glyph is not at the start of the title", () => {
+    expect(adapter.handleOscTitle?.(oscTitle("Claude Code ⠂"))).toBeNull();
   });
 });

@@ -220,6 +220,7 @@ export class SupervisorRuntime {
       {
         adapters: this.adapters,
         settingsPath: this.settingsPath,
+        baseDir,
         ...(process.env.LIGHTCODE_HOOK_PORT
           ? { preferredPort: Number(process.env.LIGHTCODE_HOOK_PORT) }
           : {}),

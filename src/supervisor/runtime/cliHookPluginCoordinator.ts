@@ -18,6 +18,14 @@ import { HookIngress, type HookIngressBootInfo } from "./hookIngress";
 export interface CliHookPluginCoordinatorOptions {
   adapters: Map<AgentKind, AgentAdapter>;
   settingsPath: string;
+  /**
+   * Lightcode data base dir for native plugin staging. Forwarded to each
+   * adapter's `ctx.baseDir` so dev (`~/.lightcode-dev`) and prod
+   * (`~/.lightcode`) keep separate plugin stages instead of stomping the
+   * same `agent-plugins/` directory. Omit only in tests — production callers
+   * always pass the resolved lightcode data dir.
+   */
+  baseDir?: string;
   /** TCP port preference; falls back to ephemeral on collision. */
   preferredPort?: number;
   /** Cache TTL for the CLI hook plugin install verdict — defaults to 7 days. */
@@ -85,7 +93,13 @@ export class CliHookPluginCoordinator {
     onEvent: import("./hookIngress").HookEventReceiver,
   ) {
     this.cacheTtlMs = options.cacheTtlMs ?? DEFAULT_CACHE_TTL_MS;
-    this.envContext = options.envContext ?? defaultEnvContext;
+    const baseDir = options.baseDir;
+    const resolveEnvContext = options.envContext ?? defaultEnvContext;
+    this.envContext = (agentKind, projectLocation) => {
+      const ctx = resolveEnvContext(agentKind, projectLocation);
+      if (ctx.baseDir !== undefined || baseDir === undefined) return ctx;
+      return { ...ctx, baseDir };
+    };
     this.wslHookBridge = options.wslHookBridge;
     const ingressOptions: import("./hookIngress").HookIngressOptions = {
       onEvent,
