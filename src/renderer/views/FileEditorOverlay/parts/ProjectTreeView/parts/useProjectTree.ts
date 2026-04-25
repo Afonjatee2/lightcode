@@ -2,9 +2,12 @@ import { useEffect, useEffectEvent, useState } from "react";
 import { toast } from "@heroui/react";
 import type { ProjectTreeEntry } from "@/shared/contracts";
 import { getBasename } from "@/shared/pathUtils";
+import { resolveSearchConfig } from "@/shared/searchExclude";
 import { readBridge } from "@/renderer/bridge";
+import { useAppStore } from "@/renderer/state/appStore";
 import { useFileEditorStore, type FileEditorRootContext } from "@/renderer/state/fileEditorStore";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { resolveAbsolutePath } from "@/renderer/utils/resolveAbsolutePath";
 
 export interface TreeDraftState {
@@ -26,6 +29,12 @@ export function useProjectTree(props: {
   const [searchResults, setSearchResults] = useState<ProjectTreeEntry[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [draft, setDraft] = useState<TreeDraftState | null>(null);
+
+  const globalUseIgnoreFiles = useSharedSettings((s) => s.searchUseIgnoreFiles);
+  const globalExclude = useSharedSettings((s) => s.searchExclude);
+  const projectSearchSettings = useAppStore(
+    (s) => s.projects.find((p) => p.id === props.rootContext.projectId)?.searchSettings,
+  );
 
   const rootKey = `${props.rootContext.projectId}:${props.rootContext.worktreePath ?? ""}`;
 
@@ -83,11 +92,18 @@ export function useProjectTree(props: {
     setSearchLoading(true);
     const handle = setTimeout(() => {
       useProjectTreeStore.getState().setCommittedSearchQuery(trimmed);
+      const searchConfig = resolveSearchConfig({
+        globalUseIgnoreFiles,
+        globalExclude,
+        projectUseIgnoreFiles: projectSearchSettings?.useIgnoreFiles,
+        projectExclude: projectSearchSettings?.exclude,
+      });
       void readBridge()
         .searchProjectTree({
           projectLocation: props.rootContext.projectLocation,
           query: searchQuery,
           limit: 50,
+          searchConfig,
         })
         .then((result) => setSearchResults(result.entries))
         .catch(() => setSearchResults([]))
@@ -95,7 +111,13 @@ export function useProjectTree(props: {
     }, 120);
 
     return () => clearTimeout(handle);
-  }, [props.rootContext.projectLocation, searchQuery]);
+  }, [
+    props.rootContext.projectLocation,
+    searchQuery,
+    globalUseIgnoreFiles,
+    globalExclude,
+    projectSearchSettings,
+  ]);
 
   async function toggleDirectory(path: string) {
     const treeStore = useProjectTreeStore.getState();

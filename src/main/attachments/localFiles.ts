@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { net, protocol } from "electron";
 import type { ProjectLocation } from "@/shared/contracts";
 import type { LightcodePaths } from "@/shared/lightcodePaths";
+import { getProjectFsPath } from "@/shared/wsl";
 
 function getThreadAttachmentDir(paths: LightcodePaths, threadId: string): string {
   return join(paths.attachmentsDir, threadId.replace(/:/g, "-").slice(0, 12));
@@ -35,18 +36,11 @@ export function deleteThreadAttachments(paths: LightcodePaths, threadId: string)
   rmSync(getThreadAttachmentDir(paths, threadId), { recursive: true, force: true });
 }
 
-export function getProjectRootPath(location: ProjectLocation): string {
-  if (location.kind === "wsl") {
-    return location.uncPath;
-  }
-  return location.path;
-}
-
 export function resolveProjectFsPath(payload: {
   projectLocation: ProjectLocation;
   path?: string;
 }): string {
-  const rootPath = getProjectRootPath(payload.projectLocation);
+  const rootPath = getProjectFsPath(payload.projectLocation);
   if (!payload.path) {
     return rootPath;
   }

@@ -37,6 +37,9 @@ export function SidebarButton(props: {
     liveText = false,
   } = props;
 
+  const labelRef = useRef<HTMLSpanElement>(null);
+  const [isTooltipOpen, setIsTooltipOpen] = useState(false);
+
   const inactiveText = liveText ? "text-foreground/85" : "text-muted";
 
   const stateClass =
@@ -66,7 +69,7 @@ export function SidebarButton(props: {
     );
   }
 
-  return (
+  const row = (
     <div
       ref={ref as React.Ref<HTMLDivElement>}
       role="button"
@@ -84,43 +87,36 @@ export function SidebarButton(props: {
     >
       {icon}
       <div className="min-w-0 flex-1">
-        {tooltip ? (
-          <OverflowTooltip tooltip={tooltip}>{label}</OverflowTooltip>
-        ) : (
-          <span className="block truncate">{label}</span>
-        )}
+        <span ref={labelRef} className="block truncate">
+          {label}
+        </span>
       </div>
       {suffix && <div className="flex shrink-0 items-center gap-[3px]">{suffix}</div>}
     </div>
   );
-}
 
-function OverflowTooltip(props: { tooltip: React.ReactNode; children: React.ReactNode }) {
-  const labelRef = useRef<HTMLSpanElement>(null);
-  const [isOpen, setIsOpen] = useState(false);
+  if (!tooltip) return row;
 
   return (
     <Tooltip
       delay={500}
-      isOpen={isOpen}
+      isOpen={isTooltipOpen}
       onOpenChange={(open) => {
         if (open) {
           const el = labelRef.current;
           if (el && el.scrollWidth > el.clientWidth) {
-            setIsOpen(true);
+            setIsTooltipOpen(true);
           }
         } else {
-          setIsOpen(false);
+          setIsTooltipOpen(false);
         }
       }}
     >
-      <Tooltip.Trigger className="block" tabIndex={-1} role="none">
-        <span ref={labelRef} className="block truncate">
-          {props.children}
-        </span>
+      <Tooltip.Trigger className="block w-full" tabIndex={-1} role="none">
+        {row}
       </Tooltip.Trigger>
       <Tooltip.Content placement="right" showArrow className="max-w-[28rem] break-all text-xs">
-        {props.tooltip}
+        {tooltip}
       </Tooltip.Content>
     </Tooltip>
   );

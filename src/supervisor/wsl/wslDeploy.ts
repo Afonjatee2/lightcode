@@ -29,7 +29,7 @@ export interface WslDeployFile {
 
 /**
  * Resolve the directory containing WSL helper assets shipped with the app
- * (watcher.node, wsl-watcher.cjs, bridge.mjs, …). The main process exports
+ * (watcher.node, bridge.mjs, …). The main process exports
  * `LIGHTCODE_WSL_HELPERS_DIR`; we keep a back-compat fallback to the legacy
  * `LIGHTCODE_WSL_WATCHER_DIR` for one release while installs roll over.
  */

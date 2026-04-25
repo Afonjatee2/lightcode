@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { type AgentEventEnvelope, agentEventEnvelopeSchema } from "@/shared/contracts/agentEvent";
-import { getWslCommand } from "../../agents/base";
+import { getWslCommand, quotePosixShellArg, resolveWslShellPathAsync } from "../../agents/base";
 import { isLightcodeHookDebug } from "../../runtime/hookDebug";
 import { deployFilesToWslHome, readBundledHelperVersion, resolveWslHelpersDir } from "../wslDeploy";
 import { attachLineSplitter, spawnWslLineChild, type WslLineChildOpts } from "../wslChild";
@@ -14,7 +14,7 @@ const execFileAsync = promisify(execFile);
 
 export type HookEventReceiver = (event: AgentEventEnvelope) => void;
 
-export interface WslHookBridgeManagerOptions {
+export interface WslBridgeServerOptions {
   /** Same callback shape as `HookIngress` so dispatcher logic stays unified. */
   onEvent: HookEventReceiver;
   /** Optional logger; defaults to no-op. */
@@ -52,8 +52,12 @@ export interface WslHookBridgeManagerOptions {
 }
 
 export interface BridgeHandle {
-  /** URL plugins inside the distro POST to. */
-  url: string;
+  /** Base URL of the in-distro server, e.g. `http://127.0.0.1:<port>`. */
+  baseUrl: string;
+  /** Hook-event URL plugins POST to — `${baseUrl}/v1/agent-event`. */
+  hookUrl: string;
+  /** Shared bearer secret used by every endpoint on this server. */
+  secret: string;
 }
 
 interface BridgeState {
@@ -63,6 +67,16 @@ interface BridgeState {
 
 const DEFAULT_BOOT_TIMEOUT_MS = 10_000;
 
+export type WatchScope = "git" | "worktree" | "unknown";
+
+export type WatchEventListener = (event: WatchEvent) => void;
+
+export interface WatchEvent {
+  subscriptionId: string;
+  scope: WatchScope;
+  paths: string[];
+}
+
 /**
  * Owns one in-WSL bridge per distro. The bridge is `node bridge.mjs`
  * staged under `~/.lightcode/bridge/bridge.mjs` and spawned via `wsl.exe`.
@@ -71,21 +85,36 @@ const DEFAULT_BOOT_TIMEOUT_MS = 10_000;
  *   {"type":"boot","port":<n>,...}        → resolves the per-distro `ready`
  *                                            promise with the loopback URL
  *   {"type":"event","payload":<envelope>} → forwarded to `options.onEvent`
+ *   {"type":"watch","subscriptionId":…}   → routed to the registered watch
+ *                                            listener for that id
  *   {"type":"error","message":"…"}        → logged via `options.onError`
  *
  * Lazy: nothing happens until `ensureBridge(distro)` is called the first
  * time. Concurrent calls share the same in-flight promise. On child exit
  * the cache entry is cleared so the next call re-stages and re-spawns.
  */
-export class WslHookBridgeManager {
+export class WslBridgeServer {
   private readonly bridges = new Map<string, BridgeState>();
   private readonly inFlight = new Map<string, Promise<BridgeHandle | undefined>>();
   private readonly disposed = new WeakSet<BridgeState>();
   private readonly bootTimeoutMs: number;
+  private readonly watchListeners = new Map<string, WatchEventListener>();
   private isDisposed = false;
 
-  constructor(private readonly options: WslHookBridgeManagerOptions) {
+  constructor(private readonly options: WslBridgeServerOptions) {
     this.bootTimeoutMs = options.bootTimeoutMs ?? DEFAULT_BOOT_TIMEOUT_MS;
+  }
+
+  /**
+   * Register a listener for a future `subscriptionId`. Must be called
+   * BEFORE the HTTP subscribe call so the first event cannot race in.
+   */
+  registerWatchListener(subscriptionId: string, listener: WatchEventListener): void {
+    this.watchListeners.set(subscriptionId, listener);
+  }
+
+  unregisterWatchListener(subscriptionId: string): void {
+    this.watchListeners.delete(subscriptionId);
   }
 
   /**
@@ -100,7 +129,7 @@ export class WslHookBridgeManager {
       if (isLightcodeHookDebug()) {
         console.log("[supervisor] hook-debug: WSL bridge (cached)", {
           distro,
-          url: existing.handle.url,
+          baseUrl: existing.handle.baseUrl,
         });
       }
       return existing.handle;
@@ -179,7 +208,14 @@ export class WslHookBridgeManager {
     }
 
     const deploy = this.options.deploy ?? deployFilesToWslHome;
-    const result = deploy(distro, [{ src: bridgeSrc, relDest: "bridge/bridge.mjs" }]);
+    const watcherBinding = join(helpersDir, "watcher.node");
+    const deployedFiles: { src: string; relDest: string }[] = [
+      { src: bridgeSrc, relDest: "bridge/bridge.mjs" },
+    ];
+    if (existsSync(watcherBinding)) {
+      deployedFiles.push({ src: watcherBinding, relDest: "bridge/watcher.node" });
+    }
+    const result = deploy(distro, deployedFiles);
     if (!result) {
       if (isLightcodeHookDebug()) {
         console.log("[supervisor] hook-debug: WSL bridge not started", {
@@ -216,15 +252,20 @@ export class WslHookBridgeManager {
         if (typeof message.version === "string" && message.version.length > 0) {
           reportedVersion = message.version;
         }
+        const baseUrl = `http://127.0.0.1:${message.port}`;
         if (isLightcodeHookDebug()) {
           console.log("[supervisor] hook-debug: WSL bridge booted in distro", {
             distro,
             port: message.port,
             version: reportedVersion ?? "(unversioned)",
-            url: `http://127.0.0.1:${message.port}/v1/agent-event`,
+            baseUrl,
           });
         }
-        resolveBoot({ url: `http://127.0.0.1:${message.port}/v1/agent-event` });
+        resolveBoot({
+          baseUrl,
+          hookUrl: `${baseUrl}/v1/agent-event`,
+          secret: this.options.secret,
+        });
         return;
       }
       if (type === "event" && message.payload && typeof message.payload === "object") {
@@ -244,19 +285,35 @@ export class WslHookBridgeManager {
         }
         return;
       }
+      if (type === "watch" && typeof message.subscriptionId === "string") {
+        const listener = this.watchListeners.get(message.subscriptionId);
+        if (listener) {
+          const scope: WatchScope =
+            message.scope === "git" || message.scope === "worktree" ? message.scope : "unknown";
+          const paths = Array.isArray(message.paths)
+            ? (message.paths.filter((v): v is string => typeof v === "string") as string[])
+            : [];
+          try {
+            listener({ subscriptionId: message.subscriptionId, scope, paths });
+          } catch (error) {
+            this.options.onError?.("wsl bridge watch: listener threw", error);
+          }
+        }
+        return;
+      }
       if (type === "error") {
         this.options.onError?.(`wsl hook bridge[${distro}]: ${String(message.message ?? "")}`);
       }
     };
 
-    // Run through `bash -lc` (login shell) so nvm / fnm / user PATH is
-    // sourced — otherwise `node` is absent in most non-system installs. This
-    // mirrors `gitWatcher.spawnWslWatcher`, which is the canonical pattern
-    // for launching Node inside a distro in this codebase.
-    const shellScript = `exec node ${quoteForShell(linuxScriptPath)}`;
+    // Run through the user's actual login shell (bash / zsh / fish / …)
+    // so nvm / fnm / user PATH is sourced. `sh -lc` would miss `.bashrc`
+    // / `.zshrc` where nvm publishes `node`, giving false negatives.
+    const shellPath = await resolveWslShellPathAsync(distro).catch(() => "/bin/sh");
+    const shellScript = `exec node ${quotePosixShellArg(linuxScriptPath)}`;
     const childOpts: WslLineChildOpts = {
       distro,
-      argv: ["bash", "-lc", shellScript],
+      argv: [shellPath, "-l", "-c", shellScript],
       env: {
         LIGHTCODE_HOOK_SECRET: this.options.secret,
         LIGHTCODE_HOOK_PROTOCOL_VERSION: String(this.options.protocolVersion),
@@ -375,29 +432,21 @@ export class WslHookBridgeManager {
 }
 
 /**
- * Probe for `node` inside a distro the same way we actually launch the
- * bridge: via `bash -lc` so that nvm / fnm / user PATH is loaded. Using
- * `sh -lc` (which resolves to dash on Ubuntu) misses the `.bashrc` where
- * nvm publishes `node`, giving a false negative.
+ * Probe for `node` inside a distro via the user's actual login shell
+ * (bash / zsh / fish / …) so nvm / fnm / user PATH is loaded. `sh -lc`
+ * wouldn't source `.bashrc` / `.zshrc` where nvm publishes `node`, giving
+ * a false negative.
  */
 async function defaultProbeNode(distro: string): Promise<boolean> {
   try {
+    const shellPath = await resolveWslShellPathAsync(distro).catch(() => "/bin/sh");
     const { stdout } = await execFileAsync(
       getWslCommand(),
-      ["-d", distro, "--", "bash", "-lc", "command -v node"],
+      ["-d", distro, "--", shellPath, "-l", "-c", "command -v node"],
       { windowsHide: true, timeout: 5_000 },
     );
     return Boolean(stdout && stdout.trim().length > 0);
   } catch {
     return false;
   }
-}
-
-/**
- * Single-quote a path for inclusion in a bash `-c` script. Linux paths
- * may contain spaces (e.g. `/home/me/My Projects/...`), and single quotes
- * escape every byte except `'` itself.
- */
-function quoteForShell(value: string): string {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
 }

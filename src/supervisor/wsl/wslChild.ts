@@ -3,8 +3,8 @@ import { getWslCommand } from "../agents/base";
 
 /**
  * Long-lived `wsl.exe` child whose stdout is parsed line by line. Used by:
- *   - `gitWatcher.spawnWslWatcher` — bash script invoking the parcel watcher
- *   - `WslHookBridgeManager` — `node bridge.mjs` listening inside the distro
+ *   - `projectWatcher.spawnWslWatcher` — bash script invoking the parcel watcher
+ *   - `WslBridgeServer` — `node bridge.mjs` listening inside the distro
  *
  * The helper is intentionally minimal: any "what command to run" decision
  * stays in the caller (it owns `argv`), and we only standardise the wsl.exe
@@ -26,7 +26,7 @@ export interface WslLineChildOpts {
    * sets matching Linux env vars before exec.
    */
   env?: Record<string, string>;
-  /** stderr piping mode; default `"ignore"` matches gitWatcher's behaviour. */
+  /** stderr piping mode; default `"ignore"` matches projectWatcher's behaviour. */
   stderr?: "ignore" | "pipe" | "inherit";
   /** Called per non-empty trimmed line of stdout. */
   onLine: (line: string) => void;

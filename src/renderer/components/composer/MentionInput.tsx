@@ -102,6 +102,7 @@ export const MentionInput = forwardRef<
     disabled?: boolean;
     placeholder: string;
     projectLocation: ProjectLocation | undefined;
+    projectId?: string;
     onTextChange: (hasText: boolean) => void;
     onSubmit: (segments: PromptSegment[]) => void;
     onPasteImage?: (file: File) => void;
@@ -113,6 +114,7 @@ export const MentionInput = forwardRef<
     disabled,
     placeholder,
     projectLocation,
+    projectId,
     onTextChange,
     onSubmit,
     onPasteImage,
@@ -121,7 +123,12 @@ export const MentionInput = forwardRef<
   const [mention, setMention] = useState<MentionState | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
-  const results = useDebouncedFileSearch(projectLocation, mention?.query ?? "", mention !== null);
+  const results = useDebouncedFileSearch(
+    projectLocation,
+    mention?.query ?? "",
+    mention !== null,
+    projectId,
+  );
 
   useEffect(() => {
     setActiveIndex(0);

@@ -6,6 +6,7 @@ import {
   Info,
   PanelLeft,
   PanelLeftClose,
+  Search,
   Settings2,
   Sparkles,
 } from "lucide-react";
@@ -52,6 +53,13 @@ export function SettingsSidebar(props: {
               label="AI"
               isActive={activeSection === "ai"}
               onPress={() => onSectionChange("ai")}
+            />
+            <SidebarButton
+              iconOnly
+              icon={<Search className="size-4" />}
+              label="Search"
+              isActive={activeSection === "search"}
+              onPress={() => onSectionChange("search")}
             />
             <SidebarButton
               iconOnly
@@ -133,6 +141,12 @@ export function SettingsSidebar(props: {
               label="AI"
               isActive={activeSection === "ai"}
               onPress={() => onSectionChange("ai")}
+            />
+            <SidebarButton
+              icon={<Search className="size-4" />}
+              label="Search"
+              isActive={activeSection === "search"}
+              onPress={() => onSectionChange("search")}
             />
             <SidebarButton
               icon={<Bot className="size-4" />}

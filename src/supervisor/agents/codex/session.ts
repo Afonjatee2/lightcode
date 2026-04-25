@@ -1,6 +1,6 @@
 import { join } from "node:path";
 import type { ProjectLocation } from "@/shared/contracts";
-import { readWslCommandOutput, resolveAgentHomeSubpath } from "../base";
+import { readWslCommandOutput, resolveAgentHomeSubpath, resolveWslShellPath } from "../base";
 import {
   parseCodexRolloutIdFromPath,
   parseCodexRolloutMeta,
@@ -59,8 +59,12 @@ export function isInteractiveCodexRollout(
 
 export function readCodexRolloutsForLocation(location: ProjectLocation): CodexRolloutMeta[] {
   if (location.kind === "wsl") {
-    const result = readWslCommandOutput(location.distro, "bash", [
-      "-lc",
+    // Use the user's actual login shell (bash / zsh / fish / …) so `~`
+    // expands against their passwd entry, not an assumed `bash` install.
+    const shellPath = resolveWslShellPath(location.distro);
+    const result = readWslCommandOutput(location.distro, shellPath, [
+      "-l",
+      "-c",
       "find ~/.codex/sessions -type f -name 'rollout-*.jsonl' -printf '%T@\\t%p\\n' 2>/dev/null",
     ]);
     if (!result.ok || result.stdout.length === 0) {

@@ -213,7 +213,7 @@ export function CommitSyncPanel(props: {
                   <ArrowUpDown className="size-3.5" />
                 )}
                 {needsPush
-                  ? `Push${ahead > 0 ? ` ${ahead} commit${ahead === 1 ? "" : "s"}` : ""}`
+                  ? `Push${ahead > 0 ? ` (${ahead})` : ""}`
                   : behind > 0 || ahead > 0
                     ? `Sync${behind > 0 ? ` ↓${behind}` : ""}${ahead > 0 ? ` ↑${ahead}` : ""}`
                     : "Sync"}

@@ -59,13 +59,6 @@ export async function execGit(
   }
 }
 
-export function getRepoPath(location: ProjectLocation): string {
-  if (location.kind === "wsl") {
-    return location.uncPath;
-  }
-  return location.path;
-}
-
 export function toForwardSlash(path: string): string {
   return path.replace(/\\/g, "/");
 }

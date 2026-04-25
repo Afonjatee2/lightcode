@@ -3,6 +3,7 @@ import { Readable, Writable } from "node:stream";
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { getProjectPosixPath } from "@/shared/wsl";
 import { probeAcpCapabilities } from "../acp";
 import {
   batchWslCommandsAsync,
@@ -66,7 +67,7 @@ async function probeCopilotModelEfforts(
   models: { id: string }[],
 ): Promise<{ defaultEffort?: string; modelEfforts?: Record<string, string[]> }> {
   const spec = buildCopilotCommand(location, ["--acp", "--stdio"], executablePath);
-  const sessionCwd = location.kind === "wsl" ? location.linuxPath : location.path;
+  const sessionCwd = getProjectPosixPath(location);
   const child = spawn(spec.command, spec.args, {
     ...(spec.cwd ? { cwd: spec.cwd } : {}),
     stdio: ["pipe", "pipe", "pipe"],
@@ -219,7 +220,7 @@ async function probeCapabilities(
   executablePath?: string,
 ): Promise<AgentCapability> {
   const spec = buildCopilotCommand(location, ["--acp", "--stdio"], executablePath);
-  const sessionCwd = location.kind === "wsl" ? location.linuxPath : location.path;
+  const sessionCwd = getProjectPosixPath(location);
   const probe = await probeAcpCapabilities(spec.command, spec.args, sessionCwd, {
     ...(spec.cwd ? { processCwd: spec.cwd } : {}),
     timeoutMs: 15_000,

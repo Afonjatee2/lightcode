@@ -37,6 +37,7 @@ export function InlineRenameInput(props: {
       onChange={(e) => setValue(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => {
+        e.stopPropagation();
         if (e.key === "Enter") {
           e.preventDefault();
           commit();

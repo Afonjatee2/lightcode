@@ -11,7 +11,7 @@ import {
   type AgentEnvContext,
   type AgentCliHookPluginSupport,
 } from "../agents/base";
-import type { WslHookBridgeManager } from "../wsl/bridge";
+import type { WslBridgeServer } from "../wsl/bridge";
 import { isLightcodeHookDebug } from "./hookDebug";
 import { HookIngress, type HookIngressBootInfo } from "./hookIngress";
 
@@ -34,11 +34,11 @@ export interface CliHookPluginCoordinatorOptions {
   envContext?: (agentKind: AgentKind, projectLocation?: ProjectLocation) => AgentEnvContext;
   /**
    * Optional WSL hook bridge manager. When provided, WSL spawns are routed
-   * through a per-distro `bridge.mjs` (see `WslHookBridgeManager`) instead
+   * through a per-distro `bridge.mjs` (see `WslBridgeServer`) instead
    * of the Windows-host `HookIngress`, which a WSL2 NAT loopback would not
    * reach.
    */
-  wslHookBridge?: WslHookBridgeManager;
+  wslHookBridge?: WslBridgeServer;
 }
 
 const DEFAULT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -60,7 +60,7 @@ const PLUGIN_VERSION_UNKNOWN = "0.0.0";
  *
  *   1. It owns the singleton `HookIngress` (HTTP server on 127.0.0.1) used
  *      by Windows / macOS / Linux agent processes.
- *   2. It optionally owns a `WslHookBridgeManager` for routing WSL spawns
+ *   2. It optionally owns a `WslBridgeServer` for routing WSL spawns
  *      through an in-distro `bridge.mjs` (WSL2 loopback can't reach the
  *      Windows-host ingress).
  *   3. It iterates installed adapters and asks any that implement
@@ -86,7 +86,7 @@ export class CliHookPluginCoordinator {
     projectLocation?: ProjectLocation,
   ) => AgentEnvContext;
   private readonly installPromises = new Map<string, Promise<InstallOutcome>>();
-  private wslHookBridge: WslHookBridgeManager | undefined;
+  private wslHookBridge: WslBridgeServer | undefined;
 
   constructor(
     private readonly options: CliHookPluginCoordinatorOptions,
@@ -134,9 +134,9 @@ export class CliHookPluginCoordinator {
    * constructing the bridge with this coordinator's hook secret. Replacing
    * a previously-set bridge is a programming error and is ignored.
    */
-  setWslHookBridge(bridge: WslHookBridgeManager): void {
+  setWslHookBridge(bridge: WslBridgeServer): void {
     if (this.wslHookBridge && this.wslHookBridge !== bridge) {
-      throw new Error("CliHookPluginCoordinator already has a WslHookBridgeManager");
+      throw new Error("CliHookPluginCoordinator already has a WslBridgeServer");
     }
     this.wslHookBridge = bridge;
   }
@@ -179,20 +179,10 @@ export class CliHookPluginCoordinator {
     agentKind: AgentKind;
     projectLocation?: ProjectLocation;
   }): Promise<{ env: Record<string, string>; extraArgs: string[] } | undefined> {
-    // Dev toggle — forces L2 terminal parsing for every spawn by refusing to
-    // inject the hook plugin env. Read from disk each call so flipping the
-    // switch in Settings affects the very next thread without a restart.
-    if (readSharedSettings(this.options.settingsPath).disableCliHookPlugin) {
-      if (isLightcodeHookDebug()) {
-        console.log("[supervisor] hook-debug: resolvePluginEnvForSpawn skipped", {
-          threadId: input.threadId,
-          agentKind: input.agentKind,
-          reason: "disableCliHookPlugin setting is on (dev override)",
-        });
-      }
-      return undefined;
-    }
-
+    // The `disableCliHookPlugin` dev toggle is handled in the supervisor's
+    // hook dispatcher (envelopes are dropped on receive). Install, launch
+    // extras (`--settings <path>`), and hook env vars stay unchanged so
+    // `preferredNotifChannel: "iterm2"` keeps flowing and L2 can drive status.
     const adapter = this.options.adapters.get(input.agentKind);
     const slice = adapter ? toCliHookPluginSlice(adapter) : undefined;
     if (!adapter || !slice) {
@@ -261,7 +251,7 @@ export class CliHookPluginCoordinator {
       if (!handle) return undefined;
       // Bridge inherits the supervisor's secret + protocol via spawn env.
       const info = await this.ingress.ready;
-      return { url: handle.url, secret: info.secret, protocolVersion: info.protocolVersion };
+      return { url: handle.hookUrl, secret: info.secret, protocolVersion: info.protocolVersion };
     }
     const info = await this.ingress.ready;
     return { url: info.url, secret: info.secret, protocolVersion: info.protocolVersion };

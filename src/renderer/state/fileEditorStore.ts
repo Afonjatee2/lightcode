@@ -57,6 +57,26 @@ interface FileEditorStoreState {
   refreshOpenBuffers: () => Promise<void>;
 }
 
+/**
+ * Per-path timestamps of the most recent user-initiated save. When the
+ * watcher fires a tree-changed event within this window we skip refreshing
+ * the buffer — the filesystem change came from us, and any read round-trip
+ * would just rebuild Monaco's value (dropping focus and causing a blink).
+ * Module-local because this isn't state anything needs to re-render on.
+ */
+const recentlySavedAt = new Map<string, number>();
+const SELF_SAVE_SUPPRESS_MS = 1500;
+
+function isRecentlySavedBySelf(path: string): boolean {
+  const at = recentlySavedAt.get(path);
+  if (at === undefined) return false;
+  if (Date.now() - at > SELF_SAVE_SUPPRESS_MS) {
+    recentlySavedAt.delete(path);
+    return false;
+  }
+  return true;
+}
+
 function buildBuffer(result: ReadProjectFileResult): FileEditorBuffer {
   if (result.status !== "ready") {
     return {
@@ -310,6 +330,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       baseModifiedAtMs: buffer.modifiedAtMs,
     });
 
+    recentlySavedAt.set(path, Date.now());
+
     set((state) => {
       const current = state.buffers[path];
       if (!current || current.status !== "ready") return {};
@@ -419,7 +441,14 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
     if (!rootContext) return;
 
     const paths = Object.entries(buffers)
-      .filter(([, buf]) => buf.status === "ready" && !buf.isDirty && !buf.isLoading)
+      .filter(([path, buf]) => {
+        if (buf.status !== "ready" || buf.isDirty || buf.isLoading) return false;
+        // Filesystem events triggered by our own save round-trip don't need
+        // to rebuild the buffer — suppress for a short window so Monaco
+        // doesn't lose focus / blink on Ctrl+S.
+        if (isRecentlySavedBySelf(path)) return false;
+        return true;
+      })
       .map(([p]) => p);
 
     if (paths.length === 0) return;
@@ -442,13 +471,25 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         const current = nextBuffers[path];
         // Skip if the buffer was modified by the user while we were reading
         if (!current || current.isDirty || current.status !== "ready") continue;
-        // Skip if content hasn't actually changed
-        if (
-          result.status === "ready" &&
-          result.content === current.savedContent &&
-          result.modifiedAtMs === current.modifiedAtMs
-        )
+
+        // Fast path: on-disk content matches what the editor shows. Refresh
+        // mtime/savedContent in-place so the next compare short-circuits,
+        // but don't swap the buffer object out from under Monaco — a prop
+        // change there drops focus and causes a visible blink.
+        if (result.status === "ready" && result.content === current.content) {
+          if (
+            result.modifiedAtMs !== current.modifiedAtMs ||
+            result.content !== current.savedContent
+          ) {
+            nextBuffers[path] = {
+              ...current,
+              modifiedAtMs: result.modifiedAtMs,
+              savedContent: result.content,
+            };
+            changed = true;
+          }
           continue;
+        }
 
         nextBuffers[path] = buildBuffer(result);
         changed = true;

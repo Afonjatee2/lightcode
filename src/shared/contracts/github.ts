@@ -61,6 +61,12 @@ export const ghReopenPrPayloadSchema = z.object({
 });
 export type GhReopenPrPayload = z.infer<typeof ghReopenPrPayloadSchema>;
 
+export const ghMarkPrReadyPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  prNumber: z.number().int().min(1),
+});
+export type GhMarkPrReadyPayload = z.infer<typeof ghMarkPrReadyPayloadSchema>;
+
 export const ghGetPrChecksPayloadSchema = z.object({
   projectLocation: projectLocationSchema,
   branch: z.string().min(1),

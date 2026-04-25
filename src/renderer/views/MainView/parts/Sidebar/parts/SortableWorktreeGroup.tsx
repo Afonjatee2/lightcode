@@ -45,7 +45,9 @@ export function SortableWorktreeGroup(props: {
     ),
   );
   const activeFilesPanelWorktreePath = usePanelStore((s) =>
-    s.filesPanelContext?.projectId === project.id ? s.filesPanelContext.worktreePath : null,
+    s.rightPanelTab === "files" && s.filesPanelContext?.projectId === project.id
+      ? s.filesPanelContext.worktreePath
+      : null,
   );
 
   const { ref } = useSortable({

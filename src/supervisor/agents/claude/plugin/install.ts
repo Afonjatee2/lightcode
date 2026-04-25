@@ -25,7 +25,7 @@ import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
  * For WSL projects the plugin must live INSIDE the distro because Claude
  * runs there and can't read `\\wsl.localhost\` paths reliably from inside
  * a login shell. We reuse the shared `deployFilesToWslHome` primitive (the
- * same one git uses for `wsl-watcher.cjs`) and emit a settings file with
+ * same one the bridge uses for `bridge.mjs`) and emit a settings file with
  * Linux-side paths.
  */
 

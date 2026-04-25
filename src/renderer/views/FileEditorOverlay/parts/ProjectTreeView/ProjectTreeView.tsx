@@ -1,5 +1,13 @@
 import { Button, Tooltip, toast } from "@heroui/react";
-import { ChevronsDownUp, FilePlus, FolderOpen, FolderPlus, RefreshCw, Search } from "lucide-react";
+import {
+  ChevronsDownUp,
+  FilePlus,
+  FolderOpen,
+  FolderPlus,
+  RefreshCw,
+  Search,
+  X,
+} from "lucide-react";
 import type { ProjectTreeEntry } from "@/shared/contracts";
 import { ContextMenu, PixelLoader } from "@/renderer/components/common";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
@@ -82,7 +90,23 @@ export function ProjectTreeView(props: {
               placeholder="Search files"
               value={tree.searchQuery}
               onChange={(event) => tree.setSearchQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && tree.searchQuery) {
+                  event.preventDefault();
+                  tree.setSearchQuery("");
+                }
+              }}
             />
+            {tree.searchQuery && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => tree.setSearchQuery("")}
+                className="flex size-4 shrink-0 items-center justify-center rounded text-muted hover:bg-white/8 hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            )}
           </div>
           <Tooltip delay={200}>
             <Tooltip.Trigger>
@@ -162,6 +186,9 @@ function SearchResultRow(props: { entry: ProjectTreeEntry; onOpen: () => void })
   const isOpenInTabRaw = useIsPathOpenInTab(entry.path);
   const isOpenInTab = !isSelected && isOpenInTabRaw;
 
+  const lastSlash = entry.path.lastIndexOf("/");
+  const dirPath = lastSlash >= 0 ? entry.path.slice(0, lastSlash) : "";
+
   return (
     <button
       className={`flex w-full items-center gap-1.5 rounded-md px-2 py-0.5 text-left text-sm text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground ${
@@ -172,6 +199,7 @@ function SearchResultRow(props: { entry: ProjectTreeEntry; onOpen: () => void })
             : ""
       }`}
       onClick={props.onOpen}
+      title={entry.path}
       type="button"
     >
       <img
@@ -180,8 +208,12 @@ function SearchResultRow(props: { entry: ProjectTreeEntry; onOpen: () => void })
         className="size-4 shrink-0"
         src={getEntryIconUrl(entry.name, entry.type === "directory")}
       />
-      <span className="min-w-0 flex-1 truncate">{entry.name}</span>
-      <span className="shrink-0 text-[11px] text-muted/70">{entry.path}</span>
+      <span className="min-w-0 truncate">{entry.name}</span>
+      {dirPath && (
+        <span className="min-w-0 flex-1 truncate text-right text-[11px] text-muted/70">
+          {dirPath}
+        </span>
+      )}
     </button>
   );
 }

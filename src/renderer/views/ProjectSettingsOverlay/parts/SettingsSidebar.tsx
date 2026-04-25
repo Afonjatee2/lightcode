@@ -1,4 +1,12 @@
-import { ArrowLeft, GitFork, PanelLeft, PanelLeftClose, Play, Settings2 } from "lucide-react";
+import {
+  ArrowLeft,
+  GitFork,
+  PanelLeft,
+  PanelLeftClose,
+  Play,
+  Search,
+  Settings2,
+} from "lucide-react";
 import { SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import type { ProjectSettingsSection } from "./types";
@@ -15,6 +23,7 @@ export function SettingsSidebar(props: {
     { id: "general", icon: <Settings2 className="size-4" />, label: "General" },
     { id: "worktrees", icon: <GitFork className="size-4" />, label: "Worktrees" },
     { id: "actions", icon: <Play className="size-4" />, label: "Actions" },
+    { id: "search", icon: <Search className="size-4" />, label: "Search" },
   ];
 
   return (

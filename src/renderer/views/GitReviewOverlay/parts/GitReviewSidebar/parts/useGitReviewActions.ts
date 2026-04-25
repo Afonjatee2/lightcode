@@ -339,6 +339,29 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     }
   }
 
+  async function handleMarkPrReady(): Promise<void> {
+    const prData = getCurrentPrData();
+    if (!prData) return;
+    setPrLoading(true);
+    try {
+      await readBridge().ghMarkPrReady({
+        projectLocation: project.location,
+        prNumber: prData.number,
+      });
+      if (effectivePrKey) {
+        useGitStore
+          .getState()
+          .setPrData(effectivePrKey, { ...prData, state: "open", isDraft: false });
+      }
+      onRefresh();
+    } catch (err) {
+      console.error("[git] mark PR ready failed", err);
+      toast.danger(friendlyError(err));
+    } finally {
+      setPrLoading(false);
+    }
+  }
+
   async function handleClosePr(): Promise<void> {
     const prData = getCurrentPrData();
     if (!prData) return;
@@ -426,6 +449,7 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     handleCreatePr,
     handleMergePr,
     handleClosePr,
+    handleMarkPrReady,
     handleGeneratePrSummary,
   };
 }

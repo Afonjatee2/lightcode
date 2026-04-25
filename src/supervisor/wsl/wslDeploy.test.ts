@@ -142,7 +142,7 @@ describe("readBundledHelperVersion", () => {
 describe("attachLineSplitter contract", () => {
   // Surface-level smoke test that the splitter handles split-across-chunk
   // newlines and ignores blank lines, mirroring real `wsl.exe` stdout
-  // behaviour. Lifted from gitWatcher's spawnWslWatcher, this is the
+  // behaviour. Lifted from projectWatcher's spawnWslWatcher, this is the
   // primitive every WSL helper now relies on.
   it("invokes onLine once per non-empty line, even when chunks split a line", async () => {
     const { attachLineSplitter } = await import("./wslChild");

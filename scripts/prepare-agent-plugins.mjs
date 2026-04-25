@@ -19,7 +19,7 @@
  * (size/mtime mismatch).
  */
 
-import { copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -56,14 +56,9 @@ function stagePlugin({ kind, assets, srcDir }) {
     }
     const dest = join(destDir, asset);
 
-    if (existsSync(dest)) {
-      const sourceStat = statSync(src);
-      const destStat = statSync(dest);
-      if (sourceStat.size === destStat.size && sourceStat.mtimeMs <= destStat.mtimeMs) {
-        console.log(`[prepare-agent-plugins] ${kind}/${asset} up to date, skipping`);
-        continue;
-      }
-    }
+    // Always copy — size+mtime heuristics can falsely skip after partial
+    // restages or same-size edits (matches the bug we fixed for bridge.mjs).
+    // Plugin assets are small; the copy is <1ms.
     copyFileSync(src, dest);
     console.log(`[prepare-agent-plugins] ${kind}/${asset} -> ${dest}`);
   }

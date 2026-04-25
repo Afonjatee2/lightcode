@@ -114,8 +114,8 @@ describe("FileIndexService", () => {
       expect(dir?.name).toBe("components");
     });
 
-    it("caps entries at 25000", async () => {
-      const lines = Array.from({ length: 30000 }, (_, i) => `file${i}.ts`).join("\n");
+    it("caps entries at 100000", async () => {
+      const lines = Array.from({ length: 110000 }, (_, i) => `file${i}.ts`).join("\n");
       mockGit(() => lines);
 
       const result = await service.searchProjectFiles({
@@ -124,7 +124,52 @@ describe("FileIndexService", () => {
         limit: 50,
       });
 
-      expect(result.totalIndexed).toBe(25000);
+      expect(result.totalIndexed).toBe(100000);
+    });
+
+    it("excludes paths matching the search exclude patterns", async () => {
+      mockGit(
+        () =>
+          "src/main.ts\nnode_modules/foo/index.js\nnode_modules/bar/baz/index.js\ndist/build.js\n",
+      );
+
+      const result = await service.searchProjectFiles({
+        projectLocation: location,
+        query: "",
+        limit: 50,
+        searchConfig: {
+          useIgnoreFiles: true,
+          excludePatterns: ["**/node_modules", "**/dist"],
+        },
+      });
+
+      const filePaths = result.entries.filter((e) => e.type === "file").map((e) => e.path);
+      expect(filePaths).toEqual(["src/main.ts"]);
+    });
+
+    it("drops --exclude-standard when useIgnoreFiles is false", async () => {
+      let observedArgs: string[] = [];
+      mockExecFile.mockImplementation(
+        (
+          _cmd: string,
+          args: string[],
+          _opts: unknown,
+          callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
+        ) => {
+          observedArgs = args;
+          callback(null, { stdout: "src/main.ts\n", stderr: "" });
+        },
+      );
+
+      await service.searchProjectFiles({
+        projectLocation: location,
+        query: "",
+        limit: 50,
+        searchConfig: { useIgnoreFiles: false, excludePatterns: [] },
+      });
+
+      expect(observedArgs).toContain("ls-files");
+      expect(observedArgs).not.toContain("--exclude-standard");
     });
   });
 
@@ -207,6 +252,35 @@ describe("FileIndexService", () => {
 
       await service.searchProjectFiles({ projectLocation: location, query: "", limit: 10 });
       vi.useRealTimers();
+
+      expect(mockExecFile).toHaveBeenCalledTimes(2);
+    });
+
+    it("rebuilds when search config changes", async () => {
+      mockGit(() => "file.ts\n");
+
+      await service.searchProjectFiles({
+        projectLocation: location,
+        query: "",
+        limit: 10,
+        searchConfig: { useIgnoreFiles: true, excludePatterns: [] },
+      });
+      await service.searchProjectFiles({
+        projectLocation: location,
+        query: "",
+        limit: 10,
+        searchConfig: { useIgnoreFiles: false, excludePatterns: [] },
+      });
+
+      expect(mockExecFile).toHaveBeenCalledTimes(2);
+    });
+
+    it("invalidateCacheForLocation forces a rebuild", async () => {
+      mockGit(() => "file.ts\n");
+
+      await service.searchProjectFiles({ projectLocation: location, query: "", limit: 10 });
+      service.invalidateCacheForLocation(location);
+      await service.searchProjectFiles({ projectLocation: location, query: "", limit: 10 });
 
       expect(mockExecFile).toHaveBeenCalledTimes(2);
     });

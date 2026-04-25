@@ -59,6 +59,8 @@ describe("sharedSettingsFile", () => {
       gitReviewMode: "panel",
       providerConfigs: {},
       editorLspEnabled: false,
+      searchUseIgnoreFiles: true,
+      searchExclude: {},
       disableCliHookPlugin: false,
       agentHookSupport: {},
     });
@@ -97,6 +99,8 @@ describe("sharedSettingsFile", () => {
       gitReviewMode: "panel",
       providerConfigs: {},
       editorLspEnabled: false,
+      searchUseIgnoreFiles: true,
+      searchExclude: {},
       disableCliHookPlugin: false,
       agentHookSupport: {},
     });

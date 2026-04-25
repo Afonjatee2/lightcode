@@ -1,6 +1,7 @@
 export type SettingsSection =
   | "general"
   | "ai"
+  | "search"
   | "agents"
   | "archived"
   | "about"

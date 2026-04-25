@@ -119,7 +119,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   if (!agent) {
     return (
       <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
-        <div className="mx-auto max-w-[560px]">
+        <div className="mx-auto max-w-[720px]">
           <h1 className="mb-6 text-lg font-semibold text-foreground">Agent not found</h1>
           <p className="text-sm text-muted">This agent is not installed.</p>
         </div>
@@ -140,7 +140,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
-      <div className="mx-auto max-w-[560px]">
+      <div className="mx-auto max-w-[720px]">
         <div className="mb-6">
           <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
           {versionRows.length > 0 ? (
@@ -208,7 +208,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
 export function AgentSettingsEmpty() {
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
-      <div className="mx-auto max-w-[560px]">
+      <div className="mx-auto max-w-[720px]">
         <h1 className="mb-6 text-lg font-semibold text-foreground">Agents</h1>
         <p className="text-sm text-muted">No agents installed.</p>
       </div>

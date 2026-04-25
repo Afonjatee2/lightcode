@@ -422,7 +422,7 @@ function quotePowerShellLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
-function quotePosixShellArg(value: string): string {
+export function quotePosixShellArg(value: string): string {
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 

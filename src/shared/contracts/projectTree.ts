@@ -12,10 +12,23 @@ export interface SearchProjectFilesResult {
   totalIndexed: number;
 }
 
+export const searchConfigSchema = z.object({
+  useIgnoreFiles: z.boolean(),
+  excludePatterns: z.array(z.string()),
+});
+export type SearchConfigPayload = z.infer<typeof searchConfigSchema>;
+
 export const searchProjectFilesPayloadSchema = z.object({
   projectLocation: projectLocationSchema,
   query: z.string().default(""),
   limit: z.number().int().min(1).max(200).default(50),
+  /**
+   * Effective search config (defaults + global + per-project) computed in
+   * the renderer. Optional for backwards compatibility — when omitted the
+   * supervisor falls back to legacy `--exclude-standard` behavior with no
+   * extra glob filtering.
+   */
+  searchConfig: searchConfigSchema.optional(),
 });
 export type SearchProjectFilesPayload = z.infer<typeof searchProjectFilesPayloadSchema>;
 
@@ -45,6 +58,7 @@ export const searchProjectTreePayloadSchema = z.object({
   projectLocation: projectLocationSchema,
   query: z.string().default(""),
   limit: z.number().int().min(1).max(200).default(50),
+  searchConfig: searchConfigSchema.optional(),
 });
 export type SearchProjectTreePayload = z.infer<typeof searchProjectTreePayloadSchema>;
 

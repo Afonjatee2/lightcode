@@ -69,6 +69,7 @@ describe("user-interrupt recovery fallback / arm-and-expire", () => {
       logWriter: { append: vi.fn<() => void>() } as never,
       resolveLogPath: () => "",
       resolveHintLogPath: () => "",
+      readDisableCliHookPlugin: () => false,
       onRecoverInvalidSessionRef: vi.fn<() => void>(),
       onStartQueuedLaunchPrompt: vi.fn<() => void>(),
       onStartSessionRefDiscovery: vi.fn<() => void>(),

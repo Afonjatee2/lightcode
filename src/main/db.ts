@@ -60,7 +60,7 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 4;
+  const SCHEMA_VERSION = 5;
 
   const storedVersion = Number(
     (
@@ -88,6 +88,13 @@ export function initDatabase(dbPath: string) {
     const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
     if (!cols.some((c) => c.name === "group_name")) {
       sqlite.exec("ALTER TABLE threads ADD COLUMN group_name TEXT");
+    }
+  }
+
+  if (storedVersion < 5) {
+    const cols = sqlite.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
+    if (!cols.some((c) => c.name === "search_settings")) {
+      sqlite.exec("ALTER TABLE projects ADD COLUMN search_settings TEXT");
     }
   }
 
@@ -154,6 +161,7 @@ function rowToProject(row: typeof schema.projects.$inferSelect): Project {
     location: rowToLocation(row),
     ...(row.lastDraftConfig ? { lastDraftConfig: JSON.parse(row.lastDraftConfig) } : {}),
     ...(row.scripts ? { scripts: JSON.parse(row.scripts) } : {}),
+    ...(row.searchSettings ? { searchSettings: JSON.parse(row.searchSettings) } : {}),
     createdAt: row.createdAt,
   };
 }
@@ -226,6 +234,7 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
       ...locationToRow(project.location),
       lastDraftConfig: project.lastDraftConfig ? JSON.stringify(project.lastDraftConfig) : null,
       scripts: project.scripts ? JSON.stringify(project.scripts) : null,
+      searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
       sortOrder,
       createdAt: project.createdAt,
     })
@@ -236,6 +245,7 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
         ...locationToRow(project.location),
         lastDraftConfig: project.lastDraftConfig ? JSON.stringify(project.lastDraftConfig) : null,
         scripts: project.scripts ? JSON.stringify(project.scripts) : null,
+        searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
         sortOrder,
       },
     })

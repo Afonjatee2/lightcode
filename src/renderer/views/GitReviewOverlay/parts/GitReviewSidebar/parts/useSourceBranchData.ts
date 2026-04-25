@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import type { ProjectLocation } from "@/shared/contracts";
+import { getProjectPosixPath } from "@/shared/wsl";
 import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
 
@@ -23,8 +24,7 @@ export function useSourceBranchData(params: {
   } = params;
 
   const projectLocationKind = project.location.kind;
-  const projectLocationPath =
-    project.location.kind === "wsl" ? project.location.linuxPath : project.location.path;
+  const projectLocationPath = getProjectPosixPath(project.location);
   const projectLocationDistro = project.location.kind === "wsl" ? project.location.distro : null;
   const projectLocationUncPath = project.location.kind === "wsl" ? project.location.uncPath : null;
 

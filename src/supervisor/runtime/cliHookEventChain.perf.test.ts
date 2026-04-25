@@ -87,6 +87,7 @@ describe("CLI hook event chain (6 threads)", () => {
       logWriter: new BufferedLogWriter(),
       resolveLogPath: () => "/dev/null",
       resolveHintLogPath: () => "/dev/null",
+      readDisableCliHookPlugin: () => false,
       onRecoverInvalidSessionRef: () => undefined,
       onStartQueuedLaunchPrompt: () => undefined,
       onStartSessionRefDiscovery: () => undefined,

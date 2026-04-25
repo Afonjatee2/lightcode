@@ -39,6 +39,8 @@ interface SharedSettingsState extends SharedSettings {
   setAutoShowTerminalPanel: (value: boolean) => void;
   setGitReviewMode: (value: GitReviewMode) => void;
   setEditorLspEnabled: (value: boolean) => void;
+  setSearchUseIgnoreFiles: (value: boolean) => void;
+  setSearchExclude: (value: Record<string, boolean>) => void;
   setDisableCliHookPlugin: (value: boolean) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
 }
@@ -185,6 +187,14 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ editorLspEnabled });
     persistSettings(selectSharedSettings(get()));
   },
+  setSearchUseIgnoreFiles: (searchUseIgnoreFiles) => {
+    set({ searchUseIgnoreFiles });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setSearchExclude: (searchExclude) => {
+    set({ searchExclude });
+    persistSettings(selectSharedSettings(get()));
+  },
   setDisableCliHookPlugin: (disableCliHookPlugin) => {
     set({ disableCliHookPlugin });
     persistSettings(selectSharedSettings(get()));
@@ -234,6 +244,8 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     gitReviewMode: state.gitReviewMode,
     providerConfigs: state.providerConfigs,
     editorLspEnabled: state.editorLspEnabled,
+    searchUseIgnoreFiles: state.searchUseIgnoreFiles,
+    searchExclude: state.searchExclude,
     disableCliHookPlugin: state.disableCliHookPlugin,
   };
 }

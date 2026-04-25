@@ -17,12 +17,25 @@ export const projectScriptsSchema = z.object({
 });
 export type ProjectScripts = z.infer<typeof projectScriptsSchema>;
 
+export const projectSearchSettingsSchema = z.object({
+  /** When set, overrides the global `searchUseIgnoreFiles` for this project. */
+  useIgnoreFiles: z.boolean().optional(),
+  /**
+   * Per-project glob overrides. A key with `true` adds an exclusion on top
+   * of the global list; `false` disables an inherited default for this
+   * project only.
+   */
+  exclude: z.record(z.string(), z.boolean()).optional(),
+});
+export type ProjectSearchSettings = z.infer<typeof projectSearchSettingsSchema>;
+
 export const projectSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1),
   location: projectLocationSchema,
   lastDraftConfig: projectDraftConfigSchema.optional(),
   scripts: projectScriptsSchema.optional(),
+  searchSettings: projectSearchSettingsSchema.optional(),
   createdAt: z.string().min(1),
 });
 export type Project = z.infer<typeof projectSchema>;

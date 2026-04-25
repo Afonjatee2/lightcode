@@ -712,6 +712,39 @@ describe("GitService.getWorktreeSourceBranch", () => {
   });
 });
 
+describe("GitService.push", () => {
+  const location = {
+    kind: "windows" as const,
+    path: "C:\\Users\\demo\\work\\repo",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("resolves the current branch when setting upstream without an explicit branch", async () => {
+    mockGitCommands((args) => {
+      if (args[0] === "branch" && args[1] === "--show-current") {
+        return { stdout: "ad_sdk\n" };
+      }
+      return { stdout: "" };
+    });
+
+    await new GitService().push(location, "origin", undefined, true);
+
+    const pushCall = execFileMock.mock.calls.find(
+      (call: unknown[]) =>
+        Array.isArray(call[1]) &&
+        (call[1] as string[])[0] === "push" &&
+        (call[1] as string[]).includes("--set-upstream"),
+    );
+    expect(pushCall).toBeDefined();
+    expect(pushCall![1]).toEqual(
+      expect.arrayContaining(["push", "--set-upstream", "origin", "ad_sdk"]),
+    );
+  });
+});
+
 describe("GitService.removeWorktree", () => {
   const location = {
     kind: "windows" as const,

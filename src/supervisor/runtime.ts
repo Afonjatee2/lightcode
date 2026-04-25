@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
+import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/settings";
 import type {
   AgentKind,
   AgentStatusesResponse,
@@ -30,6 +31,7 @@ import type {
   GhGetPrForBranchPayload,
   GhMergePrPayload,
   GhClosePrPayload,
+  GhMarkPrReadyPayload,
   GhReopenPrPayload,
   GitAbortMergePayload,
   GitAddWorktreePayload,
@@ -97,6 +99,7 @@ import type {
 import type { SupervisorEvent } from "@/shared/ipc";
 import type { LspMessagePayload, LspStartPayload, LspStopPayload } from "@/shared/lsp";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
+import { joinProjectPosixPath } from "@/shared/wsl";
 import { createAgentRegistry } from "./agents/registry";
 import { readWslCommandOutputAsync } from "./agents/base";
 import { generateCommitMessage } from "./commitMessageGenerator";
@@ -107,7 +110,7 @@ import {
 import { FileIndexService } from "./fileIndex";
 import { GitService } from "./git";
 import { GitHubService } from "./github";
-import { GitWatcher } from "./gitWatcher";
+import { ProjectWatcher } from "./projectWatcher";
 import { LanguageServerManager } from "./lsp";
 import { ProjectTreeService } from "./projectTree";
 import { generatePrSummary } from "./prSummaryGenerator";
@@ -119,17 +122,27 @@ import { ThreadSessionManager, writeSubmittedPrompt } from "./runtime/threadSess
 import { CliHookPluginCoordinator } from "./runtime/cliHookPluginCoordinator";
 import { dispatchAgentEvent } from "./runtime/agentEventDispatcher";
 import { hookDebugEnvelope, isLightcodeHookDebug } from "./runtime/hookDebug";
-import { WslHookBridgeManager } from "./wsl/bridge";
+import { WslBridgeServer } from "./wsl/bridge";
+import { WslBridgeClient } from "./wsl/bridge/client";
 import { resolveWslHelpersDir } from "./wsl/wslDeploy";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
+
+function readSupervisorSharedSettings(settingsPath: string) {
+  if (!existsSync(settingsPath)) return { ...defaultSharedSettings };
+  try {
+    return normalizeSharedSettings(JSON.parse(readFileSync(settingsPath, "utf8")));
+  } catch {
+    return { ...defaultSharedSettings };
+  }
+}
 
 export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
   private readonly logsDir: string;
   private readonly settingsPath: string;
   private readonly gitService = new GitService();
-  private _gitWatcher: GitWatcher | undefined;
+  private _projectWatcher: ProjectWatcher | undefined;
   private readonly githubService = new GitHubService();
   private readonly fileIndexService = new FileIndexService();
   private readonly projectTreeService = new ProjectTreeService();
@@ -141,20 +154,30 @@ export class SupervisorRuntime {
   private readonly threadSessionManager: ThreadSessionManager;
   private readonly lspManager: LanguageServerManager;
   private readonly cliHookPluginCoordinator: CliHookPluginCoordinator;
-  private wslHookBridge: WslHookBridgeManager | undefined;
+  private wslHookBridge: WslBridgeServer | undefined;
   private extractionAbortControllers = new Map<string, AbortController>();
 
   readonly sessions: Map<string, SessionRuntime>;
   readonly shellSessions: Map<string, ShellSessionRuntime>;
 
-  private get gitWatcher(): GitWatcher {
-    if (!this._gitWatcher) {
-      this._gitWatcher = new GitWatcher((projectId) => {
-        this.emit({ type: "git-changed", projectId });
+  private get projectWatcher(): ProjectWatcher {
+    if (!this._projectWatcher) {
+      const watcher = new ProjectWatcher({
+        onGitChanged: (projectId) => {
+          this.emit({ type: "git-changed", projectId });
+        },
+        onTreeChanged: (projectId) => {
+          this.projectTreeService.invalidateAllCaches();
+          this.emit({ type: "project-tree-changed", projectId });
+        },
       });
+      if (this.wslBridgeClient) watcher.setWslClient(this.wslBridgeClient);
+      this._projectWatcher = watcher;
     }
-    return this._gitWatcher;
+    return this._projectWatcher;
   }
+
+  private wslBridgeClient: WslBridgeClient | undefined;
 
   constructor(private readonly emit: (event: SupervisorEvent) => void) {
     // Defensive: `process.env.X = undefined` coerces to the literal string
@@ -193,6 +216,22 @@ export class SupervisorRuntime {
       envelope: import("@/shared/contracts").AgentEventEnvelope,
       source: "hook-ingress" | "wsl-bridge",
     ): void => {
+      // Dev-only toggle: drop hook envelopes on the supervisor side so the UI
+      // falls back to L2 (OSC 9;4 progress) without uninstalling the plugin
+      // or touching the agent's settings. Install + `--settings <path>` +
+      // `preferredNotifChannel: "iterm2"` all stay in place so L2 keeps
+      // flowing; we just ignore the L1 signal here.
+      if (readSupervisorSharedSettings(this.settingsPath).disableCliHookPlugin) {
+        if (isLightcodeHookDebug()) {
+          console.log(`[supervisor] hook-debug: L1 envelope dropped (dev toggle) ← ${source}`, {
+            threadId: envelope.threadId,
+            sessionId: envelope.sessionId,
+            intent: envelope.intent,
+            agentKind: envelope.agentKind,
+          });
+        }
+        return;
+      }
       hookDebugEnvelope(source, envelope);
       dispatchAgentEvent(envelope, {
         lookupSession: (input) => this.threadSessionManager.findSessionForCliHookPlugin(input),
@@ -235,7 +274,7 @@ export class SupervisorRuntime {
     // bearer secret + protocol version. Native (Windows / macOS / Linux)
     // spawns continue to use the HookIngress directly.
     if (process.platform === "win32" && resolveWslHelpersDir()) {
-      const bridge = new WslHookBridgeManager({
+      const bridge = new WslBridgeServer({
         onEvent: (envelope) => runHookDispatch(envelope, "wsl-bridge"),
         onError: (message, error) => {
           if (isLightcodeHookDebug()) {
@@ -247,6 +286,10 @@ export class SupervisorRuntime {
       });
       this.wslHookBridge = bridge;
       this.cliHookPluginCoordinator.setWslHookBridge(bridge);
+      const client = new WslBridgeClient(bridge);
+      this.wslBridgeClient = client;
+      this.projectTreeService.setWslClient(client);
+      this._projectWatcher?.setWslClient(client);
     }
 
     this.cliHookPluginCoordinator.startIngress();
@@ -491,7 +534,7 @@ export class SupervisorRuntime {
       }
     }
 
-    this.gitWatcher.unwatchWorktree(payload.path);
+    this.projectWatcher.unwatchWorktree(payload.path);
     return this.gitService.removeWorktree(
       payload.projectLocation,
       payload.path,
@@ -605,6 +648,10 @@ export class SupervisorRuntime {
     return this.githubService.reopenPr(payload.projectLocation, payload.prNumber);
   }
 
+  async ghMarkPrReady(payload: GhMarkPrReadyPayload): Promise<void> {
+    return this.githubService.markPrReady(payload.projectLocation, payload.prNumber);
+  }
+
   async ghGetPrChecks(payload: GhGetPrChecksPayload): Promise<GhGetPrChecksResult> {
     return this.githubService.getPrChecks(payload.projectLocation, payload.branch);
   }
@@ -622,15 +669,15 @@ export class SupervisorRuntime {
   }
 
   async gitWatchProject(payload: GitWatchProjectPayload): Promise<void> {
-    this.gitWatcher.watch(payload.projectId, payload.projectLocation);
+    this.projectWatcher.watch(payload.projectId, payload.projectLocation);
   }
 
   async gitWatchWorktrees(payload: GitWatchWorktreesPayload): Promise<void> {
-    this.gitWatcher.watchWorktrees(payload.projectId, payload.worktreePaths);
+    this.projectWatcher.watchWorktrees(payload.projectId, payload.worktreePaths);
   }
 
   async gitUnwatchProject(payload: GitUnwatchProjectPayload): Promise<void> {
-    this.gitWatcher.unwatch(payload.projectId);
+    this.projectWatcher.unwatch(payload.projectId);
   }
 
   async searchProjectFiles(payload: SearchProjectFilesPayload): Promise<SearchProjectFilesResult> {
@@ -688,7 +735,8 @@ export class SupervisorRuntime {
     const location = payload.projectLocation;
     if (location.kind === "wsl") {
       const checks = candidates.map(
-        (candidate) => `test -f "${location.linuxPath}/${candidate.file}" && echo yes || echo no`,
+        (candidate) =>
+          `test -f "${joinProjectPosixPath(location, candidate.file)}" && echo yes || echo no`,
       );
       const result = await readWslCommandOutputAsync(location.distro, "sh", [
         "-c",
@@ -728,7 +776,7 @@ export class SupervisorRuntime {
 
   dispose(): void {
     this.lspManager.dispose();
-    this._gitWatcher?.dispose();
+    this._projectWatcher?.dispose();
     this.threadSessionManager.dispose();
     void this.cliHookPluginCoordinator.dispose();
   }

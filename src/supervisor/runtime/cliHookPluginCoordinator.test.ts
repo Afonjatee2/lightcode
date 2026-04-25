@@ -8,7 +8,7 @@ import {
   type AgentEnvContext,
   type AgentCliHookPluginSupport,
 } from "../agents/base";
-import type { WslHookBridgeManager } from "../wsl/bridge";
+import type { WslBridgeServer } from "../wsl/bridge";
 import { CliHookPluginCoordinator } from "./cliHookPluginCoordinator";
 
 /**
@@ -600,19 +600,21 @@ describe("CliHookPluginCoordinator install cache", () => {
     expect(cache).not.toHaveProperty("claude");
   });
 
-  it("routes WSL spawns through the WslHookBridgeManager instead of HookIngress", async () => {
+  it("routes WSL spawns through the WslBridgeServer instead of HookIngress", async () => {
     const stub = makeStubAdapter("claude");
     stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
 
-    const ensureBridge = vi.fn<(distro: string) => Promise<{ url: string } | undefined>>(
-      async (_distro: string) => ({
-        url: "http://127.0.0.1:55501/v1/agent-event",
-      }),
-    );
+    const ensureBridge = vi.fn<
+      (distro: string) => Promise<{ baseUrl: string; hookUrl: string; secret: string } | undefined>
+    >(async (_distro: string) => ({
+      baseUrl: "http://127.0.0.1:55501",
+      hookUrl: "http://127.0.0.1:55501/v1/agent-event",
+      secret: "topsecret",
+    }));
     const wslHookBridge = {
       ensureBridge,
       dispose: vi.fn<() => Promise<void>>(async () => undefined),
-    } as unknown as WslHookBridgeManager;
+    } as unknown as WslBridgeServer;
 
     coordinator = new CliHookPluginCoordinator(
       {
@@ -653,11 +655,13 @@ describe("CliHookPluginCoordinator install cache", () => {
     stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
 
     const wslHookBridge = {
-      ensureBridge: vi.fn<(distro: string) => Promise<{ url: string } | undefined>>(
-        async () => undefined,
-      ),
+      ensureBridge: vi.fn<
+        (
+          distro: string,
+        ) => Promise<{ baseUrl: string; hookUrl: string; secret: string } | undefined>
+      >(async () => undefined),
       dispose: vi.fn<() => Promise<void>>(async () => undefined),
-    } as unknown as WslHookBridgeManager;
+    } as unknown as WslBridgeServer;
 
     coordinator = new CliHookPluginCoordinator(
       {

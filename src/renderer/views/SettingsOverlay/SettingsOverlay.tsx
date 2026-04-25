@@ -3,6 +3,7 @@ import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { PageLayout } from "@/renderer/components/layout/PageLayout";
 import { GeneralSettings } from "./parts/GeneralSettings";
 import { AISettings } from "./parts/AISettings";
+import { SearchSettings } from "./parts/SearchSettings";
 import { ArchivedThreadsSettings } from "./parts/ArchivedThreadsSettings";
 import { AboutSettings } from "./parts/AboutSettings";
 import { DevSettings } from "./parts/DevSettings";
@@ -34,6 +35,8 @@ export function SettingsOverlay(props: { onClose: () => void }) {
           <GeneralSettings />
         ) : activeSection === "ai" ? (
           <AISettings />
+        ) : activeSection === "search" ? (
+          <SearchSettings />
         ) : agentKind ? (
           <SingleAgentSettings agentKind={agentKind} />
         ) : activeSection === "agents" ? (

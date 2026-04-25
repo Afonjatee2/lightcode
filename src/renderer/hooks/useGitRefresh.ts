@@ -161,9 +161,11 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
           );
           const prUpdates: Record<string, PrData | null> = {};
           const prNumberUpdates = new Map<string, number | undefined>();
+          const projectBranch = status?.branch;
+          const projectPrKey = `__branch:${project.id}`;
 
-          await Promise.all(
-            wtThreads.map(async (t) => {
+          await Promise.all([
+            ...wtThreads.map(async (t) => {
               if (!isActive || !t.worktreeBranch || !t.worktreePath) return;
               try {
                 const pr = await readBridge().ghGetPrForBranch({
@@ -180,7 +182,20 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
                 // ignore — gh may not be authenticated
               }
             }),
-          );
+            (async () => {
+              if (!projectBranch) return;
+              try {
+                const pr = await readBridge().ghGetPrForBranch({
+                  projectLocation: project.location,
+                  branch: projectBranch,
+                });
+                if (!isActive) return;
+                prUpdates[projectPrKey] = pr;
+              } catch {
+                // ignore — gh may not be authenticated
+              }
+            })(),
+          ]);
           if (!isActive) return;
 
           if (Object.keys(prUpdates).length > 0) {
@@ -256,14 +271,20 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
     }
 
     const unsubWatcher = readBridge().onSupervisorEvent((event) => {
-      if (event.type !== "git-changed") return;
-      console.log(`[git-refresh] watcher-event project=${event.projectId}`);
-      const project = projects.find((p) => p.id === event.projectId);
-      if (project) scheduleWatcherRefresh(project);
-      const editorRoot = useFileEditorStore.getState().rootContext;
-      if (editorRoot && editorRoot.projectId === event.projectId) {
-        useFileEditorStore.getState().bumpRefreshToken();
-        void useFileEditorStore.getState().refreshOpenBuffers();
+      // Both events are git-affecting: `.git` metadata clearly, and worktree
+      // edits change `git status` output (a tracked file becomes modified,
+      // an untracked file appears, etc.). Refresh git state for either.
+      if (event.type === "git-changed" || event.type === "project-tree-changed") {
+        console.log(`[git-refresh] watcher-event ${event.type} project=${event.projectId}`);
+        const project = projects.find((p) => p.id === event.projectId);
+        if (project) scheduleWatcherRefresh(project);
+      }
+      if (event.type === "project-tree-changed") {
+        const editorRoot = useFileEditorStore.getState().rootContext;
+        if (editorRoot && editorRoot.projectId === event.projectId) {
+          useFileEditorStore.getState().bumpRefreshToken();
+          void useFileEditorStore.getState().refreshOpenBuffers();
+        }
       }
     });
 

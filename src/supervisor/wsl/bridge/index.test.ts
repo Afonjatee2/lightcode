@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { AgentEventEnvelope } from "@/shared/contracts";
-import { WslHookBridgeManager } from "./index";
+import { WslBridgeServer } from "./index";
 
 /**
  * The bridge manager talks to wsl.exe and the user's distro, so all real I/O
@@ -57,10 +57,10 @@ function makeStubbedManager(opts: {
   bootPort?: number;
   child?: FakeChild;
   spawnsRef?: { count: number };
-}): { manager: WslHookBridgeManager; child: FakeChild } {
+}): { manager: WslBridgeServer; child: FakeChild } {
   const child = opts.child ?? new FakeChild();
   const bootPort = opts.bootPort ?? 54321;
-  const managerOpts: ConstructorParameters<typeof WslHookBridgeManager>[0] = {
+  const managerOpts: ConstructorParameters<typeof WslBridgeServer>[0] = {
     helpersDir: opts.helpersDir,
     onEvent: opts.onEvent,
     secret: "topsecret",
@@ -81,7 +81,7 @@ function makeStubbedManager(opts: {
     },
   };
   if (opts.onError) managerOpts.onError = opts.onError;
-  return { manager: new WslHookBridgeManager(managerOpts), child };
+  return { manager: new WslBridgeServer(managerOpts), child };
 }
 
 function makeEnvelope(overrides: Partial<AgentEventEnvelope> = {}): AgentEventEnvelope {
@@ -96,7 +96,7 @@ function makeEnvelope(overrides: Partial<AgentEventEnvelope> = {}): AgentEventEn
   } as AgentEventEnvelope;
 }
 
-describe("WslHookBridgeManager", () => {
+describe("WslBridgeServer", () => {
   it("resolves ensureBridge once the child emits a boot line", async () => {
     const helpersDir = makeHelpersDir();
     const events: AgentEventEnvelope[] = [];
@@ -106,7 +106,11 @@ describe("WslHookBridgeManager", () => {
     });
 
     const handle = await manager.ensureBridge("Ubuntu");
-    expect(handle).toEqual({ url: "http://127.0.0.1:54321/v1/agent-event" });
+    expect(handle).toEqual({
+      baseUrl: "http://127.0.0.1:54321",
+      hookUrl: "http://127.0.0.1:54321/v1/agent-event",
+      secret: "topsecret",
+    });
 
     child.stdout.emit(
       "data",
@@ -134,15 +138,16 @@ describe("WslHookBridgeManager", () => {
     const first = await manager.ensureBridge("Ubuntu");
     const second = await manager.ensureBridge("Ubuntu");
     expect(spawnsRef.count).toBe(1);
-    expect(first?.url).toBe("http://127.0.0.1:1/v1/agent-event");
-    expect(second?.url).toBe("http://127.0.0.1:1/v1/agent-event");
+    expect(first?.hookUrl).toBe("http://127.0.0.1:1/v1/agent-event");
+    expect(first?.baseUrl).toBe("http://127.0.0.1:1");
+    expect(second?.hookUrl).toBe("http://127.0.0.1:1/v1/agent-event");
 
     await manager.dispose();
   });
 
   it("returns undefined when no node runtime is available in the distro", async () => {
     const helpersDir = makeHelpersDir();
-    const manager = new WslHookBridgeManager({
+    const manager = new WslBridgeServer({
       helpersDir,
       onEvent: () => undefined,
       secret: "s",
@@ -159,7 +164,7 @@ describe("WslHookBridgeManager", () => {
 
   it("returns undefined when deploy fails (e.g. UNC path unreachable)", async () => {
     const helpersDir = makeHelpersDir();
-    const manager = new WslHookBridgeManager({
+    const manager = new WslBridgeServer({
       helpersDir,
       onEvent: () => undefined,
       secret: "s",
@@ -202,7 +207,7 @@ describe("WslHookBridgeManager", () => {
   it("rejects ensureBridge when the bridge exits before booting", async () => {
     const helpersDir = makeHelpersDir();
     const child = new FakeChild();
-    const manager = new WslHookBridgeManager({
+    const manager = new WslBridgeServer({
       helpersDir,
       onEvent: () => undefined,
       onError: () => undefined,
@@ -233,7 +238,7 @@ describe("WslHookBridgeManager", () => {
 
     const children: FakeChild[] = [];
     const versions = ["1.0.0", "2.0.0"]; // stale first, fresh second
-    const manager = new WslHookBridgeManager({
+    const manager = new WslBridgeServer({
       helpersDir,
       onEvent: () => undefined,
       onError: () => undefined,
@@ -259,7 +264,7 @@ describe("WslHookBridgeManager", () => {
 
     const handle = await manager.ensureBridge("Ubuntu");
     expect(children).toHaveLength(2);
-    expect(handle?.url).toBe("http://127.0.0.1:9002/v1/agent-event");
+    expect(handle?.hookUrl).toBe("http://127.0.0.1:9002/v1/agent-event");
 
     await manager.dispose();
   });
@@ -270,7 +275,7 @@ describe("WslHookBridgeManager", () => {
     writeFileSync(join(helpersDir, "bridge.mjs"), `const BRIDGE_VERSION = "3.1.4";\n`, "utf8");
 
     const children: FakeChild[] = [];
-    const manager = new WslHookBridgeManager({
+    const manager = new WslBridgeServer({
       helpersDir,
       onEvent: () => undefined,
       onError: () => undefined,
@@ -293,7 +298,7 @@ describe("WslHookBridgeManager", () => {
 
     const handle = await manager.ensureBridge("Ubuntu");
     expect(children).toHaveLength(1);
-    expect(handle?.url).toBe("http://127.0.0.1:42000/v1/agent-event");
+    expect(handle?.hookUrl).toBe("http://127.0.0.1:42000/v1/agent-event");
 
     await manager.dispose();
   });
@@ -303,7 +308,7 @@ describe("WslHookBridgeManager", () => {
     // build). `readBundledHelperVersion` returns undefined → version check
     // is skipped regardless of what the child reports.
     const helpersDir = makeHelpersDir(); // writes `// stub` — no constant
-    const manager = new WslHookBridgeManager({
+    const manager = new WslBridgeServer({
       helpersDir,
       onEvent: () => undefined,
       onError: () => undefined,
@@ -324,7 +329,7 @@ describe("WslHookBridgeManager", () => {
     });
 
     const handle = await manager.ensureBridge("Ubuntu");
-    expect(handle?.url).toBe("http://127.0.0.1:1234/v1/agent-event");
+    expect(handle?.hookUrl).toBe("http://127.0.0.1:1234/v1/agent-event");
 
     await manager.dispose();
   });

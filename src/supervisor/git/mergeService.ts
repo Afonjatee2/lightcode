@@ -6,12 +6,12 @@ import {
   type ProjectLocation,
 } from "@/shared/contracts";
 import { errorDetail, msg } from "@/shared/messages";
+import { getProjectFsPath } from "@/shared/wsl";
 import {
   computeDefaultWorktreePath,
   ensureWorktreeParentExists,
   execGit,
   GIT_STATUS_TIMEOUT,
-  getRepoPath,
 } from "./exec";
 import { parseStatusPorcelainV2 } from "./statusService";
 import { GitWorktreeService } from "./worktreeService";
@@ -187,7 +187,7 @@ export class GitMergeService {
     const status = await execGit(location, ["status", "--porcelain"]);
     if (!status.trim()) return;
     throw new Error(
-      msg("git.worktree.dirtySource", { branch: sourceBranch, path: getRepoPath(location) }),
+      msg("git.worktree.dirtySource", { branch: sourceBranch, path: getProjectFsPath(location) }),
     );
   }
 

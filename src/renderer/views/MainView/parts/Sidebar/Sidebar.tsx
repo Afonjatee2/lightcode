@@ -37,6 +37,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import {
+  isGitPanelEclipsed,
   useCurrentProjectId,
   useCurrentThreadIds,
   useInstalledAgents,
@@ -1464,15 +1465,22 @@ export function Sidebar() {
   const activeWorktreeTerminalPath = useDevTerminalStore((s) =>
     s.isOpen ? s.activeWorktreePath : null,
   );
-  const activeGitPanelProjectId = usePanelStore((s) =>
-    s.gitReviewAsPanel ? (s.gitReviewContext?.projectId ?? null) : null,
+  const terminalPosition = useSharedSettings((s) => s.terminalPosition);
+  const activeGitPanelProjectId = usePanelStore((s) => {
+    if (!s.gitReviewAsPanel || !s.gitReviewContext) return null;
+    if (isGitPanelEclipsed(terminalPosition, s.rightPanelTab, !!s.filesPanelContext)) return null;
+    return s.gitReviewContext.projectId;
+  });
+  const activeGitPanelWorktreePath = usePanelStore((s) => {
+    if (!s.gitReviewAsPanel || !s.gitReviewContext) return null;
+    if (isGitPanelEclipsed(terminalPosition, s.rightPanelTab, !!s.filesPanelContext)) return null;
+    return s.gitReviewContext.worktreePath ?? null;
+  });
+  const activeFilesPanelProjectId = usePanelStore((s) =>
+    s.rightPanelTab === "files" ? (s.filesPanelContext?.projectId ?? null) : null,
   );
-  const activeGitPanelWorktreePath = usePanelStore((s) =>
-    s.gitReviewAsPanel ? (s.gitReviewContext?.worktreePath ?? null) : null,
-  );
-  const activeFilesPanelProjectId = usePanelStore((s) => s.filesPanelContext?.projectId ?? null);
-  const activeFilesPanelWorktreePath = usePanelStore(
-    (s) => s.filesPanelContext?.worktreePath ?? null,
+  const activeFilesPanelWorktreePath = usePanelStore((s) =>
+    s.rightPanelTab === "files" ? (s.filesPanelContext?.worktreePath ?? null) : null,
   );
 
   const gitMenuIcons = {

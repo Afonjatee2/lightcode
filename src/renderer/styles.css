@@ -13,16 +13,27 @@
   --tw-ring-offset-width: 0px;
 }
 
-/* HeroUI toast: prevent long strings (URLs, paths) from overflowing */
-.toast {
-  overflow: hidden;
+/* HeroUI Link: suppress the default focus ring/outline globally. */
+.link,
+.link[data-focus-visible="true"],
+.link:focus,
+.link:focus-visible {
+  outline: none;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-ring-offset-shadow: 0 0 #0000;
+}
+
+/* HeroUI toast: allow the close button (positioned at -top-1 -right-1) to
+   render outside the toast rect, and let long URLs/paths wrap inside. */
+.toast__content {
+  min-width: 0;
 }
 
 .toast__title,
 .toast__description {
   overflow-wrap: anywhere;
   word-break: break-all;
-  min-width: 0;
 }
 
 /* HeroUI component overrides */

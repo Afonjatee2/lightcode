@@ -31,11 +31,25 @@ export interface ThreadOutputPipelineOptions extends ThreadOutputPipelineCallbac
   logWriter: BufferedLogWriter;
   resolveLogPath(threadId: string): string;
   resolveHintLogPath(threadId: string): string;
+  /**
+   * Dev override: when true, report `terminal_parse` for terminal threads even
+   * when hook env was injected, so the "Enhanced (Hooks)" badge flips back to
+   * "Basic (CLI)" while the `disableCliHookPlugin` toggle is on. Returns the
+   * current value on each call so flipping the switch in Settings reflects in
+   * the next `thread-state` emit without restart.
+   */
+  readDisableCliHookPlugin(): boolean;
 }
 
-export function resolveThreadStatusSource(session: SessionRuntime): ThreadStatusSource {
+export function resolveThreadStatusSource(
+  session: SessionRuntime,
+  disableCliHookPlugin: boolean = false,
+): ThreadStatusSource {
   if (session.adapter.capabilities.presentationMode !== "terminal") {
     return "server";
+  }
+  if (disableCliHookPlugin) {
+    return "terminal_parse";
   }
   if (session.hasCliHookPluginActivity || session.cliHookEnvInjected) {
     return "cli_hook";
@@ -89,7 +103,10 @@ export class ThreadOutputPipeline {
       config: session.config,
       ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
       canResumeWithConfig: session.canResumeWithConfig,
-      threadStatusSource: resolveThreadStatusSource(session),
+      threadStatusSource: resolveThreadStatusSource(
+        session,
+        this.options.readDisableCliHookPlugin(),
+      ),
       ...(errorMessage ? { errorMessage } : {}),
     });
   }

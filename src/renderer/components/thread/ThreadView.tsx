@@ -333,6 +333,7 @@ function ThreadComposerSection(props: {
                           : "Send a message..."
                       }
                       projectLocation={projectLocation}
+                      projectId={thread.projectId}
                       onTextChange={setHasContent}
                       onSubmit={submitPrompt}
                       onPasteImage={(file) => {

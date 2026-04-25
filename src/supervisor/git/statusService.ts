@@ -9,12 +9,12 @@ import {
   type GitStatusResult,
   type ProjectLocation,
 } from "@/shared/contracts";
+import { getProjectFsPath } from "@/shared/wsl";
 import {
   execGit,
   GIT_DIFF_TIMEOUT,
   GIT_STATUS_TIMEOUT,
   getLocationIdentity,
-  getRepoPath,
   parseRemoteUrl,
   toForwardSlash,
 } from "./exec";
@@ -317,7 +317,7 @@ export class GitStatusService {
       return { oldContent, newContent };
     }
 
-    const repoPath = getRepoPath(location);
+    const repoPath = getProjectFsPath(location);
     const [oldContent, newContent] = await Promise.all([
       execGit(location, ["show", `:${filePath}`], { timeout: GIT_DIFF_TIMEOUT }).catch(() => ""),
       readFile(join(repoPath, filePath), "utf-8").catch(() => ""),
@@ -378,7 +378,7 @@ export class GitStatusService {
     location: ProjectLocation,
     filePath: string,
   ): Promise<number> {
-    const absolutePath = join(getRepoPath(location), filePath);
+    const absolutePath = join(getProjectFsPath(location), filePath);
     try {
       const stats = await stat(absolutePath);
       if (!stats.isFile()) {

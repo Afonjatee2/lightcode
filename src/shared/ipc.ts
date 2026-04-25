@@ -20,6 +20,7 @@ import {
   ghCreatePrPayloadSchema,
   ghGetPrChecksPayloadSchema,
   ghGetPrForBranchPayloadSchema,
+  ghMarkPrReadyPayloadSchema,
   ghMergePrPayloadSchema,
   ghReopenPrPayloadSchema,
   gitAbortMergePayloadSchema,
@@ -92,6 +93,7 @@ import type {
   GhGetPrChecksPayload,
   GhGetPrChecksResult,
   GhGetPrForBranchPayload,
+  GhMarkPrReadyPayload,
   GhMergePrPayload,
   GhReopenPrPayload,
   GitAbortMergePayload,
@@ -651,6 +653,11 @@ export const groupedIpcProcedures = {
       "supervisor",
       ghReopenPrPayloadSchema,
     ),
+    ghMarkPrReady: definePayloadProcedure<GhMarkPrReadyPayload, void, "supervisor">(
+      "ghMarkPrReady",
+      "supervisor",
+      ghMarkPrReadyPayloadSchema,
+    ),
     ghGetPrChecks: definePayloadProcedure<GhGetPrChecksPayload, GhGetPrChecksResult, "supervisor">(
       "ghGetPrChecks",
       "supervisor",
@@ -822,6 +829,7 @@ export const ipcProcedureMap = {
   ghMergePr: groupedIpcProcedures.github.ghMergePr,
   ghClosePr: groupedIpcProcedures.github.ghClosePr,
   ghReopenPr: groupedIpcProcedures.github.ghReopenPr,
+  ghMarkPrReady: groupedIpcProcedures.github.ghMarkPrReady,
   ghGetPrChecks: groupedIpcProcedures.github.ghGetPrChecks,
   getSharedSettings: groupedIpcProcedures.settings.getSharedSettings,
   setSharedSettings: groupedIpcProcedures.settings.setSharedSettings,
@@ -989,6 +997,7 @@ export type SupervisorEvent =
   | { type: "windows-agent-statuses"; statuses: AgentStatus[] }
   | { type: "wsl-agent-statuses"; statuses: AgentStatus[] }
   | { type: "git-changed"; projectId: string }
+  | { type: "project-tree-changed"; projectId: string }
   | { type: "lsp-message"; sessionId: string; message: unknown }
   | {
       type: "lsp-status";

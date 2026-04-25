@@ -36,9 +36,9 @@ export interface SupervisorClientOptions {
   supervisorPath: string;
   /**
    * Directory containing the in-WSL helpers shipped with the app
-   * (`watcher.node`, `wsl-watcher.cjs`, `bridge.mjs`). Forwarded to the
-   * supervisor via `LIGHTCODE_WSL_HELPERS_DIR` so both the git watcher and
-   * the CLI hook bridge can stage assets into running distros.
+   * (`watcher.node`, `bridge.mjs`). Forwarded to the supervisor via
+   * `LIGHTCODE_WSL_HELPERS_DIR` so the bridge server can stage assets
+   * into running distros.
    */
   wslHelpersDir: string;
   assignPid?(pid: number): Promise<void>;

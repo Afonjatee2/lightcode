@@ -7,6 +7,7 @@ import {
   themeModeSchema,
   threadRemoveActionSchema,
 } from "./contracts";
+import { DEFAULT_SEARCH_EXCLUDE } from "./searchExclude";
 
 /**
  * Cache entry recording whether a given agent supports the **CLI hook plugin**
@@ -74,6 +75,14 @@ export const sharedSettingsSchema = z.object({
   providerConfigs: z.record(z.string(), providerDraftConfigSchema),
   /** Enable LSP language servers for the file editor (type checking, completions, etc.). */
   editorLspEnabled: z.boolean(),
+  /** When true (VS Code default), the @file mention search honors `.gitignore`. */
+  searchUseIgnoreFiles: z.boolean(),
+  /**
+   * Glob exclusions applied to the @file mention search. Keys are minimatch
+   * globs. `true` keeps the pattern excluded; `false` is reserved for
+   * per-project overrides that re-enable an inherited default.
+   */
+  searchExclude: z.record(z.string(), z.boolean()),
   /**
    * Dev-only: force agents off the CLI hook plugin path (L1) so they fall back
    * to L2 terminal parsing. The UI toggle is only visible in the dev build;
@@ -126,6 +135,8 @@ export const defaultSharedSettings: SharedSettings = {
   gitReviewMode: "panel",
   providerConfigs: {},
   editorLspEnabled: false,
+  searchUseIgnoreFiles: true,
+  searchExclude: { ...DEFAULT_SEARCH_EXCLUDE },
   disableCliHookPlugin: false,
   agentHookSupport: {},
 };

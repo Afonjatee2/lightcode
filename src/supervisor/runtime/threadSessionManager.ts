@@ -97,6 +97,27 @@ function isInterruptibleBusyStatus(status: SessionRuntime["status"]): boolean {
   return status === "working" || status === "needs_approval" || status === "needs_reply";
 }
 
+function getClaudeL2TerminalEnv(input: {
+  agentKind: AgentKind;
+  projectLocation: ProjectLocation;
+  disableCliHookPlugin: boolean;
+  cliHookEnvInjected: boolean;
+}): Record<string, string> {
+  if (input.agentKind !== "claude") {
+    return {};
+  }
+  if (input.projectLocation.kind !== "windows") {
+    return {};
+  }
+  if (!input.disableCliHookPlugin && input.cliHookEnvInjected) {
+    return {};
+  }
+  return {
+    TERM_PROGRAM: "iTerm.app",
+    TERM_PROGRAM_VERSION: "3.6.6",
+  };
+}
+
 export interface ThreadSessionManagerOptions {
   emit(event: SupervisorEvent): void;
   isDev: boolean;
@@ -133,10 +154,20 @@ export class ThreadSessionManager {
       logWriter: this.logWriter,
       resolveLogPath: (threadId) => this.resolveLogPath(threadId),
       resolveHintLogPath: (threadId) => this.resolveHintLogPath(threadId),
+      readDisableCliHookPlugin: () => this.readDisableCliHookPlugin(),
       onRecoverInvalidSessionRef: (session) => this.recoverInvalidSessionRef(session),
       onStartQueuedLaunchPrompt: (session) => this.startQueuedLaunchPrompt(session),
       onStartSessionRefDiscovery: (session) => this.pollSessionRefDiscovery(session),
     });
+  }
+
+  private readDisableCliHookPlugin(): boolean {
+    try {
+      const raw = readFileSync(this.options.settingsPath, "utf8");
+      return normalizeSharedSettings(JSON.parse(raw)).disableCliHookPlugin;
+    } catch {
+      return defaultSharedSettings.disableCliHookPlugin;
+    }
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
@@ -147,7 +178,7 @@ export class ThreadSessionManager {
       config: session.config,
       ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
       canResumeWithConfig: session.canResumeWithConfig,
-      threadStatusSource: resolveThreadStatusSource(session),
+      threadStatusSource: resolveThreadStatusSource(session, this.readDisableCliHookPlugin()),
     }));
   }
 
@@ -810,6 +841,7 @@ export class ThreadSessionManager {
     this.options.emit({ type: "thread-reset", threadId: input.threadId });
 
     const agentEnv = this.resolveAgentProcessEnv(input.adapter);
+    const cliHookEnvInjected = Boolean(input.extraEnv?.LIGHTCODE_HOOK_URL);
     const providerEnv =
       input.projectLocation.kind === "wsl"
         ? input.adapter.spawnEnv?.wsl
@@ -820,6 +852,15 @@ export class ThreadSessionManager {
     if (input.extraEnv) {
       Object.assign(agentEnv, input.extraEnv);
     }
+    Object.assign(
+      agentEnv,
+      getClaudeL2TerminalEnv({
+        agentKind: input.agentKind,
+        projectLocation: input.projectLocation,
+        disableCliHookPlugin: this.readDisableCliHookPlugin(),
+        cliHookEnvInjected,
+      }),
+    );
     const command = injectWslEnv(input.command, input.projectLocation, agentEnv);
     const pty = spawn(command.command, command.args, {
       name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
@@ -832,8 +873,6 @@ export class ThreadSessionManager {
         ...agentEnv,
       },
     });
-
-    const cliHookEnvInjected = Boolean(input.extraEnv?.LIGHTCODE_HOOK_URL);
     const session: SessionRuntime = {
       instanceId: randomUUID(),
       threadId: input.threadId,

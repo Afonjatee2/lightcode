@@ -692,6 +692,7 @@ export function ThreadDraftView(props: {
                 compact={props.compact ?? false}
                 placeholder="Ask LightCode anything, @ to add files, / for commands"
                 projectLocation={project.location}
+                projectId={project.id}
                 onTextChange={(hasText) => {
                   setHasContent(hasText);
                   latestSegmentsRef.current = mentionRef.current?.serializeSegments() ?? [];

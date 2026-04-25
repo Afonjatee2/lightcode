@@ -1,5 +1,5 @@
-import { basename } from "node:path";
 import type { ProjectLocation } from "@/shared/contracts";
+import { getProjectName } from "@/shared/wsl";
 import { readWslLoginShellCommandOutputAsync, resolveAgentHomeSubpath } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 
@@ -54,6 +54,5 @@ export async function queryLatestSessionId(location: ProjectLocation): Promise<s
 }
 
 export function resolveGeminiWatchPath(location: ProjectLocation): string | undefined {
-  const projectName = basename(location.kind === "wsl" ? location.linuxPath : location.path);
-  return resolveAgentHomeSubpath(location, `.gemini/tmp/${projectName}`);
+  return resolveAgentHomeSubpath(location, `.gemini/tmp/${getProjectName(location)}`);
 }

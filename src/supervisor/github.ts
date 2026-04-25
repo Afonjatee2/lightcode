@@ -179,6 +179,14 @@ export class GitHubService {
     }
   }
 
+  async markPrReady(location: ProjectLocation, prNumber: number): Promise<void> {
+    try {
+      await runGh(location, ["pr", "ready", String(prNumber)]);
+    } catch (err) {
+      throw classifyError(err, "pr ready");
+    }
+  }
+
   async getPrChecks(location: ProjectLocation, branch: string): Promise<GhGetPrChecksResult> {
     try {
       const stdout = await runGh(location, [

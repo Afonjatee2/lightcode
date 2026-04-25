@@ -82,6 +82,9 @@ export class GitWorktreeService {
   ): Promise<void> {
     const args = ["push"];
     if (setUpstream) args.push("--set-upstream");
+    if (setUpstream && !branch) {
+      branch = (await this.getCurrentBranch(location)) ?? undefined;
+    }
     args.push(remote);
     if (branch) args.push(branch);
     await execGit(location, args, { timeout: GIT_NETWORK_TIMEOUT });

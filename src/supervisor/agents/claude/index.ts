@@ -1,9 +1,8 @@
 import { randomUUID } from "node:crypto";
 
 import type { PromptSegment } from "@/shared/contracts";
-import type { OscTitle } from "@/shared/osc";
+import type { OscNotification, OscTitle } from "@/shared/osc";
 import {
-  applyTerminalHintToConfig,
   batchWslCommandsAsync,
   createKnownSessionRef,
   detectAgentInstall,
@@ -13,15 +12,12 @@ import {
 } from "../base";
 import { buildClaudeArgs } from "./argv";
 import { claudeCapabilities, claudeDetectionSpec } from "./detection";
-import { detectClaudeTerminalStatus } from "./terminal";
 import {
   getClaudePluginPaths,
   installClaudePlugin,
   isClaudePluginInstalled,
   readBundledClaudePluginVersion,
 } from "./plugin/install";
-
-export { detectClaudeTerminalStatus, detectClaudeModelEffort } from "./terminal";
 
 // Semver comes only from plugin/plugin.json (forward.mjs reads that file too).
 // Bump `MIN_PROTOCOL_VERSION` in src/shared/contracts/agentEvent.ts when the
@@ -46,6 +42,30 @@ const BRAILLE_PREFIX_RE = /^[⠀-⣿]/;
 function claudeOscTitleHint(title: OscTitle): TerminalStatusHint | null {
   if (!BRAILLE_PREFIX_RE.test(title.text)) return null;
   return { status: "working", attention: "working", corroborated: true };
+}
+
+// With `preferredNotifChannel: "iterm2"` (set by the staged settings.json,
+// plugin/install.ts), Claude Code emits the iTerm2 **OSC 9;4 progress
+// sub-protocol** instead of plain-text OSC 9 notifications. Body shape is
+// `4;<state>[;<percent>]` where state is:
+//   0 = remove progress  → idle (turn complete)
+//   1 = set progress %   → working (determinate)
+//   2 = error            → (ignore — no clean mapping)
+//   3 = indeterminate    → working (Claude uses this during a turn)
+//   4 = paused           → (ignore — Claude doesn't emit it in practice)
+// Observed real-world bodies: "4;0;", "4;0;0", "4;3;0".
+const CLAUDE_PROGRESS_RE = /^4;(\d+)/;
+
+function claudeOscHint(notification: OscNotification): TerminalStatusHint | null {
+  if (notification.code !== 9) return null;
+  const match = CLAUDE_PROGRESS_RE.exec(notification.body);
+  if (!match) return null;
+  const state = Number(match[1]);
+  if (state === 0) return { status: "idle", attention: "none", corroborated: true };
+  if (state === 1 || state === 3) {
+    return { status: "working", attention: "working", corroborated: true };
+  }
+  return null;
 }
 
 export function createClaudeAdapter(): AgentAdapter {
@@ -114,11 +134,10 @@ export function createClaudeAdapter(): AgentAdapter {
       const restStr = rest.map((s) => (s.kind === "file" ? `@${s.path}` : s.content)).join("");
       return attachmentLines ? `${restStr}\n\n${attachmentLines} ` : restStr;
     },
-    detectTerminalStatus: detectClaudeTerminalStatus,
+    handleOscNotification: claudeOscHint,
     handleOscTitle: claudeOscTitleHint,
     oscHintsDeferToHookPlugin: true,
     workingSilenceTimeoutMs: null,
-    syncConfigFromTerminalState: applyTerminalHintToConfig,
     defaultOneShotModel: "haiku",
     buildOneShotCommand(model, effort) {
       const args = ["-p", "--model", model];

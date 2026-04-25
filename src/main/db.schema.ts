@@ -10,6 +10,7 @@ export const projects = sqliteTable("projects", {
   locationUncPath: text("location_unc_path"), // for wsl
   lastDraftConfig: text("last_draft_config"), // JSON
   scripts: text("scripts"), // JSON
+  searchSettings: text("search_settings"), // JSON
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at").notNull(),
 });

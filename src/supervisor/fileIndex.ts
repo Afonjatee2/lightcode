@@ -1,12 +1,14 @@
+import micromatch from "micromatch";
 import type {
   FileEntry,
   ProjectLocation,
+  SearchConfigPayload,
   SearchProjectFilesPayload,
   SearchProjectFilesResult,
 } from "@/shared/contracts";
 import { execGit, getLocationIdentity } from "./git";
 
-const MAX_INDEX_SIZE = 25_000;
+const MAX_INDEX_SIZE = 100_000;
 const CACHE_TTL_MS = 15_000;
 const MAX_CACHE_ENTRIES = 4;
 
@@ -15,12 +17,18 @@ interface CachedIndex {
   createdAt: number;
 }
 
+const LEGACY_CONFIG: SearchConfigPayload = {
+  useIgnoreFiles: true,
+  excludePatterns: [],
+};
+
 export class FileIndexService {
   private cache = new Map<string, CachedIndex>();
 
   async searchProjectFiles(payload: SearchProjectFilesPayload): Promise<SearchProjectFilesResult> {
     const { projectLocation, query, limit } = payload;
-    const { entries } = await this.getOrBuildIndex(projectLocation);
+    const config = payload.searchConfig ?? LEGACY_CONFIG;
+    const { entries } = await this.getOrBuildIndex(projectLocation, config);
 
     if (!query) {
       return { entries: entries.slice(0, limit), totalIndexed: entries.length };
@@ -30,8 +38,24 @@ export class FileIndexService {
     return { entries: results, totalIndexed: entries.length };
   }
 
-  private async getOrBuildIndex(location: ProjectLocation): Promise<{ entries: FileEntry[] }> {
-    const key = getLocationIdentity(location);
+  /**
+   * Drop any cached index for the given project location. Called when
+   * search settings change so the next search rebuilds with the new config.
+   */
+  invalidateCacheForLocation(location: ProjectLocation): void {
+    const prefix = `${getLocationIdentity(location)}|`;
+    for (const key of this.cache.keys()) {
+      if (key.startsWith(prefix)) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  private async getOrBuildIndex(
+    location: ProjectLocation,
+    config: SearchConfigPayload,
+  ): Promise<{ entries: FileEntry[] }> {
+    const key = `${getLocationIdentity(location)}|${cacheKeyForConfig(config)}`;
     const cached = this.cache.get(key);
 
     if (cached && Date.now() - cached.createdAt < CACHE_TTL_MS) {
@@ -41,7 +65,7 @@ export class FileIndexService {
       return { entries: cached.entries };
     }
 
-    const entries = await this.buildIndex(location);
+    const entries = await this.buildIndex(location, config);
 
     // Evict oldest if at capacity
     if (this.cache.size >= MAX_CACHE_ENTRIES) {
@@ -53,10 +77,16 @@ export class FileIndexService {
     return { entries };
   }
 
-  private async buildIndex(location: ProjectLocation): Promise<FileEntry[]> {
+  private async buildIndex(
+    location: ProjectLocation,
+    config: SearchConfigPayload,
+  ): Promise<FileEntry[]> {
+    const args = ["ls-files", "--cached", "--others"];
+    if (config.useIgnoreFiles) args.push("--exclude-standard");
+
     let raw: string;
     try {
-      raw = await execGit(location, ["ls-files", "--cached", "--others", "--exclude-standard"]);
+      raw = await execGit(location, args);
     } catch {
       // Not a git repo or git not available
       return [];
@@ -67,6 +97,12 @@ export class FileIndexService {
       .filter(Boolean)
       // Normalize backslashes to forward slashes (some Windows git configs emit backslashes)
       .map((p) => p.replace(/\\/g, "/"));
+
+    if (config.excludePatterns.length > 0) {
+      filePaths = micromatch.not(filePaths, expandDirPatterns(config.excludePatterns), {
+        dot: true,
+      });
+    }
 
     if (filePaths.length > MAX_INDEX_SIZE) {
       filePaths = filePaths.slice(0, MAX_INDEX_SIZE);
@@ -132,4 +168,25 @@ export class FileIndexService {
 
     return scored.slice(0, limit).map((s) => s.entry);
   }
+}
+
+function cacheKeyForConfig(config: SearchConfigPayload): string {
+  const sorted = [...config.excludePatterns].sort().join(",");
+  return `${config.useIgnoreFiles ? "i" : "n"}:${sorted}`;
+}
+
+/**
+ * VS Code's `search.exclude` treats a directory pattern like `**\/node_modules`
+ * as also matching everything beneath it. micromatch does not, so we expand
+ * `P` into `[P, P/**]` unless the pattern already ends in a wildcard segment.
+ */
+function expandDirPatterns(patterns: string[]): string[] {
+  const out: string[] = [];
+  for (const p of patterns) {
+    out.push(p);
+    if (!/(\/\*\*|\*)$/.test(p)) {
+      out.push(`${p}/**`);
+    }
+  }
+  return out;
 }

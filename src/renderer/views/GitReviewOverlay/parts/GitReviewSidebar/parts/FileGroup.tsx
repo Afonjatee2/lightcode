@@ -84,7 +84,7 @@ export function FileGroup(props: {
           <span className="font-normal text-muted/60">({count})</span>
         </button>
         <span className="ml-auto flex items-center gap-0.5">
-          <span className="flex items-center gap-0.5 text-[10px] font-medium font-normal group-hover/header:hidden">
+          <span className="mr-1.5 flex items-center gap-0.5 text-[10px] leading-4 font-medium font-normal group-hover/header:hidden">
             {files.reduce((s, f) => s + f.insertions, 0) > 0 && (
               <span className="text-success">+{files.reduce((s, f) => s + f.insertions, 0)}</span>
             )}

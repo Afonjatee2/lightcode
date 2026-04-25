@@ -9,12 +9,9 @@ import {
 import type { ProjectLocation } from "@/shared/contracts";
 import type { LspSessionStatus } from "@/shared/lsp";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { getProjectFsPath } from "@/shared/wsl";
+import { quotePosixShellArg, resolveWslShellPath } from "../agents/base";
 import type { LanguageServerConfig } from "./serverRegistry";
-
-function getProjectRootPath(location: ProjectLocation): string {
-  if (location.kind === "wsl") return location.uncPath;
-  return location.path;
-}
 
 function getRootUri(location: ProjectLocation): string {
   if (location.kind === "wsl") return `file:///${location.linuxPath}`;
@@ -22,10 +19,25 @@ function getRootUri(location: ProjectLocation): string {
   return `file:///${absPath}`;
 }
 
-/** Try to resolve a command, checking project-local paths first. */
-function resolveCommand(cmd: string, projectRoot: string): string {
+/**
+ * For native projects, resolve `node_modules/...` against the project root
+ * so we pick up a locally-installed server before a global one.
+ */
+function resolveNativeCommand(cmd: string, projectRoot: string): string {
   if (cmd.startsWith("node_modules/")) {
     return resolve(projectRoot, cmd);
+  }
+  return cmd;
+}
+
+/**
+ * Build a POSIX-style absolute path for a `node_modules/...` command inside
+ * the distro. `path.resolve` is Windows-biased on win32 hosts (it prepends
+ * a drive letter), so we do a string join instead.
+ */
+function resolveWslCommand(cmd: string, linuxPath: string): string {
+  if (cmd.startsWith("node_modules/")) {
+    return `${linuxPath}/${cmd}`;
   }
   return cmd;
 }
@@ -48,19 +60,22 @@ export class ServerInstance {
     if (this.disposed) return;
     this.onStatus("starting");
 
-    const projectRoot = getProjectRootPath(this.projectLocation);
+    const projectRoot = getProjectFsPath(this.projectLocation);
     let spawned = false;
 
     for (const candidate of this.config.commands) {
       try {
-        const cmd = resolveCommand(candidate.command, projectRoot);
         const isWsl = this.projectLocation.kind === "wsl";
 
         let proc: ChildProcess;
         if (isWsl) {
-          const wslCmd = candidate.command.startsWith("node_modules/")
-            ? resolve(this.projectLocation.linuxPath, candidate.command)
-            : candidate.command;
+          const wslCmd = resolveWslCommand(candidate.command, this.projectLocation.linuxPath);
+          // Route through the user's actual login shell (bash / zsh / fish /
+          // whatever their passwd entry says) so nvm / fnm / user PATH is
+          // sourced — otherwise `typescript-language-server` et al. installed
+          // via nvm are invisible.
+          const shellPath = resolveWslShellPath(this.projectLocation.distro);
+          const shellCmd = [wslCmd, ...candidate.args].map(quotePosixShellArg).join(" ");
           proc = spawn(
             "wsl.exe",
             [
@@ -69,12 +84,15 @@ export class ServerInstance {
               "--cd",
               this.projectLocation.linuxPath,
               "--",
-              wslCmd,
-              ...candidate.args,
+              shellPath,
+              "-l",
+              "-c",
+              `exec ${shellCmd}`,
             ],
             { stdio: ["pipe", "pipe", "pipe"] },
           );
         } else {
+          const cmd = resolveNativeCommand(candidate.command, projectRoot);
           proc = spawn(cmd, candidate.args, {
             cwd: projectRoot,
             stdio: ["pipe", "pipe", "pipe"],

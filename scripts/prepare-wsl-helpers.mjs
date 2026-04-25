@@ -1,21 +1,18 @@
 /**
  * Stages every Node helper that we run *inside* a WSL distro into
  * `resources/wsl-helpers/` so electron-builder can bundle them as
- * extraResources. Two consumers ride this pipeline today:
+ * extraResources. Two artefacts ride this pipeline:
  *
- *   1. Git/file watcher:
- *        - `watcher.node` — @parcel/watcher Linux x64 native binding,
- *          downloaded via `npm pack` (no .npmrc / platform override needed)
- *        - `wsl-watcher.cjs` — committed in this repo; no build action needed
- *          beyond ensuring the dest dir exists
+ *   1. `watcher.node` — @parcel/watcher Linux x64 native binding,
+ *      downloaded via `npm pack`. Loaded by `bridge.mjs` for watch
+ *      subscriptions.
+ *   2. `bridge.mjs` — the in-distro server (hook ingress + /v1/fs/*
+ *      + /v1/watch/*). Copied from `src/supervisor/wsl/bridge/bridge.mjs`.
  *
- *   2. CLI hook bridge:
- *        - `bridge.mjs` — copied from the canonical source at
- *          `src/supervisor/wsl/bridge/bridge.mjs`
- *
- * The script is idempotent: presence + non-zero size on `watcher.node` skips
- * the download, and `bridge.mjs` is only re-copied when missing or stale
- * (size/mtime mismatch).
+ * Idempotency: presence + non-zero size on `watcher.node` skips the
+ * `npm pack` download. `bridge.mjs` is always copied — the copy is <1ms
+ * and avoids the stale-resources trap where a preserved-size edit would
+ * otherwise be silently skipped.
  */
 
 import { execSync } from "node:child_process";
@@ -76,14 +73,10 @@ function stageHookBridge() {
     throw new Error(`hook bridge source missing: ${src}`);
   }
   const dest = join(destDir, "bridge.mjs");
-  if (existsSync(dest)) {
-    const sourceStat = statSync(src);
-    const destStat = statSync(dest);
-    if (sourceStat.size === destStat.size && sourceStat.mtimeMs <= destStat.mtimeMs) {
-      console.log("[prepare-wsl-helpers] bridge.mjs up to date, skipping");
-      return;
-    }
-  }
+  // Always copy. The previous size+mtime heuristic wrongly reported "up to
+  // date" after partial restages or after edits that preserved file size,
+  // leaving a stale bridge in `resources/` that then deploys into distros.
+  // File copy is <1ms and idempotent — the simpler rule is correct.
   copyFileSync(src, dest);
   console.log(`[prepare-wsl-helpers] bridge.mjs -> ${dest}`);
 }

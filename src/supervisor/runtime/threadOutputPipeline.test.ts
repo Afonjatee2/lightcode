@@ -9,6 +9,7 @@ function pipeline() {
     logWriter: { append: vi.fn<() => void>() } as never,
     resolveLogPath: () => "",
     resolveHintLogPath: () => "",
+    readDisableCliHookPlugin: () => false,
     onRecoverInvalidSessionRef: vi.fn<() => void>(),
     onStartQueuedLaunchPrompt: vi.fn<() => void>(),
     onStartSessionRefDiscovery: vi.fn<() => void>(),
@@ -50,6 +51,19 @@ describe("resolveThreadStatusSource", () => {
         adapter: { capabilities: { presentationMode: "terminal" } },
       } as never),
     ).toBe("cli_hook");
+  });
+
+  it("returns terminal_parse when dev toggle disables L1, even with hook env injected", () => {
+    expect(
+      resolveThreadStatusSource(
+        {
+          cliHookEnvInjected: true,
+          hasCliHookPluginActivity: true,
+          adapter: { capabilities: { presentationMode: "terminal" } },
+        } as never,
+        true,
+      ),
+    ).toBe("terminal_parse");
   });
 });
 
@@ -111,6 +125,7 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
       logWriter: { append: vi.fn<() => void>() } as never,
       resolveLogPath: () => "",
       resolveHintLogPath: () => "",
+      readDisableCliHookPlugin: () => false,
       onRecoverInvalidSessionRef: vi.fn<() => void>(),
       onStartQueuedLaunchPrompt: vi.fn<() => void>(),
       onStartSessionRefDiscovery: vi.fn<() => void>(),
@@ -153,6 +168,7 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
       logWriter: { append: vi.fn<() => void>() } as never,
       resolveLogPath: () => "",
       resolveHintLogPath: () => "",
+      readDisableCliHookPlugin: () => false,
       onRecoverInvalidSessionRef: vi.fn<() => void>(),
       onStartQueuedLaunchPrompt: vi.fn<() => void>(),
       onStartSessionRefDiscovery: vi.fn<() => void>(),

@@ -71,7 +71,7 @@ export function FileRow(props: {
           <FileStatusBadge status={file.status} />
         </span>
         <span className="relative w-14 shrink-0">
-          <span className="flex items-center justify-end text-[10px] font-medium transition-opacity group-hover:opacity-0">
+          <span className="flex items-center justify-end text-[10px] leading-4 font-medium transition-opacity group-hover:opacity-0">
             {file.insertions > 0 && <span className="text-success">+{file.insertions}</span>}
             {file.deletions > 0 && <span className="ml-0.5 text-danger">-{file.deletions}</span>}
           </span>

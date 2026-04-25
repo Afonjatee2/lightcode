@@ -3,6 +3,7 @@ import type {
   ProjectDraftConfig,
   ProjectLocation,
   ProjectScripts,
+  ProjectSearchSettings,
   AppView,
 } from "@/shared/contracts";
 import { isDraftPaneId, parseDraftProjectId } from "@/shared/paneId";
@@ -17,6 +18,10 @@ export interface ProjectSlice {
   deleteProject: (projectId: string) => void;
   updateProjectDraftConfig: (projectId: string, draftConfig: ProjectDraftConfig) => void;
   updateProjectScripts: (projectId: string, scripts: ProjectScripts) => void;
+  updateProjectSearchSettings: (
+    projectId: string,
+    searchSettings: ProjectSearchSettings | undefined,
+  ) => void;
   renameProject: (projectId: string, name: string) => void;
   reorderProjects: (sourceId: string, targetId: string, placement: ReorderPlacement) => void;
 }
@@ -101,6 +106,17 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
       projects: state.projects.map((project) =>
         project.id === projectId ? { ...project, scripts } : project,
       ),
+    })),
+  updateProjectSearchSettings: (projectId, searchSettings) =>
+    set((state) => ({
+      projects: state.projects.map((project) => {
+        if (project.id !== projectId) return project;
+        if (!searchSettings) {
+          const { searchSettings: _, ...rest } = project;
+          return rest;
+        }
+        return { ...project, searchSettings };
+      }),
     })),
   renameProject: (projectId, name) =>
     set((state) => ({

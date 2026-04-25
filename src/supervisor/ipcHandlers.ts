@@ -66,6 +66,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     ghMergePr: (payload) => runtime.ghMergePr(payload),
     ghClosePr: (payload) => runtime.ghClosePr(payload),
     ghReopenPr: (payload) => runtime.ghReopenPr(payload),
+    ghMarkPrReady: (payload) => runtime.ghMarkPrReady(payload),
     ghGetPrChecks: (payload) => runtime.ghGetPrChecks(payload),
     lspStart: (payload) => runtime.lspStart(payload),
     lspStop: (payload) => runtime.lspStop(payload),

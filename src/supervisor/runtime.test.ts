@@ -744,6 +744,309 @@ describe("writeSubmittedPrompt", () => {
     });
   });
 
+  it("spoofs an iTerm terminal for Claude only when running on L2", () => {
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+    writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
+
+    const runtime = new SupervisorRuntime(() => undefined);
+    const pty = createMockPty();
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: { kind: "windows"; path: string };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          command: { command: string; args: string[] };
+        }) => unknown;
+      }
+    ).spawnThread({
+      threadId: "thread-claude-l2",
+      agentKind: "claude",
+      adapter: {
+        kind: "claude",
+        label: "Claude Code",
+        capabilities: {
+          models: [{ id: "sonnet", label: "Sonnet" }],
+          efforts: ["medium"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+        },
+        createInitialSessionRef: vi.fn<() => undefined>().mockReturnValue(undefined),
+        buildLaunchArgv: vi.fn<() => void>(),
+        buildResumeArgv: vi.fn<() => void>(),
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      config: {
+        model: "sonnet",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      command: {
+        command: "claude",
+        args: [],
+      },
+    });
+
+    const [, , spawnOpts] = ptySpawnMock.mock.calls[0] as [
+      string,
+      string[],
+      { env: Record<string, string> },
+    ];
+    expect(spawnOpts.env.TERM_PROGRAM).toBe("iTerm.app");
+    expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBe("3.6.6");
+  });
+
+  it("does not spoof an iTerm terminal for Claude while hooks are active", () => {
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+    writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
+
+    const runtime = new SupervisorRuntime(() => undefined);
+    const pty = createMockPty();
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: { kind: "windows"; path: string };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          command: { command: string; args: string[] };
+          extraEnv: Record<string, string>;
+        }) => unknown;
+      }
+    ).spawnThread({
+      threadId: "thread-claude-hooks",
+      agentKind: "claude",
+      adapter: {
+        kind: "claude",
+        label: "Claude Code",
+        capabilities: {
+          models: [{ id: "sonnet", label: "Sonnet" }],
+          efforts: ["medium"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+        },
+        createInitialSessionRef: vi.fn<() => undefined>().mockReturnValue(undefined),
+        buildLaunchArgv: vi.fn<() => void>(),
+        buildResumeArgv: vi.fn<() => void>(),
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      config: {
+        model: "sonnet",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      command: {
+        command: "claude",
+        args: [],
+      },
+      extraEnv: {
+        LIGHTCODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event",
+      },
+    });
+
+    const [, , spawnOpts] = ptySpawnMock.mock.calls[0] as [
+      string,
+      string[],
+      { env: Record<string, string> },
+    ];
+    expect(spawnOpts.env.TERM_PROGRAM).toBeUndefined();
+    expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBeUndefined();
+  });
+
+  it("spoofs an iTerm terminal for Claude when hooks are injected but L1 is disabled", () => {
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+    writeFileSync(
+      resolveLightcodePaths(dataDir).settingsPath,
+      JSON.stringify({ disableCliHookPlugin: true }),
+      "utf8",
+    );
+
+    const runtime = new SupervisorRuntime(() => undefined);
+    const pty = createMockPty();
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: { kind: "windows"; path: string };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          command: { command: string; args: string[] };
+          extraEnv: Record<string, string>;
+        }) => unknown;
+      }
+    ).spawnThread({
+      threadId: "thread-claude-l2-with-hooks",
+      agentKind: "claude",
+      adapter: {
+        kind: "claude",
+        label: "Claude Code",
+        capabilities: {
+          models: [{ id: "sonnet", label: "Sonnet" }],
+          efforts: ["medium"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+        },
+        createInitialSessionRef: vi.fn<() => undefined>().mockReturnValue(undefined),
+        buildLaunchArgv: vi.fn<() => void>(),
+        buildResumeArgv: vi.fn<() => void>(),
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      config: {
+        model: "sonnet",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      command: {
+        command: "claude",
+        args: [],
+      },
+      extraEnv: {
+        LIGHTCODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event",
+      },
+    });
+
+    const [, , spawnOpts] = ptySpawnMock.mock.calls[0] as [
+      string,
+      string[],
+      { env: Record<string, string> },
+    ];
+    expect(spawnOpts.env.TERM_PROGRAM).toBe("iTerm.app");
+    expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBe("3.6.6");
+  });
+
+  it("does not spoof an iTerm terminal for Claude in WSL L2 sessions", () => {
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+    writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
+
+    const runtime = new SupervisorRuntime(() => undefined);
+    const pty = createMockPty();
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: {
+            kind: "wsl";
+            distro: string;
+            linuxPath: string;
+            uncPath: string;
+          };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          command: { command: string; args: string[] };
+        }) => unknown;
+      }
+    ).spawnThread({
+      threadId: "thread-claude-wsl-l2",
+      agentKind: "claude",
+      adapter: {
+        kind: "claude",
+        label: "Claude Code",
+        capabilities: {
+          models: [{ id: "sonnet", label: "Sonnet" }],
+          efforts: ["medium"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+        },
+        createInitialSessionRef: vi.fn<() => undefined>().mockReturnValue(undefined),
+        buildLaunchArgv: vi.fn<() => void>(),
+        buildResumeArgv: vi.fn<() => void>(),
+      },
+      projectLocation: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/repo",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\repo",
+      },
+      config: {
+        model: "sonnet",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      command: {
+        command: "C:\\Windows\\System32\\wsl.exe",
+        args: ["-d", "Ubuntu", "--cd", "/home/demo/repo"],
+      },
+    });
+
+    const [, , spawnOpts] = ptySpawnMock.mock.calls[0] as [
+      string,
+      string[],
+      { env: Record<string, string> },
+    ];
+    expect(spawnOpts.env.TERM_PROGRAM).toBeUndefined();
+    expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBeUndefined();
+  });
+
   it("does not eagerly start a queued Codex turn during thread startup", async () => {
     const runtime = new SupervisorRuntime(() => undefined);
     const pty = createMockPty();

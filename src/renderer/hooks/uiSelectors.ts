@@ -52,11 +52,14 @@ function isTerminalEclipsedOnRight(
   return terminalPosition === "right" && rightPanelTab !== "terminal";
 }
 
-function isGitPanelEclipsedOnRight(
+export function isGitPanelEclipsed(
   terminalPosition: "right" | "bottom",
   rightPanelTab: string,
+  hasFilesPanel: boolean,
 ): boolean {
-  return terminalPosition === "right" && rightPanelTab !== "git";
+  if (terminalPosition === "right") return rightPanelTab !== "git";
+  // Bottom-terminal layout: git shares the side slot with files, files takes precedence.
+  return rightPanelTab === "files" && hasFilesPanel;
 }
 
 export function useIsProjectTerminalActive(projectId: string): boolean {
@@ -95,7 +98,7 @@ export function useIsProjectGitPanelActive(projectId: string): boolean {
   return usePanelStore((s) => {
     const ctx = s.gitReviewContext;
     if (!ctx || !s.gitReviewAsPanel) return false;
-    if (isGitPanelEclipsedOnRight(terminalPosition, s.rightPanelTab)) return false;
+    if (isGitPanelEclipsed(terminalPosition, s.rightPanelTab, !!s.filesPanelContext)) return false;
     return ctx.projectId === projectId && !ctx.worktreePath;
   });
 }
@@ -106,7 +109,7 @@ export function useIsWorktreeGitPanelActive(worktreePath: string | null | undefi
     if (!worktreePath) return false;
     const ctx = s.gitReviewContext;
     if (!ctx || !s.gitReviewAsPanel) return false;
-    if (isGitPanelEclipsedOnRight(terminalPosition, s.rightPanelTab)) return false;
+    if (isGitPanelEclipsed(terminalPosition, s.rightPanelTab, !!s.filesPanelContext)) return false;
     return ctx.worktreePath === worktreePath;
   });
 }
