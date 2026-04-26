@@ -22,6 +22,7 @@ import { GitReviewSidebar } from "./GitReviewSidebar/GitReviewSidebar";
 const alwaysExpanded = {
   isCollapsed: false,
   isOverlay: false,
+  closingOverlay: false,
   collapse: () => {},
   expand: () => {},
 };

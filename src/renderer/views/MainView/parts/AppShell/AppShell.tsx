@@ -8,6 +8,8 @@ import { GitAsideSlot } from "./parts/GitAsideSlot";
 interface SidebarContextValue {
   isCollapsed: boolean;
   isOverlay: boolean;
+  /** When true, overlay sidebar is animating closed — show expanded header actions in the title row. */
+  closingOverlay: boolean;
   collapse: () => void;
   expand: () => void;
 }
@@ -15,6 +17,7 @@ interface SidebarContextValue {
 export const SidebarContext = createContext<SidebarContextValue>({
   isCollapsed: false,
   isOverlay: false,
+  closingOverlay: false,
   collapse: () => {},
   expand: () => {},
 });
@@ -27,21 +30,12 @@ export function AppShell(props: {
   sidebar: ReactNode;
   content: ReactNode;
   sidebarHeader?: ReactNode;
-  collapsedSidebarHeader?: ReactNode;
   contentHeader?: ReactNode;
   rightPanel?: ReactNode;
   gitPanel?: ReactNode;
   onRequestClosePanels?: () => void;
 }) {
-  const {
-    sidebar,
-    content,
-    sidebarHeader,
-    collapsedSidebarHeader,
-    contentHeader,
-    rightPanel,
-    gitPanel,
-  } = props;
+  const { sidebar, content, sidebarHeader, contentHeader, rightPanel, gitPanel } = props;
   const terminalPosition = useSharedSettings((s) => s.terminalPosition);
 
   const mainRef = useRef<HTMLElement>(null);
@@ -92,7 +86,7 @@ export function AppShell(props: {
   const hasHeaders = sidebarHeader != null || contentHeader != null;
 
   return (
-    <SidebarContext.Provider value={{ isCollapsed, isOverlay, collapse, expand }}>
+    <SidebarContext.Provider value={{ isCollapsed, isOverlay, closingOverlay, collapse, expand }}>
       <div
         ref={shellRef}
         className={`lightcode-shell flex h-full min-h-0 overflow-hidden bg-background text-foreground ${isResizing ? "select-none" : ""}`}
@@ -132,7 +126,7 @@ export function AppShell(props: {
                 ...(isCollapsed && !closingOverlay ? {} : { minWidth: SIDEBAR_MIN_WIDTH }),
               }}
             >
-              {isCollapsed && !closingOverlay ? collapsedSidebarHeader : sidebarHeader}
+              {sidebarHeader}
             </div>
           )}
           <div

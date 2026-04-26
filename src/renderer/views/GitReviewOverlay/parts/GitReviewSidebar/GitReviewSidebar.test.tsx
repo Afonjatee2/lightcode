@@ -178,6 +178,7 @@ vi.mock("@/renderer/components/common", async (importOriginal) => {
 vi.mock("@/renderer/views/MainView/parts/AppShell/AppShell", () => ({
   useSidebar: () => ({
     isCollapsed: false,
+    closingOverlay: false,
     isOverlay: false,
     collapse: () => undefined,
     expand: () => undefined,

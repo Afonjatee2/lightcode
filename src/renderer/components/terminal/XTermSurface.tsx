@@ -215,7 +215,7 @@ export const XTermSurface = forwardRef<
       scrollback: 5_000,
       scrollSensitivity: useSharedSettings.getState().scrollSpeed,
       fastScrollSensitivity: 10,
-      fontSize: 13,
+      fontSize: 12,
       fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
       theme: getTerminalTheme(appearance),
       // OSC 8 hyperlinks (e.g. Next.js' "Local: http://localhost:3000" in WSL

@@ -19,6 +19,7 @@ import {
   GitPullRequest,
   PanelLeft,
   PanelLeftClose,
+  House,
   Pencil,
   Play,
   Plus,
@@ -28,9 +29,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { TuxIcon } from "@/renderer/components/common/TuxIcon";
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
+import { getAppName } from "@/shared/appName";
 import type { AgentStatus, Project, Thread } from "@/shared/contracts";
 import { useShallow } from "zustand/shallow";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -1506,6 +1508,8 @@ export function Sidebar() {
   };
 
   const { isCollapsed, collapse, expand } = useSidebar();
+  const openHome = useAppStore((s) => s.openHome);
+  const appNameForHome = getAppName(import.meta.env.DEV);
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>(() => {
     try {
       const raw = localStorage.getItem("lightcode-collapsed-projects");
@@ -1564,6 +1568,14 @@ export function Sidebar() {
       {/* Collapsed icon rail overlay — width 48px, icons centered at 24px (pl-2 + w-8/2) */}
       {isCollapsed && (
         <div className="absolute inset-y-0 left-0 z-10 flex h-full min-h-0 w-12 flex-col items-start gap-3 pl-2 pb-1 pt-0">
+          <div className="shrink-0">
+            <SidebarButton
+              iconOnly
+              icon={<House className="size-3.5" />}
+              label={appNameForHome}
+              onPress={() => startTransition(() => openHome())}
+            />
+          </div>
           {/* Thread icons — only active threads */}
           <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
             {activeThreads.map((thread) => (

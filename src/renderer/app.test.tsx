@@ -106,6 +106,7 @@ vi.mock("./views/MainView/parts/AppShell/AppShell", () => ({
   ),
   useSidebar: () => ({
     isCollapsed: false,
+    closingOverlay: false,
     isOverlay: false,
     collapse: () => {},
     expand: () => {},

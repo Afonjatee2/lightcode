@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
-import { Button, Popover, Tooltip } from "@heroui/react";
-import { EllipsisVertical, House } from "lucide-react";
+import { Button, Tooltip } from "@heroui/react";
+import { House } from "lucide-react";
 import { isMac } from "@/renderer/bridge";
-import { AppShell } from "@/renderer/views/MainView/parts/AppShell/AppShell";
+import { AppShell, useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 
 /** When the sidebar header content is narrower than this, hide the wordmark. */
 const SIDEBAR_HEADER_WORDMARK_MIN_PX = 210;
@@ -62,8 +62,10 @@ function SidebarHeaderRow(props: {
   onTitleClick?: () => void;
   children?: ReactNode;
 }) {
+  const { isCollapsed, closingOverlay } = useSidebar();
   const ref = useRef<HTMLDivElement>(null);
   const [hideWordmark, setHideWordmark] = useState(false);
+  const showHeaderActions = !isCollapsed || closingOverlay;
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -87,7 +89,7 @@ function SidebarHeaderRow(props: {
         {...(props.onTitleClick != null ? { onTitleClick: props.onTitleClick } : {})}
         hideWordmark={hideWordmark}
       />
-      {props.children}
+      {showHeaderActions ? props.children : null}
       <div className="flex-1" />
     </div>
   );
@@ -126,33 +128,11 @@ export function PageLayout(props: {
     </SidebarHeaderRow>
   );
 
-  const collapsedSidebarHeader = sidebarHeaderChildren ? (
-    <div className="flex w-full justify-center">
-      <Popover>
-        <Button
-          isIconOnly
-          size="sm"
-          variant="ghost"
-          aria-label="Sidebar actions"
-          className="lightcode-overlay-header__controls size-6 min-w-0 text-muted hover:text-foreground"
-        >
-          <EllipsisVertical className="size-3.5" />
-        </Button>
-        <Popover.Content placement="right" className="w-auto p-0">
-          <Popover.Dialog className="flex items-center gap-1 p-2">
-            {sidebarHeaderChildren}
-          </Popover.Dialog>
-        </Popover.Content>
-      </Popover>
-    </div>
-  ) : undefined;
-
   const contentHeader = <>{contentHeaderChildren}</>;
 
   return (
     <AppShell
       sidebarHeader={sidebarHeader}
-      collapsedSidebarHeader={collapsedSidebarHeader}
       contentHeader={contentHeader}
       sidebar={sidebar}
       content={content}
