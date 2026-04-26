@@ -160,14 +160,18 @@ export function AppContent() {
     const project = storeProjects.find((p) => p.id === sourceThread.projectId);
     if (!project) return;
 
-    const groupId = sourceThread.groupId ?? crypto.randomUUID();
-    const groupName = sourceThread.groupName ?? sourceThread.title;
-    if (!sourceThread.groupId) {
-      useAppStore.setState((state) => ({
-        threads: state.threads.map((t) =>
-          t.id === sourceThread.id ? { ...t, groupId, groupName } : t,
-        ),
-      }));
+    let groupId: string | undefined;
+    let groupName: string | undefined;
+    if (!closeOriginal) {
+      groupId = sourceThread.groupId ?? crypto.randomUUID();
+      groupName = sourceThread.groupName ?? sourceThread.title;
+      if (!sourceThread.groupId) {
+        useAppStore.setState((state) => ({
+          threads: state.threads.map((t) =>
+            t.id === sourceThread.id ? { ...t, groupId, groupName } : t,
+          ),
+        }));
+      }
     }
 
     const thread = createThread({
@@ -177,8 +181,8 @@ export function AppContent() {
       prompt: extractedContext ? "Continuing task from another provider..." : sourceThread.title,
       ...(sourceThread.worktreePath ? { worktreePath: sourceThread.worktreePath } : {}),
       ...(sourceThread.worktreeBranch ? { worktreeBranch: sourceThread.worktreeBranch } : {}),
-      groupId,
-      groupName,
+      ...(groupId ? { groupId } : {}),
+      ...(groupName ? { groupName } : {}),
     });
 
     if (extractedContext) {
@@ -203,7 +207,15 @@ export function AppContent() {
       readBridge()
         .closeThread({ threadId: sourceThread.id })
         .catch(() => {});
-      useAppStore.getState().openThread(thread.id);
+      const store = useAppStore.getState();
+      const sourceVisible =
+        store.view.kind === "thread" && store.view.panes.includes(sourceThread.id);
+      if (sourceVisible) {
+        store.replacePaneId(sourceThread.id, thread.id);
+      } else {
+        store.openThread(thread.id);
+      }
+      useAppStore.getState().markThreadDone(sourceThread.id);
     } else {
       useAppStore.getState().openThreadSideBySide(thread.id);
     }

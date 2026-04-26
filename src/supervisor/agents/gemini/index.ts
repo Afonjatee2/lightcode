@@ -1,4 +1,5 @@
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
+import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import {
   createKnownSessionRef,
   createRecursiveDirWatcher,
@@ -89,19 +90,22 @@ export function createGeminiAdapter(): AgentAdapter {
       return createRecursiveDirWatcher(watchPath, onChanged, `gemini:${location.kind}`);
     },
 
-    buildOneShotCommand(model, _effort) {
-      return { command: "gemini", args: ["-p", "--model", model] };
+    buildOneShotCommand(model, _effort, prompt) {
+      if (!prompt) return undefined;
+      return { command: "gemini", args: ["-p", prompt, "--model", model], stdin: "" };
     },
     buildContextExtractionCommand(sessionRef, _location, model) {
       return {
         command: "gemini",
         args: [
           "-p",
+          EXTRACTION_PROMPT,
           "--resume",
           sessionRef.providerSessionId,
           "--model",
           model ?? "gemini-2.5-flash",
         ],
+        stdin: "",
       };
     },
   };
