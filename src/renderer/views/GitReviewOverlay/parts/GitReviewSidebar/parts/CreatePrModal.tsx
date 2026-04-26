@@ -105,7 +105,7 @@ export function CreatePrModal(props: {
                     onPress={() => void handleGeneratePrSummary()}
                     className="mt-0.5 shrink-0"
                   >
-                    {isGeneratingPr ? <PixelLoader size="sm" /> : <Sparkles className="size-3.5" />}
+                    {isGeneratingPr ? <PixelLoader size="xs" /> : <Sparkles className="size-3.5" />}
                   </Button>
                   <Tooltip.Content>Generate with AI</Tooltip.Content>
                 </Tooltip>
@@ -132,7 +132,7 @@ export function CreatePrModal(props: {
                 {({ isPending }) => (
                   <>
                     {isPending ? (
-                      <PixelLoader size="sm" />
+                      <PixelLoader size="xs" />
                     ) : (
                       <GitPullRequest className="size-3.5" />
                     )}

@@ -79,7 +79,7 @@ export function CommitSyncPanel(props: {
           >
             {({ isPending }) => (
               <>
-                {isPending ? <PixelLoader size="sm" /> : <Check className="size-3.5" />}
+                {isPending ? <PixelLoader size="xs" /> : <Check className="size-3.5" />}
                 Finish Merge
               </>
             )}
@@ -93,7 +93,7 @@ export function CommitSyncPanel(props: {
           >
             {({ isPending }) => (
               <>
-                {isPending && <PixelLoader size="sm" />}
+                {isPending && <PixelLoader size="xs" />}
                 Abort Merge
               </>
             )}
@@ -135,7 +135,7 @@ export function CommitSyncPanel(props: {
                   onPress={() => void handleGenerateMessage()}
                 >
                   {({ isPending }) =>
-                    isPending ? <PixelLoader size="sm" /> : <Sparkles className="size-3.5" />
+                    isPending ? <PixelLoader size="xs" /> : <Sparkles className="size-3.5" />
                   }
                 </Button>
                 <Tooltip.Content>Generate commit message</Tooltip.Content>
@@ -153,7 +153,7 @@ export function CommitSyncPanel(props: {
             >
               {({ isPending }) => (
                 <>
-                  {isPending ? <PixelLoader size="sm" /> : <Lock className="size-3.5" />}
+                  {isPending ? <PixelLoader size="xs" /> : <Lock className="size-3.5" />}
                   Commit
                 </>
               )}
@@ -208,7 +208,7 @@ export function CommitSyncPanel(props: {
             {({ isPending }) => (
               <>
                 {isPending ? (
-                  <PixelLoader size="sm" />
+                  <PixelLoader size="xs" />
                 ) : needsPush ? (
                   <ArrowUp className="size-3.5" />
                 ) : (

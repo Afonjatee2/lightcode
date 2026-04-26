@@ -44,7 +44,7 @@ export function ConflictResolutionActions(props: {
         >
           {({ isPending }) => (
             <>
-              {isPending ? <PixelLoader size="sm" /> : <GitMerge className="size-3.5" />}
+              {isPending ? <PixelLoader size="xs" /> : <GitMerge className="size-3.5" />}
               Mergetool
             </>
           )}
@@ -60,7 +60,7 @@ export function ConflictResolutionActions(props: {
       >
         {({ isPending }) => (
           <>
-            {isPending && <PixelLoader size="sm" />}
+            {isPending && <PixelLoader size="xs" />}
             Abort Merge
           </>
         )}

@@ -247,7 +247,7 @@ function TreeChildren(props: {
           className="flex items-center gap-1.5 px-2 py-0.5 text-xs text-muted"
           style={{ paddingLeft: `${depth * 14 + 8}px` }}
         >
-          <PixelLoader size="sm" />
+          <PixelLoader size="xs" />
           Loading…
         </div>
       ) : (

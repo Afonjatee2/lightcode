@@ -376,7 +376,7 @@ export function BranchSelector(props: BranchSelectorProps) {
                             {({ isSelected }) => {
                               const isDeleting = deletingBranch === branch.name;
                               if (isDeleting) {
-                                return <PixelLoader size="sm" className="text-muted" />;
+                                return <PixelLoader size="xs" className="text-muted" />;
                               }
                               return canDelete ? (
                                 <>

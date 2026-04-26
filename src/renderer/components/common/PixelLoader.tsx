@@ -53,10 +53,19 @@ const PATTERNS: Record<string, Frames> = {
 
 const KEYS = Object.keys(PATTERNS);
 
-const SIZES = { sm: 14, md: 20, lg: 32 } as const;
+/** Same Tailwind `size-*` utilities used with Lucide (`<Icon className="size-4" />`). */
+const ICON_SIZE_CLASS = {
+  xs: "size-3.5",
+  sm: "size-4",
+  md: "size-6",
+  lg: "size-8",
+} as const;
+
+/** Internal square; CSS `size-*` on the svg scales this uniformly (like Lucide viewBox scaling). */
+const VIEWBOX = 100;
 
 export interface PixelLoaderProps {
-  size?: "sm" | "md" | "lg";
+  size?: keyof typeof ICON_SIZE_CLASS;
   color?: string;
   pattern?: keyof typeof PATTERNS;
   speed?: number;
@@ -84,22 +93,22 @@ export function PixelLoader({
     return () => clearInterval(id);
   }, [frames.length, speed]);
 
-  const s = SIZES[size];
+  const s = VIEWBOX;
   const gap = Math.round(s * 0.1);
   const cell = (s - gap * 2) / 3;
   const active = new Set(frames[frame]);
   const fill = color ?? "currentColor";
   const innerBlur = Math.max(1, cell * 0.5);
   const outerBlur = Math.max(2, cell * 1.2);
+  const sizeClass = ICON_SIZE_CLASS[size];
+  const mergedClass = [sizeClass, "shrink-0", className].filter(Boolean).join(" ");
 
   return (
     <svg
-      width={s}
-      height={s}
       viewBox={`0 0 ${s} ${s}`}
       overflow="visible"
-      className={className}
-      style={{ flexShrink: 0, ...style }}
+      className={mergedClass}
+      style={style}
       aria-label="Loading"
       role="img"
     >

@@ -60,7 +60,7 @@ export function PrSection(props: {
           >
             {({ isPending }) => (
               <>
-                {isPending ? <PixelLoader size="sm" /> : <CheckCircle2 className="size-3.5" />}
+                {isPending ? <PixelLoader size="xs" /> : <CheckCircle2 className="size-3.5" />}
                 Ready for Review
               </>
             )}
@@ -101,7 +101,7 @@ export function PrSection(props: {
           >
             {({ isPending }) => (
               <>
-                {isPending ? <PixelLoader size="sm" /> : <GitMerge className="size-3.5" />}
+                {isPending ? <PixelLoader size="xs" /> : <GitMerge className="size-3.5" />}
                 Merge PR: Squash
               </>
             )}

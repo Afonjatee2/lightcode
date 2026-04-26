@@ -27,7 +27,7 @@ export function MergeToSourceSection(props: {
     <div className={`space-y-2 border-t border-white/6 pt-2 ${sectionPadX}`}>
       {sourceBranchLoading ? (
         <div className="flex items-center justify-center py-2">
-          <PixelLoader size="sm" />
+          <PixelLoader size="xs" />
         </div>
       ) : sourceBranch ? (
         <>
@@ -41,7 +41,7 @@ export function MergeToSourceSection(props: {
             >
               {({ isPending }) => (
                 <>
-                  {isPending ? <PixelLoader size="sm" /> : <GitMerge className="size-3.5" />}
+                  {isPending ? <PixelLoader size="xs" /> : <GitMerge className="size-3.5" />}
                   Merge & Remove Worktree
                 </>
               )}

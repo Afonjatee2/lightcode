@@ -113,7 +113,7 @@ export function SyncBadge(props: { projectId: string; worktreePath?: string }) {
         >
           <span className="flex items-center text-[10px] font-medium">
             {isSyncing ? (
-              <PixelLoader size="sm" />
+              <PixelLoader size="xs" />
             ) : (
               <>
                 {behind > 0 && <span className="text-accent">↓{behind}</span>}

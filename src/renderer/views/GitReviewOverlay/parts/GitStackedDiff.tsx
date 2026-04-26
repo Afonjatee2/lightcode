@@ -243,7 +243,7 @@ export function StackedFileCard(props: {
           <div className="border-t border-border">
             {loading && (
               <div className="flex items-center justify-center py-6">
-                <PixelLoader size="sm" />
+                <PixelLoader size="md" />
               </div>
             )}
             {!loading && tooLarge && (

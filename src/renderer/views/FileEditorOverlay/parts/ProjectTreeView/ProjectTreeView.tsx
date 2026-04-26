@@ -131,7 +131,7 @@ export function ProjectTreeView(props: {
           {tree.searchQuery.trim() ? (
             tree.searchLoading ? (
               <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted">
-                <PixelLoader size="sm" />
+                <PixelLoader size="xs" />
                 Searching…
               </div>
             ) : tree.searchResults.length > 0 ? (
@@ -153,7 +153,7 @@ export function ProjectTreeView(props: {
             <div>
               {rootLoading && !isAnyDirectoryLoaded ? (
                 <div className="flex items-center gap-2 px-2 py-2 text-xs text-muted">
-                  <PixelLoader size="sm" />
+                  <PixelLoader size="xs" />
                   Loading…
                 </div>
               ) : (
