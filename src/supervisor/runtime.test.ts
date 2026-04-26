@@ -96,9 +96,14 @@ function createMockPty() {
 }
 
 function decodeSpawnCommand(spawnArgs: string[]): string {
-  return spawnArgs.includes("-EncodedCommand")
+  // On Windows hosts, supervisor wraps spawns through PowerShell with
+  // -EncodedCommand and quoted args; on non-Windows hosts the test sees the
+  // cmd.exe fallback (raw, unquoted). Strip surrounding quotes so assertions
+  // can search for the same tokens regardless of host.
+  const raw = spawnArgs.includes("-EncodedCommand")
     ? Buffer.from(spawnArgs.at(-1)!, "base64").toString("utf16le")
     : spawnArgs.join(" ");
+  return raw.replaceAll("'", "");
 }
 
 function createRuntimeSession(overrides: Record<string, unknown> = {}) {
@@ -168,7 +173,10 @@ describe("writeSubmittedPrompt", () => {
     vi.useFakeTimers();
     const write = vi.fn<(data: string) => void>();
 
-    const pending = writeSubmittedPrompt({ write }, ["h", "i", "\r"]);
+    const pending = writeSubmittedPrompt({ write }, ["h", "i", "\r"], {
+      kind: "posix",
+      path: "/tmp/project",
+    });
 
     expect(write).toHaveBeenCalledTimes(1);
     expect(write).toHaveBeenNthCalledWith(1, "h");
@@ -179,6 +187,40 @@ describe("writeSubmittedPrompt", () => {
     expect(write).toHaveBeenCalledTimes(3);
     expect(write).toHaveBeenNthCalledWith(2, "i");
     expect(write).toHaveBeenNthCalledWith(3, "\r");
+    vi.useRealTimers();
+  });
+
+  it("preserves inner newlines on posix so the prompt is not submitted mid-stream", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn<(data: string) => void>();
+
+    const pending = writeSubmittedPrompt({ write }, ["hi\n\n@/tmp/file ", "\r"], {
+      kind: "posix",
+      path: "/tmp/project",
+    });
+
+    await vi.runAllTimersAsync();
+    await pending;
+
+    expect(write).toHaveBeenNthCalledWith(1, "hi\n\n@/tmp/file ");
+    expect(write).toHaveBeenNthCalledWith(2, "\r");
+    vi.useRealTimers();
+  });
+
+  it("collapses inner newlines to CR on Windows", async () => {
+    vi.useFakeTimers();
+    const write = vi.fn<(data: string) => void>();
+
+    const pending = writeSubmittedPrompt({ write }, ["hi\n\n@C:/tmp/file ", "\r"], {
+      kind: "windows",
+      path: "C:/tmp/project",
+    });
+
+    await vi.runAllTimersAsync();
+    await pending;
+
+    expect(write).toHaveBeenNthCalledWith(1, "hi\r\r@C:/tmp/file ");
+    expect(write).toHaveBeenNthCalledWith(2, "\r");
     vi.useRealTimers();
   });
 
@@ -744,7 +786,7 @@ describe("writeSubmittedPrompt", () => {
     });
   });
 
-  it("spoofs an iTerm terminal for Claude only when running on L2", () => {
+  it("spoofs an iTerm terminal for Claude when running on L2", () => {
     const dataDir = makeTempDir();
     process.env.LIGHTCODE_DATA_DIR = dataDir;
     writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
@@ -969,7 +1011,7 @@ describe("writeSubmittedPrompt", () => {
     expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBe("3.6.6");
   });
 
-  it("does not spoof an iTerm terminal for Claude in WSL L2 sessions", () => {
+  it("spoofs an iTerm terminal for Claude in WSL L2 sessions", () => {
     const dataDir = makeTempDir();
     process.env.LIGHTCODE_DATA_DIR = dataDir;
     writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
@@ -1043,8 +1085,8 @@ describe("writeSubmittedPrompt", () => {
       string[],
       { env: Record<string, string> },
     ];
-    expect(spawnOpts.env.TERM_PROGRAM).toBeUndefined();
-    expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBeUndefined();
+    expect(spawnOpts.env.TERM_PROGRAM).toBe("iTerm.app");
+    expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBe("3.6.6");
   });
 
   it("does not eagerly start a queued Codex turn during thread startup", async () => {
@@ -1207,9 +1249,9 @@ describe("writeSubmittedPrompt", () => {
 
     const [, spawnArgs] = ptySpawnMock.mock.calls[0] as [string, string[]];
     const command = decodeSpawnCommand(spawnArgs);
-    expect(command.indexOf("'--enable'")).toBeGreaterThan(-1);
-    expect(command.indexOf("'codex_hooks'")).toBeGreaterThan(command.indexOf("'--enable'"));
-    expect(command.indexOf("'hello'")).toBeGreaterThan(command.indexOf("'codex_hooks'"));
+    expect(command.indexOf("--enable")).toBeGreaterThan(-1);
+    expect(command.indexOf("codex_hooks")).toBeGreaterThan(command.indexOf("--enable"));
+    expect(command.indexOf("hello")).toBeGreaterThan(command.indexOf("codex_hooks"));
   });
 
   it("inserts Codex hook enable flags before the resume session id", async () => {
@@ -1287,10 +1329,10 @@ describe("writeSubmittedPrompt", () => {
 
     const [, spawnArgs] = ptySpawnMock.mock.calls[0] as [string, string[]];
     const command = decodeSpawnCommand(spawnArgs);
-    expect(command.indexOf("'--enable'")).toBeGreaterThan(-1);
-    expect(command.indexOf("'codex_hooks'")).toBeGreaterThan(command.indexOf("'--enable'"));
-    expect(command.indexOf("'session-123'")).toBeGreaterThan(command.indexOf("'codex_hooks'"));
-    expect(command.indexOf("'next prompt'")).toBeGreaterThan(command.indexOf("'session-123'"));
+    expect(command.indexOf("--enable")).toBeGreaterThan(-1);
+    expect(command.indexOf("codex_hooks")).toBeGreaterThan(command.indexOf("--enable"));
+    expect(command.indexOf("session-123")).toBeGreaterThan(command.indexOf("codex_hooks"));
+    expect(command.indexOf("next prompt")).toBeGreaterThan(command.indexOf("session-123"));
   });
 
   it("skips TUI parsing hooks for server-backed GUI presentation", () => {
@@ -1366,6 +1408,97 @@ describe("writeSubmittedPrompt", () => {
     expect(isReadyForInitialPrompt).not.toHaveBeenCalled();
     expect(detectTerminalStatus).not.toHaveBeenCalled();
   });
+
+  it.each([
+    {
+      name: "posix",
+      projectLocation: { kind: "posix" as const, path: "/tmp/repo" },
+    },
+    {
+      name: "windows",
+      projectLocation: { kind: "windows" as const, path: "C:\\repo" },
+    },
+  ])(
+    "passes a text + attachment prompt with special chars through to the launch arg unchanged on $name",
+    async ({ projectLocation }) => {
+      const runtime = new SupervisorRuntime(() => undefined);
+      const pty = createMockPty();
+      ptySpawnMock.mockReturnValueOnce(pty);
+
+      const buildLaunchArgv = vi.fn<
+        (location: unknown, config: unknown, prompt: string) => { binary: string; args: string[] }
+      >((_location, _config, prompt) => ({
+        binary: "claude",
+        args: prompt.length > 0 ? ["--allow-dangerously-skip-permissions", prompt] : [],
+      }));
+
+      const adapter = {
+        kind: "claude" as const,
+        label: "Claude",
+        capabilities: {
+          models: [{ id: "opus", label: "Opus" }],
+          efforts: ["high"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal" as const,
+          presentationMode: "terminal" as const,
+        },
+        detectInstall: vi.fn<() => void>(),
+        buildLaunchArgv,
+        buildResumeArgv: vi.fn<() => void>(),
+        createInitialSessionRef: vi.fn<() => undefined>().mockReturnValue(undefined),
+        formatPromptSegments: (
+          segments: Array<{ kind: string; content?: string; path?: string }>,
+        ) => {
+          const attachments = segments.filter((s) => s.kind === "attachment");
+          const rest = segments.filter((s) => s.kind !== "attachment");
+          const restStr = rest
+            .map((s) => (s.kind === "file" ? `@${s.path}` : (s.content ?? "")))
+            .join("");
+          const attachmentLines = attachments.map((s) => `@${s.path}`).join(" ");
+          return attachmentLines ? `${restStr}\n\n${attachmentLines} ` : restStr;
+        },
+      };
+
+      (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+        "claude",
+        adapter,
+      );
+
+      const spicyPrompt = "let's `do` $this\nwith 'quotes'";
+      await runtime.startThread({
+        threadId: "thread-prompt-quoting",
+        projectLocation,
+        agentKind: "claude",
+        config: { model: "opus" },
+        prompt: spicyPrompt,
+        segments: [
+          { kind: "text", content: spicyPrompt },
+          { kind: "attachment", path: "/tmp/Image 1.png" },
+        ],
+        initialSize: { cols: 120, rows: 30 },
+      });
+
+      const formattedPrompt = `${spicyPrompt}\n\n@/tmp/Image 1.png `;
+      const launchArgvCalls = buildLaunchArgv.mock.calls;
+      expect(launchArgvCalls.length).toBeGreaterThan(0);
+      expect(launchArgvCalls[0]![2]).toBe(formattedPrompt);
+
+      const [, spawnArgs] = ptySpawnMock.mock.calls[0] as [string, string[]];
+      const command = decodeSpawnCommand(spawnArgs);
+      // Each problematic substring must survive the shell-quoting layer.
+      expect(command).toContain("let");
+      expect(command).toContain("do");
+      expect(command).toContain("$this");
+      expect(command).toContain("with");
+      expect(command).toContain("quotes");
+      expect(command).toContain("@/tmp/Image 1.png");
+    },
+  );
 });
 
 describe("detectWslAgentStatuses", () => {

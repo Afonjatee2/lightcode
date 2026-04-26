@@ -1,5 +1,9 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  getCodexPluginPaths,
   isCodexSemverSupportedForHooks,
   mergeCodexHooksDocument,
   parseCodexVersionLine,
@@ -11,6 +15,19 @@ const forwardPathUnix = "/home/demo/.lightcode/agent-plugins/codex/forward.mjs";
 function lightcodeCommand(fp: string, event: string): string {
   return `node ${JSON.stringify(fp)} ${event}`;
 }
+
+describe("getCodexPluginPaths", () => {
+  it("places Codex hooks under Lightcode's private CODEX_HOME", () => {
+    const baseDir = mkdtempSync(join(tmpdir(), "lightcode-codex-paths-"));
+    const paths = getCodexPluginPaths({ envKind: "posix", baseDir }, baseDir);
+
+    expect(paths.pluginDir).toBe(join(baseDir, "agent-plugins", "codex"));
+    expect(paths.codexHomeDir).toBe(join(baseDir, "agent-plugins", "codex", "home"));
+    expect(paths.codexHooksPath).toBe(
+      join(baseDir, "agent-plugins", "codex", "home", "hooks.json"),
+    );
+  });
+});
 
 describe("parseCodexVersionLine + isCodexSemverSupportedForHooks", () => {
   it("parses codex-cli semver lines", () => {

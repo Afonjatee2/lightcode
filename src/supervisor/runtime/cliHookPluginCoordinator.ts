@@ -306,7 +306,8 @@ export class CliHookPluginCoordinator {
       const installed = await slice.isPluginInstalled(ctx);
       // Cache hit. For both positive and negative entries, re-check the staged
       // files before trusting the cache: the user may have repaired or removed
-      // ~/.lightcode/agent-plugins/ and ~/.codex/hooks.json out of band.
+      // ~/.lightcode/agent-plugins/ and the provider's generated hook config
+      // out of band.
       if (installed.installed) {
         if (!cached.supportsL1) {
           this.writeCacheEntry(cacheKey, {

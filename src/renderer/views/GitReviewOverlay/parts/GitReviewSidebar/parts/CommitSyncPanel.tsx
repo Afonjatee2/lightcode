@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown, Lock, Sparkles } from "lucide-react";
 import { Button, ButtonGroup, Dropdown, Label, Tooltip } from "@heroui/react";
 import { PixelLoader, TextArea } from "@/renderer/components/common";
+import { useGitReviewSectionPadX } from "../gitReviewPadXContext";
 
 export function CommitSyncPanel(props: {
   mergeConflicting: boolean;
@@ -62,9 +63,10 @@ export function CommitSyncPanel(props: {
     handleAbortMerge,
     handleFinishMerge,
   } = props;
+  const sectionPadX = useGitReviewSectionPadX();
 
   return (
-    <div className="space-y-2 border-t border-white/6 px-3 pt-2">
+    <div className={`space-y-2 border-t border-white/6 pt-2 ${sectionPadX}`}>
       {mergeConflicting && mergeConflictFiles.length === 0 ? (
         <>
           <p className="text-xs font-medium text-success">All conflicts resolved</p>

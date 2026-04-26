@@ -122,6 +122,7 @@ export const XTermSurface = forwardRef<
       return;
     }
 
+    const mac = isMac();
     let isActive = true;
     let lastCols = -1;
     let lastRows = -1;
@@ -130,6 +131,9 @@ export const XTermSurface = forwardRef<
     let resizeFrame = 0;
     let ptyResizeTimer = 0;
     let lastPtyResizeAt = 0;
+    let scrollbackHydrationToken = 0;
+    let hydratingScrollback = false;
+    let bufferedOutputDuringHydration = "";
     // Fit the canvas immediately; throttle (leading + trailing) the PTY resize
     // RPC so the agent sees cols updates ~40×/s during a drag — not only after
     // the user releases — while still coalescing rapid mount-time transitions.
@@ -173,6 +177,35 @@ export const XTermSurface = forwardRef<
       if (writeTimer === 0) {
         writeTimer = window.setTimeout(flushWrites, 8) as unknown as number;
       }
+    };
+
+    const hydrateScrollback = () => {
+      const token = ++scrollbackHydrationToken;
+      hydratingScrollback = true;
+      bufferedOutputDuringHydration = "";
+      void readBridge()
+        .readTerminalScrollback({ threadId: terminalId })
+        .then((scrollback) => {
+          if (!isActive || token !== scrollbackHydrationToken) {
+            return;
+          }
+          if (scrollback.length > 0) {
+            terminal.reset();
+            queueWrite(scrollback);
+            bufferedOutputDuringHydration = "";
+          }
+        })
+        .catch(() => undefined)
+        .finally(() => {
+          if (!isActive || token !== scrollbackHydrationToken) {
+            return;
+          }
+          hydratingScrollback = false;
+          if (bufferedOutputDuringHydration.length > 0) {
+            queueWrite(bufferedOutputDuringHydration);
+            bufferedOutputDuringHydration = "";
+          }
+        });
     };
 
     const terminal = new Terminal({
@@ -328,7 +361,6 @@ export const XTermSurface = forwardRef<
     // Single Ctrl+C with selection → copy. Rapid Ctrl+C (within
     // 500 ms of a copy) → pass through as SIGINT so agents can
     // be interrupted with the usual double-Ctrl+C pattern.
-    const mac = isMac();
     let lastCopyTime = 0;
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.type !== "keydown" || event.shiftKey || event.altKey) {
@@ -394,10 +426,15 @@ export const XTermSurface = forwardRef<
       if (event.type === "thread-reset" && event.threadId === terminalId) {
         terminal.reset();
         onResetRef.current?.();
+        hydrateScrollback();
         return;
       }
 
       if (event.type === "thread-output" && event.threadId === terminalId) {
+        if (hydratingScrollback) {
+          bufferedOutputDuringHydration += event.data;
+          return;
+        }
         queueWrite(event.data);
         return;
       }
@@ -406,6 +443,8 @@ export const XTermSurface = forwardRef<
         onExitedRef.current?.(event.exitCode);
       }
     });
+
+    hydrateScrollback();
 
     // Double-rAF to ensure layout has settled before fitting
     requestAnimationFrame(() => {

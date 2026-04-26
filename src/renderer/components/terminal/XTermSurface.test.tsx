@@ -7,7 +7,9 @@ const { state } = vi.hoisted(() => ({
   state: {
     terminal: null as null | Record<string, ReturnType<typeof vi.fn>>,
     eventListeners: [] as Array<(e: SupervisorEvent) => void>,
+    isMac: false,
     bridge: {
+      readTerminalScrollback: vi.fn<() => Promise<string>>().mockResolvedValue(""),
       writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       resizeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       onSupervisorEvent: vi.fn<(listener: (e: SupervisorEvent) => void) => () => void>(),
@@ -100,7 +102,7 @@ state.bridge.onSupervisorEvent.mockImplementation((listener: (e: SupervisorEvent
   };
 });
 
-vi.mock("../../bridge", () => ({ readBridge: () => state.bridge, isMac: () => false }));
+vi.mock("../../bridge", () => ({ readBridge: () => state.bridge, isMac: () => state.isMac }));
 vi.mock("../ui/provider", () => ({ useResolvedAppearance: () => "dark" }));
 
 import { XTermSurface } from "./XTermSurface";
@@ -149,6 +151,7 @@ describe("XTermSurface", () => {
   beforeEach(() => {
     state.terminal = null;
     state.eventListeners = [];
+    state.isMac = false;
     vi.clearAllMocks();
     state.bridge.onSupervisorEvent.mockImplementation((listener: (e: SupervisorEvent) => void) => {
       state.eventListeners.push(listener);
@@ -170,10 +173,31 @@ describe("XTermSurface", () => {
     expect(terminal().open).toHaveBeenCalled();
   });
 
+  it("loads the WebGL addon on non-macOS platforms", () => {
+    render(<XTermSurface terminalId="test-1" />);
+    expect(terminal().loadAddon).toHaveBeenCalledTimes(6);
+  });
+
+  it("loads the WebGL addon on macOS too", () => {
+    state.isMac = true;
+    render(<XTermSurface terminalId="test-1" />);
+    expect(terminal().loadAddon).toHaveBeenCalledTimes(6);
+  });
+
   it("subscribes to supervisor events", () => {
     render(<XTermSurface terminalId="test-1" />);
     expect(state.bridge.onSupervisorEvent).toHaveBeenCalled();
     expect(state.eventListeners).toHaveLength(1);
+  });
+
+  it("hydrates the terminal from supervisor scrollback on mount", async () => {
+    state.bridge.readTerminalScrollback.mockResolvedValueOnce("existing output");
+
+    render(<XTermSurface terminalId="test-1" />);
+    await flushWriteTimer();
+
+    expect(state.bridge.readTerminalScrollback).toHaveBeenCalledWith({ threadId: "test-1" });
+    expect(terminal().write).toHaveBeenCalledWith("\x1b[?2026hexisting output\x1b[?2026l");
   });
 
   it("disposes terminal and unsubscribes on unmount", () => {

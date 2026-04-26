@@ -1,14 +1,18 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, GitMerge } from "lucide-react";
 import { getBasename } from "@/shared/pathUtils";
+import { useGitReviewRowPadX } from "../gitReviewPadXContext";
 
 export function ConflictGroup(props: { files: string[] }) {
   const { files } = props;
+  const rowPadX = useGitReviewRowPadX();
   const [expanded, setExpanded] = useState(true);
 
   return (
     <div>
-      <div className="flex w-full items-center gap-1 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-warning">
+      <div
+        className={`flex w-full items-center gap-1 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-warning ${rowPadX}`}
+      >
         <button
           type="button"
           className="flex cursor-default items-center gap-1"
@@ -27,7 +31,7 @@ export function ConflictGroup(props: { files: string[] }) {
             return (
               <div
                 key={f}
-                className="flex w-full items-center gap-1.5 rounded px-3 py-1 text-xs text-muted"
+                className={`flex w-full items-center gap-1.5 rounded py-1 text-xs text-muted ${rowPadX}`}
               >
                 <GitMerge className="size-3.5 text-warning" />
                 <span className="min-w-0 flex-1 truncate" title={f}>

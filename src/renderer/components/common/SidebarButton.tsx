@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
+import type { StatusTone } from "@/renderer/components/providers/statusTone";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
 
 export function SidebarButton(props: {
@@ -10,6 +11,13 @@ export function SidebarButton(props: {
   isDisabled?: boolean;
   isActive?: boolean;
   iconOnly?: boolean;
+  /** Row text size. `xs` is used for thread and worktree list rows. */
+  size?: "md" | "xs";
+  /**
+   * When set, `liveText` defaults to on unless the state is `inactive` or `done`
+   * (same rule as list rows for thread status). Overridden by an explicit `liveText` prop.
+   */
+  statusTone?: StatusTone;
   tooltip?: React.ReactNode;
   suffix?: React.ReactNode;
   className?: string;
@@ -27,6 +35,8 @@ export function SidebarButton(props: {
     isDisabled = false,
     isActive = false,
     iconOnly = false,
+    size = "md",
+    statusTone,
     tooltip,
     suffix,
     className,
@@ -34,8 +44,15 @@ export function SidebarButton(props: {
     isDragging,
     isDraggingAnything = false,
     onContextMenu,
-    liveText = false,
+    liveText: liveTextProp,
   } = props;
+
+  const liveText =
+    liveTextProp !== undefined
+      ? liveTextProp
+      : statusTone != null
+        ? statusTone !== "inactive" && statusTone !== "done"
+        : false;
 
   const labelRef = useRef<HTMLSpanElement>(null);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
@@ -49,10 +66,13 @@ export function SidebarButton(props: {
         ? "bg-white/[0.08] text-foreground"
         : `${inactiveText} ${!isDraggingAnything ? "hover:bg-white/[0.04] hover:text-foreground" : ""}`;
 
+  const sizeClass = size === "xs" ? "text-xs" : "text-sm";
+  const dragRowDim = isDragging && !iconOnly && !isDisabled ? " opacity-60" : "";
+
   if (iconOnly) {
     return (
       <Tooltip delay={150}>
-        <Tooltip.Trigger>
+        <Tooltip.Trigger className="flex min-h-0 flex-col">
           <button
             ref={ref as React.Ref<HTMLButtonElement>}
             className={`flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-3xl outline-none transition-colors focus-visible:focus-ring ${stateClass} ${className ?? ""}`}
@@ -76,7 +96,7 @@ export function SidebarButton(props: {
       tabIndex={isDisabled ? -1 : 0}
       aria-disabled={isDisabled || undefined}
       aria-grabbed={isDragging}
-      className={`group relative flex w-full cursor-default items-center gap-2 rounded-3xl px-3 py-1.5 text-left text-sm outline-none transition-colors ${stateClass} ${className ?? ""}`}
+      className={`group relative flex w-full cursor-default items-center gap-2 rounded-3xl px-2 py-1.5 text-left ${sizeClass} outline-none transition-colors ${stateClass}${dragRowDim} ${className ?? ""}`}
       onClick={isDisabled ? undefined : onPress}
       onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
@@ -112,7 +132,7 @@ export function SidebarButton(props: {
         }
       }}
     >
-      <Tooltip.Trigger className="block w-full" tabIndex={-1} role="none">
+      <Tooltip.Trigger className="flex w-full min-h-0 flex-col" tabIndex={-1} role="none">
         {row}
       </Tooltip.Trigger>
       <Tooltip.Content placement="right" showArrow className="max-w-[28rem] break-all text-xs">

@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./app";
 import "./styles.css";
+import { readBridge } from "./bridge";
 import { getAppName } from "@/shared/appName";
 
 if (import.meta.env.DEV) {
@@ -20,6 +21,8 @@ if (import.meta.env.DEV) {
 }
 
 document.title = getAppName(import.meta.env.DEV);
+
+document.documentElement.dataset.platform = readBridge().platform;
 
 const root = document.getElementById("root");
 

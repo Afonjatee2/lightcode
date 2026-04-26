@@ -391,6 +391,10 @@ function buildPosixExportPrefix(env: Record<string, string> | undefined): string
   return entries.map(([k, v]) => `export ${k}=${quotePosixShellArg(v)}`).join("; ") + "; ";
 }
 
+function getPosixLoginShellArgs(script: string): string[] {
+  return process.platform === "darwin" ? ["-l", "-i", "-c", script] : ["-l", "-c", script];
+}
+
 /**
  * Inject environment variables into an already-built WSL CommandSpec.
  * The WSL command structure from `buildAgentCommand` always ends with
@@ -418,7 +422,7 @@ export function injectWslEnv(
   return { ...spec, args };
 }
 
-function quotePowerShellLiteral(value: string): string {
+export function quotePowerShellLiteral(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
@@ -478,7 +482,7 @@ function buildPosixCommand(cwd: string, command: string, args: string[]): Comman
   const script = `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
   return {
     command: shell,
-    args: ["-l", "-c", script],
+    args: getPosixLoginShellArgs(script),
     cwd,
   };
 }
@@ -598,16 +602,11 @@ export function configFileAuthProbe(
 export function cliSubcommandAuthProbe(args: string[]): AuthProbe {
   return async (ctx) => {
     if (!ctx.executablePath) return undefined;
-    if (ctx.location.kind === "wsl") {
-      const result = await readWslLoginShellCommandOutputAsync(
-        ctx.location.distro,
-        "/tmp",
-        ctx.executablePath,
-        args,
-      );
-      return result.ok ? "authenticated" : "unknown";
-    }
-    const result = await readCommandOutputAsync(ctx.executablePath, args);
+    const spec = buildAgentCommand(ctx.location, ctx.executablePath, args);
+    const result = await readCommandOutputAsync(spec.command, spec.args, {
+      ...(spec.cwd ? { cwd: spec.cwd } : {}),
+      ...(spec.env ? { env: spec.env } : {}),
+    });
     return result.ok ? "authenticated" : "unknown";
   };
 }
@@ -909,17 +908,27 @@ export function wrapWslCommand(
 }
 
 export function resolveExecutablePath(command: string): string | undefined {
-  const locator = process.platform === "win32" ? "where.exe" : "which";
-  const result = spawnSync(locator, [command], {
-    encoding: "utf8",
-    shell: false,
-    windowsHide: true,
-  });
+  const result =
+    process.platform === "win32"
+      ? spawnSync("where.exe", [command], {
+          encoding: "utf8",
+          shell: false,
+          windowsHide: true,
+        })
+      : spawnSync(
+          process.env.SHELL || "/bin/bash",
+          getPosixLoginShellArgs(`command -v ${quotePosixShellArg(command)}`),
+          {
+            cwd: homedir(),
+            encoding: "utf8",
+            shell: false,
+            windowsHide: true,
+          },
+        );
   if (result.error || result.status !== 0) {
     return undefined;
   }
-  const output = `${result.stdout}`.split(/\r?\n/g).find((line) => line.trim().length > 0);
-  return output?.trim();
+  return parseCommandOutputLine(`${result.stdout ?? ""}`);
 }
 
 export function readCommandOutput(
@@ -1142,16 +1151,30 @@ export async function resolveExecutablePathAsync(command: string): Promise<strin
     return cached.path;
   }
 
-  const locator = process.platform === "win32" ? "where.exe" : "which";
   try {
-    const { stdout } = await execFileAsync(locator, [command], {
-      windowsHide: true,
-      timeout: 5_000,
-    });
-    const resolved = stdout
-      .split(/\r?\n/g)
-      .find((line) => line.trim().length > 0)
-      ?.trim();
+    const resolved =
+      process.platform === "win32"
+        ? parseCommandOutputLine(
+            (
+              await execFileAsync("where.exe", [command], {
+                windowsHide: true,
+                timeout: 5_000,
+              })
+            ).stdout ?? "",
+          )
+        : parseCommandOutputLine(
+            (
+              await execFileAsync(
+                process.env.SHELL || "/bin/bash",
+                getPosixLoginShellArgs(`command -v ${quotePosixShellArg(command)}`),
+                {
+                  cwd: homedir(),
+                  windowsHide: true,
+                  timeout: 5_000,
+                },
+              )
+            ).stdout ?? "",
+          );
     execPathCache.set(command, { path: resolved, ts: Date.now() });
     return resolved;
   } catch {
@@ -1163,13 +1186,14 @@ export async function resolveExecutablePathAsync(command: string): Promise<strin
 export async function readCommandOutputAsync(
   command: string,
   args: string[],
-  options?: { cwd?: string },
+  options?: { cwd?: string; env?: Record<string, string> },
 ): Promise<{ ok: boolean; stdout: string; stderr: string }> {
   try {
     const { stdout, stderr } = await execFileAsync(command, args, {
       windowsHide: true,
       timeout: 10_000,
       ...(options?.cwd ? { cwd: options.cwd } : {}),
+      ...(options?.env ? { env: { ...process.env, ...options.env } } : {}),
     });
     return { ok: true, stdout: (stdout ?? "").trim(), stderr: (stderr ?? "").trim() };
   } catch (error: unknown) {

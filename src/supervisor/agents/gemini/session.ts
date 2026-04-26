@@ -1,6 +1,12 @@
 import type { ProjectLocation } from "@/shared/contracts";
 import { getProjectName } from "@/shared/wsl";
-import { readWslLoginShellCommandOutputAsync, resolveAgentHomeSubpath } from "../base";
+import {
+  buildAgentCommand,
+  readCommandOutputAsync,
+  readWslLoginShellCommandOutputAsync,
+  resolveAgentHomeSubpath,
+  resolveExecutablePathAsync,
+} from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 
 const SESSION_UUID_RE = /\[([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\]/;
@@ -32,21 +38,16 @@ export async function queryLatestSessionId(location: ProjectLocation): Promise<s
     if (!result.ok) console.log("[gemini] --list-sessions (wsl) failed: %s", result.stderr);
     output = result.ok ? result.stdout : undefined;
   } else if (location.kind === "windows" || location.kind === "posix") {
-    const cwd = location.path;
-    const { execFile } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execFileAsync = promisify(execFile);
-    try {
-      const { stdout } = await execFileAsync("gemini", ["--list-sessions"], {
-        cwd,
-        shell: true,
-        windowsHide: true,
-        timeout: 10_000,
-      });
-      output = (stdout ?? "").trim() || undefined;
-    } catch {
-      // Will retry on next poll
-    }
+    const executablePath = await resolveExecutablePathAsync("gemini");
+    if (!executablePath) return undefined;
+    const spec = buildAgentCommand(location, executablePath, ["--list-sessions"]);
+    const result = await readCommandOutputAsync(
+      spec.command,
+      spec.args,
+      spec.cwd ? { cwd: spec.cwd } : undefined,
+    );
+    if (!result.ok) return undefined;
+    output = result.stdout || undefined;
   }
   if (!output) return undefined;
   const ids = parseAllSessionIds(output);

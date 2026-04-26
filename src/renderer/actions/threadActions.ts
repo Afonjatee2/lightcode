@@ -7,6 +7,7 @@ import { useWorktreeDeleteStore } from "@/renderer/state/worktreeDeleteStore";
 import { readWorktreeDeletePref } from "@/renderer/views/MainView/parts/Sidebar/parts/DeleteWorktreeDialog";
 import { resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
 import { closeThreads } from "@/renderer/utils/shellUtils";
+import { closePanelsForUnloadedThread } from "./panelActions";
 import { getCurrentProjectId } from "./currentProject";
 import { performWorktreeRemoval } from "./worktreeActions";
 
@@ -65,7 +66,10 @@ export function reopenStoredThread(threadId: string): void {
   store.queueThreadLaunch(thread.id, "");
 }
 
-export async function unloadStoredThread(threadId: string): Promise<void> {
+export async function unloadStoredThread(
+  threadId: string,
+  options?: { closeThreadPane?: boolean },
+): Promise<void> {
   const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
   if (
     !thread ||
@@ -76,9 +80,18 @@ export async function unloadStoredThread(threadId: string): Promise<void> {
     return;
   }
 
+  const view = useAppStore.getState().view;
+  const inVisiblePane = view.kind === "thread" && view.panes.includes(threadId);
+
   await readBridge().closeThread({ threadId });
   startTransition(() => {
     useAppStore.getState().markThreadExited(threadId);
+    if (inVisiblePane) {
+      closePanelsForUnloadedThread(thread);
+    }
+    if (options?.closeThreadPane && inVisiblePane) {
+      useAppStore.getState().closePane(threadId);
+    }
   });
 }
 
@@ -110,7 +123,7 @@ export function archiveThread(threadId: string): void {
 }
 
 export function unloadThread(threadId: string): void {
-  void unloadStoredThread(threadId).catch(() => undefined);
+  void unloadStoredThread(threadId, { closeThreadPane: true }).catch(() => undefined);
 }
 
 export function toggleMarkThreadDone(threadId: string): void {

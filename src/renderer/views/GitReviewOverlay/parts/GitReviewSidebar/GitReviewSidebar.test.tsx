@@ -101,6 +101,7 @@ vi.mock("@heroui/react", () => {
 
 vi.mock("@/renderer/bridge", () => ({
   readBridge: () => bridgeMock,
+  isWindows: () => false,
 }));
 
 vi.mock("@/renderer/state/agentStatusesStore", () => ({

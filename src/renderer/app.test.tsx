@@ -530,7 +530,10 @@ describe("App", () => {
 
     await waitFor(() => {
       expect(bridge.closeThread).toHaveBeenCalledWith({ threadId: "thread-1" });
-      expect(screen.getByTestId("thread-view-thread-1")).toHaveAttribute("data-status", "inactive");
+      expect(useAppStore.getState().threads.find((t) => t.id === "thread-1")?.status).toBe(
+        "inactive",
+      );
+      expect(screen.queryByTestId("thread-view-thread-1")).toBeNull();
     });
 
     fireEvent.click(screen.getByText("open-thread-1"));

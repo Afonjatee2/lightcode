@@ -16,6 +16,13 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import { getCommitGenCandidates } from "@/renderer/components/providers";
+import {
+  gitPanelSidebarColumnClass,
+  gitReviewSidebarListScrollClass,
+  overlaySidebarColumnClass,
+  sidebarFooterNavClass,
+  sidebarIconRailFooterClass,
+} from "@/renderer/components/layout/sidebarChrome";
 import { useDiffTheme } from "../diffBuildClient";
 
 import { ConflictGroup } from "./parts/ConflictGroup";
@@ -28,6 +35,7 @@ import { CommitSyncPanel } from "./parts/CommitSyncPanel";
 import { PrSection } from "./parts/PrSection";
 import { CreatePrModal } from "./parts/CreatePrModal";
 import { MergeToSourceSection } from "./parts/MergeToSourceSection";
+import { GitReviewPadXProvider } from "./gitReviewPadXContext";
 
 const EMPTY_BRANCHES: readonly GitBranchInfo[] = [];
 
@@ -185,202 +193,212 @@ export function GitReviewSidebar(props: {
   const [createPrModalOpen, setCreatePrModalOpen] = useState(false);
 
   return (
-    <div className="relative h-full">
-      {/* Collapsed icon rail */}
-      {isCollapsed && (
-        <div className="absolute inset-0 z-10 flex h-full min-h-0 flex-col items-start gap-3 pl-2 pb-1 pt-0">
-          <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-            <SidebarButton
-              iconOnly
-              icon={<FileDiff className="size-4" />}
-              label="Changes"
-              isActive
-            />
+    <GitReviewPadXProvider rowPadX="px-2" sectionPadX={mode === "panel" ? "px-2" : "px-0"}>
+      <div className="relative h-full">
+        {/* Collapsed icon rail */}
+        {isCollapsed && (
+          <div className="absolute inset-0 z-10 flex h-full min-h-0 flex-col items-start gap-3 pl-2 pb-1 pt-0">
+            <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+              <SidebarButton
+                iconOnly
+                icon={<FileDiff className="size-4" />}
+                label="Changes"
+                isActive
+              />
+            </div>
+            <div className={sidebarIconRailFooterClass}>
+              {mode !== "panel" && (
+                <>
+                  <SidebarButton
+                    iconOnly
+                    icon={<ArrowLeft className="size-4" />}
+                    label="Return to app"
+                    onPress={onClose}
+                  />
+                  <SidebarButton
+                    iconOnly
+                    icon={<PanelLeft className="size-4" />}
+                    label="Show sidebar"
+                    onPress={expand}
+                  />
+                </>
+              )}
+            </div>
           </div>
-          <div className="space-y-1 border-t border-white/6 pt-2 pr-2">
-            {mode !== "panel" && (
-              <>
-                <SidebarButton
-                  iconOnly
-                  icon={<ArrowLeft className="size-4" />}
-                  label="Return to app"
-                  onPress={onClose}
-                />
-                <SidebarButton
-                  iconOnly
-                  icon={<PanelLeft className="size-4" />}
-                  label="Show sidebar"
-                  onPress={expand}
-                />
-              </>
-            )}
-          </div>
-        </div>
-      )}
+        )}
 
-      {/* Expanded sidebar */}
-      <div
-        className={`flex h-full min-h-0 flex-col gap-3 pb-1 pt-0 transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
-      >
-        <div className="min-h-0 min-w-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto">
-          {gitStatus && gitStatus.staged.length > 0 && (
-            <FileGroup
-              title="Staged"
-              count={gitStatus.staged.length}
-              staged
-              files={gitStatus.staged}
-              project={project}
-              selectedFile={selectedStaged ? selectedFile : null}
-              onSelectFile={onSelectFile}
-              onRefresh={onRefresh}
-              storeKey={storeKey}
-              isWorktree={isWorktreeStatus}
-              mode={mode}
-              diffTheme={diffTheme}
-              wrapLines={wrapLines}
-            />
-          )}
-          {gitStatus && gitStatus.unstaged.length > 0 && (
-            <FileGroup
-              title="Changes"
-              count={gitStatus.unstaged.length}
-              staged={false}
-              files={gitStatus.unstaged}
-              project={project}
-              selectedFile={!selectedStaged ? selectedFile : null}
-              onSelectFile={onSelectFile}
-              onRefresh={onRefresh}
-              storeKey={storeKey}
-              isWorktree={isWorktreeStatus}
-              mode={mode}
-              diffTheme={diffTheme}
-              wrapLines={wrapLines}
-            />
-          )}
+        {/* Expanded: shared overlay sidebar column + list scroll (see sidebarChrome) */}
+        <div
+          className={`${mode === "panel" ? gitPanelSidebarColumnClass : overlaySidebarColumnClass} transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
+        >
+          <div className={gitReviewSidebarListScrollClass()}>
+            {gitStatus && gitStatus.staged.length > 0 && (
+              <FileGroup
+                title="Staged"
+                count={gitStatus.staged.length}
+                staged
+                files={gitStatus.staged}
+                project={project}
+                selectedFile={selectedStaged ? selectedFile : null}
+                onSelectFile={onSelectFile}
+                onRefresh={onRefresh}
+                storeKey={storeKey}
+                isWorktree={isWorktreeStatus}
+                mode={mode}
+                diffTheme={diffTheme}
+                wrapLines={wrapLines}
+              />
+            )}
+            {gitStatus && gitStatus.unstaged.length > 0 && (
+              <FileGroup
+                title="Changes"
+                count={gitStatus.unstaged.length}
+                staged={false}
+                files={gitStatus.unstaged}
+                project={project}
+                selectedFile={!selectedStaged ? selectedFile : null}
+                onSelectFile={onSelectFile}
+                onRefresh={onRefresh}
+                storeKey={storeKey}
+                isWorktree={isWorktreeStatus}
+                mode={mode}
+                diffTheme={diffTheme}
+                wrapLines={wrapLines}
+              />
+            )}
+            {mergeConflicting && mergeConflictFiles.length > 0 && (
+              <ConflictGroup files={mergeConflictFiles} />
+            )}
+            {gitStatus &&
+              gitStatus.staged.length === 0 &&
+              gitStatus.unstaged.length === 0 &&
+              !mergeConflicting && (
+                <p
+                  className={`py-4 text-center text-xs text-muted/60 ${mode === "panel" ? "px-2" : "px-0"}`}
+                >
+                  No changes
+                </p>
+              )}
+          </div>
+
           {mergeConflicting && mergeConflictFiles.length > 0 && (
-            <ConflictGroup files={mergeConflictFiles} />
+            <ConflictResolutionActions
+              canResolveWithAgent={canResolveWithAgent}
+              isRunningMergetool={isRunningMergetool}
+              isAbortingMerge={isAbortingMerge}
+              onResolveWithAgent={handleResolveWithAgent}
+              onRunMergetool={handleRunMergetool}
+              onAbortMerge={handleAbortMerge}
+            />
           )}
-          {gitStatus &&
-            gitStatus.staged.length === 0 &&
-            gitStatus.unstaged.length === 0 &&
-            !mergeConflicting && (
-              <p className="px-3 py-4 text-center text-xs text-muted/60">No changes</p>
-            )}
-        </div>
 
-        {mergeConflicting && mergeConflictFiles.length > 0 && (
-          <ConflictResolutionActions
-            canResolveWithAgent={canResolveWithAgent}
-            isRunningMergetool={isRunningMergetool}
-            isAbortingMerge={isAbortingMerge}
-            onResolveWithAgent={handleResolveWithAgent}
-            onRunMergetool={handleRunMergetool}
-            onAbortMerge={handleAbortMerge}
-          />
-        )}
+          {(hasAnyChanges ||
+            hasRemote ||
+            (mergeConflicting && mergeConflictFiles.length === 0)) && (
+            <CommitSyncPanel
+              mergeConflicting={mergeConflicting}
+              mergeConflictFiles={mergeConflictFiles}
+              hasAnyChanges={hasAnyChanges}
+              hasStagedChanges={hasStagedChanges}
+              hasRemote={hasRemote}
+              needsPush={needsPush}
+              ahead={ahead}
+              behind={behind}
+              commitMessage={commitMessage}
+              setCommitMessage={setCommitMessage}
+              canCommitStaged={canCommitStaged}
+              canCommitAll={canCommitAll}
+              canGenerateMessage={canGenerateMessage}
+              isCommitting={isCommitting}
+              isGenerating={isGenerating}
+              isSyncing={isSyncing}
+              isPullingFromSource={isPullingFromSource}
+              isAbortingMerge={isAbortingMerge}
+              isFinishingMerge={isFinishingMerge}
+              showPullFromSource={showPullFromSource}
+              sourceBranch={sourceBranch}
+              sourceAhead={sourceAhead}
+              handleCommit={handleCommit}
+              handleGenerateMessage={handleGenerateMessage}
+              handleSyncOrPush={handleSyncOrPush}
+              handlePullFromSource={handlePullFromSource}
+              handleAbortMerge={handleAbortMerge}
+              handleFinishMerge={handleFinishMerge}
+            />
+          )}
 
-        {(hasAnyChanges || hasRemote || (mergeConflicting && mergeConflictFiles.length === 0)) && (
-          <CommitSyncPanel
-            mergeConflicting={mergeConflicting}
-            mergeConflictFiles={mergeConflictFiles}
-            hasAnyChanges={hasAnyChanges}
-            hasStagedChanges={hasStagedChanges}
-            hasRemote={hasRemote}
-            needsPush={needsPush}
-            ahead={ahead}
-            behind={behind}
-            commitMessage={commitMessage}
-            setCommitMessage={setCommitMessage}
-            canCommitStaged={canCommitStaged}
-            canCommitAll={canCommitAll}
-            canGenerateMessage={canGenerateMessage}
-            isCommitting={isCommitting}
-            isGenerating={isGenerating}
-            isSyncing={isSyncing}
-            isPullingFromSource={isPullingFromSource}
-            isAbortingMerge={isAbortingMerge}
-            isFinishingMerge={isFinishingMerge}
-            showPullFromSource={showPullFromSource}
-            sourceBranch={sourceBranch}
-            sourceAhead={sourceAhead}
-            handleCommit={handleCommit}
-            handleGenerateMessage={handleGenerateMessage}
-            handleSyncOrPush={handleSyncOrPush}
-            handlePullFromSource={handlePullFromSource}
-            handleAbortMerge={handleAbortMerge}
-            handleFinishMerge={handleFinishMerge}
-          />
-        )}
+          {showPrSection && ghAvailable && hasPr && prState !== "closed" && effectivePrKey && (
+            <PrSection
+              prKey={effectivePrKey}
+              prLoading={prLoading}
+              handleMergePr={handleMergePr}
+              handleClosePr={handleClosePr}
+              handleMarkPrReady={handleMarkPrReady}
+            />
+          )}
 
-        {showPrSection && ghAvailable && hasPr && prState !== "closed" && effectivePrKey && (
-          <PrSection
-            prKey={effectivePrKey}
-            prLoading={prLoading}
-            handleMergePr={handleMergePr}
-            handleClosePr={handleClosePr}
-            handleMarkPrReady={handleMarkPrReady}
-          />
-        )}
-
-        {showCreatePrButton && (
-          <div className="space-y-2 border-t border-white/6 px-3 pt-2">
-            <Button
-              variant="tertiary"
-              className="w-full"
-              onPress={() => setCreatePrModalOpen(true)}
+          {showCreatePrButton && (
+            <div
+              className={`space-y-2 border-t border-white/6 pt-2 ${mode === "panel" ? "px-2" : "px-0"}`}
             >
-              <GitPullRequest className="size-3.5" />
-              Create Pull Request
-            </Button>
-          </div>
-        )}
+              <Button
+                variant="tertiary"
+                className="w-full"
+                onPress={() => setCreatePrModalOpen(true)}
+              >
+                <GitPullRequest className="size-3.5" />
+                Create Pull Request
+              </Button>
+            </div>
+          )}
 
-        <CreatePrModal
-          isOpen={createPrModalOpen}
-          onOpenChange={setCreatePrModalOpen}
-          effectiveBranch={effectiveBranch}
-          sourceBranch={sourceBranch}
-          prTitle={prTitle}
-          setPrTitle={setPrTitle}
-          prBody={prBody}
-          setPrBody={setPrBody}
-          prTargetBranch={prTargetBranch}
-          setPrTargetBranch={setPrTargetBranch}
-          prLoading={prLoading}
-          isGeneratingPr={isGeneratingPr}
-          canGenerateMessage={canGenerateMessage}
-          branchList={branchList}
-          handleCreatePr={handleCreatePr}
-          handleGeneratePrSummary={handleGeneratePrSummary}
-        />
-
-        {showMergeSection && (
-          <MergeToSourceSection
-            sourceBranchLoading={sourceBranchLoading}
+          <CreatePrModal
+            isOpen={createPrModalOpen}
+            onOpenChange={setCreatePrModalOpen}
+            effectiveBranch={effectiveBranch}
             sourceBranch={sourceBranch}
-            worktreeBranch={worktreeBranch}
-            commitsAhead={commitsAhead}
-            isMerging={isMerging}
-            handleMergeAndRemove={handleMergeAndRemove}
-            handleMergeOnly={handleMergeOnly}
+            prTitle={prTitle}
+            setPrTitle={setPrTitle}
+            prBody={prBody}
+            setPrBody={setPrBody}
+            prTargetBranch={prTargetBranch}
+            setPrTargetBranch={setPrTargetBranch}
+            prLoading={prLoading}
+            isGeneratingPr={isGeneratingPr}
+            canGenerateMessage={canGenerateMessage}
+            branchList={branchList}
+            handleCreatePr={handleCreatePr}
+            handleGeneratePrSummary={handleGeneratePrSummary}
           />
-        )}
 
-        {mode !== "panel" && (
-          <div className="space-y-1 border-t border-white/6 pt-2">
-            <SidebarButton
-              icon={<ArrowLeft className="size-4" />}
-              label="Return to app"
-              onPress={onClose}
+          {showMergeSection && (
+            <MergeToSourceSection
+              sourceBranchLoading={sourceBranchLoading}
+              sourceBranch={sourceBranch}
+              worktreeBranch={worktreeBranch}
+              commitsAhead={commitsAhead}
+              isMerging={isMerging}
+              handleMergeAndRemove={handleMergeAndRemove}
+              handleMergeOnly={handleMergeOnly}
             />
-            <SidebarButton
-              icon={<PanelLeftClose className="size-4" />}
-              label="Hide sidebar"
-              onPress={collapse}
-            />
-          </div>
-        )}
+          )}
+
+          {mode !== "panel" && (
+            <div className={sidebarFooterNavClass}>
+              <SidebarButton
+                icon={<ArrowLeft className="size-4" />}
+                label="Return to app"
+                onPress={onClose}
+              />
+              <SidebarButton
+                icon={<PanelLeftClose className="size-4" />}
+                label="Hide sidebar"
+                onPress={collapse}
+              />
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </GitReviewPadXProvider>
   );
 }

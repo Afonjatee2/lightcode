@@ -48,7 +48,10 @@ export function readCodexSessionIndex(): Array<{
 }
 
 export function parseCodexRolloutIdFromPath(path: string): string | undefined {
-  const match = /^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(.+)\.jsonl$/i.exec(basename(path));
+  // Codex rollouts on Windows arrive with `\` separators; node:path/basename on
+  // posix doesn't treat `\` as a separator, so normalise first.
+  const leaf = basename(path.replace(/\\/g, "/"));
+  const match = /^rollout-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-(.+)\.jsonl$/i.exec(leaf);
   return match?.[1];
 }
 

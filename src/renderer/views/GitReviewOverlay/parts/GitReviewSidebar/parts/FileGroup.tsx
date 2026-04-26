@@ -5,6 +5,7 @@ import type { GitFileChange, Project } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { StackedFileCard } from "../../GitStackedDiff";
+import { useGitReviewRowPadX } from "../gitReviewPadXContext";
 import { FileRow } from "./FileRow";
 
 export function FileGroup(props: {
@@ -37,6 +38,7 @@ export function FileGroup(props: {
     diffTheme,
     wrapLines,
   } = props;
+  const rowPadX = useGitReviewRowPadX();
   const [expanded, setExpanded] = useState(true);
   const [revertAllOpen, setRevertAllOpen] = useState(false);
   const inlineDiffs = mode === "panel";
@@ -73,7 +75,9 @@ export function FileGroup(props: {
 
   return (
     <div>
-      <div className="group/header flex w-full items-center gap-1 px-3 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
+      <div
+        className={`group/header flex w-full items-center gap-1 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted ${rowPadX}`}
+      >
         <button
           type="button"
           className="flex cursor-default items-center gap-1"

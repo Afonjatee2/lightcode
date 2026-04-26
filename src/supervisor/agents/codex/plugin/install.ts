@@ -1,17 +1,30 @@
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
+import {
+  constants as fsConstants,
+  copyFileSync as fsCopyFileSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  symlinkSync,
+  statSync,
+  writeFileSync,
+  existsSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import type { AgentEnvContext } from "../../base";
-import { resolveWslHomeDirectory } from "../../base";
+import { batchWslCommands, quotePosixShellArg, resolveWslHomeDirectory } from "../../base";
 import { toWslUncPath } from "@/shared/wsl";
 import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
 
 export interface CodexPluginPaths {
   pluginDir: string;
-  /** Path to merged ~/.codex/hooks.json (native) or Linux path in WSL. */
+  /** Private CODEX_HOME used only for Codex processes spawned by Lightcode. */
+  codexHomeDir: string;
+  /** Path to hooks.json inside the private CODEX_HOME. */
   codexHooksPath: string;
   version: string;
 }
@@ -105,7 +118,8 @@ export function getCodexPluginPaths(ctx?: AgentEnvContext, baseDir?: string): Co
   if (isWslContext(ctx)) {
     const home = resolveWslHomeDirectory(ctx.wslDistro);
     const linuxPlugin = home ? `${home}/.lightcode/agent-plugins/codex` : "";
-    const linuxHooks = home ? `${home}/.codex/hooks.json` : "";
+    const linuxCodexHome = linuxPlugin ? `${linuxPlugin}/home` : "";
+    const linuxHooks = linuxCodexHome ? `${linuxCodexHome}/hooks.json` : "";
     let version = "0.0.0";
     if (home) {
       try {
@@ -114,18 +128,24 @@ export function getCodexPluginPaths(ctx?: AgentEnvContext, baseDir?: string): Co
         // ignore
       }
     }
-    return { pluginDir: linuxPlugin, codexHooksPath: linuxHooks, version };
+    return {
+      pluginDir: linuxPlugin,
+      codexHomeDir: linuxCodexHome,
+      codexHooksPath: linuxHooks,
+      version,
+    };
   }
   const paths = resolveLightcodePaths(baseDir);
   const pluginDir = join(paths.agentPluginsDir, "codex");
-  const codexHooksPath = join(homedir(), ".codex", "hooks.json");
+  const codexHomeDir = join(pluginDir, "home");
+  const codexHooksPath = join(codexHomeDir, "hooks.json");
   let version = "0.0.0";
   try {
     version = readManifest(pluginDir).version;
   } catch {
     // ignore
   }
-  return { pluginDir, codexHooksPath, version };
+  return { pluginDir, codexHomeDir, codexHooksPath, version };
 }
 
 function pruneLightcodeGroups(groups: unknown): unknown[] {
@@ -200,6 +220,108 @@ function parseExistingHooks(path: string): unknown | null {
   }
 }
 
+const CODEX_LINK_TARGETS = [
+  { name: "sessions", kind: "dir" as const },
+  { name: "session_index.jsonl", kind: "file" as const },
+  { name: "auth.json", kind: "file" as const },
+  { name: "config.toml", kind: "file" as const },
+];
+
+function seedNativeCodexHome(codexHomeDir: string): void {
+  mkdirSync(codexHomeDir, { recursive: true });
+  const globalCodexHome = join(homedir(), ".codex");
+  mkdirSync(join(globalCodexHome, "sessions"), { recursive: true });
+  if (!existsSync(join(globalCodexHome, "session_index.jsonl"))) {
+    writeFileSync(join(globalCodexHome, "session_index.jsonl"), "", { flag: "a" });
+  }
+  restorePrivateStateFile(codexHomeDir, globalCodexHome, "auth.json");
+  restorePrivateStateFile(codexHomeDir, globalCodexHome, "config.toml");
+
+  for (const { name, kind } of CODEX_LINK_TARGETS) {
+    ensureNativeStateLink(join(globalCodexHome, name), join(codexHomeDir, name), kind);
+  }
+}
+
+function restorePrivateStateFile(
+  codexHomeDir: string,
+  globalCodexHome: string,
+  file: "auth.json" | "config.toml",
+): void {
+  const source = join(codexHomeDir, file);
+  const target = join(globalCodexHome, file);
+  if (existsSync(target) || !existsSync(source)) return;
+  try {
+    fsCopyFileSync(source, target);
+  } catch {
+    // Best-effort recovery for Windows when file symlinks were unavailable.
+  }
+}
+
+function pathExistsOrSymlink(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function ensureNativeStateLink(source: string, target: string, kind: "dir" | "file"): void {
+  if (pathExistsOrSymlink(target)) return;
+  mkdirSync(dirname(target), { recursive: true });
+  try {
+    symlinkSync(source, target, kind === "dir" && process.platform === "win32" ? "junction" : kind);
+    return;
+  } catch {
+    // Fall through to hard-link/copy compatibility for platforms where file
+    // symlinks are disabled.
+  }
+  if (kind === "file" && existsSync(source)) {
+    try {
+      linkSync(source, target);
+      return;
+    } catch {
+      try {
+        // COPYFILE_EXCL: fail-closed if the target appeared between checks
+        // (e.g., concurrent install) so we never clobber an existing link.
+        fsCopyFileSync(source, target, fsConstants.COPYFILE_EXCL);
+      } catch {
+        // Best-effort compatibility seed; Codex can still recreate state.
+      }
+    }
+  }
+}
+
+function seedWslCodexHome(distro: string, home: string, linuxCodexHome: string): void {
+  const uncCodexHome = toWslUncPath(distro, linuxCodexHome);
+  mkdirSync(uncCodexHome, { recursive: true });
+  const globalCodexHome = `${home}/.codex`;
+  const linkExists = (path: string) =>
+    `[ -e ${quotePosixShellArg(path)} ] || [ -L ${quotePosixShellArg(path)} ]`;
+  // ln -s can fail on Windows-mounted filesystems (9p / DrvFs). For files,
+  // fall back to hardlink, then copy. Dirs only get the symlink attempt.
+  const linkLine = (name: string, kind: "dir" | "file") => {
+    const target = quotePosixShellArg(`${linuxCodexHome}/${name}`);
+    const source = quotePosixShellArg(`${globalCodexHome}/${name}`);
+    const attempts = [
+      linkExists(`${linuxCodexHome}/${name}`),
+      `ln -s ${source} ${target}`,
+      ...(kind === "file" ? [`ln ${source} ${target}`, `cp ${source} ${target}`] : []),
+    ];
+    return attempts.join(" || ");
+  };
+  const script = [
+    [
+      "mkdir -p",
+      quotePosixShellArg(linuxCodexHome),
+      quotePosixShellArg(`${globalCodexHome}/sessions`),
+    ].join(" "),
+    `touch ${quotePosixShellArg(`${globalCodexHome}/session_index.jsonl`)}`,
+    ...CODEX_LINK_TARGETS.map(({ name, kind }) => linkLine(name, kind)),
+  ].join("\n");
+  batchWslCommands(distro, [script]);
+}
+
 const MIN_CODEX_SEMVER = [0, 122, 0] as const;
 
 export function parseCodexVersionLine(line: string): [number, number, number] | null {
@@ -270,7 +392,9 @@ export function installCodexPlugin(
 
   const paths = resolveLightcodePaths(baseDir);
   const pluginDir = join(paths.agentPluginsDir, "codex");
+  const codexHomeDir = join(pluginDir, "home");
   mkdirSync(pluginDir, { recursive: true });
+  seedNativeCodexHome(codexHomeDir);
 
   if (!isFresh(sourceDir, pluginDir)) {
     for (const file of ASSET_FILES) {
@@ -279,10 +403,10 @@ export function installCodexPlugin(
   }
 
   const forwardPath = join(pluginDir, "forward.mjs");
-  const hooksPath = join(homedir(), ".codex", "hooks.json");
+  const hooksPath = join(codexHomeDir, "hooks.json");
   const existing = parseExistingHooks(hooksPath);
   if (existing === null && existsSync(hooksPath)) {
-    return { ok: false, reason: "malformed ~/.codex/hooks.json (invalid JSON)" };
+    return { ok: false, reason: "malformed private Codex hooks.json (invalid JSON)" };
   }
 
   try {
@@ -291,14 +415,14 @@ export function installCodexPlugin(
   } catch (error) {
     return {
       ok: false,
-      reason: `failed to write ~/.codex/hooks.json: ${
+      reason: `failed to write private Codex hooks.json: ${
         error instanceof Error ? error.message : String(error)
       }`,
     };
   }
 
   console.log(
-    `[supervisor] Codex hook plugin staged v${manifest.version} at ${pluginDir}; merged ${hooksPath}`,
+    `[supervisor] Codex hook plugin staged v${manifest.version} at ${pluginDir}; wrote private CODEX_HOME ${codexHomeDir}`,
   );
 
   return {
@@ -306,6 +430,7 @@ export function installCodexPlugin(
     version: manifest.version,
     paths: {
       pluginDir,
+      codexHomeDir,
       codexHooksPath: hooksPath,
       version: manifest.version,
     },
@@ -330,12 +455,17 @@ function installCodexPluginWsl(
 
   const home = deploy.home;
   const linuxForward = `${deploy.linuxBaseDir}/agent-plugins/codex/forward.mjs`;
-  const linuxHooksPath = `${home}/.codex/hooks.json`;
+  const linuxCodexHome = `${deploy.linuxBaseDir}/agent-plugins/codex/home`;
+  seedWslCodexHome(distro, home, linuxCodexHome);
+  const linuxHooksPath = `${linuxCodexHome}/hooks.json`;
   const uncHooks = toWslUncPath(distro, linuxHooksPath);
 
   const existing = parseExistingHooks(uncHooks);
   if (existing === null && existsSync(uncHooks)) {
-    return { ok: false, reason: `malformed ~/.codex/hooks.json in wsl distro ${distro}` };
+    return {
+      ok: false,
+      reason: `malformed private Codex hooks.json in wsl distro ${distro}`,
+    };
   }
 
   try {
@@ -352,7 +482,7 @@ function installCodexPluginWsl(
   }
 
   console.log(
-    `[supervisor] Codex hook plugin staged v${manifest.version} in WSL distro ${distro} at ${deploy.linuxBaseDir}/agent-plugins/codex; merged ${linuxHooksPath}`,
+    `[supervisor] Codex hook plugin staged v${manifest.version} in WSL distro ${distro} at ${deploy.linuxBaseDir}/agent-plugins/codex; wrote private CODEX_HOME ${linuxCodexHome}`,
   );
 
   return {
@@ -360,6 +490,7 @@ function installCodexPluginWsl(
     version: manifest.version,
     paths: {
       pluginDir: `${deploy.linuxBaseDir}/agent-plugins/codex`,
+      codexHomeDir: linuxCodexHome,
       codexHooksPath: linuxHooksPath,
       version: manifest.version,
     },
@@ -375,7 +506,8 @@ export function isCodexPluginInstalled(
   }
   const paths = resolveLightcodePaths(baseDir);
   const pluginDir = join(paths.agentPluginsDir, "codex");
-  const hooksPath = join(homedir(), ".codex", "hooks.json");
+  const codexHomeDir = join(pluginDir, "home");
+  const hooksPath = join(codexHomeDir, "hooks.json");
   if (!existsSync(join(pluginDir, "plugin.json"))) return Promise.resolve({ installed: false });
   if (!existsSync(join(pluginDir, "forward.mjs"))) return Promise.resolve({ installed: false });
   if (!existsSync(hooksPath)) return Promise.resolve({ installed: false });
@@ -413,7 +545,8 @@ function isCodexPluginInstalledWslSync(distro: string): { installed: boolean; ve
   const home = resolveWslHomeDirectory(distro);
   if (!home) return { installed: false };
   const linuxPlugin = `${home}/.lightcode/agent-plugins/codex`;
-  const linuxHooks = `${home}/.codex/hooks.json`;
+  const linuxCodexHome = `${linuxPlugin}/home`;
+  const linuxHooks = `${linuxCodexHome}/hooks.json`;
   const uncPlugin = toWslUncPath(distro, linuxPlugin);
   const uncHooks = toWslUncPath(distro, linuxHooks);
   if (!existsSync(join(uncPlugin, "plugin.json"))) return { installed: false };

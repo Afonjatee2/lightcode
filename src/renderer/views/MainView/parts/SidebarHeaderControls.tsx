@@ -21,7 +21,7 @@ export function SidebarHeaderControls(props: { wslAvailable: boolean }) {
   const threadSortMode = usePanelStore((s) => s.threadSortMode);
 
   return (
-    <div className="lightcode-overlay-header__controls">
+    <div className="lightcode-overlay-header__controls flex items-center gap-1.5">
       {isWindows() ? (
         <Dropdown>
           <Button

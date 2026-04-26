@@ -307,7 +307,7 @@ export function ThreadComposer(props: {
         className={editorClassName}
         disabled={promptDisabled}
         placeholder={placeholder}
-        rows={3}
+        rows={1}
         value={prompt}
         variant="secondary"
         onChange={(event) => onPromptChange(event.target.value)}

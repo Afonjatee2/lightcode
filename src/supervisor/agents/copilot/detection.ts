@@ -57,7 +57,7 @@ const ghAuthProbe: AuthProbe = async (ctx) => {
   }
   const ghPath = await resolveExecutablePathAsync("gh");
   if (!ghPath) return "unknown";
-  const result = await readCommandOutputAsync("gh", ["auth", "status"]);
+  const result = await readCommandOutputAsync(ghPath, ["auth", "status"]);
   return result.ok ? "authenticated" : "unknown";
 };
 

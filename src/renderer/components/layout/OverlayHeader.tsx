@@ -24,13 +24,15 @@ export function OverlayHeader(props: {
       {onTitleClick ? (
         <button
           type="button"
-          className="lightcode-overlay-header__controls text-xs font-semibold uppercase tracking-[0.12em] text-muted hover:text-foreground transition-colors"
+          className="lightcode-overlay-header__controls text-xs font-semibold leading-none uppercase tracking-[0.12em] text-muted hover:text-foreground transition-colors"
           onClick={onTitleClick}
         >
           {title}
         </button>
       ) : (
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">{title}</p>
+        <p className="text-xs font-semibold leading-none uppercase tracking-[0.12em] text-muted">
+          {title}
+        </p>
       )}
 
       {children}

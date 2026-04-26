@@ -1,8 +1,97 @@
 import type { ReactNode } from "react";
-import { Button, Popover } from "@heroui/react";
-import { EllipsisVertical } from "lucide-react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { Button, Popover, Tooltip } from "@heroui/react";
+import { EllipsisVertical, House } from "lucide-react";
 import { isMac } from "@/renderer/bridge";
 import { AppShell } from "@/renderer/views/MainView/parts/AppShell/AppShell";
+
+/** When the sidebar header content is narrower than this, hide the wordmark. */
+const SIDEBAR_HEADER_WORDMARK_MIN_PX = 210;
+
+function SidebarHeaderWordmark(props: {
+  title: string;
+  onTitleClick?: () => void;
+  hideWordmark: boolean;
+}) {
+  const { title, onTitleClick, hideWordmark } = props;
+
+  if (hideWordmark) {
+    if (onTitleClick) {
+      return (
+        <Tooltip delay={150}>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="ghost"
+              aria-label={title}
+              className="lightcode-overlay-header__controls size-6 min-w-0 shrink-0 text-muted hover:text-foreground"
+              onPress={onTitleClick}
+            >
+              <House className="size-3.5" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content placement="bottom">{title}</Tooltip.Content>
+        </Tooltip>
+      );
+    }
+    return <p className="sr-only">{title}</p>;
+  }
+
+  if (onTitleClick) {
+    return (
+      <button
+        type="button"
+        className="lightcode-overlay-header__controls shrink-0 text-xs font-semibold leading-none uppercase tracking-[0.12em] text-muted transition-colors hover:text-foreground"
+        onClick={onTitleClick}
+      >
+        {title}
+      </button>
+    );
+  }
+
+  return (
+    <p className="shrink-0 text-xs font-semibold leading-none uppercase tracking-[0.12em] text-muted">
+      {title}
+    </p>
+  );
+}
+
+function SidebarHeaderRow(props: {
+  title: string;
+  onTitleClick?: () => void;
+  children?: ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [hideWordmark, setHideWordmark] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const update = () => {
+      setHideWordmark(el.getBoundingClientRect().width < SIDEBAR_HEADER_WORDMARK_MIN_PX);
+    };
+
+    update();
+    const ro = new ResizeObserver(() => update());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="flex min-h-0 min-w-0 flex-1 items-center gap-1.5">
+      {isMac() && <div className="w-[60px] shrink-0" />}
+      <SidebarHeaderWordmark
+        title={props.title}
+        {...(props.onTitleClick != null ? { onTitleClick: props.onTitleClick } : {})}
+        hideWordmark={hideWordmark}
+      />
+      {props.children}
+      <div className="flex-1" />
+    </div>
+  );
+}
 
 /**
  * Shared page layout: split header (sidebar + content) + AppShell body.
@@ -32,22 +121,9 @@ export function PageLayout(props: {
   } = props;
 
   const sidebarHeader = (
-    <>
-      {isMac() && <div className="w-[60px] shrink-0" />}
-      {onTitleClick ? (
-        <button
-          type="button"
-          className="lightcode-overlay-header__controls text-xs font-semibold uppercase tracking-[0.12em] text-muted hover:text-foreground transition-colors"
-          onClick={onTitleClick}
-        >
-          {title}
-        </button>
-      ) : (
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">{title}</p>
-      )}
+    <SidebarHeaderRow title={title} {...(onTitleClick != null ? { onTitleClick } : {})}>
       {sidebarHeaderChildren}
-      <div className="flex-1" />
-    </>
+    </SidebarHeaderRow>
   );
 
   const collapsedSidebarHeader = sidebarHeaderChildren ? (

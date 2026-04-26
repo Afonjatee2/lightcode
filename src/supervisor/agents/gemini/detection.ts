@@ -45,11 +45,14 @@ export const geminiDetectionSpec: DetectionSpec = {
     const probeCmd =
       ctx.location.kind === "wsl"
         ? buildAgentCommand(ctx.location, "gemini", ["--acp"], ctx.executablePath)
-        : buildAgentCommand({ kind: "windows", path: homedir() }, "gemini", ["--acp"]);
+        : buildAgentCommand(ctx.location, ctx.executablePath, ["--acp"]);
     const probeCwd = ctx.location.kind === "wsl" ? "/tmp" : homedir();
     const probeResult = await probeAcpCapabilities(probeCmd.command, probeCmd.args, probeCwd, {
       timeoutMs: 15_000,
-      label: ctx.location.kind === "wsl" ? `gemini:wsl:${ctx.location.distro}` : "gemini:windows",
+      label:
+        ctx.location.kind === "wsl"
+          ? `gemini:wsl:${ctx.location.distro}`
+          : `gemini:${ctx.location.kind}`,
     });
     if (!probeResult) return undefined;
     return {

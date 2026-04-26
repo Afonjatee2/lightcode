@@ -121,13 +121,58 @@ export function GitReviewOverlay(props: {
   return (
     <PageLayout
       title="Git Review"
-      sidebarHeaderChildren={
-        <span className="min-w-0 truncate font-mono text-[13px] font-medium tracking-tight text-muted">
-          {project.name}
-        </span>
-      }
       contentHeaderChildren={
         <>
+          <div className="lightcode-overlay-header__controls flex min-w-0 shrink items-center gap-2">
+            <span className="min-w-0 max-w-[min(200px,30vw)] truncate font-mono text-[13px] font-medium leading-none tracking-tight text-muted">
+              {project.name}
+            </span>
+            {gitStatus?.branch ? (
+              <>
+                {statusKey ? (
+                  <Tooltip delay={300}>
+                    <Tooltip.Trigger
+                      tabIndex={-1}
+                      className="min-w-0 max-w-[min(140px,20vw)] shrink"
+                    >
+                      <span className="inline-flex h-5 w-full min-w-0 items-center gap-1 rounded-md px-1.5 text-xs text-muted">
+                        <GitBranch className="size-3 shrink-0 text-muted/50" />
+                        <span className="min-w-0 truncate">{gitStatus.branch}</span>
+                      </span>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
+                  </Tooltip>
+                ) : (
+                  <BranchSelector
+                    projectId={project.id}
+                    currentBranch={gitStatus.branch}
+                    value={gitStatus.branch}
+                    onSwitchBranch={handleSwitchBranch}
+                    hideWorktreeToggle
+                    popoverPlacement="bottom"
+                    trigger={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 min-w-0 max-w-[min(140px,24vw)] shrink px-1.5 text-xs text-muted"
+                        aria-label="Switch branch"
+                      >
+                        <GitBranch className="size-3 shrink-0 text-muted/50" />
+                        <span className="min-w-0 truncate">{gitStatus.branch}</span>
+                        <ChevronDown className="size-3 shrink-0" />
+                      </Button>
+                    }
+                  />
+                )}
+                {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
+                  <span className="shrink-0 text-xs text-muted/60">
+                    ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
+                  </span>
+                )}
+              </>
+            ) : null}
+          </div>
           {selectedFile && (
             <div className="lightcode-overlay-header__controls flex items-center gap-3">
               <button
@@ -147,7 +192,7 @@ export function GitReviewOverlay(props: {
           <div className="flex-1" />
 
           {!selectedFile && (
-            <div className="lightcode-overlay-header__controls">
+            <div className="lightcode-overlay-header__controls flex items-center">
               <Dropdown>
                 <Button variant="ghost" size="sm" className="h-5 px-1.5 text-xs text-muted">
                   {diffFilter === "changes"
@@ -184,45 +229,6 @@ export function GitReviewOverlay(props: {
           )}
 
           <div className="lightcode-overlay-header__controls flex items-center gap-1">
-            {gitStatus?.branch ? (
-              <div className="flex items-center gap-1 text-xs text-muted">
-                {statusKey ? (
-                  <>
-                    <GitBranch className="size-3 shrink-0 text-muted/50" />
-                    <Tooltip delay={300}>
-                      <Tooltip.Trigger tabIndex={-1} role="none">
-                        <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
-                      </Tooltip.Trigger>
-                      <Tooltip.Content placement="bottom">{gitStatus.branch}</Tooltip.Content>
-                    </Tooltip>
-                  </>
-                ) : (
-                  <BranchSelector
-                    projectId={project.id}
-                    currentBranch={gitStatus.branch}
-                    value={gitStatus.branch}
-                    onSwitchBranch={handleSwitchBranch}
-                    hideWorktreeToggle
-                    popoverPlacement="bottom"
-                    trigger={
-                      <button
-                        type="button"
-                        className="flex min-w-0 cursor-pointer items-center gap-1 rounded px-1.5 hover:bg-foreground/5"
-                        aria-label="Switch branch"
-                      >
-                        <GitBranch className="size-3 shrink-0 text-muted/50" />
-                        <span className="max-w-[120px] truncate">{gitStatus.branch}</span>
-                      </button>
-                    }
-                  />
-                )}
-                {((gitStatus.behind ?? 0) > 0 || (gitStatus.ahead ?? 0) > 0) && (
-                  <span className="text-muted/60">
-                    ↓{gitStatus.behind ?? 0} ↑{gitStatus.ahead ?? 0}
-                  </span>
-                )}
-              </div>
-            ) : null}
             <button
               type="button"
               className="rounded p-1 text-muted hover:text-foreground"

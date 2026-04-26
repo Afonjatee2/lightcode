@@ -64,8 +64,9 @@ export interface SessionRuntime {
   /**
    * True when `LIGHTCODE_HOOK_URL` (and related vars) were injected into the
    * agent PTY at spawn (L1 path: host or WSL bridge → HookIngress). Used so the
-   * UI can show Enhanced (Hooks) before the first routed hook event; L2 parsing
-   * still waits for {@link hasCliHookPluginActivity}. Cleared on PTY exit.
+   * UI can show Enhanced (Hooks) before the first routed hook event; once set,
+   * PTY status parsing stays off unless the dev toggle disables L1. Cleared on
+   * PTY exit.
    */
   cliHookEnvInjected?: boolean;
   /**

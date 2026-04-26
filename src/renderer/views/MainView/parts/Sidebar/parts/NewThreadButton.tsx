@@ -36,6 +36,8 @@ export function NewThreadButton(props: {
       }}
     >
       <SidebarButton
+        size="xs"
+        liveText
         ref={newThreadRef}
         icon={<Plus className="size-4" />}
         label={props.hasDraft ? "New thread (draft)" : "New thread"}

@@ -22,6 +22,7 @@ export function openTerminal(projectId: string): void {
       store.closePanel();
     } else {
       closeAllPanels();
+      store.closePanel();
     }
     return;
   }
@@ -55,6 +56,7 @@ export function openWorktreeTerminal(projectId: string, worktreePath: string): v
       store.closePanel();
     } else {
       closeAllPanels();
+      store.closePanel();
     }
     return;
   }

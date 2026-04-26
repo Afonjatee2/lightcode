@@ -24,6 +24,7 @@ import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang } from "./
 import { getBasename } from "@/shared/pathUtils";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
 import { ConfirmDialog } from "@/renderer/components/common/ConfirmDialog";
+import { useGitReviewRowPadX } from "./GitReviewSidebar/gitReviewPadXContext";
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -59,6 +60,7 @@ export function StackedFileCard(props: {
   isWorktree?: boolean;
 }) {
   const { file, project, theme, wrapLines, onRefresh, storeKey, isWorktree } = props;
+  const rowPadX = useGitReviewRowPadX();
   const [expanded, setExpanded] = useState(false);
   const [revertOpen, setRevertOpen] = useState(false);
   const [diffFile, setDiffFile] = useState<DiffFile | null>(null);
@@ -178,7 +180,7 @@ export function StackedFileCard(props: {
         <div
           role="button"
           tabIndex={0}
-          className="sticky top-0 z-10 bg-[var(--content-background)] group flex cursor-pointer select-none items-center gap-1.5 px-3 py-1 text-xs transition-colors hover:bg-content2"
+          className={`sticky top-0 z-10 bg-[var(--content-background)] group flex cursor-pointer select-none items-center gap-1.5 py-1 text-xs transition-colors hover:bg-content2 ${rowPadX}`}
           onClick={() => setExpanded((v) => !v)}
           onKeyDown={(e) => handleKeyActivate(e, () => setExpanded((v) => !v))}
         >

@@ -53,7 +53,12 @@ import {
 import { ContextMenu, SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import { SIDEBAR_MIN_WIDTH } from "@/renderer/views/MainView/parts/AppShell/parts/useResizablePanels";
-import { isWindows, readBridge } from "@/renderer/bridge";
+import {
+  sidebarBodyScrollClass,
+  sidebarColumnLayoutClass,
+  sidebarFooterNavClass,
+} from "@/renderer/components/layout/sidebarChrome";
+import { readBridge } from "@/renderer/bridge";
 import { formatBytes } from "@/shared/formatBytes";
 import { useUpdateStore } from "@/renderer/state/updateStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -207,7 +212,7 @@ function UpdateButtons(props: { iconOnly?: boolean }) {
     }
 
     return (
-      <div className="flex w-full items-center gap-2 rounded-3xl px-3 py-1.5 text-sm text-muted">
+      <div className="flex w-full items-center gap-2 rounded-3xl px-2 py-1.5 text-sm text-muted">
         <Download className="size-4 shrink-0 animate-pulse text-accent" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="truncate">
@@ -495,6 +500,8 @@ function SortableThreadItem(props: {
         }}
       >
         <SidebarButton
+          size="xs"
+          statusTone={statusTone}
           icon={
             <ProviderIcon kind={thread.agentKind} tone={statusTone} className="size-3.5 shrink-0" />
           }
@@ -516,8 +523,6 @@ function SortableThreadItem(props: {
           }
           tooltip={editingThreadId === thread.id ? undefined : thread.title}
           isActive={isCurrentThread}
-          liveText={statusTone !== "inactive" && statusTone !== "done"}
-          className={isDragging ? "opacity-60" : ""}
           onPress={() => props.onOpenThread(thread.id)}
           onDoubleClick={() => props.setEditingThreadId(thread.id)}
           isDragging={isDragging}
@@ -792,7 +797,7 @@ function SortableWorktreeGroup(props: {
         />
       </ContextMenu>
       {!isGroupCollapsed && (
-        <div className="space-y-0.5 pl-2">
+        <div className="space-y-0.5">
           {group.threads.map((thread, threadIdx) => (
             <SortableThreadItem
               key={thread.id}
@@ -869,6 +874,8 @@ function NewThreadButton(props: {
       }}
     >
       <SidebarButton
+        size="xs"
+        liveText
         ref={newThreadRef}
         icon={<Plus className="size-4" />}
         label={props.hasDraft ? "New thread (draft)" : "New thread"}
@@ -1019,14 +1026,18 @@ function SortableProjectHeader(props: {
           }
           label={
             <span className="flex items-center gap-1.5">
-              <span className="truncate font-semibold text-foreground">{project.name}</span>
+              <span className="truncate text-xs font-semibold text-foreground">{project.name}</span>
               {project.location.kind === "wsl" && (
                 <TuxIcon className="h-3 w-auto shrink-0 text-muted/60" />
               )}
             </span>
           }
           tooltip={projectLocation}
-          className={isDragging ? "opacity-60" : ""}
+          className={
+            isDragging
+              ? "lightcode-sidebar-project-nudge !pl-1 opacity-60"
+              : "lightcode-sidebar-project-nudge !pl-1"
+          }
           onPress={() =>
             props.setCollapsedProjects((current) => ({
               ...current,
@@ -1098,7 +1109,7 @@ function SortableProjectHeader(props: {
       </ContextMenu>
 
       {!isProjectCollapsed ? (
-        <div className="space-y-0.5 pl-3">
+        <div className="space-y-0.5">
           <NewThreadButton
             projectId={project.id}
             hasDraft={hasDraft}
@@ -1302,7 +1313,7 @@ function SortableProjectHeader(props: {
                         }
                       }}
                     >
-                      <div className="flex w-full items-center gap-1 rounded px-2 py-1">
+                      <div className="flex w-full items-center gap-1 rounded px-1.5 py-1">
                         <button
                           type="button"
                           className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-medium text-muted transition-colors hover:text-foreground"
@@ -1355,7 +1366,7 @@ function SortableProjectHeader(props: {
                       </div>
                     </ContextMenu>
                     {!isGroupCollapsed && (
-                      <div className="space-y-0.5 pl-2">
+                      <div className="space-y-0.5">
                         {entry.group.threads.map((thread, threadIdx) => (
                           <SortableThreadItem
                             key={thread.id}
@@ -1403,7 +1414,7 @@ function SortableProjectHeader(props: {
                 <>
                   {recentEntries.map((entry, i) => renderEntry(entry, i))}
                   {hasBothSections && (
-                    <div className="px-2 pb-0.5 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted">
+                    <div className="px-1.5 pb-0.5 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted">
                       Older
                     </div>
                   )}
@@ -1594,12 +1605,10 @@ export function Sidebar() {
 
       {/* Full expanded sidebar — icons centered at 24px (branding px-3 + w-6/2, buttons px-4 + w-4/2) */}
       <div
-        className={`flex h-full min-h-0 flex-col gap-3 px-3 pb-1 pt-0 ${isCollapsed ? "invisible" : ""}`}
+        className={`${sidebarColumnLayoutClass} ${isCollapsed ? "invisible" : ""}`}
         style={{ minWidth: SIDEBAR_MIN_WIDTH }}
       >
-        <div
-          className={`min-h-0 flex-1 overflow-y-auto px-0 -mr-3 [scrollbar-gutter:stable] ${!isWindows() ? "pr-3" : ""}`}
-        >
+        <div className={sidebarBodyScrollClass()}>
           {projects.length === 0 ? (
             <div className="pt-4">
               <p className="text-center text-sm text-muted">Add a project to start</p>
@@ -1660,7 +1669,7 @@ export function Sidebar() {
           )}
         </div>
 
-        <div className="space-y-1 border-t border-white/6 pt-2">
+        <div className={sidebarFooterNavClass}>
           <UpdateButtons />
           <SidebarButton
             icon={<Settings2 className="size-4" />}

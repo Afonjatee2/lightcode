@@ -55,7 +55,7 @@ export function ProjectTreeView(props: {
       }}
     >
       <div
-        className="flex h-full min-h-0 flex-col bg-[var(--content-background)]"
+        className="flex h-full min-h-0 flex-col bg-inherit"
         onDragOver={(event) => {
           event.preventDefault();
           useProjectTreeStore.getState().setDropTargetPath("");
@@ -82,7 +82,7 @@ export function ProjectTreeView(props: {
           }
         }}
       >
-        <div className="flex items-center gap-2 border-b border-[color:var(--border)] px-3 py-2">
+        <div className="flex items-center gap-2 border-b border-[color:var(--border)] px-0 py-2">
           <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-[color:var(--border)] bg-background px-3 py-1.5">
             <Search className="size-3.5 shrink-0 text-muted" />
             <input
@@ -124,7 +124,7 @@ export function ProjectTreeView(props: {
         </div>
 
         <div
-          className={`min-h-0 flex-1 overflow-auto px-2 py-2 ${
+          className={`min-h-0 flex-1 overflow-auto px-0 py-2 ${
             rootIsDropTarget ? "ring-1 ring-inset ring-accent/40" : ""
           }`}
         >

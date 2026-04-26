@@ -1,4 +1,5 @@
 import { toast } from "@heroui/react";
+import { overlaySidebarColumnClass } from "@/renderer/components/layout/sidebarChrome";
 import {
   useFileEditorStore,
   type FileEditorOverlayMode,
@@ -19,10 +20,12 @@ export function ProjectFilesPanel(props: { rootContext: FileEditorRootContext })
   }
 
   return (
-    <ProjectTreeView
-      rootContext={props.rootContext}
-      onSelectFile={handleSelectFile}
-      onPinFile={pinTab}
-    />
+    <div className={overlaySidebarColumnClass}>
+      <ProjectTreeView
+        rootContext={props.rootContext}
+        onSelectFile={handleSelectFile}
+        onPinFile={pinTab}
+      />
+    </div>
   );
 }

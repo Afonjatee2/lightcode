@@ -54,14 +54,18 @@ function hookDebugProjectLabel(loc: ProjectLocation): string {
 export async function writeSubmittedPrompt(
   pty: Pick<IPty, "write">,
   chunks: readonly string[],
+  projectLocation: ProjectLocation,
 ): Promise<void> {
+  // Windows ConPTY + Ink TUI need inner "\n" collapsed to "\r"; on posix/WSL
+  // bare "\r" means Enter, which submits the prompt mid-stream.
+  const rewriteNewlines = projectLocation.kind === "windows";
   for (const chunk of chunks) {
     const waitMatch = chunk.match(/^@wait:(\d+)$/);
     if (waitMatch) {
       await sleep(Number(waitMatch[1]));
       continue;
     }
-    pty.write(chunk.replace(/\r?\n/g, "\r"));
+    pty.write(rewriteNewlines ? chunk.replace(/\r?\n/g, "\r") : chunk);
     await sleep(8);
   }
 }
@@ -104,9 +108,6 @@ function getClaudeL2TerminalEnv(input: {
   cliHookEnvInjected: boolean;
 }): Record<string, string> {
   if (input.agentKind !== "claude") {
-    return {};
-  }
-  if (input.projectLocation.kind !== "windows") {
     return {};
   }
   if (!input.disableCliHookPlugin && input.cliHookEnvInjected) {
@@ -320,6 +321,7 @@ export class ThreadSessionManager {
         prompt,
         "\r",
       ],
+      session.projectLocation,
     );
 
     await sleep(300);
@@ -715,11 +717,11 @@ export class ThreadSessionManager {
       await structuredSession?.ensureResumeArtifacts?.();
     }
 
-    const hasAttachments =
-      payload.segments?.some((segment) => segment.kind === "attachment") ?? false;
-    const deferToTerminal =
-      hasAttachments || (adapter.shouldDeferPromptToTerminal?.(payload.config) ?? false);
-    const launchPrompt = isServerControlled || deferToTerminal ? "" : payload.prompt;
+    const deferToTerminal = adapter.shouldDeferPromptToTerminal?.(payload.config) ?? false;
+    // Use `initialPrompt` (the adapter-formatted version with `~/` shortening
+    // and WSL path rewriting) so attachments hand off cleanly as the launch
+    // arg instead of being staged for a deferred PTY-write.
+    const launchPrompt = isServerControlled || deferToTerminal ? "" : initialPrompt;
     const argv = payload.sessionRef
       ? adapter.buildResumeArgv(
           payload.projectLocation,

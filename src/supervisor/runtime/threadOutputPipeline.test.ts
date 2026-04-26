@@ -160,7 +160,7 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
     expect(emittedStates).toHaveLength(0);
   });
 
-  it("still applies OSC-derived status transitions when hook is active but adapter does not opt in", () => {
+  it("suppresses OSC-derived status transitions when hook is active even without adapter opt-in", () => {
     const emit = vi.fn<() => void>();
     const p = new ThreadOutputPipeline({
       emit,
@@ -195,7 +195,142 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
     } as unknown as SessionRuntime;
     p.handlePtyData(session, "\x1b]9;agent-turn-complete\x07");
     expect(handleOscNotification).toHaveBeenCalled();
+    expect(session.status).toBe("working");
+    const emittedStates = (emit.mock.calls as unknown as Array<[{ type: string }]>)
+      .map((c) => c[0])
+      .filter((e) => e.type === "thread-state");
+    expect(emittedStates).toHaveLength(0);
+  });
+
+  it("suppresses OSC-derived status transitions when hook env was injected before the first hook POST", () => {
+    const emit = vi.fn<() => void>();
+    const p = new ThreadOutputPipeline({
+      emit,
+      isDev: false,
+      logWriter: { append: vi.fn<() => void>() } as never,
+      resolveLogPath: () => "",
+      resolveHintLogPath: () => "",
+      readDisableCliHookPlugin: () => false,
+      onRecoverInvalidSessionRef: vi.fn<() => void>(),
+      onStartQueuedLaunchPrompt: vi.fn<() => void>(),
+      onStartSessionRefDiscovery: vi.fn<() => void>(),
+    });
+    const handleOscNotification = vi.fn<
+      () => { status: "idle"; attention: "none"; corroborated: true }
+    >(() => ({ status: "idle", attention: "none", corroborated: true }));
+    const session = {
+      threadId: "t1",
+      status: "working",
+      attention: "working",
+      config: {},
+      cliHookEnvInjected: true,
+      prevChunk: "",
+      outputLength: 0,
+      outputTranscript: { append: vi.fn<() => void>() },
+      ptyOscCarry: "",
+      adapter: {
+        capabilities: { presentationMode: "terminal" },
+        handleOscNotification,
+        handleOscTitle: () => null,
+        isReadyForInitialPrompt: () => false,
+      },
+      pty: { write: vi.fn<(data: string) => void>() },
+    } as unknown as SessionRuntime;
+
+    p.handlePtyData(session, "\x1b]9;agent-turn-complete\x07");
+
+    expect(handleOscNotification).toHaveBeenCalled();
+    expect(session.status).toBe("working");
+    const emittedStates = (emit.mock.calls as unknown as Array<[{ type: string }]>)
+      .map((c) => c[0])
+      .filter((e) => e.type === "thread-state");
+    expect(emittedStates).toHaveLength(0);
+  });
+
+  it("ignores launch-time working titles for empty resumes so the restored thread can settle idle", () => {
+    const p = pipeline();
+    const session = {
+      threadId: "t1",
+      status: "launching",
+      attention: "none",
+      config: {},
+      launchPrompt: "",
+      prevChunk: "",
+      outputLength: 0,
+      ptyOscCarry: "",
+      adapter: {
+        capabilities: { presentationMode: "terminal" },
+        handleOscTitle: () => ({
+          status: "working" as const,
+          attention: "working" as const,
+          corroborated: true,
+        }),
+      },
+      pty: { write: vi.fn<(data: string) => void>() },
+    } as unknown as SessionRuntime;
+
+    p.handlePtyData(session, "\x1b]0;⠋ Working (2s • esc to interrupt)\x07OpenAI Codex");
+
     expect(session.status).toBe("idle");
+    expect(session.attention).toBe("none");
+  });
+
+  it("still allows launch-time working titles when the launch already has queued work", () => {
+    const p = pipeline();
+    const session = {
+      threadId: "t1",
+      status: "launching",
+      attention: "none",
+      config: {},
+      launchPrompt: "",
+      pendingLaunchPrompt: "Fix the bug",
+      prevChunk: "",
+      outputLength: 0,
+      ptyOscCarry: "",
+      adapter: {
+        capabilities: { presentationMode: "terminal" },
+        handleOscTitle: () => ({
+          status: "working" as const,
+          attention: "working" as const,
+          corroborated: true,
+        }),
+      },
+      pty: { write: vi.fn<(data: string) => void>() },
+    } as unknown as SessionRuntime;
+
+    p.handlePtyData(session, "\x1b]0;⠋ Working (2s • esc to interrupt)\x07OpenAI Codex");
+
+    expect(session.status).toBe("working");
+    expect(session.attention).toBe("working");
+  });
+
+  it("ignores Codex spinner titles while hook env is present and no hook event has landed yet", () => {
+    const p = pipeline();
+    const session = {
+      threadId: "t1",
+      status: "idle",
+      attention: "none",
+      config: {},
+      cliHookEnvInjected: true,
+      launchPrompt: "",
+      prevChunk: "",
+      outputLength: 0,
+      ptyOscCarry: "",
+      adapter: {
+        capabilities: { presentationMode: "terminal" },
+        handleOscTitle: () => ({
+          status: "working" as const,
+          attention: "working" as const,
+          corroborated: true,
+        }),
+      },
+      pty: { write: vi.fn<(data: string) => void>() },
+    } as unknown as SessionRuntime;
+
+    p.handlePtyData(session, "\x1b]0;⠴ lightcode\x07");
+
+    expect(session.status).toBe("idle");
+    expect(session.attention).toBe("none");
   });
 });
 

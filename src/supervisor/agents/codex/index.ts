@@ -12,6 +12,7 @@ import { buildCodexArgvFor } from "./argv";
 import { codexDefaultCapabilities, codexDetectionSpec } from "./detection";
 import { detectRateLimitPrompt } from "./rateLimitPrompt";
 import {
+  getCodexPluginPaths,
   installCodexPlugin,
   isCodexPluginInstalled,
   isCodexSemverSupportedForHooks,
@@ -96,8 +97,10 @@ function codexOscHint(notification: OscNotification): TerminalStatusHint | null 
 }
 
 // Codex animates its working-state spinner inside the window title via OSC 0/2
-// using braille glyphs (U+2800–U+28FF). First braille-prefixed title after an
-// idle→working edge flips us to `working`; idle comes from OSC 9 / hooks.
+// using braille glyphs (U+2800-U+28FF). First braille-prefixed title after an
+// idle->working edge flips us to `working` when L2 is active; idle comes from
+// OSC 9 or hook events. When hook env is wired for the spawn, the supervisor
+// ignores these OSC hints until a real hook event arrives.
 const BRAILLE_PREFIX_RE = /^[⠀-⣿]/;
 
 function codexOscTitleHint(title: OscTitle): TerminalStatusHint | null {
@@ -159,13 +162,16 @@ export function createCodexAdapter(): AgentAdapter {
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },
-    async pluginLaunchExtras() {
-      return { args: ["--enable", "codex_hooks"] };
+    async pluginLaunchExtras(ctx) {
+      const paths = getCodexPluginPaths(ctx, ctx.baseDir);
+      return {
+        args: ["--enable", "codex_hooks"],
+        env: { CODEX_HOME: paths.codexHomeDir },
+      };
     },
     handleOscNotification: codexOscHint,
     handleOscTitle: codexOscTitleHint,
     oscHintsDeferToHookPlugin: true,
-    workingSilenceTimeoutMs: null,
     async detectInstall(ctx) {
       const status = await detectAgentInstall(ctx, codexDetectionSpec);
       capabilities = status.capabilities;

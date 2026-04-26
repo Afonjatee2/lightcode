@@ -138,14 +138,18 @@ export function SortableProjectHeader(props: {
           }
           label={
             <span className="flex items-center gap-1.5">
-              <span className="truncate font-semibold text-foreground">{project.name}</span>
+              <span className="truncate text-xs font-semibold text-foreground">{project.name}</span>
               {project.location.kind === "wsl" && (
                 <TuxIcon className="h-3 w-auto shrink-0 text-muted/60" />
               )}
             </span>
           }
           tooltip={projectLocation}
-          className={isDragging ? "opacity-60" : ""}
+          className={
+            isDragging
+              ? "lightcode-sidebar-project-nudge !pl-1 opacity-60"
+              : "lightcode-sidebar-project-nudge !pl-1"
+          }
           onPress={() =>
             props.setCollapsedProjects((current) => ({
               ...current,
@@ -158,7 +162,7 @@ export function SortableProjectHeader(props: {
       </ContextMenu>
 
       {!isProjectCollapsed ? (
-        <div className="space-y-0.5 pl-3">
+        <div className="space-y-0.5">
           <NewThreadButton
             projectId={project.id}
             hasDraft={hasDraft}

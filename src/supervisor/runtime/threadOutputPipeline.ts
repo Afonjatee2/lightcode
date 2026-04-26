@@ -60,6 +60,31 @@ export function resolveThreadStatusSource(
 export class ThreadOutputPipeline {
   constructor(private readonly options: ThreadOutputPipelineOptions) {}
 
+  private cliHookOwnsStatus(session: SessionRuntime, disableCliHookPlugin?: boolean): boolean {
+    return (
+      session.adapter.capabilities.presentationMode === "terminal" &&
+      !(disableCliHookPlugin ?? this.options.readDisableCliHookPlugin()) &&
+      (session.hasCliHookPluginActivity || session.cliHookEnvInjected === true)
+    );
+  }
+
+  private shouldSuppressLaunchWorkingHint(
+    session: SessionRuntime,
+    hint: TerminalStatusHint,
+  ): boolean {
+    if (session.status !== "launching" || hint.status !== "working") {
+      return false;
+    }
+    if (session.hasCliHookPluginActivity) {
+      return false;
+    }
+    return (
+      session.launchPrompt.trim().length === 0 &&
+      !session.pendingLaunchPrompt &&
+      !session.pendingTerminalPrompt
+    );
+  }
+
   clearSessionTimers(session: SessionRuntime): void {
     if (session.pendingStatusHint) {
       clearTimeout(session.pendingStatusHint.timer);
@@ -77,7 +102,7 @@ export class ThreadOutputPipeline {
 
   getLatestTerminalStatusHint(session: SessionRuntime): TerminalStatusHint | null {
     if (
-      session.hasCliHookPluginActivity ||
+      this.cliHookOwnsStatus(session) ||
       session.adapter.capabilities.presentationMode !== "terminal" ||
       !session.adapter.detectTerminalStatus ||
       session.lastStrippedPtyChunk.length === 0
@@ -140,8 +165,9 @@ export class ThreadOutputPipeline {
   /**
    * Apply a CLI hook plugin state transition. Hook events are treated as 100%
    * authoritative — we bypass L2 stabilization timers and emit immediately.
-   * When the plugin has posted at least once (`hasCliHookPluginActivity`), L2
-   * does not run, so idle-gated terminal writes are flushed here on hook idle.
+   * When hooks own the thread status (hook env injected or a routed hook has
+   * posted), L2 does not run, so idle-gated terminal writes are flushed here
+   * on hook idle.
    */
   applyCliHookPluginState(
     session: SessionRuntime,
@@ -184,7 +210,7 @@ export class ThreadOutputPipeline {
       }
       session.pendingTerminalWriteInFlight = true;
       void sleep(500)
-        .then(() => writeSubmittedPrompt(session.pty, chunks))
+        .then(() => writeSubmittedPrompt(session.pty, chunks, session.projectLocation))
         .then(() => {
           session.pendingTerminalWriteInFlight = false;
         });
@@ -199,6 +225,7 @@ export class ThreadOutputPipeline {
         writeSubmittedPrompt(
           session.pty,
           session.adapter.buildDirectInput?.(prompt, segments, session.config) ?? [prompt, "\r"],
+          session.projectLocation,
         ),
       );
     }
@@ -229,12 +256,17 @@ export class ThreadOutputPipeline {
     } = extractOscEventsFromPtyStream(ptyCarryIn, data);
     session.ptyOscCarry = carryOut;
 
+    const disableCliHookPlugin = this.options.readDisableCliHookPlugin();
+    const hookOwnsStatus = this.cliHookOwnsStatus(session, disableCliHookPlugin);
+
     const applyOscHint = (hint: TerminalStatusHint): void => {
-      const oscIsL2Fallback =
-        session.hasCliHookPluginActivity && session.adapter.oscHintsDeferToHookPlugin === true;
-      if (!oscIsL2Fallback) {
-        this.updateState(session, hint.status, hint.attention);
+      if (hookOwnsStatus) {
+        return;
       }
+      if (this.shouldSuppressLaunchWorkingHint(session, hint)) {
+        return;
+      }
+      this.updateState(session, hint.status, hint.attention);
     };
 
     for (const notification of notifications) {
@@ -314,10 +346,10 @@ export class ThreadOutputPipeline {
       usesTerminalPresentation &&
       (session.adapter.isReadyForInitialPrompt || session.adapter.detectTerminalStatus)
     ) {
-      // Hook-active fast path: keep streaming + launch-queue + invalid session ref
-      // recovery only — skip prevChunk merge, second stripAnsi pass, and all L2
-      // hint timers (major PTY hot-path savings on busy TUIs).
-      if (session.hasCliHookPluginActivity) {
+      // Hook-owned fast path: keep streaming + launch-queue + invalid session
+      // ref recovery only — skip all status parsing / timers once hooks are
+      // wired for this spawn.
+      if (hookOwnsStatus) {
         if (session.workingSilenceTimer) {
           clearTimeout(session.workingSilenceTimer);
           session.workingSilenceTimer = undefined;
@@ -331,6 +363,15 @@ export class ThreadOutputPipeline {
           session.adapter.isReadyForInitialPrompt?.(strippedData)
         ) {
           this.options.onStartQueuedLaunchPrompt(session);
+        }
+        // Without this the deferred-to-terminal initial prompt (text +
+        // attachments path) sits unsent on posix: L2 idle detection is skipped
+        // and L1 hooks don't emit until the user does something.
+        if (
+          session.pendingTerminalPrompt &&
+          session.adapter.isReadyForInitialPrompt?.(strippedData)
+        ) {
+          this.flushPendingTerminalWritesIfIdle(session);
         }
         if (
           session.status === "launching" &&
@@ -374,7 +415,9 @@ export class ThreadOutputPipeline {
       // L2 `detectTerminalStatus` must see only this `data` chunk — not
       // `stripped` from merged `prevChunk` + chunk, or old "Working" rows in
       // scrollback re-flip `working` after idle.
-      const hint = session.adapter.detectTerminalStatus?.(strippedData) ?? null;
+      const rawHint = session.adapter.detectTerminalStatus?.(strippedData) ?? null;
+      const hint =
+        rawHint && this.shouldSuppressLaunchWorkingHint(session, rawHint) ? null : rawHint;
 
       if (hint) {
         const nextConfig = session.adapter.syncConfigFromTerminalState?.({

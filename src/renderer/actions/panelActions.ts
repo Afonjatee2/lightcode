@@ -1,3 +1,4 @@
+import type { Thread } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
@@ -5,6 +6,64 @@ import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { buildFileEditorContext, resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
+import { closeThreads } from "@/renderer/utils/shellUtils";
+
+function panelContextMatchesThread(
+  projectId: string,
+  worktreePath: string | undefined,
+  ctxProjectId: string,
+  ctxWorktreePath: string | undefined,
+): boolean {
+  if (ctxProjectId !== projectId) return false;
+  if (worktreePath) return ctxWorktreePath === worktreePath;
+  return ctxWorktreePath === undefined;
+}
+
+/** Clear git, files, file editor, and worktree dev-terminal tabs for this thread's project/worktree. */
+export function closePanelsForUnloadedThread(thread: Thread): void {
+  const { projectId, worktreePath } = thread;
+  const panelStore = usePanelStore.getState();
+
+  if (
+    panelStore.gitReviewContext &&
+    panelContextMatchesThread(
+      projectId,
+      worktreePath,
+      panelStore.gitReviewContext.projectId,
+      panelStore.gitReviewContext.worktreePath,
+    )
+  ) {
+    panelStore.setGitOverlayOpen(false);
+    panelStore.setGitReviewContext(null);
+  }
+
+  if (
+    panelStore.filesPanelContext &&
+    panelContextMatchesThread(
+      projectId,
+      worktreePath,
+      panelStore.filesPanelContext.projectId,
+      panelStore.filesPanelContext.worktreePath,
+    )
+  ) {
+    panelStore.setFilesPanelContext(null);
+  }
+
+  const fileRoot = useFileEditorStore.getState().rootContext;
+  if (
+    fileRoot &&
+    panelContextMatchesThread(projectId, worktreePath, fileRoot.projectId, fileRoot.worktreePath)
+  ) {
+    useFileEditorStore.getState().clearSession();
+  }
+
+  if (worktreePath) {
+    const removedTabIds = useDevTerminalStore.getState().removeTabsForWorktree(worktreePath);
+    if (removedTabIds.length > 0) {
+      void closeThreads(removedTabIds);
+    }
+  }
+}
 
 export function openSettings(): void {
   usePanelStore.getState().openSettings();
@@ -14,9 +73,9 @@ export function openProjectSettings(projectId: string): void {
   usePanelStore.getState().openProjectSettings(projectId);
 }
 
+/** Closes git/files side and right-panel content only. Does not hide the dev terminal (bottom or right). */
 export function closeAllPanels(): void {
   usePanelStore.getState().closeAllPanels();
-  useDevTerminalStore.getState().closePanel();
 }
 
 export function openFilesPanel(projectId: string, worktreePath?: string): void {

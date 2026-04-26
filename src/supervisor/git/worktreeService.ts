@@ -1,6 +1,6 @@
 import { rm } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, normalize } from "node:path";
+import { join, normalize, posix as posixPath, win32 as win32Path } from "node:path";
 import {
   type GitAddWorktreeResult,
   type GitBranchListResult,
@@ -100,7 +100,14 @@ export class GitWorktreeService {
       let branch = "";
       for (const line of lines) {
         if (line.startsWith("worktree ")) {
-          path = location.kind === "wsl" ? line.slice(9) : normalize(line.slice(9));
+          const rawPath = line.slice(9);
+          if (location.kind === "wsl") {
+            path = rawPath;
+          } else if (location.kind === "windows") {
+            path = win32Path.normalize(rawPath);
+          } else {
+            path = posixPath.normalize(rawPath);
+          }
         } else if (line.startsWith("HEAD ")) {
           commit = line.slice(5);
         } else if (line.startsWith("branch ")) {

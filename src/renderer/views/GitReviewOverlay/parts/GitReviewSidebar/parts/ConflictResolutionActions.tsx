@@ -1,6 +1,7 @@
 import { GitMerge, Sparkles } from "lucide-react";
 import { Button } from "@heroui/react";
 import { PixelLoader } from "@/renderer/components/common";
+import { useGitReviewSectionPadX } from "../gitReviewPadXContext";
 
 export function ConflictResolutionActions(props: {
   canResolveWithAgent: boolean;
@@ -18,9 +19,10 @@ export function ConflictResolutionActions(props: {
     onRunMergetool,
     onAbortMerge,
   } = props;
+  const sectionPadX = useGitReviewSectionPadX();
 
   return (
-    <div className="space-y-2 border-t border-warning/30 px-3 pt-2 pb-2">
+    <div className={`space-y-2 border-t border-warning/30 pt-2 pb-2 ${sectionPadX}`}>
       <div className="flex gap-1.5">
         <Button
           variant="tertiary"

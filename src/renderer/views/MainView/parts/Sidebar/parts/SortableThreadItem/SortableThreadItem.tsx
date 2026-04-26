@@ -268,6 +268,8 @@ export function SortableThreadItem(props: {
         }}
       >
         <SidebarButton
+          size="xs"
+          statusTone={statusTone}
           icon={
             <ProviderIcon kind={thread.agentKind} tone={statusTone} className="size-3.5 shrink-0" />
           }
@@ -289,8 +291,6 @@ export function SortableThreadItem(props: {
           }
           tooltip={editingThreadId === thread.id ? undefined : thread.title}
           isActive={isCurrentThread}
-          liveText={statusTone !== "inactive" && statusTone !== "done"}
-          className={isDragging ? "opacity-60" : ""}
           onPress={() => openThread(thread.id)}
           onDoubleClick={() => props.setEditingThreadId(thread.id)}
           isDragging={isDragging}

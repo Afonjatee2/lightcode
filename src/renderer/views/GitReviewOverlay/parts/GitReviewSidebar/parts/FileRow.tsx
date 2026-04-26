@@ -8,6 +8,7 @@ import { isLockFile } from "@/shared/gitUtils";
 import { getBasename } from "@/shared/pathUtils";
 import { ConfirmDialog, FileIcon, FileStatusBadge } from "@/renderer/components/common";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
+import { useGitReviewRowPadX } from "../gitReviewPadXContext";
 
 export function FileRow(props: {
   path: string;
@@ -19,6 +20,7 @@ export function FileRow(props: {
   isWorktree: boolean;
 }) {
   const { path, project, isSelected, onSelect, onRefresh, storeKey, isWorktree } = props;
+  const rowPadX = useGitReviewRowPadX();
   const file = useGitFile(storeKey, path, isWorktree);
   const [revertOpen, setRevertOpen] = useState(false);
 
@@ -56,7 +58,7 @@ export function FileRow(props: {
     <>
       <button
         type="button"
-        className={`group flex w-full cursor-default items-center gap-1.5 rounded px-3 py-1 text-left text-xs transition-colors ${
+        className={`group flex w-full cursor-default items-center gap-1.5 rounded py-1 text-left text-xs transition-colors ${rowPadX} ${
           isSelected
             ? "bg-white/[0.08] text-foreground"
             : "text-muted hover:bg-white/[0.04] hover:text-foreground"

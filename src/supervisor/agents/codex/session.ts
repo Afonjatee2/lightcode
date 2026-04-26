@@ -1,6 +1,16 @@
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import type { ProjectLocation } from "@/shared/contracts";
-import { readWslCommandOutput, resolveAgentHomeSubpath, resolveWslShellPath } from "../base";
+import { resolveLightcodePaths } from "@/shared/lightcodePaths";
+import { toWslUncPath } from "@/shared/wsl";
+import {
+  quotePosixShellArg,
+  readWslCommandOutput,
+  resolveAgentHomeSubpath,
+  resolveWslHomeDirectory,
+  resolveWslShellPath,
+} from "../base";
 import {
   parseCodexRolloutIdFromPath,
   parseCodexRolloutMeta,
@@ -8,6 +18,44 @@ import {
   readCodexSessionIndex,
   type CodexRolloutMeta,
 } from "./sessionFiles";
+
+function nativePrivateCodexHome(): string {
+  return join(
+    resolveLightcodePaths(process.env.LIGHTCODE_DATA_DIR).agentPluginsDir,
+    "codex",
+    "home",
+  );
+}
+
+function nativeCodexHomeCandidates(): string[] {
+  return [join(homedir(), ".codex"), nativePrivateCodexHome()];
+}
+
+function wslPrivateCodexHome(distro: string): string | undefined {
+  const home = resolveWslHomeDirectory(distro);
+  return home ? `${home}/.lightcode/agent-plugins/codex/home` : undefined;
+}
+
+function dedupeById<T extends { id: string }>(items: T[], getUpdatedAt: (item: T) => number): T[] {
+  const byId = new Map<string, T>();
+  for (const item of items) {
+    const prev = byId.get(item.id);
+    if (!prev || getUpdatedAt(item) > getUpdatedAt(prev)) {
+      byId.set(item.id, item);
+    }
+  }
+  return [...byId.values()];
+}
+
+function dedupeRollouts(rollouts: CodexRolloutMeta[]): CodexRolloutMeta[] {
+  return dedupeById(rollouts, (r) => r.updatedAt ?? 0);
+}
+
+function dedupeSessionIndex(
+  sessions: Array<{ id: string; updatedAt: number; threadName: string }>,
+): Array<{ id: string; updatedAt: number; threadName: string }> {
+  return dedupeById(sessions, (s) => s.updatedAt).sort((a, b) => a.updatedAt - b.updatedAt);
+}
 
 export function describeCodexLocation(location: ProjectLocation): string {
   switch (location.kind) {
@@ -22,17 +70,29 @@ export function describeCodexLocation(location: ProjectLocation): string {
 
 export function readCodexSessionIndexForLocation(location: ProjectLocation) {
   if (location.kind === "wsl") {
-    const result = readWslCommandOutput(location.distro, "sh", [
-      "-lc",
+    const privateHome = wslPrivateCodexHome(location.distro);
+    const commands = [
       "cat ~/.codex/session_index.jsonl 2>/dev/null || true",
-    ]);
+      ...(privateHome
+        ? [`cat ${quotePosixShellArg(`${privateHome}/session_index.jsonl`)} 2>/dev/null || true`]
+        : []),
+    ];
+    const result = readWslCommandOutput(location.distro, "sh", ["-lc", commands.join("\n")]);
     if (!result.ok || result.stdout.length === 0) {
       return [];
     }
     return parseCodexSessionIndex(result.stdout);
   }
 
-  return readCodexSessionIndex();
+  const sessions = readCodexSessionIndex();
+  const privateIndexPath = join(nativePrivateCodexHome(), "session_index.jsonl");
+  let privateRaw: string;
+  try {
+    privateRaw = readFileSync(privateIndexPath, "utf8");
+  } catch {
+    return sessions;
+  }
+  return dedupeSessionIndex([...sessions, ...parseCodexSessionIndex(privateRaw)]);
 }
 
 export function isInteractiveCodexRollout(
@@ -62,10 +122,15 @@ export function readCodexRolloutsForLocation(location: ProjectLocation): CodexRo
     // Use the user's actual login shell (bash / zsh / fish / …) so `~`
     // expands against their passwd entry, not an assumed `bash` install.
     const shellPath = resolveWslShellPath(location.distro);
+    const privateHome = wslPrivateCodexHome(location.distro);
+    const roots = [
+      "~/.codex/sessions",
+      ...(privateHome ? [quotePosixShellArg(`${privateHome}/sessions`)] : []),
+    ].join(" ");
     const result = readWslCommandOutput(location.distro, shellPath, [
       "-l",
       "-c",
-      "find ~/.codex/sessions -type f -name 'rollout-*.jsonl' -printf '%T@\\t%p\\n' 2>/dev/null",
+      `find ${roots} -type f -name 'rollout-*.jsonl' -printf '%T@\\t%p\\n' 2>/dev/null`,
     ]);
     if (!result.ok || result.stdout.length === 0) {
       console.log(
@@ -75,29 +140,29 @@ export function readCodexRolloutsForLocation(location: ProjectLocation): CodexRo
       );
       return [];
     }
-    return result.stdout
-      .split(/\r?\n/g)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .flatMap((line) => {
-        const [mtimeRaw, path] = line.split("\t");
-        if (!path) return [];
-        const updatedAt = Number.isFinite(Number(mtimeRaw))
-          ? Math.round(Number(mtimeRaw) * 1000)
-          : undefined;
-        const id = parseCodexRolloutIdFromPath(path);
-        if (!id) return [];
-        const parsed: CodexRolloutMeta = {
-          id,
-          path,
-          ...(updatedAt !== undefined ? { updatedAt } : {}),
-        };
-        return parsed ? [parsed] : [];
-      });
+    return dedupeRollouts(
+      result.stdout
+        .split(/\r?\n/g)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .flatMap((line) => {
+          const [mtimeRaw, path] = line.split("\t");
+          if (!path) return [];
+          const updatedAt = Number.isFinite(Number(mtimeRaw))
+            ? Math.round(Number(mtimeRaw) * 1000)
+            : undefined;
+          const id = parseCodexRolloutIdFromPath(path);
+          if (!id) return [];
+          const parsed: CodexRolloutMeta = {
+            id,
+            path,
+            ...(updatedAt !== undefined ? { updatedAt } : {}),
+          };
+          return parsed ? [parsed] : [];
+        }),
+    );
   }
 
-  const { readdirSync, readFileSync, statSync } = require("node:fs") as typeof import("node:fs");
-  const root = join(require("node:os").homedir(), ".codex", "sessions");
   const rollouts: CodexRolloutMeta[] = [];
   const walk = (dir: string) => {
     let entries: import("node:fs").Dirent[];
@@ -137,8 +202,10 @@ export function readCodexRolloutsForLocation(location: ProjectLocation): CodexRo
       }
     }
   };
-  walk(root);
-  return rollouts;
+  for (const home of nativeCodexHomeCandidates()) {
+    walk(join(home, "sessions"));
+  }
+  return dedupeRollouts(rollouts);
 }
 
 export function readCodexRolloutMetaForLocation(
@@ -159,7 +226,6 @@ export function readCodexRolloutMetaForLocation(
     return parseCodexRolloutMeta(rollout.path, result.stdout, rollout.updatedAt) ?? rollout;
   }
 
-  const { readFileSync } = require("node:fs") as typeof import("node:fs");
   try {
     const firstLine = readFileSync(rollout.path, "utf8").split(/\r?\n/g)[0] ?? "";
     return parseCodexRolloutMeta(rollout.path, firstLine, rollout.updatedAt) ?? rollout;
@@ -169,5 +235,15 @@ export function readCodexRolloutMetaForLocation(
 }
 
 export function resolveCodexSessionsWatchPath(location: ProjectLocation): string | undefined {
+  if (location.kind === "wsl") {
+    const privateHome = wslPrivateCodexHome(location.distro);
+    if (privateHome) {
+      return toWslUncPath(location.distro, `${privateHome}/sessions`);
+    }
+  }
+  const privateSessions = join(nativePrivateCodexHome(), "sessions");
+  if (location.kind !== "wsl" && existsSync(nativePrivateCodexHome())) {
+    return privateSessions;
+  }
   return resolveAgentHomeSubpath(location, ".codex/sessions");
 }

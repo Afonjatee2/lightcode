@@ -144,7 +144,7 @@ export function SortableWorktreeGroup(props: {
         />
       </ContextMenu>
       {!isGroupCollapsed && (
-        <div className="space-y-0.5 pl-2">
+        <div className="space-y-0.5">
           {group.threads.map((thread, threadIdx) => (
             <SortableThreadItem
               key={thread.id}

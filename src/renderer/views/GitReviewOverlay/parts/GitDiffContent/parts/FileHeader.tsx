@@ -12,7 +12,7 @@ export function FileHeader(props: {
     <div
       role="button"
       tabIndex={0}
-      className="sticky top-0 z-10 flex cursor-pointer select-none items-center gap-2 border-b border-border bg-surface px-3 py-1.5 text-xs"
+      className="sticky top-0 z-10 flex cursor-pointer select-none items-center gap-2 border-b border-border bg-[var(--content-background)] px-3 py-1.5 text-xs"
       onClick={onToggleCollapse}
       onKeyDown={(e) => handleKeyActivate(e, onToggleCollapse)}
     >

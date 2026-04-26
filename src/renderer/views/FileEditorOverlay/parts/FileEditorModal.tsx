@@ -1,5 +1,6 @@
 import { Button, Modal, toast } from "@heroui/react";
 import { Maximize2, X } from "lucide-react";
+import { overlaySidebarColumnClass } from "@/renderer/components/layout/sidebarChrome";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { FileEditorPane } from "./FileEditorPane/FileEditorPane";
 import { ProjectTreeView } from "./ProjectTreeView/ProjectTreeView";
@@ -65,15 +66,17 @@ export function FileEditorModal() {
             <Modal.Body className="min-h-0 p-0">
               <div className="grid h-full min-h-0 grid-cols-[320px_minmax(0,1fr)]">
                 <div className="min-h-0 border-r border-[color:var(--border)]">
-                  <ProjectTreeView
-                    rootContext={rootContext}
-                    onSelectFile={(path) => {
-                      void openFile(path, "modal", true).catch((error) =>
-                        toast.danger(error instanceof Error ? error.message : String(error)),
-                      );
-                    }}
-                    onPinFile={pinTab}
-                  />
+                  <div className={overlaySidebarColumnClass}>
+                    <ProjectTreeView
+                      rootContext={rootContext}
+                      onSelectFile={(path) => {
+                        void openFile(path, "modal", true).catch((error) =>
+                          toast.danger(error instanceof Error ? error.message : String(error)),
+                        );
+                      }}
+                      onPinFile={pinTab}
+                    />
+                  </div>
                 </div>
                 <FileEditorPane
                   showTabs={false}

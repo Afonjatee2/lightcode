@@ -2,6 +2,7 @@ import { startTransition, useRef } from "react";
 import type { ExtractContextResult, Thread, ThreadConfig } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { readBridge } from "@/renderer/bridge";
+import { closePanelsForUnloadedThread } from "@/renderer/actions/panelActions";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useProject, useThread } from "@/renderer/state/useThread";
 import { ThreadView } from "@/renderer/components/thread/ThreadView";
@@ -88,6 +89,7 @@ export function ThreadPane(props: {
           if (thread.status !== "inactive" && thread.sessionRef) {
             void readBridge().closeThread({ threadId: thread.id });
             useAppStore.getState().markThreadExited(thread.id);
+            closePanelsForUnloadedThread(thread);
           }
           markThreadDone(thread.id);
         }

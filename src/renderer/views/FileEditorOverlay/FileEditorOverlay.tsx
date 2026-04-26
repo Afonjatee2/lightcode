@@ -1,6 +1,10 @@
 import { toast } from "@heroui/react";
 import { ArrowLeft } from "lucide-react";
 import { PageLayout } from "@/renderer/components/layout/PageLayout";
+import {
+  overlaySidebarColumnClass,
+  sidebarFooterNavClass,
+} from "@/renderer/components/layout/sidebarChrome";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { ProjectTreeView } from "@/renderer/views/FileEditorOverlay/parts/ProjectTreeView/ProjectTreeView";
 import { FileEditorPane } from "./parts/FileEditorPane/FileEditorPane";
@@ -28,13 +32,15 @@ export function FileEditorOverlay(props: { onClose: () => void }) {
   return (
     <PageLayout
       title="Editor"
-      sidebarHeaderChildren={
-        <span className="min-w-0 truncate font-mono text-[13px] font-medium tracking-tight text-muted">
-          {rootContext.rootLabel}
-        </span>
+      contentHeaderChildren={
+        <div className="lightcode-overlay-header__controls flex min-w-0 items-center">
+          <span className="min-w-0 max-w-[min(200px,30vw)] truncate font-mono text-[13px] font-medium leading-none tracking-tight text-muted">
+            {rootContext.rootLabel}
+          </span>
+        </div>
       }
       sidebar={
-        <div className="flex h-full min-h-0 flex-col">
+        <div className={overlaySidebarColumnClass}>
           <div className="min-h-0 flex-1 overflow-hidden">
             <ProjectTreeView
               rootContext={rootContext}
@@ -46,7 +52,7 @@ export function FileEditorOverlay(props: { onClose: () => void }) {
               onPinFile={pinTab}
             />
           </div>
-          <div className="space-y-1 border-t border-white/6 px-2 pt-2 pb-1">
+          <div className={sidebarFooterNavClass}>
             <SidebarButton
               icon={<ArrowLeft className="size-4" />}
               label="Return to app"

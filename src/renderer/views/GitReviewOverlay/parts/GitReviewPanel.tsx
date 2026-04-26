@@ -15,6 +15,7 @@ import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { BranchSelector } from "@/renderer/components/common";
+import { overlaySidebarSurfaceClass } from "@/renderer/components/layout/sidebarChrome";
 import { SidebarContext } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import { GitReviewSidebar } from "./GitReviewSidebar/GitReviewSidebar";
 
@@ -118,10 +119,12 @@ export function GitReviewPanel(props: {
 
   return (
     <SidebarContext.Provider value={alwaysExpanded}>
-      <div className="flex h-full min-h-0 flex-col">
+      <div
+        className={`flex h-full min-h-0 flex-col ${hideHeader ? overlaySidebarSurfaceClass : ""}`}
+      >
         {/* Header — full when standalone, slim git-actions-only bar when parent provides its own header */}
         {hideHeader ? (
-          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3 text-xs leading-none">
+          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1.5 pr-3 text-xs leading-none">
             {gitStatus?.branch && (
               <>
                 {statusKey ? (

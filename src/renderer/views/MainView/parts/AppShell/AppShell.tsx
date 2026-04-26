@@ -167,7 +167,7 @@ export function AppShell(props: {
               style={{
                 height: "env(titlebar-area-height, 32px)",
                 paddingRight:
-                  "calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw))",
+                  "max(1rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)))",
               }}
             >
               {contentHeader}

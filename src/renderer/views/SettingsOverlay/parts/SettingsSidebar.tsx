@@ -12,6 +12,13 @@ import {
 } from "lucide-react";
 import type { AgentStatus } from "@/shared/contracts";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import {
+  overlaySidebarColumnClass,
+  overlaySidebarSurfaceClass,
+  sidebarBodyScrollClass,
+  sidebarFooterNavClass,
+  sidebarIconRailFooterClass,
+} from "@/renderer/components/layout/sidebarChrome";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
@@ -36,7 +43,7 @@ export function SettingsSidebar(props: {
   };
 
   return (
-    <div className="relative h-full">
+    <div className={`relative h-full ${overlaySidebarSurfaceClass}`}>
       {isCollapsed && (
         <div className="absolute inset-0 z-10 flex h-full min-h-0 flex-col items-start gap-3 pl-2 pb-1 pt-0">
           <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
@@ -108,7 +115,7 @@ export function SettingsSidebar(props: {
               />
             )}
           </div>
-          <div className="space-y-1 border-t border-white/6 pt-2 pr-2">
+          <div className={sidebarIconRailFooterClass}>
             <SidebarButton
               iconOnly
               icon={<ArrowLeft className="size-4" />}
@@ -126,9 +133,9 @@ export function SettingsSidebar(props: {
       )}
 
       <div
-        className={`flex h-full min-h-0 flex-col gap-3 px-3 pb-1 pt-0 transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
+        className={`${overlaySidebarColumnClass} transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
       >
-        <div className="min-h-0 flex-1 overflow-y-auto px-1 pr-0.5">
+        <div className={sidebarBodyScrollClass()}>
           <div className="space-y-0.5">
             <SidebarButton
               icon={<Settings2 className="size-4" />}
@@ -199,7 +206,7 @@ export function SettingsSidebar(props: {
           </div>
         </div>
 
-        <div className="space-y-1 border-t border-white/6 pt-2">
+        <div className={sidebarFooterNavClass}>
           <SidebarButton
             icon={<ArrowLeft className="size-4" />}
             label="Return to app"
