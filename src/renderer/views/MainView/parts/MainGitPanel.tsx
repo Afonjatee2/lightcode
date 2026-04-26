@@ -37,7 +37,7 @@ export function MainGitPanel() {
       })()
     : null;
 
-  if (isTerminalRight || (!gitPanelOpen && !filesPanelOpen)) {
+  if (isTerminalRight) {
     return null;
   }
 

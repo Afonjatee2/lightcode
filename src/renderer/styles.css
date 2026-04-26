@@ -289,12 +289,6 @@ body {
   flex-shrink: 0;
 }
 
-/* Smooth border-color when hover highlights the long seam. */
-.lightcode-shell > aside,
-.lightcode-resize-handle + aside {
-  transition: border-color 0.12s ease;
-}
-
 /* Sidebar: [aside][handle] — accent the aside’s full-height right border. */
 .lightcode-shell > aside:has(+ .lightcode-resize-handle[aria-label="Resize sidebar"]:hover) {
   border-right-color: var(--accent);

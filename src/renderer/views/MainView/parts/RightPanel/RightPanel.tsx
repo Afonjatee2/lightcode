@@ -40,7 +40,7 @@ export function RightPanel(props: {
         />
       }
       filesContent={
-        filesPanelOpen && resolvedFilesPanelContext ? (
+        resolvedFilesPanelContext ? (
           <ProjectFilesPanel rootContext={resolvedFilesPanelContext} />
         ) : undefined
       }

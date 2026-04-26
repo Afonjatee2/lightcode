@@ -3,8 +3,8 @@ import { isMac } from "@/renderer/bridge";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { SIDEBAR_MIN_WIDTH, useResizablePanels } from "./parts/useResizablePanels";
 import { SIDEBAR_COLLAPSED_WIDTH, useSidebarOverlay } from "./parts/useSidebarOverlay";
-import { RightAsideSlot } from "./parts/RightAsideSlot";
-import { GitAsideSlot } from "./parts/GitAsideSlot";
+import { AsideSlot } from "./parts/AsideSlot";
+import { usePanelVisibility } from "./parts/usePanelVisibility";
 
 interface SidebarContextValue {
   isCollapsed: boolean;
@@ -80,6 +80,7 @@ export function AppShell(props: {
     ...(props.onRequestClosePanels ? { onRequestClosePanels: props.onRequestClosePanels } : {}),
   });
 
+  const { rightPanelOpen, gitPanelOpen } = usePanelVisibility();
   const displayWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
   const isResizing = resizeTarget !== null;
   const isBottom = terminalPosition === "bottom";
@@ -116,7 +117,7 @@ export function AppShell(props: {
             isOverlay
               ? `fixed inset-y-0 left-0 z-40 border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${closingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"}`
               : `relative border-r border-[color:var(--border)] ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`
-          } ${!isResizing && !isOverlay && !skipTransitionRef.current ? "transition-[width,min-width] duration-200" : ""}`}
+          } ${!isResizing && !isOverlay && !skipTransitionRef.current ? "transition-[width,min-width,border-color] duration-200" : ""}`}
           style={{ width: displayWidth, minWidth: displayWidth }}
         >
           {sidebarHeader && (
@@ -185,29 +186,33 @@ export function AppShell(props: {
               </main>
 
               {rightPanel ? (
-                <RightAsideSlot
-                  rightPanel={rightPanel}
-                  isBottom={isBottom}
-                  panelWidth={panelWidth}
-                  panelHeight={panelHeight}
-                  isResizing={isResizing}
-                  onResizeStart={handlePanelResizeStart}
-                  onResizeBottomStart={handlePanelBottomResizeStart}
+                <AsideSlot
+                  orientation={isBottom ? "horizontal" : "vertical"}
+                  isOpen={rightPanelOpen}
+                  targetWidth={panelWidth}
+                  targetHeight={panelHeight}
+                  onResizeStart={isBottom ? handlePanelBottomResizeStart : handlePanelResizeStart}
                   panelRef={panelRef}
                   panelInnerRef={panelInnerRef}
-                />
+                  ariaLabel="Resize terminal panel"
+                >
+                  {rightPanel}
+                </AsideSlot>
               ) : null}
             </div>
 
             {gitPanel ? (
-              <GitAsideSlot
-                gitPanel={gitPanel}
-                gitPanelWidth={gitPanelWidth}
-                isResizing={isResizing}
+              <AsideSlot
+                orientation="vertical"
+                isOpen={gitPanelOpen}
+                targetWidth={gitPanelWidth}
                 onResizeStart={handleGitPanelResizeStart}
                 panelRef={gitPanelRef}
                 panelInnerRef={gitPanelInnerRef}
-              />
+                ariaLabel="Resize git panel"
+              >
+                {gitPanel}
+              </AsideSlot>
             ) : null}
           </div>
         </div>
