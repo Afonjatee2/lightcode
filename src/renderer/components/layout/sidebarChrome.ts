@@ -67,7 +67,7 @@ export function gitReviewSidebarListScrollClass() {
  * Sticky/variable footers: Return to app, Hide sidebar, etc. Border spans column inset only.
  * @see {sidebarColumnLayoutClass}
  */
-export const sidebarFooterNavClass = "space-y-1 border-t border-white/6 pt-2";
+export const sidebarFooterNavClass = "space-y-1 border-t border-white/6 pt-2 pb-1";
 
 /**
  * Collapsed icon rail: bottom block (pr keeps icons off the right edge in the narrow column).

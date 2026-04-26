@@ -66,7 +66,7 @@ export function CommitSyncPanel(props: {
   const sectionPadX = useGitReviewSectionPadX();
 
   return (
-    <div className={`space-y-2 border-t border-white/6 pt-2 ${sectionPadX}`}>
+    <div className={`space-y-2 border-t border-white/6 pt-2 pb-1 ${sectionPadX}`}>
       {mergeConflicting && mergeConflictFiles.length === 0 ? (
         <>
           <p className="text-xs font-medium text-success">All conflicts resolved</p>
