@@ -41,7 +41,7 @@ export function RightAsideSlot(props: {
           />
         ) : (
           <div
-            className="lightcode-resize-handle mb-2"
+            className="lightcode-resize-handle mb-1"
             onMouseDown={onResizeStart}
             role="separator"
             aria-orientation="vertical"
@@ -53,7 +53,7 @@ export function RightAsideSlot(props: {
         className={`relative overflow-hidden ${
           isBottom
             ? `min-w-0 border-t border-[color:var(--border)] ${!isResizing ? "transition-[height,min-height,opacity] duration-200" : ""}`
-            : `mb-2 min-h-0 border-l border-[color:var(--border)] ${!isResizing ? "transition-[width,min-width,opacity] duration-200" : ""}`
+            : `mb-1 min-h-0 border-l border-[color:var(--border)] ${!isResizing ? "transition-[width,min-width,opacity] duration-200" : ""}`
         } ${rightPanelOpen ? "opacity-100" : "opacity-0"}`}
         style={
           isBottom

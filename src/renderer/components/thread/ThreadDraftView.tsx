@@ -549,13 +549,13 @@ export function ThreadDraftView(props: {
       className={`relative flex h-full min-h-0 flex-col ${props.isDragging ? "opacity-50" : ""}`}
     >
       {props.compact && (
-        <div className={`${paddingClass} px-4`}>
+        <div className="px-2">
           <div
             ref={props.dragHandleRef}
-            className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1.5 ${props.dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
+            className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1 ${props.dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
           >
             <TerminalSquare className="size-3.5 shrink-0 text-muted/60" />
-            <span className="flex-1 truncate text-sm font-medium text-muted">
+            <span className="flex-1 truncate text-sm font-medium leading-tight text-muted">
               New thread {project.name}
             </span>
             {props.showCloseButton && props.onClose && (
@@ -574,7 +574,7 @@ export function ThreadDraftView(props: {
         </div>
       )}
       <div
-        className={`${props.compact ? alignClass : "mx-auto"} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-4 ${props.compact ? "pb-4" : "py-8"}`}
+        className={`${props.compact ? alignClass : "mx-auto"} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-3 ${props.compact ? "pb-2" : "py-8"}`}
       >
         {props.dropIndicator === "replace" && (
           <div
@@ -690,7 +690,7 @@ export function ThreadDraftView(props: {
                 ref={mentionRef}
                 autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                 compact={props.compact ?? false}
-                placeholder="Ask LightCode anything, @ to add files, / for commands"
+                placeholder="Send a message..."
                 projectLocation={project.location}
                 projectId={project.id}
                 onTextChange={(hasText) => {
@@ -735,7 +735,7 @@ export function ThreadDraftView(props: {
                 }}
               />
             }
-            placeholder="Ask LightCode anything, @ to add files, / for commands"
+            placeholder="Send a message..."
             prompt={prompt}
             submitDisabled={!(hasContent || attachments.attachments.length > 0)}
             submitLabel="Launch thread"

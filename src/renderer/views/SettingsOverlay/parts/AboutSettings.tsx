@@ -87,7 +87,7 @@ export function AboutSettings() {
   const bridge = readBridge();
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
+    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
       <div className="mx-auto max-w-[720px]">
         <h1 className="mb-6 text-lg font-semibold text-foreground">About</h1>
 

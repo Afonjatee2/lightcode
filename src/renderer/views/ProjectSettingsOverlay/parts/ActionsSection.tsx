@@ -44,7 +44,7 @@ export function ActionsSection(props: { projectId: string }) {
   }
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
+    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
       <div className="mx-auto max-w-[720px]">
         <h1 className="mb-6 text-lg font-semibold text-foreground">Actions</h1>
         <p className="mb-4 text-xs text-muted">

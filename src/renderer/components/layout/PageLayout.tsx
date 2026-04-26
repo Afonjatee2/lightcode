@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Button, Tooltip } from "@heroui/react";
 import { House } from "lucide-react";
 import { isMac } from "@/renderer/bridge";
+import { macosTrafficLightGutterClass } from "@/renderer/components/layout/sidebarChrome";
 import { AppShell, useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 
 /** When the sidebar header content is narrower than this, hide the wordmark. */
@@ -83,7 +84,7 @@ function SidebarHeaderRow(props: {
 
   return (
     <div ref={ref} className="flex min-h-0 min-w-0 flex-1 items-center gap-1.5">
-      {isMac() && <div className="w-[60px] shrink-0" />}
+      {isMac() && <div className={macosTrafficLightGutterClass} />}
       <SidebarHeaderWordmark
         title={props.title}
         {...(props.onTitleClick != null ? { onTitleClick: props.onTitleClick } : {})}
@@ -128,7 +129,10 @@ export function PageLayout(props: {
     </SidebarHeaderRow>
   );
 
-  const contentHeader = <>{contentHeaderChildren}</>;
+  // macOS only: drop the empty center `lightcode-overlay-header` when there is no content so main
+  // + the right column reclaim the titlebar row next to hidden-inset chrome. Other platforms keep
+  // the empty row (signalled by the empty fragment, since `null` would suppress it everywhere).
+  const contentHeader = contentHeaderChildren ?? (isMac() ? null : <></>);
 
   return (
     <AppShell

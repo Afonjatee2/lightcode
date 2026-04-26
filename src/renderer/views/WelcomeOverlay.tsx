@@ -56,7 +56,7 @@ export function WelcomeOverlay() {
       onTransitionEnd={handleTransitionEnd}
     >
       <div
-        className="lightcode-overlay-header flex shrink-0 items-center px-4"
+        className="lightcode-overlay-header flex shrink-0 items-center px-2"
         style={{ height: "env(titlebar-area-height, 32px)" }}
       />
 

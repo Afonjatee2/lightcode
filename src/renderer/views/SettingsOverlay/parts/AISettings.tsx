@@ -190,7 +190,7 @@ export function AISettings() {
   );
 
   return (
-    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8">
+    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
       <div className="mx-auto max-w-[720px]">
         <div className="mb-6 flex items-center justify-between">
           <h1 className="text-lg font-semibold text-foreground">AI</h1>

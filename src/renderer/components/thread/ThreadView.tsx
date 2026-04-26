@@ -128,6 +128,11 @@ function buildControls(
   hiddenModelIds: readonly string[] | undefined,
   onConfigChange: (config: ThreadConfig) => void,
 ) {
+  const isCliThread = (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
+  if (isCliThread) {
+    return [];
+  }
+
   const statusTone = getStatusTone(thread);
   const factory = getComposerControls(thread.agentKind);
 
@@ -207,6 +212,7 @@ function ThreadComposerSection(props: {
   );
   const hiddenModelIds = useSharedSettings((s) => s.hiddenModels[thread.agentKind]);
   const controls = buildControls(thread, agentStatus, hiddenModelIds, props.onConfigChange);
+  const isCliThread = (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
   const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
 
   function handleSwitchBranch(branch: string, createNew: boolean) {
@@ -347,53 +353,56 @@ function ThreadComposerSection(props: {
                   promptDisabled={!(showServerComposer || showTerminalComposer)}
                   submitDisabled={!(hasContent || attachments.attachments.length > 0) || !canSubmit}
                   submitLabel="Send message"
-                  afterControls={
-                    <>
-                      <Button
-                        isIconOnly
-                        aria-label="Attach files"
-                        className="lightcode-composer-menu min-w-9 px-2"
-                        size="sm"
-                        variant="ghost"
-                        onPress={() => {
-                          void readBridge()
-                            .pickFiles()
-                            .then((paths) => {
-                              if (paths) attachments.addFiles(paths);
-                            });
-                        }}
-                      >
-                        <Paperclip className="size-4" />
-                      </Button>
-                      {branchName ? (
-                        thread.worktreePath ? (
-                          <Tooltip delay={0}>
-                            <Tooltip.Trigger tabIndex={-1} role="none">
-                              <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
-                                <GitFork className="size-3.5 text-muted" />
-                                <span className="truncate">{branchName}</span>
-                                {thread.prNumber ? (
-                                  <span className="shrink-0 text-muted/60">
-                                    PR #{thread.prNumber}
-                                  </span>
-                                ) : null}
-                              </div>
-                            </Tooltip.Trigger>
-                            <Tooltip.Content placement="top">{branchName}</Tooltip.Content>
-                          </Tooltip>
-                        ) : (
-                          <BranchSelector
-                            projectId={thread.projectId}
-                            currentBranch={branchName}
-                            value={branchName}
-                            onSelect={handleBranchSelect}
-                            onSwitchBranch={handleSwitchBranch}
-                            hideWorktreeToggle
-                          />
-                        )
-                      ) : null}
-                    </>
-                  }
+                  {...(() => {
+                    const extras = (
+                      <>
+                        <Button
+                          isIconOnly
+                          aria-label="Attach files"
+                          className="lightcode-composer-menu min-w-9 px-2"
+                          size="sm"
+                          variant="ghost"
+                          onPress={() => {
+                            void readBridge()
+                              .pickFiles()
+                              .then((paths) => {
+                                if (paths) attachments.addFiles(paths);
+                              });
+                          }}
+                        >
+                          <Paperclip className="size-4" />
+                        </Button>
+                        {branchName ? (
+                          thread.worktreePath ? (
+                            <Tooltip delay={0}>
+                              <Tooltip.Trigger tabIndex={-1} role="none">
+                                <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
+                                  <GitFork className="size-3.5 text-muted" />
+                                  <span className="truncate">{branchName}</span>
+                                  {thread.prNumber ? (
+                                    <span className="shrink-0 text-muted/60">
+                                      PR #{thread.prNumber}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </Tooltip.Trigger>
+                              <Tooltip.Content placement="top">{branchName}</Tooltip.Content>
+                            </Tooltip>
+                          ) : (
+                            <BranchSelector
+                              projectId={thread.projectId}
+                              currentBranch={branchName}
+                              value={branchName}
+                              onSelect={handleBranchSelect}
+                              onSwitchBranch={handleSwitchBranch}
+                              hideWorktreeToggle
+                            />
+                          )
+                        ) : null}
+                      </>
+                    );
+                    return isCliThread ? { leadingControls: extras } : { afterControls: extras };
+                  })()}
                   onPromptChange={setPrompt}
                   onSubmit={() => {
                     const segments = mentionRef.current?.serializeSegments();
@@ -510,6 +519,8 @@ export function ThreadView(props: {
   const [terminalSize, setTerminalSize] = useState<TerminalSize | null>(null);
   const [continueDialogOpen, setContinueDialogOpen] = useState(false);
   const launchRequestRef = useRef<string | null>(null);
+  const titleRef = useRef<HTMLSpanElement>(null);
+  const [isTitleTooltipOpen, setIsTitleTooltipOpen] = useState(false);
   const usesTerminalPresentation =
     (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
   const launchTerminalSize = usesTerminalPresentation ? terminalSize : DEFAULT_HIDDEN_TERMINAL_SIZE;
@@ -578,8 +589,8 @@ export function ThreadView(props: {
         className={`relative flex h-full min-h-0 flex-col ${isDragging ? "opacity-50" : ""}`}
       >
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
-        <div className={`${paddingClass} px-4`}>
-          <div className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1.5`}>
+        <div className="px-2">
+          <div className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}>
             <Tooltip delay={0}>
               <Tooltip.Trigger>
                 <button
@@ -610,12 +621,35 @@ export function ThreadView(props: {
               ref={dragHandleRef}
               className={`flex min-w-0 flex-1 items-center gap-2 ${dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
             >
-              <span className="flex-1 truncate text-sm font-medium text-foreground">
-                {thread.title}
-              </span>
+              <Tooltip
+                delay={500}
+                isOpen={isTitleTooltipOpen}
+                onOpenChange={(open) => {
+                  if (open) {
+                    const el = titleRef.current;
+                    if (el && el.scrollWidth > el.clientWidth) {
+                      setIsTitleTooltipOpen(true);
+                    }
+                  } else {
+                    setIsTitleTooltipOpen(false);
+                  }
+                }}
+              >
+                <Tooltip.Trigger className="min-w-0 flex-1" tabIndex={-1} role="none">
+                  <span
+                    ref={titleRef}
+                    className="block truncate text-sm font-medium leading-tight text-foreground"
+                  >
+                    {thread.title}
+                  </span>
+                </Tooltip.Trigger>
+                <Tooltip.Content placement="bottom" className="max-w-[28rem] break-words text-xs">
+                  {thread.title}
+                </Tooltip.Content>
+              </Tooltip>
               <div className="flex shrink-0 items-center">
                 {projectName ? (
-                  <span className="px-1 text-sm text-muted/60">{projectName}</span>
+                  <span className="px-1 text-sm leading-tight text-muted/60">{projectName}</span>
                 ) : null}
                 {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
                 {onContinueInProvider &&
@@ -671,7 +705,7 @@ export function ThreadView(props: {
         </div>
 
         <div
-          className={`${alignClass} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-4 pb-4`}
+          className={`${alignClass} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-3 pb-2`}
         >
           {dropIndicator === "replace" && (
             <div

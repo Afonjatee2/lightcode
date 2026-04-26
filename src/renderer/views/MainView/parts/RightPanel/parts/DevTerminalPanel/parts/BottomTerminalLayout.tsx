@@ -1,8 +1,13 @@
 import { Columns2, PanelBottomClose, Plus, Trash2 } from "lucide-react";
-import { Tabs, Tooltip } from "@heroui/react";
+import { Tabs } from "@heroui/react";
 import type { Project } from "@/shared/contracts";
 import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { ContextMenu } from "@/renderer/components/common";
+import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
+import {
+  panelHeaderIconButtonClass,
+  panelHeaderRowClass,
+} from "@/renderer/components/layout/sidebarChrome";
 import { TerminalSurfaces } from "./TerminalSurfaces";
 
 export function BottomTerminalLayout(props: {
@@ -52,21 +57,12 @@ export function BottomTerminalLayout(props: {
     <div className="flex h-full min-h-0 bg-[var(--content-background)]" style={fadeStyle}>
       <div className="flex w-[140px] shrink-0 flex-col overflow-hidden border-r border-[color:var(--border)]">
         {activeProject && (
-          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
-            <div className="min-w-0">
-              <Tooltip delay={300}>
-                <Tooltip.Trigger>
-                  <div className="max-w-[80px] truncate text-xs font-medium text-foreground">
-                    {activeProject.name}
-                  </div>
-                </Tooltip.Trigger>
-                <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
-              </Tooltip>
-            </div>
+          <div className={panelHeaderRowClass}>
+            <PanelHeaderProjectName name={activeProject.name} maxWidthClass="max-w-[80px]" />
             <div className="flex-1" />
             <button
               type="button"
-              className="rounded p-0.5 text-muted hover:text-foreground"
+              className={panelHeaderIconButtonClass}
               title="Hide terminal"
               onClick={() => useDevTerminalStore.getState().closePanel()}
             >
@@ -134,7 +130,7 @@ export function BottomTerminalLayout(props: {
         </div>
       </div>
 
-      <div className="relative min-h-0 min-w-0 flex-1 px-4 pt-2 pb-2">
+      <div className="relative min-h-0 min-w-0 flex-1 px-3 pt-2 pb-1">
         <TerminalSurfaces
           tabs={tabs}
           selectedTabId={selectedTabId}

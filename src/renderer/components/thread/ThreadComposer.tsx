@@ -89,6 +89,7 @@ export function ThreadComposer(props: {
   onPromptChange: (value: string) => void;
   onSubmit: () => void;
   controls: ComposerControl[];
+  leadingControls?: ReactNode;
   afterControls?: ReactNode;
 }) {
   const {
@@ -104,6 +105,7 @@ export function ThreadComposer(props: {
     onPromptChange,
     onSubmit,
     controls,
+    leadingControls,
     afterControls,
   } = props;
 
@@ -339,6 +341,9 @@ export function ThreadComposer(props: {
         {attachmentBar}
         <div ref={editorHostRef}>{renderEditor()}</div>
         <div className={toolbarClassName}>
+          {leadingControls ? (
+            <div className="flex shrink-0 items-end gap-2">{leadingControls}</div>
+          ) : null}
           {renderControls()}
           <div className="flex items-end gap-2">
             {afterControls}

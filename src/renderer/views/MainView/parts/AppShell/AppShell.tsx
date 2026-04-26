@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useRef } from "react";
+import { isMac } from "@/renderer/bridge";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { SIDEBAR_MIN_WIDTH, useResizablePanels } from "./parts/useResizablePanels";
 import { SIDEBAR_COLLAPSED_WIDTH, useSidebarOverlay } from "./parts/useSidebarOverlay";
@@ -114,13 +115,15 @@ export function AppShell(props: {
           className={`flex min-h-0 flex-col overflow-hidden ${
             isOverlay
               ? `fixed inset-y-0 left-0 z-40 border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${closingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"}`
-              : `relative ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)] border-r border-[color:var(--border)]" : ""}`
+              : `relative border-r border-[color:var(--border)] ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`
           } ${!isResizing && !isOverlay && !skipTransitionRef.current ? "transition-[width,min-width] duration-200" : ""}`}
           style={{ width: displayWidth, minWidth: displayWidth }}
         >
           {sidebarHeader && (
             <div
-              className={`lightcode-overlay-header flex shrink-0 items-center gap-3 px-4 ${isOverlay ? "bg-background" : "bg-[var(--content-background)]"}`}
+              className={`lightcode-overlay-header flex shrink-0 items-center gap-3 ${
+                isMac() ? "pl-3 pr-2 pt-0.5" : "px-2"
+              } ${isOverlay ? "bg-background" : "bg-[var(--content-background)]"}`}
               style={{
                 height: "env(titlebar-area-height, 32px)",
                 ...(isCollapsed && !closingOverlay ? {} : { minWidth: SIDEBAR_MIN_WIDTH }),
@@ -129,9 +132,7 @@ export function AppShell(props: {
               {sidebarHeader}
             </div>
           )}
-          <div
-            className={`min-h-0 flex-1 overflow-hidden ${hasHeaders ? `mb-2 ${!isOverlay ? "border-r border-[color:var(--border)]" : ""}` : ""}`}
-          >
+          <div className={`min-h-0 flex-1 overflow-hidden ${hasHeaders ? "mb-1" : ""}`}>
             {sidebar}
           </div>
         </aside>
@@ -142,8 +143,10 @@ export function AppShell(props: {
             style={
               hasHeaders
                 ? {
-                    marginTop: "env(titlebar-area-height, 32px)",
-                    marginBottom: "0.5rem",
+                    // When there is a sidebar header but no center content header, main + right start
+                    // at the top; align the handle to y=0 so it stays beside the top title row.
+                    marginTop: contentHeader != null ? "env(titlebar-area-height, 32px)" : 0,
+                    marginBottom: "0.25rem",
                   }
                 : undefined
             }
@@ -154,10 +157,10 @@ export function AppShell(props: {
           />
         )}
 
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden [isolation:isolate]">
           {contentHeader && (
             <div
-              className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-4"
+              className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-2"
               style={{
                 height: "env(titlebar-area-height, 32px)",
                 paddingRight:
@@ -168,7 +171,9 @@ export function AppShell(props: {
             </div>
           )}
 
-          <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          {/* z-0 keeps main + right panel (resize handles are z-20) below the title row when rows overlap
+              (subpixel or env() mismatch on macOS can otherwise paint the panel over the content header). */}
+          <div className="relative z-0 flex min-h-0 min-w-0 flex-1 overflow-hidden">
             <div
               className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${isBottom && rightPanel ? "flex-col" : ""}`}
             >

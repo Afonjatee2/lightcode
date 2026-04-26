@@ -29,7 +29,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { TuxIcon } from "@/renderer/components/common/TuxIcon";
-import { startTransition, useEffect, useRef, useState } from "react";
+import { Fragment, startTransition, useEffect, useRef, useState } from "react";
 import { useDraggable } from "@dnd-kit/react";
 import { useSortable } from "@dnd-kit/react/sortable";
 import { getAppName } from "@/shared/appName";
@@ -1285,7 +1285,19 @@ function SortableProjectHeader(props: {
                           label: "Rename Group",
                           icon: <Pencil className="size-3.5" />,
                         },
+                        {
+                          id: "mark-all-done",
+                          label: "Mark All Done",
+                          icon: <CircleCheck className="size-3.5" />,
+                          isDisabled: activeThreads.length === 0,
+                        },
                         { type: "separator" as const },
+                        {
+                          id: "archive-all",
+                          label: "Archive All",
+                          icon: <Archive className="size-3.5" />,
+                          variant: "warning",
+                        },
                         { id: "ungroup-all", label: "Ungroup All", variant: "warning" },
                       ]}
                       onAction={(key) => {
@@ -1294,6 +1306,31 @@ function SortableProjectHeader(props: {
                         }
                         if (key === "rename-group") {
                           props.setEditingThreadId(`group:${groupKey}`);
+                        }
+                        if (key === "mark-all-done") {
+                          for (const t of entry.group.threads) {
+                            if (!t.done) props.onMarkThreadDone(t.id);
+                          }
+                        }
+                        if (key === "archive-all") {
+                          for (const t of entry.group.threads) {
+                            props.onArchiveThread(t.id);
+                          }
+                          useAppStore.setState((state) => {
+                            const updatedThreads = state.threads.map((t) =>
+                              t.groupId === groupKey
+                                ? { ...t, groupId: undefined, groupName: undefined }
+                                : t,
+                            );
+                            const view =
+                              state.view.kind === "thread" && state.view.activeGroupId === groupKey
+                                ? {
+                                    kind: "thread" as const,
+                                    panes: [state.view.panes[0]] as [string],
+                                  }
+                                : state.view;
+                            return { threads: updatedThreads, view };
+                          });
                         }
                         if (key === "ungroup-all") {
                           useAppStore.setState((state) => {
@@ -1412,15 +1449,40 @@ function SortableProjectHeader(props: {
                 );
               };
 
+              const renderWithDividers = (list: ThreadListEntry[], offset = 0) =>
+                list.map((entry, i) => {
+                  const node = renderEntry(entry, offset + i);
+                  const isLast = i === list.length - 1;
+                  if (isLast) return node;
+                  let isOpenGroup = false;
+                  let dividerKey: string | null = null;
+                  if (entry.kind === "worktree-group") {
+                    isOpenGroup = !(props.collapsedWorktrees[entry.group.worktreePath] ?? false);
+                    dividerKey = `wt-divider:${entry.group.worktreePath}`;
+                  } else if (entry.kind === "thread-group") {
+                    isOpenGroup = !(
+                      props.collapsedWorktrees[`group:${entry.group.groupId}`] ?? false
+                    );
+                    dividerKey = `group-divider:${entry.group.groupId}`;
+                  }
+                  if (!isOpenGroup || !dividerKey) return node;
+                  return (
+                    <Fragment key={dividerKey}>
+                      {node}
+                      <div aria-hidden className="mx-1.5 my-1 h-px bg-white/6" />
+                    </Fragment>
+                  );
+                });
+
               return (
                 <>
-                  {recentEntries.map((entry, i) => renderEntry(entry, i))}
+                  {renderWithDividers(recentEntries)}
                   {hasBothSections && (
                     <div className="px-1.5 pb-0.5 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted">
                       Older
                     </div>
                   )}
-                  {olderEntries.map((entry, i) => renderEntry(entry, recentEntries.length + i))}
+                  {renderWithDividers(olderEntries, recentEntries.length)}
                 </>
               );
             })()}
@@ -1567,7 +1629,7 @@ export function Sidebar() {
     <div className="relative h-full">
       {/* Collapsed icon rail overlay — width 48px, icons centered at 24px (pl-2 + w-8/2) */}
       {isCollapsed && (
-        <div className="absolute inset-y-0 left-0 z-10 flex h-full min-h-0 w-12 flex-col items-start gap-3 pl-2 pb-1 pt-0">
+        <div className="absolute inset-y-0 left-0 z-10 flex h-full min-h-0 w-12 flex-col items-start gap-3 pl-2 pb-0 pt-0">
           <div className="shrink-0">
             <SidebarButton
               iconOnly

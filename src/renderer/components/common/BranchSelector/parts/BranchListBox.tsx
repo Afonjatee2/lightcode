@@ -40,10 +40,10 @@ export function BranchListBox(props: {
   }
 
   return (
-    <Virtualizer layout={ListLayout} layoutOptions={{ rowHeight: 32 }}>
+    <Virtualizer layout={ListLayout} layoutOptions={{ rowHeight: 28, padding: 6 }}>
       <ListBox
         aria-label="Branches"
-        className="h-72 overflow-y-auto p-1 pl-0 [&_.list-box-item]:min-h-8 [&_.list-box-item]:py-1"
+        className="max-h-60 overflow-y-auto !p-0 !m-0 [&_.list-box-item]:min-h-7 [&_.list-box-item]:py-0.5 [&_.list-box-item]:pl-1.5 [&_.list-box-item]:pr-7 [&_.list-box-item__indicator]:!right-1.5"
         items={items}
         selectedKeys={
           isWorktree || worktreeMode ? new Set([baseBranch ?? value]) : new Set([value])
@@ -67,10 +67,10 @@ export function BranchListBox(props: {
               <ListBox.Item
                 id={item.id}
                 isDisabled
-                className="!bg-transparent !cursor-default !opacity-100 !p-0 h-8 flex items-center"
+                className="!bg-transparent !cursor-default !opacity-100 !p-0 h-7 flex items-center"
                 textValue={item.name}
               >
-                <Header className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted/80">
+                <Header className="px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
                   {item.name}
                 </Header>
               </ListBox.Item>

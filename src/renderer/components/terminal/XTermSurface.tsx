@@ -268,6 +268,13 @@ export const XTermSurface = forwardRef<
       lastFitWidth = width;
       lastFitHeight = height;
 
+      // Shrink font in narrow panes (split panes, side panel, etc.) so more
+      // columns fit before the agent's TUI starts hard-wrapping.
+      const desiredFontSize = width < 360 ? 10 : width < 540 ? 11 : 12;
+      if (terminal.options.fontSize !== desiredFontSize) {
+        terminal.options.fontSize = desiredFontSize;
+      }
+
       fit.fit();
 
       const now = performance.now();

@@ -41,6 +41,16 @@
   cursor: default;
 }
 
+/* HeroUI sets `.tooltip__trigger { display: inline-block }`, which inherits
+   line-height from the surrounding text and adds descender space below
+   block-level children (e.g. svg). That makes triggers wrapping an icon render
+   taller than the icon and pushes adjacent text off the Y center. Switch to
+   inline-flex so the trigger tracks its child's box exactly. */
+.tooltip__trigger {
+  display: inline-flex;
+  align-items: center;
+}
+
 .button--sm,
 .toggle-button--sm {
   font-size: 0.75rem;
@@ -256,58 +266,48 @@ body {
   background: var(--window-header-background);
 }
 
+/* Hairline = panel border (full height/width). The handle is only a wide hit target with no
+   visible affordance; hover accent is the long shared border (see rules below). */
 .lightcode-resize-handle {
-  width: 6px;
-  margin-left: -4px;
-  margin-right: -2px;
+  /* 2× default hit area; negative margins keep layout close to 1px hairline. */
+  width: 12px;
+  margin-left: -8px;
+  margin-right: -4px;
   cursor: col-resize;
   position: relative;
   z-index: 20;
   flex-shrink: 0;
 }
 
-.lightcode-resize-handle::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 2px;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: transparent;
-  transition: background 0.15s;
-}
-
-.lightcode-resize-handle:hover::after {
-  background: var(--accent);
-}
-
 .lightcode-resize-handle-horizontal {
-  height: 6px;
-  margin-top: -4px;
-  margin-bottom: -2px;
+  height: 12px;
+  margin-top: -8px;
+  margin-bottom: -4px;
   cursor: row-resize;
   position: relative;
   z-index: 20;
   flex-shrink: 0;
 }
 
-.lightcode-resize-handle-horizontal::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
-  height: 2px;
-  transform: translateY(-50%);
-  border-radius: 999px;
-  background: transparent;
-  transition: background 0.15s;
+/* Smooth border-color when hover highlights the long seam. */
+.lightcode-shell > aside,
+.lightcode-resize-handle + aside {
+  transition: border-color 0.12s ease;
 }
 
-.lightcode-resize-handle-horizontal:hover::after {
-  background: var(--accent);
+/* Sidebar: [aside][handle] — accent the aside’s full-height right border. */
+.lightcode-shell > aside:has(+ .lightcode-resize-handle[aria-label="Resize sidebar"]:hover) {
+  border-right-color: var(--accent);
+}
+
+/* Right / git / bottom terminal: [handle][aside] or [horizontal handle][aside] */
+.lightcode-resize-handle[aria-label="Resize terminal panel"]:hover + aside,
+.lightcode-resize-handle[aria-label="Resize git panel"]:hover + aside {
+  border-left-color: var(--accent);
+}
+
+.lightcode-resize-handle-horizontal[aria-label="Resize terminal panel"]:hover + aside {
+  border-top-color: var(--accent);
 }
 
 .lightcode-pane-divider {
@@ -954,10 +954,13 @@ body {
 }
 
 .lightcode-overlay-header {
+  /* Above .lightcode-resize-handle (z-20) so title rows are not covered by
+     main / right / git panels on macOS when subpixel or titlebar env() causes overlap. */
+  position: relative;
   -webkit-app-region: drag;
   app-region: drag;
   user-select: none;
-  z-index: 10;
+  z-index: 30;
   border: none;
   border-bottom: none;
   box-shadow: none;

@@ -5,8 +5,33 @@ import { isWindows } from "@/renderer/bridge";
  * One place to tweak column padding, scroll gutter, and footer dividers.
  */
 
+/**
+ * macOS (hiddenInset) window controls sit in the top-left. Reserve enough width + gap so the
+ * sidebar wordmark and actions are not tight against the traffic lights.
+ */
+export const macosTrafficLightGutterClass = "w-[80px] shrink-0" as const;
+
+/** Shared header bar for right/bottom dock panels (project name + tab/close icons). */
+export const panelHeaderRowClass =
+  "flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-2";
+
+/** Reset Tooltip.Trigger styling so it tracks an inline span tightly (used for project labels). */
+export const panelHeaderTooltipTriggerResetClass =
+  "min-w-0 shrink-0 justify-start rounded border-0 bg-transparent p-0 shadow-none outline-none";
+
+/** Icon button in panel headers (tab toggles, close, expand). */
+export const panelHeaderIconButtonClass =
+  "inline-flex items-center justify-center rounded p-0.5 text-muted hover:text-foreground";
+
+/** Tab-style icon button: accents when active, muted+hover otherwise. */
+export function panelHeaderTabIconButtonClass(active: boolean) {
+  return `inline-flex items-center justify-center rounded p-0.5 transition-colors ${
+    active ? "text-accent" : "text-muted hover:text-foreground"
+  }`;
+}
+
 /** Column shell (inset `px-2`); pair with `overlaySidebarSurfaceClass` for overlay/panel UIs. */
-export const sidebarColumnLayoutClass = "flex h-full min-h-0 min-w-0 flex-col gap-3 px-2 pb-1 pt-0";
+export const sidebarColumnLayoutClass = "flex h-full min-h-0 min-w-0 flex-col gap-3 px-2 pb-0 pt-0";
 
 /** Primary surface for overlay and docked tool panels (matches main content / thread area). */
 export const overlaySidebarSurfaceClass = "bg-[var(--content-background)]";
@@ -18,7 +43,7 @@ export const overlaySidebarColumnClass = `${sidebarColumnLayoutClass} ${overlayS
  * Right-docked git tool: same as {@link overlaySidebarColumnClass} but `px-0` on the column so
  * horizontal inset comes from row padding only (`useGitReviewRowPadX`), not column + row.
  */
-export const gitPanelSidebarColumnClass = `flex h-full min-h-0 min-w-0 flex-col gap-0 ${overlaySidebarSurfaceClass} px-0 pb-1 pt-0`;
+export const gitPanelSidebarColumnClass = `flex h-full min-h-0 min-w-0 flex-col gap-0 ${overlaySidebarSurfaceClass} px-0 pb-0 pt-0`;
 
 /**
  * Main scroll/split region: horizontal inset is on the column; scroll handles scrollbar margin.

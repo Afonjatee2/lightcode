@@ -1,7 +1,12 @@
 import { PanelRightClose, Plus, Trash2 } from "lucide-react";
-import { Tabs, Tooltip } from "@heroui/react";
+import { Tabs } from "@heroui/react";
 import type { Project } from "@/shared/contracts";
 import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
+import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
+import {
+  panelHeaderIconButtonClass,
+  panelHeaderRowClass,
+} from "@/renderer/components/layout/sidebarChrome";
 import { TerminalSurfaces } from "./TerminalSurfaces";
 
 export function RightTerminalLayout(props: {
@@ -36,21 +41,12 @@ export function RightTerminalLayout(props: {
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]" style={fadeStyle}>
       {!hideHeader && activeProject && (
-        <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
-          <div className="min-w-0">
-            <Tooltip delay={300}>
-              <Tooltip.Trigger>
-                <div className="max-w-[100px] truncate text-xs font-medium text-foreground">
-                  {activeProject.name}
-                </div>
-              </Tooltip.Trigger>
-              <Tooltip.Content placement="bottom">{activeProject.name}</Tooltip.Content>
-            </Tooltip>
-          </div>
+        <div className={panelHeaderRowClass}>
+          <PanelHeaderProjectName name={activeProject.name} maxWidthClass="max-w-[100px]" />
           <div className="flex-1" />
           <button
             type="button"
-            className="rounded p-0.5 text-muted hover:text-foreground"
+            className={panelHeaderIconButtonClass}
             title="Hide terminal"
             onClick={() => useDevTerminalStore.getState().closePanel()}
           >
@@ -58,7 +54,7 @@ export function RightTerminalLayout(props: {
           </button>
         </div>
       )}
-      <div className="flex shrink-0 items-center gap-0 px-3">
+      <div className="flex shrink-0 items-center gap-0 px-2">
         <Tabs
           className="min-w-0 flex-1 overflow-x-auto rounded-lg"
           variant="secondary"
@@ -103,7 +99,7 @@ export function RightTerminalLayout(props: {
         </Tabs>
       </div>
 
-      <div className="relative min-h-0 flex-1 px-6 pt-2 pb-2">
+      <div className="relative min-h-0 flex-1 px-6 pt-2 pb-1">
         <TerminalSurfaces
           tabs={tabs}
           selectedTabId={selectedTabId}

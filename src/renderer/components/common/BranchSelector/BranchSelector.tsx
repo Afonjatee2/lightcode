@@ -182,10 +182,10 @@ export function BranchSelector(props: BranchSelectorProps) {
             </Tooltip>
           )}
         </Popover.Trigger>
-        <Popover.Content placement={popoverPlacement} className="w-96 p-0">
-          <Popover.Dialog className="flex max-h-[28rem] flex-col overflow-hidden">
+        <Popover.Content placement={popoverPlacement} className="w-80 p-0">
+          <Popover.Dialog className="flex max-h-[24rem] flex-col overflow-hidden !p-0">
             {/* Search */}
-            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <div className="flex items-center gap-2 border-b border-border px-1.5 py-1.5">
               <Search className="size-3.5 shrink-0 text-muted" />
               <input
                 ref={searchRef}

@@ -1,0 +1,16 @@
+import { Tooltip } from "@heroui/react";
+import { panelHeaderTooltipTriggerResetClass } from "@/renderer/components/layout/sidebarChrome";
+
+/** Truncated project label with hover tooltip — used in right/bottom panel header bars. */
+export function PanelHeaderProjectName(props: { name: string; maxWidthClass: string }) {
+  return (
+    <Tooltip delay={300}>
+      <Tooltip.Trigger className={`${panelHeaderTooltipTriggerResetClass} ${props.maxWidthClass}`}>
+        <span className="min-w-0 truncate text-left text-xs font-medium leading-none text-foreground">
+          {props.name}
+        </span>
+      </Tooltip.Trigger>
+      <Tooltip.Content placement="bottom">{props.name}</Tooltip.Content>
+    </Tooltip>
+  );
+}

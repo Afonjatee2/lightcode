@@ -18,7 +18,7 @@ export function GitAsideSlot(props: {
     <>
       {gitPanelOpen && (
         <div
-          className="lightcode-resize-handle mb-2"
+          className="lightcode-resize-handle mb-1"
           onMouseDown={onResizeStart}
           role="separator"
           aria-orientation="vertical"
@@ -27,7 +27,7 @@ export function GitAsideSlot(props: {
       )}
       <aside
         ref={panelRef}
-        className={`relative mb-2 min-h-0 overflow-hidden ${
+        className={`relative mb-1 min-h-0 overflow-hidden ${
           gitPanelDisplayWidth > 0 ? "border-l border-[color:var(--border)]" : ""
         } ${!isResizing ? "transition-[width,min-width] duration-200" : ""}`}
         style={{ width: gitPanelDisplayWidth, minWidth: gitPanelDisplayWidth }}

@@ -14,7 +14,7 @@ import {
   reorderThreadsInProject,
   type ReorderPlacement,
 } from "../reorder";
-import { makeThreadTitle, removePaneFromView, replacePaneInView } from "./helpers";
+import { makeThreadTitle, removePaneFromView, replacePaneInView, stripPlanMode } from "./helpers";
 import type { SliceCreator } from "./shared";
 
 export interface ThreadSlice {
@@ -165,7 +165,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         thread.id === threadId
           ? {
               ...thread,
-              config,
+              config: stripPlanMode(config),
               updatedAt: new Date().toISOString(),
             }
           : thread,
@@ -199,10 +199,12 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           input.threadStatusSource === undefined ||
           thread.threadStatusSource === input.threadStatusSource;
 
+        const nextConfig = stripPlanMode(input.config ?? thread.config);
+
         if (
           thread.status === effectiveStatus &&
           thread.attention === input.attention &&
-          JSON.stringify(thread.config) === JSON.stringify(input.config ?? thread.config) &&
+          JSON.stringify(thread.config) === JSON.stringify(nextConfig) &&
           thread.canResumeWithConfig === input.canResumeWithConfig &&
           statusSourceMatch &&
           !sessionRefChanged
@@ -215,7 +217,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           ...thread,
           status: effectiveStatus,
           attention: input.attention,
-          config: input.config ?? thread.config,
+          config: nextConfig,
           canResumeWithConfig: input.canResumeWithConfig,
           ...(input.threadStatusSource !== undefined
             ? { threadStatusSource: input.threadStatusSource }
@@ -342,10 +344,12 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
               (snapshot.sessionRef?.providerSessionId ?? "") ||
             (thread.sessionRef?.discoveredAt ?? "") !== (snapshot.sessionRef?.discoveredAt ?? "");
 
+          const nextConfig = stripPlanMode(snapshot.config ?? thread.config);
+
           if (
             thread.status === snapshot.status &&
             thread.attention === snapshot.attention &&
-            JSON.stringify(thread.config) === JSON.stringify(snapshot.config ?? thread.config) &&
+            JSON.stringify(thread.config) === JSON.stringify(nextConfig) &&
             thread.canResumeWithConfig === snapshot.canResumeWithConfig &&
             thread.threadStatusSource === snapshot.threadStatusSource &&
             !sessionRefChanged
@@ -358,7 +362,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
             ...thread,
             status: snapshot.status,
             attention: snapshot.attention,
-            config: snapshot.config ?? thread.config,
+            config: nextConfig,
             canResumeWithConfig: snapshot.canResumeWithConfig,
             ...(snapshot.threadStatusSource !== undefined
               ? { threadStatusSource: snapshot.threadStatusSource }

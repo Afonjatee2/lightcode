@@ -1,8 +1,9 @@
-import { ChevronRight, Columns2, Pencil } from "lucide-react";
+import { Archive, ChevronRight, CircleCheck, Columns2, Pencil } from "lucide-react";
 import { Tooltip } from "@heroui/react";
 import type { Project } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
 import { ContextMenu } from "@/renderer/components/common";
+import { archiveThread, toggleMarkThreadDone } from "@/renderer/actions/threadActions";
 import type { GitMenuIcons } from "@/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions";
 import type { WorktreeThreadGroup } from "@/renderer/views/MainView/parts/Sidebar/parts/groupThreads";
 import { InlineRenameInput } from "../../InlineRenameInput";
@@ -53,7 +54,19 @@ export function ThreadGroupRow(props: {
             label: "Rename Group",
             icon: <Pencil className="size-3.5" />,
           },
+          {
+            id: "mark-all-done",
+            label: "Mark All Done",
+            icon: <CircleCheck className="size-3.5" />,
+            isDisabled: activeThreads.length === 0,
+          },
           { type: "separator" as const },
+          {
+            id: "archive-all",
+            label: "Archive All",
+            icon: <Archive className="size-3.5" />,
+            variant: "warning",
+          },
           { id: "ungroup-all", label: "Ungroup All", variant: "warning" },
         ]}
         onAction={(key) => {
@@ -62,6 +75,29 @@ export function ThreadGroupRow(props: {
           }
           if (key === "rename-group") {
             setEditingThreadId(`group:${groupKey}`);
+          }
+          if (key === "mark-all-done") {
+            for (const t of group.threads) {
+              if (!t.done) toggleMarkThreadDone(t.id);
+            }
+          }
+          if (key === "archive-all") {
+            for (const t of group.threads) {
+              archiveThread(t.id);
+            }
+            useAppStore.setState((state) => {
+              const updatedThreads = state.threads.map((t) =>
+                t.groupId === groupKey ? { ...t, groupId: undefined, groupName: undefined } : t,
+              );
+              const view =
+                state.view.kind === "thread" && state.view.activeGroupId === groupKey
+                  ? {
+                      kind: "thread" as const,
+                      panes: [state.view.panes[0]] as [string],
+                    }
+                  : state.view;
+              return { threads: updatedThreads, view };
+            });
           }
           if (key === "ungroup-all") {
             useAppStore.setState((state) => {

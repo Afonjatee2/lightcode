@@ -43,7 +43,7 @@ export function BranchFooterActions(props: {
       {/* Create new branch */}
       <ListBox
         aria-label="Actions"
-        className="p-1"
+        className="px-1.5 py-1.5 [&_.list-box-item]:min-h-7 [&_.list-box-item]:py-0.5 [&_.list-box-item]:px-1.5"
         selectionMode="none"
         onAction={() => {
           setIsCreating(true);
@@ -93,7 +93,7 @@ export function BranchFooterActions(props: {
       {!hideWorktreeToggle && (
         <ListBox
           aria-label="Options"
-          className="p-1"
+          className="px-1.5 py-1.5 [&_.list-box-item]:min-h-7 [&_.list-box-item]:py-0.5 [&_.list-box-item]:px-1.5"
           selectionMode="none"
           onAction={() => {
             const next = !worktreeMode;

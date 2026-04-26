@@ -1,4 +1,10 @@
-import type { AppView, Thread, ThreadAttention, ThreadStatus } from "@/shared/contracts";
+import type {
+  AppView,
+  Thread,
+  ThreadAttention,
+  ThreadConfig,
+  ThreadStatus,
+} from "@/shared/contracts";
 import {
   buildPaneLayoutFromLegacy,
   collectPaneIds,
@@ -13,6 +19,18 @@ import {
   removeIndicesFromRowLayout,
 } from "@/shared/rowLayout";
 import type { SavedGroupLayout } from "./types";
+
+/**
+ * Plan mode is a launch-time intent, not a persistent thread property.
+ * Strip it so a thread that was first launched in plan mode resumes with default permission.
+ */
+export function stripPlanMode(config: ThreadConfig): ThreadConfig {
+  if (config.mode !== "plan") {
+    return config;
+  }
+  const { mode: _omit, ...rest } = config;
+  return rest;
+}
 
 export function makeThreadTitle(prompt: string): string {
   const normalized = prompt.trim().replace(/\s+/g, " ");
