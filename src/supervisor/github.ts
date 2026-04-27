@@ -11,6 +11,7 @@ import type {
   GhCheckAvailableResult,
   GhGetPrChecksResult,
 } from "@/shared/contracts";
+import { toWslUncPath } from "@/shared/wsl";
 import { buildAgentCommand } from "./agents/base";
 
 const execFileAsync = promisify(execFile);
@@ -94,10 +95,17 @@ export class GitHubService {
     body: string,
     isDraft: boolean,
   ): Promise<PrData> {
-    // Write body to temp file to avoid shell escaping issues
-    const bodyFile = join(tmpdir(), `lightcode-pr-body-${Date.now()}.md`);
+    // Write body to temp file to avoid shell escaping issues. For WSL projects,
+    // gh runs inside the distro and can't read a Windows path, so write into
+    // the distro's /tmp via UNC and pass the Linux path to --body-file.
+    const filename = `lightcode-pr-body-${Date.now()}.md`;
+    const writePath =
+      location.kind === "wsl"
+        ? toWslUncPath(location.distro, `/tmp/${filename}`)
+        : join(tmpdir(), filename);
+    const cliPath = location.kind === "wsl" ? `/tmp/${filename}` : writePath;
     try {
-      await writeFile(bodyFile, body, "utf-8");
+      await writeFile(writePath, body, "utf-8");
       const createArgs = [
         "pr",
         "create",
@@ -108,7 +116,7 @@ export class GitHubService {
         "--title",
         title,
         "--body-file",
-        bodyFile,
+        cliPath,
         ...(isDraft ? ["--draft"] : []),
       ];
       await runGh(location, createArgs);
@@ -125,7 +133,7 @@ export class GitHubService {
     } catch (err) {
       throw classifyError(err, "pr create");
     } finally {
-      await unlink(bodyFile).catch(() => {});
+      await unlink(writePath).catch(() => {});
     }
   }
 
