@@ -266,7 +266,7 @@ export function createCodexAdapter(): AgentAdapter {
         return undefined;
       }
     },
-    defaultOneShotModel: "gpt-5.4-mini",
+    defaultOneShotModel: "gpt-5.5",
     buildOneShotCommand(model, effort) {
       const args = ["exec", "-m", model];
       if (effort) {

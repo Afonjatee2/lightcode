@@ -14,20 +14,20 @@ import { withCurrentModel } from "@/renderer/components/thread/threadComposerOpt
 registerProviderIcon("codex", CodexStatusIcon);
 registerCommitGenDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.4 Mini",
-  model: "gpt-5.4-mini",
+  hint: "GPT-5.5",
+  model: "gpt-5.5",
   effort: "low",
 });
 registerTitleGenDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.4 Mini",
-  model: "gpt-5.4-mini",
+  hint: "GPT-5.5",
+  model: "gpt-5.5",
   effort: "low",
 });
 registerConflictResolverDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.4",
-  model: "gpt-5.4",
+  hint: "GPT-5.5",
+  model: "gpt-5.5",
   effort: "",
 });
 

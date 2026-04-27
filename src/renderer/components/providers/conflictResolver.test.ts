@@ -27,6 +27,7 @@ const codexStatus = {
   kind: "codex",
   capabilities: {
     models: [
+      { id: "gpt-5.5", label: "5.5" },
       { id: "gpt-5.4", label: "5.4" },
       { id: "gpt-5.4-mini", label: "5.4 Mini" },
     ],
@@ -42,9 +43,9 @@ describe("resolveConflictResolverConfig", () => {
     expect(result.model).toBe("claude-opus-4-7[1m]");
   });
 
-  it("falls back to registered defaults (Codex → GPT-5.4)", () => {
+  it("falls back to registered defaults (Codex → GPT-5.5)", () => {
     const result = resolveConflictResolverConfig(codexStatus, "", "");
-    expect(result.model).toBe("gpt-5.4");
+    expect(result.model).toBe("gpt-5.5");
   });
 
   it("preserves user-selected model when it exists in capabilities", () => {

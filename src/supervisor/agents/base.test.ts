@@ -18,7 +18,7 @@ describe("buildBatchWslScript", () => {
 });
 
 describe.skipIf(process.platform !== "win32")("wrapWslCommand", () => {
-  it("launches WSL agent commands directly instead of forcing bash", () => {
+  it("launches WSL agent commands through the resolved login shell", () => {
     expect(wrapWslCommand(wslProject, "codex", ["--version"])).toEqual({
       command: getWslCommand(),
       args: [
@@ -27,7 +27,7 @@ describe.skipIf(process.platform !== "win32")("wrapWslCommand", () => {
         "--cd",
         "/home/demo/project",
         "--",
-        "/bin/bash",
+        expect.any(String),
         "-l",
         "-i",
         "-c",
@@ -52,7 +52,7 @@ describe.skipIf(process.platform !== "win32")("wrapWslCommand", () => {
         "--cd",
         "/home/demo/project",
         "--",
-        "/bin/bash",
+        expect.any(String),
         "-l",
         "-i",
         "-c",

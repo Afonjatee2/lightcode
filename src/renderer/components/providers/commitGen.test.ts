@@ -19,6 +19,7 @@ const codexStatus: AgentStatus = {
   authState: "authenticated",
   capabilities: {
     models: [
+      { id: "gpt-5.5", label: "5.5" },
       { id: "gpt-5.4", label: "5.4" },
       { id: "gpt-5.4-mini", label: "5.4 Mini" },
       { id: "gpt-5.1-codex-mini", label: "5.1 Codex Mini" },
@@ -75,7 +76,7 @@ const claudeStatus: AgentStatus = {
 describe("resolveCommitGenConfig", () => {
   it("falls back to provider defaults when the stored config is empty", () => {
     expect(resolveCommitGenConfig(codexStatus, "", "")).toEqual({
-      model: "gpt-5.4-mini",
+      model: "gpt-5.5",
       effort: "low",
       availableEfforts: ["low", "medium", "high", "xhigh"],
     });
@@ -112,7 +113,7 @@ describe("getCommitGenCandidates", () => {
 describe("provider default hints", () => {
   it("builds commit-generation hint text from provider registrations", () => {
     expect(getCommitGenDefaultsHint()).toBe(
-      "Defaults: Claude -> Haiku, Codex -> GPT-5.4 Mini, Copilot -> first available model, Cursor -> Composer 2 Fast, Gemini -> Flash",
+      "Defaults: Claude -> Haiku, Codex -> GPT-5.5, Copilot -> first available model, Cursor -> Composer 2 Fast, Gemini -> Flash",
     );
   });
 });
@@ -145,7 +146,7 @@ describe("generateCommitMessageWithFallback", () => {
     expect(invoke).toHaveBeenNthCalledWith(1, {
       projectLocation,
       agentKind: "codex",
-      model: "gpt-5.4-mini",
+      model: "gpt-5.5",
       effort: "low",
     });
     expect(invoke).toHaveBeenNthCalledWith(2, {

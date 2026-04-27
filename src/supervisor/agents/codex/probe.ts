@@ -81,6 +81,8 @@ const EFFORT_ORDER: Record<string, number> = {
   xhigh: 5,
 };
 
+const PREFERRED_CODEX_DEFAULT_MODEL = "gpt-5.5";
+
 // ── Mapping helpers ─────────────────────────────────────────────
 
 /**
@@ -113,7 +115,13 @@ export function mapCodexModels(
   const visible = models.filter((m) => !m.hidden);
   if (visible.length === 0) return {};
 
-  const mapped = visible.map((m) => ({
+  const ordered = [...visible].sort((a, b) => {
+    if (a.id === PREFERRED_CODEX_DEFAULT_MODEL) return -1;
+    if (b.id === PREFERRED_CODEX_DEFAULT_MODEL) return 1;
+    return 0;
+  });
+
+  const mapped = ordered.map((m) => ({
     id: m.id,
     label: humanizeCodexModelName(m.id, m.displayName),
   }));
@@ -135,7 +143,10 @@ export function mapCodexModels(
   // Prefer high for Codex threads when the default model supports it.
   // The CLI may report medium as its built-in default, but Lightcode's
   // Codex UX should start at high unless the model can't use it.
-  const defaultModel = visible.find((m) => m.isDefault) ?? visible[0]!;
+  const defaultModel =
+    visible.find((m) => m.id === PREFERRED_CODEX_DEFAULT_MODEL) ??
+    visible.find((m) => m.isDefault) ??
+    visible[0]!;
   const defaultModelEfforts = perModelEfforts.get(defaultModel.id) ?? [];
   const defaultEffort = defaultModelEfforts.includes("high")
     ? "high"

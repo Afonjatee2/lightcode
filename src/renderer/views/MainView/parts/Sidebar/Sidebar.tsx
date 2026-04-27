@@ -743,12 +743,14 @@ function SortableProjectHeader(props: {
               const entries = groupThreads(
                 [...projectThreads].sort((a, b) => b[dateField].localeCompare(a[dateField])),
               );
-              const recentEntries = entries
-                .filter((e) => isRecent(getEntryDate(e, dateField)))
-                .sort((a, b) => Number(entryIsStarred(b)) - Number(entryIsStarred(a)));
-              const olderEntries = entries
-                .filter((e) => !isRecent(getEntryDate(e, dateField)))
-                .sort((a, b) => Number(entryIsStarred(b)) - Number(entryIsStarred(a)));
+              const starredEntries = entries.filter(entryIsStarred);
+              const unstarredEntries = entries.filter((e) => !entryIsStarred(e));
+              const recentEntries = unstarredEntries.filter((e) =>
+                isRecent(getEntryDate(e, dateField)),
+              );
+              const olderEntries = unstarredEntries.filter(
+                (e) => !isRecent(getEntryDate(e, dateField)),
+              );
               const hasBothSections = recentEntries.length > 0 && olderEntries.length > 0;
               let ungroupedIndex = 0;
 
@@ -1003,13 +1005,14 @@ function SortableProjectHeader(props: {
 
               return (
                 <>
-                  {renderWithDividers(recentEntries)}
+                  {renderWithDividers(starredEntries)}
+                  {renderWithDividers(recentEntries, starredEntries.length)}
                   {hasBothSections && (
                     <div className="px-1.5 pb-0.5 pt-2 text-[10px] font-medium uppercase tracking-wider text-muted">
                       Older
                     </div>
                   )}
-                  {renderWithDividers(olderEntries, recentEntries.length)}
+                  {renderWithDividers(olderEntries, starredEntries.length + recentEntries.length)}
                 </>
               );
             })()}

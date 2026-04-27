@@ -610,15 +610,15 @@ export function ThreadDraftView(props: {
         <div className="flex flex-1 flex-col items-center justify-center">
           <div className="w-full max-w-[920px] overflow-visible pb-3 text-center">
             <h1
-              className={`inline-flex items-baseline gap-3 leading-[1.15] font-semibold tracking-[-0.03em] ${props.compact ? "text-[clamp(1.375rem,2.75vw,1.875rem)]" : "text-[clamp(1.875rem,4.25vw,3.125rem)]"}`}
+              className={`inline-flex items-baseline gap-3 overflow-visible pb-[0.12em] leading-[1.28] font-semibold tracking-normal ${props.compact ? "text-[clamp(1.375rem,2.75vw,1.875rem)]" : "text-[clamp(1.875rem,4.25vw,3.125rem)]"}`}
             >
-              <span className="pr-[0.04em] pb-[0.04em] text-transparent [background-image:linear-gradient(135deg,var(--foreground)_0%,color-mix(in_oklab,var(--accent)_60%,var(--foreground))_52%,var(--muted)_100%)] [background-size:100%_100%] bg-clip-text">
+              <span className="inline-block pr-[0.04em] pb-[0.12em] text-transparent [background-image:linear-gradient(135deg,var(--foreground)_0%,color-mix(in_oklab,var(--accent)_60%,var(--foreground))_52%,var(--muted)_100%)] [background-size:100%_100%] bg-clip-text">
                 Lightcode
               </span>
               <TerminalSquare className="translate-y-[-0.04em] size-[0.48em] shrink-0 text-[color:color-mix(in_oklab,var(--accent)_58%,var(--foreground))] opacity-90" />
             </h1>
             <p
-              className={`mx-auto mt-1.5 max-w-full truncate leading-snug font-medium tracking-tight text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono ${props.compact ? "text-[clamp(0.6875rem,1.05vw,0.8125rem)]" : "text-[clamp(0.75rem,1.35vw,0.9375rem)]"}`}
+              className={`mx-auto mt-1.5 max-w-full truncate pb-[0.08em] leading-snug font-medium tracking-normal text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono ${props.compact ? "text-[clamp(0.6875rem,1.05vw,0.8125rem)]" : "text-[clamp(0.75rem,1.35vw,0.9375rem)]"}`}
             >
               {project.name}
             </p>

@@ -299,6 +299,43 @@ describe("codexIntentFor", () => {
 });
 
 describe("mapCodexModels", () => {
+  it("promotes GPT-5.5 to the Codex default model when available", () => {
+    expect(
+      mapCodexModels([
+        {
+          id: "gpt-5.4",
+          model: "gpt-5.4",
+          displayName: "gpt-5.4",
+          hidden: false,
+          isDefault: true,
+          defaultReasoningEffort: "medium",
+          supportedReasoningEfforts: [
+            { reasoningEffort: "low", description: "Low" },
+            { reasoningEffort: "medium", description: "Medium" },
+          ],
+        },
+        {
+          id: "gpt-5.5",
+          model: "gpt-5.5",
+          displayName: "gpt-5.5",
+          hidden: false,
+          isDefault: false,
+          defaultReasoningEffort: "medium",
+          supportedReasoningEfforts: [
+            { reasoningEffort: "medium", description: "Medium" },
+            { reasoningEffort: "high", description: "High" },
+          ],
+        },
+      ]),
+    ).toMatchObject({
+      models: [
+        { id: "gpt-5.5", label: "5.5" },
+        { id: "gpt-5.4", label: "5.4" },
+      ],
+      defaultEffort: "high",
+    });
+  });
+
   it("prefers high as the default effort when the default model supports it", () => {
     expect(
       mapCodexModels([

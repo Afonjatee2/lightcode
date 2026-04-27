@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
 import { useLayoutEffect, useRef, useState } from "react";
+import { Button, Tooltip } from "@heroui/react";
+import { House } from "lucide-react";
 import { isMac, isWindows } from "@/renderer/bridge";
 import { macosTrafficLightGutterClass } from "@/renderer/components/layout/sidebarChrome";
 import { AppShell, useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
@@ -48,6 +50,10 @@ function SidebarHeaderRow(props: {
   const showHeaderActions = !isCollapsed || closingOverlay;
 
   useLayoutEffect(() => {
+    // Only macOS reserves space for left-side window controls (traffic lights),
+    // so the wordmark only needs to collapse there. Other platforms have full width.
+    if (!isMac()) return;
+
     const el = ref.current;
     if (!el) return;
 
@@ -67,11 +73,31 @@ function SidebarHeaderRow(props: {
       className={`flex min-h-0 min-w-0 flex-1 items-center gap-1.5${isWindows() ? " pl-1" : ""}`}
     >
       {isMac() && <div className={macosTrafficLightGutterClass} />}
-      <SidebarHeaderWordmark
-        title={props.title}
-        {...(props.onTitleClick != null ? { onTitleClick: props.onTitleClick } : {})}
-        hideWordmark={hideWordmark}
-      />
+      {showHeaderActions ? (
+        hideWordmark && props.onTitleClick ? (
+          <Tooltip delay={150}>
+            <Tooltip.Trigger>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="ghost"
+                aria-label={props.title}
+                className="lightcode-overlay-header__controls size-6 min-w-0 shrink-0 text-muted hover:text-foreground"
+                onPress={props.onTitleClick}
+              >
+                <House className="size-3.5" />
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content placement="bottom">{props.title}</Tooltip.Content>
+          </Tooltip>
+        ) : (
+          <SidebarHeaderWordmark
+            title={props.title}
+            {...(props.onTitleClick != null ? { onTitleClick: props.onTitleClick } : {})}
+            hideWordmark={hideWordmark}
+          />
+        )
+      ) : null}
       {showHeaderActions ? props.children : null}
       <div className="flex-1" />
     </div>
