@@ -1,11 +1,21 @@
-import { mkdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveLightcodePaths } from "@/shared/lightcodePaths";
-import type { AgentEnvContext } from "../../base";
-import { resolveWslHomeDirectory } from "../../base";
 import { toWslUncPath } from "@/shared/wsl";
+import type { AgentEnvContext } from "../../base";
 import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
+import {
+  PLUGIN_ASSET_FILES,
+  copyPluginAssetsIfStale,
+  createPluginSourceResolver,
+  getNativePluginBaseDir,
+  getWslPluginBaseDirs,
+  isWslPluginContext,
+  quoteHookCommandArg,
+  readBundledPluginVersion,
+  readPluginManifest,
+  type PluginManifest,
+} from "../../plugin/installerBase";
 
 /**
  * Claude Code plugin installer.
@@ -43,58 +53,16 @@ export interface ClaudePluginPaths {
   version: string;
 }
 
-interface PluginManifest {
-  version: string;
-  [key: string]: unknown;
-}
+const callerDir =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url ?? "file://"));
 
-const ASSET_FILES = ["plugin.json", "forward.mjs"] as const;
-
-function resolveSourceDir(): string {
-  // The supervisor is bundled to dist/main/supervisor.cjs. The plugin assets
-  // (plugin.json + forward.mjs) are NOT bundled — they must exist as real
-  // files on disk because Claude spawns `forward.mjs` as a Node child
-  // (asar-trapped paths aren't readable from external processes).
-  //
-  // Layout by runtime:
-  //   dev:    <repo>/dist/main/supervisor.cjs
-  //           → plugin assets at <repo>/src/supervisor/agents/claude/plugin
-  //   prod:   <app>/resources/app.asar/dist/main/supervisor.cjs  (inside asar)
-  //           → plugin assets staged by prepare-agent-plugins.mjs and
-  //             bundled as extraResources at
-  //             process.resourcesPath/agent-plugins/claude
-  //
-  // We try the packaged location first (via process.resourcesPath when it's
-  // set — Electron sets it for main and all forked/child Electron processes
-  // including the supervisor fork), then fall back to dev-relative paths.
-  const candidates: string[] = [];
-  const override = process.env.LIGHTCODE_CLAUDE_PLUGIN_SOURCE;
-  if (override) candidates.push(resolve(override));
-  if (typeof process.resourcesPath === "string" && process.resourcesPath.length > 0) {
-    candidates.push(join(process.resourcesPath, "agent-plugins", "claude"));
-  }
-  const here =
-    typeof __dirname !== "undefined"
-      ? __dirname
-      : dirname(fileURLToPath(import.meta.url ?? "file://"));
-  // Prod fallback when process.resourcesPath isn't set: walk up from
-  // `<resources>/app.asar/dist/main/` (or `app.asar.unpacked/…`) to
-  // `<resources>/agent-plugins/claude`.
-  candidates.push(resolve(here, "../../../agent-plugins/claude"));
-  candidates.push(resolve(here, "../../src/supervisor/agents/claude/plugin"));
-  candidates.push(resolve(here, "../../../src/supervisor/agents/claude/plugin"));
-  candidates.push(resolve(here, "../../resources/agent-plugins/claude"));
-  candidates.push(resolve(here, "../resources/agent-plugins/claude"));
-  for (const candidate of candidates) {
-    if (existsSync(join(candidate, "plugin.json"))) return candidate;
-  }
-  throw new Error(`claude plugin source dir not found; checked: ${candidates.join(", ")}`);
-}
-
-function readManifest(dir: string): PluginManifest {
-  const raw = readFileSync(join(dir, "plugin.json"), "utf8");
-  return JSON.parse(raw) as PluginManifest;
-}
+const resolveSourceDir = createPluginSourceResolver({
+  kind: "claude",
+  sourceEnvVar: "LIGHTCODE_CLAUDE_PLUGIN_SOURCE",
+  callerDir,
+});
 
 /**
  * Single source of truth for the plugin semver: `plugin.json` next to this
@@ -103,76 +71,38 @@ function readManifest(dir: string): PluginManifest {
  * runtime after staging.
  */
 export function readBundledClaudePluginVersion(): string {
-  try {
-    const v = readManifest(resolveSourceDir()).version;
-    return typeof v === "string" && v.length > 0 ? v : "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
-}
-
-function copyFileSync(source: string, target: string): void {
-  mkdirSync(dirname(target), { recursive: true });
-  const data = readFileSync(source);
-  writeFileSync(target, data);
-}
-
-function isFresh(sourceDir: string, targetDir: string): boolean {
-  for (const file of ASSET_FILES) {
-    const source = join(sourceDir, file);
-    const target = join(targetDir, file);
-    if (!existsSync(target)) return false;
-    try {
-      const sourceStat = statSync(source);
-      const targetStat = statSync(target);
-      if (sourceStat.size !== targetStat.size) return false;
-      if (sourceStat.mtimeMs > targetStat.mtimeMs) return false;
-    } catch {
-      return false;
-    }
-  }
-  return true;
-}
-
-function isWslContext(ctx: AgentEnvContext | undefined): ctx is AgentEnvContext & {
-  envKind: "wsl";
-  wslDistro: string;
-} {
-  return Boolean(ctx && ctx.envKind === "wsl" && ctx.wslDistro);
+  return readBundledPluginVersion(resolveSourceDir);
 }
 
 /** Compute the plugin staging dir without performing any install work. */
-export function getClaudePluginPaths(ctx?: AgentEnvContext, baseDir?: string): ClaudePluginPaths {
-  if (isWslContext(ctx)) {
-    return getWslClaudePluginPaths(ctx.wslDistro);
-  }
-  const paths = resolveLightcodePaths(baseDir);
-  const pluginDir = join(paths.agentPluginsDir, "claude");
-  const settingsPath = join(pluginDir, "settings.json");
-  let version = "0.0.0";
-  try {
-    version = readManifest(pluginDir).version;
-  } catch {
-    // staged manifest missing; caller should run installClaudePlugin first.
-  }
-  return { pluginDir, settingsPath, version };
-}
-
-function getWslClaudePluginPaths(distro: string): ClaudePluginPaths {
-  const home = resolveWslHomeDirectory(distro);
-  const linuxBase = home ? `${home}/.lightcode/agent-plugins/claude` : "";
-  const pluginDir = linuxBase;
-  const settingsPath = linuxBase ? `${linuxBase}/settings.json` : "";
-  let version = "0.0.0";
-  if (home) {
-    const uncPluginDir = toWslUncPath(distro, pluginDir);
+export function getClaudePluginPaths(ctx?: AgentEnvContext): ClaudePluginPaths {
+  if (isWslPluginContext(ctx)) {
+    const wsl = getWslPluginBaseDirs(ctx.wslDistro, "claude");
+    if (!wsl) return { pluginDir: "", settingsPath: "", version: "0.0.0" };
+    let version = "0.0.0";
     try {
-      version = readManifest(uncPluginDir).version;
+      version = readPluginManifest(wsl.uncBase).version;
     } catch {
       // staged manifest missing or distro unreachable.
     }
+    return {
+      pluginDir: wsl.linuxBase,
+      settingsPath: `${wsl.linuxBase}/settings.json`,
+      version,
+    };
   }
-  return { pluginDir, settingsPath, version };
+  const pluginDir = getNativePluginBaseDir("claude", ctx?.baseDir);
+  let version = "0.0.0";
+  try {
+    version = readPluginManifest(pluginDir).version;
+  } catch {
+    // staged manifest missing; caller should run installClaudePlugin first.
+  }
+  return {
+    pluginDir,
+    settingsPath: join(pluginDir, "settings.json"),
+    version,
+  };
 }
 
 /**
@@ -184,7 +114,6 @@ function getWslClaudePluginPaths(distro: string): ClaudePluginPaths {
  */
 export function installClaudePlugin(
   ctx?: AgentEnvContext,
-  baseDir?: string,
 ): { ok: true; paths: ClaudePluginPaths; version: string } | { ok: false; reason: string } {
   let sourceDir: string;
   try {
@@ -195,24 +124,18 @@ export function installClaudePlugin(
 
   let manifest: PluginManifest;
   try {
-    manifest = readManifest(sourceDir);
+    manifest = readPluginManifest(sourceDir);
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }
 
-  if (isWslContext(ctx)) {
+  if (isWslPluginContext(ctx)) {
     return installClaudePluginWsl(ctx.wslDistro, sourceDir, manifest);
   }
 
-  const paths = resolveLightcodePaths(baseDir);
-  const pluginDir = join(paths.agentPluginsDir, "claude");
+  const pluginDir = getNativePluginBaseDir("claude", ctx?.baseDir);
   mkdirSync(pluginDir, { recursive: true });
-
-  if (!isFresh(sourceDir, pluginDir)) {
-    for (const file of ASSET_FILES) {
-      copyFileSync(join(sourceDir, file), join(pluginDir, file));
-    }
-  }
+  copyPluginAssetsIfStale(sourceDir, pluginDir);
 
   const settingsPath = join(pluginDir, "settings.json");
   const settings = renderClaudeSettings(pluginDir, "native");
@@ -239,7 +162,7 @@ function installClaudePluginWsl(
 ): { ok: true; paths: ClaudePluginPaths; version: string } | { ok: false; reason: string } {
   const deploy = deployFilesToWslHome(
     distro,
-    ASSET_FILES.map((file) => ({
+    PLUGIN_ASSET_FILES.map((file) => ({
       src: join(sourceDir, file),
       relDest: `agent-plugins/claude/${file}`,
     })),
@@ -290,38 +213,25 @@ function installClaudePluginWsl(
  * Read whether the plugin is already installed at the canonical staging path
  * for the given environment.
  */
-export function isClaudePluginInstalled(
-  ctx?: AgentEnvContext,
-  baseDir?: string,
-): { installed: boolean; version?: string } {
-  if (isWslContext(ctx)) {
-    return isClaudePluginInstalledWsl(ctx.wslDistro);
+export function isClaudePluginInstalled(ctx?: AgentEnvContext): {
+  installed: boolean;
+  version?: string;
+} {
+  if (isWslPluginContext(ctx)) {
+    const wsl = getWslPluginBaseDirs(ctx.wslDistro, "claude");
+    if (!wsl) return { installed: false };
+    return verifyClaudeInstallAt(wsl.uncBase);
   }
-  const paths = resolveLightcodePaths(baseDir);
-  const pluginDir = join(paths.agentPluginsDir, "claude");
-  if (!existsSync(join(pluginDir, "plugin.json"))) return { installed: false };
-  if (!existsSync(join(pluginDir, "forward.mjs"))) return { installed: false };
-  if (!existsSync(join(pluginDir, "hooks", "hooks.json"))) return { installed: false };
-  if (!existsSync(join(pluginDir, "settings.json"))) return { installed: false };
-  try {
-    const version = readManifest(pluginDir).version;
-    return { installed: true, version };
-  } catch {
-    return { installed: false };
-  }
+  return verifyClaudeInstallAt(getNativePluginBaseDir("claude", ctx?.baseDir));
 }
 
-function isClaudePluginInstalledWsl(distro: string): { installed: boolean; version?: string } {
-  const home = resolveWslHomeDirectory(distro);
-  if (!home) return { installed: false };
-  const linuxPluginDir = `${home}/.lightcode/agent-plugins/claude`;
-  const uncDir = toWslUncPath(distro, linuxPluginDir);
-  if (!existsSync(join(uncDir, "plugin.json"))) return { installed: false };
-  if (!existsSync(join(uncDir, "forward.mjs"))) return { installed: false };
-  if (!existsSync(join(uncDir, "hooks", "hooks.json"))) return { installed: false };
-  if (!existsSync(join(uncDir, "settings.json"))) return { installed: false };
+function verifyClaudeInstallAt(readableDir: string): { installed: boolean; version?: string } {
+  if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
+  if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
+  if (!existsSync(join(readableDir, "hooks", "hooks.json"))) return { installed: false };
+  if (!existsSync(join(readableDir, "settings.json"))) return { installed: false };
   try {
-    const version = readManifest(uncDir).version;
+    const version = readPluginManifest(readableDir).version;
     return { installed: true, version };
   } catch {
     return { installed: false };
@@ -414,7 +324,7 @@ function renderClaudeSettings(pluginDir: string, target: "native" | "wsl"): Clau
       hooks: [
         {
           type: "command",
-          command: `node ${quoteCommandArg(forwardPath, target)} ${spec.event}`,
+          command: `node ${quoteHookCommandArg(forwardPath, target)} ${spec.event}`,
         },
       ],
     };
@@ -424,11 +334,4 @@ function renderClaudeSettings(pluginDir: string, target: "native" | "wsl"): Clau
     hooks[spec.event] = [entry];
   }
   return { hooks, preferredNotifChannel: "iterm2" };
-}
-
-function quoteCommandArg(value: string, target: "native" | "wsl"): string {
-  if (target === "native" && process.platform === "win32") {
-    return `"${value.replaceAll('"', '\\"')}"`;
-  }
-  return `'${value.replaceAll("'", "'\\''")}'`;
 }

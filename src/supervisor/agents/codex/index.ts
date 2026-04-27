@@ -11,6 +11,7 @@ import {
 import { buildCodexArgvFor } from "./argv";
 import { codexDefaultCapabilities, codexDetectionSpec } from "./detection";
 import { detectRateLimitPrompt } from "./rateLimitPrompt";
+import { warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
   getCodexPluginPaths,
   installCodexPlugin,
@@ -36,20 +37,14 @@ export { deriveCodexStructuredState, parseCodexSocketMessage } from "./acp";
 export { detectCodexReadyForInitialPrompt, detectCodexUpdatePrompt } from "./terminal";
 
 const CODEX_PLUGIN_VERSION = readBundledCodexPluginVersion();
-const CODEX_MIN_PROTOCOL_VERSION = 1;
 const CODEX_MIN_HOOKS_VERSION_LABEL = "0.122.0";
 
-if (CODEX_PLUGIN_VERSION === "0.0.0") {
-  // Module-load fallback: plugin.json wasn't resolvable. L1 hooks will be
-  // disabled for this session; the coordinator treats `0.0.0` as a retry
-  // sentinel so the next app launch installs fresh once the manifest is in
-  // place (dev: src/supervisor/agents/codex/plugin/; packaged: resources/
-  // agent-plugins/codex/ — staged by scripts/prepare-agent-plugins.mjs).
-  console.warn(
-    "[codex] plugin manifest not found at module load — CLI hooks disabled for this session. " +
-      "If you just added the plugin files, restart the app to enable hooks.",
-  );
-}
+warnIfPluginManifestMissing(
+  "codex",
+  CODEX_PLUGIN_VERSION,
+  "Expected at src/supervisor/agents/codex/plugin/ (dev) or " +
+    "resources/agent-plugins/codex/ (packaged, staged by scripts/prepare-agent-plugins.mjs).",
+);
 
 function codexOscEventText(notification: OscNotification): string {
   const parts: string[] = [notification.title, notification.body];
@@ -121,7 +116,7 @@ export function createCodexAdapter(): AgentAdapter {
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },
     pluginId: "lightcode-status@codex",
     pluginVersion: CODEX_PLUGIN_VERSION,
-    minProtocolVersion: CODEX_MIN_PROTOCOL_VERSION,
+    minProtocolVersion: 1,
     async isPluginSupported(ctx) {
       if (ctx.envKind === "wsl" && ctx.wslDistro) {
         const [nodeOk, verOut] = await batchWslCommandsAsync(ctx.wslDistro, [
@@ -155,15 +150,15 @@ export function createCodexAdapter(): AgentAdapter {
       return isCodexVersionSupportedForHooks();
     },
     isPluginInstalled(ctx) {
-      return isCodexPluginInstalled(ctx, ctx.baseDir);
+      return isCodexPluginInstalled(ctx);
     },
     async installPlugin(ctx) {
-      const result = installCodexPlugin(ctx, ctx.baseDir);
+      const result = installCodexPlugin(ctx);
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },
     async pluginLaunchExtras(ctx) {
-      const paths = getCodexPluginPaths(ctx, ctx.baseDir);
+      const paths = getCodexPluginPaths(ctx);
       return {
         args: ["--enable", "codex_hooks"],
         env: { CODEX_HOME: paths.codexHomeDir },

@@ -807,6 +807,41 @@ describe("CliHookPluginCoordinator install cache", () => {
     expect(resolved!.extraArgs).toEqual(["--codex-marker"]);
   });
 
+  it("resolves Gemini spawn env with LIGHTCODE_AGENT_KIND=gemini and provider settings path", async () => {
+    const stub = makeStubAdapter("gemini", {
+      pluginLaunchExtras: async () => ({
+        env: {
+          GEMINI_CLI_SYSTEM_SETTINGS_PATH: "/home/u/.lightcode/agent-plugins/gemini/settings.json",
+        },
+      }),
+    });
+    stub.isPluginInstalled.mockResolvedValue({ installed: true, version: "1.0.0" });
+
+    coordinator = new CliHookPluginCoordinator(
+      {
+        adapters: new Map([["gemini", stub.adapter]]),
+        settingsPath,
+        envContext: () => ({ envKind: "posix" }),
+      },
+      () => undefined,
+    );
+    coordinator.startIngress();
+
+    const resolved = await coordinator.resolvePluginEnvForSpawn({
+      threadId: "thread-gemini",
+      agentKind: "gemini",
+    });
+
+    expect(resolved).toBeDefined();
+    expect(resolved!.env).toMatchObject({
+      LIGHTCODE_THREAD_ID: "thread-gemini",
+      LIGHTCODE_AGENT_KIND: "gemini",
+      LIGHTCODE_HOOK_PROTOCOL_VERSION: "1",
+      GEMINI_CLI_SYSTEM_SETTINGS_PATH: "/home/u/.lightcode/agent-plugins/gemini/settings.json",
+    });
+    expect(resolved!.extraArgs).toEqual([]);
+  });
+
   it("does not persist a cache entry when install fails with the 0.0.0 sentinel", async () => {
     // Sentinel pluginVersion means `readBundled*PluginVersion()` couldn't
     // resolve the manifest at module load — an artifact of a half-initialized

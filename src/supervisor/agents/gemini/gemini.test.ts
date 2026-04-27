@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { createGeminiAdapter } from ".";
+import { geminiIntentFor } from "./plugin/intentMap";
 import { detectGeminiInvalidSessionRef } from "./session";
 import { detectGeminiTerminalStatus } from "./terminal";
 
@@ -190,5 +192,69 @@ describe("detectGeminiInvalidSessionRef", () => {
 
   it("ignores unrelated output", () => {
     expect(detectGeminiInvalidSessionRef("Loaded cached credentials.")).toBe(false);
+  });
+});
+
+describe("geminiIntentFor", () => {
+  it("maps lifecycle and agent hooks to universal intents", () => {
+    expect(geminiIntentFor("SessionStart", undefined)).toBe("session.started");
+    expect(geminiIntentFor("BeforeAgent", undefined)).toBe("session.turn_started");
+    expect(geminiIntentFor("BeforeModel", undefined)).toBe("session.turn_started");
+    expect(geminiIntentFor("BeforeTool", undefined)).toBe("session.turn_started");
+    expect(geminiIntentFor("AfterTool", undefined)).toBe("session.turn_started");
+    expect(geminiIntentFor("AfterAgent", undefined)).toBe("session.turn_finished");
+  });
+
+  it("maps only approval-style notifications to needs_approval", () => {
+    expect(
+      geminiIntentFor("Notification", {
+        notification_type: "ToolPermission",
+        message: "Allow tool?",
+      }),
+    ).toBe("session.needs_approval");
+    expect(geminiIntentFor("Notification", { message: "FYI only" })).toBeUndefined();
+  });
+});
+
+describe("createGeminiAdapter hook plugin support", () => {
+  it("declares Gemini hook plugin metadata and launch env", async () => {
+    const adapter = createGeminiAdapter();
+
+    expect(adapter.pluginId).toBe("lightcode-status@gemini");
+    expect(adapter.pluginVersion).toBe("1.0.0");
+    expect(adapter.minProtocolVersion).toBe(1);
+
+    const extras = await adapter.pluginLaunchExtras?.({
+      envKind: "posix",
+      baseDir: "C:\\lightcode-test",
+    });
+
+    expect(extras?.args).toBeUndefined();
+    expect(extras?.env?.GEMINI_CLI_SYSTEM_SETTINGS_PATH).toContain("agent-plugins");
+    expect(extras?.env?.GEMINI_CLI_SYSTEM_SETTINGS_PATH).toContain("gemini");
+    expect(extras?.env?.GEMINI_CLI_SYSTEM_SETTINGS_PATH).toContain("settings.json");
+  });
+
+  it("allows hook-active terminal fallback only for Gemini attention prompts", () => {
+    const adapter = createGeminiAdapter();
+
+    expect(
+      adapter.shouldApplyTerminalStatusWhileHookActive?.({
+        status: "needs_reply",
+        attention: "needs_reply",
+      }),
+    ).toBe(true);
+    expect(
+      adapter.shouldApplyTerminalStatusWhileHookActive?.({
+        status: "working",
+        attention: "working",
+      }),
+    ).toBe(false);
+    expect(
+      adapter.shouldApplyTerminalStatusWhileHookActive?.({
+        status: "idle",
+        attention: "none",
+      }),
+    ).toBe(false);
   });
 });

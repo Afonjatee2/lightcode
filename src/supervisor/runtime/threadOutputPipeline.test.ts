@@ -117,6 +117,74 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
     expect(detectTerminalStatus).not.toHaveBeenCalled();
   });
 
+  it("allows hook-active terminal fallback when the adapter opts into an attention hint", () => {
+    const p = pipeline();
+    const detectTerminalStatus = vi.fn<
+      () => { status: "needs_reply"; attention: "needs_reply"; corroborated: true }
+    >(() => ({
+      status: "needs_reply",
+      attention: "needs_reply",
+      corroborated: true,
+    }));
+    const session = {
+      threadId: "t1",
+      status: "working",
+      attention: "working",
+      config: {},
+      cliHookEnvInjected: true,
+      prevChunk: "",
+      outputLength: 0,
+      adapter: {
+        capabilities: { presentationMode: "terminal" },
+        detectTerminalStatus,
+        shouldApplyTerminalStatusWhileHookActive: (hint: { status: string }) =>
+          hint.status === "needs_reply" || hint.status === "needs_approval",
+        isReadyForInitialPrompt: () => false,
+      },
+      pty: { write: vi.fn<(data: string) => void>() },
+    } as unknown as SessionRuntime;
+
+    p.handlePtyData(session, "Enter to select");
+
+    expect(detectTerminalStatus).toHaveBeenCalled();
+    expect(session.status).toBe("needs_reply");
+    expect(session.attention).toBe("needs_reply");
+  });
+
+  it("does not apply hook-active terminal fallback for disallowed hints", () => {
+    const p = pipeline();
+    const detectTerminalStatus = vi.fn<
+      () => { status: "idle"; attention: "none"; corroborated: true }
+    >(() => ({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    }));
+    const session = {
+      threadId: "t1",
+      status: "working",
+      attention: "working",
+      config: {},
+      cliHookEnvInjected: true,
+      prevChunk: "",
+      outputLength: 0,
+      adapter: {
+        capabilities: { presentationMode: "terminal" },
+        detectTerminalStatus,
+        shouldApplyTerminalStatusWhileHookActive: (hint: { status: string }) =>
+          hint.status === "needs_reply" || hint.status === "needs_approval",
+        isReadyForInitialPrompt: () => false,
+      },
+      pty: { write: vi.fn<(data: string) => void>() },
+    } as unknown as SessionRuntime;
+
+    p.handlePtyData(session, "◇ Ready");
+
+    expect(detectTerminalStatus).toHaveBeenCalled();
+    expect(session.status).toBe("working");
+    expect(session.attention).toBe("working");
+  });
+
   it("suppresses OSC-derived status transitions when hook is active and adapter opts in", () => {
     const emit = vi.fn<() => void>();
     const p = new ThreadOutputPipeline({

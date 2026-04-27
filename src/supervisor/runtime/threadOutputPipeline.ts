@@ -391,6 +391,40 @@ export class ThreadOutputPipeline {
             return;
           }
         }
+        const shouldApplyHookFallback = session.adapter.shouldApplyTerminalStatusWhileHookActive;
+        const rawHint =
+          shouldApplyHookFallback && session.adapter.detectTerminalStatus
+            ? session.adapter.detectTerminalStatus(strippedData)
+            : null;
+        const hookFallbackHint =
+          rawHint &&
+          shouldApplyHookFallback &&
+          !this.shouldSuppressLaunchWorkingHint(session, rawHint) &&
+          shouldApplyHookFallback(rawHint)
+            ? rawHint
+            : null;
+        if (hookFallbackHint) {
+          const nextConfig = session.adapter.syncConfigFromTerminalState?.({
+            config: session.config,
+            previousStatus: session.status,
+            previousAttention: session.attention,
+            hint: hookFallbackHint,
+          });
+          const configChanged =
+            nextConfig !== undefined && !isThreadConfigEqual(nextConfig, session.config);
+          if (configChanged) {
+            session.config = nextConfig!;
+          }
+          if (
+            session.status !== hookFallbackHint.status ||
+            session.attention !== hookFallbackHint.attention
+          ) {
+            this.updateState(session, hookFallbackHint.status, hookFallbackHint.attention);
+          } else if (configChanged) {
+            this.emitState(session);
+          }
+          this.writeHintLog(session, strippedData, hookFallbackHint);
+        }
         return;
       }
 

@@ -1,13 +1,22 @@
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import {
+  batchWslCommandsAsync,
   createKnownSessionRef,
   createRecursiveDirWatcher,
   detectAgentInstall,
   type AgentAdapter,
+  type TerminalStatusHint,
 } from "../base";
+import { warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildGeminiArgs } from "./argv";
 import { defaultGeminiCapabilities, geminiDetectionSpec } from "./detection";
+import {
+  getGeminiPluginPaths,
+  installGeminiPlugin,
+  isGeminiPluginInstalled,
+  readBundledGeminiPluginVersion,
+} from "./plugin/install";
 import {
   detectGeminiInvalidSessionRef,
   queryLatestSessionId,
@@ -16,6 +25,14 @@ import {
 import { detectGeminiTerminalStatus } from "./terminal";
 
 export { detectGeminiInvalidSessionRef } from "./session";
+
+const GEMINI_PLUGIN_VERSION = readBundledGeminiPluginVersion();
+
+warnIfPluginManifestMissing("gemini", GEMINI_PLUGIN_VERSION);
+
+function geminiHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
+  return hint.status === "needs_reply" || hint.status === "needs_approval";
+}
 
 export function createGeminiAdapter(): AgentAdapter {
   /** Latest session ID seen before the TUI spawned — used to detect the new one. */
@@ -29,6 +46,30 @@ export function createGeminiAdapter(): AgentAdapter {
       return capabilities;
     },
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },
+    pluginId: "lightcode-status@gemini",
+    pluginVersion: GEMINI_PLUGIN_VERSION,
+    minProtocolVersion: 1,
+
+    async isPluginSupported(ctx) {
+      // Gemini's hook command invokes `node`. Native sessions follow the
+      // Claude/Codex assumption that the supervisor's environment has Node;
+      // WSL needs an in-distro runtime on PATH.
+      if (ctx.envKind !== "wsl" || !ctx.wslDistro) return true;
+      const [result] = await batchWslCommandsAsync(ctx.wslDistro, ["command -v node"]);
+      return Boolean(result?.ok && result.stdout.trim().length > 0);
+    },
+    async isPluginInstalled(ctx) {
+      return isGeminiPluginInstalled(ctx);
+    },
+    async installPlugin(ctx) {
+      const result = installGeminiPlugin(ctx);
+      if (!result.ok) return result;
+      return { ok: true, version: result.version };
+    },
+    async pluginLaunchExtras(ctx) {
+      const paths = getGeminiPluginPaths(ctx);
+      return { env: { GEMINI_CLI_SYSTEM_SETTINGS_PATH: paths.settingsPath } };
+    },
 
     async detectInstall(ctx) {
       const status = await detectAgentInstall(ctx, geminiDetectionSpec);
@@ -71,6 +112,7 @@ export function createGeminiAdapter(): AgentAdapter {
       return attachmentLines ? `${restStr}\n\n${attachmentLines} ` : restStr;
     },
     detectTerminalStatus: detectGeminiTerminalStatus,
+    shouldApplyTerminalStatusWhileHookActive: geminiHookActiveTerminalFallback,
     detectInvalidSessionRef: detectGeminiInvalidSessionRef,
 
     defaultOneShotModel: "gemini-2.5-flash",

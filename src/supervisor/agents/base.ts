@@ -207,6 +207,14 @@ export interface AgentTerminalObserver {
   /** Detect when the PTY is ready to accept an initial queued launch prompt. */
   isReadyForInitialPrompt?(text: string): boolean;
   detectTerminalStatus?(text: string): TerminalStatusHint | null;
+  /**
+   * Hooks normally own status once injected. Some CLIs have hook coverage gaps
+   * for interactive prompts, so adapters may opt specific L2 hints back in.
+   * TODO: shrink as upstream hook coverage improves — currently used by Gemini
+   * for `needs_reply` / `needs_approval` because its `Notification` event
+   * doesn't fire on the `Enter to select` interactive picker.
+   */
+  shouldApplyTerminalStatusWhileHookActive?(hint: TerminalStatusHint): boolean;
   detectInvalidSessionRef?(text: string): boolean;
   /** Detect TUI prompts that should be auto-dismissed and return the key to send, or null. */
   detectAutoResponse?(text: string): string | null;

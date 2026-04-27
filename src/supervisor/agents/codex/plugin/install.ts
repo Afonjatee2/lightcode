@@ -2,23 +2,32 @@ import { execFileSync } from "node:child_process";
 import {
   constants as fsConstants,
   copyFileSync as fsCopyFileSync,
+  existsSync,
   linkSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   symlinkSync,
-  statSync,
   writeFileSync,
-  existsSync,
 } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveLightcodePaths } from "@/shared/lightcodePaths";
-import type { AgentEnvContext } from "../../base";
-import { batchWslCommands, quotePosixShellArg, resolveWslHomeDirectory } from "../../base";
 import { toWslUncPath } from "@/shared/wsl";
+import type { AgentEnvContext } from "../../base";
+import { batchWslCommands, quotePosixShellArg } from "../../base";
 import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
+import {
+  PLUGIN_ASSET_FILES,
+  copyPluginAssetsIfStale,
+  createPluginSourceResolver,
+  getNativePluginBaseDir,
+  getWslPluginBaseDirs,
+  isWslPluginContext,
+  readBundledPluginVersion,
+  readPluginManifest,
+  type PluginManifest,
+} from "../../plugin/installerBase";
 
 export interface CodexPluginPaths {
   pluginDir: string;
@@ -28,13 +37,6 @@ export interface CodexPluginPaths {
   codexHooksPath: string;
   version: string;
 }
-
-interface PluginManifest {
-  version: string;
-  [key: string]: unknown;
-}
-
-const ASSET_FILES = ["plugin.json", "forward.mjs"] as const;
 
 const CODEX_HOOK_EVENTS = [
   "SessionStart",
@@ -48,104 +50,55 @@ const CODEX_HOOK_EVENTS = [
 /** Match any Lightcode-staged forward.mjs command line in hooks.json. */
 const LIGHTCODE_FORWARD_RE = /agent-plugins(?:[/\\]+)codex(?:[/\\]+)forward\.mjs/;
 
-function resolveSourceDir(): string {
-  const candidates: string[] = [];
-  const override = process.env.LIGHTCODE_CODEX_PLUGIN_SOURCE;
-  if (override) candidates.push(resolve(override));
-  if (typeof process.resourcesPath === "string" && process.resourcesPath.length > 0) {
-    candidates.push(join(process.resourcesPath, "agent-plugins", "codex"));
-  }
-  const here =
-    typeof __dirname !== "undefined"
-      ? __dirname
-      : dirname(fileURLToPath(import.meta.url ?? "file://"));
-  candidates.push(resolve(here, "../../../agent-plugins/codex"));
-  candidates.push(resolve(here, "../../src/supervisor/agents/codex/plugin"));
-  candidates.push(resolve(here, "../../../src/supervisor/agents/codex/plugin"));
-  candidates.push(resolve(here, "../../resources/agent-plugins/codex"));
-  candidates.push(resolve(here, "../resources/agent-plugins/codex"));
-  for (const candidate of candidates) {
-    if (existsSync(join(candidate, "plugin.json"))) return candidate;
-  }
-  throw new Error(`codex plugin source dir not found; checked: ${candidates.join(", ")}`);
-}
+const callerDir =
+  typeof __dirname !== "undefined"
+    ? __dirname
+    : dirname(fileURLToPath(import.meta.url ?? "file://"));
 
-function readManifest(dir: string): PluginManifest {
-  const raw = readFileSync(join(dir, "plugin.json"), "utf8");
-  return JSON.parse(raw) as PluginManifest;
-}
+const resolveSourceDir = createPluginSourceResolver({
+  kind: "codex",
+  sourceEnvVar: "LIGHTCODE_CODEX_PLUGIN_SOURCE",
+  callerDir,
+});
 
 export function readBundledCodexPluginVersion(): string {
-  try {
-    const v = readManifest(resolveSourceDir()).version;
-    return typeof v === "string" && v.length > 0 ? v : "0.0.0";
-  } catch {
-    return "0.0.0";
-  }
+  return readBundledPluginVersion(resolveSourceDir);
 }
 
-function copyFileSync(source: string, target: string): void {
-  mkdirSync(dirname(target), { recursive: true });
-  const data = readFileSync(source);
-  writeFileSync(target, data);
-}
-
-function isFresh(sourceDir: string, targetDir: string): boolean {
-  for (const file of ASSET_FILES) {
-    const source = join(sourceDir, file);
-    const target = join(targetDir, file);
-    if (!existsSync(target)) return false;
-    try {
-      const sourceStat = statSync(source);
-      const targetStat = statSync(target);
-      if (sourceStat.size !== targetStat.size) return false;
-      if (sourceStat.mtimeMs > targetStat.mtimeMs) return false;
-    } catch {
-      return false;
+export function getCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
+  if (isWslPluginContext(ctx)) {
+    const wsl = getWslPluginBaseDirs(ctx.wslDistro, "codex");
+    if (!wsl) {
+      return { pluginDir: "", codexHomeDir: "", codexHooksPath: "", version: "0.0.0" };
     }
-  }
-  return true;
-}
-
-function isWslContext(ctx: AgentEnvContext | undefined): ctx is AgentEnvContext & {
-  envKind: "wsl";
-  wslDistro: string;
-} {
-  return Boolean(ctx && ctx.envKind === "wsl" && ctx.wslDistro);
-}
-
-export function getCodexPluginPaths(ctx?: AgentEnvContext, baseDir?: string): CodexPluginPaths {
-  if (isWslContext(ctx)) {
-    const home = resolveWslHomeDirectory(ctx.wslDistro);
-    const linuxPlugin = home ? `${home}/.lightcode/agent-plugins/codex` : "";
-    const linuxCodexHome = linuxPlugin ? `${linuxPlugin}/home` : "";
-    const linuxHooks = linuxCodexHome ? `${linuxCodexHome}/hooks.json` : "";
+    const linuxCodexHome = `${wsl.linuxBase}/home`;
     let version = "0.0.0";
-    if (home) {
-      try {
-        version = readManifest(toWslUncPath(ctx.wslDistro, linuxPlugin)).version;
-      } catch {
-        // ignore
-      }
+    try {
+      version = readPluginManifest(wsl.uncBase).version;
+    } catch {
+      // ignore
     }
     return {
-      pluginDir: linuxPlugin,
+      pluginDir: wsl.linuxBase,
       codexHomeDir: linuxCodexHome,
-      codexHooksPath: linuxHooks,
+      codexHooksPath: `${linuxCodexHome}/hooks.json`,
       version,
     };
   }
-  const paths = resolveLightcodePaths(baseDir);
-  const pluginDir = join(paths.agentPluginsDir, "codex");
+  const pluginDir = getNativePluginBaseDir("codex", ctx?.baseDir);
   const codexHomeDir = join(pluginDir, "home");
-  const codexHooksPath = join(codexHomeDir, "hooks.json");
   let version = "0.0.0";
   try {
-    version = readManifest(pluginDir).version;
+    version = readPluginManifest(pluginDir).version;
   } catch {
     // ignore
   }
-  return { pluginDir, codexHomeDir, codexHooksPath, version };
+  return {
+    pluginDir,
+    codexHomeDir,
+    codexHooksPath: join(codexHomeDir, "hooks.json"),
+    version,
+  };
 }
 
 function pruneLightcodeGroups(groups: unknown): unknown[] {
@@ -370,7 +323,6 @@ export function isCodexVersionSupportedForHooks(): boolean {
 
 export function installCodexPlugin(
   ctx?: AgentEnvContext,
-  baseDir?: string,
 ): { ok: true; paths: CodexPluginPaths; version: string } | { ok: false; reason: string } {
   let sourceDir: string;
   try {
@@ -381,26 +333,20 @@ export function installCodexPlugin(
 
   let manifest: PluginManifest;
   try {
-    manifest = readManifest(sourceDir);
+    manifest = readPluginManifest(sourceDir);
   } catch (error) {
     return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }
 
-  if (isWslContext(ctx)) {
+  if (isWslPluginContext(ctx)) {
     return installCodexPluginWsl(ctx.wslDistro, sourceDir, manifest);
   }
 
-  const paths = resolveLightcodePaths(baseDir);
-  const pluginDir = join(paths.agentPluginsDir, "codex");
+  const pluginDir = getNativePluginBaseDir("codex", ctx?.baseDir);
   const codexHomeDir = join(pluginDir, "home");
   mkdirSync(pluginDir, { recursive: true });
   seedNativeCodexHome(codexHomeDir);
-
-  if (!isFresh(sourceDir, pluginDir)) {
-    for (const file of ASSET_FILES) {
-      copyFileSync(join(sourceDir, file), join(pluginDir, file));
-    }
-  }
+  copyPluginAssetsIfStale(sourceDir, pluginDir);
 
   const forwardPath = join(pluginDir, "forward.mjs");
   const hooksPath = join(codexHomeDir, "hooks.json");
@@ -444,7 +390,7 @@ function installCodexPluginWsl(
 ): { ok: true; paths: CodexPluginPaths; version: string } | { ok: false; reason: string } {
   const deploy = deployFilesToWslHome(
     distro,
-    ASSET_FILES.map((file) => ({
+    PLUGIN_ASSET_FILES.map((file) => ({
       src: join(sourceDir, file),
       relDest: `agent-plugins/codex/${file}`,
     })),
@@ -499,61 +445,22 @@ function installCodexPluginWsl(
 
 export function isCodexPluginInstalled(
   ctx?: AgentEnvContext,
-  baseDir?: string,
 ): Promise<{ installed: boolean; version?: string }> {
-  if (isWslContext(ctx)) {
-    return Promise.resolve(isCodexPluginInstalledWslSync(ctx.wslDistro));
+  if (isWslPluginContext(ctx)) {
+    const wsl = getWslPluginBaseDirs(ctx.wslDistro, "codex");
+    if (!wsl) return Promise.resolve({ installed: false });
+    return Promise.resolve(verifyCodexInstallAt(wsl.uncBase));
   }
-  const paths = resolveLightcodePaths(baseDir);
-  const pluginDir = join(paths.agentPluginsDir, "codex");
-  const codexHomeDir = join(pluginDir, "home");
-  const hooksPath = join(codexHomeDir, "hooks.json");
-  if (!existsSync(join(pluginDir, "plugin.json"))) return Promise.resolve({ installed: false });
-  if (!existsSync(join(pluginDir, "forward.mjs"))) return Promise.resolve({ installed: false });
-  if (!existsSync(hooksPath)) return Promise.resolve({ installed: false });
-  try {
-    const raw = readFileSync(hooksPath, "utf8");
-    const doc = JSON.parse(raw) as { hooks?: Record<string, unknown> };
-    if (!doc.hooks) return Promise.resolve({ installed: false });
-    let found = false;
-    for (const event of CODEX_HOOK_EVENTS) {
-      const groups = doc.hooks[event];
-      if (!Array.isArray(groups)) continue;
-      for (const g of groups) {
-        if (!g || typeof g !== "object") continue;
-        const hooks = (g as { hooks?: unknown }).hooks;
-        if (!Array.isArray(hooks)) continue;
-        for (const h of hooks) {
-          if (!h || typeof h !== "object") continue;
-          const cmd = (h as { command?: string }).command;
-          if (typeof cmd === "string" && LIGHTCODE_FORWARD_RE.test(cmd)) {
-            found = true;
-            break;
-          }
-        }
-      }
-    }
-    if (!found) return Promise.resolve({ installed: false });
-    const version = readManifest(pluginDir).version;
-    return Promise.resolve({ installed: true, version });
-  } catch {
-    return Promise.resolve({ installed: false });
-  }
+  return Promise.resolve(verifyCodexInstallAt(getNativePluginBaseDir("codex", ctx?.baseDir)));
 }
 
-function isCodexPluginInstalledWslSync(distro: string): { installed: boolean; version?: string } {
-  const home = resolveWslHomeDirectory(distro);
-  if (!home) return { installed: false };
-  const linuxPlugin = `${home}/.lightcode/agent-plugins/codex`;
-  const linuxCodexHome = `${linuxPlugin}/home`;
-  const linuxHooks = `${linuxCodexHome}/hooks.json`;
-  const uncPlugin = toWslUncPath(distro, linuxPlugin);
-  const uncHooks = toWslUncPath(distro, linuxHooks);
-  if (!existsSync(join(uncPlugin, "plugin.json"))) return { installed: false };
-  if (!existsSync(join(uncPlugin, "forward.mjs"))) return { installed: false };
-  if (!existsSync(uncHooks)) return { installed: false };
+function verifyCodexInstallAt(readableDir: string): { installed: boolean; version?: string } {
+  const hooksPath = join(readableDir, "home", "hooks.json");
+  if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
+  if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
+  if (!existsSync(hooksPath)) return { installed: false };
   try {
-    const raw = readFileSync(uncHooks, "utf8");
+    const raw = readFileSync(hooksPath, "utf8");
     const doc = JSON.parse(raw) as { hooks?: Record<string, unknown> };
     if (!doc.hooks) return { installed: false };
     let found = false;
@@ -575,7 +482,7 @@ function isCodexPluginInstalledWslSync(distro: string): { installed: boolean; ve
       }
     }
     if (!found) return { installed: false };
-    const version = readManifest(uncPlugin).version;
+    const version = readPluginManifest(readableDir).version;
     return { installed: true, version };
   } catch {
     return { installed: false };

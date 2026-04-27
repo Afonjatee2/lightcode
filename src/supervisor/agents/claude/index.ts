@@ -12,6 +12,7 @@ import {
 } from "../base";
 import { buildClaudeArgs } from "./argv";
 import { claudeCapabilities, claudeDetectionSpec } from "./detection";
+import { warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
   getClaudePluginPaths,
   installClaudePlugin,
@@ -23,14 +24,8 @@ import {
 // Bump `MIN_PROTOCOL_VERSION` in src/shared/contracts/agentEvent.ts when the
 // envelope shape changes.
 const CLAUDE_PLUGIN_VERSION = readBundledClaudePluginVersion();
-const CLAUDE_MIN_PROTOCOL_VERSION = 1;
 
-if (CLAUDE_PLUGIN_VERSION === "0.0.0") {
-  console.warn(
-    "[claude] plugin manifest not found at module load — CLI hooks disabled for this session. " +
-      "If you just added the plugin files, restart the app to enable hooks.",
-  );
-}
+warnIfPluginManifestMissing("claude", CLAUDE_PLUGIN_VERSION);
 
 // Claude Code animates its working-state spinner in the terminal title via
 // OSC 0/2 with a leading braille glyph (U+2800–U+28FF). Real sessions observed
@@ -81,7 +76,7 @@ export function createClaudeAdapter(): AgentAdapter {
     // ── CLI hook plugin support ──────────────────────────────────────────
     pluginId: "lightcode-status@claude",
     pluginVersion: CLAUDE_PLUGIN_VERSION,
-    minProtocolVersion: CLAUDE_MIN_PROTOCOL_VERSION,
+    minProtocolVersion: 1,
     async isPluginSupported(ctx) {
       // The forwarder runs `node`, so we need a Node runtime to be available.
       // For native Windows/macOS/Linux Claude this is implicit (the supervisor
@@ -92,15 +87,15 @@ export function createClaudeAdapter(): AgentAdapter {
       return Boolean(result?.ok && result.stdout.trim().length > 0);
     },
     async isPluginInstalled(ctx) {
-      return isClaudePluginInstalled(ctx, ctx.baseDir);
+      return isClaudePluginInstalled(ctx);
     },
     async installPlugin(ctx) {
-      const result = installClaudePlugin(ctx, ctx.baseDir);
+      const result = installClaudePlugin(ctx);
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },
     async pluginLaunchExtras(ctx) {
-      const paths = getClaudePluginPaths(ctx, ctx.baseDir);
+      const paths = getClaudePluginPaths(ctx);
       return { args: ["--settings", paths.settingsPath] };
     },
     buildLaunchArgv(_location, config, prompt, _sessionRef, _launchOptions) {

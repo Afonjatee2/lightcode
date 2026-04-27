@@ -19,7 +19,7 @@ function lightcodeCommand(fp: string, event: string): string {
 describe("getCodexPluginPaths", () => {
   it("places Codex hooks under Lightcode's private CODEX_HOME", () => {
     const baseDir = mkdtempSync(join(tmpdir(), "lightcode-codex-paths-"));
-    const paths = getCodexPluginPaths({ envKind: "posix", baseDir }, baseDir);
+    const paths = getCodexPluginPaths({ envKind: "posix", baseDir });
 
     expect(paths.pluginDir).toBe(join(baseDir, "agent-plugins", "codex"));
     expect(paths.codexHomeDir).toBe(join(baseDir, "agent-plugins", "codex", "home"));
