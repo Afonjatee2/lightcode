@@ -6,6 +6,7 @@ export function AsideSlot(props: {
   children: ReactNode;
   orientation: AsideOrientation;
   isOpen: boolean;
+  isResizing?: boolean;
   targetWidth?: number;
   targetHeight?: number;
   onResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
@@ -17,6 +18,7 @@ export function AsideSlot(props: {
     children,
     orientation,
     isOpen,
+    isResizing = false,
     targetWidth,
     targetHeight,
     onResizeStart,
@@ -33,7 +35,7 @@ export function AsideSlot(props: {
   // Show: Faster fade in (300ms), fast width/height (150ms)
   // Hide: Fast width/height (150ms), fast-ish fade out (200ms)
   const duration = isOpen ? "300ms" : "200ms";
-  const sizeDuration = "150ms";
+  const sizeDuration = isResizing ? "0ms" : "150ms";
 
   return (
     <>
@@ -41,7 +43,7 @@ export function AsideSlot(props: {
         <div
           key="handle"
           className={
-            isHorizontal ? "lightcode-resize-handle-horizontal" : "lightcode-resize-handle mb-1"
+            isHorizontal ? "lightcode-resize-handle-horizontal" : "lightcode-resize-handle"
           }
           onMouseDown={onResizeStart}
           role="separator"
@@ -55,7 +57,7 @@ export function AsideSlot(props: {
         className={`relative overflow-hidden bg-[var(--content-background)] ${
           isHorizontal
             ? "min-w-0 border-t border-[color:var(--border)]"
-            : "mb-1 min-h-0 border-l border-[color:var(--border)]"
+            : "min-h-0 border-l border-[color:var(--border)]"
         }`}
         style={{
           ...(isHorizontal

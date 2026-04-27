@@ -15,6 +15,9 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
   useEffect(() => {
     if (!storeHydrated || projects.length === 0) return;
 
+    const activeProjects = projects.filter((p) => !p.disabled);
+    if (activeProjects.length === 0) return;
+
     let isActive = true;
     const refreshingProjects = new Set<string>();
     const pendingWatcherRefreshProjects = new Set<string>();
@@ -264,7 +267,7 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
       return priorityProjectIds;
     }
 
-    for (const project of projects) {
+    for (const project of activeProjects) {
       readBridge()
         .gitWatchProject({ projectId: project.id, projectLocation: project.location })
         .catch(() => undefined);
@@ -276,7 +279,7 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
       // an untracked file appears, etc.). Refresh git state for either.
       if (event.type === "git-changed" || event.type === "project-tree-changed") {
         console.log(`[git-refresh] watcher-event ${event.type} project=${event.projectId}`);
-        const project = projects.find((p) => p.id === event.projectId);
+        const project = activeProjects.find((p) => p.id === event.projectId);
         if (project) scheduleWatcherRefresh(project);
       }
       if (event.type === "project-tree-changed") {
@@ -288,7 +291,7 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
       }
     });
 
-    for (const project of projects) {
+    for (const project of activeProjects) {
       void refreshProject(project, "initial");
     }
 
@@ -303,7 +306,7 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
       const promotedProjectIds = new Set(
         [...priorityProjectIds].filter((projectId) => !previousPriorityProjectIds.has(projectId)),
       );
-      const projectsToFetch = projects.filter((project) => {
+      const projectsToFetch = activeProjects.filter((project) => {
         const isPriority = priorityProjectIds.has(project.id);
         const interval = isPriority
           ? GIT_FETCH_PRIORITY_INTERVAL_MS
@@ -348,7 +351,7 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
       isActive = false;
       clearInterval(fetchIntervalId);
       unsubWatcher();
-      for (const project of projects) {
+      for (const project of activeProjects) {
         readBridge()
           .gitUnwatchProject({ projectId: project.id })
           .catch(() => undefined);

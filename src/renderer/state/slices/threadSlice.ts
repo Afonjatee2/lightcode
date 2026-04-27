@@ -49,6 +49,8 @@ export interface ThreadSlice {
   unarchiveThread: (threadId: string) => void;
   markThreadDone: (threadId: string) => void;
   unmarkThreadDone: (threadId: string) => void;
+  starThread: (threadId: string) => void;
+  unstarThread: (threadId: string) => void;
   purgeStaleArchivedThreads: (maxAgeDays: number) => void;
   markThreadExited: (threadId: string) => void;
   touchThread: (threadId: string) => void;
@@ -101,6 +103,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       canResumeWithConfig: false,
       archived: false,
       done: false,
+      starred: false,
       ...(worktreePath ? { worktreePath } : {}),
       ...(worktreeBranch ? { worktreeBranch } : {}),
       ...(groupId ? { groupId } : {}),
@@ -263,7 +266,9 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       const thread = state.threads.find((t) => t.id === threadId);
       if (!thread || thread.done) return {};
 
-      const threads = state.threads.map((t) => (t.id === threadId ? { ...t, done: true } : t));
+      const threads = state.threads.map((t) =>
+        t.id === threadId ? { ...t, done: true, starred: false } : t,
+      );
 
       let nextView = state.view;
       if (state.view.kind === "thread") {
@@ -278,6 +283,22 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       if (!thread || !thread.done) return {};
       return {
         threads: state.threads.map((t) => (t.id === threadId ? { ...t, done: false } : t)),
+      };
+    }),
+  starThread: (threadId) =>
+    set((state) => {
+      const thread = state.threads.find((t) => t.id === threadId);
+      if (!thread || thread.starred) return {};
+      return {
+        threads: state.threads.map((t) => (t.id === threadId ? { ...t, starred: true } : t)),
+      };
+    }),
+  unstarThread: (threadId) =>
+    set((state) => {
+      const thread = state.threads.find((t) => t.id === threadId);
+      if (!thread || !thread.starred) return {};
+      return {
+        threads: state.threads.map((t) => (t.id === threadId ? { ...t, starred: false } : t)),
       };
     }),
   purgeStaleArchivedThreads: (maxAgeDays) =>

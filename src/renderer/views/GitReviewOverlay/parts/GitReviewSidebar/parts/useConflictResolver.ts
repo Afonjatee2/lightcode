@@ -1,4 +1,4 @@
-import type { Project } from "@/shared/contracts";
+import type { GitFileChange, Project } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -7,7 +7,7 @@ import { getConflictResolverDefaults } from "@/renderer/components/providers/Pro
 
 export function useConflictResolver(params: {
   project: Project;
-  mergeConflictFiles: string[];
+  mergeConflictFiles: GitFileChange[];
   worktreePath: string | undefined;
   worktreeBranch: string | undefined;
 }) {
@@ -54,7 +54,7 @@ export function useConflictResolver(params: {
       conflictResolverModel || defaults?.model || provider.capabilities.models[0]?.id || "";
     const effort = conflictResolverEffort || defaults?.effort || "";
 
-    const fileList = mergeConflictFiles.map((f) => `- ${f}`).join("\n");
+    const fileList = mergeConflictFiles.map((f) => `- ${f.path}`).join("\n");
     const prompt =
       `Resolve the merge conflicts in this worktree. The conflicted files are:\n${fileList}\n\n` +
       `For each file, open it and resolve the conflict markers (<<<<<<< =======  >>>>>>>).`;

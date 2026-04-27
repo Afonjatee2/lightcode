@@ -46,6 +46,18 @@ export const overlaySidebarColumnClass = `${sidebarColumnLayoutClass} ${overlayS
 export const gitPanelSidebarColumnClass = `flex h-full min-h-0 min-w-0 flex-col gap-0 ${overlaySidebarSurfaceClass} px-0 pb-0 pt-0`;
 
 /**
+ * Git review sidebar (used by both right-docked panel and full-page overlay).
+ * `gap-0` because each section provides its own `border-t` + `py-2` rhythm.
+ * `panel` keeps the column at `px-0` so file-row borders run edge-to-edge;
+ * `overlay` uses `px-2` so traffic-light/header chrome stays clear.
+ */
+export function gitReviewColumnClass(mode: "panel" | "overlay") {
+  return `flex h-full min-h-0 min-w-0 flex-col gap-0 ${overlaySidebarSurfaceClass} ${
+    mode === "panel" ? "px-0" : "px-2"
+  } pb-0 pt-0`;
+}
+
+/**
  * Main scroll/split region: horizontal inset is on the column; scroll handles scrollbar margin.
  * Matches the primary app `Sidebar` scroll area (incl. non-Windows `pr-2` / `-mr-2` gutter).
  */
@@ -67,7 +79,7 @@ export function gitReviewSidebarListScrollClass() {
  * Sticky/variable footers: Return to app, Hide sidebar, etc. Border spans column inset only.
  * @see {sidebarColumnLayoutClass}
  */
-export const sidebarFooterNavClass = "space-y-1 border-t border-white/6 pt-2 pb-1";
+export const sidebarFooterNavClass = "space-y-1 border-t border-white/6 pt-2 pb-2";
 
 /**
  * Collapsed icon rail: bottom block (pr keeps icons off the right edge in the narrow column).

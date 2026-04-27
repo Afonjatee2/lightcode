@@ -16,6 +16,7 @@ import { defineAppThemes, useResolvedTheme } from "./parts/monacoThemes";
 import { SortableTab } from "./parts/SortableTab";
 import { EditorToolbar } from "./parts/EditorToolbar";
 import { useLspSync } from "./parts/useLspSync";
+import { useMergeConflictContribution } from "./parts/mergeConflict/useMergeConflictContribution";
 
 export { getLanguageFromPath } from "./parts/langMap";
 
@@ -103,7 +104,10 @@ export function FileEditorPane(props: {
       {activePath && bufferStatus ? (
         <>
           {!props.showTabs ? (
-            <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+            <div
+              className="flex shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3"
+              style={{ height: "env(titlebar-area-height, 32px)" }}
+            >
               <span className="min-w-0 truncate text-xs font-medium text-foreground">
                 {getBasename(activePath)}
                 {isDirty ? " *" : ""}
@@ -156,7 +160,10 @@ function TabStripHeader(props: {
   if (paths.length === 0) return null;
 
   return (
-    <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1 pr-3">
+    <div
+      className="flex shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1 pr-3"
+      style={{ height: "env(titlebar-area-height, 32px)" }}
+    >
       <div
         className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto"
         role="tablist"
@@ -201,6 +208,12 @@ function EditorBody(props: {
   const { activePath, bufferStatus, monacoTheme, monacoRef, showPreview, isMarkdown } = props;
   const content = useActiveBufferContent();
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const [editorInstance, setEditorInstance] = useState<MonacoEditor.IStandaloneCodeEditor | null>(
+    null,
+  );
+  const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
+
+  useMergeConflictContribution({ editor: editorInstance, monaco: monacoInstance });
 
   const handleBeforeMount: BeforeMount = (monaco) => {
     defineAppThemes(monaco);
@@ -209,6 +222,8 @@ function EditorBody(props: {
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
+    setEditorInstance(editor);
+    setMonacoInstance(monaco);
     // eslint-disable-next-line no-bitwise -- Monaco uses bitmask key combos
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
       const path = useFileEditorStore.getState().activePath;

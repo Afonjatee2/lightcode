@@ -5,6 +5,8 @@ import type {
   ReadProjectFileResult,
 } from "@/shared/contracts";
 import { readBridge } from "../bridge";
+import { hasUnresolvedConflicts } from "@/renderer/utils/mergeConflicts";
+import { useGitStore } from "./gitStore";
 
 export type FileEditorOverlayMode = "modal" | "fullscreen";
 
@@ -75,6 +77,33 @@ function isRecentlySavedBySelf(path: string): boolean {
     return false;
   }
   return true;
+}
+
+async function maybeStageResolvedConflict(
+  rootContext: FileEditorRootContext,
+  path: string,
+  savedContent: string,
+): Promise<void> {
+  if (hasUnresolvedConflicts(savedContent)) return;
+
+  const gitState = useGitStore.getState();
+  const isWorktree = Boolean(rootContext.worktreePath);
+  const storeKey = rootContext.worktreePath ?? rootContext.projectId;
+  const status = isWorktree
+    ? gitState.worktreeStatuses[rootContext.worktreePath as string]
+    : gitState.statuses[rootContext.projectId];
+  const wasConflicted = status?.conflictFiles?.some((file) => file.path === path) ?? false;
+  if (!wasConflicted) return;
+
+  gitState.optimisticStageFile(storeKey, path, isWorktree);
+  try {
+    await readBridge().gitStage({
+      projectLocation: rootContext.projectLocation,
+      filePath: path,
+    });
+  } catch {
+    // Best-effort: a status refresh elsewhere will reconcile.
+  }
 }
 
 function buildBuffer(result: ReadProjectFileResult): FileEditorBuffer {
@@ -323,10 +352,11 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       return;
     }
 
+    const savedContent = buffer.content;
     const result = await readBridge().writeProjectFile({
       projectLocation: rootContext.projectLocation,
       path,
-      content: buffer.content,
+      content: savedContent,
       baseModifiedAtMs: buffer.modifiedAtMs,
     });
 
@@ -347,6 +377,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         },
       };
     });
+
+    void maybeStageResolvedConflict(rootContext, path, savedContent);
   },
   closeTab: (path) =>
     set((state) => {

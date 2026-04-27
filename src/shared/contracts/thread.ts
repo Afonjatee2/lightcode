@@ -29,6 +29,7 @@ export const threadSchema = z.object({
   groupName: z.string().optional(),
   archived: z.boolean().default(false),
   done: z.boolean().default(false),
+  starred: z.boolean().default(false),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   /** Set by supervisor `thread-state`; not user-editable. */

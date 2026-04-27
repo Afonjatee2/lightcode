@@ -76,8 +76,6 @@ export function parseStatusPorcelainV2(output: string): ParsedPorcelainStatus {
       const parts = line.split(" ");
       const path = toForwardSlash(parts.slice(10).join(" "));
       conflictFiles.push(path);
-      staged.push({ path, status: "U", staged: true, insertions: 0, deletions: 0 });
-      unstaged.push({ path, status: "U", staged: false, insertions: 0, deletions: 0 });
       continue;
     }
 
@@ -235,6 +233,11 @@ export class GitStatusService {
       parsed.staged.reduce((sum, file) => sum + file.deletions, 0) +
       parsed.unstaged.reduce((sum, file) => sum + file.deletions, 0);
 
+    const conflictFileChanges: GitFileChange[] =
+      parsed.mergeInProgress && parsed.conflictFiles.length > 0
+        ? await this.buildConflictFileChanges(location, parsed.conflictFiles)
+        : [];
+
     return {
       isRepo: true,
       branch: parsed.branch,
@@ -248,9 +251,35 @@ export class GitStatusService {
       totalInsertions,
       totalDeletions,
       ...(parsed.mergeInProgress
-        ? { mergeInProgress: true, conflictFiles: parsed.conflictFiles }
+        ? { mergeInProgress: true, conflictFiles: conflictFileChanges }
         : {}),
     };
+  }
+
+  private async buildConflictFileChanges(
+    location: ProjectLocation,
+    paths: string[],
+  ): Promise<GitFileChange[]> {
+    const headNumstat = await execGit(location, ["diff", "HEAD", "--numstat"], {
+      timeout: GIT_STATUS_TIMEOUT,
+    }).catch((err: unknown) => {
+      console.warn("[git] conflict numstat failed; counts will show as 0", err);
+      return "";
+    });
+    const stats = new Map<string, { insertions: number; deletions: number }>();
+    for (const entry of parseDiffNumstat(headNumstat)) {
+      stats.set(entry.path, { insertions: entry.insertions, deletions: entry.deletions });
+    }
+    return paths.map((path) => {
+      const entry = stats.get(path);
+      return {
+        path,
+        status: "U",
+        staged: false,
+        insertions: entry?.insertions ?? 0,
+        deletions: entry?.deletions ?? 0,
+      };
+    });
   }
 
   async getDiff(

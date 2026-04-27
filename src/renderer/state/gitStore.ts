@@ -53,18 +53,30 @@ interface GitActions {
   optimisticUnstageAll: (key: string, isWorktree: boolean) => void;
 }
 
-function areStringArraysEqual(a: readonly string[] | undefined, b: readonly string[] | undefined) {
-  if (a === b) return true;
-  if (!a || !b || a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i += 1) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
+type FileChange = GitStatusResult["staged"][number];
+
+/** Replace any entry with the same path, then append. Mirrors VS Code resource-group semantics. */
+function upsertByPath(list: readonly FileChange[], item: FileChange): FileChange[] {
+  return [...list.filter((f) => f.path !== item.path), item];
 }
 
-function areStatusFilesEqual(a: GitStatusResult["staged"], b: GitStatusResult["staged"]) {
+/** Bulk variant of upsertByPath — incoming entries win over any same-path entries in `list`. */
+function upsertManyByPath(list: readonly FileChange[], items: readonly FileChange[]): FileChange[] {
+  if (items.length === 0) return [...list];
+  const incomingPaths = new Set(items.map((f) => f.path));
+  return [...list.filter((f) => !incomingPaths.has(f.path)), ...items];
+}
+
+function removeByPath(list: readonly FileChange[], path: string): FileChange[] {
+  return list.filter((f) => f.path !== path);
+}
+
+function areStatusFilesEqual(
+  a: readonly GitStatusResult["staged"][number][] | undefined,
+  b: readonly GitStatusResult["staged"][number][] | undefined,
+) {
   if (a === b) return true;
-  if (a.length !== b.length) return false;
+  if (!a || !b || a.length !== b.length) return false;
   for (let i = 0; i < a.length; i += 1) {
     const left = a[i]!;
     const right = b[i]!;
@@ -104,7 +116,7 @@ function areGitStatusesEqual(a: GitStatusResult | undefined, b: GitStatusResult)
     a.totalInsertions === b.totalInsertions &&
     a.totalDeletions === b.totalDeletions &&
     a.mergeInProgress === b.mergeInProgress &&
-    areStringArraysEqual(a.conflictFiles, b.conflictFiles) &&
+    areStatusFilesEqual(a.conflictFiles, b.conflictFiles) &&
     areStatusFilesEqual(a.staged, b.staged) &&
     areStatusFilesEqual(a.unstaged, b.unstaged)
   );
@@ -345,16 +357,34 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
       const bucket = isWorktree ? "worktreeStatuses" : "statuses";
       const status = state[bucket][key];
       if (!status) return state;
+      const conflictFile = status.conflictFiles?.find((f) => f.path === filePath);
+      if (conflictFile) {
+        const moved: FileChange = { ...conflictFile, staged: true, status: "M" };
+        return {
+          [bucket]: {
+            ...state[bucket],
+            [key]: {
+              ...status,
+              staged: upsertByPath(status.staged, moved),
+              conflictFiles: removeByPath(status.conflictFiles!, filePath),
+            },
+          },
+        };
+      }
       const file = status.unstaged.find((f) => f.path === filePath);
       if (!file) return state;
-      const moved = { ...file, staged: true, status: file.status === "?" ? "A" : file.status };
+      const moved: FileChange = {
+        ...file,
+        staged: true,
+        status: file.status === "?" ? "A" : file.status,
+      };
       return {
         [bucket]: {
           ...state[bucket],
           [key]: {
             ...status,
-            staged: [...status.staged, moved],
-            unstaged: status.unstaged.filter((f) => f.path !== filePath),
+            staged: upsertByPath(status.staged, moved),
+            unstaged: removeByPath(status.unstaged, filePath),
           },
         },
       };
@@ -367,14 +397,14 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
       if (!status) return state;
       const file = status.staged.find((f) => f.path === filePath);
       if (!file) return state;
-      const moved = { ...file, staged: false };
+      const moved: FileChange = { ...file, staged: false };
       return {
         [bucket]: {
           ...state[bucket],
           [key]: {
             ...status,
-            staged: status.staged.filter((f) => f.path !== filePath),
-            unstaged: [...status.unstaged, moved],
+            staged: removeByPath(status.staged, filePath),
+            unstaged: upsertByPath(status.unstaged, moved),
           },
         },
       };
@@ -385,7 +415,7 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
       const bucket = isWorktree ? "worktreeStatuses" : "statuses";
       const status = state[bucket][key];
       if (!status || status.unstaged.length === 0) return state;
-      const moved = status.unstaged.map((f) => ({
+      const moved: FileChange[] = status.unstaged.map((f) => ({
         ...f,
         staged: true,
         status: f.status === "?" ? "A" : f.status,
@@ -393,7 +423,11 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
       return {
         [bucket]: {
           ...state[bucket],
-          [key]: { ...status, staged: [...status.staged, ...moved], unstaged: [] },
+          [key]: {
+            ...status,
+            staged: upsertManyByPath(status.staged, moved),
+            unstaged: [],
+          },
         },
       };
     }),
@@ -403,11 +437,15 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
       const bucket = isWorktree ? "worktreeStatuses" : "statuses";
       const status = state[bucket][key];
       if (!status || status.staged.length === 0) return state;
-      const moved = status.staged.map((f) => ({ ...f, staged: false }));
+      const moved: FileChange[] = status.staged.map((f) => ({ ...f, staged: false }));
       return {
         [bucket]: {
           ...state[bucket],
-          [key]: { ...status, staged: [], unstaged: [...status.unstaged, ...moved] },
+          [key]: {
+            ...status,
+            staged: [],
+            unstaged: upsertManyByPath(status.unstaged, moved),
+          },
         },
       };
     }),

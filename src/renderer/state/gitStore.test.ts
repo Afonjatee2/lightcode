@@ -120,6 +120,84 @@ describe("gitStore batch updates", () => {
     expect(secondStatuses["/wt/b"]?.ahead).toBe(1);
   });
 
+  it("dedupes by path when staging an MM file (one entry, latest stats win)", () => {
+    const stagedM = {
+      path: "src/foo.ts",
+      status: "M",
+      staged: true,
+      insertions: 10,
+      deletions: 2,
+    };
+    const unstagedM = {
+      path: "src/foo.ts",
+      status: "M",
+      staged: false,
+      insertions: 3,
+      deletions: 1,
+    };
+    useGitStore.getState().setStatus("p1", {
+      ...baseStatus,
+      staged: [stagedM],
+      unstaged: [unstagedM],
+    });
+
+    useGitStore.getState().optimisticStageFile("p1", "src/foo.ts", false);
+
+    const status = useGitStore.getState().statuses["p1"]!;
+    expect(status.staged).toHaveLength(1);
+    expect(status.staged[0]).toMatchObject({
+      path: "src/foo.ts",
+      staged: true,
+      insertions: 3,
+      deletions: 1,
+    });
+    expect(status.unstaged).toHaveLength(0);
+  });
+
+  it("dedupes by path when stage-all merges unstaged into already-staged entries", () => {
+    useGitStore.getState().setStatus("p1", {
+      ...baseStatus,
+      staged: [
+        { path: "a.ts", status: "M", staged: true, insertions: 5, deletions: 0 },
+        { path: "b.ts", status: "A", staged: true, insertions: 50, deletions: 0 },
+      ],
+      unstaged: [
+        { path: "a.ts", status: "M", staged: false, insertions: 2, deletions: 1 },
+        { path: "c.ts", status: "?", staged: false, insertions: 7, deletions: 0 },
+      ],
+    });
+
+    useGitStore.getState().optimisticStageAll("p1", false);
+
+    const status = useGitStore.getState().statuses["p1"]!;
+    const byPath = new Map(status.staged.map((f) => [f.path, f]));
+    expect(status.staged).toHaveLength(3);
+    expect(byPath.get("a.ts")).toMatchObject({ insertions: 2, deletions: 1, staged: true });
+    expect(byPath.get("b.ts")).toMatchObject({ insertions: 50, deletions: 0, staged: true });
+    expect(byPath.get("c.ts")).toMatchObject({ insertions: 7, status: "A", staged: true });
+    expect(status.unstaged).toHaveLength(0);
+  });
+
+  it("dedupes by path on repeated stage-all calls (no accumulation)", () => {
+    useGitStore.getState().setStatus("p1", {
+      ...baseStatus,
+      staged: [{ path: "a.ts", status: "M", staged: true, insertions: 5, deletions: 0 }],
+      unstaged: [{ path: "a.ts", status: "M", staged: false, insertions: 1, deletions: 0 }],
+    });
+
+    useGitStore.getState().optimisticStageAll("p1", false);
+    // Simulate a second click before the real status fetch lands by re-introducing an unstaged entry.
+    useGitStore.getState().setStatus("p1", {
+      ...useGitStore.getState().statuses["p1"]!,
+      unstaged: [{ path: "a.ts", status: "M", staged: false, insertions: 2, deletions: 0 }],
+    });
+    useGitStore.getState().optimisticStageAll("p1", false);
+
+    const status = useGitStore.getState().statuses["p1"]!;
+    expect(status.staged).toHaveLength(1);
+    expect(status.staged[0]).toMatchObject({ path: "a.ts", insertions: 2, staged: true });
+  });
+
   it("batches PR updates without rewriting equal entries", () => {
     useGitStore.getState().setPrData("/wt/a", basePr);
     useGitStore

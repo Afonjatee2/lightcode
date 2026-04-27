@@ -45,7 +45,6 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     gitMergeToSource: (payload) => runtime.gitMergeToSource(payload),
     gitPullFromSource: (payload) => runtime.gitPullFromSource(payload),
     gitAbortMerge: (payload) => runtime.gitAbortMerge(payload),
-    gitRunMergetool: (payload) => runtime.gitRunMergetool(payload),
     gitFinishMerge: (payload) => runtime.gitFinishMerge(payload),
     gitWatchProject: (payload) => runtime.gitWatchProject(payload),
     gitWatchWorktrees: (payload) => runtime.gitWatchWorktrees(payload),

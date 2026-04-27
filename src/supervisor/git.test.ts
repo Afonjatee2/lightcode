@@ -380,7 +380,11 @@ describe("GitService.getStatus", () => {
     const result = await new GitService().getStatus(location);
 
     expect(result.mergeInProgress).toBe(true);
-    expect(result.conflictFiles).toEqual(["src/file.ts"]);
+    expect(result.conflictFiles).toEqual([
+      { path: "src/file.ts", status: "U", staged: false, insertions: 0, deletions: 0 },
+    ]);
+    expect(result.staged).toEqual([]);
+    expect(result.unstaged).toEqual([]);
   });
 
   it("does not report mergeInProgress when no unmerged entries exist", async () => {

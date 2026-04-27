@@ -5,6 +5,38 @@ import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 
+export function setProjectDisabled(projectId: string, disabled: boolean): void {
+  const store = useAppStore.getState();
+  const project = store.projects.find((p) => p.id === projectId);
+  if (!project) return;
+  if ((project.disabled ?? false) === disabled) return;
+
+  store.setProjectDisabled(projectId, disabled);
+
+  if (disabled) {
+    void readBridge()
+      .gitUnwatchProject({ projectId })
+      .catch(() => undefined);
+
+    useGitStore.getState().clearStatus(projectId);
+
+    const termStore = useDevTerminalStore.getState();
+    if (termStore.isOpen && termStore.activeProjectId === projectId) {
+      termStore.closePanel();
+    }
+
+    const panelStore = usePanelStore.getState();
+    if (panelStore.gitReviewContext?.projectId === projectId) {
+      panelStore.setGitOverlayOpen(false);
+      panelStore.setGitReviewContext(null);
+    }
+    if (panelStore.filesPanelContext?.projectId === projectId) {
+      panelStore.setFilesPanelContext(null);
+      useFileEditorStore.getState().clearSession();
+    }
+  }
+}
+
 export function deleteProject(projectId: string): void {
   const store = useAppStore.getState();
   const projectThreadIds = store.threads.filter((t) => t.projectId === projectId).map((t) => t.id);

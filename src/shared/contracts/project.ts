@@ -36,6 +36,7 @@ export const projectSchema = z.object({
   lastDraftConfig: projectDraftConfigSchema.optional(),
   scripts: projectScriptsSchema.optional(),
   searchSettings: projectSearchSettingsSchema.optional(),
+  disabled: z.boolean().optional(),
   createdAt: z.string().min(1),
 });
 export type Project = z.infer<typeof projectSchema>;

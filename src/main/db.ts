@@ -60,7 +60,7 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 5;
+  const SCHEMA_VERSION = 6;
 
   const storedVersion = Number(
     (
@@ -95,6 +95,13 @@ export function initDatabase(dbPath: string) {
     const cols = sqlite.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
     if (!cols.some((c) => c.name === "search_settings")) {
       sqlite.exec("ALTER TABLE projects ADD COLUMN search_settings TEXT");
+    }
+  }
+
+  if (storedVersion < 6) {
+    const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!cols.some((c) => c.name === "starred")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN starred INTEGER NOT NULL DEFAULT 0");
     }
   }
 
@@ -184,6 +191,7 @@ function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
     ...(row.groupName ? { groupName: row.groupName } : {}),
     archived: row.archived,
     done: row.done,
+    starred: row.starred,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -273,6 +281,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       groupName: thread.groupName ?? null,
       archived: thread.archived,
       done: thread.done,
+      starred: thread.starred,
       sortOrder,
       createdAt: thread.createdAt,
       updatedAt: thread.updatedAt,
@@ -293,6 +302,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         groupId: thread.groupId ?? null,
         archived: thread.archived,
         done: thread.done,
+        starred: thread.starred,
         sortOrder,
         updatedAt: thread.updatedAt,
       },

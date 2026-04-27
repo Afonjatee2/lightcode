@@ -138,6 +138,17 @@ export function toggleMarkThreadDone(threadId: string): void {
   }
 }
 
+export function toggleStarThread(threadId: string): void {
+  const store = useAppStore.getState();
+  const thread = store.threads.find((t) => t.id === threadId);
+  if (!thread) return;
+  if (thread.starred) {
+    store.unstarThread(threadId);
+  } else {
+    store.starThread(threadId);
+  }
+}
+
 export function renameThread(threadId: string, title: string): void {
   useAppStore.getState().renameThread(threadId, title);
 }

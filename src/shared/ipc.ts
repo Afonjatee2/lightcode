@@ -39,7 +39,6 @@ import {
   gitRemoveWorktreePayloadSchema,
   gitRevertAllPayloadSchema,
   gitRevertPayloadSchema,
-  gitRunMergetoolPayloadSchema,
   gitStageAllPayloadSchema,
   gitStagePayloadSchema,
   gitSwitchBranchPayloadSchema,
@@ -122,8 +121,6 @@ import type {
   GitRemoveWorktreePayload,
   GitRevertAllPayload,
   GitRevertPayload,
-  GitRunMergetoolPayload,
-  GitRunMergetoolResult,
   GitStageAllPayload,
   GitStagePayload,
   GitStatusResult,
@@ -539,11 +536,6 @@ export const groupedIpcProcedures = {
       "supervisor",
       gitAbortMergePayloadSchema,
     ),
-    gitRunMergetool: definePayloadProcedure<
-      GitRunMergetoolPayload,
-      GitRunMergetoolResult,
-      "supervisor"
-    >("gitRunMergetool", "supervisor", gitRunMergetoolPayloadSchema),
     gitFinishMerge: definePayloadProcedure<
       GitFinishMergePayload,
       GitFinishMergeResult,
@@ -807,7 +799,6 @@ export const ipcProcedureMap = {
   gitMergeToSource: groupedIpcProcedures.git.gitMergeToSource,
   gitPullFromSource: groupedIpcProcedures.git.gitPullFromSource,
   gitAbortMerge: groupedIpcProcedures.git.gitAbortMerge,
-  gitRunMergetool: groupedIpcProcedures.git.gitRunMergetool,
   gitFinishMerge: groupedIpcProcedures.git.gitFinishMerge,
   gitWatchProject: groupedIpcProcedures.git.gitWatchProject,
   gitWatchWorktrees: groupedIpcProcedures.git.gitWatchWorktrees,

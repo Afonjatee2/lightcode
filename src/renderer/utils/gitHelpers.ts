@@ -1,7 +1,9 @@
+import { toast } from "@heroui/react";
 import type { Project } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import type { FileEditorRootContext } from "@/renderer/state/fileEditorStore";
 
@@ -53,6 +55,40 @@ export function buildFileEditorContext(
     rootLabel: worktreeBranch ?? worktreePath.split(/[/\\]/).pop() ?? project.name,
     worktreePath,
   };
+}
+
+export function compareFilesByDirThenName(a: { path: string }, b: { path: string }): number {
+  const aSlash = a.path.lastIndexOf("/");
+  const bSlash = b.path.lastIndexOf("/");
+  const aDir = aSlash === -1 ? "" : a.path.substring(0, aSlash);
+  const bDir = bSlash === -1 ? "" : b.path.substring(0, bSlash);
+  const dirCmp = aDir.localeCompare(bDir, undefined, { sensitivity: "base" });
+  if (dirCmp !== 0) return dirCmp;
+  const aName = a.path.substring(aSlash + 1);
+  const bName = b.path.substring(bSlash + 1);
+  return aName.localeCompare(bName, undefined, { sensitivity: "base" });
+}
+
+export async function openFileInEditor(
+  project: Project,
+  worktreePath: string | undefined,
+  worktreeBranch: string | undefined,
+  path: string,
+): Promise<void> {
+  const fileEditor = useFileEditorStore.getState();
+  const targetContext = buildFileEditorContext(project, worktreePath, worktreeBranch);
+  const currentRoot = fileEditor.rootContext;
+  const isSameContext =
+    currentRoot?.projectId === targetContext.projectId &&
+    currentRoot?.worktreePath === targetContext.worktreePath;
+  if (!isSameContext) {
+    fileEditor.setRootContext(targetContext);
+  }
+  try {
+    await fileEditor.openFile(path, "modal", false);
+  } catch (error) {
+    toast.danger(error instanceof Error ? error.message : String(error));
+  }
 }
 
 export function autoDetectSetupScript(project: Project) {

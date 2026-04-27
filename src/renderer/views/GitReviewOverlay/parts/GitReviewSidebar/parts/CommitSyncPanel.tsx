@@ -1,11 +1,12 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown, Lock, Sparkles } from "lucide-react";
 import { Button, ButtonGroup, Dropdown, Label, Tooltip } from "@heroui/react";
+import type { GitFileChange } from "@/shared/contracts";
 import { PixelLoader, TextArea } from "@/renderer/components/common";
-import { useGitReviewSectionPadX } from "../gitReviewPadXContext";
+import { GitReviewSection } from "./GitReviewSection";
 
 export function CommitSyncPanel(props: {
   mergeConflicting: boolean;
-  mergeConflictFiles: string[];
+  mergeConflictFiles: GitFileChange[];
   hasAnyChanges: boolean;
   hasStagedChanges: boolean;
   hasRemote: boolean;
@@ -63,10 +64,9 @@ export function CommitSyncPanel(props: {
     handleAbortMerge,
     handleFinishMerge,
   } = props;
-  const sectionPadX = useGitReviewSectionPadX();
 
   return (
-    <div className={`space-y-2 border-t border-white/6 pt-2 pb-1 ${sectionPadX}`}>
+    <GitReviewSection gap={1}>
       {mergeConflicting && mergeConflictFiles.length === 0 ? (
         <>
           <p className="text-xs font-medium text-success">All conflicts resolved</p>
@@ -224,6 +224,6 @@ export function CommitSyncPanel(props: {
           </Button>
         </>
       ) : null}
-    </div>
+    </GitReviewSection>
   );
 }

@@ -31,9 +31,6 @@ const messages = {
   // ── Git: pull from source ─────────────────────────────────
   "git.pull.failed": "Pull failed: {detail}",
 
-  // ── Git: mergetool ────────────────────────────────────────
-  "git.mergetool.failed": "Merge tool failed to resolve conflicts",
-
   // ── Git: worktree ─────────────────────────────────────────
   "git.worktree.noBranch": "Cannot create a default worktree path without a branch name",
   "git.worktree.dirtySource":

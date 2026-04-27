@@ -17,9 +17,8 @@ import { SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import { getCommitGenCandidates } from "@/renderer/components/providers";
 import {
-  gitPanelSidebarColumnClass,
+  gitReviewColumnClass,
   gitReviewSidebarListScrollClass,
-  overlaySidebarColumnClass,
   sidebarFooterNavClass,
   sidebarIconRailFooterClass,
 } from "@/renderer/components/layout/sidebarChrome";
@@ -35,6 +34,7 @@ import { CommitSyncPanel } from "./parts/CommitSyncPanel";
 import { PrSection } from "./parts/PrSection";
 import { CreatePrModal } from "./parts/CreatePrModal";
 import { MergeToSourceSection } from "./parts/MergeToSourceSection";
+import { GitReviewSection } from "./parts/GitReviewSection";
 import { GitReviewPadXProvider } from "./gitReviewPadXContext";
 
 const EMPTY_BRANCHES: readonly GitBranchInfo[] = [];
@@ -116,7 +116,6 @@ export function GitReviewSidebar(props: {
     isSyncing,
     isMerging,
     isPullingFromSource,
-    isRunningMergetool,
     isAbortingMerge,
     isFinishingMerge,
     prTitle,
@@ -133,7 +132,6 @@ export function GitReviewSidebar(props: {
     handleMergeOnly,
     handleMergeAndRemove,
     handlePullFromSource,
-    handleRunMergetool,
     handleAbortMerge,
     handleFinishMerge,
     handleCreatePr,
@@ -227,11 +225,24 @@ export function GitReviewSidebar(props: {
           </div>
         )}
 
-        {/* Expanded: shared overlay sidebar column + list scroll (see sidebarChrome) */}
+        {/* Expanded: shared git-review column + list scroll (see sidebarChrome) */}
         <div
-          className={`${mode === "panel" ? gitPanelSidebarColumnClass : overlaySidebarColumnClass} transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
+          className={`${gitReviewColumnClass(mode)} transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
         >
           <div className={gitReviewSidebarListScrollClass()}>
+            {mergeConflicting && mergeConflictFiles.length > 0 && (
+              <ConflictGroup
+                files={mergeConflictFiles}
+                project={project}
+                selectedFile={selectedFile}
+                worktreePath={worktreePath}
+                worktreeBranch={worktreeBranch}
+                onSelectFile={onSelectFile}
+                mode={mode}
+                diffTheme={diffTheme}
+                wrapLines={wrapLines}
+              />
+            )}
             {gitStatus && gitStatus.staged.length > 0 && (
               <FileGroup
                 title="Staged"
@@ -266,9 +277,6 @@ export function GitReviewSidebar(props: {
                 wrapLines={wrapLines}
               />
             )}
-            {mergeConflicting && mergeConflictFiles.length > 0 && (
-              <ConflictGroup files={mergeConflictFiles} />
-            )}
             {gitStatus &&
               gitStatus.staged.length === 0 &&
               gitStatus.unstaged.length === 0 &&
@@ -284,10 +292,8 @@ export function GitReviewSidebar(props: {
           {mergeConflicting && mergeConflictFiles.length > 0 && (
             <ConflictResolutionActions
               canResolveWithAgent={canResolveWithAgent}
-              isRunningMergetool={isRunningMergetool}
               isAbortingMerge={isAbortingMerge}
               onResolveWithAgent={handleResolveWithAgent}
-              onRunMergetool={handleRunMergetool}
               onAbortMerge={handleAbortMerge}
             />
           )}
@@ -338,9 +344,7 @@ export function GitReviewSidebar(props: {
           )}
 
           {showCreatePrButton && (
-            <div
-              className={`space-y-2 border-t border-white/6 pt-2 ${mode === "panel" ? "px-2" : "px-0"}`}
-            >
+            <GitReviewSection>
               <Button
                 variant="tertiary"
                 className="w-full"
@@ -349,7 +353,7 @@ export function GitReviewSidebar(props: {
                 <GitPullRequest className="size-3.5" />
                 Create Pull Request
               </Button>
-            </div>
+            </GitReviewSection>
           )}
 
           <CreatePrModal

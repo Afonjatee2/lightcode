@@ -123,8 +123,8 @@ export function GitReviewOverlay(props: {
       title="Git Review"
       contentHeaderChildren={
         <>
-          <div className="lightcode-overlay-header__controls flex min-w-0 shrink items-center gap-2">
-            <span className="min-w-0 max-w-[min(200px,30vw)] truncate font-mono text-[13px] font-medium leading-none tracking-tight text-muted">
+          <div className="lightcode-overlay-header__controls flex min-w-0 shrink items-center gap-2 pl-1.5">
+            <span className="min-w-0 max-w-[min(200px,30vw)] truncate font-mono text-[13px] font-medium tracking-tight text-muted">
               {project.name}
             </span>
             {gitStatus?.branch ? (

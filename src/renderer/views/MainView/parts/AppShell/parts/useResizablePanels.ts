@@ -131,43 +131,70 @@ export function useResizablePanels(refs: {
   useEffect(() => {
     if (!resizeTarget) return;
 
-    function onMouseMove(e: MouseEvent) {
+    let rafId: number | null = null;
+    let pendingX = 0;
+    let pendingY = 0;
+    let hasPending = false;
+
+    function flush() {
+      rafId = null;
+      if (!hasPending) return;
+      hasPending = false;
+      const x = pendingX;
+      const y = pendingY;
+
       if (resizeTarget === "sidebar") {
-        const delta = e.clientX - resizeRef.current.startX;
+        const delta = x - resizeRef.current.startX;
         const next = Math.min(
           SIDEBAR_MAX_WIDTH,
           Math.max(SIDEBAR_MIN_WIDTH, resizeRef.current.startWidth + delta),
         );
+        if (next === sizeRef.current.sidebarWidth) return;
         sizeRef.current.sidebarWidth = next;
         applySidebarWidth(next);
       } else if (resizeTarget === "panel") {
-        const delta = resizeRef.current.startX - e.clientX;
+        const delta = resizeRef.current.startX - x;
         const next = Math.min(
           PANEL_MAX_WIDTH,
           Math.max(PANEL_MIN_WIDTH, resizeRef.current.startWidth + delta),
         );
+        if (next === sizeRef.current.panelWidth) return;
         sizeRef.current.panelWidth = next;
         applyPanelWidth(next);
       } else if (resizeTarget === "panel-bottom") {
-        const delta = resizeRef.current.startY - e.clientY;
+        const delta = resizeRef.current.startY - y;
         const next = Math.min(
           PANEL_BOTTOM_MAX_HEIGHT,
           Math.max(PANEL_BOTTOM_MIN_HEIGHT, resizeRef.current.startHeight + delta),
         );
+        if (next === sizeRef.current.panelHeight) return;
         sizeRef.current.panelHeight = next;
         applyPanelHeight(next);
       } else if (resizeTarget === "git-panel") {
-        const delta = resizeRef.current.startX - e.clientX;
+        const delta = resizeRef.current.startX - x;
         const next = Math.min(
           GIT_PANEL_MAX_WIDTH,
           Math.max(GIT_PANEL_MIN_WIDTH, resizeRef.current.startWidth + delta),
         );
+        if (next === sizeRef.current.gitPanelWidth) return;
         sizeRef.current.gitPanelWidth = next;
         applyGitPanelWidth(next);
       }
     }
 
+    function onMouseMove(e: MouseEvent) {
+      pendingX = e.clientX;
+      pendingY = e.clientY;
+      hasPending = true;
+      if (rafId === null) rafId = requestAnimationFrame(flush);
+    }
+
     function onMouseUp() {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+      if (hasPending) flush();
       setSidebarWidth(sizeRef.current.sidebarWidth);
       setPanelWidth(sizeRef.current.panelWidth);
       setPanelHeight(sizeRef.current.panelHeight);
@@ -178,6 +205,7 @@ export function useResizablePanels(refs: {
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };

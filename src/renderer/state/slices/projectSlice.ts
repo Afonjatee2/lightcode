@@ -23,6 +23,7 @@ export interface ProjectSlice {
     searchSettings: ProjectSearchSettings | undefined,
   ) => void;
   renameProject: (projectId: string, name: string) => void;
+  setProjectDisabled: (projectId: string, disabled: boolean) => void;
   reorderProjects: (sourceId: string, targetId: string, placement: ReorderPlacement) => void;
 }
 
@@ -124,6 +125,42 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
         project.id === projectId ? { ...project, name } : project,
       ),
     })),
+  setProjectDisabled: (projectId, disabled) =>
+    set((state) => {
+      const target = state.projects.find((p) => p.id === projectId);
+      if (!target) return {};
+      if ((target.disabled ?? false) === disabled) return {};
+
+      const nextProjects = state.projects.map((project) => {
+        if (project.id !== projectId) return project;
+        if (disabled) return { ...project, disabled: true };
+        const { disabled: _, ...rest } = project;
+        return rest;
+      });
+
+      if (!disabled) {
+        return { projects: nextProjects };
+      }
+
+      const projectThreadIds = new Set(
+        state.threads.filter((thread) => thread.projectId === projectId).map((thread) => thread.id),
+      );
+
+      let nextView = state.view;
+      if (state.view.kind === "draft" && state.view.projectId === projectId) {
+        nextView = { kind: "home" };
+      } else if (state.view.kind === "thread") {
+        nextView = state.view.panes.reduce<AppView>((view, paneId) => {
+          if (view.kind !== "thread") return view;
+          const shouldRemove = isDraftPaneId(paneId)
+            ? parseDraftProjectId(paneId) === projectId
+            : projectThreadIds.has(paneId);
+          return shouldRemove ? removePaneFromView(view, paneId) : view;
+        }, state.view);
+      }
+
+      return { projects: nextProjects, view: nextView };
+    }),
   reorderProjects: (sourceId, targetId, placement) =>
     set((state) => {
       const projectIds = state.projects.map((project) => project.id);

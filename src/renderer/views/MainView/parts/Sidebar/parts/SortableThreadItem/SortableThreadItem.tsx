@@ -7,6 +7,7 @@ import {
   GitFork,
   Pencil,
   Play,
+  Star,
   Trash2,
 } from "lucide-react";
 import type { Project, Thread } from "@/shared/contracts";
@@ -43,6 +44,7 @@ import {
   archiveThread,
   unloadThread,
   toggleMarkThreadDone,
+  toggleStarThread,
   deleteThread,
   renameThread,
   continueInProvider,
@@ -150,6 +152,11 @@ export function SortableThreadItem(props: {
             id: "mark-done",
             label: thread.done ? "Unmark Done" : "Mark Done",
             icon: <CircleCheck className="size-3.5" />,
+          },
+          {
+            id: "toggle-star",
+            label: thread.starred ? "Unpin" : "Pin to top",
+            icon: <Star className="size-3.5" />,
           },
           {
             id: "continue-in",
@@ -261,6 +268,7 @@ export function SortableThreadItem(props: {
           if (key === "rename") props.setEditingThreadId(thread.id);
           if (key === "unload") unloadThread(thread.id);
           if (key === "mark-done") toggleMarkThreadDone(thread.id);
+          if (key === "toggle-star") toggleStarThread(thread.id);
           if (key === "delete") deleteThread(thread.id, thread.worktreePath, thread.projectId);
           if (key.startsWith("action:")) {
             runProjectAction(project.id, key.slice("action:".length), thread.worktreePath);

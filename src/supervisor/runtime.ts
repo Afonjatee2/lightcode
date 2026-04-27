@@ -59,8 +59,6 @@ import type {
   GitRemoveWorktreePayload,
   GitRevertAllPayload,
   GitRevertPayload,
-  GitRunMergetoolPayload,
-  GitRunMergetoolResult,
   GitStageAllPayload,
   GitStagePayload,
   GitStatusResult,
@@ -658,10 +656,6 @@ export class SupervisorRuntime {
 
   async gitAbortMerge(payload: GitAbortMergePayload): Promise<void> {
     return this.gitService.abortMerge(payload.worktreeLocation);
-  }
-
-  async gitRunMergetool(payload: GitRunMergetoolPayload): Promise<GitRunMergetoolResult> {
-    return this.gitService.runMergetool(payload.worktreeLocation);
   }
 
   async gitFinishMerge(payload: GitFinishMergePayload): Promise<GitFinishMergeResult> {

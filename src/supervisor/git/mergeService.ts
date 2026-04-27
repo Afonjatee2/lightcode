@@ -2,18 +2,11 @@ import {
   type GitFinishMergeResult,
   type GitMergeToSourceResult,
   type GitPullFromSourceResult,
-  type GitRunMergetoolResult,
   type ProjectLocation,
 } from "@/shared/contracts";
 import { errorDetail, msg } from "@/shared/messages";
 import { getProjectFsPath } from "@/shared/wsl";
-import {
-  computeDefaultWorktreePath,
-  ensureWorktreeParentExists,
-  execGit,
-  GIT_STATUS_TIMEOUT,
-} from "./exec";
-import { parseStatusPorcelainV2 } from "./statusService";
+import { computeDefaultWorktreePath, ensureWorktreeParentExists, execGit } from "./exec";
 import { GitWorktreeService } from "./worktreeService";
 
 export class GitMergeService {
@@ -145,23 +138,6 @@ export class GitMergeService {
     try {
       await execGit(worktreeLocation, ["commit", "--no-edit"]);
       return { success: true };
-    } catch (error: unknown) {
-      return { success: false, error: errorDetail(error) };
-    }
-  }
-
-  async runMergetool(worktreeLocation: ProjectLocation): Promise<GitRunMergetoolResult> {
-    try {
-      await execGit(worktreeLocation, ["mergetool", "--no-prompt"]);
-      const statusOutput = await execGit(worktreeLocation, ["status", "--porcelain=v2", "-b"], {
-        timeout: GIT_STATUS_TIMEOUT,
-      });
-      const parsed = parseStatusPorcelainV2(statusOutput);
-      if (parsed.conflictFiles.length > 0) {
-        return { success: true, merged: false };
-      }
-      await execGit(worktreeLocation, ["commit", "--no-edit"]);
-      return { success: true, merged: true };
     } catch (error: unknown) {
       return { success: false, error: errorDetail(error) };
     }

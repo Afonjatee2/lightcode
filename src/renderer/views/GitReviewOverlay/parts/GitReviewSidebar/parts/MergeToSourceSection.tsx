@@ -1,7 +1,7 @@
 import { ChevronDown, GitMerge } from "lucide-react";
 import { Button, ButtonGroup, Dropdown, Label } from "@heroui/react";
 import { PixelLoader } from "@/renderer/components/common";
-import { useGitReviewSectionPadX } from "../gitReviewPadXContext";
+import { GitReviewSection } from "./GitReviewSection";
 
 export function MergeToSourceSection(props: {
   sourceBranchLoading: boolean;
@@ -21,10 +21,9 @@ export function MergeToSourceSection(props: {
     handleMergeAndRemove,
     handleMergeOnly,
   } = props;
-  const sectionPadX = useGitReviewSectionPadX();
 
   return (
-    <div className={`space-y-2 border-t border-white/6 pt-2 ${sectionPadX}`}>
+    <GitReviewSection>
       {sourceBranchLoading ? (
         <div className="flex items-center justify-center py-2">
           <PixelLoader size="xs" />
@@ -80,6 +79,6 @@ export function MergeToSourceSection(props: {
           Source branch unknown — merge manually
         </p>
       )}
-    </div>
+    </GitReviewSection>
   );
 }

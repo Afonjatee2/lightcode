@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useRef } from "react";
-import { isMac } from "@/renderer/bridge";
+import { isMac, isWindows } from "@/renderer/bridge";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { SIDEBAR_MIN_WIDTH, useResizablePanels } from "./parts/useResizablePanels";
 import { SIDEBAR_COLLAPSED_WIDTH, useSidebarOverlay } from "./parts/useSidebarOverlay";
@@ -86,6 +86,9 @@ export function AppShell(props: {
   const isBottom = terminalPosition === "bottom";
 
   const hasHeaders = sidebarHeader != null || contentHeader != null;
+  // Windows: stop the sidebar divider below the header so it doesn't run through the title row.
+  // macOS keeps the full-height border because the header sits inside the hidden-inset titlebar.
+  const sidebarDividerBelowHeader = hasHeaders && !isOverlay && !isMac();
 
   return (
     <SidebarContext.Provider value={{ isCollapsed, isOverlay, closingOverlay, collapse, expand }}>
@@ -116,7 +119,7 @@ export function AppShell(props: {
           className={`flex min-h-0 flex-col overflow-hidden ${
             isOverlay
               ? `fixed inset-y-0 left-0 z-40 border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${closingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"}`
-              : `relative border-r border-[color:var(--border)] ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`
+              : `relative ${sidebarDividerBelowHeader ? "" : "border-r border-[color:var(--border)]"} ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`
           } ${!isResizing && !isOverlay && !skipTransitionRef.current ? "transition-[width,min-width,border-color] duration-200" : ""}`}
           style={{ width: displayWidth, minWidth: displayWidth }}
         >
@@ -133,7 +136,9 @@ export function AppShell(props: {
               {sidebarHeader}
             </div>
           )}
-          <div className={`min-h-0 flex-1 overflow-hidden ${hasHeaders ? "mb-1" : ""}`}>
+          <div
+            className={`lightcode-sidebar-body min-h-0 flex-1 overflow-hidden ${sidebarDividerBelowHeader ? "border-r border-[color:var(--border)]" : ""}`}
+          >
             {sidebar}
           </div>
         </aside>
@@ -164,8 +169,9 @@ export function AppShell(props: {
               className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-2"
               style={{
                 height: "env(titlebar-area-height, 32px)",
-                paddingRight:
-                  "max(1rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)))",
+                paddingRight: isWindows()
+                  ? "max(calc(1rem + 4px), calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 4px))"
+                  : "max(1rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)))",
               }}
             >
               {contentHeader}
@@ -189,6 +195,7 @@ export function AppShell(props: {
                 <AsideSlot
                   orientation={isBottom ? "horizontal" : "vertical"}
                   isOpen={rightPanelOpen}
+                  isResizing={resizeTarget === "panel" || resizeTarget === "panel-bottom"}
                   targetWidth={panelWidth}
                   targetHeight={panelHeight}
                   onResizeStart={isBottom ? handlePanelBottomResizeStart : handlePanelResizeStart}
@@ -205,6 +212,7 @@ export function AppShell(props: {
               <AsideSlot
                 orientation="vertical"
                 isOpen={gitPanelOpen}
+                isResizing={resizeTarget === "git-panel"}
                 targetWidth={gitPanelWidth}
                 onResizeStart={handleGitPanelResizeStart}
                 panelRef={gitPanelRef}

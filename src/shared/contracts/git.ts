@@ -32,7 +32,7 @@ export interface GitStatusResult {
   totalInsertions: number;
   totalDeletions: number;
   mergeInProgress?: boolean;
-  conflictFiles?: string[];
+  conflictFiles?: GitFileChange[];
 }
 
 export interface GitDiffResult {
@@ -343,17 +343,6 @@ export const gitAbortMergePayloadSchema = z.object({
   worktreeLocation: projectLocationSchema,
 });
 export type GitAbortMergePayload = z.infer<typeof gitAbortMergePayloadSchema>;
-
-export const gitRunMergetoolPayloadSchema = z.object({
-  worktreeLocation: projectLocationSchema,
-});
-export type GitRunMergetoolPayload = z.infer<typeof gitRunMergetoolPayloadSchema>;
-
-export interface GitRunMergetoolResult {
-  success: boolean;
-  merged?: boolean;
-  error?: string;
-}
 
 export const gitFinishMergePayloadSchema = z.object({
   worktreeLocation: projectLocationSchema,

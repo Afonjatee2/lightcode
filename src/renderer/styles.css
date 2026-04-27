@@ -289,8 +289,12 @@ body {
   flex-shrink: 0;
 }
 
-/* Sidebar: [aside][handle] — accent the aside’s full-height right border. */
-.lightcode-shell > aside:has(+ .lightcode-resize-handle[aria-label="Resize sidebar"]:hover) {
+/* Sidebar: [aside][handle] — accent the divider on hover. macOS draws it on the aside (full
+   height); Windows draws it on the inner body so the title row stays clear. */
+.lightcode-shell > aside:has(+ .lightcode-resize-handle[aria-label="Resize sidebar"]:hover),
+.lightcode-shell
+  > aside:has(+ .lightcode-resize-handle[aria-label="Resize sidebar"]:hover)
+  > .lightcode-sidebar-body {
   border-right-color: var(--accent);
 }
 

@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, Minus, Plus, Undo2 } from "lucide-react";
 import type { GitFileChange, Project } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
+import { compareFilesByDirThenName } from "@/renderer/utils/gitHelpers";
 import { StackedFileCard } from "../../GitStackedDiff";
 import { useGitReviewRowPadX } from "../gitReviewPadXContext";
 import { FileRow } from "./FileRow";
@@ -63,15 +64,7 @@ export function FileGroup(props: {
     onRefresh();
   }
 
-  const sorted = files.toSorted((a, b) => {
-    const aDir = a.path.substring(0, a.path.lastIndexOf("/"));
-    const bDir = b.path.substring(0, b.path.lastIndexOf("/"));
-    const dirCmp = aDir.localeCompare(bDir, undefined, { sensitivity: "base" });
-    if (dirCmp !== 0) return dirCmp;
-    const aName = a.path.substring(a.path.lastIndexOf("/") + 1);
-    const bName = b.path.substring(b.path.lastIndexOf("/") + 1);
-    return aName.localeCompare(bName, undefined, { sensitivity: "base" });
-  });
+  const sorted = files.toSorted(compareFilesByDirThenName);
 
   return (
     <div>

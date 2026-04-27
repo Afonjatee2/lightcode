@@ -73,7 +73,6 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isMerging, setIsMerging] = useState(false);
   const [isPullingFromSource, setIsPullingFromSource] = useState(false);
-  const [isRunningMergetool, setIsRunningMergetool] = useState(false);
   const [isAbortingMerge, setIsAbortingMerge] = useState(false);
   const [isFinishingMerge, setIsFinishingMerge] = useState(false);
 
@@ -234,26 +233,6 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
       toast.danger(friendlyError(err));
     } finally {
       setIsPullingFromSource(false);
-    }
-  }
-
-  async function handleRunMergetool(): Promise<void> {
-    if (!worktreePath) return;
-    setIsRunningMergetool(true);
-    try {
-      const result = await readBridge().gitRunMergetool({
-        worktreeLocation: getWorktreeLocation(),
-      });
-      if (!result.success) {
-        toast.danger(result.error ?? msg("git.mergetool.failed"));
-        return;
-      }
-      onRefresh();
-    } catch (err) {
-      console.error("[git] mergetool failed", err);
-      toast.danger(friendlyError(err));
-    } finally {
-      setIsRunningMergetool(false);
     }
   }
 
@@ -426,7 +405,6 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     isSyncing,
     isMerging,
     isPullingFromSource,
-    isRunningMergetool,
     isAbortingMerge,
     isFinishingMerge,
     prTitle,
@@ -443,7 +421,6 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     handleMergeOnly,
     handleMergeAndRemove,
     handlePullFromSource,
-    handleRunMergetool,
     handleAbortMerge,
     handleFinishMerge,
     handleCreatePr,

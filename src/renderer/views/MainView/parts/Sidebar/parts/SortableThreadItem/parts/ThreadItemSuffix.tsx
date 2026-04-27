@@ -1,5 +1,5 @@
 import { Tooltip } from "@heroui/react";
-import { Archive, FolderOpen, GitFork, TerminalSquare, Trash2 } from "lucide-react";
+import { Archive, FolderOpen, GitFork, Star, TerminalSquare, Trash2 } from "lucide-react";
 import type { Thread } from "@/shared/contracts";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { GitBadge } from "@/renderer/views/MainView/parts/Sidebar/parts/GitBadge";
@@ -29,6 +29,7 @@ export function ThreadItemSuffix(props: {
 
   return (
     <>
+      {thread.starred && <Star className="size-3 shrink-0 fill-current" aria-label="Pinned" />}
       {showWorktreeBadge && thread.worktreePath && (
         <>
           {showWorktreeFilesButton ? (

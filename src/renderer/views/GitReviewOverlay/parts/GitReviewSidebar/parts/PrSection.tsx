@@ -10,7 +10,7 @@ import {
   usePrUrl,
 } from "@/renderer/state/gitSelectors";
 import { getPrStatusTone, PR_TONE_BG_CLASS } from "@/renderer/utils/prStatus";
-import { useGitReviewSectionPadX } from "../gitReviewPadXContext";
+import { GitReviewSection } from "./GitReviewSection";
 
 export function PrSection(props: {
   prKey: string;
@@ -30,10 +30,9 @@ export function PrSection(props: {
 
   const stateBadge = state === "draft" ? "(Draft)" : "";
   const fallbackTitle = title || (state === "merged" ? "Merged" : state === "draft" ? "" : "Open");
-  const sectionPadX = useGitReviewSectionPadX();
 
   return (
-    <div className={`space-y-2 border-t border-white/6 pt-2 ${sectionPadX}`}>
+    <GitReviewSection>
       <div className="flex items-center gap-2">
         <span className={`size-2 shrink-0 rounded-full ${indicatorColor}`} />
         <Link
@@ -134,6 +133,6 @@ export function PrSection(props: {
           </Dropdown>
         </ButtonGroup>
       )}
-    </div>
+    </GitReviewSection>
   );
 }

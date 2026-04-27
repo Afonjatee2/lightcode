@@ -2,7 +2,6 @@ import { Tooltip } from "@heroui/react";
 import {
   Archive,
   ArrowDownToLine,
-  ArrowRightLeft,
   ArrowUpFromLine,
   ArrowDownUp,
   CalendarClock,
@@ -23,6 +22,8 @@ import {
   Pencil,
   Play,
   Plus,
+  Power,
+  PowerOff,
   RefreshCw,
   Settings2,
   TerminalSquare,
@@ -48,7 +49,6 @@ import { useSidebarActions } from "@/renderer/views/MainView/parts/Sidebar/parts
 import {
   useDragSource,
   useIsDraggingProject,
-  useIsDraggingThread,
   useIsDraggingWorktreeGroup,
   type DragSourceData,
 } from "@/renderer/dnd";
@@ -61,6 +61,8 @@ import {
   sidebarFooterNavClass,
 } from "@/renderer/components/layout/sidebarChrome";
 import { readBridge } from "@/renderer/bridge";
+import { setProjectDisabled } from "@/renderer/actions/projectActions";
+import { SortableThreadItem } from "./parts/SortableThreadItem/SortableThreadItem";
 import { formatBytes } from "@/shared/formatBytes";
 import { useUpdateStore } from "@/renderer/state/updateStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -79,21 +81,6 @@ function formatProjectLocation(project: Project): string {
   return project.location.path;
 }
 
-function formatRelativeTime(iso: string): string {
-  const deltaMinutes = Math.max(1, Math.floor((Date.now() - new Date(iso).getTime()) / 60000));
-
-  if (deltaMinutes < 60) {
-    return `${deltaMinutes}m`;
-  }
-
-  const deltaHours = Math.floor(deltaMinutes / 60);
-  if (deltaHours < 24) {
-    return `${deltaHours}h`;
-  }
-
-  return `${Math.floor(deltaHours / 24)}d`;
-}
-
 function isRecent(iso: string): boolean {
   return Date.now() - new Date(iso).getTime() < 24 * 60 * 60 * 1000;
 }
@@ -104,6 +91,11 @@ function getEntryDate(entry: ThreadListEntry, field: "updatedAt" | "createdAt"):
     (latest, t) => (t[field] > latest ? t[field] : latest),
     entry.group.threads[0]![field],
   );
+}
+
+function entryIsStarred(entry: ThreadListEntry): boolean {
+  if (entry.kind === "thread") return entry.thread.starred;
+  return entry.group.threads.some((t) => t.starred);
 }
 
 export type ThreadSortMode = "updated" | "created" | "manual";
@@ -251,399 +243,6 @@ function ThreadIcon(props: { thread: Thread }) {
       tone={getStatusTone(props.thread)}
       className="size-3.5"
     />
-  );
-}
-
-// ── Sortable thread item ────────────────────────────────────────
-function SortableThreadItem(props: {
-  thread: Thread;
-  threadIndex: number;
-  project: Project;
-  showWorktreeBadge: boolean;
-  showWorktreeFilesButton?: boolean;
-  currentThreadIds: string[];
-  editingThreadId: string | null;
-  setEditingThreadId: (id: string | null) => void;
-  onOpenThread: (threadId: string) => void;
-  onUnloadThread: (threadId: string) => void;
-  onMarkThreadDone: (threadId: string) => void;
-  onRenameThread: (threadId: string, title: string) => void;
-  onArchiveThread: (threadId: string) => void;
-  onDeleteThread: (threadId: string, worktreePath?: string, projectId?: string) => void;
-  onOpenFiles: (projectId: string, worktreePath?: string) => void;
-  onOpenGitReview: (projectId: string, worktreePath?: string) => void;
-  onGitSync: (projectId: string, worktreePath?: string) => void;
-  onGitPush: (projectId: string, worktreePath: string) => void;
-  onGitPull: (projectId: string, worktreePath: string) => void;
-  onGitMergeToSource: (projectId: string, worktreePath: string) => void;
-  onGitMergeAndRemove: (projectId: string, worktreePath: string) => void;
-  onGitPullFromSource: (projectId: string, worktreePath: string) => void;
-  onOpenWorktreeTerminal: (projectId: string, worktreePath: string) => void;
-  onRunProjectAction: (projectId: string, actionId: string, worktreePath?: string) => void;
-  activeWorktreeTerminalPaths: string[];
-  activeWorktreeTerminalPath: string | null;
-  activeGitPanelWorktreePath: string | null;
-  activeFilesPanelWorktreePath: string | null;
-  gitMenuIcons: GitMenuIcons;
-  installedAgents: AgentStatus[];
-  onContinueInProvider: (threadId: string) => void;
-  group: string;
-  sortDisabled?: boolean;
-}) {
-  const {
-    thread,
-    project,
-    showWorktreeBadge,
-    showWorktreeFilesButton = false,
-    currentThreadIds,
-    editingThreadId,
-    sortDisabled = false,
-  } = props;
-  const worktreeGitItems = useWorktreeGitItems(
-    thread.projectId,
-    thread.worktreePath ?? "",
-    props.gitMenuIcons,
-  );
-  const threadRemoveAction = useSharedSettings((s) => s.threadRemoveAction);
-  const unloadDisabledReason =
-    thread.status === "inactive"
-      ? "Thread is already unloaded."
-      : thread.status === "launching"
-        ? "Wait for the thread to finish starting."
-        : !thread.sessionRef
-          ? "This thread can't be resumed yet."
-          : undefined;
-
-  const { ref } = useSortable({
-    id: `thread:${thread.id}`,
-    index: props.threadIndex,
-    type: "thread",
-    accept: sortDisabled ? [] : ["thread", "worktree-group"],
-    group: props.group,
-    data: {
-      type: "thread",
-      threadId: thread.id,
-      projectId: thread.projectId,
-      ...(thread.worktreePath != null ? { worktreePath: thread.worktreePath } : {}),
-    } satisfies DragSourceData,
-  });
-
-  const isDragging = useIsDraggingThread(thread.id);
-
-  const isCurrentThread = currentThreadIds.includes(thread.id);
-  const statusTone = getStatusTone(thread);
-
-  return (
-    <div ref={ref} className="relative">
-      <ContextMenu
-        items={[
-          ...(thread.worktreePath
-            ? [
-                {
-                  type: "submenu" as const,
-                  id: "git",
-                  label: "Git",
-                  icon: <GitFork className="size-3.5" />,
-                  items: worktreeGitItems,
-                },
-              ]
-            : []),
-          ...(thread.worktreePath && project.scripts?.actions?.length
-            ? [
-                {
-                  type: "submenu" as const,
-                  id: "run-action",
-                  label: "Run",
-                  icon: <Play className="size-3.5" />,
-                  items: project.scripts.actions.map((action) => ({
-                    id: `action:${action.id}`,
-                    label: action.name,
-                    icon: resolveActionIcon(action.icon),
-                  })),
-                },
-              ]
-            : []),
-          {
-            id: "rename",
-            label: "Rename",
-            icon: <Pencil className="size-3.5" />,
-          },
-          {
-            id: "unload",
-            label: "Unload Thread",
-            icon: <ArrowDownToLine className="size-3.5" />,
-            isDisabled: unloadDisabledReason !== undefined,
-            ...(unloadDisabledReason ? { disabledReason: unloadDisabledReason } : {}),
-          },
-          {
-            id: "mark-done",
-            label: thread.done ? "Unmark Done" : "Mark Done",
-            icon: <CircleCheck className="size-3.5" />,
-          },
-          {
-            id: "continue-in",
-            label: "Continue in...",
-            icon: <ArrowRightLeft className="size-3.5" />,
-            isDisabled:
-              !thread.sessionRef ||
-              props.installedAgents.filter((a) => a.kind !== thread.agentKind).length === 0,
-            ...(!thread.sessionRef ||
-            props.installedAgents.filter((a) => a.kind !== thread.agentKind).length === 0
-              ? {
-                  disabledReason: !thread.sessionRef
-                    ? "No active session"
-                    : "No other agents installed",
-                }
-              : {}),
-          },
-          ...(thread.groupId
-            ? [
-                {
-                  id: "ungroup",
-                  label: "Remove from group",
-                },
-              ]
-            : []),
-          ...(props.currentThreadIds.length >= 2 &&
-          props.currentThreadIds.includes(thread.id) &&
-          !thread.groupId
-            ? [
-                {
-                  id: "group-open-threads",
-                  label: "Group open threads",
-                  icon: <Columns2 className="size-3.5" />,
-                },
-              ]
-            : []),
-          { type: "separator" as const },
-          {
-            id: "archive",
-            label: "Archive Thread",
-            icon: <Archive className="size-3.5" />,
-            variant: "warning",
-          },
-          {
-            id: "delete",
-            label: "Delete Thread",
-            icon: <Trash2 className="size-3.5" />,
-            variant: "danger",
-          },
-        ]}
-        onAction={(key) => {
-          if (key === "git-review") props.onOpenGitReview(thread.projectId, thread.worktreePath);
-          if (key === "git-sync" && thread.worktreePath)
-            props.onGitSync(thread.projectId, thread.worktreePath);
-          if (key === "git-push" && thread.worktreePath)
-            props.onGitPush(thread.projectId, thread.worktreePath);
-          if (key === "git-pull" && thread.worktreePath)
-            props.onGitPull(thread.projectId, thread.worktreePath);
-          if (key === "git-pull-from-source" && thread.worktreePath)
-            props.onGitPullFromSource(thread.projectId, thread.worktreePath);
-          if (key === "git-merge-to-source" && thread.worktreePath)
-            props.onGitMergeToSource(thread.projectId, thread.worktreePath);
-          if (key === "git-merge-and-remove" && thread.worktreePath)
-            props.onGitMergeAndRemove(thread.projectId, thread.worktreePath);
-          if (key === "open-pr" && thread.worktreePath) {
-            const pr = useGitStore.getState().prData[thread.worktreePath];
-            if (pr?.url) void readBridge().openExternal(pr.url);
-          }
-          if (key === "create-pr") props.onOpenGitReview(thread.projectId, thread.worktreePath);
-          if (key === "continue-in") props.onContinueInProvider(thread.id);
-          if (key === "group-open-threads") {
-            const state = useAppStore.getState();
-            if (state.view.kind !== "thread") return;
-            const openThreads = state.threads.filter(
-              (t) => state.view.kind === "thread" && state.view.panes.includes(t.id),
-            );
-            // Only group if all from the same project
-            const projectId = openThreads[0]?.projectId;
-            if (!projectId || !openThreads.every((t) => t.projectId === projectId)) return;
-            const groupId = crypto.randomUUID();
-            const groupName = thread.title;
-            useAppStore.setState((s) => ({
-              threads: s.threads.map((t) =>
-                s.view.kind === "thread" && s.view.panes.includes(t.id)
-                  ? { ...t, groupId, groupName }
-                  : t,
-              ),
-              view: s.view.kind === "thread" ? { ...s.view, activeGroupId: groupId } : s.view,
-            }));
-          }
-          if (key === "ungroup") {
-            useAppStore.setState((state) => {
-              let updatedThreads = state.threads.map((t) =>
-                t.id === thread.id ? { ...t, groupId: undefined, groupName: undefined } : t,
-              );
-              // If only 1 thread left in the group, dissolve it
-              const remaining = updatedThreads.filter((t) => t.groupId === thread.groupId);
-              if (remaining.length === 1) {
-                updatedThreads = updatedThreads.map((t) =>
-                  t.id === remaining[0]!.id
-                    ? { ...t, groupId: undefined, groupName: undefined }
-                    : t,
-                );
-              }
-              const view =
-                state.view.kind === "thread" && state.view.activeGroupId === thread.groupId
-                  ? { kind: "thread" as const, panes: [state.view.panes[0]] as [string] }
-                  : state.view;
-              return { threads: updatedThreads, view };
-            });
-          }
-          if (key === "archive") props.onArchiveThread(thread.id);
-          if (key === "rename") props.setEditingThreadId(thread.id);
-          if (key === "unload") props.onUnloadThread(thread.id);
-          if (key === "mark-done") props.onMarkThreadDone(thread.id);
-          if (key === "delete")
-            props.onDeleteThread(thread.id, thread.worktreePath, thread.projectId);
-          if (key.startsWith("action:")) {
-            props.onRunProjectAction(project.id, key.slice("action:".length), thread.worktreePath);
-          }
-        }}
-      >
-        <SidebarButton
-          size="xs"
-          statusTone={statusTone}
-          icon={
-            <ProviderIcon kind={thread.agentKind} tone={statusTone} className="size-3.5 shrink-0" />
-          }
-          label={
-            editingThreadId === thread.id ? (
-              <InlineRenameInput
-                initialValue={thread.title}
-                onCommit={(newTitle) => {
-                  props.onRenameThread(thread.id, newTitle);
-                  props.setEditingThreadId(null);
-                }}
-                onCancel={() => props.setEditingThreadId(null)}
-              />
-            ) : thread.done ? (
-              <span className="opacity-50 line-through">{thread.title}</span>
-            ) : (
-              thread.title
-            )
-          }
-          tooltip={editingThreadId === thread.id ? undefined : thread.title}
-          isActive={isCurrentThread}
-          onPress={() => props.onOpenThread(thread.id)}
-          onDoubleClick={() => props.setEditingThreadId(thread.id)}
-          isDragging={isDragging}
-          suffix={
-            <>
-              {showWorktreeBadge && thread.worktreePath && (
-                <>
-                  {showWorktreeFilesButton ? (
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-label={`Files for ${thread.worktreeBranch ?? thread.title}`}
-                      className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
-                        props.activeFilesPanelWorktreePath === thread.worktreePath
-                          ? "text-accent"
-                          : "text-muted/60 opacity-0 group-hover:opacity-100"
-                      }`}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        props.onOpenFiles(thread.projectId, thread.worktreePath);
-                      }}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter" || event.key === " ") {
-                          event.stopPropagation();
-                          props.onOpenFiles(thread.projectId, thread.worktreePath);
-                        }
-                      }}
-                    >
-                      <FolderOpen className="size-3.5" />
-                    </div>
-                  ) : null}
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Terminal for ${thread.worktreeBranch}`}
-                    className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
-                      props.activeWorktreeTerminalPath === thread.worktreePath
-                        ? "text-accent"
-                        : props.activeWorktreeTerminalPaths.includes(thread.worktreePath)
-                          ? "text-foreground"
-                          : "text-muted/60 opacity-0 group-hover:opacity-100"
-                    }`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      props.onOpenWorktreeTerminal(thread.projectId, thread.worktreePath!);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.stopPropagation();
-                        props.onOpenWorktreeTerminal(thread.projectId, thread.worktreePath!);
-                      }
-                    }}
-                  >
-                    <TerminalSquare className="size-3.5" />
-                  </div>
-                  <SyncBadge projectId={thread.projectId} worktreePath={thread.worktreePath} />
-                  <GitBadge
-                    projectId={thread.projectId}
-                    projectName={thread.worktreeBranch ?? ""}
-                    worktreePath={thread.worktreePath}
-                    onPress={() => props.onOpenGitReview(thread.projectId, thread.worktreePath)}
-                    isActive={props.activeGitPanelWorktreePath === thread.worktreePath}
-                  />
-                  <Tooltip delay={150}>
-                    <Tooltip.Trigger tabIndex={-1} role="none">
-                      <div className="flex shrink-0 items-center">
-                        <GitFork className="size-3 text-muted/60" />
-                      </div>
-                    </Tooltip.Trigger>
-                    <Tooltip.Content placement="right">
-                      Worktree: {thread.worktreeBranch}
-                    </Tooltip.Content>
-                  </Tooltip>
-                </>
-              )}
-              <span className="relative w-[2.4ch] shrink-0">
-                <span className="block text-center font-mono text-[10px] tabular-nums text-muted group-hover:invisible">
-                  {formatRelativeTime(thread.updatedAt)}
-                </span>
-                <div
-                  role="button"
-                  tabIndex={0}
-                  aria-label={
-                    threadRemoveAction === "archive"
-                      ? `Archive ${thread.title}`
-                      : `Delete ${thread.title}`
-                  }
-                  className={`absolute inset-0 flex items-center justify-center rounded text-muted/55 opacity-0 transition group-hover:opacity-100 ${threadRemoveAction === "archive" ? "hover:text-warning" : "hover:text-danger"}`}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    if (threadRemoveAction === "archive") {
-                      props.onArchiveThread(thread.id);
-                    } else {
-                      props.onDeleteThread(thread.id, thread.worktreePath, thread.projectId);
-                    }
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.stopPropagation();
-                      if (threadRemoveAction === "archive") {
-                        props.onArchiveThread(thread.id);
-                      } else {
-                        props.onDeleteThread(thread.id, thread.worktreePath, thread.projectId);
-                      }
-                    }
-                  }}
-                >
-                  {threadRemoveAction === "archive" ? (
-                    <Archive className="size-3.5" />
-                  ) : (
-                    <Trash2 className="size-3.5" />
-                  )}
-                </div>
-              </span>
-            </>
-          }
-        />
-      </ContextMenu>
-    </div>
   );
 }
 
@@ -808,32 +407,9 @@ function SortableWorktreeGroup(props: {
               project={project}
               showWorktreeBadge={false}
               showWorktreeFilesButton={false}
-              currentThreadIds={props.currentThreadIds}
               editingThreadId={props.editingThreadId}
               setEditingThreadId={props.setEditingThreadId}
-              onOpenThread={props.onOpenThread}
-              onUnloadThread={props.onUnloadThread}
-              onMarkThreadDone={props.onMarkThreadDone}
-              onArchiveThread={props.onArchiveThread}
-              onRenameThread={props.onRenameThread}
-              onDeleteThread={props.onDeleteThread}
-              onOpenFiles={props.onOpenFiles}
-              onOpenGitReview={props.onOpenGitReview}
-              onGitSync={props.onGitSync}
-              onGitPush={props.onGitPush}
-              onGitPull={props.onGitPull}
-              onGitMergeToSource={props.onGitMergeToSource}
-              onGitMergeAndRemove={props.onGitMergeAndRemove}
-              onGitPullFromSource={props.onGitPullFromSource}
-              onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
-              onRunProjectAction={props.onRunProjectAction}
-              activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
-              activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
-              activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
-              activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
               gitMenuIcons={props.gitMenuIcons}
-              installedAgents={props.installedAgents}
-              onContinueInProvider={props.onContinueInProvider}
               group={`wt:${group.worktreePath}`}
             />
           ))}
@@ -947,6 +523,8 @@ function SortableProjectHeader(props: {
   );
   const hasDraft = useAppStore((s) => project.id in s.draftContents);
   const projectLocation = formatProjectLocation(project);
+  const isDisabled = !!project.disabled;
+  const showBody = !isProjectCollapsed && !isDisabled;
 
   const { ref } = useSortable({
     id: `project:${project.id}`,
@@ -968,39 +546,48 @@ function SortableProjectHeader(props: {
             label: "Project Settings",
             icon: <Settings2 className="size-3.5" />,
           },
-          {
-            type: "submenu" as const,
-            id: "git",
-            label: "Git",
-            icon: <GitFork className="size-3.5" />,
-            items: [
-              {
-                id: "git-review",
-                label: "Review Changes",
-                icon: <FileDiff className="size-3.5" />,
-              },
-              {
-                id: "git-sync",
-                label: "Sync",
-                icon: <RefreshCw className="size-3.5" />,
-              },
-            ],
-          },
-          ...(project.scripts?.actions?.length
-            ? [
+          ...(isDisabled
+            ? []
+            : [
                 {
                   type: "submenu" as const,
-                  id: "run-action",
-                  label: "Run",
-                  icon: <Play className="size-3.5" />,
-                  items: project.scripts.actions.map((action) => ({
-                    id: `action:${action.id}`,
-                    label: action.name,
-                    icon: resolveActionIcon(action.icon),
-                  })),
+                  id: "git",
+                  label: "Git",
+                  icon: <GitFork className="size-3.5" />,
+                  items: [
+                    {
+                      id: "git-review",
+                      label: "Review Changes",
+                      icon: <FileDiff className="size-3.5" />,
+                    },
+                    {
+                      id: "git-sync",
+                      label: "Sync",
+                      icon: <RefreshCw className="size-3.5" />,
+                    },
+                  ],
                 },
-              ]
-            : []),
+                ...(project.scripts?.actions?.length
+                  ? [
+                      {
+                        type: "submenu" as const,
+                        id: "run-action",
+                        label: "Run",
+                        icon: <Play className="size-3.5" />,
+                        items: project.scripts.actions.map((action) => ({
+                          id: `action:${action.id}`,
+                          label: action.name,
+                          icon: resolveActionIcon(action.icon),
+                        })),
+                      },
+                    ]
+                  : []),
+              ]),
+          {
+            id: "toggle-disabled",
+            label: isDisabled ? "Enable Project" : "Disable Project",
+            icon: isDisabled ? <Power className="size-3.5" /> : <PowerOff className="size-3.5" />,
+          },
           {
             id: "remove-project",
             label: "Remove Project",
@@ -1011,6 +598,7 @@ function SortableProjectHeader(props: {
         onAction={(key) => {
           if (key === "project-settings") props.onOpenProjectSettings(project.id);
           if (key === "remove-project") props.onDeleteProject(project.id);
+          if (key === "toggle-disabled") setProjectDisabled(project.id, !isDisabled);
           if (key === "git-review") props.onOpenGitReview(project.id);
           if (key === "git-sync") props.onGitSync(project.id);
           if (key.startsWith("action:")) {
@@ -1022,7 +610,7 @@ function SortableProjectHeader(props: {
           icon={
             <ChevronRight
               className={`size-3.5 shrink-0 text-muted transition-transform ${
-                isProjectCollapsed ? "" : "rotate-90"
+                showBody ? "rotate-90" : ""
               }`}
             />
           }
@@ -1034,83 +622,85 @@ function SortableProjectHeader(props: {
               )}
             </span>
           }
-          tooltip={projectLocation}
-          className={
-            isDragging
-              ? "lightcode-sidebar-project-nudge !pl-1 opacity-60"
-              : "lightcode-sidebar-project-nudge !pl-1"
-          }
-          onPress={() =>
+          tooltip={isDisabled ? `${projectLocation} (disabled)` : projectLocation}
+          className={`lightcode-sidebar-project-nudge !pl-1${isDragging ? " opacity-60" : ""}${
+            isDisabled ? " opacity-50" : ""
+          }`}
+          onPress={() => {
+            if (isDisabled) return;
             props.setCollapsedProjects((current) => ({
               ...current,
               [project.id]: !isProjectCollapsed,
-            }))
-          }
+            }));
+          }}
           isDragging={isDragging}
           suffix={
-            <>
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label={`Files for ${project.name}`}
-                className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
-                  props.activeFilesPanelProjectId === project.id &&
-                  !props.activeFilesPanelWorktreePath
-                    ? "text-accent"
-                    : "text-muted/60 opacity-0 group-hover:opacity-100"
-                }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onOpenFiles(project.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
+            isDisabled ? null : (
+              <>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Files for ${project.name}`}
+                  className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+                    props.activeFilesPanelProjectId === project.id &&
+                    !props.activeFilesPanelWorktreePath
+                      ? "text-accent"
+                      : "text-muted/60 opacity-0 group-hover:opacity-100"
+                  }`}
+                  onClick={(event) => {
                     event.stopPropagation();
                     props.onOpenFiles(project.id);
-                  }
-                }}
-              >
-                <FolderOpen className="size-3.5" />
-              </div>
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label={`Terminal for ${project.name}`}
-                className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
-                  props.activeTerminalProjectId === project.id
-                    ? "text-accent"
-                    : props.terminalProjectIds.includes(project.id)
-                      ? "text-foreground"
-                      : "text-muted/60 opacity-0 group-hover:opacity-100"
-                }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  props.onOpenTerminal(project.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.stopPropagation();
+                      props.onOpenFiles(project.id);
+                    }
+                  }}
+                >
+                  <FolderOpen className="size-3.5" />
+                </div>
+                <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Terminal for ${project.name}`}
+                  className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+                    props.activeTerminalProjectId === project.id
+                      ? "text-accent"
+                      : props.terminalProjectIds.includes(project.id)
+                        ? "text-foreground"
+                        : "text-muted/60 opacity-0 group-hover:opacity-100"
+                  }`}
+                  onClick={(event) => {
                     event.stopPropagation();
                     props.onOpenTerminal(project.id);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.stopPropagation();
+                      props.onOpenTerminal(project.id);
+                    }
+                  }}
+                >
+                  <TerminalSquare className="size-3.5" />
+                </div>
+                <SyncBadge projectId={project.id} />
+                <GitBadge
+                  projectId={project.id}
+                  projectName={project.name}
+                  onPress={() => props.onOpenGitReview(project.id)}
+                  isActive={
+                    props.activeGitPanelProjectId === project.id &&
+                    !props.activeGitPanelWorktreePath
                   }
-                }}
-              >
-                <TerminalSquare className="size-3.5" />
-              </div>
-              <SyncBadge projectId={project.id} />
-              <GitBadge
-                projectId={project.id}
-                projectName={project.name}
-                onPress={() => props.onOpenGitReview(project.id)}
-                isActive={
-                  props.activeGitPanelProjectId === project.id && !props.activeGitPanelWorktreePath
-                }
-              />
-            </>
+                />
+              </>
+            )
           }
         />
       </ContextMenu>
 
-      {!isProjectCollapsed ? (
+      {showBody ? (
         <div className="space-y-0.5">
           <NewThreadButton
             projectId={project.id}
@@ -1128,9 +718,11 @@ function SortableProjectHeader(props: {
               const dndDisabled = !isManual;
               const dndGroup = `project-entries:${project.id}`;
 
-              // Manual mode: flat list, no worktree grouping, no date sections, DnD enabled
               if (isManual) {
-                return projectThreads.map((thread, idx) => (
+                const orderedThreads = [...projectThreads].sort(
+                  (a, b) => Number(b.starred) - Number(a.starred),
+                );
+                return orderedThreads.map((thread, idx) => (
                   <SortableThreadItem
                     key={thread.id}
                     thread={thread}
@@ -1138,32 +730,9 @@ function SortableProjectHeader(props: {
                     project={project}
                     showWorktreeBadge={true}
                     showWorktreeFilesButton={!!thread.worktreePath}
-                    currentThreadIds={props.currentThreadIds}
                     editingThreadId={props.editingThreadId}
                     setEditingThreadId={props.setEditingThreadId}
-                    onOpenThread={props.onOpenThread}
-                    onUnloadThread={props.onUnloadThread}
-                    onMarkThreadDone={props.onMarkThreadDone}
-                    onArchiveThread={props.onArchiveThread}
-                    onRenameThread={props.onRenameThread}
-                    onDeleteThread={props.onDeleteThread}
-                    onOpenFiles={props.onOpenFiles}
-                    onOpenGitReview={props.onOpenGitReview}
-                    onGitSync={props.onGitSync}
-                    onGitPush={props.onGitPush}
-                    onGitPull={props.onGitPull}
-                    onGitMergeToSource={props.onGitMergeToSource}
-                    onGitMergeAndRemove={props.onGitMergeAndRemove}
-                    onGitPullFromSource={props.onGitPullFromSource}
-                    onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
-                    onRunProjectAction={props.onRunProjectAction}
-                    activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
-                    activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
-                    activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
-                    activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                     gitMenuIcons={props.gitMenuIcons}
-                    installedAgents={props.installedAgents}
-                    onContinueInProvider={props.onContinueInProvider}
                     group={dndGroup}
                   />
                 ));
@@ -1174,8 +743,12 @@ function SortableProjectHeader(props: {
               const entries = groupThreads(
                 [...projectThreads].sort((a, b) => b[dateField].localeCompare(a[dateField])),
               );
-              const recentEntries = entries.filter((e) => isRecent(getEntryDate(e, dateField)));
-              const olderEntries = entries.filter((e) => !isRecent(getEntryDate(e, dateField)));
+              const recentEntries = entries
+                .filter((e) => isRecent(getEntryDate(e, dateField)))
+                .sort((a, b) => Number(entryIsStarred(b)) - Number(entryIsStarred(a)));
+              const olderEntries = entries
+                .filter((e) => !isRecent(getEntryDate(e, dateField)))
+                .sort((a, b) => Number(entryIsStarred(b)) - Number(entryIsStarred(a)));
               const hasBothSections = recentEntries.length > 0 && olderEntries.length > 0;
               let ungroupedIndex = 0;
 
@@ -1190,32 +763,9 @@ function SortableProjectHeader(props: {
                       project={project}
                       showWorktreeBadge={true}
                       showWorktreeFilesButton={!!entry.thread.worktreePath}
-                      currentThreadIds={props.currentThreadIds}
                       editingThreadId={props.editingThreadId}
                       setEditingThreadId={props.setEditingThreadId}
-                      onOpenThread={props.onOpenThread}
-                      onUnloadThread={props.onUnloadThread}
-                      onMarkThreadDone={props.onMarkThreadDone}
-                      onArchiveThread={props.onArchiveThread}
-                      onRenameThread={props.onRenameThread}
-                      onDeleteThread={props.onDeleteThread}
-                      onOpenFiles={props.onOpenFiles}
-                      onOpenGitReview={props.onOpenGitReview}
-                      onGitSync={props.onGitSync}
-                      onGitPush={props.onGitPush}
-                      onGitPull={props.onGitPull}
-                      onGitMergeToSource={props.onGitMergeToSource}
-                      onGitMergeAndRemove={props.onGitMergeAndRemove}
-                      onGitPullFromSource={props.onGitPullFromSource}
-                      onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
-                      onRunProjectAction={props.onRunProjectAction}
-                      activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
-                      activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
-                      activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
-                      activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                       gitMenuIcons={props.gitMenuIcons}
-                      installedAgents={props.installedAgents}
-                      onContinueInProvider={props.onContinueInProvider}
                       group={dndGroup}
                       sortDisabled={dndDisabled}
                     />
@@ -1413,32 +963,9 @@ function SortableProjectHeader(props: {
                             threadIndex={threadIdx}
                             project={project}
                             showWorktreeBadge={!!thread.worktreePath}
-                            currentThreadIds={props.currentThreadIds}
                             editingThreadId={props.editingThreadId}
                             setEditingThreadId={props.setEditingThreadId}
-                            onOpenThread={props.onOpenThread}
-                            onUnloadThread={props.onUnloadThread}
-                            onMarkThreadDone={props.onMarkThreadDone}
-                            onArchiveThread={props.onArchiveThread}
-                            onRenameThread={props.onRenameThread}
-                            onDeleteThread={props.onDeleteThread}
-                            onOpenFiles={props.onOpenFiles}
-                            onOpenGitReview={props.onOpenGitReview}
-                            onGitSync={props.onGitSync}
-                            onGitPush={props.onGitPush}
-                            onGitPull={props.onGitPull}
-                            onGitMergeToSource={props.onGitMergeToSource}
-                            onGitMergeAndRemove={props.onGitMergeAndRemove}
-                            onGitPullFromSource={props.onGitPullFromSource}
-                            onOpenWorktreeTerminal={props.onOpenWorktreeTerminal}
-                            onRunProjectAction={props.onRunProjectAction}
-                            activeWorktreeTerminalPaths={props.activeWorktreeTerminalPaths}
-                            activeWorktreeTerminalPath={props.activeWorktreeTerminalPath}
-                            activeGitPanelWorktreePath={props.activeGitPanelWorktreePath}
-                            activeFilesPanelWorktreePath={props.activeFilesPanelWorktreePath}
                             gitMenuIcons={props.gitMenuIcons}
-                            installedAgents={props.installedAgents}
-                            onContinueInProvider={props.onContinueInProvider}
                             group={`group:${groupKey}`}
                             sortDisabled={dndDisabled}
                           />
@@ -1659,7 +1186,7 @@ export function Sidebar() {
           </div>
 
           {/* Footer icons */}
-          <div className="flex flex-col gap-1 border-t border-white/6 pt-2 pr-2">
+          <div className="flex flex-col gap-1 border-t border-white/6 pt-2 pb-2 pr-2">
             <UpdateButtons iconOnly />
             <SidebarButton
               iconOnly

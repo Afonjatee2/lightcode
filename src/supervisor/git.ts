@@ -8,7 +8,6 @@ import type {
   GitGetWorktreeSourceBranchResult,
   GitMergeToSourceResult,
   GitPullFromSourceResult,
-  GitRunMergetoolResult,
   GitStatusResult,
   GitSwitchBranchResult,
   GitWorktreeListResult,
@@ -233,10 +232,6 @@ export class GitService {
 
   async finishMerge(worktreeLocation: ProjectLocation): Promise<GitFinishMergeResult> {
     return this.mergeService.finishMerge(worktreeLocation);
-  }
-
-  async runMergetool(worktreeLocation: ProjectLocation): Promise<GitRunMergetoolResult> {
-    return this.mergeService.runMergetool(worktreeLocation);
   }
 
   async pruneWorktrees(location: ProjectLocation, activeWorktreePaths: string[]): Promise<void> {
