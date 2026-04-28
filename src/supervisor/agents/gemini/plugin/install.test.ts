@@ -34,9 +34,10 @@ describe("getGeminiPluginPaths", () => {
 });
 
 describe("renderGeminiSettings", () => {
-  it("renders Lightcode hook entries using Gemini's settings schema", () => {
-    const pluginDir = "/home/demo/.lightcode/agent-plugins/gemini";
-    const doc = renderGeminiSettings(pluginDir, "wsl");
+  it("renders WSL hook entries with the resolved-node command prefix", () => {
+    const commandPrefix =
+      "'/home/demo/.nvm/versions/node/v22.11.0/bin/node' '/home/demo/.lightcode/agent-plugins/gemini/forward.mjs'";
+    const doc = renderGeminiSettings(commandPrefix);
 
     expect(doc.hooksConfig).toEqual({ notifications: false });
     expect(Object.keys(doc.hooks)).toEqual([
@@ -54,7 +55,7 @@ describe("renderGeminiSettings", () => {
     expect(doc.hooks.AfterAgent?.[0]?.hooks[0]).toMatchObject({
       name: "lightcode-status-AfterAgent",
       type: "command",
-      command: "node '/home/demo/.lightcode/agent-plugins/gemini/forward.mjs' AfterAgent",
+      command: `${commandPrefix} AfterAgent`,
       timeout: 5000,
     });
   });
@@ -74,14 +75,14 @@ describe("installGeminiPlugin", () => {
     expect(existsSync(result.paths.settingsPath)).toBe(true);
     expect(isGeminiPluginInstalled({ envKind: "posix", baseDir })).toMatchObject({
       installed: true,
-      version: "1.0.0",
+      version: "1.1.0",
     });
 
     const settings = JSON.parse(readFileSync(result.paths.settingsPath, "utf8")) as {
       hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
     };
     expect(settings.hooks.Notification?.[0]?.hooks[0]?.command).toMatch(
-      /agent-plugins[\\/]+gemini[\\/]+forward\.mjs/,
+      /agent-plugins[\\/]+gemini[\\/]+lightcode-hook\.(?:sh|cmd)/,
     );
   });
 });

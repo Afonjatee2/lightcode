@@ -23,9 +23,11 @@ import {
   createPluginSourceResolver,
   getNativePluginBaseDir,
   getWslPluginBaseDirs,
+  hasNativeHookWrapper,
   isWslPluginContext,
   readBundledPluginVersion,
   readPluginManifest,
+  writeNativeHookWrapper,
   type PluginManifest,
 } from "../../plugin/installerBase";
 
@@ -47,8 +49,14 @@ const CODEX_HOOK_EVENTS = [
   "Stop",
 ] as const;
 
-/** Match any Lightcode-staged forward.mjs command line in hooks.json. */
-const LIGHTCODE_FORWARD_RE = /agent-plugins(?:[/\\]+)codex(?:[/\\]+)forward\.mjs/;
+/**
+ * Match any Lightcode-staged Codex hook command in hooks.json. Covers both
+ * the WSL shape (where `forward.mjs` is invoked directly via an absolute
+ * node path) and the native shape (where `lightcode-hook.{sh,cmd}` is the
+ * entry point).
+ */
+const LIGHTCODE_FORWARD_RE =
+  /agent-plugins(?:[/\\]+)codex(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd))/;
 
 const callerDir =
   typeof __dirname !== "undefined"
@@ -116,12 +124,12 @@ function pruneLightcodeGroups(groups: unknown): unknown[] {
   });
 }
 
-function commandForEvent(forwardPath: string, event: string): string {
-  return `node ${JSON.stringify(forwardPath)} ${event}`;
+function commandForEvent(commandHead: string, event: string): string {
+  return `${commandHead} ${event}`;
 }
 
-function buildLightcodeGroup(event: string, forwardPath: string): Record<string, unknown> {
-  const command = commandForEvent(forwardPath, event);
+function buildLightcodeGroup(event: string, commandHead: string): Record<string, unknown> {
+  const command = commandForEvent(commandHead, event);
   const hook = { type: "command", command };
   if (event === "SessionStart" || event === "PreToolUse" || event === "PostToolUse") {
     return { matcher: "*", hooks: [hook] };
@@ -130,12 +138,14 @@ function buildLightcodeGroup(event: string, forwardPath: string): Record<string,
 }
 
 /**
- * Merge Lightcode Codex hook matcher groups into a parsed `hooks.json` document.
- * Exported for unit tests.
+ * Merge Lightcode Codex hook matcher groups into a parsed `hooks.json`
+ * document. `commandHead` is the entire pre-event portion of each hook
+ * command — for WSL it's `"<absolute-node-path>" "<forward.mjs-path>"`;
+ * for native it's just `"<wrapper-path>"`. Exported for unit tests.
  */
 export function mergeCodexHooksDocument(
   existingParsed: unknown,
-  forwardPath: string,
+  commandHead: string,
 ): { hooks: Record<string, unknown[]> } {
   let hooksRoot: Record<string, unknown> = {};
   if (
@@ -151,7 +161,7 @@ export function mergeCodexHooksDocument(
   for (const event of CODEX_HOOK_EVENTS) {
     const prev = hooksRoot[event];
     const pruned = pruneLightcodeGroups(prev);
-    pruned.push(buildLightcodeGroup(event, forwardPath));
+    pruned.push(buildLightcodeGroup(event, commandHead));
     hooksRoot[event] = pruned;
   }
 
@@ -321,8 +331,18 @@ export function isCodexVersionSupportedForHooks(): boolean {
   return isCodexSemverSupportedForHooks(probeCodexCliSemver());
 }
 
+export interface InstallCodexPluginOptions {
+  /**
+   * Required for WSL contexts: absolute Linux path to the Node binary the
+   * staged hook command should use. Comes from `resolveNodeForDistro`.
+   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   */
+  resolvedNodePath?: string | undefined;
+}
+
 export function installCodexPlugin(
   ctx?: AgentEnvContext,
+  options?: InstallCodexPluginOptions,
 ): { ok: true; paths: CodexPluginPaths; version: string } | { ok: false; reason: string } {
   let sourceDir: string;
   try {
@@ -339,7 +359,14 @@ export function installCodexPlugin(
   }
 
   if (isWslPluginContext(ctx)) {
-    return installCodexPluginWsl(ctx.wslDistro, sourceDir, manifest);
+    if (!options?.resolvedNodePath) {
+      return {
+        ok: false,
+        reason:
+          "WSL Codex plugin install requires a resolved node path; the adapter must call resolveNodeForDistro before installing.",
+      };
+    }
+    return installCodexPluginWsl(ctx.wslDistro, sourceDir, manifest, options.resolvedNodePath);
   }
 
   const pluginDir = getNativePluginBaseDir("codex", ctx?.baseDir);
@@ -347,16 +374,21 @@ export function installCodexPlugin(
   mkdirSync(pluginDir, { recursive: true });
   seedNativeCodexHome(codexHomeDir);
   copyPluginAssetsIfStale(sourceDir, pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir);
 
-  const forwardPath = join(pluginDir, "forward.mjs");
   const hooksPath = join(codexHomeDir, "hooks.json");
   const existing = parseExistingHooks(hooksPath);
   if (existing === null && existsSync(hooksPath)) {
     return { ok: false, reason: "malformed private Codex hooks.json (invalid JSON)" };
   }
 
+  // Native command shape: `"<wrapper-path>" <event>`. The wrapper sets
+  // ELECTRON_RUN_AS_NODE=1 and execs the bundled Electron Node on
+  // forward.mjs (which lives next to the wrapper).
+  const commandHead = JSON.stringify(wrapperPath);
+
   try {
-    const merged = mergeCodexHooksDocument(existing, forwardPath);
+    const merged = mergeCodexHooksDocument(existing, commandHead);
     writeHooksJson(hooksPath, merged);
   } catch (error) {
     return {
@@ -387,6 +419,7 @@ function installCodexPluginWsl(
   distro: string,
   sourceDir: string,
   manifest: PluginManifest,
+  resolvedNodePath: string,
 ): { ok: true; paths: CodexPluginPaths; version: string } | { ok: false; reason: string } {
   const deploy = deployFilesToWslHome(
     distro,
@@ -414,8 +447,13 @@ function installCodexPluginWsl(
     };
   }
 
+  // WSL command shape: `"<absolute-node-path>" "<forward.mjs-path>" <event>`.
+  // /bin/sh -c never has to resolve `node` from PATH because both are
+  // absolute paths.
+  const commandHead = `${JSON.stringify(resolvedNodePath)} ${JSON.stringify(linuxForward)}`;
+
   try {
-    const merged = mergeCodexHooksDocument(existing, linuxForward);
+    const merged = mergeCodexHooksDocument(existing, commandHead);
     mkdirSync(dirname(uncHooks), { recursive: true });
     writeFileSync(uncHooks, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
   } catch (error) {
@@ -449,15 +487,21 @@ export function isCodexPluginInstalled(
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "codex");
     if (!wsl) return Promise.resolve({ installed: false });
-    return Promise.resolve(verifyCodexInstallAt(wsl.uncBase));
+    return Promise.resolve(verifyCodexInstallAt(wsl.uncBase, "wsl"));
   }
-  return Promise.resolve(verifyCodexInstallAt(getNativePluginBaseDir("codex", ctx?.baseDir)));
+  return Promise.resolve(
+    verifyCodexInstallAt(getNativePluginBaseDir("codex", ctx?.baseDir), "native"),
+  );
 }
 
-function verifyCodexInstallAt(readableDir: string): { installed: boolean; version?: string } {
+function verifyCodexInstallAt(
+  readableDir: string,
+  target: "native" | "wsl",
+): { installed: boolean; version?: string } {
   const hooksPath = join(readableDir, "home", "hooks.json");
   if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
+  if (!hasNativeHookWrapper(readableDir, target)) return { installed: false };
   if (!existsSync(hooksPath)) return { installed: false };
   try {
     const raw = readFileSync(hooksPath, "utf8");

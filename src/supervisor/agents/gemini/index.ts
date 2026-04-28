@@ -1,14 +1,13 @@
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import {
-  batchWslCommandsAsync,
   createKnownSessionRef,
   createRecursiveDirWatcher,
   detectAgentInstall,
   type AgentAdapter,
   type TerminalStatusHint,
 } from "../base";
-import { warnIfPluginManifestMissing } from "../plugin/installerBase";
+import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildGeminiArgs } from "./argv";
 import { defaultGeminiCapabilities, geminiDetectionSpec } from "./detection";
 import {
@@ -51,18 +50,20 @@ export function createGeminiAdapter(): AgentAdapter {
     minProtocolVersion: 1,
 
     async isPluginSupported(ctx) {
-      // Gemini's hook command invokes `node`. Native sessions follow the
-      // Claude/Codex assumption that the supervisor's environment has Node;
-      // WSL needs an in-distro runtime on PATH.
-      if (ctx.envKind !== "wsl" || !ctx.wslDistro) return true;
-      const [result] = await batchWslCommandsAsync(ctx.wslDistro, ["command -v node"]);
-      return Boolean(result?.ok && result.stdout.trim().length > 0);
+      // Native: forward.mjs runs under Electron-as-Node via a wrapper.
+      // WSL: hooks always supported; the runtime resolver probes the distro
+      // for an existing node and falls back to installing the pinned LTS if
+      // none is available. The actual install happens in `installPlugin`.
+      void ctx;
+      return true;
     },
     async isPluginInstalled(ctx) {
       return isGeminiPluginInstalled(ctx);
     },
     async installPlugin(ctx) {
-      const result = installGeminiPlugin(ctx);
+      const node = await resolveInstallNodePath(ctx);
+      if (!node.ok) return node;
+      const result = installGeminiPlugin(ctx, { resolvedNodePath: node.nodePath });
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },

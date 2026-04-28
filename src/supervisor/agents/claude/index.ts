@@ -3,7 +3,6 @@ import { randomUUID } from "node:crypto";
 import type { PromptSegment } from "@/shared/contracts";
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import {
-  batchWslCommandsAsync,
   createKnownSessionRef,
   detectAgentInstall,
   shortenHomePath,
@@ -12,7 +11,7 @@ import {
 } from "../base";
 import { buildClaudeArgs } from "./argv";
 import { claudeCapabilities, claudeDetectionSpec } from "./detection";
-import { warnIfPluginManifestMissing } from "../plugin/installerBase";
+import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
   getClaudePluginPaths,
   installClaudePlugin,
@@ -78,19 +77,21 @@ export function createClaudeAdapter(): AgentAdapter {
     pluginVersion: CLAUDE_PLUGIN_VERSION,
     minProtocolVersion: 1,
     async isPluginSupported(ctx) {
-      // The forwarder runs `node`, so we need a Node runtime to be available.
-      // For native Windows/macOS/Linux Claude this is implicit (the supervisor
-      // itself ships with Node). For WSL we have to actually probe the distro
-      // — common, but not guaranteed.
-      if (ctx.envKind !== "wsl" || !ctx.wslDistro) return true;
-      const [result] = await batchWslCommandsAsync(ctx.wslDistro, ["command -v node"]);
-      return Boolean(result?.ok && result.stdout.trim().length > 0);
+      // Native: forward.mjs runs under Electron-as-Node via a generated
+      // wrapper script — always supported.
+      // WSL: hooks always supported; the runtime resolver probes the distro
+      // for an existing node and falls back to installing the pinned LTS if
+      // none is available. The actual install happens in `installPlugin`.
+      void ctx;
+      return true;
     },
     async isPluginInstalled(ctx) {
       return isClaudePluginInstalled(ctx);
     },
     async installPlugin(ctx) {
-      const result = installClaudePlugin(ctx);
+      const node = await resolveInstallNodePath(ctx);
+      if (!node.ok) return node;
+      const result = installClaudePlugin(ctx, { resolvedNodePath: node.nodePath });
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },

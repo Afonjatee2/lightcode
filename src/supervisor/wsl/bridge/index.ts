@@ -1,16 +1,12 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import type { ChildProcess } from "node:child_process";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { type AgentEventEnvelope, agentEventEnvelopeSchema } from "@/shared/contracts/agentEvent";
-import { getWslCommand, quotePosixShellArg, resolveWslShellPathAsync } from "../../agents/base";
 import { isLightcodeHookDebug } from "../../runtime/hookDebug";
 import { deployFilesToWslHome, readBundledHelperVersion, resolveWslHelpersDir } from "../wslDeploy";
+import { resolveNodeForDistro, type ResolvedNode } from "../runtime";
 import { attachLineSplitter, spawnWslLineChild, type WslLineChildOpts } from "../wslChild";
-
-const execFileAsync = promisify(execFile);
 
 export type HookEventReceiver = (event: AgentEventEnvelope) => void;
 
@@ -30,10 +26,12 @@ export interface WslBridgeServerOptions {
    */
   spawn?: (opts: WslLineChildOpts) => ChildProcess;
   /**
-   * Test seam: replace the in-WSL `node` probe. Defaults to running
-   * `wsl.exe -d <distro> -- which node`.
+   * Test seam: replace the in-WSL Node resolver. Defaults to
+   * `resolveNodeForDistro` from `../runtime`. Returns null when no usable
+   * node is available (and no install fallback succeeded), in which case
+   * the bridge declines to start.
    */
-  probeNode?: (distro: string) => Promise<boolean>;
+  resolveNode?: (distro: string) => Promise<ResolvedNode | null>;
   /**
    * Test seam: replace the deploy step. Defaults to `deployFilesToWslHome`.
    */
@@ -195,13 +193,21 @@ export class WslBridgeServer {
       return undefined;
     }
 
-    const probe = this.options.probeNode ?? defaultProbeNode;
-    const hasNode = await probe(distro).catch(() => false);
-    if (!hasNode) {
+    const resolveNode = this.options.resolveNode ?? defaultResolveNode;
+    const resolved = await resolveNode(distro).catch((error) => {
+      if (isLightcodeHookDebug()) {
+        console.log("[supervisor] hook-debug: WSL node resolve failed", {
+          distro,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return null;
+    });
+    if (!resolved) {
       if (isLightcodeHookDebug()) {
         console.log("[supervisor] hook-debug: WSL bridge not started", {
           distro,
-          reason: "no `node` in distro (install Node or PATH it)",
+          reason: "no usable node in distro and runtime install failed",
         });
       }
       return undefined;
@@ -306,14 +312,14 @@ export class WslBridgeServer {
       }
     };
 
-    // Run through the user's actual login shell (bash / zsh / fish / …)
-    // so nvm / fnm / user PATH is sourced. `sh -lc` would miss `.bashrc`
-    // / `.zshrc` where nvm publishes `node`, giving false negatives.
-    const shellPath = await resolveWslShellPathAsync(distro).catch(() => "/bin/sh");
-    const shellScript = `exec node ${quotePosixShellArg(linuxScriptPath)}`;
+    // Use the resolved absolute node path directly — no shell wrapping
+    // needed because we don't depend on PATH lookup. This sidesteps the
+    // `/bin/sh: node: not found` failure mode when the user has nvm-only
+    // node and Claude (or wsl.exe under a sanitized env) doesn't source
+    // their shell init files.
     const childOpts: WslLineChildOpts = {
       distro,
-      argv: [shellPath, "-l", "-c", shellScript],
+      argv: [resolved.nodePath, linuxScriptPath],
       env: {
         LIGHTCODE_HOOK_SECRET: this.options.secret,
         LIGHTCODE_HOOK_PROTOCOL_VERSION: String(this.options.protocolVersion),
@@ -432,21 +438,14 @@ export class WslBridgeServer {
 }
 
 /**
- * Probe for `node` inside a distro via the user's actual login shell
- * (bash / zsh / fish / …) so nvm / fnm / user PATH is loaded. `sh -lc`
- * wouldn't source `.bashrc` / `.zshrc` where nvm publishes `node`, giving
- * a false negative.
+ * Default Node resolver: probes the distro for the user's nvm/system node,
+ * downloading the pinned LTS as a fallback. See `../runtime` for details.
+ * Returns null when both probe and install fail.
  */
-async function defaultProbeNode(distro: string): Promise<boolean> {
+async function defaultResolveNode(distro: string): Promise<ResolvedNode | null> {
   try {
-    const shellPath = await resolveWslShellPathAsync(distro).catch(() => "/bin/sh");
-    const { stdout } = await execFileAsync(
-      getWslCommand(),
-      ["-d", distro, "--", shellPath, "-l", "-c", "command -v node"],
-      { windowsHide: true, timeout: 5_000 },
-    );
-    return Boolean(stdout && stdout.trim().length > 0);
+    return await resolveNodeForDistro(distro);
   } catch {
-    return false;
+    return null;
   }
 }

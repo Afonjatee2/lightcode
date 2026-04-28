@@ -6,14 +6,18 @@ import type { AgentEnvContext } from "../../base";
 import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
 import {
   PLUGIN_ASSET_FILES,
+  buildWslHookCommandHead,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
+  getNativeHookWrapperFilename,
   getNativePluginBaseDir,
   getWslPluginBaseDirs,
+  hasNativeHookWrapper,
   isWslPluginContext,
   quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
+  writeNativeHookWrapper,
   type PluginManifest,
 } from "../../plugin/installerBase";
 
@@ -95,8 +99,18 @@ export function getGeminiPluginPaths(ctx?: AgentEnvContext): GeminiPluginPaths {
   };
 }
 
+export interface InstallGeminiPluginOptions {
+  /**
+   * Required for WSL contexts: absolute Linux path to the Node binary the
+   * staged hook command should use. Comes from `resolveNodeForDistro`.
+   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   */
+  resolvedNodePath?: string | undefined;
+}
+
 export function installGeminiPlugin(
   ctx?: AgentEnvContext,
+  options?: InstallGeminiPluginOptions,
 ): { ok: true; paths: GeminiPluginPaths; version: string } | { ok: false; reason: string } {
   let sourceDir: string;
   try {
@@ -113,19 +127,27 @@ export function installGeminiPlugin(
   }
 
   if (isWslPluginContext(ctx)) {
-    return installGeminiPluginWsl(ctx.wslDistro, sourceDir, manifest);
+    if (!options?.resolvedNodePath) {
+      return {
+        ok: false,
+        reason:
+          "WSL Gemini plugin install requires a resolved node path; the adapter must call resolveNodeForDistro before installing.",
+      };
+    }
+    return installGeminiPluginWsl(ctx.wslDistro, sourceDir, manifest, options.resolvedNodePath);
   }
 
   const pluginDir = getNativePluginBaseDir("gemini", ctx?.baseDir);
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir);
 
   const settingsPath = join(pluginDir, "settings.json");
-  const settings = renderGeminiSettings(pluginDir, "native");
+  const settings = renderGeminiSettings(quoteHookCommandArg(wrapperPath, "native"));
   writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 
   console.log(
-    `[supervisor] Gemini hook plugin staged v${manifest.version} at ${pluginDir} (forward.mjs, settings.json)`,
+    `[supervisor] Gemini hook plugin staged v${manifest.version} at ${pluginDir} (forward.mjs, ${getNativeHookWrapperFilename()}, settings.json)`,
   );
 
   return {
@@ -139,6 +161,7 @@ function installGeminiPluginWsl(
   distro: string,
   sourceDir: string,
   manifest: PluginManifest,
+  resolvedNodePath: string,
 ): { ok: true; paths: GeminiPluginPaths; version: string } | { ok: false; reason: string } {
   const deploy = deployFilesToWslHome(
     distro,
@@ -153,11 +176,13 @@ function installGeminiPluginWsl(
 
   const linuxPluginDir = `${deploy.linuxBaseDir}/agent-plugins/gemini`;
   const linuxSettingsPath = `${linuxPluginDir}/settings.json`;
+  const linuxForwardPath = `${linuxPluginDir}/forward.mjs`;
   const uncSettingsPath = toWslUncPath(distro, linuxSettingsPath);
+  const headExpression = buildWslHookCommandHead(resolvedNodePath, linuxForwardPath);
 
   try {
     mkdirSync(dirname(uncSettingsPath), { recursive: true });
-    const settings = renderGeminiSettings(linuxPluginDir, "wsl");
+    const settings = renderGeminiSettings(headExpression);
     writeFileSync(uncSettingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
   } catch (error) {
     return {
@@ -190,15 +215,19 @@ export function isGeminiPluginInstalled(ctx?: AgentEnvContext): {
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "gemini");
     if (!wsl) return { installed: false };
-    return verifyGeminiInstallAt(wsl.uncBase);
+    return verifyGeminiInstallAt(wsl.uncBase, "wsl");
   }
-  return verifyGeminiInstallAt(getNativePluginBaseDir("gemini", ctx?.baseDir));
+  return verifyGeminiInstallAt(getNativePluginBaseDir("gemini", ctx?.baseDir), "native");
 }
 
-function verifyGeminiInstallAt(readableDir: string): { installed: boolean; version?: string } {
+function verifyGeminiInstallAt(
+  readableDir: string,
+  target: "native" | "wsl",
+): { installed: boolean; version?: string } {
   if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
   if (!existsSync(join(readableDir, "settings.json"))) return { installed: false };
+  if (!hasNativeHookWrapper(readableDir, target)) return { installed: false };
   try {
     const settings = JSON.parse(readFileSync(join(readableDir, "settings.json"), "utf8")) as {
       hooks?: Record<string, unknown>;
@@ -210,6 +239,13 @@ function verifyGeminiInstallAt(readableDir: string): { installed: boolean; versi
     return { installed: false };
   }
 }
+
+/**
+ * Match either the WSL command shape (`forward.mjs` invoked via absolute
+ * node path) or the native shape (`lightcode-hook.{sh,cmd}` wrapper).
+ */
+const LIGHTCODE_GEMINI_HOOK_RE =
+  /agent-plugins(?:[/\\]+)gemini(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd))/;
 
 function hasGeminiHooks(hooks: Record<string, unknown> | undefined): boolean {
   if (!hooks) return false;
@@ -223,10 +259,7 @@ function hasGeminiHooks(hooks: Record<string, unknown> | undefined): boolean {
       return hookEntries.some((hook) => {
         if (!hook || typeof hook !== "object") return false;
         const command = (hook as { command?: unknown }).command;
-        return (
-          typeof command === "string" &&
-          /agent-plugins(?:[/\\]+)gemini(?:[/\\]+)forward\.mjs/.test(command)
-        );
+        return typeof command === "string" && LIGHTCODE_GEMINI_HOOK_RE.test(command);
       });
     });
     if (!found) return false;
@@ -234,9 +267,7 @@ function hasGeminiHooks(hooks: Record<string, unknown> | undefined): boolean {
   return true;
 }
 
-export function renderGeminiSettings(pluginDir: string, target: "native" | "wsl"): GeminiSettings {
-  const forwardPath =
-    target === "wsl" ? `${pluginDir}/forward.mjs` : join(pluginDir, "forward.mjs");
+export function renderGeminiSettings(headExpression: string): GeminiSettings {
   const hooks: Record<string, GeminiHookEntry[]> = {};
   for (const spec of GEMINI_HOOK_SPECS) {
     const entry: GeminiHookEntry = {
@@ -244,14 +275,12 @@ export function renderGeminiSettings(pluginDir: string, target: "native" | "wsl"
         {
           name: `lightcode-status-${spec.event}`,
           type: "command",
-          command: `node ${quoteHookCommandArg(forwardPath, target)} ${spec.event}`,
+          command: `${headExpression} ${spec.event}`,
           timeout: 5000,
         },
       ],
     };
-    if (spec.matcher !== undefined) {
-      entry.matcher = spec.matcher;
-    }
+    if (spec.matcher !== undefined) entry.matcher = spec.matcher;
     hooks[spec.event] = [entry];
   }
   return { hooksConfig: { notifications: false }, hooks };

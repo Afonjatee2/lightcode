@@ -11,7 +11,7 @@ import {
 import { buildCodexArgvFor } from "./argv";
 import { codexDefaultCapabilities, codexDetectionSpec } from "./detection";
 import { detectRateLimitPrompt } from "./rateLimitPrompt";
-import { warnIfPluginManifestMissing } from "../plugin/installerBase";
+import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
   getCodexPluginPaths,
   installCodexPlugin,
@@ -118,18 +118,11 @@ export function createCodexAdapter(): AgentAdapter {
     pluginVersion: CODEX_PLUGIN_VERSION,
     minProtocolVersion: 1,
     async isPluginSupported(ctx) {
+      // Node availability is now handled by the runtime resolver during
+      // installPlugin (probe-first with auto-install fallback). We only
+      // gate hook support on the codex CLI version itself.
       if (ctx.envKind === "wsl" && ctx.wslDistro) {
-        const [nodeOk, verOut] = await batchWslCommandsAsync(ctx.wslDistro, [
-          "command -v node",
-          "codex --version",
-        ]);
-        if (!nodeOk?.ok) {
-          console.warn(
-            `[codex] WSL hook plugin unsupported in distro ${ctx.wslDistro}: ` +
-              "Node.js is not available in the login-shell PATH",
-          );
-          return false;
-        }
+        const [verOut] = await batchWslCommandsAsync(ctx.wslDistro, ["codex --version"]);
         const versionLine =
           verOut?.stdout
             .split("\n")
@@ -153,7 +146,9 @@ export function createCodexAdapter(): AgentAdapter {
       return isCodexPluginInstalled(ctx);
     },
     async installPlugin(ctx) {
-      const result = installCodexPlugin(ctx);
+      const node = await resolveInstallNodePath(ctx);
+      if (!node.ok) return node;
+      const result = installCodexPlugin(ctx, { resolvedNodePath: node.nodePath });
       if (!result.ok) return result;
       return { ok: true, version: result.version };
     },

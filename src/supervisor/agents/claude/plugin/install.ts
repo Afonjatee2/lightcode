@@ -6,14 +6,18 @@ import type { AgentEnvContext } from "../../base";
 import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
 import {
   PLUGIN_ASSET_FILES,
+  buildWslHookCommandHead,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
+  getNativeHookWrapperFilename,
   getNativePluginBaseDir,
   getWslPluginBaseDirs,
+  hasNativeHookWrapper,
   isWslPluginContext,
   quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
+  writeNativeHookWrapper,
   type PluginManifest,
 } from "../../plugin/installerBase";
 
@@ -112,8 +116,19 @@ export function getClaudePluginPaths(ctx?: AgentEnvContext): ClaudePluginPaths {
  * staged into the distro's `~/.lightcode/agent-plugins/claude/` via the
  * shared `deployFilesToWslHome` helper.
  */
+export interface InstallClaudePluginOptions {
+  /**
+   * Required for WSL contexts: absolute Linux path to the Node binary the
+   * staged hook command should use. Comes from `resolveNodeForDistro`,
+   * which the adapter is expected to call before installing the plugin.
+   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   */
+  resolvedNodePath?: string | undefined;
+}
+
 export function installClaudePlugin(
   ctx?: AgentEnvContext,
+  options?: InstallClaudePluginOptions,
 ): { ok: true; paths: ClaudePluginPaths; version: string } | { ok: false; reason: string } {
   let sourceDir: string;
   try {
@@ -130,22 +145,30 @@ export function installClaudePlugin(
   }
 
   if (isWslPluginContext(ctx)) {
-    return installClaudePluginWsl(ctx.wslDistro, sourceDir, manifest);
+    if (!options?.resolvedNodePath) {
+      return {
+        ok: false,
+        reason:
+          "WSL Claude plugin install requires a resolved node path; the adapter must call resolveNodeForDistro before installing.",
+      };
+    }
+    return installClaudePluginWsl(ctx.wslDistro, sourceDir, manifest, options.resolvedNodePath);
   }
 
   const pluginDir = getNativePluginBaseDir("claude", ctx?.baseDir);
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir);
 
   const settingsPath = join(pluginDir, "settings.json");
-  const settings = renderClaudeSettings(pluginDir, "native");
+  const settings = renderClaudeSettings(quoteHookCommandArg(wrapperPath, "native"));
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
   const hooksPath = join(pluginDir, "hooks", "hooks.json");
   mkdirSync(dirname(hooksPath), { recursive: true });
   writeFileSync(hooksPath, JSON.stringify(settings, null, 2), "utf8");
 
   console.log(
-    `[supervisor] Claude hook plugin staged v${manifest.version} at ${pluginDir} (forward.mjs, settings.json, hooks/hooks.json)`,
+    `[supervisor] Claude hook plugin staged v${manifest.version} at ${pluginDir} (forward.mjs, ${getNativeHookWrapperFilename()}, settings.json, hooks/hooks.json)`,
   );
 
   return {
@@ -159,6 +182,7 @@ function installClaudePluginWsl(
   distro: string,
   sourceDir: string,
   manifest: PluginManifest,
+  resolvedNodePath: string,
 ): { ok: true; paths: ClaudePluginPaths; version: string } | { ok: false; reason: string } {
   const deploy = deployFilesToWslHome(
     distro,
@@ -173,14 +197,13 @@ function installClaudePluginWsl(
 
   const linuxPluginDir = `${deploy.linuxBaseDir}/agent-plugins/claude`;
   const linuxSettingsPath = `${linuxPluginDir}/settings.json`;
+  const linuxForwardPath = `${linuxPluginDir}/forward.mjs`;
+  const headExpression = buildWslHookCommandHead(resolvedNodePath, linuxForwardPath);
 
-  // The settings.json itself lives inside the distro alongside the plugin so
-  // Claude reads it from a Linux-side path. We write it via the same UNC
-  // path the deploy helper uses.
   const uncSettingsPath = toWslUncPath(distro, linuxSettingsPath);
   try {
     mkdirSync(dirname(uncSettingsPath), { recursive: true });
-    const settings = renderClaudeSettings(linuxPluginDir, "wsl");
+    const settings = renderClaudeSettings(headExpression);
     writeFileSync(uncSettingsPath, JSON.stringify(settings, null, 2), "utf8");
     const uncHooksPath = toWslUncPath(distro, `${linuxPluginDir}/hooks/hooks.json`);
     mkdirSync(dirname(uncHooksPath), { recursive: true });
@@ -195,7 +218,7 @@ function installClaudePluginWsl(
   }
 
   console.log(
-    `[supervisor] Claude hook plugin staged v${manifest.version} in WSL distro ${distro} at ${linuxPluginDir} (forward.mjs, settings.json, hooks/hooks.json)`,
+    `[supervisor] Claude hook plugin staged v${manifest.version} in WSL distro ${distro} at ${linuxPluginDir} (forward.mjs, settings.json, hooks/hooks.json) using node=${resolvedNodePath}`,
   );
 
   return {
@@ -220,16 +243,20 @@ export function isClaudePluginInstalled(ctx?: AgentEnvContext): {
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "claude");
     if (!wsl) return { installed: false };
-    return verifyClaudeInstallAt(wsl.uncBase);
+    return verifyClaudeInstallAt(wsl.uncBase, "wsl");
   }
-  return verifyClaudeInstallAt(getNativePluginBaseDir("claude", ctx?.baseDir));
+  return verifyClaudeInstallAt(getNativePluginBaseDir("claude", ctx?.baseDir), "native");
 }
 
-function verifyClaudeInstallAt(readableDir: string): { installed: boolean; version?: string } {
+function verifyClaudeInstallAt(
+  readableDir: string,
+  target: "native" | "wsl",
+): { installed: boolean; version?: string } {
   if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
   if (!existsSync(join(readableDir, "hooks", "hooks.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "settings.json"))) return { installed: false };
+  if (!hasNativeHookWrapper(readableDir, target)) return { installed: false };
   try {
     const version = readPluginManifest(readableDir).version;
     return { installed: true, version };
@@ -310,27 +337,18 @@ function claudeHookSpecsForInstall(): ReadonlyArray<{ event: string; matcher?: s
 }
 
 /**
- * Build the Claude `--settings` document. We embed the staged `forward.mjs`
- * path directly so that Claude can spawn it without needing
- * `LIGHTCODE_PLUGIN_DIR` to be present in its env. The same object is written
- * to `hooks/hooks.json` after install so diagnostics match what Claude loads.
+ * Build the Claude `--settings` document. `headExpression` is the fully
+ * quoted command prefix to which we append ` <event>` per hook — caller
+ * decides whether that's a native wrapper path or a WSL `<node> <fwd>`
+ * pair.
  */
-function renderClaudeSettings(pluginDir: string, target: "native" | "wsl"): ClaudeSettings {
-  const forwardPath =
-    target === "wsl" ? `${pluginDir}/forward.mjs` : join(pluginDir, "forward.mjs");
+function renderClaudeSettings(headExpression: string): ClaudeSettings {
   const hooks: Record<string, ClaudeHookEntry[]> = {};
   for (const spec of claudeHookSpecsForInstall()) {
     const entry: ClaudeHookEntry = {
-      hooks: [
-        {
-          type: "command",
-          command: `node ${quoteHookCommandArg(forwardPath, target)} ${spec.event}`,
-        },
-      ],
+      hooks: [{ type: "command", command: `${headExpression} ${spec.event}` }],
     };
-    if (spec.matcher !== undefined) {
-      entry.matcher = spec.matcher;
-    }
+    if (spec.matcher !== undefined) entry.matcher = spec.matcher;
     hooks[spec.event] = [entry];
   }
   return { hooks, preferredNotifChannel: "iterm2" };

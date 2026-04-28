@@ -73,6 +73,17 @@ The codebase is provider-agnostic by design (targeting 5-10 providers). Each pro
 - Shell detection (`resolveWslShellPath`) is cached per distro with `/bin/sh` fallback.
 - Agent install detection runs per-environment (Windows and each active WSL distro independently).
 
+## Hook Runtime Resolution
+
+Hooks (Claude/Codex/Gemini `forward.mjs` + the WSL `bridge.mjs`) need a Node binary they can invoke by absolute path. `/bin/sh -c` doesn't source nvm, so a bare `node` token in a hook command fails for nvm-only users — the resolver in `src/supervisor/wsl/runtime/index.ts` prevents that:
+
+- **Native (mac/win/linux):** `installerBase.writeNativeHookWrapper` generates `lightcode-hook.{sh,cmd}` next to `forward.mjs` at install time. The wrapper sets `ELECTRON_RUN_AS_NODE=1` and execs lightcode's own Electron binary on `forward.mjs` — no user-installed node required.
+- **WSL — probe first:** `resolveNodeForDistro(distro)` runs `command -v node && node --version` through the user's login shell (`batchWslCommandsAsync` already does `-l -i`). If the result is ≥ Node 22, the absolute path is baked into hook commands. Cached for the supervisor lifetime; cleared on restart.
+- **WSL — install fallback:** If no acceptable node is found, the resolver downloads the pinned LTS tarball from `nodejs.org/dist/`, verifies SHA256 against checksums in `NODE_TARBALL_CHECKSUMS`, and extracts inside the distro via `tar -xJf`. Glibc only — Alpine/musl users are expected to have `apk add nodejs` installed (probe finds it).
+- **Bumping pinned Node:** edit `LIGHTCODE_PINNED_NODE_VERSION`, then run `pnpm tsx scripts/refresh-node-checksums.mjs` to populate checksums from the official SHASUMS.
+
+Adapters' `installPlugin` resolves the node path via `resolveInstallNodePath(ctx)` from `installerBase`; provider-specific install code then bakes that path (or the wrapper path) into the rendered hook command.
+
 ## Capability-Based UI
 
 The UI only shows controls that the agent's `capabilities` object declares. Do not show fake controls for features a CLI cannot support (e.g. no effort selector for Gemini, no sandbox modes for Claude).

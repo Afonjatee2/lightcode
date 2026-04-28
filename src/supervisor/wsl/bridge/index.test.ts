@@ -65,7 +65,11 @@ function makeStubbedManager(opts: {
     onEvent: opts.onEvent,
     secret: "topsecret",
     protocolVersion: 1,
-    probeNode: async () => true,
+    resolveNode: async () => ({
+      nodePath: "/usr/bin/node",
+      nodeVersion: "22.11.0",
+      source: "user-installed",
+    }),
     deploy: () => ({ home: "/home/me", linuxBaseDir: "/home/me/.lightcode" }),
     spawn: () => {
       if (opts.spawnsRef) opts.spawnsRef.count += 1;
@@ -152,7 +156,7 @@ describe("WslBridgeServer", () => {
       onEvent: () => undefined,
       secret: "s",
       protocolVersion: 1,
-      probeNode: async () => false,
+      resolveNode: async () => null,
       deploy: () => ({ home: "/h", linuxBaseDir: "/h/.lightcode" }),
       spawn: () => {
         throw new Error("should not spawn");
@@ -169,7 +173,11 @@ describe("WslBridgeServer", () => {
       onEvent: () => undefined,
       secret: "s",
       protocolVersion: 1,
-      probeNode: async () => true,
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "22.11.0",
+        source: "user-installed",
+      }),
       deploy: () => null,
       spawn: () => {
         throw new Error("should not spawn");
@@ -213,7 +221,11 @@ describe("WslBridgeServer", () => {
       onError: () => undefined,
       secret: "s",
       protocolVersion: 1,
-      probeNode: async () => true,
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "22.11.0",
+        source: "user-installed",
+      }),
       deploy: () => ({ home: "/h", linuxBaseDir: "/h/.lightcode" }),
       spawn: () => {
         // Schedule the early exit AFTER spawn returns so the manager has
@@ -244,7 +256,11 @@ describe("WslBridgeServer", () => {
       onError: () => undefined,
       secret: "s",
       protocolVersion: 1,
-      probeNode: async () => true,
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "22.11.0",
+        source: "user-installed",
+      }),
       deploy: () => ({ home: "/h", linuxBaseDir: "/h/.lightcode" }),
       spawn: () => {
         const child = new FakeChild();
@@ -281,7 +297,11 @@ describe("WslBridgeServer", () => {
       onError: () => undefined,
       secret: "s",
       protocolVersion: 1,
-      probeNode: async () => true,
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "22.11.0",
+        source: "user-installed",
+      }),
       deploy: () => ({ home: "/h", linuxBaseDir: "/h/.lightcode" }),
       spawn: () => {
         const child = new FakeChild();
@@ -314,7 +334,11 @@ describe("WslBridgeServer", () => {
       onError: () => undefined,
       secret: "s",
       protocolVersion: 1,
-      probeNode: async () => true,
+      resolveNode: async () => ({
+        nodePath: "/usr/bin/node",
+        nodeVersion: "22.11.0",
+        source: "user-installed",
+      }),
       deploy: () => ({ home: "/h", linuxBaseDir: "/h/.lightcode" }),
       spawn: () => {
         const child = new FakeChild();

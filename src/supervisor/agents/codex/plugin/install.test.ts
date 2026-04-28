@@ -12,8 +12,22 @@ import {
 const forwardPath = "C:\\Users\\demo\\.lightcode\\agent-plugins\\codex\\forward.mjs";
 const forwardPathUnix = "/home/demo/.lightcode/agent-plugins/codex/forward.mjs";
 
-function lightcodeCommand(fp: string, event: string): string {
-  return `node ${JSON.stringify(fp)} ${event}`;
+/**
+ * Test helpers build a `commandHead` matching one of the two shapes
+ * `mergeCodexHooksDocument` accepts: WSL (`<node-path> <forward-mjs-path>`)
+ * or native (`<wrapper-path>`). The merger doesn't care which shape it
+ * gets — it just appends ` <event>`.
+ */
+function wslCommandHead(fp: string): string {
+  return `${JSON.stringify("/home/demo/.nvm/versions/node/v22.11.0/bin/node")} ${JSON.stringify(fp)}`;
+}
+
+function nativeCommandHead(wrapperPath: string): string {
+  return JSON.stringify(wrapperPath);
+}
+
+function commandFor(head: string, event: string): string {
+  return `${head} ${event}`;
 }
 
 describe("getCodexPluginPaths", () => {
@@ -51,8 +65,9 @@ describe("parseCodexVersionLine + isCodexSemverSupportedForHooks", () => {
 });
 
 describe("mergeCodexHooksDocument", () => {
-  it("creates only Lightcode entries when hooks.json was absent", () => {
-    const doc = mergeCodexHooksDocument(null, forwardPath);
+  it("creates only Lightcode entries when hooks.json was absent (WSL shape)", () => {
+    const head = wslCommandHead(forwardPath);
+    const doc = mergeCodexHooksDocument(null, head);
     expect(Object.keys(doc.hooks)).toEqual([
       "SessionStart",
       "UserPromptSubmit",
@@ -64,10 +79,11 @@ describe("mergeCodexHooksDocument", () => {
     const stop = doc.hooks.Stop as unknown[];
     expect(stop).toHaveLength(1);
     const stopHook = (stop[0] as { hooks: { command: string }[] }).hooks[0];
-    expect(stopHook?.command).toBe(lightcodeCommand(forwardPath, "Stop"));
+    expect(stopHook?.command).toBe(commandFor(head, "Stop"));
   });
 
   it("preserves user matcher groups and appends Lightcode", () => {
+    const head = wslCommandHead(forwardPath);
     const userGroup = {
       matcher: "*",
       hooks: [{ type: "command", command: "node user-script.js" }],
@@ -78,15 +94,16 @@ describe("mergeCodexHooksDocument", () => {
         SessionStart: [],
       },
     };
-    const doc = mergeCodexHooksDocument(existing, forwardPath);
+    const doc = mergeCodexHooksDocument(existing, head);
     const stop = doc.hooks.Stop as unknown[];
     expect(stop).toHaveLength(2);
     expect(stop[0]).toEqual(userGroup);
     const lc = (stop[1] as { hooks: { command: string }[] }).hooks[0];
-    expect(lc?.command).toBe(lightcodeCommand(forwardPath, "Stop"));
+    expect(lc?.command).toBe(commandFor(head, "Stop"));
   });
 
   it("prunes stale Lightcode groups by forward.mjs path fingerprint and replaces", () => {
+    const head = wslCommandHead(forwardPath);
     const stale = {
       hooks: [
         {
@@ -96,16 +113,37 @@ describe("mergeCodexHooksDocument", () => {
       ],
     };
     const existing = { hooks: { Stop: [stale] } };
-    const doc = mergeCodexHooksDocument(existing, forwardPath);
+    const doc = mergeCodexHooksDocument(existing, head);
     const stop = doc.hooks.Stop as unknown[];
     expect(stop).toHaveLength(1);
     const h = (stop[0] as { hooks: { command: string }[] }).hooks[0];
-    expect(h?.command).toBe(lightcodeCommand(forwardPath, "Stop"));
+    expect(h?.command).toBe(commandFor(head, "Stop"));
   });
 
-  it("is idempotent when re-run with the same forward path", () => {
-    const first = mergeCodexHooksDocument(null, forwardPathUnix);
-    const second = mergeCodexHooksDocument(first, forwardPathUnix);
+  it("prunes stale Lightcode groups by native wrapper fingerprint", () => {
+    const head = nativeCommandHead(
+      "C:\\Users\\demo\\.lightcode\\agent-plugins\\codex\\lightcode-hook.cmd",
+    );
+    const stale = {
+      hooks: [
+        {
+          type: "command",
+          command: `"C:\\old\\.lightcode\\agent-plugins\\codex\\lightcode-hook.cmd" Stop`,
+        },
+      ],
+    };
+    const existing = { hooks: { Stop: [stale] } };
+    const doc = mergeCodexHooksDocument(existing, head);
+    const stop = doc.hooks.Stop as unknown[];
+    expect(stop).toHaveLength(1);
+    const h = (stop[0] as { hooks: { command: string }[] }).hooks[0];
+    expect(h?.command).toBe(commandFor(head, "Stop"));
+  });
+
+  it("is idempotent when re-run with the same command head", () => {
+    const head = wslCommandHead(forwardPathUnix);
+    const first = mergeCodexHooksDocument(null, head);
+    const second = mergeCodexHooksDocument(first, head);
     expect(second).toEqual(first);
   });
 
