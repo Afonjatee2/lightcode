@@ -84,7 +84,7 @@ function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
     return configuredBypass;
   }
 
-  const preferredIds = new Set(["never", "yolo", "bypassPermissions", "dontAsk"]);
+  const preferredIds = new Set(["never", "yolo", "auto", "bypassPermissions", "dontAsk"]);
   const byId = policies.find((policy) => preferredIds.has(policy.id));
   if (byId) {
     return byId.id;
@@ -216,7 +216,7 @@ export function ThreadDraftView(props: {
   const setProviderConfig = useSharedSettings((s) => s.setProviderConfig);
   const providerConfigs = useSharedSettings((s) => s.providerConfigs);
   const providerConfigsRef = useRef<Record<string, ProviderDraftConfig>>({});
-  providerConfigsRef.current = { ...providerConfigs };
+  providerConfigsRef.current = providerConfigs;
 
   // --- Draft preservation: save on unmount, restore on mount ---
   const saveDraftContent = useAppStore((s) => s.saveDraftContent);

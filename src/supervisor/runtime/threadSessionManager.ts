@@ -284,16 +284,6 @@ export class ThreadSessionManager {
         ? { ...payload.config, mode: undefined }
         : payload.config;
 
-    if (
-      session.adapter.capabilities.liveInputMode !== "server" &&
-      session.canResumeWithConfig &&
-      !isThreadConfigEqual(session.config, effectiveConfig) &&
-      session.sessionRef
-    ) {
-      await this.restartThread(session, prompt, effectiveConfig);
-      return;
-    }
-
     session.config = effectiveConfig;
     if (
       session.adapter.capabilities.liveInputMode === "server" &&

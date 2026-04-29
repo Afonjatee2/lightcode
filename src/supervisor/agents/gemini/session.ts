@@ -1,9 +1,7 @@
 import type { ProjectLocation } from "@/shared/contracts";
 import { getProjectName } from "@/shared/wsl";
 import {
-  buildAgentCommand,
-  readCommandOutputAsync,
-  readWslLoginShellCommandOutputAsync,
+  readAgentCommandOutput,
   resolveAgentHomeSubpath,
   resolveExecutablePathAsync,
 } from "../base";
@@ -26,31 +24,20 @@ export function detectGeminiInvalidSessionRef(output: string): boolean {
 }
 
 export async function queryLatestSessionId(location: ProjectLocation): Promise<string | undefined> {
-  let output: string | undefined;
-  if (location.kind === "wsl") {
-    const executablePath = resolveAgentBinaryPath(location, "gemini") ?? "gemini";
-    const result = await readWslLoginShellCommandOutputAsync(
-      location.distro,
-      location.linuxPath,
-      executablePath,
-      ["--list-sessions"],
-    );
-    if (!result.ok) console.log("[gemini] --list-sessions (wsl) failed: %s", result.stderr);
-    output = result.ok ? result.stdout : undefined;
-  } else if (location.kind === "windows" || location.kind === "posix") {
-    const executablePath = await resolveExecutablePathAsync("gemini");
-    if (!executablePath) return undefined;
-    const spec = buildAgentCommand(location, executablePath, ["--list-sessions"]);
-    const result = await readCommandOutputAsync(
-      spec.command,
-      spec.args,
-      spec.cwd ? { cwd: spec.cwd } : undefined,
-    );
-    if (!result.ok) return undefined;
-    output = result.stdout || undefined;
+  const executablePath =
+    location.kind === "wsl"
+      ? (resolveAgentBinaryPath(location, "gemini") ?? "gemini")
+      : await resolveExecutablePathAsync("gemini");
+  if (!executablePath) return undefined;
+  const result = await readAgentCommandOutput(location, executablePath, ["--list-sessions"]);
+  if (!result.ok) {
+    if (location.kind === "wsl") {
+      console.log("[gemini] --list-sessions (wsl) failed: %s", result.stderr);
+    }
+    return undefined;
   }
-  if (!output) return undefined;
-  const ids = parseAllSessionIds(output);
+  if (!result.stdout) return undefined;
+  const ids = parseAllSessionIds(result.stdout);
   return ids[ids.length - 1];
 }
 

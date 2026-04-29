@@ -1,5 +1,9 @@
 import type { AgentCapability } from "@/shared/contracts";
 import { cliSubcommandAuthProbe, type DetectionSpec } from "../base";
+import { probeClaudeCapabilities } from "./probe";
+
+/** Default `--permission-mode` when `ThreadConfig.approvalPolicy` is omitted. */
+export const CLAUDE_DEFAULT_APPROVAL_POLICY = "auto" as const;
 
 export const claudeCapabilities: AgentCapability = {
   models: [
@@ -18,7 +22,7 @@ export const claudeCapabilities: AgentCapability = {
   modes: ["agent", "plan"],
   approvalPolicies: [
     { id: "default", label: "Default" },
-
+    { id: "auto", label: "Auto mode" },
     { id: "acceptEdits", label: "Accept Edits" },
     { id: "dontAsk", label: "Don't Ask" },
     { id: "bypassPermissions", label: "Bypass Permissions" },
@@ -28,7 +32,7 @@ export const claudeCapabilities: AgentCapability = {
   supportsDirectInput: true,
   liveInputMode: "terminal",
   presentationMode: "terminal",
-  bypassApprovalPolicy: "bypassPermissions",
+  bypassApprovalPolicy: CLAUDE_DEFAULT_APPROVAL_POLICY,
   settingDefs: [
     {
       key: "usePowershellTool",
@@ -68,4 +72,5 @@ export const claudeDetectionSpec: DetectionSpec = {
   binary: "claude",
   capabilities: claudeCapabilities,
   authProbes: [cliSubcommandAuthProbe(["auth", "status"])],
+  capabilitiesProbe: (ctx) => probeClaudeCapabilities(ctx),
 };

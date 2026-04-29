@@ -106,6 +106,12 @@ export const MentionInput = forwardRef<
     onTextChange: (hasText: boolean) => void;
     onSubmit: (segments: PromptSegment[]) => void;
     onPasteImage?: (file: File) => void;
+    /**
+     * Called before MentionInput's own key handling (after the mention popover
+     * absorbs navigation keys). Return `true` to indicate the key was handled
+     * and stop further processing.
+     */
+    onInterceptKey?: (e: React.KeyboardEvent<HTMLDivElement>) => boolean;
   }
 >(function MentionInput(props, ref) {
   const {
@@ -118,6 +124,7 @@ export const MentionInput = forwardRef<
     onTextChange,
     onSubmit,
     onPasteImage,
+    onInterceptKey,
   } = props;
   const editorRef = useRef<HTMLDivElement>(null);
   const [mention, setMention] = useState<MentionState | null>(null);
@@ -261,6 +268,8 @@ export const MentionInput = forwardRef<
         return;
       }
     }
+
+    if (onInterceptKey?.(e)) return;
 
     // Enter without popover = submit
     if (e.key === "Enter" && !e.shiftKey) {

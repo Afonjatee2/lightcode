@@ -14,8 +14,10 @@ import {
   copyPluginAssetFile,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
+  ctxCacheKey,
   isPluginAssetsFresh,
   isWslPluginContext,
+  memoByCtx,
   PLUGIN_ASSET_FILES,
   quoteHookCommandArg,
   readBundledPluginVersion,
@@ -248,5 +250,73 @@ describe("warnIfPluginManifestMissing", () => {
   it("appends the dev hint when provided", () => {
     warnIfPluginManifestMissing("test", "0.0.0", "Expected at src/...");
     expect(String(calls[0]?.[0])).toContain("Expected at src/...");
+  });
+});
+
+describe("memoByCtx", () => {
+  it("calls the underlying fn once per unique key", () => {
+    let calls = 0;
+    const memo = memoByCtx(
+      (n: number) => {
+        calls += 1;
+        return n * 2;
+      },
+      (n) => String(n),
+    );
+
+    expect(memo.call(3)).toBe(6);
+    expect(memo.call(3)).toBe(6);
+    expect(calls).toBe(1);
+
+    expect(memo.call(4)).toBe(8);
+    expect(calls).toBe(2);
+
+    expect(memo.call(3)).toBe(6);
+    expect(calls).toBe(2);
+  });
+
+  it("returns the same reference across calls (cached object identity)", () => {
+    const memo = memoByCtx((n: number) => ({ value: n * 2 }), String);
+    const a = memo.call(3);
+    const b = memo.call(3);
+    expect(a).toBe(b);
+  });
+
+  it("invalidate clears the entry so the next call recomputes", () => {
+    let calls = 0;
+    const memo = memoByCtx((n: number) => {
+      calls += 1;
+      return n;
+    }, String);
+    memo.call(1);
+    memo.call(1);
+    expect(calls).toBe(1);
+    memo.invalidate(1);
+    memo.call(1);
+    expect(calls).toBe(2);
+  });
+
+  it("clear empties the cache", () => {
+    let calls = 0;
+    const memo = memoByCtx((n: number) => {
+      calls += 1;
+      return n;
+    }, String);
+    memo.call(1);
+    memo.call(2);
+    expect(calls).toBe(2);
+    memo.clear();
+    memo.call(1);
+    memo.call(2);
+    expect(calls).toBe(4);
+  });
+});
+
+describe("ctxCacheKey", () => {
+  it("produces a stable string per (envKind, wslDistro, baseDir) tuple", () => {
+    expect(ctxCacheKey({ envKind: "windows" })).toBe("windows||");
+    expect(ctxCacheKey({ envKind: "windows", baseDir: "/tmp/a" })).toBe("windows||/tmp/a");
+    expect(ctxCacheKey({ envKind: "wsl", wslDistro: "Ubuntu" })).toBe("wsl|Ubuntu|");
+    expect(ctxCacheKey(undefined)).toBe("no-ctx");
   });
 });

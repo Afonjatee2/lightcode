@@ -16,3 +16,4 @@ export * from "./copilot";
 export * from "./codex";
 export * from "./gemini";
 export * from "./cursor";
+export * from "./opencode";

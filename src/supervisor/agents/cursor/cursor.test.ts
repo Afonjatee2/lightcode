@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isCursorSemverSupportedForHooks, parseCursorVersionLine } from "./detection";
 import {
   buildCursorProbeSpec,
   createCursorAdapter,
@@ -251,6 +252,35 @@ describe("sortCursorModels", () => {
       "GPT-5.1 Codex Max Medium", // was "GPT-5.1 Codex Max"
       "GPT-5.1 Codex Max Low",
     ]);
+  });
+});
+
+describe("parseCursorVersionLine", () => {
+  it("extracts semver from common cursor-agent --version output shapes", () => {
+    expect(parseCursorVersionLine("1.7.0")).toEqual([1, 7, 0]);
+    expect(parseCursorVersionLine("cursor-agent 1.7.2")).toEqual([1, 7, 2]);
+    expect(parseCursorVersionLine("Cursor CLI v2.0.10\n")).toEqual([2, 0, 10]);
+    expect(parseCursorVersionLine("[32m1.8.3[0m")).toEqual([1, 8, 3]);
+  });
+
+  it("returns null for unparseable output", () => {
+    expect(parseCursorVersionLine("")).toBeNull();
+    expect(parseCursorVersionLine("not a version")).toBeNull();
+    expect(parseCursorVersionLine("v1.7")).toBeNull();
+  });
+});
+
+describe("isCursorSemverSupportedForHooks", () => {
+  it("requires >= 1.7.0", () => {
+    expect(isCursorSemverSupportedForHooks([1, 7, 0])).toBe(true);
+    expect(isCursorSemverSupportedForHooks([1, 7, 5])).toBe(true);
+    expect(isCursorSemverSupportedForHooks([2, 0, 0])).toBe(true);
+    expect(isCursorSemverSupportedForHooks([1, 6, 999])).toBe(false);
+    expect(isCursorSemverSupportedForHooks([0, 99, 99])).toBe(false);
+  });
+
+  it("returns false for null", () => {
+    expect(isCursorSemverSupportedForHooks(null)).toBe(false);
   });
 });
 

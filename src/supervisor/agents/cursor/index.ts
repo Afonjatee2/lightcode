@@ -1,12 +1,42 @@
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
-import { createKnownSessionRef, detectAgentInstall, type AgentAdapter } from "../base";
+import {
+  createKnownSessionRef,
+  detectAgentInstall,
+  type AgentAdapter,
+  type TerminalStatusHint,
+} from "../base";
+import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildCursorArgs } from "./argv";
-import { cursorDefaultCapabilities, cursorDetectionSpec } from "./detection";
+import {
+  cursorDefaultCapabilities,
+  cursorDetectionSpec,
+  isCursorVersionSupportedForHooks,
+} from "./detection";
+import {
+  installCursorPlugin,
+  isCursorPluginInstalled,
+  readBundledCursorPluginVersion,
+} from "./plugin/install";
 import { createCursorChatSync } from "./session";
 import { CURSOR_IDLE_RE, CURSOR_WORKING_RE, detectCursorTerminalStatus } from "./terminal";
 
 export { buildCursorProbeSpec, parseCursorModels, sortCursorModels } from "./detection";
 export { detectCursorTerminalStatus } from "./terminal";
+
+const CURSOR_PLUGIN_VERSION = readBundledCursorPluginVersion();
+
+warnIfPluginManifestMissing("cursor", CURSOR_PLUGIN_VERSION);
+
+/**
+ * Hook coverage gap: Cursor's `beforeShellExecution` / `beforeMCPExecution`
+ * fire on every command, not only when the user is being prompted for
+ * approval. Keep the existing terminal regex (`CURSOR_ATTENTION_RE` matching
+ * `Run this command?` / `Suggested Plan` / `Waiting for approval`)
+ * authoritative for `needs_approval` while hooks own the rest.
+ */
+function cursorHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
+  return hint.status === "needs_approval";
+}
 
 export function createCursorAdapter(): AgentAdapter {
   let capabilities: AgentCapability = cursorDefaultCapabilities;
@@ -18,6 +48,24 @@ export function createCursorAdapter(): AgentAdapter {
       return capabilities;
     },
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },
+    pluginId: "lightcode-status@cursor",
+    pluginVersion: CURSOR_PLUGIN_VERSION,
+    minProtocolVersion: 1,
+
+    async isPluginSupported(ctx) {
+      return await isCursorVersionSupportedForHooks(ctx);
+    },
+    async isPluginInstalled(ctx) {
+      return isCursorPluginInstalled(ctx);
+    },
+    async installPlugin(ctx) {
+      const node = await resolveInstallNodePath(ctx);
+      if (!node.ok) return node;
+      const result = installCursorPlugin(ctx, { resolvedNodePath: node.nodePath });
+      if (!result.ok) return result;
+      return { ok: true, version: result.version };
+    },
+
     detectInstall: async (ctx) => {
       const status = await detectAgentInstall(ctx, cursorDetectionSpec);
       capabilities = status.capabilities;
@@ -40,7 +88,12 @@ export function createCursorAdapter(): AgentAdapter {
       return undefined;
     },
     buildDirectInput(prompt) {
-      return [prompt, "@wait:40", "\r"];
+      // Cursor's TUI debounces fast incoming bytes as a paste burst. With
+      // less than ~120ms between the text and Enter, the agent submits but
+      // the input repaint never fires and the prompt visually stays in the
+      // input box. 150ms is the empirically-tested floor that lets the TUI
+      // settle before the Enter keystroke.
+      return [prompt, "@wait:150", "\r"];
     },
     formatPromptSegments(segments: PromptSegment[]) {
       const attachments = segments.filter((s) => s.kind === "attachment");
@@ -55,6 +108,7 @@ export function createCursorAdapter(): AgentAdapter {
     detectTerminalStatus(text) {
       return detectCursorTerminalStatus(text);
     },
+    shouldApplyTerminalStatusWhileHookActive: cursorHookActiveTerminalFallback,
     defaultOneShotModel: "composer-2-fast",
     buildOneShotCommand(model) {
       const args = ["--print", "--force", "--trust", "--output-format", "json"];

@@ -1,5 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { stripAnsi } from "@/shared/ansi";
 import type {
   AgentCapability,
@@ -9,13 +7,13 @@ import type {
 } from "@/shared/contracts";
 import {
   buildAgentCommand,
+  readCommandOutputAsync,
   readWslLoginShellCommandOutputAsync,
+  type AgentEnvContext,
   type AuthProbe,
   type CommandSpec,
   type DetectionSpec,
 } from "../base";
-
-const execFileAsync = promisify(execFile);
 
 export const cursorDefaultCapabilities: AgentCapability = {
   models: [],
@@ -47,32 +45,15 @@ export function buildCursorProbeSpec(
   return buildAgentCommand(location, executablePath, args);
 }
 
-async function readCommandSpecOutputAsync(
-  spec: CommandSpec,
-): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  try {
-    const { stdout, stderr } = await execFileAsync(spec.command, spec.args, {
-      windowsHide: true,
-      timeout: 10_000,
-      ...(spec.cwd ? { cwd: spec.cwd } : {}),
-      ...(spec.env ? { env: { ...process.env, ...spec.env } } : {}),
-    });
-    return { ok: true, stdout: (stdout ?? "").trim(), stderr: (stderr ?? "").trim() };
-  } catch (error: unknown) {
-    const err = error as { stdout?: string; stderr?: string } | undefined;
-    return {
-      ok: false,
-      stdout: (err?.stdout ?? "").trim(),
-      stderr: (err?.stderr ?? "").trim(),
-    };
-  }
-}
-
 async function readCursorProbeOutputAsync(
   executablePath: string,
   args: string[],
 ): Promise<{ ok: boolean; stdout: string; stderr: string }> {
-  return readCommandSpecOutputAsync(buildCursorProbeSpec(executablePath, args));
+  const spec = buildCursorProbeSpec(executablePath, args);
+  return readCommandOutputAsync(spec.command, spec.args, {
+    ...(spec.cwd ? { cwd: spec.cwd } : {}),
+    ...(spec.env ? { env: spec.env } : {}),
+  });
 }
 
 export function parseCursorModels(output: string): LabeledOption[] {
@@ -277,3 +258,58 @@ export const cursorDetectionSpec: DetectionSpec = {
     return models.length > 0 ? { models } : undefined;
   },
 };
+
+/**
+ * Hooks were introduced in Cursor 1.7. The minimum here is the floor at which
+ * `sessionStart` and the agent-loop hooks fire reliably in headless CLI mode.
+ * Bump if testing reveals 1.7.x has gaps.
+ */
+const MIN_CURSOR_SEMVER = [1, 7, 0] as const;
+
+const CURSOR_SEMVER_RE = /(\d+)\.(\d+)\.(\d+)/;
+
+export function parseCursorVersionLine(line: string): [number, number, number] | null {
+  const m = CURSOR_SEMVER_RE.exec(stripAnsi(line).trim());
+  if (!m) return null;
+  return [Number(m[1]), Number(m[2]), Number(m[3])];
+}
+
+function semverGte(a: [number, number, number], b: readonly [number, number, number]): boolean {
+  if (a[0] !== b[0]) return a[0] > b[0];
+  if (a[1] !== b[1]) return a[1] > b[1];
+  return a[2] >= b[2];
+}
+
+export function isCursorSemverSupportedForHooks(v: [number, number, number] | null): boolean {
+  if (!v) return false;
+  return semverGte(v, MIN_CURSOR_SEMVER);
+}
+
+async function probeCursorCliSemverNative(): Promise<[number, number, number] | null> {
+  const result = await readCursorProbeOutputAsync("cursor-agent", ["--version"]);
+  const text = result.stdout || result.stderr;
+  return text ? parseCursorVersionLine(text) : null;
+}
+
+async function probeCursorCliSemverWsl(distro: string): Promise<[number, number, number] | null> {
+  const result = await readWslLoginShellCommandOutputAsync(distro, "/tmp", "cursor-agent", [
+    "--version",
+  ]);
+  const text = result.stdout || result.stderr;
+  return text ? parseCursorVersionLine(text) : null;
+}
+
+export async function probeCursorCliSemver(
+  ctx: AgentEnvContext | undefined,
+): Promise<[number, number, number] | null> {
+  if (ctx?.envKind === "wsl" && ctx.wslDistro) {
+    return probeCursorCliSemverWsl(ctx.wslDistro);
+  }
+  return probeCursorCliSemverNative();
+}
+
+export async function isCursorVersionSupportedForHooks(
+  ctx: AgentEnvContext | undefined,
+): Promise<boolean> {
+  return isCursorSemverSupportedForHooks(await probeCursorCliSemver(ctx));
+}

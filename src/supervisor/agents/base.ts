@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 import { toWslUncPath } from "@/shared/wsl";
 
 const execFileAsync = promisify(execFile);
-import type { OscNotification, OscTitle } from "@/shared/osc";
+import type { OscNotification, OscShellEvent, OscTitle } from "@/shared/osc";
 import type {
   AgentCapability,
   AgentKind,
@@ -116,6 +116,8 @@ export interface AgentArgvSpec {
 export interface DetectProbeCtx {
   location: ProjectLocation;
   executablePath: string | undefined;
+  /** Semver text from `readDetectedVersion` (same `--version` probe as install detection). */
+  version?: string | undefined;
 }
 
 export type AuthProbe = (ctx: DetectProbeCtx) => Promise<AuthState | undefined>;
@@ -237,6 +239,13 @@ export interface AgentTerminalObserver {
    */
   handleOscTitle?(title: OscTitle): TerminalStatusHint | null;
   /**
+   * Handle a VS Code shell-integration event (OSC 633: prompt/command/exit
+   * markers, cwd updates). Emitted by shells with VS Code shell integration
+   * sourced — useful as an L2 source for command boundaries when no hook
+   * plugin is wired. Return a status hint or null.
+   */
+  handleOscShellEvent?(event: OscShellEvent): TerminalStatusHint | null;
+  /**
    * Treat OSC-derived hints as **L2 fallback**: suppress them while the CLI
    * hook plugin is active (hooks own status). Notifications are still emitted
    * to the renderer; only the status transition is skipped.
@@ -307,6 +316,15 @@ export interface AgentCliHookPluginSupport {
   readonly pluginVersion: string;
   /** Earliest hook protocol the provider's forwarder script can produce. */
   readonly minProtocolVersion: number;
+  /**
+   * When true, L1 hook events update status for the transitions they cover
+   * but L2 (terminal/OSC parsing) keeps running for the rest. Used by
+   * providers whose hook event vocabulary lacks a clean turn-finished signal
+   * (e.g. GitHub Copilot CLI: no `agentStop`, `sessionEnd` only fires on
+   * full-session termination). Default `false` — L1 alone owns status when
+   * any hook is wired.
+   */
+  readonly partialL1?: boolean;
 
   /**
    * Quick gate before doing any IO. Return false to short-circuit the install
@@ -680,6 +698,123 @@ async function readDetectedVersion(
   return result.ok ? extractSemverFromVersionOutput(result.stdout) : undefined;
 }
 
+// ── Agent command output (native vs WSL) ─────────────────────────────────
+
+/**
+ * Run `<executablePath> <args>` against an agent binary and return its
+ * stdout/stderr/ok, abstracting the native-vs-WSL fork that detection /
+ * session code used to inline. For WSL it routes through the user's login
+ * shell (so PATH and profile-loaded helpers like nvm resolve); for native it
+ * uses the platform-aware `buildAgentCommand` wrapper.
+ */
+export async function readAgentCommandOutput(
+  location: ProjectLocation,
+  executablePath: string,
+  args: string[],
+  options?: { timeoutMs?: number; wslLinuxCwd?: string },
+): Promise<{ ok: boolean; stdout: string; stderr: string }> {
+  if (location.kind === "wsl") {
+    return readWslLoginShellCommandOutputAsync(
+      location.distro,
+      options?.wslLinuxCwd ?? location.linuxPath,
+      executablePath,
+      args,
+      options?.timeoutMs ? { timeout: options.timeoutMs } : undefined,
+    );
+  }
+  const spec = buildAgentCommand(location, executablePath, args);
+  return readCommandOutputAsync(spec.command, spec.args, spec.cwd ? { cwd: spec.cwd } : undefined);
+}
+
+// ── OSC notification helpers (shared across providers) ───────────────────
+
+const OSC_NOTIFICATION_PAYLOAD_KEYS = [
+  "event",
+  "type",
+  "kind",
+  "name",
+  "notification",
+  "id",
+] as const;
+
+/**
+ * Concatenate the searchable text of an OSC notification, lowercased. Pulls
+ * the title, body, the JSON-stringified payload (catches keywords in nested
+ * fields like `{ details: { reason: "permission_requested" } }`), and any
+ * string fields under common payload keys. Used by codex/opencode for
+ * keyword scans like `text.includes("approval")`.
+ */
+export function getOscNotificationText(notification: OscNotification): string {
+  const parts: string[] = [];
+  if (notification.title) parts.push(notification.title);
+  if (notification.body) parts.push(notification.body);
+  const p = notification.payload;
+  if (p && typeof p === "object") {
+    parts.push(JSON.stringify(p));
+    for (const key of OSC_NOTIFICATION_PAYLOAD_KEYS) {
+      const value = (p as Record<string, unknown>)[key];
+      if (typeof value === "string") parts.push(value);
+    }
+  }
+  return parts.length === 0 ? "" : parts.join("\n").toLowerCase();
+}
+
+/**
+ * iTerm2 OSC 9;4 progress sub-protocol parser. Body shape: `4;<state>[;<percent>]`.
+ *   0 = remove progress  → idle
+ *   1 = set progress %   → working
+ *   3 = indeterminate    → working (used during a turn)
+ *   2 = error / 4 = paused → ignored (no clean status mapping)
+ *
+ * Used by Claude (which opts in via `preferredNotifChannel: "iterm2"` in the
+ * staged settings) and OpenCode (best-effort fallback when hooks miss). Pure
+ * function; safe to share via reference.
+ */
+const ITERM2_PROGRESS_RE = /^4;(\d+)/;
+export function iterm2ProgressOscHint(notification: OscNotification): TerminalStatusHint | null {
+  if (notification.code !== 9) return null;
+  const match = ITERM2_PROGRESS_RE.exec(notification.body);
+  if (!match) return null;
+  const state = Number(match[1]);
+  if (state === 0) return { status: "idle", attention: "none", corroborated: true };
+  if (state === 1 || state === 3) {
+    return { status: "working", attention: "working", corroborated: true };
+  }
+  return null;
+}
+
+const BRAILLE_OSC_TITLE_PREFIX_RE = /^[⠀-⣿]/;
+
+/**
+ * Many TUIs prefix their window/tab title with a braille spinner glyph while
+ * a turn is in flight (Claude, Codex, OpenCode). Emit `working` when we see
+ * any glyph in the braille block, regardless of the rest of the title.
+ */
+export function brailleSpinnerOscTitleHint(title: OscTitle): TerminalStatusHint | null {
+  if (!BRAILLE_OSC_TITLE_PREFIX_RE.test(title.text)) return null;
+  return { status: "working", attention: "working", corroborated: true };
+}
+
+/**
+ * Shell-integration command boundary hint (OSC 133 and OSC 633 share the same
+ * A/B/C/D vocabulary). `command-pre-exec` (`;C`) marks the start of agent
+ * execution → working; `command-finished` (`;D`) marks the end → idle. Prompt
+ * markers (`;A`/`;B`) are ignored — they fire before/after user input editing
+ * and don't represent a status change.
+ *
+ * Used by GitHub Copilot CLI (OSC 133) as a primary turn-boundary signal,
+ * useful especially in WSL where its OSC 9;4 progress emit is unreliable.
+ */
+export function shellExecOscHint(event: OscShellEvent): TerminalStatusHint | null {
+  if (event.kind === "command-pre-exec") {
+    return { status: "working", attention: "working", corroborated: true };
+  }
+  if (event.kind === "command-finished") {
+    return { status: "idle", attention: "none", corroborated: true };
+  }
+  return null;
+}
+
 // ── Terminal hint sweeping / config reconciliation ────────────────────────
 
 /**
@@ -834,10 +969,11 @@ export function createRecursiveDirWatcher(
     };
   } catch (error) {
     console.log(
-      "[%s] session watcher unavailable at %s: %s",
-      label,
-      watchPath,
-      error instanceof Error ? error.message : String(error),
+      [
+        `[${label}] session watcher unavailable`,
+        `  path: ${watchPath}`,
+        `  error: ${error instanceof Error ? error.message : String(error)}`,
+      ].join("\n"),
     );
     return undefined;
   }
@@ -867,7 +1003,7 @@ export async function detectAgentInstall(
 
   let capabilities = spec.capabilities;
   if (executablePath && spec.capabilitiesProbe) {
-    const partial = await spec.capabilitiesProbe({ location, executablePath });
+    const partial = await spec.capabilitiesProbe({ location, executablePath, version });
     if (partial) {
       capabilities = { ...capabilities, ...partial };
     }
@@ -878,7 +1014,7 @@ export async function detectAgentInstall(
     authState = "missing";
   } else {
     authState = "unknown";
-    const probeCtx: DetectProbeCtx = { location, executablePath };
+    const probeCtx: DetectProbeCtx = { location, executablePath, version };
     for (const probe of spec.authProbes ?? []) {
       const result = await probe(probeCtx);
       if (result === "authenticated") {

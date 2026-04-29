@@ -1,10 +1,12 @@
 import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
-import type { OscNotification, OscTitle } from "@/shared/osc";
+import type { OscNotification } from "@/shared/osc";
 import {
   batchWslCommandsAsync,
+  brailleSpinnerOscTitleHint,
   createKnownSessionRef,
   createRecursiveDirWatcher,
   detectAgentInstall,
+  getOscNotificationText,
   type AgentAdapter,
   type TerminalStatusHint,
 } from "../base";
@@ -46,26 +48,8 @@ warnIfPluginManifestMissing(
     "resources/agent-plugins/codex/ (packaged, staged by scripts/prepare-agent-plugins.mjs).",
 );
 
-function codexOscEventText(notification: OscNotification): string {
-  const parts: string[] = [notification.title, notification.body];
-  const p = notification.payload;
-  if (p && typeof p === "object") {
-    parts.push(JSON.stringify(p));
-    for (const key of ["event", "type", "kind", "name", "notification", "id"] as const) {
-      const v = p[key];
-      if (typeof v === "string") {
-        parts.push(v);
-      }
-    }
-  }
-  return parts
-    .filter((s) => s.length > 0)
-    .join("\n")
-    .toLowerCase();
-}
-
 function codexOscHint(notification: OscNotification): TerminalStatusHint | null {
-  const t = codexOscEventText(notification);
+  const t = getOscNotificationText(notification);
   if (
     t.includes("approval") ||
     t.includes("permission-requested") ||
@@ -89,18 +73,6 @@ function codexOscHint(notification: OscNotification): TerminalStatusHint | null 
     return { status: "idle", attention: "none", corroborated: true };
   }
   return null;
-}
-
-// Codex animates its working-state spinner inside the window title via OSC 0/2
-// using braille glyphs (U+2800-U+28FF). First braille-prefixed title after an
-// idle->working edge flips us to `working` when L2 is active; idle comes from
-// OSC 9 or hook events. When hook env is wired for the spawn, the supervisor
-// ignores these OSC hints until a real hook event arrives.
-const BRAILLE_PREFIX_RE = /^[⠀-⣿]/;
-
-function codexOscTitleHint(title: OscTitle): TerminalStatusHint | null {
-  if (!BRAILLE_PREFIX_RE.test(title.text)) return null;
-  return { status: "working", attention: "working", corroborated: true };
 }
 
 export function createCodexAdapter(): AgentAdapter {
@@ -160,7 +132,7 @@ export function createCodexAdapter(): AgentAdapter {
       };
     },
     handleOscNotification: codexOscHint,
-    handleOscTitle: codexOscTitleHint,
+    handleOscTitle: brailleSpinnerOscTitleHint,
     oscHintsDeferToHookPlugin: true,
     async detectInstall(ctx) {
       const status = await detectAgentInstall(ctx, codexDetectionSpec);
@@ -172,11 +144,12 @@ export function createCodexAdapter(): AgentAdapter {
       const rollouts = readCodexRolloutsForLocation(location);
       preSpawnRolloutIds = new Set(rollouts.map((rollout) => rollout.id));
       console.log(
-        "[codex] pre-spawn session snapshot (%s): sessionIndex=%d latestIndex=%s interactiveRollouts=%d",
-        describeCodexLocation(location),
-        sessions.length,
-        sessions.at(-1)?.id ?? "(none)",
-        rollouts.length,
+        [
+          `[codex] pre-spawn session snapshot (${describeCodexLocation(location)})`,
+          `  sessionIndex: ${sessions.length}`,
+          `  latestIndex: ${sessions.at(-1)?.id ?? "(none)"}`,
+          `  interactiveRollouts: ${rollouts.length}`,
+        ].join("\n"),
       );
       return buildCodexArgvFor(config, prompt, sessionRef, launchOptions);
     },
@@ -231,16 +204,17 @@ export function createCodexAdapter(): AgentAdapter {
           }
         }
         console.log(
-          "[codex] discoverSessionRef (%s): sessionIndex=%d interactiveRollouts=%d preSpawnRollouts=%d newRollouts=%d latestIndex=%s candidate=%s originator=%s source=%s",
-          describeCodexLocation(location),
-          sessions.length,
-          rollouts.length,
-          preSpawnRolloutIds.size,
-          newRollouts.length,
-          sessions.at(-1)?.id ?? "(none)",
-          next?.id ?? "(none)",
-          next?.originator ?? "(none)",
-          next?.source ?? "(none)",
+          [
+            `[codex] discoverSessionRef (${describeCodexLocation(location)})`,
+            `  sessionIndex: ${sessions.length}`,
+            `  interactiveRollouts: ${rollouts.length}`,
+            `  preSpawnRollouts: ${preSpawnRolloutIds.size}`,
+            `  newRollouts: ${newRollouts.length}`,
+            `  latestIndex: ${sessions.at(-1)?.id ?? "(none)"}`,
+            `  candidate: ${next?.id ?? "(none)"}`,
+            `  originator: ${next?.originator ?? "(none)"}`,
+            `  source: ${next?.source ?? "(none)"}`,
+          ].join("\n"),
         );
         if (!next) {
           return undefined;

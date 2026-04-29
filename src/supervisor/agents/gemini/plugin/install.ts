@@ -3,20 +3,23 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
-import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
 import {
-  PLUGIN_ASSET_FILES,
+  FORWARD_RUNTIME_FILE,
   buildWslHookCommandHead,
+  copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
+  ctxCacheKey,
   getNativeHookWrapperFilename,
   getNativePluginBaseDir,
   getWslPluginBaseDirs,
   hasNativeHookWrapper,
   isWslPluginContext,
+  memoByCtx,
   quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
+  stagePluginAssetsToWsl,
   writeNativeHookWrapper,
   type PluginManifest,
 } from "../../plugin/installerBase";
@@ -69,7 +72,7 @@ export function readBundledGeminiPluginVersion(): string {
   return readBundledPluginVersion(resolveSourceDir);
 }
 
-export function getGeminiPluginPaths(ctx?: AgentEnvContext): GeminiPluginPaths {
+function computeGeminiPluginPaths(ctx?: AgentEnvContext): GeminiPluginPaths {
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "gemini");
     if (!wsl) return { pluginDir: "", settingsPath: "", version: "0.0.0" };
@@ -97,6 +100,12 @@ export function getGeminiPluginPaths(ctx?: AgentEnvContext): GeminiPluginPaths {
     settingsPath: join(pluginDir, "settings.json"),
     version,
   };
+}
+
+const geminiPluginPathsMemo = memoByCtx(computeGeminiPluginPaths, ctxCacheKey);
+
+export function getGeminiPluginPaths(ctx?: AgentEnvContext): GeminiPluginPaths {
+  return geminiPluginPathsMemo.call(ctx);
 }
 
 export interface InstallGeminiPluginOptions {
@@ -140,6 +149,7 @@ export function installGeminiPlugin(
   const pluginDir = getNativePluginBaseDir("gemini", ctx?.baseDir);
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
+  copyForwardRuntimeFile(pluginDir);
   const wrapperPath = writeNativeHookWrapper(pluginDir);
 
   const settingsPath = join(pluginDir, "settings.json");
@@ -163,18 +173,12 @@ function installGeminiPluginWsl(
   manifest: PluginManifest,
   resolvedNodePath: string,
 ): { ok: true; paths: GeminiPluginPaths; version: string } | { ok: false; reason: string } {
-  const deploy = deployFilesToWslHome(
-    distro,
-    PLUGIN_ASSET_FILES.map((file) => ({
-      src: join(sourceDir, file),
-      relDest: `agent-plugins/gemini/${file}`,
-    })),
-  );
-  if (!deploy) {
-    return { ok: false, reason: `failed to stage Gemini plugin into wsl distro ${distro}` };
-  }
+  const staged = stagePluginAssetsToWsl(distro, sourceDir, "gemini", {
+    includeForwardRuntime: true,
+  });
+  if (!staged.ok) return staged;
 
-  const linuxPluginDir = `${deploy.linuxBaseDir}/agent-plugins/gemini`;
+  const linuxPluginDir = staged.linuxPluginDir;
   const linuxSettingsPath = `${linuxPluginDir}/settings.json`;
   const linuxForwardPath = `${linuxPluginDir}/forward.mjs`;
   const uncSettingsPath = toWslUncPath(distro, linuxSettingsPath);
@@ -226,6 +230,7 @@ function verifyGeminiInstallAt(
 ): { installed: boolean; version?: string } {
   if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
+  if (!existsSync(join(readableDir, FORWARD_RUNTIME_FILE))) return { installed: false };
   if (!existsSync(join(readableDir, "settings.json"))) return { installed: false };
   if (!hasNativeHookWrapper(readableDir, target)) return { installed: false };
   try {

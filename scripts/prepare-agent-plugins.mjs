@@ -15,6 +15,13 @@
  *   - claude: plugin.json, forward.mjs
  *   - codex: plugin.json, forward.mjs
  *   - gemini: plugin.json, forward.mjs
+ *   - copilot: plugin.json, forward.mjs
+ *   - opencode: plugin.json, plugin.mjs (in-process plugin, no forward.mjs)
+ *
+ * Plus a shared forwarder runtime under `_runtime/lightcode-hook-runtime.mjs`
+ * that's deployed next to each `forward.mjs` at install time. Single source
+ * of truth for the manifest read / postWithRetry / envelope plumbing across
+ * all forwarder providers.
  *
  * The script is idempotent: each asset is only copied when missing or stale
  * (size/mtime mismatch).
@@ -45,11 +52,35 @@ const PLUGINS = [
     assets: ["plugin.json", "forward.mjs"],
     srcDir: join(repoRoot, "src", "supervisor", "agents", "gemini", "plugin"),
   },
+  {
+    kind: "copilot",
+    assets: ["plugin.json", "forward.mjs"],
+    srcDir: join(repoRoot, "src", "supervisor", "agents", "copilot", "plugin"),
+  },
+  {
+    kind: "opencode",
+    assets: ["plugin.json", "plugin.mjs"],
+    srcDir: join(repoRoot, "src", "supervisor", "agents", "opencode", "plugin"),
+  },
 ];
+
+const SHARED_RUNTIME = {
+  src: join(
+    repoRoot,
+    "src",
+    "supervisor",
+    "agents",
+    "plugin",
+    "forward-runtime",
+    "lightcode-hook-runtime.mjs",
+  ),
+  destRel: join("_runtime", "lightcode-hook-runtime.mjs"),
+};
 
 for (const plugin of PLUGINS) {
   stagePlugin(plugin);
 }
+stageSharedRuntime();
 
 function stagePlugin({ kind, assets, srcDir }) {
   const destDir = join(destBase, kind);
@@ -68,4 +99,14 @@ function stagePlugin({ kind, assets, srcDir }) {
     copyFileSync(src, dest);
     console.log(`[prepare-agent-plugins] ${kind}/${asset} -> ${dest}`);
   }
+}
+
+function stageSharedRuntime() {
+  if (!existsSync(SHARED_RUNTIME.src)) {
+    throw new Error(`[prepare-agent-plugins] missing shared runtime source: ${SHARED_RUNTIME.src}`);
+  }
+  const dest = join(destBase, SHARED_RUNTIME.destRel);
+  mkdirSync(dirname(dest), { recursive: true });
+  copyFileSync(SHARED_RUNTIME.src, dest);
+  console.log(`[prepare-agent-plugins] _runtime -> ${dest}`);
 }

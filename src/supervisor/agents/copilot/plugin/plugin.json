@@ -1,0 +1,7 @@
+{
+  "name": "lightcode-status-copilot",
+  "version": "1.0.0",
+  "description": "GitHub Copilot CLI lifecycle hook forwarder for Lightcode thread status",
+  "author": "Lightcode",
+  "license": "Apache-2.0"
+}

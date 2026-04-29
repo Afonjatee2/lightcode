@@ -1,0 +1,5 @@
+{
+  "name": "lightcode-status-opencode",
+  "version": "1.0.0",
+  "description": "OpenCode plugin forwarder for Lightcode thread status"
+}

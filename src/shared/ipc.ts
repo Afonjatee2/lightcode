@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { LspMessagePayload, LspSessionStatus, LspStartPayload, LspStopPayload } from "./lsp";
+import type { OscShellEvent } from "./osc";
 import type { SharedSettings, SharedSettingsInput } from "./settings";
 import {
   closeThreadPayloadSchema,
@@ -984,6 +985,11 @@ export type SupervisorEvent =
       threadId: string;
       title: string;
       body: string;
+    }
+  | {
+      type: "thread-osc-shell";
+      threadId: string;
+      event: OscShellEvent;
     }
   | { type: "windows-agent-statuses"; statuses: AgentStatus[] }
   | { type: "wsl-agent-statuses"; statuses: AgentStatus[] }

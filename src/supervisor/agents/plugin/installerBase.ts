@@ -1,10 +1,14 @@
 import {
+  constants as fsConstants,
   copyFileSync,
   chmodSync,
   existsSync,
+  linkSync,
+  lstatSync,
   mkdirSync,
   readFileSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -12,6 +16,7 @@ import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../base";
 import { resolveWslHomeDirectory } from "../base";
+import { deployFilesToWslHome, type WslHomeDeployResult } from "../../wsl/wslDeploy";
 
 /**
  * Shared plumbing for provider hook plugin installers (claude/codex/gemini).
@@ -161,6 +166,45 @@ export function getNativePluginBaseDir(kind: string, baseDir?: string): string {
 }
 
 /**
+ * Generic in-memory memo over a callable. Keyed by `keyFn(...args)`. Intended
+ * for closure-scoped caches inside individual adapters (path resolution, node
+ * resolution, project-hook install). Process-lifetime cache; no TTL. Pass an
+ * `invalidate(key)` returned alongside the wrapped fn to clear an entry after
+ * a write that should re-trigger the underlying op next time.
+ */
+export function memoByCtx<TArgs extends unknown[], TResult>(
+  fn: (...args: TArgs) => TResult,
+  keyFn: (...args: TArgs) => string,
+): {
+  call: (...args: TArgs) => TResult;
+  invalidate: (...args: TArgs) => void;
+  clear: () => void;
+} {
+  const cache = new Map<string, TResult>();
+  return {
+    call(...args: TArgs): TResult {
+      const key = keyFn(...args);
+      if (cache.has(key)) return cache.get(key) as TResult;
+      const value = fn(...args);
+      cache.set(key, value);
+      return value;
+    },
+    invalidate(...args: TArgs): void {
+      cache.delete(keyFn(...args));
+    },
+    clear(): void {
+      cache.clear();
+    },
+  };
+}
+
+/** Stable string key for an `AgentEnvContext`. Process-local; not for persistence. */
+export function ctxCacheKey(ctx: AgentEnvContext | undefined): string {
+  if (!ctx) return "no-ctx";
+  return `${ctx.envKind}|${ctx.wslDistro ?? ""}|${ctx.baseDir ?? ""}`;
+}
+
+/**
  * Print a one-line warning at module load when a provider's bundled plugin
  * manifest is missing (the `0.0.0` sentinel from `readBundledPluginVersion`).
  * The coordinator treats `0.0.0` as a no-cache retry-on-success state.
@@ -291,4 +335,280 @@ export async function resolveInstallNodePath(
       }`,
     };
   }
+}
+
+// ── Shared hooks.json IO ─────────────────────────────────────────────────
+
+/**
+ * Read and JSON-parse a hooks document. Returns `null` if the file is
+ * missing or unparseable — callers can then distinguish "missing" from
+ * "malformed" by following with `existsSync(path)` if they need to.
+ */
+export function parseExistingHooksJson(path: string): unknown | null {
+  if (!existsSync(path)) return null;
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** Write a hooks document with stable 2-space indent and trailing newline. */
+export function writeHooksJsonFile(path: string, doc: unknown): void {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(doc, null, 2)}\n`, "utf8");
+}
+
+// ── Shared private-home state mirroring ──────────────────────────────────
+
+/**
+ * `lstatSync`-based existence check that succeeds for symlinks even when
+ * their target is missing — matches the semantics installers want when
+ * deciding whether to (re)create a state link.
+ */
+export function pathExistsOrSymlink(path: string): boolean {
+  try {
+    lstatSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Mirror a global-home file/dir into a private agent-home dir, preferring
+ * symlinks. Falls back to hardlink, then file copy on platforms where
+ * symlinks are restricted (e.g. Windows without dev mode). Skips when the
+ * source is missing — the agent CLI is expected to recreate state on first
+ * use in that case.
+ */
+export function ensureNativeStateLink(source: string, target: string, kind: "dir" | "file"): void {
+  if (pathExistsOrSymlink(target)) return;
+  if (!existsSync(source)) return;
+  mkdirSync(dirname(target), { recursive: true });
+  try {
+    symlinkSync(source, target, kind === "dir" && process.platform === "win32" ? "junction" : kind);
+    return;
+  } catch {
+    // Fall through to hard-link/copy compatibility.
+  }
+  if (kind === "file") {
+    try {
+      linkSync(source, target);
+      return;
+    } catch {
+      try {
+        copyFileSync(source, target, fsConstants.COPYFILE_EXCL);
+      } catch {
+        // Best-effort; the agent CLI will recreate state if missing.
+      }
+    }
+  }
+}
+
+// ── Shared forward.mjs runtime ───────────────────────────────────────────
+
+/**
+ * Filename of the shared forwarder runtime that ships next to each provider's
+ * `forward.mjs` in the staging dir. Each `forward.mjs` imports it as a
+ * sibling (`./lightcode-hook-runtime.mjs`) and calls `runForwarder({...})`.
+ */
+export const FORWARD_RUNTIME_FILE = "lightcode-hook-runtime.mjs";
+
+let cachedRuntimeSourcePath: string | undefined;
+
+/**
+ * Resolve the canonical `lightcode-hook-runtime.mjs` source path. Mirrors
+ * `createPluginSourceResolver`: checks packaged `<resources>/agent-plugins/
+ * _runtime/`, then dev candidates relative to this module's location.
+ * Memoized for the supervisor lifetime.
+ */
+export function resolveForwardRuntimeSourcePath(): string {
+  if (cachedRuntimeSourcePath) return cachedRuntimeSourcePath;
+  const callerDir = __dirname;
+  const candidates: string[] = [];
+  if (typeof process.resourcesPath === "string" && process.resourcesPath.length > 0) {
+    candidates.push(join(process.resourcesPath, "agent-plugins", "_runtime", FORWARD_RUNTIME_FILE));
+  }
+  candidates.push(resolve(callerDir, "forward-runtime", FORWARD_RUNTIME_FILE));
+  candidates.push(resolve(callerDir, "../plugin/forward-runtime", FORWARD_RUNTIME_FILE));
+  candidates.push(
+    resolve(callerDir, "../../src/supervisor/agents/plugin/forward-runtime", FORWARD_RUNTIME_FILE),
+  );
+  candidates.push(
+    resolve(
+      callerDir,
+      "../../../src/supervisor/agents/plugin/forward-runtime",
+      FORWARD_RUNTIME_FILE,
+    ),
+  );
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      cachedRuntimeSourcePath = candidate;
+      return candidate;
+    }
+  }
+  throw new Error(`forward runtime source not found; checked: ${candidates.join(", ")}`);
+}
+
+/**
+ * Copy the shared runtime into a native plugin staging dir. Idempotent:
+ * skips when target file is identical (size+mtime). Targets sit next to
+ * `forward.mjs` so its relative `import "./lightcode-hook-runtime.mjs"`
+ * resolves.
+ */
+export function copyForwardRuntimeFile(targetDir: string): void {
+  const source = resolveForwardRuntimeSourcePath();
+  const target = join(targetDir, FORWARD_RUNTIME_FILE);
+  if (existsSync(target)) {
+    try {
+      const sourceStat = statSync(source);
+      const targetStat = statSync(target);
+      if (sourceStat.size === targetStat.size && sourceStat.mtimeMs <= targetStat.mtimeMs) {
+        return;
+      }
+    } catch {
+      // fall through to copy
+    }
+  }
+  copyPluginAssetFile(source, target);
+}
+
+/**
+ * Build the WSL deploy file list for a forwarder-based provider. Includes
+ * `plugin.json`, `forward.mjs` (from the per-provider source dir), and the
+ * shared runtime (from the canonical location). Used by callers that pass
+ * the result to `deployFilesToWslHome` directly.
+ */
+export function getForwarderWslDeployFiles(
+  sourceDir: string,
+  kind: string,
+): Array<{ src: string; relDest: string }> {
+  return [
+    ...PLUGIN_ASSET_FILES.map((file) => ({
+      src: join(sourceDir, file),
+      relDest: `agent-plugins/${kind}/${file}`,
+    })),
+    {
+      src: resolveForwardRuntimeSourcePath(),
+      relDest: `agent-plugins/${kind}/${FORWARD_RUNTIME_FILE}`,
+    },
+  ];
+}
+
+// ── Shared install-verification ──────────────────────────────────────────
+
+export interface VerifyStagedPluginOptions {
+  /**
+   * Asset list whose existence is required for "installed" to be true.
+   * Defaults to `PLUGIN_ASSET_FILES` (plugin.json + forward.mjs). Providers
+   * that ship different files (e.g. OpenCode's plugin.mjs) override this.
+   */
+  assets?: readonly string[];
+  /**
+   * When true (default), native installs must also have the
+   * `lightcode-hook.{sh,cmd}` wrapper next to forward.mjs. WSL installs bake
+   * the absolute node path directly into hook commands and never need it.
+   * Providers that don't use a forwarder wrapper (OpenCode in-process plugin)
+   * set this to false.
+   */
+  requireNativeWrapper?: boolean;
+  /**
+   * Optional provider-specific extra check run after the asset existence
+   * checks pass. Returns true to continue treating the install as good.
+   * Used by Cursor (hooks.json must contain a Lightcode entry) and OpenCode
+   * (dropped files must byte-match the staging dir).
+   */
+  extraCheck?: () => boolean;
+}
+
+/**
+ * Generic "is the staged plugin layout intact" check used by every provider's
+ * `isXxxPluginInstalled`. Returns `{ installed: false }` on any missing
+ * asset, missing wrapper (native + required), failing extra check, or
+ * unreadable manifest. On success, includes the manifest version.
+ */
+export function verifyStagedPluginAt(
+  readableDir: string,
+  target: "native" | "wsl",
+  options?: VerifyStagedPluginOptions,
+): { installed: boolean; version?: string } {
+  const assets = options?.assets ?? PLUGIN_ASSET_FILES;
+  for (const asset of assets) {
+    if (!existsSync(join(readableDir, asset))) return { installed: false };
+  }
+  const requireWrapper = options?.requireNativeWrapper ?? true;
+  if (requireWrapper && !hasNativeHookWrapper(readableDir, target)) {
+    return { installed: false };
+  }
+  if (options?.extraCheck && !options.extraCheck()) return { installed: false };
+  try {
+    const version = readPluginManifest(readableDir).version;
+    return { installed: true, version };
+  } catch {
+    return { installed: false };
+  }
+}
+
+// ── Shared WSL plugin staging ────────────────────────────────────────────
+
+export interface StagePluginAssetsToWslOptions {
+  /**
+   * Asset list (filenames in sourceDir) to deploy. Defaults to
+   * `PLUGIN_ASSET_FILES`. OpenCode passes its own list (`plugin.mjs` instead
+   * of `forward.mjs`).
+   */
+  assets?: readonly string[];
+  /**
+   * When true, also stage the shared `lightcode-hook-runtime.mjs` next to
+   * `forward.mjs`. Forwarder-based providers (claude/codex/gemini/copilot/
+   * cursor) pass true; OpenCode (in-process plugin, no forwarder) passes false.
+   */
+  includeForwardRuntime?: boolean;
+}
+
+/**
+ * Stage a provider's plugin assets into a WSL distro under
+ * `<home>/.lightcode/agent-plugins/<kind>/`. Returns the deploy result on
+ * success; on failure returns a `reason` string the caller should propagate.
+ * Centralizes the `deployFilesToWslHome → !deploy → reason` pattern shared
+ * across copilot/cursor/opencode (and matches the shape used by claude/codex
+ * /gemini callers, even though those have extra steps after staging).
+ */
+export function stagePluginAssetsToWsl(
+  distro: string,
+  sourceDir: string,
+  kind: string,
+  options?: StagePluginAssetsToWslOptions | readonly string[],
+):
+  | { ok: true; deploy: WslHomeDeployResult; linuxPluginDir: string }
+  | { ok: false; reason: string } {
+  let opts: StagePluginAssetsToWslOptions;
+  if (Array.isArray(options)) {
+    opts = { assets: options as readonly string[] };
+  } else if (options) {
+    opts = options as StagePluginAssetsToWslOptions;
+  } else {
+    opts = {};
+  }
+  const assets = opts.assets ?? PLUGIN_ASSET_FILES;
+  const files: Array<{ src: string; relDest: string }> = assets.map((file) => ({
+    src: join(sourceDir, file),
+    relDest: `agent-plugins/${kind}/${file}`,
+  }));
+  if (opts.includeForwardRuntime) {
+    files.push({
+      src: resolveForwardRuntimeSourcePath(),
+      relDest: `agent-plugins/${kind}/${FORWARD_RUNTIME_FILE}`,
+    });
+  }
+  const deploy = deployFilesToWslHome(distro, files);
+  if (!deploy) {
+    return { ok: false, reason: `failed to stage ${kind} plugin into wsl distro ${distro}` };
+  }
+  return {
+    ok: true,
+    deploy,
+    linuxPluginDir: `${deploy.linuxBaseDir}/agent-plugins/${kind}`,
+  };
 }

@@ -10,6 +10,7 @@ build/icons/
 # heroui-agents-md
 .heroui-docs/
 .tmp/
+tmp/
 .agent/
 .spec-workflow/
 **/worktrees/

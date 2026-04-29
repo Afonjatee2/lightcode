@@ -88,7 +88,11 @@ registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfig
             iconKind: "permission" as const,
             options: capabilities.approvalPolicies,
             hideLabelOnWrap: true,
-            value: config.approvalPolicy ?? capabilities.approvalPolicies[0]?.id ?? "default",
+            value:
+              config.approvalPolicy ??
+              capabilities.bypassApprovalPolicy ??
+              capabilities.approvalPolicies[0]?.id ??
+              "default",
             isDisabled,
             onChange: (value: string) => onConfigChange({ approvalPolicy: value }),
           },

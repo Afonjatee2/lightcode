@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.18.0",
+    "@anthropic-ai/claude-agent-sdk": "^0.2.122",
     "@dnd-kit/abstract": "^0.3.2",
     "@dnd-kit/collision": "^0.3.2",
     "@dnd-kit/dom": "^0.3.2",

@@ -13,7 +13,7 @@ const shared = {
   deps: {
     alwaysBundle: ["electron-updater", "simple-git", "zod"],
     onlyBundle: false as const,
-    neverBundle: ["electron", "node-pty", "better-sqlite3"],
+    neverBundle: ["electron", "node-pty", "better-sqlite3", "@anthropic-ai/claude-agent-sdk"],
   },
 };
 
@@ -32,5 +32,21 @@ export default defineConfig([
     entry: { supervisor: "src/supervisor/index.ts" },
     clean: false,
     ...shared,
+  },
+  {
+    entry: { claudeSdkProbeWorker: "src/supervisor/agents/claude/sdkProbeWorker.ts" },
+    clean: false,
+    outDir: "dist/main",
+    platform: "node" as const,
+    format: "esm" as const,
+    target: "node24" as const,
+    sourcemap: true,
+    dts: false,
+    minify: false,
+    deps: {
+      alwaysBundle: ["electron-updater", "simple-git", "zod"],
+      onlyBundle: false as const,
+      neverBundle: ["electron", "node-pty", "better-sqlite3", "@anthropic-ai/claude-agent-sdk"],
+    },
   },
 ]);

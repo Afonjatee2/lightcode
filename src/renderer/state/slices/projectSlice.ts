@@ -12,6 +12,22 @@ import { reorderIds, type ReorderPlacement } from "../reorder";
 import { removePaneFromView } from "./helpers";
 import type { SliceCreator } from "./shared";
 
+function projectDraftConfigEqual(
+  a: ProjectDraftConfig | undefined,
+  b: ProjectDraftConfig,
+): boolean {
+  return (
+    a !== undefined &&
+    a.agentKind === b.agentKind &&
+    a.model === b.model &&
+    a.effort === b.effort &&
+    a.mode === b.mode &&
+    a.approvalPolicy === b.approvalPolicy &&
+    a.sandboxMode === b.sandboxMode &&
+    a.worktreeMode === b.worktreeMode
+  );
+}
+
 export interface ProjectSlice {
   projects: Project[];
   addProject: (location: ProjectLocation, nameOverride?: string) => Project;
@@ -97,11 +113,17 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
       };
     }),
   updateProjectDraftConfig: (projectId, draftConfig) =>
-    set((state) => ({
-      projects: state.projects.map((project) =>
-        project.id === projectId ? { ...project, lastDraftConfig: draftConfig } : project,
-      ),
-    })),
+    set((state) => {
+      const project = state.projects.find((item) => item.id === projectId);
+      if (!project || projectDraftConfigEqual(project.lastDraftConfig, draftConfig)) {
+        return {};
+      }
+      return {
+        projects: state.projects.map((item) =>
+          item.id === projectId ? { ...item, lastDraftConfig: draftConfig } : item,
+        ),
+      };
+    }),
   updateProjectScripts: (projectId, scripts) =>
     set((state) => ({
       projects: state.projects.map((project) =>

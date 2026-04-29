@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { Selection } from "@heroui/react";
 import { Dropdown, Label, Tooltip } from "@heroui/react";
 import { ChevronDown } from "lucide-react";
@@ -34,6 +34,7 @@ export function OptionMenu(props: OptionMenuProps) {
     tooltip,
     onOpenChange,
   } = props;
+  const [isOpen, setIsOpen] = useState(false);
   const normalizedOptions = options.map((option) =>
     typeof option === "string"
       ? { id: option, label: option, icon: undefined, hint: undefined }
@@ -72,10 +73,13 @@ export function OptionMenu(props: OptionMenuProps) {
     </Button>
   );
 
-  const dropdownProps = onOpenChange ? { onOpenChange } : {};
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    onOpenChange?.(open);
+  };
 
   return (
-    <Dropdown {...dropdownProps}>
+    <Dropdown isOpen={isOpen} onOpenChange={handleOpenChange}>
       {effectiveTooltip ? (
         <Tooltip>
           {button}
@@ -84,29 +88,31 @@ export function OptionMenu(props: OptionMenuProps) {
       ) : (
         button
       )}
-      <Dropdown.Popover placement="top">
-        <Dropdown.Menu
-          aria-label="Options"
-          selectedKeys={new Set([value])}
-          selectionMode="single"
-          onSelectionChange={(keys: Selection) => {
-            if (keys === "all") return;
-            const selected = [...keys][0];
-            if (selected !== undefined) {
-              onChange(String(selected));
-            }
-          }}
-        >
-          {normalizedOptions.map((option) => (
-            <Dropdown.Item key={option.id} id={option.id} textValue={option.label}>
-              <Dropdown.ItemIndicator />
-              {option.icon}
-              <Label>{option.label}</Label>
-              {option.hint && <span className="ms-auto text-xs text-muted">{option.hint}</span>}
-            </Dropdown.Item>
-          ))}
-        </Dropdown.Menu>
-      </Dropdown.Popover>
+      {isOpen ? (
+        <Dropdown.Popover placement="top">
+          <Dropdown.Menu
+            aria-label="Options"
+            selectedKeys={new Set([value])}
+            selectionMode="single"
+            onSelectionChange={(keys: Selection) => {
+              if (keys === "all") return;
+              const selected = [...keys][0];
+              if (selected !== undefined) {
+                onChange(String(selected));
+              }
+            }}
+          >
+            {normalizedOptions.map((option) => (
+              <Dropdown.Item key={option.id} id={option.id} textValue={option.label}>
+                <Dropdown.ItemIndicator />
+                {option.icon}
+                <Label>{option.label}</Label>
+                {option.hint && <span className="ms-auto text-xs text-muted">{option.hint}</span>}
+              </Dropdown.Item>
+            ))}
+          </Dropdown.Menu>
+        </Dropdown.Popover>
+      ) : null}
     </Dropdown>
   );
 }

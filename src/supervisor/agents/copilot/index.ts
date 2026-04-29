@@ -6,12 +6,20 @@ import {
   applyTerminalHintToConfig,
   createKnownSessionRef,
   detectAgentInstall,
+  iterm2ProgressOscHint,
+  shellExecOscHint,
   type AgentAdapter,
   type CreateStructuredSessionInput,
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
+import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildCopilotArgs, formatCopilotInteractivePrompt } from "./argv";
 import { buildCopilotCommand, copilotDefaultCapabilities, copilotDetectionSpec } from "./detection";
+import {
+  installCopilotPlugin,
+  isCopilotPluginInstalled,
+  readBundledCopilotPluginVersion,
+} from "./plugin/install";
 import {
   detectCopilotInvalidSessionRef,
   detectCopilotTerminalStatus,
@@ -25,6 +33,15 @@ export {
   detectCopilotStatusLineModel,
   detectCopilotTerminalStatus,
 } from "./terminal";
+
+const COPILOT_PLUGIN_VERSION = readBundledCopilotPluginVersion();
+
+warnIfPluginManifestMissing(
+  "copilot",
+  COPILOT_PLUGIN_VERSION,
+  "Expected at src/supervisor/agents/copilot/plugin/ (dev) or " +
+    "resources/agent-plugins/copilot/ (packaged, staged by scripts/prepare-agent-plugins.mjs).",
+);
 
 export function createCopilotAdapter(): AgentAdapter {
   let capabilities = copilotDefaultCapabilities;
@@ -41,6 +58,28 @@ export function createCopilotAdapter(): AgentAdapter {
       capabilities = status.capabilities;
       return status;
     },
+    // ── CLI hook plugin support ──────────────────────────────────────────
+    pluginId: "lightcode-status@copilot",
+    pluginVersion: COPILOT_PLUGIN_VERSION,
+    minProtocolVersion: 1,
+    // Copilot CLI's hook event vocabulary lacks a clean turn-finished signal:
+    // there's no `agentStop`, and `sessionEnd` only fires on full-session
+    // termination. We let L1 events drive working/error transitions and keep
+    // L2 OSC parsing running for the working->idle edge.
+    partialL1: true,
+    async isPluginInstalled(ctx) {
+      return isCopilotPluginInstalled(ctx);
+    },
+    async installPlugin(ctx) {
+      const node = await resolveInstallNodePath(ctx);
+      if (!node.ok) return node;
+      const result = installCopilotPlugin(ctx, { resolvedNodePath: node.nodePath });
+      if (!result.ok) return result;
+      return { ok: true, version: result.version };
+    },
+    // No `pluginLaunchExtras` needed — Copilot CLI auto-loads
+    // `${COPILOT_HOME ?? ~/.copilot}/hooks/lightcode-status.json` written at
+    // install time, and `LIGHTCODE_HOOK_*` env is injected by the coordinator.
     buildLaunchArgv(_location, config, prompt, _sessionRef, launchOptions) {
       const sessionId = launchOptions?.resumeThreadId ?? randomUUID();
       return {
@@ -101,6 +140,14 @@ export function createCopilotAdapter(): AgentAdapter {
       }
       return hint;
     },
+    // Copilot CLI emits OSC 9;4 progress (iTerm2 protocol) — `4;3` while a
+    // turn is in flight, `4;0` when it returns to idle. Same protocol Claude
+    // uses; reuse helper.
+    handleOscNotification: iterm2ProgressOscHint,
+    // Copilot also emits OSC 133;C / 133;D shell-integration markers around
+    // agent execution. Redundant with OSC 9;4 in most environments but the
+    // primary signal in WSL where 9;4 is unreliable.
+    handleOscShellEvent: shellExecOscHint,
     detectInvalidSessionRef(text) {
       return detectCopilotInvalidSessionRef(text);
     },

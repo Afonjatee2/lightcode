@@ -29,6 +29,15 @@ const agentSelectSettingDefSchema = z.object({
   platforms: z.array(z.string()).optional(),
 });
 
+/** Slash commands reported by Claude Code SDK initialization (optional metadata). */
+export const agentSlashCommandSchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().optional(),
+  argumentHint: z.string().optional(),
+});
+export type AgentSlashCommand = z.infer<typeof agentSlashCommandSchema>;
+
 export const agentSettingDefSchema = z.discriminatedUnion("type", [
   agentToggleSettingDefSchema,
   agentSelectSettingDefSchema,
@@ -50,6 +59,8 @@ export const agentCapabilitySchema = z.object({
   requiresTerminalFocusBeforeInput: z.boolean().optional(),
   bypassApprovalPolicy: z.string().optional(),
   settingDefs: z.array(agentSettingDefSchema).default([]),
+  /** Populated when the Claude Agent SDK init probe succeeds (install detection). */
+  slashCommands: z.array(agentSlashCommandSchema).optional(),
 });
 export type AgentCapability = z.infer<typeof agentCapabilitySchema>;
 

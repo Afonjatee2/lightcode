@@ -9,8 +9,14 @@ export function StatusIcon(props: {
   cssPrefix: string;
   className?: string | undefined;
   title?: string | undefined;
+  /**
+   * Optional second path rendered behind `path` at reduced opacity. Useful
+   * for two-region brand marks (e.g. OpenCode's frame + inner panel) where
+   * a single fill would lose the brand's tonal contrast.
+   */
+  secondaryPath?: string | undefined;
 }) {
-  const { tone, path, viewBox, fillRule, cssPrefix, className, title } = props;
+  const { tone, path, viewBox, fillRule, cssPrefix, className, title, secondaryPath } = props;
   const baseId = useId().replaceAll(":", "");
   const clipId = `${baseId}-clip`;
   const gradientId = `${baseId}-gradient`;
@@ -50,6 +56,9 @@ export function StatusIcon(props: {
         ) : null}
         {tone === "working" ? (
           <path className="lightcode-provider-icon__shell" d={path} {...pathProps} />
+        ) : null}
+        {secondaryPath ? (
+          <path className="lightcode-provider-icon__shell" d={secondaryPath} {...pathProps} />
         ) : null}
         <path
           className={`lightcode-provider-icon__fill${tone === "done" ? " opacity-40" : ""}`}

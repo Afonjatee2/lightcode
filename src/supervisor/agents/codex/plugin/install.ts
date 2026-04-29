@@ -1,13 +1,9 @@
 import { execFileSync } from "node:child_process";
 import {
-  constants as fsConstants,
   copyFileSync as fsCopyFileSync,
   existsSync,
-  linkSync,
-  lstatSync,
   mkdirSync,
   readFileSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { homedir } from "node:os";
@@ -16,17 +12,23 @@ import { fileURLToPath } from "node:url";
 import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
 import { batchWslCommands, quotePosixShellArg } from "../../base";
-import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
 import {
-  PLUGIN_ASSET_FILES,
+  FORWARD_RUNTIME_FILE,
+  copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
+  ctxCacheKey,
+  ensureNativeStateLink,
   getNativePluginBaseDir,
   getWslPluginBaseDirs,
   hasNativeHookWrapper,
   isWslPluginContext,
+  memoByCtx,
+  parseExistingHooksJson,
   readBundledPluginVersion,
   readPluginManifest,
+  stagePluginAssetsToWsl,
+  writeHooksJsonFile,
   writeNativeHookWrapper,
   type PluginManifest,
 } from "../../plugin/installerBase";
@@ -73,7 +75,7 @@ export function readBundledCodexPluginVersion(): string {
   return readBundledPluginVersion(resolveSourceDir);
 }
 
-export function getCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
+function computeCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "codex");
     if (!wsl) {
@@ -107,6 +109,12 @@ export function getCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
     codexHooksPath: join(codexHomeDir, "hooks.json"),
     version,
   };
+}
+
+const codexPluginPathsMemo = memoByCtx(computeCodexPluginPaths, ctxCacheKey);
+
+export function getCodexPluginPaths(ctx?: AgentEnvContext): CodexPluginPaths {
+  return codexPluginPathsMemo.call(ctx);
 }
 
 function pruneLightcodeGroups(groups: unknown): unknown[] {
@@ -168,21 +176,6 @@ export function mergeCodexHooksDocument(
   return { hooks: hooksRoot as Record<string, unknown[]> };
 }
 
-function writeHooksJson(path: string, doc: unknown): void {
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, `${JSON.stringify(doc, null, 2)}\n`, "utf8");
-}
-
-function parseExistingHooks(path: string): unknown | null {
-  if (!existsSync(path)) return null;
-  try {
-    const raw = readFileSync(path, "utf8");
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
-}
-
 const CODEX_LINK_TARGETS = [
   { name: "sessions", kind: "dir" as const },
   { name: "session_index.jsonl", kind: "file" as const },
@@ -217,41 +210,6 @@ function restorePrivateStateFile(
     fsCopyFileSync(source, target);
   } catch {
     // Best-effort recovery for Windows when file symlinks were unavailable.
-  }
-}
-
-function pathExistsOrSymlink(path: string): boolean {
-  try {
-    lstatSync(path);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function ensureNativeStateLink(source: string, target: string, kind: "dir" | "file"): void {
-  if (pathExistsOrSymlink(target)) return;
-  mkdirSync(dirname(target), { recursive: true });
-  try {
-    symlinkSync(source, target, kind === "dir" && process.platform === "win32" ? "junction" : kind);
-    return;
-  } catch {
-    // Fall through to hard-link/copy compatibility for platforms where file
-    // symlinks are disabled.
-  }
-  if (kind === "file" && existsSync(source)) {
-    try {
-      linkSync(source, target);
-      return;
-    } catch {
-      try {
-        // COPYFILE_EXCL: fail-closed if the target appeared between checks
-        // (e.g., concurrent install) so we never clobber an existing link.
-        fsCopyFileSync(source, target, fsConstants.COPYFILE_EXCL);
-      } catch {
-        // Best-effort compatibility seed; Codex can still recreate state.
-      }
-    }
   }
 }
 
@@ -374,10 +332,11 @@ export function installCodexPlugin(
   mkdirSync(pluginDir, { recursive: true });
   seedNativeCodexHome(codexHomeDir);
   copyPluginAssetsIfStale(sourceDir, pluginDir);
+  copyForwardRuntimeFile(pluginDir);
   const wrapperPath = writeNativeHookWrapper(pluginDir);
 
   const hooksPath = join(codexHomeDir, "hooks.json");
-  const existing = parseExistingHooks(hooksPath);
+  const existing = parseExistingHooksJson(hooksPath);
   if (existing === null && existsSync(hooksPath)) {
     return { ok: false, reason: "malformed private Codex hooks.json (invalid JSON)" };
   }
@@ -389,7 +348,7 @@ export function installCodexPlugin(
 
   try {
     const merged = mergeCodexHooksDocument(existing, commandHead);
-    writeHooksJson(hooksPath, merged);
+    writeHooksJsonFile(hooksPath, merged);
   } catch (error) {
     return {
       ok: false,
@@ -400,7 +359,11 @@ export function installCodexPlugin(
   }
 
   console.log(
-    `[supervisor] Codex hook plugin staged v${manifest.version} at ${pluginDir}; wrote private CODEX_HOME ${codexHomeDir}`,
+    [
+      `[supervisor] Codex hook plugin staged v${manifest.version}`,
+      `  pluginDir: ${pluginDir}`,
+      `  CODEX_HOME: ${codexHomeDir}`,
+    ].join("\n"),
   );
 
   return {
@@ -421,25 +384,18 @@ function installCodexPluginWsl(
   manifest: PluginManifest,
   resolvedNodePath: string,
 ): { ok: true; paths: CodexPluginPaths; version: string } | { ok: false; reason: string } {
-  const deploy = deployFilesToWslHome(
-    distro,
-    PLUGIN_ASSET_FILES.map((file) => ({
-      src: join(sourceDir, file),
-      relDest: `agent-plugins/codex/${file}`,
-    })),
-  );
-  if (!deploy) {
-    return { ok: false, reason: `failed to stage Codex plugin into wsl distro ${distro}` };
-  }
+  const staged = stagePluginAssetsToWsl(distro, sourceDir, "codex", {
+    includeForwardRuntime: true,
+  });
+  if (!staged.ok) return staged;
 
-  const home = deploy.home;
-  const linuxForward = `${deploy.linuxBaseDir}/agent-plugins/codex/forward.mjs`;
-  const linuxCodexHome = `${deploy.linuxBaseDir}/agent-plugins/codex/home`;
-  seedWslCodexHome(distro, home, linuxCodexHome);
+  const linuxForward = `${staged.linuxPluginDir}/forward.mjs`;
+  const linuxCodexHome = `${staged.linuxPluginDir}/home`;
+  seedWslCodexHome(distro, staged.deploy.home, linuxCodexHome);
   const linuxHooksPath = `${linuxCodexHome}/hooks.json`;
   const uncHooks = toWslUncPath(distro, linuxHooksPath);
 
-  const existing = parseExistingHooks(uncHooks);
+  const existing = parseExistingHooksJson(uncHooks);
   if (existing === null && existsSync(uncHooks)) {
     return {
       ok: false,
@@ -454,8 +410,7 @@ function installCodexPluginWsl(
 
   try {
     const merged = mergeCodexHooksDocument(existing, commandHead);
-    mkdirSync(dirname(uncHooks), { recursive: true });
-    writeFileSync(uncHooks, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+    writeHooksJsonFile(uncHooks, merged);
   } catch (error) {
     return {
       ok: false,
@@ -466,14 +421,18 @@ function installCodexPluginWsl(
   }
 
   console.log(
-    `[supervisor] Codex hook plugin staged v${manifest.version} in WSL distro ${distro} at ${deploy.linuxBaseDir}/agent-plugins/codex; wrote private CODEX_HOME ${linuxCodexHome}`,
+    [
+      `[supervisor] Codex hook plugin staged v${manifest.version} (wsl:${distro})`,
+      `  pluginDir: ${staged.linuxPluginDir}`,
+      `  CODEX_HOME: ${linuxCodexHome}`,
+    ].join("\n"),
   );
 
   return {
     ok: true,
     version: manifest.version,
     paths: {
-      pluginDir: `${deploy.linuxBaseDir}/agent-plugins/codex`,
+      pluginDir: staged.linuxPluginDir,
       codexHomeDir: linuxCodexHome,
       codexHooksPath: linuxHooksPath,
       version: manifest.version,
@@ -501,6 +460,7 @@ function verifyCodexInstallAt(
   const hooksPath = join(readableDir, "home", "hooks.json");
   if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
+  if (!existsSync(join(readableDir, FORWARD_RUNTIME_FILE))) return { installed: false };
   if (!hasNativeHookWrapper(readableDir, target)) return { installed: false };
   if (!existsSync(hooksPath)) return { installed: false };
   try {

@@ -345,6 +345,37 @@ function ThreadComposerSection(props: {
                       onPasteImage={(file) => {
                         void attachments.addClipboardImage(file, thread.id);
                       }}
+                      {...(showTerminalComposer
+                        ? {
+                            onInterceptKey: (e) => {
+                              // Forward common terminal shortcuts (Shift+Tab,
+                              // Ctrl/Cmd+T) to the PTY so users can drive the
+                              // CLI agent without leaving the composer.
+                              if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                                e.preventDefault();
+                                void readBridge().writeTerminal({
+                                  threadId: thread.id,
+                                  data: "\x1b[Z",
+                                });
+                                return true;
+                              }
+                              if (
+                                (e.ctrlKey || e.metaKey) &&
+                                !e.shiftKey &&
+                                !e.altKey &&
+                                e.key.toLowerCase() === "t"
+                              ) {
+                                e.preventDefault();
+                                void readBridge().writeTerminal({
+                                  threadId: thread.id,
+                                  data: "\x14",
+                                });
+                                return true;
+                              }
+                              return false;
+                            },
+                          }
+                        : {})}
                     />
                   }
                   controls={controls}

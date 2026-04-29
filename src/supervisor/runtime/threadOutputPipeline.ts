@@ -61,6 +61,13 @@ export class ThreadOutputPipeline {
   constructor(private readonly options: ThreadOutputPipelineOptions) {}
 
   private cliHookOwnsStatus(session: SessionRuntime, disableCliHookPlugin?: boolean): boolean {
+    // Providers with `partialL1` keep L2 active alongside hooks: their event
+    // vocabulary doesn't cover every transition (Copilot CLI lacks
+    // turn-finished), so terminal parsing fills the gap. L1 events still
+    // apply via `applyCliHookPluginState`; only L2 suppression is gated.
+    if (session.adapter.partialL1) {
+      return false;
+    }
     return (
       session.adapter.capabilities.presentationMode === "terminal" &&
       !(disableCliHookPlugin ?? this.options.readDisableCliHookPlugin()) &&
@@ -252,6 +259,7 @@ export class ThreadOutputPipeline {
       carryOut,
       notifications,
       titles,
+      shell,
       cleaned: dataAfterOsc,
     } = extractOscEventsFromPtyStream(ptyCarryIn, data);
     session.ptyOscCarry = carryOut;
@@ -310,6 +318,36 @@ export class ThreadOutputPipeline {
       }
       if (titleHint) {
         applyOscHint(titleHint);
+      }
+    }
+
+    for (const shellEvent of shell) {
+      this.options.emit({
+        type: "thread-osc-shell",
+        threadId: session.threadId,
+        event: shellEvent,
+      });
+
+      const shellHint = session.adapter.handleOscShellEvent?.(shellEvent);
+      if (isLightcodeOscDebugEnabled()) {
+        const summary =
+          shellEvent.kind === "command-finished"
+            ? `${shellEvent.kind} exit=${shellEvent.exitCode ?? "?"}`
+            : shellEvent.kind === "command-line"
+              ? `${shellEvent.kind} cmd=${JSON.stringify(shellEvent.command.slice(0, 160))}`
+              : shellEvent.kind === "property"
+                ? `${shellEvent.kind} ${shellEvent.key}=${JSON.stringify(shellEvent.value.slice(0, 160))}`
+                : shellEvent.kind;
+        const hintText = shellHint
+          ? `hint=${shellHint.status}/${shellHint.attention}`
+          : "hint=(null — shell event not mapped)";
+        console.log(
+          `[lightcode-osc] PTY thread=${session.threadId} kind=${session.agentKind} ` +
+            `osc=633 ${summary} ${hintText}`,
+        );
+      }
+      if (shellHint) {
+        applyOscHint(shellHint);
       }
     }
 

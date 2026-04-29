@@ -277,14 +277,15 @@ export async function probeAcpCapabilities(
     }
 
     console.log(
-      "%s success — models: %d, efforts: %s, defaultEffort: %s, modes: %s, approvalPolicies: %s (raw ACP modes: %s)",
-      tag,
-      probeResult.models?.length ?? 0,
-      probeResult.efforts?.join(", ") ?? "(none)",
-      probeResult.defaultEffort ?? "(none)",
-      probeResult.modes?.join(", ") ?? "(none)",
-      probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(none)",
-      result.modes?.availableModes?.map((m) => m.id).join(", ") ?? "(none)",
+      [
+        `${tag} success`,
+        `  models: ${probeResult.models?.length ?? 0}`,
+        `  efforts: ${probeResult.efforts?.join(", ") ?? "(none)"}`,
+        `  defaultEffort: ${probeResult.defaultEffort ?? "(none)"}`,
+        `  modes: ${probeResult.modes?.join(", ") ?? "(none)"}`,
+        `  approvalPolicies: ${probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(none)"}`,
+        `  raw ACP modes: ${result.modes?.availableModes?.map((m) => m.id).join(", ") ?? "(none)"}`,
+      ].join("\n"),
     );
 
     return probeResult;

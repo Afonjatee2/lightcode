@@ -162,19 +162,260 @@ describe("extractOscEvents", () => {
       expect(result.cleaned).toBe("middle");
     });
 
-    it("does NOT match OSC 7 (cwd) or OSC 133 (prompt marking)", () => {
-      const data = "\x1b]7;file:///home\x07\x1b]133;A\x07";
+    it("does NOT match OSC 7 (cwd) as a title", () => {
+      const data = "\x1b]7;file:///home\x07";
       const result = extractOscEvents(data);
       expect(result.titles).toEqual([]);
       expect(result.notifications).toEqual([]);
       expect(result.cleaned).toBe(data);
     });
 
-    it("does NOT match multi-digit codes that start with 0/1/2 (11, 133, 1337)", () => {
-      const data = "\x1b]11;rgb:ff/ff/ff\x07\x1b]133;A\x07\x1b]1337;something\x07";
+    it("does NOT match unrelated multi-digit codes 11 / 1337 as titles", () => {
+      const data = "\x1b]11;rgb:ff/ff/ff\x07\x1b]1337;something\x07";
       const result = extractOscEvents(data);
       expect(result.titles).toEqual([]);
       expect(result.cleaned).toBe(data);
+    });
+  });
+
+  // ── OSC 633 (VS Code shell integration) ──────────────
+
+  describe("OSC 633 (VS Code shell integration)", () => {
+    it("extracts marker A (prompt-start) with BEL terminator", () => {
+      const data = "before\x1b]633;A\x07after";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 633, kind: "prompt-start" }]);
+      expect(result.notifications).toEqual([]);
+      expect(result.titles).toEqual([]);
+      expect(result.cleaned).toBe("beforeafter");
+    });
+
+    it("extracts marker B (prompt-end) with ST terminator", () => {
+      const data = "\x1b]633;B\x1b\\rest";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 633, kind: "prompt-end" }]);
+      expect(result.cleaned).toBe("rest");
+    });
+
+    it("extracts marker C (command-pre-exec)", () => {
+      const data = "\x1b]633;C\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 633, kind: "command-pre-exec" }]);
+    });
+
+    it("extracts marker D with exit code 0", () => {
+      const data = "\x1b]633;D;0\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 633, kind: "command-finished", exitCode: 0 }]);
+    });
+
+    it("extracts marker D with non-zero exit code", () => {
+      const data = "\x1b]633;D;137\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 633, kind: "command-finished", exitCode: 137 }]);
+    });
+
+    it("extracts marker D without exit code", () => {
+      const data = "\x1b]633;D\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 633, kind: "command-finished", exitCode: undefined }]);
+    });
+
+    it("treats non-numeric exit code as undefined", () => {
+      const data = "\x1b]633;D;abc\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 633, kind: "command-finished", exitCode: undefined }]);
+    });
+
+    it("extracts marker E with command line and no nonce", () => {
+      const data = "\x1b]633;E;echo hello\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([
+        { code: 633, kind: "command-line", command: "echo hello", nonce: undefined },
+      ]);
+    });
+
+    it("extracts marker E with command line and nonce", () => {
+      const data = "\x1b]633;E;echo hello;abc123\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([
+        { code: 633, kind: "command-line", command: "echo hello", nonce: "abc123" },
+      ]);
+    });
+
+    it("decodes \\\\ to literal backslash in command line", () => {
+      // Input bytes: OSC 633 ; E ; echo \\ BEL
+      const data = "\x1b]633;E;echo \\\\\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([
+        { code: 633, kind: "command-line", command: "echo \\", nonce: undefined },
+      ]);
+    });
+
+    it("decodes \\xNN hex escapes in command line (e.g. \\x3b → ;)", () => {
+      // Input represents: echo a;b — with the inner ; encoded as \x3b so it
+      // doesn't terminate the command argument.
+      const data = "\x1b]633;E;echo a\\x3bb\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([
+        { code: 633, kind: "command-line", command: "echo a;b", nonce: undefined },
+      ]);
+    });
+
+    it("extracts marker P with Cwd property", () => {
+      const data = "\x1b]633;P;Cwd=/home/user/project\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([
+        { code: 633, kind: "property", key: "Cwd", value: "/home/user/project" },
+      ]);
+    });
+
+    it("decodes \\xNN escapes in property value", () => {
+      // Cwd containing an encoded space (\x20).
+      const data = "\x1b]633;P;Cwd=/path/with\\x20space\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([
+        { code: 633, kind: "property", key: "Cwd", value: "/path/with space" },
+      ]);
+    });
+
+    it("ignores unknown markers", () => {
+      const data = "before\x1b]633;Z;ignored\x07after";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([]);
+      // Sequence is still consumed (cleaned).
+      expect(result.cleaned).toBe("beforeafter");
+    });
+
+    it("ignores malformed body with no marker", () => {
+      const data = "before\x1b]633;\x07after";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([]);
+      expect(result.cleaned).toBe("beforeafter");
+    });
+
+    it("ignores marker P without `=` separator", () => {
+      const data = "\x1b]633;P;NoEqualsHere\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([]);
+    });
+
+    it("does NOT match unrelated codes 633x / 6330", () => {
+      const data = "\x1b]6330;A\x07\x1b]633A;A\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([]);
+      expect(result.cleaned).toBe(data);
+    });
+
+    it("reconstructs OSC 633 split across two PTY chunks", () => {
+      const a = "before\x1b]633;D";
+      const b = ";0\x07after";
+      const r1 = extractOscEventsFromPtyStream("", a);
+      expect(r1.shell).toEqual([]);
+      expect(r1.carryOut.startsWith("\x1b]633;")).toBe(true);
+      const r2 = extractOscEventsFromPtyStream(r1.carryOut, b);
+      expect(r2.shell).toEqual([{ code: 633, kind: "command-finished", exitCode: 0 }]);
+      expect(r1.cleaned + r2.cleaned).toBe("beforeafter");
+    });
+
+    it("interleaves OSC 633 events with OSC 9 notifications and titles", () => {
+      const data =
+        "\x1b]0;Window\x07" +
+        "\x1b]633;A\x07" +
+        "\x1b]633;E;ls\x07" +
+        "\x1b]633;C\x07" +
+        "\x1b]9;ping\x07" +
+        "\x1b]633;D;0\x07";
+      const result = extractOscEvents(data);
+      expect(result.titles).toEqual([{ code: 0, text: "Window" }]);
+      expect(result.notifications).toHaveLength(1);
+      expect(result.notifications[0]!.body).toBe("ping");
+      expect(result.shell).toEqual([
+        { code: 633, kind: "prompt-start" },
+        { code: 633, kind: "command-line", command: "ls", nonce: undefined },
+        { code: 633, kind: "command-pre-exec" },
+        { code: 633, kind: "command-finished", exitCode: 0 },
+      ]);
+      expect(result.cleaned).toBe("");
+    });
+  });
+
+  // ── OSC 133 (FinalTerm/iTerm2 shell integration) ─────
+
+  describe("OSC 133 (FinalTerm/iTerm2 shell integration)", () => {
+    it("extracts marker A (prompt-start)", () => {
+      const data = "before\x1b]133;A\x07after";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 133, kind: "prompt-start" }]);
+      expect(result.cleaned).toBe("beforeafter");
+    });
+
+    it("extracts marker B (prompt-end) with ST terminator", () => {
+      const data = "\x1b]133;B\x1b\\rest";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 133, kind: "prompt-end" }]);
+      expect(result.cleaned).toBe("rest");
+    });
+
+    it("extracts marker C (command-pre-exec) — Copilot turn-start signal", () => {
+      const data = "\x1b]133;C\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 133, kind: "command-pre-exec" }]);
+    });
+
+    it("extracts marker D with exit code", () => {
+      const data = "\x1b]133;D;0\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 133, kind: "command-finished", exitCode: 0 }]);
+    });
+
+    it("extracts marker D without exit code — Copilot turn-end signal", () => {
+      const data = "\x1b]133;D\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([{ code: 133, kind: "command-finished", exitCode: undefined }]);
+    });
+
+    it("ignores unknown markers (E/P are 633-only)", () => {
+      const data = "\x1b]133;E;echo\x07\x1b]133;P;Cwd=/tmp\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([]);
+      expect(result.cleaned).toBe("");
+    });
+
+    it("does NOT match unrelated codes 1330 / 13", () => {
+      const data = "\x1b]1330;A\x07\x1b]13;A\x07";
+      const result = extractOscEvents(data);
+      expect(result.shell).toEqual([]);
+      expect(result.cleaned).toBe(data);
+    });
+
+    it("reconstructs OSC 133 split across two PTY chunks", () => {
+      const a = "before\x1b]133;D";
+      const b = "\x07after";
+      const r1 = extractOscEventsFromPtyStream("", a);
+      expect(r1.shell).toEqual([]);
+      expect(r1.carryOut.startsWith("\x1b]133;")).toBe(true);
+      const r2 = extractOscEventsFromPtyStream(r1.carryOut, b);
+      expect(r2.shell).toEqual([{ code: 133, kind: "command-finished", exitCode: undefined }]);
+      expect(r1.cleaned + r2.cleaned).toBe("beforeafter");
+    });
+
+    it("coexists with OSC 9 progress and OSC 0 titles in a real Copilot turn", () => {
+      // Approximation of what a Copilot turn looks like on the wire.
+      const data =
+        "\x1b]0;GitHub Copilot\x07" +
+        "\x1b]133;C\x07" +
+        "\x1b]9;4;3;0\x07" +
+        "\x1b]9;4;0;0\x07" +
+        "\x1b]133;D\x07";
+      const result = extractOscEvents(data);
+      expect(result.titles).toEqual([{ code: 0, text: "GitHub Copilot" }]);
+      expect(result.notifications.map((n) => n.body)).toEqual(["4;3;0", "4;0;0"]);
+      expect(result.shell).toEqual([
+        { code: 133, kind: "command-pre-exec" },
+        { code: 133, kind: "command-finished", exitCode: undefined },
+      ]);
+      expect(result.cleaned).toBe("");
     });
   });
 

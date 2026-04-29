@@ -9,6 +9,7 @@ import { createCopilotAdapter } from "./copilot";
 import { createCodexAdapter } from "./codex";
 import { createCursorAdapter } from "./cursor";
 import { createGeminiAdapter } from "./gemini";
+import { createOpenCodeAdapter } from "./opencode";
 
 export function createAgentRegistry(): AgentAdapter[] {
   const adapters = [
@@ -17,6 +18,7 @@ export function createAgentRegistry(): AgentAdapter[] {
     createCodexAdapter(),
     createGeminiAdapter(),
     createCursorAdapter(),
+    createOpenCodeAdapter(),
   ];
   const kinds = new Set(adapters.map((a) => a.kind));
   if (kinds.size !== adapters.length) {

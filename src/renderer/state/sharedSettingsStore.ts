@@ -81,6 +81,20 @@ function persistSettings(settings: SharedSettingsInput): void {
   }
 }
 
+function providerDraftConfigEqual(
+  a: ProviderDraftConfig | undefined,
+  b: ProviderDraftConfig,
+): boolean {
+  return (
+    a !== undefined &&
+    a.model === b.model &&
+    a.effort === b.effort &&
+    a.mode === b.mode &&
+    a.approvalPolicy === b.approvalPolicy &&
+    a.sandboxMode === b.sandboxMode
+  );
+}
+
 const initialSettings = loadFallbackSettings();
 
 export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
@@ -204,6 +218,9 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
       return;
     }
     const current = get().providerConfigs;
+    if (providerDraftConfigEqual(current[agentKind], config)) {
+      return;
+    }
     set({ providerConfigs: { ...current, [agentKind]: config } });
     persistSettings(selectSharedSettings(get()));
   },

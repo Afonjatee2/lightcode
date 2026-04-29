@@ -1,4 +1,5 @@
 import type { ThreadConfig } from "@/shared/contracts";
+import { CLAUDE_DEFAULT_APPROVAL_POLICY } from "./detection";
 
 export function buildClaudeArgs(
   config: ThreadConfig,
@@ -23,7 +24,8 @@ export function buildClaudeArgs(
 
   args.push("--allow-dangerously-skip-permissions");
 
-  const permissionMode = config.mode === "plan" ? "plan" : (config.approvalPolicy ?? "default");
+  const permissionMode =
+    config.mode === "plan" ? "plan" : (config.approvalPolicy ?? CLAUDE_DEFAULT_APPROVAL_POLICY);
   args.push("--permission-mode", permissionMode);
 
   if (prompt.trim().length > 0) {

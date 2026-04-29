@@ -3,20 +3,23 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
-import { deployFilesToWslHome } from "../../../wsl/wslDeploy";
 import {
-  PLUGIN_ASSET_FILES,
+  FORWARD_RUNTIME_FILE,
   buildWslHookCommandHead,
+  copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
+  ctxCacheKey,
   getNativeHookWrapperFilename,
   getNativePluginBaseDir,
   getWslPluginBaseDirs,
   hasNativeHookWrapper,
   isWslPluginContext,
+  memoByCtx,
   quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
+  stagePluginAssetsToWsl,
   writeNativeHookWrapper,
   type PluginManifest,
 } from "../../plugin/installerBase";
@@ -78,8 +81,7 @@ export function readBundledClaudePluginVersion(): string {
   return readBundledPluginVersion(resolveSourceDir);
 }
 
-/** Compute the plugin staging dir without performing any install work. */
-export function getClaudePluginPaths(ctx?: AgentEnvContext): ClaudePluginPaths {
+function computeClaudePluginPaths(ctx?: AgentEnvContext): ClaudePluginPaths {
   if (isWslPluginContext(ctx)) {
     const wsl = getWslPluginBaseDirs(ctx.wslDistro, "claude");
     if (!wsl) return { pluginDir: "", settingsPath: "", version: "0.0.0" };
@@ -107,6 +109,19 @@ export function getClaudePluginPaths(ctx?: AgentEnvContext): ClaudePluginPaths {
     settingsPath: join(pluginDir, "settings.json"),
     version,
   };
+}
+
+const claudePluginPathsMemo = memoByCtx(computeClaudePluginPaths, ctxCacheKey);
+
+/**
+ * Compute the plugin staging dir without performing any install work.
+ * Result is memoized per (envKind, wslDistro, baseDir) for the supervisor
+ * lifetime — all inputs are stable across spawns. After `installClaudePlugin`
+ * runs, the manifest version on disk is the same the memo would have read,
+ * so re-installs don't require invalidation in practice.
+ */
+export function getClaudePluginPaths(ctx?: AgentEnvContext): ClaudePluginPaths {
+  return claudePluginPathsMemo.call(ctx);
 }
 
 /**
@@ -158,6 +173,7 @@ export function installClaudePlugin(
   const pluginDir = getNativePluginBaseDir("claude", ctx?.baseDir);
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
+  copyForwardRuntimeFile(pluginDir);
   const wrapperPath = writeNativeHookWrapper(pluginDir);
 
   const settingsPath = join(pluginDir, "settings.json");
@@ -184,18 +200,12 @@ function installClaudePluginWsl(
   manifest: PluginManifest,
   resolvedNodePath: string,
 ): { ok: true; paths: ClaudePluginPaths; version: string } | { ok: false; reason: string } {
-  const deploy = deployFilesToWslHome(
-    distro,
-    PLUGIN_ASSET_FILES.map((file) => ({
-      src: join(sourceDir, file),
-      relDest: `agent-plugins/claude/${file}`,
-    })),
-  );
-  if (!deploy) {
-    return { ok: false, reason: `failed to stage Claude plugin into wsl distro ${distro}` };
-  }
+  const staged = stagePluginAssetsToWsl(distro, sourceDir, "claude", {
+    includeForwardRuntime: true,
+  });
+  if (!staged.ok) return staged;
 
-  const linuxPluginDir = `${deploy.linuxBaseDir}/agent-plugins/claude`;
+  const linuxPluginDir = staged.linuxPluginDir;
   const linuxSettingsPath = `${linuxPluginDir}/settings.json`;
   const linuxForwardPath = `${linuxPluginDir}/forward.mjs`;
   const headExpression = buildWslHookCommandHead(resolvedNodePath, linuxForwardPath);
@@ -254,6 +264,7 @@ function verifyClaudeInstallAt(
 ): { installed: boolean; version?: string } {
   if (!existsSync(join(readableDir, "plugin.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "forward.mjs"))) return { installed: false };
+  if (!existsSync(join(readableDir, FORWARD_RUNTIME_FILE))) return { installed: false };
   if (!existsSync(join(readableDir, "hooks", "hooks.json"))) return { installed: false };
   if (!existsSync(join(readableDir, "settings.json"))) return { installed: false };
   if (!hasNativeHookWrapper(readableDir, target)) return { installed: false };
