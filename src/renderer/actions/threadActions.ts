@@ -68,7 +68,7 @@ export function reopenStoredThread(threadId: string): void {
 
 export async function unloadStoredThread(
   threadId: string,
-  options?: { closeThreadPane?: boolean },
+  options?: { closeThreadPane?: boolean; keepSidePanels?: boolean },
 ): Promise<void> {
   const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
   if (
@@ -86,7 +86,7 @@ export async function unloadStoredThread(
   await readBridge().closeThread({ threadId });
   startTransition(() => {
     useAppStore.getState().markThreadExited(threadId);
-    if (inVisiblePane) {
+    if (inVisiblePane && !options?.keepSidePanels) {
       closePanelsForUnloadedThread(thread);
     }
     if (options?.closeThreadPane && inVisiblePane) {
@@ -133,7 +133,7 @@ export function toggleMarkThreadDone(threadId: string): void {
   if (thread.done) {
     store.unmarkThreadDone(threadId);
   } else {
-    void unloadStoredThread(threadId).catch(() => undefined);
+    void unloadStoredThread(threadId, { keepSidePanels: true }).catch(() => undefined);
     store.markThreadDone(threadId);
   }
 }

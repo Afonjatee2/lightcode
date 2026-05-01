@@ -96,7 +96,7 @@ describe("installCursorPlugin", () => {
     expect(existsSync(result.paths.globalHooksPath)).toBe(true);
 
     const installed = await isCursorPluginInstalledForTest(baseDir, globalCursorDirOverride);
-    expect(installed).toMatchObject({ installed: true, version: "1.0.1" });
+    expect(installed).toMatchObject({ installed: true, version: "1.0.2" });
 
     const doc = JSON.parse(readFileSync(result.paths.globalHooksPath, "utf8")) as {
       version: number;

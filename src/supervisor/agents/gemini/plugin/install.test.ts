@@ -80,7 +80,7 @@ describe("installGeminiPlugin", () => {
     expect(existsSync(result.paths.settingsPath)).toBe(true);
     expect(isGeminiPluginInstalled({ envKind: "posix", baseDir })).toMatchObject({
       installed: true,
-      version: "1.2.0",
+      version: "1.2.1",
     });
 
     const settings = JSON.parse(readFileSync(result.paths.settingsPath, "utf8")) as {

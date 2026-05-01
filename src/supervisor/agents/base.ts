@@ -664,11 +664,6 @@ async function resolveDetectedBinary(
   binary: string,
 ): Promise<string | undefined> {
   if (ctx?.envKind === "wsl" && ctx.wslDistro) {
-    // Kick off the unified login-env probe (PATH + HOME + SHELL) in the
-    // background. Detection doesn't need it, but warming the cache here lets
-    // subsequent batched probe spawns (batchWslCommandsAsync,
-    // parallelWslCommandsAsync) skip `-l -i` for short non-PTY queries.
-    void primeWslLoginEnv(ctx.wslDistro);
     const [result] = await batchWslCommandsAsync(ctx.wslDistro, [`command -v ${binary}`]);
     const path = result?.ok ? result.stdout : undefined;
     primeAgentBinaryPath(ctx.wslDistro, binary, path);
@@ -1105,77 +1100,6 @@ const WSL_BATCH_DELIMITER = "---LIGHTCODE_BATCH_SEP---";
 const DEFAULT_WSL_EXEC_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const wslShellPathCache = new Map<string, string>();
 
-interface WslLoginEnv {
-  path: string;
-  home: string;
-  shell: string;
-}
-
-const wslLoginEnvCache = new Map<string, WslLoginEnv>();
-const wslLoginEnvInflight = new Map<string, Promise<WslLoginEnv | undefined>>();
-
-/**
- * Read the canonical login+interactive PATH/HOME/SHELL inside a WSL distro.
- * Memoized for the supervisor lifetime — one wsl.exe spawn per distro
- * primes:
- *   - {@link batchWslCommandsAsync} / {@link parallelWslCommandsAsync} probe
- *     spawns (skip `-l -i` rc sourcing for short non-PTY queries)
- *   - {@link resolveWslShellPath} sync cache (login-shell `getent passwd` lookup)
- *   - {@link resolveWslHomeDirectory} sync cache (`$HOME` lookup)
- *
- * Note: agent PTY launches in {@link buildAgentCommand} always go through a
- * full `-l -i` shell — the user's rc files must run so hooks see fnm/nvm node.
- *
- * Replaces three independent wsl.exe probes during boot/detection. Safe to
- * call concurrently — the in-flight promise is shared.
- */
-export function primeWslLoginEnv(distro: string): Promise<WslLoginEnv | undefined> {
-  const cached = wslLoginEnvCache.get(distro);
-  if (cached) return Promise.resolve(cached);
-  const inflight = wslLoginEnvInflight.get(distro);
-  if (inflight) return inflight;
-
-  const promise = (async (): Promise<WslLoginEnv | undefined> => {
-    try {
-      const shellPath = await resolveWslShellPathAsync(distro);
-      const sep = WSL_BATCH_DELIMITER;
-      const script =
-        `printf '%s\\n${sep}\\n' "$PATH"; ` +
-        `printf '%s\\n${sep}\\n' "$HOME"; ` +
-        `printf '%s\\n${sep}\\n' "$SHELL"`;
-      const { stdout } = await execFileAsync(
-        getWslCommand(),
-        ["-d", distro, "--", shellPath, "-l", "-i", "-c", script],
-        { windowsHide: true, timeout: 8_000 },
-      );
-      const parts = (stdout ?? "").split(sep).map((s) => s.replace(/^\n+|\n+$/g, "").trim());
-      const path = parts[0] ?? "";
-      const home = parts[1] ?? "";
-      const shell = parts[2] || shellPath;
-      if (!path) return undefined;
-      const entry: WslLoginEnv = { path, home, shell };
-      wslLoginEnvCache.set(distro, entry);
-      // Populate the per-purpose sync caches so any subsequent sync lookup
-      // (`resolveWslShellPath`, `resolveWslHomeDirectory`) returns instantly
-      // without a second wsl.exe roundtrip.
-      if (home) wslHomeCache.set(distro, home);
-      if (shell) wslShellPathCache.set(distro, shell);
-      return entry;
-    } catch {
-      return undefined;
-    } finally {
-      wslLoginEnvInflight.delete(distro);
-    }
-  })();
-  wslLoginEnvInflight.set(distro, promise);
-  return promise;
-}
-
-export function clearWslLoginEnvCacheForTests(): void {
-  wslLoginEnvCache.clear();
-  wslLoginEnvInflight.clear();
-}
-
 function parseCommandOutputLine(stdout: string): string | undefined {
   return stdout
     .split(/\r?\n/g)
@@ -1439,21 +1363,20 @@ export async function batchWslCommandsAsync(
   const script = buildBatchWslScript(commands, sep);
   try {
     const shellPath = await resolveWslShellPathAsync(distro);
-    // When the login env was already captured (PATH+HOME+SHELL via
-    // primeWslLoginEnv), skip `-l -i` and inject PATH directly. Saves the
-    // ~500ms–2s rc-sourcing cost on every detection/probe call once the
-    // first prime has landed.
-    const loginEnv = wslLoginEnvCache.get(distro);
-    const wslArgs: string[] = ["-d", distro, "--"];
-    if (loginEnv) {
-      wslArgs.push(shellPath, "-c", `export PATH=${quotePosixShellArg(loginEnv.path)}; ${script}`);
-    } else {
-      wslArgs.push(shellPath, "-l", "-i", "-c", script);
-    }
-    const { stdout } = await execFileAsync(getWslCommand(), wslArgs, {
-      windowsHide: true,
-      timeout: 15_000,
-    });
+    // Always source the user's rc files (`-l -i`) so detection sees the
+    // same PATH the user gets in their terminal — fnm/nvm/asdf shims, npm
+    // global bin dirs, etc. A captured PATH from a non-tty `-l -i` shell
+    // is unreliable (rc files often gate PATH additions on `[ -t 0 ]`),
+    // and detection silently dropping codex/gemini/opencode is worse than
+    // paying the rc-sourcing cost on every probe.
+    const { stdout } = await execFileAsync(
+      getWslCommand(),
+      ["-d", distro, "--", shellPath, "-l", "-i", "-c", script],
+      {
+        windowsHide: true,
+        timeout: 15_000,
+      },
+    );
     const parts = (stdout ?? "").split(sep);
     return commands.map((_, i) => {
       const raw = (parts[i] ?? "").trim();
@@ -1487,18 +1410,11 @@ export async function parallelWslCommandsAsync(
   const script = buildParallelWslScript(commands, sep);
   try {
     const shellPath = await resolveWslShellPathAsync(distro);
-    // Skip `-l` when the login env is cached; we prepend the captured PATH
-    // to the script instead. `-l` exists today only to source ~/.profile so
-    // git/gh resolve — once we've already stored that PATH we can avoid the
-    // rc-source cost on every git refresh.
-    const loginEnv = wslLoginEnvCache.get(distro);
-    const fullScript = loginEnv
-      ? `export PATH=${quotePosixShellArg(loginEnv.path)}\n${script}`
-      : script;
-    const wslArgs = loginEnv
-      ? ["-d", distro, "--", shellPath]
-      : ["-d", distro, "--", shellPath, "-l"];
-    const stdout = await runWslScriptViaStdin(wslArgs, fullScript, timeoutMs);
+    // Always run under `-l` so ~/.profile sources the user's PATH (git, gh,
+    // npm-global bins). Mirrors the always-login-shell rule applied to PTY
+    // launches and detection probes.
+    const wslArgs = ["-d", distro, "--", shellPath, "-l"];
+    const stdout = await runWslScriptViaStdin(wslArgs, script, timeoutMs);
     return parseParallelWslOutput(stdout, commands.length, sep);
   } catch {
     return commands.map(() => ({ ok: false, stdout: "", exitCode: 1 }));

@@ -1,5 +1,5 @@
 {
   "name": "lightcode-status-cursor",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Cursor CLI lifecycle hook forwarder for Lightcode thread status"
 }

@@ -4,7 +4,7 @@
  * Each provider's `forward.mjs` imports this file as a sibling and calls
  * `runForwarder({ agentKind, intentFor, buildExtra, pickSessionId, ... })`.
  * The runtime owns: manifest read for `pluginVersion`, env-var debug flag,
- * stdin read with 256KB cap, retry POST, envelope construction, debug
+ * bounded stdin read, retry POST, envelope construction, debug
  * logging, and the always-emit-stdout-on-error contract some CLIs require.
  *
  * Standalone ESM: must run under user CLI Node (claude / codex / cursor /
@@ -21,6 +21,7 @@ import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const PROTOCOL_VERSION = 1;
+const MAX_STDIN_CHARS = 2 * 1024 * 1024;
 
 export function readPluginVersionFromManifest(importMetaUrl) {
   try {
@@ -51,19 +52,28 @@ export function summarizePayload(payload) {
   }
 }
 
-export async function readStdin() {
+export async function readJsonFromStream(stream, maxChars = MAX_STDIN_CHARS) {
   let data = "";
-  process.stdin.setEncoding("utf8");
-  for await (const chunk of process.stdin) {
-    data += chunk;
-    if (data.length > 256 * 1024) break;
+  let truncated = false;
+  if (typeof stream.setEncoding === "function") stream.setEncoding("utf8");
+  for await (const chunk of stream) {
+    const text = String(chunk);
+    const remaining = maxChars - data.length;
+    if (remaining > 0) {
+      data += text.length <= remaining ? text : text.slice(0, remaining);
+    }
+    if (text.length > remaining) truncated = true;
   }
-  if (!data.trim()) return undefined;
+  if (!data.trim() || truncated) return undefined;
   try {
     return JSON.parse(data);
   } catch {
     return undefined;
   }
+}
+
+export async function readStdin() {
+  return readJsonFromStream(process.stdin);
 }
 
 export async function postWithRetry(url, headers, body, attempts = 2) {

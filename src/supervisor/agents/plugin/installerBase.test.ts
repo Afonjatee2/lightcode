@@ -23,6 +23,7 @@ import {
   quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
+  renderNativeHookPowerShellWrapper,
   renderNativeHookWrapper,
   warnIfPluginManifestMissing,
 } from "./installerBase";
@@ -255,6 +256,43 @@ describe("renderNativeHookWrapper", () => {
     const expectedFragment =
       process.platform === "win32" ? '"C:\\a""b\\node.exe"' : "'/p/a'\\''b/node'";
     expect(body).toContain(expectedFragment);
+  });
+
+  it("prefers PowerShell 7, then Windows PowerShell, before cmd fallback on Windows", () => {
+    const body = renderNativeHookWrapper({ electronPath: "C:\\Lightcode\\Lightcode.exe" });
+    if (process.platform !== "win32") {
+      return;
+    }
+    expect(body.indexOf("where pwsh.exe")).toBeLessThan(body.indexOf("where powershell.exe"));
+    expect(body.indexOf("where powershell.exe")).toBeLessThan(
+      body.indexOf("set ELECTRON_RUN_AS_NODE=1"),
+    );
+    expect(body).toContain(
+      'pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0lightcode-hook.ps1" %*',
+    );
+    expect(body).toContain(
+      'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0lightcode-hook.ps1" %*',
+    );
+  });
+});
+
+describe("renderNativeHookPowerShellWrapper", () => {
+  it("passes hook args through to forward.mjs", () => {
+    const body = renderNativeHookPowerShellWrapper({
+      electronPath: "C:\\Lightcode\\Lightcode.exe",
+    });
+    expect(body).toContain("$forward = Join-Path $PSScriptRoot 'forward.mjs'");
+    expect(body).toContain("$forward @args");
+    expect(body).toContain("$env:ELECTRON_RUN_AS_NODE = '1'");
+  });
+
+  it("escapes single quotes in the node path", () => {
+    const body = renderNativeHookPowerShellWrapper({
+      electronPath: "C:\\Lightcode\\Lightcode.exe",
+      nodePath: "C:\\a'b\\node.exe",
+    });
+    expect(body).toContain("& 'C:\\a''b\\node.exe' $forward @args");
+    expect(body).not.toContain("ELECTRON_RUN_AS_NODE");
   });
 });
 

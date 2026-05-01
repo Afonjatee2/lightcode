@@ -149,7 +149,8 @@ export function quoteHookCommandArg(value: string, target: "native" | "wsl"): st
  * On Windows, native hook commands may be executed by Windows PowerShell,
  * PowerShell 7, or cmd.exe depending on the agent CLI and the user's launch
  * shell. Route through cmd.exe explicitly so the same command string works in
- * all three while still invoking the staged `.cmd` wrapper.
+ * all three; the staged `.cmd` wrapper then prefers pwsh, then Windows
+ * PowerShell, and only falls back to direct cmd execution when neither exists.
  */
 export function buildNativeHookCommandHead(wrapperPath: string): string {
   if (process.platform === "win32") {
@@ -248,6 +249,10 @@ export function getNativeHookWrapperFilename(): string {
   return process.platform === "win32" ? "lightcode-hook.cmd" : "lightcode-hook.sh";
 }
 
+function getNativeHookPowerShellWrapperFilename(): string {
+  return "lightcode-hook.ps1";
+}
+
 /**
  * Render the wrapper script body. Two shapes:
  *
@@ -270,12 +275,43 @@ export interface RenderNativeHookWrapperOptions {
   nodePath?: string;
 }
 
+function quotePowerShellSingleQuoted(value: string): string {
+  return `'${value.replaceAll("'", "''")}'`;
+}
+
+export function renderNativeHookPowerShellWrapper(opts: RenderNativeHookWrapperOptions): string {
+  const useElectron = !opts.nodePath;
+  const bin = opts.nodePath ?? opts.electronPath;
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    ...(useElectron ? ["$env:ELECTRON_RUN_AS_NODE = '1'"] : []),
+    `$forward = Join-Path $PSScriptRoot 'forward.mjs'`,
+    `& ${quotePowerShellSingleQuoted(bin)} $forward @args`,
+    "exit $LASTEXITCODE",
+    "",
+  ].join("\r\n");
+}
+
 export function renderNativeHookWrapper(opts: RenderNativeHookWrapperOptions): string {
   const useElectron = !opts.nodePath;
   const bin = opts.nodePath ?? opts.electronPath;
   if (process.platform === "win32") {
     const safe = bin.replaceAll('"', '""');
-    const lines = ["@echo off", "setlocal"];
+    const ps1 = getNativeHookPowerShellWrapperFilename();
+    const lines = [
+      "@echo off",
+      "setlocal",
+      "where pwsh.exe >nul 2>nul",
+      "if not errorlevel 1 (",
+      `  pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0${ps1}" %*`,
+      "  exit /b %errorlevel%",
+      ")",
+      "where powershell.exe >nul 2>nul",
+      "if not errorlevel 1 (",
+      `  powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0${ps1}" %*`,
+      "  exit /b %errorlevel%",
+      ")",
+    ];
     if (useElectron) lines.push("set ELECTRON_RUN_AS_NODE=1");
     lines.push(`"${safe}" "%~dp0forward.mjs" %*`, "");
     return lines.join("\r\n");
@@ -327,6 +363,20 @@ export function writeNativeHookWrapper(
     // File missing or unreadable — fall through to writeFileSync below.
   }
   if (needsWrite) writeFileSync(target, body, "utf8");
+  if (process.platform === "win32") {
+    const psTarget = join(pluginDir, getNativeHookPowerShellWrapperFilename());
+    const psBody = renderNativeHookPowerShellWrapper({
+      electronPath: options?.electronPath ?? process.execPath,
+      ...(options?.nodePath ? { nodePath: options.nodePath } : {}),
+    });
+    let needsPowerShellWrite = true;
+    try {
+      needsPowerShellWrite = readFileSync(psTarget, "utf8") !== psBody;
+    } catch {
+      // File missing or unreadable — fall through to writeFileSync below.
+    }
+    if (needsPowerShellWrite) writeFileSync(psTarget, psBody, "utf8");
+  }
   if (process.platform !== "win32") {
     try {
       chmodSync(target, 0o755);

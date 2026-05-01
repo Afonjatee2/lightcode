@@ -224,7 +224,7 @@ describe("createGeminiAdapter hook plugin support", () => {
     const adapter = createGeminiAdapter();
 
     expect(adapter.pluginId).toBe("lightcode-status@gemini");
-    expect(adapter.pluginVersion).toBe("1.2.0");
+    expect(adapter.pluginVersion).toBe("1.2.1");
     expect(adapter.minProtocolVersion).toBe(1);
 
     const extras = await adapter.pluginLaunchExtras?.({
