@@ -423,14 +423,9 @@ function getPosixLoginShellArgs(script: string): string[] {
 
 /**
  * Inject environment variables into an already-built WSL CommandSpec.
- *
- * Two spec shapes are supported, matching the two paths in
- * `buildAgentCommand`:
- *   - **Login-shell form** (`[..., shellPath, "-l", "-i", "-c", script]`):
- *     `export KEY=VALUE; ...` is prepended to the script string.
- *   - **`/usr/bin/env` fast-path form** (`[..., "/usr/bin/env", "PATH=...",
- *     ...kv, exec, ...args]`): new `KEY=VALUE` literals are inserted
- *     immediately after the existing K=V block.
+ * The WSL command structure from `buildAgentCommand` always ends with
+ * `[..., shellPath, "-l", "-i", "-c", script]`, so we prepend `export`
+ * statements to the script string.
  *
  * For non-WSL commands, the env is stored on `CommandSpec.env` and merged
  * into the PTY spawn options by the caller — no script rewriting needed.
@@ -442,24 +437,11 @@ export function injectWslEnv(
 ): CommandSpec {
   if (location.kind !== "wsl" || Object.keys(env).length === 0) return spec;
 
-  const args = [...spec.args];
-  const envIdx = args.indexOf("/usr/bin/env");
-  if (envIdx >= 0 && envValuesAreWslSafe(env)) {
-    // Walk forward past the existing PATH=... and any other KEY=VALUE
-    // literals; insert new ones at that boundary, before the binary.
-    let insertAt = envIdx + 1;
-    while (insertAt < args.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(args[insertAt]!)) {
-      insertAt += 1;
-    }
-    const newKv = Object.entries(env).map(([k, v]) => `${k}=${v}`);
-    args.splice(insertAt, 0, ...newKv);
-    return { ...spec, args };
-  }
-
   const prefix = buildPosixExportPrefix(env);
   if (!prefix) return spec;
 
-  // Login-shell form: the script is always the last arg after "-c".
+  // The script is always the last arg after "-c".
+  const args = [...spec.args];
   const scriptIdx = args.length - 1;
   args[scriptIdx] = `${prefix}${args[scriptIdx]}`;
   return { ...spec, args };
@@ -547,36 +529,12 @@ export function buildAgentCommand(
   env?: Record<string, string>,
 ): CommandSpec {
   if (location.kind === "wsl") {
-    // Fast path: when the user's login PATH was already captured (via
-    // primeWslLoginEnv during install detection) and the agent binary is an
-    // absolute path, skip the `-l -i` shell wrap entirely. Sourcing
-    // ~/.bashrc / ~/.profile costs 500ms–2s on nvm/fnm/asdf setups; once we
-    // have the resolved PATH we can just exec the binary via `/usr/bin/env`.
-    // Aliases and shell functions are not propagated, but agent CLIs don't
-    // depend on them — they're an interactive-shell convenience only.
-    const loginEnv = wslLoginEnvCache.get(location.distro);
-    const fastPathExec = wslExecPath && wslExecPath.startsWith("/") ? wslExecPath : undefined;
-    if (loginEnv && fastPathExec && envValuesAreWslSafe(env)) {
-      const envArgs: string[] = [`PATH=${loginEnv.path}`];
-      if (env) {
-        for (const [k, v] of Object.entries(env)) envArgs.push(`${k}=${v}`);
-      }
-      return {
-        command: getWslCommand(),
-        args: [
-          "-d",
-          location.distro,
-          "--cd",
-          location.linuxPath,
-          "--",
-          "/usr/bin/env",
-          ...envArgs,
-          fastPathExec,
-          ...args,
-        ],
-      };
-    }
-
+    // Always launch the agent through `bash -l -i -c` so the user's rc files
+    // (nvm/fnm/asdf init, PATH overrides, shell functions) are sourced. Hooks
+    // spawned by the agent inherit this env — without `-l -i`, Windows-side
+    // tooling reachable via `/mnt/c` interop can shadow Linux node from a
+    // version manager and break things like `npx` (e.g. fnm shims that exec a
+    // node not on PATH).
     const shellPath = resolveWslShellPath(location.distro);
     const execCommand = wslExecPath ?? command;
     const exports = buildPosixExportPrefix(env);
@@ -707,9 +665,9 @@ async function resolveDetectedBinary(
 ): Promise<string | undefined> {
   if (ctx?.envKind === "wsl" && ctx.wslDistro) {
     // Kick off the unified login-env probe (PATH + HOME + SHELL) in the
-    // background. Detection doesn't need it, but warming the cache here means
-    // the user's first PTY launch can take the no-shell fast path in
-    // buildAgentCommand.
+    // background. Detection doesn't need it, but warming the cache here lets
+    // subsequent batched probe spawns (batchWslCommandsAsync,
+    // parallelWslCommandsAsync) skip `-l -i` for short non-PTY queries.
     void primeWslLoginEnv(ctx.wslDistro);
     const [result] = await batchWslCommandsAsync(ctx.wslDistro, [`command -v ${binary}`]);
     const path = result?.ok ? result.stdout : undefined;
@@ -1157,28 +1115,16 @@ const wslLoginEnvCache = new Map<string, WslLoginEnv>();
 const wslLoginEnvInflight = new Map<string, Promise<WslLoginEnv | undefined>>();
 
 /**
- * Whether values in the env map are safe to pass through `wsl.exe` argv as
- * `KEY=VALUE` literals. `wsl.exe` pre-expands `$VAR` and `$(...)` in its argv
- * before forwarding to the Linux side, so values that look like shell
- * substitutions corrupt. This is rare for the env we ship into PTYs
- * (`LIGHTCODE_HOOK_URL`, `BROWSER`, etc.), but if the caller passes a value
- * with a `$` we fall back to the login-shell wrap which quotes safely.
- */
-function envValuesAreWslSafe(env: Record<string, string> | undefined): boolean {
-  if (!env) return true;
-  for (const v of Object.values(env)) {
-    if (v.includes("$") || v.includes("`")) return false;
-  }
-  return true;
-}
-
-/**
  * Read the canonical login+interactive PATH/HOME/SHELL inside a WSL distro.
  * Memoized for the supervisor lifetime — one wsl.exe spawn per distro
  * primes:
- *   - {@link buildAgentCommand} fast path (skip `-l -i` rc sourcing)
+ *   - {@link batchWslCommandsAsync} / {@link parallelWslCommandsAsync} probe
+ *     spawns (skip `-l -i` rc sourcing for short non-PTY queries)
  *   - {@link resolveWslShellPath} sync cache (login-shell `getent passwd` lookup)
  *   - {@link resolveWslHomeDirectory} sync cache (`$HOME` lookup)
+ *
+ * Note: agent PTY launches in {@link buildAgentCommand} always go through a
+ * full `-l -i` shell — the user's rc files must run so hooks see fnm/nvm node.
  *
  * Replaces three independent wsl.exe probes during boot/detection. Safe to
  * call concurrently — the in-flight promise is shared.
