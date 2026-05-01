@@ -5,6 +5,7 @@ import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
+  buildNativeHookCommandHead,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -16,7 +17,6 @@ import {
   hasNativeHookWrapper,
   isWslPluginContext,
   memoByCtx,
-  quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
   stagePluginAssetsToWsl,
@@ -133,10 +133,12 @@ export function getClaudePluginPaths(ctx?: AgentEnvContext): ClaudePluginPaths {
  */
 export interface InstallClaudePluginOptions {
   /**
-   * Required for WSL contexts: absolute Linux path to the Node binary the
-   * staged hook command should use. Comes from `resolveNodeForDistro`,
-   * which the adapter is expected to call before installing the plugin.
-   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   * Absolute path to the Node binary the staged hook command should use.
+   *
+   * - **WSL contexts:** required. Comes from `resolveNodeForDistro`.
+   * - **Native contexts:** optional. When provided (preferred), the wrapper
+   *   exec's the bare Node binary directly; otherwise it falls back to
+   *   `ELECTRON_RUN_AS_NODE=1` against the bundled Electron binary.
    */
   resolvedNodePath?: string | undefined;
 }
@@ -174,10 +176,12 @@ export function installClaudePlugin(
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
   copyForwardRuntimeFile(pluginDir);
-  const wrapperPath = writeNativeHookWrapper(pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir, {
+    ...(options?.resolvedNodePath ? { nodePath: options.resolvedNodePath } : {}),
+  });
 
   const settingsPath = join(pluginDir, "settings.json");
-  const settings = renderClaudeSettings(quoteHookCommandArg(wrapperPath, "native"));
+  const settings = renderClaudeSettings(buildNativeHookCommandHead(wrapperPath));
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
   const hooksPath = join(pluginDir, "hooks", "hooks.json");
   mkdirSync(dirname(hooksPath), { recursive: true });

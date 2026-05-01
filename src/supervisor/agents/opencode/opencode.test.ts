@@ -113,6 +113,17 @@ describe("detectOpenCodeTerminalStatus", () => {
     });
   });
 
+  it("detects idle from the keybind footer painted only in input state", () => {
+    // The TUI renders the keybind hints right next to each other without a
+    // space, e.g. `…tab agentsctrl+p commands`. Either substring is enough.
+    const text = "                                  tab agentsctrl+p commands";
+    expect(detectOpenCodeTerminalStatus(text)).toEqual({
+      status: "idle",
+      attention: "none",
+      corroborated: true,
+    });
+  });
+
   it("returns null when no pattern matches", () => {
     expect(detectOpenCodeTerminalStatus("nothing of note here")).toBeNull();
   });
@@ -189,5 +200,69 @@ describe("createOpenCodeAdapter", () => {
     expect(
       adapter.buildOneShotCommand?.("opencode/claude-haiku-4-5", undefined, undefined),
     ).toBeUndefined();
+  });
+
+  it("skips ACP session setup when resuming an existing session", async () => {
+    // On resume the providerSessionId is already known — no need to ask
+    // `opencode acp` to allocate a new one. Returning undefined keeps the
+    // existing flow (just `opencode --session <id>`).
+    const adapter = createOpenCodeAdapter();
+    await expect(
+      adapter.createStructuredSession?.({
+        threadId: "thread-1",
+        projectLocation: { kind: "windows", path: "C:\\repo" },
+        config: { model: "opencode/big-pickle" },
+        sessionRef: {
+          providerSessionId: "ses_existing",
+          discoveredAt: new Date().toISOString(),
+        },
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("buildLaunchArgv returns no --session and no sessionRef when launchOptions is empty", () => {
+    // Defensive path: if ACP allocation never ran (failed, skipped, structured
+    // session disabled), the TUI is launched without `--session` and OpenCode
+    // creates a fresh session itself — same as before Shape A.
+    const adapter = createOpenCodeAdapter();
+    const argv = adapter.buildLaunchArgv(
+      { kind: "windows", path: "C:\\repo" },
+      { model: "" },
+      "",
+      undefined,
+      undefined,
+    );
+    expect(argv.args).not.toContain("--session");
+    expect(argv.sessionRef).toBeUndefined();
+  });
+
+  it("isReadyForInitialPrompt fires on the keybind footer", () => {
+    // The hook-fast-path uses this to gate flushing the deferred initial
+    // prompt. The footer painted only in input-ready state is enough.
+    const adapter = createOpenCodeAdapter();
+    expect(adapter.isReadyForInitialPrompt?.("...tab agentsctrl+p commands")).toBe(true);
+    expect(adapter.isReadyForInitialPrompt?.("...esc to interrupt")).toBe(false);
+  });
+
+  it("buildLaunchArgv promotes launchOptions.resumeThreadId to --session and sessionRef", () => {
+    // This is the post-ACP path: the structured session captured a freshly
+    // allocated session id and stashed it in launchOptions before disposing.
+    const adapter = createOpenCodeAdapter();
+    const argv = adapter.buildLaunchArgv(
+      { kind: "windows", path: "C:\\repo" },
+      { model: "opencode/big-pickle" },
+      "hello",
+      undefined,
+      { resumeThreadId: "ses_acp_allocated" },
+    );
+    expect(argv.args).toEqual([
+      "--session",
+      "ses_acp_allocated",
+      "--model",
+      "opencode/big-pickle",
+      "--prompt",
+      "hello",
+    ]);
+    expect(argv.sessionRef?.providerSessionId).toBe("ses_acp_allocated");
   });
 });

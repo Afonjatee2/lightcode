@@ -6,8 +6,10 @@ import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import {
+  buildBranchPrKey,
   useCommitsAhead,
   useHasPr,
+  usePrBaseBranch,
   usePrState,
   useSourceAhead,
   useSourceBranch,
@@ -83,13 +85,18 @@ export function GitReviewSidebar(props: {
     isWsl ? s.wslCommitGenProvider : s.commitGenProvider,
   );
 
-  const isGitHub = gitStatus?.remoteInfo?.platform === "github";
+  // Treat "unknown" as "might be GitHub" — covers SSH host aliases where the
+  // remote URL hostname doesn't contain "github" but resolves to github.com.
+  const remotePlatform = gitStatus?.remoteInfo?.platform;
+  const isGitHub = remotePlatform === "github" || remotePlatform === "unknown";
   const ghAvailable = useGitStore((s) => s.ghAvailable[project.id] ?? false);
   const branchList = useGitStore((s) => s.branches[project.id]?.branches) ?? EMPTY_BRANCHES;
   const effectiveBranch = worktreeBranch ?? gitStatus?.branch;
-  const effectivePrKey = worktreePath ?? (gitStatus?.branch ? `__branch:${project.id}` : undefined);
+  const effectivePrKey =
+    worktreePath ?? (gitStatus?.branch ? buildBranchPrKey(project.id) : undefined);
   const hasPr = useHasPr(effectivePrKey);
   const prState = usePrState(effectivePrKey);
+  const prBaseBranch = usePrBaseBranch(effectivePrKey);
   const sourceBranch = useSourceBranch(effectivePrKey) ?? null;
   const commitsAhead = useCommitsAhead(effectivePrKey);
   const sourceAhead = useSourceAhead(effectivePrKey);
@@ -105,6 +112,7 @@ export function GitReviewSidebar(props: {
     worktreePath,
     isGitHub,
     ghAvailable,
+    preferredSourceBranch: prBaseBranch,
     refreshKey,
   });
 
@@ -138,6 +146,7 @@ export function GitReviewSidebar(props: {
     handleMergePr,
     handleClosePr,
     handleMarkPrReady,
+    handleUpdatePrBranch,
     handleGeneratePrSummary,
   } = useGitReviewActions({
     project,
@@ -181,9 +190,7 @@ export function GitReviewSidebar(props: {
   const showMergeSection = Boolean(
     worktreeBranch && worktreePath && !hasAnyChanges && (sourceBranchLoading || commitsAhead > 0),
   );
-  const showPullFromSource = Boolean(
-    worktreeBranch && worktreePath && sourceBranch && sourceAhead > 0,
-  );
+  const showPullFromSource = Boolean(effectiveBranch && sourceBranch && sourceAhead > 0);
   const isPushed = hasTracking && ahead === 0;
   const showCreatePrButton = Boolean(
     showPrSection && ghAvailable && isPushed && sourceBranch && (!prState || prState === "closed"),
@@ -336,10 +343,13 @@ export function GitReviewSidebar(props: {
           {showPrSection && ghAvailable && hasPr && prState !== "closed" && effectivePrKey && (
             <PrSection
               prKey={effectivePrKey}
+              projectId={project.id}
+              worktreePath={worktreePath}
               prLoading={prLoading}
               handleMergePr={handleMergePr}
               handleClosePr={handleClosePr}
               handleMarkPrReady={handleMarkPrReady}
+              handleUpdatePrBranch={handleUpdatePrBranch}
             />
           )}
 

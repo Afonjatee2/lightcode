@@ -7,6 +7,36 @@ const INVALID_SESSION_RE = /Failed to resume session:|Session not found:/i;
 
 const COPILOT_KNOWN_EFFORTS = new Set(["low", "medium", "high", "xhigh"]);
 
+// Reject capture-group payloads that contain TUI overlay glyphs. The status
+// line lives on the same logical row as the `/model` picker, so when the picker
+// is open the captured "model" can be box-drawing chars, an arrow indicator,
+// or two visual lines glued by a bare `\r` (which `.` matches).
+//   \u0000-\u001f + \u007f  control chars (CR/LF/TAB/etc.)
+//   ─-▟            box-drawing + block elements
+//   ■-◿            geometric shapes (▶ ◀ ● ○ etc.)
+//   ☀-⛿            misc symbols
+//   ✀-➿            dingbats (❯ ❮ etc.)
+// Real model names are alphanumeric + `.`/`-`/space (e.g. "Claude Opus 4.6",
+// "gpt-5.4-mini", "GLM-5.1"), so this is safely conservative.
+const MODEL_NAME_REJECT_RE = /[─-▟■-◿☀-⛿✀-➿]/;
+
+function hasControlCharacter(value: string): boolean {
+  for (const ch of value) {
+    const code = ch.codePointAt(0);
+    if (code !== undefined && (code < 0x20 || code === 0x7f)) return true;
+  }
+  return false;
+}
+
+export function sanitizeModelName(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const trimmed = raw.trim();
+  if (trimmed.length === 0 || trimmed.length > 80) return undefined;
+  if (hasControlCharacter(trimmed) || MODEL_NAME_REJECT_RE.test(trimmed)) return undefined;
+  if (!/[A-Za-z0-9]/.test(trimmed)) return undefined;
+  return trimmed;
+}
+
 interface CopilotHintEntry extends HintEntry {
   status: TerminalStatusHint["status"];
   attention: TerminalStatusHint["attention"];
@@ -91,7 +121,7 @@ export function detectCopilotModelEffort(
   }
   if (!last) return null;
 
-  const rawModel = last[1]?.trim();
+  const rawModel = sanitizeModelName(last[1]);
   const rawEffort = last[2]?.toLowerCase();
   const effort = rawEffort && COPILOT_KNOWN_EFFORTS.has(rawEffort) ? rawEffort : undefined;
 
@@ -131,7 +161,7 @@ export function detectCopilotStatusLineModel(
   }
 
   // Strip remaining parenthetical decorations like "(3x)" to get clean model name
-  const rawModel = raw.replace(/\s*\([^)]*\)/g, "").trim() || undefined;
+  const rawModel = sanitizeModelName(raw.replace(/\s*\([^)]*\)/g, ""));
 
   if (!rawModel && !effort) return null;
   const result: { rawModel?: string; effort?: string } = {};

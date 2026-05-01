@@ -59,6 +59,14 @@ export function createLocalIpcHandlers(
     openExternal: async (url) => {
       await shell.openExternal(url);
     },
+    focusWindow: () => {
+      const win = options.getMainWindow();
+      if (!win) return;
+      if (win.isMinimized()) {
+        win.restore();
+      }
+      win.focus();
+    },
     revealProjectEntry: async (payload) => {
       shell.showItemInFolder(resolveProjectFsPath(payload));
     },

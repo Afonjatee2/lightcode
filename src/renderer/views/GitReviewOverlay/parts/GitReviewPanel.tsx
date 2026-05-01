@@ -157,7 +157,7 @@ export function GitReviewPanel(props: {
                         aria-label="Switch branch"
                       >
                         <GitBranch className="size-3 shrink-0 text-muted/50" />
-                        <span className="max-w-[100px] truncate text-muted">
+                        <span className="max-w-[200px] truncate text-muted">
                           {gitStatus.branch}
                         </span>
                       </button>
@@ -246,7 +246,7 @@ export function GitReviewPanel(props: {
                         aria-label="Switch branch"
                       >
                         <GitBranch className="size-3 shrink-0 text-muted/50" />
-                        <span className="max-w-[100px] truncate text-muted">
+                        <span className="max-w-[200px] truncate text-muted">
                           {gitStatus.branch}
                         </span>
                       </button>

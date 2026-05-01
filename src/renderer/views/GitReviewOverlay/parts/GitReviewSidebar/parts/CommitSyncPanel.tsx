@@ -27,7 +27,7 @@ export function CommitSyncPanel(props: {
   showPullFromSource: boolean;
   sourceBranch: string | null;
   sourceAhead: number;
-  handleCommit: (addAll: boolean) => Promise<void>;
+  handleCommit: (addAll: boolean, pushAfter?: boolean) => Promise<void>;
   handleGenerateMessage: () => Promise<void>;
   handleSyncOrPush: () => Promise<void>;
   handlePullFromSource: () => Promise<void>;
@@ -173,12 +173,34 @@ export function CommitSyncPanel(props: {
                   aria-label="Commit options"
                   onAction={(key) => {
                     if (key === "add-all-commit") void handleCommit(true);
+                    if (key === "commit-and-push") void handleCommit(!hasStagedChanges, true);
+                    if (key === "add-all-commit-push") void handleCommit(true, true);
                     if (key === "pull-from-source") void handlePullFromSource();
                   }}
                 >
                   <Dropdown.Item id="add-all-commit" textValue="Add all + commit">
                     <Label>Add all + commit</Label>
                   </Dropdown.Item>
+                  {hasRemote ? (
+                    <Dropdown.Item
+                      id="commit-and-push"
+                      textValue="Commit + push"
+                      isDisabled={!canCommitStaged}
+                    >
+                      <ArrowUp className="size-3.5" />
+                      <Label>Commit + push</Label>
+                    </Dropdown.Item>
+                  ) : null}
+                  {hasRemote ? (
+                    <Dropdown.Item
+                      id="add-all-commit-push"
+                      textValue="Add all, commit + push"
+                      isDisabled={!canCommitAll}
+                    >
+                      <ArrowUp className="size-3.5" />
+                      <Label>Add all, commit + push</Label>
+                    </Dropdown.Item>
+                  ) : null}
                   {showPullFromSource ? (
                     <Dropdown.Item
                       id="pull-from-source"
@@ -197,10 +219,10 @@ export function CommitSyncPanel(props: {
           </ButtonGroup>
         </>
       ) : hasRemote ? (
-        <>
+        <ButtonGroup className="w-full">
           <Button
             variant="tertiary"
-            className="w-full"
+            className="flex-1"
             isDisabled={isSyncing}
             isPending={isSyncing}
             onPress={() => void handleSyncOrPush()}
@@ -222,7 +244,39 @@ export function CommitSyncPanel(props: {
               </>
             )}
           </Button>
-        </>
+          {showPullFromSource && sourceBranch && sourceAhead > 0 && (
+            <Dropdown>
+              <Button
+                isIconOnly
+                variant="tertiary"
+                aria-label="More sync options"
+                isDisabled={isSyncing || isPullingFromSource}
+              >
+                <ButtonGroup.Separator />
+                <ChevronDown className="size-3.5" />
+              </Button>
+              <Dropdown.Popover placement="top end">
+                <Dropdown.Menu
+                  aria-label="Sync options"
+                  onAction={(key) => {
+                    if (key === "pull-from-source") void handlePullFromSource();
+                  }}
+                >
+                  <Dropdown.Item
+                    id="pull-from-source"
+                    textValue={`Pull from ${sourceBranch} (${sourceAhead})`}
+                    isDisabled={isPullingFromSource}
+                  >
+                    <ArrowDown className="size-3.5" />
+                    <Label>
+                      Pull from {sourceBranch} ({sourceAhead})
+                    </Label>
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+          )}
+        </ButtonGroup>
       ) : null}
     </GitReviewSection>
   );

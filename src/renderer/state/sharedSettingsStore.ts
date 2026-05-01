@@ -9,6 +9,7 @@ import {
 import type {
   GitReviewMode,
   NewThreadMode,
+  NotificationFilter,
   ProviderDraftConfig,
   TerminalPosition,
   ThemeMode,
@@ -43,6 +44,14 @@ interface SharedSettingsState extends SharedSettings {
   setSearchExclude: (value: Record<string, boolean>) => void;
   setDisableCliHookPlugin: (value: boolean) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
+  setNotificationsEnabled: (value: boolean) => void;
+  setNotificationSound: (value: boolean) => void;
+  setNotificationFilter: (value: NotificationFilter) => void;
+  setNotificationStatuses: (value: {
+    done?: boolean;
+    needsAttention?: boolean;
+    error?: boolean;
+  }) => void;
 }
 
 function hasBridge(): boolean {
@@ -224,6 +233,34 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ providerConfigs: { ...current, [agentKind]: config } });
     persistSettings(selectSharedSettings(get()));
   },
+  setNotificationsEnabled: (notificationsEnabled) => {
+    if (get().notificationsEnabled === notificationsEnabled) return;
+    set({ notificationsEnabled });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setNotificationSound: (notificationSound) => {
+    if (get().notificationSound === notificationSound) return;
+    set({ notificationSound });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setNotificationFilter: (notificationFilter) => {
+    if (get().notificationFilter === notificationFilter) return;
+    set({ notificationFilter });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setNotificationStatuses: (partial) => {
+    const current = get().notificationStatuses;
+    const next = { ...current, ...partial };
+    if (
+      current.done === next.done &&
+      current.needsAttention === next.needsAttention &&
+      current.error === next.error
+    ) {
+      return;
+    }
+    set({ notificationStatuses: next });
+    persistSettings(selectSharedSettings(get()));
+  },
 }));
 
 function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
@@ -264,6 +301,10 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     searchUseIgnoreFiles: state.searchUseIgnoreFiles,
     searchExclude: state.searchExclude,
     disableCliHookPlugin: state.disableCliHookPlugin,
+    notificationsEnabled: state.notificationsEnabled,
+    notificationSound: state.notificationSound,
+    notificationFilter: state.notificationFilter,
+    notificationStatuses: state.notificationStatuses,
   };
 }
 

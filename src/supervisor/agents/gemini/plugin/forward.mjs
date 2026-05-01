@@ -34,9 +34,6 @@ function intentFor(eventName, payload) {
     case "SessionStart":
       return "session.started";
     case "BeforeAgent":
-    case "BeforeModel":
-    case "BeforeTool":
-    case "AfterTool":
       return "session.turn_started";
     case "AfterAgent":
       return "session.turn_finished";

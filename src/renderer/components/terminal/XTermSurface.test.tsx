@@ -6,6 +6,7 @@ import type { SupervisorEvent } from "@/shared/ipc";
 const { state } = vi.hoisted(() => ({
   state: {
     terminal: null as null | Record<string, ReturnType<typeof vi.fn>>,
+    terminalOptions: null as null | Record<string, unknown>,
     eventListeners: [] as Array<(e: SupervisorEvent) => void>,
     isMac: false,
     bridge: {
@@ -54,8 +55,9 @@ vi.mock("@xterm/xterm", () => ({
     buffer = { active: { baseY: 0, viewportY: 0 } };
     cols = 80;
     rows = 24;
-    constructor() {
+    constructor(options: Record<string, unknown>) {
       state.terminal = this as unknown as Record<string, ReturnType<typeof vi.fn>>;
+      state.terminalOptions = options;
     }
   },
 }));
@@ -150,6 +152,7 @@ function terminal(): MockTerminalShape {
 describe("XTermSurface", () => {
   beforeEach(() => {
     state.terminal = null;
+    state.terminalOptions = null;
     state.eventListeners = [];
     state.isMac = false;
     vi.clearAllMocks();
@@ -171,6 +174,11 @@ describe("XTermSurface", () => {
     render(<XTermSurface terminalId="test-1" />);
     expect(state.terminal).not.toBeNull();
     expect(terminal().open).toHaveBeenCalled();
+  });
+
+  it("minimizes xterm's internal scrollbar gutter", () => {
+    render(<XTermSurface terminalId="test-1" />);
+    expect(state.terminalOptions?.overviewRuler).toEqual({ width: 0.01 });
   });
 
   it("loads the WebGL addon on non-macOS platforms", () => {

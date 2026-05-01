@@ -1,6 +1,7 @@
 import {
   Archive,
   ArrowLeft,
+  Bell,
   Bot,
   FlaskConical,
   Info,
@@ -53,6 +54,13 @@ export function SettingsSidebar(props: {
               label="General"
               isActive={activeSection === "general"}
               onPress={() => onSectionChange("general")}
+            />
+            <SidebarButton
+              iconOnly
+              icon={<Bell className="size-4" />}
+              label="Notifications"
+              isActive={activeSection === "notifications"}
+              onPress={() => onSectionChange("notifications")}
             />
             <SidebarButton
               iconOnly
@@ -142,6 +150,12 @@ export function SettingsSidebar(props: {
               label="General"
               isActive={activeSection === "general"}
               onPress={() => onSectionChange("general")}
+            />
+            <SidebarButton
+              icon={<Bell className="size-4" />}
+              label="Notifications"
+              isActive={activeSection === "notifications"}
+              onPress={() => onSectionChange("notifications")}
             />
             <SidebarButton
               icon={<Sparkles className="size-4" />}

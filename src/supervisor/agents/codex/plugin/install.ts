@@ -14,6 +14,7 @@ import type { AgentEnvContext } from "../../base";
 import { batchWslCommands, quotePosixShellArg } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
+  buildNativeHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
@@ -291,9 +292,12 @@ export function isCodexVersionSupportedForHooks(): boolean {
 
 export interface InstallCodexPluginOptions {
   /**
-   * Required for WSL contexts: absolute Linux path to the Node binary the
-   * staged hook command should use. Comes from `resolveNodeForDistro`.
-   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   * Absolute path to the Node binary the staged hook command should use.
+   *
+   * - **WSL contexts:** required. Comes from `resolveNodeForDistro`.
+   * - **Native contexts:** optional. When provided (preferred), the wrapper
+   *   exec's the bare Node binary directly; otherwise it falls back to
+   *   `ELECTRON_RUN_AS_NODE=1` against the bundled Electron binary.
    */
   resolvedNodePath?: string | undefined;
 }
@@ -333,7 +337,9 @@ export function installCodexPlugin(
   seedNativeCodexHome(codexHomeDir);
   copyPluginAssetsIfStale(sourceDir, pluginDir);
   copyForwardRuntimeFile(pluginDir);
-  const wrapperPath = writeNativeHookWrapper(pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir, {
+    ...(options?.resolvedNodePath ? { nodePath: options.resolvedNodePath } : {}),
+  });
 
   const hooksPath = join(codexHomeDir, "hooks.json");
   const existing = parseExistingHooksJson(hooksPath);
@@ -341,10 +347,10 @@ export function installCodexPlugin(
     return { ok: false, reason: "malformed private Codex hooks.json (invalid JSON)" };
   }
 
-  // Native command shape: `"<wrapper-path>" <event>`. The wrapper sets
+  // Native command shape: `<wrapper-command-head> <event>`. The wrapper sets
   // ELECTRON_RUN_AS_NODE=1 and execs the bundled Electron Node on
   // forward.mjs (which lives next to the wrapper).
-  const commandHead = JSON.stringify(wrapperPath);
+  const commandHead = buildNativeHookCommandHead(wrapperPath);
 
   try {
     const merged = mergeCodexHooksDocument(existing, commandHead);

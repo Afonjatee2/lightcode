@@ -28,11 +28,17 @@ import type {
   GhCreatePrPayload,
   GhGetPrChecksPayload,
   GhGetPrChecksResult,
+  GhGetPrDiffPayload,
+  GhGetPrDiffResult,
+  GhGetPrFilesPayload,
+  GhGetPrFilesResult,
   GhGetPrForBranchPayload,
   GhMergePrPayload,
   GhClosePrPayload,
   GhMarkPrReadyPayload,
   GhReopenPrPayload,
+  GhSubmitPrReviewPayload,
+  GhUpdatePrBranchPayload,
   GitAbortMergePayload,
   GitAddWorktreePayload,
   GitAddWorktreeResult,
@@ -48,6 +54,10 @@ import type {
   GitFinishMergeResult,
   GitGetWorktreeSourceBranchPayload,
   GitGetWorktreeSourceBranchResult,
+  GitProjectSnapshotPayload,
+  GitProjectSnapshotResult,
+  GitWorktreeStatusBatchPayload,
+  GitWorktreeStatusBatchResult,
   GitListWorktreesPayload,
   GitMergeToSourcePayload,
   GitMergeToSourceResult,
@@ -99,6 +109,7 @@ import type { LspMessagePayload, LspStartPayload, LspStopPayload } from "@/share
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { joinProjectPosixPath } from "@/shared/wsl";
 import { createAgentRegistry } from "./agents/registry";
+import { prefetchNativeNodeRuntime } from "./runtime/prefetchNativeNode";
 import { readWslCommandOutputAsync } from "./agents/base";
 import { generateCommitMessage } from "./commitMessageGenerator";
 import {
@@ -192,6 +203,12 @@ export class SupervisorRuntime {
     this.settingsPath = paths.settingsPath;
     mkdirSync(paths.cacheDir, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
+
+    // Prefetch the native Node resolver so the login-shell probe runs in
+    // parallel with the rest of the supervisor boot. By the time providers'
+    // `installPlugin` calls `resolveInstallNodePath`, the shared promise is
+    // typically already settled. Failures surface as a single warn line.
+    void prefetchNativeNodeRuntime(baseDir);
 
     this.lspManager = new LanguageServerManager(emit);
     this.windowsShell =
@@ -599,7 +616,42 @@ export class SupervisorRuntime {
   async gitGetWorktreeSourceBranch(
     payload: GitGetWorktreeSourceBranchPayload,
   ): Promise<GitGetWorktreeSourceBranchResult> {
-    return this.gitService.getWorktreeSourceBranch(payload.projectLocation, payload.branch);
+    return this.gitService.getWorktreeSourceBranch(
+      payload.projectLocation,
+      payload.branch,
+      payload.sourceBranchOverride,
+    );
+  }
+
+  async gitProjectSnapshot(payload: GitProjectSnapshotPayload): Promise<GitProjectSnapshotResult> {
+    const { projectLocation, includeGhCheck } = payload;
+    if (projectLocation.kind === "wsl") {
+      return this.gitService.batchedWslProjectSnapshot(projectLocation, includeGhCheck);
+    }
+    const [statusResult, branchesResult, worktreesResult, ghResult] = await Promise.allSettled([
+      this.gitService.getStatus(projectLocation),
+      this.gitService.listBranches(projectLocation, true),
+      this.gitService.listWorktrees(projectLocation),
+      includeGhCheck
+        ? this.githubService.checkGhAvailable(projectLocation).then((r) => r.available)
+        : Promise.resolve<boolean | null>(null),
+    ]);
+    return {
+      status: statusResult.status === "fulfilled" ? statusResult.value : null,
+      branches: branchesResult.status === "fulfilled" ? branchesResult.value : null,
+      worktrees: worktreesResult.status === "fulfilled" ? worktreesResult.value.worktrees : null,
+      ghAvailable: ghResult.status === "fulfilled" ? ghResult.value : null,
+    };
+  }
+
+  async gitWorktreeStatusBatch(
+    payload: GitWorktreeStatusBatchPayload,
+  ): Promise<GitWorktreeStatusBatchResult> {
+    const statuses = await this.gitService.getWorktreeStatusBatch(
+      payload.projectLocation,
+      payload.worktreePaths,
+    );
+    return { statuses };
   }
 
   async gitMergeToSource(payload: GitMergeToSourcePayload): Promise<GitMergeToSourceResult> {
@@ -635,7 +687,12 @@ export class SupervisorRuntime {
   }
 
   async ghMergePr(payload: GhMergePrPayload): Promise<void> {
-    return this.githubService.mergePr(payload.projectLocation, payload.prNumber, payload.method);
+    return this.githubService.mergePr(
+      payload.projectLocation,
+      payload.prNumber,
+      payload.method,
+      payload.admin,
+    );
   }
 
   async ghClosePr(payload: GhClosePrPayload): Promise<void> {
@@ -652,6 +709,31 @@ export class SupervisorRuntime {
 
   async ghGetPrChecks(payload: GhGetPrChecksPayload): Promise<GhGetPrChecksResult> {
     return this.githubService.getPrChecks(payload.projectLocation, payload.branch);
+  }
+
+  async ghGetPrFiles(payload: GhGetPrFilesPayload): Promise<GhGetPrFilesResult> {
+    return this.githubService.getPrFiles(payload.projectLocation, payload.prNumber);
+  }
+
+  async ghGetPrDiff(payload: GhGetPrDiffPayload): Promise<GhGetPrDiffResult> {
+    return this.githubService.getPrDiff(payload.projectLocation, payload.prNumber);
+  }
+
+  async ghSubmitPrReview(payload: GhSubmitPrReviewPayload): Promise<void> {
+    return this.githubService.submitPrReview(
+      payload.projectLocation,
+      payload.prNumber,
+      payload.decision,
+      payload.body,
+    );
+  }
+
+  async ghUpdatePrBranch(payload: GhUpdatePrBranchPayload): Promise<void> {
+    return this.githubService.updatePrBranch(
+      payload.projectLocation,
+      payload.prNumber,
+      payload.rebase,
+    );
   }
 
   async gitAbortMerge(payload: GitAbortMergePayload): Promise<void> {

@@ -196,13 +196,16 @@ describe("detectGeminiInvalidSessionRef", () => {
 });
 
 describe("geminiIntentFor", () => {
-  it("maps lifecycle and agent hooks to universal intents", () => {
+  it("maps the trimmed lifecycle hooks to universal intents", () => {
     expect(geminiIntentFor("SessionStart", undefined)).toBe("session.started");
     expect(geminiIntentFor("BeforeAgent", undefined)).toBe("session.turn_started");
-    expect(geminiIntentFor("BeforeModel", undefined)).toBe("session.turn_started");
-    expect(geminiIntentFor("BeforeTool", undefined)).toBe("session.turn_started");
-    expect(geminiIntentFor("AfterTool", undefined)).toBe("session.turn_started");
     expect(geminiIntentFor("AfterAgent", undefined)).toBe("session.turn_finished");
+  });
+
+  it("ignores dropped redundant turn-open events", () => {
+    expect(geminiIntentFor("BeforeModel", undefined)).toBeUndefined();
+    expect(geminiIntentFor("BeforeTool", undefined)).toBeUndefined();
+    expect(geminiIntentFor("AfterTool", undefined)).toBeUndefined();
   });
 
   it("maps only approval-style notifications to needs_approval", () => {
@@ -221,7 +224,7 @@ describe("createGeminiAdapter hook plugin support", () => {
     const adapter = createGeminiAdapter();
 
     expect(adapter.pluginId).toBe("lightcode-status@gemini");
-    expect(adapter.pluginVersion).toBe("1.1.0");
+    expect(adapter.pluginVersion).toBe("1.2.0");
     expect(adapter.minProtocolVersion).toBe(1);
 
     const extras = await adapter.pluginLaunchExtras?.({

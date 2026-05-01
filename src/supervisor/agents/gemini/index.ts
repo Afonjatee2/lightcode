@@ -44,7 +44,14 @@ export function createGeminiAdapter(): AgentAdapter {
     get capabilities() {
       return capabilities;
     },
-    spawnEnv: { wsl: { BROWSER: "/bin/true" } },
+    // GEMINI_CLI_TRUST_WORKSPACE=true bypasses Gemini's folder-trust check.
+    // Without it, the AgentRegistry emits "Skipping project agents due to
+    // untrusted folder..." onto stdout, which can collide with JSON-RPC
+    // frames in --acp mode and break the ACP stream parser.
+    spawnEnv: {
+      native: { GEMINI_CLI_TRUST_WORKSPACE: "true" },
+      wsl: { BROWSER: "/bin/true", GEMINI_CLI_TRUST_WORKSPACE: "true" },
+    },
     pluginId: "lightcode-status@gemini",
     pluginVersion: GEMINI_PLUGIN_VERSION,
     minProtocolVersion: 1,

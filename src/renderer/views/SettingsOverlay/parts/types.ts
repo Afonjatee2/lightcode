@@ -1,5 +1,6 @@
 export type SettingsSection =
   | "general"
+  | "notifications"
   | "ai"
   | "search"
   | "agents"

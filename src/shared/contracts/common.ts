@@ -48,6 +48,9 @@ export const threadAttentionSchema = z.enum([
 ]);
 export type ThreadAttention = z.infer<typeof threadAttentionSchema>;
 
+export const notificationFilterSchema = z.enum(["unfocused", "all"]);
+export type NotificationFilter = z.infer<typeof notificationFilterSchema>;
+
 export const authStateSchema = z.enum(["authenticated", "missing", "unknown"]);
 export type AuthState = z.infer<typeof authStateSchema>;
 

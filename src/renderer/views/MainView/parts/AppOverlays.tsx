@@ -14,10 +14,16 @@ const GitReviewOverlay = lazy(() =>
     default: m.GitReviewOverlay,
   })),
 );
+const PrReviewOverlay = lazy(() =>
+  import("@/renderer/views/PrReviewOverlay/PrReviewOverlay").then((m) => ({
+    default: m.PrReviewOverlay,
+  })),
+);
 
 import { useAppStore } from "@/renderer/state/appStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { resolvePrKey } from "@/renderer/state/gitSelectors";
 
 import { resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
 import { closeThreads } from "@/renderer/utils/shellUtils";
@@ -39,6 +45,11 @@ export function AppOverlays() {
     ? projects.find((p) => p.id === gitReviewContext.projectId)
     : undefined;
   const gitOverlayVisible = gitOverlayOpen && !!gitReviewContext && !!gitReviewProject;
+  const prReviewContext = usePanelStore((s) => s.prReviewContext);
+  const prReviewProject = prReviewContext
+    ? projects.find((p) => p.id === prReviewContext.projectId)
+    : undefined;
+  const prReviewVisible = !!prReviewContext && !!prReviewProject;
 
   return (
     <>
@@ -110,6 +121,36 @@ export function AppOverlays() {
                 usePanelStore.getState().setGitOverlayOpen(false);
                 if (!gitReviewAsPanel) usePanelStore.getState().setGitReviewContext(null);
               }}
+            />
+          </Suspense>
+        )}
+      </OverlayShell>
+      <OverlayShell
+        open={prReviewVisible}
+        onExited={() => usePanelStore.getState().setPrReviewContext(null)}
+      >
+        {prReviewContext && prReviewProject && (
+          <Suspense
+            fallback={
+              <div className="flex flex-1 items-center justify-center">
+                <PixelLoader size="lg" />
+              </div>
+            }
+          >
+            <PrReviewOverlay
+              project={prReviewProject}
+              prNumber={prReviewContext.prNumber}
+              prKey={resolvePrKey(prReviewContext.projectId, prReviewContext.worktreePath)}
+              {...(prReviewContext.worktreePath
+                ? {
+                    locationOverride: buildWorktreeLocation(
+                      prReviewProject.location,
+                      prReviewContext.worktreePath,
+                    ),
+                    worktreePath: prReviewContext.worktreePath,
+                  }
+                : {})}
+              onClose={() => usePanelStore.getState().setPrReviewContext(null)}
             />
           </Suspense>
         )}

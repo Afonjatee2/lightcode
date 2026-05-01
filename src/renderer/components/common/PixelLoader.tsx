@@ -52,6 +52,7 @@ const PATTERNS: Record<string, Frames> = {
 };
 
 const KEYS = Object.keys(PATTERNS);
+const SESSION_PATTERN = KEYS[Math.floor(Math.random() * KEYS.length)] ?? "waveLR";
 
 /** Same Tailwind `size-*` utilities used with Lucide (`<Icon className="size-4" />`). */
 const ICON_SIZE_CLASS = {
@@ -84,7 +85,7 @@ export function PixelLoader({
   style,
 }: PixelLoaderProps) {
   const [frame, setFrame] = useState(0);
-  const chosen = useRef(pattern ?? KEYS[Math.floor(Math.random() * KEYS.length)] ?? "waveLR");
+  const chosen = useRef(pattern ?? SESSION_PATTERN);
   const filterId = useRef(`px-glow-${filterIdCounter++}`);
   const frames = PATTERNS[chosen.current] as Frames;
 

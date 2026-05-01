@@ -1,5 +1,6 @@
 import { GitPullRequest } from "lucide-react";
 import { useGitStore } from "@/renderer/state/gitStore";
+import { buildBranchPrKey } from "@/renderer/state/gitSelectors";
 import { useShallow } from "zustand/shallow";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
 import { getPrStatusTone, PR_TONE_TEXT_CLASS } from "@/renderer/utils/prStatus";
@@ -18,7 +19,7 @@ export function GitBadge(props: {
         : s.statuses[props.projectId];
       const pr = props.worktreePath
         ? s.prData[props.worktreePath]
-        : s.prData[`__branch:${props.projectId}`];
+        : s.prData[buildBranchPrKey(props.projectId)];
       return {
         isRepo: gitStatus?.isRepo ?? false,
         totalInsertions: gitStatus?.totalInsertions ?? 0,

@@ -54,6 +54,17 @@ export const getGitStatusPayloadSchema = z.object({
 });
 export type GetGitStatusPayload = z.infer<typeof getGitStatusPayloadSchema>;
 
+export const gitWorktreeStatusBatchPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  worktreePaths: z.array(z.string().min(1)),
+});
+export type GitWorktreeStatusBatchPayload = z.infer<typeof gitWorktreeStatusBatchPayloadSchema>;
+
+export interface GitWorktreeStatusBatchResult {
+  /** Map worktree filesystem path → status. Worktrees whose status fetch failed are omitted. */
+  statuses: Record<string, GitStatusResult>;
+}
+
 export const getGitDiffPayloadSchema = z.object({
   projectLocation: projectLocationSchema,
   filePath: z.string().optional(),
@@ -295,9 +306,25 @@ export interface GitSyncResult {
   pushed: boolean;
 }
 
+export const gitProjectSnapshotPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  /** Pass true to also include the gh availability check (`gh --version`). */
+  includeGhCheck: z.boolean().default(false),
+});
+export type GitProjectSnapshotPayload = z.infer<typeof gitProjectSnapshotPayloadSchema>;
+
+export interface GitProjectSnapshotResult {
+  status: GitStatusResult | null;
+  branches: GitBranchListResult | null;
+  worktrees: GitWorktreeInfo[] | null;
+  ghAvailable: boolean | null;
+}
+
 export const gitGetWorktreeSourceBranchPayloadSchema = z.object({
   projectLocation: projectLocationSchema,
   branch: z.string().min(1),
+  /** When set, skip inference and use this branch as the source (e.g. PR baseRefName). */
+  sourceBranchOverride: z.string().optional(),
 });
 export type GitGetWorktreeSourceBranchPayload = z.infer<
   typeof gitGetWorktreeSourceBranchPayloadSchema

@@ -62,6 +62,10 @@ describe("sharedSettingsFile", () => {
       searchUseIgnoreFiles: true,
       searchExclude: {},
       disableCliHookPlugin: false,
+      notificationsEnabled: true,
+      notificationSound: true,
+      notificationFilter: "unfocused",
+      notificationStatuses: { done: true, needsAttention: true, error: true },
       agentHookSupport: {},
     });
 
@@ -102,6 +106,10 @@ describe("sharedSettingsFile", () => {
       searchUseIgnoreFiles: true,
       searchExclude: {},
       disableCliHookPlugin: false,
+      notificationsEnabled: true,
+      notificationSound: true,
+      notificationFilter: "unfocused",
+      notificationStatuses: { done: true, needsAttention: true, error: true },
       agentHookSupport: {},
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');

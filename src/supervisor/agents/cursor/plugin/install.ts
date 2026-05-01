@@ -7,6 +7,7 @@ import type { AgentEnvContext } from "../../base";
 import { resolveWslHomeDirectory } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
+  buildNativeHookCommandHead,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -17,7 +18,6 @@ import {
   isWslPluginContext,
   memoByCtx,
   parseExistingHooksJson,
-  quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
   stagePluginAssetsToWsl,
@@ -162,9 +162,12 @@ export function mergeCursorHooksDocument(
 
 export interface InstallCursorPluginOptions {
   /**
-   * Required for WSL contexts: absolute Linux path to the Node binary the
-   * staged hook command should use. Comes from `resolveNodeForDistro`.
-   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   * Absolute path to the Node binary the staged hook command should use.
+   *
+   * - **WSL contexts:** required. Comes from `resolveNodeForDistro`.
+   * - **Native contexts:** optional. When provided (preferred), the wrapper
+   *   exec's the bare Node binary directly; otherwise it falls back to
+   *   `ELECTRON_RUN_AS_NODE=1` against the bundled Electron binary.
    */
   resolvedNodePath?: string | undefined;
   /**
@@ -214,7 +217,9 @@ export function installCursorPlugin(
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
   copyForwardRuntimeFile(pluginDir);
-  const wrapperPath = writeNativeHookWrapper(pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir, {
+    ...(options?.resolvedNodePath ? { nodePath: options.resolvedNodePath } : {}),
+  });
 
   const globalCursorDir = options?.globalCursorDirOverride ?? nativeGlobalCursorDir();
   const hooksPath = join(globalCursorDir, "hooks.json");
@@ -223,7 +228,7 @@ export function installCursorPlugin(
     return { ok: false, reason: `malformed Cursor hooks.json at ${hooksPath} (invalid JSON)` };
   }
 
-  const commandHead = quoteHookCommandArg(wrapperPath, "native");
+  const commandHead = buildNativeHookCommandHead(wrapperPath);
 
   try {
     const merged = mergeCursorHooksDocument(existing, commandHead);

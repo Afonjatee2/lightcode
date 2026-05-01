@@ -40,7 +40,21 @@ const OPENCODE_HINTS: OpenCodeHintEntry[] = [
     attention: "working",
     strong: true,
   },
-  // Weak idle cue — only counts when no strong signal sits closer to the tail.
+  // Idle: keybind footer is only painted when the TUI accepts input. The two
+  // glyph clusters render side-by-side without a separator (`tab agentsctrl+p
+  // commands`) because of cursor positioning, so match each independently and
+  // skip the trailing word boundary — `agents` butts directly against `ctrl`
+  // and `commands` against the cursor reset, so `\b` would refuse to match.
+  // Strong because the footer is mutually exclusive with the working
+  // indicator above (working state replaces it with "esc to interrupt").
+  {
+    re: /\btab\s*agents|\bctrl\+p\s*commands/i,
+    status: "idle",
+    attention: "none",
+    strong: true,
+  },
+  // Backstop for older opencode releases that still painted the placeholder
+  // text. Weak: counts only when no strong cue is closer to the tail.
   { re: /Type a message|Type your message|Send a message/i, status: "idle", attention: "none" },
 ];
 

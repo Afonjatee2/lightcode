@@ -11,6 +11,8 @@ export function useSourceBranchData(params: {
   worktreePath: string | undefined;
   isGitHub: boolean;
   ghAvailable: boolean;
+  /** When set (e.g. PR base), overrides the inferred source branch. */
+  preferredSourceBranch?: string | undefined;
   refreshKey: number;
 }) {
   const {
@@ -20,6 +22,7 @@ export function useSourceBranchData(params: {
     worktreePath,
     isGitHub,
     ghAvailable,
+    preferredSourceBranch,
     refreshKey,
   } = params;
 
@@ -52,6 +55,7 @@ export function useSourceBranchData(params: {
       .gitGetWorktreeSourceBranch({
         projectLocation: sourceProjectLocation,
         branch: effectiveBranch,
+        ...(preferredSourceBranch ? { sourceBranchOverride: preferredSourceBranch } : {}),
       })
       .then((result) => {
         if (!isActive) return;
@@ -80,6 +84,7 @@ export function useSourceBranchData(params: {
   }, [
     effectiveBranch,
     effectivePrKey,
+    preferredSourceBranch,
     projectLocationDistro,
     projectLocationKind,
     projectLocationPath,

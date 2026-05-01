@@ -75,14 +75,37 @@ The codebase is provider-agnostic by design (targeting 5-10 providers). Each pro
 
 ## Hook Runtime Resolution
 
-Hooks (Claude/Codex/Gemini `forward.mjs` + the WSL `bridge.mjs`) need a Node binary they can invoke by absolute path. `/bin/sh -c` doesn't source nvm, so a bare `node` token in a hook command fails for nvm-only users — the resolver in `src/supervisor/wsl/runtime/index.ts` prevents that:
+Hooks (Claude/Codex/Gemini `forward.mjs` + the WSL `bridge.mjs`) need a Node binary they can invoke by absolute path. `/bin/sh -c` doesn't source nvm, so a bare `node` token in a hook command fails for nvm-only users. Both runtimes (native + WSL) resolve to an absolute Node path before staging the wrapper.
 
-- **Native (mac/win/linux):** `installerBase.writeNativeHookWrapper` generates `lightcode-hook.{sh,cmd}` next to `forward.mjs` at install time. The wrapper sets `ELECTRON_RUN_AS_NODE=1` and execs lightcode's own Electron binary on `forward.mjs` — no user-installed node required.
-- **WSL — probe first:** `resolveNodeForDistro(distro)` runs `command -v node && node --version` through the user's login shell (`batchWslCommandsAsync` already does `-l -i`). If the result is ≥ Node 22, the absolute path is baked into hook commands. Cached for the supervisor lifetime; cleared on restart.
-- **WSL — install fallback:** If no acceptable node is found, the resolver downloads the pinned LTS tarball from `nodejs.org/dist/`, verifies SHA256 against checksums in `NODE_TARBALL_CHECKSUMS`, and extracts inside the distro via `tar -xJf`. Glibc only — Alpine/musl users are expected to have `apk add nodejs` installed (probe finds it).
-- **Bumping pinned Node:** edit `LIGHTCODE_PINNED_NODE_VERSION`, then run `pnpm tsx scripts/refresh-node-checksums.mjs` to populate checksums from the official SHASUMS.
+Pinned LTS version + SHA256 checksums for every target live in `src/supervisor/runtime/pinnedNode.ts`. Both resolvers import from there.
 
-Adapters' `installPlugin` resolves the node path via `resolveInstallNodePath(ctx)` from `installerBase`; provider-specific install code then bakes that path (or the wrapper path) into the rendered hook command.
+### Native (mac / linux / win32) — `src/supervisor/native/runtime/index.ts`
+
+Three layers, in order of cost:
+
+1. **Managed runtime fast path.** Single `existsSync` on `~/.lightcode/runtime/node-v<x>-<target>/{bin/node,node.exe}`. Zero shell spawn — answers in microseconds when a previous boot installed it.
+2. **Login-shell probe.** macOS GUI apps don't inherit the user's interactive PATH (no Homebrew, no nvm) — so on POSIX we spawn `$SHELL -lic` with sentinel markers (`__LC_NODE_PATH__:`, `__LC_NODE_VERSION__:`) to extract the user's `node` past any rc-file noise. On Windows, Electron inherits PATH from the registry already, so `where.exe node` is enough. If the binary version is ≥ `MIN_ACCEPTED_NODE_MAJOR`, that's our pick.
+3. **Background install.** When 1 + 2 both miss, the resolver fires `installNativeRuntime` (download → SHA256-verify → `tar -xJf` for `.tar.xz` / `tar.exe -xf` for `.zip`) and immediately returns null. The current install pass falls back to `ELECTRON_RUN_AS_NODE=1`; next supervisor boot picks up the managed runtime via the fast path.
+
+Result is memoized for the supervisor lifetime (one promise shared across all 5 providers) and cleared on restart. `resolveNativeNode` is the public entry point; `managedNodePath` is exported for tests.
+
+### WSL — `src/supervisor/wsl/runtime/index.ts`
+
+- **Probe first:** `resolveNodeForDistro(distro)` runs `command -v node && node --version` through the user's login shell (`batchWslCommandsAsync` already does `-l -i`). ≥ Node 22 wins.
+- **Install fallback:** Downloads the pinned LTS tarball, verifies SHA256 against `NODE_TARBALL_CHECKSUMS`, extracts inside the distro via `tar -xJf`. Glibc only — Alpine/musl users surface their own node via probe (`apk add nodejs`).
+
+### Hook wrapper
+
+`installerBase.writeNativeHookWrapper(pluginDir, { nodePath? })` writes `lightcode-hook.{sh,cmd}` next to `forward.mjs`. Two shapes:
+
+- **With nodePath (preferred):** wrapper exec's the bare Node binary directly. ~30–50 ms cold start.
+- **Without:** wrapper sets `ELECTRON_RUN_AS_NODE=1` and exec's `process.execPath` (lightcode's bundled Electron). ~150 ms cold start. Always works.
+
+Adapters' `installPlugin` calls `resolveInstallNodePath(ctx)` from `installerBase`, which routes to the WSL or native resolver as appropriate. Provider install code passes the result through `options.resolvedNodePath` to `installXPlugin(ctx, options)`, which threads it into `writeNativeHookWrapper`. The wrapper is rewritten on every install pass — when a user installs Node between launches, the next boot detects it and upgrades the wrapper transparently.
+
+### Bumping pinned Node
+
+Edit `LIGHTCODE_PINNED_NODE_VERSION` in `src/supervisor/runtime/pinnedNode.ts`, then run `pnpm tsx scripts/refresh-node-checksums.mjs`. The script walks the `NODE_TARBALL_CHECKSUMS` block and replaces every target's SHA256 from the official `nodejs.org/dist/v<x>/SHASUMS256.txt`. Covers `linux-{x64,arm64}` (.tar.xz), `darwin-{x64,arm64}` (.tar.xz), `win-{x64,arm64}` (.zip).
 
 ## Capability-Based UI
 

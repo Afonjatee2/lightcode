@@ -23,45 +23,88 @@ import {
 } from "./exec";
 import { parseStatusPorcelainV2 } from "./statusService";
 
+/** Argv for `git branch` to feed {@link parseBranchListOutput}. */
+export function buildBranchListArgs(includeRemote: boolean): string[] {
+  const args = ["branch", "--format=%(refname)\t%(objectname:short)\t%(HEAD)", "--sort=-HEAD"];
+  if (includeRemote) args.push("-a");
+  return args;
+}
+
+export function parseBranchListOutput(output: string): GitBranchListResult {
+  let current = "";
+  const branches: GitBranchListResult["branches"] = [];
+  for (const line of output.trim().split("\n")) {
+    if (!line) continue;
+    const parts = line.split("\t");
+    const ref = parts[0]!;
+    const commit = parts[1] ?? "";
+    const isCurrent = parts[2] === "*";
+    if (ref.endsWith("/HEAD")) continue;
+
+    const isRemoteBranch = ref.startsWith("refs/remotes/");
+    let remoteName: string | undefined;
+    const name = isRemoteBranch
+      ? (() => {
+          const match = ref.match(/^refs\/remotes\/([^/]+)\/(.*)/);
+          remoteName = match?.[1];
+          return match?.[2] ?? ref;
+        })()
+      : ref.replace(/^refs\/heads\//, "");
+
+    if (isCurrent) current = name;
+    branches.push({
+      name,
+      current: isCurrent,
+      commit,
+      isRemote: isRemoteBranch,
+      ...(remoteName ? { remote: remoteName } : {}),
+    });
+  }
+  return { current, branches };
+}
+
+export function parseWorktreeListOutput(
+  raw: string,
+  locationKind: ProjectLocation["kind"],
+): GitWorktreeListResult {
+  const worktrees: GitWorktreeInfo[] = [];
+  for (const block of raw.split(/\r?\n\r?\n+/).filter(Boolean)) {
+    const lines = block.trim().split(/\r?\n/);
+    let path = "";
+    let commit = "";
+    let branch = "";
+    for (const line of lines) {
+      if (line.startsWith("worktree ")) {
+        const rawPath = line.slice(9);
+        if (locationKind === "wsl") {
+          path = rawPath;
+        } else if (locationKind === "windows") {
+          path = win32Path.normalize(rawPath);
+        } else {
+          path = posixPath.normalize(rawPath);
+        }
+      } else if (line.startsWith("HEAD ")) {
+        commit = line.slice(5);
+      } else if (line.startsWith("branch ")) {
+        const fullRef = line.slice(7);
+        branch = fullRef.startsWith("refs/heads/") ? fullRef.slice(11) : fullRef;
+      }
+    }
+    if (path) {
+      worktrees.push({ path, branch, commit, isMain: worktrees.length === 0 });
+    }
+  }
+  return { worktrees };
+}
+
 export class GitWorktreeService {
   async listBranches(
     location: ProjectLocation,
     includeRemote: boolean,
   ): Promise<GitBranchListResult> {
-    const args = ["branch", "--format=%(refname)\t%(objectname:short)\t%(HEAD)", "--sort=-HEAD"];
-    if (includeRemote) args.push("-a");
+    const args = buildBranchListArgs(includeRemote);
     const output = await execGit(location, args);
-
-    let current = "";
-    const branches: GitBranchListResult["branches"] = [];
-    for (const line of output.trim().split("\n")) {
-      if (!line) continue;
-      const parts = line.split("\t");
-      const ref = parts[0]!;
-      const commit = parts[1] ?? "";
-      const isCurrent = parts[2] === "*";
-      if (ref.endsWith("/HEAD")) continue;
-
-      const isRemoteBranch = ref.startsWith("refs/remotes/");
-      let remoteName: string | undefined;
-      const name = isRemoteBranch
-        ? (() => {
-            const match = ref.match(/^refs\/remotes\/([^/]+)\/(.*)/);
-            remoteName = match?.[1];
-            return match?.[2] ?? ref;
-          })()
-        : ref.replace(/^refs\/heads\//, "");
-
-      if (isCurrent) current = name;
-      branches.push({
-        name,
-        current: isCurrent,
-        commit,
-        isRemote: isRemoteBranch,
-        ...(remoteName ? { remote: remoteName } : {}),
-      });
-    }
-    return { current, branches };
+    return parseBranchListOutput(output);
   }
 
   async fetch(location: ProjectLocation, remote: string, prune: boolean): Promise<void> {
@@ -92,34 +135,7 @@ export class GitWorktreeService {
 
   async listWorktrees(location: ProjectLocation): Promise<GitWorktreeListResult> {
     const raw = await execGit(location, ["worktree", "list", "--porcelain"]);
-    const worktrees: GitWorktreeInfo[] = [];
-    for (const block of raw.split(/\r?\n\r?\n+/).filter(Boolean)) {
-      const lines = block.trim().split(/\r?\n/);
-      let path = "";
-      let commit = "";
-      let branch = "";
-      for (const line of lines) {
-        if (line.startsWith("worktree ")) {
-          const rawPath = line.slice(9);
-          if (location.kind === "wsl") {
-            path = rawPath;
-          } else if (location.kind === "windows") {
-            path = win32Path.normalize(rawPath);
-          } else {
-            path = posixPath.normalize(rawPath);
-          }
-        } else if (line.startsWith("HEAD ")) {
-          commit = line.slice(5);
-        } else if (line.startsWith("branch ")) {
-          const fullRef = line.slice(7);
-          branch = fullRef.startsWith("refs/heads/") ? fullRef.slice(11) : fullRef;
-        }
-      }
-      if (path) {
-        worktrees.push({ path, branch, commit, isMain: worktrees.length === 0 });
-      }
-    }
-    return { worktrees };
+    return parseWorktreeListOutput(raw, location.kind);
   }
 
   async addWorktree(
@@ -245,8 +261,12 @@ export class GitWorktreeService {
   async getWorktreeSourceBranch(
     location: ProjectLocation,
     branch: string,
+    sourceBranchOverride?: string,
   ): Promise<GitGetWorktreeSourceBranchResult> {
-    const sourceBranch = await this.readWorktreeSourceBranch(location, branch);
+    const sourceBranch =
+      sourceBranchOverride && sourceBranchOverride !== branch
+        ? sourceBranchOverride
+        : await this.readWorktreeSourceBranch(location, branch);
     let commitsAhead = 0;
     let sourceAhead = 0;
     if (sourceBranch) {

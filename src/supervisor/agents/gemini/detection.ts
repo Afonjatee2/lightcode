@@ -42,9 +42,13 @@ export const geminiDetectionSpec: DetectionSpec = {
   authProbes: [envVarAuthProbe(["GEMINI_API_KEY"]), configDirAuthProbe],
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;
+    // Bypass Gemini's folder-trust check during the probe so the AgentRegistry
+    // doesn't emit "Skipping project agents..." onto stdout, which can collide
+    // with JSON-RPC frames and break the ACP parser.
+    const trustEnv = { GEMINI_CLI_TRUST_WORKSPACE: "true" };
     const probeCmd =
       ctx.location.kind === "wsl"
-        ? buildAgentCommand(ctx.location, "gemini", ["--acp"], ctx.executablePath)
+        ? buildAgentCommand(ctx.location, "gemini", ["--acp"], ctx.executablePath, trustEnv)
         : buildAgentCommand(ctx.location, ctx.executablePath, ["--acp"]);
     const probeCwd = ctx.location.kind === "wsl" ? "/tmp" : homedir();
     const probeResult = await probeAcpCapabilities(probeCmd.command, probeCmd.args, probeCwd, {
@@ -53,6 +57,7 @@ export const geminiDetectionSpec: DetectionSpec = {
         ctx.location.kind === "wsl"
           ? `gemini:wsl:${ctx.location.distro}`
           : `gemini:${ctx.location.kind}`,
+      ...(ctx.location.kind === "wsl" ? {} : { env: trustEnv }),
     });
     if (!probeResult) return undefined;
     return {

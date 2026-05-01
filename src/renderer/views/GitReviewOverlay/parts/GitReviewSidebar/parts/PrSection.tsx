@@ -1,35 +1,92 @@
-import { CheckCircle2, ChevronDown, ExternalLink, GitMerge } from "lucide-react";
-import { Button, ButtonGroup, Dropdown, Label, Link, Separator } from "@heroui/react";
+import { useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  Eye,
+  ExternalLink,
+  GitMerge,
+  RefreshCw,
+  ShieldOff,
+} from "lucide-react";
+import {
+  Button,
+  ButtonGroup,
+  Dropdown,
+  Label,
+  Link,
+  Separator,
+  ToggleButton,
+  Tooltip,
+} from "@heroui/react";
 import { readBridge } from "@/renderer/bridge";
 import { PixelLoader } from "@/renderer/components/common";
 import {
   usePrChecksStatus,
+  usePrMergeStateStatus,
+  usePrMergeable,
   usePrNumber,
   usePrState,
   usePrTitle,
   usePrUrl,
 } from "@/renderer/state/gitSelectors";
+import { usePanelStore } from "@/renderer/state/panelStore";
 import { getPrStatusTone, PR_TONE_BG_CLASS } from "@/renderer/utils/prStatus";
 import { GitReviewSection } from "./GitReviewSection";
 
+const BLOCK_REASON: Record<string, string> = {
+  BLOCKED: "Required reviews, conversations, or status checks not met.",
+  BEHIND: "Base branch is ahead — branch must be updated first.",
+  DIRTY: "Merge conflicts must be resolved.",
+  UNSTABLE: "Some checks are failing or pending.",
+  HAS_HOOKS: "Repository pre-receive hook is blocking the merge.",
+};
+
 export function PrSection(props: {
   prKey: string;
+  projectId: string;
+  worktreePath?: string | undefined;
   prLoading: boolean;
-  handleMergePr: (method: "merge" | "squash" | "rebase") => Promise<void>;
+  handleMergePr: (method: "merge" | "squash" | "rebase", admin?: boolean) => Promise<void>;
   handleClosePr: () => Promise<void>;
   handleMarkPrReady: () => Promise<void>;
+  handleUpdatePrBranch?: ((rebase?: boolean) => Promise<void>) | undefined;
 }) {
-  const { prKey, prLoading, handleMergePr, handleClosePr, handleMarkPrReady } = props;
+  const {
+    prKey,
+    projectId,
+    worktreePath,
+    prLoading,
+    handleMergePr,
+    handleClosePr,
+    handleMarkPrReady,
+    handleUpdatePrBranch,
+  } = props;
   const state = usePrState(prKey);
   const number = usePrNumber(prKey);
   const title = usePrTitle(prKey);
   const url = usePrUrl(prKey);
   const checksStatus = usePrChecksStatus(prKey);
+  const mergeStateStatus = usePrMergeStateStatus(prKey);
+  const mergeable = usePrMergeable(prKey);
+  const [bypass, setBypass] = useState(false);
 
   const indicatorColor = PR_TONE_BG_CLASS[getPrStatusTone(state, checksStatus)];
 
+  const reasonKey = mergeable === "CONFLICTING" ? "DIRTY" : mergeStateStatus;
+  const isBlocked =
+    reasonKey !== undefined &&
+    reasonKey !== "CLEAN" &&
+    reasonKey !== "DRAFT" &&
+    reasonKey !== "UNKNOWN";
+  const blockReason = reasonKey ? BLOCK_REASON[reasonKey] : undefined;
+  // Conflicts and pre-receive hooks can't be admin-bypassed.
+  const canBypass = isBlocked && reasonKey !== "DIRTY" && reasonKey !== "HAS_HOOKS";
+
   const stateBadge = state === "draft" ? "(Draft)" : "";
   const fallbackTitle = title || (state === "merged" ? "Merged" : state === "draft" ? "" : "Open");
+
+  const canReview = number !== undefined && state !== "merged" && state !== "closed";
 
   return (
     <GitReviewSection>
@@ -47,6 +104,27 @@ export function PrSection(props: {
           </span>
           <ExternalLink className="size-4 shrink-0" />
         </Link>
+        {canReview && (
+          <Tooltip delay={300}>
+            <Tooltip.Trigger>
+              <button
+                type="button"
+                aria-label="Review PR"
+                className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                onClick={() =>
+                  usePanelStore.getState().setPrReviewContext({
+                    projectId,
+                    ...(worktreePath !== undefined ? { worktreePath } : {}),
+                    prNumber: number,
+                  })
+                }
+              >
+                <Eye className="size-3.5" />
+              </button>
+            </Tooltip.Trigger>
+            <Tooltip.Content placement="top">Review PR</Tooltip.Content>
+          </Tooltip>
+        )}
       </div>
       {state === "draft" && (
         <ButtonGroup className="w-full">
@@ -90,48 +168,129 @@ export function PrSection(props: {
         </ButtonGroup>
       )}
       {state !== "merged" && state !== "draft" && (
-        <ButtonGroup className="w-full">
-          <Button
-            variant="tertiary"
-            className="flex-1"
-            isDisabled={prLoading}
-            isPending={prLoading}
-            onPress={() => void handleMergePr("squash")}
-          >
-            {({ isPending }) => (
-              <>
-                {isPending ? <PixelLoader size="xs" /> : <GitMerge className="size-3.5" />}
-                Merge PR: Squash
-              </>
-            )}
-          </Button>
-          <Dropdown>
-            <Button isIconOnly variant="tertiary" aria-label="Merge options" isDisabled={prLoading}>
-              <ButtonGroup.Separator />
-              <ChevronDown className="size-3.5" />
-            </Button>
-            <Dropdown.Popover placement="top end">
-              <Dropdown.Menu
-                aria-label="Merge method"
-                onAction={(key) => {
-                  if (key === "close") void handleClosePr();
-                  else void handleMergePr(key as "merge" | "squash" | "rebase");
-                }}
+        <>
+          {isBlocked && (
+            <div className="flex flex-col gap-1 text-xs">
+              <div className="flex items-center gap-2 text-danger">
+                <AlertTriangle className="size-3.5 shrink-0" />
+                <span className="min-w-0 flex-1 truncate font-medium">Merging is blocked</span>
+                {canBypass && (
+                  <Tooltip>
+                    <ToggleButton
+                      isIconOnly
+                      size="sm"
+                      variant="ghost"
+                      isSelected={bypass}
+                      onChange={setBypass}
+                      isDisabled={prLoading}
+                      aria-label="Bypass branch protection rules"
+                      className="size-5 shrink-0 text-danger data-[selected=true]:bg-danger data-[selected=true]:text-white"
+                    >
+                      <ShieldOff className="size-3" />
+                    </ToggleButton>
+                    <Tooltip.Content placement="top">
+                      Bypass branch protection rules (admin merge)
+                    </Tooltip.Content>
+                  </Tooltip>
+                )}
+              </div>
+              {blockReason && <span className="text-muted">{blockReason}</span>}
+            </div>
+          )}
+          {mergeStateStatus === "BEHIND" && handleUpdatePrBranch && (
+            <ButtonGroup className="w-full">
+              <Button
+                variant="tertiary"
+                className="flex-1"
+                isDisabled={prLoading}
+                isPending={prLoading}
+                onPress={() => void handleUpdatePrBranch(false)}
               >
-                <Dropdown.Item id="merge" textValue="Merge PR: Commit">
-                  <Label>Merge PR: Commit</Label>
-                </Dropdown.Item>
-                <Dropdown.Item id="rebase" textValue="Merge PR: Rebase">
-                  <Label>Merge PR: Rebase</Label>
-                </Dropdown.Item>
-                <Separator />
-                <Dropdown.Item id="close" textValue="Close PR" variant="danger">
-                  <Label>Close PR</Label>
-                </Dropdown.Item>
-              </Dropdown.Menu>
-            </Dropdown.Popover>
-          </Dropdown>
-        </ButtonGroup>
+                {({ isPending }) => (
+                  <>
+                    {isPending ? <PixelLoader size="xs" /> : <RefreshCw className="size-3.5" />}
+                    Update branch
+                  </>
+                )}
+              </Button>
+              <Dropdown>
+                <Button
+                  isIconOnly
+                  variant="tertiary"
+                  aria-label="Update method"
+                  isDisabled={prLoading}
+                >
+                  <ButtonGroup.Separator />
+                  <ChevronDown className="size-3.5" />
+                </Button>
+                <Dropdown.Popover placement="top end">
+                  <Dropdown.Menu
+                    aria-label="Update method"
+                    onAction={(key) => {
+                      if (key === "rebase") void handleUpdatePrBranch(true);
+                      else void handleUpdatePrBranch(false);
+                    }}
+                  >
+                    <Dropdown.Item id="merge" textValue="Update with merge commit">
+                      <Label>Update with merge commit</Label>
+                    </Dropdown.Item>
+                    <Dropdown.Item id="rebase" textValue="Update with rebase">
+                      <Label>Update with rebase</Label>
+                    </Dropdown.Item>
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
+            </ButtonGroup>
+          )}
+          <ButtonGroup className="w-full">
+            <Button
+              variant="tertiary"
+              className="flex-1"
+              isDisabled={prLoading || (isBlocked && !bypass)}
+              isPending={prLoading}
+              onPress={() => void handleMergePr("squash", bypass)}
+            >
+              {({ isPending }) => (
+                <>
+                  {isPending ? <PixelLoader size="xs" /> : <GitMerge className="size-3.5" />}
+                  Merge PR: Squash
+                </>
+              )}
+            </Button>
+            <Dropdown>
+              <Button
+                isIconOnly
+                variant="tertiary"
+                aria-label="Merge options"
+                isDisabled={prLoading}
+              >
+                <ButtonGroup.Separator />
+                <ChevronDown className="size-3.5" />
+              </Button>
+              <Dropdown.Popover placement="top end">
+                <Dropdown.Menu
+                  aria-label="Merge method"
+                  disabledKeys={isBlocked && !bypass ? ["merge", "squash", "rebase"] : []}
+                  onAction={(key) => {
+                    if (key === "close") void handleClosePr();
+                    else void handleMergePr(key as "merge" | "squash" | "rebase", bypass);
+                  }}
+                >
+                  <Dropdown.Item id="merge" textValue="Merge PR: Commit">
+                    <Label>Merge PR: Commit</Label>
+                  </Dropdown.Item>
+                  <Dropdown.Item id="rebase" textValue="Merge PR: Rebase">
+                    <Label>Merge PR: Rebase</Label>
+                  </Dropdown.Item>
+                  <Separator />
+                  <Dropdown.Item id="close" textValue="Close PR" variant="danger">
+                    <Label>Close PR</Label>
+                  </Dropdown.Item>
+                </Dropdown.Menu>
+              </Dropdown.Popover>
+            </Dropdown>
+          </ButtonGroup>
+        </>
       )}
     </GitReviewSection>
   );

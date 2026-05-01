@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { PageLayout } from "@/renderer/components/layout/PageLayout";
 import { GeneralSettings } from "./parts/GeneralSettings";
+import { NotificationSettings } from "./parts/NotificationSettings";
 import { AISettings } from "./parts/AISettings";
 import { SearchSettings } from "./parts/SearchSettings";
 import { ArchivedThreadsSettings } from "./parts/ArchivedThreadsSettings";
@@ -11,13 +12,29 @@ import { SettingsSidebar } from "./parts/SettingsSidebar";
 import { AgentSettingsEmpty, SingleAgentSettings } from "./parts/SingleAgentSettings";
 import type { SettingsSection } from "./parts/types";
 
+const SECTION_VIEWS: Partial<Record<SettingsSection, () => ReactNode>> = {
+  general: () => <GeneralSettings />,
+  notifications: () => <NotificationSettings />,
+  ai: () => <AISettings />,
+  search: () => <SearchSettings />,
+  agents: () => <AgentSettingsEmpty />,
+  archived: () => <ArchivedThreadsSettings />,
+  about: () => <AboutSettings />,
+  dev: () => <DevSettings />,
+};
+
+function renderSection(activeSection: SettingsSection): ReactNode {
+  if (activeSection.startsWith("agents:")) {
+    return <SingleAgentSettings agentKind={activeSection.slice(7)} />;
+  }
+  return SECTION_VIEWS[activeSection]?.() ?? null;
+}
+
 export function SettingsOverlay(props: { onClose: () => void }) {
   const { onClose } = props;
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const installedAgents = agentStatuses.filter((a) => a.installed);
-
-  const agentKind = activeSection.startsWith("agents:") ? activeSection.slice(7) : undefined;
 
   return (
     <PageLayout
@@ -30,25 +47,7 @@ export function SettingsOverlay(props: { onClose: () => void }) {
           installedAgents={installedAgents}
         />
       }
-      content={
-        activeSection === "general" ? (
-          <GeneralSettings />
-        ) : activeSection === "ai" ? (
-          <AISettings />
-        ) : activeSection === "search" ? (
-          <SearchSettings />
-        ) : agentKind ? (
-          <SingleAgentSettings agentKind={agentKind} />
-        ) : activeSection === "agents" ? (
-          <AgentSettingsEmpty />
-        ) : activeSection === "archived" ? (
-          <ArchivedThreadsSettings />
-        ) : activeSection === "about" ? (
-          <AboutSettings />
-        ) : activeSection === "dev" ? (
-          <DevSettings />
-        ) : null
-      }
+      content={renderSection(activeSection)}
     />
   );
 }

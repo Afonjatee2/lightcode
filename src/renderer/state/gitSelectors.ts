@@ -30,6 +30,16 @@ export function useGitFile(
   );
 }
 
+/** Sentinel key for the project's main-branch PR (no worktree). */
+export function buildBranchPrKey(projectId: string): string {
+  return `__branch:${projectId}`;
+}
+
+/** Resolve the prData lookup key — worktree path takes precedence. */
+export function resolvePrKey(projectId: string, worktreePath: string | undefined): string {
+  return worktreePath ?? buildBranchPrKey(projectId);
+}
+
 type PrField<K extends keyof PrData> = PrData[K] | undefined;
 
 function makePrFieldSelector<K extends keyof PrData>(field: K) {
@@ -43,6 +53,10 @@ export const usePrState = makePrFieldSelector("state");
 export const usePrTitle = makePrFieldSelector("title");
 export const usePrUrl = makePrFieldSelector("url");
 export const usePrChecksStatus = makePrFieldSelector("checksStatus");
+export const usePrMergeStateStatus = makePrFieldSelector("mergeStateStatus");
+export const usePrMergeable = makePrFieldSelector("mergeable");
+export const usePrBaseBranch = makePrFieldSelector("baseBranch");
+export const usePrViewerDidAuthor = makePrFieldSelector("viewerDidAuthor");
 
 export function useHasPr(key: string | undefined): boolean {
   return useGitStore((s) => Boolean(key && s.prData[key]));

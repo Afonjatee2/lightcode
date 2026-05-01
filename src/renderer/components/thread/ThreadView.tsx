@@ -772,7 +772,11 @@ export function ThreadView(props: {
           <div
             className={`${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col gap-2 pt-2`}
           >
-            <div className="relative min-h-0 flex-1 overflow-hidden">
+            <div
+              className={`relative min-h-0 flex-1 ${
+                usesTerminalPresentation ? "overflow-visible" : "overflow-hidden"
+              }`}
+            >
               {usesTerminalPresentation ? (
                 <TerminalPane
                   ref={terminalPaneRef}

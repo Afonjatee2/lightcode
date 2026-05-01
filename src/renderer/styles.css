@@ -71,6 +71,17 @@
   padding: 0.25rem;
 }
 
+/* HeroUI radio: default unselected ring is too low-contrast on dark surfaces.
+   Bump the unselected border so the control is visible without changing the
+   selected-state styling (which still flows from the variant tokens). */
+.radio__control {
+  border-color: color-mix(in oklch, var(--muted) 70%, transparent);
+}
+.radio[data-selected="true"] .radio__control,
+.radio--selected .radio__control {
+  border-color: var(--primary);
+}
+
 @layer base {
   :root {
     /* Intentional overrides from HeroUI defaults */
@@ -462,6 +473,18 @@ body {
 .monaco-editor .sticky-widget,
 .monaco-editor .sticky-widget .monaco-editor-background {
   background-color: var(--content-background) !important;
+}
+
+.lightcode-terminal-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--lightcode-terminal-scrollbar-width);
+  width: calc(100% + var(--lightcode-terminal-scrollbar-width));
+  background: var(--content-background);
+}
+
+.lightcode-terminal-shell > .lightcode-terminal-pane {
+  grid-column: 1;
+  width: 100% !important;
 }
 
 .lightcode-terminal-pane,
@@ -976,8 +999,23 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
   app-region: no-drag;
 }
 
-.xterm .xterm-scrollable-element > .scrollbar.vertical {
-  width: 9px !important;
+.lightcode-terminal-pane .xterm .xterm-scrollable-element > .scrollbar.vertical {
+  display: none !important;
+}
+
+.lightcode-terminal-scrollbar {
+  grid-column: 2;
+  width: var(--lightcode-terminal-scrollbar-width);
+  cursor: default;
+  transition: opacity 150ms ease-out;
+}
+
+.lightcode-terminal-scrollbar__thumb {
+  position: absolute;
+  width: 4px !important;
+  left: 2px !important;
+  border-radius: 999px;
+  background: var(--scrollbar) !important;
 }
 
 .xterm .xterm-scrollable-element > .scrollbar.vertical > .slider {
@@ -987,7 +1025,6 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
   background: var(--scrollbar) !important;
 }
 
-.xterm .xterm-scrollable-element > .scrollbar.vertical > .scra,
 .xterm .xterm-scrollable-element .arrow-background,
 .xterm .xterm-scrollable-element .up-arrow,
 .xterm .xterm-scrollable-element .down-arrow {

@@ -1,7 +1,12 @@
 import { toast } from "@heroui/react";
+import { useEffect } from "react";
 import { PixelLoader } from "./components/common";
 import { msg } from "@/shared/messages";
 import { readBridge } from "./bridge";
+import {
+  handleThreadStateNotification,
+  shouldInspectThreadStateForNotification,
+} from "./notifications";
 
 import { useAppStore } from "./state/appStore";
 import { useAgentStatusesStore } from "./state/agentStatusesStore";
@@ -20,13 +25,25 @@ import { MainView } from "@/renderer/views/MainView/MainView";
 // Both subscribe calls return unsubscribe functions which we store
 // so that Vite HMR can tear them down before re-executing the module.
 
+let threadStateNotificationsArmed = false;
+
 const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
   if ("threadId" in event && event.threadId.startsWith("shell:")) {
     return;
   }
 
   if (event.type === "thread-state") {
-    useAppStore.getState().updateThreadRuntime(event.threadId, event);
+    const shouldCheckNotifications =
+      threadStateNotificationsArmed && shouldInspectThreadStateForNotification();
+    const appStore = useAppStore.getState();
+    const oldThread = shouldCheckNotifications
+      ? appStore.threads.find((t) => t.id === event.threadId)
+      : undefined;
+    appStore.updateThreadRuntime(event.threadId, event);
+    if (shouldCheckNotifications) {
+      const newThread = useAppStore.getState().threads.find((t) => t.id === event.threadId);
+      handleThreadStateNotification(event, oldThread, newThread);
+    }
   }
   if (event.type === "thread-server-request") {
     useAppStore.getState().addThreadServerRequest({
@@ -91,6 +108,18 @@ if (import.meta.hot) {
 
 export function App() {
   const { initialLoading, storeHydrated, loadT0 } = useAppHydration();
+
+  useEffect(() => {
+    if (initialLoading) {
+      threadStateNotificationsArmed = false;
+      return;
+    }
+
+    threadStateNotificationsArmed = true;
+    return () => {
+      threadStateNotificationsArmed = false;
+    };
+  }, [initialLoading]);
 
   if (initialLoading) {
     console.log(

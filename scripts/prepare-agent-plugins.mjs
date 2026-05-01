@@ -14,6 +14,7 @@
  * Currently registered:
  *   - claude: plugin.json, forward.mjs
  *   - codex: plugin.json, forward.mjs
+ *   - cursor: plugin.json, forward.mjs
  *   - gemini: plugin.json, forward.mjs
  *   - copilot: plugin.json, forward.mjs
  *   - opencode: plugin.json, plugin.mjs (in-process plugin, no forward.mjs)
@@ -46,6 +47,11 @@ const PLUGINS = [
     kind: "codex",
     assets: ["plugin.json", "forward.mjs"],
     srcDir: join(repoRoot, "src", "supervisor", "agents", "codex", "plugin"),
+  },
+  {
+    kind: "cursor",
+    assets: ["plugin.json", "forward.mjs"],
+    srcDir: join(repoRoot, "src", "supervisor", "agents", "cursor", "plugin"),
   },
   {
     kind: "gemini",

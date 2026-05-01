@@ -409,6 +409,13 @@ export class ProjectWatcher {
             return;
           }
           if (event.scope === "worktree") {
+            // `.git/...` writes (e.g. our own `git status` creating
+            // `.git/index.lock`) leak into worktree-scope events because the
+            // worktree path is the parent of `.git`. Those are already covered
+            // by the dedicated git-scope subscription with noise filtering, so
+            // drop them here to avoid a refresh→lock-write→refresh loop.
+            const treePaths = event.paths.filter((p) => p !== ".git" && !p.startsWith(".git/"));
+            if (treePaths.length === 0 && event.paths.length > 0) return;
             schedule.onTree();
             return;
           }

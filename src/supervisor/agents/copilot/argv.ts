@@ -1,4 +1,5 @@
 import type { ThreadConfig } from "@/shared/contracts";
+import { sanitizeModelName } from "./terminal";
 
 export function formatCopilotInteractivePrompt(prompt: string, config?: ThreadConfig): string {
   if (config?.mode !== "plan") {
@@ -24,8 +25,12 @@ export function buildCopilotArgs(
 
   // Copilot's TUI only reflects the selected model/effort when the resume
   // command also carries those flags, even if ACP already applied them.
-  if (config.model) {
-    args.push("--model", config.model);
+  // Sanitize: status-line scraping can capture TUI overlay glyphs as the
+  // model name; passing those to `--model` makes the CLI error and fall back
+  // to "auto", which is fine — but only if we don't pass the bad value.
+  const safeModel = sanitizeModelName(config.model);
+  if (safeModel) {
+    args.push("--model", safeModel);
   }
   if (config.effort) {
     args.push("--effort", config.effort);

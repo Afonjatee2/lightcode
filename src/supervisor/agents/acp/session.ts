@@ -231,7 +231,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     const child = spawn(command.command, command.args, {
       ...(spawnCwd ? { cwd: spawnCwd } : {}),
       stdio: ["pipe", "pipe", "pipe"],
-      env: { ...process.env, TERM: "xterm-256color" },
+      env: { ...process.env, TERM: "xterm-256color", ...(command.env ?? {}) },
       shell: false,
       windowsHide: true,
     });
@@ -302,7 +302,17 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     });
 
     child.once("exit", (code) => {
-      console.log(`[acp] process exited with code ${code}`);
+      // Quiet path: the structured session is one-shot for adapters whose
+      // `liveInputMode === "terminal"` (every adapter today). The runtime
+      // disposes us once `openThread` returns, and some agents (OpenCode)
+      // exit non-zero on stdin close even when everything went fine —
+      // there's nothing actionable to surface in that case.
+      const expected = session.isDisposed || session.sessionId !== undefined;
+      if (expected) {
+        console.log(`[acp] child exited (code ${code})`);
+      } else {
+        console.log(`[acp] child exited unexpectedly (code ${code})`);
+      }
       if (!session.isDisposed) {
         session.listener?.onClose();
       }
@@ -348,15 +358,33 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       initResult.agentInfo?.name ?? "unknown",
     );
 
-    // Handle authentication if required
+    // Handle authentication if required.
+    //
+    // ACP's authMethods list is *advertisements*, not necessarily callable
+    // RPCs. Some agents (notably OpenCode, whose `opencode-login` method's
+    // description literally reads "Run `opencode auth login` in the
+    // terminal") use it to tell the user how to authenticate out-of-band,
+    // and reject the `authenticate` RPC with "Authentication not
+    // implemented". Treat the call as best-effort: if the agent is already
+    // authenticated (the common case), `session/new` below succeeds and the
+    // failure here was harmless; if the agent really isn't authenticated,
+    // `session/new` will return a clear auth error of its own.
     const authMethods = initResult.authMethods;
     if (authMethods && authMethods.length > 0) {
       const firstMethod = authMethods[0]!;
       const methodId = "id" in firstMethod ? (firstMethod as { id: string }).id : undefined;
       if (methodId) {
-        console.log("[acp] authenticating with method:", methodId);
-        await this.connection.authenticate({ methodId });
-        console.log("[acp] authenticated");
+        try {
+          console.log("[acp] authenticating with method:", methodId);
+          await this.connection.authenticate({ methodId });
+          console.log("[acp] authenticated");
+        } catch (error) {
+          console.log(
+            "[acp] authenticate(%s) rejected, continuing: %s",
+            methodId,
+            error instanceof Error ? error.message : String(error),
+          );
+        }
       }
     }
   }

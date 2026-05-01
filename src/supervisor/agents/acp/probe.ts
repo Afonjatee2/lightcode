@@ -193,7 +193,12 @@ export async function probeAcpCapabilities(
   command: string,
   args: string[],
   sessionCwd: string,
-  options?: { processCwd?: string; timeoutMs?: number; label?: string },
+  options?: {
+    processCwd?: string;
+    timeoutMs?: number;
+    label?: string;
+    env?: Record<string, string>;
+  },
 ): Promise<AcpProbeResult | undefined> {
   const timeoutMs = options?.timeoutMs ?? 15_000;
   const tag = options?.label ? `[acp-probe:${options.label}]` : "[acp-probe]";
@@ -203,6 +208,7 @@ export async function probeAcpCapabilities(
     child = spawn(command, args, {
       cwd: options?.processCwd,
       stdio: ["pipe", "pipe", "pipe"],
+      env: options?.env ? { ...process.env, ...options.env } : process.env,
       shell: false,
       windowsHide: true,
     });
@@ -238,14 +244,26 @@ export async function probeAcpCapabilities(
           clientCapabilities: {},
         });
 
-        // Authenticate if the agent advertises auth methods (e.g. Cursor's cursor_login).
+        // Authenticate if the agent advertises auth methods (e.g. Cursor's
+        // cursor_login). Best-effort: some agents (OpenCode) advertise
+        // informational methods that throw "Authentication not implemented"
+        // when called — swallow and let `newSession` surface real auth errors.
         const authMethods = initResult.authMethods;
         if (authMethods && authMethods.length > 0) {
           const firstMethod = authMethods[0]!;
           const methodId = "id" in firstMethod ? (firstMethod as { id: string }).id : undefined;
           if (methodId) {
-            console.log("%s authenticating with method: %s", tag, methodId);
-            await connection.authenticate({ methodId });
+            try {
+              console.log("%s authenticating with method: %s", tag, methodId);
+              await connection.authenticate({ methodId });
+            } catch (error) {
+              console.log(
+                "%s authenticate(%s) rejected, continuing: %s",
+                tag,
+                methodId,
+                error instanceof Error ? error.message : String(error),
+              );
+            }
           }
         }
 

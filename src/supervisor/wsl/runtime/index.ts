@@ -9,71 +9,42 @@
  *      every supervisor boot so nvm version changes are picked up.
  *
  *   2. If no acceptable node is found, download the pinned LTS Node tarball
- *      from nodejs.org (or unofficial-builds.nodejs.org for musl distros),
- *      verify SHA256, stage it via `\\wsl.localhost\` UNC, and extract
- *      inside the distro using its own `tar`.
+ *      from nodejs.org, verify SHA256, stage it via `\\wsl.localhost\` UNC,
+ *      and extract inside the distro using its own `tar`.
  *
  * In both cases the returned `nodePath` is an absolute Linux path baked
  * into hook commands and the bridge launch argv. /bin/sh -c never needs
  * to resolve `node` from PATH.
  */
 
-import { createHash } from "node:crypto";
-import {
-  copyFileSync,
-  createReadStream,
-  createWriteStream,
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  rmSync,
-  statSync,
-} from "node:fs";
+import { copyFileSync, existsSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { spawn } from "node:child_process";
-import { Readable } from "node:stream";
-import { pipeline } from "node:stream/promises";
+import { join } from "node:path";
 import { toWslUncPath } from "@/shared/wsl";
 import { batchWslCommandsAsync, getWslCommand, resolveWslHomeDirectory } from "../../agents/base";
+import { pruneStaleRuntimeDirs, safeRm } from "../../runtime/cleanup";
+import { downloadToFile, verifySha256 } from "../../runtime/download";
+import {
+  LIGHTCODE_PINNED_NODE_VERSION,
+  MIN_ACCEPTED_NODE_MAJOR,
+  NODE_TARBALL_CHECKSUMS,
+  nodeArchiveDirName,
+  nodeArchiveFileName,
+  nodeArchiveUrl,
+  parseNodeMajor,
+  type NodeTargetTriple as SharedNodeTargetTriple,
+} from "../../runtime/pinnedNode";
+import { spawnAndAwaitExit } from "../../runtime/spawn";
 
-// ── Pinned Node version + checksums ──────────────────────────────────────
-
-/**
- * Pinned Node LTS version that the runtime installer downloads when the
- * user's distro doesn't have an acceptable node. Bumped manually with new
- * LTS releases. Keep in lockstep with `MIN_ACCEPTED_NODE_MAJOR`.
- *
- * When bumping: run `pnpm tsx scripts/refresh-node-checksums.mjs` to update
- * `NODE_TARBALL_CHECKSUMS` from nodejs.org's official SHASUMS256.txt.
- */
-export const LIGHTCODE_PINNED_NODE_VERSION = "22.11.0";
-
-/**
- * Minimum Node major version we accept from the user's distro. Below this,
- * we download our own. Same major as `LIGHTCODE_PINNED_NODE_VERSION` so
- * we have a single supported version line for testing/debugging.
- */
-export const MIN_ACCEPTED_NODE_MAJOR = 22;
+export { LIGHTCODE_PINNED_NODE_VERSION, MIN_ACCEPTED_NODE_MAJOR, NODE_TARBALL_CHECKSUMS };
 
 export type LinuxArch = "x64" | "arm64";
-export type NodeTargetTriple = "linux-x64" | "linux-arm64";
-
 /**
- * SHA256 checksums for the pinned Node tarballs from the official
- * nodejs.org SHASUMS256.txt. Updated by `scripts/refresh-node-checksums.mjs`.
- *
- * Only glibc tarballs are tracked; musl distros (Alpine) are expected to
- * have node available via probe (the user's `apk add nodejs` install).
- * If a checksum is empty, install fails loudly — refresh after bumping
- * `LIGHTCODE_PINNED_NODE_VERSION`.
+ * Subset of `NodeTargetTriple` that this WSL resolver actually downloads —
+ * always glibc Linux tarballs. The wider native targets (darwin-*, win-*)
+ * are handled by `src/supervisor/native/runtime`.
  */
-export const NODE_TARBALL_CHECKSUMS: Record<NodeTargetTriple, string> = {
-  // node-v22.11.0-linux-x64.tar.xz
-  "linux-x64": "83bf07dd343002a26211cf1fcd46a9d9534219aad42ee02847816940bf610a72",
-  // node-v22.11.0-linux-arm64.tar.xz
-  "linux-arm64": "6031d04b98f59ff0f7cb98566f65b115ecd893d3b7870821171708cdbaf7ae6e",
-};
+export type NodeTargetTriple = Extract<SharedNodeTargetTriple, "linux-x64" | "linux-arm64">;
 
 // ── Cache ────────────────────────────────────────────────────────────────
 
@@ -87,8 +58,8 @@ export interface ResolvedNode {
 }
 
 /**
- * In-memory cache, keyed by distro name. Cleared on supervisor restart so
- * users picking up a new nvm default get re-probed without manual action.
+ * Cleared on supervisor restart so users picking up a new nvm default get
+ * re-probed without manual action.
  */
 const distroNodeCache = new Map<string, ResolvedNode>();
 
@@ -138,7 +109,7 @@ export async function resolveNodeForDistro(
   const probed = await probeUserNode(distro);
 
   if (probed) {
-    const major = parseMajor(probed.version);
+    const major = parseNodeMajor(probed.version);
     if (major !== null && major >= MIN_ACCEPTED_NODE_MAJOR) {
       options?.onProgress?.({ kind: "probe-result", resolved: "found", version: probed.version });
       const resolved: ResolvedNode = {
@@ -187,7 +158,7 @@ export async function probeUserNode(
   if (!nodePath || !nodePath.startsWith("/")) return null;
   if (!versionRaw.startsWith("v")) return null;
   const version = versionRaw.slice(1).split(/\s/)[0] ?? "";
-  if (!parseMajor(version)) return null;
+  if (!parseNodeMajor(version)) return null;
   return { nodePath, version };
 }
 
@@ -245,7 +216,18 @@ export async function installRuntimeIntoDistro(
   options?.onProgress?.({ kind: "download-start", url, target });
   const tmpTarball = join(tmpdir(), `lightcode-node-${Date.now()}-${tarballName}`);
   try {
-    await downloadToFile(url, tmpTarball, options);
+    await downloadToFile(url, tmpTarball, {
+      ...(options?.onProgress
+        ? {
+            onProgress: ({ bytesReceived, bytesTotal }) =>
+              options.onProgress?.({
+                kind: "download-progress",
+                bytesReceived,
+                bytesTotal,
+              }),
+          }
+        : {}),
+    });
     options?.onProgress?.({ kind: "verify-start" });
     await verifySha256(tmpTarball, checksum);
 
@@ -259,143 +241,25 @@ export async function installRuntimeIntoDistro(
     copyFileSync(tmpTarball, stagedUncPath);
 
     options?.onProgress?.({ kind: "extract-start" });
-    await extractInDistro(distro, stagedLinuxPath, linuxRuntimeDir);
+    await spawnAndAwaitExit(getWslCommand(), [
+      "-d",
+      distro,
+      "--",
+      "tar",
+      "-xJf",
+      stagedLinuxPath,
+      "-C",
+      linuxRuntimeDir,
+    ]);
 
-    // Drop the staged tarball — we have the extracted tree.
-    try {
-      rmSync(stagedUncPath);
-    } catch {
-      // Non-fatal — disk hygiene only.
-    }
+    safeRm(stagedUncPath);
 
     if (!existsSync(uncNodePath)) {
       throw new Error(`Node binary not found at expected path after extraction: ${linuxNodePath}`);
     }
-    pruneStaleRuntimes(distro, linuxRuntimeDir, versionedDirName);
+    pruneStaleRuntimeDirs(uncRuntimeDir, versionedDirName);
     return { nodePath: linuxNodePath };
   } finally {
-    try {
-      rmSync(tmpTarball);
-    } catch {
-      // Ignore — Windows TMP cleans itself up.
-    }
-  }
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function parseMajor(version: string): number | null {
-  const match = /^(\d+)\./.exec(version);
-  if (!match) return null;
-  const n = Number.parseInt(match[1]!, 10);
-  return Number.isFinite(n) ? n : null;
-}
-
-function nodeArchiveFileName(target: NodeTargetTriple): string {
-  return `node-v${LIGHTCODE_PINNED_NODE_VERSION}-${target}.tar.xz`;
-}
-
-function nodeArchiveDirName(target: NodeTargetTriple): string {
-  return `node-v${LIGHTCODE_PINNED_NODE_VERSION}-${target}`;
-}
-
-function nodeArchiveUrl(target: NodeTargetTriple): string {
-  return `https://nodejs.org/dist/v${LIGHTCODE_PINNED_NODE_VERSION}/${nodeArchiveFileName(target)}`;
-}
-
-async function downloadToFile(
-  url: string,
-  destPath: string,
-  options?: ResolveNodeOptions,
-): Promise<void> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} fetching ${url}`);
-  }
-  if (!response.body) {
-    throw new Error(`empty response body for ${url}`);
-  }
-
-  const totalHeader = response.headers.get("content-length");
-  const bytesTotal = totalHeader ? Number.parseInt(totalHeader, 10) : 0;
-  let bytesReceived = 0;
-  let lastReport = 0;
-  const progressChunkBytes = 262_144;
-
-  mkdirSync(dirname(destPath), { recursive: true });
-  const out = createWriteStream(destPath);
-
-  const nodeStream = Readable.fromWeb(
-    response.body as unknown as Parameters<typeof Readable.fromWeb>[0],
-  );
-  nodeStream.on("data", (chunk: Buffer | string) => {
-    const len = typeof chunk === "string" ? Buffer.byteLength(chunk) : chunk.length;
-    bytesReceived += len;
-    if (bytesReceived - lastReport >= progressChunkBytes) {
-      options?.onProgress?.({ kind: "download-progress", bytesReceived, bytesTotal });
-      lastReport = bytesReceived;
-    }
-  });
-  await pipeline(nodeStream, out);
-  options?.onProgress?.({
-    kind: "download-progress",
-    bytesReceived,
-    bytesTotal: bytesTotal || bytesReceived,
-  });
-}
-
-async function verifySha256(filePath: string, expected: string): Promise<void> {
-  const hash = createHash("sha256");
-  await pipeline(createReadStream(filePath), hash);
-  const actual = hash.digest("hex");
-  if (actual.toLowerCase() !== expected.toLowerCase()) {
-    throw new Error(`SHA256 mismatch for ${filePath}: expected ${expected}, got ${actual}`);
-  }
-}
-
-async function extractInDistro(
-  distro: string,
-  linuxTarballPath: string,
-  linuxDestDir: string,
-): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(
-      getWslCommand(),
-      ["-d", distro, "--", "tar", "-xJf", linuxTarballPath, "-C", linuxDestDir],
-      { windowsHide: true, stdio: ["ignore", "pipe", "pipe"] },
-    );
-    let stderr = "";
-    child.stderr?.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
-    child.on("error", reject);
-    child.on("exit", (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`tar exited ${code}: ${stderr.trim()}`));
-    });
-  });
-}
-
-/**
- * Best-effort sweep of stale `node-v*` directories that don't match the
- * just-installed runtime. Keeps `~/.lightcode/runtime/` from accumulating
- * ~80 MB per pinned-version bump. Failures are swallowed.
- */
-function pruneStaleRuntimes(distro: string, linuxRuntimeDir: string, keepDirName: string): void {
-  const uncRuntimeDir = toWslUncPath(distro, linuxRuntimeDir);
-  let entries: string[];
-  try {
-    entries = readdirSync(uncRuntimeDir);
-  } catch {
-    return;
-  }
-  for (const entry of entries) {
-    if (!entry.startsWith("node-v") || entry === keepDirName) continue;
-    const target = `${uncRuntimeDir}\\${entry}`;
-    try {
-      if (statSync(target).isDirectory()) rmSync(target, { recursive: true, force: true });
-    } catch {
-      // Ignore — best effort.
-    }
+    safeRm(tmpTarball);
   }
 }

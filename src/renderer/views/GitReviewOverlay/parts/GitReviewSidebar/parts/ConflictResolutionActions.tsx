@@ -13,30 +13,34 @@ export function ConflictResolutionActions(props: {
 
   return (
     <GitReviewSection>
-      <Button
-        variant="tertiary"
-        size="sm"
-        className="w-full"
-        isDisabled={!canResolveWithAgent || isAbortingMerge}
-        onPress={onResolveWithAgent}
-      >
-        <Sparkles className="size-3.5" />
-        Fix in Agent
-      </Button>
-      <Button
-        variant="tertiary"
-        size="sm"
-        className="w-full text-danger hover:text-danger"
-        isPending={isAbortingMerge}
-        onPress={() => void onAbortMerge()}
-      >
-        {({ isPending }) => (
-          <>
-            {isPending && <PixelLoader size="xs" />}
-            Abort Merge
-          </>
-        )}
-      </Button>
+      <div className="@container">
+        <div className="flex flex-col gap-2 @[18rem]:flex-row">
+          <Button
+            variant="tertiary"
+            size="sm"
+            className="w-full @[18rem]:flex-1"
+            isDisabled={!canResolveWithAgent || isAbortingMerge}
+            onPress={onResolveWithAgent}
+          >
+            <Sparkles className="size-3.5" />
+            Fix in Agent
+          </Button>
+          <Button
+            variant="tertiary"
+            size="sm"
+            className="w-full text-danger hover:text-danger @[18rem]:flex-1"
+            isPending={isAbortingMerge}
+            onPress={() => void onAbortMerge()}
+          >
+            {({ isPending }) => (
+              <>
+                {isPending && <PixelLoader size="xs" />}
+                Abort Merge
+              </>
+            )}
+          </Button>
+        </div>
+      </div>
     </GitReviewSection>
   );
 }

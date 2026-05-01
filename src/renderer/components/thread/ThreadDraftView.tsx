@@ -216,7 +216,10 @@ export function ThreadDraftView(props: {
   const setProviderConfig = useSharedSettings((s) => s.setProviderConfig);
   const providerConfigs = useSharedSettings((s) => s.providerConfigs);
   const providerConfigsRef = useRef<Record<string, ProviderDraftConfig>>({});
-  providerConfigsRef.current = providerConfigs;
+  // Spread is required: the effects below mutate `providerConfigsRef.current[kind]`
+  // in place to keep effort/model selections in sync mid-render. Assigning the
+  // store reference directly would mutate Zustand state and skip subscribers.
+  providerConfigsRef.current = { ...providerConfigs };
 
   // --- Draft preservation: save on unmount, restore on mount ---
   const saveDraftContent = useAppStore((s) => s.saveDraftContent);

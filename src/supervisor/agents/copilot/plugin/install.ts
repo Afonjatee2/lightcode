@@ -150,9 +150,12 @@ export function getCopilotPluginPaths(ctx?: AgentEnvContext): CopilotPluginPaths
 
 export interface InstallCopilotPluginOptions {
   /**
-   * Required for WSL contexts: absolute Linux path to the Node binary the
-   * staged hook command should use. Comes from `resolveNodeForDistro`.
-   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   * Absolute path to the Node binary the staged hook command should use.
+   *
+   * - **WSL contexts:** required. Comes from `resolveNodeForDistro`.
+   * - **Native contexts:** optional. When provided (preferred), the wrapper
+   *   exec's the bare Node binary directly; otherwise it falls back to
+   *   `ELECTRON_RUN_AS_NODE=1` against the bundled Electron binary.
    */
   resolvedNodePath?: string | undefined;
   /**
@@ -202,7 +205,9 @@ export function installCopilotPlugin(
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
   copyForwardRuntimeFile(pluginDir);
-  const wrapperPath = writeNativeHookWrapper(pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir, {
+    ...(options?.resolvedNodePath ? { nodePath: options.resolvedNodePath } : {}),
+  });
 
   const globalCopilotDir = options?.globalCopilotDirOverride ?? nativeGlobalCopilotDir();
   const hookFilePath = join(globalCopilotDir, GLOBAL_HOOK_DIR_NAME, GLOBAL_HOOK_FILENAME);

@@ -38,7 +38,7 @@ export const TerminalPane = forwardRef<
 
   return (
     <div
-      className={`h-full w-full overflow-hidden transition-opacity duration-300 ease-out ${
+      className={`h-full w-full overflow-visible transition-opacity duration-300 ease-out ${
         status === "inactive" || status === "launching" ? "opacity-0" : "opacity-100"
       }`}
     >

@@ -21,7 +21,7 @@ export function buildGeminiArgs(
     args.push("--approval-mode=auto_edit");
   }
   if (prompt.trim().length > 0) {
-    args.push(prompt);
+    args.push("--prompt-interactive", prompt);
   }
   return args;
 }

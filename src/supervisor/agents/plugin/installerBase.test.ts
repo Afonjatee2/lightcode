@@ -15,6 +15,7 @@ import {
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
   ctxCacheKey,
+  buildNativeHookCommandHead,
   isPluginAssetsFresh,
   isWslPluginContext,
   memoByCtx,
@@ -22,6 +23,7 @@ import {
   quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
+  renderNativeHookWrapper,
   warnIfPluginManifestMissing,
 } from "./installerBase";
 
@@ -219,6 +221,60 @@ describe("quoteHookCommandArg", () => {
   it("escapes embedded special chars per platform on native", () => {
     const expected = process.platform === "win32" ? '"a\\"b"' : "'a\"b'";
     expect(quoteHookCommandArg('a"b', "native")).toBe(expected);
+  });
+});
+
+describe("renderNativeHookWrapper", () => {
+  it("emits ELECTRON_RUN_AS_NODE fallback when nodePath is not provided", () => {
+    const body = renderNativeHookWrapper({ electronPath: "/path/to/electron" });
+    expect(body).toContain("ELECTRON_RUN_AS_NODE=1");
+    const expectedQuoted =
+      process.platform === "win32" ? '"/path/to/electron"' : "'/path/to/electron'";
+    expect(body).toContain(expectedQuoted);
+  });
+
+  it("emits bare-node exec when nodePath is provided (no Electron-as-Node)", () => {
+    const body = renderNativeHookWrapper({
+      electronPath: "/path/to/electron",
+      nodePath: "/usr/local/bin/node",
+    });
+    expect(body).not.toContain("ELECTRON_RUN_AS_NODE");
+    expect(body).not.toContain("electron");
+    const expectedQuoted =
+      process.platform === "win32" ? '"/usr/local/bin/node"' : "'/usr/local/bin/node'";
+    expect(body).toContain(expectedQuoted);
+  });
+
+  it("escapes embedded quotes safely on both shapes", () => {
+    const tricky = process.platform === "win32" ? 'C:\\a"b\\node.exe' : "/p/a'b/node";
+    const body = renderNativeHookWrapper({
+      electronPath: "/dummy/electron",
+      nodePath: tricky,
+    });
+    // win32: cmd.exe doubles `"` → `a""b`. POSIX: sh `'` becomes `'\''`.
+    const expectedFragment =
+      process.platform === "win32" ? '"C:\\a""b\\node.exe"' : "'/p/a'\\''b/node'";
+    expect(body).toContain(expectedFragment);
+  });
+});
+
+describe("buildNativeHookCommandHead", () => {
+  it("routes native Windows hook wrappers through cmd.exe", () => {
+    const commandHead = buildNativeHookCommandHead("C:\\Users\\u\\fw.cmd");
+    const expected =
+      process.platform === "win32"
+        ? 'cmd.exe /d /s /c call "C:\\Users\\u\\fw.cmd"'
+        : "'C:\\Users\\u\\fw.cmd'";
+    expect(commandHead).toBe(expected);
+  });
+
+  it("escapes embedded quotes for the active native shell", () => {
+    const commandHead = buildNativeHookCommandHead('C:\\Users\\a"b\\fw.cmd');
+    const expected =
+      process.platform === "win32"
+        ? 'cmd.exe /d /s /c call "C:\\Users\\a\\"b\\fw.cmd"'
+        : "'C:\\Users\\a\"b\\fw.cmd'";
+    expect(commandHead).toBe(expected);
   });
 });
 

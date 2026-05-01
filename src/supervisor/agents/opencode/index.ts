@@ -1,11 +1,15 @@
 import type { AgentCapability } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
+import { createAcpStructuredSession } from "../acp";
 import {
+  buildAgentCommand,
   createKnownSessionRef,
   detectAgentInstall,
   type AgentAdapter,
+  type CreateStructuredSessionInput,
   type TerminalStatusHint,
 } from "../base";
+import { resolveAgentBinaryPath } from "../binaryResolver";
 import { warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildOpenCodeArgs } from "./argv";
 import { opencodeDefaultCapabilities, opencodeDetectionSpec } from "./detection";
@@ -15,7 +19,6 @@ import {
   readBundledOpenCodePluginVersion,
   uninstallOpenCodePlugin,
 } from "./plugin/install";
-import { queryLatestOpenCodeSessionId } from "./session";
 import { detectOpenCodeTerminalStatus, opencodeOscHint, opencodeOscTitleHint } from "./terminal";
 
 const OPENCODE_PLUGIN_VERSION = readBundledOpenCodePluginVersion();
@@ -42,7 +45,6 @@ function opencodeHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
 }
 
 export function createOpenCodeAdapter(): AgentAdapter {
-  let preSpawnLatestId: string | undefined;
   let capabilities: AgentCapability = opencodeDefaultCapabilities;
 
   return {
@@ -91,11 +93,22 @@ export function createOpenCodeAdapter(): AgentAdapter {
     },
 
     // ── Launch / resume ──────────────────────────────────────────────────
-    buildLaunchArgv(location, config, prompt) {
-      void queryLatestOpenCodeSessionId(location).then((id) => {
-        preSpawnLatestId = id;
-      });
-      return { binary: "opencode", args: buildOpenCodeArgs(config, prompt) };
+    //
+    // Session ID allocation: see `createStructuredSession` below. On a fresh
+    // launch the runtime spins up `opencode acp`, calls `session/new`, captures
+    // the resulting `ses_xxx` id, sets `launchOptions.resumeThreadId`, and then
+    // disposes the ACP connection (because `liveInputMode === "terminal"`).
+    // The TUI process below picks up the pre-allocated id via `--session <id>`,
+    // so the supervisor knows the providerSessionId synchronously instead of
+    // polling `opencode session list` after spawn.
+    buildLaunchArgv(_location, config, prompt, _sessionRef, launchOptions) {
+      const sessionId = launchOptions?.resumeThreadId;
+      const args = buildOpenCodeArgs(config, prompt, sessionId);
+      return {
+        binary: "opencode",
+        args,
+        ...(sessionId ? { sessionRef: createKnownSessionRef(sessionId) } : {}),
+      };
     },
     buildResumeArgv(_location, config, prompt, sessionRef) {
       return {
@@ -107,6 +120,31 @@ export function createOpenCodeAdapter(): AgentAdapter {
       return undefined;
     },
 
+    // ── Structured session (ACP — used only to allocate a session id) ────
+    //
+    // The runtime calls `activate()` then `openThread()` on the returned
+    // handle, which fires ACP `initialize` + `session/new`. The handle stores
+    // the new id in `launchOptions.resumeThreadId`, then the runtime disposes
+    // the handle (because `liveInputMode === "terminal"` makes
+    // `keepStructuredSession` false in `threadSessionManager.ts`). The child
+    // `opencode acp` process is killed before the TUI spawns — the TUI reads
+    // the same SQLite store and resumes via `--session <id>`.
+    //
+    // On resume (`input.sessionRef` set) we skip ACP entirely: the id we
+    // already have is good as-is.
+    async createStructuredSession(input: CreateStructuredSessionInput) {
+      if (input.sessionRef) {
+        return undefined;
+      }
+      const command = buildAgentCommand(
+        input.projectLocation,
+        "opencode",
+        ["acp"],
+        resolveAgentBinaryPath(input.projectLocation, "opencode"),
+      );
+      return createAcpStructuredSession(command, input);
+    },
+
     // ── Input ────────────────────────────────────────────────────────────
     buildDirectInput(prompt) {
       // OpenCode's TUI accepts pasted prompts cleanly; a small wait before
@@ -115,23 +153,29 @@ export function createOpenCodeAdapter(): AgentAdapter {
       return [prompt, "@wait:60", "\r"];
     },
 
-    // ── Session discovery ────────────────────────────────────────────────
-    initialSessionRefDiscoveryDelayMs: 1000,
-    async discoverSessionRef(location) {
-      try {
-        const latest = await queryLatestOpenCodeSessionId(location);
-        if (!latest || latest === preSpawnLatestId) return undefined;
-        return createKnownSessionRef(latest);
-      } catch (error) {
-        console.log(
-          "[opencode] discoverSessionRef failed: %s",
-          error instanceof Error ? error.message : String(error),
-        );
-        return undefined;
-      }
+    // OpenCode's TUI silently ignores `--prompt` when `--session <id>` is
+    // also present (verified empirically against opencode 1.14.30: the prompt
+    // text never lands in the session). Since we always pre-allocate the
+    // session id via ACP for new threads, `--session` is *always* present —
+    // so the launch-time prompt path is dead. Defer the initial prompt to the
+    // PTY: the runtime queues it as `pendingTerminalPrompt` and types it via
+    // `buildDirectInput` once the TUI is ready. Same pattern Codex uses for
+    // plan mode.
+    shouldDeferPromptToTerminal() {
+      return true;
     },
-    // No fs watcher — OpenCode persists sessions in a SQLite DB; the
-    // supervisor's polling cadence is good enough.
+    // Gate for flushing the deferred initial prompt. The runtime sets
+    // `cliHookEnvInjected = true` for any agent whose hook plugin is
+    // configured (which we are — the in-process plugin). That puts the
+    // pipeline on the hook-fast-path immediately, where the L2 idle hint we
+    // emit from `detectTerminalStatus` is bypassed. Instead, the fast path
+    // calls `isReadyForInitialPrompt(strippedData)` on every PTY chunk and
+    // only flushes the queued prompt once we say the input box is up.
+    // Match the same keybind footer the idle hint uses — it's painted only
+    // when the TUI accepts input.
+    isReadyForInitialPrompt(text) {
+      return /\btab\s*agents|\bctrl\+p\s*commands/i.test(text);
+    },
 
     // ── L2 (terminal heuristics + OSC) ───────────────────────────────────
     detectTerminalStatus: detectOpenCodeTerminalStatus,

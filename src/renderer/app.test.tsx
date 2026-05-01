@@ -49,6 +49,36 @@ const { bridge } = vi.hoisted(() => ({
     gitListWorktrees: vi
       .fn<() => Promise<{ worktrees: unknown[] }>>()
       .mockResolvedValue({ worktrees: [] }),
+    gitProjectSnapshot: vi
+      .fn<
+        () => Promise<{
+          status: unknown;
+          branches: unknown;
+          worktrees: unknown[] | null;
+          ghAvailable: boolean | null;
+        }>
+      >()
+      .mockResolvedValue({
+        status: {
+          isRepo: true,
+          branch: "main",
+          tracking: "",
+          hasRemote: false,
+          remoteInfo: null,
+          ahead: 0,
+          behind: 0,
+          staged: [],
+          unstaged: [],
+          totalInsertions: 0,
+          totalDeletions: 0,
+        },
+        branches: { current: "main", branches: [] },
+        worktrees: [],
+        ghAvailable: null,
+      }),
+    gitWorktreeStatusBatch: vi
+      .fn<() => Promise<{ statuses: Record<string, unknown> }>>()
+      .mockResolvedValue({ statuses: {} }),
     gitGetWorktreeSourceBranch: vi
       .fn<() => Promise<{ sourceBranch: string; commitsAhead: number; sourceAhead: number }>>()
       .mockResolvedValue({

@@ -5,6 +5,7 @@ import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
+  buildNativeHookCommandHead,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -16,7 +17,6 @@ import {
   hasNativeHookWrapper,
   isWslPluginContext,
   memoByCtx,
-  quoteHookCommandArg,
   readBundledPluginVersion,
   readPluginManifest,
   stagePluginAssetsToWsl,
@@ -47,12 +47,25 @@ interface GeminiSettings {
   hooks: Record<string, GeminiHookEntry[]>;
 }
 
+/**
+ * Minimal hook surface for Gemini status tracking. Every entry produces a
+ * distinct state edge in the supervisor:
+ *   - SessionStart   → `session.started`         (bookkeeping / install proof-of-life)
+ *   - BeforeAgent    → `session.turn_started`    (turn-open edge)
+ *   - AfterAgent     → `session.turn_finished`   (turn-close edge)
+ *   - Notification   → `session.needs_approval`  (approval prompts only)
+ *
+ * `BeforeModel` / `BeforeTool` / `AfterTool` were intentionally dropped:
+ * they all converged on `session.turn_started`, fired up to 2N+ times per
+ * turn (matcher: "*"), and the supervisor already deduplicates identical
+ * state transitions in `ThreadOutputPipeline.updateState`. Tool-level
+ * granularity is recoverable from the terminal title-bar heuristic
+ * (`detectGeminiTerminalStatus`) and per-tool extras were only consumed by
+ * `hookDebug` for diagnostics.
+ */
 const GEMINI_HOOK_SPECS: ReadonlyArray<{ event: string; matcher?: string }> = [
   { event: "SessionStart" },
   { event: "BeforeAgent" },
-  { event: "BeforeModel" },
-  { event: "BeforeTool", matcher: "*" },
-  { event: "AfterTool", matcher: "*" },
   { event: "AfterAgent" },
   { event: "Notification" },
 ];
@@ -110,9 +123,12 @@ export function getGeminiPluginPaths(ctx?: AgentEnvContext): GeminiPluginPaths {
 
 export interface InstallGeminiPluginOptions {
   /**
-   * Required for WSL contexts: absolute Linux path to the Node binary the
-   * staged hook command should use. Comes from `resolveNodeForDistro`.
-   * Ignored for native contexts (we use Electron-as-Node via the wrapper).
+   * Absolute path to the Node binary the staged hook command should use.
+   *
+   * - **WSL contexts:** required. Comes from `resolveNodeForDistro`.
+   * - **Native contexts:** optional. When provided (preferred), the wrapper
+   *   exec's the bare Node binary directly; otherwise it falls back to
+   *   `ELECTRON_RUN_AS_NODE=1` against the bundled Electron binary.
    */
   resolvedNodePath?: string | undefined;
 }
@@ -150,10 +166,12 @@ export function installGeminiPlugin(
   mkdirSync(pluginDir, { recursive: true });
   copyPluginAssetsIfStale(sourceDir, pluginDir);
   copyForwardRuntimeFile(pluginDir);
-  const wrapperPath = writeNativeHookWrapper(pluginDir);
+  const wrapperPath = writeNativeHookWrapper(pluginDir, {
+    ...(options?.resolvedNodePath ? { nodePath: options.resolvedNodePath } : {}),
+  });
 
   const settingsPath = join(pluginDir, "settings.json");
-  const settings = renderGeminiSettings(quoteHookCommandArg(wrapperPath, "native"));
+  const settings = renderGeminiSettings(buildNativeHookCommandHead(wrapperPath));
   writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 
   console.log(

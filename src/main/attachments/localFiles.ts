@@ -5,8 +5,12 @@ import type { ProjectLocation } from "@/shared/contracts";
 import type { LightcodePaths } from "@/shared/lightcodePaths";
 import { getProjectFsPath } from "@/shared/wsl";
 
+function sanitizeAttachmentPathPart(value: string): string {
+  return value.replace(/[<>:"/\\|?*]/g, "-");
+}
+
 function getThreadAttachmentDir(paths: LightcodePaths, threadId: string): string {
-  return join(paths.attachmentsDir, threadId.replace(/:/g, "-").slice(0, 12));
+  return join(paths.attachmentsDir, sanitizeAttachmentPathPart(threadId).slice(0, 12));
 }
 
 export function saveClipboardImageFile(
@@ -15,7 +19,8 @@ export function saveClipboardImageFile(
 ): string {
   const threadDir = getThreadAttachmentDir(paths, payload.threadId);
   mkdirSync(threadDir, { recursive: true });
-  const fileName = `${payload.threadId.slice(0, 8)}-${Date.now()}.${payload.extension || "png"}`;
+  const namePrefix = sanitizeAttachmentPathPart(payload.threadId).slice(0, 8);
+  const fileName = `${namePrefix}-${Date.now()}.${payload.extension || "png"}`;
   const filePath = join(threadDir, fileName);
   writeFileSync(filePath, Buffer.from(payload.data));
   return filePath;

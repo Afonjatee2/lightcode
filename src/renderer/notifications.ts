@@ -1,0 +1,232 @@
+import { toast } from "@heroui/react";
+import type { Thread, ThreadAttention, ThreadStatus } from "@/shared/contracts";
+import { openThread } from "@/renderer/actions/threadActions";
+import { useAppStore } from "@/renderer/state/appStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { readBridge } from "@/renderer/bridge";
+
+type NotificationCategory = "done" | "needsAttention" | "error";
+
+const TOAST_VARIANT_BY_CATEGORY: Record<NotificationCategory, "success" | "warning" | "danger"> = {
+  done: "success",
+  needsAttention: "warning",
+  error: "danger",
+};
+
+const ACTIVE_STATUSES: ReadonlySet<ThreadStatus> = new Set([
+  "working",
+  "needs_approval",
+  "needs_reply",
+  "launching",
+]);
+
+type SupervisorThreadStateEvent = {
+  type: "thread-state";
+  threadId: string;
+  status: ThreadStatus;
+  attention: ThreadAttention;
+};
+
+function canUseNativeNotifications(): boolean {
+  if (typeof Notification === "undefined") return false;
+  return Notification.permission !== "denied";
+}
+
+const NOTIFICATION_SOUND_URL = "./notification.mp3";
+
+let audio: HTMLAudioElement | null = null;
+
+function getNotificationAudio(): HTMLAudioElement {
+  if (!audio) {
+    audio = new Audio(NOTIFICATION_SOUND_URL);
+    audio.volume = 0.4;
+  }
+  return audio;
+}
+
+function classifyTransition(
+  oldStatus: ThreadStatus,
+  newStatus: ThreadStatus,
+  newAttention: ThreadAttention,
+): NotificationCategory | null {
+  if (newStatus === "error") return "error";
+
+  if (
+    newStatus === "needs_approval" ||
+    newStatus === "needs_reply" ||
+    newAttention === "needs_approval" ||
+    newAttention === "needs_reply"
+  ) {
+    return "needsAttention";
+  }
+
+  if (ACTIVE_STATUSES.has(oldStatus) && (newStatus === "idle" || newStatus === "finished")) {
+    return "done";
+  }
+
+  return null;
+}
+
+function isThreadInActivePanes(threadId: string): boolean {
+  const view = useAppStore.getState().view;
+  return view.kind === "thread" && view.panes.includes(threadId);
+}
+
+function getProjectName(projectId: string): string {
+  const project = useAppStore.getState().projects.find((p) => p.id === projectId);
+  return project?.name ?? "Unknown project";
+}
+
+function getStatusDetail(category: NotificationCategory, status: ThreadStatus): string {
+  switch (category) {
+    case "done":
+      return status === "finished"
+        ? "Finished · Waiting for your input"
+        : "Done · Waiting for your input";
+    case "needsAttention":
+      return status === "needs_approval"
+        ? "Needs Attention · Approval required"
+        : "Needs Attention · Reply required";
+    case "error":
+      return "Error · Agent encountered an error";
+  }
+}
+
+function playSound(): void {
+  const settings = useSharedSettings.getState();
+  if (!settings.notificationSound) return;
+
+  try {
+    void getNotificationAudio().play();
+  } catch {
+    /* requires user gesture */
+  }
+}
+
+function showToastNotification(
+  threadId: string,
+  projectName: string,
+  threadTitle: string,
+  category: NotificationCategory,
+  status: ThreadStatus,
+): void {
+  const variant = TOAST_VARIANT_BY_CATEGORY[category];
+  const detail = getStatusDetail(category, status);
+
+  toast[variant](projectName, {
+    description: `${threadTitle}\n${detail}`,
+    actionProps: {
+      children: "Open",
+      variant: "tertiary",
+      onPress: () => {
+        openThread(threadId);
+      },
+    },
+    timeout: 6000,
+  });
+  playSound();
+}
+
+let permissionRequest: Promise<NotificationPermission> | null = null;
+
+function ensurePermission(): Promise<NotificationPermission> {
+  if (Notification.permission !== "default") {
+    return Promise.resolve(Notification.permission);
+  }
+  if (!permissionRequest) {
+    permissionRequest = Notification.requestPermission();
+  }
+  return permissionRequest;
+}
+
+function showNativeNotification(
+  threadId: string,
+  projectName: string,
+  threadTitle: string,
+  category: NotificationCategory,
+  status: ThreadStatus,
+): void {
+  if (!canUseNativeNotifications()) return;
+
+  const detail = getStatusDetail(category, status);
+  const body = `${threadTitle}\n${detail}`;
+
+  const show = () => {
+    try {
+      const native = new Notification(projectName, {
+        body,
+        silent: true,
+      });
+      native.onclick = () => {
+        void readBridge().focusWindow();
+        openThread(threadId);
+        native.close();
+      };
+    } catch {
+      /* unsupported on some Linux distros */
+    }
+  };
+
+  if (Notification.permission === "granted") {
+    show();
+  } else {
+    void ensurePermission().then((perm) => {
+      if (perm === "granted") show();
+    });
+  }
+
+  playSound();
+}
+
+export function handleThreadStateNotification(
+  event: SupervisorThreadStateEvent,
+  oldThread: Thread | undefined,
+  newThread?: Pick<Thread, "status" | "attention">,
+): void {
+  const settings = useSharedSettings.getState();
+
+  if (!settings.notificationsEnabled) return;
+  if (!oldThread) return;
+
+  const newStatus = newThread?.status ?? event.status;
+  const newAttention = newThread?.attention ?? event.attention;
+
+  if (oldThread.status === newStatus) return;
+
+  const category = classifyTransition(oldThread.status, newStatus, newAttention);
+  if (!category) return;
+
+  if (!settings.notificationStatuses[category]) return;
+
+  const projectName = getProjectName(oldThread.projectId);
+  const threadId = oldThread.id;
+  const threadTitle = oldThread.title;
+
+  if (!document.hasFocus()) {
+    showNativeNotification(threadId, projectName, threadTitle, category, newStatus);
+    return;
+  }
+
+  if (settings.notificationFilter === "all") {
+    if (isThreadInActivePanes(threadId)) return;
+    showToastNotification(threadId, projectName, threadTitle, category, newStatus);
+  }
+}
+
+export function shouldInspectThreadStateForNotification(): boolean {
+  const settings = useSharedSettings.getState();
+
+  if (!settings.notificationsEnabled) return false;
+  if (
+    !settings.notificationStatuses.done &&
+    !settings.notificationStatuses.needsAttention &&
+    !settings.notificationStatuses.error
+  ) {
+    return false;
+  }
+
+  const focused = typeof document !== "undefined" && document.hasFocus();
+  if (focused && settings.notificationFilter !== "all") return false;
+
+  return true;
+}

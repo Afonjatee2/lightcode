@@ -13,7 +13,12 @@ import {
 import type { SupervisorEvent } from "@/shared/ipc";
 import { normalizeSharedSettings } from "@/shared/settings";
 import { normalizeWslListOutput } from "@/shared/wsl";
-import { type AgentAdapter, type AgentEnvContext, getWslCommand } from "../agents/base";
+import {
+  type AgentAdapter,
+  type AgentEnvContext,
+  getWslCommand,
+  primeWslLoginEnv,
+} from "../agents/base";
 
 const execFileAsync = promisify(execFile);
 
@@ -92,6 +97,13 @@ export async function detectWslAgentStatuses(
   const adapterList = [...adapters];
   const statuses = await Promise.all(
     distros.map(async (distro) => {
+      // Kick off one login-shell spawn per distro to capture PATH/HOME/SHELL.
+      // Fire-and-forget so per-adapter detection order is preserved; the
+      // first probes that race ahead pay full rc-sourcing cost, but later
+      // probes (and every future PTY launch) hit the fast no-shell path.
+      // The in-flight dedup inside primeWslLoginEnv ensures only one wsl.exe
+      // is spawned per distro even with N concurrent callers.
+      void primeWslLoginEnv(distro);
       const ctx: AgentEnvContext = { envKind: "wsl", wslDistro: distro };
       return Promise.all(
         adapterList.map(async (adapter) => {

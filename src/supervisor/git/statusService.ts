@@ -10,6 +10,7 @@ import {
   type ProjectLocation,
 } from "@/shared/contracts";
 import { getProjectFsPath } from "@/shared/wsl";
+import { parallelWslCommandsAsync } from "../agents/base";
 import {
   execGit,
   GIT_DIFF_TIMEOUT,
@@ -138,7 +139,7 @@ export function parseStatusPorcelainV2(output: string): ParsedPorcelainStatus {
   };
 }
 
-function parseDiffNumstat(output: string): DiffStatEntry[] {
+export function parseDiffNumstat(output: string): DiffStatEntry[] {
   const entries: DiffStatEntry[] = [];
   for (const line of output.trim().split(/\r?\n/)) {
     if (!line) continue;
@@ -160,10 +161,96 @@ interface UntrackedStatsCacheEntry {
   insertions: number;
 }
 
+/**
+ * Assemble a {@link GitStatusResult} from raw git outputs collected by
+ * `git status --porcelain=v2 -b`, `git remote -v`, `git diff --cached --numstat`,
+ * and `git diff --numstat`. Lets the snapshot orchestrator batch all four
+ * commands into one wsl.exe spawn and feed the outputs through here.
+ */
+export function buildGitStatusResultFromOutputs(args: {
+  isRepo: boolean;
+  statusOutput: string;
+  remoteOutput: string;
+  stagedNumstat: string;
+  unstagedNumstat: string;
+}): GitStatusResult {
+  if (!args.isRepo) {
+    return {
+      isRepo: false,
+      branch: "",
+      tracking: "",
+      hasRemote: false,
+      remoteInfo: null,
+      ahead: 0,
+      behind: 0,
+      staged: [],
+      unstaged: [],
+      totalInsertions: 0,
+      totalDeletions: 0,
+    };
+  }
+
+  const parsed = parseStatusPorcelainV2(args.statusOutput);
+  const remoteLines = args.remoteOutput.trim().split("\n").filter(Boolean);
+  const hasRemote = remoteLines.length > 0;
+  let remoteInfo: GitRemoteInfo | null = null;
+  if (hasRemote) {
+    const originLine =
+      remoteLines.find((line) => line.startsWith("origin\t") && line.includes("(fetch)")) ??
+      remoteLines.find((line) => line.includes("(fetch)"));
+    if (originLine) {
+      const urlMatch = originLine.match(/^\S+\t(\S+)/);
+      if (urlMatch) {
+        remoteInfo = parseRemoteUrl(urlMatch[1]!);
+      }
+    }
+  }
+
+  for (const entry of parseDiffNumstat(args.stagedNumstat)) {
+    const match = parsed.staged.find((file) => file.path === entry.path);
+    if (match) {
+      match.insertions = entry.insertions;
+      match.deletions = entry.deletions;
+    }
+  }
+  for (const entry of parseDiffNumstat(args.unstagedNumstat)) {
+    const match = parsed.unstaged.find((file) => file.path === entry.path);
+    if (match) {
+      match.insertions = entry.insertions;
+      match.deletions = entry.deletions;
+    }
+  }
+
+  const totalInsertions =
+    parsed.staged.reduce((sum, file) => sum + file.insertions, 0) +
+    parsed.unstaged.reduce((sum, file) => sum + file.insertions, 0);
+  const totalDeletions =
+    parsed.staged.reduce((sum, file) => sum + file.deletions, 0) +
+    parsed.unstaged.reduce((sum, file) => sum + file.deletions, 0);
+
+  return {
+    isRepo: true,
+    branch: parsed.branch,
+    tracking: parsed.tracking,
+    hasRemote,
+    remoteInfo,
+    ahead: parsed.ahead,
+    behind: parsed.behind,
+    staged: parsed.staged,
+    unstaged: parsed.unstaged,
+    totalInsertions,
+    totalDeletions,
+  };
+}
+
 export class GitStatusService {
   private readonly untrackedStatsCache = new Map<string, UntrackedStatsCacheEntry>();
 
   async getStatus(location: ProjectLocation): Promise<GitStatusResult> {
+    if (location.kind === "wsl") {
+      return this.getStatusBatchedWsl(location);
+    }
+
     try {
       await execGit(location, ["rev-parse", "--is-inside-work-tree"], {
         timeout: GIT_STATUS_TIMEOUT,
@@ -253,6 +340,163 @@ export class GitStatusService {
       ...(parsed.mergeInProgress
         ? { mergeInProgress: true, conflictFiles: conflictFileChanges }
         : {}),
+    };
+  }
+
+  /**
+   * Apply untracked-file stats and conflict-file enrichment to a status result
+   * built from raw outputs. Exposed for the snapshot orchestrator that bypasses
+   * the per-method git calls in favor of one batched WSL spawn.
+   */
+  async enrichStatus(location: ProjectLocation, base: GitStatusResult): Promise<GitStatusResult> {
+    return this.enrichStatusInternal(location, base);
+  }
+
+  /**
+   * Re-parse the porcelain status output to recover `mergeInProgress` and
+   * `conflictFiles` after `buildGitStatusResultFromOutputs` / `enrichStatus`,
+   * which both drop those fields. Without this, the project snapshot path
+   * (used on app refresh) reports no merge in progress even when the working
+   * tree has unmerged paths.
+   */
+  async applyMergeState(
+    location: ProjectLocation,
+    statusOutput: string,
+    base: GitStatusResult,
+  ): Promise<GitStatusResult> {
+    if (!base.isRepo) return base;
+    const parsed = parseStatusPorcelainV2(statusOutput);
+    if (!parsed.mergeInProgress || parsed.conflictFiles.length === 0) {
+      return base;
+    }
+    const conflictFileChanges = await this.buildConflictFileChanges(location, parsed.conflictFiles);
+    return { ...base, mergeInProgress: true, conflictFiles: conflictFileChanges };
+  }
+
+  private async getStatusBatchedWsl(
+    location: ProjectLocation & { kind: "wsl" },
+  ): Promise<GitStatusResult> {
+    const cwd = location.linuxPath;
+    const results = await parallelWslCommandsAsync(
+      location.distro,
+      [
+        { cwd, cmd: "git rev-parse --is-inside-work-tree" },
+        { cwd, cmd: "git status --porcelain=v2 -b" },
+        { cwd, cmd: "git remote -v" },
+        { cwd, cmd: "git diff --cached --numstat" },
+        { cwd, cmd: "git diff --numstat" },
+      ],
+      { timeoutMs: GIT_STATUS_TIMEOUT },
+    );
+    const isRepo = results[0]!.ok;
+    const base = buildGitStatusResultFromOutputs({
+      isRepo,
+      statusOutput: results[1]!.stdout,
+      remoteOutput: results[2]!.stdout,
+      stagedNumstat: results[3]!.stdout,
+      unstagedNumstat: results[4]!.stdout,
+    });
+    if (!isRepo) return base;
+    const enriched = await this.enrichStatusInternal(location, base);
+    return this.applyMergeState(location, results[1]!.stdout, enriched);
+  }
+
+  /**
+   * Run `rev-parse + status + remote + diff --cached + diff` for each of N
+   * worktree paths inside a single `wsl.exe` parallel batch — collapses what
+   * was N×wsl.exe invocations (one per worktree) into 1. Untracked-file
+   * enrichment + conflict detection are then done sequentially per worktree
+   * but they only fire when a status actually had untracked/conflict markers,
+   * so the typical refresh path costs 1 wsl.exe spawn total.
+   */
+  async getWorktreeStatusBatchWsl(
+    location: ProjectLocation & { kind: "wsl" },
+    worktreePaths: string[],
+  ): Promise<Record<string, GitStatusResult>> {
+    if (worktreePaths.length === 0) return {};
+
+    const PER_WORKTREE_CMDS = 5;
+    const commands: { cwd: string; cmd: string }[] = [];
+    for (const cwd of worktreePaths) {
+      commands.push(
+        { cwd, cmd: "git rev-parse --is-inside-work-tree" },
+        { cwd, cmd: "git status --porcelain=v2 -b" },
+        { cwd, cmd: "git remote -v" },
+        { cwd, cmd: "git diff --cached --numstat" },
+        { cwd, cmd: "git diff --numstat" },
+      );
+    }
+    const results = await parallelWslCommandsAsync(location.distro, commands, {
+      timeoutMs: GIT_STATUS_TIMEOUT,
+    });
+
+    const out: Record<string, GitStatusResult> = {};
+    await Promise.all(
+      worktreePaths.map(async (path, i) => {
+        const off = i * PER_WORKTREE_CMDS;
+        const isRepo = results[off]!.ok;
+        const statusOutput = results[off + 1]!.stdout;
+        const base = buildGitStatusResultFromOutputs({
+          isRepo,
+          statusOutput,
+          remoteOutput: results[off + 2]!.stdout,
+          stagedNumstat: results[off + 3]!.stdout,
+          unstagedNumstat: results[off + 4]!.stdout,
+        });
+        if (!isRepo) {
+          out[path] = base;
+          return;
+        }
+        const wtLocation: ProjectLocation = {
+          kind: "wsl",
+          distro: location.distro,
+          linuxPath: path,
+          uncPath: location.uncPath,
+        };
+        try {
+          const enriched = await this.enrichStatusInternal(wtLocation, base);
+          out[path] = await this.applyMergeState(wtLocation, statusOutput, enriched);
+        } catch {
+          // Fall back to the raw batched result rather than dropping the
+          // worktree from the response — callers prefer slightly stale data
+          // over a missing key.
+          out[path] = base;
+        }
+      }),
+    );
+    return out;
+  }
+
+  private async enrichStatusInternal(
+    location: ProjectLocation,
+    base: GitStatusResult,
+  ): Promise<GitStatusResult> {
+    if (!base.isRepo) return base;
+    // The parsed status has unstaged untracked entries with status "?" but no
+    // insertion/deletion counts; replaceUntrackedEntries fills them in.
+    const parsed: ParsedPorcelainStatus = {
+      branch: base.branch,
+      tracking: base.tracking,
+      ahead: base.ahead,
+      behind: base.behind,
+      staged: base.staged,
+      unstaged: base.unstaged,
+      conflictFiles: [],
+      mergeInProgress: false,
+    };
+    await this.replaceUntrackedEntries(location, parsed);
+    const totalInsertions =
+      parsed.staged.reduce((sum, file) => sum + file.insertions, 0) +
+      parsed.unstaged.reduce((sum, file) => sum + file.insertions, 0);
+    const totalDeletions =
+      parsed.staged.reduce((sum, file) => sum + file.deletions, 0) +
+      parsed.unstaged.reduce((sum, file) => sum + file.deletions, 0);
+    return {
+      ...base,
+      staged: parsed.staged,
+      unstaged: parsed.unstaged,
+      totalInsertions,
+      totalDeletions,
     };
   }
 

@@ -2,15 +2,18 @@
 /**
  * Release-prep helper: fetches the official SHASUMS256.txt for the pinned
  * Node.js LTS version and writes the relevant rows into
- * `src/supervisor/wsl/runtime/index.ts`.
+ * `src/supervisor/runtime/pinnedNode.ts`.
  *
  * Run after bumping `LIGHTCODE_PINNED_NODE_VERSION` in that file:
  *
  *   pnpm tsx scripts/refresh-node-checksums.mjs
  *
- * Only the official glibc tarballs (linux-x64, linux-arm64) are tracked;
- * Alpine/musl users are expected to surface their own node via the probe
- * (the resolver's first path) or install it via `apk add nodejs`.
+ * Covers every target lightcode ships a managed-runtime install for:
+ *   - linux-x64 / linux-arm64        (.tar.xz)   — WSL + native Linux
+ *   - darwin-x64 / darwin-arm64      (.tar.xz)   — native macOS
+ *   - win-x64 / win-arm64            (.zip)      — native Windows
+ *
+ * Alpine/musl users are expected to surface their own node via the probe.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -19,11 +22,15 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
-const indexFile = join(repoRoot, "src", "supervisor", "wsl", "runtime", "index.ts");
+const indexFile = join(repoRoot, "src", "supervisor", "runtime", "pinnedNode.ts");
 
 const TARGETS = /** @type {const} */ ([
-  { triple: "linux-x64", source: "official" },
-  { triple: "linux-arm64", source: "official" },
+  { triple: "linux-x64", ext: "tar.xz" },
+  { triple: "linux-arm64", ext: "tar.xz" },
+  { triple: "darwin-x64", ext: "tar.xz" },
+  { triple: "darwin-arm64", ext: "tar.xz" },
+  { triple: "win-x64", ext: "zip" },
+  { triple: "win-arm64", ext: "zip" },
 ]);
 
 function readPinnedVersion() {
@@ -58,19 +65,20 @@ function parseManifest(text) {
   return map;
 }
 
-function archiveFileName(version, triple) {
-  return `node-v${version}-${triple}.tar.xz`;
+function archiveFileName(version, triple, ext) {
+  return `node-v${version}-${triple}.${ext}`;
 }
 
 async function main() {
   const version = readPinnedVersion();
-  console.log(`refreshing Node tarball checksums for v${version}`);
+  console.log(`refreshing Node archive checksums for v${version}`);
 
   const manifest = parseManifest(await fetchOfficialManifest(version));
 
+  /** @type {Record<string, string>} */
   const newChecksums = {};
-  for (const { triple } of TARGETS) {
-    const filename = archiveFileName(version, triple);
+  for (const { triple, ext } of TARGETS) {
+    const filename = archiveFileName(version, triple, ext);
     const sha = manifest.get(filename);
     if (!sha) {
       throw new Error(
@@ -96,8 +104,8 @@ async function main() {
 
   const lines = [
     startMarker,
-    ...TARGETS.map(({ triple }) => {
-      const filename = archiveFileName(version, triple);
+    ...TARGETS.map(({ triple, ext }) => {
+      const filename = archiveFileName(version, triple, ext);
       return `  // ${filename}\n  "${triple}": "${newChecksums[triple]}",`;
     }),
   ];

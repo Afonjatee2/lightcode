@@ -14,8 +14,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { toWslUncPath } from "@/shared/wsl";
-import type { AgentEnvContext } from "../base";
-import { resolveWslHomeDirectory } from "../base";
+import { resolveWslHomeDirectory, type AgentEnvContext } from "../base";
 import { deployFilesToWslHome, type WslHomeDeployResult } from "../../wsl/wslDeploy";
 
 /**
@@ -144,6 +143,21 @@ export function quoteHookCommandArg(value: string, target: "native" | "wsl"): st
   return `'${value.replaceAll("'", "'\\''")}'`;
 }
 
+/**
+ * Native hook command head for staged `lightcode-hook.{sh,cmd}` wrappers.
+ *
+ * On Windows, native hook commands may be executed by Windows PowerShell,
+ * PowerShell 7, or cmd.exe depending on the agent CLI and the user's launch
+ * shell. Route through cmd.exe explicitly so the same command string works in
+ * all three while still invoking the staged `.cmd` wrapper.
+ */
+export function buildNativeHookCommandHead(wrapperPath: string): string {
+  if (process.platform === "win32") {
+    return `cmd.exe /d /s /c call ${quoteHookCommandArg(wrapperPath, "native")}`;
+  }
+  return quoteHookCommandArg(wrapperPath, "native");
+}
+
 export interface WslPluginBaseDirs {
   /** Linux home dir, e.g. `/home/sdsle`. */
   home: string;
@@ -235,28 +249,43 @@ export function getNativeHookWrapperFilename(): string {
 }
 
 /**
- * Render the wrapper script body. `electronPath` is baked in absolute
- * (typically `process.execPath` of the running supervisor) so the wrapper
- * doesn't depend on PATH or env var inheritance. `forward.mjs` is
- * resolved relative to the wrapper at runtime — keeps the wrapper
+ * Render the wrapper script body. Two shapes:
+ *
+ *   - When `nodePath` is provided, the wrapper invokes that bare Node
+ *     binary directly — fastest path (~30–50 ms cold) and what we always
+ *     prefer.
+ *   - Otherwise it falls back to running lightcode's bundled Electron
+ *     binary with `ELECTRON_RUN_AS_NODE=1`, which still produces a
+ *     working Node runtime but pays a ~150 ms startup tax per spawn.
+ *
+ * `electronPath` is baked in absolute (typically `process.execPath`) so
+ * the wrapper doesn't depend on PATH or env-var inheritance. `forward.mjs`
+ * is resolved relative to the wrapper at runtime — keeps the wrapper
  * portable if the staging dir is relocated.
  */
-export function renderNativeHookWrapper(electronPath: string): string {
+export interface RenderNativeHookWrapperOptions {
+  /** lightcode's bundled Electron binary, used as the fallback runtime. */
+  electronPath: string;
+  /** Absolute path to a usable native Node binary (preferred runtime). */
+  nodePath?: string;
+}
+
+export function renderNativeHookWrapper(opts: RenderNativeHookWrapperOptions): string {
+  const useElectron = !opts.nodePath;
+  const bin = opts.nodePath ?? opts.electronPath;
   if (process.platform === "win32") {
-    const safePath = electronPath.replaceAll('"', '""');
-    return [
-      "@echo off",
-      "setlocal",
-      "set ELECTRON_RUN_AS_NODE=1",
-      `"${safePath}" "%~dp0forward.mjs" %*`,
-      "",
-    ].join("\r\n");
+    const safe = bin.replaceAll('"', '""');
+    const lines = ["@echo off", "setlocal"];
+    if (useElectron) lines.push("set ELECTRON_RUN_AS_NODE=1");
+    lines.push(`"${safe}" "%~dp0forward.mjs" %*`, "");
+    return lines.join("\r\n");
   }
-  const safePath = electronPath.replaceAll("'", "'\\''");
+  const safe = bin.replaceAll("'", "'\\''");
+  const envPrefix = useElectron ? "env ELECTRON_RUN_AS_NODE=1 " : "";
   return [
     "#!/bin/sh",
     'dir=$(dirname "$0")',
-    `exec env ELECTRON_RUN_AS_NODE=1 '${safePath}' "$dir/forward.mjs" "$@"`,
+    `exec ${envPrefix}'${safe}' "$dir/forward.mjs" "$@"`,
     "",
   ].join("\n");
 }
@@ -266,15 +295,30 @@ export function renderNativeHookWrapper(electronPath: string): string {
  * Chmods to 0755 on POSIX. Returns the absolute path to the wrapper
  * (suitable for use as a hook command in agent settings).
  *
- * Pass an explicit `electronPath` to override `process.execPath` — useful
- * for tests and for the rare case where the supervisor is itself running
+ * `nodePath`, when provided, makes the wrapper exec a bare Node binary
+ * instead of `ELECTRON_RUN_AS_NODE=1` — preferred path because it shaves
+ * ~100–200 ms off every hook spawn (smaller binary, no Chromium init).
+ *
+ * `electronPath` overrides `process.execPath` for the fallback case. Useful
+ * for tests and for the rare case where the supervisor itself is running
  * under bare Node (e.g. `pnpm tsx`) instead of inside the Electron
- * binary; production callers should use the default.
+ * binary; production callers should leave it undefined.
  */
-export function writeNativeHookWrapper(pluginDir: string, electronPath?: string): string {
+export interface WriteNativeHookWrapperOptions {
+  electronPath?: string;
+  nodePath?: string;
+}
+
+export function writeNativeHookWrapper(
+  pluginDir: string,
+  options?: WriteNativeHookWrapperOptions,
+): string {
   const filename = getNativeHookWrapperFilename();
   const target = join(pluginDir, filename);
-  const body = renderNativeHookWrapper(electronPath ?? process.execPath);
+  const body = renderNativeHookWrapper({
+    electronPath: options?.electronPath ?? process.execPath,
+    ...(options?.nodePath ? { nodePath: options.nodePath } : {}),
+  });
   mkdirSync(pluginDir, { recursive: true });
   let needsWrite = true;
   try {
@@ -313,27 +357,56 @@ export function buildWslHookCommandHead(nodePath: string, forwardMjsPath: string
 }
 
 /**
- * For WSL adapter contexts, resolve the absolute Node path the install
- * should bake into hook commands. Returns `{ ok: true, nodePath }` on
- * success or `{ ok: false, reason }` on failure (no node found and
- * download failed). For native contexts, returns `{ ok: true }` with no
- * node path — the install uses Electron-as-Node via the wrapper instead.
+ * Resolve an absolute Node path the installer should bake into the hook
+ * command. Three paths:
+ *
+ *   - **WSL:** required. Pulled from `resolveNodeForDistro`, which probes
+ *     the user's login shell and falls back to downloading the pinned LTS
+ *     into the distro. Failure is fatal — the installer reports it and the
+ *     adapter surfaces a degraded state.
+ *
+ *   - **Native:** preferred. When the host has a usable Node binary (managed
+ *     fast path → user login-shell probe), we bake that path in directly,
+ *     skipping the ~100–200 ms Electron-as-Node startup tax. On a miss the
+ *     resolver kicks off a background download for next boot, and this
+ *     call returns `{ ok: true }` with no `nodePath` — the wrapper falls
+ *     back to Electron-as-Node for this session.
+ *
+ *   - **Bare Node supervisor (`pnpm tsx`)**: tests/dev. Same as native, just
+ *     no Electron. Probe still resolves the user's node; if not, the
+ *     wrapper exec'ing `process.execPath` produces a working runtime.
+ *
+ * Native resolution is best-effort: any error inside the probe is swallowed
+ * and treated as "no native node available" so a flaky shell rc never
+ * fails plugin install.
  */
 export async function resolveInstallNodePath(
   ctx: AgentEnvContext | undefined,
 ): Promise<{ ok: true; nodePath?: string } | { ok: false; reason: string }> {
-  if (!ctx || ctx.envKind !== "wsl" || !ctx.wslDistro) return { ok: true };
+  if (ctx && ctx.envKind === "wsl" && ctx.wslDistro) {
+    try {
+      const { resolveNodeForDistro } = await import("../../wsl/runtime");
+      const resolved = await resolveNodeForDistro(ctx.wslDistro);
+      return { ok: true, nodePath: resolved.nodePath };
+    } catch (error) {
+      return {
+        ok: false,
+        reason: `failed to resolve node in WSL distro ${ctx.wslDistro}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    }
+  }
+
   try {
-    const { resolveNodeForDistro } = await import("../../wsl/runtime");
-    const resolved = await resolveNodeForDistro(ctx.wslDistro);
-    return { ok: true, nodePath: resolved.nodePath };
-  } catch (error) {
-    return {
-      ok: false,
-      reason: `failed to resolve node in WSL distro ${ctx.wslDistro}: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    };
+    const { resolveNativeNode } = await import("../../native/runtime");
+    const baseDirOpts = ctx?.baseDir ? { baseDir: ctx.baseDir } : {};
+    const resolved = await resolveNativeNode(baseDirOpts);
+    if (resolved) return { ok: true, nodePath: resolved.nodePath };
+    return { ok: true };
+  } catch {
+    // Probe failed — fall back to Electron-as-Node by returning no nodePath.
+    return { ok: true };
   }
 }
 

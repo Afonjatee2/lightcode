@@ -18,6 +18,15 @@ function notificationNeedsApproval(payload: GeminiHookPayload | undefined): bool
   );
 }
 
+/**
+ * Mirror of the trimmed hook surface registered in `install.ts`.
+ *
+ * Gemini's lifecycle has redundant turn-open events (BeforeModel, BeforeTool,
+ * AfterTool) that all converge to `session.turn_started`. Registering them
+ * paid the spawn/POST cost N+ times per turn for no state change, so we now
+ * register only `BeforeAgent` (turn opens) and `AfterAgent` (turn closes)
+ * plus `SessionStart` (bookkeeping) and `Notification` (approval prompts).
+ */
 export function geminiIntentFor(
   eventName: string,
   payload: GeminiHookPayload | undefined,
@@ -27,9 +36,6 @@ export function geminiIntentFor(
     case "SessionStart":
       return "session.started";
     case "BeforeAgent":
-    case "BeforeModel":
-    case "BeforeTool":
-    case "AfterTool":
       return "session.turn_started";
     case "AfterAgent":
       return "session.turn_finished";

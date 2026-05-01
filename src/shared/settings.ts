@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   gitReviewModeSchema,
   newThreadModeSchema,
+  notificationFilterSchema,
   providerDraftConfigSchema,
   terminalPositionSchema,
   themeModeSchema,
@@ -83,6 +84,14 @@ export const sharedSettingsSchema = z.object({
    * per-project overrides that re-enable an inherited default.
    */
   searchExclude: z.record(z.string(), z.boolean()),
+  notificationsEnabled: z.boolean(),
+  notificationSound: z.boolean(),
+  notificationFilter: notificationFilterSchema,
+  notificationStatuses: z.object({
+    done: z.boolean(),
+    needsAttention: z.boolean(),
+    error: z.boolean(),
+  }),
   /**
    * Dev-only: force agents off the CLI hook plugin path (L1) so they fall back
    * to L2 terminal parsing. The UI toggle is only visible in the dev build;
@@ -137,6 +146,10 @@ export const defaultSharedSettings: SharedSettings = {
   editorLspEnabled: false,
   searchUseIgnoreFiles: true,
   searchExclude: { ...DEFAULT_SEARCH_EXCLUDE },
+  notificationsEnabled: true,
+  notificationSound: true,
+  notificationFilter: "unfocused",
+  notificationStatuses: { done: true, needsAttention: true, error: true },
   disableCliHookPlugin: false,
   agentHookSupport: {},
 };

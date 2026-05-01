@@ -6,6 +6,12 @@ export interface GitReviewContext {
   worktreePath?: string;
 }
 
+export interface PrReviewContext {
+  projectId: string;
+  worktreePath?: string;
+  prNumber: number;
+}
+
 export interface FilesPanelContext {
   projectId: string;
   projectName: string;
@@ -19,6 +25,7 @@ interface PanelState {
   gitReviewContext: GitReviewContext | null;
   gitReviewAsPanel: boolean;
   gitOverlayOpen: boolean;
+  prReviewContext: PrReviewContext | null;
   filesPanelContext: FilesPanelContext | null;
   rightPanelTab: RightPanelTab;
   settingsOpen: boolean;
@@ -28,6 +35,7 @@ interface PanelState {
   setThreadSortMode: (mode: ThreadSortMode) => void;
   setGitReviewAsPanel: (v: boolean) => void;
   setGitOverlayOpen: (v: boolean) => void;
+  setPrReviewContext: (ctx: PrReviewContext | null) => void;
   setFilesPanelContext: (ctx: FilesPanelContext | null) => void;
   setRightPanelTab: (tab: RightPanelTab) => void;
   openSettings: () => void;
@@ -52,6 +60,7 @@ export const usePanelStore = create<PanelState>((set) => ({
   gitReviewContext: loadInitialGitContext(),
   gitReviewAsPanel: false,
   gitOverlayOpen: false,
+  prReviewContext: null,
   filesPanelContext: null,
   rightPanelTab: "git",
   settingsOpen: false,
@@ -80,6 +89,21 @@ export const usePanelStore = create<PanelState>((set) => ({
     set((state) => (state.gitReviewAsPanel === v ? {} : { gitReviewAsPanel: v })),
   setGitOverlayOpen: (v) =>
     set((state) => (state.gitOverlayOpen === v ? {} : { gitOverlayOpen: v })),
+  setPrReviewContext: (ctx) =>
+    set((state) => {
+      const prev = state.prReviewContext;
+      if (
+        (prev === null && ctx === null) ||
+        (prev !== null &&
+          ctx !== null &&
+          prev.projectId === ctx.projectId &&
+          prev.worktreePath === ctx.worktreePath &&
+          prev.prNumber === ctx.prNumber)
+      ) {
+        return {};
+      }
+      return { prReviewContext: ctx };
+    }),
   setFilesPanelContext: (ctx) =>
     set((state) => {
       const prev = state.filesPanelContext;

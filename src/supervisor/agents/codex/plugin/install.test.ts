@@ -8,6 +8,7 @@ import {
   mergeCodexHooksDocument,
   parseCodexVersionLine,
 } from "./install";
+import { buildNativeHookCommandHead } from "../../plugin/installerBase";
 
 const forwardPath = "C:\\Users\\demo\\.lightcode\\agent-plugins\\codex\\forward.mjs";
 const forwardPathUnix = "/home/demo/.lightcode/agent-plugins/codex/forward.mjs";
@@ -23,7 +24,7 @@ function wslCommandHead(fp: string): string {
 }
 
 function nativeCommandHead(wrapperPath: string): string {
-  return JSON.stringify(wrapperPath);
+  return buildNativeHookCommandHead(wrapperPath);
 }
 
 function commandFor(head: string, event: string): string {

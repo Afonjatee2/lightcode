@@ -42,7 +42,7 @@ vi.mock("./agents/base", () => ({
   buildAgentCommand: buildAgentCommandMock,
 }));
 
-import { GitHubService } from "./github";
+import { GitHubService, aggregateChecksStatus } from "./github";
 
 const location = { kind: "windows" as const, path: "C:\\Users\\demo\\repo" };
 
@@ -256,6 +256,16 @@ describe("GitHubService", () => {
       expect(ghArgs).toContain("42");
       expect(ghArgs).toContain("--squash");
       expect(ghArgs).toContain("--delete-branch");
+      expect(ghArgs).not.toContain("--admin");
+    });
+
+    it("appends --admin when bypass is requested", async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: "" });
+
+      await new GitHubService().mergePr(location, 42, "squash", true);
+
+      const ghArgs = buildAgentCommandMock.mock.calls[0]![2] as string[];
+      expect(ghArgs).toContain("--admin");
     });
   });
 
@@ -278,6 +288,182 @@ describe("GitHubService", () => {
 
       const ghArgs = buildAgentCommandMock.mock.calls[0]![2] as string[];
       expect(ghArgs).toEqual(["pr", "reopen", "42"]);
+    });
+  });
+
+  describe("getPrFiles", () => {
+    it("parses files list from gh pr view --json files", async () => {
+      execFileAsyncMock.mockResolvedValue({
+        stdout: JSON.stringify({
+          files: [
+            { path: "src/a.ts", additions: 5, deletions: 2 },
+            { path: "src/b.ts", additions: 1, deletions: 0 },
+          ],
+        }),
+      });
+
+      const result = await new GitHubService().getPrFiles(location, 42);
+
+      expect(buildAgentCommandMock.mock.calls[0]![2]).toEqual([
+        "pr",
+        "view",
+        "42",
+        "--json",
+        "files",
+      ]);
+      expect(result.files).toEqual([
+        { path: "src/a.ts", additions: 5, deletions: 2 },
+        { path: "src/b.ts", additions: 1, deletions: 0 },
+      ]);
+    });
+  });
+
+  describe("getPrDiff", () => {
+    it("returns raw diff stdout", async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: "diff --git a/x b/x\n" });
+
+      const result = await new GitHubService().getPrDiff(location, 42);
+
+      expect(buildAgentCommandMock.mock.calls[0]![2]).toEqual(["pr", "diff", "42"]);
+      expect(result.diff).toBe("diff --git a/x b/x\n");
+    });
+  });
+
+  describe("submitPrReview", () => {
+    it("approves without a body file when body is empty", async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: "" });
+
+      await new GitHubService().submitPrReview(location, 42, "approve", "");
+
+      const ghArgs = buildAgentCommandMock.mock.calls[0]![2] as string[];
+      expect(ghArgs).toEqual(["pr", "review", "42", "--approve"]);
+      expect(writeFileMock).not.toHaveBeenCalled();
+    });
+
+    it("submits a comment review with body via --body-file", async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: "" });
+
+      await new GitHubService().submitPrReview(location, 42, "comment", "Looks good");
+
+      expect(writeFileMock).toHaveBeenCalledTimes(1);
+      const ghArgs = buildAgentCommandMock.mock.calls[0]![2] as string[];
+      expect(ghArgs[0]).toBe("pr");
+      expect(ghArgs[1]).toBe("review");
+      expect(ghArgs[2]).toBe("42");
+      expect(ghArgs[3]).toBe("--comment");
+      expect(ghArgs[4]).toBe("--body-file");
+      expect(unlinkMock).toHaveBeenCalledTimes(1);
+    });
+
+    it("rejects request-changes with empty body", async () => {
+      await expect(
+        new GitHubService().submitPrReview(location, 42, "request-changes", "   "),
+      ).rejects.toThrow(/required/i);
+      expect(execFileAsyncMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("aggregateChecksStatus", () => {
+    it("returns FAILURE when any check run failed", () => {
+      expect(
+        aggregateChecksStatus([
+          { name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+          { name: "e2e", status: "COMPLETED", conclusion: "FAILURE" },
+          { name: "coverage", status: "COMPLETED", conclusion: "SUCCESS" },
+        ]),
+      ).toBe("FAILURE");
+    });
+
+    it("returns FAILURE when a status context errored", () => {
+      expect(
+        aggregateChecksStatus([
+          { context: "Vercel", state: "ERROR" },
+          { name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+        ]),
+      ).toBe("FAILURE");
+    });
+
+    it("returns FAILURE for timed-out / cancelled / action-required", () => {
+      for (const conclusion of ["TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"]) {
+        expect(aggregateChecksStatus([{ name: "x", status: "COMPLETED", conclusion }])).toBe(
+          "FAILURE",
+        );
+      }
+    });
+
+    it("returns PENDING when checks are still in progress", () => {
+      expect(
+        aggregateChecksStatus([
+          { name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+          { name: "build", status: "IN_PROGRESS", conclusion: null },
+        ]),
+      ).toBe("PENDING");
+    });
+
+    it("returns PENDING for status contexts in pending state", () => {
+      expect(
+        aggregateChecksStatus([
+          { name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+          { context: "Vercel", state: "PENDING" },
+        ]),
+      ).toBe("PENDING");
+    });
+
+    it("returns SUCCESS when all checks pass (incl. NEUTRAL/SKIPPED)", () => {
+      expect(
+        aggregateChecksStatus([
+          { name: "a", status: "COMPLETED", conclusion: "SUCCESS" },
+          { name: "b", status: "COMPLETED", conclusion: "NEUTRAL" },
+          { name: "c", status: "COMPLETED", conclusion: "SKIPPED" },
+          { context: "Vercel", state: "SUCCESS" },
+        ]),
+      ).toBe("SUCCESS");
+    });
+
+    it("returns undefined for empty / missing rollups", () => {
+      expect(aggregateChecksStatus([])).toBeUndefined();
+      expect(aggregateChecksStatus(undefined)).toBeUndefined();
+      expect(aggregateChecksStatus(null)).toBeUndefined();
+      expect(aggregateChecksStatus("FAILURE")).toBeUndefined();
+    });
+  });
+
+  describe("getPrForBranch with rollup", () => {
+    it("aggregates statusCheckRollup to FAILURE when any check failed", async () => {
+      const prJson = JSON.stringify([
+        {
+          number: 609,
+          url: "https://github.com/owner/repo/pull/609",
+          state: "OPEN",
+          title: "PR with failing E2E",
+          baseRefName: "main",
+          isDraft: false,
+          updatedAt: "2026-04-30T16:27:32Z",
+          statusCheckRollup: [
+            { name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+            { name: "Unit Tests", status: "COMPLETED", conclusion: "SUCCESS" },
+            { name: "E2E Tests", status: "COMPLETED", conclusion: "FAILURE" },
+            { name: "typecheck", status: "COMPLETED", conclusion: "SUCCESS" },
+            { name: "Coverage Report", status: "COMPLETED", conclusion: "SUCCESS" },
+          ],
+        },
+      ]);
+      execFileAsyncMock.mockResolvedValue({ stdout: prJson });
+
+      const result = await new GitHubService().getPrForBranch(location, "feature/x");
+
+      expect(result?.checksStatus).toBe("FAILURE");
+    });
+
+    it("requests statusCheckRollup in --json fields", async () => {
+      execFileAsyncMock.mockResolvedValue({ stdout: "[]" });
+
+      await new GitHubService().getPrForBranch(location, "feature/x");
+
+      const ghArgs = buildAgentCommandMock.mock.calls[0]![2] as string[];
+      const jsonIdx = ghArgs.indexOf("--json");
+      expect(jsonIdx).toBeGreaterThan(-1);
+      expect(ghArgs[jsonIdx + 1]).toContain("statusCheckRollup");
     });
   });
 

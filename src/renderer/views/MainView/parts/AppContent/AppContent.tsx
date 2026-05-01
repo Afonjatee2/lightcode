@@ -304,7 +304,7 @@ export function AppContent() {
     return (
       <div className="flex h-full flex-col">
         {activeGroupId && activeGroupName && (
-          <div className="flex shrink-0 items-center gap-1 border-b border-white/[0.06] px-2 py-0.5">
+          <div className="flex h-[env(titlebar-area-height,32px)] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2">
             <span className="truncate text-xs font-medium text-muted">{activeGroupName}</span>
             <button
               type="button"

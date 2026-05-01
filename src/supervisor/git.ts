@@ -13,6 +13,8 @@ import type {
   GitWorktreeListResult,
   ProjectLocation,
 } from "@/shared/contracts";
+import { buildWorktreeLocation } from "@/shared/worktree";
+import { parallelWslCommandsAsync, quotePosixShellArg as quote } from "./agents/base";
 import {
   computeDefaultWorktreePath,
   execGit,
@@ -20,8 +22,17 @@ import {
   parseRemoteUrl,
 } from "./git/exec";
 import { GitMergeService } from "./git/mergeService";
-import { GitStatusService, parseStatusPorcelainV2 } from "./git/statusService";
-import { GitWorktreeService } from "./git/worktreeService";
+import {
+  GitStatusService,
+  buildGitStatusResultFromOutputs,
+  parseStatusPorcelainV2,
+} from "./git/statusService";
+import {
+  GitWorktreeService,
+  buildBranchListArgs,
+  parseBranchListOutput,
+  parseWorktreeListOutput,
+} from "./git/worktreeService";
 
 export {
   computeDefaultWorktreePath,
@@ -38,6 +49,94 @@ export class GitService {
 
   async getStatus(location: ProjectLocation): Promise<GitStatusResult> {
     return this.statusService.getStatus(location);
+  }
+
+  /**
+   * WSL fast path for project refresh: collapse `rev-parse + status + remote +
+   * diff numstats + branch list + worktree list (+ gh --version)` into a single
+   * `wsl.exe` spawn that runs all commands in parallel inside the distro. Saves
+   * ~6 separate bash-init cycles vs spawning each git op individually.
+   */
+  async batchedWslProjectSnapshot(
+    location: ProjectLocation & { kind: "wsl" },
+    includeGhCheck: boolean,
+  ): Promise<{
+    status: GitStatusResult | null;
+    branches: GitBranchListResult | null;
+    worktrees: GitWorktreeListResult["worktrees"] | null;
+    ghAvailable: boolean | null;
+  }> {
+    const cwd = location.linuxPath;
+    const branchListArgs = buildBranchListArgs(true)
+      .map((a) => quote(a))
+      .join(" ");
+    const commands: { cwd: string; cmd: string }[] = [
+      { cwd, cmd: "git rev-parse --is-inside-work-tree" },
+      { cwd, cmd: "git status --porcelain=v2 -b" },
+      { cwd, cmd: "git remote -v" },
+      { cwd, cmd: "git diff --cached --numstat" },
+      { cwd, cmd: "git diff --numstat" },
+      { cwd, cmd: `git ${branchListArgs}` },
+      { cwd, cmd: "git worktree list --porcelain" },
+      ...(includeGhCheck ? [{ cwd, cmd: "gh --version" }] : []),
+    ];
+    const results = await parallelWslCommandsAsync(location.distro, commands, {
+      timeoutMs: 30_000,
+    });
+
+    const isRepo = results[0]!.ok;
+    const baseStatus = buildGitStatusResultFromOutputs({
+      isRepo,
+      statusOutput: results[1]!.stdout,
+      remoteOutput: results[2]!.stdout,
+      stagedNumstat: results[3]!.stdout,
+      unstagedNumstat: results[4]!.stdout,
+    });
+    const status = isRepo
+      ? await this.statusService.applyMergeState(
+          location,
+          results[1]!.stdout,
+          await this.statusService.enrichStatus(location, baseStatus),
+        )
+      : baseStatus;
+
+    const branches = results[5]!.ok ? parseBranchListOutput(results[5]!.stdout) : null;
+    const worktrees = results[6]!.ok
+      ? parseWorktreeListOutput(results[6]!.stdout, location.kind).worktrees
+      : null;
+    const ghAvailable = includeGhCheck ? results[7]!.ok : null;
+
+    return { status, branches, worktrees, ghAvailable };
+  }
+
+  /**
+   * Fetch `git status` for many worktree paths at once. On WSL collapses N
+   * separate `wsl.exe` invocations into one parallel batch script — what used
+   * to be N×bash-init cycles becomes one. Worktrees whose status fetch fails
+   * are silently dropped from the result.
+   */
+  async getWorktreeStatusBatch(
+    location: ProjectLocation,
+    worktreePaths: string[],
+  ): Promise<Record<string, GitStatusResult>> {
+    if (worktreePaths.length === 0) return {};
+
+    if (location.kind === "wsl") {
+      return this.statusService.getWorktreeStatusBatchWsl(location, worktreePaths);
+    }
+
+    const entries = await Promise.all(
+      worktreePaths.map(async (path) => {
+        try {
+          const wtLocation = buildWorktreeLocation(location, path);
+          const status = await this.statusService.getStatus(wtLocation);
+          return [path, status] as const;
+        } catch {
+          return undefined;
+        }
+      }),
+    );
+    return Object.fromEntries(entries.filter((e) => e !== undefined));
   }
 
   async getDiff(
@@ -201,8 +300,9 @@ export class GitService {
   async getWorktreeSourceBranch(
     location: ProjectLocation,
     branch: string,
+    sourceBranchOverride?: string,
   ): Promise<GitGetWorktreeSourceBranchResult> {
-    return this.worktreeService.getWorktreeSourceBranch(location, branch);
+    return this.worktreeService.getWorktreeSourceBranch(location, branch, sourceBranchOverride);
   }
 
   async mergeToSource(

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { buildCopilotArgs } from "./argv";
 import {
   createCopilotAdapter,
   detectCopilotInvalidSessionRef,
@@ -338,6 +339,36 @@ describe("detectCopilotStatusLineModel", () => {
 
   it("returns null for lines without bracket+space pattern", () => {
     expect(detectCopilotStatusLineModel("just some random text")).toBeNull();
+  });
+
+  it("rejects captured model containing box-drawing/arrow glyphs from /model picker overlay", () => {
+    // The picker overlay can sit on the same logical line as the status row;
+    // `.` matches `\r`, so the captured "model" ends up being the picker glyphs
+    // glued together. Reject so we don't pass garbage to `--model` on resume.
+    const text = "~/work/lightcode [↗ master]          ──────────────❯";
+    expect(detectCopilotStatusLineModel(text)).toBeNull();
+  });
+
+  it("rejects captured model when it spans an embedded \\r (picker glyphs across two visual lines)", () => {
+    const text = "~/work/lightcode [↗ master]          ─────────\r  ─────❯";
+    expect(detectCopilotStatusLineModel(text)).toBeNull();
+  });
+});
+
+describe("buildCopilotArgs", () => {
+  it("drops a corrupted model value rather than passing TUI glyphs to --model", () => {
+    // Self-heal path: if a previous picker-overlay capture wrote junk into the
+    // persisted config, the next resume should silently fall back to "auto"
+    // instead of erroring on every spawn.
+    const args = buildCopilotArgs({ model: "──────────\r\n  ────❯" }, "", "session-1");
+    expect(args).not.toContain("--model");
+  });
+
+  it("passes a clean model value through to --model on resume", () => {
+    const args = buildCopilotArgs({ model: "claude-opus-4.6" }, "", "session-1");
+    const idx = args.indexOf("--model");
+    expect(idx).toBeGreaterThanOrEqual(0);
+    expect(args[idx + 1]).toBe("claude-opus-4.6");
   });
 });
 

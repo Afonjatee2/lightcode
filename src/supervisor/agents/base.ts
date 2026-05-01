@@ -2,7 +2,7 @@ import { existsSync, watch as fsWatch } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
-import { execFile, spawnSync } from "node:child_process";
+import { execFile, spawn, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
 import { toWslUncPath } from "@/shared/wsl";
 
@@ -423,9 +423,14 @@ function getPosixLoginShellArgs(script: string): string[] {
 
 /**
  * Inject environment variables into an already-built WSL CommandSpec.
- * The WSL command structure from `buildAgentCommand` always ends with
- * `[..., shellPath, "-l", "-i", "-c", script]`, so we prepend `export`
- * statements to the script string.
+ *
+ * Two spec shapes are supported, matching the two paths in
+ * `buildAgentCommand`:
+ *   - **Login-shell form** (`[..., shellPath, "-l", "-i", "-c", script]`):
+ *     `export KEY=VALUE; ...` is prepended to the script string.
+ *   - **`/usr/bin/env` fast-path form** (`[..., "/usr/bin/env", "PATH=...",
+ *     ...kv, exec, ...args]`): new `KEY=VALUE` literals are inserted
+ *     immediately after the existing K=V block.
  *
  * For non-WSL commands, the env is stored on `CommandSpec.env` and merged
  * into the PTY spawn options by the caller — no script rewriting needed.
@@ -437,14 +442,26 @@ export function injectWslEnv(
 ): CommandSpec {
   if (location.kind !== "wsl" || Object.keys(env).length === 0) return spec;
 
+  const args = [...spec.args];
+  const envIdx = args.indexOf("/usr/bin/env");
+  if (envIdx >= 0 && envValuesAreWslSafe(env)) {
+    // Walk forward past the existing PATH=... and any other KEY=VALUE
+    // literals; insert new ones at that boundary, before the binary.
+    let insertAt = envIdx + 1;
+    while (insertAt < args.length && /^[A-Za-z_][A-Za-z0-9_]*=/.test(args[insertAt]!)) {
+      insertAt += 1;
+    }
+    const newKv = Object.entries(env).map(([k, v]) => `${k}=${v}`);
+    args.splice(insertAt, 0, ...newKv);
+    return { ...spec, args };
+  }
+
   const prefix = buildPosixExportPrefix(env);
   if (!prefix) return spec;
 
-  // The script is always the last arg after "-c"
-  const args = [...spec.args];
+  // Login-shell form: the script is always the last arg after "-c".
   const scriptIdx = args.length - 1;
   args[scriptIdx] = `${prefix}${args[scriptIdx]}`;
-
   return { ...spec, args };
 }
 
@@ -530,6 +547,36 @@ export function buildAgentCommand(
   env?: Record<string, string>,
 ): CommandSpec {
   if (location.kind === "wsl") {
+    // Fast path: when the user's login PATH was already captured (via
+    // primeWslLoginEnv during install detection) and the agent binary is an
+    // absolute path, skip the `-l -i` shell wrap entirely. Sourcing
+    // ~/.bashrc / ~/.profile costs 500ms–2s on nvm/fnm/asdf setups; once we
+    // have the resolved PATH we can just exec the binary via `/usr/bin/env`.
+    // Aliases and shell functions are not propagated, but agent CLIs don't
+    // depend on them — they're an interactive-shell convenience only.
+    const loginEnv = wslLoginEnvCache.get(location.distro);
+    const fastPathExec = wslExecPath && wslExecPath.startsWith("/") ? wslExecPath : undefined;
+    if (loginEnv && fastPathExec && envValuesAreWslSafe(env)) {
+      const envArgs: string[] = [`PATH=${loginEnv.path}`];
+      if (env) {
+        for (const [k, v] of Object.entries(env)) envArgs.push(`${k}=${v}`);
+      }
+      return {
+        command: getWslCommand(),
+        args: [
+          "-d",
+          location.distro,
+          "--cd",
+          location.linuxPath,
+          "--",
+          "/usr/bin/env",
+          ...envArgs,
+          fastPathExec,
+          ...args,
+        ],
+      };
+    }
+
     const shellPath = resolveWslShellPath(location.distro);
     const execCommand = wslExecPath ?? command;
     const exports = buildPosixExportPrefix(env);
@@ -659,6 +706,11 @@ async function resolveDetectedBinary(
   binary: string,
 ): Promise<string | undefined> {
   if (ctx?.envKind === "wsl" && ctx.wslDistro) {
+    // Kick off the unified login-env probe (PATH + HOME + SHELL) in the
+    // background. Detection doesn't need it, but warming the cache here means
+    // the user's first PTY launch can take the no-shell fast path in
+    // buildAgentCommand.
+    void primeWslLoginEnv(ctx.wslDistro);
     const [result] = await batchWslCommandsAsync(ctx.wslDistro, [`command -v ${binary}`]);
     const path = result?.ok ? result.stdout : undefined;
     primeAgentBinaryPath(ctx.wslDistro, binary, path);
@@ -1095,6 +1147,89 @@ const WSL_BATCH_DELIMITER = "---LIGHTCODE_BATCH_SEP---";
 const DEFAULT_WSL_EXEC_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const wslShellPathCache = new Map<string, string>();
 
+interface WslLoginEnv {
+  path: string;
+  home: string;
+  shell: string;
+}
+
+const wslLoginEnvCache = new Map<string, WslLoginEnv>();
+const wslLoginEnvInflight = new Map<string, Promise<WslLoginEnv | undefined>>();
+
+/**
+ * Whether values in the env map are safe to pass through `wsl.exe` argv as
+ * `KEY=VALUE` literals. `wsl.exe` pre-expands `$VAR` and `$(...)` in its argv
+ * before forwarding to the Linux side, so values that look like shell
+ * substitutions corrupt. This is rare for the env we ship into PTYs
+ * (`LIGHTCODE_HOOK_URL`, `BROWSER`, etc.), but if the caller passes a value
+ * with a `$` we fall back to the login-shell wrap which quotes safely.
+ */
+function envValuesAreWslSafe(env: Record<string, string> | undefined): boolean {
+  if (!env) return true;
+  for (const v of Object.values(env)) {
+    if (v.includes("$") || v.includes("`")) return false;
+  }
+  return true;
+}
+
+/**
+ * Read the canonical login+interactive PATH/HOME/SHELL inside a WSL distro.
+ * Memoized for the supervisor lifetime — one wsl.exe spawn per distro
+ * primes:
+ *   - {@link buildAgentCommand} fast path (skip `-l -i` rc sourcing)
+ *   - {@link resolveWslShellPath} sync cache (login-shell `getent passwd` lookup)
+ *   - {@link resolveWslHomeDirectory} sync cache (`$HOME` lookup)
+ *
+ * Replaces three independent wsl.exe probes during boot/detection. Safe to
+ * call concurrently — the in-flight promise is shared.
+ */
+export function primeWslLoginEnv(distro: string): Promise<WslLoginEnv | undefined> {
+  const cached = wslLoginEnvCache.get(distro);
+  if (cached) return Promise.resolve(cached);
+  const inflight = wslLoginEnvInflight.get(distro);
+  if (inflight) return inflight;
+
+  const promise = (async (): Promise<WslLoginEnv | undefined> => {
+    try {
+      const shellPath = await resolveWslShellPathAsync(distro);
+      const sep = WSL_BATCH_DELIMITER;
+      const script =
+        `printf '%s\\n${sep}\\n' "$PATH"; ` +
+        `printf '%s\\n${sep}\\n' "$HOME"; ` +
+        `printf '%s\\n${sep}\\n' "$SHELL"`;
+      const { stdout } = await execFileAsync(
+        getWslCommand(),
+        ["-d", distro, "--", shellPath, "-l", "-i", "-c", script],
+        { windowsHide: true, timeout: 8_000 },
+      );
+      const parts = (stdout ?? "").split(sep).map((s) => s.replace(/^\n+|\n+$/g, "").trim());
+      const path = parts[0] ?? "";
+      const home = parts[1] ?? "";
+      const shell = parts[2] || shellPath;
+      if (!path) return undefined;
+      const entry: WslLoginEnv = { path, home, shell };
+      wslLoginEnvCache.set(distro, entry);
+      // Populate the per-purpose sync caches so any subsequent sync lookup
+      // (`resolveWslShellPath`, `resolveWslHomeDirectory`) returns instantly
+      // without a second wsl.exe roundtrip.
+      if (home) wslHomeCache.set(distro, home);
+      if (shell) wslShellPathCache.set(distro, shell);
+      return entry;
+    } catch {
+      return undefined;
+    } finally {
+      wslLoginEnvInflight.delete(distro);
+    }
+  })();
+  wslLoginEnvInflight.set(distro, promise);
+  return promise;
+}
+
+export function clearWslLoginEnvCacheForTests(): void {
+  wslLoginEnvCache.clear();
+  wslLoginEnvInflight.clear();
+}
+
 function parseCommandOutputLine(stdout: string): string | undefined {
   return stdout
     .split(/\r?\n/g)
@@ -1358,11 +1493,21 @@ export async function batchWslCommandsAsync(
   const script = buildBatchWslScript(commands, sep);
   try {
     const shellPath = await resolveWslShellPathAsync(distro);
-    const { stdout } = await execFileAsync(
-      getWslCommand(),
-      ["-d", distro, "--", shellPath, "-l", "-i", "-c", script],
-      { windowsHide: true, timeout: 15_000 },
-    );
+    // When the login env was already captured (PATH+HOME+SHELL via
+    // primeWslLoginEnv), skip `-l -i` and inject PATH directly. Saves the
+    // ~500ms–2s rc-sourcing cost on every detection/probe call once the
+    // first prime has landed.
+    const loginEnv = wslLoginEnvCache.get(distro);
+    const wslArgs: string[] = ["-d", distro, "--"];
+    if (loginEnv) {
+      wslArgs.push(shellPath, "-c", `export PATH=${quotePosixShellArg(loginEnv.path)}; ${script}`);
+    } else {
+      wslArgs.push(shellPath, "-l", "-i", "-c", script);
+    }
+    const { stdout } = await execFileAsync(getWslCommand(), wslArgs, {
+      windowsHide: true,
+      timeout: 15_000,
+    });
     const parts = (stdout ?? "").split(sep);
     return commands.map((_, i) => {
       const raw = (parts[i] ?? "").trim();
@@ -1371,6 +1516,136 @@ export async function batchWslCommandsAsync(
   } catch {
     return commands.map(() => ({ ok: false, stdout: "" }));
   }
+}
+
+/**
+ * Run multiple shell commands **in parallel** inside a single `wsl.exe` spawn.
+ * Each command's stdout is captured to a tempfile, then all are emitted in
+ * order with a delimiter between them. Saves N×bash-init overhead vs spawning
+ * N separate wsl.exe processes, *and* runs commands concurrently inside the
+ * distro. Best for refresh-style "do several independent git/gh calls and
+ * collect all outputs" patterns.
+ *
+ * The script is piped to bash via stdin (not `-c`) because `wsl.exe`
+ * pre-expands `$VAR` and `$(...)` in its argv before forwarding to the target
+ * binary, which would corrupt our use of `$T` / `$?` / `$(mktemp)`. stdin
+ * forwards bytes verbatim.
+ */
+export async function parallelWslCommandsAsync(
+  distro: string,
+  commands: { cwd?: string; cmd: string }[],
+  options?: { timeoutMs?: number },
+): Promise<{ ok: boolean; stdout: string; exitCode: number }[]> {
+  const sep = WSL_BATCH_DELIMITER;
+  const timeoutMs = options?.timeoutMs ?? 30_000;
+  const script = buildParallelWslScript(commands, sep);
+  try {
+    const shellPath = await resolveWslShellPathAsync(distro);
+    // Skip `-l` when the login env is cached; we prepend the captured PATH
+    // to the script instead. `-l` exists today only to source ~/.profile so
+    // git/gh resolve — once we've already stored that PATH we can avoid the
+    // rc-source cost on every git refresh.
+    const loginEnv = wslLoginEnvCache.get(distro);
+    const fullScript = loginEnv
+      ? `export PATH=${quotePosixShellArg(loginEnv.path)}\n${script}`
+      : script;
+    const wslArgs = loginEnv
+      ? ["-d", distro, "--", shellPath]
+      : ["-d", distro, "--", shellPath, "-l"];
+    const stdout = await runWslScriptViaStdin(wslArgs, fullScript, timeoutMs);
+    return parseParallelWslOutput(stdout, commands.length, sep);
+  } catch {
+    return commands.map(() => ({ ok: false, stdout: "", exitCode: 1 }));
+  }
+}
+
+function runWslScriptViaStdin(
+  wslArgs: string[],
+  script: string,
+  timeoutMs: number,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(getWslCommand(), wslArgs, {
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
+    let stdout = "";
+    let stderr = "";
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill();
+    }, timeoutMs);
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString("utf8");
+      if (stdout.length > 50 * 1024 * 1024) child.kill();
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8");
+    });
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      if (timedOut) return reject(new Error("wsl batch timed out"));
+      if (code !== 0 && stdout.length === 0) {
+        return reject(new Error(`wsl batch exited ${code}: ${stderr.trim()}`));
+      }
+      resolve(stdout);
+    });
+    child.stdin.write(script);
+    child.stdin.end();
+  });
+}
+
+function buildParallelWslScript(commands: { cwd?: string; cmd: string }[], sep: string): string {
+  const launchers = commands
+    .map((c, i) => {
+      const cwdPrefix = c.cwd ? `cd ${quotePosixShellArg(c.cwd)} && ` : "";
+      // Each cmd writes stdout to its own tempfile and exit code to a sibling
+      // file. stderr is silenced — git prints noise on success too.
+      return `(${cwdPrefix}${c.cmd}) >"$T/${i}.out" 2>/dev/null; echo $? >"$T/${i}.rc" &`;
+    })
+    .join("\n");
+  const emitters = commands
+    .map(
+      (_, i) =>
+        `printf '%s\\n' "$(cat "$T/${i}.out")"; printf '\\n${sep}\\n%s\\n${sep}\\n' "$(cat "$T/${i}.rc")"`,
+    )
+    .join("\n");
+  return [
+    // Suppress git's optional `.git/index` stat-cache refresh: read-only ops
+    // (status, diff) won't write the index and so won't fire `.git/index`
+    // watcher events that would trigger a refresh→write→refresh loop.
+    `export GIT_OPTIONAL_LOCKS=0`,
+    `T=$(mktemp -d)`,
+    `trap 'rm -rf "$T"' EXIT`,
+    launchers,
+    `wait`,
+    emitters,
+  ].join("\n");
+}
+
+function parseParallelWslOutput(
+  stdout: string,
+  count: number,
+  sep: string,
+): { ok: boolean; stdout: string; exitCode: number }[] {
+  const parts = stdout.split(sep);
+  const result: { ok: boolean; stdout: string; exitCode: number }[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const out = (parts[i * 2] ?? "").replace(/^\n+|\n+$/g, "");
+    const rcStr = (parts[i * 2 + 1] ?? "").trim();
+    const exitCode = parseInt(rcStr, 10);
+    result.push({
+      ok: Number.isFinite(exitCode) && exitCode === 0,
+      stdout: out,
+      exitCode: Number.isFinite(exitCode) ? exitCode : 1,
+    });
+  }
+  return result;
 }
 
 export async function readWslCommandOutputAsync(

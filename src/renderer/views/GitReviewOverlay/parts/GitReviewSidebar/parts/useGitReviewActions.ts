@@ -1,14 +1,6 @@
-// Reconstructed from the pre-split GitReviewSidebar.tsx (recovered monolithic
-// version) + hints showing post-crash edits (getCurrentPrData pattern).
 import { useState } from "react";
 import { toast } from "@heroui/react";
-import type {
-  GitBranchInfo,
-  GitStatusResult,
-  PrData,
-  Project,
-  ProjectLocation,
-} from "@/shared/contracts";
+import type { GitBranchInfo, GitStatusResult, Project, ProjectLocation } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { msg, friendlyError } from "@/shared/messages";
@@ -21,6 +13,7 @@ import {
   getCommitGenCandidates,
   resolveCommitGenConfig,
 } from "@/renderer/components/providers";
+import { usePrWriteActions } from "@/renderer/hooks/usePrWriteActions";
 
 export interface UseGitReviewActionsArgs {
   project: Project;
@@ -43,12 +36,27 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     gitStatus,
     worktreeBranch,
     worktreePath,
+    storeKey,
+    isWorktreeStatus,
     onRefresh,
     onMergeAndRemove,
     effectiveBranch,
     effectivePrKey,
     sourceBranch,
   } = args;
+
+  // Apply an in-place tweak to the cached status. Used by post-action
+  // optimistic updates so the UI flips immediately instead of waiting on a
+  // `git status` round-trip — particularly slow on WSL (~500ms–1s per
+  // wsl.exe spawn).
+  function applyStatusOptimistic(updater: (current: GitStatusResult) => GitStatusResult): void {
+    const store = useGitStore.getState();
+    const current = isWorktreeStatus ? store.worktreeStatuses[storeKey] : store.statuses[storeKey];
+    if (!current) return;
+    const next = updater(current);
+    if (isWorktreeStatus) store.setWorktreeStatus(storeKey, next);
+    else store.setStatus(storeKey, next);
+  }
 
   const isWsl = project.location.kind === "wsl";
   const commitGenProvider = useSharedSettings((s) =>
@@ -79,8 +87,15 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
   const [prTitle, setPrTitle] = useState("");
   const [prBody, setPrBody] = useState("");
   const [prTargetBranch, setPrTargetBranch] = useState<string | null>(null);
-  const [prLoading, setPrLoading] = useState(false);
+  const [isCreatingPr, setIsCreatingPr] = useState(false);
   const [isGeneratingPr, setIsGeneratingPr] = useState(false);
+
+  const writeActions = usePrWriteActions({
+    projectLocation: project.location,
+    prKey: effectivePrKey,
+    onRefresh,
+  });
+  const prLoading = isCreatingPr || writeActions.prLoading;
 
   const hasRemote = gitStatus?.hasRemote ?? false;
   const hasTracking = Boolean(gitStatus?.tracking);
@@ -95,11 +110,6 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     return buildWorktreeLocation(project.location, worktreePath);
   }
 
-  function getCurrentPrData(): PrData | null | undefined {
-    if (!effectivePrKey) return undefined;
-    return useGitStore.getState().prData[effectivePrKey] as PrData | null | undefined;
-  }
-
   async function generateMessage(): Promise<string> {
     return generateCommitMessageWithFallback({
       projectLocation: project.location,
@@ -111,7 +121,7 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     });
   }
 
-  async function handleCommit(addAll: boolean): Promise<void> {
+  async function handleCommit(addAll: boolean, pushAfter = false): Promise<void> {
     setIsCommitting(true);
     try {
       let message = commitMessage.trim();
@@ -131,10 +141,37 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
         addAll,
       });
       setCommitMessage("");
-      await readBridge()
-        .gitFetch({ projectLocation: project.location, remote: "origin", prune: false })
-        .catch(() => undefined);
+      // The new commit makes us one ahead and the staged set is now part of
+      // the commit. Reflect that in the store immediately so the push button
+      // appears without waiting for a `git status` round-trip.
+      applyStatusOptimistic((s) => ({ ...s, ahead: s.ahead + 1, staged: [] }));
+
+      if (pushAfter && hasRemote) {
+        setIsSyncing(true);
+        try {
+          await readBridge().gitPush({
+            projectLocation: project.location,
+            setUpstream: !hasTracking,
+          });
+          applyStatusOptimistic((s) => ({ ...s, ahead: 0 }));
+          // GitHub takes a beat to register the new commits — refreshing
+          // immediately fetches a stale PR snapshot. Delay so the post-push
+          // refresh picks up fresh state.
+          setTimeout(() => onRefresh(), 1500);
+        } finally {
+          setIsSyncing(false);
+        }
+        return;
+      }
+
       onRefresh();
+      // `git fetch` only updates `behind`, which doesn't gate the push UI.
+      // Run it in the background so the user isn't blocked on a wsl.exe
+      // network call (1–2s on WSL).
+      readBridge()
+        .gitFetch({ projectLocation: project.location, remote: "origin", prune: false })
+        .catch(() => undefined)
+        .finally(() => onRefresh());
     } catch (err) {
       console.error("[git] commit failed", err);
       toast.danger(friendlyError(err));
@@ -164,10 +201,17 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
           projectLocation: project.location,
           setUpstream: !hasTracking,
         });
+        // Optimistic: a successful push clears `ahead`. The refresh below
+        // confirms it a moment later.
+        applyStatusOptimistic((s) => ({ ...s, ahead: 0 }));
+        // GitHub takes a beat to register the new commits — refreshing
+        // immediately fetches a stale PR snapshot (mergeable/checks not
+        // yet updated). Delay so the post-push refresh picks up fresh state.
+        setTimeout(() => onRefresh(), 1500);
       } else {
         await readBridge().gitSync({ projectLocation: project.location });
+        onRefresh();
       }
-      onRefresh();
     } catch (err) {
       console.error("[git] sync/push failed", err);
       toast.danger(friendlyError(err));
@@ -212,7 +256,7 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
   }
 
   async function handlePullFromSource(): Promise<void> {
-    if (!sourceBranch || !worktreePath) return;
+    if (!sourceBranch) return;
     setIsPullingFromSource(true);
     try {
       const result = await readBridge().gitPullFromSource({
@@ -273,7 +317,7 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
   async function handleCreatePr(isDraft: boolean): Promise<void> {
     const targetBranch = prTargetBranch || sourceBranch;
     if (!effectiveBranch || !targetBranch) return;
-    setPrLoading(true);
+    setIsCreatingPr(true);
     try {
       const pr = await readBridge().ghCreatePr({
         projectLocation: project.location,
@@ -292,72 +336,7 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
       console.error("[git] create PR failed", err);
       toast.danger(friendlyError(err));
     } finally {
-      setPrLoading(false);
-    }
-  }
-
-  async function handleMergePr(method: "merge" | "squash" | "rebase"): Promise<void> {
-    const prData = getCurrentPrData();
-    if (!prData) return;
-    setPrLoading(true);
-    try {
-      await readBridge().ghMergePr({
-        projectLocation: project.location,
-        prNumber: prData.number,
-        method,
-      });
-      if (effectivePrKey) {
-        useGitStore.getState().setPrData(effectivePrKey, { ...prData, state: "merged" });
-      }
-      onRefresh();
-    } catch (err) {
-      console.error("[git] merge PR failed", err);
-      toast.danger(friendlyError(err));
-    } finally {
-      setPrLoading(false);
-    }
-  }
-
-  async function handleMarkPrReady(): Promise<void> {
-    const prData = getCurrentPrData();
-    if (!prData) return;
-    setPrLoading(true);
-    try {
-      await readBridge().ghMarkPrReady({
-        projectLocation: project.location,
-        prNumber: prData.number,
-      });
-      if (effectivePrKey) {
-        useGitStore
-          .getState()
-          .setPrData(effectivePrKey, { ...prData, state: "open", isDraft: false });
-      }
-      onRefresh();
-    } catch (err) {
-      console.error("[git] mark PR ready failed", err);
-      toast.danger(friendlyError(err));
-    } finally {
-      setPrLoading(false);
-    }
-  }
-
-  async function handleClosePr(): Promise<void> {
-    const prData = getCurrentPrData();
-    if (!prData) return;
-    setPrLoading(true);
-    try {
-      await readBridge().ghClosePr({
-        projectLocation: project.location,
-        prNumber: prData.number,
-      });
-      if (effectivePrKey) {
-        useGitStore.getState().setPrData(effectivePrKey, { ...prData, state: "closed" });
-      }
-    } catch (err) {
-      console.error("[git] close PR failed", err);
-      toast.danger(friendlyError(err));
-    } finally {
-      setPrLoading(false);
+      setIsCreatingPr(false);
     }
   }
 
@@ -424,9 +403,10 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     handleAbortMerge,
     handleFinishMerge,
     handleCreatePr,
-    handleMergePr,
-    handleClosePr,
-    handleMarkPrReady,
+    handleMergePr: writeActions.handleMergePr,
+    handleClosePr: writeActions.handleClosePr,
+    handleMarkPrReady: writeActions.handleMarkPrReady,
+    handleUpdatePrBranch: writeActions.handleUpdatePrBranch,
     handleGeneratePrSummary,
   };
 }

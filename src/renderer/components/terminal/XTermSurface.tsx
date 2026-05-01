@@ -14,6 +14,8 @@ import {
   useImperativeHandle,
   useRef,
   useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react";
 import type { TerminalSize } from "@/shared/contracts";
@@ -28,6 +30,9 @@ export interface XTermSurfaceHandle {
   findPrevious(query: string): boolean;
   clearSearch(): void;
 }
+
+const TERMINAL_SCROLLBAR_WIDTH = 9;
+const TERMINAL_INTERNAL_SCROLLBAR_WIDTH = 0.01;
 
 function getTerminalTheme(appearance: "light" | "dark") {
   const rootStyles =
@@ -81,6 +86,7 @@ export const XTermSurface = forwardRef<
   } = props;
   const appearance = useResolvedAppearance();
   const mountRef = useRef<HTMLDivElement | null>(null);
+  const scrollbarTrackRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const searchRef = useRef<SearchAddon | null>(null);
@@ -98,6 +104,11 @@ export const XTermSurface = forwardRef<
   onTerminalResizeRef.current = onTerminalResize;
   const [hasSelection, setHasSelection] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
+  const [scrollbar, setScrollbar] = useState({
+    isVisible: false,
+    thumbTopPercent: 0,
+    thumbHeightPercent: 100,
+  });
 
   useImperativeHandle(ref, () => ({
     focus() {
@@ -215,6 +226,9 @@ export const XTermSurface = forwardRef<
       scrollback: 5_000,
       scrollSensitivity: useSharedSettings.getState().scrollSpeed,
       fastScrollSensitivity: 10,
+      // Keep xterm's internal scrollbar gutter effectively zero; Lightcode
+      // renders the visible scrollbar outside the terminal content area.
+      overviewRuler: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },
       fontSize: 12,
       fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
       theme: getTerminalTheme(appearance),
@@ -354,6 +368,30 @@ export const XTermSurface = forwardRef<
           wasScrolledUp = scrolledUp;
           setShowScrollDown(scrolledUp);
         }
+
+        const maxScroll = terminal.buffer.active.baseY;
+        if (maxScroll <= 0) {
+          setScrollbar((previous) =>
+            previous.isVisible
+              ? { isVisible: false, thumbTopPercent: 0, thumbHeightPercent: 100 }
+              : previous,
+          );
+          return;
+        }
+
+        const totalRows = terminal.buffer.active.baseY + terminal.rows;
+        const thumbHeightPercent = Math.max(8, Math.min(100, (terminal.rows / totalRows) * 100));
+        const thumbTopPercent = Math.min(
+          100 - thumbHeightPercent,
+          (terminal.buffer.active.viewportY / maxScroll) * (100 - thumbHeightPercent),
+        );
+        setScrollbar((previous) =>
+          previous.isVisible &&
+          Math.abs(previous.thumbTopPercent - thumbTopPercent) < 0.1 &&
+          Math.abs(previous.thumbHeightPercent - thumbHeightPercent) < 0.1
+            ? previous
+            : { isVisible: true, thumbTopPercent, thumbHeightPercent },
+        );
       });
     };
     terminal.onScroll(checkScrollPosition);
@@ -512,10 +550,66 @@ export const XTermSurface = forwardRef<
     }
   }
 
+  function scrollTerminalFromTrackPointer(clientY: number) {
+    const terminal = terminalRef.current;
+    const track = scrollbarTrackRef.current;
+    if (!terminal || !track) return;
+
+    const maxScroll = terminal.buffer.active.baseY;
+    if (maxScroll <= 0) return;
+
+    const rect = track.getBoundingClientRect();
+    const thumbHeight = (scrollbar.thumbHeightPercent / 100) * rect.height;
+    const travel = rect.height - thumbHeight;
+    if (travel <= 0) return;
+
+    const top = Math.max(0, Math.min(travel, clientY - rect.top - thumbHeight / 2));
+    terminal.scrollToLine(Math.round((top / travel) * maxScroll));
+  }
+
+  function handleScrollbarPointerDown(event: ReactPointerEvent<HTMLDivElement>) {
+    event.preventDefault();
+    event.stopPropagation();
+    scrollTerminalFromTrackPointer(event.clientY);
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      scrollTerminalFromTrackPointer(moveEvent.clientY);
+    };
+    const onPointerUp = () => {
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+    };
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp, { once: true });
+  }
+
   return (
     <ContextMenu items={contextMenuItems} onAction={handleContextMenuAction}>
-      <div className={`relative h-full w-full overflow-hidden ${className ?? ""}`}>
-        <div ref={mountRef} className="lightcode-terminal-pane h-full w-full overflow-hidden" />
+      <div
+        className={`lightcode-terminal-shell relative h-full w-full overflow-visible ${className ?? ""}`}
+        style={
+          {
+            "--lightcode-terminal-scrollbar-width": `${TERMINAL_SCROLLBAR_WIDTH}px`,
+          } as CSSProperties
+        }
+      >
+        <div ref={mountRef} className="lightcode-terminal-pane h-full min-w-0 overflow-hidden" />
+        <div
+          ref={scrollbarTrackRef}
+          className={`lightcode-terminal-scrollbar absolute bottom-0 right-0 top-0 ${
+            scrollbar.isVisible ? "opacity-100" : "pointer-events-none opacity-0"
+          }`}
+          onPointerDown={handleScrollbarPointerDown}
+        >
+          <div
+            className="lightcode-terminal-scrollbar__thumb"
+            style={{
+              height: `${scrollbar.thumbHeightPercent}%`,
+              top: `${scrollbar.thumbTopPercent}%`,
+            }}
+          />
+        </div>
         <Button
           isIconOnly
           variant="tertiary"

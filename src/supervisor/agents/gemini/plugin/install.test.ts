@@ -34,7 +34,7 @@ describe("getGeminiPluginPaths", () => {
 });
 
 describe("renderGeminiSettings", () => {
-  it("renders WSL hook entries with the resolved-node command prefix", () => {
+  it("renders only the trimmed hook surface with the resolved-node command prefix", () => {
     const commandPrefix =
       "'/home/demo/.nvm/versions/node/v22.11.0/bin/node' '/home/demo/.lightcode/agent-plugins/gemini/forward.mjs'";
     const doc = renderGeminiSettings(commandPrefix);
@@ -43,21 +43,26 @@ describe("renderGeminiSettings", () => {
     expect(Object.keys(doc.hooks)).toEqual([
       "SessionStart",
       "BeforeAgent",
-      "BeforeModel",
-      "BeforeTool",
-      "AfterTool",
       "AfterAgent",
       "Notification",
     ]);
-    expect(doc.hooks.BeforeTool?.[0]).toMatchObject({ matcher: "*" });
-    expect(doc.hooks.AfterTool?.[0]).toMatchObject({ matcher: "*" });
     expect(doc.hooks.SessionStart?.[0]?.matcher).toBeUndefined();
+    expect(doc.hooks.BeforeAgent?.[0]?.matcher).toBeUndefined();
+    expect(doc.hooks.AfterAgent?.[0]?.matcher).toBeUndefined();
+    expect(doc.hooks.Notification?.[0]?.matcher).toBeUndefined();
     expect(doc.hooks.AfterAgent?.[0]?.hooks[0]).toMatchObject({
       name: "lightcode-status-AfterAgent",
       type: "command",
       command: `${commandPrefix} AfterAgent`,
       timeout: 5000,
     });
+  });
+
+  it("does not register dropped redundant turn-open hooks", () => {
+    const doc = renderGeminiSettings("'/usr/bin/node' '/tmp/forward.mjs'");
+    expect(doc.hooks.BeforeModel).toBeUndefined();
+    expect(doc.hooks.BeforeTool).toBeUndefined();
+    expect(doc.hooks.AfterTool).toBeUndefined();
   });
 });
 
@@ -75,14 +80,16 @@ describe("installGeminiPlugin", () => {
     expect(existsSync(result.paths.settingsPath)).toBe(true);
     expect(isGeminiPluginInstalled({ envKind: "posix", baseDir })).toMatchObject({
       installed: true,
-      version: "1.1.0",
+      version: "1.2.0",
     });
 
     const settings = JSON.parse(readFileSync(result.paths.settingsPath, "utf8")) as {
       hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
     };
-    expect(settings.hooks.Notification?.[0]?.hooks[0]?.command).toMatch(
-      /agent-plugins[\\/]+gemini[\\/]+lightcode-hook\.(?:sh|cmd)/,
+    const command = settings.hooks.Notification?.[0]?.hooks[0]?.command ?? "";
+    expect(command).toMatch(/agent-plugins[\\/]+gemini[\\/]+lightcode-hook\.(?:sh|cmd)/);
+    expect(command).toMatch(
+      process.platform === "win32" ? /^cmd\.exe \/d \/s \/c call "/ : /^(?!cmd\.exe)/,
     );
   });
 });

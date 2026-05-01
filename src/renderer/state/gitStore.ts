@@ -4,6 +4,7 @@ import type {
   GitStatusResult,
   GitWorktreeInfo,
   PrData,
+  PrFile,
 } from "@/shared/contracts";
 
 export interface WorktreeSourceInfo {
@@ -20,6 +21,10 @@ interface GitState {
   ghAvailable: Record<string, boolean>;
   prData: Record<string, PrData | null>;
   worktreeSourceInfo: Record<string, WorktreeSourceInfo>;
+  /** PR file lists keyed by `${projectId}#${prNumber}`. */
+  prFiles: Record<string, PrFile[]>;
+  /** PR raw unified diffs keyed by `${projectId}#${prNumber}`. */
+  prDiffs: Record<string, string>;
 }
 
 interface GitProjectSnapshot {
@@ -43,6 +48,9 @@ interface GitActions {
   setPrDataBatch: (entries: Record<string, PrData | null>) => void;
   setWorktreeSourceInfo: (worktreePath: string, info: WorktreeSourceInfo) => void;
   setWorktreeSourceInfoBatch: (entries: Record<string, WorktreeSourceInfo>) => void;
+  setPrFiles: (key: string, files: PrFile[]) => void;
+  setPrDiff: (key: string, diff: string) => void;
+  clearPrCache: (key: string) => void;
   /** Optimistically move a single file from unstaged to staged. */
   optimisticStageFile: (key: string, filePath: string, isWorktree: boolean) => void;
   /** Optimistically move a single file from staged to unstaged. */
@@ -171,18 +179,88 @@ function arePrDataEqual(a: PrData | null | undefined, b: PrData | null) {
     a.isDraft === b.isDraft &&
     a.reviewDecision === b.reviewDecision &&
     a.checksStatus === b.checksStatus &&
+    a.mergeable === b.mergeable &&
+    a.mergeStateStatus === b.mergeStateStatus &&
+    a.viewerDidAuthor === b.viewerDidAuthor &&
     a.updatedAt === b.updatedAt
   );
 }
 
+/**
+ * Persist a snapshot of git state to localStorage so the next app launch can
+ * paint the previous session's +/- chips, branch, and PR section instantly,
+ * while the background refresh runs to update them. Only fields that are cheap
+ * to serialize and useful at first paint are persisted — the in-flight `prFiles`
+ * / `prDiffs` caches are kept session-local since they're tied to overlay state.
+ */
+const PERSIST_KEY = "lightcode-git-cache-v1";
+const PERSIST_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+interface PersistedSnapshot {
+  v: 1;
+  ts: number;
+  statuses: Record<string, GitStatusResult>;
+  worktreeStatuses: Record<string, GitStatusResult>;
+  worktrees: Record<string, GitWorktreeInfo[]>;
+  branches: Record<string, GitBranchListResult>;
+  ghAvailable: Record<string, boolean>;
+  prData: Record<string, PrData | null>;
+  worktreeSourceInfo: Record<string, WorktreeSourceInfo>;
+}
+
+function loadPersistedSnapshot(): Partial<PersistedSnapshot> {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as PersistedSnapshot;
+    if (parsed.v !== 1) return {};
+    if (Date.now() - parsed.ts > PERSIST_TTL_MS) return {};
+    return parsed;
+  } catch {
+    return {};
+  }
+}
+
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+function schedulePersist(state: GitState) {
+  if (typeof localStorage === "undefined") return;
+  if (persistTimer) clearTimeout(persistTimer);
+  // Debounce — refreshes write to several fields rapidly. One round-trip after
+  // 200ms of quiet covers the whole batch.
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    try {
+      const snapshot: PersistedSnapshot = {
+        v: 1,
+        ts: Date.now(),
+        statuses: state.statuses,
+        worktreeStatuses: state.worktreeStatuses,
+        worktrees: state.worktrees,
+        branches: state.branches,
+        ghAvailable: state.ghAvailable,
+        prData: state.prData,
+        worktreeSourceInfo: state.worktreeSourceInfo,
+      };
+      localStorage.setItem(PERSIST_KEY, JSON.stringify(snapshot));
+    } catch {
+      // localStorage may be full or unavailable — silently skip.
+    }
+  }, 200);
+}
+
+const initialPersisted = loadPersistedSnapshot();
+
 export const useGitStore = create<GitState & GitActions>()((set, get) => ({
-  statuses: {},
-  worktreeStatuses: {},
-  worktrees: {},
-  branches: {},
-  ghAvailable: {},
-  prData: {},
-  worktreeSourceInfo: {},
+  statuses: initialPersisted.statuses ?? {},
+  worktreeStatuses: initialPersisted.worktreeStatuses ?? {},
+  worktrees: initialPersisted.worktrees ?? {},
+  branches: initialPersisted.branches ?? {},
+  ghAvailable: initialPersisted.ghAvailable ?? {},
+  prData: initialPersisted.prData ?? {},
+  worktreeSourceInfo: initialPersisted.worktreeSourceInfo ?? {},
+  prFiles: {},
+  prDiffs: {},
 
   setStatus: (projectId, status) => {
     if (areGitStatusesEqual(get().statuses[projectId], status)) return;
@@ -432,6 +510,17 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
       };
     }),
 
+  setPrFiles: (key, files) => set((state) => ({ prFiles: { ...state.prFiles, [key]: files } })),
+
+  setPrDiff: (key, diff) => set((state) => ({ prDiffs: { ...state.prDiffs, [key]: diff } })),
+
+  clearPrCache: (key) =>
+    set((state) => {
+      const { [key]: _f, ...restFiles } = state.prFiles;
+      const { [key]: _d, ...restDiffs } = state.prDiffs;
+      return { prFiles: restFiles, prDiffs: restDiffs };
+    }),
+
   optimisticUnstageAll: (key, isWorktree) =>
     set((state) => {
       const bucket = isWorktree ? "worktreeStatuses" : "statuses";
@@ -450,3 +539,18 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
       };
     }),
 }));
+
+// Persist a snapshot whenever any of the cached fields change.
+useGitStore.subscribe((state, prev) => {
+  if (
+    state.statuses !== prev.statuses ||
+    state.worktreeStatuses !== prev.worktreeStatuses ||
+    state.worktrees !== prev.worktrees ||
+    state.branches !== prev.branches ||
+    state.ghAvailable !== prev.ghAvailable ||
+    state.prData !== prev.prData ||
+    state.worktreeSourceInfo !== prev.worktreeSourceInfo
+  ) {
+    schedulePersist(state);
+  }
+});
