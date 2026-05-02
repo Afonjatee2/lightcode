@@ -52,6 +52,8 @@ async function runGh(location: ProjectLocation, args: string[]): Promise<string>
   const { stdout } = await execFileAsync(spec.command, spec.args, {
     windowsHide: true,
     timeout: GH_TIMEOUT,
+    cwd: spec.cwd,
+    env: spec.env ? { ...process.env, ...spec.env } : process.env,
   });
   return stdout;
 }
