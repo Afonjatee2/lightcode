@@ -15,7 +15,7 @@ export function initDatabase(dbPath: string) {
   sqlite.pragma("foreign_keys = ON");
 
   _sqlite = sqlite;
-  _db = drizzle(sqlite, { schema });
+  _db = drizzle({ client: sqlite, schema });
 
   // Create tables if they don't exist.
   sqlite.exec(`

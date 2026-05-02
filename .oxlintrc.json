@@ -8,6 +8,7 @@
   "rules": {
     "import/no-unassigned-import": "off",
     "import/no-duplicates": "error",
+    "eslint/no-underscore-dangle": "off",
     "jsx-a11y/alt-text": "error",
     "react/jsx-key": "error",
     "react/react-in-jsx-scope": "off",

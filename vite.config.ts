@@ -34,44 +34,39 @@ export default defineConfig({
             dropDebugger: true,
           },
         },
-        manualChunks(id) {
-          if (!id.includes("node_modules")) {
-            return;
-          }
-
-          if (id.includes("@xterm")) {
-            return "xterm";
-          }
-
-          if (id.includes("@git-diff-view")) {
-            return "git-diff";
-          }
-
-          if (id.includes("monaco-editor") || id.includes("@monaco-editor")) {
-            return "monaco";
-          }
-
-          if (
-            id.includes("@heroui") ||
-            id.includes("react-aria") ||
-            id.includes("@react-stately") ||
-            id.includes("@react-types") ||
-            id.includes("tailwind-merge") ||
-            id.includes("tailwind-variants")
-          ) {
-            return "ui";
-          }
-
-          if (
-            id.includes("react") ||
-            id.includes("scheduler") ||
-            id.includes("zustand") ||
-            id.includes("zod")
-          ) {
-            return "framework";
-          }
-
-          return "vendor";
+        codeSplitting: {
+          groups: [
+            {
+              name: "xterm",
+              test: /[\\/]node_modules[\\/]@xterm[\\/]/,
+              priority: 50,
+            },
+            {
+              name: "git-diff",
+              test: /[\\/]node_modules[\\/]@git-diff-view[\\/]/,
+              priority: 45,
+            },
+            {
+              name: "monaco",
+              test: /[\\/]node_modules[\\/](@monaco-editor|monaco-editor)[\\/]/,
+              priority: 40,
+            },
+            {
+              name: "ui",
+              test: /[\\/]node_modules[\\/](@heroui|react-aria|@react-stately|@react-types|tailwind-merge|tailwind-variants)[\\/]/,
+              priority: 35,
+            },
+            {
+              name: "framework",
+              test: /[\\/]node_modules[\\/](react|react-dom|scheduler|zustand|zod)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: "vendor",
+              test: /[\\/]node_modules[\\/]/,
+              priority: 10,
+            },
+          ],
         },
       },
     },

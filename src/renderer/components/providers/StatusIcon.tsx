@@ -17,7 +17,7 @@ export function StatusIcon(props: {
   secondaryPath?: string | undefined;
 }) {
   const { tone, path, viewBox, fillRule, cssPrefix, className, title, secondaryPath } = props;
-  const baseId = useId().replaceAll(":", "");
+  const baseId = `status-icon-${useId().replace(/[^A-Za-z0-9_-]/g, "")}`;
   const clipId = `${baseId}-clip`;
   const gradientId = `${baseId}-gradient`;
 
