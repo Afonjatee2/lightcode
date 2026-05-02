@@ -30,7 +30,8 @@ import {
  *      bookkeeping, the manifest the supervisor reads at boot, and as the
  *      authoritative source for the file that gets dropped into OpenCode.
  *   2. Copy `plugin.mjs` to OpenCode's auto-scanned plugins directory as
- *      `lightcode-status.mjs`. OpenCode picks it up on next launch.
+ *      `lightcode-status.js` — OpenCode globs `{plugin,plugins}/*.{ts,js}`
+ *      and ignores other extensions. OpenCode picks it up on next launch.
  *
  * The plugin file itself reads `LIGHTCODE_HOOK_URL` / `LIGHTCODE_HOOK_SECRET`
  * / `LIGHTCODE_THREAD_ID` etc. from `process.env` at hook time. When those
@@ -41,13 +42,27 @@ import {
 /** The two assets we publish — manifest for version reads + the plugin code. */
 const OPENCODE_PLUGIN_ASSET_FILES = ["plugin.json", "plugin.mjs"] as const;
 
-/** Filename OpenCode auto-discovers in its plugins/ directory. */
-const OPENCODE_PLUGIN_FILE_NAME = "lightcode-status.mjs";
+/**
+ * Filename OpenCode auto-discovers in its plugins/ directory. Must use a `.js`
+ * (or `.ts`) extension — OpenCode's loader scans `{plugin,plugins}/*.{ts,js}`
+ * and silently ignores any other extension, so a `.mjs` drop is invisible to
+ * it. The file's content is still ESM (top-level `import`) and runs fine under
+ * Bun, which is OpenCode's runtime.
+ */
+const OPENCODE_PLUGIN_FILE_NAME = "lightcode-status.js";
 
 /**
- * Filename of the manifest dropped alongside the .mjs. The plugin code reads
- * `<basename>.plugin.json` from `import.meta.url`'s directory at load time so
- * `pluginVersion` in every emitted envelope reflects the staged version.
+ * Older Lightcode versions dropped a `.mjs` here, which OpenCode never loaded
+ * (see comment above). Cleaned up at install/uninstall time so a user
+ * upgrading doesn't end up with two stale siblings.
+ */
+const OPENCODE_PLUGIN_LEGACY_FILE_NAME = "lightcode-status.mjs";
+
+/**
+ * Filename of the manifest dropped alongside the plugin file. The plugin code
+ * reads `<basename>.plugin.json` from `import.meta.url`'s directory at load
+ * time so `pluginVersion` in every emitted envelope reflects the staged
+ * version.
  */
 const OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME = "lightcode-status.plugin.json";
 
@@ -160,6 +175,7 @@ export function installOpenCodePlugin(
     mkdirSync(opencodePluginsDir, { recursive: true });
     copyFileSync(join(pluginDir, "plugin.mjs"), opencodePluginFile);
     copyFileSync(join(pluginDir, "plugin.json"), opencodeManifestFile);
+    removeIfPresent(join(opencodePluginsDir, OPENCODE_PLUGIN_LEGACY_FILE_NAME));
   } catch (error) {
     return {
       ok: false,
@@ -200,6 +216,7 @@ function installOpenCodePluginWsl(
   const opencodePluginFile = `${opencodeDir.linuxDir}/${OPENCODE_PLUGIN_FILE_NAME}`;
   const opencodePluginUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_FILE_NAME}`;
   const opencodeManifestUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME}`;
+  const opencodeLegacyUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_LEGACY_FILE_NAME}`;
   const stagedPluginUnc = toWslUncPath(distro, `${linuxPluginDir}/plugin.mjs`);
   const stagedManifestUnc = toWslUncPath(distro, `${linuxPluginDir}/plugin.json`);
 
@@ -207,6 +224,7 @@ function installOpenCodePluginWsl(
     mkdirSync(opencodeDir.uncDir, { recursive: true });
     copyFileSync(stagedPluginUnc, opencodePluginUnc);
     copyFileSync(stagedManifestUnc, opencodeManifestUnc);
+    removeIfPresent(opencodeLegacyUnc);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return {
@@ -282,9 +300,10 @@ function verifyOpenCodeInstallAt(
   });
 }
 
-// Removes the dropped `lightcode-status.mjs` + `lightcode-status.plugin.json`
-// from OpenCode's plugins/ directory; staging dir stays so version diagnostics
-// survive. Best-effort: missing files / unreachable distros are swallowed.
+// Removes the dropped `lightcode-status.js` + `lightcode-status.plugin.json`
+// (and any legacy `lightcode-status.mjs`) from OpenCode's plugins/ directory;
+// staging dir stays so version diagnostics survive. Best-effort: missing
+// files / unreachable distros are swallowed.
 export function uninstallOpenCodePlugin(ctx?: AgentEnvContext): void {
   const targets: string[] = [];
   if (isWslPluginContext(ctx)) {
@@ -292,18 +311,24 @@ export function uninstallOpenCodePlugin(ctx?: AgentEnvContext): void {
     if (opencodeDir) {
       targets.push(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_FILE_NAME}`);
       targets.push(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME}`);
+      targets.push(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_LEGACY_FILE_NAME}`);
     }
   } else {
     const dir = resolveOpenCodeNativePluginsDir();
     targets.push(join(dir, OPENCODE_PLUGIN_FILE_NAME));
     targets.push(join(dir, OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME));
+    targets.push(join(dir, OPENCODE_PLUGIN_LEGACY_FILE_NAME));
   }
   for (const target of targets) {
-    try {
-      const stat = statSync(target);
-      if (stat.isFile()) unlinkSync(target);
-    } catch {
-      // file missing or unreachable
-    }
+    removeIfPresent(target);
+  }
+}
+
+function removeIfPresent(path: string): void {
+  try {
+    const stat = statSync(path);
+    if (stat.isFile()) unlinkSync(path);
+  } catch {
+    // file missing or unreachable
   }
 }

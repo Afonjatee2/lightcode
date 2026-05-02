@@ -8,7 +8,7 @@
  *
  * The CLI loads hooks from `${COPILOT_HOME ?? ~/.copilot}/hooks/*.json`, so
  * the user-global `lightcode-status.json` points its `bash` / `powershell`
- * field at this script (via the staged `lightcode-hook.{sh,cmd}` wrapper or
+ * field at this script (via the staged `lightcode-hook.{sh,cmd,ps1}` wrapper or
  * an absolute node path on WSL).
  *
  * Generic plumbing (manifest read, env-var POST, retry, debug) lives in the

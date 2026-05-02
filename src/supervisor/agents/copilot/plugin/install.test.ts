@@ -53,16 +53,16 @@ describe("renderCopilotHookConfig", () => {
   it("populates both bash and powershell when both supplied", () => {
     const config = renderCopilotHookConfig({
       bashCommand: "'/wrapper.sh'",
-      powershellCommand: "& 'C:\\wrapper.cmd'",
+      powershellCommand: "& 'C:\\wrapper.ps1'",
     });
     expect(config.hooks.sessionStart?.[0]?.bash).toBe("'/wrapper.sh' sessionStart");
-    expect(config.hooks.sessionStart?.[0]?.powershell).toBe("& 'C:\\wrapper.cmd' sessionStart");
+    expect(config.hooks.sessionStart?.[0]?.powershell).toBe("& 'C:\\wrapper.ps1' sessionStart");
   });
 
   it("omits unset fields", () => {
-    const config = renderCopilotHookConfig({ powershellCommand: "& 'C:\\wrapper.cmd'" });
+    const config = renderCopilotHookConfig({ powershellCommand: "& 'C:\\wrapper.ps1'" });
     expect(config.hooks.sessionStart?.[0]?.bash).toBeUndefined();
-    expect(config.hooks.sessionStart?.[0]?.powershell).toBe("& 'C:\\wrapper.cmd' sessionStart");
+    expect(config.hooks.sessionStart?.[0]?.powershell).toBe("& 'C:\\wrapper.ps1' sessionStart");
   });
 
   it("sets a fixed timeout per hook entry", () => {
@@ -95,6 +95,12 @@ describe("installCopilotPlugin (native, global hook write)", () => {
     };
     expect(written.version).toBe(1);
     expect(Object.keys(written.hooks).sort()).toEqual([...COPILOT_HOOK_EVENTS].sort());
+    const powershellCommand = written.hooks.sessionStart?.[0]?.powershell;
+    expect(
+      process.platform === "win32"
+        ? /lightcode-hook\.ps1' sessionStart$/.test(powershellCommand ?? "")
+        : powershellCommand,
+    ).toBe(process.platform === "win32" ? true : undefined);
   });
 
   it("is idempotent — re-install with identical inputs does not bump mtime", async () => {

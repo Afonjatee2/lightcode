@@ -7,7 +7,7 @@ import type { AgentEnvContext } from "../../base";
 import { resolveWslHomeDirectory } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
-  buildNativeHookCommandHead,
+  buildNativeHookCommandHeads,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -59,10 +59,10 @@ const CURSOR_HOOK_TIMEOUT_SECONDS = 5;
 /**
  * Match any Lightcode-staged Cursor hook command in hooks.json. Covers both
  * the WSL shape (`forward.mjs` invoked via absolute node path) and native
- * (`lightcode-hook.{sh,cmd}` wrapper).
+ * (`lightcode-hook.{sh,cmd,ps1}` wrapper).
  */
 const LIGHTCODE_FORWARD_RE =
-  /agent-plugins(?:[/\\]+)cursor(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd))/;
+  /agent-plugins(?:[/\\]+)cursor(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd|ps1))/;
 
 const callerDir =
   typeof __dirname !== "undefined"
@@ -228,7 +228,7 @@ export function installCursorPlugin(
     return { ok: false, reason: `malformed Cursor hooks.json at ${hooksPath} (invalid JSON)` };
   }
 
-  const commandHead = buildNativeHookCommandHead(wrapperPath);
+  const commandHead = buildNativeHookCommandHeads(wrapperPath).command;
 
   try {
     const merged = mergeCursorHooksDocument(existing, commandHead);

@@ -1,6 +1,14 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   getOpenCodePluginPaths,
@@ -40,7 +48,7 @@ describe("getOpenCodePluginPaths", () => {
     const paths = getOpenCodePluginPaths({ envKind: "posix", baseDir });
     expect(paths.pluginDir).toBe(join(baseDir, "agent-plugins", "opencode"));
     expect(paths.opencodePluginFile).toBe(
-      join(process.env.OPENCODE_CONFIG_DIR, "plugins", "lightcode-status.mjs"),
+      join(process.env.OPENCODE_CONFIG_DIR, "plugins", "lightcode-status.js"),
     );
   });
 
@@ -48,7 +56,7 @@ describe("getOpenCodePluginPaths", () => {
     const baseDir = makeBaseDir();
     delete process.env.OPENCODE_CONFIG_DIR;
     const paths = getOpenCodePluginPaths({ envKind: "posix", baseDir });
-    expect(paths.opencodePluginFile.endsWith(join("plugins", "lightcode-status.mjs"))).toBe(true);
+    expect(paths.opencodePluginFile.endsWith(join("plugins", "lightcode-status.js"))).toBe(true);
   });
 });
 
@@ -68,7 +76,7 @@ describe("installOpenCodePlugin", () => {
     expect(existsSync(join(result.paths.pluginDir, "plugin.mjs"))).toBe(true);
 
     // OpenCode-side drops
-    const droppedFile = join(opencodeDir, "plugins", "lightcode-status.mjs");
+    const droppedFile = join(opencodeDir, "plugins", "lightcode-status.js");
     const droppedManifest = join(opencodeDir, "plugins", "lightcode-status.plugin.json");
     expect(existsSync(droppedFile)).toBe(true);
     expect(existsSync(droppedManifest)).toBe(true);
@@ -86,7 +94,7 @@ describe("installOpenCodePlugin", () => {
 
     expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toMatchObject({
       installed: true,
-      version: "1.0.0",
+      version: "1.1.0",
     });
   });
 
@@ -147,6 +155,21 @@ describe("installOpenCodePlugin", () => {
     unlinkSync(join(opencodeDir, "plugins", "lightcode-status.plugin.json"));
 
     expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toEqual({ installed: false });
+  });
+
+  it("removes a legacy lightcode-status.mjs left behind by an older install", () => {
+    const baseDir = makeBaseDir();
+    const opencodeDir = makeBaseDir();
+    process.env.OPENCODE_CONFIG_DIR = opencodeDir;
+
+    const legacyPath = join(opencodeDir, "plugins", "lightcode-status.mjs");
+    mkdirSync(dirname(legacyPath), { recursive: true });
+    writeFileSync(legacyPath, "// stale legacy plugin\n");
+
+    const result = installOpenCodePlugin({ envKind: "posix", baseDir });
+    expect(result.ok).toBe(true);
+
+    expect(existsSync(legacyPath)).toBe(false);
   });
 });
 

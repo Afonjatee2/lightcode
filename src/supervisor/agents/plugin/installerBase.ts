@@ -14,7 +14,7 @@ import {
 import { dirname, join, resolve } from "node:path";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { toWslUncPath } from "@/shared/wsl";
-import { resolveWslHomeDirectory, type AgentEnvContext } from "../base";
+import { resolveExecutablePath, resolveWslHomeDirectory, type AgentEnvContext } from "../base";
 import { deployFilesToWslHome, type WslHomeDeployResult } from "../../wsl/wslDeploy";
 
 /**
@@ -144,19 +144,68 @@ export function quoteHookCommandArg(value: string, target: "native" | "wsl"): st
 }
 
 /**
- * Native hook command head for staged `lightcode-hook.{sh,cmd}` wrappers.
+ * Native hook command heads for staged hook wrappers.
  *
- * On Windows, native hook commands may be executed by Windows PowerShell,
- * PowerShell 7, or cmd.exe depending on the agent CLI and the user's launch
- * shell. Route through cmd.exe explicitly so the same command string works in
- * all three; the staged `.cmd` wrapper then prefers pwsh, then Windows
- * PowerShell, and only falls back to direct cmd execution when neither exists.
+ * On Windows, prefer invoking the staged PowerShell wrapper directly. Claude
+ * runs hook commands through its own Windows shell layer, and nesting another
+ * `cmd.exe /c call ...` can leave the JSON hook payload to be interpreted by
+ * an interactive cmd prompt instead of being delivered to the forwarder.
+ * Keep the `.cmd` wrapper as the final fallback for machines without either
+ * PowerShell 7 or Windows PowerShell.
  */
-export function buildNativeHookCommandHead(wrapperPath: string): string {
+export interface NativeHookCommandHeads {
+  /**
+   * Generic hook command field used by providers whose hook config exposes a
+   * single shell command string (Claude/Codex/Gemini/Cursor).
+   */
+  command: string;
+  /**
+   * Bash-specific hook command for providers with per-shell config fields
+   * (Copilot). Uses the staged cmd/sh wrapper path.
+   */
+  bashCommand: string;
+  /**
+   * PowerShell-specific hook command for providers with per-shell config
+   * fields. On Windows this targets the staged ps1 wrapper directly.
+   */
+  powershellCommand?: string;
+}
+
+export function buildNativeHookCommandHeads(
+  wrapperPath: string,
+  resolvePath: (command: string) => string | undefined = resolveExecutablePath,
+): NativeHookCommandHeads {
+  const bashCommand = quoteHookCommandArg(wrapperPath, "wsl");
   if (process.platform === "win32") {
-    return `cmd.exe /d /s /c call ${quoteHookCommandArg(wrapperPath, "native")}`;
+    const ps1Path = join(dirname(wrapperPath), getNativeHookPowerShellWrapperFilename());
+    const powershellCommand = `& ${quotePowerShellSingleQuoted(ps1Path)}`;
+    const shell =
+      (resolvePath("pwsh.exe") && "pwsh.exe") ||
+      (resolvePath("pwsh") && "pwsh") ||
+      (resolvePath("powershell.exe") && "powershell.exe") ||
+      (resolvePath("powershell") && "powershell");
+    if (shell) {
+      return {
+        command: `${shell} -NoProfile -ExecutionPolicy Bypass -File ${quoteHookCommandArg(ps1Path, "native")}`,
+        bashCommand,
+        powershellCommand,
+      };
+    }
+    return {
+      command: `cmd.exe /d /s /c call ${quoteHookCommandArg(wrapperPath, "native")}`,
+      bashCommand,
+      powershellCommand,
+    };
   }
-  return quoteHookCommandArg(wrapperPath, "native");
+  return { command: quoteHookCommandArg(wrapperPath, "native"), bashCommand };
+}
+
+/** Back-compat convenience for callers that only need the generic command field. */
+export function buildNativeHookCommandHead(
+  wrapperPath: string,
+  resolvePath: (command: string) => string | undefined = resolveExecutablePath,
+): string {
+  return buildNativeHookCommandHeads(wrapperPath, resolvePath).command;
 }
 
 export interface WslPluginBaseDirs {

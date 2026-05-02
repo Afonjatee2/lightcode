@@ -80,16 +80,18 @@ describe("installGeminiPlugin", () => {
     expect(existsSync(result.paths.settingsPath)).toBe(true);
     expect(isGeminiPluginInstalled({ envKind: "posix", baseDir })).toMatchObject({
       installed: true,
-      version: "1.2.1",
+      version: "1.2.2",
     });
 
     const settings = JSON.parse(readFileSync(result.paths.settingsPath, "utf8")) as {
       hooks: Record<string, Array<{ hooks: Array<{ command: string }> }>>;
     };
     const command = settings.hooks.Notification?.[0]?.hooks[0]?.command ?? "";
-    expect(command).toMatch(/agent-plugins[\\/]+gemini[\\/]+lightcode-hook\.(?:sh|cmd)/);
+    expect(command).toMatch(/agent-plugins[\\/]+gemini[\\/]+lightcode-hook\.(?:sh|cmd|ps1)/);
     expect(command).toMatch(
-      process.platform === "win32" ? /^cmd\.exe \/d \/s \/c call "/ : /^(?!cmd\.exe)/,
+      process.platform === "win32"
+        ? /^(?:pwsh(?:\.exe)?|powershell(?:\.exe)?|cmd\.exe \/d \/s \/c call ")/
+        : /^(?!cmd\.exe)/,
     );
   });
 });

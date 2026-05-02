@@ -5,7 +5,7 @@ import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
-  buildNativeHookCommandHead,
+  buildNativeHookCommandHeads,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -181,7 +181,8 @@ export function installClaudePlugin(
   });
 
   const settingsPath = join(pluginDir, "settings.json");
-  const settings = renderClaudeSettings(buildNativeHookCommandHead(wrapperPath));
+  const nativeCommands = buildNativeHookCommandHeads(wrapperPath);
+  const settings = renderClaudeSettings(nativeCommands.command);
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
   const hooksPath = join(pluginDir, "hooks", "hooks.json");
   mkdirSync(dirname(hooksPath), { recursive: true });

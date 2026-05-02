@@ -14,7 +14,7 @@ import type { AgentEnvContext } from "../../base";
 import { batchWslCommands, quotePosixShellArg } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
-  buildNativeHookCommandHead,
+  buildNativeHookCommandHeads,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
@@ -55,11 +55,11 @@ const CODEX_HOOK_EVENTS = [
 /**
  * Match any Lightcode-staged Codex hook command in hooks.json. Covers both
  * the WSL shape (where `forward.mjs` is invoked directly via an absolute
- * node path) and the native shape (where `lightcode-hook.{sh,cmd}` is the
+ * node path) and the native shape (where `lightcode-hook.{sh,cmd,ps1}` is the
  * entry point).
  */
 const LIGHTCODE_FORWARD_RE =
-  /agent-plugins(?:[/\\]+)codex(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd))/;
+  /agent-plugins(?:[/\\]+)codex(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd|ps1))/;
 
 const callerDir =
   typeof __dirname !== "undefined"
@@ -350,7 +350,7 @@ export function installCodexPlugin(
   // Native command shape: `<wrapper-command-head> <event>`. The wrapper sets
   // ELECTRON_RUN_AS_NODE=1 and execs the bundled Electron Node on
   // forward.mjs (which lives next to the wrapper).
-  const commandHead = buildNativeHookCommandHead(wrapperPath);
+  const commandHead = buildNativeHookCommandHeads(wrapperPath).command;
 
   try {
     const merged = mergeCodexHooksDocument(existing, commandHead);

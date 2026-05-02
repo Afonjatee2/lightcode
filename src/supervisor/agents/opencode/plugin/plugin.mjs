@@ -11,20 +11,23 @@
  */
 
 import { readFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as sleep } from "node:timers/promises";
 
 // Manifest is colocated with this file under two layouts:
 //   1. Deployed in OpenCode's plugins/ dir → sibling `<basename>.plugin.json`
 //      (we drop both files together so `import.meta.url` reaches them).
+//      OpenCode only auto-loads `.{ts,js}` extensions, so the deployed file is
+//      `lightcode-status.js`.
 //   2. Staged in our agent-plugins/ dir → sibling `plugin.json` (matches
-//      `installerBase`'s canonical filename, used by tests / dev paths).
+//      `installerBase`'s canonical filename, used by tests / dev paths). Here
+//      the file is `plugin.mjs`. `extname`-based stem stripping handles both.
 function readPluginVersionFromManifest() {
   try {
     const filePath = fileURLToPath(import.meta.url);
     const dir = dirname(filePath);
-    const stem = basename(filePath, ".mjs");
+    const stem = basename(filePath, extname(filePath));
     for (const candidate of [`${stem}.plugin.json`, "plugin.json"]) {
       try {
         const raw = readFileSync(join(dir, candidate), "utf8");

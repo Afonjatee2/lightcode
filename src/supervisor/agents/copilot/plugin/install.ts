@@ -3,14 +3,10 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toWslUncPath } from "@/shared/wsl";
-import {
-  quotePosixShellArg,
-  quotePowerShellLiteral,
-  resolveWslHomeDirectory,
-  type AgentEnvContext,
-} from "../../base";
+import { resolveWslHomeDirectory, type AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
+  buildNativeHookCommandHeads,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -212,13 +208,13 @@ export function installCopilotPlugin(
   const globalCopilotDir = options?.globalCopilotDirOverride ?? nativeGlobalCopilotDir();
   const hookFilePath = join(globalCopilotDir, GLOBAL_HOOK_DIR_NAME, GLOBAL_HOOK_FILENAME);
 
-  const bashCommand = quotePosixShellArg(wrapperPath);
-  const powershellCommand =
-    process.platform === "win32" ? `& ${quotePowerShellLiteral(wrapperPath)}` : undefined;
+  const nativeCommands = buildNativeHookCommandHeads(wrapperPath);
 
   const writeResult = writeCopilotHookFileIfChanged(hookFilePath, {
-    bashCommand,
-    ...(powershellCommand ? { powershellCommand } : {}),
+    bashCommand: nativeCommands.bashCommand,
+    ...(nativeCommands.powershellCommand
+      ? { powershellCommand: nativeCommands.powershellCommand }
+      : {}),
   });
   if (!writeResult.ok) return writeResult;
 

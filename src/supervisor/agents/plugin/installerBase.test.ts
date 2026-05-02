@@ -16,6 +16,7 @@ import {
   createPluginSourceResolver,
   ctxCacheKey,
   buildNativeHookCommandHead,
+  buildNativeHookCommandHeads,
   isPluginAssetsFresh,
   isWslPluginContext,
   memoByCtx,
@@ -297,8 +298,34 @@ describe("renderNativeHookPowerShellWrapper", () => {
 });
 
 describe("buildNativeHookCommandHead", () => {
-  it("routes native Windows hook wrappers through cmd.exe", () => {
-    const commandHead = buildNativeHookCommandHead("C:\\Users\\u\\fw.cmd");
+  const missingShell = () => undefined;
+
+  it("prefers PowerShell 7 for native Windows hook wrappers", () => {
+    const commandHead = buildNativeHookCommandHead("C:\\Users\\u\\lightcode-hook.cmd", (name) =>
+      name === "pwsh.exe" ? "C:\\Program Files\\PowerShell\\7\\pwsh.exe" : undefined,
+    );
+    const expected =
+      process.platform === "win32"
+        ? 'pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "C:\\Users\\u\\lightcode-hook.ps1"'
+        : "'C:\\Users\\u\\lightcode-hook.cmd'";
+    expect(commandHead).toBe(expected);
+  });
+
+  it("falls back to Windows PowerShell when PowerShell 7 is missing", () => {
+    const commandHead = buildNativeHookCommandHead("C:\\Users\\u\\lightcode-hook.cmd", (name) =>
+      name === "powershell.exe"
+        ? "C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe"
+        : undefined,
+    );
+    const expected =
+      process.platform === "win32"
+        ? 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "C:\\Users\\u\\lightcode-hook.ps1"'
+        : "'C:\\Users\\u\\lightcode-hook.cmd'";
+    expect(commandHead).toBe(expected);
+  });
+
+  it("uses cmd.exe only when PowerShell is unavailable", () => {
+    const commandHead = buildNativeHookCommandHead("C:\\Users\\u\\fw.cmd", missingShell);
     const expected =
       process.platform === "win32"
         ? 'cmd.exe /d /s /c call "C:\\Users\\u\\fw.cmd"'
@@ -307,12 +334,36 @@ describe("buildNativeHookCommandHead", () => {
   });
 
   it("escapes embedded quotes for the active native shell", () => {
-    const commandHead = buildNativeHookCommandHead('C:\\Users\\a"b\\fw.cmd');
+    const commandHead = buildNativeHookCommandHead('C:\\Users\\a"b\\lightcode-hook.cmd', (name) =>
+      name === "pwsh.exe" ? "C:\\Program Files\\PowerShell\\7\\pwsh.exe" : undefined,
+    );
     const expected =
       process.platform === "win32"
-        ? 'cmd.exe /d /s /c call "C:\\Users\\a\\"b\\fw.cmd"'
-        : "'C:\\Users\\a\"b\\fw.cmd'";
+        ? 'pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "C:\\Users\\a\\"b\\lightcode-hook.ps1"'
+        : "'C:\\Users\\a\"b\\lightcode-hook.cmd'";
     expect(commandHead).toBe(expected);
+  });
+});
+
+describe("buildNativeHookCommandHeads", () => {
+  it("centralizes generic, bash, and PowerShell native command shapes", () => {
+    const heads = buildNativeHookCommandHeads("C:\\Users\\u\\lightcode-hook.cmd", (name) =>
+      name === "pwsh.exe" ? "C:\\Program Files\\PowerShell\\7\\pwsh.exe" : undefined,
+    );
+
+    const expected =
+      process.platform === "win32"
+        ? {
+            command:
+              'pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "C:\\Users\\u\\lightcode-hook.ps1"',
+            bashCommand: "'C:\\Users\\u\\lightcode-hook.cmd'",
+            powershellCommand: "& 'C:\\Users\\u\\lightcode-hook.ps1'",
+          }
+        : {
+            command: "'C:\\Users\\u\\lightcode-hook.cmd'",
+            bashCommand: "'C:\\Users\\u\\lightcode-hook.cmd'",
+          };
+    expect(heads).toEqual(expected);
   });
 });
 

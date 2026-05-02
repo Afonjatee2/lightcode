@@ -5,7 +5,7 @@ import { toWslUncPath } from "@/shared/wsl";
 import type { AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
-  buildNativeHookCommandHead,
+  buildNativeHookCommandHeads,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -171,7 +171,8 @@ export function installGeminiPlugin(
   });
 
   const settingsPath = join(pluginDir, "settings.json");
-  const settings = renderGeminiSettings(buildNativeHookCommandHead(wrapperPath));
+  const nativeCommands = buildNativeHookCommandHeads(wrapperPath);
+  const settings = renderGeminiSettings(nativeCommands.command);
   writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 
   console.log(
@@ -265,10 +266,10 @@ function verifyGeminiInstallAt(
 
 /**
  * Match either the WSL command shape (`forward.mjs` invoked via absolute
- * node path) or the native shape (`lightcode-hook.{sh,cmd}` wrapper).
+ * node path) or the native shape (`lightcode-hook.{sh,cmd,ps1}` wrapper).
  */
 const LIGHTCODE_GEMINI_HOOK_RE =
-  /agent-plugins(?:[/\\]+)gemini(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd))/;
+  /agent-plugins(?:[/\\]+)gemini(?:[/\\]+)(?:forward\.mjs|lightcode-hook\.(?:sh|cmd|ps1))/;
 
 function hasGeminiHooks(hooks: Record<string, unknown> | undefined): boolean {
   if (!hooks) return false;

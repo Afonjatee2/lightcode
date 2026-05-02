@@ -96,7 +96,7 @@ describe("installCursorPlugin", () => {
     expect(existsSync(result.paths.globalHooksPath)).toBe(true);
 
     const installed = await isCursorPluginInstalledForTest(baseDir, globalCursorDirOverride);
-    expect(installed).toMatchObject({ installed: true, version: "1.0.2" });
+    expect(installed).toMatchObject({ installed: true, version: "1.0.3" });
 
     const doc = JSON.parse(readFileSync(result.paths.globalHooksPath, "utf8")) as {
       version: number;
@@ -104,10 +104,12 @@ describe("installCursorPlugin", () => {
     };
     expect(doc.version).toBe(1);
     expect(doc.hooks.sessionStart?.[0]?.command).toMatch(
-      /agent-plugins[\\/]+cursor[\\/]+lightcode-hook\.(?:sh|cmd)['"]? sessionStart$/,
+      /agent-plugins[\\/]+cursor[\\/]+lightcode-hook\.(?:sh|cmd|ps1)['"]? sessionStart$/,
     );
     expect(doc.hooks.sessionStart?.[0]?.command).toMatch(
-      process.platform === "win32" ? /^cmd\.exe \/d \/s \/c call "/ : /^(?!cmd\.exe)/,
+      process.platform === "win32"
+        ? /^(?:pwsh(?:\.exe)?|powershell(?:\.exe)?|cmd\.exe \/d \/s \/c call ")/
+        : /^(?!cmd\.exe)/,
     );
   });
 
@@ -142,7 +144,7 @@ describe("installCursorPlugin", () => {
     const sessionStart = doc.hooks.sessionStart!;
     expect(sessionStart).toHaveLength(2);
     expect(sessionStart[0]).toEqual({ type: "command", command: "/usr/local/bin/audit.sh" });
-    expect(sessionStart[1]?.command).toMatch(/lightcode-hook\.(?:sh|cmd)['"]? sessionStart$/);
+    expect(sessionStart[1]?.command).toMatch(/lightcode-hook\.(?:sh|cmd|ps1)['"]? sessionStart$/);
   });
 });
 
