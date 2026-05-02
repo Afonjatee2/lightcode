@@ -49,6 +49,11 @@ const scrollSpeedOptions = Array.from({ length: 10 }, (_, i) => ({
   label: `${i + 1}x`,
 })) as readonly { id: string; label: string }[];
 
+const fontSizeOptions = Array.from({ length: 13 }, (_, i) => ({
+  id: String(i + 8),
+  label: `${i + 8}px`,
+})) as readonly { id: string; label: string }[];
+
 export function GeneralSettings() {
   const themeMode = useSharedSettings((state) => state.themeMode);
   const setThemeMode = useSharedSettings((state) => state.setThemeMode);
@@ -66,6 +71,10 @@ export function GeneralSettings() {
   );
   const scrollSpeed = useSharedSettings((state) => state.scrollSpeed);
   const setScrollSpeed = useSharedSettings((state) => state.setScrollSpeed);
+  const agentTerminalFontSize = useSharedSettings((state) => state.agentTerminalFontSize);
+  const setAgentTerminalFontSize = useSharedSettings((state) => state.setAgentTerminalFontSize);
+  const terminalPanelFontSize = useSharedSettings((state) => state.terminalPanelFontSize);
+  const setTerminalPanelFontSize = useSharedSettings((state) => state.setTerminalPanelFontSize);
   const preventSleepWhileWorking = useSharedSettings((state) => state.preventSleepWhileWorking);
   const setPreventSleepWhileWorking = useSharedSettings(
     (state) => state.setPreventSleepWhileWorking,
@@ -178,6 +187,46 @@ export function GeneralSettings() {
               onChange={(value) => {
                 startTransition(() => {
                   setStaleThreadUnloadMinutes(Number.parseInt(value, 10) || 0);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Agent terminal font size</p>
+              <p className="text-xs text-muted">
+                Base font size for agent terminals. Auto-shrinks in narrow or short panes.
+              </p>
+            </div>
+            <Select
+              aria-label="Agent terminal font size"
+              className="w-[160px] shrink-0"
+              options={fontSizeOptions}
+              value={String(agentTerminalFontSize)}
+              onChange={(value) => {
+                startTransition(() => {
+                  setAgentTerminalFontSize(Number.parseInt(value, 10) || 12);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Terminal panel font size</p>
+              <p className="text-xs text-muted">
+                Base font size for the terminal panel. Auto-shrinks in narrow or short panes.
+              </p>
+            </div>
+            <Select
+              aria-label="Terminal panel font size"
+              className="w-[160px] shrink-0"
+              options={fontSizeOptions}
+              value={String(terminalPanelFontSize)}
+              onChange={(value) => {
+                startTransition(() => {
+                  setTerminalPanelFontSize(Number.parseInt(value, 10) || 11);
                 });
               }}
             />

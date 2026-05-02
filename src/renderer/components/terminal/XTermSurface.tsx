@@ -71,6 +71,7 @@ export const XTermSurface = forwardRef<
     onTitleChange?: (title: string) => void;
     onTerminalResize?: (size: TerminalSize) => void;
     className?: string;
+    baseFontSize?: number;
   }
 >(function XTermSurface(props, ref) {
   const {
@@ -83,6 +84,7 @@ export const XTermSurface = forwardRef<
     onTitleChange,
     onTerminalResize,
     className,
+    baseFontSize = 12,
   } = props;
   const appearance = useResolvedAppearance();
   const mountRef = useRef<HTMLDivElement | null>(null);
@@ -102,6 +104,9 @@ export const XTermSurface = forwardRef<
   onTitleChangeRef.current = onTitleChange;
   const onTerminalResizeRef: RefObject<typeof onTerminalResize> = useRef(onTerminalResize);
   onTerminalResizeRef.current = onTerminalResize;
+  const baseFontSizeRef = useRef(baseFontSize);
+  baseFontSizeRef.current = baseFontSize;
+  const requestRefitRef = useRef<(() => void) | null>(null);
   const [hasSelection, setHasSelection] = useState(false);
   const [showScrollDown, setShowScrollDown] = useState(false);
   const [scrollbar, setScrollbar] = useState({
@@ -229,7 +234,7 @@ export const XTermSurface = forwardRef<
       // Keep xterm's internal scrollbar gutter effectively zero; Lightcode
       // renders the visible scrollbar outside the terminal content area.
       overviewRuler: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },
-      fontSize: 12,
+      fontSize: baseFontSizeRef.current,
       fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
       theme: getTerminalTheme(appearance),
       // OSC 8 hyperlinks (e.g. Next.js' "Local: http://localhost:3000" in WSL
@@ -282,9 +287,11 @@ export const XTermSurface = forwardRef<
       lastFitWidth = width;
       lastFitHeight = height;
 
-      // Shrink font in narrow panes (split panes, side panel, etc.) so more
-      // columns fit before the agent's TUI starts hard-wrapping.
-      const desiredFontSize = width < 360 ? 10 : width < 540 ? 11 : 12;
+      // Shrink font in narrow/short panes (split panes, side panel, etc.) so
+      // more columns fit before the agent's TUI starts hard-wrapping.
+      const base = baseFontSizeRef.current;
+      const desiredFontSize =
+        width < 360 || height < 240 ? base - 2 : width < 540 || height < 360 ? base - 1 : base;
       if (terminal.options.fontSize !== desiredFontSize) {
         terminal.options.fontSize = desiredFontSize;
       }
@@ -311,6 +318,12 @@ export const XTermSurface = forwardRef<
         if (!isActive) return;
         doFit();
       });
+    };
+
+    requestRefitRef.current = () => {
+      lastFitWidth = -1;
+      lastFitHeight = -1;
+      scheduleResize();
     };
 
     const search = new SearchAddon();
@@ -518,9 +531,14 @@ export const XTermSurface = forwardRef<
       terminalRef.current = null;
       fitRef.current = null;
       searchRef.current = null;
+      requestRefitRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-once: terminal is created once, readOnly/terminalId/appearance are captured at init
   }, []);
+
+  useEffect(() => {
+    requestRefitRef.current?.();
+  }, [baseFontSize]);
 
   const contextMenuItems: ContextMenuItem[] = [
     { id: "copy", label: "Copy", isDisabled: !hasSelection },

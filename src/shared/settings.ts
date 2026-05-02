@@ -62,6 +62,10 @@ export const sharedSettingsSchema = z.object({
   staleThreadUnloadMinutes: z.number().int().min(0),
   /** Terminal scrollback scroll speed multiplier. */
   scrollSpeed: z.number().int().min(1).max(10),
+  /** Base font size for agent terminals. Auto-shrinks in narrow/short panes. */
+  agentTerminalFontSize: z.number().int().min(8).max(20),
+  /** Base font size for the dev terminal panel. Auto-shrinks in narrow/short panes. */
+  terminalPanelFontSize: z.number().int().min(8).max(20),
   /** Prevent OS sleep while any thread is actively working. */
   preventSleepWhileWorking: z.boolean(),
   /** Default action for the thread remove button: archive or delete permanently. */
@@ -137,6 +141,8 @@ export const defaultSharedSettings: SharedSettings = {
   collapseTerminalComposer: false,
   staleThreadUnloadMinutes: 20,
   scrollSpeed: 2,
+  agentTerminalFontSize: 12,
+  terminalPanelFontSize: 11,
   preventSleepWhileWorking: true,
   threadRemoveAction: "archive",
   newThreadMode: "page",

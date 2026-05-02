@@ -34,6 +34,8 @@ interface SharedSettingsState extends SharedSettings {
   setCollapseTerminalComposer: (value: boolean) => void;
   setStaleThreadUnloadMinutes: (value: number) => void;
   setScrollSpeed: (value: number) => void;
+  setAgentTerminalFontSize: (value: number) => void;
+  setTerminalPanelFontSize: (value: number) => void;
   setPreventSleepWhileWorking: (value: boolean) => void;
   setThreadRemoveAction: (value: ThreadRemoveAction) => void;
   setNewThreadMode: (value: NewThreadMode) => void;
@@ -186,6 +188,14 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ scrollSpeed });
     persistSettings(selectSharedSettings(get()));
   },
+  setAgentTerminalFontSize: (agentTerminalFontSize) => {
+    set({ agentTerminalFontSize });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setTerminalPanelFontSize: (terminalPanelFontSize) => {
+    set({ terminalPanelFontSize });
+    persistSettings(selectSharedSettings(get()));
+  },
   setPreventSleepWhileWorking: (preventSleepWhileWorking) => {
     set({ preventSleepWhileWorking });
     persistSettings(selectSharedSettings(get()));
@@ -291,6 +301,8 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     collapseTerminalComposer: state.collapseTerminalComposer,
     staleThreadUnloadMinutes: state.staleThreadUnloadMinutes,
     scrollSpeed: state.scrollSpeed,
+    agentTerminalFontSize: state.agentTerminalFontSize,
+    terminalPanelFontSize: state.terminalPanelFontSize,
     preventSleepWhileWorking: state.preventSleepWhileWorking,
     threadRemoveAction: state.threadRemoveAction,
     newThreadMode: state.newThreadMode,

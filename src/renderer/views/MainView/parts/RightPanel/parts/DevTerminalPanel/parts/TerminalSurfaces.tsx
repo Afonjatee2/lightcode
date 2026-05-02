@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { XTermSurface } from "@/renderer/components/terminal/XTermSurface";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const SPLIT_MIN_PERCENT = 15;
 const SPLIT_DEFAULT_PERCENT = 50;
@@ -33,6 +34,7 @@ export function TerminalSurfaces(props: {
   updateTabTitle: (tabId: string, title: string) => void;
 }) {
   const { tabs, selectedTabId, activeTab, markTabActive, updateTabTitle } = props;
+  const fontSize = useSharedSettings((state) => state.terminalPanelFontSize);
   const [splitPercent, setSplitPercent] = useState(readSplitPercent);
   const [resizing, setResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -106,6 +108,7 @@ export function TerminalSurfaces(props: {
             >
               <XTermSurface
                 terminalId={tab.id}
+                baseFontSize={fontSize}
                 onActivity={() => markTabActive(tab.id)}
                 onBell={() => markTabActive(tab.id)}
                 onTitleChange={(title) => updateTabTitle(tab.id, title)}
@@ -130,6 +133,7 @@ export function TerminalSurfaces(props: {
               >
                 <XTermSurface
                   terminalId={tab.splitId!}
+                  baseFontSize={fontSize}
                   onActivity={() => markTabActive(tab.id)}
                   onBell={() => markTabActive(tab.id)}
                   onTitleChange={(title) => updateTabTitle(tab.splitId!, title)}
@@ -151,6 +155,7 @@ export function TerminalSurfaces(props: {
         >
           <XTermSurface
             terminalId={tab.id}
+            baseFontSize={fontSize}
             onActivity={() => markTabActive(tab.id)}
             onBell={() => markTabActive(tab.id)}
             onTitleChange={(title) => updateTabTitle(tab.id, title)}

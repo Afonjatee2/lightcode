@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import type { TerminalSize, ThreadStatus } from "@/shared/contracts";
 import { XTermSurface, type XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 export interface TerminalPaneHandle {
   focus(): void;
@@ -17,6 +18,7 @@ export const TerminalPane = forwardRef<
   const { threadId, status, onTerminalResize } = props;
   const xtermRef = useRef<XTermSurfaceHandle>(null);
   const prevStatusRef = useRef(status);
+  const fontSize = useSharedSettings((state) => state.agentTerminalFontSize);
 
   useImperativeHandle(ref, () => ({
     focus() {
@@ -46,6 +48,7 @@ export const TerminalPane = forwardRef<
         ref={xtermRef}
         terminalId={threadId}
         enabled={isTerminalActive}
+        baseFontSize={fontSize}
         {...(onTerminalResize ? { onTerminalResize } : {})}
       />
     </div>
