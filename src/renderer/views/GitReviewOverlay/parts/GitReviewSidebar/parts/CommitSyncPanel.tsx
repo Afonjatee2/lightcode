@@ -10,6 +10,7 @@ export function CommitSyncPanel(props: {
   hasAnyChanges: boolean;
   hasStagedChanges: boolean;
   hasRemote: boolean;
+  hasTracking: boolean;
   needsPush: boolean;
   ahead: number;
   behind: number;
@@ -30,6 +31,7 @@ export function CommitSyncPanel(props: {
   handleCommit: (addAll: boolean, pushAfter?: boolean) => Promise<void>;
   handleGenerateMessage: () => Promise<void>;
   handleSyncOrPush: () => Promise<void>;
+  handleSyncAction: (key: "pull" | "pullRebase" | "push" | "sync" | "syncRebase") => Promise<void>;
   handlePullFromSource: () => Promise<void>;
   handleAbortMerge: () => Promise<void>;
   handleFinishMerge: () => Promise<void>;
@@ -40,6 +42,7 @@ export function CommitSyncPanel(props: {
     hasAnyChanges,
     hasStagedChanges,
     hasRemote,
+    hasTracking,
     needsPush,
     ahead,
     behind,
@@ -60,6 +63,7 @@ export function CommitSyncPanel(props: {
     handleCommit,
     handleGenerateMessage,
     handleSyncOrPush,
+    handleSyncAction,
     handlePullFromSource,
     handleAbortMerge,
     handleFinishMerge,
@@ -217,66 +221,138 @@ export function CommitSyncPanel(props: {
               </Dropdown.Popover>
             </Dropdown>
           </ButtonGroup>
+          {hasRemote && ahead > 0 ? (
+            <Button
+              variant="tertiary"
+              className="w-full"
+              isDisabled={isSyncing}
+              isPending={isSyncing}
+              onPress={() => void handleSyncAction("push")}
+            >
+              {({ isPending }) => (
+                <>
+                  {isPending ? <PixelLoader size="xs" /> : <ArrowUp className="size-3.5" />}
+                  Push ({ahead})
+                </>
+              )}
+            </Button>
+          ) : null}
         </>
       ) : hasRemote ? (
-        <ButtonGroup className="w-full">
-          <Button
-            variant="tertiary"
-            className="flex-1"
-            isDisabled={isSyncing}
-            isPending={isSyncing}
-            onPress={() => void handleSyncOrPush()}
-          >
-            {({ isPending }) => (
-              <>
-                {isPending ? (
-                  <PixelLoader size="xs" />
-                ) : needsPush ? (
-                  <ArrowUp className="size-3.5" />
-                ) : (
-                  <ArrowUpDown className="size-3.5" />
-                )}
-                {needsPush
-                  ? `Push${ahead > 0 ? ` (${ahead})` : ""}`
-                  : behind > 0 || ahead > 0
-                    ? `Sync${behind > 0 ? ` ↓${behind}` : ""}${ahead > 0 ? ` ↑${ahead}` : ""}`
-                    : "Sync"}
-              </>
-            )}
-          </Button>
-          {showPullFromSource && sourceBranch && sourceAhead > 0 && (
-            <Dropdown>
-              <Button
-                isIconOnly
-                variant="tertiary"
-                aria-label="More sync options"
-                isDisabled={isSyncing || isPullingFromSource}
-              >
-                <ButtonGroup.Separator />
-                <ChevronDown className="size-3.5" />
-              </Button>
-              <Dropdown.Popover placement="top end">
-                <Dropdown.Menu
-                  aria-label="Sync options"
-                  onAction={(key) => {
-                    if (key === "pull-from-source") void handlePullFromSource();
-                  }}
+        (() => {
+          const showPull = hasTracking && behind > 0;
+          const showPush = ahead > 0 || !hasTracking;
+          const showSyncBoth = hasTracking && ahead > 0 && behind > 0;
+          const showPullFromSourceItem = Boolean(
+            showPullFromSource && sourceBranch && sourceAhead > 0,
+          );
+          const hasSyncOptions = showPull || showPush || showSyncBoth || showPullFromSourceItem;
+
+          const primaryButton = (
+            <Button
+              variant="tertiary"
+              className="flex-1"
+              isDisabled={isSyncing}
+              isPending={isSyncing}
+              onPress={() => void handleSyncOrPush()}
+            >
+              {({ isPending }) => (
+                <>
+                  {isPending ? (
+                    <PixelLoader size="xs" />
+                  ) : needsPush ? (
+                    <ArrowUp className="size-3.5" />
+                  ) : (
+                    <ArrowUpDown className="size-3.5" />
+                  )}
+                  {needsPush
+                    ? `Push${ahead > 0 ? ` (${ahead})` : ""}`
+                    : behind > 0 || ahead > 0
+                      ? `Sync${behind > 0 ? ` ↓${behind}` : ""}${ahead > 0 ? ` ↑${ahead}` : ""}`
+                      : "Sync"}
+                </>
+              )}
+            </Button>
+          );
+
+          if (!hasSyncOptions) {
+            return <div className="flex w-full">{primaryButton}</div>;
+          }
+
+          return (
+            <ButtonGroup className="w-full">
+              {primaryButton}
+              <Dropdown>
+                <Button
+                  isIconOnly
+                  variant="tertiary"
+                  aria-label="More sync options"
+                  isDisabled={isSyncing || isPullingFromSource}
                 >
-                  <Dropdown.Item
-                    id="pull-from-source"
-                    textValue={`Pull from ${sourceBranch} (${sourceAhead})`}
-                    isDisabled={isPullingFromSource}
+                  <ButtonGroup.Separator />
+                  <ChevronDown className="size-3.5" />
+                </Button>
+                <Dropdown.Popover placement="top end">
+                  <Dropdown.Menu
+                    aria-label="Sync options"
+                    onAction={(key) => {
+                      if (key === "pull-from-source") {
+                        void handlePullFromSource();
+                        return;
+                      }
+                      void handleSyncAction(
+                        key as "pull" | "pullRebase" | "push" | "sync" | "syncRebase",
+                      );
+                    }}
                   >
-                    <ArrowDown className="size-3.5" />
-                    <Label>
-                      Pull from {sourceBranch} ({sourceAhead})
-                    </Label>
-                  </Dropdown.Item>
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
-          )}
-        </ButtonGroup>
+                    {showPull ? (
+                      <Dropdown.Item id="pull" textValue={`Pull (${behind})`}>
+                        <ArrowDown className="size-3.5" />
+                        <Label>Pull ({behind})</Label>
+                      </Dropdown.Item>
+                    ) : null}
+                    {showPull ? (
+                      <Dropdown.Item id="pullRebase" textValue={`Pull Rebase (${behind})`}>
+                        <ArrowDown className="size-3.5" />
+                        <Label>Pull Rebase ({behind})</Label>
+                      </Dropdown.Item>
+                    ) : null}
+                    {showPush ? (
+                      <Dropdown.Item id="push" textValue={`Push${ahead > 0 ? ` (${ahead})` : ""}`}>
+                        <ArrowUp className="size-3.5" />
+                        <Label>Push{ahead > 0 ? ` (${ahead})` : ""}</Label>
+                      </Dropdown.Item>
+                    ) : null}
+                    {showSyncBoth ? (
+                      <Dropdown.Item id="sync" textValue="Sync">
+                        <ArrowUpDown className="size-3.5" />
+                        <Label>Sync</Label>
+                      </Dropdown.Item>
+                    ) : null}
+                    {showSyncBoth ? (
+                      <Dropdown.Item id="syncRebase" textValue="Sync (Rebase)">
+                        <ArrowUpDown className="size-3.5" />
+                        <Label>Sync (Rebase)</Label>
+                      </Dropdown.Item>
+                    ) : null}
+                    {showPullFromSourceItem ? (
+                      <Dropdown.Item
+                        id="pull-from-source"
+                        textValue={`Pull from ${sourceBranch} (${sourceAhead})`}
+                        isDisabled={isPullingFromSource}
+                      >
+                        <ArrowDown className="size-3.5" />
+                        <Label>
+                          Pull from {sourceBranch} ({sourceAhead})
+                        </Label>
+                      </Dropdown.Item>
+                    ) : null}
+                  </Dropdown.Menu>
+                </Dropdown.Popover>
+              </Dropdown>
+            </ButtonGroup>
+          );
+        })()
       ) : null}
     </GitReviewSection>
   );

@@ -63,17 +63,6 @@ export function gitPullRebase(projectId: string, worktreePath: string): void {
     .catch(() => undefined);
 }
 
-export function gitFetch(projectId: string, worktreePath?: string): void {
-  const project = useAppStore.getState().projects.find((p) => p.id === projectId);
-  if (!project) return;
-  const location = worktreePath
-    ? buildWorktreeLocation(project.location, worktreePath)
-    : project.location;
-  void readBridge()
-    .gitFetch({ projectLocation: location, remote: "origin", prune: false })
-    .catch(() => undefined);
-}
-
 export function gitMergeToSource(projectId: string, worktreePath: string): void {
   const project = useAppStore.getState().projects.find((p) => p.id === projectId);
   if (!project) return;

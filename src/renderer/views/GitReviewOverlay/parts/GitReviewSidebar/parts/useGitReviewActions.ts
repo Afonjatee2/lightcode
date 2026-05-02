@@ -220,6 +220,42 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     }
   }
 
+  async function handleSyncAction(
+    key: "pull" | "pullRebase" | "push" | "sync" | "syncRebase",
+  ): Promise<void> {
+    setIsSyncing(true);
+    try {
+      switch (key) {
+        case "pull":
+          await readBridge().gitPull({ projectLocation: project.location });
+          break;
+        case "pullRebase":
+          await readBridge().gitPullRebase({ projectLocation: project.location });
+          break;
+        case "push":
+          await readBridge().gitPush({
+            projectLocation: project.location,
+            setUpstream: !hasTracking,
+          });
+          applyStatusOptimistic((s) => ({ ...s, ahead: 0 }));
+          setTimeout(() => onRefresh(), 1500);
+          return;
+        case "sync":
+          await readBridge().gitSync({ projectLocation: project.location });
+          break;
+        case "syncRebase":
+          await readBridge().gitSyncRebase({ projectLocation: project.location });
+          break;
+      }
+      onRefresh();
+    } catch (err) {
+      console.error("[git] sync action failed", err);
+      toast.danger(friendlyError(err));
+    } finally {
+      setIsSyncing(false);
+    }
+  }
+
   async function performMerge(): Promise<boolean> {
     if (!sourceBranch || !worktreeBranch || !worktreePath) return false;
     setIsMerging(true);
@@ -397,6 +433,7 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
     handleCommit,
     handleGenerateMessage,
     handleSyncOrPush,
+    handleSyncAction,
     handleMergeOnly,
     handleMergeAndRemove,
     handlePullFromSource,
