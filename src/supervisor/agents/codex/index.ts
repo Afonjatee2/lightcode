@@ -159,15 +159,6 @@ export function createCodexAdapter(): AgentAdapter {
     createInitialSessionRef() {
       return undefined;
     },
-    shouldDeferPromptToTerminal(config) {
-      return config.mode === "plan";
-    },
-    buildTerminalPreInputs(config) {
-      if (config.mode === "plan") {
-        return [["/plan", "@wait:160", "\r"]];
-      }
-      return undefined;
-    },
     buildDirectInput(prompt) {
       return [prompt, "@wait:160", "\r"];
     },

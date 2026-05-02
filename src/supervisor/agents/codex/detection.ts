@@ -7,7 +7,7 @@ export const codexDefaultCapabilities: AgentCapability = {
   models: [],
   efforts: [],
   modelEfforts: {},
-  modes: ["agent", "plan"],
+  modes: ["agent"],
   approvalPolicies: [],
   sandboxModes: [],
   supportsResume: true,
