@@ -581,6 +581,10 @@ export class SupervisorRuntime {
     return this.gitService.pull(payload.projectLocation, payload.remote ?? "origin");
   }
 
+  async gitPullRebase(payload: GitPullPayload): Promise<void> {
+    return this.gitService.pullRebase(payload.projectLocation, payload.remote ?? "origin");
+  }
+
   async gitPush(payload: GitPushPayload): Promise<void> {
     return this.gitService.push(
       payload.projectLocation,
@@ -591,6 +595,14 @@ export class SupervisorRuntime {
   }
 
   async gitSync(payload: GitSyncPayload): Promise<GitSyncResult> {
+    return this.runSync(payload, false);
+  }
+
+  async gitSyncRebase(payload: GitSyncPayload): Promise<GitSyncResult> {
+    return this.runSync(payload, true);
+  }
+
+  private async runSync(payload: GitSyncPayload, rebase: boolean): Promise<GitSyncResult> {
     const location = payload.projectLocation;
     const remote = payload.remote ?? "origin";
     await this.gitService.fetch(location, remote, false);
@@ -600,7 +612,11 @@ export class SupervisorRuntime {
     let pushed = false;
 
     if (status.behind > 0) {
-      await this.gitService.pull(location, remote);
+      if (rebase) {
+        await this.gitService.pullRebase(location, remote);
+      } else {
+        await this.gitService.pull(location, remote);
+      }
       pulled = true;
     }
 

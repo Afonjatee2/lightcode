@@ -245,6 +245,10 @@ export class GitService {
     return this.worktreeService.pull(location, remote);
   }
 
+  async pullRebase(location: ProjectLocation, remote: string): Promise<void> {
+    return this.worktreeService.pullRebase(location, remote);
+  }
+
   async push(
     location: ProjectLocation,
     remote: string,

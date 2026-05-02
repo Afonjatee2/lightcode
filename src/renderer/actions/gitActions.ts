@@ -18,6 +18,17 @@ export function gitSync(projectId: string, worktreePath?: string): void {
     .catch(() => undefined);
 }
 
+export function gitSyncRebase(projectId: string, worktreePath?: string): void {
+  const project = useAppStore.getState().projects.find((p) => p.id === projectId);
+  if (!project) return;
+  const location = worktreePath
+    ? buildWorktreeLocation(project.location, worktreePath)
+    : project.location;
+  void readBridge()
+    .gitSyncRebase({ projectLocation: location })
+    .catch(() => undefined);
+}
+
 export function gitPush(projectId: string, worktreePath: string): void {
   const project = useAppStore.getState().projects.find((p) => p.id === projectId);
   if (!project) return;
@@ -40,6 +51,26 @@ export function gitPull(projectId: string, worktreePath: string): void {
   const worktreeLocation = buildWorktreeLocation(project.location, worktreePath);
   void readBridge()
     .gitPull({ projectLocation: worktreeLocation, remote: "origin" })
+    .catch(() => undefined);
+}
+
+export function gitPullRebase(projectId: string, worktreePath: string): void {
+  const project = useAppStore.getState().projects.find((p) => p.id === projectId);
+  if (!project) return;
+  const worktreeLocation = buildWorktreeLocation(project.location, worktreePath);
+  void readBridge()
+    .gitPullRebase({ projectLocation: worktreeLocation, remote: "origin" })
+    .catch(() => undefined);
+}
+
+export function gitFetch(projectId: string, worktreePath?: string): void {
+  const project = useAppStore.getState().projects.find((p) => p.id === projectId);
+  if (!project) return;
+  const location = worktreePath
+    ? buildWorktreeLocation(project.location, worktreePath)
+    : project.location;
+  void readBridge()
+    .gitFetch({ projectLocation: location, remote: "origin", prune: false })
     .catch(() => undefined);
 }
 

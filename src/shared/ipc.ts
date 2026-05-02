@@ -524,6 +524,11 @@ export const groupedIpcProcedures = {
       "supervisor",
       gitPullPayloadSchema,
     ),
+    gitPullRebase: definePayloadProcedure<GitPullPayload, void, "supervisor">(
+      "gitPullRebase",
+      "supervisor",
+      gitPullPayloadSchema,
+    ),
     gitPush: definePayloadProcedure<GitPushPayload, void, "supervisor">(
       "gitPush",
       "supervisor",
@@ -531,6 +536,11 @@ export const groupedIpcProcedures = {
     ),
     gitSync: definePayloadProcedure<GitSyncPayload, GitSyncResult, "supervisor">(
       "gitSync",
+      "supervisor",
+      gitSyncPayloadSchema,
+    ),
+    gitSyncRebase: definePayloadProcedure<GitSyncPayload, GitSyncResult, "supervisor">(
+      "gitSyncRebase",
       "supervisor",
       gitSyncPayloadSchema,
     ),
@@ -842,8 +852,10 @@ export const ipcProcedureMap = {
   gitDeleteBranch: groupedIpcProcedures.git.gitDeleteBranch,
   gitSwitchBranch: groupedIpcProcedures.git.gitSwitchBranch,
   gitPull: groupedIpcProcedures.git.gitPull,
+  gitPullRebase: groupedIpcProcedures.git.gitPullRebase,
   gitPush: groupedIpcProcedures.git.gitPush,
   gitSync: groupedIpcProcedures.git.gitSync,
+  gitSyncRebase: groupedIpcProcedures.git.gitSyncRebase,
   gitGetWorktreeSourceBranch: groupedIpcProcedures.git.gitGetWorktreeSourceBranch,
   gitProjectSnapshot: groupedIpcProcedures.git.gitProjectSnapshot,
   gitWorktreeStatusBatch: groupedIpcProcedures.git.gitWorktreeStatusBatch,

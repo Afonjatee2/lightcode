@@ -114,7 +114,11 @@ export class GitWorktreeService {
   }
 
   async pull(location: ProjectLocation, remote: string): Promise<void> {
-    await execGit(location, ["pull", "--ff-only", remote], { timeout: GIT_NETWORK_TIMEOUT });
+    await execGit(location, ["pull", remote], { timeout: GIT_NETWORK_TIMEOUT });
+  }
+
+  async pullRebase(location: ProjectLocation, remote: string): Promise<void> {
+    await execGit(location, ["pull", "--rebase", remote], { timeout: GIT_NETWORK_TIMEOUT });
   }
 
   async push(
