@@ -142,7 +142,7 @@ export const defaultSharedSettings: SharedSettings = {
   staleThreadUnloadMinutes: 20,
   scrollSpeed: 2,
   agentTerminalFontSize: 12,
-  terminalPanelFontSize: 11,
+  terminalPanelFontSize: 12,
   preventSleepWhileWorking: true,
   threadRemoveAction: "archive",
   newThreadMode: "page",
