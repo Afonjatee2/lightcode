@@ -231,7 +231,12 @@ export class ThreadOutputPipeline {
       void sleep(500).then(() =>
         writeSubmittedPrompt(
           session.pty,
-          session.adapter.buildDirectInput?.(prompt, segments, session.config) ?? [prompt, "\r"],
+          session.adapter.buildDirectInput?.(
+            prompt,
+            segments,
+            session.config,
+            session.projectLocation,
+          ) ?? [prompt, "\r"],
           session.projectLocation,
         ),
       );

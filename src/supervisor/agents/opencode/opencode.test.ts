@@ -44,15 +44,28 @@ describe("buildOpenCodeArgs", () => {
 });
 
 describe("OpenCode prompt formatting", () => {
-  it("keeps attachment refs inline so Windows PTY newline rewriting does not split the turn", () => {
+  it("places attachments on their own line with \\n\\n separator", () => {
     const adapter = createOpenCodeAdapter();
     const prompt = adapter.formatPromptSegments?.([
       { kind: "text", content: "can you see this image?" },
       { kind: "attachment", path: "C:\\Users\\sdsle\\.lightcode\\attachments\\draft\\image.png" },
     ]);
 
-    expect(prompt).toBe("can you see this image? @~/.lightcode/attachments/draft/image.png ");
-    expect(prompt).not.toContain("\n");
+    expect(prompt).toBe("can you see this image?\n\n@~/.lightcode/attachments/draft/image.png ");
+  });
+
+  it("wraps multiline prompts in bracketed paste in buildDirectInput", () => {
+    const adapter = createOpenCodeAdapter();
+    const result = adapter.buildDirectInput?.("line one\nline two");
+
+    expect(result).toEqual(["\x1b[200~line one\nline two\x1b[201~", "@wait:60", "\r"]);
+  });
+
+  it("does not wrap single-line prompts in bracketed paste", () => {
+    const adapter = createOpenCodeAdapter();
+    const result = adapter.buildDirectInput?.("just one line");
+
+    expect(result).toEqual(["just one line", "@wait:60", "\r"]);
   });
 });
 

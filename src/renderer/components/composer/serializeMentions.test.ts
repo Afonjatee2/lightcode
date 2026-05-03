@@ -72,4 +72,18 @@ describe("serializeComposerContent", () => {
 
     expect(serializeComposerContent(container)).toBe("@README.md");
   });
+
+  it("excludes attachment segments from serialization", () => {
+    // Note: serializeComposerContent uses serializeToSegments which walks DOM nodes.
+    // The AttachmentBar logic is what puts attachments in the segments array.
+    // This test ensures that if someone adds an attachment segment to the
+    // result of serializeToSegments, it doesn't appear in the flat string.
+    return import("./serializeMentions").then((m) => {
+      const segments: any[] = [
+        { kind: "text", content: "hello" },
+        { kind: "attachment", path: "/tmp/foo.png" },
+      ];
+      expect(m.flattenSegments(segments)).toBe("hello");
+    });
+  });
 });

@@ -148,25 +148,20 @@ export function createOpenCodeAdapter(): AgentAdapter {
 
     // ── Input ────────────────────────────────────────────────────────────
     buildDirectInput(prompt) {
-      // OpenCode's TUI accepts pasted prompts cleanly; a small wait before
-      // Enter avoids the "paste-as-newline" trap Gemini hit and matches
-      // Claude's empirically-tested 60ms.
-      return [prompt, "@wait:60", "\r"];
+      const hasInnerNewline = prompt.includes("\n");
+      const payload = hasInnerNewline ? `\x1b[200~${prompt}\x1b[201~` : prompt;
+      return [payload, "@wait:60", "\r"];
     },
     formatPromptSegments(segments: PromptSegment[]) {
-      // Windows PTY writes rewrite embedded newlines to Enter keys. Keep
-      // OpenCode attachment mentions inline so the text and image land in
-      // the same user turn instead of being submitted separately.
       const attachments = segments.filter((segment) => segment.kind === "attachment");
       const rest = segments.filter((segment) => segment.kind !== "attachment");
+      const attachmentLines = attachments
+        .map((segment) => `@${shortenHomePath(segment.path)}`)
+        .join(" ");
       const restStr = rest
         .map((segment) => (segment.kind === "file" ? `@${segment.path}` : segment.content))
         .join("");
-      const attachmentRefs = attachments
-        .map((segment) => `@${shortenHomePath(segment.path)}`)
-        .join(" ");
-      if (!attachmentRefs) return restStr;
-      return restStr ? `${restStr.trimEnd()} ${attachmentRefs} ` : `${attachmentRefs} `;
+      return attachmentLines ? `${restStr}\n\n${attachmentLines} ` : restStr;
     },
 
     // OpenCode's TUI silently ignores `--prompt` when `--session <id>` is

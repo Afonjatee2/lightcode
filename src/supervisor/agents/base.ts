@@ -195,7 +195,12 @@ export interface AgentPromptFormatter {
    * first idle, then the prompt on the next idle.
    */
   buildTerminalPreInputs?(config: ThreadConfig): string[][] | undefined;
-  buildDirectInput?(prompt: string, segments?: PromptSegment[], config?: ThreadConfig): string[];
+  buildDirectInput?(
+    prompt: string,
+    segments?: PromptSegment[],
+    config?: ThreadConfig,
+    projectLocation?: ProjectLocation,
+  ): string[];
   /**
    * Format structured prompt segments into a prompt string for this agent.
    * Each adapter decides how to represent file references (e.g. Claude: `@path`,

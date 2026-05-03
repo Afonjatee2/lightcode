@@ -87,13 +87,18 @@ export function createCursorAdapter(): AgentAdapter {
     createInitialSessionRef() {
       return undefined;
     },
-    buildDirectInput(prompt) {
+    buildDirectInput(prompt, _segments, _config, projectLocation) {
       // Cursor's TUI debounces fast incoming bytes as a paste burst. With
       // less than ~120ms between the text and Enter, the agent submits but
       // the input repaint never fires and the prompt visually stays in the
       // input box. 150ms is the empirically-tested floor that lets the TUI
       // settle before the Enter keystroke.
-      return [prompt, "@wait:150", "\r"];
+      //
+      // On Windows, no inner-newline sequence keeps text in Cursor's
+      // composer (raw LF, CR, and bracketed paste all trigger submit).
+      // Flatten to single-line so the prompt lands as one submission.
+      const payload = projectLocation?.kind === "windows" ? prompt.replace(/\n/g, " ") : prompt;
+      return [payload, "@wait:150", "\r"];
     },
     formatPromptSegments(segments: PromptSegment[]) {
       const attachments = segments.filter((s) => s.kind === "attachment");

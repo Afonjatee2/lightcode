@@ -207,7 +207,7 @@ describe("writeSubmittedPrompt", () => {
     vi.useRealTimers();
   });
 
-  it("collapses inner newlines to CR on Windows", async () => {
+  it("passes chunks through unchanged on Windows (no global newline rewrite)", async () => {
     vi.useFakeTimers();
     const write = vi.fn<(data: string) => void>();
 
@@ -219,7 +219,7 @@ describe("writeSubmittedPrompt", () => {
     await vi.runAllTimersAsync();
     await pending;
 
-    expect(write).toHaveBeenNthCalledWith(1, "hi\r\r@C:/tmp/file ");
+    expect(write).toHaveBeenNthCalledWith(1, "hi\n\n@C:/tmp/file ");
     expect(write).toHaveBeenNthCalledWith(2, "\r");
     vi.useRealTimers();
   });

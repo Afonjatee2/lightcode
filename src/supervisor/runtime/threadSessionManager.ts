@@ -54,18 +54,15 @@ function hookDebugProjectLabel(loc: ProjectLocation): string {
 export async function writeSubmittedPrompt(
   pty: Pick<IPty, "write">,
   chunks: readonly string[],
-  projectLocation: ProjectLocation,
+  _projectLocation: ProjectLocation,
 ): Promise<void> {
-  // Windows ConPTY + Ink TUI need inner "\n" collapsed to "\r"; on posix/WSL
-  // bare "\r" means Enter, which submits the prompt mid-stream.
-  const rewriteNewlines = projectLocation.kind === "windows";
   for (const chunk of chunks) {
     const waitMatch = chunk.match(/^@wait:(\d+)$/);
     if (waitMatch) {
       await sleep(Number(waitMatch[1]));
       continue;
     }
-    pty.write(rewriteNewlines ? chunk.replace(/\r?\n/g, "\r") : chunk);
+    pty.write(chunk);
     await sleep(8);
   }
 }
@@ -307,10 +304,12 @@ export class ThreadSessionManager {
 
     await writeSubmittedPrompt(
       session.pty,
-      session.adapter.buildDirectInput?.(prompt, payload.segments, session.config) ?? [
+      session.adapter.buildDirectInput?.(
         prompt,
-        "\r",
-      ],
+        payload.segments,
+        session.config,
+        session.projectLocation,
+      ) ?? [prompt, "\r"],
       session.projectLocation,
     );
 

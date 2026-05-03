@@ -8,7 +8,7 @@ import { CLAUDE_DEFAULT_APPROVAL_POLICY } from "./detection";
  */
 export function applyClaudeContextSuffix(model: string, contextSize?: string): string {
   const base = model.replace(/\[[0-9]+[mk]\]$/i, "");
-  if (!contextSize) return base;
+  if (!contextSize || contextSize === "200k") return base;
   return `${base}[${contextSize}]`;
 }
 
