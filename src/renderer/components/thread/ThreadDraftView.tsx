@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Paperclip, TerminalSquare, X } from "lucide-react";
+import { Paperclip, TerminalSquare, X, Zap } from "lucide-react";
 import { Button, toast, Tooltip } from "@heroui/react";
 import { useShallow } from "zustand/shallow";
 import type {
@@ -11,7 +11,8 @@ import type {
   ThreadConfig,
 } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
-import { ProviderIcon, getComposerControls } from "@/renderer/components/providers";
+import { getComposerControls } from "@/renderer/components/providers";
+import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { useGitStore } from "@/renderer/state/gitStore";
 import {
   BranchSelector,
@@ -64,6 +65,25 @@ function resolveEffortValue(agent: AgentStatus, model: string, preferred?: strin
   }
 
   return efforts[0] ?? "";
+}
+
+function resolveContextSizeValue(
+  agent: AgentStatus,
+  model: string,
+  preferred?: string,
+): string | undefined {
+  const allowed = agent.capabilities.modelContextSizes?.[model];
+  if (!allowed?.length) return agent.capabilities.defaultContextSize;
+  if (preferred && allowed.includes(preferred)) return preferred;
+  // First entry in the per-model list is the model's default; this lets the
+  // adapter spec a different default per model (e.g. Sonnet→200k, Opus→1M)
+  // without needing a separate map.
+  return allowed[0];
+}
+
+function resolveFastValue(agent: AgentStatus, model: string, preferred?: boolean): boolean {
+  if (!agent.capabilities.fastModels?.includes(model)) return false;
+  return preferred === true;
 }
 
 function resolveModeValue(agent: AgentStatus, preferred?: string): string {
@@ -125,6 +145,29 @@ function resolveSandboxModeValue(agent: AgentStatus, preferred?: string): string
   return preferred && modes.some((m) => m.id === preferred)
     ? preferred
     : (findDefaultSandboxMode(agent) ?? modes[0]?.id ?? "");
+}
+
+function resolveProviderDraftConfig(
+  agent: AgentStatus,
+  preferred?: Partial<ProviderDraftConfig>,
+): ProviderDraftConfig {
+  const nextModel = resolveModelValue(agent, preferred?.model);
+  const nextEffort = resolveEffortValue(agent, nextModel, preferred?.effort);
+  const nextContext = resolveContextSizeValue(agent, nextModel, preferred?.contextSize);
+  const nextFast = resolveFastValue(agent, nextModel, preferred?.fast);
+  const nextMode = resolveModeValue(agent, preferred?.mode) as "agent" | "plan" | "autopilot";
+  const nextApproval = resolveApprovalPolicyValue(agent, preferred?.approvalPolicy);
+  const nextSandbox = resolveSandboxModeValue(agent, preferred?.sandboxMode);
+
+  return {
+    model: nextModel,
+    effort: nextEffort,
+    ...(nextContext ? { contextSize: nextContext } : {}),
+    ...(nextFast ? { fast: nextFast } : {}),
+    mode: nextMode,
+    approvalPolicy: nextApproval,
+    sandboxMode: nextSandbox,
+  };
 }
 
 function formatAgentList(names: string[]): string {
@@ -198,6 +241,8 @@ export function ThreadDraftView(props: {
     installedAgents.find((status) => status.kind === effectiveAgentKind) ?? installedAgents[0];
   const [model, setModel] = useState("");
   const [effort, setEffort] = useState("");
+  const [contextSize, setContextSize] = useState<string | undefined>(undefined);
+  const [fast, setFast] = useState(false);
   const [mode, setMode] = useState<"agent" | "plan" | "autopilot">("agent");
   const [approvalPolicy, setApprovalPolicy] = useState("");
   const [sandboxMode, setSandboxMode] = useState("");
@@ -311,12 +356,16 @@ export function ThreadDraftView(props: {
     const saved = providerConfigsRef.current?.[effectiveAgentKind];
     const preferredModel = saved?.model;
     const preferredEffort = saved?.effort;
+    const preferredContext = saved?.contextSize;
+    const preferredFast = saved?.fast;
     const preferredMode = saved?.mode;
     const preferredApproval = saved?.approvalPolicy;
     const preferredSandbox = saved?.sandboxMode;
 
     const nextModel = resolveModelValue(selectedAgent, preferredModel);
     const nextEffort = resolveEffortValue(selectedAgent, nextModel, preferredEffort);
+    const nextContext = resolveContextSizeValue(selectedAgent, nextModel, preferredContext);
+    const nextFast = resolveFastValue(selectedAgent, nextModel, preferredFast);
     const nextMode = resolveModeValue(selectedAgent, preferredMode) as
       | "agent"
       | "plan"
@@ -326,6 +375,8 @@ export function ThreadDraftView(props: {
 
     setModel(nextModel);
     setEffort(nextEffort);
+    setContextSize(nextContext);
+    setFast(nextFast);
     setMode(nextMode);
     setApprovalPolicy(nextApproval);
     setSandboxMode(nextSandbox);
@@ -335,6 +386,8 @@ export function ThreadDraftView(props: {
     const resolved: ProviderDraftConfig = {
       model: nextModel,
       effort: nextEffort,
+      ...(nextContext ? { contextSize: nextContext } : {}),
+      ...(nextFast ? { fast: nextFast } : {}),
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
@@ -347,6 +400,8 @@ export function ThreadDraftView(props: {
       agentKind: effectiveAgentKind,
       model: nextModel,
       effort: nextEffort,
+      ...(nextContext ? { contextSize: nextContext } : {}),
+      ...(nextFast ? { fast: nextFast } : {}),
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
@@ -367,14 +422,20 @@ export function ThreadDraftView(props: {
     }
 
     const nextEffort = resolveEffortValue(selectedAgent, model, effort);
-    if (nextEffort !== effort) {
-      setEffort(nextEffort);
+    const nextContext = resolveContextSizeValue(selectedAgent, model, contextSize);
+    const nextFast = resolveFastValue(selectedAgent, model, fast);
+    if (nextEffort !== effort || nextContext !== contextSize || nextFast !== fast) {
+      if (nextEffort !== effort) setEffort(nextEffort);
+      if (nextContext !== contextSize) setContextSize(nextContext);
+      if (nextFast !== fast) setFast(nextFast);
 
-      // Persist the corrected effort
+      // Persist the corrected values
       const corrected: ProviderDraftConfig = {
         ...providerConfigsRef.current?.[effectiveAgentKind],
         model,
         effort: nextEffort,
+        ...(nextContext ? { contextSize: nextContext } : {}),
+        ...(nextFast ? { fast: nextFast } : {}),
       };
       if (providerConfigsRef.current) {
         providerConfigsRef.current[effectiveAgentKind] = corrected;
@@ -384,6 +445,8 @@ export function ThreadDraftView(props: {
         agentKind: effectiveAgentKind,
         model,
         effort: nextEffort,
+        ...(nextContext ? { contextSize: nextContext } : {}),
+        ...(nextFast ? { fast: nextFast } : {}),
         mode,
         approvalPolicy,
         sandboxMode,
@@ -392,6 +455,8 @@ export function ThreadDraftView(props: {
     }
   }, [
     effort,
+    contextSize,
+    fast,
     model,
     selectedAgent,
     effectiveAgentKind,
@@ -416,6 +481,8 @@ export function ThreadDraftView(props: {
 
     const nextModel = resolveModelValue(selectedAgent, saved.model);
     const nextEffort = resolveEffortValue(selectedAgent, nextModel, saved.effort);
+    const nextContext = resolveContextSizeValue(selectedAgent, nextModel, saved.contextSize);
+    const nextFast = resolveFastValue(selectedAgent, nextModel, saved.fast);
     const nextMode = resolveModeValue(selectedAgent, saved.mode) as "agent" | "plan" | "autopilot";
     const nextApproval = resolveApprovalPolicyValue(selectedAgent, saved.approvalPolicy);
     const nextSandbox = resolveSandboxModeValue(selectedAgent, saved.sandboxMode);
@@ -423,6 +490,8 @@ export function ThreadDraftView(props: {
     if (
       nextModel === model &&
       nextEffort === effort &&
+      nextContext === contextSize &&
+      nextFast === fast &&
       nextMode === mode &&
       nextApproval === approvalPolicy &&
       nextSandbox === sandboxMode
@@ -432,6 +501,8 @@ export function ThreadDraftView(props: {
 
     setModel(nextModel);
     setEffort(nextEffort);
+    setContextSize(nextContext);
+    setFast(nextFast);
     setMode(nextMode);
     setApprovalPolicy(nextApproval);
     setSandboxMode(nextSandbox);
@@ -440,6 +511,8 @@ export function ThreadDraftView(props: {
     const resolved: ProviderDraftConfig = {
       model: nextModel,
       effort: nextEffort,
+      ...(nextContext ? { contextSize: nextContext } : {}),
+      ...(nextFast ? { fast: nextFast } : {}),
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
@@ -448,6 +521,8 @@ export function ThreadDraftView(props: {
     if (
       saved.model !== nextModel ||
       saved.effort !== nextEffort ||
+      saved.contextSize !== nextContext ||
+      saved.fast !== nextFast ||
       saved.mode !== nextMode ||
       saved.approvalPolicy !== nextApproval ||
       saved.sandboxMode !== nextSandbox
@@ -460,6 +535,8 @@ export function ThreadDraftView(props: {
       agentKind: effectiveAgentKind,
       model: nextModel,
       effort: nextEffort,
+      ...(nextContext ? { contextSize: nextContext } : {}),
+      ...(nextFast ? { fast: nextFast } : {}),
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
@@ -471,6 +548,8 @@ export function ThreadDraftView(props: {
     effectiveAgentKind,
     model,
     effort,
+    contextSize,
+    fast,
     mode,
     approvalPolicy,
     sandboxMode,
@@ -483,6 +562,7 @@ export function ThreadDraftView(props: {
   const hiddenModelIds = useSharedSettings((s) =>
     selectedAgent ? s.hiddenModels[selectedAgent.kind] : undefined,
   );
+  const allHiddenModels = useSharedSettings((s) => s.hiddenModels);
 
   if (!selectedAgent) {
     if (props.isDetectingAgents) {
@@ -505,38 +585,39 @@ export function ThreadDraftView(props: {
 
   const factory = getComposerControls(selectedAgent.kind);
   const onConfigPatch = (patch: Partial<ThreadConfig>) => {
-    const nextModel = patch.model ?? model;
-    const nextEffort = patch.effort ?? effort;
-    const nextMode = (patch.mode ?? mode) as "agent" | "plan" | "autopilot";
-    const nextApproval = patch.approvalPolicy ?? approvalPolicy;
-    const nextSandbox = patch.sandboxMode ?? sandboxMode;
+    const resolved = resolveProviderDraftConfig(selectedAgent, {
+      model: patch.model ?? model,
+      effort: patch.effort ?? effort,
+      ...(patch.contextSize !== undefined ? { contextSize: patch.contextSize } : { contextSize }),
+      ...(patch.fast !== undefined ? { fast: patch.fast } : { fast }),
+      mode: patch.mode ?? mode,
+      approvalPolicy: patch.approvalPolicy ?? approvalPolicy,
+      sandboxMode: patch.sandboxMode ?? sandboxMode,
+    });
 
-    if (patch.model !== undefined) setModel(patch.model);
-    if (patch.effort !== undefined) setEffort(patch.effort);
-    if (patch.mode !== undefined) setMode(nextMode);
-    if (patch.approvalPolicy !== undefined) setApprovalPolicy(patch.approvalPolicy);
-    if (patch.sandboxMode !== undefined) setSandboxMode(patch.sandboxMode);
+    setModel(resolved.model);
+    setEffort(resolved.effort ?? "");
+    setContextSize(resolved.contextSize);
+    setFast(resolved.fast ?? false);
+    setMode((resolved.mode ?? "agent") as "agent" | "plan" | "autopilot");
+    setApprovalPolicy(resolved.approvalPolicy ?? "");
+    setSandboxMode(resolved.sandboxMode ?? "");
 
     // Eagerly persist per-provider config (app-wide) + project draft
     if (effectiveAgentKind) {
-      const updated: ProviderDraftConfig = {
-        model: nextModel,
-        effort: nextEffort,
-        mode: nextMode,
-        approvalPolicy: nextApproval,
-        sandboxMode: nextSandbox,
-      };
       if (providerConfigsRef.current) {
-        providerConfigsRef.current[effectiveAgentKind] = updated;
+        providerConfigsRef.current[effectiveAgentKind] = resolved;
       }
-      setProviderConfig(effectiveAgentKind, updated);
+      setProviderConfig(effectiveAgentKind, resolved);
       updateProjectDraftConfig(project.id, {
         agentKind: effectiveAgentKind,
-        model: nextModel,
-        effort: nextEffort,
-        mode: nextMode,
-        approvalPolicy: nextApproval,
-        sandboxMode: nextSandbox,
+        model: resolved.model,
+        effort: resolved.effort,
+        ...(resolved.contextSize ? { contextSize: resolved.contextSize } : {}),
+        ...(resolved.fast ? { fast: resolved.fast } : {}),
+        mode: resolved.mode,
+        approvalPolicy: resolved.approvalPolicy,
+        sandboxMode: resolved.sandboxMode,
         worktreeMode,
       });
     }
@@ -633,51 +714,139 @@ export function ThreadDraftView(props: {
           <ThreadComposer
             autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
             compact={props.compact ?? false}
-            controls={[
-              {
-                icon: (
-                  <ProviderIcon
-                    kind={selectedAgent.kind}
-                    tone="active"
-                    className="size-4 shrink-0"
-                  />
-                ),
-                options: installedAgents.map((agent) => ({
-                  id: agent.kind,
-                  label: agent.label,
-                  icon: (
-                    <ProviderIcon kind={agent.kind} tone="active" className="size-4 shrink-0" />
-                  ),
-                })),
-                value: selectedAgent.kind,
-                iconOnly: true,
-                onChange: (value) => {
-                  // Snapshot current provider settings before switching
-                  if (effectiveAgentKind) {
-                    const snapshot: ProviderDraftConfig = {
+            controls={(() => {
+              const filteredCaps = filterHiddenModels(selectedAgent.capabilities, hiddenModelIds);
+              const providers = installedAgents.map((agent) => ({
+                kind: agent.kind,
+                label: agent.label,
+                capabilities: filterHiddenModels(agent.capabilities, allHiddenModels[agent.kind]),
+              }));
+              const currentEfforts = (
+                filteredCaps.modelEfforts?.[model] ??
+                filteredCaps.efforts ??
+                []
+              ).map((id) => ({
+                id,
+                label: id.charAt(0).toUpperCase() + id.slice(1),
+              }));
+              const currentContextIds = filteredCaps.modelContextSizes?.[model];
+              const currentContextSizes = currentContextIds
+                ? (filteredCaps.contextSizes?.filter((c) => currentContextIds.includes(c.id)) ?? [])
+                : [];
+              const supportsFast = filteredCaps.fastModels?.includes(model) ?? false;
+              const ctrls: import("./ThreadComposer").ComposerControl[] = [
+                {
+                  kind: "provider-model",
+                  providers,
+                  currentAgentKind: selectedAgent.kind,
+                  currentModel: model,
+                  hideLabelOnWrap: true,
+                  onChange: ({ agentKind: nextKind, model: nextModel }) => {
+                    if (nextKind !== selectedAgent.kind) {
+                      const targetAgent = installedAgents.find((agent) => agent.kind === nextKind);
+                      if (!targetAgent) return;
+
+                      // Snapshot current provider before switching, then attach the
+                      // newly chosen model to the target provider's saved draft so
+                      // resolveModelValue prefers it on the next effect run.
+                      if (effectiveAgentKind) {
+                        const snapshot: ProviderDraftConfig = {
+                          model,
+                          effort,
+                          ...(contextSize ? { contextSize } : {}),
+                          ...(fast ? { fast } : {}),
+                          mode,
+                          approvalPolicy,
+                          sandboxMode,
+                        };
+                        if (providerConfigsRef.current) {
+                          providerConfigsRef.current[effectiveAgentKind] = snapshot;
+                        }
+                        setProviderConfig(effectiveAgentKind, snapshot);
+                      }
+                      const targetSaved = providerConfigsRef.current[nextKind];
+                      const resolved = resolveProviderDraftConfig(targetAgent, {
+                        ...(targetSaved ?? {}),
+                        model: nextModel,
+                      });
+                      providerConfigsRef.current[nextKind] = resolved;
+                      setProviderConfig(nextKind, resolved);
+                      setModel(resolved.model);
+                      setEffort(resolved.effort ?? "");
+                      setContextSize(resolved.contextSize);
+                      setFast(resolved.fast ?? false);
+                      setMode((resolved.mode ?? "agent") as "agent" | "plan" | "autopilot");
+                      setApprovalPolicy(resolved.approvalPolicy ?? "");
+                      setSandboxMode(resolved.sandboxMode ?? "");
+                      lastAppliedAgentKindRef.current = nextKind as AgentStatus["kind"];
+                      setAgentKind(nextKind as AgentStatus["kind"]);
+                      updateProjectDraftConfig(project.id, {
+                        agentKind: nextKind as AgentStatus["kind"],
+                        model: resolved.model,
+                        effort: resolved.effort,
+                        ...(resolved.contextSize ? { contextSize: resolved.contextSize } : {}),
+                        ...(resolved.fast ? { fast: resolved.fast } : {}),
+                        mode: resolved.mode,
+                        approvalPolicy: resolved.approvalPolicy,
+                        sandboxMode: resolved.sandboxMode,
+                        worktreeMode,
+                      });
+                    } else {
+                      onConfigPatch({ model: nextModel });
+                    }
+                  },
+                },
+              ];
+              if (currentEfforts.length > 0 || currentContextSizes.length > 0) {
+                ctrls.push({
+                  kind: "effort-context",
+                  efforts: currentEfforts,
+                  ...(effort ? { effortValue: effort } : {}),
+                  onEffortChange: (value) => onConfigPatch({ effort: value }),
+                  contextSizes: currentContextSizes,
+                  ...(contextSize ? { contextValue: contextSize } : {}),
+                  onContextChange: (value) => onConfigPatch({ contextSize: value }),
+                  hideLabelOnWrap: true,
+                  icon:
+                    currentEfforts.length > 0 ? (
+                      <EffortIcon
+                        className="size-4 text-foreground"
+                        effort={effort}
+                        efforts={currentEfforts.map((e) => e.id)}
+                      />
+                    ) : undefined,
+                });
+              }
+              if (supportsFast) {
+                ctrls.push({
+                  kind: "toggle",
+                  label: "Fast",
+                  icon: <Zap className="size-3.5" />,
+                  hideLabelOnWrap: true,
+                  isSelected: fast,
+                  onChange: (selected) => onConfigPatch({ fast: selected }),
+                });
+              }
+              if (factory) {
+                ctrls.push(
+                  ...factory({
+                    capabilities: filteredCaps,
+                    config: {
                       model,
                       effort,
+                      ...(contextSize ? { contextSize } : {}),
+                      ...(fast ? { fast } : {}),
                       mode,
                       approvalPolicy,
                       sandboxMode,
-                    };
-                    if (providerConfigsRef.current) {
-                      providerConfigsRef.current[effectiveAgentKind] = snapshot;
-                    }
-                    setProviderConfig(effectiveAgentKind, snapshot);
-                  }
-                  setAgentKind(value as AgentStatus["kind"]);
-                },
-              },
-              ...(factory
-                ? factory({
-                    capabilities: filterHiddenModels(selectedAgent.capabilities, hiddenModelIds),
-                    config: { model, effort, mode, approvalPolicy, sandboxMode },
+                    },
                     isDisabled: false,
                     onConfigChange: onConfigPatch,
-                  })
-                : []),
-            ]}
+                  }),
+                );
+              }
+              return ctrls;
+            })()}
             attachmentBar={
               <AttachmentBar
                 attachments={attachments.attachments}
@@ -713,6 +882,8 @@ export function ThreadDraftView(props: {
                     config: {
                       model,
                       ...(effort ? { effort } : {}),
+                      ...(contextSize ? { contextSize } : {}),
+                      ...(fast ? { fast } : {}),
                       ...(mode ? { mode } : {}),
                       ...(approvalPolicy ? { approvalPolicy } : {}),
                       ...(sandboxMode ? { sandboxMode } : {}),
@@ -757,6 +928,8 @@ export function ThreadDraftView(props: {
                 config: {
                   model,
                   ...(effort ? { effort } : {}),
+                  ...(contextSize ? { contextSize } : {}),
+                  ...(fast ? { fast } : {}),
                   ...(mode ? { mode } : {}),
                   ...(approvalPolicy ? { approvalPolicy } : {}),
                   ...(sandboxMode ? { sandboxMode } : {}),

@@ -8,15 +8,15 @@ const claudeStatus = {
   kind: "claude",
   capabilities: {
     models: [
-      { id: "claude-opus-4-7[1m]", label: "Opus 4.7" },
-      { id: "claude-opus-4-6[1m]", label: "Opus 4.6" },
+      { id: "claude-opus-4-7", label: "Opus 4.7" },
+      { id: "claude-opus-4-6", label: "Opus 4.6" },
       { id: "sonnet", label: "Sonnet" },
       { id: "haiku", label: "Haiku" },
     ],
     efforts: ["low", "medium", "high", "xHigh", "max"],
     defaultEffort: "high" as string | undefined,
     modelEfforts: {
-      "claude-opus-4-6[1m]": ["low", "medium", "high", "max"],
+      "claude-opus-4-6": ["low", "medium", "high", "max"],
       haiku: [] as string[],
       sonnet: ["low", "medium", "high"],
     } as Record<string, string[]>,
@@ -40,7 +40,7 @@ const codexStatus = {
 describe("resolveConflictResolverConfig", () => {
   it("falls back to registered defaults (Claude → Opus)", () => {
     const result = resolveConflictResolverConfig(claudeStatus, "", "");
-    expect(result.model).toBe("claude-opus-4-7[1m]");
+    expect(result.model).toBe("claude-opus-4-7");
   });
 
   it("falls back to registered defaults (Codex → GPT-5.5)", () => {
@@ -55,7 +55,7 @@ describe("resolveConflictResolverConfig", () => {
 
   it("falls back to default when user-selected model is not in capabilities", () => {
     const result = resolveConflictResolverConfig(claudeStatus, "nonexistent", "");
-    expect(result.model).toBe("claude-opus-4-7[1m]");
+    expect(result.model).toBe("claude-opus-4-7");
   });
 
   it("returns empty for undefined agent", () => {

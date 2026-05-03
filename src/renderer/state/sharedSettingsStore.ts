@@ -54,7 +54,11 @@ interface SharedSettingsState extends SharedSettings {
     needsAttention?: boolean;
     error?: boolean;
   }) => void;
+  toggleFavoriteModel: (agentKind: string, modelId: string) => void;
+  pushRecentModel: (agentKind: string, modelId: string) => void;
 }
+
+const RECENT_MODELS_LIMIT = 16;
 
 function hasBridge(): boolean {
   return typeof window !== "undefined" && window.lightcode !== undefined;
@@ -100,6 +104,8 @@ function providerDraftConfigEqual(
     a !== undefined &&
     a.model === b.model &&
     a.effort === b.effort &&
+    a.contextSize === b.contextSize &&
+    a.fast === b.fast &&
     a.mode === b.mode &&
     a.approvalPolicy === b.approvalPolicy &&
     a.sandboxMode === b.sandboxMode
@@ -271,6 +277,29 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ notificationStatuses: next });
     persistSettings(selectSharedSettings(get()));
   },
+  toggleFavoriteModel: (agentKind, modelId) => {
+    const current = get().favoriteModels;
+    const idx = current.findIndex((m) => m.agentKind === agentKind && m.modelId === modelId);
+    const next =
+      idx >= 0
+        ? [...current.slice(0, idx), ...current.slice(idx + 1)]
+        : [...current, { agentKind, modelId }];
+    set({ favoriteModels: next });
+    persistSettings(selectSharedSettings(get()));
+  },
+  pushRecentModel: (agentKind, modelId) => {
+    const current = get().recentModels;
+    const filtered = current.filter((m) => !(m.agentKind === agentKind && m.modelId === modelId));
+    const next = [{ agentKind, modelId }, ...filtered].slice(0, RECENT_MODELS_LIMIT);
+    if (
+      current.length === next.length &&
+      current.every((m, i) => m.agentKind === next[i]!.agentKind && m.modelId === next[i]!.modelId)
+    ) {
+      return;
+    }
+    set({ recentModels: next });
+    persistSettings(selectSharedSettings(get()));
+  },
 }));
 
 function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
@@ -317,6 +346,8 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     notificationSound: state.notificationSound,
     notificationFilter: state.notificationFilter,
     notificationStatuses: state.notificationStatuses,
+    favoriteModels: state.favoriteModels,
+    recentModels: state.recentModels,
   };
 }
 

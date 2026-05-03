@@ -98,6 +98,33 @@ const geminiStatus: AgentStatus = {
   },
 };
 
+const claudeStatus: AgentStatus = {
+  kind: "claude",
+  label: "Claude",
+  installed: true,
+  authState: "authenticated",
+  capabilities: {
+    models: [
+      { id: "claude-sonnet-4-7", label: "Sonnet 4.7" },
+      { id: "claude-opus-4-7", label: "Opus 4.7" },
+    ],
+    efforts: [],
+    modelEfforts: {},
+    modes: ["agent", "plan"],
+    approvalPolicies: [
+      { id: "default", label: "Default" },
+      { id: "auto", label: "Auto mode" },
+    ],
+    sandboxModes: [],
+    supportsResume: true,
+    supportsDirectInput: true,
+    liveInputMode: "terminal",
+    presentationMode: "terminal",
+    bypassApprovalPolicy: "auto",
+    settingDefs: [],
+  },
+};
+
 describe("ThreadDraftView", () => {
   beforeEach(() => {
     composerSpy.mockClear();
@@ -121,9 +148,17 @@ describe("ThreadDraftView", () => {
     );
 
     await waitFor(() => {
-      const props = composerSpy.mock.lastCall?.[0] as { controls: Array<{ value?: string }> };
-      expect(props.controls[0]?.value).toBe("gemini");
-      expect(props.controls[1]?.value).toBe("auto");
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          value?: string;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentAgentKind).toBe("gemini");
+      expect(providerModel?.currentModel).toBe("auto");
       expect(props.controls.some((control) => control.value === "never")).toBe(true);
     });
   });
@@ -148,11 +183,21 @@ describe("ThreadDraftView", () => {
 
     await waitFor(() => {
       const props = composerSpy.mock.lastCall?.[0] as {
-        controls: Array<{ value?: string; label?: string; isSelected?: boolean }>;
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          effortValue?: string;
+          value?: string;
+          label?: string;
+          isSelected?: boolean;
+        }>;
       };
-      expect(props.controls[0]?.value).toBe("codex");
-      expect(props.controls[1]?.value).toBe("gpt-5.4");
-      expect(props.controls[2]?.value).toBe("high");
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentAgentKind).toBe("codex");
+      expect(providerModel?.currentModel).toBe("gpt-5.4");
+      const effortContext = props.controls.find((c) => c.kind === "effort-context");
+      expect(effortContext?.effortValue).toBe("high");
       expect(
         props.controls.some(
           (control) => control.label === "Full Access" && control.isSelected === true,
@@ -182,8 +227,11 @@ describe("ThreadDraftView", () => {
     render(<ThreadDraftView project={project} agentStatuses={[codexStatus]} onStart={onStart} />);
 
     await waitFor(() => {
-      const props = composerSpy.mock.lastCall?.[0] as { controls: Array<{ value?: string }> };
-      expect(props.controls[2]?.value).toBe("high");
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{ kind?: string; effortValue?: string; currentModel?: string }>;
+      };
+      const effortContext = props.controls.find((c) => c.kind === "effort-context");
+      expect(effortContext?.effortValue).toBe("high");
     });
 
     act(() => {
@@ -201,9 +249,92 @@ describe("ThreadDraftView", () => {
     });
 
     await waitFor(() => {
-      const props = composerSpy.mock.lastCall?.[0] as { controls: Array<{ value?: string }> };
-      expect(props.controls[1]?.value).toBe("gpt-5.4");
-      expect(props.controls[2]?.value).toBe("medium");
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{ kind?: string; effortValue?: string; currentModel?: string }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      const effortContext = props.controls.find((c) => c.kind === "effort-context");
+      expect(providerModel?.currentModel).toBe("gpt-5.4");
+      expect(effortContext?.effortValue).toBe("medium");
     });
+  });
+
+  it("switches provider and selected model in one coherent composer state", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[codexStatus, claudeStatus]}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          onChange?: (next: { agentKind: string; model: string }) => void;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentAgentKind).toBe("codex");
+      expect(providerModel?.currentModel).toBe("gpt-5.4");
+    });
+
+    const initialProps = composerSpy.mock.lastCall?.[0] as {
+      controls: Array<{
+        kind?: string;
+        currentAgentKind?: string;
+        currentModel?: string;
+        onChange?: (next: { agentKind: string; model: string }) => void;
+      }>;
+    };
+    const providerModel = initialProps.controls.find((c) => c.kind === "provider-model");
+
+    composerSpy.mockClear();
+    act(() => {
+      providerModel?.onChange?.({ agentKind: "claude", model: "claude-opus-4-7" });
+    });
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          value?: string;
+        }>;
+      };
+      const nextProviderModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(nextProviderModel?.currentAgentKind).toBe("claude");
+      expect(nextProviderModel?.currentModel).toBe("claude-opus-4-7");
+      expect(props.controls.some((control) => control.value === "auto")).toBe(true);
+    });
+
+    const claudeRenderModels = (
+      composerSpy.mock.calls as Array<
+        [
+          {
+            controls: Array<{
+              kind?: string;
+              currentAgentKind?: string;
+              currentModel?: string;
+            }>;
+          },
+        ]
+      >
+    )
+      .map(([props]) => props.controls.find((c) => c.kind === "provider-model"))
+      .filter(
+        (control): control is { kind?: string; currentAgentKind?: string; currentModel?: string } =>
+          control?.currentAgentKind === "claude",
+      )
+      .map((control) => control.currentModel);
+
+    expect(claudeRenderModels.length).toBeGreaterThan(0);
+    expect(claudeRenderModels).toEqual(claudeRenderModels.map(() => "claude-opus-4-7"));
   });
 });

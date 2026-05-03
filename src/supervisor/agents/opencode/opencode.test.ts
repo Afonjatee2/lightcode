@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createOpenCodeAdapter } from ".";
 import { buildOpenCodeArgs } from "./argv";
+import { humanizeOpenCodeModelId, humanizeOpenCodeSubProviderId } from "./detection";
 import { opencodeIntentFor } from "./plugin/intentMap";
 import { detectOpenCodeTerminalStatus, opencodeOscHint, opencodeOscTitleHint } from "./terminal";
 
@@ -39,6 +40,40 @@ describe("buildOpenCodeArgs", () => {
 
   it("ignores whitespace-only prompts", () => {
     expect(buildOpenCodeArgs({ model: "" }, "   ")).toEqual([]);
+  });
+});
+
+describe("OpenCode prompt formatting", () => {
+  it("keeps attachment refs inline so Windows PTY newline rewriting does not split the turn", () => {
+    const adapter = createOpenCodeAdapter();
+    const prompt = adapter.formatPromptSegments?.([
+      { kind: "text", content: "can you see this image?" },
+      { kind: "attachment", path: "C:\\Users\\sdsle\\.lightcode\\attachments\\draft\\image.png" },
+    ]);
+
+    expect(prompt).toBe("can you see this image? @~/.lightcode/attachments/draft/image.png ");
+    expect(prompt).not.toContain("\n");
+  });
+});
+
+describe("humanizeOpenCodeModelId", () => {
+  it("strips the sub-provider prefix from provider/model IDs", () => {
+    expect(humanizeOpenCodeModelId("opencode/big-pickle")).toBe("Big Pickle");
+    expect(humanizeOpenCodeModelId("github-copilot/gpt-5.4-mini")).toBe("GPT 5.4 Mini");
+  });
+
+  it("normalizes common model title tokens", () => {
+    expect(humanizeOpenCodeModelId("anthropic/claude-haiku-4-5")).toBe("Claude Haiku 4.5");
+    expect(humanizeOpenCodeModelId("openrouter/gpt-oss-120b")).toBe("GPT OSS 120B");
+    expect(humanizeOpenCodeModelId("openai/o3-mini")).toBe("o3 Mini");
+  });
+});
+
+describe("humanizeOpenCodeSubProviderId", () => {
+  it("normalizes sub-provider labels", () => {
+    expect(humanizeOpenCodeSubProviderId("opencode")).toBe("OpenCode");
+    expect(humanizeOpenCodeSubProviderId("github-copilot")).toBe("GitHub Copilot");
+    expect(humanizeOpenCodeSubProviderId("openrouter")).toBe("OpenRouter");
   });
 });
 
@@ -139,6 +174,7 @@ describe("opencodeIntentFor", () => {
     expect(opencodeIntentFor("session.created")).toBe("session.started");
     expect(opencodeIntentFor("tool.execute.before")).toBe("session.turn_started");
     expect(opencodeIntentFor("permission.asked")).toBe("session.needs_approval");
+    expect(opencodeIntentFor("permission.updated")).toBe("session.needs_approval");
     expect(opencodeIntentFor("session.idle")).toBe("session.turn_finished");
     expect(opencodeIntentFor("session.error")).toBe("session.turn_errored");
   });

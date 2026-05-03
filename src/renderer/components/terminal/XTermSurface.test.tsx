@@ -178,7 +178,7 @@ describe("XTermSurface", () => {
 
   it("minimizes xterm's internal scrollbar gutter", () => {
     render(<XTermSurface terminalId="test-1" />);
-    expect(state.terminalOptions?.overviewRuler).toEqual({ width: 0.01 });
+    expect(state.terminalOptions?.scrollbar).toEqual({ width: 0.01 });
   });
 
   it("loads the WebGL addon on non-macOS platforms", () => {
@@ -262,6 +262,32 @@ describe("XTermSurface", () => {
 
     expect(terminal().reset).toHaveBeenCalled();
     expect(onReset).toHaveBeenCalled();
+  });
+
+  it("does not rehydrate stale scrollback after a thread-reset", async () => {
+    let resolveScrollback: (value: string) => void = () => {};
+    state.bridge.readTerminalScrollback.mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        resolveScrollback = resolve;
+      }),
+    );
+
+    render(<XTermSurface terminalId="test-1" />);
+
+    act(() => {
+      emitEvent({ type: "thread-reset", threadId: "test-1" });
+    });
+
+    await act(async () => {
+      resolveScrollback("old session output");
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 16);
+      });
+    });
+
+    expect(state.bridge.readTerminalScrollback).toHaveBeenCalledTimes(1);
+    expect(terminal().reset).toHaveBeenCalled();
+    expect(terminal().write).not.toHaveBeenCalled();
   });
 
   it("calls onExited on thread-exited", async () => {

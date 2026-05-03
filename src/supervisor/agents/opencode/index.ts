@@ -1,10 +1,11 @@
-import type { AgentCapability } from "@/shared/contracts";
+import type { AgentCapability, PromptSegment } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import { createAcpStructuredSession } from "../acp";
 import {
   buildAgentCommand,
   createKnownSessionRef,
   detectAgentInstall,
+  shortenHomePath,
   type AgentAdapter,
   type CreateStructuredSessionInput,
   type TerminalStatusHint,
@@ -151,6 +152,21 @@ export function createOpenCodeAdapter(): AgentAdapter {
       // Enter avoids the "paste-as-newline" trap Gemini hit and matches
       // Claude's empirically-tested 60ms.
       return [prompt, "@wait:60", "\r"];
+    },
+    formatPromptSegments(segments: PromptSegment[]) {
+      // Windows PTY writes rewrite embedded newlines to Enter keys. Keep
+      // OpenCode attachment mentions inline so the text and image land in
+      // the same user turn instead of being submitted separately.
+      const attachments = segments.filter((segment) => segment.kind === "attachment");
+      const rest = segments.filter((segment) => segment.kind !== "attachment");
+      const restStr = rest
+        .map((segment) => (segment.kind === "file" ? `@${segment.path}` : segment.content))
+        .join("");
+      const attachmentRefs = attachments
+        .map((segment) => `@${shortenHomePath(segment.path)}`)
+        .join(" ");
+      if (!attachmentRefs) return restStr;
+      return restStr ? `${restStr.trimEnd()} ${attachmentRefs} ` : `${attachmentRefs} `;
     },
 
     // OpenCode's TUI silently ignores `--prompt` when `--session <id>` is

@@ -8,7 +8,6 @@ import {
   registerProviderIcon,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
-import { withCurrentModel } from "@/renderer/components/thread/threadComposerOptions";
 
 // `big-pickle` is OpenCode's free always-on house model — every other model
 // in `opencode models` is gated behind a user-configured paid provider, so
@@ -37,14 +36,8 @@ registerConflictResolverDefaults("opencode", {
   effort: "",
 });
 
-registerComposerControls("opencode", ({ capabilities, config, isDisabled, onConfigChange }) => [
-  {
-    options: withCurrentModel(capabilities.models, config.model),
-    value: config.model,
-    isDisabled,
-    onChange: (value: string) => onConfigChange({ model: value }),
-  },
-  ...(capabilities.approvalPolicies.length > 0
+registerComposerControls("opencode", ({ capabilities, config, isDisabled, onConfigChange }) =>
+  capabilities.approvalPolicies.length > 0
     ? [
         {
           iconKind: "permission" as const,
@@ -55,5 +48,5 @@ registerComposerControls("opencode", ({ capabilities, config, isDisabled, onConf
           onChange: (value: string) => onConfigChange({ approvalPolicy: value }),
         },
       ]
-    : []),
-]);
+    : [],
+);

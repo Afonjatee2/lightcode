@@ -49,6 +49,18 @@ export const agentCapabilitySchema = z.object({
   efforts: z.array(z.string().min(1)).default([]),
   defaultEffort: z.string().optional(),
   modelEfforts: z.record(z.string(), z.array(z.string().min(1))).default({}),
+  /** Optional sub-provider grouping (e.g. OpenCode Zen, GitHub Copilot under OpenCode). */
+  subProviders: z.array(labeledOptionSchema).optional(),
+  /** Map from model id to its sub-provider id. Falls back to model-id namespace prefix when omitted. */
+  modelSubProvider: z.record(z.string(), z.string()).optional(),
+  /** Available context-window sizes (when a model exposes more than one). */
+  contextSizes: z.array(labeledOptionSchema).optional(),
+  /** Per-model allowed contextSize ids. */
+  modelContextSizes: z.record(z.string(), z.array(z.string().min(1))).optional(),
+  /** Provider's default contextSize id. */
+  defaultContextSize: z.string().optional(),
+  /** Model ids that support a fast/turbo execution mode. */
+  fastModels: z.array(z.string().min(1)).optional(),
   modes: z.array(threadModeSchema).default([]),
   approvalPolicies: z.array(labeledOptionSchema).default([]),
   sandboxModes: z.array(labeledOptionSchema).default([]),

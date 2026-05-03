@@ -21,6 +21,7 @@ type Phase = "select" | "extracting" | "error";
 
 function renderComposerControl(control: ComposerControl, index: number) {
   if (control.kind === "static") return null;
+  if (control.kind === "provider-model" || control.kind === "effort-context") return null;
 
   if (control.kind === "toggle") {
     const icon =
@@ -170,24 +171,36 @@ export function ContinueInProviderDialog(props: {
   const [extractEffort, setExtractEffort] = useState("low");
 
   const hiddenModelIds = useSharedSettings((s) => s.hiddenModels[thread.agentKind]);
-  const extractionControls =
-    sourceAgent && thread.sessionRef
-      ? (getComposerControls(thread.agentKind)?.({
-          capabilities: filterHiddenModels(sourceAgent.capabilities, hiddenModelIds),
-          config: { model: extractModel, effort: extractEffort },
-          isDisabled: false,
-          onConfigChange: (patch) => {
-            if (patch.model !== undefined) setExtractModel(patch.model);
-            if (patch.effort !== undefined) setExtractEffort(patch.effort);
+  const filteredSourceCaps = sourceAgent
+    ? filterHiddenModels(sourceAgent.capabilities, hiddenModelIds)
+    : undefined;
+  const extractionEfforts =
+    filteredSourceCaps?.modelEfforts?.[extractModel] ?? filteredSourceCaps?.efforts ?? [];
+  const modelEffortControls: ComposerControl[] =
+    sourceAgent && thread.sessionRef && filteredSourceCaps
+      ? [
+          {
+            options: filteredSourceCaps.models,
+            value: extractModel,
+            isDisabled: false,
+            onChange: (value: string) => setExtractModel(value),
           },
-        }) ?? [])
+          ...(extractionEfforts.length > 0
+            ? [
+                {
+                  iconKind: "effort" as const,
+                  options: extractionEfforts.map((id) => ({
+                    id,
+                    label: id.charAt(0).toUpperCase() + id.slice(1),
+                  })),
+                  value: extractEffort || extractionEfforts[0] || "",
+                  isDisabled: false,
+                  onChange: (value: string) => setExtractEffort(value),
+                },
+              ]
+            : []),
+        ]
       : [];
-
-  // Only model and effort for extraction
-  const modelEffortControls = extractionControls.filter((c) => {
-    if (c.kind === "toggle" || c.kind === "static") return false;
-    return c.iconKind === "effort" || (!c.iconKind && c.options.length > 0);
-  });
 
   async function handleAction(closeOriginal: boolean) {
     setPendingCloseOriginal(closeOriginal);

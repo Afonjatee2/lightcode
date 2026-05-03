@@ -67,6 +67,35 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.config.effort).toBe("low");
   });
 
+  it("updates the saved draft config when only context size and fast change", () => {
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+
+    useAppStore.getState().updateProjectDraftConfig(project.id, {
+      agentKind: "claude",
+      model: "claude-opus-4-7",
+      effort: "high",
+      contextSize: "1m",
+      mode: "agent",
+    });
+
+    useAppStore.getState().updateProjectDraftConfig(project.id, {
+      agentKind: "claude",
+      model: "claude-opus-4-7",
+      effort: "high",
+      contextSize: "200k",
+      fast: true,
+      mode: "agent",
+    });
+
+    expect(useAppStore.getState().projects[0]?.lastDraftConfig).toMatchObject({
+      contextSize: "200k",
+      fast: true,
+    });
+  });
+
   it("createThread sets view to single pane", () => {
     const project = useAppStore.getState().addProject({
       kind: "windows",

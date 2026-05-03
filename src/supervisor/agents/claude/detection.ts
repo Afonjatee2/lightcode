@@ -7,18 +7,32 @@ export const CLAUDE_DEFAULT_APPROVAL_POLICY = "auto" as const;
 
 export const claudeCapabilities: AgentCapability = {
   models: [
-    { id: "claude-opus-4-7[1m]", label: "Opus 4.7" },
-    { id: "claude-opus-4-6[1m]", label: "Opus 4.6" },
+    { id: "claude-opus-4-7", label: "Opus 4.7" },
+    { id: "claude-opus-4-6", label: "Opus 4.6" },
     { id: "sonnet", label: "Sonnet" },
     { id: "haiku", label: "Haiku" },
   ],
   efforts: ["low", "medium", "high", "xHigh", "max"],
   defaultEffort: "high",
   modelEfforts: {
-    "claude-opus-4-6[1m]": ["low", "medium", "high", "max"],
+    "claude-opus-4-6": ["low", "medium", "high", "max"],
     haiku: [],
     sonnet: ["low", "medium", "high"],
   },
+  contextSizes: [
+    { id: "200k", label: "200k" },
+    { id: "1m", label: "1M" },
+  ],
+  // Order matters: the first entry is the per-model default. Opus tiers default
+  // to 1M (the long-context build users select these for); Sonnet defaults to
+  // 200k because the 1M tier is billed per-token at premium rates.
+  modelContextSizes: {
+    "claude-opus-4-7": ["1m", "200k"],
+    "claude-opus-4-6": ["1m", "200k"],
+    sonnet: ["200k", "1m"],
+  },
+  defaultContextSize: "200k",
+  fastModels: ["claude-opus-4-6"],
   modes: ["agent", "plan"],
   approvalPolicies: [
     { id: "default", label: "Default" },

@@ -28,7 +28,7 @@ function opencodeNativeAuthPath(): string {
 }
 
 // `opencode models` prints one `provider/model` per line; we surface every
-// line as an opaque model id (UI doesn't parse them).
+// line as an opaque model id while deriving cleaner display metadata for UI.
 async function probeOpenCodeModels(
   location: ProjectLocation,
   executablePath: string,
@@ -42,6 +42,94 @@ async function probeOpenCodeModels(
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && /\//.test(line));
   return lines.length > 0 ? lines : undefined;
+}
+
+const OPENCODE_TITLE_TOKEN_OVERRIDES: Record<string, string> = {
+  api: "API",
+  aws: "AWS",
+  chatgpt: "ChatGPT",
+  claude: "Claude",
+  codestral: "Codestral",
+  copilot: "Copilot",
+  deepseek: "DeepSeek",
+  devstral: "Devstral",
+  gemini: "Gemini",
+  github: "GitHub",
+  glm: "GLM",
+  gpt: "GPT",
+  grok: "Grok",
+  groq: "Groq",
+  haiku: "Haiku",
+  kimi: "Kimi",
+  llama: "Llama",
+  llm: "LLM",
+  max: "Max",
+  mini: "Mini",
+  mistral: "Mistral",
+  ollama: "Ollama",
+  openai: "OpenAI",
+  opencode: "OpenCode",
+  openrouter: "OpenRouter",
+  opus: "Opus",
+  oss: "OSS",
+  pro: "Pro",
+  qwen: "Qwen",
+  sonnet: "Sonnet",
+  xai: "xAI",
+};
+
+function titleizeOpenCodeToken(token: string): string {
+  const lower = token.toLowerCase();
+  const override = OPENCODE_TITLE_TOKEN_OVERRIDES[lower];
+  if (override) return override;
+  if (/^o\d/.test(lower)) return lower;
+  if (/^[a-z]\d/.test(lower)) return lower.charAt(0).toUpperCase() + lower.slice(1);
+  const size = /^(\d+)([bkmt])$/i.exec(token);
+  if (size) {
+    const [, amount, unit] = size;
+    return `${amount}${unit!.toUpperCase()}`;
+  }
+  return lower.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+function isString(value: string | undefined): value is string {
+  return typeof value === "string";
+}
+
+function titleizeOpenCodeName(name: string): string {
+  const rawParts = name.split(/[-_\s]+/g).filter(Boolean);
+  const parts: string[] = [];
+
+  for (let i = 0; i < rawParts.length; i += 1) {
+    const part = rawParts[i]!;
+    const next = rawParts[i + 1];
+    if (/^\d{1,2}$/.test(part) && next && /^\d{1,2}$/.test(next)) {
+      parts.push(`${part}.${next}`);
+      i += 1;
+      continue;
+    }
+    parts.push(titleizeOpenCodeToken(part));
+  }
+
+  return parts.join(" ");
+}
+
+function openCodeModelNamePart(id: string): string {
+  const slash = id.indexOf("/");
+  return slash >= 0 ? id.slice(slash + 1) : id;
+}
+
+function openCodeModelSubProvider(id: string): string | undefined {
+  const slash = id.indexOf("/");
+  return slash > 0 ? id.slice(0, slash) : undefined;
+}
+
+export function humanizeOpenCodeModelId(id: string): string {
+  return titleizeOpenCodeName(openCodeModelNamePart(id));
+}
+
+export function humanizeOpenCodeSubProviderId(id: string): string {
+  return titleizeOpenCodeName(id);
 }
 
 export const opencodeDetectionSpec: DetectionSpec = {
@@ -59,8 +147,13 @@ export const opencodeDetectionSpec: DetectionSpec = {
     if (!ctx.executablePath) return undefined;
     const models = await probeOpenCodeModels(ctx.location, ctx.executablePath);
     if (!models) return undefined;
+    const subProviderIds = [...new Set(models.map(openCodeModelSubProvider).filter(isString))];
     return {
-      models: models.map((id) => ({ id, label: id })),
+      models: models.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
+      subProviders: subProviderIds.map((id) => ({
+        id,
+        label: humanizeOpenCodeSubProviderId(id),
+      })),
     };
   },
 };

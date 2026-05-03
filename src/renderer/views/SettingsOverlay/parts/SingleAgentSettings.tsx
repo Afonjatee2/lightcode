@@ -1,11 +1,24 @@
 import { startTransition } from "react";
-import { Button, Dropdown, Label, Switch } from "@heroui/react";
-import type { Selection } from "@heroui/react";
+import {
+  Button,
+  Label,
+  ListBox,
+  ListLayout,
+  Popover,
+  Switch,
+  type Selection,
+  Virtualizer,
+} from "@heroui/react";
 import type { AgentSettingDef, AgentStatus } from "@/shared/contracts";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
 import { Select } from "@/renderer/components/common";
+import {
+  LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD,
+  MENU_DROPDOWN_ROW_HEIGHT,
+  VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS,
+} from "@/renderer/components/common/dropdownVirtualization";
 
 function AgentSettingRow(props: { agentKind: string; def: AgentSettingDef }) {
   const { agentKind, def } = props;
@@ -64,6 +77,32 @@ function ModelVisibilityDropdown(props: {
     models.filter((m) => !hiddenSet.has(m.id)).map((m) => m.id),
   );
   const hiddenCount = hidden.length;
+  const isVirtualized = models.length > LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD;
+  const listBox = (
+    <ListBox
+      aria-label="Visible models"
+      className={
+        isVirtualized
+          ? `max-h-[400px] min-w-[280px] overflow-y-auto !m-0 !p-0 ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2`
+          : "max-h-[400px] min-w-[280px] overflow-y-auto !m-0 !p-1 [&_.list-box-item]:min-h-8 [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2"
+      }
+      items={models}
+      selectedKeys={visibleKeys}
+      selectionMode="multiple"
+      onSelectionChange={(keys) => {
+        const selected = keys === "all" ? new Set(models.map((m) => m.id)) : (keys as Set<string>);
+        const nextHidden = models.filter((m) => !selected.has(m.id)).map((m) => m.id);
+        setHiddenModels(agentKind, nextHidden);
+      }}
+    >
+      {(model) => (
+        <ListBox.Item id={model.id} textValue={model.label} className="focus-visible:outline-none">
+          <ListBox.ItemIndicator />
+          <Label className="flex-1 truncate">{model.label}</Label>
+        </ListBox.Item>
+      )}
+    </ListBox>
+  );
 
   return (
     <div className="flex items-center justify-between gap-4">
@@ -71,31 +110,27 @@ function ModelVisibilityDropdown(props: {
         <p className="text-sm font-medium text-foreground">Visible models</p>
         <p className="text-xs text-muted">Toggle models off to hide them from the selector.</p>
       </div>
-      <Dropdown>
-        <Button variant="secondary" size="sm" className="min-w-[4.5rem] tabular-nums">
-          {models.length - hiddenCount} / {models.length}
-        </Button>
-        <Dropdown.Popover className="min-w-[280px]">
-          <Dropdown.Menu
-            className="max-h-[400px] overflow-y-auto"
-            selectedKeys={visibleKeys}
-            selectionMode="multiple"
-            onSelectionChange={(keys) => {
-              const selected =
-                keys === "all" ? new Set(models.map((m) => m.id)) : (keys as Set<string>);
-              const nextHidden = models.filter((m) => !selected.has(m.id)).map((m) => m.id);
-              setHiddenModels(agentKind, nextHidden);
-            }}
-          >
-            {models.map((m) => (
-              <Dropdown.Item key={m.id} id={m.id} textValue={m.label}>
-                <Dropdown.ItemIndicator />
-                <Label>{m.label}</Label>
-              </Dropdown.Item>
-            ))}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
-      </Dropdown>
+      <Popover>
+        <Popover.Trigger>
+          <Button variant="secondary" size="sm" className="min-w-[4.5rem] tabular-nums">
+            {models.length - hiddenCount} / {models.length}
+          </Button>
+        </Popover.Trigger>
+        <Popover.Content className="p-0">
+          <Popover.Dialog className="overflow-hidden">
+            {isVirtualized ? (
+              <Virtualizer
+                layout={ListLayout}
+                layoutOptions={{ padding: 4, rowHeight: MENU_DROPDOWN_ROW_HEIGHT }}
+              >
+                {listBox}
+              </Virtualizer>
+            ) : (
+              listBox
+            )}
+          </Popover.Dialog>
+        </Popover.Content>
+      </Popover>
     </div>
   );
 }

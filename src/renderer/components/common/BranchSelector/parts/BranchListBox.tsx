@@ -1,6 +1,10 @@
 import { Check, GitBranch, Globe, Trash2 } from "lucide-react";
 import { Header, Label, ListBox, ListLayout, Virtualizer } from "@heroui/react";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
+import {
+  COMPACT_DROPDOWN_ROW_HEIGHT,
+  VIRTUALIZED_COMPACT_DROPDOWN_ITEM_CLASS,
+} from "../../dropdownVirtualization";
 import { PixelLoader } from "../../PixelLoader";
 import type { BranchListItem } from "./useBranchList";
 
@@ -40,10 +44,13 @@ export function BranchListBox(props: {
   }
 
   return (
-    <Virtualizer layout={ListLayout} layoutOptions={{ rowHeight: 28, padding: 6 }}>
+    <Virtualizer
+      layout={ListLayout}
+      layoutOptions={{ rowHeight: COMPACT_DROPDOWN_ROW_HEIGHT, padding: 6 }}
+    >
       <ListBox
         aria-label="Branches"
-        className="max-h-60 overflow-y-auto !p-0 !m-0 [&_.list-box-item]:min-h-7 [&_.list-box-item]:py-0.5 [&_.list-box-item]:pl-1.5 [&_.list-box-item]:pr-7 [&_.list-box-item__indicator]:!right-1.5"
+        className={`max-h-60 overflow-y-auto !p-0 !m-0 ${VIRTUALIZED_COMPACT_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-0.5 [&_.list-box-item]:pl-1.5 [&_.list-box-item]:pr-7 [&_.list-box-item__indicator]:!right-1.5`}
         items={items}
         selectedKeys={
           isWorktree || worktreeMode ? new Set([baseBranch ?? value]) : new Set([value])

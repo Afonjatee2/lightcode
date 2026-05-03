@@ -7,6 +7,7 @@ describe("sharedSettingsStore", () => {
     useSharedSettings.setState({
       themeMode: "system",
       staleThreadUnloadMinutes: 20,
+      providerConfigs: {},
     });
   });
 
@@ -22,5 +23,29 @@ describe("sharedSettingsStore", () => {
   it("updates the stale thread unload timing", () => {
     useSharedSettings.getState().setStaleThreadUnloadMinutes(30);
     expect(useSharedSettings.getState().staleThreadUnloadMinutes).toBe(30);
+  });
+
+  it("updates provider config when only context size and fast change", () => {
+    useSharedSettings.getState().setProviderConfig("claude", {
+      model: "claude-opus-4-7",
+      effort: "high",
+      contextSize: "1m",
+      mode: "agent",
+      approvalPolicy: "auto",
+    });
+
+    useSharedSettings.getState().setProviderConfig("claude", {
+      model: "claude-opus-4-7",
+      effort: "high",
+      contextSize: "200k",
+      fast: true,
+      mode: "agent",
+      approvalPolicy: "auto",
+    });
+
+    expect(useSharedSettings.getState().providerConfigs.claude).toMatchObject({
+      contextSize: "200k",
+      fast: true,
+    });
   });
 });

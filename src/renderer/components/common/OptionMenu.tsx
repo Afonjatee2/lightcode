@@ -1,8 +1,13 @@
 import { useState, type ReactNode } from "react";
 import type { Selection } from "@heroui/react";
-import { Dropdown, Label, Tooltip } from "@heroui/react";
+import { Label, ListBox, ListLayout, Popover, Tooltip, Virtualizer } from "@heroui/react";
 import { ChevronDown } from "lucide-react";
 import { Button, type ButtonProps } from "./Button";
+import {
+  LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD,
+  MENU_DROPDOWN_ROW_HEIGHT,
+  VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS,
+} from "./dropdownVirtualization";
 
 export interface OptionMenuProps {
   value: string;
@@ -77,42 +82,73 @@ export function OptionMenu(props: OptionMenuProps) {
     setIsOpen(open);
     onOpenChange?.(open);
   };
+  const selectedKeys = value ? new Set([value]) : new Set<string>();
+  const isVirtualized = normalizedOptions.length > LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD;
+  const listBoxClassName = isVirtualized
+    ? `max-h-60 overflow-y-auto !m-0 !p-0 ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2`
+    : "max-h-60 overflow-y-auto !m-0 !p-1 [&_.list-box-item]:min-h-8 [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2";
+  const listBox = (
+    <ListBox
+      aria-label="Options"
+      className={listBoxClassName}
+      items={normalizedOptions}
+      selectedKeys={selectedKeys}
+      selectionMode="single"
+      disallowEmptySelection
+      onSelectionChange={(keys: Selection) => {
+        if (keys === "all") return;
+        const selected = [...keys][0];
+        if (selected !== undefined) {
+          handleOpenChange(false);
+          onChange(String(selected));
+        }
+      }}
+    >
+      {(option) => (
+        <ListBox.Item
+          id={option.id}
+          textValue={option.label}
+          className="focus-visible:outline-none"
+        >
+          <ListBox.ItemIndicator />
+          {option.icon}
+          <Label className="flex-1 truncate">{option.label}</Label>
+          {option.hint && (
+            <span className="ms-auto truncate text-xs text-muted">{option.hint}</span>
+          )}
+        </ListBox.Item>
+      )}
+    </ListBox>
+  );
 
   return (
-    <Dropdown isOpen={isOpen} onOpenChange={handleOpenChange}>
-      {effectiveTooltip ? (
-        <Tooltip>
-          {button}
-          <Tooltip.Content placement="top">{effectiveTooltip}</Tooltip.Content>
-        </Tooltip>
-      ) : (
-        button
-      )}
+    <Popover isOpen={isOpen} onOpenChange={handleOpenChange}>
+      <Popover.Trigger>
+        {effectiveTooltip ? (
+          <Tooltip>
+            {button}
+            <Tooltip.Content placement="top">{effectiveTooltip}</Tooltip.Content>
+          </Tooltip>
+        ) : (
+          button
+        )}
+      </Popover.Trigger>
       {isOpen ? (
-        <Dropdown.Popover placement="top">
-          <Dropdown.Menu
-            aria-label="Options"
-            selectedKeys={new Set([value])}
-            selectionMode="single"
-            onSelectionChange={(keys: Selection) => {
-              if (keys === "all") return;
-              const selected = [...keys][0];
-              if (selected !== undefined) {
-                onChange(String(selected));
-              }
-            }}
-          >
-            {normalizedOptions.map((option) => (
-              <Dropdown.Item key={option.id} id={option.id} textValue={option.label}>
-                <Dropdown.ItemIndicator />
-                {option.icon}
-                <Label>{option.label}</Label>
-                {option.hint && <span className="ms-auto text-xs text-muted">{option.hint}</span>}
-              </Dropdown.Item>
-            ))}
-          </Dropdown.Menu>
-        </Dropdown.Popover>
+        <Popover.Content placement="top" className="p-0">
+          <Popover.Dialog className="overflow-hidden">
+            {isVirtualized ? (
+              <Virtualizer
+                layout={ListLayout}
+                layoutOptions={{ padding: 4, rowHeight: MENU_DROPDOWN_ROW_HEIGHT }}
+              >
+                {listBox}
+              </Virtualizer>
+            ) : (
+              listBox
+            )}
+          </Popover.Dialog>
+        </Popover.Content>
       ) : null}
-    </Dropdown>
+    </Popover>
   );
 }

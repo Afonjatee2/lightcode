@@ -15,6 +15,10 @@ import type { GitBranchInfo } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
+import {
+  MENU_DROPDOWN_ROW_HEIGHT,
+  VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS,
+} from "./dropdownVirtualization";
 import { Button } from "./Button";
 
 export interface BranchSelection {
@@ -326,10 +330,13 @@ export function BranchSelector(props: BranchSelectorProps) {
             {/* Branch list */}
             <div className="flex-1 overflow-hidden">
               {hasLocal || hasRemote ? (
-                <Virtualizer layout={ListLayout} layoutOptions={{ rowHeight: 32 }}>
+                <Virtualizer
+                  layout={ListLayout}
+                  layoutOptions={{ rowHeight: MENU_DROPDOWN_ROW_HEIGHT }}
+                >
                   <ListBox
                     aria-label="Branches"
-                    className="h-72 overflow-y-auto p-1 pl-0 [&_.list-box-item]:min-h-8 [&_.list-box-item]:py-1"
+                    className={`h-72 overflow-y-auto p-1 pl-0 ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-1`}
                     items={items}
                     selectedKeys={
                       isWorktree || worktreeMode ? new Set([baseBranch ?? value]) : new Set([value])

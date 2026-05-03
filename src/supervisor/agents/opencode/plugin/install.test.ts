@@ -61,7 +61,7 @@ describe("getOpenCodePluginPaths", () => {
 });
 
 describe("installOpenCodePlugin", () => {
-  it("stages plugin assets and drops mjs+manifest into OpenCode's plugins dir", () => {
+  it("stages assets and drops the plugin + manifest into OpenCode's plugins dir", () => {
     const baseDir = makeBaseDir();
     const opencodeDir = makeBaseDir();
     process.env.OPENCODE_CONFIG_DIR = opencodeDir;
@@ -73,18 +73,19 @@ describe("installOpenCodePlugin", () => {
 
     // Lightcode-side staging
     expect(existsSync(join(result.paths.pluginDir, "plugin.json"))).toBe(true);
-    expect(existsSync(join(result.paths.pluginDir, "plugin.mjs"))).toBe(true);
+    expect(existsSync(join(result.paths.pluginDir, "lightcode-status.mjs"))).toBe(true);
 
-    // OpenCode-side drops
-    const droppedFile = join(opencodeDir, "plugins", "lightcode-status.js");
+    // OpenCode-side drops: .js plugin file (auto-discovered) + sibling manifest
+    const droppedPlugin = join(opencodeDir, "plugins", "lightcode-status.js");
     const droppedManifest = join(opencodeDir, "plugins", "lightcode-status.plugin.json");
-    expect(existsSync(droppedFile)).toBe(true);
+    expect(existsSync(droppedPlugin)).toBe(true);
     expect(existsSync(droppedManifest)).toBe(true);
 
-    // Drop files match the staged sources byte-for-byte so the plugin reads
-    // the right version when OpenCode imports it.
+    // Drop matches staged source byte-for-byte.
     expect(
-      readFileSync(join(result.paths.pluginDir, "plugin.mjs")).equals(readFileSync(droppedFile)),
+      readFileSync(join(result.paths.pluginDir, "lightcode-status.mjs")).equals(
+        readFileSync(droppedPlugin),
+      ),
     ).toBe(true);
     expect(
       readFileSync(join(result.paths.pluginDir, "plugin.json")).equals(
@@ -94,8 +95,54 @@ describe("installOpenCodePlugin", () => {
 
     expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toMatchObject({
       installed: true,
-      version: "1.1.0",
+      version: "1.7.1",
     });
+  });
+
+  it("scrubs a stale `file://` plugin entry that older builds left in opencode.json", () => {
+    const baseDir = makeBaseDir();
+    const opencodeDir = makeBaseDir();
+    process.env.OPENCODE_CONFIG_DIR = opencodeDir;
+    const configPath = join(opencodeDir, "opencode.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        theme: "dark",
+        plugin: [
+          "@warp-dot-dev/opencode-warp",
+          `file:///prior/baseDir/agent-plugins/opencode/lightcode-status.mjs`,
+        ],
+      }),
+      "utf8",
+    );
+
+    const result = installOpenCodePlugin({ envKind: "posix", baseDir });
+    expect(result.ok).toBe(true);
+
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+    expect(config.theme).toBe("dark");
+    // Lightcode entry removed; user's other plugin entry is preserved.
+    expect(config.plugin).toEqual(["@warp-dot-dev/opencode-warp"]);
+  });
+
+  it("removes the `plugin` key entirely when ours was the only entry", () => {
+    const baseDir = makeBaseDir();
+    const opencodeDir = makeBaseDir();
+    process.env.OPENCODE_CONFIG_DIR = opencodeDir;
+    const configPath = join(opencodeDir, "opencode.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        plugin: [`file:///prior/baseDir/agent-plugins/opencode/lightcode-status.mjs`],
+      }),
+      "utf8",
+    );
+
+    const result = installOpenCodePlugin({ envKind: "posix", baseDir });
+    expect(result.ok).toBe(true);
+
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+    expect(config.plugin).toBeUndefined();
   });
 
   it("is idempotent — restaging produces the same end state", () => {
@@ -114,7 +161,22 @@ describe("installOpenCodePlugin", () => {
     });
   });
 
-  it("treats a hand-edited plugin file as not-installed", () => {
+  it("removes a legacy lightcode-status.mjs left behind by an older install", () => {
+    const baseDir = makeBaseDir();
+    const opencodeDir = makeBaseDir();
+    process.env.OPENCODE_CONFIG_DIR = opencodeDir;
+
+    const legacyPath = join(opencodeDir, "plugins", "lightcode-status.mjs");
+    mkdirSync(dirname(legacyPath), { recursive: true });
+    writeFileSync(legacyPath, "// stale legacy plugin\n");
+
+    const result = installOpenCodePlugin({ envKind: "posix", baseDir });
+    expect(result.ok).toBe(true);
+
+    expect(existsSync(legacyPath)).toBe(false);
+  });
+
+  it("treats a hand-edited drop as not-installed", () => {
     const baseDir = makeBaseDir();
     const opencodeDir = makeBaseDir();
     process.env.OPENCODE_CONFIG_DIR = opencodeDir;
@@ -124,21 +186,6 @@ describe("installOpenCodePlugin", () => {
     if (!result.ok) return;
 
     writeFileSync(result.paths.opencodePluginFile, "// hand edit\n");
-
-    expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toEqual({ installed: false });
-  });
-
-  it("treats a missing dropped file as not-installed", () => {
-    const baseDir = makeBaseDir();
-    const opencodeDir = makeBaseDir();
-    process.env.OPENCODE_CONFIG_DIR = opencodeDir;
-
-    const result = installOpenCodePlugin({ envKind: "posix", baseDir });
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-
-    // Simulate the user clearing OpenCode's plugins dir manually.
-    unlinkSync(result.paths.opencodePluginFile);
 
     expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toEqual({ installed: false });
   });
@@ -156,25 +203,10 @@ describe("installOpenCodePlugin", () => {
 
     expect(isOpenCodePluginInstalled({ envKind: "posix", baseDir })).toEqual({ installed: false });
   });
-
-  it("removes a legacy lightcode-status.mjs left behind by an older install", () => {
-    const baseDir = makeBaseDir();
-    const opencodeDir = makeBaseDir();
-    process.env.OPENCODE_CONFIG_DIR = opencodeDir;
-
-    const legacyPath = join(opencodeDir, "plugins", "lightcode-status.mjs");
-    mkdirSync(dirname(legacyPath), { recursive: true });
-    writeFileSync(legacyPath, "// stale legacy plugin\n");
-
-    const result = installOpenCodePlugin({ envKind: "posix", baseDir });
-    expect(result.ok).toBe(true);
-
-    expect(existsSync(legacyPath)).toBe(false);
-  });
 });
 
 describe("uninstallOpenCodePlugin", () => {
-  it("removes both dropped files but leaves staging intact", () => {
+  it("removes both dropped files and any opencode.json entry, leaves staging intact", () => {
     const baseDir = makeBaseDir();
     const opencodeDir = makeBaseDir();
     process.env.OPENCODE_CONFIG_DIR = opencodeDir;
@@ -183,11 +215,28 @@ describe("uninstallOpenCodePlugin", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    // Add an unrelated plugin alongside ours into opencode.json so we can
+    // verify uninstall preserves it.
+    const configPath = join(opencodeDir, "opencode.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        plugin: [
+          "@user/other-plugin",
+          `file://${result.paths.pluginDir.replace(/\\/g, "/")}/lightcode-status.mjs`,
+        ],
+      }),
+      "utf8",
+    );
+
     uninstallOpenCodePlugin({ envKind: "posix", baseDir });
 
     expect(existsSync(result.paths.opencodePluginFile)).toBe(false);
     expect(existsSync(join(opencodeDir, "plugins", "lightcode-status.plugin.json"))).toBe(false);
     expect(existsSync(join(result.paths.pluginDir, "plugin.json"))).toBe(true);
-    expect(existsSync(join(result.paths.pluginDir, "plugin.mjs"))).toBe(true);
+    expect(existsSync(join(result.paths.pluginDir, "lightcode-status.mjs"))).toBe(true);
+
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as Record<string, unknown>;
+    expect(config.plugin).toEqual(["@user/other-plugin"]);
   });
 });

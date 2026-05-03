@@ -1,9 +1,17 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { ArrowUp } from "lucide-react";
 import { ToggleButton, Tooltip } from "@heroui/react";
-import { Button, OptionMenu, TextArea } from "@/renderer/components/common";
+import {
+  Button,
+  EffortContextMenu,
+  OptionMenu,
+  ProviderModelMenu,
+  TextArea,
+  type ProviderModelMenuProvider,
+} from "@/renderer/components/common";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { PermissionIcon } from "@/renderer/components/providers/PermissionIcon";
+import type { LabeledOption } from "@/shared/contracts";
 
 export type OptionMenuOption = string | { id: string; label: string; hint?: string };
 
@@ -39,10 +47,35 @@ export type ComposerControl =
       icon?: ReactNode;
       iconOnly?: boolean;
       hideLabelOnWrap?: boolean;
+    }
+  | {
+      kind: "provider-model";
+      providers: ProviderModelMenuProvider[];
+      currentAgentKind: string;
+      currentModel: string;
+      lockedAgentKind?: string;
+      isDisabled?: boolean;
+      hideLabelOnWrap?: boolean;
+      onChange: (next: { agentKind: string; model: string }) => void;
+    }
+  | {
+      kind: "effort-context";
+      efforts: readonly LabeledOption[];
+      effortValue?: string;
+      onEffortChange?: (value: string) => void;
+      contextSizes: readonly LabeledOption[];
+      contextValue?: string;
+      onContextChange?: (value: string) => void;
+      icon?: ReactNode;
+      isDisabled?: boolean;
+      hideLabelOnWrap?: boolean;
     };
 
 function resolveIcon(control: ComposerControl): ReactNode | undefined {
   if (control.kind === "static") return control.icon;
+  if (control.kind === "provider-model" || control.kind === "effort-context") {
+    return undefined;
+  }
   if (control.icon) return control.icon;
   const iconKind = control.iconKind;
   if (!iconKind) return undefined;
@@ -175,6 +208,48 @@ export function ThreadComposer(props: {
 
   const renderControlsList = (forceShowLabels = false) =>
     controls.map((control, index) => {
+      if (control.kind === "provider-model") {
+        return (
+          <ProviderModelMenu
+            key={`provider-model-${index}`}
+            providers={control.providers}
+            currentAgentKind={control.currentAgentKind}
+            currentModel={control.currentModel}
+            {...(control.lockedAgentKind ? { lockedAgentKind: control.lockedAgentKind } : {})}
+            {...(control.isDisabled !== undefined ? { isDisabled: control.isDisabled } : {})}
+            {...(control.hideLabelOnWrap !== undefined
+              ? { hideLabelOnWrap: control.hideLabelOnWrap && !forceShowLabels }
+              : {})}
+            onChange={control.onChange}
+            onOpenChange={(open) => {
+              if (!open) returnFocusToInput();
+            }}
+          />
+        );
+      }
+
+      if (control.kind === "effort-context") {
+        return (
+          <EffortContextMenu
+            key={`effort-context-${index}`}
+            efforts={control.efforts}
+            {...(control.effortValue !== undefined ? { effortValue: control.effortValue } : {})}
+            {...(control.onEffortChange ? { onEffortChange: control.onEffortChange } : {})}
+            contextSizes={control.contextSizes}
+            {...(control.contextValue !== undefined ? { contextValue: control.contextValue } : {})}
+            {...(control.onContextChange ? { onContextChange: control.onContextChange } : {})}
+            {...(control.icon ? { icon: control.icon } : {})}
+            {...(control.isDisabled !== undefined ? { isDisabled: control.isDisabled } : {})}
+            {...(control.hideLabelOnWrap !== undefined
+              ? { hideLabelOnWrap: control.hideLabelOnWrap && !forceShowLabels }
+              : {})}
+            onOpenChange={(open) => {
+              if (!open) returnFocusToInput();
+            }}
+          />
+        );
+      }
+
       if (control.kind === "static") {
         const hideLabel = control.iconOnly || (control.hideLabelOnWrap && !forceShowLabels);
         const content = (

@@ -5,20 +5,20 @@ import type { SDKUserMessage, SlashCommand } from "@anthropic-ai/claude-agent-sd
 import { readWslLoginShellCommandOutputAsync, type DetectProbeCtx } from "../base";
 
 const MIN_CLAUDE_OPUS_47_CLI = [2, 1, 111] as const;
-const OPUS_47_MODEL_ID = "claude-opus-4-7[1m]";
+const OPUS_47_MODEL_ID = "claude-opus-4-7";
 
 const CLAUDE_SEMVER_RE = /(\d+)\.(\d+)\.(\d+)/;
 
 /** Built-in catalog (CLI `--model` ids) merged with semver gate + SDK slash commands. */
 const BUILTIN_MODELS: AgentCapability["models"] = [
   { id: OPUS_47_MODEL_ID, label: "Opus 4.7" },
-  { id: "claude-opus-4-6[1m]", label: "Opus 4.6" },
+  { id: "claude-opus-4-6", label: "Opus 4.6" },
   { id: "sonnet", label: "Sonnet" },
   { id: "haiku", label: "Haiku" },
 ];
 
 const BUILTIN_MODEL_EFFORTS: AgentCapability["modelEfforts"] = {
-  "claude-opus-4-6[1m]": ["low", "medium", "high", "max"],
+  "claude-opus-4-6": ["low", "medium", "high", "max"],
   haiku: [],
   sonnet: ["low", "medium", "high"],
 };

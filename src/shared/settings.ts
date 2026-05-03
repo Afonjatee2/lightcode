@@ -96,6 +96,13 @@ export const sharedSettingsSchema = z.object({
     needsAttention: z.boolean(),
     error: z.boolean(),
   }),
+  /** User-starred (provider, model) entries surfaced at the top of the model picker. */
+  favoriteModels: z.array(z.object({ agentKind: z.string().min(1), modelId: z.string().min(1) })),
+  /**
+   * Most-recent (provider, model) launches for the model picker. Newest first; the menu
+   * caps to 5 entries that aren't already in `favoriteModels`.
+   */
+  recentModels: z.array(z.object({ agentKind: z.string().min(1), modelId: z.string().min(1) })),
   /**
    * Dev-only: force agents off the CLI hook plugin path (L1) so they fall back
    * to L2 terminal parsing. The UI toggle is only visible in the dev build;
@@ -156,6 +163,8 @@ export const defaultSharedSettings: SharedSettings = {
   notificationSound: true,
   notificationFilter: "unfocused",
   notificationStatuses: { done: true, needsAttention: true, error: true },
+  favoriteModels: [],
+  recentModels: [],
   disableCliHookPlugin: false,
   agentHookSupport: {},
 };

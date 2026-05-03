@@ -60,7 +60,7 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 6;
+  const SCHEMA_VERSION = 7;
 
   const storedVersion = Number(
     (
@@ -105,6 +105,14 @@ export function initDatabase(dbPath: string) {
     }
   }
 
+  if (storedVersion < 7) {
+    // Fold model-id context-size suffixes (e.g. `claude-opus-4-7[1m]`) into a
+    // separate `contextSize` field so the UI can pick model and context size
+    // independently. Adapter argv reattaches the suffix at PTY launch.
+    foldContextSuffix(sqlite, "threads", "config");
+    foldContextSuffix(sqlite, "projects", "last_draft_config");
+  }
+
   if (storedVersion < SCHEMA_VERSION) {
     sqlite
       .prepare(
@@ -115,6 +123,32 @@ export function initDatabase(dbPath: string) {
 
   console.log("[db] initialized");
   return _db;
+}
+
+function foldContextSuffix(sqlite: InstanceType<typeof Database>, table: string, column: string) {
+  const rows = sqlite
+    .prepare(`SELECT rowid AS rowid, ${column} AS json FROM ${table} WHERE ${column} IS NOT NULL`)
+    .all() as { rowid: number; json: string }[];
+  const update = sqlite.prepare(`UPDATE ${table} SET ${column} = ? WHERE rowid = ?`);
+  const suffix = /\[([0-9]+[mk])\]$/i;
+  for (const row of rows) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(row.json);
+    } catch {
+      continue;
+    }
+    if (!parsed || typeof parsed !== "object") continue;
+    const cfg = parsed as { model?: unknown; contextSize?: unknown };
+    if (typeof cfg.model !== "string") continue;
+    const match = cfg.model.match(suffix);
+    if (!match) continue;
+    cfg.model = cfg.model.slice(0, -match[0].length);
+    if (typeof cfg.contextSize !== "string") {
+      cfg.contextSize = match[1]!.toLowerCase();
+    }
+    update.run(JSON.stringify(cfg), row.rowid);
+  }
 }
 
 export function getDb() {

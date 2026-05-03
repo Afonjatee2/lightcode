@@ -21,6 +21,8 @@ function projectDraftConfigEqual(
     a.agentKind === b.agentKind &&
     a.model === b.model &&
     a.effort === b.effort &&
+    a.contextSize === b.contextSize &&
+    a.fast === b.fast &&
     a.mode === b.mode &&
     a.approvalPolicy === b.approvalPolicy &&
     a.sandboxMode === b.sandboxMode &&

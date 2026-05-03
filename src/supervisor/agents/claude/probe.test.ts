@@ -4,8 +4,8 @@ import { claudeCapabilitiesFromCliVersion, win32PathToWslMount } from "./probe";
 describe("claudeCapabilitiesFromCliVersion", () => {
   it("hides Opus 4.7 when CLI is below 2.1.111", () => {
     const p = claudeCapabilitiesFromCliVersion("2.1.110");
-    expect(p?.models?.map((m) => m.id)).not.toContain("claude-opus-4-7[1m]");
-    expect(p?.modelEfforts && "claude-opus-4-7[1m]" in p.modelEfforts).toBe(false);
+    expect(p?.models?.map((m) => m.id)).not.toContain("claude-opus-4-7");
+    expect(p?.modelEfforts && "claude-opus-4-7" in p.modelEfforts).toBe(false);
   });
 
   it("returns undefined when CLI supports Opus 4.7", () => {

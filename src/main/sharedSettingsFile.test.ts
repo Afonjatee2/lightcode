@@ -68,6 +68,8 @@ describe("sharedSettingsFile", () => {
       notificationSound: true,
       notificationFilter: "unfocused",
       notificationStatuses: { done: true, needsAttention: true, error: true },
+      favoriteModels: [],
+      recentModels: [],
       agentHookSupport: {},
     });
 
@@ -114,6 +116,8 @@ describe("sharedSettingsFile", () => {
       notificationSound: true,
       notificationFilter: "unfocused",
       notificationStatuses: { done: true, needsAttention: true, error: true },
+      favoriteModels: [],
+      recentModels: [],
       agentHookSupport: {},
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');

@@ -223,20 +223,40 @@ export const XTermSurface = forwardRef<
           }
         });
     };
+    const resetForNewPty = () => {
+      scrollbackHydrationToken++;
+      hydratingScrollback = false;
+      bufferedOutputDuringHydration = "";
+      writeBuf = "";
+      if (writeTimer !== 0) {
+        clearTimeout(writeTimer);
+        writeTimer = 0;
+      }
+      terminal.reset();
+      onResetRef.current?.();
+    };
 
     const terminal = new Terminal({
       allowProposedApi: true,
       cursorBlink: false,
       cursorStyle: "bar",
+      cursorInactiveStyle: "outline",
       scrollback: 5_000,
       scrollSensitivity: useSharedSettings.getState().scrollSpeed,
       fastScrollSensitivity: 10,
+      scrollOnEraseInDisplay: true,
       // Keep xterm's internal scrollbar gutter effectively zero; Lightcode
       // renders the visible scrollbar outside the terminal content area.
-      overviewRuler: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },
+      scrollbar: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },
       fontSize: baseFontSizeRef.current,
       fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
       theme: getTerminalTheme(appearance),
+      vtExtensions: {
+        kittyKeyboard: true,
+        win32InputMode: true,
+        colorSchemeQuery: true,
+        kittySgrBoldFaintControl: true,
+      },
       // OSC 8 hyperlinks (e.g. Next.js' "Local: http://localhost:3000" in WSL
       // emits \x1b]8;;URL\x07...\x1b]8;;\x07). Without a handler, xterm falls
       // back to a browser confirm() dialog; we route to the default browser.
@@ -482,9 +502,7 @@ export const XTermSurface = forwardRef<
     // Subscribe to supervisor events - this stays alive for the terminal's entire lifecycle
     const unsubscribe = readBridge().onSupervisorEvent((event) => {
       if (event.type === "thread-reset" && event.threadId === terminalId) {
-        terminal.reset();
-        onResetRef.current?.();
-        hydrateScrollback();
+        resetForNewPty();
         return;
       }
 

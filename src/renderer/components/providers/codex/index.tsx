@@ -9,7 +9,6 @@ import {
   registerProviderIcon,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
-import { withCurrentModel } from "@/renderer/components/thread/threadComposerOptions";
 
 registerProviderIcon("codex", CodexStatusIcon);
 registerCommitGenDefaults("codex", {
@@ -32,44 +31,12 @@ registerConflictResolverDefaults("codex", {
 });
 
 registerComposerControls("codex", ({ capabilities, config, isDisabled, onConfigChange }) => {
-  const availableEfforts =
-    capabilities.modelEfforts?.[config.model ?? ""] ?? capabilities.efforts ?? [];
   const hasPermissions =
     capabilities.approvalPolicies.length > 0 || capabilities.sandboxModes.length > 0;
   const isFullAccess =
     config.approvalPolicy === "never" && config.sandboxMode === "danger-full-access";
 
   return [
-    // Model
-    {
-      options: withCurrentModel(capabilities.models, config.model),
-      value: config.model,
-      isDisabled,
-      onChange: (value: string) => {
-        const nextEfforts = capabilities.modelEfforts?.[value] ?? capabilities.efforts ?? [];
-        const effortValid = nextEfforts.includes(config.effort ?? "");
-        onConfigChange({
-          model: value,
-          ...(!effortValid && nextEfforts.length > 0 ? { effort: nextEfforts[0] } : {}),
-        });
-      },
-    },
-    // Effort
-    ...(availableEfforts.length > 0
-      ? [
-          {
-            iconKind: "effort" as const,
-            options: availableEfforts.map((value) => ({
-              id: value,
-              label: value.charAt(0).toUpperCase() + value.slice(1),
-            })),
-            value: config.effort ?? availableEfforts[0] ?? "",
-            hideLabelOnWrap: true,
-            isDisabled,
-            onChange: (value: string) => onConfigChange({ effort: value }),
-          },
-        ]
-      : []),
     // Plan toggle
     ...(capabilities.modes.length === 2
       ? [

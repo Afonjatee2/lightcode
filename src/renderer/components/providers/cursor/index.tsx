@@ -10,7 +10,6 @@ import {
   registerProviderIcon,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
-import { withCurrentModel } from "@/renderer/components/thread/threadComposerOptions";
 
 registerProviderIcon("cursor", CursorIcon);
 registerCommitGenDefaults("cursor", {
@@ -36,12 +35,6 @@ registerComposerControls("cursor", ({ capabilities, config, isDisabled, onConfig
   const hasPlanMode = capabilities.modes.includes("plan");
 
   const controls: ComposerControl[] = [
-    {
-      options: withCurrentModel(capabilities.models, config.model),
-      value: config.model,
-      isDisabled,
-      onChange: (value: string) => onConfigChange({ model: value }),
-    },
     ...(hasPlanMode
       ? [
           {

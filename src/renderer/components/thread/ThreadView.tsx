@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
-import { ArrowRightLeft, ChevronDown, CircleCheck, GitFork, Paperclip, X } from "lucide-react";
+import { ArrowRightLeft, ChevronDown, CircleCheck, GitFork, Paperclip, X, Zap } from "lucide-react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -13,6 +13,7 @@ import type {
 } from "@/shared/contracts";
 
 import { ProviderIcon, getComposerControls, getStatusTone } from "@/renderer/components/providers";
+import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import {
@@ -20,6 +21,7 @@ import {
   type BranchSelection,
   Button,
   PixelLoader,
+  type ProviderModelMenuProvider,
   TuxIcon,
 } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -34,7 +36,7 @@ import {
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import { filterHiddenModels } from "./threadComposerOptions";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
-import { ThreadComposer } from "./ThreadComposer";
+import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 
@@ -127,31 +129,113 @@ function buildControls(
   agentStatus: AgentStatus | undefined,
   hiddenModelIds: readonly string[] | undefined,
   onConfigChange: (config: ThreadConfig) => void,
-) {
+): ComposerControl[] {
   const isCliThread = (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
-  if (isCliThread) {
-    return [];
+  if (isCliThread) return [];
+  if (!agentStatus) return [];
+
+  const filteredCaps = filterHiddenModels(agentStatus.capabilities, hiddenModelIds);
+  const isDisabled = !thread.canResumeWithConfig;
+  const onPatch = (patch: Partial<ThreadConfig>) => onConfigChange({ ...thread.config, ...patch });
+  const provider: ProviderModelMenuProvider = {
+    kind: thread.agentKind,
+    label: agentStatus.label,
+    capabilities: filteredCaps,
+  };
+
+  const efforts = (
+    filteredCaps.modelEfforts?.[thread.config.model] ??
+    filteredCaps.efforts ??
+    []
+  ).map((id) => ({
+    id,
+    label: id.charAt(0).toUpperCase() + id.slice(1),
+  }));
+  const modelContext = filteredCaps.modelContextSizes?.[thread.config.model];
+  const contextSizes =
+    (modelContext
+      ? filteredCaps.contextSizes?.filter((c) => modelContext.includes(c.id))
+      : undefined) ?? [];
+  const supportsFast = filteredCaps.fastModels?.includes(thread.config.model) ?? false;
+
+  const controls: ComposerControl[] = [
+    {
+      kind: "provider-model",
+      providers: [provider],
+      currentAgentKind: thread.agentKind,
+      currentModel: thread.config.model,
+      lockedAgentKind: thread.agentKind,
+      isDisabled,
+      hideLabelOnWrap: true,
+      onChange: ({ model }) => {
+        const nextEfforts = filteredCaps.modelEfforts?.[model] ?? filteredCaps.efforts ?? [];
+        const effortValid = thread.config.effort
+          ? nextEfforts.includes(thread.config.effort)
+          : true;
+        const nextContextIds = filteredCaps.modelContextSizes?.[model];
+        const contextValid =
+          !thread.config.contextSize ||
+          (nextContextIds ? nextContextIds.includes(thread.config.contextSize) : false);
+        // First entry in the per-model context list is the model's default; fall
+        // back to the global default only when the model is unmapped.
+        const nextContextDefault = nextContextIds?.[0] ?? filteredCaps.defaultContextSize;
+        onPatch({
+          model,
+          ...(!effortValid && nextEfforts.length > 0 ? { effort: nextEfforts[0] } : {}),
+          ...(!contextValid && nextContextDefault ? { contextSize: nextContextDefault } : {}),
+          ...(filteredCaps.fastModels?.includes(model) ? {} : { fast: false }),
+        });
+      },
+    },
+  ];
+
+  if (efforts.length > 0 || contextSizes.length > 0) {
+    controls.push({
+      kind: "effort-context",
+      efforts,
+      ...(thread.config.effort ? { effortValue: thread.config.effort } : {}),
+      onEffortChange: (value) => onPatch({ effort: value }),
+      contextSizes,
+      ...(thread.config.contextSize ? { contextValue: thread.config.contextSize } : {}),
+      onContextChange: (value) => onPatch({ contextSize: value }),
+      isDisabled,
+      hideLabelOnWrap: true,
+      icon:
+        efforts.length > 0 ? (
+          <EffortIcon
+            className="size-4 text-foreground"
+            effort={thread.config.effort ?? ""}
+            efforts={efforts.map((e) => e.id)}
+          />
+        ) : undefined,
+    });
   }
 
-  const statusTone = getStatusTone(thread);
-  const factory = getComposerControls(thread.agentKind);
+  if (supportsFast) {
+    controls.push({
+      kind: "toggle",
+      label: "Fast",
+      icon: <Zap className="size-3.5" />,
+      hideLabelOnWrap: true,
+      isSelected: thread.config.fast === true,
+      isDisabled,
+      onChange: (selected) => onPatch({ fast: selected }),
+    });
+  }
 
-  return [
-    {
-      kind: "static" as const,
-      value: agentStatus?.label ?? thread.agentKind,
-      iconOnly: true,
-      icon: <ProviderIcon kind={thread.agentKind} tone={statusTone} className="size-4 shrink-0" />,
-    },
-    ...(factory && agentStatus
-      ? factory({
-          capabilities: filterHiddenModels(agentStatus.capabilities, hiddenModelIds),
-          config: thread.config,
-          isDisabled: !thread.canResumeWithConfig,
-          onConfigChange: (patch) => onConfigChange({ ...thread.config, ...patch }),
-        })
-      : []),
-  ];
+  const factory = getComposerControls(thread.agentKind);
+  if (factory) {
+    controls.push(
+      ...factory({
+        capabilities: filteredCaps,
+        config: thread.config,
+        isDisabled,
+        onConfigChange: onPatch,
+      }),
+    );
+  }
+
+  return controls;
 }
 
 function ThreadComposerSection(props: {
@@ -580,6 +664,10 @@ export function ThreadView(props: {
 
     launchRequestRef.current = launchKey;
     onLaunchConsumed?.();
+
+    if (thread.config.model) {
+      useSharedSettings.getState().pushRecentModel(thread.agentKind, thread.config.model);
+    }
 
     void readBridge()
       .startThread({

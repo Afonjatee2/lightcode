@@ -517,6 +517,14 @@ body {
   --tw-ring-offset-shadow: 0 0 #0000 !important;
 }
 
+.lightcode-model-menu-listbox:focus-visible,
+.lightcode-model-menu-listbox[data-focus-visible="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: 0 0 #0000 !important;
+  --tw-ring-offset-shadow: 0 0 #0000 !important;
+}
+
 .lightcode-composer-editor.textarea,
 .lightcode-composer-editor.input-group,
 .lightcode-composer-editor .textarea,

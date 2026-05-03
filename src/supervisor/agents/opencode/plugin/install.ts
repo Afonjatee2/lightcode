@@ -1,4 +1,12 @@
-import { copyFileSync, mkdirSync, readFileSync, statSync, unlinkSync } from "node:fs";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,60 +22,80 @@ import {
   readBundledPluginVersion,
   readPluginManifest,
   stagePluginAssetsToWsl,
-  verifyStagedPluginAt,
   type PluginManifest,
 } from "../../plugin/installerBase";
 
 /**
  * OpenCode plugin installer.
  *
- * Unlike Claude/Codex/Gemini — which stage `forward.mjs` and render a
- * settings document so the agent CLI invokes the forwarder via shell command —
- * OpenCode loads plugin files in-process from `~/.config/opencode/plugins/`.
- * So "install" here means:
- *   1. Stage `plugin.mjs` + `plugin.json` to a canonical lightcode-managed
- *      location (`~/.lightcode/agent-plugins/opencode/`) — used for version
- *      bookkeeping, the manifest the supervisor reads at boot, and as the
- *      authoritative source for the file that gets dropped into OpenCode.
- *   2. Copy `plugin.mjs` to OpenCode's auto-scanned plugins directory as
- *      `lightcode-status.js` — OpenCode globs `{plugin,plugins}/*.{ts,js}`
- *      and ignores other extensions. OpenCode picks it up on next launch.
+ * Unlike Claude/Codex/Gemini — which stage `forward.mjs` and render a settings
+ * document so the agent CLI invokes the forwarder via shell command — OpenCode
+ * loads plugin files in-process. So "install" here means:
  *
- * The plugin file itself reads `LIGHTCODE_HOOK_URL` / `LIGHTCODE_HOOK_SECRET`
- * / `LIGHTCODE_THREAD_ID` etc. from `process.env` at hook time. When those
+ *   1. Stage `plugin.json` + `lightcode-status.mjs` to
+ *      `~/.lightcode/agent-plugins/opencode/` (the canonical lightcode-managed
+ *      location used for version bookkeeping and the manifest the supervisor
+ *      reads at boot).
+ *   2. Copy the staged plugin into OpenCode's auto-discovery directory at
+ *      `~/.config/opencode/plugins/lightcode-status.js`. OpenCode globs
+ *      `{plugin,plugins}/*.{ts,js}` (no `.mjs`!) so the deployed file uses
+ *      `.js`. Bun (OpenCode's runtime) treats ESM syntax in `.js` natively.
+ *
+ * Why drop into `plugins/` instead of registering a `file://` spec in
+ * `~/.config/opencode/opencode.json`: empirically, an opencode.json reference
+ * to a file under `~/.lightcode/` did not load reliably in OpenCode 1.14.31
+ * across Windows/WSL — auto-discovery from `plugins/` is the well-trodden
+ * path every other ecosystem plugin (Warp, sample plugins) uses, and the
+ * displayed name in OpenCode's TUI status panel comes from the basename of
+ * the dropped file, so naming the drop `lightcode-status.js` gives the right
+ * label without further plumbing.
+ *
+ * Older lightcode builds added a `file://` plugin entry to opencode.json that
+ * would now be a dead reference; install removes it on every run so users
+ * upgrading from those builds aren't left with a ghost entry.
+ *
+ * The plugin reads `LIGHTCODE_HOOK_URL` / `LIGHTCODE_HOOK_SECRET` /
+ * `LIGHTCODE_THREAD_ID` etc. from `process.env` at hook time. When those
  * vars are unset (i.e. the user runs `opencode` outside Lightcode) the
  * handlers no-op.
  */
 
-/** The two assets we publish — manifest for version reads + the plugin code. */
-const OPENCODE_PLUGIN_ASSET_FILES = ["plugin.json", "plugin.mjs"] as const;
+/** Files staged into `~/.lightcode/agent-plugins/opencode/`. */
+const OPENCODE_PLUGIN_ASSET_FILES = ["plugin.json", "lightcode-status.mjs"] as const;
 
 /**
  * Filename OpenCode auto-discovers in its plugins/ directory. Must use a `.js`
  * (or `.ts`) extension — OpenCode's loader scans `{plugin,plugins}/*.{ts,js}`
- * and silently ignores any other extension, so a `.mjs` drop is invisible to
- * it. The file's content is still ESM (top-level `import`) and runs fine under
- * Bun, which is OpenCode's runtime.
+ * and silently ignores any other extension.
  */
-const OPENCODE_PLUGIN_FILE_NAME = "lightcode-status.js";
+const OPENCODE_PLUGIN_DROP_FILE_NAME = "lightcode-status.js";
+
+/**
+ * Filename of the manifest we drop next to the plugin file. Lets the plugin
+ * read its version at runtime from `import.meta.url`'s directory.
+ */
+const OPENCODE_PLUGIN_DROP_MANIFEST_NAME = "lightcode-status.plugin.json";
 
 /**
  * Older Lightcode versions dropped a `.mjs` here, which OpenCode never loaded
- * (see comment above). Cleaned up at install/uninstall time so a user
- * upgrading doesn't end up with two stale siblings.
+ * (auto-discovery is `*.{ts,js}` only). Cleaned up at install/uninstall time
+ * so users upgrading don't end up with two stale siblings.
  */
-const OPENCODE_PLUGIN_LEGACY_FILE_NAME = "lightcode-status.mjs";
+const OPENCODE_LEGACY_DROP_FILES = ["lightcode-status.mjs"] as const;
 
 /**
- * Filename of the manifest dropped alongside the plugin file. The plugin code
- * reads `<basename>.plugin.json` from `import.meta.url`'s directory at load
- * time so `pluginVersion` in every emitted envelope reflects the staged
- * version.
+ * Substring identifying our entry in the user's `opencode.json` `"plugin"`
+ * array. Older lightcode versions registered a `file://` URL here pointing
+ * at the staged plugin under `~/.lightcode/`. We no longer write such an
+ * entry but still scrub any prior one out on every install / uninstall.
  */
-const OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME = "lightcode-status.plugin.json";
+const LIGHTCODE_PLUGIN_SPEC_MARKER = "agent-plugins/opencode/";
+
+const OPENCODE_CONFIG_FILE_NAME = "opencode.json";
 
 export interface OpenCodePluginPaths {
   pluginDir: string;
+  /** Path to the dropped file OpenCode auto-discovers. */
   opencodePluginFile: string;
   version: string;
 }
@@ -88,26 +116,41 @@ export function readBundledOpenCodePluginVersion(): string {
 }
 
 /**
- * Resolve the directory OpenCode auto-scans for plugins on the current
- * environment. Honors `OPENCODE_CONFIG_DIR` for native installs (per
+ * Resolve the directory OpenCode reads its global config from. Honors
+ * `OPENCODE_CONFIG_DIR` for native installs (per
  * https://opencode.ai/docs/config); WSL always uses `$HOME/.config/opencode`
  * inside the distro because the host can't introspect the distro's env.
  */
-function resolveOpenCodeNativePluginsDir(): string {
+function resolveOpenCodeNativeConfigDir(): string {
   const override = process.env.OPENCODE_CONFIG_DIR;
   if (override && override.trim().length > 0) {
-    return resolve(override, "plugins");
+    return resolve(override);
   }
-  return join(homedir(), ".config", "opencode", "plugins");
+  return join(homedir(), ".config", "opencode");
+}
+
+function resolveOpenCodeNativePluginsDir(): string {
+  return join(resolveOpenCodeNativeConfigDir(), "plugins");
+}
+
+function resolveOpenCodeWslConfigDir(
+  distro: string,
+): { linuxDir: string; uncDir: string } | undefined {
+  const home = resolveWslHomeDirectory(distro);
+  if (!home) return undefined;
+  const linuxDir = `${home}/.config/opencode`;
+  return { linuxDir, uncDir: toWslUncPath(distro, linuxDir) };
 }
 
 function resolveOpenCodeWslPluginsDir(
   distro: string,
 ): { linuxDir: string; uncDir: string } | undefined {
-  const home = resolveWslHomeDirectory(distro);
-  if (!home) return undefined;
-  const linuxDir = `${home}/.config/opencode/plugins`;
-  return { linuxDir, uncDir: toWslUncPath(distro, linuxDir) };
+  const cfg = resolveOpenCodeWslConfigDir(distro);
+  if (!cfg) return undefined;
+  return {
+    linuxDir: `${cfg.linuxDir}/plugins`,
+    uncDir: `${cfg.uncDir}\\plugins`,
+  };
 }
 
 export function getOpenCodePluginPaths(ctx?: AgentEnvContext): OpenCodePluginPaths {
@@ -125,7 +168,9 @@ export function getOpenCodePluginPaths(ctx?: AgentEnvContext): OpenCodePluginPat
     const opencodeDir = resolveOpenCodeWslPluginsDir(ctx.wslDistro);
     return {
       pluginDir: wsl.linuxBase,
-      opencodePluginFile: opencodeDir ? `${opencodeDir.linuxDir}/${OPENCODE_PLUGIN_FILE_NAME}` : "",
+      opencodePluginFile: opencodeDir
+        ? `${opencodeDir.linuxDir}/${OPENCODE_PLUGIN_DROP_FILE_NAME}`
+        : "",
       version,
     };
   }
@@ -138,7 +183,7 @@ export function getOpenCodePluginPaths(ctx?: AgentEnvContext): OpenCodePluginPat
   }
   return {
     pluginDir,
-    opencodePluginFile: join(resolveOpenCodeNativePluginsDir(), OPENCODE_PLUGIN_FILE_NAME),
+    opencodePluginFile: join(resolveOpenCodeNativePluginsDir(), OPENCODE_PLUGIN_DROP_FILE_NAME),
     version,
   };
 }
@@ -169,13 +214,13 @@ export function installOpenCodePlugin(
   copyPluginAssetsIfStale(sourceDir, pluginDir, OPENCODE_PLUGIN_ASSET_FILES);
 
   const opencodePluginsDir = resolveOpenCodeNativePluginsDir();
-  const opencodePluginFile = join(opencodePluginsDir, OPENCODE_PLUGIN_FILE_NAME);
-  const opencodeManifestFile = join(opencodePluginsDir, OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME);
+  const opencodePluginFile = join(opencodePluginsDir, OPENCODE_PLUGIN_DROP_FILE_NAME);
+  const opencodeManifestFile = join(opencodePluginsDir, OPENCODE_PLUGIN_DROP_MANIFEST_NAME);
   try {
     mkdirSync(opencodePluginsDir, { recursive: true });
-    copyFileSync(join(pluginDir, "plugin.mjs"), opencodePluginFile);
+    copyFileSync(join(pluginDir, "lightcode-status.mjs"), opencodePluginFile);
     copyFileSync(join(pluginDir, "plugin.json"), opencodeManifestFile);
-    removeIfPresent(join(opencodePluginsDir, OPENCODE_PLUGIN_LEGACY_FILE_NAME));
+    cleanupLegacyDrops(opencodePluginsDir);
   } catch (error) {
     return {
       ok: false,
@@ -184,6 +229,11 @@ export function installOpenCodePlugin(
       }`,
     };
   }
+
+  // Best-effort: scrub the dead `file://...` entry older lightcode versions
+  // wrote into opencode.json. Failure here doesn't block install — the plugin
+  // is already loadable via auto-discovery.
+  removePluginEntryFromConfig(join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME));
 
   console.log(
     `[supervisor] OpenCode hook plugin staged v${manifest.version} at ${pluginDir} ` +
@@ -213,18 +263,17 @@ function installOpenCodePluginWsl(
       reason: `failed to resolve OpenCode plugins dir in wsl distro ${distro} (could not read $HOME)`,
     };
   }
-  const opencodePluginFile = `${opencodeDir.linuxDir}/${OPENCODE_PLUGIN_FILE_NAME}`;
-  const opencodePluginUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_FILE_NAME}`;
-  const opencodeManifestUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME}`;
-  const opencodeLegacyUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_LEGACY_FILE_NAME}`;
-  const stagedPluginUnc = toWslUncPath(distro, `${linuxPluginDir}/plugin.mjs`);
+  const opencodePluginFile = `${opencodeDir.linuxDir}/${OPENCODE_PLUGIN_DROP_FILE_NAME}`;
+  const opencodePluginUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_DROP_FILE_NAME}`;
+  const opencodeManifestUnc = `${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_DROP_MANIFEST_NAME}`;
+  const stagedPluginUnc = toWslUncPath(distro, `${linuxPluginDir}/lightcode-status.mjs`);
   const stagedManifestUnc = toWslUncPath(distro, `${linuxPluginDir}/plugin.json`);
 
   try {
     mkdirSync(opencodeDir.uncDir, { recursive: true });
     copyFileSync(stagedPluginUnc, opencodePluginUnc);
     copyFileSync(stagedManifestUnc, opencodeManifestUnc);
-    removeIfPresent(opencodeLegacyUnc);
+    cleanupLegacyDrops(opencodeDir.uncDir, "wsl");
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
     return {
@@ -233,8 +282,15 @@ function installOpenCodePluginWsl(
     };
   }
 
+  // Same scrub on the WSL-side opencode.json.
+  const cfgDir = resolveOpenCodeWslConfigDir(distro);
+  if (cfgDir) {
+    removePluginEntryFromConfig(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`);
+  }
+
   console.log(
-    `[supervisor] OpenCode hook plugin staged v${manifest.version} in WSL distro ${distro} at ${linuxPluginDir} → ${opencodePluginFile}`,
+    `[supervisor] OpenCode hook plugin staged v${manifest.version} in WSL distro ${distro} ` +
+      `at ${linuxPluginDir} → ${opencodePluginFile}`,
   );
 
   return {
@@ -271,57 +327,129 @@ function verifyOpenCodeInstallAt(
   readableOpencodeDir: string,
   target: "native" | "wsl",
 ): { installed: boolean; version?: string } {
-  // Native uses `path.join` (platform-native separator). WSL paths are UNC
-  // strings (`\\wsl.localhost\<distro>\...`) so we always concat with `\`.
+  let version: string;
+  try {
+    version = readPluginManifest(readableStagingDir).version;
+  } catch {
+    return { installed: false };
+  }
+  for (const asset of OPENCODE_PLUGIN_ASSET_FILES) {
+    if (!existsSync(join(readableStagingDir, asset))) return { installed: false };
+  }
   const joinDropped = (name: string) =>
     target === "wsl" ? `${readableOpencodeDir}\\${name}` : join(readableOpencodeDir, name);
-  const droppedPlugin = joinDropped(OPENCODE_PLUGIN_FILE_NAME);
-  const droppedManifest = joinDropped(OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME);
-  // Byte-for-byte equality on both files: a hand-edited drop is treated as
-  // not-installed so the next install call restages.
-  const filesByteMatch = (): boolean => {
-    try {
-      const stagedPlugin = readFileSync(join(readableStagingDir, "plugin.mjs"));
-      const droppedPluginBuf = readFileSync(droppedPlugin);
-      if (stagedPlugin.length !== droppedPluginBuf.length) return false;
-      if (!stagedPlugin.equals(droppedPluginBuf)) return false;
-      const stagedManifest = readFileSync(join(readableStagingDir, "plugin.json"));
-      const droppedManifestBuf = readFileSync(droppedManifest);
-      if (stagedManifest.length !== droppedManifestBuf.length) return false;
-      return stagedManifest.equals(droppedManifestBuf);
-    } catch {
-      return false;
-    }
-  };
-  return verifyStagedPluginAt(readableStagingDir, target, {
-    assets: OPENCODE_PLUGIN_ASSET_FILES,
-    requireNativeWrapper: false,
-    extraCheck: filesByteMatch,
-  });
+  const droppedPlugin = joinDropped(OPENCODE_PLUGIN_DROP_FILE_NAME);
+  const droppedManifest = joinDropped(OPENCODE_PLUGIN_DROP_MANIFEST_NAME);
+  // Byte-for-byte equality so a hand-edited drop is treated as not-installed
+  // and the next install call restages.
+  try {
+    const stagedPlugin = readFileSync(join(readableStagingDir, "lightcode-status.mjs"));
+    const droppedBuf = readFileSync(droppedPlugin);
+    if (stagedPlugin.length !== droppedBuf.length) return { installed: false };
+    if (!stagedPlugin.equals(droppedBuf)) return { installed: false };
+    const stagedManifest = readFileSync(join(readableStagingDir, "plugin.json"));
+    const droppedManifestBuf = readFileSync(droppedManifest);
+    if (stagedManifest.length !== droppedManifestBuf.length) return { installed: false };
+    if (!stagedManifest.equals(droppedManifestBuf)) return { installed: false };
+  } catch {
+    return { installed: false };
+  }
+  return { installed: true, version };
 }
 
-// Removes the dropped `lightcode-status.js` + `lightcode-status.plugin.json`
-// (and any legacy `lightcode-status.mjs`) from OpenCode's plugins/ directory;
-// staging dir stays so version diagnostics survive. Best-effort: missing
-// files / unreachable distros are swallowed.
+function cleanupLegacyDrops(pluginsDir: string, target: "native" | "wsl" = "native"): void {
+  for (const name of OPENCODE_LEGACY_DROP_FILES) {
+    const path = target === "wsl" ? `${pluginsDir}\\${name}` : join(pluginsDir, name);
+    removeIfPresent(path);
+  }
+}
+
+interface ReadJsonOk {
+  ok: true;
+  value: unknown;
+}
+interface ReadJsonErr {
+  ok: false;
+  reason: string;
+}
+function readJsonFileOrEmpty(path: string): ReadJsonOk | ReadJsonErr {
+  if (!existsSync(path)) return { ok: true, value: {} };
+  let raw: string;
+  try {
+    raw = readFileSync(path, "utf8");
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `failed to read ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (raw.trim().length === 0) return { ok: true, value: {} };
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: `malformed JSON in ${path}: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+/**
+ * Strip the lightcode-managed `file://` plugin entry from an existing
+ * `opencode.json` (left behind by an older lightcode build that registered
+ * the plugin via the config file). Best-effort: missing files / malformed
+ * config are swallowed.
+ */
+function removePluginEntryFromConfig(configPath: string): void {
+  const read = readJsonFileOrEmpty(configPath);
+  if (!read.ok || !read.value || typeof read.value !== "object" || Array.isArray(read.value)) {
+    return;
+  }
+  const config = read.value as Record<string, unknown>;
+  const existing = config.plugin;
+  if (!Array.isArray(existing)) return;
+  const filtered = existing.filter((entry) => {
+    if (typeof entry !== "string") return true;
+    return !entry.includes(LIGHTCODE_PLUGIN_SPEC_MARKER);
+  });
+  if (filtered.length === existing.length) return;
+  if (filtered.length === 0) {
+    delete config.plugin;
+  } else {
+    config.plugin = filtered;
+  }
+  try {
+    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+  } catch {
+    // best-effort
+  }
+}
+
+/**
+ * Removes the dropped plugin file from OpenCode's plugins/ directory and any
+ * legacy drops, plus scrubs the lightcode entry from opencode.json. Staging
+ * dir under `~/.lightcode/` stays so version diagnostics survive.
+ * Best-effort: missing files / unreachable distros are swallowed.
+ */
 export function uninstallOpenCodePlugin(ctx?: AgentEnvContext): void {
-  const targets: string[] = [];
   if (isWslPluginContext(ctx)) {
     const opencodeDir = resolveOpenCodeWslPluginsDir(ctx.wslDistro);
     if (opencodeDir) {
-      targets.push(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_FILE_NAME}`);
-      targets.push(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME}`);
-      targets.push(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_LEGACY_FILE_NAME}`);
+      removeIfPresent(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_DROP_FILE_NAME}`);
+      removeIfPresent(`${opencodeDir.uncDir}\\${OPENCODE_PLUGIN_DROP_MANIFEST_NAME}`);
+      cleanupLegacyDrops(opencodeDir.uncDir, "wsl");
     }
-  } else {
-    const dir = resolveOpenCodeNativePluginsDir();
-    targets.push(join(dir, OPENCODE_PLUGIN_FILE_NAME));
-    targets.push(join(dir, OPENCODE_PLUGIN_MANIFEST_DROPPED_NAME));
-    targets.push(join(dir, OPENCODE_PLUGIN_LEGACY_FILE_NAME));
+    const cfgDir = resolveOpenCodeWslConfigDir(ctx.wslDistro);
+    if (cfgDir) {
+      removePluginEntryFromConfig(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`);
+    }
+    return;
   }
-  for (const target of targets) {
-    removeIfPresent(target);
-  }
+  const pluginsDir = resolveOpenCodeNativePluginsDir();
+  removeIfPresent(join(pluginsDir, OPENCODE_PLUGIN_DROP_FILE_NAME));
+  removeIfPresent(join(pluginsDir, OPENCODE_PLUGIN_DROP_MANIFEST_NAME));
+  cleanupLegacyDrops(pluginsDir);
+  removePluginEntryFromConfig(join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME));
 }
 
 function removeIfPresent(path: string): void {
