@@ -485,6 +485,11 @@ function WindowedProviderModelList(props: {
   const viewportHeight = Math.min(totalHeight, MODEL_MENU_MAX_HEIGHT);
   const visibleRowCount = Math.max(1, Math.ceil(viewportHeight / MODEL_MENU_ROW_HEIGHT));
   const clampedVisibleRow = Math.min(visibleRow, Math.max(0, items.length - 1));
+  const startIndex = Math.max(0, clampedVisibleRow - MODEL_MENU_OVERSCAN_ROWS);
+  const endIndex = Math.min(
+    items.length,
+    startIndex + visibleRowCount + MODEL_MENU_OVERSCAN_ROWS * 2,
+  );
   const stickyHeaderIndex = meta.stickyHeaderIndexByRow[clampedVisibleRow] ?? -1;
   const stickyHeader =
     stickyHeaderIndex >= 0 &&
@@ -492,12 +497,9 @@ function WindowedProviderModelList(props: {
       items[stickyHeaderIndex]?.type === "header-provider")
       ? items[stickyHeaderIndex]
       : null;
-  const shouldShowStickyHeader = stickyHeader !== null && stickyHeaderIndex < clampedVisibleRow;
-  const startIndex = Math.max(0, clampedVisibleRow - MODEL_MENU_OVERSCAN_ROWS);
-  const endIndex = Math.min(
-    items.length,
-    startIndex + visibleRowCount + MODEL_MENU_OVERSCAN_ROWS * 2,
-  );
+  const stickyHeaderIsRendered = stickyHeaderIndex >= startIndex && stickyHeaderIndex < endIndex;
+  const shouldShowStickyHeader =
+    stickyHeader !== null && stickyHeaderIndex < clampedVisibleRow && !stickyHeaderIsRendered;
   const topSpacerHeight = itemTop(meta, startIndex);
   const bottomSpacerHeight = Math.max(0, totalHeight - itemTop(meta, endIndex));
   const visibleItems = items.slice(startIndex, endIndex);
