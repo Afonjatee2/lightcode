@@ -75,7 +75,8 @@ pnpm run dist:linux  # Linux
 | `pnpm run dist`      | Package for all platforms |
 | `pnpm run typecheck` | Type checking             |
 | `pnpm run lint`      | Linting                   |
-| `pnpm run fmt`       | Code formatting           |
+| `pnpm run fmt:check` | Check code formatting     |
+| `pnpm run fmt`       | Write code formatting     |
 | `pnpm run test`      | Run tests                 |
 
 ## Tech Stack
