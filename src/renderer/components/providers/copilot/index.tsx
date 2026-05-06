@@ -3,6 +3,7 @@ export * from "./CopilotIcon";
 import { ClipboardList } from "lucide-react";
 import { CopilotIcon } from "./CopilotIcon";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
+import type { ThreadConfig } from "@/shared/contracts";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
@@ -31,35 +32,55 @@ registerConflictResolverDefaults("copilot", {
   effort: "",
 });
 
-registerComposerControls("copilot", ({ capabilities, config, isDisabled, onConfigChange }) => {
-  const hasPlanMode = capabilities.modes.includes("plan");
+// Copilot calls this "Autopilot" in its CLI/docs (`--yolo` flag, `autopilot`
+// ACP session mode). We surface Copilot's own terminology rather than the
+// generic "Bypass Approvals" label other adapters use.
+function copilotAutopilotToggle({
+  config,
+  isDisabled,
+  onConfigChange,
+}: {
+  config: ThreadConfig;
+  isDisabled: boolean;
+  onConfigChange: (patch: Partial<ThreadConfig>) => void;
+}): ComposerControl {
+  return {
+    kind: "toggle",
+    label: "Autopilot",
+    iconKind: "permission",
+    isSelected: (config.approvalPolicy ?? "never") === "never",
+    hideLabelOnWrap: true,
+    isDisabled,
+    onChange: (isSelected) => onConfigChange({ approvalPolicy: isSelected ? "never" : "default" }),
+  };
+}
 
-  const controls: ComposerControl[] = [
-    ...(hasPlanMode
+registerComposerControls("copilot", {
+  // Plan toggle is shared: ACP exposes it as a session mode and the CLI maps
+  // it to a `/plan` slash-command prefix. Both surfaces accept the same
+  // `mode: "plan"` config value.
+  shared: ({ capabilities, config, isDisabled, onConfigChange }) =>
+    capabilities.modes.includes("plan")
       ? [
           {
-            kind: "toggle" as const,
+            kind: "toggle",
             label: "Plan",
             icon: <ClipboardList className="size-3.5" />,
             isSelected: config.mode === "plan",
             hideLabelOnWrap: true,
             isDisabled,
-            onChange: (isSelected: boolean) =>
-              onConfigChange({ mode: isSelected ? "plan" : "agent" }),
+            onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
           },
         ]
-      : []),
-    {
-      kind: "toggle" as const,
-      label: "Bypass Approvals",
-      iconKind: "permission" as const,
-      isSelected: (config.approvalPolicy ?? "never") === "never",
-      hideLabelOnWrap: true,
-      isDisabled,
-      onChange: (isSelected: boolean) =>
-        onConfigChange({ approvalPolicy: isSelected ? "never" : "default" }),
-    },
-  ];
-
-  return controls;
+      : [],
+  // ACP exposes Plan/Agent/Autopilot as a single mutually-exclusive
+  // session-mode field, so hide Autopilot while Plan is on to avoid
+  // suggesting a combination the protocol can't represent.
+  gui: ({ config, isDisabled, onConfigChange }) =>
+    config.mode === "plan" ? [] : [copilotAutopilotToggle({ config, isDisabled, onConfigChange })],
+  // CLI: `/plan` and `--yolo` are independent flags, so Autopilot is always
+  // available regardless of Plan state.
+  terminal: ({ config, isDisabled, onConfigChange }) => [
+    copilotAutopilotToggle({ config, isDisabled, onConfigChange }),
+  ],
 });

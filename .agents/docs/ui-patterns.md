@@ -25,6 +25,13 @@ Before creating a new component, check if an existing one handles the use case.
 - **`BranchSelector`** handles branch picking and worktree creation in `ThreadDraftView`. Reuse it for any branch-related UI.
 - **`OptionMenu`** is the dropdown for model/effort/permission selections. It supports custom label formatters via the provider registry.
 
+## ACP Composer Behavior
+
+- **Inline file mentions stay text-first, then serialize to structured segments.** `MentionInput` + `serializeMentions` accept raw `@path` tokens, so repo-relative references like `@.agents/docs/ui-patterns.md` become `{ kind: "file" }` prompt segments on submit without requiring a picker chip.
+- **ACP resource paths resolve from the active project root.** Relative file mentions and attachments are normalized before ACP conversion so Windows, WSL, spaces, and `file://` URIs stay valid.
+- **GUI ACP threads support steering via follow-up submits while working.** A new submit during `working` interrupts the active turn, queues the follow-up as structured `{ prompt, segments, config }`, and drains queued turns FIFO once the session returns to `idle` / `needs_reply`.
+- **Terminal presentation stays PTY-owned.** Do not add queueing or fake stop/steering UI to terminal-native threads; the terminal surface remains the source of truth there.
+
 ## Provider Registration (Plugin Pattern)
 
 The renderer is provider-agnostic. Provider-specific rendering is registered via side-effect imports in `src/renderer/components/providers/` — no provider-specific if/else in shared UI, layout, or thread components:

@@ -1,9 +1,11 @@
 import type {
+  AgentInstanceId,
   AppView,
   SessionRef,
   Thread,
   ThreadAttention,
   ThreadConfig,
+  ThreadPresentationMode,
   ThreadRuntimeSnapshot,
   ThreadServerRequestId,
   ThreadStatus,
@@ -23,6 +25,7 @@ export interface ThreadSlice {
   createThread: (input: {
     projectId: string;
     agentKind: Thread["agentKind"];
+    agentInstanceId?: AgentInstanceId;
     config: ThreadConfig;
     prompt: string;
     worktreePath?: string;
@@ -30,6 +33,7 @@ export interface ThreadSlice {
     groupId?: string;
     groupName?: string;
     replacePaneId?: string;
+    presentationMode?: ThreadPresentationMode;
   }) => Thread;
   deleteThread: (threadId: string) => void;
   renameThread: (threadId: string, title: string) => void;
@@ -83,6 +87,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
   createThread: ({
     projectId,
     agentKind,
+    agentInstanceId,
     config,
     prompt,
     worktreePath,
@@ -90,6 +95,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
     groupId,
     groupName,
     replacePaneId: replacePaneIdParam,
+    presentationMode,
   }) => {
     const now = new Date().toISOString();
     const thread: Thread = {
@@ -97,6 +103,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       projectId,
       title: makeThreadTitle(prompt),
       agentKind,
+      ...(agentInstanceId ? { agentInstanceId } : {}),
       config,
       status: "launching",
       attention: "none",
@@ -104,6 +111,8 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       archived: false,
       done: false,
       starred: false,
+      presentationMode: presentationMode ?? "terminal",
+      threadStatusSource: (presentationMode ?? "terminal") !== "terminal" ? "server" : undefined,
       ...(worktreePath ? { worktreePath } : {}),
       ...(worktreeBranch ? { worktreeBranch } : {}),
       ...(groupId ? { groupId } : {}),
@@ -142,6 +151,12 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         nextView = removePaneFromView(state.view, threadId);
       }
 
+      const { [threadId]: _droppedItemIds, ...runtimeItemIdsByThread } =
+        state.runtimeItemIdsByThread;
+      const { [threadId]: _droppedItems, ...runtimeItemsByIdByThread } =
+        state.runtimeItemsByIdByThread;
+      const { [threadId]: _droppedReqs, ...runtimeRequestsByThread } =
+        state.runtimeRequestsByThread;
       return {
         threads: nextThreads,
         pendingServerRequests: state.pendingServerRequests.filter(
@@ -153,6 +168,9 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         pendingLaunchSegments: Object.fromEntries(
           Object.entries(state.pendingLaunchSegments).filter(([id]) => id !== threadId),
         ),
+        runtimeItemIdsByThread,
+        runtimeItemsByIdByThread,
+        runtimeRequestsByThread,
         view: nextView,
       };
     }),
@@ -163,17 +181,21 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       ),
     })),
   updateThreadConfig: (threadId, config) =>
-    set((state) => ({
-      threads: state.threads.map((thread) =>
-        thread.id === threadId
-          ? {
-              ...thread,
-              config: stripPlanMode(config),
-              updatedAt: new Date().toISOString(),
-            }
-          : thread,
-      ),
-    })),
+    set((state) => {
+      let changed = false;
+      const threads = state.threads.map((thread) => {
+        if (thread.id !== threadId) return thread;
+        const nextConfig = thread.presentationMode === "gui" ? config : stripPlanMode(config);
+        if (JSON.stringify(thread.config) === JSON.stringify(nextConfig)) return thread;
+        changed = true;
+        return {
+          ...thread,
+          config: nextConfig,
+          updatedAt: new Date().toISOString(),
+        };
+      });
+      return changed ? { threads } : {};
+    }),
   updateThreadRuntime: (threadId, input) =>
     set((state) => {
       let changed = false;
@@ -202,7 +224,10 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           input.threadStatusSource === undefined ||
           thread.threadStatusSource === input.threadStatusSource;
 
-        const nextConfig = stripPlanMode(input.config ?? thread.config);
+        const nextConfig =
+          thread.presentationMode === "gui"
+            ? (input.config ?? thread.config)
+            : stripPlanMode(input.config ?? thread.config);
 
         if (
           thread.status === effectiveStatus &&
@@ -365,7 +390,10 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
               (snapshot.sessionRef?.providerSessionId ?? "") ||
             (thread.sessionRef?.discoveredAt ?? "") !== (snapshot.sessionRef?.discoveredAt ?? "");
 
-          const nextConfig = stripPlanMode(snapshot.config ?? thread.config);
+          const nextConfig =
+            thread.presentationMode === "gui"
+              ? (snapshot.config ?? thread.config)
+              : stripPlanMode(snapshot.config ?? thread.config);
 
           if (
             thread.status === snapshot.status &&

@@ -1,0 +1,57 @@
+import { CheckCircle2, Circle, ListChecks, Loader2 } from "lucide-react";
+import type { PlanItemPayload } from "@/shared/contracts";
+import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
+import { getThreadTodoDockStateForItem } from "@/renderer/components/thread/threadTodoState";
+
+interface PlanItemProps {
+  item: RuntimeChatItem;
+}
+
+type StepStatus = PlanItemPayload["steps"][number]["status"];
+
+export function PlanItem({ item }: PlanItemProps) {
+  const todoState = getThreadTodoDockStateForItem(item);
+  const steps = todoState?.steps ?? [];
+  const activeIndex = todoState?.activeIndex ?? -1;
+  if (steps.length === 0) return null;
+  return (
+    <div className="flex gap-2 text-xs">
+      <ListChecks className="size-3.5 shrink-0 text-foreground-muted" />
+      <ul className="flex min-w-0 flex-1 flex-col">
+        {steps.map((step, i) => {
+          const isDone = step.status === "completed";
+          const isActive = i === activeIndex;
+          return (
+            <li
+              key={i}
+              className={`flex items-center gap-2 rounded px-1 py-0.5 leading-none ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-foreground/5" : ""}`}
+            >
+              <StatusIcon status={step.status} />
+              <span className={`truncate ${isDone ? "text-foreground-muted" : "text-foreground"}`}>
+                {step.text}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function StatusIcon({ status }: { status: StepStatus }) {
+  switch (status) {
+    case "completed":
+      return (
+        <CheckCircle2 aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />
+      );
+    case "in_progress":
+      return (
+        <Loader2
+          aria-label="in progress"
+          className="size-3.5 shrink-0 animate-spin text-foreground"
+        />
+      );
+    default:
+      return <Circle aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/60" />;
+  }
+}

@@ -339,7 +339,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
           ) : (
             <ListBox
               aria-label="Models"
-              className="lightcode-model-menu-listbox max-h-72 overflow-y-auto no-scrollbar !m-0 !p-0 [&_.list-box-item]:min-h-7 [&_.list-box-item]:py-0.5 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2"
+              className="lightcode-menu lightcode-model-menu-listbox max-h-72 overflow-y-auto no-scrollbar !pb-1"
               items={items}
               selectedKeys={selectedKeys}
               selectionMode="single"
@@ -566,7 +566,7 @@ function WindowedProviderModelList(props: {
       aria-activedescendant={
         activeIndex >= 0 ? `${domIdPrefix}-${items[activeIndex]?.id}` : undefined
       }
-      className="lightcode-model-menu-listbox no-scrollbar max-h-72 overflow-y-auto !m-0 !p-0 outline-none"
+      className="lightcode-model-menu-listbox no-scrollbar max-h-72 overflow-y-auto pb-1 outline-none"
       style={{ height: viewportHeight }}
       tabIndex={0}
       onScroll={(event) => {
@@ -671,9 +671,8 @@ function WindowedProviderModelList(props: {
             id={`${domIdPrefix}-${item.id}`}
             role="option"
             aria-selected={isSelected}
-            className={`group mx-1.5 flex h-7 cursor-default items-center gap-2 rounded px-2 text-sm text-foreground ${
-              isActive ? "bg-accent/10" : "hover:bg-overlay"
-            }`}
+            data-active={isActive ? "true" : undefined}
+            className="lightcode-menu-item group mx-1.5 flex h-7 cursor-default items-center text-foreground"
             onMouseEnter={() => {
               shouldAutoScrollRef.current = false;
               setActiveRowId(item.id);

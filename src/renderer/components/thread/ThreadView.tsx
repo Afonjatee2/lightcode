@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
-import { ArrowRightLeft, ChevronDown, CircleCheck, GitFork, Paperclip, X, Zap } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Bug,
+  ChevronDown,
+  CircleCheck,
+  GitFork,
+  Paperclip,
+  X,
+  Zap,
+} from "lucide-react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -25,6 +34,7 @@ import {
   TuxIcon,
 } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { useThreadTodoDockStore } from "@/renderer/state/threadTodoDockStore";
 import { readBridge } from "@/renderer/bridge";
 import {
   MentionInput,
@@ -36,9 +46,18 @@ import {
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import { filterHiddenModels } from "./threadComposerOptions";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
+import { ChatPane } from "./ChatPane/ChatPane";
+import { guiChatFontCssVars } from "./ChatPane/chatFontVars";
+import { ChatRuntimeDebugPanel } from "./ChatPane/ChatRuntimeDebugPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
+import { ThreadTodoDock } from "./ThreadTodoDock";
 import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
+import {
+  getThreadTodoDockStateForItem,
+  selectThreadTodoDockItem,
+  type ThreadTodoDockState,
+} from "./threadTodoState";
 
 const DEFAULT_HIDDEN_TERMINAL_SIZE: TerminalSize = { cols: 120, rows: 30 };
 
@@ -76,7 +95,7 @@ function threadStatusSupportDetail(source: ThreadStatusSource | undefined): stri
     case "terminal_parse":
       return "Status is inferred from terminal output (L2). Install the hook plugin in settings for structured updates.";
     case "server":
-      return "This thread uses the agent server protocol (ACP-style); terminal hooks do not apply.";
+      return "Status is provided by the agent control protocol (ACP).";
     default:
       return "Support mode appears once the session connects.";
   }
@@ -100,6 +119,7 @@ function ThreadHeaderStatusTooltipBody(props: { thread: Thread }) {
   const { thread } = props;
   const runtime = threadRuntimeStatusLabel(thread);
   const source = thread.threadStatusSource;
+  const isServer = source === "server";
 
   return (
     <div className="w-[min(22rem,calc(100vw-2rem))] space-y-3 py-3 pl-2 pr-5 [overflow-wrap:break-word] [word-break:normal] hyphens-none">
@@ -108,14 +128,16 @@ function ThreadHeaderStatusTooltipBody(props: { thread: Thread }) {
           <span className="text-muted">Status: </span>
           <span className="font-semibold text-foreground">{runtime}</span>
         </p>
-        <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
-          <span className="text-muted">Support:</span>
-          <span
-            className={`relative top-px size-1.5 shrink-0 rounded-full ring-1 ring-white/10 ${supportSourceDotClass(source)}`}
-            aria-hidden
-          />
-          <span className="font-semibold text-foreground">{activeSupportLabel(source)}</span>
-        </p>
+        {!isServer && (
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
+            <span className="text-muted">Support:</span>
+            <span
+              className={`relative top-px size-1.5 shrink-0 rounded-full ring-1 ring-white/10 ${supportSourceDotClass(source)}`}
+              aria-hidden
+            />
+            <span className="font-semibold text-foreground">{activeSupportLabel(source)}</span>
+          </p>
+        )}
       </div>
       <p className="border-t border-border/60 pt-2.5 text-xs leading-snug text-muted [overflow-wrap:break-word] [word-break:normal] hyphens-none">
         {threadStatusSupportDetail(source)}
@@ -130,7 +152,9 @@ function buildControls(
   hiddenModelIds: readonly string[] | undefined,
   onConfigChange: (config: ThreadConfig) => void,
 ): ComposerControl[] {
-  const isCliThread = (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
+  const presentationMode =
+    thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
+  const isCliThread = presentationMode === "terminal";
   if (isCliThread) return [];
   if (!agentStatus) return [];
 
@@ -216,7 +240,7 @@ function buildControls(
       kind: "toggle",
       label: "Fast",
       icon: <Zap className="size-3.5" />,
-      hideLabelOnWrap: true,
+      iconOnly: true,
       isSelected: thread.config.fast === true,
       isDisabled,
       onChange: (selected) => onPatch({ fast: selected }),
@@ -231,6 +255,7 @@ function buildControls(
         config: thread.config,
         isDisabled,
         onConfigChange: onPatch,
+        presentationMode,
       }),
     );
   }
@@ -245,6 +270,9 @@ function ThreadComposerSection(props: {
   paneCount: number;
   pendingServerRequests: PendingThreadServerRequest[];
   terminalPaneRef: React.RefObject<TerminalPaneHandle | null>;
+  todoDockCollapsed: boolean;
+  todoDockPlacement: "composer" | "right";
+  todoDockState: ThreadTodoDockState | null;
   onConfigChange: (config: ThreadConfig) => void;
   onResolveServerRequest: (input: {
     requestId: ThreadServerRequestId;
@@ -252,8 +280,19 @@ function ThreadComposerSection(props: {
     response: unknown;
   }) => Promise<void>;
   onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
+  onTodoDockCollapsedChange: (collapsed: boolean) => void;
+  onTodoDockPlacementChange: (placement: "composer" | "right") => void;
 }) {
-  const { thread, agentStatus, projectLocation, paneCount, pendingServerRequests } = props;
+  const {
+    thread,
+    agentStatus,
+    projectLocation,
+    paneCount,
+    pendingServerRequests,
+    todoDockCollapsed,
+    todoDockPlacement,
+    todoDockState,
+  } = props;
   const [prompt, setPrompt] = useState("");
   const [hasContent, setHasContent] = useState(false);
   const mentionRef = useRef<MentionInputHandle>(null);
@@ -261,28 +300,36 @@ function ThreadComposerSection(props: {
   const attachments = useAttachments();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const imageAttachments = attachments.attachments.filter((a) => a.isImage);
-  const isServerControlled = agentStatus?.capabilities.liveInputMode === "server";
+  const presentationMode =
+    thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
+  const usesTerminalPresentation = presentationMode === "terminal";
+  const isServerControlled =
+    agentStatus?.capabilities.liveInputMode === "server" || !usesTerminalPresentation;
   const isTerminalInput = agentStatus?.capabilities.liveInputMode === "terminal";
-  const usesTerminalPresentation =
-    (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
   const needsFocusBeforeInput = agentStatus?.capabilities.requiresTerminalFocusBeforeInput === true;
   const activeServerRequest = pendingServerRequests[0];
+  const canQueueServerInput =
+    isServerControlled &&
+    !usesTerminalPresentation &&
+    thread.sessionRef !== undefined &&
+    thread.status === "working";
   const canSubmitServerInput =
     isServerControlled &&
     thread.sessionRef !== undefined &&
-    (thread.status === "idle" || thread.status === "needs_reply");
+    (thread.status === "idle" || thread.status === "needs_reply" || canQueueServerInput);
   const canSubmitTerminalInput =
     usesTerminalPresentation &&
     isTerminalInput &&
     thread.status !== "inactive" &&
     thread.status !== "launching";
-  const showServerComposer =
-    isServerControlled && thread.status !== "inactive" && thread.status !== "launching";
+  const showServerComposer = isServerControlled && thread.status !== "inactive";
   const showTerminalComposer =
     usesTerminalPresentation &&
     isTerminalInput &&
     thread.status !== "inactive" &&
     thread.status !== "launching";
+  const showTodoInComposer =
+    !usesTerminalPresentation && todoDockState !== null && todoDockPlacement === "composer";
   const collapseTerminalComposerSetting = useSharedSettings((s) => s.collapseTerminalComposer);
   const [composerCollapsed, setComposerCollapsed] = useState(collapseTerminalComposerSetting);
   const canCollapseComposer = showTerminalComposer;
@@ -296,8 +343,18 @@ function ThreadComposerSection(props: {
   );
   const hiddenModelIds = useSharedSettings((s) => s.hiddenModels[thread.agentKind]);
   const controls = buildControls(thread, agentStatus, hiddenModelIds, props.onConfigChange);
-  const isCliThread = (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
+  const isCliThread = usesTerminalPresentation;
   const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
+  const canInterruptStructuredTurn =
+    !usesTerminalPresentation && thread.sessionRef !== undefined && thread.status === "working";
+
+  function handleInterrupt() {
+    void readBridge()
+      .interruptThread({ threadId: thread.id })
+      .catch((error: unknown) => {
+        console.error("[thread] failed to interrupt turn", error);
+      });
+  }
 
   function handleSwitchBranch(branch: string, createNew: boolean) {
     readBridge()
@@ -382,7 +439,7 @@ function ThreadComposerSection(props: {
         />
       ) : null}
 
-      {thread.status !== "launching" ? (
+      {thread.status !== "launching" || !usesTerminalPresentation ? (
         <div>
           <div
             className={`grid transition-[grid-template-rows] ease-[cubic-bezier(0.16,1,0.3,1)] ${isComposerCollapsed ? "duration-300" : "duration-200"}`}
@@ -401,6 +458,17 @@ function ThreadComposerSection(props: {
                 <ThreadComposer
                   autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                   compact
+                  fixedContent={
+                    showTodoInComposer ? (
+                      <ThreadTodoDock
+                        collapsed={todoDockCollapsed}
+                        placement={todoDockPlacement}
+                        state={todoDockState!}
+                        onCollapsedChange={props.onTodoDockCollapsedChange}
+                        onPlacementChange={props.onTodoDockPlacementChange}
+                      />
+                    ) : null
+                  }
                   attachmentBar={
                     <AttachmentBar
                       attachments={attachments.attachments}
@@ -468,6 +536,7 @@ function ThreadComposerSection(props: {
                   promptDisabled={!(showServerComposer || showTerminalComposer)}
                   submitDisabled={!(hasContent || attachments.attachments.length > 0) || !canSubmit}
                   submitLabel="Send message"
+                  onStop={canInterruptStructuredTurn ? handleInterrupt : undefined}
                   {...(() => {
                     const extras = (
                       <>
@@ -633,12 +702,34 @@ export function ThreadView(props: {
   const terminalPaneRef = useRef<TerminalPaneHandle>(null);
   const [terminalSize, setTerminalSize] = useState<TerminalSize | null>(null);
   const [continueDialogOpen, setContinueDialogOpen] = useState(false);
+  const [runtimeDebugOpen, setRuntimeDebugOpen] = useState(false);
   const launchRequestRef = useRef<string | null>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
   const [isTitleTooltipOpen, setIsTitleTooltipOpen] = useState(false);
+  // Thread-level mode wins over the adapter-declared default. Existing rows
+  // load from DB with `presentationMode: "terminal"` thanks to the schema
+  // default, so behaviour is preserved for everything that already shipped.
   const usesTerminalPresentation =
-    (agentStatus?.capabilities.presentationMode ?? "terminal") === "terminal";
+    (thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal") ===
+    "terminal";
+  const guiChatFontSize = useSharedSettings((s) => s.guiChatFontSize);
+  const todoDockPlacement = useThreadTodoDockStore((s) => s.placement);
+  const todoDockCollapsed = useThreadTodoDockStore((s) => s.collapsed);
+  const setTodoDockPlacement = useThreadTodoDockStore((s) => s.setPlacement);
+  const setTodoDockCollapsed = useThreadTodoDockStore((s) => s.setCollapsed);
+  const todoDockItem = useAppStore((s) => selectThreadTodoDockItem(s, thread.id));
+  const todoDockState = todoDockItem ? getThreadTodoDockStateForItem(todoDockItem) : null;
   const launchTerminalSize = usesTerminalPresentation ? terminalSize : DEFAULT_HIDDEN_TERMINAL_SIZE;
+  const showTodoDock = !usesTerminalPresentation && todoDockState !== null;
+  const showTodoInRightRail = showTodoDock && todoDockPlacement === "right";
+  const showThreadSideRail = runtimeDebugOpen || showTodoInRightRail;
+  const hiddenRuntimeItemId = !usesTerminalPresentation ? todoDockState?.sourceItemId : undefined;
+  const hiddenRuntimeItemIsLive =
+    !usesTerminalPresentation && todoDockState !== null && todoDockState.itemState !== "completed";
+
+  useEffect(() => {
+    setRuntimeDebugOpen(false);
+  }, [thread.id]);
 
   useEffect(() => {
     if (pendingLaunchPrompt === undefined) {
@@ -669,16 +760,47 @@ export function ThreadView(props: {
       useSharedSettings.getState().pushRecentModel(thread.agentKind, thread.config.model);
     }
 
+    // Optimistic user_message for the FIRST prompt in a fresh GUI thread.
+    // Without this the chat sits empty for the duration of the supervisor's
+    // structured-session bringup (process spawn + ACP handshake +
+    // newSession), which can be a noticeable delay. The supervisor reuses
+    // this id when it emits its own canonical user_message events so the
+    // renderer's per-id dedupe drops the duplicate.
+    const presentation = thread.presentationMode ?? "terminal";
+    let optimisticUserMessageItemId: string | undefined;
+    if (
+      presentation === "gui" &&
+      pendingLaunchPrompt.length > 0 &&
+      thread.sessionRef === undefined
+    ) {
+      optimisticUserMessageItemId = `user-${crypto.randomUUID()}`;
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "item.started",
+        threadId: thread.id,
+        itemId: optimisticUserMessageItemId,
+        itemType: "user_message",
+        payload: { content: [{ kind: "text", text: pendingLaunchPrompt }] },
+      });
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "item.completed",
+        threadId: thread.id,
+        itemId: optimisticUserMessageItemId,
+      });
+    }
+
     void readBridge()
       .startThread({
         threadId: thread.id,
         projectLocation,
         agentKind: thread.agentKind,
+        ...(thread.agentInstanceId ? { agentInstanceId: thread.agentInstanceId } : {}),
         config: thread.config,
         prompt: pendingLaunchPrompt,
         ...(pendingLaunchSegments ? { segments: pendingLaunchSegments } : {}),
         initialSize: launchTerminalSize,
         ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
+        ...(thread.presentationMode ? { presentationMode: thread.presentationMode } : {}),
+        ...(optimisticUserMessageItemId ? { userMessageItemId: optimisticUserMessageItemId } : {}),
       })
       .catch(() => {
         launchRequestRef.current = null;
@@ -692,9 +814,11 @@ export function ThreadView(props: {
     projectLocation,
     launchTerminalSize,
     thread.agentKind,
+    thread.agentInstanceId,
     thread.config,
     thread.id,
     thread.sessionRef,
+    thread.presentationMode,
   ]);
 
   const alignClass =
@@ -792,6 +916,31 @@ export function ThreadView(props: {
                     <Tooltip.Content>Continue in another provider</Tooltip.Content>
                   </Tooltip>
                 ) : null}
+                {!usesTerminalPresentation ? (
+                  <Tooltip delay={0}>
+                    <Tooltip.Trigger>
+                      <button
+                        type="button"
+                        aria-label={
+                          runtimeDebugOpen ? "Hide runtime debug panel" : "Show runtime debug panel"
+                        }
+                        aria-pressed={runtimeDebugOpen}
+                        className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${runtimeDebugOpen ? "text-foreground" : "text-muted/60 hover:text-foreground"}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRuntimeDebugOpen((o) => !o);
+                        }}
+                      >
+                        <Bug className="size-3.5" />
+                      </button>
+                    </Tooltip.Trigger>
+                    <Tooltip.Content>
+                      {runtimeDebugOpen
+                        ? "Hide canonical runtime item inspector"
+                        : "Inspect canonical runtime items"}
+                    </Tooltip.Content>
+                  </Tooltip>
+                ) : null}
                 {onMarkDone ? (
                   <button
                     type="button"
@@ -857,9 +1006,7 @@ export function ThreadView(props: {
             />
           )}
 
-          <div
-            className={`${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col gap-2 pt-2`}
-          >
+          <div className={`${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col pt-2`}>
             <div
               className={`relative min-h-0 flex-1 ${
                 usesTerminalPresentation ? "overflow-visible" : "overflow-hidden"
@@ -873,8 +1020,48 @@ export function ThreadView(props: {
                   status={thread.status}
                   threadId={thread.id}
                 />
-              ) : null}
-              {thread.status === "launching" ? (
+              ) : (
+                <div
+                  className="flex h-full min-h-0 w-full gap-2 text-[length:var(--lc-chat-font-size)]"
+                  style={guiChatFontCssVars(guiChatFontSize)}
+                >
+                  <div className="min-h-0 min-w-0 flex-1">
+                    <ChatPane
+                      hasSupplementaryContent={showTodoDock}
+                      hiddenRuntimeItemId={hiddenRuntimeItemId}
+                      hiddenRuntimeItemIsLive={hiddenRuntimeItemIsLive}
+                      thread={thread}
+                    />
+                  </div>
+                  {showThreadSideRail ? (
+                    <div className="flex h-full min-h-0 w-[min(44%,24rem)] shrink-0 flex-col gap-2 border-l border-[color:var(--border)] pl-2">
+                      {showTodoInRightRail ? (
+                        <div
+                          className={
+                            runtimeDebugOpen && !todoDockCollapsed
+                              ? "min-h-0 max-h-[45%] shrink-0"
+                              : "min-h-0 flex-1"
+                          }
+                        >
+                          <ThreadTodoDock
+                            collapsed={todoDockCollapsed}
+                            placement={todoDockPlacement}
+                            state={todoDockState!}
+                            onCollapsedChange={setTodoDockCollapsed}
+                            onPlacementChange={setTodoDockPlacement}
+                          />
+                        </div>
+                      ) : null}
+                      {runtimeDebugOpen ? (
+                        <div className="min-h-0 flex-1">
+                          <ChatRuntimeDebugPanel threadId={thread.id} />
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              )}
+              {thread.status === "launching" && usesTerminalPresentation ? (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <PixelLoader size="md" />
                 </div>
@@ -888,9 +1075,14 @@ export function ThreadView(props: {
               paneCount={paneCount}
               pendingServerRequests={pendingServerRequests}
               terminalPaneRef={terminalPaneRef}
+              todoDockCollapsed={todoDockCollapsed}
+              todoDockPlacement={todoDockPlacement}
+              todoDockState={todoDockState}
               onConfigChange={onConfigChange}
               onResolveServerRequest={onResolveServerRequest}
               onSubmitInput={onSubmitInput}
+              onTodoDockCollapsedChange={setTodoDockCollapsed}
+              onTodoDockPlacementChange={setTodoDockPlacement}
             />
           </div>
         </div>

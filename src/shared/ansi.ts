@@ -2,6 +2,9 @@ const ANSI_PATTERN =
   // eslint-disable-next-line no-control-regex
   /\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\u0007]*(?:\u0007|\u001B\\))/g;
 
+/** Cap CUF→spaces so hostile or buggy PTY output cannot force huge allocations. */
+const MAX_CUF_SPACES = 8192;
+
 export function stripAnsi(value: string): string {
   return value.replace(ANSI_PATTERN, "");
 }
@@ -17,12 +20,22 @@ export function stripAnsi(value: string): string {
  * (e.g. interaction-hint detection) can work with.
  */
 export function stripAnsiPreservingLayout(value: string): string {
+  if (value.length === 0) {
+    return "";
+  }
+  /** Hot path: most subprocess logs are plain text — skip regex work entirely. */
+  if (value.indexOf("\u001B") < 0) {
+    return value;
+  }
   // CUP (Cursor Position) → newline  — each positioned write is a new line
   // eslint-disable-next-line no-control-regex
   let result = value.replace(/\u001B\[\d*(?:;\d*)*[Hf]/g, "\n");
   // CUF (Cursor Forward n) → equivalent spaces
   // eslint-disable-next-line no-control-regex
-  result = result.replace(/\u001B\[(\d*)C/g, (_, n) => " ".repeat(Number(n) || 1));
+  result = result.replace(/\u001B\[(\d*)C/g, (_, n) => {
+    const k = Math.min(MAX_CUF_SPACES, Number(n) || 1);
+    return " ".repeat(k);
+  });
   // Strip all remaining ANSI sequences (SGR colours, CUU/CUD/CUB, etc.)
   return stripAnsi(result);
 }

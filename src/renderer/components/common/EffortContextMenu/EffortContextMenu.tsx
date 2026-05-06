@@ -52,11 +52,15 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
     onOpenChange?.(open);
   }
 
+  const closeOnSelect = !(hasEffort && hasContext);
+
   function handleEffort(id: string) {
+    if (closeOnSelect) handleOpenChange(false);
     if (id === effortValue) return;
     startTransition(() => onEffortChange?.(id));
   }
   function handleContext(id: string) {
+    if (closeOnSelect) handleOpenChange(false);
     if (id === contextValue) return;
     startTransition(() => onContextChange?.(id));
   }
@@ -144,7 +148,7 @@ function Column(props: {
       </Header>
       <ListBox
         aria-label={label}
-        className="max-h-60 overflow-y-auto !p-1 [&_.list-box-item]:min-h-7 [&_.list-box-item]:py-0.5 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2"
+        className="lightcode-menu max-h-60 overflow-y-auto"
         items={options as LabeledOption[]}
         selectedKeys={value ? new Set([value]) : new Set<string>()}
         selectionMode="single"

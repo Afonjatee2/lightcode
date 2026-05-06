@@ -16,6 +16,7 @@ const { bridge } = vi.hoisted(() => ({
 vi.mock("@/renderer/bridge", () => ({
   readBridge: () => bridge,
   isMac: () => false,
+  isDevApp: () => false,
 }));
 
 vi.mock("@/renderer/components/thread/TerminalPane", () => ({

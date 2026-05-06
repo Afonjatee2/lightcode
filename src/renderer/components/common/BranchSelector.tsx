@@ -336,7 +336,7 @@ export function BranchSelector(props: BranchSelectorProps) {
                 >
                   <ListBox
                     aria-label="Branches"
-                    className={`h-72 overflow-y-auto p-1 pl-0 ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-1`}
+                    className={`lightcode-menu h-72 overflow-y-auto ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS}`}
                     items={items}
                     selectedKeys={
                       isWorktree || worktreeMode ? new Set([baseBranch ?? value]) : new Set([value])

@@ -28,6 +28,7 @@ import {
   type AgentAdapter,
   type CommandSpec,
   type StructuredSessionHandle,
+  createKnownSessionRef,
   defaultFormatPromptSegments,
   getWslCommand,
   injectWslEnv,
@@ -36,7 +37,7 @@ import {
 import type { WindowsShellPreference } from "../shellPreference";
 import { BufferedLogWriter } from "./bufferedLogWriter";
 import { hookDebugSpawn } from "./hookDebug";
-import type { SessionRuntime, ShellSessionRuntime } from "./sessionTypes";
+import type { QueuedStructuredTurn, SessionRuntime, ShellSessionRuntime } from "./sessionTypes";
 import { ThreadOutputPipeline, resolveThreadStatusSource } from "./threadOutputPipeline";
 import { rewriteSegmentsForWsl } from "./threadAttachments";
 
@@ -96,6 +97,13 @@ export function isUserInterruptKeystroke(data: string): boolean {
  */
 function isInterruptibleBusyStatus(status: SessionRuntime["status"]): boolean {
   return status === "working" || status === "needs_approval" || status === "needs_reply";
+}
+
+function requireSessionPty(session: SessionRuntime): IPty {
+  if (!session.pty) {
+    throw new Error(`Thread ${session.threadId} does not have a terminal PTY.`);
+  }
+  return session.pty;
 }
 
 function getClaudeL2TerminalEnv(input: {
@@ -267,8 +275,12 @@ export class ThreadSessionManager {
       throw new Error("This thread exited before a resumable session id was discovered.");
     }
 
+    const usesStructuredFlow =
+      session.adapter.capabilities.liveInputMode === "server" || session.presentationMode === "gui";
     const effectiveSegments = payload.segments
-      ? rewriteSegmentsForWsl(payload.segments, session.projectLocation)
+      ? rewriteSegmentsForWsl(payload.segments, session.projectLocation, {
+          preserveImageAttachments: usesStructuredFlow,
+        })
       : undefined;
     const prompt =
       effectiveSegments && effectiveSegments.length > 0
@@ -277,36 +289,48 @@ export class ThreadSessionManager {
         : payload.prompt;
 
     const effectiveConfig =
-      payload.config.mode === "plan" && session.config.mode === undefined
+      session.presentationMode !== "gui" &&
+      payload.config.mode === "plan" &&
+      session.config.mode === undefined
         ? { ...payload.config, mode: undefined }
         : payload.config;
 
     session.config = effectiveConfig;
-    if (
-      session.adapter.capabilities.liveInputMode === "server" &&
-      session.structuredSession?.startTurn
-    ) {
-      void session.structuredSession
-        .startTurn(prompt, payload.config, payload.segments)
-        .catch((error) => {
+    // Route through the structured session when either the adapter is
+    // server-controlled OR this thread was launched in chat mode (the
+    // structured session owns input/output instead of the PTY).
+    if (usesStructuredFlow && session.structuredSession?.startTurn) {
+      const turn: QueuedStructuredTurn = {
+        prompt,
+        config: effectiveConfig,
+        ...(effectiveSegments ? { segments: effectiveSegments } : {}),
+        ...(payload.userMessageItemId ? { userMessageItemId: payload.userMessageItemId } : {}),
+      };
+      if (session.presentationMode === "gui" && session.status === "working") {
+        this.enqueueStructuredTurn(session, turn);
+        void this.interruptStructuredTurn(session).catch((error) => {
           if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
             return;
           }
-          this.outputPipeline.updateState(
-            session,
-            "error",
-            "error",
-            error instanceof Error ? error.message : String(error),
-          );
+          console.error("[supervisor] failed to interrupt structured turn:", error);
         });
+        return;
+      }
+      if (session.presentationMode === "gui" && (session.queuedStructuredTurns?.length ?? 0) > 0) {
+        this.enqueueStructuredTurn(session, turn);
+        this.maybeStartQueuedStructuredTurn(session);
+        return;
+      }
+      this.startStructuredTurn(session, turn);
       return;
     }
 
+    const pty = requireSessionPty(session);
     await writeSubmittedPrompt(
-      session.pty,
+      pty,
       session.adapter.buildDirectInput?.(
         prompt,
-        payload.segments,
+        effectiveSegments,
         session.config,
         session.projectLocation,
       ) ?? [prompt, "\r"],
@@ -315,8 +339,13 @@ export class ThreadSessionManager {
 
     await sleep(300);
     if (session.prevChunk.includes("[Pasted text")) {
-      session.pty.write("\r");
+      pty.write("\r");
     }
+  }
+
+  async interruptThread(payload: { threadId: string }): Promise<void> {
+    const session = this.requireSession(payload.threadId);
+    await this.interruptStructuredTurn(session);
   }
 
   async writeTerminal(payload: WriteTerminalPayload): Promise<void> {
@@ -326,7 +355,7 @@ export class ThreadSessionManager {
       return;
     }
     const session = this.requireSession(payload.threadId);
-    session.pty.write(payload.data);
+    requireSessionPty(session).write(payload.data);
     this.maybeArmUserInterruptRecovery(session, payload.data);
   }
 
@@ -368,7 +397,78 @@ export class ThreadSessionManager {
       return;
     }
     session.terminalSize = { cols: payload.cols, rows: payload.rows };
-    session.pty.resize(payload.cols, payload.rows);
+    session.pty?.resize(payload.cols, payload.rows);
+  }
+
+  private enqueueStructuredTurn(session: SessionRuntime, turn: QueuedStructuredTurn): void {
+    if (!session.queuedStructuredTurns) {
+      session.queuedStructuredTurns = [];
+    }
+    session.queuedStructuredTurns.push(turn);
+  }
+
+  private maybeStartQueuedStructuredTurn(session: SessionRuntime): void {
+    if (session.presentationMode !== "gui") {
+      return;
+    }
+    if (session.status !== "idle" && session.status !== "needs_reply") {
+      return;
+    }
+    const nextTurn = session.queuedStructuredTurns?.shift();
+    if (!nextTurn) {
+      return;
+    }
+    this.startStructuredTurn(session, nextTurn);
+  }
+
+  private async interruptStructuredTurn(session: SessionRuntime): Promise<void> {
+    if (session.presentationMode !== "gui") {
+      return;
+    }
+    if (!session.structuredSession?.interruptTurn || session.structuredTurnInterruptRequested) {
+      return;
+    }
+    session.structuredTurnInterruptRequested = true;
+    try {
+      await session.structuredSession.interruptTurn();
+    } catch (error) {
+      session.structuredTurnInterruptRequested = false;
+      throw error;
+    }
+  }
+
+  private startStructuredTurn(session: SessionRuntime, turn: QueuedStructuredTurn): void {
+    if (!session.structuredSession?.startTurn) {
+      return;
+    }
+    // Optimistic user_message: paint the user's prompt in the chat pane
+    // before the structured session's `prompt()` round-trip resolves so the
+    // chat doesn't visually stall waiting on the agent. Only meaningful for
+    // GUI threads — terminal threads render user input via PTY echo.
+    // Prefer the renderer-supplied id when present (the chat pane has
+    // already painted the message); otherwise emit one from the supervisor.
+    const optimisticItemId =
+      session.presentationMode === "gui" && turn.prompt.length > 0
+        ? (turn.userMessageItemId ?? this.emitOptimisticUserMessage(session.threadId, turn.prompt))
+        : undefined;
+    void session.structuredSession
+      .startTurn(
+        turn.prompt,
+        turn.config,
+        turn.segments,
+        optimisticItemId ? { userMessageItemId: optimisticItemId } : undefined,
+      )
+      .catch((error) => {
+        if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+          return;
+        }
+        this.outputPipeline.updateState(
+          session,
+          "error",
+          "error",
+          error instanceof Error ? error.message : String(error),
+        );
+      });
   }
 
   async closeThread(payload: CloseThreadPayload): Promise<void> {
@@ -642,6 +742,41 @@ export class ThreadSessionManager {
     }
   }
 
+  /**
+   * Synchronously paint the user's typed prompt into the chat pane as a
+   * canonical user_message item, ahead of the structured session's own
+   * `prompt()` round-trip. The structured session below reuses this item id
+   * via {@link StartTurnOptions} so its eventual emit is no-op'd by the
+   * renderer's per-id dedupe, and the supervisor still drives the rest of the
+   * canonical event stream.
+   */
+  private emitOptimisticUserMessage(threadId: string, prompt: string): string {
+    const turnId = `turn-${randomUUID()}`;
+    const itemId = `user-${randomUUID()}`;
+    this.options.emit({
+      type: "thread-runtime-event",
+      threadId,
+      event: { type: "turn.started", threadId, turnId },
+    });
+    this.options.emit({
+      type: "thread-runtime-event",
+      threadId,
+      event: {
+        type: "item.started",
+        threadId,
+        itemId,
+        itemType: "user_message",
+        payload: { content: [{ kind: "text", text: prompt }] },
+      },
+    });
+    this.options.emit({
+      type: "thread-runtime-event",
+      threadId,
+      event: { type: "item.completed", threadId, itemId },
+    });
+    return itemId;
+  }
+
   private async startThreadInner(
     payload: StartThreadPayload & { threadId: string },
   ): Promise<StartThreadResult> {
@@ -649,9 +784,16 @@ export class ThreadSessionManager {
 
     const adapter = this.requireAdapter(payload.agentKind);
     const isServerControlled = adapter.capabilities.liveInputMode === "server";
-    const usesTerminalPresentation = adapter.capabilities.presentationMode === "terminal";
+    // Per-thread mode wins over the adapter default. Chat-mode threads route
+    // input/output through the structured session even for adapters whose
+    // `liveInputMode` is "terminal".
+    const requestedPresentation = payload.presentationMode ?? adapter.capabilities.presentationMode;
+    const usesTerminalPresentation = requestedPresentation === "terminal";
+    const useStructuredFlow = isServerControlled || !usesTerminalPresentation;
     const effectiveSegments = payload.segments
-      ? rewriteSegmentsForWsl(payload.segments, payload.projectLocation)
+      ? rewriteSegmentsForWsl(payload.segments, payload.projectLocation, {
+          preserveImageAttachments: useStructuredFlow,
+        })
       : undefined;
     const initialPrompt =
       effectiveSegments && effectiveSegments.length > 0
@@ -664,12 +806,26 @@ export class ThreadSessionManager {
       usesTerminalPresentation &&
       initialPrompt.length > 0 &&
       adapter.isReadyForInitialPrompt !== undefined;
+
+    // Optimistic user_message: for GUI threads with a fresh prompt, surface
+    // the user's typed text in the chat pane immediately — before the slow
+    // structured-session work (process spawn + ACP handshake +
+    // newSession/loadSession) runs. When the renderer has already painted an
+    // optimistic message and shipped its id with the payload, we reuse that
+    // id end-to-end so the chat pane never sees a duplicate.
+    const optimisticUserMessageItemId =
+      !usesTerminalPresentation && initialPrompt.length > 0 && !payload.sessionRef
+        ? (payload.userMessageItemId ??
+          this.emitOptimisticUserMessage(payload.threadId, initialPrompt))
+        : undefined;
+
     const structuredSession = await this.createStructuredSession(
       adapter,
       payload.threadId,
       payload.projectLocation,
       payload.config,
       payload.sessionRef,
+      requestedPresentation,
     );
 
     if (structuredSession?.activate) {
@@ -681,25 +837,77 @@ export class ThreadSessionManager {
       }
     }
 
+    let openedStructuredThreadId: string | undefined;
     if (structuredSession?.openThread) {
       try {
-        await structuredSession.openThread(payload.config, payload.sessionRef);
+        openedStructuredThreadId = await structuredSession.openThread(
+          payload.config,
+          payload.sessionRef,
+        );
       } catch (error) {
         await structuredSession.dispose();
         throw error;
       }
     }
 
+    if (!usesTerminalPresentation) {
+      if (!structuredSession) {
+        throw new Error(
+          `Agent ${payload.agentKind} does not support ${requestedPresentation} presentation.`,
+        );
+      }
+      const resolvedSessionRef =
+        payload.sessionRef ??
+        (openedStructuredThreadId ? createKnownSessionRef(openedStructuredThreadId) : undefined);
+      const session = this.spawnThread({
+        threadId: payload.threadId,
+        adapter,
+        agentKind: payload.agentKind,
+        projectLocation: payload.projectLocation,
+        config: payload.config,
+        initialSize: payload.initialSize,
+        launchPrompt: "",
+        structuredSession,
+        ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
+        presentationMode: requestedPresentation,
+      });
+      if (!payload.sessionRef && initialPrompt.length > 0 && structuredSession.startTurn) {
+        void structuredSession
+          .startTurn(
+            initialPrompt,
+            payload.config,
+            effectiveSegments,
+            optimisticUserMessageItemId
+              ? { userMessageItemId: optimisticUserMessageItemId }
+              : undefined,
+          )
+          .catch((error) => {
+            if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+              return;
+            }
+            this.outputPipeline.updateState(
+              session,
+              "error",
+              "error",
+              error instanceof Error ? error.message : String(error),
+            );
+          });
+      }
+      return { threadId: payload.threadId };
+    }
+
     if (
       !payload.sessionRef &&
-      isServerControlled &&
+      useStructuredFlow &&
       initialPrompt.length > 0 &&
       !shouldQueueInitialPrompt &&
       structuredSession?.startTurn
     ) {
-      void structuredSession.startTurn(initialPrompt, payload.config).catch((error) => {
-        console.error("[supervisor] initial turn failed:", error);
-      });
+      void structuredSession
+        .startTurn(initialPrompt, payload.config, effectiveSegments)
+        .catch((error) => {
+          console.error("[supervisor] initial turn failed:", error);
+        });
     }
 
     if (shouldQueueInitialPrompt) {
@@ -710,7 +918,7 @@ export class ThreadSessionManager {
     // Use `initialPrompt` (the adapter-formatted version with `~/` shortening
     // and WSL path rewriting) so attachments hand off cleanly as the launch
     // arg instead of being staged for a deferred PTY-write.
-    const launchPrompt = isServerControlled || deferToTerminal ? "" : initialPrompt;
+    const launchPrompt = useStructuredFlow || deferToTerminal ? "" : initialPrompt;
     const argv = payload.sessionRef
       ? adapter.buildResumeArgv(
           payload.projectLocation,
@@ -750,7 +958,7 @@ export class ThreadSessionManager {
     }
     const command = resolveLaunchSpec(payload.projectLocation, argv);
 
-    const keepStructuredSession = structuredSession && isServerControlled;
+    const keepStructuredSession = structuredSession && useStructuredFlow;
     if (structuredSession && !keepStructuredSession) {
       await structuredSession.dispose();
     }
@@ -769,13 +977,14 @@ export class ThreadSessionManager {
       ...(keepStructuredSession ? { structuredSession } : {}),
       ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
       ...(shouldQueueInitialPrompt ? { pendingLaunchPrompt: initialPrompt } : {}),
-      ...(deferToTerminal && !isServerControlled
+      presentationMode: requestedPresentation,
+      ...(deferToTerminal && !useStructuredFlow
         ? (() => {
             const preInputs = adapter.buildTerminalPreInputs?.(payload.config);
             return {
               ...(preInputs ? { pendingTerminalPreInputs: preInputs } : {}),
               pendingTerminalPrompt: initialPrompt,
-              ...(payload.segments ? { pendingTerminalSegments: payload.segments } : {}),
+              ...(effectiveSegments ? { pendingTerminalSegments: effectiveSegments } : {}),
             };
           })()
         : {}),
@@ -790,6 +999,7 @@ export class ThreadSessionManager {
     projectLocation: ProjectLocation,
     config: ThreadConfig,
     sessionRef?: SessionRef,
+    presentationMode?: import("@/shared/contracts").ThreadPresentationMode,
   ): Promise<StructuredSessionHandle | undefined> {
     if (!adapter.createStructuredSession) {
       return undefined;
@@ -800,6 +1010,7 @@ export class ThreadSessionManager {
         projectLocation,
         config,
         ...(sessionRef ? { sessionRef } : {}),
+        ...(presentationMode ? { presentationMode } : {}),
       });
     } catch (error) {
       console.error("[supervisor] structured session creation failed:", error);
@@ -815,7 +1026,7 @@ export class ThreadSessionManager {
     config: ThreadConfig;
     initialSize: TerminalSize;
     launchPrompt: string;
-    command: CommandSpec;
+    command?: CommandSpec;
     /**
      * Extra env injected into the agent PTY (merged on top of agentEnv +
      * provider spawnEnv). Currently used by the CLI hook ingress to ferry
@@ -828,8 +1039,19 @@ export class ThreadSessionManager {
     pendingTerminalPreInputs?: string[][];
     pendingTerminalPrompt?: string;
     pendingTerminalSegments?: PromptSegment[];
+    presentationMode?: import("@/shared/contracts").ThreadPresentationMode;
   }): SessionRuntime {
-    this.options.emit({ type: "thread-reset", threadId: input.threadId });
+    // `thread-reset` is only consumed by the terminal panel (xterm scrollback
+    // reset) and the renderer-side runtime-event/server-request slice clear.
+    // GUI threads have no terminal scrollback, and clearing the slice would
+    // wipe the optimistic user_message we may have already painted ahead of
+    // structured-session setup. Skip the reset for any GUI-presentation
+    // thread (initial launch, resume, restart all run through here).
+    const isGuiPresentation =
+      input.presentationMode !== undefined && input.presentationMode !== "terminal";
+    if (!isGuiPresentation) {
+      this.options.emit({ type: "thread-reset", threadId: input.threadId });
+    }
 
     const agentEnv = this.resolveAgentProcessEnv(input.adapter);
     const cliHookEnvInjected = Boolean(input.extraEnv?.LIGHTCODE_HOOK_URL);
@@ -852,24 +1074,28 @@ export class ThreadSessionManager {
         cliHookEnvInjected,
       }),
     );
-    const command = injectWslEnv(input.command, input.projectLocation, agentEnv);
-    const pty = spawn(command.command, command.args, {
-      name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
-      cols: input.initialSize.cols,
-      rows: input.initialSize.rows,
-      cwd: command.cwd ?? process.cwd(),
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-        ...agentEnv,
-      },
-    });
+    const command = input.command
+      ? injectWslEnv(input.command, input.projectLocation, agentEnv)
+      : undefined;
+    const pty = command
+      ? spawn(command.command, command.args, {
+          name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
+          cols: input.initialSize.cols,
+          rows: input.initialSize.rows,
+          cwd: command.cwd ?? process.cwd(),
+          env: {
+            ...process.env,
+            TERM: "xterm-256color",
+            ...agentEnv,
+          },
+        })
+      : undefined;
     const session: SessionRuntime = {
       instanceId: randomUUID(),
       threadId: input.threadId,
       agentKind: input.agentKind,
       adapter: input.adapter,
-      pty,
+      ...(pty ? { pty } : {}),
       projectLocation: input.projectLocation,
       config: input.config,
       terminalSize: input.initialSize,
@@ -883,6 +1109,7 @@ export class ThreadSessionManager {
       pendingTerminalPreInputs: input.pendingTerminalPreInputs,
       pendingTerminalPrompt: input.pendingTerminalPrompt,
       pendingTerminalSegments: input.pendingTerminalSegments,
+      ...(input.presentationMode ? { presentationMode: input.presentationMode } : {}),
       prevChunk: "",
       lastStrippedPtyChunk: "",
       ptyOscCarry: "",
@@ -937,6 +1164,8 @@ export class ThreadSessionManager {
         ) {
           return;
         }
+        const wasWorking = session.status === "working";
+        const hadInterruptRequest = session.structuredTurnInterruptRequested === true;
         if (update.sessionRef) {
           const prevId = session.sessionRef?.providerSessionId;
           session.sessionRef = update.sessionRef;
@@ -960,13 +1189,36 @@ export class ThreadSessionManager {
           update.attention,
           update.errorMessage,
         );
+        if (update.status !== "working") {
+          session.structuredTurnInterruptRequested = false;
+        }
+        if (
+          session.presentationMode === "gui" &&
+          (wasWorking || hadInterruptRequest) &&
+          (update.status === "idle" || update.status === "needs_reply")
+        ) {
+          this.maybeStartQueuedStructuredTurn(session);
+        }
         if (configChanged && !stateChanged && update.errorMessage === undefined) {
           this.outputPipeline.emitState(session);
         }
       },
+      onRuntimeEvent: (event) => {
+        if (
+          this.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
+          session.ignoreExit
+        ) {
+          return;
+        }
+        this.options.emit({
+          type: "thread-runtime-event",
+          threadId: session.threadId,
+          event,
+        });
+      },
     });
 
-    pty.onData((data) => {
+    pty?.onData((data) => {
       if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
         return;
       }
@@ -980,7 +1232,7 @@ export class ThreadSessionManager {
       }
     });
 
-    pty.onExit((event) => {
+    pty?.onExit((event) => {
       session.ptyExited = true;
       if (session.ignoreExit) {
         return;
@@ -1063,6 +1315,9 @@ export class ThreadSessionManager {
     }
 
     const isServerControlled = session.adapter.capabilities.liveInputMode === "server";
+    const usesTerminalPresentation =
+      (session.presentationMode ?? session.adapter.capabilities.presentationMode) === "terminal";
+    const useStructuredFlow = isServerControlled || !usesTerminalPresentation;
     session.ignoreExit = true;
     await session.structuredSession?.dispose();
     if (session.structuredSession) {
@@ -1076,6 +1331,7 @@ export class ThreadSessionManager {
       session.projectLocation,
       config,
       session.sessionRef,
+      session.presentationMode,
     );
 
     if (structuredSession?.activate) {
@@ -1096,7 +1352,42 @@ export class ThreadSessionManager {
       }
     }
 
-    const launchPrompt = isServerControlled ? "" : prompt;
+    if (!usesTerminalPresentation) {
+      if (!structuredSession) {
+        throw new Error(`Thread ${session.threadId} cannot restart without a structured session.`);
+      }
+      const restarted = this.spawnThread({
+        threadId: session.threadId,
+        agentKind: session.agentKind,
+        adapter: session.adapter,
+        projectLocation: session.projectLocation,
+        config,
+        initialSize: session.terminalSize,
+        launchPrompt: "",
+        structuredSession,
+        sessionRef: session.sessionRef,
+        ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
+      });
+      if (prompt.trim().length > 0 && structuredSession.startTurn) {
+        const optimisticItemId = this.emitOptimisticUserMessage(session.threadId, prompt);
+        void structuredSession
+          .startTurn(prompt, config, undefined, { userMessageItemId: optimisticItemId })
+          .catch((error) => {
+            if (this.sessions.get(restarted.threadId)?.instanceId !== restarted.instanceId) {
+              return;
+            }
+            this.outputPipeline.updateState(
+              restarted,
+              "error",
+              "error",
+              error instanceof Error ? error.message : String(error),
+            );
+          });
+      }
+      return;
+    }
+
+    const launchPrompt = useStructuredFlow ? "" : prompt;
     const cliHookExtras = await this.resolveCliHookPluginExtras(
       session.threadId,
       session.agentKind,
@@ -1120,7 +1411,7 @@ export class ThreadSessionManager {
     }
     const command = resolveLaunchSpec(session.projectLocation, argv);
 
-    const keepStructuredSession = structuredSession && isServerControlled;
+    const keepStructuredSession = structuredSession && useStructuredFlow;
     if (structuredSession && !keepStructuredSession) {
       await structuredSession.dispose();
     }
@@ -1137,6 +1428,7 @@ export class ThreadSessionManager {
       ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
       ...(keepStructuredSession ? { structuredSession } : {}),
       sessionRef: session.sessionRef,
+      ...(session.presentationMode ? { presentationMode: session.presentationMode } : {}),
     });
   }
 
@@ -1233,6 +1525,9 @@ export class ThreadSessionManager {
   }
 
   private safePtyKill(session: SessionRuntime): void {
+    if (!session.pty) {
+      return;
+    }
     if (session.ptyExited) {
       return;
     }

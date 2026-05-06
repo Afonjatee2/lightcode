@@ -125,11 +125,36 @@ export function ThreadPane(props: {
       {...(pendingLaunchPrompt !== undefined ? { pendingLaunchPrompt } : {})}
       {...(pendingLaunchSegments ? { pendingLaunchSegments } : {})}
       onSubmitInput={async (prompt, segments) => {
+        // Optimistic user_message for GUI threads: paint the typed prompt
+        // into the chat pane synchronously so it shows before the IPC
+        // round-trip + (for first prompts) ACP handshake completes. The
+        // supervisor reuses the same item id end-to-end so duplicates are
+        // dropped by the renderer's per-id dedupe in `applyRuntimeEvent`.
+        const presentation = thread.presentationMode ?? "terminal";
+        let optimisticUserMessageItemId: string | undefined;
+        if (presentation === "gui" && prompt.length > 0) {
+          optimisticUserMessageItemId = `user-${crypto.randomUUID()}`;
+          useAppStore.getState().applyRuntimeEvent(thread.id, {
+            type: "item.started",
+            threadId: thread.id,
+            itemId: optimisticUserMessageItemId,
+            itemType: "user_message",
+            payload: { content: [{ kind: "text", text: prompt }] },
+          });
+          useAppStore.getState().applyRuntimeEvent(thread.id, {
+            type: "item.completed",
+            threadId: thread.id,
+            itemId: optimisticUserMessageItemId,
+          });
+        }
         await readBridge().sendThreadInput({
           threadId: thread.id,
           prompt,
           ...(segments ? { segments } : {}),
           config: thread.config,
+          ...(optimisticUserMessageItemId
+            ? { userMessageItemId: optimisticUserMessageItemId }
+            : {}),
         });
         touchThread(thread.id);
       }}

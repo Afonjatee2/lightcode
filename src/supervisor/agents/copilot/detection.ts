@@ -30,6 +30,7 @@ export const copilotDefaultCapabilities: AgentCapability = {
   supportsDirectInput: true,
   liveInputMode: "terminal",
   presentationMode: "terminal",
+  presentationModes: ["terminal", "gui"],
   requiresTerminalFocusBeforeInput: true,
   bypassApprovalPolicy: "never",
   settingDefs: [],

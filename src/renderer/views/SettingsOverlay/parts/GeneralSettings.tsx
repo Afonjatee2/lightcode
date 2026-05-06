@@ -73,6 +73,8 @@ export function GeneralSettings() {
   const setScrollSpeed = useSharedSettings((state) => state.setScrollSpeed);
   const agentTerminalFontSize = useSharedSettings((state) => state.agentTerminalFontSize);
   const setAgentTerminalFontSize = useSharedSettings((state) => state.setAgentTerminalFontSize);
+  const guiChatFontSize = useSharedSettings((state) => state.guiChatFontSize);
+  const setGuiChatFontSize = useSharedSettings((state) => state.setGuiChatFontSize);
   const terminalPanelFontSize = useSharedSettings((state) => state.terminalPanelFontSize);
   const setTerminalPanelFontSize = useSharedSettings((state) => state.setTerminalPanelFontSize);
   const preventSleepWhileWorking = useSharedSettings((state) => state.preventSleepWhileWorking);
@@ -207,6 +209,27 @@ export function GeneralSettings() {
               onChange={(value) => {
                 startTransition(() => {
                   setAgentTerminalFontSize(Number.parseInt(value, 10) || 12);
+                });
+              }}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">GUI chat font size</p>
+              <p className="text-xs text-muted">
+                Agent chat (ACP / markdown). Command rows use this size minus 1&nbsp;px; tool and
+                plan lines minus 2&nbsp;px.
+              </p>
+            </div>
+            <Select
+              aria-label="GUI chat font size"
+              className="w-[160px] shrink-0"
+              options={fontSizeOptions}
+              value={String(guiChatFontSize)}
+              onChange={(value) => {
+                startTransition(() => {
+                  setGuiChatFontSize(Number.parseInt(value, 10) || 13);
                 });
               }}
             />

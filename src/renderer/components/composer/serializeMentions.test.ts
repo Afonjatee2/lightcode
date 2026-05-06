@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeEach } from "vitest";
-import { serializeComposerContent } from "./serializeMentions";
+import { beforeEach, describe, expect, it } from "vitest";
+import { serializeComposerContent, serializeToSegments } from "./serializeMentions";
 
 describe("serializeComposerContent", () => {
   let container: HTMLDivElement;
@@ -11,6 +11,30 @@ describe("serializeComposerContent", () => {
   it("serializes plain text", () => {
     container.textContent = "hello world";
     expect(serializeComposerContent(container)).toBe("hello world");
+  });
+
+  it("promotes inline @path tokens into file segments", () => {
+    container.textContent = "inspect @.agents/docs/ui-patterns.md now";
+    expect(serializeToSegments(container)).toEqual([
+      { kind: "text", content: "inspect " },
+      { kind: "file", path: ".agents/docs/ui-patterns.md" },
+      { kind: "text", content: " now" },
+    ]);
+  });
+
+  it("treats end-of-input @path tokens as complete mentions", () => {
+    container.textContent = "inspect @README.md";
+    expect(serializeToSegments(container)).toEqual([
+      { kind: "text", content: "inspect " },
+      { kind: "file", path: "README.md" },
+    ]);
+  });
+
+  it("does not treat email addresses as file mentions", () => {
+    container.textContent = "email me@example.com please";
+    expect(serializeToSegments(container)).toEqual([
+      { kind: "text", content: "email me@example.com please" },
+    ]);
   });
 
   it("trims whitespace", () => {

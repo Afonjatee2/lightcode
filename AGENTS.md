@@ -1,6 +1,6 @@
 # Lightcode
 
-Terminal-native AI agent orchestrator — Electron desktop app managing Claude, Codex, and Gemini CLIs via real PTY sessions.
+Terminal-native AI agent orchestrator — Electron desktop app managing Claude, Codex, and Gemini CLIs via real PTY sessions plus provider structured runtimes.
 
 ## Quick Reference
 
@@ -15,7 +15,7 @@ Terminal-native AI agent orchestrator — Electron desktop app managing Claude, 
 
 ## Critical Rules
 
-- Every live thread must be backed by a real PTY process. The terminal viewport is the source of truth.
+- Terminal-presentation threads must be backed by a real PTY process; GUI-presentation threads must be backed by the provider structured runtime process. The active presentation surface is the source of truth.
 - The renderer must never spawn agent processes — the supervisor runtime owns all agent processes.
 - React Compiler is the default memoization strategy. Do not add `useMemo`, `useCallback`, or `React.memo` unless escaping the compiler. Keep `babel-plugin-react-compiler` pinned to an exact version.
 - Use HeroUI v3 for all non-terminal UI. When working with HeroUI components, always load the `heroui-react` skill first (`/skill heroui-react`).

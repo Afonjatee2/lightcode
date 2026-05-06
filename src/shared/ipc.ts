@@ -57,6 +57,7 @@ import {
   gitWatchWorktreesPayloadSchema,
   listProjectTreePayloadSchema,
   moveProjectEntryPayloadSchema,
+  interruptThreadPayloadSchema,
   projectSchema,
   readProjectFilePayloadSchema,
   renameProjectEntryPayloadSchema,
@@ -151,6 +152,7 @@ import type {
   GitWatchProjectPayload,
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
+  InterruptThreadPayload,
   ListProjectTreePayload,
   ListProjectTreeResult,
   MoveProjectEntryPayload,
@@ -180,6 +182,7 @@ import type {
   WriteProjectFilePayload,
   WriteProjectFileResult,
   WriteTerminalPayload,
+  RuntimeEvent,
 } from "./contracts";
 
 const emptyPayloadSchema = z.object({});
@@ -229,6 +232,23 @@ const dbSyncAllPayloadSchema = z.object({
   projects: z.array(projectSchema),
   threads: z.array(threadSchema),
   viewJson: z.string(),
+});
+
+const persistedRuntimeItemSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  state: z.enum(["started", "updated", "completed"]),
+  payload: z.unknown(),
+  streams: z.record(z.string(), z.string()),
+});
+export type PersistedRuntimeItem = z.infer<typeof persistedRuntimeItemSchema>;
+
+const dbReplaceRuntimeItemsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  items: z.array(persistedRuntimeItemSchema),
+});
+const dbGetRuntimeItemsPayloadSchema = z.object({
+  threadId: z.string().min(1),
 });
 
 const openExternalPayloadSchema = z.string().min(1);
@@ -366,6 +386,11 @@ export const groupedIpcProcedures = {
       "sendThreadInput",
       "supervisor",
       sendThreadInputPayloadSchema,
+    ),
+    interruptThread: definePayloadProcedure<InterruptThreadPayload, void, "supervisor">(
+      "interruptThread",
+      "supervisor",
+      interruptThreadPayloadSchema,
     ),
     writeTerminal: definePayloadProcedure<WriteTerminalPayload, void, "supervisor">(
       "writeTerminal",
@@ -781,6 +806,19 @@ export const groupedIpcProcedures = {
     >("dbSyncAll", "main-local", dbSyncAllPayloadSchema, (projects, threads, viewJson) =>
       dbSyncAllPayloadSchema.parse({ projects, threads, viewJson }),
     ),
+    dbGetThreadRuntimeItems: defineIpcProcedure<
+      [string],
+      z.infer<typeof dbGetRuntimeItemsPayloadSchema>,
+      PersistedRuntimeItem[],
+      "main-local"
+    >("dbGetThreadRuntimeItems", "main-local", dbGetRuntimeItemsPayloadSchema, (threadId) =>
+      dbGetRuntimeItemsPayloadSchema.parse({ threadId }),
+    ),
+    dbReplaceThreadRuntimeItems: definePayloadProcedure<
+      z.infer<typeof dbReplaceRuntimeItemsPayloadSchema>,
+      void,
+      "main-local"
+    >("dbReplaceThreadRuntimeItems", "main-local", dbReplaceRuntimeItemsPayloadSchema),
   },
   updates: {
     checkForUpdate: defineNoArgProcedure<void, "main-local">("checkForUpdate", "main-local"),
@@ -821,6 +859,7 @@ export const ipcProcedureMap = {
   getThreadSnapshots: groupedIpcProcedures.thread.getThreadSnapshots,
   startThread: groupedIpcProcedures.thread.startThread,
   sendThreadInput: groupedIpcProcedures.thread.sendThreadInput,
+  interruptThread: groupedIpcProcedures.thread.interruptThread,
   writeTerminal: groupedIpcProcedures.thread.writeTerminal,
   resizeTerminal: groupedIpcProcedures.thread.resizeTerminal,
   resolveThreadServerRequest: groupedIpcProcedures.thread.resolveThreadServerRequest,
@@ -901,6 +940,8 @@ export const ipcProcedureMap = {
   dbDeleteThread: groupedIpcProcedures.db.dbDeleteThread,
   dbDeleteProject: groupedIpcProcedures.db.dbDeleteProject,
   dbSyncAll: groupedIpcProcedures.db.dbSyncAll,
+  dbGetThreadRuntimeItems: groupedIpcProcedures.db.dbGetThreadRuntimeItems,
+  dbReplaceThreadRuntimeItems: groupedIpcProcedures.db.dbReplaceThreadRuntimeItems,
   checkForUpdate: groupedIpcProcedures.updates.checkForUpdate,
   startUpdateDownload: groupedIpcProcedures.updates.startUpdateDownload,
   installUpdate: groupedIpcProcedures.updates.installUpdate,
@@ -940,6 +981,8 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "dbDeleteThread",
   "dbDeleteProject",
   "dbSyncAll",
+  "dbGetThreadRuntimeItems",
+  "dbReplaceThreadRuntimeItems",
   "checkForUpdate",
   "startUpdateDownload",
   "installUpdate",
@@ -1027,6 +1070,7 @@ export type SupervisorReply =
 export type SupervisorEvent =
   | { type: "thread-reset"; threadId: string }
   | { type: "thread-output"; threadId: string; data: string; outputLength: number }
+  | { type: "thread-runtime-event"; threadId: string; event: RuntimeEvent }
   | {
       type: "thread-server-request";
       threadId: string;

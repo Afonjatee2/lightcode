@@ -1,19 +1,20 @@
 /**
  * Lightweight Codex app-server capability probe.
  *
- * Spawns a temporary app-server, connects via WebSocket, queries
+ * Spawns a temporary app-server, speaks JSON-RPC over stdio, queries
  * `model/list` and `configRequirements/read`, then kills the process.
  * Falls back gracefully on any failure.
  *
  * Provider-specific — unlike the ACP probe, this speaks the Codex
- * app-server JSON-RPC 2.0 protocol over a loopback WebSocket.
+ * app-server JSON-RPC 2.0 protocol over newline-delimited stdio.
  */
 
-import { createServer } from "node:net";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import { buildAgentCommand, type CommandSpec } from "../base";
+import { resolveNodeForDistro } from "../../wsl/runtime";
+import { buildCodexAppServerCommand } from "./argv";
+import { CodexStdioTransport } from "./stdioTransport";
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -204,79 +205,53 @@ export function mapCodexRequirements(
 
 // ── JSON-RPC helpers ────────────────────────────────────────────
 
-function buildAppServerCommand(
-  location: ProjectLocation,
-  remoteUrl: string,
-  wslExecPath?: string,
-): CommandSpec {
-  const args = ["app-server", "--listen", remoteUrl, "--enable", "tui_app_server"];
-  return buildAgentCommand(location, "codex", args, wslExecPath);
-}
-
-function allocateLoopbackPort(): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close(() => reject(new Error("Unable to allocate a loopback port.")));
-        return;
-      }
-      const { port } = address;
-      server.close((error) => {
-        if (error) reject(error);
-        else resolve(port);
-      });
-    });
-  });
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
- * Minimal JSON-RPC 2.0 client over WebSocket for the probe.
+ * Minimal JSON-RPC 2.0 client over app-server stdio for the probe.
  *
- * Lifetime: connect → request/notify → dispose.
+ * Lifetime: spawn → request/notify → dispose.
  */
 class ProbeClient {
-  private socket: WebSocket;
   private seq = 0;
   private pending = new Map<
     string,
     { resolve: (v: unknown) => void; reject: (e: Error) => void }
   >();
 
-  constructor(socket: WebSocket) {
-    this.socket = socket;
-    this.socket.addEventListener("message", (event) => {
-      const raw = typeof event.data === "string" ? event.data : "";
-      if (!raw) return;
-      let msg: Record<string, unknown>;
-      try {
-        msg = JSON.parse(raw);
-      } catch {
-        return;
-      }
-      if ("id" in msg && typeof msg.id === "string") {
-        const entry = this.pending.get(msg.id);
-        if (!entry) return;
-        this.pending.delete(msg.id);
-        if (msg.error !== undefined) {
-          const err = msg.error;
-          const errMsg =
-            typeof err === "object" && err !== null && "message" in err
-              ? String((err as Record<string, unknown>).message)
-              : String(err);
-          entry.reject(new Error(errMsg));
-        } else {
-          entry.resolve(msg.result);
+  constructor(private readonly transport: CodexStdioTransport) {
+    this.transport.setListener({
+      onMessage: (message) => {
+        if (!message || typeof message !== "object") return;
+        const msg = message as Record<string, unknown>;
+        if ("id" in msg && typeof msg.id === "string") {
+          const entry = this.pending.get(msg.id);
+          if (!entry) return;
+          this.pending.delete(msg.id);
+          if (msg.error !== undefined) {
+            const err = msg.error;
+            const errMsg =
+              typeof err === "object" && err !== null && "message" in err
+                ? String((err as Record<string, unknown>).message)
+                : String(err);
+            entry.reject(new Error(errMsg));
+          } else {
+            entry.resolve(msg.result);
+          }
         }
-      }
+      },
+      onClose: () => {
+        this.rejectAll(new Error(`Codex app-server exited.${this.transport.formatOutput()}`));
+      },
+      onError: (error) => {
+        this.rejectAll(error);
+      },
     });
+  }
+
+  private rejectAll(error: Error): void {
+    for (const entry of this.pending.values()) {
+      entry.reject(error);
+    }
+    this.pending.clear();
   }
 
   request(method: string, params: Record<string, unknown>): Promise<unknown> {
@@ -284,66 +259,18 @@ class ProbeClient {
     const promise = new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
     });
-    this.socket.send(JSON.stringify({ jsonrpc: "2.0", id, method, params }));
+    this.transport.write({ jsonrpc: "2.0", id, method, params });
     return promise;
   }
 
   notify(method: string): void {
-    this.socket.send(JSON.stringify({ jsonrpc: "2.0", method }));
+    this.transport.write({ jsonrpc: "2.0", method });
   }
 
   dispose(): void {
-    for (const entry of this.pending.values()) {
-      entry.reject(new Error("Probe disposed."));
-    }
-    this.pending.clear();
-    try {
-      this.socket.close();
-    } catch {
-      // ignore
-    }
+    this.rejectAll(new Error("Probe disposed."));
+    this.transport.dispose();
   }
-}
-
-async function connectWebSocket(
-  url: string,
-  appServer: ChildProcess,
-  maxAttempts = 30,
-): Promise<WebSocket> {
-  const WS = WebSocket;
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    if (appServer.exitCode !== null) {
-      throw new Error("Codex app-server exited before WebSocket could connect.");
-    }
-
-    try {
-      const socket = await new Promise<WebSocket>((resolve, reject) => {
-        const candidate = new WS(url);
-        const handleOpen = () => {
-          candidate.removeEventListener("open", handleOpen);
-          candidate.removeEventListener("error", handleError);
-          resolve(candidate);
-        };
-        const handleError = (event: Event) => {
-          candidate.removeEventListener("open", handleOpen);
-          candidate.removeEventListener("error", handleError);
-          reject(event);
-        };
-        candidate.addEventListener("open", handleOpen);
-        candidate.addEventListener("error", handleError);
-      });
-      return socket;
-    } catch (error) {
-      lastError = error;
-      await sleep(200);
-    }
-  }
-
-  throw new Error(
-    `Unable to connect to Codex app-server probe.${lastError ? ` Last error: ${String(lastError)}` : ""}`,
-  );
 }
 
 // ── Probe ───────────────────────────────────────────────────────
@@ -365,17 +292,18 @@ export async function probeCodexCapabilities(
   let client: ProbeClient | undefined;
 
   try {
-    const port = await allocateLoopbackPort();
-    const remoteUrl = `ws://127.0.0.1:${port}`;
-    const cmd = buildAppServerCommand(location, remoteUrl, options?.wslExecPath);
+    const wslNodePath =
+      location.kind === "wsl" ? (await resolveNodeForDistro(location.distro)).nodePath : undefined;
+    const cmd = buildCodexAppServerCommand(location, options?.wslExecPath, wslNodePath);
 
     appServer = spawn(cmd.command, cmd.args, {
       cwd: cmd.cwd ?? undefined,
       env: { ...process.env, TERM: "xterm-256color" },
-      stdio: ["ignore", "pipe", "pipe"],
+      stdio: ["pipe", "pipe", "pipe"],
       shell: false,
       windowsHide: true,
     });
+    const transport = new CodexStdioTransport(appServer);
 
     // Bail early if the process fails to start
     const spawnError = await new Promise<Error | undefined>((resolve) => {
@@ -386,15 +314,14 @@ export async function probeCodexCapabilities(
       console.log("%s failed to spawn: %s", tag, spawnError.message);
       return undefined;
     }
-
-    // Drain stdout/stderr to avoid backpressure stalls
-    appServer.stdout?.resume();
-    appServer.stderr?.resume();
+    if (appServer.exitCode !== null) {
+      console.log("%s exited before probe:%s", tag, transport.formatOutput());
+      return undefined;
+    }
 
     const result = await Promise.race([
       (async () => {
-        const socket = await connectWebSocket(remoteUrl, appServer!);
-        client = new ProbeClient(socket);
+        client = new ProbeClient(transport);
 
         // Handshake
         await client.request("initialize", {

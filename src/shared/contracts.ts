@@ -8,3 +8,5 @@ export * from "./contracts/projectTree";
 export * from "./contracts/github";
 export * from "./contracts/appView";
 export * from "./contracts/agentEvent";
+export * from "./contracts/runtimeEvent";
+export * from "./contracts/agentInstance";

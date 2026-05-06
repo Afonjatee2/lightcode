@@ -1,3 +1,5 @@
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 import {
   createCodexAdapter,
@@ -9,6 +11,7 @@ import {
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import { codexIntentFor } from "./plugin/intentMap";
 import { mapCodexModels } from "./probe";
+import { CodexStdioTransport } from "./stdioTransport";
 
 describe("deriveCodexStructuredState", () => {
   it("maps active approval state to needs_approval", () => {
@@ -97,6 +100,79 @@ describe("deriveCodexStructuredState", () => {
         ok: true,
       },
     });
+  });
+});
+
+function createTransportHarness() {
+  const child = new EventEmitter() as EventEmitter & {
+    stdin: PassThrough;
+    stdout: PassThrough;
+    stderr: PassThrough;
+  };
+  child.stdin = new PassThrough();
+  child.stdout = new PassThrough();
+  child.stderr = new PassThrough();
+
+  const writes: string[] = [];
+  child.stdin.on("data", (chunk) => writes.push(String(chunk)));
+
+  const messages: unknown[] = [];
+  const errors: Error[] = [];
+  let closed = false;
+  const transport = new CodexStdioTransport(
+    child as unknown as import("node:child_process").ChildProcess,
+  );
+  transport.setListener({
+    onMessage: (message) => messages.push(message),
+    onClose: () => {
+      closed = true;
+    },
+    onError: (error) => errors.push(error),
+  });
+
+  return {
+    child,
+    transport,
+    messages,
+    errors,
+    writes,
+    get closed() {
+      return closed;
+    },
+  };
+}
+
+describe("CodexStdioTransport", () => {
+  it("parses newline-delimited JSON-RPC messages across split stdout chunks", () => {
+    const { child, messages } = createTransportHarness();
+
+    child.stdout.write('{"jsonrpc":"2.0","id":"1",');
+    expect(messages).toEqual([]);
+
+    child.stdout.write('"result":{"ok":true}}\n{"jsonrpc":"2.0","method":"turn/started"}\r\n');
+
+    expect(messages).toEqual([
+      { jsonrpc: "2.0", id: "1", result: { ok: true } },
+      { jsonrpc: "2.0", method: "turn/started" },
+    ]);
+  });
+
+  it("keeps stderr out of protocol parsing and records it for diagnostics", () => {
+    const { child, messages, transport } = createTransportHarness();
+
+    child.stderr.write("warning from app-server\n");
+    child.stdout.write('{"jsonrpc":"2.0","id":"1","result":null}\n');
+
+    expect(messages).toEqual([{ jsonrpc: "2.0", id: "1", result: null }]);
+    expect(transport.formatOutput()).toContain("warning from app-server");
+  });
+
+  it("writes outgoing JSON-RPC messages as newline-delimited JSON", () => {
+    const { transport, writes } = createTransportHarness();
+
+    transport.write({ jsonrpc: "2.0", method: "initialized" });
+
+    expect(writes).toEqual(['{"jsonrpc":"2.0","method":"initialized"}\n']);
   });
 });
 

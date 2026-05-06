@@ -13,6 +13,7 @@ import type {
   ProviderDraftConfig,
   TerminalPosition,
   ThemeMode,
+  ThreadPresentationMode,
   ThreadRemoveAction,
 } from "@/shared/contracts";
 
@@ -35,6 +36,7 @@ interface SharedSettingsState extends SharedSettings {
   setStaleThreadUnloadMinutes: (value: number) => void;
   setScrollSpeed: (value: number) => void;
   setAgentTerminalFontSize: (value: number) => void;
+  setGuiChatFontSize: (value: number) => void;
   setTerminalPanelFontSize: (value: number) => void;
   setPreventSleepWhileWorking: (value: boolean) => void;
   setThreadRemoveAction: (value: ThreadRemoveAction) => void;
@@ -46,6 +48,7 @@ interface SharedSettingsState extends SharedSettings {
   setSearchExclude: (value: Record<string, boolean>) => void;
   setDisableCliHookPlugin: (value: boolean) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
+  setLastPresentationMode: (agentKind: string, mode: ThreadPresentationMode) => void;
   setNotificationsEnabled: (value: boolean) => void;
   setNotificationSound: (value: boolean) => void;
   setNotificationFilter: (value: NotificationFilter) => void;
@@ -198,6 +201,10 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ agentTerminalFontSize });
     persistSettings(selectSharedSettings(get()));
   },
+  setGuiChatFontSize: (guiChatFontSize) => {
+    set({ guiChatFontSize });
+    persistSettings(selectSharedSettings(get()));
+  },
   setTerminalPanelFontSize: (terminalPanelFontSize) => {
     set({ terminalPanelFontSize });
     persistSettings(selectSharedSettings(get()));
@@ -247,6 +254,12 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
       return;
     }
     set({ providerConfigs: { ...current, [agentKind]: config } });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setLastPresentationMode: (agentKind, mode) => {
+    const current = get().lastPresentationModeByAgent;
+    if (current[agentKind] === mode) return;
+    set({ lastPresentationModeByAgent: { ...current, [agentKind]: mode } });
     persistSettings(selectSharedSettings(get()));
   },
   setNotificationsEnabled: (notificationsEnabled) => {
@@ -331,6 +344,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     staleThreadUnloadMinutes: state.staleThreadUnloadMinutes,
     scrollSpeed: state.scrollSpeed,
     agentTerminalFontSize: state.agentTerminalFontSize,
+    guiChatFontSize: state.guiChatFontSize,
     terminalPanelFontSize: state.terminalPanelFontSize,
     preventSleepWhileWorking: state.preventSleepWhileWorking,
     threadRemoveAction: state.threadRemoveAction,
@@ -338,6 +352,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     autoShowTerminalPanel: state.autoShowTerminalPanel,
     gitReviewMode: state.gitReviewMode,
     providerConfigs: state.providerConfigs,
+    lastPresentationModeByAgent: state.lastPresentationModeByAgent,
     editorLspEnabled: state.editorLspEnabled,
     searchUseIgnoreFiles: state.searchUseIgnoreFiles,
     searchExclude: state.searchExclude,

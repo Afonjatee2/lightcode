@@ -18,7 +18,7 @@ const GIT_PANEL_DEFAULT_WIDTH = 350;
 
 export const CONTENT_MIN_WIDTH = 540;
 
-export type ResizeTarget = "sidebar" | "panel" | "panel-bottom" | "git-panel" | null;
+export type ResizeTarget = "sidebar" | "panel" | "panel-bottom" | "git-panel";
 
 export function useResizablePanels(refs: {
   sidebarRef: RefObject<HTMLDivElement | null>;
@@ -26,6 +26,7 @@ export function useResizablePanels(refs: {
   panelInnerRef: RefObject<HTMLDivElement | null>;
   gitPanelRef: RefObject<HTMLDivElement | null>;
   gitPanelInnerRef: RefObject<HTMLDivElement | null>;
+  overlayRef: RefObject<HTMLDivElement | null>;
 }) {
   const [sidebarWidth, setSidebarWidth] = useState(() =>
     readStoredNumber("lightcode-sidebar-width", SIDEBAR_DEFAULT_WIDTH),
@@ -39,8 +40,6 @@ export function useResizablePanels(refs: {
   const [gitPanelWidth, setGitPanelWidth] = useState(() =>
     readStoredNumber("lightcode-git-panel-width", GIT_PANEL_DEFAULT_WIDTH),
   );
-  const [resizeTarget, setResizeTarget] = useState<ResizeTarget>(null);
-  const resizeRef = useRef({ startX: 0, startY: 0, startWidth: 0, startHeight: 0 });
   const sizeRef = useRef({
     sidebarWidth,
     panelWidth,
@@ -128,111 +127,155 @@ export function useResizablePanels(refs: {
     localStorage.setItem("lightcode-git-panel-width", String(gitPanelWidth));
   }, [gitPanelWidth]);
 
+  // Cleanup an in-flight resize if the component unmounts mid-drag.
+  const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    if (!resizeTarget) return;
-
-    let rafId: number | null = null;
-    let pendingX = 0;
-    let pendingY = 0;
-    let hasPending = false;
-
-    function flush() {
-      rafId = null;
-      if (!hasPending) return;
-      hasPending = false;
-      const x = pendingX;
-      const y = pendingY;
-
-      if (resizeTarget === "sidebar") {
-        const delta = x - resizeRef.current.startX;
-        const next = Math.min(
-          SIDEBAR_MAX_WIDTH,
-          Math.max(SIDEBAR_MIN_WIDTH, resizeRef.current.startWidth + delta),
-        );
-        if (next === sizeRef.current.sidebarWidth) return;
-        sizeRef.current.sidebarWidth = next;
-        applySidebarWidth(next);
-      } else if (resizeTarget === "panel") {
-        const delta = resizeRef.current.startX - x;
-        const next = Math.min(
-          PANEL_MAX_WIDTH,
-          Math.max(PANEL_MIN_WIDTH, resizeRef.current.startWidth + delta),
-        );
-        if (next === sizeRef.current.panelWidth) return;
-        sizeRef.current.panelWidth = next;
-        applyPanelWidth(next);
-      } else if (resizeTarget === "panel-bottom") {
-        const delta = resizeRef.current.startY - y;
-        const next = Math.min(
-          PANEL_BOTTOM_MAX_HEIGHT,
-          Math.max(PANEL_BOTTOM_MIN_HEIGHT, resizeRef.current.startHeight + delta),
-        );
-        if (next === sizeRef.current.panelHeight) return;
-        sizeRef.current.panelHeight = next;
-        applyPanelHeight(next);
-      } else if (resizeTarget === "git-panel") {
-        const delta = resizeRef.current.startX - x;
-        const next = Math.min(
-          GIT_PANEL_MAX_WIDTH,
-          Math.max(GIT_PANEL_MIN_WIDTH, resizeRef.current.startWidth + delta),
-        );
-        if (next === sizeRef.current.gitPanelWidth) return;
-        sizeRef.current.gitPanelWidth = next;
-        applyGitPanelWidth(next);
-      }
-    }
-
-    function onMouseMove(e: MouseEvent) {
-      pendingX = e.clientX;
-      pendingY = e.clientY;
-      hasPending = true;
-      if (rafId === null) rafId = requestAnimationFrame(flush);
-    }
-
-    function onMouseUp() {
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
-        rafId = null;
-      }
-      if (hasPending) flush();
-      setSidebarWidth(sizeRef.current.sidebarWidth);
-      setPanelWidth(sizeRef.current.panelWidth);
-      setPanelHeight(sizeRef.current.panelHeight);
-      setGitPanelWidth(sizeRef.current.gitPanelWidth);
-      setResizeTarget(null);
-    }
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
     return () => {
-      if (rafId !== null) cancelAnimationFrame(rafId);
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
+      cleanupRef.current?.();
     };
-  }, [applyGitPanelWidth, applyPanelHeight, applyPanelWidth, applySidebarWidth, resizeTarget]);
+  }, []);
+
+  const startResize = useCallback(
+    (target: ResizeTarget, event: React.MouseEvent) => {
+      event.preventDefault();
+      cleanupRef.current?.();
+
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const startWidth =
+        target === "sidebar"
+          ? sizeRef.current.sidebarWidth
+          : target === "panel"
+            ? sizeRef.current.panelWidth
+            : target === "git-panel"
+              ? sizeRef.current.gitPanelWidth
+              : 0;
+      const startHeight = target === "panel-bottom" ? sizeRef.current.panelHeight : 0;
+
+      // The element whose CSS transition must be paused for the duration of the drag,
+      // otherwise its width/height will lag behind the per-frame ref writes below.
+      const affected =
+        target === "sidebar"
+          ? refs.sidebarRef.current
+          : target === "git-panel"
+            ? refs.gitPanelRef.current
+            : refs.panelRef.current;
+      const prevTransitionDuration = affected ? affected.style.transitionDuration : "";
+      if (affected) affected.style.transitionDuration = "0ms";
+
+      const overlay = refs.overlayRef.current;
+      if (overlay) {
+        overlay.style.display = "block";
+        overlay.style.cursor = target === "panel-bottom" ? "row-resize" : "col-resize";
+      }
+
+      let rafId: number | null = null;
+      let pendingX = startX;
+      let pendingY = startY;
+      let hasPending = false;
+
+      function flush() {
+        rafId = null;
+        if (!hasPending) return;
+        hasPending = false;
+        const x = pendingX;
+        const y = pendingY;
+
+        if (target === "sidebar") {
+          const delta = x - startX;
+          const next = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, startWidth + delta));
+          if (next === sizeRef.current.sidebarWidth) return;
+          sizeRef.current.sidebarWidth = next;
+          applySidebarWidth(next);
+        } else if (target === "panel") {
+          const delta = startX - x;
+          const next = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, startWidth + delta));
+          if (next === sizeRef.current.panelWidth) return;
+          sizeRef.current.panelWidth = next;
+          applyPanelWidth(next);
+        } else if (target === "panel-bottom") {
+          const delta = startY - y;
+          const next = Math.min(
+            PANEL_BOTTOM_MAX_HEIGHT,
+            Math.max(PANEL_BOTTOM_MIN_HEIGHT, startHeight + delta),
+          );
+          if (next === sizeRef.current.panelHeight) return;
+          sizeRef.current.panelHeight = next;
+          applyPanelHeight(next);
+        } else if (target === "git-panel") {
+          const delta = startX - x;
+          const next = Math.min(
+            GIT_PANEL_MAX_WIDTH,
+            Math.max(GIT_PANEL_MIN_WIDTH, startWidth + delta),
+          );
+          if (next === sizeRef.current.gitPanelWidth) return;
+          sizeRef.current.gitPanelWidth = next;
+          applyGitPanelWidth(next);
+        }
+      }
+
+      function onMouseMove(e: MouseEvent) {
+        pendingX = e.clientX;
+        pendingY = e.clientY;
+        hasPending = true;
+        if (rafId === null) rafId = requestAnimationFrame(flush);
+      }
+
+      function teardown() {
+        if (rafId !== null) {
+          cancelAnimationFrame(rafId);
+          rafId = null;
+        }
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+        if (affected) affected.style.transitionDuration = prevTransitionDuration;
+        if (overlay) {
+          overlay.style.display = "none";
+          overlay.style.cursor = "";
+        }
+        cleanupRef.current = null;
+      }
+
+      function onMouseUp() {
+        if (hasPending) flush();
+        teardown();
+        // Single batched re-render at the end persists the final size to localStorage.
+        setSidebarWidth(sizeRef.current.sidebarWidth);
+        setPanelWidth(sizeRef.current.panelWidth);
+        setPanelHeight(sizeRef.current.panelHeight);
+        setGitPanelWidth(sizeRef.current.gitPanelWidth);
+      }
+
+      cleanupRef.current = teardown;
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [
+      applyGitPanelWidth,
+      applyPanelHeight,
+      applyPanelWidth,
+      applySidebarWidth,
+      refs.gitPanelRef,
+      refs.overlayRef,
+      refs.panelRef,
+      refs.sidebarRef,
+    ],
+  );
 
   function handleSidebarResizeStart(e: React.MouseEvent) {
-    e.preventDefault();
-    resizeRef.current = { startX: e.clientX, startY: 0, startWidth: sidebarWidth, startHeight: 0 };
-    setResizeTarget("sidebar");
+    startResize("sidebar", e);
   }
 
   function handlePanelResizeStart(e: React.MouseEvent) {
-    e.preventDefault();
-    resizeRef.current = { startX: e.clientX, startY: 0, startWidth: panelWidth, startHeight: 0 };
-    setResizeTarget("panel");
+    startResize("panel", e);
   }
 
   function handlePanelBottomResizeStart(e: React.MouseEvent) {
-    e.preventDefault();
-    resizeRef.current = { startX: 0, startY: e.clientY, startWidth: 0, startHeight: panelHeight };
-    setResizeTarget("panel-bottom");
+    startResize("panel-bottom", e);
   }
 
   function handleGitPanelResizeStart(e: React.MouseEvent) {
-    e.preventDefault();
-    resizeRef.current = { startX: e.clientX, startY: 0, startWidth: gitPanelWidth, startHeight: 0 };
-    setResizeTarget("git-panel");
+    startResize("git-panel", e);
   }
 
   return {
@@ -240,7 +283,6 @@ export function useResizablePanels(refs: {
     panelWidth,
     panelHeight,
     gitPanelWidth,
-    resizeTarget,
     handleSidebarResizeStart,
     handlePanelResizeStart,
     handlePanelBottomResizeStart,

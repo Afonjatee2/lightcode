@@ -24,7 +24,7 @@ Every supported agent implements the `AgentAdapter` interface (`src/supervisor/a
 
 ### Optional — Structured Sessions
 
-- `createStructuredSession?(input)` — Start a server-controlled session (Codex App Server: WebSocket JSON-RPC, rollout file coordination with PTY).
+- `createStructuredSession?(input)` — Start a server-controlled session (for example Codex app-server JSON-RPC over stdio for GUI presentation).
 
 ### Optional — Input
 
@@ -49,13 +49,13 @@ Every provider is a folder under `src/supervisor/agents/<kind>/` with the same i
 
 Opening two provider folders side-by-side answers "what does this provider do differently" by file-name alignment alone.
 
-| Provider | Models                                                              | Efforts                  | Live Input | Structured Session |
-| -------- | ------------------------------------------------------------------- | ------------------------ | ---------- | ------------------ |
-| Claude   | opus-4-7, opus-4-6[1m], sonnet, haiku                               | low, medium, high, max   | terminal   | No                 |
-| Codex    | gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2-codex, etc.           | low, medium, high, xhigh | server     | Yes (WebSocket)    |
-| Gemini   | auto, gemini-3.1-pro-preview, gemini-2.5-pro/flash/flash-lite, etc. | (none)                   | terminal   | No                 |
-| Copilot  | (probed via ACP)                                                    | low, medium, high, xhigh | terminal   | Yes (ACP)          |
-| Cursor   | auto, composer-\*, GPT/Opus/Sonnet variants                         | (embedded in model name) | terminal   | No                 |
+| Provider | Models                                                              | Efforts                  | Live Input            | Structured Session     |
+| -------- | ------------------------------------------------------------------- | ------------------------ | --------------------- | ---------------------- |
+| Claude   | opus-4-7, opus-4-6[1m], sonnet, haiku                               | low, medium, high, max   | terminal              | No                     |
+| Codex    | gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2-codex, etc.           | low, medium, high, xhigh | terminal / GUI server | Yes (stdio app-server) |
+| Gemini   | auto, gemini-3.1-pro-preview, gemini-2.5-pro/flash/flash-lite, etc. | (none)                   | terminal              | No                     |
+| Copilot  | (probed via ACP)                                                    | low, medium, high, xhigh | terminal              | Yes (ACP)              |
+| Cursor   | auto, composer-\*, GPT/Opus/Sonnet variants                         | (embedded in model name) | terminal              | No                     |
 
 ## Plugin Architecture
 

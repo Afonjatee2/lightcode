@@ -1,12 +1,14 @@
+import { dirname as posixDirname } from "node:path/posix";
 import type { ProjectLocation, SessionRef, ThreadConfig } from "@/shared/contracts";
 import {
   buildAgentCommand,
+  getWslCommand,
   type AgentArgvSpec,
   type AgentLaunchOptions,
   type CommandSpec,
 } from "../base";
 
-export const CODEX_REMOTE_TUI_FEATURE = "tui_app_server";
+const DEFAULT_WSL_EXEC_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 
 function buildCodexArgs(
   config: ThreadConfig,
@@ -14,14 +16,6 @@ function buildCodexArgs(
   launchOptions?: AgentLaunchOptions,
 ): string[] {
   const args: string[] = [];
-
-  for (const feature of launchOptions?.enabledFeatures ?? []) {
-    args.push("--enable", feature);
-  }
-
-  if (launchOptions?.remoteUrl) {
-    args.push("--remote", launchOptions.remoteUrl);
-  }
 
   args.push("--no-alt-screen");
 
@@ -97,9 +91,30 @@ export function buildCodexArgvFor(
 
 export function buildCodexAppServerCommand(
   location: ProjectLocation,
-  remoteUrl: string,
   wslExecPath?: string,
+  wslNodePath?: string,
 ): CommandSpec {
-  const args = ["app-server", "--listen", remoteUrl, "--enable", CODEX_REMOTE_TUI_FEATURE];
+  const args = ["app-server"];
+  if (location.kind === "wsl") {
+    const pathSegments = [
+      wslNodePath ? posixDirname(wslNodePath) : undefined,
+      wslExecPath?.startsWith("/") ? posixDirname(wslExecPath) : undefined,
+      DEFAULT_WSL_EXEC_PATH,
+    ].filter((segment): segment is string => Boolean(segment));
+    return {
+      command: getWslCommand(),
+      args: [
+        "-d",
+        location.distro,
+        "--cd",
+        location.linuxPath,
+        "--",
+        "/usr/bin/env",
+        `PATH=${pathSegments.join(":")}`,
+        wslExecPath ?? "codex",
+        ...args,
+      ],
+    };
+  }
   return buildAgentCommand(location, "codex", args, wslExecPath);
 }

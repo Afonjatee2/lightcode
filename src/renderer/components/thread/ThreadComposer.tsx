@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Square } from "lucide-react";
 import { ToggleButton, Tooltip } from "@heroui/react";
 import {
   Button,
@@ -39,6 +39,7 @@ export type ComposerControl =
       isSelected: boolean;
       onChange?: (isSelected: boolean) => void;
       isDisabled?: boolean;
+      iconOnly?: boolean;
       hideLabelOnWrap?: boolean;
     }
   | {
@@ -114,6 +115,7 @@ export function ThreadComposer(props: {
   compact?: boolean;
   prompt: string;
   placeholder: string;
+  fixedContent?: ReactNode;
   inputContent?: ReactNode;
   attachmentBar?: ReactNode;
   promptDisabled?: boolean;
@@ -121,6 +123,7 @@ export function ThreadComposer(props: {
   submitDisabled: boolean;
   onPromptChange: (value: string) => void;
   onSubmit: () => void;
+  onStop?: (() => void) | undefined;
   controls: ComposerControl[];
   leadingControls?: ReactNode;
   afterControls?: ReactNode;
@@ -130,6 +133,7 @@ export function ThreadComposer(props: {
     compact = false,
     prompt,
     placeholder,
+    fixedContent,
     inputContent,
     attachmentBar,
     promptDisabled = false,
@@ -137,6 +141,7 @@ export function ThreadComposer(props: {
     submitDisabled,
     onPromptChange,
     onSubmit,
+    onStop,
     controls,
     leadingControls,
     afterControls,
@@ -281,10 +286,17 @@ export function ThreadComposer(props: {
       }
 
       if (control.kind === "toggle") {
+        const hideLabel =
+          control.iconOnly || (control.hideLabelOnWrap && !forceShowLabels && isWrapping);
         const toggle = (
           <ToggleButton
             key={`toggle-${index}`}
-            className="lightcode-composer-toggle min-w-0 px-2.5"
+            aria-label={control.label}
+            className={
+              control.iconOnly
+                ? "lightcode-composer-toggle min-w-9 px-2"
+                : "lightcode-composer-toggle min-w-0 px-2.5"
+            }
             isDisabled={control.isDisabled ?? false}
             isSelected={control.isSelected}
             size="sm"
@@ -292,19 +304,21 @@ export function ThreadComposer(props: {
             onChange={control.onChange ?? (() => undefined)}
           >
             {resolveIcon(control)}
-            <span
-              className={
-                control.hideLabelOnWrap && !forceShowLabels
-                  ? "lightcode-composer-label-hideable"
-                  : undefined
-              }
-            >
-              {control.label}
-            </span>
+            {!control.iconOnly && (
+              <span
+                className={
+                  control.hideLabelOnWrap && !forceShowLabels
+                    ? "lightcode-composer-label-hideable"
+                    : undefined
+                }
+              >
+                {control.label}
+              </span>
+            )}
           </ToggleButton>
         );
 
-        if (control.hideLabelOnWrap && !forceShowLabels && isWrapping) {
+        if (hideLabel) {
           return (
             <Tooltip key={`toggle-tooltip-${index}`}>
               {toggle}
@@ -397,22 +411,44 @@ export function ThreadComposer(props: {
       />
     );
 
-  const renderSendButton = () => (
-    <Button
-      isIconOnly
-      aria-label={submitLabel}
-      className="lightcode-composer-send"
-      isDisabled={submitDisabled || promptDisabled}
-      onPress={onSubmit}
-      size="sm"
-    >
-      <ArrowUp className="size-4" />
-    </Button>
-  );
+  const renderSendButton = () => {
+    // When the agent is running and input is empty, show stop button
+    if (onStop && submitDisabled) {
+      return (
+        <Tooltip delay={0}>
+          <Tooltip.Trigger>
+            <Button
+              isIconOnly
+              aria-label="Stop response"
+              className="lightcode-composer-send"
+              onPress={onStop}
+              size="sm"
+            >
+              <Square className="size-3.5 fill-current" />
+            </Button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Stop response</Tooltip.Content>
+        </Tooltip>
+      );
+    }
+    return (
+      <Button
+        isIconOnly
+        aria-label={submitLabel}
+        className="lightcode-composer-send"
+        isDisabled={submitDisabled || promptDisabled}
+        onPress={onSubmit}
+        size="sm"
+      >
+        <ArrowUp className="size-4" />
+      </Button>
+    );
+  };
 
   return (
     <div>
       <div className="lightcode-composer-shell overflow-hidden">
+        {fixedContent}
         {attachmentBar}
         <div ref={editorHostRef}>{renderEditor()}</div>
         <div className={toolbarClassName}>

@@ -250,6 +250,7 @@ describe("writeSubmittedPrompt", () => {
         model: "gpt-5.4",
       },
       undefined,
+      undefined,
     );
     expect(session.pty.write).not.toHaveBeenCalled();
     expect(emitted).toEqual([]);
@@ -298,6 +299,7 @@ describe("writeSubmittedPrompt", () => {
         model: "gpt-5.4",
       },
       undefined,
+      undefined,
     );
     expect(emitted).toEqual([]);
 
@@ -343,6 +345,139 @@ describe("writeSubmittedPrompt", () => {
         errorMessage: "request failed",
       }),
     ]);
+  });
+
+  it("queues GUI follow-ups, interrupts the active turn, and drains them in order", async () => {
+    const runtime = new SupervisorRuntime(() => undefined);
+    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const interruptTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: { kind: "windows"; path: string };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          structuredSession: Record<string, unknown>;
+          presentationMode: "gui";
+        }) => { status: string };
+      }
+    ).spawnThread({
+      threadId: "thread-gui-queue",
+      agentKind: "codex",
+      adapter: {
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "read-only", label: "Read Only" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "gui",
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      config: {
+        model: "gpt-5.4",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      structuredSession: {
+        launchOptions: {},
+        setListener: vi.fn<(listener: unknown) => void>(),
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        startTurn,
+        interruptTurn,
+      },
+      presentationMode: "gui",
+    });
+
+    (
+      runtime as unknown as {
+        sessions: Map<
+          string,
+          {
+            status: string;
+            structuredSession: { setListener: ReturnType<typeof vi.fn> };
+          }
+        >;
+      }
+    ).sessions.get("thread-gui-queue")!.status = "working";
+
+    await runtime.sendThreadInput({
+      threadId: "thread-gui-queue",
+      prompt: "first",
+      config: {
+        model: "gpt-5.4",
+      },
+      userMessageItemId: "user-first",
+    });
+    await runtime.sendThreadInput({
+      threadId: "thread-gui-queue",
+      prompt: "second",
+      config: {
+        model: "gpt-5.4",
+      },
+      userMessageItemId: "user-second",
+    });
+
+    expect(interruptTurn).toHaveBeenCalledTimes(1);
+    expect(startTurn).not.toHaveBeenCalled();
+
+    const listener = (
+      (
+        runtime as unknown as {
+          sessions: Map<
+            string,
+            {
+              structuredSession: { setListener: ReturnType<typeof vi.fn> };
+            }
+          >;
+        }
+      ).sessions.get("thread-gui-queue")!.structuredSession.setListener as ReturnType<typeof vi.fn>
+    ).mock.calls[0]?.[0] as { onUpdate: (update: { status: string; attention: string }) => void };
+
+    listener.onUpdate({ status: "idle", attention: "none" });
+    await Promise.resolve();
+
+    expect(startTurn).toHaveBeenNthCalledWith(
+      1,
+      "first",
+      {
+        model: "gpt-5.4",
+      },
+      undefined,
+      { userMessageItemId: "user-first" },
+    );
+
+    listener.onUpdate({ status: "working", attention: "working" });
+    listener.onUpdate({ status: "idle", attention: "none" });
+    await Promise.resolve();
+
+    expect(startTurn).toHaveBeenNthCalledWith(
+      2,
+      "second",
+      {
+        model: "gpt-5.4",
+      },
+      undefined,
+      { userMessageItemId: "user-second" },
+    );
   });
 
   it("does not emit runtime status updates for raw terminal writes", async () => {
@@ -1176,6 +1311,93 @@ describe("writeSubmittedPrompt", () => {
     expect(encoded).toContain("codex");
     expect(encoded).toContain("session-1");
     expect(spawnOpts).toMatchObject({ cols: 132, rows: 42 });
+  });
+
+  it("starts Codex GUI presentation on the structured session without a PTY", async () => {
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const setListener = vi.fn<(listener: unknown) => void>();
+
+    const adapter = {
+      kind: "codex" as const,
+      label: "Codex",
+      capabilities: {
+        models: [{ id: "gpt-5.4", label: "5.4" }],
+        efforts: ["high"],
+        modelEfforts: {},
+        modes: ["agent"],
+        approvalPolicies: [{ id: "on-request", label: "On Request" }],
+        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "terminal" as const,
+        presentationMode: "terminal" as const,
+        presentationModes: ["terminal", "gui"] as const,
+      },
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "codex",
+        args: ["should-not-spawn"],
+      })),
+      buildResumeArgv: vi.fn<() => void>(),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+      createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+        launchOptions: { suppressResumeConfigOverrides: true, resumeThreadId: "session-1" },
+        activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        openThread: vi.fn<() => Promise<string>>().mockResolvedValue("session-1"),
+        startTurn,
+        setListener,
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      }),
+    };
+
+    (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+      "codex",
+      adapter,
+    );
+
+    await runtime.startThread({
+      threadId: "thread-gui-start",
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      agentKind: "codex",
+      config: {
+        model: "gpt-5.4",
+      },
+      prompt: "hi",
+      presentationMode: "gui",
+      initialSize: {
+        cols: 132,
+        rows: 42,
+      },
+    });
+
+    expect(adapter.buildLaunchArgv).not.toHaveBeenCalled();
+    expect(ptySpawnMock).not.toHaveBeenCalled();
+    expect(setListener).toHaveBeenCalledTimes(1);
+    expect(startTurn).toHaveBeenCalledWith("hi", { model: "gpt-5.4" }, undefined, {
+      userMessageItemId: expect.stringMatching(/^user-/),
+    });
+    expect(
+      (runtime as unknown as { sessions: Map<string, { pty?: unknown }> }).sessions.get(
+        "thread-gui-start",
+      )?.pty,
+    ).toBeUndefined();
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-gui-start",
+        status: "launching",
+        threadStatusSource: "server",
+      }),
+    );
   });
 
   it("inserts Codex hook enable flags before the positional prompt", async () => {

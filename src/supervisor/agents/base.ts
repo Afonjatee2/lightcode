@@ -15,10 +15,12 @@ import type {
   AuthState,
   ProjectLocation,
   PromptSegment,
+  RuntimeEvent,
   SessionRef,
   ThreadServerRequestId,
   ThreadAttention,
   ThreadConfig,
+  ThreadPresentationMode,
   ThreadStatus,
 } from "@/shared/contracts";
 import { primeAgentBinaryPath, resolveAgentBinaryPath } from "./binaryResolver";
@@ -49,8 +51,6 @@ export interface AgentEnvContext {
 }
 
 export interface AgentLaunchOptions {
-  enabledFeatures?: string[];
-  remoteUrl?: string;
   suppressResumeConfigOverrides?: boolean;
   resumeThreadId?: string;
 }
@@ -72,6 +72,25 @@ export interface StructuredSessionListener {
     params: unknown;
   }): void;
   onUpdate(update: StructuredSessionUpdate): void;
+  /**
+   * Emit a canonical chat-runtime event (per-message item lifecycle, content
+   * streams, approvals, etc.). Optional — adapters that have not yet wired up
+   * their canonical-event mapper can omit it; the chat UI will simply have no
+   * structured items for those threads.
+   */
+  onRuntimeEvent?(event: RuntimeEvent): void;
+}
+
+/** Per-call options for {@link StructuredSessionHandle.startTurn}. */
+export interface StartTurnOptions {
+  /**
+   * Pre-allocated runtime item id for the user_message event. The runtime
+   * emits an optimistic `item.started`/`item.completed` for the user's typed
+   * prompt before the structured session is even spawned, so the chat pane
+   * can render it instantly. Passing the same id here lets the structured
+   * session's own emit dedupe via the renderer's per-id check.
+   */
+  userMessageItemId?: string;
 }
 
 export interface StructuredSessionHandle {
@@ -80,7 +99,13 @@ export interface StructuredSessionHandle {
   openThread?(config: ThreadConfig, sessionRef?: SessionRef): Promise<string>;
   ensureResumeArtifacts?(): Promise<void>;
   waitForRolloutFile?(timeoutMs?: number): Promise<void>;
-  startTurn?(prompt: string, config: ThreadConfig, segments?: PromptSegment[]): Promise<void>;
+  startTurn?(
+    prompt: string,
+    config: ThreadConfig,
+    segments?: PromptSegment[],
+    options?: StartTurnOptions,
+  ): Promise<void>;
+  interruptTurn?(): Promise<void>;
   resolveServerRequest?(requestId: ThreadServerRequestId, response: unknown): Promise<void>;
   setListener(listener: StructuredSessionListener): void;
   dispose(): Promise<void>;
@@ -93,6 +118,12 @@ export interface CreateStructuredSessionInput {
   projectLocation: ProjectLocation;
   config: ThreadConfig;
   sessionRef?: SessionRef;
+  /**
+   * Per-thread presentation mode at launch. Adapters whose structured session
+   * is only required for chat mode (e.g. Codex's app-server) can
+   * return `undefined` for terminal-mode threads to skip the spawn.
+   */
+  presentationMode?: ThreadPresentationMode;
 }
 
 /**

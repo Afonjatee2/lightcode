@@ -85,8 +85,8 @@ export function OptionMenu(props: OptionMenuProps) {
   const selectedKeys = value ? new Set([value]) : new Set<string>();
   const isVirtualized = normalizedOptions.length > LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD;
   const listBoxClassName = isVirtualized
-    ? `max-h-60 overflow-y-auto !m-0 !p-0 ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2`
-    : "max-h-60 overflow-y-auto !m-0 !p-1 [&_.list-box-item]:min-h-8 [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2";
+    ? `lightcode-menu max-h-60 overflow-y-auto ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS}`
+    : "lightcode-menu max-h-60 overflow-y-auto";
   const listBox = (
     <ListBox
       aria-label="Options"

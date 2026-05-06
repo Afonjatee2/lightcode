@@ -2,6 +2,24 @@
 @import "@heroui/styles";
 @import "@xterm/xterm/css/xterm.css";
 
+/* Shiki output (tool-call / file_change accordion bodies). The wrapper
+   provides the scroll/font sizing; the inner <pre class="shiki"> needs to
+   inherit those and shed Shiki's default block styling so it lines up with
+   the plain-text fallback. */
+.lc-shiki > pre.shiki {
+  background-color: transparent !important;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.lc-shiki > pre.shiki code {
+  font-family: inherit;
+}
+
 /* Soften the default HeroUI focus rings globally */
 @utility focus-ring {
   @apply ring-1 ring-inset ring-focus/50 ring-offset-0 ring-offset-background outline-none;
@@ -69,6 +87,92 @@
 
 .dropdown__popover [data-slot="dropdown-menu"] {
   padding: 0.25rem;
+}
+
+/* ── Compact list-box menu ──────────────────────────
+   App-wide override applied by adding `lightcode-menu`
+   to a ListBox (or any container with `.list-box-item`
+   descendants). Tightens HeroUI defaults (which target
+   touch UI) for the dense desktop dropdown rows used by
+   the model picker, branch picker, effort/context menu,
+   etc. Keeps the indicator-aware right padding so the
+   absolute-positioned checkmark never overlaps an
+   `ms-auto` hint on the same row. */
+.lightcode-menu.list-box,
+.lightcode-menu .list-box {
+  padding: 0;
+  margin: 0;
+  gap: 0;
+}
+
+.lightcode-menu .list-box-item {
+  min-height: 1.75rem;
+  padding: 0.125rem 0.5rem;
+  gap: 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+/* HeroUI's .label hardcodes text-sm (14px); make it inherit so
+   the lightcode-menu item font-size actually wins. */
+.lightcode-menu .list-box-item [data-slot="label"] {
+  font-size: inherit;
+}
+
+/* Mirror of `.list-box-item` styling for hand-rolled menu rows
+   (e.g. the custom virtualizer in ProviderModelMenu, which can't
+   use HeroUI's ListBox without a perf regression). Lets manual
+   `<div role="option">` rows pick up the same sizing and hover
+   colors as HeroUI's listbox items. Mark the keyboard-active row
+   with `data-active="true"` for the focused background. */
+.lightcode-menu-item {
+  min-height: 1.75rem;
+  padding: 0.125rem 0.5rem;
+  gap: 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+}
+
+@media (hover: hover) {
+  .lightcode-menu-item:hover {
+    background-color: var(--default);
+  }
+}
+
+.lightcode-menu-item[data-active="true"] {
+  background-color: var(--default);
+}
+
+.lightcode-menu .list-box-item:has(.list-box-item__indicator) {
+  padding-right: 1.75rem;
+}
+
+/* Inner padding for popover dialogs that host a lightcode-menu.
+   HeroUI's default `p-4` (16px) is too generous for dense menus;
+   menus that need flush content (search bar over list) opt out by
+   setting their own `!p-0`, which beats this non-important rule. */
+.popover__dialog:has(.lightcode-menu) {
+  padding: 0.375rem;
+}
+
+/* Section header (HeroUI <Header>) preceding a lightcode-menu
+   listbox gains a 4px gap so the first row doesn't sit flush
+   against the header's bottom border. Uses `~` (general sibling)
+   because React Aria injects focus-scope `<span>` and `<template>`
+   nodes between the Header and the listbox. */
+[data-slot="header"]:has(~ .lightcode-menu) {
+  margin-bottom: 0.25rem;
+  padding-left: 0.5rem;
+}
+
+/* HeroUI Disclosure: drop the default expand/collapse height/opacity
+   transition and indicator rotation easing. Long chat threads can host
+   hundreds of disclosures (one per tool_call, file_change, web_search,
+   command_execution); keeping animations causes paint storms and visible
+   resize lag. The expand/collapse remains correct — it just snaps. */
+.disclosure__content,
+.disclosure__indicator {
+  transition: none !important;
 }
 
 /* HeroUI radio: default unselected ring is too low-contrast on dark surfaces.
@@ -298,15 +402,6 @@ body {
   position: relative;
   z-index: 20;
   flex-shrink: 0;
-}
-
-/* Sidebar: [aside][handle] — accent the divider on hover. macOS draws it on the aside (full
-   height); Windows draws it on the inner body so the title row stays clear. */
-.lightcode-shell > aside:has(+ .lightcode-resize-handle[aria-label="Resize sidebar"]:hover),
-.lightcode-shell
-  > aside:has(+ .lightcode-resize-handle[aria-label="Resize sidebar"]:hover)
-  > .lightcode-sidebar-body {
-  border-right-color: var(--accent);
 }
 
 /* Right / git / bottom terminal: [handle][aside] or [horizontal handle][aside] */
@@ -1195,4 +1290,28 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
 .lightcode-markdown-preview input[type="checkbox"] {
   margin-right: 0.4em;
   vertical-align: middle;
+}
+
+.lc-chat-markdown ol {
+  list-style: decimal outside;
+  padding-left: 1.5em;
+  margin: 0.4em 0;
+}
+.lc-chat-markdown ul {
+  list-style: disc outside;
+  padding-left: 1.5em;
+  margin: 0.4em 0;
+}
+.lc-chat-markdown li {
+  margin: 0.35em 0;
+}
+.lc-chat-markdown li::marker {
+  color: var(--lc-text-muted, currentColor);
+}
+.lc-chat-markdown li > p {
+  margin: 0.15em 0;
+}
+.lc-chat-markdown p + ol,
+.lc-chat-markdown p + ul {
+  margin-top: 0.25em;
 }

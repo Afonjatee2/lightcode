@@ -8,6 +8,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     getThreadSnapshots: () => runtime.getThreadSnapshots(),
     startThread: (payload) => runtime.startThread(payload),
     sendThreadInput: (payload) => runtime.sendThreadInput(payload),
+    interruptThread: (payload) => runtime.interruptThread(payload),
     writeTerminal: (payload) => runtime.writeTerminal(payload),
     resizeTerminal: (payload) => runtime.resizeTerminal(payload),
     resolveThreadServerRequest: (payload) => runtime.resolveThreadServerRequest(payload),

@@ -131,12 +131,11 @@ export function createOpenCodeAdapter(): AgentAdapter {
     // `opencode acp` process is killed before the TUI spawns — the TUI reads
     // the same SQLite store and resumes via `--session <id>`.
     //
-    // On resume (`input.sessionRef` set) we skip ACP entirely: the id we
-    // already have is good as-is.
+    // Resume gating: `createAcpStructuredSession` skips the spawn for
+    // terminal-mode resume (the TUI re-attaches via `--session <id>`), so we
+    // don't need a local guard here. If OpenCode ever adds GUI presentation,
+    // resume will keep ACP alive automatically.
     async createStructuredSession(input: CreateStructuredSessionInput) {
-      if (input.sessionRef) {
-        return undefined;
-      }
       const command = buildAgentCommand(
         input.projectLocation,
         "opencode",

@@ -100,10 +100,9 @@ export function createCopilotAdapter(): AgentAdapter {
       };
     },
     async createStructuredSession(input: CreateStructuredSessionInput) {
-      if (input.sessionRef) {
-        return undefined;
-      }
-
+      // Resume/presentation gating lives in `createAcpStructuredSession` so
+      // every ACP-speaking provider behaves identically — we just hand it the
+      // command and let it decide whether to actually spawn.
       const args = ["--acp", "--stdio"];
       if (input.config.approvalPolicy === "never") {
         args.push("--yolo");

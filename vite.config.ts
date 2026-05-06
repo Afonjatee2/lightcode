@@ -4,15 +4,6 @@ import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 
 const compilerPreset = reactCompilerPreset();
-compilerPreset.rolldown = {
-  ...(compilerPreset.rolldown ?? {}),
-  filter: {
-    ...(compilerPreset.rolldown?.filter ?? {}),
-    id: {
-      include: ["src/renderer/**/*.tsx"],
-    },
-  },
-};
 
 export default defineConfig({
   plugins: [react(), babel({ presets: [compilerPreset] })],

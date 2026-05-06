@@ -21,7 +21,7 @@ import {
 } from "./base";
 import { createClaudeAdapter } from "./claude";
 import { createCopilotAdapter } from "./copilot";
-import { buildCodexAppServerCommand, CODEX_REMOTE_TUI_FEATURE, createCodexAdapter } from "./codex";
+import { buildCodexAppServerCommand, createCodexAdapter } from "./codex";
 import { createCursorAdapter } from "./cursor";
 
 function launch(
@@ -121,48 +121,50 @@ describe("agent command builders", () => {
     20_000,
   );
 
-  it("builds a remote Codex launch command with the TUI feature enabled", () => {
-    const spec = launch(createCodexAdapter(), windowsProject, config, "hello", undefined, {
-      enabledFeatures: [CODEX_REMOTE_TUI_FEATURE],
-      remoteUrl: "ws://127.0.0.1:43123",
-    });
-
-    const { cmdArgs } = parseWindowsSpec(spec);
-    expect(cmdArgs).toContain("--enable");
-    expect(cmdArgs).toContain(CODEX_REMOTE_TUI_FEATURE);
-    expect(cmdArgs).toContain("--remote");
-    expect(cmdArgs).toContain("ws://127.0.0.1:43123");
-  });
-
-  it("builds a Codex app-server command accepted by codex 0.117+", () => {
-    const spec = buildCodexAppServerCommand(windowsProject, "ws://127.0.0.1:43123");
+  it("builds a Codex app-server stdio command", () => {
+    const spec = buildCodexAppServerCommand(windowsProject);
 
     const { cmd, cmdArgs } = parseWindowsSpec(spec);
     expect(cmd).toBe("codex");
-    expect(cmdArgs).toContain("app-server");
-    expect(cmdArgs).toContain("--listen");
-    expect(cmdArgs).toContain("ws://127.0.0.1:43123");
-    expect(cmdArgs).toContain("--enable");
-    expect(cmdArgs).toContain(CODEX_REMOTE_TUI_FEATURE);
+    expect(cmdArgs).toEqual(["app-server"]);
+    expect(cmdArgs).not.toContain("--listen");
+    expect(cmdArgs).not.toContain("--remote");
     expect(cmdArgs).not.toContain("--session-source");
   });
 
   it("resumes the server thread when structured session provides a threadId", () => {
     const spec = launch(createCodexAdapter(), windowsProject, config, "", undefined, {
-      enabledFeatures: [CODEX_REMOTE_TUI_FEATURE],
-      remoteUrl: "ws://127.0.0.1:43123",
       suppressResumeConfigOverrides: true,
       resumeThreadId: "019d19c4-8050-7270-b8fc-589eee8136c2",
     });
 
     const { cmdArgs } = parseWindowsSpec(spec);
     expect(cmdArgs[0]).toBe("resume");
-    expect(cmdArgs).toContain("--enable");
-    expect(cmdArgs).toContain(CODEX_REMOTE_TUI_FEATURE);
-    expect(cmdArgs).toContain("--remote");
-    expect(cmdArgs).toContain("ws://127.0.0.1:43123");
+    expect(cmdArgs).not.toContain("--enable");
+    expect(cmdArgs).not.toContain("--remote");
     expect(cmdArgs).not.toContain("-m");
     expect(cmdArgs[cmdArgs.length - 1]).toBe("019d19c4-8050-7270-b8fc-589eee8136c2");
+  });
+
+  it("builds a WSL Codex app-server command without a login shell", () => {
+    const spec = buildCodexAppServerCommand(
+      wslProject,
+      "/home/demo/.local/bin/codex",
+      "/home/demo/.nvm/versions/node/v24.10.0/bin/node",
+    );
+
+    expect(spec.command.toLowerCase()).toBe(getWslCommand().toLowerCase());
+    expect(spec.args).toEqual([
+      "-d",
+      "Ubuntu",
+      "--cd",
+      "/home/demo/project",
+      "--",
+      "/usr/bin/env",
+      "PATH=/home/demo/.nvm/versions/node/v24.10.0/bin:/home/demo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+      "/home/demo/.local/bin/codex",
+      "app-server",
+    ]);
   });
 
   it("omits an empty prompt when reopening Codex", () => {
@@ -242,9 +244,12 @@ describe("agent command builders", () => {
       args: ["exec", "-m", "gpt-5.4-mini", "-c", 'model_reasoning_effort="low"', "-"],
     });
 
-    expect(createClaudeAdapter().buildOneShotCommand?.("haiku", "low")).toEqual({
+    expect(
+      createClaudeAdapter().buildOneShotCommand?.("haiku", "low", "Summarize this diff"),
+    ).toEqual({
       command: "claude",
-      args: ["-p", "--model", "haiku", "--effort", "low"],
+      args: ["-p", "Summarize this diff", "--model", "haiku", "--effort", "low"],
+      stdin: "",
     });
 
     expect(

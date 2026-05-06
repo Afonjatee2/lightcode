@@ -169,8 +169,8 @@ function SplitGroup(props: {
   const count = children.length;
   const storageKey = splitStorageKey(props.layout, axis);
   const [sizes, setSizes] = useState(() => readStoredSizes(storageKey, count));
-  const [resizingIndex, setResizingIndex] = useState<number | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const paneRefs = useRef<Array<HTMLDivElement | null>>([]);
   const sizesRef = useRef(sizes);
   const dragRef = useRef({
@@ -180,6 +180,7 @@ function SplitGroup(props: {
     index: 0,
     currentSizes: sizes,
   });
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   function applySizes(nextSizes: number[]) {
     for (let index = 0; index < nextSizes.length; index++) {
@@ -203,13 +204,34 @@ function SplitGroup(props: {
   }, [sizes]);
 
   useEffect(() => {
-    if (resizingIndex === null) return;
+    return () => {
+      cleanupRef.current?.();
+    };
+  }, []);
 
-    function onMouseMove(event: MouseEvent) {
+  function handleResizeStart(event: React.MouseEvent, index: number) {
+    event.preventDefault();
+    cleanupRef.current?.();
+    const currentSizes = sizesRef.current;
+    dragRef.current = {
+      start: axis === "vertical" ? event.clientX : event.clientY,
+      beforeStart: currentSizes[index]!,
+      afterStart: currentSizes[index + 1]!,
+      index,
+      currentSizes,
+    };
+
+    const overlay = overlayRef.current;
+    if (overlay) {
+      overlay.style.display = "block";
+      overlay.style.cursor = axis === "vertical" ? "col-resize" : "row-resize";
+    }
+
+    function onMouseMove(ev: MouseEvent) {
       const container = containerRef.current;
       if (!container) return;
       const isVertical = axis === "vertical";
-      const deltaPx = (isVertical ? event.clientX : event.clientY) - dragRef.current.start;
+      const deltaPx = (isVertical ? ev.clientX : ev.clientY) - dragRef.current.start;
       const containerSize = isVertical ? container.offsetWidth : container.offsetHeight;
       const deltaPercent = (deltaPx / containerSize) * 100;
       const newBefore = dragRef.current.beforeStart + deltaPercent;
@@ -223,40 +245,32 @@ function SplitGroup(props: {
       applySizes(next);
     }
 
-    function onMouseUp() {
-      const committed = dragRef.current.currentSizes;
-      writeStoredSizes(storageKey, committed);
-      setSizes(committed);
-      setResizingIndex(null);
-    }
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    return () => {
+    function teardown() {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [axis, resizingIndex, storageKey]);
+      if (overlay) {
+        overlay.style.display = "none";
+        overlay.style.cursor = "";
+      }
+      cleanupRef.current = null;
+    }
 
-  function handleResizeStart(event: React.MouseEvent, index: number) {
-    event.preventDefault();
-    const currentSizes = sizesRef.current;
-    dragRef.current = {
-      start: axis === "vertical" ? event.clientX : event.clientY,
-      beforeStart: currentSizes[index]!,
-      afterStart: currentSizes[index + 1]!,
-      index,
-      currentSizes,
-    };
-    setResizingIndex(index);
+    function onMouseUp() {
+      const committed = dragRef.current.currentSizes;
+      teardown();
+      writeStoredSizes(storageKey, committed);
+      setSizes(committed);
+    }
+
+    cleanupRef.current = teardown;
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   }
 
   return (
     <div
       ref={containerRef}
-      className={`flex h-full min-h-0 w-full ${
-        axis === "vertical" ? "flex-row" : "flex-col"
-      } ${resizingIndex !== null ? "select-none" : ""}`}
+      className={`flex h-full min-h-0 w-full ${axis === "vertical" ? "flex-row" : "flex-col"}`}
     >
       {children.map((child, index) => (
         <React.Fragment key={leadPaneId(child)}>
@@ -287,13 +301,12 @@ function SplitGroup(props: {
           ) : null}
         </React.Fragment>
       ))}
-      {resizingIndex !== null ? (
-        <div
-          className={`fixed inset-0 z-50 ${
-            axis === "vertical" ? "cursor-col-resize" : "cursor-row-resize"
-          }`}
-        />
-      ) : null}
+      <div
+        ref={overlayRef}
+        aria-hidden="true"
+        className="fixed inset-0 z-50"
+        style={{ display: "none" }}
+      />
     </div>
   );
 }

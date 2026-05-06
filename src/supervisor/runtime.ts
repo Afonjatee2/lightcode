@@ -82,6 +82,7 @@ import type {
   GitWatchProjectPayload,
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
+  InterruptThreadPayload,
   ListProjectTreePayload,
   ListProjectTreeResult,
   MoveProjectEntryPayload,
@@ -342,6 +343,10 @@ export class SupervisorRuntime {
 
   async sendThreadInput(payload: SendThreadInputPayload): Promise<void> {
     return this.threadSessionManager.sendThreadInput(payload);
+  }
+
+  async interruptThread(payload: InterruptThreadPayload): Promise<void> {
+    return this.threadSessionManager.interruptThread(payload);
   }
 
   async writeTerminal(payload: WriteTerminalPayload): Promise<void> {

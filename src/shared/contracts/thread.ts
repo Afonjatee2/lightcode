@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { agentInstanceIdSchema } from "./agentInstance";
 import {
   agentKindSchema,
   projectLocationSchema,
   sessionRefSchema,
   threadAttentionSchema,
+  threadPresentationModeSchema,
   threadStatusSchema,
 } from "./common";
 import { threadConfigSchema } from "./config";
@@ -17,6 +19,8 @@ export const threadSchema = z.object({
   projectId: z.string().min(1),
   title: z.string().min(1),
   agentKind: agentKindSchema,
+  /** Optional reference to a user-registered ACP instance (Phase 7). */
+  agentInstanceId: agentInstanceIdSchema.optional(),
   config: threadConfigSchema,
   status: threadStatusSchema,
   attention: threadAttentionSchema,
@@ -30,6 +34,8 @@ export const threadSchema = z.object({
   archived: z.boolean().default(false),
   done: z.boolean().default(false),
   starred: z.boolean().default(false),
+  /** "terminal" → xterm-backed PTY (current default); "gui" → renderer-native chat. */
+  presentationMode: threadPresentationModeSchema.optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
   /** Set by supervisor `thread-state`; not user-editable. */
@@ -65,11 +71,20 @@ export const startThreadPayloadSchema = z.object({
   threadId: z.string().min(1).optional(),
   projectLocation: projectLocationSchema,
   agentKind: agentKindSchema,
+  agentInstanceId: agentInstanceIdSchema.optional(),
   config: threadConfigSchema,
   prompt: z.string().default(""),
   segments: z.array(promptSegmentSchema).optional(),
   initialSize: terminalSizeSchema,
   sessionRef: sessionRefSchema.optional(),
+  presentationMode: threadPresentationModeSchema.optional(),
+  /**
+   * Renderer-allocated id for the user_message item the chat pane has already
+   * painted optimistically. The supervisor reuses this id when emitting its
+   * own canonical user_message events, so the renderer's per-id dedupe drops
+   * the duplicate. Only set for GUI threads with a fresh prompt.
+   */
+  userMessageItemId: z.string().min(1).optional(),
 });
 export type StartThreadPayload = z.infer<typeof startThreadPayloadSchema>;
 
@@ -82,8 +97,15 @@ export const sendThreadInputPayloadSchema = z.object({
   prompt: z.string().min(1),
   segments: z.array(promptSegmentSchema).optional(),
   config: threadConfigSchema,
+  /** See {@link startThreadPayloadSchema.userMessageItemId}. */
+  userMessageItemId: z.string().min(1).optional(),
 });
 export type SendThreadInputPayload = z.infer<typeof sendThreadInputPayloadSchema>;
+
+export const interruptThreadPayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+export type InterruptThreadPayload = z.infer<typeof interruptThreadPayloadSchema>;
 
 export const writeTerminalPayloadSchema = z.object({
   threadId: z.string().min(1),

@@ -7,17 +7,25 @@ import type {
   TerminalSize,
   ThreadAttention,
   ThreadConfig,
+  ThreadPresentationMode,
   ThreadStatus,
 } from "@/shared/contracts";
 import type { AgentAdapter, StructuredSessionHandle, TerminalStatusHint } from "../agents/base";
 import type { TranscriptBuffer } from "./transcriptBuffer";
+
+export interface QueuedStructuredTurn {
+  prompt: string;
+  config: ThreadConfig;
+  segments?: PromptSegment[];
+  userMessageItemId?: string;
+}
 
 export interface SessionRuntime {
   instanceId: string;
   threadId: string;
   agentKind: AgentKind;
   adapter: AgentAdapter;
-  pty: IPty;
+  pty?: IPty;
   projectLocation: ProjectLocation;
   config: ThreadConfig;
   sessionRef?: SessionRef;
@@ -28,6 +36,8 @@ export interface SessionRuntime {
   launchPrompt: string;
   outputLength: number;
   structuredSession?: StructuredSessionHandle;
+  /** Mode the thread was launched in. Preserved for restart / recovery flows. */
+  presentationMode?: ThreadPresentationMode;
   ignoreExit?: boolean;
   invalidSessionRecoveryStarted?: boolean;
   ptyExited?: boolean;
@@ -39,6 +49,8 @@ export interface SessionRuntime {
   pendingTerminalWriteInFlight?: boolean | undefined;
   pendingTerminalPrompt?: string | undefined;
   pendingTerminalSegments?: PromptSegment[] | undefined;
+  queuedStructuredTurns?: QueuedStructuredTurn[] | undefined;
+  structuredTurnInterruptRequested?: boolean | undefined;
   prevChunk: string;
   /**
    * ANSI-stripped text from the **latest** PTY `data` chunk (post OSC extract).

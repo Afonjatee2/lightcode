@@ -52,6 +52,7 @@ export function AppContent() {
       worktreeBranch?: string;
       worktreeBaseBranch?: string;
       worktreeIsNewBranch?: boolean;
+      presentationMode?: import("@/shared/contracts").ThreadPresentationMode;
     },
     replacePaneIdParam?: string,
   ) {
@@ -64,6 +65,7 @@ export function AppContent() {
       worktreeBranch,
       worktreeBaseBranch,
       worktreeIsNewBranch,
+      presentationMode,
     } = input;
 
     updateProjectDraftConfig(project.id, {
@@ -140,6 +142,7 @@ export function AppContent() {
       agentKind,
       config,
       prompt: titlePrompt,
+      ...(presentationMode ? { presentationMode } : {}),
       ...(worktreePath ? { worktreePath, worktreeBranch } : {}),
       ...(replacePaneIdParam ? { replacePaneId: replacePaneIdParam } : {}),
       ...(activeGroup?.groupId ? { groupId: activeGroup.groupId } : {}),

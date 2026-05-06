@@ -8,8 +8,11 @@ import {
   detectAgentInstall,
   getOscNotificationText,
   type AgentAdapter,
+  type CreateStructuredSessionInput,
   type TerminalStatusHint,
 } from "../base";
+import { resolveAgentBinaryPath } from "../binaryResolver";
+import { CodexStructuredSession } from "./acp";
 import { buildCodexArgvFor } from "./argv";
 import { codexDefaultCapabilities, codexDetectionSpec } from "./detection";
 import { detectRateLimitPrompt } from "./rateLimitPrompt";
@@ -34,7 +37,7 @@ import {
 import type { CodexRolloutMeta } from "./sessionFiles";
 import { detectCodexReadyForInitialPrompt } from "./terminal";
 
-export { buildCodexAppServerCommand, CODEX_REMOTE_TUI_FEATURE } from "./argv";
+export { buildCodexAppServerCommand } from "./argv";
 export { deriveCodexStructuredState, parseCodexSocketMessage } from "./acp";
 export { detectCodexReadyForInitialPrompt, detectCodexUpdatePrompt } from "./terminal";
 
@@ -158,6 +161,18 @@ export function createCodexAdapter(): AgentAdapter {
     },
     createInitialSessionRef() {
       return undefined;
+    },
+    /**
+     * Codex app-server backs `presentationMode === "gui"` chat.
+     * Terminal threads skip the spawn — the PTY-driven CLI is the only
+     * surface and the app server would just waste a process.
+     */
+    async createStructuredSession(input: CreateStructuredSessionInput) {
+      if (input.presentationMode !== "gui") {
+        return undefined;
+      }
+      const wslExecPath = resolveAgentBinaryPath(input.projectLocation, "codex");
+      return CodexStructuredSession.create(input, wslExecPath);
     },
     buildDirectInput(prompt) {
       return [prompt, "@wait:160", "\r"];

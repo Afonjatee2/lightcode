@@ -36,11 +36,12 @@ export function TerminalSurfaces(props: {
   const { tabs, selectedTabId, activeTab, markTabActive, updateTabTitle } = props;
   const fontSize = useSharedSettings((state) => state.terminalPanelFontSize);
   const [splitPercent, setSplitPercent] = useState(readSplitPercent);
-  const [resizing, setResizing] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const firstPaneRef = useRef<HTMLDivElement>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef({ startX: 0, startPercent: 0 });
   const splitPercentRef = useRef(splitPercent);
+  const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     splitPercentRef.current = splitPercent;
@@ -54,13 +55,24 @@ export function TerminalSurfaces(props: {
   }, [splitPercent]);
 
   useEffect(() => {
-    if (!resizing) return;
+    return () => {
+      cleanupRef.current?.();
+    };
+  }, []);
 
-    function onMouseMove(e: MouseEvent) {
+  function handleResizeStart(e: React.MouseEvent) {
+    e.preventDefault();
+    cleanupRef.current?.();
+    dragRef.current = { startX: e.clientX, startPercent: splitPercentRef.current };
+
+    const overlay = overlayRef.current;
+    if (overlay) overlay.style.display = "block";
+
+    function onMouseMove(ev: MouseEvent) {
       const container = containerRef.current;
       if (!container) return;
       const totalWidth = container.offsetWidth;
-      const deltaPx = e.clientX - dragRef.current.startX;
+      const deltaPx = ev.clientX - dragRef.current.startX;
       const deltaPercent = (deltaPx / totalWidth) * 100;
       const next = dragRef.current.startPercent + deltaPercent;
       if (next >= SPLIT_MIN_PERCENT && next <= 100 - SPLIT_MIN_PERCENT) {
@@ -71,31 +83,26 @@ export function TerminalSurfaces(props: {
       }
     }
 
-    function onMouseUp() {
-      setSplitPercent(splitPercentRef.current);
-      setResizing(false);
-    }
-
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-    return () => {
+    function teardown() {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
-    };
-  }, [resizing]);
+      if (overlay) overlay.style.display = "none";
+      cleanupRef.current = null;
+    }
 
-  function handleResizeStart(e: React.MouseEvent) {
-    e.preventDefault();
-    dragRef.current = { startX: e.clientX, startPercent: splitPercent };
-    setResizing(true);
+    function onMouseUp() {
+      teardown();
+      setSplitPercent(splitPercentRef.current);
+    }
+
+    cleanupRef.current = teardown;
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
   }
 
   if (activeTab?.splitId) {
     return (
-      <div
-        ref={containerRef}
-        className={`flex h-full min-h-0 w-full ${resizing ? "select-none" : ""}`}
-      >
+      <div ref={containerRef} className="flex h-full min-h-0 w-full">
         <div
           ref={firstPaneRef}
           className="relative h-full min-h-0 min-w-0 overflow-hidden"
@@ -141,7 +148,12 @@ export function TerminalSurfaces(props: {
               </div>
             ))}
         </div>
-        {resizing && <div className="fixed inset-0 z-50 cursor-col-resize" />}
+        <div
+          ref={overlayRef}
+          aria-hidden="true"
+          className="fixed inset-0 z-50 cursor-col-resize"
+          style={{ display: "none" }}
+        />
       </div>
     );
   }

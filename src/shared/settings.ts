@@ -6,6 +6,7 @@ import {
   providerDraftConfigSchema,
   terminalPositionSchema,
   themeModeSchema,
+  threadPresentationModeSchema,
   threadRemoveActionSchema,
 } from "./contracts";
 import { DEFAULT_SEARCH_EXCLUDE } from "./searchExclude";
@@ -64,6 +65,8 @@ export const sharedSettingsSchema = z.object({
   scrollSpeed: z.number().int().min(1).max(10),
   /** Base font size for agent terminals. Auto-shrinks in narrow/short panes. */
   agentTerminalFontSize: z.number().int().min(8).max(20),
+  /** Base font size for agent thread chat (GUI / ACP markdown surface), in px. */
+  guiChatFontSize: z.number().int().min(8).max(20),
   /** Base font size for the dev terminal panel. Auto-shrinks in narrow/short panes. */
   terminalPanelFontSize: z.number().int().min(8).max(20),
   /** Prevent OS sleep while any thread is actively working. */
@@ -78,6 +81,12 @@ export const sharedSettingsSchema = z.object({
   gitReviewMode: gitReviewModeSchema,
   /** Per-provider last-used draft config (model, effort, mode, etc.). App-wide. */
   providerConfigs: z.record(z.string(), providerDraftConfigSchema),
+  /**
+   * Per-provider last-picked thread presentation mode (terminal vs gui chat).
+   * Read by ThreadDraftView so a provider that supports both modes remembers
+   * the user's previous choice.
+   */
+  lastPresentationModeByAgent: z.record(z.string(), threadPresentationModeSchema),
   /** Enable LSP language servers for the file editor (type checking, completions, etc.). */
   editorLspEnabled: z.boolean(),
   /** When true (VS Code default), the @file mention search honors `.gitignore`. */
@@ -149,6 +158,7 @@ export const defaultSharedSettings: SharedSettings = {
   staleThreadUnloadMinutes: 20,
   scrollSpeed: 2,
   agentTerminalFontSize: 12,
+  guiChatFontSize: 13,
   terminalPanelFontSize: 12,
   preventSleepWhileWorking: true,
   threadRemoveAction: "archive",
@@ -156,6 +166,7 @@ export const defaultSharedSettings: SharedSettings = {
   autoShowTerminalPanel: true,
   gitReviewMode: "panel",
   providerConfigs: {},
+  lastPresentationModeByAgent: {},
   editorLspEnabled: false,
   searchUseIgnoreFiles: true,
   searchExclude: { ...DEFAULT_SEARCH_EXCLUDE },

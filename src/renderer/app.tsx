@@ -11,6 +11,7 @@ import {
 import { useAppStore } from "./state/appStore";
 import { useAgentStatusesStore } from "./state/agentStatusesStore";
 import { useUpdateStore } from "./state/updateStore";
+import { installRuntimeItemsPersister } from "./state/chatRuntimePersister";
 
 import { useAppHydration } from "@/renderer/hooks/useAppHydration";
 import { AppProvider } from "./components/ui/provider";
@@ -53,8 +54,12 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
       params: event.params,
     });
   }
+  if (event.type === "thread-runtime-event") {
+    useAppStore.getState().applyRuntimeEvent(event.threadId, event.event);
+  }
   if (event.type === "thread-reset") {
     useAppStore.getState().clearThreadServerRequests(event.threadId);
+    useAppStore.getState().clearThreadRuntimeEvents(event.threadId);
   }
   if (event.type === "thread-exited") {
     useAppStore.getState().markThreadExited(event.threadId);
@@ -99,10 +104,13 @@ const unsubUpdate = readBridge().onUpdateStatus((status) => {
   }
 });
 
+const uninstallRuntimePersister = installRuntimeItemsPersister();
+
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     unsubSupervisor();
     unsubUpdate();
+    uninstallRuntimePersister();
   });
 }
 

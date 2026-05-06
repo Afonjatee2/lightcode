@@ -22,6 +22,8 @@ export const threads = sqliteTable("threads", {
     .references(() => projects.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   agentKind: text("agent_kind").notNull(), // provider kind
+  /** Optional id of a user-registered ACP instance backing this thread. */
+  agentInstanceId: text("agent_instance_id"),
   config: text("config").notNull(), // JSON
   status: text("status").notNull(),
   attention: text("attention").notNull(),
@@ -38,6 +40,8 @@ export const threads = sqliteTable("threads", {
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
   starred: integer("starred", { mode: "boolean" }).notNull().default(false),
+  /** "terminal" (xterm-backed PTY) vs "gui" (renderer-native chat). */
+  presentationMode: text("presentation_mode").notNull().default("terminal"),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
@@ -46,4 +50,21 @@ export const threads = sqliteTable("threads", {
 export const appState = sqliteTable("app_state", {
   key: text("key").primaryKey(),
   value: text("value").notNull(), // JSON
+});
+
+/**
+ * Persisted canonical chat items per thread (for renderer-native chat mode).
+ * Mirrors the renderer's `RuntimeChatItem` shape so we can hydrate the chat
+ * UI when the user reopens a thread.
+ */
+export const threadRuntimeItems = sqliteTable("thread_runtime_items", {
+  threadId: text("thread_id")
+    .notNull()
+    .references(() => threads.id, { onDelete: "cascade" }),
+  itemId: text("item_id").notNull(),
+  position: integer("position").notNull(),
+  type: text("type").notNull(),
+  state: text("state").notNull(),
+  payload: text("payload"), // JSON, nullable
+  streams: text("streams"), // JSON of Partial<Record<RuntimeContentStreamKind, string>>
 });

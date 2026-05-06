@@ -83,8 +83,8 @@ function ModelVisibilityDropdown(props: {
       aria-label="Visible models"
       className={
         isVirtualized
-          ? `max-h-[400px] min-w-[280px] overflow-y-auto !m-0 !p-0 ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2`
-          : "max-h-[400px] min-w-[280px] overflow-y-auto !m-0 !p-1 [&_.list-box-item]:min-h-8 [&_.list-box-item]:py-1 [&_.list-box-item]:pl-2 [&_.list-box-item]:pr-2"
+          ? `lightcode-menu max-h-[400px] min-w-[280px] overflow-y-auto ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS}`
+          : "lightcode-menu max-h-[400px] min-w-[280px] overflow-y-auto"
       }
       items={models}
       selectedKeys={visibleKeys}

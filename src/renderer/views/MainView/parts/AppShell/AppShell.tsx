@@ -1,4 +1,4 @@
-import { createContext, type ReactNode, useContext, useRef } from "react";
+import { createContext, type ReactNode, useContext, useRef, useState } from "react";
 import { isMac, isWindows } from "@/renderer/bridge";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { SIDEBAR_MIN_WIDTH, useResizablePanels } from "./parts/useResizablePanels";
@@ -46,13 +46,15 @@ export function AppShell(props: {
   const panelInnerRef = useRef<HTMLDivElement>(null);
   const gitPanelRef = useRef<HTMLDivElement>(null);
   const gitPanelInnerRef = useRef<HTMLDivElement>(null);
+  const resizeOverlayRef = useRef<HTMLDivElement>(null);
+  // Keep the hover accent off the CSS `:has()` path so dragging the sidebar stays cheap.
+  const [isSidebarHandleHovered, setIsSidebarHandleHovered] = useState(false);
 
   const {
     sidebarWidth,
     panelWidth,
     panelHeight,
     gitPanelWidth,
-    resizeTarget,
     handleSidebarResizeStart,
     handlePanelResizeStart,
     handlePanelBottomResizeStart,
@@ -63,6 +65,7 @@ export function AppShell(props: {
     panelInnerRef,
     gitPanelRef,
     gitPanelInnerRef,
+    overlayRef: resizeOverlayRef,
   });
 
   const {
@@ -82,8 +85,11 @@ export function AppShell(props: {
 
   const { rightPanelOpen, gitPanelOpen } = usePanelVisibility();
   const displayWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
-  const isResizing = resizeTarget !== null;
   const isBottom = terminalPosition === "bottom";
+  const sidebarDividerColorClass =
+    isSidebarHandleHovered && !isOverlay
+      ? "border-[color:var(--accent)]"
+      : "border-[color:var(--border)]";
 
   const hasHeaders = sidebarHeader != null || contentHeader != null;
   // Windows: stop the sidebar divider below the header so it doesn't run through the title row.
@@ -94,7 +100,7 @@ export function AppShell(props: {
     <SidebarContext.Provider value={{ isCollapsed, isOverlay, closingOverlay, collapse, expand }}>
       <div
         ref={shellRef}
-        className={`lightcode-shell flex h-full min-h-0 overflow-hidden bg-background text-foreground ${isResizing ? "select-none" : ""}`}
+        className="lightcode-shell flex h-full min-h-0 overflow-hidden bg-background text-foreground"
         style={hasHeaders ? { paddingTop: 0 } : undefined}
       >
         {!hasHeaders && <div aria-hidden="true" className="lightcode-drag-region" />}
@@ -119,8 +125,10 @@ export function AppShell(props: {
           className={`flex min-h-0 flex-col overflow-hidden ${
             isOverlay
               ? `fixed inset-y-0 left-0 z-40 border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${closingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"}`
-              : `relative ${sidebarDividerBelowHeader ? "" : "border-r border-[color:var(--border)]"} ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`
-          } ${!isResizing && !isOverlay && !skipTransitionRef.current ? "transition-[width,min-width,border-color] duration-200" : ""}`}
+              : `relative ${
+                  sidebarDividerBelowHeader ? "" : `border-r ${sidebarDividerColorClass}`
+                } ${!hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`
+          } ${!isOverlay && !skipTransitionRef.current ? "transition-[width,min-width,border-color] duration-200" : ""}`}
           style={{ width: displayWidth, minWidth: displayWidth }}
         >
           {sidebarHeader && (
@@ -137,7 +145,9 @@ export function AppShell(props: {
             </div>
           )}
           <div
-            className={`lightcode-sidebar-body min-h-0 flex-1 overflow-hidden ${sidebarDividerBelowHeader ? "border-r border-[color:var(--border)]" : ""}`}
+            className={`lightcode-sidebar-body min-h-0 flex-1 overflow-hidden ${
+              sidebarDividerBelowHeader ? `border-r ${sidebarDividerColorClass}` : ""
+            }`}
           >
             {sidebar}
           </div>
@@ -156,7 +166,12 @@ export function AppShell(props: {
                   }
                 : undefined
             }
-            onMouseDown={handleSidebarResizeStart}
+            onMouseEnter={() => setIsSidebarHandleHovered(true)}
+            onMouseLeave={() => setIsSidebarHandleHovered(false)}
+            onMouseDown={(event) => {
+              setIsSidebarHandleHovered(false);
+              handleSidebarResizeStart(event);
+            }}
             role="separator"
             aria-orientation="vertical"
             aria-label="Resize sidebar"
@@ -195,7 +210,6 @@ export function AppShell(props: {
                 <AsideSlot
                   orientation={isBottom ? "horizontal" : "vertical"}
                   isOpen={rightPanelOpen}
-                  isResizing={resizeTarget === "panel" || resizeTarget === "panel-bottom"}
                   targetWidth={panelWidth}
                   targetHeight={panelHeight}
                   onResizeStart={isBottom ? handlePanelBottomResizeStart : handlePanelResizeStart}
@@ -212,7 +226,6 @@ export function AppShell(props: {
               <AsideSlot
                 orientation="vertical"
                 isOpen={gitPanelOpen}
-                isResizing={resizeTarget === "git-panel"}
                 targetWidth={gitPanelWidth}
                 onResizeStart={handleGitPanelResizeStart}
                 panelRef={gitPanelRef}
@@ -225,11 +238,12 @@ export function AppShell(props: {
           </div>
         </div>
 
-        {isResizing && (
-          <div
-            className={`fixed inset-0 z-50 ${resizeTarget === "panel-bottom" ? "cursor-row-resize" : "cursor-col-resize"}`}
-          />
-        )}
+        <div
+          ref={resizeOverlayRef}
+          aria-hidden="true"
+          className="fixed inset-0 z-50"
+          style={{ display: "none" }}
+        />
       </div>
     </SidebarContext.Provider>
   );

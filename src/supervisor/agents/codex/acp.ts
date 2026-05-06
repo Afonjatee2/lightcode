@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
 import { dirname } from "node:path";
 import type {
   PromptSegment,
+  RuntimeEvent,
   SessionRef,
   ThreadAttention,
   ThreadConfig,
@@ -12,15 +13,23 @@ import type {
 } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { toWslUncPath } from "@/shared/wsl";
+import { resolveNodeForDistro } from "../../wsl/runtime";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,
   type CommandSpec,
   type CreateStructuredSessionInput,
+  type StartTurnOptions,
   type StructuredSessionHandle,
   type StructuredSessionListener,
 } from "../base";
-import { buildCodexAppServerCommand, CODEX_REMOTE_TUI_FEATURE } from "./argv";
+import { buildCodexAppServerCommand } from "./argv";
+import {
+  createCodexMapperState,
+  mapCodexNotification,
+  type CodexMapperState,
+} from "./canonicalMapping";
+import { CodexStdioTransport } from "./stdioTransport";
 
 export type CodexThreadStatus =
   | { type: "active"; activeFlags?: string[] }
@@ -50,36 +59,6 @@ type CodexSocketMessage =
       kind: "unknown";
     };
 
-function requireWebSocket(): typeof WebSocket {
-  if (typeof WebSocket === "undefined") {
-    throw new Error("WebSocket is unavailable in this runtime.");
-  }
-  return WebSocket;
-}
-
-async function allocateLoopbackPort(): Promise<number> {
-  return new Promise<number>((resolve, reject) => {
-    const server = createServer();
-    server.unref();
-    server.once("error", reject);
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      if (!address || typeof address === "string") {
-        server.close(() => reject(new Error("Unable to allocate a loopback port.")));
-        return;
-      }
-      const { port } = address;
-      server.close((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
-        resolve(port);
-      });
-    });
-  });
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
@@ -93,7 +72,7 @@ function spawnAppServer(command: CommandSpec): ChildProcess {
       ...process.env,
       TERM: "xterm-256color",
     },
-    stdio: ["ignore", "pipe", "pipe"],
+    stdio: ["pipe", "pipe", "pipe"],
     shell: false,
     windowsHide: true,
   });
@@ -202,34 +181,40 @@ export function parseCodexSocketMessage(payload: unknown): CodexSocketMessage {
   return { kind: "unknown" };
 }
 
-function formatAppServerOutput(chunks: string[]): string {
-  const text = chunks.join("").trim();
-  return text ? ` Output: ${text}` : "";
+function isRecoverableResumeError(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("not found") ||
+    lower.includes("does not exist") ||
+    lower.includes("missing thread") ||
+    lower.includes("unknown thread") ||
+    lower.includes("no session") ||
+    lower.includes("expired") ||
+    lower.includes("invalid thread") ||
+    lower.includes("session not found")
+  );
 }
 
 // ── Structured Session ──────────────────────────────────────────
 //
 // Lifecycle for a new thread:
-//   1. create()       → spawn app-server, connect WebSocket
+//   1. create()       → spawn app-server and attach stdio JSON-RPC
 //   2. activate()     → initialize handshake with the server
 //   3. openThread()   → thread/start on the server, get Codex thread ID
-//   4. startTurn()    → fire initial turn (creates rollout file)
-//   5. (caller waits for rollout file, then spawns TUI with resume)
+//   4. startTurn()    → fire turns through the structured server
 //
 // Lifecycle for resuming a saved thread:
-//   1. create()       → spawn app-server, connect WebSocket
+//   1. create()       → spawn app-server and attach stdio JSON-RPC
 //   2. activate()     → initialize handshake
 //   3. openThread()   → thread/resume with saved session ID
-//   4. (caller spawns TUI with resume)
 
 // eslint-disable-next-line no-unused-vars -- planned: structured SDK session support
 export class CodexStructuredSession implements StructuredSessionHandle {
   launchOptions: AgentLaunchOptions;
 
-  private readonly remoteUrl: string;
   private readonly appServer: ChildProcess;
-  private readonly appServerOutput: string[] = [];
-  private readonly socket: WebSocket;
+  private readonly transport: CodexStdioTransport;
+  private readonly threadId: string;
   private listener: StructuredSessionListener | undefined;
   private isDisposed = false;
   private activated = false;
@@ -243,6 +228,12 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   private rolloutModelProvider: string | undefined;
   private wslDistro: string | undefined;
   private currentThreadStatus: CodexThreadStatus = { type: "idle" };
+  private mapperState: CodexMapperState | undefined;
+  /**
+   * Runtime events emitted before the listener was wired. Replayed on
+   * `setListener` — same race as `AcpStructuredSession`.
+   */
+  private bufferedRuntimeEvents: RuntimeEvent[] = [];
   private readonly pendingRequests = new Map<
     string,
     {
@@ -253,69 +244,81 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   >();
 
   private constructor(
-    remoteUrl: string,
     appServer: ChildProcess,
-    socket: WebSocket,
+    transport: CodexStdioTransport,
+    threadId: string,
     wslDistro?: string,
   ) {
-    this.remoteUrl = remoteUrl;
     this.appServer = appServer;
-    this.socket = socket;
+    this.transport = transport;
+    this.threadId = threadId;
     this.wslDistro = wslDistro;
     this.launchOptions = {
-      enabledFeatures: [CODEX_REMOTE_TUI_FEATURE],
-      remoteUrl,
       suppressResumeConfigOverrides: true,
     };
+  }
+
+  private ensureMapperState(): CodexMapperState {
+    if (!this.mapperState) {
+      this.mapperState = createCodexMapperState(this.threadId);
+    }
+    return this.mapperState;
+  }
+
+  private emitRuntimeEvents(events: RuntimeEvent[]): void {
+    if (events.length === 0) return;
+    if (!this.listener?.onRuntimeEvent) {
+      this.bufferedRuntimeEvents.push(...events);
+      return;
+    }
+    for (const event of events) {
+      this.listener.onRuntimeEvent(event);
+    }
   }
 
   static async create(
     input: CreateStructuredSessionInput,
     wslExecPath?: string,
   ): Promise<CodexStructuredSession> {
-    const port = await allocateLoopbackPort();
-    const remoteUrl = `ws://127.0.0.1:${port}`;
+    const wslNodePath =
+      input.projectLocation.kind === "wsl"
+        ? (await resolveNodeForDistro(input.projectLocation.distro)).nodePath
+        : undefined;
     const appServer = spawnAppServer(
-      buildCodexAppServerCommand(input.projectLocation, remoteUrl, wslExecPath),
+      buildCodexAppServerCommand(input.projectLocation, wslExecPath, wslNodePath),
     );
-    const WebSocketCtor = requireWebSocket();
+    const transport = new CodexStdioTransport(appServer);
 
-    const appServerOutput: string[] = [];
-    appServer.stdout?.on("data", (chunk) => {
-      const text = String(chunk);
-
-      appServerOutput.push(text);
-      if (appServerOutput.length > 12) {
-        appServerOutput.shift();
-      }
+    const spawnError = await new Promise<Error | undefined>((resolve) => {
+      appServer.once("error", (error) => resolve(error));
+      setImmediate(() => resolve(undefined));
     });
-    appServer.stderr?.on("data", (chunk) => {
-      const text = String(chunk);
-
-      appServerOutput.push(text);
-      if (appServerOutput.length > 12) {
-        appServerOutput.shift();
-      }
-    });
-
-    const socket = await connectCodexAppServer(
-      remoteUrl,
-      appServer,
-      appServerOutput,
-      WebSocketCtor,
-    );
+    if (spawnError) {
+      throw new Error(`Codex app-server failed to spawn: ${spawnError.message}`);
+    }
+    if (appServer.exitCode !== null) {
+      throw new Error(`Codex app-server exited early.${transport.formatOutput()}`);
+    }
 
     const wslDistro =
       input.projectLocation.kind === "wsl" ? input.projectLocation.distro : undefined;
-    const session = new CodexStructuredSession(remoteUrl, appServer, socket, wslDistro);
-    session.appServerOutput.push(...appServerOutput);
-    session.attachSocketHandlers();
+    const session = new CodexStructuredSession(appServer, transport, input.threadId, wslDistro);
+    session.attachTransportHandlers();
 
     return session;
   }
 
   setListener(listener: StructuredSessionListener): void {
     this.listener = listener;
+
+    // Drain runtime events that arrived before the listener was wired.
+    if (listener.onRuntimeEvent && this.bufferedRuntimeEvents.length > 0) {
+      const drained = this.bufferedRuntimeEvents;
+      this.bufferedRuntimeEvents = [];
+      for (const event of drained) {
+        listener.onRuntimeEvent(event);
+      }
+    }
 
     // Re-emit current state so the listener doesn't miss updates that
     // fired before the listener was attached.
@@ -349,50 +352,71 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       ...(config.mode === "plan" ? { mode: "plan" } : {}),
     };
 
+    const startParams = {
+      ...threadOverrides,
+      experimentalRawEvents: false,
+      persistExtendedHistory: true,
+    };
+
     let threadId: string;
+
     if (sessionRef) {
-      await this.request("thread/resume", {
-        ...threadOverrides,
-        threadId: sessionRef.providerSessionId,
-        persistExtendedHistory: true,
-      });
-      threadId = sessionRef.providerSessionId;
+      try {
+        await this.request("thread/resume", {
+          ...threadOverrides,
+          threadId: sessionRef.providerSessionId,
+          persistExtendedHistory: true,
+        });
+        threadId = sessionRef.providerSessionId;
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (!isRecoverableResumeError(msg)) {
+          throw error;
+        }
+        console.log("[codex] thread/resume failed (%s), falling back to thread/start", msg);
+        const result = await this.request("thread/start", startParams);
+        threadId = extractThreadField(result, "id") ?? "";
+        if (!threadId) {
+          throw new Error("thread/start fallback response did not contain a thread id.", {
+            cause: error,
+          });
+        }
+        this.extractRolloutMeta(result);
+      }
     } else {
-      const result = await this.request("thread/start", {
-        ...threadOverrides,
-        experimentalRawEvents: false,
-        persistExtendedHistory: true,
-      });
+      const result = await this.request("thread/start", startParams);
       threadId = extractThreadField(result, "id") ?? "";
       if (!threadId) {
         throw new Error("thread/start response did not contain a thread id.");
       }
-      const thread =
-        result && typeof result === "object" && "thread" in result
-          ? ((result as Record<string, unknown>).thread as Record<string, unknown> | undefined)
-          : undefined;
-      const rawPath = extractThreadField(result, "path") ?? undefined;
-      this.rolloutPath =
-        rawPath && this.wslDistro ? toWslUncPath(this.wslDistro, rawPath) : rawPath;
-      this.rolloutCreatedAt =
-        thread && typeof thread.createdAt === "number"
-          ? new Date(thread.createdAt * 1000).toISOString()
-          : new Date().toISOString();
-      this.rolloutCwd = typeof thread?.cwd === "string" ? thread.cwd : undefined;
-      this.rolloutCliVersion =
-        typeof thread?.cliVersion === "string" ? thread.cliVersion : undefined;
-      this.rolloutSource =
-        thread && typeof thread.source === "object" && thread.source !== null
-          ? (thread.source as Record<string, unknown>)
-          : undefined;
-      this.rolloutModelProvider =
-        typeof thread?.modelProvider === "string" ? thread.modelProvider : undefined;
+      this.extractRolloutMeta(result);
     }
 
     this.remoteThreadId = threadId;
     this.launchOptions = { ...this.launchOptions, resumeThreadId: threadId };
 
     return threadId;
+  }
+
+  private extractRolloutMeta(result: unknown): void {
+    const thread =
+      result && typeof result === "object" && "thread" in result
+        ? ((result as Record<string, unknown>).thread as Record<string, unknown> | undefined)
+        : undefined;
+    const rawPath = extractThreadField(result, "path") ?? undefined;
+    this.rolloutPath = rawPath && this.wslDistro ? toWslUncPath(this.wslDistro, rawPath) : rawPath;
+    this.rolloutCreatedAt =
+      thread && typeof thread.createdAt === "number"
+        ? new Date(thread.createdAt * 1000).toISOString()
+        : new Date().toISOString();
+    this.rolloutCwd = typeof thread?.cwd === "string" ? thread.cwd : undefined;
+    this.rolloutCliVersion = typeof thread?.cliVersion === "string" ? thread.cliVersion : undefined;
+    this.rolloutSource =
+      thread && typeof thread.source === "object" && thread.source !== null
+        ? (thread.source as Record<string, unknown>)
+        : undefined;
+    this.rolloutModelProvider =
+      typeof thread?.modelProvider === "string" ? thread.modelProvider : undefined;
   }
 
   async waitForRolloutFile(timeoutMs = 10_000): Promise<void> {
@@ -447,8 +471,31 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     }
   }
 
-  async startTurn(prompt: string, config: ThreadConfig, segments?: PromptSegment[]): Promise<void> {
+  async startTurn(
+    prompt: string,
+    config: ThreadConfig,
+    segments?: PromptSegment[],
+    options?: StartTurnOptions,
+  ): Promise<void> {
     const threadId = await this.waitForRemoteThreadId();
+
+    const turnId = `turn-${randomUUID()}`;
+    const userItemId = options?.userMessageItemId ?? `user-${turnId}`;
+
+    this.emitRuntimeEvents([
+      {
+        type: "item.started",
+        threadId: this.threadId,
+        itemId: userItemId,
+        itemType: "user_message",
+        payload: {
+          content: prompt.trim().length > 0 ? [{ kind: "text" as const, text: prompt }] : [],
+        },
+      },
+      { type: "item.completed", threadId: this.threadId, itemId: userItemId },
+    ]);
+
+    this.listener?.onUpdate({ status: "working", attention: "working" });
 
     // Build structured input using native Codex protocol types:
     //   - "localImage" for image attachments (path-based)
@@ -485,17 +532,18 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       model: config.model,
       ...(config.effort ? { effort: config.effort } : {}),
       ...(config.approvalPolicy ? { approvalPolicy: config.approvalPolicy } : {}),
+      ...(config.sandboxMode ? { sandbox: config.sandboxMode } : {}),
+      ...(config.mode === "plan" ? { mode: "plan" } : {}),
+      ...(config.fast ? { config: { service_tier: "fast" } } : {}),
     });
   }
 
   async resolveServerRequest(requestId: ThreadServerRequestId, response: unknown): Promise<void> {
-    this.socket.send(
-      JSON.stringify({
-        jsonrpc: "2.0",
-        id: requestId,
-        result: response,
-      }),
-    );
+    this.transport.write({
+      jsonrpc: "2.0",
+      id: requestId,
+      result: response,
+    });
   }
 
   async dispose(): Promise<void> {
@@ -504,160 +552,149 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     }
     this.isDisposed = true;
 
-    try {
-      this.socket.close();
-    } catch {
-      // Ignore close races during teardown.
-    }
+    this.transport.dispose();
 
-    for (const pending of this.pendingRequests.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(new Error("Codex app-server session disposed."));
-    }
-    this.pendingRequests.clear();
+    this.rejectPendingRequests(new Error("Codex app-server session disposed."));
 
     if (!this.appServer.killed) {
       terminateChildProcessTree(this.appServer);
     }
   }
 
-  private attachSocketHandlers(): void {
-    this.socket.addEventListener("message", (event) => {
-      const raw = typeof event.data === "string" ? event.data : "";
-      if (!raw) {
-        return;
-      }
+  private attachTransportHandlers(): void {
+    this.transport.setListener({
+      onMessage: (payload) => {
+        const message = parseCodexSocketMessage(payload);
 
-      let payload: unknown;
-      try {
-        payload = JSON.parse(raw);
-      } catch {
-        return;
-      }
+        if (message.kind === "response") {
+          const pending = this.pendingRequests.get(message.id);
+          if (!pending) {
+            return;
+          }
 
-      const message = parseCodexSocketMessage(payload);
+          this.pendingRequests.delete(message.id);
+          clearTimeout(pending.timeout);
 
-      if (message.kind === "response") {
-        const pending = this.pendingRequests.get(message.id);
-        if (!pending) {
+          if (message.error !== undefined) {
+            const err = message.error;
+            const errMsg =
+              typeof err === "object" && err !== null && "message" in err
+                ? String((err as Record<string, unknown>).message)
+                : String(err);
+            pending.reject(new Error(errMsg));
+          } else {
+            pending.resolve(message.result);
+          }
           return;
         }
 
-        this.pendingRequests.delete(message.id);
-        clearTimeout(pending.timeout);
-
-        if (message.error !== undefined) {
-          const err = message.error;
-          const errMsg =
-            typeof err === "object" && err !== null && "message" in err
-              ? String((err as Record<string, unknown>).message)
-              : String(err);
-          pending.reject(new Error(errMsg));
-        } else {
-          pending.resolve(message.result);
-        }
-        return;
-      }
-
-      if (message.kind === "request") {
-        this.listener?.onServerRequest({
-          requestId: message.id,
-          method: message.method,
-          params: message.params,
-        });
-        return;
-      }
-
-      if (message.kind !== "notification") {
-        return;
-      }
-
-      const { method, params } = message;
-
-      if (method === "thread/started" && params && "thread" in params) {
-        const thread = params.thread;
-        if (!thread || typeof thread !== "object" || !("id" in thread)) {
+        if (message.kind === "request") {
+          this.listener?.onServerRequest({
+            requestId: message.id,
+            method: message.method,
+            params: message.params,
+          });
           return;
         }
 
-        const threadId = String(thread.id);
-
-        // Ignore thread/started for threads we didn't create (e.g. the TUI's own thread).
-        if (this.remoteThreadId !== undefined && this.remoteThreadId !== threadId) {
+        if (message.kind !== "notification") {
           return;
         }
 
-        this.remoteThreadId = threadId;
-        const nextSessionRef = toSessionRef(threadId);
-        this.currentThreadStatus =
-          "status" in thread && thread.status && typeof thread.status === "object"
-            ? (thread.status as CodexThreadStatus)
-            : { type: "idle" };
-        this.emitDerivedUpdate(nextSessionRef);
-        void this.syncRemoteThreadState(threadId, nextSessionRef);
-        return;
-      }
+        const { method, params } = message;
 
-      if (
-        method === "thread/status/changed" &&
-        params &&
-        "threadId" in params &&
-        "status" in params
-      ) {
-        if (!this.isCurrentThreadNotification(String(params.threadId))) {
-          return;
-        }
-        this.currentThreadStatus = params.status as CodexThreadStatus;
-        this.emitDerivedUpdate();
-        return;
-      }
+        // Translate to canonical chat events for chat-mode renderers. Runs
+        // alongside the existing status-derivation logic below — terminal mode
+        // is unaffected.
+        const runtimeEvents = mapCodexNotification(method, params, this.ensureMapperState());
+        if (runtimeEvents.length > 0) this.emitRuntimeEvents(runtimeEvents);
 
-      if (method === "turn/started" && params && "threadId" in params) {
-        if (!this.isCurrentThreadNotification(String(params.threadId))) {
-          return;
-        }
+        if (method === "thread/started" && params && "thread" in params) {
+          const thread = params.thread;
+          if (!thread || typeof thread !== "object" || !("id" in thread)) {
+            return;
+          }
 
-        this.listener?.onUpdate({
-          status: "working",
-          attention: "working",
-        });
-        return;
-      }
+          const threadId = String(thread.id);
 
-      if (method === "turn/completed" && params && "threadId" in params) {
-        if (!this.isCurrentThreadNotification(String(params.threadId))) {
+          // Ignore thread/started for threads we didn't create (e.g. the TUI's own thread).
+          if (this.remoteThreadId !== undefined && this.remoteThreadId !== threadId) {
+            return;
+          }
+
+          this.remoteThreadId = threadId;
+          const nextSessionRef = toSessionRef(threadId);
+          this.currentThreadStatus =
+            "status" in thread && thread.status && typeof thread.status === "object"
+              ? (thread.status as CodexThreadStatus)
+              : { type: "idle" };
+          this.emitDerivedUpdate(nextSessionRef);
+          void this.syncRemoteThreadState(threadId, nextSessionRef);
           return;
         }
 
-        void this.syncRemoteThreadState(String(params.threadId));
-        return;
-      }
+        if (
+          method === "thread/status/changed" &&
+          params &&
+          "threadId" in params &&
+          "status" in params
+        ) {
+          if (!this.isCurrentThreadNotification(String(params.threadId))) {
+            return;
+          }
+          this.currentThreadStatus = params.status as CodexThreadStatus;
+          this.emitDerivedUpdate();
+          return;
+        }
 
-      if (method === "account/rateLimits/updated" && params && "rateLimits" in params) {
-        return;
-      }
+        if (method === "turn/started" && params) {
+          const incomingThreadId =
+            "threadId" in params ? String(params.threadId) : this.remoteThreadId;
+          if (incomingThreadId && !this.isCurrentThreadNotification(incomingThreadId)) {
+            return;
+          }
 
-      if (method === "thread/closed") {
-        this.listener?.onClose();
-      }
-    });
+          this.listener?.onUpdate({
+            status: "working",
+            attention: "working",
+          });
+          return;
+        }
 
-    this.socket.addEventListener("close", () => {
-      if (!this.isDisposed) {
-        this.listener?.onClose();
-      }
-    });
+        if ((method === "turn/completed" || method === "turn/aborted") && params) {
+          const incomingThreadId =
+            "threadId" in params ? String(params.threadId) : this.remoteThreadId;
+          if (!incomingThreadId) return;
+          if (!this.isCurrentThreadNotification(incomingThreadId)) {
+            return;
+          }
 
-    this.socket.addEventListener("error", () => {
-      if (!this.isDisposed) {
-        this.listener?.onError("Codex app-server connection failed.");
-      }
-    });
+          void this.syncRemoteThreadState(incomingThreadId);
+          return;
+        }
 
-    this.appServer.once("exit", () => {
-      if (!this.isDisposed) {
-        this.listener?.onClose();
-      }
+        if (method === "account/rateLimits/updated" && params && "rateLimits" in params) {
+          return;
+        }
+
+        if (method === "thread/closed") {
+          this.listener?.onClose();
+        }
+      },
+      onClose: () => {
+        this.rejectPendingRequests(
+          new Error(`Codex app-server exited.${this.transport.formatOutput()}`),
+        );
+        if (!this.isDisposed) {
+          this.listener?.onClose();
+        }
+      },
+      onError: (error) => {
+        this.rejectPendingRequests(error);
+        if (!this.isDisposed) {
+          this.listener?.onError("Codex app-server connection failed.");
+        }
+      },
     });
   }
 
@@ -672,12 +709,10 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       },
     });
 
-    const initializedNotification = JSON.stringify({
+    this.transport.write({
       jsonrpc: "2.0",
       method: "initialized",
     });
-
-    this.socket.send(initializedNotification);
   }
 
   private isCurrentThreadNotification(threadId: string): boolean {
@@ -745,61 +780,21 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       });
     });
 
-    const outgoing = JSON.stringify({
+    this.transport.write({
       jsonrpc: "2.0",
       id,
       method,
       params,
     });
 
-    this.socket.send(outgoing);
-
     return pending;
   }
-}
 
-async function connectCodexAppServer(
-  remoteUrl: string,
-  appServer: ChildProcess,
-  appServerOutput: string[],
-  WebSocketCtor: typeof WebSocket,
-): Promise<WebSocket> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < 30; attempt += 1) {
-    if (appServer.exitCode !== null) {
-      throw new Error(`Codex app-server exited early.${formatAppServerOutput(appServerOutput)}`);
+  private rejectPendingRequests(error: Error): void {
+    for (const pending of this.pendingRequests.values()) {
+      clearTimeout(pending.timeout);
+      pending.reject(error);
     }
-
-    try {
-      const socket = await new Promise<WebSocket>((resolve, reject) => {
-        const candidate = new WebSocketCtor(remoteUrl);
-        const handleOpen = () => {
-          cleanup();
-          resolve(candidate);
-        };
-        const handleError = (event: Event) => {
-          cleanup();
-          reject(event);
-        };
-        const cleanup = () => {
-          candidate.removeEventListener("open", handleOpen);
-          candidate.removeEventListener("error", handleError);
-        };
-        candidate.addEventListener("open", handleOpen);
-        candidate.addEventListener("error", handleError);
-      });
-
-      return socket;
-    } catch (error) {
-      lastError = error;
-      await sleep(200);
-    }
+    this.pendingRequests.clear();
   }
-
-  throw new Error(
-    `Unable to connect to Codex app-server.${formatAppServerOutput(appServerOutput)}${
-      lastError ? ` Last error: ${String(lastError)}` : ""
-    }`,
-  );
 }

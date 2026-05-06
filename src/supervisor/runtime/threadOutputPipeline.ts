@@ -45,7 +45,9 @@ export function resolveThreadStatusSource(
   session: SessionRuntime,
   disableCliHookPlugin: boolean = false,
 ): ThreadStatusSource {
-  if (session.adapter.capabilities.presentationMode !== "terminal") {
+  const presentationMode =
+    session.presentationMode ?? session.adapter.capabilities.presentationMode;
+  if (presentationMode !== "terminal" || session.structuredSession) {
     return "server";
   }
   if (disableCliHookPlugin) {
@@ -61,15 +63,14 @@ export class ThreadOutputPipeline {
   constructor(private readonly options: ThreadOutputPipelineOptions) {}
 
   private cliHookOwnsStatus(session: SessionRuntime, disableCliHookPlugin?: boolean): boolean {
-    // Providers with `partialL1` keep L2 active alongside hooks: their event
-    // vocabulary doesn't cover every transition (Copilot CLI lacks
-    // turn-finished), so terminal parsing fills the gap. L1 events still
-    // apply via `applyCliHookPluginState`; only L2 suppression is gated.
     if (session.adapter.partialL1) {
       return false;
     }
+    const presentationMode =
+      session.presentationMode ?? session.adapter.capabilities.presentationMode;
     return (
-      session.adapter.capabilities.presentationMode === "terminal" &&
+      presentationMode === "terminal" &&
+      !session.structuredSession &&
       !(disableCliHookPlugin ?? this.options.readDisableCliHookPlugin()) &&
       (session.hasCliHookPluginActivity || session.cliHookEnvInjected === true)
     );
@@ -108,9 +109,11 @@ export class ThreadOutputPipeline {
   }
 
   getLatestTerminalStatusHint(session: SessionRuntime): TerminalStatusHint | null {
+    const presentationMode =
+      session.presentationMode ?? session.adapter.capabilities.presentationMode;
     if (
       this.cliHookOwnsStatus(session) ||
-      session.adapter.capabilities.presentationMode !== "terminal" ||
+      presentationMode !== "terminal" ||
       !session.adapter.detectTerminalStatus ||
       session.lastStrippedPtyChunk.length === 0
     ) {
@@ -210,6 +213,10 @@ export class ThreadOutputPipeline {
   }
 
   private flushPendingTerminalWritesIfIdle(session: SessionRuntime): void {
+    if (!session.pty) {
+      return;
+    }
+    const pty = session.pty;
     if (session.pendingTerminalPreInputs?.length && !session.pendingTerminalWriteInFlight) {
       const chunks = session.pendingTerminalPreInputs.shift()!;
       if (!session.pendingTerminalPreInputs.length) {
@@ -217,7 +224,7 @@ export class ThreadOutputPipeline {
       }
       session.pendingTerminalWriteInFlight = true;
       void sleep(500)
-        .then(() => writeSubmittedPrompt(session.pty, chunks, session.projectLocation))
+        .then(() => writeSubmittedPrompt(pty, chunks, session.projectLocation))
         .then(() => {
           session.pendingTerminalWriteInFlight = false;
         });
@@ -230,7 +237,7 @@ export class ThreadOutputPipeline {
       session.pendingTerminalSegments = undefined;
       void sleep(500).then(() =>
         writeSubmittedPrompt(
-          session.pty,
+          pty,
           session.adapter.buildDirectInput?.(
             prompt,
             segments,
@@ -381,7 +388,7 @@ export class ThreadOutputPipeline {
       const key = session.adapter.detectAutoResponse(strippedData);
       if (key) {
         session.autoResponseEmitted = true;
-        session.pty.write(key);
+        session.pty?.write(key);
       }
     }
 

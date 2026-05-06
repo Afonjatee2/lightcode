@@ -25,9 +25,20 @@ function resolveWslAttachmentDirs(distro: string): { uncDir: string; linuxDir: s
   return entry;
 }
 
+function isImageAttachmentSegment(segment: PromptSegment): boolean {
+  if (segment.kind !== "attachment") {
+    return false;
+  }
+  return (
+    segment.mimeType?.startsWith("image/") === true ||
+    /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(segment.path)
+  );
+}
+
 export function rewriteSegmentsForWsl(
   segments: PromptSegment[],
   location: ProjectLocation,
+  options?: { preserveImageAttachments?: boolean },
 ): PromptSegment[] {
   if (location.kind !== "wsl") {
     return segments;
@@ -36,6 +47,9 @@ export function rewriteSegmentsForWsl(
   let dirs: { uncDir: string; linuxDir: string } | undefined;
   return segments.map((segment) => {
     if ((segment.kind !== "attachment" && segment.kind !== "file") || !segment.path) {
+      return segment;
+    }
+    if (options?.preserveImageAttachments && isImageAttachmentSegment(segment)) {
       return segment;
     }
     if (!/^[A-Za-z]:[\\/]/.test(segment.path)) {

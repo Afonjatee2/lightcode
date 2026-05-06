@@ -99,12 +99,13 @@ export function createClaudeAdapter(): AgentAdapter {
     oscHintsDeferToHookPlugin: true,
     workingSilenceTimeoutMs: null,
     defaultOneShotModel: "haiku",
-    buildOneShotCommand(model, effort) {
-      const args = ["-p", "--model", model];
+    buildOneShotCommand(model, effort, prompt) {
+      if (!prompt) return undefined;
+      const args = ["-p", prompt, "--model", model];
       if (effort) {
         args.push("--effort", effort);
       }
-      return { command: "claude", args };
+      return { command: "claude", args, stdin: "" };
     },
     buildContextExtractionCommand(sessionRef, _location, model) {
       const args = ["-p", "--resume", sessionRef.providerSessionId, "--model", model ?? "haiku"];

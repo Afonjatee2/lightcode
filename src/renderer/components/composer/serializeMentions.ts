@@ -1,10 +1,52 @@
 import type { PromptSegment } from "@/shared/contracts";
 
+const INLINE_FILE_TOKEN_REGEX = /(^|\s)@([^\s@]+)(?=\s|$)/g;
+
+function pushTextSegment(segments: PromptSegment[], content: string): void {
+  if (content.length === 0) {
+    return;
+  }
+  const last = segments.at(-1);
+  if (last?.kind === "text") {
+    last.content += content;
+    return;
+  }
+  segments.push({ kind: "text", content });
+}
+
+function pushTextBufferSegments(segments: PromptSegment[], content: string): void {
+  if (content.length === 0) {
+    return;
+  }
+
+  let cursor = 0;
+  for (const match of content.matchAll(INLINE_FILE_TOKEN_REGEX)) {
+    const prefix = match[1] ?? "";
+    const path = match[2] ?? "";
+    const matchIndex = match.index ?? 0;
+    const mentionStart = matchIndex + prefix.length;
+    const mentionEnd = mentionStart + 1 + path.length;
+
+    if (mentionStart > cursor) {
+      pushTextSegment(segments, content.slice(cursor, mentionStart));
+    }
+    if (path.length > 0) {
+      segments.push({ kind: "file", path });
+    }
+    cursor = mentionEnd;
+  }
+
+  if (cursor < content.length) {
+    pushTextSegment(segments, content.slice(cursor));
+  }
+}
+
 /**
  * Walk a contentEditable container and produce structured prompt segments.
  * Text content becomes `{ kind: "text" }` segments, file mention chips
- * become `{ kind: "file", path }` segments. Each adapter then formats
- * these segments its own way (Claude: @path, Codex: structured API, etc.).
+ * and inline `@path` tokens become `{ kind: "file", path }` segments.
+ * Each adapter then formats these segments its own way (Claude: @path,
+ * Codex: structured API, etc.).
  */
 export function serializeToSegments(container: HTMLDivElement): PromptSegment[] {
   const segments: PromptSegment[] = [];
@@ -12,7 +54,7 @@ export function serializeToSegments(container: HTMLDivElement): PromptSegment[] 
 
   function flushText() {
     if (textBuffer.length > 0) {
-      segments.push({ kind: "text", content: textBuffer });
+      pushTextBufferSegments(segments, textBuffer);
       textBuffer = "";
     }
   }

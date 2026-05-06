@@ -10,10 +10,12 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, posix, win32 } from "node:path";
 import { homedir } from "node:os";
 import { Readable, Writable } from "node:stream";
+import { pathToFileURL } from "node:url";
 import {
   ClientSideConnection,
   ndJsonStream,
@@ -28,18 +30,29 @@ import {
 import type {
   ProjectLocation,
   PromptSegment,
+  RuntimeEvent,
   SessionRef,
   ThreadAttention,
   ThreadConfig,
   ThreadServerRequestId,
   ThreadStatus,
 } from "@/shared/contracts";
+import { isThreadConfigEqual } from "@/shared/contracts";
+import {
+  closeOpenContentItems,
+  createAcpMapperState,
+  mapAcpPermissionRequest,
+  mapAcpSessionUpdate,
+  resetMapperForTurnEnd,
+  type AcpMapperState,
+} from "./canonicalMapping";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,
   type CommandSpec,
   type CreateStructuredSessionInput,
+  type StartTurnOptions,
   type StructuredSessionHandle,
   type StructuredSessionListener,
 } from "../base";
@@ -67,45 +80,90 @@ function resolveSpawnCwd(location: ProjectLocation): string | undefined {
   return location.path;
 }
 
+function basenameForProjectPath(location: ProjectLocation, filePath: string): string {
+  switch (location.kind) {
+    case "windows":
+      return win32.basename(filePath);
+    case "wsl":
+    case "posix":
+      return posix.basename(filePath);
+  }
+}
+
+function isWindowsAbsolutePath(filePath: string): boolean {
+  return /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith("\\\\");
+}
+
+export function resolveAcpResourcePath(location: ProjectLocation, rawPath: string): string {
+  if (isWindowsAbsolutePath(rawPath)) {
+    return rawPath;
+  }
+  switch (location.kind) {
+    case "windows":
+      return win32.join(location.path, rawPath);
+    case "wsl":
+      return rawPath.startsWith("/") ? rawPath : posix.join(location.linuxPath, rawPath);
+    case "posix":
+      return rawPath.startsWith("/") ? rawPath : posix.join(location.path, rawPath);
+  }
+}
+
+export function toAcpResourceUri(location: ProjectLocation, rawPath: string): string {
+  const absolutePath = resolveAcpResourcePath(location, rawPath);
+  if (isWindowsAbsolutePath(absolutePath)) {
+    return pathToFileURL(absolutePath).href;
+  }
+  switch (location.kind) {
+    case "windows":
+      return pathToFileURL(absolutePath).href;
+    case "wsl":
+    case "posix":
+      return new URL(`file://${absolutePath.replace(/\\/g, "/")}`).href;
+  }
+}
+
 /**
  * Convert Lightcode `PromptSegment[]` + prompt text into ACP `ContentBlock[]`.
  */
 async function segmentsToContentBlocks(
   prompt: string,
+  location: ProjectLocation,
   segments?: PromptSegment[],
 ): Promise<ContentBlock[]> {
   const blocks: ContentBlock[] = [];
 
   for (const seg of segments ?? []) {
     if (seg.kind === "attachment") {
+      const resourcePath = resolveAcpResourcePath(location, seg.path);
       const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(seg.path);
       if (isImage) {
         try {
-          const data = await readFile(seg.path);
+          const data = await readFile(resourcePath);
           const mimeType = seg.mimeType ?? guessMimeType(seg.path);
           blocks.push({ type: "image", data: data.toString("base64"), mimeType });
         } catch {
           // Fall back to resource link if image can't be read
           blocks.push({
             type: "resource_link",
-            uri: `file://${seg.path}`,
-            name: basename(seg.path),
+            uri: toAcpResourceUri(location, seg.path),
+            name: basenameForProjectPath(location, resourcePath),
             ...(seg.mimeType ? { mimeType: seg.mimeType } : {}),
           });
         }
       } else {
         blocks.push({
           type: "resource_link",
-          uri: `file://${seg.path}`,
-          name: basename(seg.path),
+          uri: toAcpResourceUri(location, seg.path),
+          name: basenameForProjectPath(location, resourcePath),
           ...(seg.mimeType ? { mimeType: seg.mimeType } : {}),
         });
       }
     } else if (seg.kind === "file") {
+      const resourcePath = resolveAcpResourcePath(location, seg.path);
       blocks.push({
         type: "resource_link",
-        uri: `file://${seg.path}`,
-        name: basename(seg.path),
+        uri: toAcpResourceUri(location, seg.path),
+        name: basenameForProjectPath(location, resourcePath),
       });
     }
   }
@@ -156,12 +214,18 @@ function resolveAcpMode(config: ThreadConfig, availableModeIds: string[]): strin
     return undefined;
   }
 
+  if (config.mode === "autopilot" || config.approvalPolicy === "autopilot") {
+    if (available.has("autopilot")) return available.get("autopilot");
+    if (available.has("yolo")) return available.get("yolo");
+  }
+
   // Agent mode: pick based on approval policy
   if (config.approvalPolicy === "autopilot") {
     if (available.has("autopilot")) return available.get("autopilot");
   }
   if (config.approvalPolicy === "never") {
     if (available.has("yolo")) return available.get("yolo");
+    if (available.has("autopilot")) return available.get("autopilot");
   }
   if (config.approvalPolicy === "auto_edit") {
     if (available.has("autoedit")) return available.get("autoedit");
@@ -196,6 +260,36 @@ function findThoughtLevelConfig(configOptions: unknown): AcpConfigOptionLike | u
   }) as AcpConfigOptionLike | undefined;
 }
 
+function applyAcpModeUpdateToConfig(currentConfig: ThreadConfig, modeId: string): ThreadConfig {
+  const normalized = normalizeAcpModeId(modeId).toLowerCase();
+
+  if (normalized === "plan" || normalized === "architect") {
+    return { ...currentConfig, mode: "plan", approvalPolicy: undefined };
+  }
+
+  if (normalized === "autoedit") {
+    return { ...currentConfig, mode: "agent", approvalPolicy: "auto_edit" };
+  }
+
+  if (normalized === "autopilot") {
+    return {
+      ...currentConfig,
+      mode: "agent",
+      approvalPolicy: currentConfig.approvalPolicy === "autopilot" ? "autopilot" : "never",
+    };
+  }
+
+  if (normalized === "yolo") {
+    return { ...currentConfig, mode: "agent", approvalPolicy: "never" };
+  }
+
+  return {
+    ...currentConfig,
+    mode: "agent",
+    approvalPolicy: currentConfig.approvalPolicy === undefined ? undefined : "default",
+  };
+}
+
 // ── Session ──────────────────────────────────────────────────────
 
 export class AcpStructuredSession implements StructuredSessionHandle {
@@ -204,18 +298,130 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private readonly child: ChildProcess;
   private readonly connection: ClientSideConnection;
   private readonly cwd: string;
+  private readonly projectLocation: ProjectLocation;
+  /** Lightcode thread id (stable identifier we report in RuntimeEvents). */
+  private readonly threadId: string;
   private readonly stderrChunks: string[] = [];
   private listener: StructuredSessionListener | undefined;
   private sessionId: string | undefined;
   private isDisposed = false;
   private currentConfig: ThreadConfig | undefined;
   private spawnReady: Promise<void> = Promise.resolve();
+  private currentTurnId: string | undefined;
+  private availableModeIds: string[] = [];
+  private thoughtLevelConfigId: string | undefined;
 
-  private constructor(child: ChildProcess, connection: ClientSideConnection, cwd: string) {
+  private mapperState: AcpMapperState | undefined;
+  /**
+   * Runtime events that fired before the listener was wired (typical race:
+   * the supervisor calls `void startTurn(...)` and then `await`s plugin-env
+   * resolution, which lets the turn's microtask emit user_message events
+   * before `spawnThread` reaches `setListener`). Replayed on `setListener`.
+   */
+  private bufferedRuntimeEvents: RuntimeEvent[] = [];
+  /**
+   * True while `loadSession` is replaying historical `session/update`
+   * notifications. Lightcode persists thread history in its own DB, so
+   * surfacing the replay as new canonical events would duplicate every
+   * message in the chat pane. We drop ACP→canonical mapping for the duration
+   * and let normal mapping resume once the load completes.
+   */
+  private isReplayingHistory = false;
+
+  private constructor(
+    child: ChildProcess,
+    connection: ClientSideConnection,
+    projectLocation: ProjectLocation,
+    cwd: string,
+    threadId: string,
+  ) {
     this.child = child;
     this.connection = connection;
+    this.projectLocation = projectLocation;
     this.cwd = cwd;
+    this.threadId = threadId;
     this.launchOptions = { suppressResumeConfigOverrides: true };
+  }
+
+  /** Initialize the canonical mapper once we have a stable thread id. */
+  private ensureMapperState(): AcpMapperState {
+    if (!this.mapperState || this.mapperState.threadId !== this.threadId) {
+      this.mapperState = createAcpMapperState(this.threadId);
+    }
+    return this.mapperState;
+  }
+
+  private emitRuntimeEvents(events: RuntimeEvent[]): void {
+    if (events.length === 0) return;
+    if (!this.listener?.onRuntimeEvent) {
+      this.bufferedRuntimeEvents.push(...events);
+      return;
+    }
+    for (const event of events) {
+      this.listener.onRuntimeEvent(event);
+    }
+  }
+
+  private rememberSessionOptions(availableModeIds: string[], configOptions: unknown): void {
+    this.availableModeIds = availableModeIds;
+    this.thoughtLevelConfigId = findThoughtLevelConfig(configOptions)?.id;
+  }
+
+  private async applyTurnConfig(config: ThreadConfig): Promise<void> {
+    if (!this.sessionId) {
+      return;
+    }
+
+    const previousConfig = this.currentConfig;
+    const nextModeId = resolveAcpMode(config, this.availableModeIds);
+    const previousModeId = previousConfig
+      ? resolveAcpMode(previousConfig, this.availableModeIds)
+      : undefined;
+
+    if (nextModeId && nextModeId !== previousModeId) {
+      try {
+        await this.connection.setSessionMode({ sessionId: this.sessionId, modeId: nextModeId });
+        console.log("[acp] mode set to:", nextModeId);
+      } catch (error) {
+        console.log(
+          "[acp] live mode change rejected, continuing: %s",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+
+    if (config.model !== previousConfig?.model) {
+      try {
+        await this.connection.unstable_setSessionModel({
+          sessionId: this.sessionId,
+          modelId: config.model,
+        });
+        console.log("[acp] model set to:", config.model);
+      } catch (error) {
+        console.log(
+          "[acp] live model change rejected, continuing: %s",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+
+    if (config.effort && this.thoughtLevelConfigId && config.effort !== previousConfig?.effort) {
+      try {
+        await this.connection.setSessionConfigOption({
+          sessionId: this.sessionId,
+          configId: this.thoughtLevelConfigId,
+          value: config.effort,
+        });
+        console.log("[acp] effort set to:", config.effort);
+      } catch (error) {
+        console.log(
+          "[acp] live effort change rejected, continuing: %s",
+          error instanceof Error ? error.message : String(error),
+        );
+      }
+    }
+
+    this.currentConfig = config;
   }
 
   /**
@@ -224,7 +430,11 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    * The `command` should launch the CLI in ACP mode (e.g. `gemini --acp`).
    * The SDK communicates over stdin/stdout using newline-delimited JSON.
    */
-  static create(command: CommandSpec, projectLocation: ProjectLocation): AcpStructuredSession {
+  static create(
+    command: CommandSpec,
+    projectLocation: ProjectLocation,
+    threadId: string,
+  ): AcpStructuredSession {
     const sessionCwd = resolveSessionCwd(projectLocation);
     const spawnCwd = command.cwd ?? resolveSpawnCwd(projectLocation);
 
@@ -290,7 +500,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       stream,
     );
 
-    session = new AcpStructuredSession(child, connection, sessionCwd);
+    session = new AcpStructuredSession(child, connection, projectLocation, sessionCwd, threadId);
     session.spawnReady = spawnReady;
     session.stderrChunks.push(...stderrChunks);
 
@@ -323,6 +533,17 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
   setListener(listener: StructuredSessionListener): void {
     this.listener = listener;
+
+    // Drain any runtime events that landed before the listener was wired
+    // (turn.started / user_message from startTurn typically race ahead of
+    // spawnThread's setListener call).
+    if (listener.onRuntimeEvent && this.bufferedRuntimeEvents.length > 0) {
+      const drained = this.bufferedRuntimeEvents;
+      this.bufferedRuntimeEvents = [];
+      for (const event of drained) {
+        listener.onRuntimeEvent(event);
+      }
+    }
 
     // Re-emit current state for late listeners
     if (this.sessionId) {
@@ -399,18 +620,23 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   async openThread(config: ThreadConfig, sessionRef?: SessionRef): Promise<string> {
     let availableModeIds: string[] = [];
     let configOptions: unknown[] = [];
-    this.currentConfig = config;
+    this.currentConfig = undefined;
 
     if (sessionRef) {
       console.log("[acp] loading session:", sessionRef.providerSessionId);
-      const result = await this.connection.loadSession({
-        sessionId: sessionRef.providerSessionId,
-        cwd: this.cwd,
-        mcpServers: [],
-      });
-      this.sessionId = sessionRef.providerSessionId;
-      availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
-      configOptions = result.configOptions ?? [];
+      this.isReplayingHistory = true;
+      try {
+        const result = await this.connection.loadSession({
+          sessionId: sessionRef.providerSessionId,
+          cwd: this.cwd,
+          mcpServers: [],
+        });
+        this.sessionId = sessionRef.providerSessionId;
+        availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
+        configOptions = result.configOptions ?? [];
+      } finally {
+        this.isReplayingHistory = false;
+      }
     } else {
       console.log("[acp] creating new session in", this.cwd);
       const result = await this.connection.newSession({
@@ -423,53 +649,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       console.log("[acp] session created:", this.sessionId, "modes:", availableModeIds);
     }
 
-    // Apply session mode. Agents use different mode IDs:
-    //   Gemini: "default", "autoEdit", "yolo", "plan"
-    //   Generic ACP: "code", "architect", "ask"
-    // We try to find the best match from the agent's available modes.
-    if (this.sessionId) {
-      const modeId = resolveAcpMode(config, availableModeIds);
-      if (modeId) {
-        try {
-          await this.connection.setSessionMode({ sessionId: this.sessionId, modeId });
-          console.log("[acp] mode set to:", modeId);
-        } catch {
-          // Agent may reject the mode change — that's fine
-        }
-      }
-    }
-
-    // Set model via unstable setSessionModel if the agent supports it
-    if (config.model && this.sessionId) {
-      try {
-        await this.connection.unstable_setSessionModel({
-          sessionId: this.sessionId,
-          modelId: config.model,
-        });
-        console.log("[acp] model set to:", config.model);
-      } catch {
-        // Agent may not support setSessionModel — that's fine
-      }
-    }
-
-    const thoughtLevelConfig = findThoughtLevelConfig(configOptions);
-    if (
-      config.effort &&
-      this.sessionId &&
-      thoughtLevelConfig?.id &&
-      thoughtLevelConfig.currentValue !== config.effort
-    ) {
-      try {
-        await this.connection.setSessionConfigOption({
-          sessionId: this.sessionId,
-          configId: thoughtLevelConfig.id,
-          value: config.effort,
-        });
-        console.log("[acp] effort set to:", config.effort);
-      } catch {
-        // Agent may not support reasoning-effort config — that's fine
-      }
-    }
+    this.rememberSessionOptions(availableModeIds, configOptions);
+    await this.applyTurnConfig(config);
 
     this.launchOptions = { ...this.launchOptions, resumeThreadId: this.sessionId };
     return this.sessionId!;
@@ -482,15 +663,43 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    * returns a `stopReason`). During the turn, `session/update` notifications
    * flow through `handleSessionUpdate` which emits status updates.
    */
-  async startTurn(prompt: string, config: ThreadConfig, segments?: PromptSegment[]): Promise<void> {
+  async startTurn(
+    prompt: string,
+    config: ThreadConfig,
+    segments?: PromptSegment[],
+    options?: StartTurnOptions,
+  ): Promise<void> {
     if (!this.sessionId) {
       throw new Error("ACP session not opened yet.");
     }
 
-    const contentBlocks = await segmentsToContentBlocks(prompt, segments);
+    await this.applyTurnConfig(config);
+
+    // Mark a new canonical turn and surface the user-typed message as a
+    // user_message item (the prompt itself doesn't generate a session/update).
+    // When the runtime has already pushed an optimistic user_message ahead of
+    // structured-session setup, we reuse the same item id so the renderer's
+    // per-id dedupe drops this duplicate emit.
+    this.currentTurnId = `turn-${randomUUID()}`;
+    const userItemId = options?.userMessageItemId ?? `user-${this.currentTurnId}`;
+    this.emitRuntimeEvents([
+      { type: "turn.started", threadId: this.threadId, turnId: this.currentTurnId },
+      {
+        type: "item.started",
+        threadId: this.threadId,
+        itemId: userItemId,
+        itemType: "user_message",
+        payload: {
+          content: prompt.trim().length > 0 ? [{ kind: "text", text: prompt }] : [],
+        },
+      },
+      { type: "item.completed", threadId: this.threadId, itemId: userItemId },
+    ]);
 
     // Signal working state immediately
     this.listener?.onUpdate({ status: "working", attention: "working" });
+
+    const contentBlocks = await segmentsToContentBlocks(prompt, this.projectLocation, segments);
 
     try {
       const result = await this.connection.prompt({
@@ -501,10 +710,39 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       // Map stopReason to Lightcode status
       const { status, attention } = this.mapStopReason(result.stopReason);
       this.listener?.onUpdate({ status, attention });
+
+      // Close any items still open at end-of-turn and emit turn.completed.
+      const mapperState = this.ensureMapperState();
+      this.emitRuntimeEvents([
+        ...closeOpenContentItems(mapperState),
+        {
+          type: "turn.completed",
+          threadId: this.threadId,
+          turnId: this.currentTurnId,
+          state: result.stopReason === "cancelled" ? "cancelled" : "completed",
+        },
+      ]);
+      resetMapperForTurnEnd(mapperState);
     } catch (error) {
       if (this.isDisposed) return;
       const message = error instanceof Error ? error.message : String(error);
       this.listener?.onUpdate({ status: "error", attention: "error", errorMessage: message });
+      const mapperState = this.ensureMapperState();
+      this.emitRuntimeEvents([
+        ...closeOpenContentItems(mapperState),
+        { type: "error", threadId: this.threadId, message },
+        ...(this.currentTurnId
+          ? ([
+              {
+                type: "turn.completed",
+                threadId: this.threadId,
+                turnId: this.currentTurnId,
+                state: "failed",
+              },
+            ] as RuntimeEvent[])
+          : []),
+      ]);
+      resetMapperForTurnEnd(mapperState);
     }
   }
 
@@ -522,15 +760,20 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
   }
 
+  async interruptTurn(): Promise<void> {
+    if (!this.sessionId || this.isDisposed) {
+      return;
+    }
+
+    this.cancelPendingPermissionRequests();
+    await this.connection.cancel({ sessionId: this.sessionId });
+  }
+
   async dispose(): Promise<void> {
     if (this.isDisposed) return;
     this.isDisposed = true;
 
-    // Reject pending permission requests
-    for (const [, resolver] of this.pendingPermissionResolvers) {
-      resolver({ outcome: { outcome: "cancelled" } });
-    }
-    this.pendingPermissionResolvers.clear();
+    this.cancelPendingPermissionRequests();
 
     // Don't send cancel — the ACP process may not be generating,
     // and the connection may already be closing. Just kill the process.
@@ -587,6 +830,26 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
   private permissionRequestSeq = 0;
 
+  private cancelPendingPermissionRequests(): void {
+    const requestIds = [...this.pendingPermissionResolvers.keys()];
+    for (const requestId of requestIds) {
+      const resolver = this.pendingPermissionResolvers.get(requestId);
+      if (!resolver) continue;
+      this.pendingPermissionResolvers.delete(requestId);
+      resolver({ outcome: { outcome: "cancelled" } });
+    }
+    if (requestIds.length > 0) {
+      this.emitRuntimeEvents(
+        requestIds.map((requestId) => ({
+          type: "request.resolved",
+          threadId: this.threadId,
+          requestId: String(requestId),
+          outcome: "cancelled",
+        })),
+      );
+    }
+  }
+
   /**
    * Handle `requestPermission` calls from the agent.
    *
@@ -619,6 +882,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         },
       });
 
+      // Mirror as a canonical request.opened so the chat UI can render an
+      // inline ApprovalCard. The terminal panel still handles the legacy
+      // server-request flow above.
+      const mapperState = this.ensureMapperState();
+      this.emitRuntimeEvents([mapAcpPermissionRequest(params, mapperState, String(requestId))]);
+
       // Also signal that the thread needs approval
       this.listener?.onUpdate({ status: "needs_approval", attention: "needs_approval" });
     });
@@ -632,6 +901,19 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    */
   private handleSessionUpdate(params: SessionNotification): void {
     const update: SessionUpdate = params.update;
+
+    // Emit canonical events for chat-mode renderers. The legacy text/status
+    // path below stays in place — terminal-mode threads still get all the
+    // existing behaviour, and the canonical channel runs in parallel.
+    //
+    // During `loadSession` the agent replays persisted history as
+    // `session/update` notifications. Lightcode already has those messages
+    // in its own DB, so we skip canonical mapping for the replay window to
+    // avoid duplicating every message in the chat pane.
+    if (!this.isReplayingHistory) {
+      const events = mapAcpSessionUpdate(params, this.ensureMapperState());
+      if (events.length > 0) this.emitRuntimeEvents(events);
+    }
 
     switch (update.sessionUpdate) {
       case "agent_message_chunk":
@@ -659,25 +941,22 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           "currentModeId" in update &&
           typeof update.currentModeId === "string"
         ) {
-          const normalized = normalizeAcpModeId(update.currentModeId).toLowerCase();
-          const nextMode: ThreadConfig["mode"] =
-            normalized === "plan" ? "plan" : normalized === "autopilot" ? "autopilot" : "agent";
-          const nextConfig =
-            this.currentConfig.mode === nextMode
-              ? this.currentConfig
-              : { ...this.currentConfig, mode: nextMode };
-          this.currentConfig = nextConfig;
-          this.listener?.onUpdate({
-            status: "idle",
-            attention: "none",
-            config: nextConfig,
-            ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
-          });
+          const nextConfig = applyAcpModeUpdateToConfig(this.currentConfig, update.currentModeId);
+          if (!isThreadConfigEqual(this.currentConfig, nextConfig)) {
+            this.currentConfig = nextConfig;
+            this.listener?.onUpdate({
+              status: "idle",
+              attention: "none",
+              config: nextConfig,
+              ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+            });
+          }
         }
         break;
 
       case "config_option_update":
         if (this.currentConfig && "configOptions" in update) {
+          this.rememberSessionOptions(this.availableModeIds, update.configOptions);
           const thoughtLevelConfig = findThoughtLevelConfig(update.configOptions);
           if (
             thoughtLevelConfig?.currentValue &&
@@ -731,14 +1010,45 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 // ── Factory ──────────────────────────────────────────────────────
 
 /**
+ * Decide whether `createAcpStructuredSession` should actually spawn the ACP
+ * agent for this thread launch. Pulled out as a pure predicate so adapters
+ * (and tests) can audit the contract without instantiating a real process.
+ *
+ *   - **Terminal resume** → `false`. The TUI re-attaches via its native flag
+ *     (`--resume <id>`, `--session <id>`, etc.) and a parallel ACP session
+ *     would just waste a process and confuse the renderer.
+ *   - **GUI resume** → `true`. The structured session IS the chat surface,
+ *     so it must stay live for the thread's whole lifetime; `openThread`
+ *     calls `loadSession` to re-attach.
+ *   - **Initial launch (any presentation)** → `true`. Even terminal threads
+ *     use a short-lived ACP session to allocate the provider session id
+ *     before the TUI takes over.
+ */
+export function shouldSpawnAcpSession(input: CreateStructuredSessionInput): boolean {
+  if (input.sessionRef && input.presentationMode !== "gui") {
+    return false;
+  }
+  return true;
+}
+
+/**
  * Create an ACP structured session for the given adapter command.
  *
  * Agent adapters call this from their `createStructuredSession()` method,
- * passing the ACP-mode command (e.g. `gemini --acp`).
+ * passing the ACP-mode command (e.g. `gemini --acp`, `copilot --acp --stdio`).
+ *
+ * The factory owns the resume/presentation gating via {@link shouldSpawnAcpSession}
+ * so every ACP-speaking provider behaves identically. Adapters should NOT add
+ * their own `if (input.sessionRef) return undefined` gate — that's what
+ * produced the Copilot GUI-resume regression. Just call this factory
+ * unconditionally and trust the shared decision.
  */
 export function createAcpStructuredSession(
   acpCommand: CommandSpec,
   input: CreateStructuredSessionInput,
-): AcpStructuredSession {
-  return AcpStructuredSession.create(acpCommand, input.projectLocation);
+): AcpStructuredSession | undefined {
+  if (!shouldSpawnAcpSession(input)) {
+    return undefined;
+  }
+  return AcpStructuredSession.create(acpCommand, input.projectLocation, input.threadId);
 }

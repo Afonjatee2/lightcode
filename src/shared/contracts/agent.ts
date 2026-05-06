@@ -68,6 +68,12 @@ export const agentCapabilitySchema = z.object({
   supportsDirectInput: z.boolean().default(true),
   liveInputMode: liveInputModeSchema.default("terminal"),
   presentationMode: threadPresentationModeSchema.default("terminal"),
+  /**
+   * Modes the adapter supports. When >1, the new-thread picker exposes a
+   * Mode select (Terminal / Chat). Defaults to `[presentationMode]` (computed
+   * by consumers) — adapters that haven't migrated yet keep working unchanged.
+   */
+  presentationModes: z.array(threadPresentationModeSchema).optional(),
   requiresTerminalFocusBeforeInput: z.boolean().optional(),
   bypassApprovalPolicy: z.string().optional(),
   settingDefs: z.array(agentSettingDefSchema).default([]),

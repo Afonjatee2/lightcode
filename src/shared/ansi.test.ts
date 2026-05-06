@@ -65,6 +65,16 @@ describe("stripAnsiPreservingLayout", () => {
     ]);
   });
 
+  it("returns the same string when there is no ESC (fast path)", () => {
+    const plain = "npm warn exec\nbuild ok";
+    expect(stripAnsiPreservingLayout(plain)).toBe(plain);
+  });
+
+  it("caps CUF space expansion", () => {
+    const input = `a\u001b[999999Cb`;
+    expect(stripAnsiPreservingLayout(input)).toBe(`a${" ".repeat(8192)}b`);
+  });
+
   it("leaves normal \\r\\n-based output unchanged", () => {
     const normal = "line one\r\nline two\r\nline three";
     expect(stripAnsiPreservingLayout(normal)).toBe(normal);

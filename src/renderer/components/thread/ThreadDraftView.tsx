@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Paperclip, TerminalSquare, X, Zap } from "lucide-react";
-import { Button, toast, Tooltip } from "@heroui/react";
-import { useShallow } from "zustand/shallow";
+import { Button, toast } from "@heroui/react";
 import type {
   AgentStatus,
   Project,
@@ -9,9 +8,11 @@ import type {
   ProviderDraftConfig,
   PromptSegment,
   ThreadConfig,
+  ThreadPresentationMode,
 } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { getComposerControls } from "@/renderer/components/providers";
+import { getConfigNormalizer } from "@/renderer/components/providers/ProviderIcon";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { useGitStore } from "@/renderer/state/gitStore";
 import {
@@ -33,6 +34,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { filterHiddenModels } from "./threadComposerOptions";
 import { friendlyError } from "@/shared/messages";
 import { ThreadComposer } from "./ThreadComposer";
+import { PresentationModeTabs } from "./PresentationModeTabs";
 
 function resolvePreferredAgentKind(
   installedAgents: AgentStatus[],
@@ -147,6 +149,17 @@ function resolveSandboxModeValue(agent: AgentStatus, preferred?: string): string
     : (findDefaultSandboxMode(agent) ?? modes[0]?.id ?? "");
 }
 
+function resolveInitialPresentationMode(
+  agent: AgentStatus | undefined,
+  lastByAgent: Record<string, ThreadPresentationMode>,
+): ThreadPresentationMode {
+  if (!agent) return "terminal";
+  const supported = agent.capabilities.presentationModes ?? [agent.capabilities.presentationMode];
+  const last = lastByAgent[agent.kind];
+  if (last && supported.includes(last)) return last;
+  return supported[0] ?? agent.capabilities.presentationMode ?? "terminal";
+}
+
 function resolveProviderDraftConfig(
   agent: AgentStatus,
   preferred?: Partial<ProviderDraftConfig>,
@@ -212,22 +225,11 @@ export function ThreadDraftView(props: {
     worktreeBranch?: string;
     worktreeBaseBranch?: string;
     worktreeIsNewBranch?: boolean;
+    presentationMode?: ThreadPresentationMode;
   }) => void;
 }) {
   const { project, agentStatuses, lastDraftConfig, onStart } = props;
-  const { gitBranch, gitHasRemote, gitHasTracking, gitAhead, gitBehind } = useGitStore(
-    useShallow((s) => {
-      const gitStatus = s.statuses[project.id];
-      return {
-        gitBranch: gitStatus?.branch,
-        gitHasRemote: gitStatus?.hasRemote ?? false,
-        gitHasTracking: Boolean(gitStatus?.tracking),
-        gitAhead: gitStatus?.ahead ?? 0,
-        gitBehind: gitStatus?.behind ?? 0,
-      };
-    }),
-  );
-  const [isSyncing, setIsSyncing] = useState(false);
+  const gitBranch = useGitStore((s) => s.statuses[project.id]?.branch);
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
   const installedAgents = agentStatuses.filter(
     (status) => status.installed && !disabledAgents.includes(status.kind),
@@ -255,6 +257,32 @@ export function ThreadDraftView(props: {
   const [worktreeMode, setWorktreeMode] = useState(lastDraftConfig?.worktreeMode ?? false);
   const [branchSelection, setBranchSelection] = useState<BranchSelection | null>(null);
   const lastAppliedAgentKindRef = useRef<AgentStatus["kind"] | undefined>(undefined);
+
+  // Presentation-mode picker — only meaningful for adapters that advertise
+  // multiple modes. The render fork in ThreadView consumes `presentationMode`
+  // off the Thread row, but we resolve it here so the user's last choice for
+  // this provider is remembered across new-thread drafts.
+  const lastPresentationModeByAgent = useSharedSettings((s) => s.lastPresentationModeByAgent);
+  const setLastPresentationMode = useSharedSettings((s) => s.setLastPresentationMode);
+  const supportedPresentationModes = selectedAgent
+    ? (selectedAgent.capabilities.presentationModes ?? [
+        selectedAgent.capabilities.presentationMode,
+      ])
+    : [];
+  const supportsTerminalMode = supportedPresentationModes.includes("terminal");
+  const supportsGuiMode = supportedPresentationModes.includes("gui");
+  const supportsModePicker = supportedPresentationModes.length > 1;
+  const [presentationMode, setPresentationMode] = useState<ThreadPresentationMode>(() =>
+    resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent),
+  );
+  // Re-resolve when the user switches providers — a Codex draft should not
+  // leak its "gui" choice into a Claude draft that only supports terminal.
+  useEffect(() => {
+    if (!effectiveAgentKind) return;
+    const next = resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent);
+    if (next !== presentationMode) setPresentationMode(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on provider change
+  }, [effectiveAgentKind]);
 
   // --- Per-provider config memory (app-wide via shared settings) ---
   const updateProjectDraftConfig = useAppStore((s) => s.updateProjectDraftConfig);
@@ -709,6 +737,36 @@ export function ThreadDraftView(props: {
           </div>
         </div>
 
+        <PresentationModeTabs
+          presentationMode={presentationMode}
+          supportsTerminal={supportsTerminalMode}
+          supportsGui={supportsGuiMode}
+          className={`${props.compact ? alignClass : "mx-auto"} mb-1 w-full max-w-[920px]`}
+          onChange={(next) => {
+            setPresentationMode(next);
+            // Drop config values that the new presentation surface
+            // doesn't support (e.g. Codex plan mode is ACP-only).
+            const normalizer = effectiveAgentKind
+              ? getConfigNormalizer(effectiveAgentKind)
+              : undefined;
+            if (!normalizer) return;
+            const patch = normalizer({
+              capabilities: selectedAgent.capabilities,
+              config: {
+                model,
+                effort,
+                ...(contextSize ? { contextSize } : {}),
+                ...(fast ? { fast } : {}),
+                mode,
+                approvalPolicy,
+                sandboxMode,
+              },
+              presentationMode: next,
+            });
+            if (Object.keys(patch).length > 0) onConfigPatch(patch);
+          }}
+        />
+
         {/* Composer at bottom */}
         <div className={`${props.compact ? alignClass : "mx-auto"} w-full max-w-[920px]`}>
           <ThreadComposer
@@ -716,11 +774,21 @@ export function ThreadDraftView(props: {
             compact={props.compact ?? false}
             controls={(() => {
               const filteredCaps = filterHiddenModels(selectedAgent.capabilities, hiddenModelIds);
-              const providers = installedAgents.map((agent) => ({
-                kind: agent.kind,
-                label: agent.label,
-                capabilities: filterHiddenModels(agent.capabilities, allHiddenModels[agent.kind]),
-              }));
+              // Only surface providers that support the active CLI/chat
+              // presentation; the model picker shouldn't offer agents the
+              // user can't actually run in this mode.
+              const providers = installedAgents
+                .filter((agent) => {
+                  const supported = agent.capabilities.presentationModes ?? [
+                    agent.capabilities.presentationMode,
+                  ];
+                  return supported.includes(presentationMode);
+                })
+                .map((agent) => ({
+                  kind: agent.kind,
+                  label: agent.label,
+                  capabilities: filterHiddenModels(agent.capabilities, allHiddenModels[agent.kind]),
+                }));
               const currentEfforts = (
                 filteredCaps.modelEfforts?.[model] ??
                 filteredCaps.efforts ??
@@ -818,14 +886,25 @@ export function ThreadDraftView(props: {
                 });
               }
               if (supportsFast) {
-                ctrls.push({
-                  kind: "toggle",
-                  label: "Fast",
-                  icon: <Zap className="size-3.5" />,
-                  hideLabelOnWrap: true,
-                  isSelected: fast,
-                  onChange: (selected) => onConfigPatch({ fast: selected }),
-                });
+                if (presentationMode === "gui") {
+                  ctrls.push({
+                    kind: "toggle",
+                    label: "Fast",
+                    icon: <Zap className="size-3.5" />,
+                    iconOnly: true,
+                    isSelected: fast,
+                    onChange: (selected) => onConfigPatch({ fast: selected }),
+                  });
+                } else {
+                  ctrls.push({
+                    kind: "toggle",
+                    label: "Fast",
+                    icon: <Zap className="size-3.5" />,
+                    hideLabelOnWrap: true,
+                    isSelected: fast,
+                    onChange: (selected) => onConfigPatch({ fast: selected }),
+                  });
+                }
               }
               if (factory) {
                 ctrls.push(
@@ -842,6 +921,7 @@ export function ThreadDraftView(props: {
                     },
                     isDisabled: false,
                     onConfigChange: onConfigPatch,
+                    presentationMode,
                   }),
                 );
               }
@@ -877,6 +957,9 @@ export function ThreadDraftView(props: {
                   const allSegments = [...attachments.toSegments(), ...segments];
                   const useWorktree = branchSelection?.isWorktree ?? worktreeMode;
                   resetDraftRefs();
+                  if (supportsModePicker) {
+                    setLastPresentationMode(selectedAgent.kind, presentationMode);
+                  }
                   onStart({
                     agentKind: selectedAgent.kind,
                     config: {
@@ -890,6 +973,7 @@ export function ThreadDraftView(props: {
                     },
                     prompt: flattenSegments(allSegments),
                     segments: allSegments,
+                    ...(supportsModePicker ? { presentationMode } : {}),
                     ...(useWorktree
                       ? branchSelection?.worktreePath
                         ? {
@@ -923,6 +1007,9 @@ export function ThreadDraftView(props: {
               latestSegmentsRef.current = [];
               attachmentsRef.current = [];
               const useWorktree = branchSelection?.isWorktree ?? worktreeMode;
+              if (supportsModePicker) {
+                setLastPresentationMode(selectedAgent.kind, presentationMode);
+              }
               onStart({
                 agentKind: selectedAgent.kind,
                 config: {
@@ -936,6 +1023,7 @@ export function ThreadDraftView(props: {
                 },
                 prompt: flatPrompt,
                 ...(allSegments.length > 0 ? { segments: allSegments } : {}),
+                ...(supportsModePicker ? { presentationMode } : {}),
                 ...(useWorktree
                   ? branchSelection?.worktreePath
                     ? {
@@ -972,62 +1060,17 @@ export function ThreadDraftView(props: {
                   <Paperclip className="size-4" />
                 </Button>
                 {gitBranch ? (
-                  <div className="flex items-center gap-0.5">
-                    <BranchSelector
-                      projectId={project.id}
-                      currentBranch={gitBranch}
-                      value={branchSelection?.branch ?? gitBranch}
-                      isWorktree={branchSelection?.isWorktree}
-                      baseBranch={branchSelection?.baseBranch}
-                      worktreeMode={worktreeMode}
-                      onWorktreeModeChange={setWorktreeMode}
-                      onSelect={setBranchSelection}
-                      onSwitchBranch={handleSwitchBranch}
-                    />
-                    {gitHasRemote && (
-                      <Tooltip delay={0}>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="lightcode-composer-menu min-w-9 px-2"
-                          isDisabled={isSyncing}
-                          isPending={isSyncing}
-                          onPress={() => {
-                            setIsSyncing(true);
-                            const needsPush = gitHasTracking
-                              ? gitAhead > 0 && gitBehind === 0
-                              : true;
-                            const op = needsPush
-                              ? readBridge().gitPush({
-                                  projectLocation: project.location,
-                                  setUpstream: !gitHasTracking,
-                                })
-                              : readBridge().gitSync({ projectLocation: project.location });
-                            void op.finally(() => setIsSyncing(false));
-                          }}
-                        >
-                          {({ isPending }) =>
-                            isPending ? (
-                              <PixelLoader size="sm" />
-                            ) : (
-                              <span className="text-sm">
-                                {gitHasTracking ? `${gitBehind}↓ ${gitAhead}↑` : "↑"}
-                              </span>
-                            )
-                          }
-                        </Button>
-                        <Tooltip.Content>
-                          {!gitHasTracking
-                            ? "Push"
-                            : gitBehind > 0
-                              ? `Sync (↓${gitBehind}${gitAhead > 0 ? ` ↑${gitAhead}` : ""})`
-                              : gitAhead > 0
-                                ? `Push ↑${gitAhead}`
-                                : "Sync"}
-                        </Tooltip.Content>
-                      </Tooltip>
-                    )}
-                  </div>
+                  <BranchSelector
+                    projectId={project.id}
+                    currentBranch={gitBranch}
+                    value={branchSelection?.branch ?? gitBranch}
+                    isWorktree={branchSelection?.isWorktree}
+                    baseBranch={branchSelection?.baseBranch}
+                    worktreeMode={worktreeMode}
+                    onWorktreeModeChange={setWorktreeMode}
+                    onSelect={setBranchSelection}
+                    onSwitchBranch={handleSwitchBranch}
+                  />
                 ) : null}
               </>
             }

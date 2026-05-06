@@ -6,7 +6,6 @@ export function AsideSlot(props: {
   children: ReactNode;
   orientation: AsideOrientation;
   isOpen: boolean;
-  isResizing?: boolean;
   targetWidth?: number;
   targetHeight?: number;
   onResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
@@ -18,7 +17,6 @@ export function AsideSlot(props: {
     children,
     orientation,
     isOpen,
-    isResizing = false,
     targetWidth,
     targetHeight,
     onResizeStart,
@@ -34,8 +32,10 @@ export function AsideSlot(props: {
   // Timings:
   // Show: Faster fade in (300ms), fast width/height (150ms)
   // Hide: Fast width/height (150ms), fast-ish fade out (200ms)
+  // During an active drag, useResizablePanels writes transitionDuration: 0ms directly
+  // to the panel element so per-frame width/height updates aren't smoothed.
   const duration = isOpen ? "300ms" : "200ms";
-  const sizeDuration = isResizing ? "0ms" : "150ms";
+  const sizeDuration = "150ms";
 
   return (
     <>

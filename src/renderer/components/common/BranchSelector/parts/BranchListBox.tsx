@@ -50,7 +50,7 @@ export function BranchListBox(props: {
     >
       <ListBox
         aria-label="Branches"
-        className={`max-h-60 overflow-y-auto !p-0 !m-0 ${VIRTUALIZED_COMPACT_DROPDOWN_ITEM_CLASS} [&_.list-box-item]:py-0.5 [&_.list-box-item]:pl-1.5 [&_.list-box-item]:pr-7 [&_.list-box-item__indicator]:!right-1.5`}
+        className={`lightcode-menu max-h-60 overflow-y-auto ${VIRTUALIZED_COMPACT_DROPDOWN_ITEM_CLASS}`}
         items={items}
         selectedKeys={
           isWorktree || worktreeMode ? new Set([baseBranch ?? value]) : new Set([value])

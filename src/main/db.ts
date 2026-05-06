@@ -56,11 +56,23 @@ export function initDatabase(dbPath: string) {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS thread_runtime_items (
+      thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+      item_id TEXT NOT NULL,
+      position INTEGER NOT NULL,
+      type TEXT NOT NULL,
+      state TEXT NOT NULL,
+      payload TEXT,
+      streams TEXT,
+      PRIMARY KEY (thread_id, item_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_runtime_items_thread_pos
+      ON thread_runtime_items (thread_id, position);
   `);
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 7;
+  const SCHEMA_VERSION = 9;
 
   const storedVersion = Number(
     (
@@ -111,6 +123,38 @@ export function initDatabase(dbPath: string) {
     // independently. Adapter argv reattaches the suffix at PTY launch.
     foldContextSuffix(sqlite, "threads", "config");
     foldContextSuffix(sqlite, "projects", "last_draft_config");
+  }
+
+  if (storedVersion < 8) {
+    // Per-thread presentation mode (terminal vs renderer-native chat) +
+    // optional reference to a user-registered ACP instance.
+    const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!cols.some((c) => c.name === "presentation_mode")) {
+      sqlite.exec(
+        "ALTER TABLE threads ADD COLUMN presentation_mode TEXT NOT NULL DEFAULT 'terminal'",
+      );
+    }
+    if (!cols.some((c) => c.name === "agent_instance_id")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN agent_instance_id TEXT");
+    }
+  }
+
+  if (storedVersion < 9) {
+    // Persisted canonical chat items per thread (chat-mode hydration on reopen).
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS thread_runtime_items (
+        thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+        item_id TEXT NOT NULL,
+        position INTEGER NOT NULL,
+        type TEXT NOT NULL,
+        state TEXT NOT NULL,
+        payload TEXT,
+        streams TEXT,
+        PRIMARY KEY (thread_id, item_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_runtime_items_thread_pos
+        ON thread_runtime_items (thread_id, position);
+    `);
   }
 
   if (storedVersion < SCHEMA_VERSION) {
@@ -213,6 +257,7 @@ function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
     projectId: row.projectId,
     title: row.title,
     agentKind: row.agentKind as Thread["agentKind"],
+    ...(row.agentInstanceId ? { agentInstanceId: row.agentInstanceId } : {}),
     config: JSON.parse(row.config),
     status: row.status as Thread["status"],
     attention: row.attention as Thread["attention"],
@@ -226,6 +271,9 @@ function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
     archived: row.archived,
     done: row.done,
     starred: row.starred,
+    presentationMode: (row.presentationMode === "gui"
+      ? "gui"
+      : "terminal") as Thread["presentationMode"],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -302,6 +350,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       projectId: thread.projectId,
       title: thread.title,
       agentKind: thread.agentKind,
+      agentInstanceId: thread.agentInstanceId ?? null,
       config: JSON.stringify(thread.config),
       status: thread.status,
       attention: thread.attention,
@@ -316,6 +365,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       archived: thread.archived,
       done: thread.done,
       starred: thread.starred,
+      presentationMode: thread.presentationMode ?? "terminal",
       sortOrder,
       createdAt: thread.createdAt,
       updatedAt: thread.updatedAt,
@@ -324,6 +374,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       target: schema.threads.id,
       set: {
         title: thread.title,
+        agentInstanceId: thread.agentInstanceId ?? null,
         config: JSON.stringify(thread.config),
         status: thread.status,
         attention: thread.attention,
@@ -337,6 +388,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         archived: thread.archived,
         done: thread.done,
         starred: thread.starred,
+        presentationMode: thread.presentationMode ?? "terminal",
         sortOrder,
         updatedAt: thread.updatedAt,
       },
@@ -347,6 +399,97 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
 export function dbDeleteThread(threadId: string): void {
   const db = getDb();
   db.delete(schema.threads).where(eq(schema.threads.id, threadId)).run();
+}
+
+/**
+ * Persisted canonical chat items per thread. Stored as a flat table keyed by
+ * (thread_id, item_id); ordered by `position` to preserve insertion order.
+ * Mirrors the renderer's `RuntimeChatItem` shape (id, type, state, payload,
+ * streams) so the chat UI can hydrate on reopen.
+ */
+export interface PersistedRuntimeItem {
+  id: string;
+  type: string;
+  state: "started" | "updated" | "completed";
+  payload: unknown;
+  streams: Record<string, string>;
+}
+
+export function dbGetThreadRuntimeItems(threadId: string): PersistedRuntimeItem[] {
+  if (!_sqlite) throw new Error("Database not initialized");
+  const rows = _sqlite
+    .prepare(
+      "SELECT item_id, type, state, payload, streams FROM thread_runtime_items WHERE thread_id = ? ORDER BY position ASC",
+    )
+    .all(threadId) as Array<{
+    item_id: string;
+    type: string;
+    state: string;
+    payload: string | null;
+    streams: string | null;
+  }>;
+  return rows.map((row) => ({
+    id: row.item_id,
+    type: row.type,
+    state: (row.state === "completed" || row.state === "updated"
+      ? row.state
+      : "started") as PersistedRuntimeItem["state"],
+    payload: row.payload ? safeParse(row.payload) : undefined,
+    streams: row.streams ? (safeParse(row.streams) as Record<string, string>) : {},
+  }));
+}
+
+export function dbReplaceThreadRuntimeItems(threadId: string, items: PersistedRuntimeItem[]): void {
+  if (!_sqlite) throw new Error("Database not initialized");
+  const replace = _sqlite.prepare(
+    `INSERT INTO thread_runtime_items (thread_id, item_id, position, type, state, payload, streams)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(thread_id, item_id) DO UPDATE SET
+       position = excluded.position,
+       type = excluded.type,
+       state = excluded.state,
+       payload = excluded.payload,
+       streams = excluded.streams`,
+  );
+  const incomingIds = new Set(items.map((it) => it.id));
+  const existing = _sqlite
+    .prepare("SELECT item_id FROM thread_runtime_items WHERE thread_id = ?")
+    .all(threadId) as Array<{ item_id: string }>;
+  const removeStmt = _sqlite.prepare(
+    "DELETE FROM thread_runtime_items WHERE thread_id = ? AND item_id = ?",
+  );
+  _sqlite.transaction(() => {
+    for (const row of existing) {
+      if (!incomingIds.has(row.item_id)) {
+        removeStmt.run(threadId, row.item_id);
+      }
+    }
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]!;
+      replace.run(
+        threadId,
+        it.id,
+        i,
+        it.type,
+        it.state,
+        it.payload === undefined ? null : JSON.stringify(it.payload),
+        JSON.stringify(it.streams ?? {}),
+      );
+    }
+  })();
+}
+
+export function dbClearThreadRuntimeItems(threadId: string): void {
+  if (!_sqlite) throw new Error("Database not initialized");
+  _sqlite.prepare("DELETE FROM thread_runtime_items WHERE thread_id = ?").run(threadId);
+}
+
+function safeParse(json: string): unknown {
+  try {
+    return JSON.parse(json);
+  } catch {
+    return undefined;
+  }
 }
 
 export function dbDeleteProject(projectId: string): void {
