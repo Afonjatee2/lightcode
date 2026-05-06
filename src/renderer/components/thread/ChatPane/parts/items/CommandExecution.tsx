@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useMemo, useState } from "react";
 import { Terminal } from "lucide-react";
 import type { CommandExecutionPayload } from "@/shared/contracts";
 import { stripAnsiPreservingLayout } from "@/shared/ansi";
@@ -26,42 +26,17 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
       : (readAcpStringField(payload, "command") ?? "");
   const cwd = payload?.cwd?.trim() ?? readAcpStringField(payload, "cwd")?.trim() ?? undefined;
   const isRunning = item.state !== "completed";
-  /**
-   * `null` = follow default (open while running so output is visible; closed when done).
-   * Once the user toggles, that choice wins until the row unmounts.
-   */
-  const [userOpen, setUserOpen] = useState<boolean | null>(null);
-  const isExpanded = userOpen === null ? isRunning : userOpen;
+  const [isExpanded, setIsExpanded] = useState(false);
   const status = resolveCommandStatus(isRunning, payload?.exitCode, payload?.durationMs);
   const fullCommandLine = formatShellInvocation(cwd, command);
   const title = humanIntentTitle(fullCommandLine);
 
   const rawOutput = item.streams.command_output ?? "";
-  /**
-   * Strip only while the panel is open so we don't pay for large completed logs when
-   * collapsed. When open, stream coalesces to one strip per frame; when completed,
-   * strip once per `rawOutput` change while expanded.
-   */
-  const completedPlain = useMemo(() => {
-    if (isRunning || !isExpanded) return "";
+  const plainOutput = useMemo(() => {
+    if (!isExpanded) return "";
     return stripAnsiPreservingLayout(rawOutput);
-  }, [isRunning, isExpanded, rawOutput]);
+  }, [rawOutput, isExpanded]);
 
-  const rawRef = useRef(rawOutput);
-  rawRef.current = rawOutput;
-  const [streamPlain, setStreamPlain] = useState("");
-  useEffect(() => {
-    if (!isRunning || !isExpanded) {
-      setStreamPlain("");
-      return;
-    }
-    const id = requestAnimationFrame(() => {
-      setStreamPlain(stripAnsiPreservingLayout(rawRef.current));
-    });
-    return () => cancelAnimationFrame(id);
-  }, [rawOutput, isRunning, isExpanded]);
-
-  const plainOutput = isRunning ? streamPlain : completedPlain;
   // ACP rows ship the full command output as a single result blob — surface it
   // as the body when no streamed output exists.
   const acpResultText = isExpanded && plainOutput.length === 0 ? extractAcpResultText(payload) : "";
@@ -84,7 +59,7 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
       rightLabel={status.rightLabel}
       rightLabelClassName={status.textClass}
       isExpanded={isExpanded}
-      onExpandedChange={(next) => setUserOpen(next)}
+      onExpandedChange={setIsExpanded}
     >
       {terminalBody.length > 0 ? <CommandOutputViewport text={terminalBody} /> : null}
     </ChatItemAccordion>

@@ -14,6 +14,11 @@ type MockVirtualizer = {
   getTotalSize: () => number;
   measure: () => void;
   measureElement: (element: HTMLDivElement | null) => void;
+  shouldAdjustScrollPositionOnItemSizeChange?: (
+    item: { start: number; size: number },
+    delta: number,
+    instance: unknown,
+  ) => boolean;
 };
 
 type MockVirtualizerOptions = {
@@ -98,6 +103,25 @@ describe("MessageList", () => {
       transform: "translateY(96px)",
     });
     expect(document.querySelector("[data-item-id='item-2']")).not.toHaveAttribute("style");
+  });
+
+  it("only adjusts scroll for measured rows fully above the viewport", () => {
+    const scrollRef = { current: document.createElement("div") };
+    scrollRef.current.scrollTop = 160;
+
+    render(
+      <MessageList
+        threadId="thread-1"
+        entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
+        scrollRef={scrollRef}
+      />,
+    );
+
+    const virtualizer = useVirtualizerMock.mock.results[0]!.value;
+    const shouldAdjust = virtualizer.shouldAdjustScrollPositionOnItemSizeChange!;
+
+    expect(shouldAdjust({ start: 0, size: 80 }, 40, {})).toBe(true);
+    expect(shouldAdjust({ start: 96, size: 100 }, 40, {})).toBe(false);
   });
 
   it("reports virtual total size changes to parent actions", () => {

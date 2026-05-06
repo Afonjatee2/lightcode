@@ -25,9 +25,11 @@ export function selectVisibleThreadRuntimeItemIds(
   const itemIds = state.runtimeItemIdsByThread[threadId];
   if (!itemIds?.length) return EMPTY_THREAD_ITEM_IDS;
   const items = state.runtimeItemsByIdByThread[threadId];
+  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
   const visible = itemIds.filter((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
+    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
     return item ? isVisibleRuntimeItem(item) : true;
   });
   if (visible.length === 0) return EMPTY_THREAD_ITEM_IDS;
@@ -54,7 +56,7 @@ export function selectVisibleThreadTimelineEntries(
   while (idx < itemIds.length) {
     const itemId = itemIds[idx]!;
     const item = items?.[itemId];
-    if (item?.type !== "tool_call") {
+    if (!item || !isToolGroupItem(item)) {
       entries.push({ kind: "item", id: itemId });
       idx += 1;
       continue;
@@ -63,7 +65,8 @@ export function selectVisibleThreadTimelineEntries(
     idx += 1;
     while (idx < itemIds.length) {
       const nextId = itemIds[idx]!;
-      if (items?.[nextId]?.type !== "tool_call") break;
+      const next = items?.[nextId];
+      if (!next || !isToolGroupItem(next)) break;
       groupIds.push(nextId);
       idx += 1;
     }
@@ -82,6 +85,15 @@ export function selectVisibleThreadTimelineEntries(
   return entries;
 }
 
+function isToolGroupItem(item: RuntimeChatItem): boolean {
+  return (
+    item.type === "tool_call" ||
+    item.type === "command_execution" ||
+    item.type === "file_change" ||
+    item.type === "web_search"
+  );
+}
+
 export function selectThreadHasLiveVisibleRuntimeItem(
   state: AppStoreState,
   threadId: string,
@@ -90,9 +102,11 @@ export function selectThreadHasLiveVisibleRuntimeItem(
   const itemIds = state.runtimeItemIdsByThread[threadId];
   if (!itemIds?.length) return false;
   const items = state.runtimeItemsByIdByThread[threadId];
+  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
   return itemIds.some((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
+    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
     return item ? isVisibleRuntimeItem(item) && item.state !== "completed" : false;
   });
 }
@@ -113,9 +127,11 @@ export function selectChatScrollAnchorForTimeline(
   const itemIds = state.runtimeItemIdsByThread[threadId];
   if (!itemIds?.length) return "";
   const items = state.runtimeItemsByIdByThread[threadId];
+  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
   const lastId = [...itemIds].reverse().find((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
+    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
     return item ? isVisibleRuntimeItem(item) : true;
   });
   if (!lastId) return "";

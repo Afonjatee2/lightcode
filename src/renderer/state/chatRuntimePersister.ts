@@ -1,4 +1,4 @@
-import type { ToolCallPayload } from "@/shared/contracts";
+import type { FileChangePayload, ToolCallPayload } from "@/shared/contracts";
 import { readBridge } from "../bridge";
 import { useAppStore } from "./appStore";
 import type { RuntimeChatItem } from "./slices/runtimeEventSlice";
@@ -30,7 +30,7 @@ export function installRuntimeItemsPersister(): () => void {
       const snapshot = pendingItems.get(threadId);
       pendingItems.delete(threadId);
       if (!snapshot) return;
-      const persistedItems = compactCompletedToolCallRuns(snapshot);
+      const persistedItems = compactCompletedToolRuns(snapshot);
       void readBridge()
         .dbReplaceThreadRuntimeItems({
           threadId,
@@ -88,7 +88,7 @@ export async function hydrateThreadRuntimeItems(threadId: string): Promise<void>
   try {
     const persisted = await readBridge().dbGetThreadRuntimeItems(threadId);
     if (persisted.length === 0) return;
-    const items: RuntimeChatItem[] = compactCompletedToolCallRuns(
+    const items: RuntimeChatItem[] = compactCompletedToolRuns(
       persisted.map((row) => ({
         id: row.id,
         type: row.type as RuntimeChatItem["type"],
@@ -103,12 +103,12 @@ export async function hydrateThreadRuntimeItems(threadId: string): Promise<void>
   }
 }
 
-function compactCompletedToolCallRuns(items: readonly RuntimeChatItem[]): RuntimeChatItem[] {
+function compactCompletedToolRuns(items: readonly RuntimeChatItem[]): RuntimeChatItem[] {
   const compacted: RuntimeChatItem[] = [];
   let idx = 0;
   while (idx < items.length) {
     const item = items[idx]!;
-    if (item.type !== "tool_call" || item.state !== "completed") {
+    if (!isToolGroupItem(item) || item.state !== "completed") {
       compacted.push(item);
       idx += 1;
       continue;
@@ -117,29 +117,40 @@ function compactCompletedToolCallRuns(items: readonly RuntimeChatItem[]): Runtim
     idx += 1;
     while (idx < items.length) {
       const next = items[idx]!;
-      if (next.type !== "tool_call" || next.state !== "completed") break;
+      if (!isToolGroupItem(next) || next.state !== "completed") break;
       run.push(next);
       idx += 1;
     }
-    compacted.push(run.length === 1 ? run[0]! : summarizeToolCallRun(run));
+    compacted.push(
+      run.length === 1 ? normalizeToolSummaryItem(run[0]!) : summarizeToolCallRun(run),
+    );
   }
   return compacted;
+}
+
+function normalizeToolSummaryItem(item: RuntimeChatItem): RuntimeChatItem {
+  if (!item.id.startsWith("tool-call-summary:") || item.type !== "tool_call") return item;
+  const payload = item.payload as Partial<ToolCallPayload> | undefined;
+  return {
+    ...item,
+    payload: {
+      ...payload,
+      name: payload?.name ?? "Tool calls",
+      status: "success",
+    } satisfies ToolCallPayload,
+  };
 }
 
 function summarizeToolCallRun(items: readonly RuntimeChatItem[]): RuntimeChatItem {
   const first = items[0]!;
   const last = items[items.length - 1]!;
-  const hasError = items.some((item) => {
-    const payload = item.payload as Partial<ToolCallPayload> | undefined;
-    return payload?.status === "error";
-  });
   return {
     id: `tool-call-summary:${first.id}:${last.id}:${items.length}`,
     type: "tool_call",
     state: "completed",
     payload: {
       name: summarizeToolCallNames(items),
-      status: hasError ? "error" : "success",
+      status: "success",
     } satisfies ToolCallPayload,
     streams: {},
   };
@@ -148,8 +159,7 @@ function summarizeToolCallRun(items: readonly RuntimeChatItem[]): RuntimeChatIte
 function summarizeToolCallNames(items: readonly RuntimeChatItem[]): string {
   const counts = new Map<string, number>();
   for (const item of items) {
-    const payload = item.payload as Partial<ToolCallPayload> | undefined;
-    const category = categorizeToolName(payload?.name ?? "");
+    const category = categorizeItem(item);
     counts.set(category, (counts.get(category) ?? 0) + 1);
   }
   const topCounts = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
@@ -159,6 +169,28 @@ function summarizeToolCallNames(items: readonly RuntimeChatItem[]): string {
   const rest = items.length - topCounts.reduce((sum, [, count]) => sum + count, 0);
   if (rest > 0) parts.push(`${rest} other`);
   return `${items.length} tool calls${parts.length > 0 ? `: ${parts.join(", ")}` : ""}`;
+}
+
+function isToolGroupItem(item: RuntimeChatItem): boolean {
+  return (
+    item.type === "tool_call" ||
+    item.type === "command_execution" ||
+    item.type === "file_change" ||
+    item.type === "web_search"
+  );
+}
+
+function categorizeItem(item: RuntimeChatItem): string {
+  if (item.type === "command_execution") return "command";
+  if (item.type === "file_change") return categorizeFileChange(item.payload);
+  if (item.type === "web_search") return "search";
+  const payload = item.payload as Partial<ToolCallPayload> | undefined;
+  return categorizeToolName(payload?.name ?? "");
+}
+
+function categorizeFileChange(payload: unknown): string {
+  const change = payload as Partial<FileChangePayload> | undefined;
+  return change?.changeKind === "delete" ? "delete" : "edit";
 }
 
 function categorizeToolName(name: string): string {

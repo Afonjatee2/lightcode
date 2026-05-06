@@ -112,9 +112,9 @@ function MdTable({ children }: { children?: ReactNode }) {
     return null;
   }
   return (
-    <div className="not-prose my-2 w-full max-w-full">
-      <Table>
-        <Table.ScrollContainer className="max-w-full overflow-x-auto">
+    <div className="not-prose my-2 min-w-0 max-w-full overflow-hidden">
+      <Table className="min-w-0 max-w-full">
+        <Table.ScrollContainer className="min-w-0 max-w-full overflow-x-auto">
           <Table.Content
             aria-label="Table"
             className="text-[length:var(--lc-chat-font-size-command)]"

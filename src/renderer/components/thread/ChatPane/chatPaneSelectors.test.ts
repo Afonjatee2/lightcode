@@ -48,7 +48,7 @@ describe("chatPaneSelectors", () => {
   it("can hide a runtime item that is rendered in a pinned surface instead", () => {
     const state = {
       runtimeItemIdsByThread: {
-        t1: ["assistant-1", "plan-1", "assistant-2"],
+        t1: ["assistant-1", "plan-1", "plan-2", "assistant-2"],
       },
       runtimeItemsByIdByThread: {
         t1: {
@@ -63,6 +63,12 @@ describe("chatPaneSelectors", () => {
             type: "plan",
             state: "updated",
             streams: { plan_text: "- [ ] Build dock" },
+          },
+          "plan-2": {
+            id: "plan-2",
+            type: "plan",
+            state: "updated",
+            streams: { plan_text: "- [ ] Keep dock only" },
           },
           "assistant-2": {
             id: "assistant-2",
@@ -83,7 +89,7 @@ describe("chatPaneSelectors", () => {
   it("groups adjacent tool calls into one timeline entry", () => {
     const state = {
       runtimeItemIdsByThread: {
-        t1: ["assistant-1", "tool-1", "tool-2", "assistant-2", "tool-3"],
+        t1: ["assistant-1", "tool-1", "command-1", "assistant-2", "tool-3"],
       },
       runtimeItemsByIdByThread: {
         t1: {
@@ -100,11 +106,11 @@ describe("chatPaneSelectors", () => {
             payload: { name: "Viewing src/a.ts", status: "success" },
             streams: {},
           },
-          "tool-2": {
-            id: "tool-2",
-            type: "tool_call",
+          "command-1": {
+            id: "command-1",
+            type: "command_execution",
             state: "completed",
-            payload: { name: "Searching for 'foo'", status: "success" },
+            payload: { command: "pnpm run lint" },
             streams: {},
           },
           "assistant-2": {
@@ -128,8 +134,8 @@ describe("chatPaneSelectors", () => {
       { kind: "item", id: "assistant-1" },
       {
         kind: "tool_call_group",
-        id: "tool-call-group:tool-1:tool-2:2",
-        itemIds: ["tool-1", "tool-2"],
+        id: "tool-call-group:tool-1:command-1:2",
+        itemIds: ["tool-1", "command-1"],
       },
       { kind: "item", id: "assistant-2" },
       { kind: "item", id: "tool-3" },

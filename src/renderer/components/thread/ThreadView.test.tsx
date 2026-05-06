@@ -643,10 +643,19 @@ describe("ThreadView", () => {
   it("shows the pinned todo dock for GUI plan items without duplicating the latest plan row in chat", () => {
     useAppStore.setState({
       runtimeItemIdsByThread: {
-        "thread-gui-plan": ["plan-1"],
+        "thread-gui-plan": ["plan-old", "plan-1"],
       },
       runtimeItemsByIdByThread: {
         "thread-gui-plan": {
+          "plan-old": {
+            id: "plan-old",
+            type: "plan",
+            state: "completed",
+            payload: {
+              steps: [{ step: "Old inline todo", status: "completed" }],
+            },
+            streams: {},
+          },
           "plan-1": {
             id: "plan-1",
             type: "plan",
@@ -718,6 +727,7 @@ describe("ThreadView", () => {
 
     expect(screen.getByLabelText("Thread todo dock")).toHaveAttribute("data-placement", "composer");
     expect(screen.getAllByText("Build ACP todo dock")).toHaveLength(1);
+    expect(screen.queryByText("Old inline todo")).not.toBeInTheDocument();
     expect(screen.queryByText("No messages yet")).not.toBeInTheDocument();
   });
 

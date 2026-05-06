@@ -60,6 +60,18 @@ export const MessageList = memo(function MessageList({
     // a "flushSync called from inside a lifecycle" warning. Disable it.
     useFlushSync: false,
   });
+
+  useLayoutEffect(() => {
+    virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item) => {
+      const el = scrollRef.current;
+      if (!el) return false;
+      return item.start + item.size <= el.scrollTop;
+    };
+    return () => {
+      virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+    };
+  }, [scrollRef, virtualizer]);
+
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
   const firstVisibleStart = virtualItems[0]?.start ?? 0;

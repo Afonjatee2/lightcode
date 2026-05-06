@@ -214,6 +214,92 @@ describe("ChatPane", () => {
 
     await waitFor(() => expect(metrics.getScrollTop()).toBe(80));
   });
+
+  it("keeps running command accordions closed until clicked", async () => {
+    const thread = makeThread();
+    seedCommandItem(thread.id, "cmd-1", "npm run test", "command output");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const trigger = screen.getByText("Check: npm run test").closest("button");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/command output/)).not.toBeInTheDocument();
+
+    fireEvent.click(trigger!);
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    await screen.findByText(/command output/);
+  });
+
+  it("keeps ACP command accordions closed while live output streams in", async () => {
+    const thread = makeThread();
+    startCommandItem(thread.id, "cmd-1", "npm run test");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const trigger = screen.getByText("Check: npm run test").closest("button");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    act(() => {
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "content.delta",
+        threadId: thread.id,
+        itemId: "cmd-1",
+        stream: "command_output",
+        delta: "streamed output",
+      });
+    });
+
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/streamed output/)).not.toBeInTheDocument();
+  });
+
+  it("keeps running tool-call groups closed until clicked", async () => {
+    const thread = makeThread();
+    seedCommandItem(thread.id, "cmd-1", "echo one", "one");
+    seedCommandItem(thread.id, "cmd-2", "echo two", "two");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const trigger = screen.getByText(/^2 tool calls:/).closest("button");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(trigger!);
+
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("keeps ACP tool-call groups closed when a live row folds into a group", async () => {
+    const thread = makeThread();
+    seedCommandItem(thread.id, "cmd-1", "echo one", "first output");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    expect(screen.getByText("echo one").closest("button")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+
+    act(() => {
+      startCommandItem(thread.id, "cmd-2", "echo two");
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "content.delta",
+        threadId: thread.id,
+        itemId: "cmd-2",
+        stream: "command_output",
+        delta: "second output",
+      });
+    });
+
+    const trigger = await screen.findByText(/^2 tool calls:/);
+    expect(trigger.closest("button")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/first output/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/second output/)).not.toBeInTheDocument();
+  });
 });
 
 function renderChatPane(thread: Thread) {
@@ -241,6 +327,27 @@ function seedPlanItem(
     threadId,
     itemId: PLAN_ITEM_ID,
     payload: { steps },
+  });
+}
+
+function seedCommandItem(threadId: string, itemId: string, command: string, output: string) {
+  startCommandItem(threadId, itemId, command);
+  useAppStore.getState().applyRuntimeEvent(threadId, {
+    type: "content.delta",
+    threadId,
+    itemId,
+    stream: "command_output",
+    delta: output,
+  });
+}
+
+function startCommandItem(threadId: string, itemId: string, command: string) {
+  useAppStore.getState().applyRuntimeEvent(threadId, {
+    type: "item.started",
+    threadId,
+    itemId,
+    itemType: "command_execution",
+    payload: { command },
   });
 }
 
