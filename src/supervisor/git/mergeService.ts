@@ -6,7 +6,12 @@ import {
 } from "@/shared/contracts";
 import { errorDetail, msg } from "@/shared/messages";
 import { getProjectFsPath } from "@/shared/wsl";
-import { computeDefaultWorktreePath, ensureWorktreeParentExists, execGit } from "./exec";
+import {
+  computeDefaultWorktreePath,
+  ensureWorktreeParentExists,
+  execGit,
+  GIT_HOOK_TIMEOUT,
+} from "./exec";
 import { GitWorktreeService } from "./worktreeService";
 
 export class GitMergeService {
@@ -104,7 +109,9 @@ export class GitMergeService {
     }
 
     try {
-      await execGit(worktreeLocation, ["merge", sourceBranch, "--no-ff", "--no-edit"]);
+      await execGit(worktreeLocation, ["merge", sourceBranch, "--no-ff", "--no-edit"], {
+        timeout: GIT_HOOK_TIMEOUT,
+      });
     } catch (mergeError: unknown) {
       const detail = errorDetail(mergeError);
       if (detail.includes("CONFLICT") || detail.includes("Merge conflict")) {
@@ -136,7 +143,9 @@ export class GitMergeService {
 
   async finishMerge(worktreeLocation: ProjectLocation): Promise<GitFinishMergeResult> {
     try {
-      await execGit(worktreeLocation, ["commit", "--no-edit"]);
+      await execGit(worktreeLocation, ["commit", "--no-edit"], {
+        timeout: GIT_HOOK_TIMEOUT,
+      });
       return { success: true };
     } catch (error: unknown) {
       return { success: false, error: errorDetail(error) };
@@ -172,7 +181,9 @@ export class GitMergeService {
     worktreeBranch: string,
   ): Promise<GitMergeToSourceResult> {
     try {
-      await execGit(location, ["merge", worktreeBranch, "--no-edit", "--no-ff"]);
+      await execGit(location, ["merge", worktreeBranch, "--no-edit", "--no-ff"], {
+        timeout: GIT_HOOK_TIMEOUT,
+      });
     } catch (mergeError: unknown) {
       const detail = errorDetail(mergeError);
       if (detail.includes("CONFLICT") || detail.includes("Merge conflict")) {

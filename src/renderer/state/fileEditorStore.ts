@@ -30,6 +30,13 @@ export interface FileEditorBuffer {
   isLoading: boolean;
 }
 
+export interface FileEditorPendingReveal {
+  path: string;
+  lineNumber: number;
+  /** Monotonic token so re-opening the same path at the same line re-triggers the reveal. */
+  token: number;
+}
+
 interface FileEditorStoreState {
   rootContext: FileEditorRootContext | null;
   overlayMode: FileEditorOverlayMode | null;
@@ -38,13 +45,16 @@ interface FileEditorStoreState {
   previewTab: string | null;
   buffers: Record<string, FileEditorBuffer>;
   refreshToken: number;
+  pendingReveal: FileEditorPendingReveal | null;
   setRootContext: (context: FileEditorRootContext | null) => void;
   clearSession: () => void;
   openFile: (
     path: string,
     mode?: FileEditorOverlayMode | null,
     preview?: boolean,
+    options?: { lineNumber?: number },
   ) => Promise<ReadProjectFileResult>;
+  consumeReveal: (token: number) => void;
   pinTab: (path: string) => void;
   setOverlayMode: (mode: FileEditorOverlayMode | null) => void;
   setActivePath: (path: string | null) => void;
@@ -197,6 +207,8 @@ function computeTabOpen(
   };
 }
 
+let revealTokenCounter = 0;
+
 export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
   rootContext: null,
   overlayMode: null,
@@ -205,6 +217,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
   previewTab: null,
   buffers: {},
   refreshToken: 0,
+  pendingReveal: null,
   setRootContext: (rootContext) =>
     set((state) => {
       if (
@@ -221,6 +234,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         activePath: null,
         previewTab: null,
         buffers: {},
+        pendingReveal: null,
         refreshToken: state.refreshToken + 1,
       };
     }),
@@ -232,9 +246,19 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       activePath: null,
       previewTab: null,
       buffers: {},
+      pendingReveal: null,
       refreshToken: state.refreshToken + 1,
     })),
-  async openFile(path, mode = "modal", preview = false) {
+  consumeReveal: (token) =>
+    set((state) =>
+      state.pendingReveal && state.pendingReveal.token === token ? { pendingReveal: null } : {},
+    ),
+  async openFile(path, mode = "modal", preview = false, options) {
+    const lineNumber = options?.lineNumber;
+    const reveal: FileEditorPendingReveal | null =
+      lineNumber !== undefined && Number.isFinite(lineNumber) && lineNumber > 0
+        ? { path, lineNumber, token: ++revealTokenCounter }
+        : null;
     const rootContext = get().rootContext;
     if (!rootContext) {
       throw new Error("No file editor context is active.");
@@ -244,7 +268,11 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
     if (existing && !existing.isLoading) {
       set((state) => {
         const changes = computeTabOpen(state, path, mode, preview);
-        return { ...changes, activePath: path };
+        return {
+          ...changes,
+          activePath: path,
+          ...(reveal ? { pendingReveal: reveal } : {}),
+        };
       });
       return {
         path,
@@ -265,6 +293,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       return {
         ...changes,
         activePath: path,
+        ...(reveal ? { pendingReveal: reveal } : {}),
         buffers: {
           ...changes.buffers,
           [path]: {

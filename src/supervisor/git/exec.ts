@@ -17,6 +17,9 @@ export const GIT_STATUS_TIMEOUT = 10_000;
 export const GIT_DIFF_TIMEOUT = 15_000;
 export const GIT_NETWORK_TIMEOUT = 30_000;
 export const GIT_DEFAULT_TIMEOUT = 15_000;
+// Operations that invoke user-defined hooks (pre-commit lint/typecheck/test, etc.).
+// Generous bound so common hook chains complete; still finite so a hung hook can't pin the UI forever.
+export const GIT_HOOK_TIMEOUT = 300_000;
 
 export async function execGit(
   location: ProjectLocation,

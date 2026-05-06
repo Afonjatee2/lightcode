@@ -1,12 +1,11 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Paperclip, TerminalSquare, X, Zap } from "lucide-react";
-import { Button, toast } from "@heroui/react";
+import { useEffect, useRef, useState } from "react";
+import { TerminalSquare, X, Zap } from "lucide-react";
+import { toast } from "@heroui/react";
 import type {
   AgentStatus,
   Project,
   ProjectDraftConfig,
   ProviderDraftConfig,
-  PromptSegment,
   ThreadConfig,
   ThreadPresentationMode,
 } from "@/shared/contracts";
@@ -15,26 +14,14 @@ import { getComposerControls } from "@/renderer/components/providers";
 import { getConfigNormalizer } from "@/renderer/components/providers/ProviderIcon";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { useGitStore } from "@/renderer/state/gitStore";
-import {
-  BranchSelector,
-  generateWorktreeBranch,
-  type BranchSelection,
-  PixelLoader,
-} from "@/renderer/components/common";
-import {
-  MentionInput,
-  type MentionInputHandle,
-  AttachmentBar,
-  ImageLightbox,
-  useAttachments,
-} from "@/renderer/components/composer";
-import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
+import { PixelLoader } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { filterHiddenModels } from "./threadComposerOptions";
 import { friendlyError } from "@/shared/messages";
-import { ThreadComposer } from "./ThreadComposer";
 import { PresentationModeTabs } from "./PresentationModeTabs";
+import { ThreadDraftComposerArea, type DraftStartInput } from "./ThreadDraftComposerArea";
+import type { ComposerControl } from "./ThreadComposer";
 
 function resolvePreferredAgentKind(
   installedAgents: AgentStatus[],
@@ -216,17 +203,7 @@ export function ThreadDraftView(props: {
   droppableRef?: React.RefObject<HTMLDivElement | null>;
   onClose?: () => void;
   dragHandleRef?: React.RefCallback<Element>;
-  onStart: (input: {
-    agentKind: AgentStatus["kind"];
-    config: ThreadConfig;
-    prompt: string;
-    segments?: PromptSegment[];
-    existingWorktreePath?: string;
-    worktreeBranch?: string;
-    worktreeBaseBranch?: string;
-    worktreeIsNewBranch?: boolean;
-    presentationMode?: ThreadPresentationMode;
-  }) => void;
+  onStart: (input: DraftStartInput) => void;
 }) {
   const { project, agentStatuses, lastDraftConfig, onStart } = props;
   const gitBranch = useGitStore((s) => s.statuses[project.id]?.branch);
@@ -248,14 +225,7 @@ export function ThreadDraftView(props: {
   const [mode, setMode] = useState<"agent" | "plan" | "autopilot">("agent");
   const [approvalPolicy, setApprovalPolicy] = useState("");
   const [sandboxMode, setSandboxMode] = useState("");
-  const [prompt, setPrompt] = useState("");
-  const [hasContent, setHasContent] = useState(false);
-  const mentionRef = useRef<MentionInputHandle>(null);
-  const attachments = useAttachments();
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const imageAttachments = attachments.attachments.filter((a) => a.isImage);
   const [worktreeMode, setWorktreeMode] = useState(lastDraftConfig?.worktreeMode ?? false);
-  const [branchSelection, setBranchSelection] = useState<BranchSelection | null>(null);
   const lastAppliedAgentKindRef = useRef<AgentStatus["kind"] | undefined>(undefined);
 
   // Presentation-mode picker — only meaningful for adapters that advertise
@@ -294,21 +264,6 @@ export function ThreadDraftView(props: {
   // store reference directly would mutate Zustand state and skip subscribers.
   providerConfigsRef.current = { ...providerConfigs };
 
-  // --- Draft preservation: save on unmount, restore on mount ---
-  const saveDraftContent = useAppStore((s) => s.saveDraftContent);
-  const clearDraftContent = useAppStore((s) => s.clearDraftContent);
-
-  // Refs capture the latest values so the unmount cleanup can read
-  // them after the contentEditable DOM has been torn down.
-  const latestSegmentsRef = useRef<PromptSegment[]>([]);
-  const attachmentsRef = useRef(attachments.attachments);
-  attachmentsRef.current = attachments.attachments;
-
-  function resetDraftRefs() {
-    latestSegmentsRef.current = [];
-    attachmentsRef.current = [];
-  }
-
   function handleSwitchBranch(branch: string, createNew: boolean) {
     readBridge()
       .gitSwitchBranch({
@@ -336,35 +291,6 @@ export function ThreadDraftView(props: {
         toast.danger(friendlyError(err));
       });
   }
-
-  const initialDraftRef = useRef(useAppStore.getState().draftContents[project.id]);
-
-  useLayoutEffect(() => {
-    const saved = initialDraftRef.current;
-    if (!saved) return;
-    if (saved.segments.length > 0) {
-      mentionRef.current?.restoreFromSegments(saved.segments);
-      latestSegmentsRef.current = saved.segments;
-    }
-    if (saved.attachments.length > 0) {
-      attachments.restore(saved.attachments);
-    }
-    clearDraftContent(project.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time mount restore
-  }, []);
-
-  // Save draft content + config when the component unmounts.
-  useEffect(() => {
-    const pid = project.id;
-    return () => {
-      const segments = latestSegmentsRef.current;
-      const atts = attachmentsRef.current;
-      if (segments.length > 0 || atts.length > 0) {
-        saveDraftContent(pid, { segments, attachments: atts });
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- cleanup-only effect keyed on project
-  }, [project.id, saveDraftContent]);
 
   useEffect(() => {
     if (effectiveAgentKind && agentKind !== effectiveAgentKind) {
@@ -769,9 +695,9 @@ export function ThreadDraftView(props: {
 
         {/* Composer at bottom */}
         <div className={`${props.compact ? alignClass : "mx-auto"} w-full max-w-[920px]`}>
-          <ThreadComposer
-            autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
-            compact={props.compact ?? false}
+          <ThreadDraftComposerArea
+            project={project}
+            selectedAgent={selectedAgent}
             controls={(() => {
               const filteredCaps = filterHiddenModels(selectedAgent.capabilities, hiddenModelIds);
               // Only surface providers that support the active CLI/chat
@@ -802,7 +728,7 @@ export function ThreadDraftView(props: {
                 ? (filteredCaps.contextSizes?.filter((c) => currentContextIds.includes(c.id)) ?? [])
                 : [];
               const supportsFast = filteredCaps.fastModels?.includes(model) ?? false;
-              const ctrls: import("./ThreadComposer").ComposerControl[] = [
+              const ctrls: ComposerControl[] = [
                 {
                   kind: "provider-model",
                   providers,
@@ -927,163 +853,30 @@ export function ThreadDraftView(props: {
               }
               return ctrls;
             })()}
-            attachmentBar={
-              <AttachmentBar
-                attachments={attachments.attachments}
-                onRemove={attachments.removeAttachment}
-                onPreviewImage={(att) => {
-                  const idx = imageAttachments.findIndex((a) => a.id === att.id);
-                  if (idx >= 0) setLightboxIndex(idx);
-                }}
-              />
-            }
-            inputContent={
-              <MentionInput
-                ref={mentionRef}
-                autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
-                compact={props.compact ?? false}
-                placeholder="Send a message..."
-                projectLocation={project.location}
-                projectId={project.id}
-                onTextChange={(hasText) => {
-                  setHasContent(hasText);
-                  latestSegmentsRef.current = mentionRef.current?.serializeSegments() ?? [];
-                }}
-                onPasteImage={(file) => {
-                  // Draft view uses project.id as threadId for temp storage
-                  void attachments.addClipboardImage(file, `draft:${project.id}`);
-                }}
-                onSubmit={(segments) => {
-                  const allSegments = [...attachments.toSegments(), ...segments];
-                  const useWorktree = branchSelection?.isWorktree ?? worktreeMode;
-                  resetDraftRefs();
-                  if (supportsModePicker) {
-                    setLastPresentationMode(selectedAgent.kind, presentationMode);
-                  }
-                  onStart({
-                    agentKind: selectedAgent.kind,
-                    config: {
-                      model,
-                      ...(effort ? { effort } : {}),
-                      ...(contextSize ? { contextSize } : {}),
-                      ...(fast ? { fast } : {}),
-                      ...(mode ? { mode } : {}),
-                      ...(approvalPolicy ? { approvalPolicy } : {}),
-                      ...(sandboxMode ? { sandboxMode } : {}),
-                    },
-                    prompt: flattenSegments(allSegments),
-                    segments: allSegments,
-                    ...(supportsModePicker ? { presentationMode } : {}),
-                    ...(useWorktree
-                      ? branchSelection?.worktreePath
-                        ? {
-                            existingWorktreePath: branchSelection.worktreePath,
-                            worktreeBranch: branchSelection.branch,
-                          }
-                        : {
-                            worktreeBranch: generateWorktreeBranch(),
-                            ...(branchSelection?.baseBranch
-                              ? { worktreeBaseBranch: branchSelection.baseBranch }
-                              : {}),
-                            worktreeIsNewBranch: true,
-                          }
-                      : {}),
-                  });
-                  attachments.clearAll();
-                }}
-              />
-            }
-            placeholder="Send a message..."
-            prompt={prompt}
-            submitDisabled={!(hasContent || attachments.attachments.length > 0)}
-            submitLabel="Launch thread"
-            onPromptChange={setPrompt}
-            onSubmit={() => {
-              const segments = mentionRef.current?.serializeSegments() ?? [];
-              const allSegments = [...attachments.toSegments(), ...segments];
-              const flatPrompt = flattenSegments(allSegments) || prompt.trim();
-              if (flatPrompt.length === 0) return;
-              // Clear refs so unmount effect won't re-save a stale draft.
-              latestSegmentsRef.current = [];
-              attachmentsRef.current = [];
-              const useWorktree = branchSelection?.isWorktree ?? worktreeMode;
-              if (supportsModePicker) {
-                setLastPresentationMode(selectedAgent.kind, presentationMode);
-              }
-              onStart({
-                agentKind: selectedAgent.kind,
-                config: {
-                  model,
-                  ...(effort ? { effort } : {}),
-                  ...(contextSize ? { contextSize } : {}),
-                  ...(fast ? { fast } : {}),
-                  ...(mode ? { mode } : {}),
-                  ...(approvalPolicy ? { approvalPolicy } : {}),
-                  ...(sandboxMode ? { sandboxMode } : {}),
-                },
-                prompt: flatPrompt,
-                ...(allSegments.length > 0 ? { segments: allSegments } : {}),
-                ...(supportsModePicker ? { presentationMode } : {}),
-                ...(useWorktree
-                  ? branchSelection?.worktreePath
-                    ? {
-                        existingWorktreePath: branchSelection.worktreePath,
-                        worktreeBranch: branchSelection.branch,
-                      }
-                    : {
-                        worktreeBranch: generateWorktreeBranch(),
-                        ...(branchSelection?.baseBranch
-                          ? { worktreeBaseBranch: branchSelection.baseBranch }
-                          : {}),
-                        worktreeIsNewBranch: true,
-                      }
-                  : {}),
-              });
-              attachments.clearAll();
+            config={{
+              model,
+              ...(effort ? { effort } : {}),
+              ...(contextSize ? { contextSize } : {}),
+              ...(fast ? { fast } : {}),
+              ...(mode ? { mode } : {}),
+              ...(approvalPolicy ? { approvalPolicy } : {}),
+              ...(sandboxMode ? { sandboxMode } : {}),
             }}
-            afterControls={
-              <>
-                <Button
-                  isIconOnly
-                  aria-label="Attach files"
-                  className="lightcode-composer-menu min-w-9 px-2"
-                  size="sm"
-                  variant="ghost"
-                  onPress={() => {
-                    void readBridge()
-                      .pickFiles()
-                      .then((paths) => {
-                        if (paths) attachments.addFiles(paths);
-                      });
-                  }}
-                >
-                  <Paperclip className="size-4" />
-                </Button>
-                {gitBranch ? (
-                  <BranchSelector
-                    projectId={project.id}
-                    currentBranch={gitBranch}
-                    value={branchSelection?.branch ?? gitBranch}
-                    isWorktree={branchSelection?.isWorktree}
-                    baseBranch={branchSelection?.baseBranch}
-                    worktreeMode={worktreeMode}
-                    onWorktreeModeChange={setWorktreeMode}
-                    onSelect={setBranchSelection}
-                    onSwitchBranch={handleSwitchBranch}
-                  />
-                ) : null}
-              </>
-            }
+            compact={props.compact}
+            paneCount={props.paneCount}
+            gitBranch={gitBranch}
+            worktreeMode={worktreeMode}
+            supportsModePicker={supportsModePicker}
+            presentationMode={presentationMode}
+            onWorktreeModeChange={setWorktreeMode}
+            onSwitchBranch={handleSwitchBranch}
+            onRememberPresentationMode={() => {
+              setLastPresentationMode(selectedAgent.kind, presentationMode);
+            }}
+            onStart={onStart}
           />
         </div>
       </div>
-      {lightboxIndex !== null && imageAttachments.length > 0 ? (
-        <ImageLightbox
-          images={imageAttachments}
-          initialIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-        />
-      ) : null}
     </div>
   );
 }

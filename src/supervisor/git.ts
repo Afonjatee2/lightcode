@@ -18,6 +18,7 @@ import { parallelWslCommandsAsync, quotePosixShellArg as quote } from "./agents/
 import {
   computeDefaultWorktreePath,
   execGit,
+  GIT_HOOK_TIMEOUT,
   getLocationIdentity,
   parseRemoteUrl,
 } from "./git/exec";
@@ -209,7 +210,9 @@ export class GitService {
     if (addAll) {
       await execGit(location, ["add", "."]);
     }
-    const output = await execGit(location, ["commit", "-m", message]);
+    const output = await execGit(location, ["commit", "-m", message], {
+      timeout: GIT_HOOK_TIMEOUT,
+    });
     const hashMatch = output.match(/\[.+?\s+([a-f0-9]+)\]/);
     return { hash: hashMatch?.[1] ?? "" };
   }

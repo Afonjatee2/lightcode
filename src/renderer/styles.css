@@ -865,6 +865,47 @@ body {
   display: inline-flex;
 }
 
+/* ── Inline File Path Chip (clickable, in chat markdown) ────── */
+
+.lightcode-inline-path-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.1em 0.35em;
+  margin: 0 1px;
+  border: 0;
+  border-radius: 0.3rem;
+  background: color-mix(in oklab, var(--accent) 12%, var(--surface));
+  color: var(--foreground);
+  font-family: inherit;
+  font-size: 0.875em;
+  line-height: 1;
+  vertical-align: text-bottom;
+  cursor: var(--interactive-cursor, pointer);
+  transition: background 120ms ease;
+}
+
+.lightcode-inline-path-chip:hover {
+  background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+}
+
+.lightcode-inline-path-chip__icon {
+  width: 1.1em;
+  height: 1.1em;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.lightcode-inline-path-chip__name {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.lightcode-inline-path-chip__line {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 /* ── Attachment Bar (file/image chips above editor) ────────── */
 
 .lightcode-attachment-bar {

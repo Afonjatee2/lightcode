@@ -1,5 +1,6 @@
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import type { AppStoreState } from "@/renderer/state/slices/shared";
+import { isContextCompactionToolCall } from "./parts/items/ContextCompaction";
 
 export const EMPTY_THREAD_ITEM_IDS = Object.freeze([]) as readonly string[];
 export const EMPTY_THREAD_TIMELINE_ENTRIES = Object.freeze([]) as readonly ChatTimelineEntry[];
@@ -86,6 +87,7 @@ export function selectVisibleThreadTimelineEntries(
 }
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {
+  if (isContextCompactionToolCall(item)) return false;
   return (
     item.type === "tool_call" ||
     item.type === "command_execution" ||
@@ -147,11 +149,10 @@ export function selectChatScrollAnchorForTimeline(
 }
 
 function isVisibleRuntimeItem(_item: RuntimeChatItem): boolean {
-  // Reasoning items stay in the timeline after completion so the user can
-  // expand them later — the `Reasoning` component renders a collapsed
-  // "Thought" disclosure for completed items with text. Empty completed
-  // reasoning is hidden by `Reasoning` itself, not filtered here, since
-  // emptiness is recomputed on every chunk and would churn this selector.
+  // Empty completed reasoning items are dropped at the data layer
+  // (`runtimeEventSlice` on `item.completed`), so this selector treats every
+  // remaining item as visible. Reasoning items with text stay so the user
+  // can expand the "Thought" disclosure later.
   return true;
 }
 

@@ -120,6 +120,25 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
                 ? mergePayload(prev.payload, event.payload)
                 : prev.payload,
           };
+          // A reasoning item that completes with no streamed text is a bracket
+          // some agents emit before producing nothing — keeping it in the
+          // timeline would split otherwise-adjacent tool calls into separate
+          // groups. Drop it from the data so grouping naturally fuses them.
+          if (next.type === "reasoning" && !(next.streams.reasoning_text ?? "").trim()) {
+            const ids = state.runtimeItemIdsByThread[threadId];
+            if (!ids) return {};
+            const { [event.itemId]: _dropped, ...remaining } = items;
+            return {
+              runtimeItemIdsByThread: {
+                ...state.runtimeItemIdsByThread,
+                [threadId]: ids.filter((id) => id !== event.itemId),
+              },
+              runtimeItemsByIdByThread: {
+                ...state.runtimeItemsByIdByThread,
+                [threadId]: remaining,
+              },
+            };
+          }
           return {
             runtimeItemsByIdByThread: {
               ...state.runtimeItemsByIdByThread,

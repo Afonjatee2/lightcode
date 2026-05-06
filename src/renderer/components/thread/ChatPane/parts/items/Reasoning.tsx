@@ -20,11 +20,6 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
   const [isOpen, setIsOpen] = useState(false);
   const actions = useChatPaneActions();
 
-  // Once the turn moves past reasoning, keep the item collapsed-but-available
-  // so the user can re-open it later. Drop only the empty case (some agents
-  // emit a reasoning bracket without any text — nothing to expand).
-  if (!isStreaming && !hasText) return null;
-
   if (!isStreaming) {
     // Compact toggle — visually distinct from tool-call accordions: no border
     // tile, dotted left rule when expanded, italic body. Equal vertical

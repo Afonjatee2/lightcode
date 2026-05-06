@@ -1,5 +1,5 @@
 import { Button, Disclosure } from "@heroui/react";
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { FileEdit, ListChecks, Search, Terminal, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type {
@@ -15,6 +15,7 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { CommandOutputViewport } from "./CommandOutputViewport";
+import { isContextCompactionToolCall } from "./ContextCompaction";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import {
   extractAcpArgsPart,
@@ -28,6 +29,8 @@ import { pickToolIcon } from "./ToolCall";
 interface ToolCallGroupProps {
   threadId: string;
   itemIds: readonly string[];
+  /** True while this group is the tail of the timeline. Drives default expand state. */
+  isLive?: boolean;
 }
 
 const VISIBLE_TOOL_CALLS = 5;
@@ -35,6 +38,7 @@ const VISIBLE_TOOL_CALLS = 5;
 export const ToolCallGroup = memo(function ToolCallGroup({
   threadId,
   itemIds,
+  isLive = false,
 }: ToolCallGroupProps) {
   const items = useAppStore(
     useShallow((state) =>
@@ -44,8 +48,14 @@ export const ToolCallGroup = memo(function ToolCallGroup({
     ),
   );
   const actions = useChatPaneActions();
-  const [isExpanded, setIsExpanded] = useState(false);
+  // Live tail expands by default so the user sees in-flight calls; collapse
+  // automatically once another item arrives after the group (isLive flips
+  // false). Manual toggles still apply afterwards.
+  const [isExpanded, setIsExpanded] = useState(isLive);
   const [showAll, setShowAll] = useState(false);
+  useEffect(() => {
+    if (!isLive) setIsExpanded(false);
+  }, [isLive]);
   if (items.length === 0) return null;
   const isRunning = items.some((item) => item.state !== "completed");
   const summary = summarizeToolCalls(items);
@@ -285,6 +295,7 @@ function summarizeToolCalls(items: readonly RuntimeChatItem[]): { title: string 
 }
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {
+  if (isContextCompactionToolCall(item)) return false;
   return (
     item.type === "tool_call" ||
     item.type === "command_execution" ||

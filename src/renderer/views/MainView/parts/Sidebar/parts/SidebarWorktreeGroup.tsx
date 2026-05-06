@@ -1,0 +1,135 @@
+import { GitFork, Play, Trash2 } from "lucide-react";
+import { useSortable } from "@dnd-kit/react/sortable";
+import type { Project } from "@/shared/contracts";
+import { ContextMenu } from "@/renderer/components/common";
+import { useDragSource, useIsDraggingWorktreeGroup, type DragSourceData } from "@/renderer/dnd";
+import {
+  useIsWorktreeFilesPanelActive,
+  useIsWorktreeTerminalActive,
+  useIsWorktreeTerminalOpen,
+} from "@/renderer/hooks/uiSelectors";
+import {
+  gitMergeAndRemove,
+  gitMergeToSource,
+  gitPull,
+  gitPullFromSource,
+  gitPush,
+  gitSync,
+} from "@/renderer/actions/gitActions";
+import { openFilesPanel, openGitReview } from "@/renderer/actions/panelActions";
+import { openWorktreeTerminal, runProjectAction } from "@/renderer/actions/terminalActions";
+import { deleteWorktreeGroup } from "@/renderer/actions/worktreeActions";
+import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
+import { useIsWorktreeCollapsed, useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
+import { resolveActionIcon } from "@/renderer/utils/actionIcons";
+import { gitMenuIcons } from "./gitMenuIcons";
+import type { WorktreeThreadGroup } from "./groupThreads";
+import { useWorktreeGitItems } from "./useWorktreeActions";
+import { WorktreeGroupHeader } from "./WorktreeGroupHeader";
+
+export function SidebarWorktreeGroup(props: {
+  group: WorktreeThreadGroup;
+  entryIndex: number;
+  project: Project;
+  sortableGroup: string;
+  sortDisabled?: boolean;
+}) {
+  const { group, project, sortDisabled = false } = props;
+  const isGroupCollapsed = useIsWorktreeCollapsed(group.worktreePath);
+  const toggleWorktreeCollapsed = useSidebarUiStore((s) => s.toggleWorktreeCollapsed);
+  const worktreeGitItems = useWorktreeGitItems(project.id, group.worktreePath, gitMenuIcons);
+  const hasTerminal = useIsWorktreeTerminalOpen(group.worktreePath);
+  const isActiveTerminal = useIsWorktreeTerminalActive(group.worktreePath);
+  const isActiveFiles = useIsWorktreeFilesPanelActive(group.worktreePath);
+  const groupThreadIds = group.threads.map((t) => t.id);
+
+  const { ref } = useSortable({
+    id: `wt:${group.worktreePath}`,
+    index: props.entryIndex,
+    type: "worktree-group",
+    accept: sortDisabled ? [] : "worktree-group",
+    group: props.sortableGroup,
+    data: {
+      type: "worktree-group",
+      worktreePath: group.worktreePath,
+      projectId: project.id,
+      threadIds: group.threads.map((t) => t.id),
+    } satisfies DragSourceData,
+  });
+
+  const source = useDragSource();
+  const isDragging = useIsDraggingWorktreeGroup(group.worktreePath);
+
+  return (
+    <div ref={ref} className={`relative space-y-0.5 ${isDragging ? "opacity-60" : ""}`}>
+      <ContextMenu
+        items={[
+          {
+            type: "submenu" as const,
+            id: "git",
+            label: "Git",
+            icon: <GitFork className="size-3.5" />,
+            items: worktreeGitItems,
+          },
+          ...(project.scripts?.actions?.length
+            ? [
+                {
+                  type: "submenu" as const,
+                  id: "run-action",
+                  label: "Run",
+                  icon: <Play className="size-3.5" />,
+                  items: project.scripts.actions.map((action) => ({
+                    id: `action:${action.id}`,
+                    label: action.name,
+                    icon: resolveActionIcon(action.icon),
+                  })),
+                },
+              ]
+            : []),
+          {
+            id: "delete-worktree",
+            label: "Delete Worktree",
+            icon: <Trash2 className="size-3.5" />,
+            variant: "danger" as const,
+          },
+        ]}
+        onAction={(key) => {
+          if (key === "git-review") openGitReview(project.id, group.worktreePath);
+          if (key === "delete-worktree")
+            deleteWorktreeGroup(project.id, group.worktreePath, groupThreadIds);
+          if (key === "git-sync") gitSync(project.id, group.worktreePath);
+          if (key === "git-push") gitPush(project.id, group.worktreePath);
+          if (key === "git-pull") gitPull(project.id, group.worktreePath);
+          if (key === "git-pull-from-source") gitPullFromSource(project.id, group.worktreePath);
+          if (key === "git-merge-to-source") gitMergeToSource(project.id, group.worktreePath);
+          if (key === "git-merge-and-remove") gitMergeAndRemove(project.id, group.worktreePath);
+          if (key === "open-pr") {
+            const pr = useGitStore.getState().prData[group.worktreePath];
+            if (pr?.url) void readBridge().openExternal(pr.url);
+          }
+          if (key === "create-pr") openGitReview(project.id, group.worktreePath);
+          if (key.startsWith("action:")) {
+            runProjectAction(project.id, key.slice("action:".length), group.worktreePath);
+          }
+        }}
+      >
+        <WorktreeGroupHeader
+          worktreePath={group.worktreePath}
+          worktreeBranch={group.worktreeBranch}
+          projectId={project.id}
+          isCollapsed={isGroupCollapsed}
+          hasTerminal={hasTerminal}
+          isActiveTerminal={isActiveTerminal}
+          isActiveFiles={isActiveFiles}
+          onToggleCollapse={() => toggleWorktreeCollapsed(group.worktreePath)}
+          onOpenFiles={() => openFilesPanel(project.id, group.worktreePath)}
+          onOpenGitReview={() => openGitReview(project.id, group.worktreePath)}
+          onOpenTerminal={() => openWorktreeTerminal(project.id, group.worktreePath)}
+          isDragging={isDragging}
+          isDraggingAnything={!!source}
+        />
+      </ContextMenu>
+    </div>
+  );
+}

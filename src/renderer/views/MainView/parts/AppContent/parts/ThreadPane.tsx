@@ -83,15 +83,17 @@ export function ThreadPane(props: {
       droppableRef={paneElementRef}
       onClose={props.onClose}
       onMarkDone={() => {
-        if (thread.done) {
-          unmarkThreadDone(thread.id);
+        const latestThread = useAppStore.getState().threads.find((t) => t.id === props.threadId);
+        if (!latestThread) return;
+        if (latestThread.done) {
+          unmarkThreadDone(latestThread.id);
         } else {
-          if (thread.status !== "inactive" && thread.sessionRef) {
-            void readBridge().closeThread({ threadId: thread.id });
-            useAppStore.getState().markThreadExited(thread.id);
-            closePanelsForUnloadedThread(thread);
+          if (latestThread.status !== "inactive" && latestThread.sessionRef) {
+            void readBridge().closeThread({ threadId: latestThread.id });
+            useAppStore.getState().markThreadExited(latestThread.id);
+            closePanelsForUnloadedThread(latestThread);
           }
-          markThreadDone(thread.id);
+          markThreadDone(latestThread.id);
         }
       }}
       onConfigChange={(config) => updateThreadConfig(thread.id, config)}

@@ -19,6 +19,7 @@ import {
   type RuntimeChatItem,
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { ChatItemAccordion } from "./ChatItemAccordion";
+import { ContextCompaction, isContextCompactionToolCall } from "./ContextCompaction";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import { extractAcpArgsPart, extractAcpResultPart } from "./acpToolPayload";
 
@@ -37,6 +38,7 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
     ];
   }, [isExpanded, payload]);
   if (!payload?.name) return null;
+  if (isContextCompactionToolCall(item)) return <ContextCompaction item={item} />;
   const hasDetails = payload.args !== undefined || payload.result !== undefined;
   const Icon = pickToolIcon(payload);
   const errorLabel = payload.status === "error" ? "error" : undefined;

@@ -137,6 +137,7 @@ export const MessageList = memo(function MessageList({
                   threadId={threadId}
                   entry={entry}
                   index={virtualRow.index}
+                  isLastEntry={virtualRow.index === entries.length - 1}
                   measureElement={measureRowElement}
                 />
               );
@@ -152,6 +153,7 @@ type VirtualChatListRowProps = {
   threadId: string;
   entry: ChatTimelineEntry;
   index: number;
+  isLastEntry: boolean;
   measureElement: (index: number, element: HTMLDivElement | null) => void;
 };
 
@@ -159,6 +161,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   threadId,
   entry,
   index,
+  isLastEntry,
   measureElement,
 }: VirtualChatListRowProps) {
   const ref = useCallback(
@@ -177,7 +180,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
       className="w-full"
     >
       <div className="w-full pb-1">
-        <ChatItemRow threadId={threadId} entry={entry} />
+        <ChatItemRow threadId={threadId} entry={entry} isLastEntry={isLastEntry} />
       </div>
     </div>
   );

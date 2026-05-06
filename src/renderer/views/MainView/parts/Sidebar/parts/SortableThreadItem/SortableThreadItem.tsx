@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import {
   Archive,
   ArrowDownToLine,
@@ -19,10 +20,8 @@ import { ContextMenu, SidebarButton } from "@/renderer/components/common";
 import { ProviderIcon, getStatusTone } from "@/renderer/components/providers";
 import { readBridge } from "@/renderer/bridge";
 import { resolveActionIcon } from "@/renderer/utils/actionIcons";
-import {
-  type GitMenuIcons,
-  useWorktreeGitItems,
-} from "@/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions";
+import { useWorktreeGitItems } from "@/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions";
+import { gitMenuIcons } from "@/renderer/views/MainView/parts/Sidebar/parts/gitMenuIcons";
 import { InlineRenameInput } from "../InlineRenameInput";
 import { ThreadItemSuffix } from "./parts/ThreadItemSuffix";
 import {
@@ -59,9 +58,10 @@ export function SortableThreadItem(props: {
   showWorktreeFilesButton?: boolean;
   editingThreadId: string | null;
   setEditingThreadId: (id: string | null) => void;
-  gitMenuIcons: GitMenuIcons;
   group: string;
   sortDisabled?: boolean;
+  virtualIndex?: number;
+  measureElement?: (element: Element | null) => void;
 }) {
   const {
     thread,
@@ -70,6 +70,7 @@ export function SortableThreadItem(props: {
     showWorktreeFilesButton = false,
     editingThreadId,
     sortDisabled = false,
+    measureElement,
   } = props;
   const isCurrentThread = useIsCurrentThread(thread.id);
   const currentThreadCount = useCurrentThreadIdsCount();
@@ -77,7 +78,7 @@ export function SortableThreadItem(props: {
   const worktreeGitItems = useWorktreeGitItems(
     thread.projectId,
     thread.worktreePath ?? "",
-    props.gitMenuIcons,
+    gitMenuIcons,
   );
   const unloadDisabledReason =
     thread.status === "inactive"
@@ -99,15 +100,24 @@ export function SortableThreadItem(props: {
       threadId: thread.id,
       projectId: thread.projectId,
       ...(thread.worktreePath != null ? { worktreePath: thread.worktreePath } : {}),
+      sortGroup: props.group,
+      sortIndex: props.threadIndex,
     } satisfies DragSourceData,
   });
 
   const isDragging = useIsDraggingThread(thread.id);
 
   const statusTone = getStatusTone(thread);
+  const setRowRef = useCallback(
+    (element: HTMLDivElement | null) => {
+      ref(element);
+      measureElement?.(element);
+    },
+    [ref, measureElement],
+  );
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={setRowRef} data-index={props.virtualIndex} className="relative w-full pb-0.5">
       <ContextMenu
         items={[
           ...(thread.worktreePath

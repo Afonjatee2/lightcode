@@ -88,5 +88,11 @@ export function CodeBlock({ text, lang, className }: CodeBlockProps) {
       />
     );
   }
-  return <pre className={`text-foreground-muted ${className ?? ""}`.trim()}>{text}</pre>;
+  return (
+    <pre
+      className={`whitespace-pre-wrap break-words text-foreground-muted ${className ?? ""}`.trim()}
+    >
+      {text}
+    </pre>
+  );
 }

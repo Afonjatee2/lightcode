@@ -5,8 +5,6 @@ import { readBridge } from "@/renderer/bridge";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { AppDndProvider } from "@/renderer/dnd";
-import { useMainViewActions } from "@/renderer/views/MainView/parts/useMainViewActions";
-import { SidebarActionsProvider } from "@/renderer/views/MainView/parts/Sidebar/parts/SidebarActionsContext";
 
 import { useKeyboardShortcuts } from "@/renderer/hooks/useKeyboardShortcuts";
 import { useWslDetection } from "@/renderer/hooks/useWslDetection";
@@ -32,8 +30,6 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
   useGitRefresh(projects, storeHydrated);
 
   const { handleSortEnd, handlePaneDrop } = useDndHandlers();
-
-  const { sidebarActions } = useMainViewActions();
 
   const wslProjectDistrosKey = [
     ...new Set(
@@ -83,12 +79,10 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
             : buildPaneLayoutFromLegacy(["__placeholder__"])
         }
       >
-        <SidebarActionsProvider value={sidebarActions}>
-          <MainPageLayout
-            wslAvailable={wslAvailable}
-            onTitleClick={() => startTransition(() => openHome())}
-          />
-        </SidebarActionsProvider>
+        <MainPageLayout
+          wslAvailable={wslAvailable}
+          onTitleClick={() => startTransition(() => openHome())}
+        />
       </AppDndProvider>
       <StalePanelCleanup />
       <AppOverlays />

@@ -5,6 +5,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { normalizeChatRelativePath } from "../../chatPathUtils";
+import { InlineFilePathChip } from "./InlineFilePathChip";
+import { InlineFolderPathChip } from "./InlineFolderPathChip";
 
 interface ItemMarkdownProps {
   text: string;
@@ -25,7 +27,7 @@ export function ItemMarkdown({ text, mode = "markdown" }: ItemMarkdownProps) {
     return <PlainText text={text} />;
   }
   return (
-    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-0.5 prose-pre:rounded-lg prose-pre:border prose-pre:border-white/10 prose-pre:bg-foreground/5 prose-pre:px-2.5 prose-pre:py-1.5 prose-pre:font-mono prose-pre:text-[length:var(--lc-chat-font-size)] prose-pre:leading-snug prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
+    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-0.5 prose-pre:rounded-lg prose-pre:border prose-pre:border-white/10 prose-pre:bg-foreground/5 prose-pre:px-2.5 prose-pre:py-1.5 prose-pre:font-mono prose-pre:text-[length:var(--lc-chat-font-size)] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
       <ReactMarkdown remarkPlugins={REMARK_PLUGINS} components={MD_COMPONENTS}>
         {text}
       </ReactMarkdown>
@@ -63,16 +65,27 @@ function MdCode(props: { className: string; children?: ReactNode }) {
   if (isBlock) {
     return <code className={props.className || undefined}>{props.children}</code>;
   }
-  if (actions && isProjectPathLike(text)) {
-    return (
-      <button
-        type="button"
-        className="rounded-lg bg-foreground/10 px-1 py-0.5 font-mono text-[length:var(--lc-chat-font-size)] leading-tight text-accent underline-offset-2 hover:bg-foreground/15 hover:underline"
-        onClick={() => actions.openProjectRelativePath(normalizeChatRelativePath(text))}
-      >
-        {text}
-      </button>
-    );
+  if (actions) {
+    const ref = parseProjectPathRef(text);
+    if (ref) {
+      const normalized = normalizeChatRelativePath(ref.path);
+      if (ref.kind === "file") {
+        return (
+          <InlineFilePathChip
+            path={normalized}
+            line={ref.line}
+            onOpen={actions.openProjectRelativePath}
+          />
+        );
+      }
+      return (
+        <InlineFolderPathChip
+          path={normalized}
+          onRevealInTree={actions.revealProjectFolderInTree}
+          onShowInExplorer={actions.showProjectEntryInExplorer}
+        />
+      );
+    }
   }
   return <code className={inlineCodeChipClass}>{props.children}</code>;
 }
@@ -88,16 +101,37 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
       </a>
     );
   }
-  if (actions && (isProjectPathLike(href) || href.includes("/") || href.includes("\\"))) {
-    return (
-      <button
-        type="button"
-        className="inline cursor-pointer rounded-lg border-0 bg-foreground/10 px-1 py-0.5 font-mono text-[length:var(--lc-chat-font-size)] leading-tight text-accent underline-offset-2 hover:bg-foreground/15 hover:underline"
-        onClick={() => actions.openProjectRelativePath(normalizeChatRelativePath(href))}
-      >
-        {props.children}
-      </button>
-    );
+  if (actions) {
+    const ref = parseProjectPathRef(href);
+    if (ref?.kind === "folder") {
+      const folderPath = normalizeChatRelativePath(ref.path);
+      return (
+        <button
+          type="button"
+          className="inline cursor-pointer rounded-lg border-0 bg-foreground/10 px-1 py-0.5 font-mono text-[length:var(--lc-chat-font-size)] leading-tight text-accent underline-offset-2 hover:bg-foreground/15 hover:underline"
+          onClick={() => actions.revealProjectFolderInTree(folderPath)}
+        >
+          {props.children}
+        </button>
+      );
+    }
+    const fallbackPath =
+      !ref && (href.includes("/") || href.includes("\\")) ? href : undefined;
+    if (ref?.kind === "file" || fallbackPath !== undefined) {
+      const targetPath = ref?.kind === "file" ? ref.path : (fallbackPath as string);
+      const targetLine = ref?.kind === "file" ? ref.line : undefined;
+      return (
+        <button
+          type="button"
+          className="inline cursor-pointer rounded-lg border-0 bg-foreground/10 px-1 py-0.5 font-mono text-[length:var(--lc-chat-font-size)] leading-tight text-accent underline-offset-2 hover:bg-foreground/15 hover:underline"
+          onClick={() =>
+            actions.openProjectRelativePath(normalizeChatRelativePath(targetPath), targetLine)
+          }
+        >
+          {props.children}
+        </button>
+      );
+    }
   }
   return (
     <a href={href} target="_blank" rel="noreferrer noopener">
@@ -215,12 +249,47 @@ function flattenMdChildren(node: ReactNode): string {
   return "";
 }
 
-function isProjectPathLike(s: string): boolean {
+const PATH_EXTENSION_RE =
+  /\.(tsx?|jsx?|mjs|cjs|json|mdx?|css|scss|rs|go|py|toml|yaml|yml|vue|svelte|html?|txt)$/i;
+
+export type ProjectPathRef =
+  | { kind: "file"; path: string; line?: number }
+  | { kind: "folder"; path: string };
+
+/**
+ * Recognize a project path with an optional `:<line>` suffix.
+ * Distinguishes files (extension or `:line`) from folders (separator with a
+ * non-extension last segment, or trailing slash). Returns null for plain
+ * words, URLs, or `name:digits` shapes that don't look like file paths.
+ */
+function parseProjectPathRef(s: string): ProjectPathRef | null {
   const t = s.trim();
-  if (t.length < 2 || /\s/.test(t)) return false;
-  if (/^https?:\/\//i.test(t)) return false;
-  if (t.includes("/") || t.includes("\\")) return true;
-  return /\.(tsx?|jsx?|mjs|cjs|json|mdx?|css|scss|rs|go|py|toml|yaml|yml|vue|svelte|html?|txt)$/i.test(
-    t,
-  );
+  if (t.length < 2 || /\s/.test(t)) return null;
+  if (/^https?:\/\//i.test(t)) return null;
+
+  const lineMatch = t.match(/^(.+):(\d+)$/);
+  const candidate = lineMatch ? lineMatch[1]! : t;
+  const hasSeparator = candidate.includes("/") || candidate.includes("\\");
+  const hasExtension = PATH_EXTENSION_RE.test(candidate);
+  const lastSegment = candidate.split(/[\\/]/).filter(Boolean).pop() ?? "";
+  const isDotfile = lastSegment.startsWith(".") && !lastSegment.includes("/");
+  const trailingSeparator = /[\\/]$/.test(candidate);
+
+  if (!hasSeparator && !hasExtension) return null;
+
+  if (lineMatch && Number.isFinite(Number.parseInt(lineMatch[2]!, 10))) {
+    const line = Number.parseInt(lineMatch[2]!, 10);
+    if (line > 0) {
+      return { kind: "file", path: candidate, line };
+    }
+  }
+
+  if (trailingSeparator) {
+    const cleaned = candidate.replace(/[\\/]+$/, "");
+    return cleaned ? { kind: "folder", path: cleaned } : null;
+  }
+  if (hasExtension || isDotfile) {
+    return { kind: "file", path: candidate };
+  }
+  return { kind: "folder", path: candidate };
 }

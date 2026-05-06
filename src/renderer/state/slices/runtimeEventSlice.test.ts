@@ -130,6 +130,69 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     expect(item?.streams.assistant_text).toBe("late"); // delta still appends, but state stays completed
   });
 
+  it("drops a reasoning item on item.completed when no text was streamed", () => {
+    // Some agents emit a reasoning bracket that never produces text. Keeping
+    // it in the timeline would split otherwise-adjacent tool calls into
+    // separate groups, so the slice prunes it on completion.
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "tool-1",
+      itemType: "tool_call",
+    });
+    apply("t1", {
+      type: "item.completed",
+      threadId: "t1",
+      itemId: "tool-1",
+    });
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "reason-1",
+      itemType: "reasoning",
+    });
+    apply("t1", {
+      type: "item.completed",
+      threadId: "t1",
+      itemId: "reason-1",
+    });
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "tool-2",
+      itemType: "tool_call",
+    });
+    const state = store.getState();
+    expect(state.runtimeItemIdsByThread["t1"]).toEqual(["tool-1", "tool-2"]);
+    expect(state.runtimeItemsByIdByThread["t1"]?.["reason-1"]).toBeUndefined();
+  });
+
+  it("keeps a reasoning item that completed with text", () => {
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "reason-1",
+      itemType: "reasoning",
+    });
+    apply("t1", {
+      type: "content.delta",
+      threadId: "t1",
+      itemId: "reason-1",
+      stream: "reasoning_text",
+      delta: "thinking…",
+    });
+    apply("t1", {
+      type: "item.completed",
+      threadId: "t1",
+      itemId: "reason-1",
+    });
+    const state = store.getState();
+    expect(state.runtimeItemIdsByThread["t1"]).toEqual(["reason-1"]);
+    expect(state.runtimeItemsByIdByThread["t1"]?.["reason-1"]?.streams.reasoning_text).toBe(
+      "thinking…",
+    );
+  });
+
   it("opens and resolves runtime requests", () => {
     apply("t1", {
       type: "request.opened",

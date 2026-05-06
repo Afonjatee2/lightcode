@@ -1,67 +1,90 @@
 import { useMemo } from "react";
-import type { GitBranchInfo } from "@/shared/contracts";
+import { useShallow } from "zustand/shallow";
+import type { GitBranchInfo, Thread } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useProject } from "@/renderer/state/useThread";
+
+export function getActiveWorktreeBranchNames(
+  threads: readonly Thread[],
+  projectId: string,
+): string[] {
+  const branches = new Set<string>();
+  for (const thread of threads) {
+    if (thread.projectId === projectId && !thread.archived && thread.worktreeBranch) {
+      branches.add(thread.worktreeBranch);
+    }
+  }
+  return Array.from(branches).sort();
+}
 
 export function useBranchList(params: { projectId: string; search: string }) {
   const { projectId, search } = params;
   const branchData = useGitStore((s) => s.branches[projectId]);
   const worktrees = useGitStore((s) => s.worktrees[projectId]);
-  const threads = useAppStore((s) => s.threads);
+  const activeWorktreeBranchNames = useAppStore(
+    useShallow((s) => getActiveWorktreeBranchNames(s.threads, projectId)),
+  );
   const projectLocation = useProject(projectId)?.location;
 
-  const activeWorktreeBranches = new Set(
-    threads
-      .filter((t) => t.projectId === projectId && !t.archived && t.worktreeBranch)
-      .map((t) => t.worktreeBranch!),
+  const activeWorktreeBranches = useMemo(
+    () => new Set(activeWorktreeBranchNames),
+    [activeWorktreeBranchNames],
   );
-  const worktreeBranches = new Set(worktrees?.filter((w) => !w.isMain).map((w) => w.branch) ?? []);
-  const branchWorktreePath = new Map(
-    worktrees?.filter((w) => !w.isMain && w.branch).map((w) => [w.branch, w.path]) ?? [],
+  const worktreeBranches = useMemo(
+    () => new Set(worktrees?.filter((w) => !w.isMain).map((w) => w.branch) ?? []),
+    [worktrees],
+  );
+  const branchWorktreePath = useMemo(
+    () =>
+      new Map(worktrees?.filter((w) => !w.isMain && w.branch).map((w) => [w.branch, w.path]) ?? []),
+    [worktrees],
   );
 
-  // Deduplicate: prefer local over remote with same name
-  const allBranches = branchData?.branches ?? [];
-  const seen = new Set<string>();
-  const deduped: GitBranchInfo[] = [];
-  for (const b of allBranches) {
-    if (!b.isRemote && !seen.has(b.name)) {
-      seen.add(b.name);
-      deduped.push(b);
+  const { items, hasLocal, hasRemote } = useMemo(() => {
+    const allBranches = branchData?.branches ?? [];
+    const seen = new Set<string>();
+    const deduped: GitBranchInfo[] = [];
+    for (const branch of allBranches) {
+      if (!branch.isRemote && !seen.has(branch.name)) {
+        seen.add(branch.name);
+        deduped.push(branch);
+      }
     }
-  }
-  for (const b of allBranches) {
-    if (b.isRemote && !seen.has(b.name)) {
-      seen.add(b.name);
-      deduped.push(b);
+    for (const branch of allBranches) {
+      if (branch.isRemote && !seen.has(branch.name)) {
+        seen.add(branch.name);
+        deduped.push(branch);
+      }
     }
-  }
 
-  const filtered = search.trim()
-    ? deduped.filter((b) => b.name.toLowerCase().includes(search.toLowerCase()))
-    : deduped;
+    const normalizedSearch = search.trim().toLowerCase();
+    const allLocal: GitBranchInfo[] = [];
+    const allRemote: GitBranchInfo[] = [];
+    for (const branch of deduped) {
+      if (normalizedSearch && !branch.name.toLowerCase().includes(normalizedSearch)) {
+        continue;
+      }
+      if (branch.isRemote) {
+        allRemote.push(branch);
+      } else {
+        allLocal.push(branch);
+      }
+    }
 
-  const allLocal = filtered.filter((b) => !b.isRemote);
-  const allRemote = filtered.filter((b) => b.isRemote);
-  const hasLocal = allLocal.length > 0;
-  const hasRemote = allRemote.length > 0;
-
-  const items = useMemo(() => {
-    const list: (
-      | { type: "header"; id: string; name: string }
-      | { type: "branch"; id: string; branch: GitBranchInfo }
-    )[] = [];
-    if (hasLocal) {
+    const containsLocal = allLocal.length > 0;
+    const containsRemote = allRemote.length > 0;
+    const list: BranchListItem[] = [];
+    if (containsLocal) {
       list.push({ type: "header", id: "header-local", name: "Local" });
       allLocal.forEach((b) => list.push({ type: "branch", id: b.name, branch: b }));
     }
-    if (hasRemote) {
+    if (containsRemote) {
       list.push({ type: "header", id: "header-remote", name: "Remote" });
       allRemote.forEach((b) => list.push({ type: "branch", id: b.name, branch: b }));
     }
-    return list;
-  }, [allLocal, allRemote, hasLocal, hasRemote]);
+    return { items: list, hasLocal: containsLocal, hasRemote: containsRemote };
+  }, [branchData?.branches, search]);
 
   return {
     items,

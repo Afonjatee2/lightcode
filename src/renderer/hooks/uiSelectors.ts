@@ -14,19 +14,21 @@ const EMPTY_STRINGS: string[] = [];
 const EMPTY_THREADS: Thread[] = [];
 const EMPTY_REQUESTS: PendingThreadServerRequest[] = [];
 
+function selectCurrentProjectId(s: ReturnType<typeof useAppStore.getState>) {
+  const v = s.view;
+  if (v.kind === "draft") return v.projectId;
+  if (v.kind === "thread") {
+    const firstPaneId = v.panes[0];
+    if (!firstPaneId) return undefined;
+    const draftProjectId = parseDraftProjectId(firstPaneId);
+    if (draftProjectId) return draftProjectId;
+    return s.threads.find((t) => t.id === firstPaneId)?.projectId;
+  }
+  return undefined;
+}
+
 export function useCurrentProjectId(): string | undefined {
-  return useAppStore((s) => {
-    const v = s.view;
-    if (v.kind === "draft") return v.projectId;
-    if (v.kind === "thread") {
-      const firstPaneId = v.panes[0];
-      if (!firstPaneId) return undefined;
-      const draftProjectId = parseDraftProjectId(firstPaneId);
-      if (draftProjectId) return draftProjectId;
-      return s.threads.find((t) => t.id === firstPaneId)?.projectId;
-    }
-    return undefined;
-  });
+  return useAppStore(selectCurrentProjectId);
 }
 
 export function useCurrentThreadIds(): string[] {
@@ -35,6 +37,27 @@ export function useCurrentThreadIds(): string[] {
 
 export function useCurrentThreadIdsCount(): number {
   return useAppStore((s) => (s.view.kind === "thread" ? s.view.panes.length : 0));
+}
+
+export function useIsCurrentProjectDraft(projectId: string): boolean {
+  return useAppStore((s) => {
+    const v = s.view;
+    if (v.kind === "draft") return v.projectId === projectId;
+    if (v.kind !== "thread" || v.panes.length > 0) return false;
+    return selectCurrentProjectId(s) === projectId;
+  });
+}
+
+export function useCurrentWorktreePath(): string | undefined {
+  return useAppStore((s) => {
+    const v = s.view;
+    if (v.kind !== "thread") return undefined;
+    for (const threadId of v.panes) {
+      const thread = s.threads.find((t) => t.id === threadId);
+      if (thread?.worktreePath) return thread.worktreePath;
+    }
+    return undefined;
+  });
 }
 
 /**

@@ -16,6 +16,8 @@ import { WebSearchItem } from "./WebSearchItem";
 interface ChatItemRowProps {
   threadId: string;
   entry: ChatTimelineEntry;
+  /** True when this is the tail of the visible timeline. Drives live-group expand state. */
+  isLastEntry?: boolean;
 }
 
 /**
@@ -26,10 +28,14 @@ interface ChatItemRowProps {
  * (expand/collapse, scroll). React Compiler does not guarantee skipping those
  * parent-driven passes for siblings — explicit memo isolates rows (AGENTS.md escape).
  */
-export const ChatItemRow = memo(function ChatItemRow({ threadId, entry }: ChatItemRowProps) {
+export const ChatItemRow = memo(function ChatItemRow({
+  threadId,
+  entry,
+  isLastEntry = false,
+}: ChatItemRowProps) {
   "use no memo";
   if (entry.kind === "tool_call_group") {
-    return <ToolCallGroup threadId={threadId} itemIds={entry.itemIds} />;
+    return <ToolCallGroup threadId={threadId} itemIds={entry.itemIds} isLive={isLastEntry} />;
   }
   return <SingleChatItemRow threadId={threadId} itemId={entry.id} />;
 });

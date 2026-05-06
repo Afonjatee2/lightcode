@@ -3,7 +3,8 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "./state/appStore";
 import { useGitStore } from "./state/gitStore";
-import { useSidebarActions } from "@/renderer/views/MainView/parts/Sidebar/parts/SidebarActionsContext";
+import { gitMergeAndRemove } from "@/renderer/actions/gitActions";
+import { openThread, unloadThread } from "@/renderer/actions/threadActions";
 
 const { bridge } = vi.hoisted(() => ({
   bridge: {
@@ -176,19 +177,18 @@ vi.mock("./views/MainView/parts/Sidebar/Sidebar", () => ({
     manual: "Manual",
   },
   Sidebar: () => {
-    const actions = useSidebarActions();
     return (
       <div>
         sidebar
-        <button onClick={() => actions.onOpenThread("thread-1")} type="button">
+        <button onClick={() => openThread("thread-1")} type="button">
           open-thread-1
         </button>
-        <button onClick={() => actions.onUnloadThread("thread-1")} type="button">
+        <button onClick={() => unloadThread("thread-1")} type="button">
           unload-thread-1
         </button>
         <button
           onClick={() =>
-            actions.onGitMergeAndRemove(
+            gitMergeAndRemove(
               "project-1",
               "C:\\Users\\demo\\.lightcode\\worktrees\\repo-12345678\\feature-x",
             )

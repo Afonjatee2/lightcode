@@ -1173,7 +1173,7 @@ export function resolveWslShellPath(distro: string): string {
         encoding: "utf8",
         shell: false,
         windowsHide: true,
-        timeout: 1_000,
+        timeout: 3_000,
       },
     );
     if (!result.error && result.status === 0) {
@@ -1184,10 +1184,10 @@ export function resolveWslShellPath(distro: string): string {
       }
     }
   } catch {
-    // Fall through to POSIX sh.
+    // Fall through to bash so rc files (nvm/fnm/asdf) still get sourced.
   }
 
-  const fallback = "/bin/sh";
+  const fallback = "/bin/bash";
   wslShellPathCache.set(distro, fallback);
   return fallback;
 }
@@ -1204,7 +1204,7 @@ export async function resolveWslShellPathAsync(distro: string): Promise<string> 
       ["-d", distro, "--", "sh", "-lc", 'getent passwd "$(id -un)" | cut -d: -f7'],
       {
         windowsHide: true,
-        timeout: 1_000,
+        timeout: 3_000,
       },
     );
     const shellPath = parseCommandOutputLine(stdout ?? "");
@@ -1213,10 +1213,10 @@ export async function resolveWslShellPathAsync(distro: string): Promise<string> 
       return shellPath;
     }
   } catch {
-    // Fall through to POSIX sh.
+    // Fall through to bash so rc files (nvm/fnm/asdf) still get sourced.
   }
 
-  const fallback = "/bin/sh";
+  const fallback = "/bin/bash";
   wslShellPathCache.set(distro, fallback);
   return fallback;
 }

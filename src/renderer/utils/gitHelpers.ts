@@ -74,6 +74,7 @@ export async function openFileInEditor(
   worktreePath: string | undefined,
   worktreeBranch: string | undefined,
   path: string,
+  lineNumber?: number,
 ): Promise<void> {
   const fileEditor = useFileEditorStore.getState();
   const targetContext = buildFileEditorContext(project, worktreePath, worktreeBranch);
@@ -85,7 +86,12 @@ export async function openFileInEditor(
     fileEditor.setRootContext(targetContext);
   }
   try {
-    await fileEditor.openFile(path, "modal", false);
+    await fileEditor.openFile(
+      path,
+      "modal",
+      false,
+      lineNumber !== undefined ? { lineNumber } : undefined,
+    );
   } catch (error) {
     toast.danger(error instanceof Error ? error.message : String(error));
   }

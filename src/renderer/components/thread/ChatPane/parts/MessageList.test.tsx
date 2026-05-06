@@ -75,7 +75,9 @@ describe("MessageList", () => {
   it("renders only the visible virtual rows", () => {
     const scrollRef = { current: document.createElement("div") };
     const actions = {
-      openProjectRelativePath: vi.fn<(path: string) => void>(),
+      openProjectRelativePath: vi.fn<(path: string, lineNumber?: number) => void>(),
+      revealProjectFolderInTree: vi.fn<(path: string) => void>(),
+      showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange: vi.fn<() => void>(),
     };
 
@@ -127,7 +129,9 @@ describe("MessageList", () => {
   it("reports virtual total size changes to parent actions", () => {
     const onContentHeightChange = vi.fn<() => void>();
     const actions = {
-      openProjectRelativePath: vi.fn<(path: string) => void>(),
+      openProjectRelativePath: vi.fn<(path: string, lineNumber?: number) => void>(),
+      revealProjectFolderInTree: vi.fn<(path: string) => void>(),
+      showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange,
     };
     const scrollRef = { current: document.createElement("div") };
@@ -160,7 +164,9 @@ describe("MessageList", () => {
   it("delegates height change to parent actions without calling virtualizer.measure()", () => {
     const onContentHeightChange = vi.fn<() => void>();
     const actions = {
-      openProjectRelativePath: vi.fn<(path: string) => void>(),
+      openProjectRelativePath: vi.fn<(path: string, lineNumber?: number) => void>(),
+      revealProjectFolderInTree: vi.fn<(path: string) => void>(),
+      showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange,
     };
 

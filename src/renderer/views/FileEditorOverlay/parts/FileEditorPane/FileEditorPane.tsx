@@ -212,8 +212,20 @@ function EditorBody(props: {
     null,
   );
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
+  const pendingReveal = useFileEditorStore((state) => state.pendingReveal);
 
   useMergeConflictContribution({ editor: editorInstance, monaco: monacoInstance });
+
+  useEffect(() => {
+    if (!pendingReveal || !editorInstance) return;
+    if (pendingReveal.path !== activePath) return;
+    if (bufferStatus !== "ready") return;
+    const { lineNumber, token } = pendingReveal;
+    editorInstance.revealLineInCenter(lineNumber);
+    editorInstance.setPosition({ lineNumber, column: 1 });
+    editorInstance.focus();
+    useFileEditorStore.getState().consumeReveal(token);
+  }, [pendingReveal, editorInstance, activePath, bufferStatus]);
 
   const handleBeforeMount: BeforeMount = (monaco) => {
     defineAppThemes(monaco);

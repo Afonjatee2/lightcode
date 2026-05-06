@@ -9,7 +9,14 @@ import { useFileEditorStore } from "./state/fileEditorStore";
 
 export type DragSourceData =
   | { type: "project"; projectId: string }
-  | { type: "thread"; threadId: string; projectId: string; worktreePath?: string }
+  | {
+      type: "thread";
+      threadId: string;
+      projectId: string;
+      worktreePath?: string;
+      sortGroup?: string;
+      sortIndex?: number;
+    }
   | { type: "worktree-group"; worktreePath: string; projectId: string; threadIds: string[] }
   | { type: "pane"; paneId: string }
   | { type: "new-thread"; projectId: string }
@@ -251,6 +258,7 @@ export function AppDndProvider(props: {
     finalIndex: number,
     initialGroup: string | undefined,
     finalGroup: string | undefined,
+    target: DragSourceData | null,
   ) => void;
   onPaneDrop: (source: DragSourceData, target: PaneDropIndicator | null) => void;
   paneThreadIds: string[];
@@ -258,6 +266,7 @@ export function AppDndProvider(props: {
 }) {
   const pointer = useRef({ x: 0, y: 0 });
   const paneIndicatorRef = useRef<PaneDropIndicator | null>(null);
+  const sidebarSortTargetRef = useRef<DragSourceData | null>(null);
   const paneThreadIdsRef = useRef(props.paneThreadIds);
   paneThreadIdsRef.current = props.paneThreadIds;
 
@@ -309,6 +318,7 @@ export function AppDndProvider(props: {
       onDragStart={(event) => {
         const data = event.operation.source?.data as DragSourceData | undefined;
         if (data) setDragSource(data);
+        sidebarSortTargetRef.current = null;
       }}
       onDragMove={() => {
         if (activePaneTarget.current) {
@@ -327,6 +337,26 @@ export function AppDndProvider(props: {
 
         const targetData = target.data as Record<string, unknown> | undefined;
         const targetType = targetData?.type as string | undefined;
+
+        if (
+          (data.type === "project" || data.type === "thread" || data.type === "worktree-group") &&
+          (targetType === "project" || targetType === "thread" || targetType === "worktree-group")
+        ) {
+          const sidebarTarget = target.data as DragSourceData;
+          const isSameTarget =
+            (data.type === "project" &&
+              sidebarTarget.type === "project" &&
+              data.projectId === sidebarTarget.projectId) ||
+            (data.type === "thread" &&
+              sidebarTarget.type === "thread" &&
+              data.threadId === sidebarTarget.threadId) ||
+            (data.type === "worktree-group" &&
+              sidebarTarget.type === "worktree-group" &&
+              data.worktreePath === sidebarTarget.worktreePath);
+          if (!isSameTarget) {
+            sidebarSortTargetRef.current = sidebarTarget;
+          }
+        }
 
         if (
           targetType === "pane-drop-zone" &&
@@ -414,6 +444,7 @@ export function AppDndProvider(props: {
               src.index,
               src.initialGroup as string | undefined,
               src.group as string | undefined,
+              sidebarSortTargetRef.current,
             );
           }
         }
@@ -422,6 +453,7 @@ export function AppDndProvider(props: {
         setDragSource(null);
         setPaneIndicatorState(null);
         paneIndicatorRef.current = null;
+        sidebarSortTargetRef.current = null;
       }}
     >
       {props.children}

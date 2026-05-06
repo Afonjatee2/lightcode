@@ -14,10 +14,17 @@ import { ArrowDown } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { Thread } from "@/shared/contracts";
 import { PixelLoader } from "@/renderer/components/common";
+import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { hydrateThreadRuntimeItems } from "@/renderer/state/chatRuntimePersister";
+import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
 import type { OpenRuntimeRequest } from "@/renderer/state/slices/runtimeEventSlice";
-import { openFileInEditor, resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
+import {
+  buildFileEditorContext,
+  openFileInEditor,
+  resolveWorktreeBranch,
+} from "@/renderer/utils/gitHelpers";
 import { ChatPaneActionsContext, type ChatPaneActions } from "./chatPaneActionsContext";
 import {
   selectChatScrollAnchor,
@@ -67,19 +74,44 @@ export function ChatPane(props: ChatPaneProps) {
 
   const paneActions: ChatPaneActions | null = useMemo(() => {
     if (!project) return null;
+    const branch = resolveWorktreeBranch(
+      thread.projectId,
+      thread.worktreePath ?? "",
+      thread.worktreeBranch,
+    );
+    const targetContext = buildFileEditorContext(project, thread.worktreePath, branch);
     return {
-      openProjectRelativePath: (path) => {
-        const branch = resolveWorktreeBranch(
-          thread.projectId,
-          thread.worktreePath ?? "",
-          thread.worktreeBranch,
-        );
+      openProjectRelativePath: (path, lineNumber) => {
         void openFileInEditor(
           project,
           thread.worktreePath,
           branch,
           normalizeChatRelativePath(path),
+          lineNumber,
         );
+      },
+      revealProjectFolderInTree: (path) => {
+        const normalized = normalizeChatRelativePath(path);
+        const fileEditor = useFileEditorStore.getState();
+        const currentRoot = fileEditor.rootContext;
+        const isSameContext =
+          currentRoot?.projectId === targetContext.projectId &&
+          currentRoot?.worktreePath === targetContext.worktreePath;
+        if (!isSameContext) {
+          fileEditor.setRootContext(targetContext);
+        }
+        if (fileEditor.overlayMode !== "fullscreen") {
+          fileEditor.setOverlayMode("modal");
+        }
+        const ancestors = collectPathAncestors(normalized);
+        useProjectTreeStore.getState().expandMany(ancestors);
+      },
+      showProjectEntryInExplorer: (path) => {
+        const normalized = normalizeChatRelativePath(path);
+        void readBridge().revealProjectEntry({
+          projectLocation: targetContext.projectLocation,
+          path: normalized,
+        });
       },
       onContentHeightChange: () => scrollControlsRef.current?.onContentHeightChange(),
     };
@@ -291,6 +323,16 @@ function ChatTailLoader() {
 
 function isElementAtBottom(el: HTMLDivElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_EPSILON_PX;
+}
+
+/** ["", "src", "src/foo", "src/foo/bar"] for "src/foo/bar". Empty string is the tree root. */
+function collectPathAncestors(path: string): string[] {
+  const segments = path.split("/").filter(Boolean);
+  const ancestors: string[] = [""];
+  for (let i = 0; i < segments.length; i++) {
+    ancestors.push(segments.slice(0, i + 1).join("/"));
+  }
+  return ancestors;
 }
 
 const ApprovalRequestList = memo(function ApprovalRequestList(props: {

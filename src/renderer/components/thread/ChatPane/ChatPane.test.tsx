@@ -256,7 +256,7 @@ describe("ChatPane", () => {
     expect(screen.queryByText(/streamed output/)).not.toBeInTheDocument();
   });
 
-  it("keeps running tool-call groups closed until clicked", async () => {
+  it("expands the live tool-call group at the timeline tail and collapses it on click", async () => {
     const thread = makeThread();
     seedCommandItem(thread.id, "cmd-1", "echo one", "one");
     seedCommandItem(thread.id, "cmd-2", "echo two", "two");
@@ -265,40 +265,41 @@ describe("ChatPane", () => {
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
     const trigger = screen.getByText(/^2 tool calls:/).closest("button");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(trigger!);
 
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("keeps ACP tool-call groups closed when a live row folds into a group", async () => {
+  it("collapses the tool-call group automatically once a non-group item arrives after it", async () => {
     const thread = makeThread();
-    seedCommandItem(thread.id, "cmd-1", "echo one", "first output");
+    seedCommandItem(thread.id, "cmd-1", "echo one", "one");
+    seedCommandItem(thread.id, "cmd-2", "echo two", "two");
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    expect(screen.getByText("echo one").closest("button")).toHaveAttribute(
-      "aria-expanded",
-      "false",
-    );
+    const trigger = screen.getByText(/^2 tool calls:/).closest("button");
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     act(() => {
-      startCommandItem(thread.id, "cmd-2", "echo two");
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "item.started",
+        threadId: thread.id,
+        itemId: "asst-1",
+        itemType: "assistant_message",
+      });
       useAppStore.getState().applyRuntimeEvent(thread.id, {
         type: "content.delta",
         threadId: thread.id,
-        itemId: "cmd-2",
-        stream: "command_output",
-        delta: "second output",
+        itemId: "asst-1",
+        stream: "assistant_text",
+        delta: "follow up",
       });
     });
 
-    const trigger = await screen.findByText(/^2 tool calls:/);
-    expect(trigger.closest("button")).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText(/first output/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/second output/)).not.toBeInTheDocument();
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 });
 

@@ -108,6 +108,10 @@ function compactCompletedToolRuns(items: readonly RuntimeChatItem[]): RuntimeCha
   let idx = 0;
   while (idx < items.length) {
     const item = items[idx]!;
+    if (isEmptyCompletedReasoning(item)) {
+      idx += 1;
+      continue;
+    }
     if (!isToolGroupItem(item) || item.state !== "completed") {
       compacted.push(item);
       idx += 1;
@@ -177,6 +181,14 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
     item.type === "command_execution" ||
     item.type === "file_change" ||
     item.type === "web_search"
+  );
+}
+
+function isEmptyCompletedReasoning(item: RuntimeChatItem): boolean {
+  return (
+    item.type === "reasoning" &&
+    item.state === "completed" &&
+    !(item.streams.reasoning_text ?? "").trim()
   );
 }
 

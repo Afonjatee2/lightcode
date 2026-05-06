@@ -1,15 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
-import {
-  ArrowRightLeft,
-  Bug,
-  ChevronDown,
-  CircleCheck,
-  GitFork,
-  Paperclip,
-  X,
-  Zap,
-} from "lucide-react";
+import { ArrowRightLeft, Bug, CircleCheck, X } from "lucide-react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -18,617 +9,52 @@ import type {
   Thread,
   ThreadConfig,
   ThreadServerRequestId,
-  ThreadStatusSource,
 } from "@/shared/contracts";
 
-import { ProviderIcon, getComposerControls, getStatusTone } from "@/renderer/components/providers";
-import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
-import { useGitStore } from "@/renderer/state/gitStore";
-import {
-  BranchSelector,
-  type BranchSelection,
-  Button,
-  PixelLoader,
-  type ProviderModelMenuProvider,
-  TuxIcon,
-} from "@/renderer/components/common";
+import { TuxIcon } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
-import { useThreadTodoDockStore } from "@/renderer/state/threadTodoDockStore";
 import { readBridge } from "@/renderer/bridge";
-import {
-  MentionInput,
-  type MentionInputHandle,
-  AttachmentBar,
-  ImageLightbox,
-  useAttachments,
-} from "@/renderer/components/composer";
-import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
-import { filterHiddenModels } from "./threadComposerOptions";
-import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
-import { ChatPane } from "./ChatPane/ChatPane";
-import { guiChatFontCssVars } from "./ChatPane/chatFontVars";
-import { ChatRuntimeDebugPanel } from "./ChatPane/ChatRuntimeDebugPanel";
-import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
-import { ThreadTodoDock } from "./ThreadTodoDock";
+import type { TerminalPaneHandle } from "./TerminalPane";
 import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
-import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
-import {
-  getThreadTodoDockStateForItem,
-  selectThreadTodoDockItem,
-  type ThreadTodoDockState,
-} from "./threadTodoState";
+import { GuiThreadContent, TerminalThreadContent } from "./ThreadContent";
+import { ThreadHeaderStatusButton } from "./ThreadHeaderStatus";
 
 const DEFAULT_HIDDEN_TERMINAL_SIZE: TerminalSize = { cols: 120, rows: 30 };
 
-function threadRuntimeStatusLabel(thread: Thread): string {
-  const { status, attention } = thread;
-  if (status === "launching") return "Launching…";
-  if (status === "inactive") return "Inactive";
-  if (status === "error") return "Error";
-  if (status === "finished") return "Finished";
-  if (status === "needs_approval" || attention === "needs_approval") return "Needs approval";
-  if (status === "needs_reply" || attention === "needs_reply") return "Needs reply";
-  if (status === "working" || attention === "working") return "Working";
-  if (status === "idle") return "Idle";
-  return status;
-}
-
-/** Third line of the header status tooltip — detail only, no duplicate labels. */
-function activeSupportLabel(source: ThreadStatusSource | undefined): string {
-  switch (source) {
-    case "cli_hook":
-      return "Enhanced (Hooks)";
-    case "terminal_parse":
-      return "Basic (CLI)";
-    case "server":
-      return "ACP";
-    default:
-      return "Basic (CLI)";
-  }
-}
-
-function threadStatusSupportDetail(source: ThreadStatusSource | undefined): string {
-  switch (source) {
-    case "cli_hook":
-      return "Status updates come from the CLI hook plugin.";
-    case "terminal_parse":
-      return "Status is inferred from terminal output (L2). Install the hook plugin in settings for structured updates.";
-    case "server":
-      return "Status is provided by the agent control protocol (ACP).";
-    default:
-      return "Support mode appears once the session connects.";
-  }
-}
-
-/** Dot next to Support — encodes how status is sourced, not runtime state (so Basic ≠ “idle green”). */
-function supportSourceDotClass(source: ThreadStatusSource | undefined): string {
-  switch (source) {
-    case "cli_hook":
-      return "bg-[oklch(0.72_0.12_145)]";
-    case "terminal_parse":
-      return "bg-[oklch(0.72_0.11_75)]";
-    case "server":
-      return "bg-[oklch(0.68_0.12_265)]";
-    default:
-      return "bg-muted/70";
-  }
-}
-
-function ThreadHeaderStatusTooltipBody(props: { thread: Thread }) {
-  const { thread } = props;
-  const runtime = threadRuntimeStatusLabel(thread);
-  const source = thread.threadStatusSource;
-  const isServer = source === "server";
-
+function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): boolean {
   return (
-    <div className="w-[min(22rem,calc(100vw-2rem))] space-y-3 py-3 pl-2 pr-5 [overflow-wrap:break-word] [word-break:normal] hyphens-none">
-      <div className="space-y-2.5">
-        <p className="text-sm leading-snug">
-          <span className="text-muted">Status: </span>
-          <span className="font-semibold text-foreground">{runtime}</span>
-        </p>
-        {!isServer && (
-          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs leading-relaxed">
-            <span className="text-muted">Support:</span>
-            <span
-              className={`relative top-px size-1.5 shrink-0 rounded-full ring-1 ring-white/10 ${supportSourceDotClass(source)}`}
-              aria-hidden
-            />
-            <span className="font-semibold text-foreground">{activeSupportLabel(source)}</span>
-          </p>
-        )}
-      </div>
-      <p className="border-t border-border/60 pt-2.5 text-xs leading-snug text-muted [overflow-wrap:break-word] [word-break:normal] hyphens-none">
-        {threadStatusSupportDetail(source)}
-      </p>
-    </div>
+    prev.thread.id === next.thread.id &&
+    prev.thread.projectId === next.thread.projectId &&
+    prev.thread.title === next.thread.title &&
+    prev.thread.agentKind === next.thread.agentKind &&
+    prev.thread.agentInstanceId === next.thread.agentInstanceId &&
+    prev.thread.worktreePath === next.thread.worktreePath &&
+    prev.thread.presentationMode === next.thread.presentationMode &&
+    prev.thread.done === next.thread.done &&
+    prev.thread.canResumeWithConfig === next.thread.canResumeWithConfig &&
+    prev.thread.sessionRef?.providerSessionId === next.thread.sessionRef?.providerSessionId &&
+    prev.thread.config === next.thread.config &&
+    prev.agentStatus === next.agentStatus &&
+    prev.projectLocation === next.projectLocation &&
+    prev.projectName === next.projectName &&
+    prev.pendingLaunchPrompt === next.pendingLaunchPrompt &&
+    prev.pendingLaunchSegments === next.pendingLaunchSegments &&
+    prev.isWsl === next.isWsl &&
+    prev.pendingServerRequests === next.pendingServerRequests &&
+    prev.showCloseButton === next.showCloseButton &&
+    prev.paneAlign === next.paneAlign &&
+    prev.isDragging === next.isDragging &&
+    prev.dropIndicator === next.dropIndicator &&
+    prev.paneCount === next.paneCount &&
+    prev.dragHandleRef === next.dragHandleRef &&
+    prev.droppableRef === next.droppableRef &&
+    prev.installedAgents === next.installedAgents &&
+    prev.onContinueInProvider === next.onContinueInProvider
   );
 }
 
-function buildControls(
-  thread: Thread,
-  agentStatus: AgentStatus | undefined,
-  hiddenModelIds: readonly string[] | undefined,
-  onConfigChange: (config: ThreadConfig) => void,
-): ComposerControl[] {
-  const presentationMode =
-    thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
-  const isCliThread = presentationMode === "terminal";
-  if (isCliThread) return [];
-  if (!agentStatus) return [];
-
-  const filteredCaps = filterHiddenModels(agentStatus.capabilities, hiddenModelIds);
-  const isDisabled = !thread.canResumeWithConfig;
-  const onPatch = (patch: Partial<ThreadConfig>) => onConfigChange({ ...thread.config, ...patch });
-  const provider: ProviderModelMenuProvider = {
-    kind: thread.agentKind,
-    label: agentStatus.label,
-    capabilities: filteredCaps,
-  };
-
-  const efforts = (
-    filteredCaps.modelEfforts?.[thread.config.model] ??
-    filteredCaps.efforts ??
-    []
-  ).map((id) => ({
-    id,
-    label: id.charAt(0).toUpperCase() + id.slice(1),
-  }));
-  const modelContext = filteredCaps.modelContextSizes?.[thread.config.model];
-  const contextSizes =
-    (modelContext
-      ? filteredCaps.contextSizes?.filter((c) => modelContext.includes(c.id))
-      : undefined) ?? [];
-  const supportsFast = filteredCaps.fastModels?.includes(thread.config.model) ?? false;
-
-  const controls: ComposerControl[] = [
-    {
-      kind: "provider-model",
-      providers: [provider],
-      currentAgentKind: thread.agentKind,
-      currentModel: thread.config.model,
-      lockedAgentKind: thread.agentKind,
-      isDisabled,
-      hideLabelOnWrap: true,
-      onChange: ({ model }) => {
-        const nextEfforts = filteredCaps.modelEfforts?.[model] ?? filteredCaps.efforts ?? [];
-        const effortValid = thread.config.effort
-          ? nextEfforts.includes(thread.config.effort)
-          : true;
-        const nextContextIds = filteredCaps.modelContextSizes?.[model];
-        const contextValid =
-          !thread.config.contextSize ||
-          (nextContextIds ? nextContextIds.includes(thread.config.contextSize) : false);
-        // First entry in the per-model context list is the model's default; fall
-        // back to the global default only when the model is unmapped.
-        const nextContextDefault = nextContextIds?.[0] ?? filteredCaps.defaultContextSize;
-        onPatch({
-          model,
-          ...(!effortValid && nextEfforts.length > 0 ? { effort: nextEfforts[0] } : {}),
-          ...(!contextValid && nextContextDefault ? { contextSize: nextContextDefault } : {}),
-          ...(filteredCaps.fastModels?.includes(model) ? {} : { fast: false }),
-        });
-      },
-    },
-  ];
-
-  if (efforts.length > 0 || contextSizes.length > 0) {
-    controls.push({
-      kind: "effort-context",
-      efforts,
-      ...(thread.config.effort ? { effortValue: thread.config.effort } : {}),
-      onEffortChange: (value) => onPatch({ effort: value }),
-      contextSizes,
-      ...(thread.config.contextSize ? { contextValue: thread.config.contextSize } : {}),
-      onContextChange: (value) => onPatch({ contextSize: value }),
-      isDisabled,
-      hideLabelOnWrap: true,
-      icon:
-        efforts.length > 0 ? (
-          <EffortIcon
-            className="size-4 text-foreground"
-            effort={thread.config.effort ?? ""}
-            efforts={efforts.map((e) => e.id)}
-          />
-        ) : undefined,
-    });
-  }
-
-  if (supportsFast) {
-    controls.push({
-      kind: "toggle",
-      label: "Fast",
-      icon: <Zap className="size-3.5" />,
-      iconOnly: true,
-      isSelected: thread.config.fast === true,
-      isDisabled,
-      onChange: (selected) => onPatch({ fast: selected }),
-    });
-  }
-
-  const factory = getComposerControls(thread.agentKind);
-  if (factory) {
-    controls.push(
-      ...factory({
-        capabilities: filteredCaps,
-        config: thread.config,
-        isDisabled,
-        onConfigChange: onPatch,
-        presentationMode,
-      }),
-    );
-  }
-
-  return controls;
-}
-
-function ThreadComposerSection(props: {
-  thread: Thread;
-  agentStatus: AgentStatus | undefined;
-  projectLocation: ProjectLocation;
-  paneCount: number;
-  pendingServerRequests: PendingThreadServerRequest[];
-  terminalPaneRef: React.RefObject<TerminalPaneHandle | null>;
-  todoDockCollapsed: boolean;
-  todoDockPlacement: "composer" | "right";
-  todoDockState: ThreadTodoDockState | null;
-  onConfigChange: (config: ThreadConfig) => void;
-  onResolveServerRequest: (input: {
-    requestId: ThreadServerRequestId;
-    method: string;
-    response: unknown;
-  }) => Promise<void>;
-  onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
-  onTodoDockCollapsedChange: (collapsed: boolean) => void;
-  onTodoDockPlacementChange: (placement: "composer" | "right") => void;
-}) {
-  const {
-    thread,
-    agentStatus,
-    projectLocation,
-    paneCount,
-    pendingServerRequests,
-    todoDockCollapsed,
-    todoDockPlacement,
-    todoDockState,
-  } = props;
-  const [prompt, setPrompt] = useState("");
-  const [hasContent, setHasContent] = useState(false);
-  const mentionRef = useRef<MentionInputHandle>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const attachments = useAttachments();
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const imageAttachments = attachments.attachments.filter((a) => a.isImage);
-  const presentationMode =
-    thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
-  const usesTerminalPresentation = presentationMode === "terminal";
-  const isServerControlled =
-    agentStatus?.capabilities.liveInputMode === "server" || !usesTerminalPresentation;
-  const isTerminalInput = agentStatus?.capabilities.liveInputMode === "terminal";
-  const needsFocusBeforeInput = agentStatus?.capabilities.requiresTerminalFocusBeforeInput === true;
-  const activeServerRequest = pendingServerRequests[0];
-  const canQueueServerInput =
-    isServerControlled &&
-    !usesTerminalPresentation &&
-    thread.sessionRef !== undefined &&
-    thread.status === "working";
-  const canSubmitServerInput =
-    isServerControlled &&
-    thread.sessionRef !== undefined &&
-    (thread.status === "idle" || thread.status === "needs_reply" || canQueueServerInput);
-  const canSubmitTerminalInput =
-    usesTerminalPresentation &&
-    isTerminalInput &&
-    thread.status !== "inactive" &&
-    thread.status !== "launching";
-  const showServerComposer = isServerControlled && thread.status !== "inactive";
-  const showTerminalComposer =
-    usesTerminalPresentation &&
-    isTerminalInput &&
-    thread.status !== "inactive" &&
-    thread.status !== "launching";
-  const showTodoInComposer =
-    !usesTerminalPresentation && todoDockState !== null && todoDockPlacement === "composer";
-  const collapseTerminalComposerSetting = useSharedSettings((s) => s.collapseTerminalComposer);
-  const [composerCollapsed, setComposerCollapsed] = useState(collapseTerminalComposerSetting);
-  const canCollapseComposer = showTerminalComposer;
-  const isComposerCollapsed = canCollapseComposer && composerCollapsed;
-  const branchName = useGitStore(
-    (s) =>
-      thread.worktreeBranch ??
-      (thread.worktreePath
-        ? s.worktreeStatuses[thread.worktreePath]?.branch
-        : s.statuses[thread.projectId]?.branch),
-  );
-  const hiddenModelIds = useSharedSettings((s) => s.hiddenModels[thread.agentKind]);
-  const controls = buildControls(thread, agentStatus, hiddenModelIds, props.onConfigChange);
-  const isCliThread = usesTerminalPresentation;
-  const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
-  const canInterruptStructuredTurn =
-    !usesTerminalPresentation && thread.sessionRef !== undefined && thread.status === "working";
-
-  function handleInterrupt() {
-    void readBridge()
-      .interruptThread({ threadId: thread.id })
-      .catch((error: unknown) => {
-        console.error("[thread] failed to interrupt turn", error);
-      });
-  }
-
-  function handleSwitchBranch(branch: string, createNew: boolean) {
-    readBridge()
-      .gitSwitchBranch({
-        projectLocation,
-        branch,
-        createNew,
-      })
-      .then((result) => {
-        const store = useGitStore.getState();
-        const status = store.statuses[thread.projectId];
-        if (status) {
-          store.setStatus(thread.projectId, {
-            ...status,
-            branch: result.branch,
-            tracking: result.tracking,
-            ahead: result.ahead,
-            behind: result.behind,
-          });
-        }
-      })
-      .catch((err: unknown) => {
-        console.error("[git] switch branch failed", err);
-      });
-  }
-
-  function handleBranchSelect(selection: BranchSelection) {
-    if (!selection.isWorktree && selection.branch !== branchName) {
-      handleSwitchBranch(selection.branch, false);
-    }
-  }
-
-  function submitPrompt(segments: PromptSegment[]) {
-    const attachmentSegments = attachments.toSegments();
-    const allSegments = [...attachmentSegments, ...segments];
-    const flat = flattenSegments(allSegments);
-    if (flat.length === 0 || !canSubmit) return;
-    setIsSubmitting(true);
-
-    const focusPromise = needsFocusBeforeInput
-      ? (props.terminalPaneRef.current?.focus(), new Promise<void>((r) => setTimeout(r, 80)))
-      : Promise.resolve();
-
-    void focusPromise
-      .then(() => props.onSubmitInput(flat, allSegments.length > 0 ? allSegments : undefined))
-      .then(() => {
-        mentionRef.current?.clear();
-        mentionRef.current?.focus();
-        setPrompt("");
-        setHasContent(false);
-        attachments.clearAll();
-      })
-      .catch(() => {
-        // Leave the prompt intact so the user can retry.
-      })
-      .finally(() => {
-        setIsSubmitting(false);
-      });
-  }
-
-  useEffect(() => {
-    setPrompt("");
-    setComposerCollapsed(collapseTerminalComposerSetting);
-  }, [thread.id, collapseTerminalComposerSetting]);
-
-  useEffect(() => {
-    function handlePasteToComposer(e: Event) {
-      const text = (e as CustomEvent<string>).detail;
-      if (text) setPrompt((prev) => prev + text);
-    }
-    window.addEventListener("lightcode:paste-to-composer", handlePasteToComposer);
-    return () => window.removeEventListener("lightcode:paste-to-composer", handlePasteToComposer);
-  }, []);
-
-  return (
-    <>
-      {activeServerRequest ? (
-        <ThreadServerRequestPanel
-          agentLabel={agentStatus?.label}
-          request={activeServerRequest}
-          onResolve={props.onResolveServerRequest}
-        />
-      ) : null}
-
-      {thread.status !== "launching" || !usesTerminalPresentation ? (
-        <div>
-          <div
-            className={`grid transition-[grid-template-rows] ease-[cubic-bezier(0.16,1,0.3,1)] ${isComposerCollapsed ? "duration-300" : "duration-200"}`}
-            style={{ gridTemplateRows: isComposerCollapsed ? "0fr" : "1fr" }}
-          >
-            <div className="overflow-hidden">
-              <div
-                className={`relative ${isComposerCollapsed ? "pointer-events-none" : ""}`}
-                style={{
-                  opacity: isComposerCollapsed ? 0 : 1,
-                  transition: isComposerCollapsed
-                    ? "opacity 150ms ease 50ms"
-                    : "opacity 200ms ease 100ms",
-                }}
-              >
-                <ThreadComposer
-                  autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
-                  compact
-                  fixedContent={
-                    showTodoInComposer ? (
-                      <ThreadTodoDock
-                        collapsed={todoDockCollapsed}
-                        placement={todoDockPlacement}
-                        state={todoDockState!}
-                        onCollapsedChange={props.onTodoDockCollapsedChange}
-                        onPlacementChange={props.onTodoDockPlacementChange}
-                      />
-                    ) : null
-                  }
-                  attachmentBar={
-                    <AttachmentBar
-                      attachments={attachments.attachments}
-                      onRemove={attachments.removeAttachment}
-                      onPreviewImage={(att) => {
-                        const idx = imageAttachments.findIndex((a) => a.id === att.id);
-                        if (idx >= 0) setLightboxIndex(idx);
-                      }}
-                    />
-                  }
-                  inputContent={
-                    <MentionInput
-                      ref={mentionRef}
-                      autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
-                      compact
-                      disabled={!(showServerComposer || showTerminalComposer)}
-                      placeholder={
-                        isServerControlled
-                          ? `Ask ${agentStatus?.label ?? "the agent"} anything about this workspace`
-                          : "Send a message..."
-                      }
-                      projectLocation={projectLocation}
-                      projectId={thread.projectId}
-                      onTextChange={setHasContent}
-                      onSubmit={submitPrompt}
-                      onPasteImage={(file) => {
-                        void attachments.addClipboardImage(file, thread.id);
-                      }}
-                      {...(showTerminalComposer
-                        ? {
-                            onInterceptKey: (e) => {
-                              // Forward common terminal shortcuts (Shift+Tab,
-                              // Ctrl/Cmd+T) to the PTY so users can drive the
-                              // CLI agent without leaving the composer.
-                              if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                                e.preventDefault();
-                                void readBridge().writeTerminal({
-                                  threadId: thread.id,
-                                  data: "\x1b[Z",
-                                });
-                                return true;
-                              }
-                              if (
-                                (e.ctrlKey || e.metaKey) &&
-                                !e.shiftKey &&
-                                !e.altKey &&
-                                e.key.toLowerCase() === "t"
-                              ) {
-                                e.preventDefault();
-                                void readBridge().writeTerminal({
-                                  threadId: thread.id,
-                                  data: "\x14",
-                                });
-                                return true;
-                              }
-                              return false;
-                            },
-                          }
-                        : {})}
-                    />
-                  }
-                  controls={controls}
-                  placeholder="Send a message..."
-                  prompt={prompt}
-                  promptDisabled={!(showServerComposer || showTerminalComposer)}
-                  submitDisabled={!(hasContent || attachments.attachments.length > 0) || !canSubmit}
-                  submitLabel="Send message"
-                  onStop={canInterruptStructuredTurn ? handleInterrupt : undefined}
-                  {...(() => {
-                    const extras = (
-                      <>
-                        <Button
-                          isIconOnly
-                          aria-label="Attach files"
-                          className="lightcode-composer-menu min-w-9 px-2"
-                          size="sm"
-                          variant="ghost"
-                          onPress={() => {
-                            void readBridge()
-                              .pickFiles()
-                              .then((paths) => {
-                                if (paths) attachments.addFiles(paths);
-                              });
-                          }}
-                        >
-                          <Paperclip className="size-4" />
-                        </Button>
-                        {branchName ? (
-                          thread.worktreePath ? (
-                            <Tooltip delay={0}>
-                              <Tooltip.Trigger tabIndex={-1} role="none">
-                                <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
-                                  <GitFork className="size-3.5 text-muted" />
-                                  <span className="truncate">{branchName}</span>
-                                  {thread.prNumber ? (
-                                    <span className="shrink-0 text-muted/60">
-                                      PR #{thread.prNumber}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </Tooltip.Trigger>
-                              <Tooltip.Content placement="top">{branchName}</Tooltip.Content>
-                            </Tooltip>
-                          ) : (
-                            <BranchSelector
-                              projectId={thread.projectId}
-                              currentBranch={branchName}
-                              value={branchName}
-                              onSelect={handleBranchSelect}
-                              onSwitchBranch={handleSwitchBranch}
-                              hideWorktreeToggle
-                            />
-                          )
-                        ) : null}
-                      </>
-                    );
-                    return isCliThread ? { leadingControls: extras } : { afterControls: extras };
-                  })()}
-                  onPromptChange={setPrompt}
-                  onSubmit={() => {
-                    const segments = mentionRef.current?.serializeSegments();
-                    submitPrompt(
-                      segments && segments.length > 0
-                        ? segments
-                        : [{ kind: "text", content: prompt.trim() }],
-                    );
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-          {canCollapseComposer ? (
-            <div className="relative z-10 flex h-0 justify-center">
-              <button
-                type="button"
-                aria-label={isComposerCollapsed ? "Show composer" : "Collapse composer"}
-                className="absolute -top-[9px] flex items-center rounded-full border border-[var(--border)] bg-[var(--background)] px-2 py-0 text-muted transition-colors hover:text-foreground"
-                onClick={() => setComposerCollapsed(!composerCollapsed)}
-              >
-                <ChevronDown
-                  className={`size-3.5 transition-transform duration-150 ${isComposerCollapsed ? "rotate-180" : ""}`}
-                />
-              </button>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {lightboxIndex !== null && imageAttachments.length > 0 ? (
-        <ImageLightbox
-          images={imageAttachments}
-          initialIndex={lightboxIndex}
-          onClose={() => setLightboxIndex(null)}
-        />
-      ) : null}
-    </>
-  );
-}
-
-export function ThreadView(props: {
+export type ThreadViewProps = {
   thread: Thread;
   agentStatus: AgentStatus | undefined;
   projectLocation: ProjectLocation;
@@ -671,7 +97,9 @@ export function ThreadView(props: {
     response: unknown;
   }) => Promise<void>;
   onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
-}) {
+};
+
+export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   const {
     thread,
     agentStatus,
@@ -712,20 +140,7 @@ export function ThreadView(props: {
   const usesTerminalPresentation =
     (thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal") ===
     "terminal";
-  const guiChatFontSize = useSharedSettings((s) => s.guiChatFontSize);
-  const todoDockPlacement = useThreadTodoDockStore((s) => s.placement);
-  const todoDockCollapsed = useThreadTodoDockStore((s) => s.collapsed);
-  const setTodoDockPlacement = useThreadTodoDockStore((s) => s.setPlacement);
-  const setTodoDockCollapsed = useThreadTodoDockStore((s) => s.setCollapsed);
-  const todoDockItem = useAppStore((s) => selectThreadTodoDockItem(s, thread.id));
-  const todoDockState = todoDockItem ? getThreadTodoDockStateForItem(todoDockItem) : null;
   const launchTerminalSize = usesTerminalPresentation ? terminalSize : DEFAULT_HIDDEN_TERMINAL_SIZE;
-  const showTodoDock = !usesTerminalPresentation && todoDockState !== null;
-  const showTodoInRightRail = showTodoDock && todoDockPlacement === "right";
-  const showThreadSideRail = runtimeDebugOpen || showTodoInRightRail;
-  const hiddenRuntimeItemId = !usesTerminalPresentation ? todoDockState?.sourceItemId : undefined;
-  const hiddenRuntimeItemIsLive =
-    !usesTerminalPresentation && todoDockState !== null && todoDockState.itemState !== "completed";
 
   useEffect(() => {
     setRuntimeDebugOpen(false);
@@ -834,32 +249,12 @@ export function ThreadView(props: {
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
         <div className="px-2">
           <div className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}>
-            <Tooltip delay={0}>
-              <Tooltip.Trigger>
-                <button
-                  type="button"
-                  className="inline-flex shrink-0 rounded-sm p-0.5 outline-offset-2 hover:bg-white/[0.06]"
-                  aria-label={`${agentStatus?.label ?? thread.agentKind}: ${threadRuntimeStatusLabel(thread)}. Hover for status details.`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                  }}
-                >
-                  <ProviderIcon
-                    kind={thread.agentKind}
-                    tone={getStatusTone(thread)}
-                    className="size-3.5 shrink-0"
-                  />
-                </button>
-              </Tooltip.Trigger>
-              <Tooltip.Content
-                placement="bottom start"
-                offset={8}
-                showArrow
-                className="max-w-[min(22rem,calc(100vw-2rem))] text-left [overflow-wrap:break-word] [word-break:normal] hyphens-none"
-              >
-                <ThreadHeaderStatusTooltipBody thread={thread} />
-              </Tooltip.Content>
-            </Tooltip>
+            <ThreadHeaderStatusButton
+              threadId={thread.id}
+              fallbackThread={thread}
+              fallbackAgentKind={thread.agentKind}
+              agentLabel={agentStatus?.label}
+            />
             <div
               ref={dragHandleRef}
               className={`flex min-w-0 flex-1 items-center gap-2 ${dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
@@ -1007,83 +402,35 @@ export function ThreadView(props: {
           )}
 
           <div className={`${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col pt-2`}>
-            <div
-              className={`relative min-h-0 flex-1 ${
-                usesTerminalPresentation ? "overflow-visible" : "overflow-hidden"
-              }`}
-            >
-              {usesTerminalPresentation ? (
-                <TerminalPane
-                  ref={terminalPaneRef}
-                  key={thread.id}
-                  onTerminalResize={setTerminalSize}
-                  status={thread.status}
-                  threadId={thread.id}
-                />
-              ) : (
-                <div
-                  className="flex h-full min-h-0 w-full gap-2 text-[length:var(--lc-chat-font-size)]"
-                  style={guiChatFontCssVars(guiChatFontSize)}
-                >
-                  <div className="min-h-0 min-w-0 flex-1">
-                    <ChatPane
-                      hasSupplementaryContent={showTodoDock}
-                      hiddenRuntimeItemId={hiddenRuntimeItemId}
-                      hiddenRuntimeItemIsLive={hiddenRuntimeItemIsLive}
-                      thread={thread}
-                    />
-                  </div>
-                  {showThreadSideRail ? (
-                    <div className="flex h-full min-h-0 w-[min(44%,24rem)] shrink-0 flex-col gap-2 border-l border-[color:var(--border)] pl-2">
-                      {showTodoInRightRail ? (
-                        <div
-                          className={
-                            runtimeDebugOpen && !todoDockCollapsed
-                              ? "min-h-0 max-h-[45%] shrink-0"
-                              : "min-h-0 flex-1"
-                          }
-                        >
-                          <ThreadTodoDock
-                            collapsed={todoDockCollapsed}
-                            placement={todoDockPlacement}
-                            state={todoDockState!}
-                            onCollapsedChange={setTodoDockCollapsed}
-                            onPlacementChange={setTodoDockPlacement}
-                          />
-                        </div>
-                      ) : null}
-                      {runtimeDebugOpen ? (
-                        <div className="min-h-0 flex-1">
-                          <ChatRuntimeDebugPanel threadId={thread.id} />
-                        </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-              {thread.status === "launching" && usesTerminalPresentation ? (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <PixelLoader size="md" />
-                </div>
-              ) : null}
-            </div>
-
-            <ThreadComposerSection
-              thread={thread}
-              agentStatus={agentStatus}
-              projectLocation={projectLocation}
-              paneCount={paneCount}
-              pendingServerRequests={pendingServerRequests}
-              terminalPaneRef={terminalPaneRef}
-              todoDockCollapsed={todoDockCollapsed}
-              todoDockPlacement={todoDockPlacement}
-              todoDockState={todoDockState}
-              onConfigChange={onConfigChange}
-              onResolveServerRequest={onResolveServerRequest}
-              onSubmitInput={onSubmitInput}
-              onTodoDockCollapsedChange={setTodoDockCollapsed}
-              onTodoDockPlacementChange={setTodoDockPlacement}
-            />
+            {usesTerminalPresentation ? (
+              <TerminalThreadContent
+                threadId={thread.id}
+                fallbackThread={thread}
+                agentStatus={agentStatus}
+                projectLocation={projectLocation}
+                paneCount={paneCount}
+                pendingServerRequests={pendingServerRequests}
+                terminalPaneRef={terminalPaneRef}
+                onTerminalResize={setTerminalSize}
+                onConfigChange={onConfigChange}
+                onResolveServerRequest={onResolveServerRequest}
+                onSubmitInput={onSubmitInput}
+              />
+            ) : (
+              <GuiThreadContent
+                threadId={thread.id}
+                fallbackThread={thread}
+                agentStatus={agentStatus}
+                projectLocation={projectLocation}
+                paneCount={paneCount}
+                pendingServerRequests={pendingServerRequests}
+                terminalPaneRef={terminalPaneRef}
+                runtimeDebugOpen={runtimeDebugOpen}
+                onConfigChange={onConfigChange}
+                onResolveServerRequest={onResolveServerRequest}
+                onSubmitInput={onSubmitInput}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1108,4 +455,4 @@ export function ThreadView(props: {
       ) : null}
     </>
   );
-}
+}, areThreadViewPropsEqual);
