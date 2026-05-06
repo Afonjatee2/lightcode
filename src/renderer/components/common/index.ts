@@ -8,6 +8,7 @@ export * from "./FileIcon";
 export * from "./FileStatusBadge";
 export * from "./Input";
 export * from "./OptionMenu";
+export * from "./PathDisplay";
 export * from "./PixelLoader";
 export * from "./ProviderModelMenu";
 export * from "./Select";

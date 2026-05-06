@@ -4,7 +4,7 @@ import "@git-diff-view/react/styles/diff-view.css";
 
 setEnableFastDiffTemplate(true);
 
-import { PixelLoader } from "@/renderer/components/common";
+import { PathDisplay, PixelLoader } from "@/renderer/components/common";
 import {
   ChevronDown,
   ChevronRight,
@@ -21,7 +21,6 @@ import { getFileIconUrl } from "@/renderer/components/common/fileIcons";
 import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang } from "./diffBuildClient";
-import { getBasename } from "@/shared/pathUtils";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
 import { ConfirmDialog } from "@/renderer/components/common/ConfirmDialog";
 import { useGitReviewRowPadX } from "./GitReviewSidebar/gitReviewPadXContext";
@@ -67,9 +66,6 @@ export function StackedFileCard(props: {
   const [loading, setLoading] = useState(false);
   const loadedKeyRef = useRef<string | null>(null);
   const tooLarge = file.insertions + file.deletions > LARGE_DIFF_THRESHOLD;
-
-  const basename = getBasename(file.path);
-  const dir = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : undefined;
 
   // Theme is intentionally excluded from the fetch key — DiffView re-styles without re-fetching.
   const fetchKey = `${file.path}|${file.staged ? "s" : "u"}|${file.status}|${file.insertions}|${file.deletions}`;
@@ -190,12 +186,19 @@ export function StackedFileCard(props: {
             <ChevronRight className="size-3 shrink-0 text-muted" />
           )}
           <FileIcon path={file.path} />
-          <span className="min-w-0 flex-1 truncate" title={file.path}>
-            <span className="font-medium text-foreground">{basename}</span>
-            {isLockFile(file.path) && <Lock className="ml-1 inline-block size-2 text-muted/40" />}
-            {dir && <span className="ml-1 text-muted/60">{dir}</span>}
-            <FileStatusBadge status={file.status} />
-          </span>
+          <PathDisplay
+            path={file.path}
+            className="flex-1"
+            basenameClassName="font-medium text-foreground"
+            trailing={
+              <>
+                {isLockFile(file.path) && (
+                  <Lock className="ml-1 inline-block size-2 shrink-0 text-muted/40" />
+                )}
+                <FileStatusBadge status={file.status} />
+              </>
+            }
+          />
           <span className="relative w-14 shrink-0">
             {/* Stats — visible when not hovering */}
             <span className="flex items-center justify-end text-[10px] leading-4 font-medium transition-opacity group-hover:opacity-0">

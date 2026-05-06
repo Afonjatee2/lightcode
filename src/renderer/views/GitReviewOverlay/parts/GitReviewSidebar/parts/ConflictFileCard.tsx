@@ -3,10 +3,9 @@ import { ChevronDown, ChevronRight, FileEdit } from "lucide-react";
 import { DiffFile, DiffView, highlighter } from "@git-diff-view/react";
 import type { GitFileChange, Project } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
-import { FileIcon, FileStatusBadge, PixelLoader } from "@/renderer/components/common";
+import { FileIcon, FileStatusBadge, PathDisplay, PixelLoader } from "@/renderer/components/common";
 import { openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
-import { getBasename } from "@/shared/pathUtils";
 import {
   buildInWorker,
   diffFileFromBundle,
@@ -33,8 +32,6 @@ export function ConflictFileCard(props: {
   const loadedKeyRef = useRef<string | null>(null);
   const tooLarge = file.insertions + file.deletions > LARGE_DIFF_THRESHOLD;
 
-  const basename = getBasename(file.path);
-  const dir = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : undefined;
   const fetchKey = `${file.path}|${file.insertions}|${file.deletions}`;
 
   useEffect(() => {
@@ -113,11 +110,12 @@ export function ConflictFileCard(props: {
           <ChevronRight className="size-3 shrink-0 text-muted" />
         )}
         <FileIcon path={file.path} />
-        <span className="min-w-0 flex-1 truncate" title={file.path}>
-          <span className="font-medium text-foreground">{basename}</span>
-          {dir && <span className="ml-1 text-muted/60">{dir}</span>}
-          <FileStatusBadge status={file.status} />
-        </span>
+        <PathDisplay
+          path={file.path}
+          className="flex-1"
+          basenameClassName="font-medium text-foreground"
+          trailing={<FileStatusBadge status={file.status} />}
+        />
         <span className="relative w-14 shrink-0">
           <span className="flex items-center justify-end text-[10px] leading-4 font-medium transition-opacity group-hover:opacity-0">
             {file.insertions > 0 && <span className="text-success">+{file.insertions}</span>}

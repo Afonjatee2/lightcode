@@ -5,8 +5,12 @@ import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useGitFile } from "@/renderer/state/gitSelectors";
 import { isLockFile } from "@/shared/gitUtils";
-import { getBasename } from "@/shared/pathUtils";
-import { ConfirmDialog, FileIcon, FileStatusBadge } from "@/renderer/components/common";
+import {
+  ConfirmDialog,
+  FileIcon,
+  FileStatusBadge,
+  PathDisplay,
+} from "@/renderer/components/common";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
 import { useGitReviewRowPadX } from "../gitReviewPadXContext";
 
@@ -25,9 +29,6 @@ export function FileRow(props: {
   const [revertOpen, setRevertOpen] = useState(false);
 
   if (!file) return null;
-
-  const basename = getBasename(path);
-  const dir = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : undefined;
 
   async function handleStageToggle() {
     if (!file) return;
@@ -66,12 +67,18 @@ export function FileRow(props: {
         onClick={onSelect}
       >
         <FileIcon path={path} />
-        <span className="min-w-0 flex-1 truncate" title={path}>
-          <span className="text-foreground">{basename}</span>
-          {isLockFile(path) && <Lock className="ml-1 inline-block size-2 text-muted/40" />}
-          {dir && <span className="ml-1 text-muted/60">{dir}</span>}
-          <FileStatusBadge status={file.status} />
-        </span>
+        <PathDisplay
+          path={path}
+          className="flex-1"
+          trailing={
+            <>
+              {isLockFile(path) && (
+                <Lock className="ml-1 inline-block size-2 shrink-0 text-muted/40" />
+              )}
+              <FileStatusBadge status={file.status} />
+            </>
+          }
+        />
         <span className="relative w-14 shrink-0">
           <span className="flex items-center justify-end text-[10px] leading-4 font-medium transition-opacity group-hover:opacity-0">
             {file.insertions > 0 && <span className="text-success">+{file.insertions}</span>}

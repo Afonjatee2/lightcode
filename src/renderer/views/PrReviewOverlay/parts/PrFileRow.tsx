@@ -1,11 +1,8 @@
 import type { PrFile } from "@/shared/contracts";
-import { getBasename } from "@/shared/pathUtils";
-import { FileIcon } from "@/renderer/components/common";
+import { FileIcon, PathDisplay } from "@/renderer/components/common";
 
 export function PrFileRow(props: { file: PrFile; isSelected: boolean; onSelect: () => void }) {
   const { file, isSelected, onSelect } = props;
-  const basename = getBasename(file.path);
-  const dir = file.path.includes("/") ? file.path.slice(0, file.path.lastIndexOf("/")) : undefined;
 
   return (
     <button
@@ -18,10 +15,7 @@ export function PrFileRow(props: { file: PrFile; isSelected: boolean; onSelect: 
       onClick={onSelect}
     >
       <FileIcon path={file.path} />
-      <span className="min-w-0 flex-1 truncate" title={file.path}>
-        <span className="text-foreground">{basename}</span>
-        {dir && <span className="ml-1 text-muted/60">{dir}</span>}
-      </span>
+      <PathDisplay path={file.path} className="flex-1" />
       <span className="flex w-14 shrink-0 items-center justify-end text-[10px] leading-4 font-medium">
         {file.additions > 0 && <span className="text-success">+{file.additions}</span>}
         {file.deletions > 0 && <span className="ml-0.5 text-danger">-{file.deletions}</span>}

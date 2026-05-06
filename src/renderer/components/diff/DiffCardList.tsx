@@ -3,7 +3,7 @@ import { DiffFile, DiffView, highlighter } from "@git-diff-view/react";
 import "@git-diff-view/react/styles/diff-view.css";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
-import { PixelLoader } from "@/renderer/components/common";
+import { PathDisplay, PixelLoader } from "@/renderer/components/common";
 import {
   buildInWorker,
   diffFileFromBundle,
@@ -147,7 +147,11 @@ function DiffCard(props: { entry: RenderedEntry; mode: number; theme: "light" | 
         ) : (
           <ChevronDown className="size-3 shrink-0 text-muted" />
         )}
-        <span className="min-w-0 truncate font-medium text-foreground">{entry.path}</span>
+        <PathDisplay
+          path={entry.path}
+          className="min-w-0 flex-1"
+          basenameClassName="font-medium text-foreground"
+        />
         <span className="ml-auto flex shrink-0 gap-2 text-[10px] font-medium">
           {entry.additions > 0 && <span className="text-success">+{entry.additions}</span>}
           {entry.deletions > 0 && <span className="text-danger">-{entry.deletions}</span>}

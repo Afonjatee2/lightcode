@@ -1,6 +1,7 @@
 import { memo, useMemo, useState } from "react";
 import { FileEdit } from "lucide-react";
 import type { FileChangePayload } from "@/shared/contracts";
+import { PathDisplay } from "@/renderer/components/common";
 import {
   getRuntimeItemPayload,
   type RuntimeChatItem,
@@ -36,7 +37,13 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   return (
     <ChatItemAccordion
       icon={<FileEdit className="size-3" />}
-      title={payload.path}
+      title={
+        <PathDisplay
+          path={payload.path}
+          basenameClassName="!text-[color:var(--foreground)]"
+          dirClassName="!text-[color:var(--muted)]"
+        />
+      }
       rightLabel={right}
       hasBody={hasDetails}
       isExpanded={isExpanded}
