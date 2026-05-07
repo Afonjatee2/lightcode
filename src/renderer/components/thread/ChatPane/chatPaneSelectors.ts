@@ -9,7 +9,43 @@ export type ChatTimelineEntry =
   | { kind: "item"; id: string }
   | { kind: "tool_call_group"; id: string; itemIds: readonly string[] };
 
-const timelineEntryCache = new Map<string, readonly ChatTimelineEntry[]>();
+/**
+ * Cache for `selectVisibleThreadTimelineEntries`. Keyed by
+ * `${threadId}\0${hiddenItemId ?? ""}` (a small constant-size string) and
+ * validated in O(1) by reference-comparing the source `itemIds` array and the
+ * thread's structural version. The structural version (maintained by
+ * `runtimeEventSlice`) bumps only on grouping-affecting changes — content
+ * deltas don't invalidate the cache.
+ *
+ * Zustand re-runs every subscriber's selector on every `set()`. With 8 GUI
+ * panes mounted and ~500 streaming events/sec, this selector is one of the
+ * hottest read paths in the app; the previous O(N) string-concat cache key
+ * (one entry per item, full id+type) was burning real CPU.
+ */
+const timelineEntryCache = new Map<
+  string,
+  {
+    itemIds: readonly string[];
+    structuralVersion: number;
+    entries: readonly ChatTimelineEntry[];
+  }
+>();
+
+/**
+ * Cache for `selectVisibleThreadRuntimeItemIds`. The base `itemIds` array is
+ * already reference-stable per thread, but the filtered result for the
+ * `hiddenItemId !== undefined` case is freshly allocated on every call. We
+ * memoize so the timeline cache above can rely on a stable `itemIds`
+ * reference even when a thread is rendering a pinned/floating item surface.
+ */
+const visibleItemIdsCache = new Map<
+  string,
+  {
+    sourceItemIds: readonly string[];
+    structuralVersion: number;
+    result: readonly string[];
+  }
+>();
 
 export function selectThreadRuntimeItemIds(
   state: AppStoreState,
@@ -25,16 +61,37 @@ export function selectVisibleThreadRuntimeItemIds(
 ): readonly string[] {
   const itemIds = state.runtimeItemIdsByThread[threadId];
   if (!itemIds?.length) return EMPTY_THREAD_ITEM_IDS;
+  if (!hiddenItemId) return itemIds;
+
+  const structuralVersion = state.runtimeStructuralVersionByThread?.[threadId] ?? 0;
+  const cacheKey = `${threadId}\0${hiddenItemId}`;
+  const cached = visibleItemIdsCache.get(cacheKey);
+  if (
+    cached &&
+    cached.sourceItemIds === itemIds &&
+    cached.structuralVersion === structuralVersion
+  ) {
+    return cached.result;
+  }
+
   const items = state.runtimeItemsByIdByThread[threadId];
-  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
+  const hiddenItem = items?.[hiddenItemId];
   const visible = itemIds.filter((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
     if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
     return item ? isVisibleRuntimeItem(item) : true;
   });
-  if (visible.length === 0) return EMPTY_THREAD_ITEM_IDS;
-  return visible.length === itemIds.length ? itemIds : visible;
+  const result =
+    visible.length === 0
+      ? EMPTY_THREAD_ITEM_IDS
+      : visible.length === itemIds.length
+        ? itemIds
+        : visible;
+
+  if (visibleItemIdsCache.size > 500) visibleItemIdsCache.clear();
+  visibleItemIdsCache.set(cacheKey, { sourceItemIds: itemIds, structuralVersion, result });
+  return result;
 }
 
 export function selectVisibleThreadTimelineEntries(
@@ -44,14 +101,15 @@ export function selectVisibleThreadTimelineEntries(
 ): readonly ChatTimelineEntry[] {
   const itemIds = selectVisibleThreadRuntimeItemIds(state, threadId, hiddenItemId);
   if (itemIds.length === 0) return EMPTY_THREAD_TIMELINE_ENTRIES;
-  const items = state.runtimeItemsByIdByThread[threadId];
-  const cacheKey = [
-    threadId,
-    hiddenItemId ?? "",
-    ...itemIds.map((itemId) => `${itemId}:${items?.[itemId]?.type ?? ""}`),
-  ].join("\0");
+
+  const structuralVersion = state.runtimeStructuralVersionByThread?.[threadId] ?? 0;
+  const cacheKey = `${threadId}\0${hiddenItemId ?? ""}`;
   const cached = timelineEntryCache.get(cacheKey);
-  if (cached) return cached;
+  if (cached && cached.itemIds === itemIds && cached.structuralVersion === structuralVersion) {
+    return cached.entries;
+  }
+
+  const items = state.runtimeItemsByIdByThread[threadId];
   const entries: ChatTimelineEntry[] = [];
   let idx = 0;
   while (idx < itemIds.length) {
@@ -82,7 +140,7 @@ export function selectVisibleThreadTimelineEntries(
     }
   }
   if (timelineEntryCache.size > 500) timelineEntryCache.clear();
-  timelineEntryCache.set(cacheKey, entries);
+  timelineEntryCache.set(cacheKey, { itemIds, structuralVersion, entries });
   return entries;
 }
 
@@ -186,4 +244,19 @@ export function getRuntimeItemStoreSelector(
     runtimeItemStoreSelectorCache.set(key, sel);
   }
   return sel;
+}
+
+export function clearRuntimeItemStoreSelectorCacheForThread(threadId: string): void {
+  const prefix = `${threadId}\0`;
+  for (const key of runtimeItemStoreSelectorCache.keys()) {
+    if (key.startsWith(prefix)) {
+      runtimeItemStoreSelectorCache.delete(key);
+    }
+  }
+  for (const key of timelineEntryCache.keys()) {
+    if (key.startsWith(prefix)) timelineEntryCache.delete(key);
+  }
+  for (const key of visibleItemIdsCache.keys()) {
+    if (key.startsWith(prefix)) visibleItemIdsCache.delete(key);
+  }
 }

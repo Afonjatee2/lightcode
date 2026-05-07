@@ -37,12 +37,17 @@ export interface AcpMapperState {
   toolCallItems: Map<string, string>;
   /** Item id of the most recent plan, if open. */
   openPlanItemId?: string;
+  /** ACP `toolCallId`s rerouted to other item types (e.g. assistant_message
+   * for Copilot's `task_complete` summary). Their `tool_call_update`s must be
+   * dropped so we don't emit ghost updates against the wrong item. */
+  suppressedToolCallIds: Set<string>;
 }
 
 export function createAcpMapperState(threadId: string): AcpMapperState {
   return {
     threadId,
     toolCallItems: new Map(),
+    suppressedToolCallIds: new Set(),
   };
 }
 
@@ -77,6 +82,7 @@ export function closeOpenContentItems(state: AcpMapperState): RuntimeEvent[] {
  */
 export function resetMapperForTurnEnd(state: AcpMapperState): void {
   state.toolCallItems.clear();
+  state.suppressedToolCallIds.clear();
   delete state.openPlanItemId;
 }
 
@@ -202,6 +208,31 @@ export function mapAcpSessionUpdate(
         status?: "pending" | "in_progress" | "completed" | "failed";
         rawInput?: unknown;
       };
+      // Copilot's `task_complete` is the end-of-turn summary, not a real tool —
+      // surface it as an assistant_message so it renders inline with the rest
+      // of the response instead of as a collapsed accordion.
+      if (isTaskCompleteSummary(toolCall.title, toolCall.kind)) {
+        const text = extractTaskCompleteSummary(toolCall.rawInput);
+        state.suppressedToolCallIds.add(toolCall.toolCallId);
+        if (text) {
+          const asstId = newItemId("asst");
+          events.push({
+            type: "item.started",
+            threadId,
+            itemId: asstId,
+            itemType: "assistant_message",
+          });
+          events.push({
+            type: "content.delta",
+            threadId,
+            itemId: asstId,
+            stream: "assistant_text",
+            delta: text,
+          });
+          events.push({ type: "item.completed", threadId, itemId: asstId });
+        }
+        break;
+      }
       const itemId = newItemId("tool");
       state.toolCallItems.set(toolCall.toolCallId, itemId);
       const status =
@@ -228,6 +259,12 @@ export function mapAcpSessionUpdate(
         status?: "pending" | "in_progress" | "completed" | "failed";
         rawOutput?: unknown;
       };
+      if (state.suppressedToolCallIds.has(toolCall.toolCallId)) {
+        if (toolCall.status === "completed" || toolCall.status === "failed") {
+          state.suppressedToolCallIds.delete(toolCall.toolCallId);
+        }
+        break;
+      }
       const itemId = state.toolCallItems.get(toolCall.toolCallId);
       if (!itemId) break;
       const isTerminal = toolCall.status === "completed" || toolCall.status === "failed";
@@ -355,6 +392,34 @@ function buildAcpToolCallPayload(
     return { ...base, query };
   }
   return base;
+}
+
+/**
+ * Copilot's ACP server emits an end-of-turn summary as a `tool_call` named
+ * `task_complete`. It isn't a tool — it's the agent's wrap-up message — so we
+ * detect it here and reroute it to an assistant_message item instead.
+ */
+function isTaskCompleteSummary(title: string | undefined, kind: string | undefined): boolean {
+  const t = (title ?? "").toLowerCase().trim();
+  const k = (kind ?? "").toLowerCase().trim();
+  return t === "task_complete" || k === "task_complete";
+}
+
+/** Pull the summary text from a `task_complete` `rawInput`. The shape isn't
+ * standardized, so we accept the input as either a string or an object with a
+ * recognizable text field, falling back to a JSON dump of the object. */
+function extractTaskCompleteSummary(input: unknown): string | undefined {
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    return trimmed.length > 0 ? trimmed : undefined;
+  }
+  if (input && typeof input === "object") {
+    for (const key of ["summary", "message", "body", "text", "description"]) {
+      const v = (input as Record<string, unknown>)[key];
+      if (typeof v === "string" && v.trim().length > 0) return v;
+    }
+  }
+  return undefined;
 }
 
 function readStringField(input: unknown, key: string): string | undefined {

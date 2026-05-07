@@ -9,8 +9,8 @@ interface InlineFilePathChipProps {
 
 /**
  * Inline chip rendered inside chat markdown for `path[:line]` references.
- * Sits on the text baseline (em-based sizing, line-height: 1) so it doesn't
- * inflate paragraph height. Mirrors the visual language of
+ * Vertically centered with surrounding prose (em-based sizing) so it reads
+ * inline without clipping descenders. Mirrors the visual language of
  * `.lightcode-mention-chip` used in the composer.
  */
 export function InlineFilePathChip({ path, line, onOpen }: InlineFilePathChipProps) {
@@ -28,12 +28,7 @@ export function InlineFilePathChip({ path, line, onOpen }: InlineFilePathChipPro
         onOpen?.(path, line);
       }}
     >
-      <img
-        className="lightcode-inline-path-chip__icon"
-        src={iconUrl}
-        alt=""
-        draggable={false}
-      />
+      <img className="lightcode-inline-path-chip__icon" src={iconUrl} alt="" draggable={false} />
       <span className="lightcode-inline-path-chip__name">{basename}</span>
       {line !== undefined ? (
         <span className="lightcode-inline-path-chip__line">{`· L${line}`}</span>

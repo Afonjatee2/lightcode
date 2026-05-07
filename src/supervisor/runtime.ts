@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, watch, type FSWatcher } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/settings";
@@ -83,6 +83,8 @@ import type {
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
   InterruptThreadPayload,
+  SetPendingSteerPayload,
+  ClearPendingSteerPayload,
   ListProjectTreePayload,
   ListProjectTreeResult,
   MoveProjectEntryPayload,
@@ -147,10 +149,46 @@ function readSupervisorSharedSettings(settingsPath: string) {
   }
 }
 
+class SupervisorSharedSettingsCache {
+  private cached: ReturnType<typeof readSupervisorSharedSettings> | undefined;
+  private watcher: FSWatcher | undefined;
+
+  constructor(private readonly settingsPath: string) {}
+
+  read(): ReturnType<typeof readSupervisorSharedSettings> {
+    this.cached ??= readSupervisorSharedSettings(this.settingsPath);
+    this.ensureWatcher();
+    return this.cached;
+  }
+
+  dispose(): void {
+    this.watcher?.close();
+    this.watcher = undefined;
+    this.cached = undefined;
+  }
+
+  private ensureWatcher(): void {
+    if (this.watcher) return;
+    try {
+      this.watcher = watch(this.settingsPath, () => {
+        this.cached = undefined;
+      });
+      this.watcher.on("error", () => {
+        this.watcher?.close();
+        this.watcher = undefined;
+        this.cached = undefined;
+      });
+    } catch {
+      // Settings may not exist on first boot; the next read will retry.
+    }
+  }
+}
+
 export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
   private readonly logsDir: string;
   private readonly settingsPath: string;
+  private readonly sharedSettingsCache: SupervisorSharedSettingsCache;
   private readonly gitService = new GitService();
   private _projectWatcher: ProjectWatcher | undefined;
   private readonly githubService = new GitHubService();
@@ -202,6 +240,7 @@ export class SupervisorRuntime {
     const paths = resolveLightcodePaths(baseDir);
     this.logsDir = paths.terminalLogsDir;
     this.settingsPath = paths.settingsPath;
+    this.sharedSettingsCache = new SupervisorSharedSettingsCache(this.settingsPath);
     mkdirSync(paths.cacheDir, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
 
@@ -237,7 +276,7 @@ export class SupervisorRuntime {
       // or touching the agent's settings. Install + `--settings <path>` +
       // `preferredNotifChannel: "iterm2"` all stay in place so L2 keeps
       // flowing; we just ignore the L1 signal here.
-      if (readSupervisorSharedSettings(this.settingsPath).disableCliHookPlugin) {
+      if (this.sharedSettingsCache.read().disableCliHookPlugin) {
         if (isLightcodeHookDebug()) {
           console.log(`[supervisor] hook-debug: L1 envelope dropped (dev toggle) ← ${source}`, {
             threadId: envelope.threadId,
@@ -316,6 +355,7 @@ export class SupervisorRuntime {
       isDev: this.isDev,
       logsDir: this.logsDir,
       settingsPath: this.settingsPath,
+      readDisableCliHookPlugin: () => this.sharedSettingsCache.read().disableCliHookPlugin,
       adapters: this.adapters,
       windowsShell: this.windowsShell,
       resolvePluginEnvForSpawn: (input) =>
@@ -347,6 +387,14 @@ export class SupervisorRuntime {
 
   async interruptThread(payload: InterruptThreadPayload): Promise<void> {
     return this.threadSessionManager.interruptThread(payload);
+  }
+
+  async setPendingSteer(payload: SetPendingSteerPayload): Promise<void> {
+    return this.threadSessionManager.setPendingSteer(payload);
+  }
+
+  async clearPendingSteer(payload: ClearPendingSteerPayload): Promise<void> {
+    return this.threadSessionManager.clearPendingSteer(payload);
   }
 
   async writeTerminal(payload: WriteTerminalPayload): Promise<void> {
@@ -875,6 +923,7 @@ export class SupervisorRuntime {
     this.lspManager.dispose();
     this._projectWatcher?.dispose();
     this.threadSessionManager.dispose();
+    this.sharedSettingsCache.dispose();
     void this.cliHookPluginCoordinator.dispose();
   }
 

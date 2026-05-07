@@ -80,8 +80,19 @@ function probeDir(): string {
   return typeof __dirname !== "undefined" ? __dirname : dirname(fileURLToPath(import.meta.url));
 }
 
+/**
+ * In packaged builds the worker lives at `…/app.asar/dist/main/…`, but WSL's
+ * `node` cannot read inside an asar archive — only Electron's patched fs hooks
+ * can. The corresponding electron-builder `asarUnpack` rule mirrors the file to
+ * `…/app.asar.unpacked/dist/main/…`; rewrite the path so the external
+ * interpreter sees a regular on-disk file.
+ */
+function unpackedAsarPath(p: string): string {
+  return p.replace(/([\\/])app\.asar([\\/])/, "$1app.asar.unpacked$2");
+}
+
 function getSdkWorkerPath(): string {
-  return join(probeDir(), "claudeSdkProbeWorker.mjs");
+  return join(unpackedAsarPath(probeDir()), "claudeSdkProbeWorker.mjs");
 }
 
 /**

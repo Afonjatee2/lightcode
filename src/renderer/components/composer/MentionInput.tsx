@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { FileEntry, ProjectLocation, PromptSegment } from "@/shared/contracts";
+import { fileNameFromPath } from "@/shared/promptContent";
 import { createChipElement, type FileMentionData } from "./FileMentionChip";
-import { fileNameFromPath } from "./useAttachments";
 import { MentionPopover } from "./MentionPopover";
 import { useDebouncedFileSearch } from "./useDebouncedFileSearch";
 import { serializeToSegments, flattenSegments } from "./serializeMentions";

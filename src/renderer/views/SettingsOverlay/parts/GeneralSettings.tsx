@@ -1,5 +1,5 @@
 import { startTransition } from "react";
-import { Switch } from "@heroui/react";
+import { NumberField, Switch } from "@heroui/react";
 import type {
   GitReviewMode,
   NewThreadMode,
@@ -68,6 +68,10 @@ export function GeneralSettings() {
   const staleThreadUnloadMinutes = useSharedSettings((state) => state.staleThreadUnloadMinutes);
   const setStaleThreadUnloadMinutes = useSharedSettings(
     (state) => state.setStaleThreadUnloadMinutes,
+  );
+  const autoArchiveDoneAfterDays = useSharedSettings((state) => state.autoArchiveDoneAfterDays);
+  const setAutoArchiveDoneAfterDays = useSharedSettings(
+    (state) => state.setAutoArchiveDoneAfterDays,
   );
   const scrollSpeed = useSharedSettings((state) => state.scrollSpeed);
   const setScrollSpeed = useSharedSettings((state) => state.setScrollSpeed);
@@ -192,6 +196,36 @@ export function GeneralSettings() {
                 });
               }}
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Auto-archive done threads after</p>
+              <p className="text-xs text-muted">
+                Threads marked done that haven&apos;t been touched for this many days are archived
+                automatically on app launch. Set to 0 to disable.
+              </p>
+            </div>
+            <NumberField
+              aria-label="Auto-archive done threads after (days)"
+              className="w-[160px] shrink-0"
+              minValue={0}
+              maxValue={3650}
+              step={1}
+              value={autoArchiveDoneAfterDays}
+              onChange={(value) => {
+                if (Number.isNaN(value)) return;
+                startTransition(() => {
+                  setAutoArchiveDoneAfterDays(Math.max(0, Math.floor(value)));
+                });
+              }}
+            >
+              <NumberField.Group>
+                <NumberField.DecrementButton />
+                <NumberField.Input />
+                <NumberField.IncrementButton />
+              </NumberField.Group>
+            </NumberField>
           </div>
 
           <div className="flex items-center justify-between gap-4">

@@ -25,8 +25,11 @@ import type { SliceCreator } from "./shared";
 export interface ViewSlice {
   view: AppView;
   focusedPaneId: string | null;
+  pendingComposerFocusThreadId: string | null;
   groupLayouts: Record<string, SavedGroupLayout>;
   setFocusedPane: (paneId: string) => void;
+  requestComposerFocus: (threadId: string) => void;
+  clearComposerFocusRequest: (threadId: string) => void;
   openDraft: (projectId: string) => void;
   openDraftSideBySide: (projectId: string) => void;
   openHome: () => void;
@@ -66,8 +69,14 @@ export interface ViewSlice {
 export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   view: { kind: "home" },
   focusedPaneId: null,
+  pendingComposerFocusThreadId: null,
   groupLayouts: {},
   setFocusedPane: (paneId) => set({ focusedPaneId: paneId }),
+  requestComposerFocus: (threadId) => set({ pendingComposerFocusThreadId: threadId }),
+  clearComposerFocusRequest: (threadId) =>
+    set((state) =>
+      state.pendingComposerFocusThreadId === threadId ? { pendingComposerFocusThreadId: null } : {},
+    ),
   openDraft: (projectId) => set({ view: { kind: "draft", projectId } }),
   openDraftSideBySide: (projectId) =>
     set((state) => {

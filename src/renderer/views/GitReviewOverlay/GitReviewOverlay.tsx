@@ -39,6 +39,7 @@ export function GitReviewOverlay(props: {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedStaged, setSelectedStaged] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const [diffMode, setDiffMode] = useState<number>(DIFF_MODE.Split);
   const [diffFilter, setDiffFilter] = useState<DiffFilter>("changes");
   const gitStatus = useGitStore((s) =>
@@ -46,6 +47,7 @@ export function GitReviewOverlay(props: {
   ) as GitStatusResult | undefined;
 
   async function fetchStatus() {
+    setRefreshing(true);
     try {
       const status = await readBridge().getGitStatus({
         projectLocation: effectiveLocation,
@@ -57,6 +59,8 @@ export function GitReviewOverlay(props: {
       }
     } catch {
       // ignore
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -255,7 +259,7 @@ export function GitReviewOverlay(props: {
               title="Refresh"
               onClick={() => void handleRefresh()}
             >
-              <RefreshCw className="size-4" />
+              <RefreshCw className={`size-4 ${refreshing ? "animate-spin" : ""}`} />
             </button>
           </div>
         </>

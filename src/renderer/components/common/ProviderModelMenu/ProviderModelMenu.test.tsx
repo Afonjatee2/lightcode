@@ -103,6 +103,23 @@ describe("ProviderModelMenu", () => {
     expect(screen.queryByText("Model 499")).not.toBeInTheDocument();
   });
 
+  it("window-renders model lists instead of switching render paths by size", async () => {
+    render(
+      <ProviderModelMenu
+        providers={[makeProvider(3)]}
+        currentAgentKind="codex"
+        currentModel="model-1"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    expect(listbox).toHaveClass("no-scrollbar");
+    expect(screen.getByText("Model 3")).toBeInTheDocument();
+  });
+
   it("resets the window when a long list shrinks so rows do not render blank", async () => {
     const { rerender } = render(
       <ProviderModelMenu
@@ -131,10 +148,13 @@ describe("ProviderModelMenu", () => {
     expect(within(rerenderedListbox).getAllByRole("option").length).toBeGreaterThan(0);
   });
 
-  it("does not reorder into the favorites section until the menu is reopened", async () => {
+  it("aggregates favorites into a sticky section when multiple providers are visible", async () => {
     render(
       <ProviderModelMenu
-        providers={[makeProvider(3)]}
+        providers={[
+          makeNamedProvider("codex", "Codex", 3),
+          makeNamedProvider("claude", "Claude", 3),
+        ]}
         currentAgentKind="codex"
         currentModel="model-1"
         onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
@@ -156,7 +176,32 @@ describe("ProviderModelMenu", () => {
     expect(await screen.findByText("Favorites")).toBeInTheDocument();
   });
 
-  it("focuses the favorite copy of the selected model when reopened", async () => {
+  it("does not duplicate favorites into a separate section when only one provider is visible", async () => {
+    useSharedSettings.setState({
+      favoriteModels: [{ agentKind: "codex", modelId: "model-2" }],
+      recentModels: [],
+    });
+
+    render(
+      <ProviderModelMenu
+        providers={[makeProvider(3)]}
+        currentAgentKind="codex"
+        currentModel="model-1"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    expect(within(listbox).queryByText("Favorites")).not.toBeInTheDocument();
+    const optionLabels = within(listbox)
+      .getAllByRole("option")
+      .map((o) => o.textContent?.trim());
+    expect(optionLabels[0]).toContain("Model 2");
+  });
+
+  it("hoists the selected favorite to the top of the single-provider list when reopened", async () => {
     useSharedSettings.setState({
       favoriteModels: [{ agentKind: "codex", modelId: "model-500" }],
       recentModels: [],
@@ -174,7 +219,7 @@ describe("ProviderModelMenu", () => {
     fireEvent.click(screen.getByRole("button", { name: "Select model" }));
 
     const listbox = await screen.findByRole("listbox", { name: "Models" });
-    expect((await screen.findAllByText("Favorites")).length).toBeGreaterThan(0);
+    expect(within(listbox).queryByText("Favorites")).not.toBeInTheDocument();
     expect(await within(listbox).findByText("Model 500")).toBeInTheDocument();
     await waitFor(() => expect(listbox.scrollTop).toBe(0));
   });

@@ -11,6 +11,7 @@ import type {
   ThreadServerRequestId,
   ThreadStatus,
 } from "@/shared/contracts";
+import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { toWslUncPath } from "@/shared/wsl";
 import { resolveNodeForDistro } from "../../wsl/runtime";
@@ -82,15 +83,57 @@ function toSessionRef(threadId: string): SessionRef {
   return createKnownSessionRef(threadId);
 }
 
+// Codex's `turn/start` requires a non-empty `developer_instructions` string
+// inside `collaborationMode.settings`. We send these on every turn so that
+// switching between Plan and Default mode mid-session takes effect (Codex
+// would otherwise treat the prior mode as sticky).
+const PLAN_MODE_DEVELOPER_INSTRUCTIONS =
+  "You are operating in plan mode. Produce a clear, step-by-step plan for the user's request. Do not edit files, run shell commands, or call mutating tools — gather context with read-only tools as needed, then present the plan and wait for the user to approve before executing any changes.";
+
+const DEFAULT_MODE_DEVELOPER_INSTRUCTIONS =
+  "You are operating in default mode. Any prior plan-mode instructions no longer apply: you may edit files, run commands, and use mutating tools as appropriate to fulfill the user's request.";
+
+// `thread/start` accepts a SandboxMode string ("read-only" / "workspace-write" /
+// "danger-full-access"), but `turn/start` accepts a SandboxPolicy *object*
+// under the `sandboxPolicy` key. Sending a kebab-case string under `sandbox`
+// to `turn/start` is silently dropped, so per-turn sandbox overrides — like
+// switching from Supervised to Full Access mid-thread — never reach Codex.
+function toCodexSandboxPolicy(
+  mode: string | undefined,
+): { type: "readOnly" } | { type: "workspaceWrite" } | { type: "dangerFullAccess" } | undefined {
+  switch (mode) {
+    case "read-only":
+      return { type: "readOnly" };
+    case "workspace-write":
+      return { type: "workspaceWrite" };
+    case "danger-full-access":
+      return { type: "dangerFullAccess" };
+    default:
+      return undefined;
+  }
+}
+
 function extractThreadField(result: unknown, field: string): string | undefined {
-  if (!result || typeof result !== "object" || !("thread" in result)) {
+  return extractObjectStringField(result, "thread", field);
+}
+
+function extractTurnField(result: unknown, field: string): string | undefined {
+  return extractObjectStringField(result, "turn", field);
+}
+
+function extractObjectStringField(
+  result: unknown,
+  objectField: string,
+  field: string,
+): string | undefined {
+  if (!result || typeof result !== "object" || !(objectField in result)) {
     return undefined;
   }
-  const thread = (result as Record<string, unknown>).thread;
-  if (!thread || typeof thread !== "object" || !(field in thread)) {
+  const object = (result as Record<string, unknown>)[objectField];
+  if (!object || typeof object !== "object" || !(field in object)) {
     return undefined;
   }
-  const value = (thread as Record<string, unknown>)[field];
+  const value = (object as Record<string, unknown>)[field];
   return typeof value === "string" ? value : undefined;
 }
 
@@ -228,6 +271,12 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   private rolloutModelProvider: string | undefined;
   private wslDistro: string | undefined;
   private currentThreadStatus: CodexThreadStatus = { type: "idle" };
+  private activeTurnId: string | undefined;
+  private pendingTurnInterrupt = false;
+  // Sticky-error gate: once a turn fails, derived status updates from
+  // `thread/status/changed` (which Codex emits as `idle` after an aborted
+  // turn) must not overwrite the error state. Cleared on the next user turn.
+  private errorSticky = false;
   private mapperState: CodexMapperState | undefined;
   /**
    * Runtime events emitted before the listener was wired. Replayed on
@@ -344,12 +393,13 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   }
 
   async openThread(config: ThreadConfig, sessionRef?: SessionRef): Promise<string> {
+    // `mode` does not exist on `thread/start` or `thread/resume`; plan mode is
+    // a per-turn override sent via `collaborationMode` on `turn/start`.
     const threadOverrides = {
       model: config.model,
       ...(config.approvalPolicy ? { approvalPolicy: config.approvalPolicy } : {}),
       ...(config.sandboxMode ? { sandbox: config.sandboxMode } : {}),
       ...(config.effort ? { config: { model_reasoning_effort: config.effort } } : {}),
-      ...(config.mode === "plan" ? { mode: "plan" } : {}),
     };
 
     const startParams = {
@@ -477,6 +527,8 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     segments?: PromptSegment[],
     options?: StartTurnOptions,
   ): Promise<void> {
+    // New user turn clears any sticky error from a previous failed turn.
+    this.errorSticky = false;
     const threadId = await this.waitForRemoteThreadId();
 
     const turnId = `turn-${randomUUID()}`;
@@ -489,7 +541,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         itemId: userItemId,
         itemType: "user_message",
         payload: {
-          content: prompt.trim().length > 0 ? [{ kind: "text" as const, text: prompt }] : [],
+          content: buildPromptContentBlocks(prompt, segments),
         },
       },
       { type: "item.completed", threadId: this.threadId, itemId: userItemId },
@@ -526,15 +578,67 @@ export class CodexStructuredSession implements StructuredSessionHandle {
 
     input.push({ type: "text", text: prompt, text_elements: [] });
 
-    await this.request("turn/start", {
+    const sandboxPolicy = toCodexSandboxPolicy(config.sandboxMode);
+    // Plan mode is sticky at the session level once set, so always send the
+    // current mode on every turn — otherwise toggling Plan off won't revert.
+    // `collaborationMode.settings` is a *required* field and its three
+    // string members (model / reasoning_effort / developer_instructions)
+    // reject `null`s and empty objects — Codex's JSON-RPC validator wants
+    // real strings on every turn. Mirrors the working shape used by t3code.
+    const collaborationMode = {
+      mode: config.mode === "plan" ? "plan" : "default",
+      settings: {
+        model: config.model,
+        reasoning_effort: config.effort ?? "medium",
+        developer_instructions:
+          config.mode === "plan"
+            ? PLAN_MODE_DEVELOPER_INSTRUCTIONS
+            : DEFAULT_MODE_DEVELOPER_INSTRUCTIONS,
+      },
+    };
+    try {
+      const result = await this.request("turn/start", {
+        threadId,
+        input,
+        model: config.model,
+        ...(config.effort ? { effort: config.effort } : {}),
+        ...(config.approvalPolicy ? { approvalPolicy: config.approvalPolicy } : {}),
+        ...(sandboxPolicy ? { sandboxPolicy } : {}),
+        collaborationMode,
+        ...(config.fast ? { serviceTier: "fast" } : {}),
+      });
+      this.activeTurnId = extractTurnField(result, "id");
+      if (this.pendingTurnInterrupt && this.activeTurnId) {
+        this.pendingTurnInterrupt = false;
+        await this.request("turn/interrupt", {
+          threadId,
+          turnId: this.activeTurnId,
+        });
+      }
+    } catch (error) {
+      if (this.isDisposed) return;
+      const message = error instanceof Error ? error.message : String(error);
+      this.errorSticky = true;
+      this.listener?.onUpdate({ status: "error", attention: "error", errorMessage: message });
+      this.emitRuntimeEvents([{ type: "error", threadId: this.threadId, message }]);
+      throw error;
+    }
+  }
+
+  async interruptTurn(): Promise<void> {
+    if (this.isDisposed) {
+      return;
+    }
+
+    const threadId = await this.waitForRemoteThreadId();
+    if (!this.activeTurnId) {
+      this.pendingTurnInterrupt = true;
+      return;
+    }
+
+    await this.request("turn/interrupt", {
       threadId,
-      input,
-      model: config.model,
-      ...(config.effort ? { effort: config.effort } : {}),
-      ...(config.approvalPolicy ? { approvalPolicy: config.approvalPolicy } : {}),
-      ...(config.sandboxMode ? { sandbox: config.sandboxMode } : {}),
-      ...(config.mode === "plan" ? { mode: "plan" } : {}),
-      ...(config.fast ? { config: { service_tier: "fast" } } : {}),
+      turnId: this.activeTurnId,
     });
   }
 
@@ -654,6 +758,9 @@ export class CodexStructuredSession implements StructuredSessionHandle {
             return;
           }
 
+          this.activeTurnId =
+            extractTurnField(params, "id") ??
+            (typeof params.turnId === "string" ? params.turnId : this.activeTurnId);
           this.listener?.onUpdate({
             status: "working",
             attention: "working",
@@ -669,6 +776,8 @@ export class CodexStructuredSession implements StructuredSessionHandle {
             return;
           }
 
+          this.pendingTurnInterrupt = false;
+          this.activeTurnId = undefined;
           void this.syncRemoteThreadState(incomingThreadId);
           return;
         }
@@ -731,6 +840,14 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   }
 
   private emitDerivedUpdate(sessionRef?: SessionRef): void {
+    if (this.errorSticky) {
+      // Preserve error status until the user starts a new turn. Still forward
+      // sessionRef updates if present so resume metadata is not lost.
+      if (sessionRef) {
+        this.listener?.onUpdate({ status: "error", attention: "error", sessionRef });
+      }
+      return;
+    }
     const next = deriveCodexStructuredState(this.currentThreadStatus);
     this.listener?.onUpdate({
       status: next.status,

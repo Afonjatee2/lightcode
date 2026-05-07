@@ -1,8 +1,6 @@
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
-import { createAcpStructuredSession } from "../acp";
 import {
-  buildAgentCommand,
   createKnownSessionRef,
   detectAgentInstall,
   shortenHomePath,
@@ -10,10 +8,10 @@ import {
   type CreateStructuredSessionInput,
   type TerminalStatusHint,
 } from "../base";
-import { resolveAgentBinaryPath } from "../binaryResolver";
 import { warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildOpenCodeArgs } from "./argv";
 import { opencodeDefaultCapabilities, opencodeDetectionSpec } from "./detection";
+import { OpencodeSdkSession } from "./sdkSession";
 import {
   installOpenCodePlugin,
   isOpenCodePluginInstalled,
@@ -121,28 +119,25 @@ export function createOpenCodeAdapter(): AgentAdapter {
       return undefined;
     },
 
-    // ── Structured session (ACP — used only to allocate a session id) ────
+    // ── Structured session (SDK-backed for both modes) ──────────────────
     //
-    // The runtime calls `activate()` then `openThread()` on the returned
-    // handle, which fires ACP `initialize` + `session/new`. The handle stores
-    // the new id in `launchOptions.resumeThreadId`, then the runtime disposes
-    // the handle (because `liveInputMode === "terminal"` makes
-    // `keepStructuredSession` false in `threadSessionManager.ts`). The child
-    // `opencode acp` process is killed before the TUI spawns — the TUI reads
-    // the same SQLite store and resumes via `--session <id>`.
+    // Terminal mode (default): runtime calls `activate()` + `openThread()`,
+    // captures the returned session id into `launchOptions.resumeThreadId`,
+    // then disposes immediately because `liveInputMode === "terminal"`. The
+    // ephemeral `opencode serve` process exits; the TUI launches with
+    // `--session <id>` and resumes from SQLite. Same observable behaviour as
+    // the previous `opencode acp` allocation, just over HTTP+SDK so we share
+    // infrastructure with the GUI flow.
     //
-    // Resume gating: `createAcpStructuredSession` skips the spawn for
-    // terminal-mode resume (the TUI re-attaches via `--session <id>`), so we
-    // don't need a local guard here. If OpenCode ever adds GUI presentation,
-    // resume will keep ACP alive automatically.
+    // GUI mode: same handle stays alive for the thread's lifetime; SSE
+    // events stream through `sdkCanonicalMapping` into chat items.
     async createStructuredSession(input: CreateStructuredSessionInput) {
-      const command = buildAgentCommand(
-        input.projectLocation,
-        "opencode",
-        ["acp"],
-        resolveAgentBinaryPath(input.projectLocation, "opencode"),
-      );
-      return createAcpStructuredSession(command, input);
+      // Terminal-mode resume: the TUI re-attaches via `--session <id>` from
+      // SQLite, so we don't need a live SDK session. Skip the spawn entirely.
+      const isResume = input.sessionRef !== undefined;
+      const isTerminal = input.presentationMode !== "gui";
+      if (isResume && isTerminal) return undefined;
+      return OpencodeSdkSession.create(input);
     },
 
     // ── Input ────────────────────────────────────────────────────────────

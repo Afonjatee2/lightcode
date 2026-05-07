@@ -30,20 +30,24 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
       { label: "result", part: resultPart },
     ];
   }, [isExpanded, payload, stream]);
-  if (!payload?.path) return null;
+  if (!payload) return null;
   const right = formatRightLabel(payload);
   const hasDetails = (stream && stream.length > 0) || hasAuxFields(payload);
+  const titleNode =
+    payload.path && payload.path.length > 0 ? (
+      <PathDisplay
+        path={payload.path}
+        basenameClassName="!text-[color:var(--foreground)]"
+        dirClassName="!text-[color:var(--muted)]"
+      />
+    ) : (
+      (readPayloadString(payload, "name") ?? "Edit")
+    );
 
   return (
     <ChatItemAccordion
       icon={<FileEdit className="size-3" />}
-      title={
-        <PathDisplay
-          path={payload.path}
-          basenameClassName="!text-[color:var(--foreground)]"
-          dirClassName="!text-[color:var(--muted)]"
-        />
-      }
+      title={titleNode}
       rightLabel={right}
       hasBody={hasDetails}
       isExpanded={isExpanded}
@@ -62,6 +66,12 @@ function hasAuxFields(payload: unknown): boolean {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
   return p.args !== undefined || p.result !== undefined;
+}
+
+function readPayloadString(payload: unknown, key: string): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const v = (payload as Record<string, unknown>)[key];
+  return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
 /**

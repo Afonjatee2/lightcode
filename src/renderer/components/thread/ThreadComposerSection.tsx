@@ -16,14 +16,17 @@ import { flattenSegments } from "../composer/serializeMentions";
 import { getComposerControls } from "../providers";
 import { EffortIcon } from "../providers/EffortIcon";
 import { readBridge } from "@/renderer/bridge";
-import type { PendingThreadServerRequest } from "@/renderer/state/appStore";
+import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
+import { ThreadErrorDock } from "./ThreadErrorDock";
+import { ThreadPendingSteerStrip } from "./ThreadPendingSteerStrip";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 import { ThreadTodoDock } from "./ThreadTodoDock";
 import { filterHiddenModels } from "./threadComposerOptions";
+import type { ThreadErrorDockState } from "./threadErrorState";
 import type { ThreadTodoDockState } from "./threadTodoState";
 import type { TerminalPaneHandle } from "./TerminalPane";
 
@@ -153,6 +156,7 @@ type ThreadComposerSectionProps = {
   todoDockCollapsed: boolean;
   todoDockPlacement: "composer" | "right";
   todoDockState: ThreadTodoDockState | null;
+  errorDockState: ThreadErrorDockState | null;
   onConfigChange: (config: ThreadConfig) => void;
   onResolveServerRequest: (input: {
     requestId: ThreadServerRequestId;
@@ -179,11 +183,13 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     todoDockCollapsed,
     todoDockPlacement,
     todoDockState,
+    errorDockState,
   } = props;
   const [prompt, setPrompt] = useState("");
   const [hasContent, setHasContent] = useState(false);
   const mentionRef = useRef<MentionInputHandle>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isInterrupting, setIsInterrupting] = useState(false);
   const attachments = useAttachments();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const imageAttachments = attachments.attachments.filter((a) => a.isImage);
@@ -217,6 +223,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     thread.status !== "launching";
   const showTodoInComposer =
     !usesTerminalPresentation && todoDockState !== null && todoDockPlacement === "composer";
+  const showErrorInComposer = !usesTerminalPresentation && errorDockState !== null;
   const collapseTerminalComposerSetting = useSharedSettings((s) => s.collapseTerminalComposer);
   const [composerCollapsed, setComposerCollapsed] = useState(collapseTerminalComposerSetting);
   const canCollapseComposer = showTerminalComposer;
@@ -234,11 +241,16 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
   const canInterruptStructuredTurn =
     !usesTerminalPresentation && thread.sessionRef !== undefined && thread.status === "working";
+  const pendingSteer = useAppStore((s) => s.pendingSteerByThreadId[thread.id]);
+  const usesPendingSteerPath = !usesTerminalPresentation && thread.status === "working";
 
   function handleInterrupt() {
+    if (isInterrupting) return;
+    setIsInterrupting(true);
     void readBridge()
       .interruptThread({ threadId: thread.id })
       .catch((error: unknown) => {
+        setIsInterrupting(false);
         console.error("[thread] failed to interrupt turn", error);
       });
   }
@@ -285,8 +297,23 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
       ? (props.terminalPaneRef.current?.focus(), new Promise<void>((r) => setTimeout(r, 80)))
       : Promise.resolve();
 
+    // GUI threads + working status → stage as pending steer (replace-latest).
+    // The supervisor fires the cancel and drains the slot when the in-flight
+    // turn returns with `cancelled` stopReason. No optimistic chat paint —
+    // the strip above the composer is the visual confirmation; the real
+    // user_message item lands when the turn drains and starts.
+    const runSubmission = () =>
+      usesPendingSteerPath
+        ? readBridge().setPendingSteer({
+            threadId: thread.id,
+            prompt: flat,
+            ...(allSegments.length > 0 ? { segments: allSegments } : {}),
+            config: thread.config,
+          })
+        : props.onSubmitInput(flat, allSegments.length > 0 ? allSegments : undefined);
+
     void focusPromise
-      .then(() => props.onSubmitInput(flat, allSegments.length > 0 ? allSegments : undefined))
+      .then(runSubmission)
       .then(() => {
         mentionRef.current?.clear();
         mentionRef.current?.focus();
@@ -302,10 +329,23 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
       });
   }
 
+  function handleCancelPendingSteer() {
+    void readBridge()
+      .clearPendingSteer({ threadId: thread.id })
+      .catch((error: unknown) => {
+        console.error("[thread] failed to clear pending steer", error);
+      });
+  }
+
   useEffect(() => {
     setPrompt("");
+    setIsInterrupting(false);
     setComposerCollapsed(collapseTerminalComposerSetting);
   }, [thread.id, collapseTerminalComposerSetting]);
+
+  useEffect(() => {
+    if (thread.status !== "working") setIsInterrupting(false);
+  }, [thread.status]);
 
   useEffect(() => {
     function handlePasteToComposer(e: Event) {
@@ -315,6 +355,16 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     window.addEventListener("lightcode:paste-to-composer", handlePasteToComposer);
     return () => window.removeEventListener("lightcode:paste-to-composer", handlePasteToComposer);
   }, []);
+
+  const pendingComposerFocusThreadId = useAppStore((s) => s.pendingComposerFocusThreadId);
+  useEffect(() => {
+    if (pendingComposerFocusThreadId !== thread.id) return;
+    const raf = requestAnimationFrame(() => {
+      mentionRef.current?.focus();
+      useAppStore.getState().clearComposerFocusRequest(thread.id);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [pendingComposerFocusThreadId, thread.id]);
 
   return (
     <>
@@ -346,14 +396,25 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                   compact
                   fixedContent={
-                    showTodoInComposer ? (
-                      <ThreadTodoDock
-                        collapsed={todoDockCollapsed}
-                        placement={todoDockPlacement}
-                        state={todoDockState!}
-                        onCollapsedChange={props.onTodoDockCollapsedChange}
-                        onPlacementChange={props.onTodoDockPlacementChange}
-                      />
+                    showErrorInComposer || showTodoInComposer || pendingSteer ? (
+                      <>
+                        {showErrorInComposer ? <ThreadErrorDock state={errorDockState!} /> : null}
+                        {showTodoInComposer ? (
+                          <ThreadTodoDock
+                            collapsed={todoDockCollapsed}
+                            placement={todoDockPlacement}
+                            state={todoDockState!}
+                            onCollapsedChange={props.onTodoDockCollapsedChange}
+                            onPlacementChange={props.onTodoDockPlacementChange}
+                          />
+                        ) : null}
+                        {pendingSteer ? (
+                          <ThreadPendingSteerStrip
+                            pending={pendingSteer}
+                            onCancel={handleCancelPendingSteer}
+                          />
+                        ) : null}
+                      </>
                     ) : null
                   }
                   attachmentBar={
@@ -418,6 +479,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   placeholder="Send a message..."
                   prompt={prompt}
                   promptDisabled={!(showServerComposer || showTerminalComposer)}
+                  stopPending={isInterrupting}
                   submitDisabled={!(hasContent || attachments.attachments.length > 0) || !canSubmit}
                   submitLabel="Send message"
                   onStop={canInterruptStructuredTurn ? handleInterrupt : undefined}

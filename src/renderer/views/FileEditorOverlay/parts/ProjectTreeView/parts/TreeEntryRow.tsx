@@ -27,6 +27,7 @@ export function TreeEntryRow(props: {
   onMovePath: (sourcePath: string, nextParentPath: string) => Promise<void>;
   onHandleRename: (path: string, nextName: string) => Promise<void>;
   onHandleCreate: (parentPath: string, type: "file" | "directory", value: string) => Promise<void>;
+  renderChildren?: boolean;
 }) {
   const { entry, depth, draft, setDraft } = props;
   const isDirectory = entry.type === "directory";
@@ -186,7 +187,7 @@ export function TreeEntryRow(props: {
         </div>
       </ContextMenu>
 
-      {isDirectory && isExpanded ? (
+      {props.renderChildren !== false && isDirectory && isExpanded ? (
         <TreeChildren
           parentPath={entry.path}
           depth={depth + 1}

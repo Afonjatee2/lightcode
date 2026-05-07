@@ -61,6 +61,8 @@ export const sharedSettingsSchema = z.object({
   collapseTerminalComposer: z.boolean(),
   /** Idle minutes before a hidden resumable thread is unloaded. 0 disables auto-unload. */
   staleThreadUnloadMinutes: z.number().int().min(0),
+  /** Days a thread can stay marked done before it is auto-archived. 0 disables auto-archive. */
+  autoArchiveDoneAfterDays: z.number().int().min(0),
   /** Terminal scrollback scroll speed multiplier. */
   scrollSpeed: z.number().int().min(1).max(10),
   /** Base font size for agent terminals. Auto-shrinks in narrow/short panes. */
@@ -156,6 +158,7 @@ export const defaultSharedSettings: SharedSettings = {
   disabledAgents: [],
   collapseTerminalComposer: false,
   staleThreadUnloadMinutes: 20,
+  autoArchiveDoneAfterDays: 7,
   scrollSpeed: 2,
   agentTerminalFontSize: 12,
   guiChatFontSize: 13,

@@ -38,6 +38,10 @@ export function useProject(projectId: string | undefined) {
   return useAppStore((s) => (projectId ? getProjectMap(s.projects).get(projectId) : undefined));
 }
 
+export function useProjectIds() {
+  return useAppStore(useShallow((s) => s.projects.map((project) => project.id)));
+}
+
 /**
  * Subscribe to the ordered list of thread IDs.
  *

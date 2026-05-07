@@ -1,16 +1,7 @@
 import { useState } from "react";
 import { readBridge } from "@/renderer/bridge";
 import type { PromptSegment } from "@/shared/contracts";
-
-/**
- * Convert an absolute filesystem path to a lightcode-local:// URL
- * that the custom protocol handler in main can resolve.
- * Windows backslashes are normalized to forward slashes.
- */
-export function toLocalFileUrl(absolutePath: string): string {
-  const normalized = absolutePath.replaceAll("\\", "/");
-  return `lightcode-local:///${normalized}`;
-}
+import { fileNameFromPath, isImagePath } from "@/shared/promptContent";
 
 export interface Attachment {
   id: string;
@@ -19,18 +10,6 @@ export interface Attachment {
   mimeType?: string;
   isImage: boolean;
 }
-
-const IMAGE_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "webp",
-  "svg",
-  "bmp",
-  "ico",
-  "avif",
-]);
 
 const MIME_BY_EXT: Record<string, string> = {
   png: "image/png",
@@ -57,17 +36,6 @@ function inferMimeType(name: string): string | undefined {
   return MIME_BY_EXT[getExtension(name)];
 }
 
-function isImageExtension(name: string): boolean {
-  return IMAGE_EXTENSIONS.has(getExtension(name));
-}
-
-export function fileNameFromPath(path: string): string {
-  const sep = path.lastIndexOf("/");
-  const bsep = path.lastIndexOf("\\");
-  const lastSep = Math.max(sep, bsep);
-  return lastSep >= 0 ? path.slice(lastSep + 1) : path;
-}
-
 export function useAttachments() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
 
@@ -80,7 +48,7 @@ export function useAttachments() {
         path,
         name,
         ...(mimeType ? { mimeType } : {}),
-        isImage: isImageExtension(name),
+        isImage: isImagePath(name, mimeType),
       };
     });
     setAttachments((prev) => [...prev, ...newAttachments]);

@@ -38,6 +38,7 @@ import type {
   ThreadStatus,
 } from "@/shared/contracts";
 import { isThreadConfigEqual } from "@/shared/contracts";
+import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
   closeOpenContentItems,
   createAcpMapperState,
@@ -308,6 +309,16 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private currentConfig: ThreadConfig | undefined;
   private spawnReady: Promise<void> = Promise.resolve();
   private currentTurnId: string | undefined;
+  /**
+   * True while a `connection.prompt()` call is in flight (between issue and
+   * resolution). Used together with `pendingPromptInterrupt` to close the
+   * window where `interruptTurn()` fires before the ACP runtime has actually
+   * accepted the prompt — without this, `connection.cancel()` lands on an
+   * idle session and is silently dropped, so the steer would be lost.
+   * Mirrors Codex's `pendingTurnInterrupt` race guard at codex/acp.ts:264.
+   */
+  private promptInFlight = false;
+  private pendingPromptInterrupt = false;
   private availableModeIds: string[] = [];
   private thoughtLevelConfigId: string | undefined;
 
@@ -690,7 +701,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         itemId: userItemId,
         itemType: "user_message",
         payload: {
-          content: prompt.trim().length > 0 ? [{ kind: "text", text: prompt }] : [],
+          content: buildPromptContentBlocks(prompt, segments),
         },
       },
       { type: "item.completed", threadId: this.threadId, itemId: userItemId },
@@ -702,6 +713,15 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     const contentBlocks = await segmentsToContentBlocks(prompt, this.projectLocation, segments);
 
     try {
+      this.promptInFlight = true;
+      // If `interruptTurn()` was called between `startTurn` entry and this
+      // point (rare, but possible: the supervisor stages a steer immediately
+      // after a previous turn ended), fire the cancel now so the agent
+      // doesn't process this prompt.
+      if (this.pendingPromptInterrupt && this.sessionId) {
+        this.pendingPromptInterrupt = false;
+        await this.connection.cancel({ sessionId: this.sessionId });
+      }
       const result = await this.connection.prompt({
         sessionId: this.sessionId,
         prompt: contentBlocks,
@@ -743,6 +763,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           : []),
       ]);
       resetMapperForTurnEnd(mapperState);
+    } finally {
+      this.promptInFlight = false;
     }
   }
 
@@ -766,6 +788,16 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
 
     this.cancelPendingPermissionRequests();
+    // Race guard: if interrupt fires before `connection.prompt()` has been
+    // entered (e.g. the supervisor stages a steer in the same microtask as
+    // a fresh startTurn), set a flag instead of issuing the cancel directly.
+    // The cancel would land on an idle session and be silently ignored;
+    // `startTurn` checks the flag right before awaiting `prompt()` and fires
+    // the cancel from there. Mirrors codex/acp.ts:584-599.
+    if (!this.promptInFlight) {
+      this.pendingPromptInterrupt = true;
+      return;
+    }
     await this.connection.cancel({ sessionId: this.sessionId });
   }
 

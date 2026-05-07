@@ -34,7 +34,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: Assista
         ) : null}
         {isStreaming && rawText.length === 0 ? (
           <div className="text-foreground-muted">
-            <PixelLoader size="xs" />
+            <PixelLoader size="xxs" />
           </div>
         ) : null}
       </div>

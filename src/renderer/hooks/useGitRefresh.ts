@@ -1,8 +1,9 @@
-import { useEffect, useRef } from "react";
-import type { PrData, Project, ProjectLocation } from "@/shared/contracts";
+import { useEffect } from "react";
+import type { PrData, ProjectLocation } from "@/shared/contracts";
 import { parseDraftProjectId } from "@/shared/paneId";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
+import { buildActiveProjectsKey } from "@/renderer/state/projectKeys";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { buildBranchPrKey } from "@/renderer/state/gitSelectors";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
@@ -11,24 +12,14 @@ import {
   GIT_FETCH_BACKGROUND_INTERVAL_MS,
 } from "@/renderer/utils/gitHelpers";
 
-export function useGitRefresh(projects: readonly Project[], storeHydrated: boolean) {
-  // Keep the latest projects in a ref so the effect can read them without
-  // re-running every time the appStore mints a new array reference (which
-  // happens on agent-status events, view changes, etc.). The effect only
-  // re-runs when the *set* of active project IDs changes.
-  const projectsRef = useRef(projects);
-  projectsRef.current = projects;
-  const activeProjectsKey = projects
-    .filter((p) => !p.disabled)
-    .map((p) => `${p.id}:${p.location.kind}`)
-    .sort()
-    .join("|");
+export function useGitRefresh(storeHydrated: boolean) {
+  // Subscribe only to the active-project identity/location key so draft config
+  // writes do not invalidate the whole shell.
+  const activeProjectsKey = useAppStore((state) => buildActiveProjectsKey(state.projects));
 
   useEffect(() => {
-    if (!storeHydrated || projectsRef.current.length === 0) return;
-
-    const activeProjects = projectsRef.current.filter((p) => !p.disabled);
-    if (activeProjects.length === 0) return;
+    const activeProjects = useAppStore.getState().projects.filter((project) => !project.disabled);
+    if (!storeHydrated || activeProjects.length === 0) return;
 
     let isActive = true;
     const refreshingProjects = new Set<string>();
@@ -409,6 +400,5 @@ export function useGitRefresh(projects: readonly Project[], storeHydrated: boole
           .catch(() => undefined);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- projectsRef is intentionally read via .current
   }, [storeHydrated, activeProjectsKey]);
 }

@@ -19,6 +19,7 @@ import { guiChatFontCssVars } from "./ChatPane/chatFontVars";
 import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposerSection } from "./ThreadComposerSection";
 import { ThreadTodoDock } from "./ThreadTodoDock";
+import { getThreadErrorDockStateForItem, selectThreadLatestErrorItem } from "./threadErrorState";
 import { getThreadTodoDockStateForItem, selectThreadTodoDockItem } from "./threadTodoState";
 
 type CommonContentProps = {
@@ -42,6 +43,7 @@ const emptyTodoComposerProps = {
   todoDockCollapsed: false,
   todoDockPlacement: "composer" as const,
   todoDockState: null,
+  errorDockState: null,
   onTodoDockCollapsedChange: () => undefined,
   onTodoDockPlacementChange: () => undefined,
 };
@@ -88,6 +90,8 @@ export function GuiThreadContent(
   const setTodoDockCollapsed = useThreadTodoDockStore((s) => s.setCollapsed);
   const todoDockItem = useAppStore((s) => selectThreadTodoDockItem(s, props.threadId));
   const todoDockState = todoDockItem ? getThreadTodoDockStateForItem(todoDockItem) : null;
+  const errorItem = useAppStore((s) => selectThreadLatestErrorItem(s, props.threadId));
+  const errorDockState = errorItem ? getThreadErrorDockStateForItem(errorItem) : null;
   const showTodoDock = todoDockState !== null;
   const showTodoInRightRail = showTodoDock && todoDockPlacement === "right";
   const showThreadSideRail = runtimeDebugOpen || showTodoInRightRail;
@@ -143,6 +147,7 @@ export function GuiThreadContent(
         todoDockCollapsed={todoDockCollapsed}
         todoDockPlacement={todoDockPlacement}
         todoDockState={todoDockState}
+        errorDockState={errorDockState}
         onTodoDockCollapsedChange={setTodoDockCollapsed}
         onTodoDockPlacementChange={setTodoDockPlacement}
       />

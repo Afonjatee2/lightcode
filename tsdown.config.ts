@@ -2,6 +2,18 @@ import { defineConfig } from "tsdown";
 
 const isProd = process.env.NODE_ENV === "production";
 
+const deps = {
+  alwaysBundle: ["electron-updater", "simple-git", "zod"],
+  onlyBundle: false as const,
+  neverBundle: [
+    "electron",
+    "node-pty",
+    "better-sqlite3",
+    "@anthropic-ai/claude-agent-sdk",
+    "@opencode-ai/sdk",
+  ],
+};
+
 const shared = {
   outDir: "dist/main",
   platform: "node" as const,
@@ -10,11 +22,7 @@ const shared = {
   sourcemap: true,
   dts: false,
   minify: isProd ? ({ compress: { dropConsole: true, dropDebugger: true } } as const) : false,
-  deps: {
-    alwaysBundle: ["electron-updater", "simple-git", "zod"],
-    onlyBundle: false as const,
-    neverBundle: ["electron", "node-pty", "better-sqlite3", "@anthropic-ai/claude-agent-sdk"],
-  },
+  deps,
 };
 
 export default defineConfig([
@@ -43,10 +51,6 @@ export default defineConfig([
     sourcemap: true,
     dts: false,
     minify: false,
-    deps: {
-      alwaysBundle: ["electron-updater", "simple-git", "zod"],
-      onlyBundle: false as const,
-      neverBundle: ["electron", "node-pty", "better-sqlite3", "@anthropic-ai/claude-agent-sdk"],
-    },
+    deps,
   },
 ]);

@@ -37,6 +37,18 @@ describe("mapCodexNotification — turn lifecycle", () => {
     const completed = events.find((e) => e.type === "turn.completed");
     expect(completed).toMatchObject({ type: "turn.completed", state: "interrupted" });
   });
+
+  it("treats turn/completed with interrupted status as state=interrupted", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification("turn/started", { turnId: "t-1", threadId: "x" }, state);
+    const events = mapCodexNotification(
+      "turn/completed",
+      { threadId: "x", turn: { id: "t-1", status: "interrupted" } },
+      state,
+    );
+    const completed = events.find((e) => e.type === "turn.completed");
+    expect(completed).toMatchObject({ type: "turn.completed", state: "interrupted" });
+  });
 });
 
 describe("mapCodexNotification — item lifecycle (item/started, item/completed)", () => {

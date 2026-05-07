@@ -1,18 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
+import { ButtonGroup } from "@heroui/react";
+import { HelpCircle, Plug, ShieldAlert } from "lucide-react";
 import type { ThreadServerRequestId } from "@/shared/contracts";
 import type { PendingThreadServerRequest } from "@/renderer/state/appStore";
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  Input,
-  Select,
-  TextArea,
-} from "@/renderer/components/common";
+import { Button, Input, PathDisplay, Select, TextArea } from "@/renderer/components/common";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -107,6 +98,21 @@ type CommandApprovalParams = {
   grantRoot?: string | null;
   permissions?: unknown;
   availableDecisions?: unknown[] | null;
+};
+
+type AcpPermissionOption = {
+  optionId: string;
+  name: string;
+  kind?: string | null;
+};
+
+type AcpPermissionRequestParams = {
+  toolCall: {
+    title?: string | null;
+    kind?: string | null;
+    rawInput?: unknown;
+  };
+  options: AcpPermissionOption[];
 };
 
 function parseUserInputRequestParams(params: unknown): UserInputRequestParams | undefined {
@@ -239,6 +245,47 @@ function parseCommandApprovalParams(params: unknown): CommandApprovalParams {
       ? { availableDecisions: params.availableDecisions }
       : {}),
   };
+}
+
+function parseAcpPermissionRequestParams(params: unknown): AcpPermissionRequestParams | undefined {
+  if (!isRecord(params) || !isRecord(params.toolCall) || !Array.isArray(params.options)) {
+    return undefined;
+  }
+
+  const options = params.options.flatMap((option): AcpPermissionOption[] => {
+    if (!isRecord(option)) {
+      return [];
+    }
+    const optionId = asString(option.optionId);
+    const name = asString(option.name);
+    if (!optionId || !name) {
+      return [];
+    }
+    return [
+      {
+        optionId,
+        name,
+        ...(Object.hasOwn(option, "kind") ? { kind: asString(option.kind) ?? null } : {}),
+      },
+    ];
+  });
+
+  return options.length > 0
+    ? {
+        toolCall: {
+          ...(Object.hasOwn(params.toolCall, "title")
+            ? { title: asString(params.toolCall.title) ?? null }
+            : {}),
+          ...(Object.hasOwn(params.toolCall, "kind")
+            ? { kind: asString(params.toolCall.kind) ?? null }
+            : {}),
+          ...(Object.hasOwn(params.toolCall, "rawInput")
+            ? { rawInput: params.toolCall.rawInput }
+            : {}),
+        },
+        options,
+      }
+    : undefined;
 }
 
 function getCommandDecisionLabel(decision: unknown): string {
@@ -378,43 +425,135 @@ function resolveAgentLead(agentLabel?: string): string {
   return trimmed && trimmed.length > 0 ? trimmed : "The agent";
 }
 
+type DetailRow = {
+  label: string;
+  value: string;
+  isPath?: boolean;
+  mono?: boolean;
+};
+
+type LucideIcon = ComponentType<SVGProps<SVGSVGElement>>;
+
+function ApprovalDetailRow(props: DetailRow) {
+  return (
+    <div className="flex min-w-0 items-baseline gap-2 px-2 py-0.5 leading-tight">
+      <dt className="w-[5.5rem] shrink-0 text-[10px] font-medium uppercase tracking-wider text-muted/80">
+        {props.label}
+      </dt>
+      <dd
+        className={`min-w-0 flex-1 ${props.mono ? "font-mono" : ""} text-foreground`}
+        title={props.value}
+      >
+        {props.isPath ? (
+          <PathDisplay path={props.value} />
+        ) : (
+          <span className="block truncate">{props.value}</span>
+        )}
+      </dd>
+    </div>
+  );
+}
+
+type ActionDescriptor = {
+  key: string;
+  label: string;
+  onPress: () => void;
+  isDisabled?: boolean;
+};
+
+function ApprovalActionBar(props: {
+  cancel?: ActionDescriptor | null;
+  extraNegatives?: ActionDescriptor[];
+  positives: ActionDescriptor[];
+  isDisabled?: boolean;
+}) {
+  const { cancel, extraNegatives = [], positives, isDisabled = false } = props;
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center gap-1">
+        {cancel ? (
+          <Button
+            isDisabled={isDisabled || cancel.isDisabled === true}
+            size="sm"
+            variant="ghost"
+            onPress={cancel.onPress}
+          >
+            {cancel.label}
+          </Button>
+        ) : (
+          <span />
+        )}
+        {extraNegatives.map((action) => (
+          <Button
+            key={action.key}
+            isDisabled={isDisabled || action.isDisabled === true}
+            size="sm"
+            variant="ghost"
+            onPress={action.onPress}
+          >
+            {action.label}
+          </Button>
+        ))}
+      </div>
+      {positives.length > 0 ? (
+        <ButtonGroup size="sm">
+          {positives.map((action, idx) => (
+            <Button
+              key={action.key}
+              isDisabled={isDisabled || action.isDisabled === true}
+              variant={idx === 0 ? "primary" : "secondary"}
+              onPress={action.onPress}
+            >
+              {action.label}
+            </Button>
+          ))}
+        </ButtonGroup>
+      ) : null}
+    </div>
+  );
+}
+
 function RequestShell(props: {
   title: string;
   description: string;
-  details?: Array<{ label: string; value: string }>;
-  body: ReactNode;
+  details?: DetailRow[];
+  body?: ReactNode;
   footer?: ReactNode;
+  icon?: LucideIcon;
 }) {
-  const { title, description, details = [], body, footer } = props;
+  const { title, description, details = [], body, footer, icon: Icon = ShieldAlert } = props;
 
   return (
-    <Card className="border border-[color:var(--border)] bg-[color:color-mix(in_oklab,var(--surface)_94%,transparent)] shadow-none">
-      <CardHeader className="space-y-1 px-5 py-4">
-        <CardTitle className="text-base font-semibold tracking-tight text-foreground">
-          {title}
-        </CardTitle>
-        <CardDescription className="text-sm text-muted">{description}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4 px-5 pb-5">
-        {details.length > 0 ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {details.map((detail) => (
-              <div
-                key={`${detail.label}-${detail.value}`}
-                className="rounded-xl border border-[color:var(--border)] bg-white/[0.03] px-3 py-2"
-              >
-                <p className="text-[11px] font-medium uppercase tracking-[0.16em] text-muted">
-                  {detail.label}
-                </p>
-                <p className="mt-1 text-sm text-foreground">{detail.value}</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        {body}
-      </CardContent>
-      {footer ? <CardFooter className="px-5 pb-5 pt-0">{footer}</CardFooter> : null}
-    </Card>
+    <section
+      aria-label={title}
+      className="mx-2 mt-2 mb-2 flex flex-col rounded-2xl border border-warning-300/40 bg-[var(--composer-surface)] text-xs"
+    >
+      <div className="flex items-start gap-2 px-2.5 pt-2 pb-1.5 leading-tight">
+        <Icon className="mt-0.5 size-3.5 shrink-0 text-warning" />
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold text-foreground">{title}</div>
+          <div className="mt-0.5 line-clamp-3 text-[color:var(--muted)]">{description}</div>
+        </div>
+      </div>
+
+      {details.length > 0 ? (
+        <dl className="px-0.5 pb-1.5">
+          {details.map((detail) => (
+            <ApprovalDetailRow key={`${detail.label}-${detail.value}`} {...detail} />
+          ))}
+        </dl>
+      ) : null}
+
+      {body ? (
+        <div className="max-h-[55vh] overflow-y-auto px-2.5 pb-2 [scrollbar-gutter:stable]">
+          {body}
+        </div>
+      ) : null}
+
+      {footer ? (
+        <div className="border-t border-[color:var(--border)] px-2 py-1.5">{footer}</div>
+      ) : null}
+    </section>
   );
 }
 
@@ -430,17 +569,31 @@ function UserInputRequestCard(props: {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const agentLead = resolveAgentLead(agentLabel);
 
+  const submit = async () => {
+    setIsSubmitting(true);
+    try {
+      await onResolve({
+        answers: Object.fromEntries(
+          Object.entries(answers).map(([id, value]) => [id, { answers: value ? [value] : [] }]),
+        ),
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <RequestShell
+      icon={HelpCircle}
       title="Input requested"
       description={`${agentLead} is waiting for more information before it can continue.`}
       body={
-        <div className="space-y-4">
+        <div className="space-y-3">
           {params.questions.map((question) => (
-            <div key={question.id} className="space-y-2">
-              <div className="space-y-1">
-                <p className="text-sm font-medium text-foreground">{question.header}</p>
-                <p className="text-sm text-muted">{question.question}</p>
+            <div key={question.id} className="space-y-1.5">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-foreground">{question.header}</p>
+                <p className="text-xs text-muted">{question.question}</p>
               </div>
               {question.options ? (
                 <Select
@@ -488,29 +641,10 @@ function UserInputRequestCard(props: {
         </div>
       }
       footer={
-        <div className="flex w-full justify-end">
-          <Button
-            className="rounded-full px-4"
-            isDisabled={isSubmitting}
-            onPress={async () => {
-              setIsSubmitting(true);
-              try {
-                await onResolve({
-                  answers: Object.fromEntries(
-                    Object.entries(answers).map(([id, value]) => [
-                      id,
-                      { answers: value ? [value] : [] },
-                    ]),
-                  ),
-                });
-              } finally {
-                setIsSubmitting(false);
-              }
-            }}
-          >
-            Submit
-          </Button>
-        </div>
+        <ApprovalActionBar
+          isDisabled={isSubmitting}
+          positives={[{ key: "submit", label: "Submit", onPress: () => void submit() }]}
+        />
       }
     />
   );
@@ -542,13 +676,14 @@ function McpElicitationRequestCard(props: {
 
   return (
     <RequestShell
+      icon={Plug}
       title="MCP input requested"
       description={params.message}
       details={[{ label: "Server", value: params.serverName }]}
       body={
         params.mode === "url" ? (
           <a
-            className="text-sm font-medium text-[color:var(--accent)] underline-offset-4 hover:underline"
+            className="text-xs font-medium text-[color:var(--accent)] underline-offset-4 hover:underline"
             href={params.url}
             rel="noreferrer"
             target="_blank"
@@ -556,21 +691,21 @@ function McpElicitationRequestCard(props: {
             Open required URL
           </a>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {Object.entries(params.requestedSchema.properties).map(([key, property]) => {
               const label = property.title ?? key;
               const description = property.description ?? "";
               const options = getMcpEnumOptions(property);
 
               return (
-                <div key={key} className="space-y-2">
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-foreground">{label}</p>
-                    {description ? <p className="text-sm text-muted">{description}</p> : null}
+                <div key={key} className="space-y-1.5">
+                  <div className="space-y-0.5">
+                    <p className="text-xs font-medium text-foreground">{label}</p>
+                    {description ? <p className="text-xs text-muted">{description}</p> : null}
                   </div>
 
                   {property.type === "boolean" ? (
-                    <label className="flex items-center gap-2 text-sm text-foreground">
+                    <label className="flex items-center gap-2 text-xs text-foreground">
                       <input
                         checked={Boolean(formValues[key])}
                         className="size-4"
@@ -601,7 +736,7 @@ function McpElicitationRequestCard(props: {
                       }
                     />
                   ) : property.type === "array" ? (
-                    <div className="grid gap-2">
+                    <div className="grid gap-1.5">
                       {options.map((option) => {
                         const currentValues = Array.isArray(formValues[key])
                           ? (formValues[key] as string[])
@@ -610,7 +745,7 @@ function McpElicitationRequestCard(props: {
                         return (
                           <label
                             key={option.id}
-                            className="flex items-center gap-2 text-sm text-foreground"
+                            className="flex items-center gap-2 text-xs text-foreground"
                           >
                             <input
                               checked={currentValues.includes(option.id)}
@@ -667,37 +802,144 @@ function McpElicitationRequestCard(props: {
         )
       }
       footer={
-        <div className="flex w-full flex-wrap justify-end gap-2">
-          <Button
-            className="rounded-full px-4"
-            isDisabled={isSubmitting}
-            onPress={() => resolveWith({ action: "decline" })}
-            variant="ghost"
-          >
-            Decline
-          </Button>
-          <Button
-            className="rounded-full px-4"
-            isDisabled={isSubmitting}
-            onPress={() => resolveWith({ action: "cancel" })}
-            variant="ghost"
-          >
-            Cancel
-          </Button>
-          <Button
-            className="rounded-full px-4"
-            isDisabled={isSubmitting || hasMissingRequiredField}
-            onPress={() =>
-              resolveWith({
-                action: "accept",
-                ...(params.mode === "form" ? { content: formValues } : {}),
-                ...(Object.hasOwn(params, "_meta") ? { _meta: params._meta } : {}),
-              })
-            }
-          >
-            Continue
-          </Button>
-        </div>
+        <ApprovalActionBar
+          isDisabled={isSubmitting}
+          cancel={{
+            key: "cancel",
+            label: "Cancel",
+            onPress: () => void resolveWith({ action: "cancel" }),
+          }}
+          extraNegatives={[
+            {
+              key: "decline",
+              label: "Decline",
+              onPress: () => void resolveWith({ action: "decline" }),
+            },
+          ]}
+          positives={[
+            {
+              key: "continue",
+              label: "Continue",
+              isDisabled: hasMissingRequiredField,
+              onPress: () =>
+                void resolveWith({
+                  action: "accept",
+                  ...(params.mode === "form" ? { content: formValues } : {}),
+                  ...(Object.hasOwn(params, "_meta") ? { _meta: params._meta } : {}),
+                }),
+            },
+          ]}
+        />
+      }
+    />
+  );
+}
+
+type DecisionPolarity = "positive" | "negative";
+
+function classifyDecision(decision: unknown): DecisionPolarity {
+  if (
+    decision === "decline" ||
+    decision === "cancel" ||
+    decision === "denied" ||
+    decision === "abort"
+  ) {
+    return "negative";
+  }
+  if (isRecord(decision) && isRecord(decision.applyNetworkPolicyAmendment)) {
+    const amendment = decision.applyNetworkPolicyAmendment.network_policy_amendment;
+    if (isRecord(amendment) && asString(amendment.action) === "deny") {
+      return "negative";
+    }
+  }
+  return "positive";
+}
+
+function isCancelOrAbort(rawKey: string): boolean {
+  try {
+    const parsed = JSON.parse(rawKey);
+    if (parsed === "cancel" || parsed === "abort") return true;
+  } catch {
+    // fall through to literal compare
+  }
+  return rawKey === "cancel" || rawKey === "abort";
+}
+
+function isRejectPermissionKind(kind: string | null | undefined): boolean {
+  return kind === "reject_once" || kind === "reject_always";
+}
+
+type RawAction = {
+  key: string;
+  label: string;
+  response: unknown;
+  polarity: DecisionPolarity;
+};
+
+function AcpPermissionRequestCard(props: {
+  params: AcpPermissionRequestParams;
+  agentLabel?: string | undefined;
+  onResolve: (response: unknown) => Promise<void>;
+}) {
+  const { params, agentLabel, onResolve } = props;
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const agentLead = resolveAgentLead(agentLabel);
+  const toolTitle = params.toolCall.title ?? params.toolCall.kind ?? "tool call";
+  const actions: RawAction[] = params.options.map((option) => ({
+    key: option.optionId,
+    label: option.name,
+    response: { optionId: option.optionId },
+    polarity: isRejectPermissionKind(option.kind) ? "negative" : "positive",
+  }));
+  const positives = actions.filter((action) => action.polarity === "positive");
+  const negatives = actions.filter((action) => action.polarity === "negative");
+  const cancelRaw = negatives[0];
+  const extraNegativesRaw = negatives.slice(1);
+
+  const resolveWith = async (response: unknown) => {
+    setIsSubmitting(true);
+    try {
+      await onResolve(response);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <RequestShell
+      title="Permission requested"
+      description={`${agentLead} is waiting for approval to run ${toolTitle}.`}
+      details={[...(params.toolCall.kind ? [{ label: "Tool", value: params.toolCall.kind }] : [])]}
+      body={
+        Object.hasOwn(params.toolCall, "rawInput") ? (
+          <pre className="overflow-x-auto rounded border border-[color:var(--border)] bg-foreground/[0.04] p-2 text-[11px] text-muted">
+            {formatJson(params.toolCall.rawInput)}
+          </pre>
+        ) : null
+      }
+      footer={
+        <ApprovalActionBar
+          isDisabled={isSubmitting}
+          cancel={
+            cancelRaw
+              ? {
+                  key: cancelRaw.key,
+                  label: cancelRaw.label,
+                  onPress: () => void resolveWith(cancelRaw.response),
+                }
+              : null
+          }
+          extraNegatives={extraNegativesRaw.map((action) => ({
+            key: action.key,
+            label: action.label,
+            onPress: () => void resolveWith(action.response),
+          }))}
+          positives={positives.map((action) => ({
+            key: action.key,
+            label: action.label,
+            onPress: () => void resolveWith(action.response),
+          }))}
+        />
       }
     />
   );
@@ -722,64 +964,59 @@ function ApprovalRequestCard(props: {
     }
   };
 
-  const commonDetails = [
-    ...(params.reason ? [{ label: "Reason", value: params.reason }] : []),
-    ...(params.command ? [{ label: "Command", value: params.command }] : []),
-    ...(params.cwd ? [{ label: "Directory", value: params.cwd }] : []),
-    ...(params.grantRoot ? [{ label: "Grant root", value: params.grantRoot }] : []),
-  ];
-
   if (request.method === "item/permissions/requestApproval") {
     return (
       <RequestShell
         title="Permissions requested"
         description={params.reason ?? `${agentLead} requested additional permissions.`}
         body={
-          <pre className="overflow-x-auto rounded-xl border border-[color:var(--border)] bg-white/[0.03] p-3 text-xs text-muted">
+          <pre className="overflow-x-auto rounded border border-[color:var(--border)] bg-foreground/[0.04] p-2 text-[11px] text-muted">
             {formatJson(params.permissions ?? request.params)}
           </pre>
         }
         footer={
-          <div className="flex w-full flex-wrap justify-end gap-2">
-            <Button
-              className="rounded-full px-4"
-              isDisabled={isSubmitting}
-              onPress={() =>
-                resolveWith({
-                  permissions: params.permissions ?? {},
-                  scope: "turn",
-                })
-              }
-              variant="secondary"
-            >
-              Allow this turn
-            </Button>
-            <Button
-              className="rounded-full px-4"
-              isDisabled={isSubmitting}
-              onPress={() =>
-                resolveWith({
-                  permissions: params.permissions ?? {},
-                  scope: "session",
-                })
-              }
-            >
-              Allow for session
-            </Button>
-          </div>
+          <ApprovalActionBar
+            isDisabled={isSubmitting}
+            positives={[
+              {
+                key: "turn",
+                label: "Allow this turn",
+                onPress: () =>
+                  void resolveWith({
+                    permissions: params.permissions ?? {},
+                    scope: "turn",
+                  }),
+              },
+              {
+                key: "session",
+                label: "Allow for session",
+                onPress: () =>
+                  void resolveWith({
+                    permissions: params.permissions ?? {},
+                    scope: "session",
+                  }),
+              },
+            ]}
+          />
         }
       />
     );
   }
 
-  const actions =
+  const isFileChange =
+    request.method === "item/fileChange/requestApproval" || request.method === "applyPatchApproval";
+  const title = isFileChange ? "File changes need approval" : "Command needs approval";
+  const description =
+    params.reason ?? `${agentLead} is waiting for approval before it can continue.`;
+
+  const actions: RawAction[] =
     request.method === "item/commandExecution/requestApproval"
       ? (params.availableDecisions ?? ["accept", "acceptForSession", "decline", "cancel"]).map(
           (decision) => ({
             key: JSON.stringify(decision),
             label: getCommandDecisionLabel(decision),
             response: { decision },
-            variant: decision === "decline" || decision === "cancel" ? "ghost" : "secondary",
+            polarity: classifyDecision(decision),
           }),
         )
       : request.method === "item/fileChange/requestApproval"
@@ -787,46 +1024,62 @@ function ApprovalRequestCard(props: {
             key: decision,
             label: getCommandDecisionLabel(decision),
             response: { decision },
-            variant: decision === "decline" || decision === "cancel" ? "ghost" : "secondary",
+            polarity: classifyDecision(decision),
           }))
         : ["approved", "approved_for_session", "denied", "abort"].map((decision) => ({
             key: decision,
             label: getLegacyDecisionLabel(decision),
             response: { decision },
-            variant: decision === "denied" || decision === "abort" ? "ghost" : "secondary",
+            polarity: classifyDecision(decision),
           }));
+
+  // Cancel slot prefers the strongest negative ("cancel"/"abort") over a per-call "decline".
+  const negatives = actions.filter((a) => a.polarity === "negative");
+  const positives = actions.filter((a) => a.polarity === "positive");
+  const cancelRaw = negatives.find((a) => isCancelOrAbort(a.key)) ?? negatives[0];
+  const extraNegativesRaw = negatives.filter((a) => a !== cancelRaw);
+
+  const details: DetailRow[] = [
+    ...(params.command ? [{ label: "Command", value: params.command, mono: true }] : []),
+    ...(params.cwd ? [{ label: "Directory", value: params.cwd, isPath: true }] : []),
+    ...(params.grantRoot ? [{ label: "Grant root", value: params.grantRoot, isPath: true }] : []),
+  ];
 
   return (
     <RequestShell
-      title={
-        request.method === "item/fileChange/requestApproval" ||
-        request.method === "applyPatchApproval"
-          ? "File changes need approval"
-          : "Command needs approval"
-      }
-      description={params.reason ?? `${agentLead} is waiting for approval before it can continue.`}
-      details={commonDetails}
+      title={title}
+      description={description}
+      details={details}
       body={
         params.permissions ? (
-          <pre className="overflow-x-auto rounded-xl border border-[color:var(--border)] bg-white/[0.03] p-3 text-xs text-muted">
+          <pre className="overflow-x-auto rounded border border-[color:var(--border)] bg-foreground/[0.04] p-2 text-[11px] text-muted">
             {formatJson(params.permissions)}
           </pre>
         ) : null
       }
       footer={
-        <div className="flex w-full flex-wrap justify-end gap-2">
-          {actions.map((action) => (
-            <Button
-              key={action.key}
-              className="rounded-full px-4"
-              isDisabled={isSubmitting}
-              onPress={() => resolveWith(action.response)}
-              variant={action.variant === "ghost" ? "ghost" : "secondary"}
-            >
-              {action.label}
-            </Button>
-          ))}
-        </div>
+        <ApprovalActionBar
+          isDisabled={isSubmitting}
+          cancel={
+            cancelRaw
+              ? {
+                  key: cancelRaw.key,
+                  label: cancelRaw.label,
+                  onPress: () => void resolveWith(cancelRaw.response),
+                }
+              : null
+          }
+          extraNegatives={extraNegativesRaw.map((a) => ({
+            key: a.key,
+            label: a.label,
+            onPress: () => void resolveWith(a.response),
+          }))}
+          positives={positives.map((a) => ({
+            key: a.key,
+            label: a.label,
+            onPress: () => void resolveWith(a.response),
+          }))}
+        />
       }
     />
   );
@@ -842,6 +1095,23 @@ export function ThreadServerRequestPanel(props: {
   }) => Promise<void>;
 }) {
   const { request, agentLabel, onResolve } = props;
+  const acpPermissionParams = parseAcpPermissionRequestParams(request.params);
+  if (request.method === "requestPermission" && acpPermissionParams) {
+    return (
+      <AcpPermissionRequestCard
+        params={acpPermissionParams}
+        agentLabel={agentLabel}
+        onResolve={(response) =>
+          onResolve({
+            requestId: request.requestId,
+            method: request.method,
+            response,
+          })
+        }
+      />
+    );
+  }
+
   const userInputParams = parseUserInputRequestParams(request.params);
   if (request.method === "item/tool/requestUserInput" && userInputParams) {
     return (

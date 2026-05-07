@@ -1,17 +1,21 @@
 import { ArrowRight, FolderOpen, Plus, TerminalSquare } from "lucide-react";
+import { useShallow } from "zustand/shallow";
 import { useAppStore } from "@/renderer/state/appStore";
 import { ProviderIcon, getStatusTone } from "@/renderer/components/providers";
 import { formatRelativeTime } from "@/renderer/utils/formatTime";
 
 export function HomeView() {
-  const projects = useAppStore((state) => state.projects);
-  const threads = useAppStore((state) => state.threads);
+  const projects = useAppStore(useShallow((state) => state.projects));
+  const recentThreads = useAppStore(
+    useShallow((state) =>
+      state.threads
+        .filter((t) => !t.done)
+        .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+        .slice(0, 8),
+    ),
+  );
   const openDraft = useAppStore((state) => state.openDraft);
   const openThread = useAppStore((state) => state.openThread);
-  const recentThreads = threads
-    .filter((t) => !t.done)
-    .toSorted((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 8);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

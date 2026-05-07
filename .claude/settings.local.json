@@ -16,7 +16,9 @@
       "Bash(pnpm typecheck *)",
       "WebSearch",
       "Bash(git checkout *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(pnpm run *)",
+      "Read(//tmp/**)"
     ]
   }
 }

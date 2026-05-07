@@ -1,6 +1,7 @@
 import { startTransition, useRef } from "react";
 import type { ExtractContextResult, Thread, ThreadConfig } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
+import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { readBridge } from "@/renderer/bridge";
 import { closePanelsForUnloadedThread } from "@/renderer/actions/panelActions";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -141,7 +142,7 @@ export function ThreadPane(props: {
             threadId: thread.id,
             itemId: optimisticUserMessageItemId,
             itemType: "user_message",
-            payload: { content: [{ kind: "text", text: prompt }] },
+            payload: { content: buildPromptContentBlocks(prompt, segments) },
           });
           useAppStore.getState().applyRuntimeEvent(thread.id, {
             type: "item.completed",

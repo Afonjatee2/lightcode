@@ -168,6 +168,56 @@ describe("mapAcpSessionUpdate", () => {
     expect(started.payload.query).toBe("repo:foo bar");
   });
 
+  it("reroutes Copilot's `task_complete` tool call to an assistant_message", () => {
+    // Copilot emits the end-of-turn wrap-up as a `tool_call` named
+    // `task_complete`. It isn't a real tool — surface it as an assistant
+    // message so it renders inline, not as a collapsed accordion. The
+    // matching `tool_call_update` is suppressed (no ghost item update).
+    const state = createAcpMapperState("t-tc");
+    const summary = "Done. Here is what changed: ...";
+    const started = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-summary",
+        title: "task_complete",
+        kind: "other",
+        status: "in_progress",
+        rawInput: { summary },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    expect(started.map((e) => e.type)).toEqual(["item.started", "content.delta", "item.completed"]);
+    expect((started[0] as { itemType: string }).itemType).toBe("assistant_message");
+    expect((started[1] as { delta: string }).delta).toBe(summary);
+    expect(state.toolCallItems.has("tc-summary")).toBe(false);
+    expect(state.suppressedToolCallIds.has("tc-summary")).toBe(true);
+
+    const updated = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-summary",
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    expect(updated).toEqual([]);
+    expect(state.suppressedToolCallIds.has("tc-summary")).toBe(false);
+  });
+
+  it("accepts a plain-string `task_complete` rawInput", () => {
+    const state = createAcpMapperState("t-tc-str");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-str",
+        title: "task_complete",
+        rawInput: "All set.",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    expect((events[1] as { delta: string }).delta).toBe("All set.");
+  });
+
   it("ignores unknown sessionUpdate kinds without throwing", () => {
     const state = createAcpMapperState("t-4");
     const events = mapAcpSessionUpdate(

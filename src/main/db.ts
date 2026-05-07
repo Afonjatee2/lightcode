@@ -13,6 +13,7 @@ export function initDatabase(dbPath: string) {
   sqlite.pragma("journal_mode = WAL");
   sqlite.pragma("synchronous = NORMAL");
   sqlite.pragma("foreign_keys = ON");
+  sqlite.pragma("busy_timeout = 5000");
 
   _sqlite = sqlite;
   _db = drizzle({ client: sqlite, schema });

@@ -1,14 +1,7 @@
-import {
-  memo,
-  useCallback,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type RefObject,
-} from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAppStore } from "@/renderer/state/appStore";
+import type { AppStoreState } from "@/renderer/state/slices/shared";
 import {
   ChatPaneActionsContext,
   type ChatPaneActions,
@@ -20,7 +13,7 @@ import { ChatItemRow } from "./items/ChatItemRow";
 interface MessageListProps {
   threadId: string;
   entries: readonly ChatTimelineEntry[];
-  scrollRef: RefObject<HTMLDivElement | null>;
+  scrollElement: HTMLDivElement | null;
 }
 
 const CHAT_TRANSCRIPT_OVERSCAN = 8;
@@ -38,7 +31,7 @@ const DEFAULT_ROW_ESTIMATE_PX = 96;
 export const MessageList = memo(function MessageList({
   threadId,
   entries,
-  scrollRef,
+  scrollElement,
 }: MessageListProps) {
   const hasItems = entries.length > 0;
   const parentActions = useChatPaneActions();
@@ -46,7 +39,7 @@ export const MessageList = memo(function MessageList({
   const [measureEpoch, setMeasureEpoch] = useState(0);
   const virtualizer = useVirtualizer({
     count: entries.length,
-    getScrollElement: useCallback(() => scrollRef.current, [scrollRef]),
+    getScrollElement: useCallback(() => scrollElement, [scrollElement]),
     estimateSize: useCallback(
       (index: number) => {
         const entry = entries[index];
@@ -63,18 +56,29 @@ export const MessageList = memo(function MessageList({
 
   useLayoutEffect(() => {
     virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item) => {
-      const el = scrollRef.current;
-      if (!el) return false;
-      return item.start + item.size <= el.scrollTop;
+      if (!scrollElement) return false;
+      return item.start + item.size <= scrollElement.scrollTop;
     };
     return () => {
       virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
     };
-  }, [scrollRef, virtualizer]);
+  }, [scrollElement, virtualizer]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
   const firstVisibleStart = virtualItems[0]?.start ?? 0;
+
+  // The "live tail" index drives the auto-expand on `ToolCallGroup`. Trailing
+  // empty/in-flight reasoning items don't count: an agent emitting a reasoning
+  // bracket between tool calls would otherwise collapse the group prematurely
+  // (and it often completes empty and gets dropped, causing a flicker). Only
+  // once reasoning actually has text — or any other item arrives — does the
+  // previous group lose its live status.
+  const liveTailSelector = useCallback(
+    (state: AppStoreState) => computeLiveTailIndex(state, threadId, entries),
+    [entries, threadId],
+  );
+  const lastLiveIndex = useAppStore(liveTailSelector);
 
   useLayoutEffect(() => {
     parentActions?.onContentHeightChange();
@@ -137,7 +141,7 @@ export const MessageList = memo(function MessageList({
                   threadId={threadId}
                   entry={entry}
                   index={virtualRow.index}
-                  isLastEntry={virtualRow.index === entries.length - 1}
+                  isLastEntry={virtualRow.index === lastLiveIndex}
                   measureElement={measureRowElement}
                 />
               );
@@ -185,6 +189,22 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
     </div>
   );
 });
+
+function computeLiveTailIndex(
+  state: AppStoreState,
+  threadId: string,
+  entries: readonly ChatTimelineEntry[],
+): number {
+  const items = state.runtimeItemsByIdByThread[threadId];
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i]!;
+    if (entry.kind === "tool_call_group") return i;
+    const item = items?.[entry.id];
+    if (item?.type === "reasoning" && !(item.streams.reasoning_text ?? "").trim()) continue;
+    return i;
+  }
+  return -1;
+}
 
 function estimateTimelineEntrySize(entry: ChatTimelineEntry | undefined, threadId: string): number {
   if (!entry) return DEFAULT_ROW_ESTIMATE_PX;

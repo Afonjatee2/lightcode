@@ -31,12 +31,7 @@ export function InlineFolderPathChip({
   return (
     <Dropdown>
       <button type="button" className="lightcode-inline-path-chip" title={path}>
-        <img
-          className="lightcode-inline-path-chip__icon"
-          src={iconUrl}
-          alt=""
-          draggable={false}
-        />
+        <img className="lightcode-inline-path-chip__icon" src={iconUrl} alt="" draggable={false} />
         <span className="lightcode-inline-path-chip__name">{path}</span>
       </button>
       <Dropdown.Popover className="min-w-[220px]">

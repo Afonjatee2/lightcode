@@ -14,6 +14,10 @@ export const opencodeDefaultCapabilities: AgentCapability = {
   supportsDirectInput: true,
   liveInputMode: "terminal",
   presentationMode: "terminal",
+  // GUI presentation routes through `OpencodeSdkSession` (long-lived
+  // `opencode serve` + SDK SSE stream); terminal stays the default and uses
+  // the same SDK helper for one-shot session-id allocation.
+  presentationModes: ["terminal", "gui"],
   bypassApprovalPolicy: "yolo",
   settingDefs: [],
 };

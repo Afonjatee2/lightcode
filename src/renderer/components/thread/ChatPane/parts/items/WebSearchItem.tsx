@@ -1,5 +1,5 @@
 import { memo, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Globe } from "lucide-react";
 import type { WebSearchPayload } from "@/shared/contracts";
 import {
   getRuntimeItemPayload,
@@ -31,7 +31,7 @@ export const WebSearchItem = memo(function WebSearchItem({ item }: WebSearchItem
 
   return (
     <ChatItemAccordion
-      icon={<Search className="size-3" />}
+      icon={<Globe className="size-3" />}
       title={payload.query}
       rightLabel={right}
       hasBody={hasDetails}

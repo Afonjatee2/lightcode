@@ -1,5 +1,6 @@
 import { memo, useMemo, useState } from "react";
 import {
+  CircleAlert,
   Download,
   Eye,
   FilePlus,
@@ -41,7 +42,10 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
   if (isContextCompactionToolCall(item)) return <ContextCompaction item={item} />;
   const hasDetails = payload.args !== undefined || payload.result !== undefined;
   const Icon = pickToolIcon(payload);
-  const errorLabel = payload.status === "error" ? "error" : undefined;
+  const errorLabel =
+    payload.status === "error" ? (
+      <CircleAlert className="size-3 text-danger" aria-label="error" />
+    ) : undefined;
 
   return (
     <ChatItemAccordion

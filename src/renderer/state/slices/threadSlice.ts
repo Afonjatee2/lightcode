@@ -1,15 +1,16 @@
-import type {
-  AgentInstanceId,
-  AppView,
-  SessionRef,
-  Thread,
-  ThreadAttention,
-  ThreadConfig,
-  ThreadPresentationMode,
-  ThreadRuntimeSnapshot,
-  ThreadServerRequestId,
-  ThreadStatus,
-  ThreadStatusSource,
+import {
+  type AgentInstanceId,
+  type AppView,
+  type SessionRef,
+  type Thread,
+  type ThreadAttention,
+  type ThreadConfig,
+  type ThreadPresentationMode,
+  type ThreadRuntimeSnapshot,
+  type ThreadServerRequestId,
+  type ThreadStatus,
+  type ThreadStatusSource,
+  isThreadConfigEqual,
 } from "@/shared/contracts";
 import {
   reorderThreadBlockInProject,
@@ -56,6 +57,7 @@ export interface ThreadSlice {
   starThread: (threadId: string) => void;
   unstarThread: (threadId: string) => void;
   purgeStaleArchivedThreads: (maxAgeDays: number) => void;
+  archiveOldDoneThreads: (maxAgeDays: number) => void;
   markThreadExited: (threadId: string) => void;
   touchThread: (threadId: string) => void;
   reconcileRuntimeSnapshots: (snapshots: ThreadRuntimeSnapshot[]) => void;
@@ -186,7 +188,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       const threads = state.threads.map((thread) => {
         if (thread.id !== threadId) return thread;
         const nextConfig = thread.presentationMode === "gui" ? config : stripPlanMode(config);
-        if (JSON.stringify(thread.config) === JSON.stringify(nextConfig)) return thread;
+        if (isThreadConfigEqual(thread.config, nextConfig)) return thread;
         changed = true;
         return {
           ...thread,
@@ -232,7 +234,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         if (
           thread.status === effectiveStatus &&
           thread.attention === input.attention &&
-          JSON.stringify(thread.config) === JSON.stringify(nextConfig) &&
+          isThreadConfigEqual(thread.config, nextConfig) &&
           thread.canResumeWithConfig === input.canResumeWithConfig &&
           statusSourceMatch &&
           !sessionRefChanged
@@ -291,8 +293,9 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       const thread = state.threads.find((t) => t.id === threadId);
       if (!thread || thread.done) return {};
 
+      const now = new Date().toISOString();
       const threads = state.threads.map((t) =>
-        t.id === threadId ? { ...t, done: true, starred: false } : t,
+        t.id === threadId ? { ...t, done: true, starred: false, updatedAt: now } : t,
       );
 
       let nextView = state.view;
@@ -306,8 +309,11 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
     set((state) => {
       const thread = state.threads.find((t) => t.id === threadId);
       if (!thread || !thread.done) return {};
+      const now = new Date().toISOString();
       return {
-        threads: state.threads.map((t) => (t.id === threadId ? { ...t, done: false } : t)),
+        threads: state.threads.map((t) =>
+          t.id === threadId ? { ...t, done: false, updatedAt: now } : t,
+        ),
       };
     }),
   starThread: (threadId) =>
@@ -334,6 +340,34 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       );
       if (nextThreads.length === state.threads.length) return {};
       return { threads: nextThreads };
+    }),
+  archiveOldDoneThreads: (maxAgeDays) =>
+    set((state) => {
+      if (maxAgeDays <= 0) return {};
+      const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+      let changed = false;
+      const visiblePanes =
+        state.view.kind === "thread" ? new Set(state.view.panes) : new Set<string>();
+
+      const threads = state.threads.map((t) => {
+        if (!t.done || t.archived || t.starred) return t;
+        if (new Date(t.updatedAt).getTime() > cutoff) return t;
+        changed = true;
+        return { ...t, archived: true };
+      });
+
+      if (!changed) return {};
+
+      let nextView = state.view;
+      if (state.view.kind === "thread") {
+        for (const t of threads) {
+          if (t.archived && visiblePanes.has(t.id) && nextView.kind === "thread") {
+            nextView = removePaneFromView(nextView, t.id);
+          }
+        }
+      }
+
+      return { threads, view: nextView };
     }),
   markThreadExited: (threadId) =>
     set((state) => {
@@ -398,7 +432,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           if (
             thread.status === snapshot.status &&
             thread.attention === snapshot.attention &&
-            JSON.stringify(thread.config) === JSON.stringify(nextConfig) &&
+            isThreadConfigEqual(thread.config, nextConfig) &&
             thread.canResumeWithConfig === snapshot.canResumeWithConfig &&
             thread.threadStatusSource === snapshot.threadStatusSource &&
             !sessionRefChanged

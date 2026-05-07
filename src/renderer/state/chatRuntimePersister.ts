@@ -16,8 +16,6 @@ const FLUSH_DEBOUNCE_MS = 300;
  * within a turn.
  */
 export function installRuntimeItemsPersister(): () => void {
-  let prevItemIdsByThread = useAppStore.getState().runtimeItemIdsByThread;
-  let prevItemsByIdByThread = useAppStore.getState().runtimeItemsByIdByThread;
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const pendingItems = new Map<string, RuntimeChatItem[]>();
 
@@ -49,16 +47,19 @@ export function installRuntimeItemsPersister(): () => void {
     pendingTimers.set(threadId, timer);
   };
 
-  const unsubscribe = useAppStore.subscribe((state) => {
-    const nextIds = state.runtimeItemIdsByThread;
-    const nextItemsById = state.runtimeItemsByIdByThread;
-    if (nextIds === prevItemIdsByThread && nextItemsById === prevItemsByIdByThread) return;
-    for (const threadId of Object.keys(nextIds)) {
-      const ids = nextIds[threadId];
-      const prevIds = prevItemIdsByThread[threadId];
-      const itemsById = nextItemsById[threadId];
-      const prevItemsById = prevItemsByIdByThread[threadId];
-      if (ids !== prevIds || itemsById !== prevItemsById) {
+  // Gate the subscriber on `runtimeDirtyThreadIds` reference change so the
+  // persister body skips the ~99% of store mutations that aren't runtime
+  // events (theme toggles, thread metadata edits, drafts, view changes, …).
+  // The slice keeps `runtimeDirtyThreadIds` reference-stable until a runtime
+  // event fires, so reference equality is the right gate here.
+  const unsubscribe = useAppStore.subscribe(
+    (state) => state.runtimeDirtyThreadIds,
+    (dirtyThreadIds) => {
+      if (dirtyThreadIds.length === 0) return;
+      const state = useAppStore.getState();
+      for (const threadId of dirtyThreadIds) {
+        const ids = state.runtimeItemIdsByThread[threadId];
+        const itemsById = state.runtimeItemsByIdByThread[threadId];
         scheduleFlush(
           threadId,
           (ids ?? [])
@@ -66,10 +67,9 @@ export function installRuntimeItemsPersister(): () => void {
             .filter((item): item is RuntimeChatItem => !!item),
         );
       }
-    }
-    prevItemIdsByThread = nextIds;
-    prevItemsByIdByThread = nextItemsById;
-  });
+      useAppStore.getState().clearRuntimeDirtyThreadIds(dirtyThreadIds);
+    },
+  );
 
   return () => {
     unsubscribe();
@@ -172,7 +172,7 @@ function summarizeToolCallNames(items: readonly RuntimeChatItem[]): string {
   );
   const rest = items.length - topCounts.reduce((sum, [, count]) => sum + count, 0);
   if (rest > 0) parts.push(`${rest} other`);
-  return `${items.length} tool calls${parts.length > 0 ? `: ${parts.join(", ")}` : ""}`;
+  return parts.length > 0 ? parts.join(", ") : `${items.length} tools`;
 }
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {

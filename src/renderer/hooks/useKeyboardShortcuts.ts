@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import { usePanelStore } from "@/renderer/state/panelStore";
 
 export function useKeyboardShortcuts() {
   useEffect(() => {
@@ -9,6 +10,11 @@ export function useKeyboardShortcuts() {
       if (e.ctrlKey && e.key === "`") {
         e.preventDefault();
         useDevTerminalStore.getState().togglePanel();
+      }
+
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "p") {
+        e.preventDefault();
+        usePanelStore.getState().openThreadSearch();
       }
 
       if ((e.ctrlKey || e.metaKey) && e.key === "w") {

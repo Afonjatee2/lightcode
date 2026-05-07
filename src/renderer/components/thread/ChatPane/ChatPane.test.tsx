@@ -166,6 +166,43 @@ describe("ChatPane", () => {
     expect(metrics.getScrollTop()).toBe(220);
   });
 
+  it("stays sticky when scrollHeight grows after a programmatic scroll lands", async () => {
+    const thread = makeThread();
+    seedPlanItem(thread.id, [{ step: "Inspect output", status: "in_progress" }]);
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const contentElement = getContentElement(scrollElement);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 200,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(100);
+      fireEvent.scroll(scrollElement);
+    });
+
+    // Race: virtualizer measurement grows scrollHeight after the auto-pin
+    // landed, but the delayed scroll event for that programmatic scroll only
+    // fires now. Bare `!isAtBottom` must not disengage sticky here, or the
+    // corrective re-pin will skip and the "scroll to bottom" button will
+    // appear despite the user wanting to stay pinned.
+    act(() => {
+      metrics.setScrollHeight(300);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      MockResizeObserver.notify(contentElement);
+    });
+
+    await waitFor(() => expect(metrics.getScrollTop()).toBe(300));
+  });
+
   it("does not pull the user back to the bottom after they scroll up", async () => {
     const thread = makeThread();
     seedPlanItem(thread.id, [{ step: "Inspect output", status: "in_progress" }]);
@@ -232,6 +269,33 @@ describe("ChatPane", () => {
     await screen.findByText(/command output/);
   });
 
+  it("collapses long user messages behind a show more button", async () => {
+    const thread = makeThread();
+    seedUserMessage(
+      thread.id,
+      [
+        "Validate optimisations and plan fixes",
+        "Issue one with enough context to fill the first visible line.",
+        "Issue two with enough context to fill the second visible line.",
+        "Issue three with enough context to fill the third visible line.",
+        "Issue four should be hidden until the message is expanded.",
+      ].join("\n"),
+    );
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const button = await screen.findByRole("button", { name: "Show more" });
+    expect(button).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(button);
+
+    expect(screen.getByRole("button", { name: "Show less" })).toHaveAttribute(
+      "aria-expanded",
+      "true",
+    );
+  });
+
   it("keeps ACP command accordions closed while live output streams in", async () => {
     const thread = makeThread();
     startCommandItem(thread.id, "cmd-1", "npm run test");
@@ -264,7 +328,7 @@ describe("ChatPane", () => {
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    const trigger = screen.getByText(/^2 tool calls:/).closest("button");
+    const trigger = screen.getByText(/^2 commands$/).closest("button");
     expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     fireEvent.click(trigger!);
@@ -280,7 +344,7 @@ describe("ChatPane", () => {
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    const trigger = screen.getByText(/^2 tool calls:/).closest("button");
+    const trigger = screen.getByText(/^2 commands$/).closest("button");
     expect(trigger).toHaveAttribute("aria-expanded", "true");
 
     act(() => {
@@ -349,6 +413,16 @@ function startCommandItem(threadId: string, itemId: string, command: string) {
     itemId,
     itemType: "command_execution",
     payload: { command },
+  });
+}
+
+function seedUserMessage(threadId: string, text: string) {
+  useAppStore.getState().applyRuntimeEvent(threadId, {
+    type: "item.started",
+    threadId,
+    itemId: "user-1",
+    itemType: "user_message",
+    payload: { content: [{ kind: "text", text }] },
   });
 }
 

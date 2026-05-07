@@ -45,8 +45,20 @@ export type RuntimeContentStreamKind = z.infer<typeof runtimeContentStreamKindSc
 
 export const canonicalContentBlockSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("text"), text: z.string() }),
-  z.object({ kind: z.literal("image"), mimeType: z.string(), dataUrl: z.string() }),
-  z.object({ kind: z.literal("file"), path: z.string(), name: z.string().optional() }),
+  z.object({
+    kind: z.literal("image"),
+    mimeType: z.string(),
+    dataUrl: z.string(),
+    path: z.string().optional(),
+    name: z.string().optional(),
+    source: z.enum(["attachment", "mention"]).optional(),
+  }),
+  z.object({
+    kind: z.literal("file"),
+    path: z.string(),
+    name: z.string().optional(),
+    source: z.enum(["attachment", "mention"]).optional(),
+  }),
 ]);
 export type CanonicalContentBlock = z.infer<typeof canonicalContentBlockSchema>;
 

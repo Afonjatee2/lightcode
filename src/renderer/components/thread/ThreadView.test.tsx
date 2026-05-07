@@ -11,6 +11,8 @@ const { bridge } = vi.hoisted(() => ({
   bridge: {
     startThread: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     interruptThread: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    setPendingSteer: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    clearPendingSteer: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     searchProjectFiles: vi
       .fn<() => Promise<{ entries: unknown[]; totalIndexed: number }>>()
@@ -432,6 +434,95 @@ describe("ThreadView", () => {
     });
 
     expect(screen.getByText("Input requested")).toBeInTheDocument();
+  });
+
+  it("resolves ACP permission requests with the selected option id", async () => {
+    const onResolveServerRequest = vi
+      .fn<
+        (input: { requestId: string | number; method: string; response: unknown }) => Promise<void>
+      >()
+      .mockResolvedValue(undefined);
+
+    renderThreadView({
+      thread: {
+        id: "thread-acp-request",
+        projectId: "project-1",
+        title: "Gemini thread",
+        agentKind: "gemini",
+        config: {
+          model: "gemini-3-flash-preview",
+        },
+        status: "needs_approval",
+        attention: "needs_approval",
+        canResumeWithConfig: true,
+        archived: false,
+        done: false,
+        starred: false,
+        sessionRef: {
+          providerSessionId: "session-1",
+          discoveredAt: new Date().toISOString(),
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "gemini",
+        label: "Gemini",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "gemini-3-flash-preview", label: "Gemini 3 Flash" }],
+          efforts: [],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+          presentationModes: ["terminal", "gui"],
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      pendingServerRequests: [
+        {
+          threadId: "thread-acp-request",
+          requestId: "acp-perm-1",
+          method: "requestPermission",
+          params: {
+            toolCall: {
+              toolCallId: "tool-1",
+              kind: "execute",
+              title: "echo hi",
+              rawInput: { command: "echo hi" },
+            },
+            options: [
+              { optionId: "allow_once", name: "Allow once", kind: "allow_once" },
+              { optionId: "reject_once", name: "Reject", kind: "reject_once" },
+            ],
+          },
+          receivedAt: new Date().toISOString(),
+        },
+      ],
+      onConfigChange: () => undefined,
+      onResolveServerRequest,
+      onSubmitInput: async () => undefined,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
+
+    await waitFor(() => {
+      expect(onResolveServerRequest).toHaveBeenCalledWith({
+        requestId: "acp-perm-1",
+        method: "requestPermission",
+        response: { optionId: "allow_once" },
+      });
+    });
   });
 
   it("keeps Claude live threads terminal-driven", () => {
@@ -996,11 +1087,13 @@ describe("ThreadView", () => {
     // With empty input and agent working, stop button replaces send
     expect(screen.getByLabelText("Stop response")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByLabelText("Stop response"));
+    const stopButton = screen.getByLabelText("Stop response");
+    fireEvent.click(stopButton);
 
     await waitFor(() => {
       expect(bridge.interruptThread).toHaveBeenCalledWith({ threadId: "thread-gui-working" });
     });
+    expect(stopButton.querySelector('[aria-label="Loading"]')).toBeInTheDocument();
 
     // After entering text, send button appears instead
     const input = screen.getByPlaceholderText("Ask Codex anything about this workspace");

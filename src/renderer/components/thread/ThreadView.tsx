@@ -10,6 +10,7 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
 } from "@/shared/contracts";
+import { buildPromptContentBlocks } from "@/shared/promptContent";
 
 import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
 import { TuxIcon } from "@/renderer/components/common";
@@ -194,7 +195,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         threadId: thread.id,
         itemId: optimisticUserMessageItemId,
         itemType: "user_message",
-        payload: { content: [{ kind: "text", text: pendingLaunchPrompt }] },
+        payload: { content: buildPromptContentBlocks(pendingLaunchPrompt, pendingLaunchSegments) },
       });
       useAppStore.getState().applyRuntimeEvent(thread.id, {
         type: "item.completed",

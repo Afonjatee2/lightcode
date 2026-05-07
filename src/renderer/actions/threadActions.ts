@@ -35,11 +35,14 @@ export function openNewThreadSideBySide(projectId: string): void {
   });
 }
 
-export function openThread(threadId: string): void {
+export function openThread(threadId: string, options?: { focusComposer?: boolean }): void {
   const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
 
   startTransition(() => {
     useAppStore.getState().openThread(threadId);
+    if (options?.focusComposer) {
+      useAppStore.getState().requestComposerFocus(threadId);
+    }
   });
 
   if (thread?.status === "inactive") {

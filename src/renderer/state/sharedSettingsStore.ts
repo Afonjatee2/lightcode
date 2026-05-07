@@ -34,6 +34,7 @@ interface SharedSettingsState extends SharedSettings {
   setAgentDisabled: (agentKind: string, disabled: boolean) => void;
   setCollapseTerminalComposer: (value: boolean) => void;
   setStaleThreadUnloadMinutes: (value: number) => void;
+  setAutoArchiveDoneAfterDays: (value: number) => void;
   setScrollSpeed: (value: number) => void;
   setAgentTerminalFontSize: (value: number) => void;
   setGuiChatFontSize: (value: number) => void;
@@ -193,6 +194,10 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ staleThreadUnloadMinutes });
     persistSettings(selectSharedSettings(get()));
   },
+  setAutoArchiveDoneAfterDays: (autoArchiveDoneAfterDays) => {
+    set({ autoArchiveDoneAfterDays });
+    persistSettings(selectSharedSettings(get()));
+  },
   setScrollSpeed: (scrollSpeed) => {
     set({ scrollSpeed });
     persistSettings(selectSharedSettings(get()));
@@ -342,6 +347,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     disabledAgents: state.disabledAgents,
     collapseTerminalComposer: state.collapseTerminalComposer,
     staleThreadUnloadMinutes: state.staleThreadUnloadMinutes,
+    autoArchiveDoneAfterDays: state.autoArchiveDoneAfterDays,
     scrollSpeed: state.scrollSpeed,
     agentTerminalFontSize: state.agentTerminalFontSize,
     guiChatFontSize: state.guiChatFontSize,

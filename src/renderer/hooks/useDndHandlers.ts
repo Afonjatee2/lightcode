@@ -2,6 +2,7 @@ import { startTransition } from "react";
 import { makeDraftPaneId } from "@/shared/paneId";
 import type { Thread } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useProjectIds } from "@/renderer/state/useThread";
 import type { DragSourceData, PaneDropIndicator } from "@/renderer/dnd";
 import type { ReorderPlacement } from "@/renderer/state/reorder";
 
@@ -50,7 +51,7 @@ export function resolveThreadReorder(input: {
 }
 
 export function useDndHandlers() {
-  const projects = useAppStore((s) => s.projects);
+  const projectIds = useProjectIds();
   const reorderProjects = useAppStore((s) => s.reorderProjects);
   const reorderThreads = useAppStore((s) => s.reorderThreads);
   const replacePaneById = useAppStore((s) => s.replacePaneById);
@@ -70,7 +71,6 @@ export function useDndHandlers() {
     if (source.type === "project") {
       if (initialIndex === finalIndex) return;
       const projectId = source.projectId;
-      const projectIds = projects.map((p) => p.id);
       const targetId = projectIds[finalIndex];
       if (!targetId || targetId === projectId) return;
       const placement = initialIndex < finalIndex ? ("after" as const) : ("before" as const);

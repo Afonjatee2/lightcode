@@ -56,6 +56,7 @@ const SESSION_PATTERN = KEYS[Math.floor(Math.random() * KEYS.length)] ?? "waveLR
 
 /** Same Tailwind `size-*` utilities used with Lucide (`<Icon className="size-4" />`). */
 const ICON_SIZE_CLASS = {
+  xxs: "size-3",
   xs: "size-3.5",
   sm: "size-4",
   md: "size-6",

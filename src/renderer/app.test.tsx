@@ -101,6 +101,8 @@ const { bridge } = vi.hoisted(() => ({
     gitDeleteBranch: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     startThread: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     sendThreadInput: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    setPendingSteer: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    clearPendingSteer: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     resizeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     resolveThreadServerRequest: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
@@ -268,11 +270,16 @@ vi.mock("@/renderer/components/thread/ThreadView", () => ({
 vi.mock("./state/sharedSettingsStore", () => ({
   useSharedSettings: Object.assign(
     (selector: (s: Record<string, unknown>) => unknown) =>
-      selector({ themeMode: "system", staleThreadUnloadMinutes: 20 }),
+      selector({
+        themeMode: "system",
+        staleThreadUnloadMinutes: 20,
+        autoArchiveDoneAfterDays: 7,
+      }),
     {
       getState: () => ({
         themeMode: "system",
         staleThreadUnloadMinutes: 20,
+        autoArchiveDoneAfterDays: 7,
         setThemeMode: () => undefined,
       }),
     },

@@ -7,6 +7,11 @@ export type ChatPaneActions = {
   /** Reveal a file or folder in the OS file explorer (Finder/Explorer/Nautilus). */
   showProjectEntryInExplorer: (path: string) => void;
   onContentHeightChange: () => void;
+  /**
+   * Top-level entry names for the chat's project, used to validate path-like
+   * tokens before chipping them. Empty until the project tree responds.
+   */
+  projectRootNames: ReadonlySet<string>;
 };
 
 export const ChatPaneActionsContext = createContext<ChatPaneActions | null>(null);

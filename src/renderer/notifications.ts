@@ -119,7 +119,7 @@ function showToastNotification(
       children: "Open",
       variant: "tertiary",
       onPress: () => {
-        openThread(threadId);
+        openThread(threadId, { focusComposer: true });
       },
     },
     timeout: 6000,
@@ -159,7 +159,7 @@ function showNativeNotification(
       });
       native.onclick = () => {
         void readBridge().focusWindow();
-        openThread(threadId);
+        openThread(threadId, { focusComposer: true });
         native.close();
       };
     } catch {

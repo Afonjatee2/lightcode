@@ -20,6 +20,22 @@ export interface QueuedStructuredTurn {
   userMessageItemId?: string;
 }
 
+/**
+ * Single staged steer message held while we wait for the agent to ack the
+ * cancel notification (the gap between `connection.cancel` / `turn/interrupt`
+ * fire and the in-flight prompt resolving with `cancelled` stopReason).
+ *
+ * Replace-latest semantics: a second submit-while-working overwrites the slot
+ * rather than queueing. There is no multi-message queue surface — the user's
+ * intent is "redirect", and stacking redirects is rarely what they want.
+ */
+export interface PendingSteerSlot extends QueuedStructuredTurn {
+  /** Stable id allocated at stage time. Used by edit/clear IPC and renderer dedupe. */
+  id: string;
+  /** Wall-clock timestamp the slot was staged or last edited. */
+  stagedAt: number;
+}
+
 export interface SessionRuntime {
   instanceId: string;
   threadId: string;
@@ -49,7 +65,13 @@ export interface SessionRuntime {
   pendingTerminalWriteInFlight?: boolean | undefined;
   pendingTerminalPrompt?: string | undefined;
   pendingTerminalSegments?: PromptSegment[] | undefined;
-  queuedStructuredTurns?: QueuedStructuredTurn[] | undefined;
+  /**
+   * Single staged steer message. Set when the user submits while the thread
+   * is `working`; cleared when the in-flight turn resolves with `cancelled`
+   * stopReason and the slot is drained as the next prompt, or when the user
+   * explicitly aborts via `clearPendingSteer`. Replace-latest on edit.
+   */
+  pendingSteer?: PendingSteerSlot | undefined;
   structuredTurnInterruptRequested?: boolean | undefined;
   prevChunk: string;
   /**

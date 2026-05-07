@@ -20,6 +20,7 @@ export const defaultGeminiCapabilities: AgentCapability = {
   supportsDirectInput: true,
   liveInputMode: "terminal",
   presentationMode: "terminal",
+  presentationModes: ["terminal", "gui"],
   bypassApprovalPolicy: "yolo",
   settingDefs: [],
 };

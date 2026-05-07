@@ -19,7 +19,7 @@ export const ContextCompaction = memo(function ContextCompaction({ item }: Conte
         <div className="inline-flex min-w-0 items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
           <Layers className="size-3 shrink-0" />
           <span>Compacting context</span>
-          <PixelLoader size="xs" />
+          <PixelLoader size="xxs" />
         </div>
       </Surface>
     );

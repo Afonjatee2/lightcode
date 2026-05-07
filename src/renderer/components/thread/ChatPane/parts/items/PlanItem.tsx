@@ -1,7 +1,8 @@
-import { CheckCircle2, Circle, ListChecks, Loader2 } from "lucide-react";
+import { Check, Circle, ListChecks } from "lucide-react";
 import type { PlanItemPayload } from "@/shared/contracts";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { getThreadTodoDockStateForItem } from "@/renderer/components/thread/threadTodoState";
+import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 
 interface PlanItemProps {
   item: RuntimeChatItem;
@@ -41,16 +42,9 @@ export function PlanItem({ item }: PlanItemProps) {
 function StatusIcon({ status }: { status: StepStatus }) {
   switch (status) {
     case "completed":
-      return (
-        <CheckCircle2 aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />
-      );
+      return <Check aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />;
     case "in_progress":
-      return (
-        <Loader2
-          aria-label="in progress"
-          className="size-3.5 shrink-0 animate-spin text-foreground"
-        />
-      );
+      return <PixelLoader size="xxs" className="text-foreground" />;
     default:
       return <Circle aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/60" />;
   }

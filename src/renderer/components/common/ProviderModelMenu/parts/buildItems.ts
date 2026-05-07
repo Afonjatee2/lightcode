@@ -175,10 +175,27 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
   const query = search.trim().toLowerCase();
   const isSearching = query.length > 0;
   const out: ProviderModelItem[] = [];
+  const singleProviderMode = visibleProviders.length === 1;
   const showProviderHeaders = visibleProviders.length > 1;
   const visibleKinds = new Set(visibleProviders.map((p) => p.kind));
   const sectionFavoriteSet = new Set((favorites ?? []).map(refKey));
   const favoriteStateSet = new Set((favoriteStateRefs ?? favorites ?? []).map(refKey));
+
+  // In single-provider mode the standalone Favorites/Recent sections would just
+  // duplicate rows from the provider's own model list (and a provider icon column
+  // makes no sense with only one provider). Surface favorites by sorting them to
+  // the top of each natural section instead. Use the frozen-at-open `favorites`
+  // snapshot for ordering so toggling a star mid-session doesn't reshuffle rows.
+  function sortFavoritesFirst(models: readonly ModelEntry[], providerKind: string): ModelEntry[] {
+    if (!singleProviderMode) return [...models];
+    const favs: ModelEntry[] = [];
+    const rest: ModelEntry[] = [];
+    for (const m of models) {
+      if (sectionFavoriteSet.has(`${providerKind}:${m.id}`)) favs.push(m);
+      else rest.push(m);
+    }
+    return [...favs, ...rest];
+  }
 
   function pushShortcutSection(
     sectionId: string,
@@ -209,15 +226,17 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
     }
   }
 
-  if (favorites?.length) {
-    pushShortcutSection("fav", "Favorites", favorites);
-  }
-  if (recents?.length) {
-    const filteredRecents = recents
-      .filter((r) => !sectionFavoriteSet.has(refKey(r)))
-      .slice(0, recentsLimit);
-    if (filteredRecents.length > 0) {
-      pushShortcutSection("recent", "Recent", filteredRecents);
+  if (!singleProviderMode) {
+    if (favorites?.length) {
+      pushShortcutSection("fav", "Favorites", favorites);
+    }
+    if (recents?.length) {
+      const filteredRecents = recents
+        .filter((r) => !sectionFavoriteSet.has(refKey(r)))
+        .slice(0, recentsLimit);
+      if (filteredRecents.length > 0) {
+        pushShortcutSection("recent", "Recent", filteredRecents);
+      }
     }
   }
 
@@ -251,7 +270,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
 
     if (isSearching) {
       // Flat under the provider; sub-provider promoted to right-rail label.
-      for (const m of filtered) {
+      for (const m of sortFavoritesFirst(filtered, provider.kind)) {
         out.push({
           type: "model",
           id: `model:${provider.kind}:${m.id}`,
@@ -281,7 +300,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
       }
     }
 
-    for (const m of ungrouped) {
+    for (const m of sortFavoritesFirst(ungrouped, provider.kind)) {
       out.push({
         type: "model",
         id: `model:${provider.kind}:${m.id}`,
@@ -304,7 +323,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         subId: sp.id,
         label: sp.label,
       });
-      for (const m of models) {
+      for (const m of sortFavoritesFirst(models, provider.kind)) {
         out.push({
           type: "model",
           id: `model:${provider.kind}:${m.id}`,

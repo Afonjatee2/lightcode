@@ -1,10 +1,11 @@
 import { X } from "lucide-react";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
-import { toLocalFileUrl, type Attachment } from "./useAttachments";
+import { toLocalFileUrl } from "@/shared/promptContent";
+import type { Attachment } from "./useAttachments";
 
 function AttachmentChip(props: {
   attachment: Attachment;
-  onRemove: (id: string) => void;
+  onRemove?: ((id: string) => void) | undefined;
   onPreviewImage?: ((attachment: Attachment) => void) | undefined;
 }) {
   const { attachment: att, onRemove, onPreviewImage } = props;
@@ -27,18 +28,20 @@ function AttachmentChip(props: {
         />
       )}
       <span className="lightcode-attachment-chip__name">{att.name}</span>
-      <button
-        type="button"
-        className="lightcode-attachment-chip__delete"
-        aria-label={`Remove ${att.name}`}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRemove(att.id);
-        }}
-      >
-        <X className="size-2.5" />
-      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          className="lightcode-attachment-chip__delete"
+          aria-label={`Remove ${att.name}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(att.id);
+          }}
+        >
+          <X className="size-2.5" />
+        </button>
+      ) : null}
     </>
   );
 
@@ -59,7 +62,7 @@ function AttachmentChip(props: {
 
 export function AttachmentBar(props: {
   attachments: Attachment[];
-  onRemove: (id: string) => void;
+  onRemove?: ((id: string) => void) | undefined;
   onPreviewImage?: (attachment: Attachment) => void;
 }) {
   const { attachments, onRemove, onPreviewImage } = props;

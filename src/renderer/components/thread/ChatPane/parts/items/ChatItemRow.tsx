@@ -4,7 +4,6 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { getRuntimeItemStoreSelector, type ChatTimelineEntry } from "../../chatPaneSelectors";
 import { AssistantMessage } from "./AssistantMessage";
 import { CommandExecution } from "./CommandExecution";
-import { ErrorItem } from "./ErrorItem";
 import { FileChange } from "./FileChange";
 import { PlanItem } from "./PlanItem";
 import { Reasoning } from "./Reasoning";
@@ -79,7 +78,7 @@ function renderItem(item: RuntimeChatItem) {
     case "web_search":
       return <WebSearchItem item={item} />;
     case "error":
-      return <ErrorItem item={item} />;
+      return null;
     default:
       return null;
   }

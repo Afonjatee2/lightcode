@@ -1,6 +1,6 @@
 import { startTransition } from "react";
-import { FolderPlus, Monitor } from "lucide-react";
-import { Button, Dropdown, Label } from "@heroui/react";
+import { FolderPlus, Monitor, Search } from "lucide-react";
+import { Button, Dropdown, Label, Tooltip } from "@heroui/react";
 import { TuxIcon } from "@/renderer/components/common";
 import { parseWslUncPath } from "@/shared/wsl";
 import { isWindows, readBridge } from "@/renderer/bridge";
@@ -22,6 +22,21 @@ export function SidebarHeaderControls(props: { wslAvailable: boolean }) {
 
   return (
     <div className="lightcode-overlay-header__controls flex items-center gap-1.5">
+      <Tooltip delay={150}>
+        <Tooltip.Trigger>
+          <Button
+            isIconOnly
+            aria-label="Search"
+            size="sm"
+            variant="ghost"
+            className="size-6 min-w-0 text-muted hover:text-foreground"
+            onPress={() => usePanelStore.getState().openThreadSearch()}
+          >
+            <Search className="size-3.5" />
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content placement="bottom">Search threads</Tooltip.Content>
+      </Tooltip>
       {isWindows() ? (
         <Dropdown>
           <Button

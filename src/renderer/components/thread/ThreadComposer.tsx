@@ -5,6 +5,7 @@ import {
   Button,
   EffortContextMenu,
   OptionMenu,
+  PixelLoader,
   ProviderModelMenu,
   TextArea,
   type ProviderModelMenuProvider,
@@ -121,6 +122,7 @@ export function ThreadComposer(props: {
   promptDisabled?: boolean;
   submitLabel: string;
   submitDisabled: boolean;
+  stopPending?: boolean;
   onPromptChange: (value: string) => void;
   onSubmit: () => void;
   onStop?: (() => void) | undefined;
@@ -139,6 +141,7 @@ export function ThreadComposer(props: {
     promptDisabled = false,
     submitLabel,
     submitDisabled,
+    stopPending = false,
     onPromptChange,
     onSubmit,
     onStop,
@@ -421,10 +424,13 @@ export function ThreadComposer(props: {
               isIconOnly
               aria-label="Stop response"
               className="lightcode-composer-send"
+              isPending={stopPending}
               onPress={onStop}
               size="sm"
             >
-              <Square className="size-3.5 fill-current" />
+              {({ isPending }) =>
+                isPending ? <PixelLoader size="xs" /> : <Square className="size-3.5 fill-current" />
+              }
             </Button>
           </Tooltip.Trigger>
           <Tooltip.Content>Stop response</Tooltip.Content>

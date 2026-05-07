@@ -4,6 +4,7 @@ import { readBridge } from "@/renderer/bridge";
 
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
+import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { AppDndProvider } from "@/renderer/dnd";
 
 import { useKeyboardShortcuts } from "@/renderer/hooks/useKeyboardShortcuts";
@@ -15,31 +16,22 @@ import { useDndHandlers } from "@/renderer/hooks/useDndHandlers";
 import { AppOverlays } from "@/renderer/views/MainView/parts/AppOverlays";
 import { WorktreeDeleteDialogs } from "@/renderer/views/MainView/parts/WorktreeDeleteDialogs";
 import { MainPageLayout, StalePanelCleanup } from "@/renderer/views/MainView/parts/MainPageLayout";
+import { ThreadSearchOverlayHost } from "@/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay";
 
 const EMPTY_PANES: string[] = [];
 
 export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
   const { storeHydrated, loadT0 } = props;
-  const projects = useAppStore((state) => state.projects);
   const view = useAppStore((state) => state.view);
   const openHome = useAppStore((state) => state.openHome);
+  const wslProjectDistrosKey = useAppStore((state) => buildWslProjectDistrosKey(state.projects));
 
   useThreadLifecycle(storeHydrated);
   const { wslAvailable } = useWslDetection(storeHydrated);
   useKeyboardShortcuts();
-  useGitRefresh(projects, storeHydrated);
+  useGitRefresh(storeHydrated);
 
   const { handleSortEnd, handlePaneDrop } = useDndHandlers();
-
-  const wslProjectDistrosKey = [
-    ...new Set(
-      projects.flatMap((project) =>
-        project.location.kind === "wsl" ? [project.location.distro] : [],
-      ),
-    ),
-  ]
-    .sort()
-    .join("\0");
 
   useEffect(() => {
     if (!storeHydrated) {
@@ -83,6 +75,7 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
           wslAvailable={wslAvailable}
           onTitleClick={() => startTransition(() => openHome())}
         />
+        <ThreadSearchOverlayHost />
       </AppDndProvider>
       <StalePanelCleanup />
       <AppOverlays />

@@ -1,12 +1,16 @@
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
+import { createAcpStructuredSession } from "../acp";
 import {
+  buildAgentCommand,
   createKnownSessionRef,
   createRecursiveDirWatcher,
   detectAgentInstall,
   type AgentAdapter,
+  type CreateStructuredSessionInput,
   type TerminalStatusHint,
 } from "../base";
+import { resolveAgentBinaryPath } from "../binaryResolver";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildGeminiArgs } from "./argv";
 import { defaultGeminiCapabilities, geminiDetectionSpec } from "./detection";
@@ -97,6 +101,17 @@ export function createGeminiAdapter(): AgentAdapter {
     buildResumeArgv(_location, config, prompt, sessionRef) {
       const args = buildGeminiArgs(config, prompt, sessionRef.providerSessionId);
       return { binary: "gemini", args };
+    },
+
+    async createStructuredSession(input: CreateStructuredSessionInput) {
+      const command = buildAgentCommand(
+        input.projectLocation,
+        "gemini",
+        ["--acp"],
+        resolveAgentBinaryPath(input.projectLocation, "gemini"),
+        { GEMINI_CLI_TRUST_WORKSPACE: "true" },
+      );
+      return createAcpStructuredSession(command, input);
     },
 
     createInitialSessionRef() {

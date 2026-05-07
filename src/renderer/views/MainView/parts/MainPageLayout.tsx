@@ -6,9 +6,9 @@ import { AppContent } from "@/renderer/views/MainView/parts/AppContent/AppConten
 import { SidebarHeaderControls } from "@/renderer/views/MainView/parts/SidebarHeaderControls";
 import { MainRightPanel } from "@/renderer/views/MainView/parts/MainRightPanel";
 import { MainGitPanel } from "@/renderer/views/MainView/parts/MainGitPanel";
-import { useAppStore } from "@/renderer/state/appStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { useProjectIds } from "@/renderer/state/useThread";
 import { closeAllPanels } from "@/renderer/actions/panelActions";
 
 const FileEditorPanel = lazy(() =>
@@ -42,7 +42,7 @@ export function MainPageLayout(props: { wslAvailable: boolean; onTitleClick: () 
 }
 
 export function StalePanelCleanup() {
-  const projects = useAppStore((state) => state.projects);
+  const projectIds = useProjectIds();
   const fileEditorRootContext = useFileEditorStore((state) => state.rootContext);
   const clearFileEditorSession = useFileEditorStore((state) => state.clearSession);
   const gitReviewContext = usePanelStore((s) => s.gitReviewContext);
@@ -50,21 +50,21 @@ export function StalePanelCleanup() {
   const filesPanelContext = usePanelStore((s) => s.filesPanelContext);
 
   useEffect(() => {
-    const projectIds = new Set(projects.map((project) => project.id));
+    const projectIdSet = new Set(projectIds);
     const panelStore = usePanelStore.getState();
 
-    if (gitReviewContext && !projectIds.has(gitReviewContext.projectId)) {
+    if (gitReviewContext && !projectIdSet.has(gitReviewContext.projectId)) {
       panelStore.setGitOverlayOpen(false);
       panelStore.setGitReviewContext(null);
     } else if (!gitReviewContext && gitOverlayOpen) {
       panelStore.setGitOverlayOpen(false);
     }
 
-    if (filesPanelContext && !projectIds.has(filesPanelContext.projectId)) {
+    if (filesPanelContext && !projectIdSet.has(filesPanelContext.projectId)) {
       panelStore.setFilesPanelContext(null);
     }
 
-    if (fileEditorRootContext && !projectIds.has(fileEditorRootContext.projectId)) {
+    if (fileEditorRootContext && !projectIdSet.has(fileEditorRootContext.projectId)) {
       clearFileEditorSession();
     }
   }, [
@@ -73,7 +73,7 @@ export function StalePanelCleanup() {
     filesPanelContext,
     gitOverlayOpen,
     gitReviewContext,
-    projects,
+    projectIds,
   ]);
 
   return null;

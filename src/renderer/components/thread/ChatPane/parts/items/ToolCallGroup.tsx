@@ -1,6 +1,6 @@
-import { Button, Disclosure } from "@heroui/react";
-import { memo, useEffect, useState } from "react";
-import { FileEdit, ListChecks, Search, Terminal, type LucideIcon } from "lucide-react";
+import { Disclosure } from "@heroui/react";
+import { memo, useEffect, useState, type ReactNode } from "react";
+import { CircleAlert, FileEdit, Globe, Terminal, Wrench, type LucideIcon } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type {
   CommandExecutionPayload,
@@ -8,6 +8,7 @@ import type {
   ToolCallPayload,
   WebSearchPayload,
 } from "@/shared/contracts";
+import { PixelLoader } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
 import {
   getRuntimeItemPayload,
@@ -57,13 +58,12 @@ export const ToolCallGroup = memo(function ToolCallGroup({
     if (!isLive) setIsExpanded(false);
   }, [isLive]);
   if (items.length === 0) return null;
-  const isRunning = items.some((item) => item.state !== "completed");
   const summary = summarizeToolCalls(items);
+  const GroupIcon = pickGroupIcon(items);
   const visibleItems = showAll ? items : items.slice(-VISIBLE_TOOL_CALLS);
-  const hiddenCount = items.length - visibleItems.length;
 
   return (
-    <div className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1.5">
+    <div className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1">
       <Disclosure
         className="text-[length:var(--lc-chat-font-size-command)] leading-tight"
         isExpanded={isExpanded}
@@ -72,34 +72,28 @@ export const ToolCallGroup = memo(function ToolCallGroup({
           actions?.onContentHeightChange();
         }}
       >
-        <div className="flex items-center gap-2 pb-1">
-          <Disclosure.Heading className="min-w-0 flex-1">
-            <Disclosure.Trigger className="flex w-full min-w-0 items-center gap-1.5 text-left">
-              <ListChecks className="size-3 shrink-0 text-[color:var(--muted)]" />
-              <code className="min-w-0 flex-1 truncate font-mono uppercase tracking-wide !text-[color:var(--muted)]">
-                {summary.title}
-              </code>
-              {isRunning ? (
-                <span className="shrink-0 tabular-nums font-medium text-[color:var(--muted)]">
-                  running
-                </span>
-              ) : null}
-              <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
-            </Disclosure.Trigger>
-          </Disclosure.Heading>
-        </div>
+        <Disclosure.Heading>
+          <Disclosure.Trigger className="flex w-full min-w-0 items-center gap-1.5 py-0 text-left">
+            <GroupIcon className="size-3 shrink-0 text-[color:var(--muted)]" />
+            <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
+              {summary.title}
+            </code>
+            <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
+          </Disclosure.Trigger>
+        </Disclosure.Heading>
         <Disclosure.Content>
-          <Disclosure.Body>
+          <Disclosure.Body className="mt-0.5 border-t border-[color:var(--border)] pt-1">
             <div className="flex max-h-[420px] flex-col gap-1 overflow-y-auto pr-1">
-              {hiddenCount > 0 ? (
-                <Button
-                  variant="tertiary"
-                  size="sm"
-                  onPress={() => setShowAll(true)}
-                  className="ml-auto px-1.5 text-[length:var(--lc-chat-font-size-command)] uppercase tracking-wide"
-                >
-                  Show {hiddenCount} more
-                </Button>
+              {items.length > VISIBLE_TOOL_CALLS ? (
+                <div className="flex justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowAll((prev) => !prev)}
+                    className="text-[length:var(--lc-chat-font-size-command)] !text-[color:var(--muted)] hover:!text-foreground"
+                  >
+                    {showAll ? "Show less" : `Show ${items.length - VISIBLE_TOOL_CALLS} more`}
+                  </button>
+                </div>
               ) : null}
               {visibleItems.map((item) => (
                 <ToolCallInline key={item.id} item={item} />
@@ -167,7 +161,7 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
 type InlineRow = {
   Icon: LucideIcon;
   title: string;
-  rightLabel?: string | undefined;
+  rightLabel?: ReactNode;
   rightLabelClassName: string;
   hasDetails: boolean;
   sections: ToolCallSection[];
@@ -193,14 +187,25 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
           { label: "result", part: extractAcpResultPart(payload) },
         ]
       : [];
+  const isRunning = item.state !== "completed";
+  const isError = payload.status === "error";
+  const rightLabel: ReactNode = isRunning ? (
+    <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
+  ) : isError ? (
+    <ErrorIcon />
+  ) : undefined;
   return {
     Icon,
     title: payload.name,
-    rightLabel: payload.status === "error" ? "error" : undefined,
-    rightLabelClassName: "text-danger",
+    rightLabel,
+    rightLabelClassName: isError ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails,
     sections,
   };
+}
+
+function ErrorIcon() {
+  return <CircleAlert className="size-3 text-danger" aria-label="error" />;
 }
 
 function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | null {
@@ -215,16 +220,17 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
       ? item.streams.command_output
       : extractAcpResultText(payload);
   const isRunning = item.state !== "completed";
-  const rightLabel = isRunning
-    ? "running"
-    : payload?.exitCode && payload.exitCode !== 0
-      ? "error"
-      : undefined;
+  const isErrorExit = !isRunning && payload?.exitCode != null && payload.exitCode !== 0;
+  const rightLabel: ReactNode = isRunning ? (
+    <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
+  ) : isErrorExit ? (
+    <ErrorIcon />
+  ) : undefined;
   return {
     Icon: Terminal,
     title,
     rightLabel,
-    rightLabelClassName: rightLabel === "error" ? "text-danger" : "text-[color:var(--muted)]",
+    rightLabelClassName: isErrorExit ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails: output.length > 0,
     sections: [],
     bodyText: isExpanded ? output : undefined,
@@ -233,7 +239,7 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
 
 function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | null {
   const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
-  if (!payload?.path) return null;
+  if (!payload) return null;
   const sections: ToolCallSection[] =
     isExpanded && (hasAuxFields(payload) || !item.streams.file_change_output)
       ? [
@@ -241,12 +247,24 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
           { label: "result", part: extractAcpResultPart(payload) },
         ]
       : [];
-  const rightLabel = payload.diffSummary
-    ? `${payload.changeKind} +${payload.diffSummary.added} -${payload.diffSummary.removed}`
-    : payload.changeKind;
+  const isRunning = item.state !== "completed";
+  const rightLabel: ReactNode = isRunning ? (
+    <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
+  ) : payload.diffSummary ? (
+    `${payload.changeKind} +${payload.diffSummary.added} -${payload.diffSummary.removed}`
+  ) : (
+    payload.changeKind
+  );
+  // ACP can emit file_change items without an extractable path (path === "").
+  // Fall back to the human-readable tool title carried on the ACP payload so
+  // the row stays visible inside the group instead of silently dropping out.
+  const title =
+    payload.path && payload.path.length > 0
+      ? payload.path
+      : (readPayloadString(payload, "name") ?? "Edit");
   return {
     Icon: FileEdit,
-    title: payload.path,
+    title,
     rightLabel,
     rightLabelClassName: "text-[color:var(--muted)]",
     hasDetails: !!item.streams.file_change_output || hasAuxFields(payload),
@@ -265,16 +283,38 @@ function getWebSearchRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow 
           { label: "results", part: extractAcpResultPart(payload) },
         ]
       : [];
+  const isRunning = item.state !== "completed";
   const resultCount = payload.resultCount ?? deriveResultCount(payload);
+  const rightLabel: ReactNode = isRunning ? (
+    <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
+  ) : resultCount != null ? (
+    `${resultCount} result${resultCount === 1 ? "" : "s"}`
+  ) : undefined;
   return {
-    Icon: Search,
+    Icon: Globe,
     title: payload.query,
-    rightLabel:
-      resultCount != null ? `${resultCount} result${resultCount === 1 ? "" : "s"}` : undefined,
+    rightLabel,
     rightLabelClassName: "text-[color:var(--muted)]",
     hasDetails: hasAuxFields(payload),
     sections,
   };
+}
+
+/**
+ * When every item in the group is the same underlying type, surface the icon
+ * the individual row would use; mixed groups stay on the generic Wrench.
+ */
+function pickGroupIcon(items: readonly RuntimeChatItem[]): LucideIcon {
+  const types = new Set<RuntimeChatItem["type"]>();
+  for (const item of items) {
+    types.add(item.type);
+    if (types.size > 1) return Wrench;
+  }
+  const [only] = [...types];
+  if (only === "command_execution") return Terminal;
+  if (only === "file_change") return FileEdit;
+  if (only === "web_search") return Globe;
+  return Wrench;
 }
 
 function summarizeToolCalls(items: readonly RuntimeChatItem[]): { title: string } {
@@ -290,7 +330,7 @@ function summarizeToolCalls(items: readonly RuntimeChatItem[]): { title: string 
   const rest = items.length - topCounts.reduce((sum, [, count]) => sum + count, 0);
   if (rest > 0) parts.push(`${rest} other`);
   return {
-    title: `${items.length} tool calls${parts.length > 0 ? `: ${parts.join(", ")}` : ""}`,
+    title: parts.length > 0 ? parts.join(", ") : `${items.length} tools`,
   };
 }
 
@@ -316,6 +356,12 @@ function hasAuxFields(payload: unknown): boolean {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
   return p.args !== undefined || p.result !== undefined;
+}
+
+function readPayloadString(payload: unknown, key: string): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const v = (payload as Record<string, unknown>)[key];
+  return typeof v === "string" && v.length > 0 ? v : undefined;
 }
 
 function deriveResultCount(payload: unknown): number | undefined {

@@ -56,7 +56,7 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
         <div className="inline-flex items-center gap-1.5">
           <Brain className="size-3 shrink-0" />
           <span>Thinking</span>
-          <PixelLoader size="xs" />
+          <PixelLoader size="xxs" />
         </div>
         {hasText ? (
           <div className="max-h-64 overflow-y-auto pl-4 [scrollbar-gutter:stable]">

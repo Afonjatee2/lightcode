@@ -8,10 +8,9 @@ import {
   type RefObject,
 } from "react";
 import { Check, ChevronDown, Search, Star } from "lucide-react";
-import { Header, Label, ListBox, Popover, Tooltip } from "@heroui/react";
+import { Popover, Tooltip } from "@heroui/react";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
-import { LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD } from "@/renderer/components/common/dropdownVirtualization";
 import { Button } from "../Button";
 import {
   buildProviderModelItems,
@@ -210,9 +209,9 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
     onOpenChange?.(open);
   }
 
-  // Build the expensive row model only while the popover is open. The composer
-  // can mount this control twice for wrap measurement, so closed menus should
-  // stay as cheap as a trigger label lookup.
+  // Build the row model only while the popover is open. The composer can mount
+  // this control twice for wrap measurement, so closed menus should stay as
+  // cheap as a trigger label lookup.
   const deferredAgentKind = useDeferredValue(currentAgentKind);
   const deferredModel = useDeferredValue(currentModel);
   const sectionFavorites = isOpen ? (sessionFavorites ?? favorites) : favorites;
@@ -236,8 +235,6 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
     `recent:${currentAgentKind}:${currentModel}`,
     `model:${currentAgentKind}:${currentModel}`,
   ]);
-  const disabledKeys = items.filter((i) => i.type !== "model").map((i) => i.id);
-  const isWindowed = items.length > LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD;
 
   function handleSelect(itemId: string) {
     const parsed = parseShortcutId(itemId);
@@ -318,7 +315,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
                   handleOpenChange(false);
                   return;
                 }
-                if (isWindowed && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
+                if (items.length > 0 && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
                   e.preventDefault();
                   windowedListRef.current?.focus();
                 }
@@ -327,7 +324,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
           </div>
           {items.length === 0 ? (
             <div className="px-3 py-3 text-center text-sm text-muted">No models found</div>
-          ) : isWindowed ? (
+          ) : (
             <WindowedProviderModelList
               domIdPrefix={listboxDomIdPrefix}
               items={items}
@@ -336,124 +333,10 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
               toggleFavorite={toggleFavoriteModel}
               onSelect={handleSelect}
             />
-          ) : (
-            <ListBox
-              aria-label="Models"
-              className="lightcode-menu lightcode-model-menu-listbox max-h-72 overflow-y-auto no-scrollbar !pb-1"
-              items={items}
-              selectedKeys={selectedKeys}
-              selectionMode="single"
-              disallowEmptySelection
-              disabledKeys={new Set(disabledKeys)}
-              onSelectionChange={(keys) => {
-                if (keys === "all") return;
-                for (const sel of keys) {
-                  if (typeof sel === "string" && !selectedKeys.has(sel)) {
-                    handleSelect(sel);
-                    break;
-                  }
-                }
-              }}
-            >
-              {(item) => renderItem(item, toggleFavoriteModel)}
-            </ListBox>
           )}
         </Popover.Dialog>
       </Popover.Content>
     </Popover>
-  );
-}
-
-function renderItem(item: ProviderModelItem, toggleFavorite: (k: string, m: string) => void) {
-  const stickyHeaderClassName = " sticky top-0 z-10";
-  if (item.type === "header-plain") {
-    return (
-      <ListBox.Item
-        id={item.id}
-        className={`!bg-overlay !cursor-default !opacity-100 !p-0 h-7 mb-1 flex items-center border-b border-border/40${stickyHeaderClassName}`}
-        textValue={item.label}
-      >
-        <Header className="flex w-full items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80">
-          {item.label}
-        </Header>
-      </ListBox.Item>
-    );
-  }
-  if (item.type === "header-provider") {
-    return (
-      <ListBox.Item
-        id={item.id}
-        className={`!bg-overlay !cursor-default !opacity-100 !p-0 h-7 mb-1 flex items-center border-b border-border/40${stickyHeaderClassName}`}
-        textValue={item.label}
-      >
-        <Header className="flex w-full items-center gap-1.5 px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80">
-          <ProviderIcon kind={item.providerKind} tone="active" className="size-3" />
-          {item.label}
-        </Header>
-      </ListBox.Item>
-    );
-  }
-  if (item.type === "header-sub") {
-    return (
-      <ListBox.Item
-        id={item.id}
-        className={`!bg-overlay !cursor-default !opacity-100 !p-0 h-7 mb-1 flex items-center border-b border-border/40${stickyHeaderClassName}`}
-        textValue={item.label}
-      >
-        <Header className="px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80">
-          {item.label}
-        </Header>
-      </ListBox.Item>
-    );
-  }
-  return (
-    <ListBox.Item
-      id={item.id}
-      textValue={item.label}
-      className="group mx-1.5 rounded focus-visible:outline-none"
-    >
-      {({ isSelected }) => (
-        <>
-          <Check
-            className={`size-3 shrink-0 transition-opacity ${isSelected ? "opacity-100" : "opacity-0"}`}
-          />
-          <Label className="flex-1 truncate">{item.label}</Label>
-          {item.showProviderIcon || item.subProviderLabel ? (
-            <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 text-muted/70">
-              {item.showProviderIcon ? (
-                <ProviderIcon
-                  kind={item.providerKind}
-                  tone="inactive"
-                  className="size-3 shrink-0"
-                />
-              ) : null}
-              {item.subProviderLabel ? (
-                <span className="truncate text-[10px]">{item.subProviderLabel}</span>
-              ) : null}
-            </span>
-          ) : null}
-          {item.hideFavoriteToggle ? null : (
-            <button
-              type="button"
-              aria-label={item.isFavorite ? "Remove from favorites" : "Add to favorites"}
-              className={`ml-1 flex size-5 shrink-0 items-center justify-center rounded transition ${
-                item.isFavorite
-                  ? "text-[oklch(0.78_0.13_75)]"
-                  : "text-muted/40 opacity-0 group-hover:opacity-100 hover:text-foreground"
-              }`}
-              onPointerDown={(e) => e.stopPropagation()}
-              onPointerUp={(e) => e.stopPropagation()}
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFavorite(item.providerKind, item.modelId);
-              }}
-            >
-              <Star className="size-3.5" fill={item.isFavorite ? "currentColor" : "none"} />
-            </button>
-          )}
-        </>
-      )}
-    </ListBox.Item>
   );
 }
 

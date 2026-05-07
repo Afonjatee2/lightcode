@@ -73,12 +73,13 @@ describe("MessageList", () => {
   });
 
   it("renders only the visible virtual rows", () => {
-    const scrollRef = { current: document.createElement("div") };
+    const scrollElement = document.createElement("div");
     const actions = {
       openProjectRelativePath: vi.fn<(path: string, lineNumber?: number) => void>(),
       revealProjectFolderInTree: vi.fn<(path: string) => void>(),
       showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange: vi.fn<() => void>(),
+      projectRootNames: new Set<string>(),
     };
 
     render(
@@ -86,7 +87,7 @@ describe("MessageList", () => {
         <MessageList
           threadId="thread-1"
           entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
-          scrollRef={scrollRef}
+          scrollElement={scrollElement}
         />
       </ChatPaneActionsContext.Provider>,
     );
@@ -94,7 +95,7 @@ describe("MessageList", () => {
     expect(useVirtualizerMock).toHaveBeenCalledOnce();
     const virtualizerOptions = useVirtualizerMock.mock.calls[0]![0];
     expect(virtualizerOptions.count).toBe(4);
-    expect(virtualizerOptions.getScrollElement()).toBe(scrollRef.current);
+    expect(virtualizerOptions.getScrollElement()).toBe(scrollElement);
     expect(virtualizerOptions.useFlushSync).toBe(false);
     expect(screen.queryByText("item-1")).not.toBeInTheDocument();
     expect(screen.getByText("item-2")).toBeInTheDocument();
@@ -108,14 +109,14 @@ describe("MessageList", () => {
   });
 
   it("only adjusts scroll for measured rows fully above the viewport", () => {
-    const scrollRef = { current: document.createElement("div") };
-    scrollRef.current.scrollTop = 160;
+    const scrollElement = document.createElement("div");
+    scrollElement.scrollTop = 160;
 
     render(
       <MessageList
         threadId="thread-1"
         entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
-        scrollRef={scrollRef}
+        scrollElement={scrollElement}
       />,
     );
 
@@ -133,14 +134,15 @@ describe("MessageList", () => {
       revealProjectFolderInTree: vi.fn<(path: string) => void>(),
       showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange,
+      projectRootNames: new Set<string>(),
     };
-    const scrollRef = { current: document.createElement("div") };
+    const scrollElement = document.createElement("div");
     const { rerender } = render(
       <ChatPaneActionsContext.Provider value={actions}>
         <MessageList
           threadId="thread-1"
           entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
-          scrollRef={scrollRef}
+          scrollElement={scrollElement}
         />
       </ChatPaneActionsContext.Provider>,
     );
@@ -153,7 +155,7 @@ describe("MessageList", () => {
         <MessageList
           threadId="thread-1"
           entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
-          scrollRef={scrollRef}
+          scrollElement={scrollElement}
         />
       </ChatPaneActionsContext.Provider>,
     );
@@ -168,6 +170,7 @@ describe("MessageList", () => {
       revealProjectFolderInTree: vi.fn<(path: string) => void>(),
       showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange,
+      projectRootNames: new Set<string>(),
     };
 
     render(
@@ -175,7 +178,7 @@ describe("MessageList", () => {
         <MessageList
           threadId="thread-1"
           entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
-          scrollRef={{ current: document.createElement("div") }}
+          scrollElement={document.createElement("div")}
         />
       </ChatPaneActionsContext.Provider>,
     );

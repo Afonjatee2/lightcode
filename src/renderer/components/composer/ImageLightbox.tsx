@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import { toLocalFileUrl, type Attachment } from "./useAttachments";
+import { toLocalFileUrl } from "@/shared/promptContent";
+import type { Attachment } from "./useAttachments";
 
 export function ImageLightbox(props: {
   images: Attachment[];

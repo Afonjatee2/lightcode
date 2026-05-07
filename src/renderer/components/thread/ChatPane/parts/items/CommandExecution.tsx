@@ -1,7 +1,8 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import { Terminal } from "lucide-react";
 import type { CommandExecutionPayload } from "@/shared/contracts";
 import { stripAnsiPreservingLayout } from "@/shared/ansi";
+import { PixelLoader } from "@/renderer/components/common";
 import {
   getRuntimeItemPayload,
   type RuntimeChatItem,
@@ -66,7 +67,7 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
   );
 });
 
-type CommandStatus = { textClass: string; rightLabel: string };
+type CommandStatus = { textClass: string; rightLabel: ReactNode };
 
 function resolveCommandStatus(
   isRunning: boolean,
@@ -74,7 +75,10 @@ function resolveCommandStatus(
   durationMs: number | undefined,
 ): CommandStatus {
   if (isRunning) {
-    return { textClass: "!text-[color:var(--muted)]", rightLabel: "running" };
+    return {
+      textClass: "!text-[color:var(--muted)]",
+      rightLabel: <PixelLoader size="xxs" className="text-[color:var(--muted)]" />,
+    };
   }
   const dur = durationMs != null ? formatDuration(durationMs) : "";
   if (exitCode === undefined || exitCode === 0) {

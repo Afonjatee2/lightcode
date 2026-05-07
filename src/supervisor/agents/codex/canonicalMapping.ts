@@ -149,6 +149,12 @@ function readItemId(
   return undefined;
 }
 
+function isInterruptedTurn(params: Record<string, unknown> | undefined): boolean {
+  const turn = params?.turn;
+  if (!turn || typeof turn !== "object" || !("status" in turn)) return false;
+  return (turn as Record<string, unknown>).status === "interrupted";
+}
+
 export function mapCodexNotification(
   method: string,
   params: Record<string, unknown> | undefined,
@@ -177,7 +183,7 @@ export function mapCodexNotification(
       type: "turn.completed",
       threadId,
       turnId,
-      state: method === "turn/aborted" ? "interrupted" : "completed",
+      state: method === "turn/aborted" || isInterruptedTurn(params) ? "interrupted" : "completed",
     });
     delete state.currentTurnId;
     state.itemIdMap.clear();

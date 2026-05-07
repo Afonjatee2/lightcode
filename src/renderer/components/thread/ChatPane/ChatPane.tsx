@@ -1,6 +1,7 @@
 import {
   forwardRef,
   memo,
+  useCallback,
   useEffect,
   useEffectEvent,
   useImperativeHandle,
@@ -9,15 +10,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { Button } from "@heroui/react";
+import { Button, Surface } from "@heroui/react";
 import { ArrowDown } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { Thread } from "@/shared/contracts";
 import { PixelLoader } from "@/renderer/components/common";
+import { chatMessageSurfaceClass } from "./parts/items/chatMessageSurface";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { hydrateThreadRuntimeItems } from "@/renderer/state/chatRuntimePersister";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import { useProjectRootNames } from "@/renderer/state/projectRootNamesStore";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
 import type { OpenRuntimeRequest } from "@/renderer/state/slices/runtimeEventSlice";
 import {
@@ -61,6 +64,17 @@ export function ChatPane(props: ChatPaneProps) {
     hasSupplementaryContent = false,
   } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
+  // `scrollEl` mirrors `scrollRef.current` as React state so the virtualizer
+  // in `MessageList` sees the element transition from `null` to mounted across
+  // a real React render. Without this, after a drag-drop pane move the
+  // virtualizer's internal observer-driven rerender can be lost and the chat
+  // renders empty (with a scrollbar from `getTotalSize`) until the next state
+  // change forces a recompute.
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const setScrollContainer = useCallback((el: HTMLDivElement | null) => {
+    scrollRef.current = el;
+    setScrollEl(el);
+  }, []);
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollControlsRef = useRef<ChatScrollControlsHandle>(null);
   const timelineEntries = useAppStore(
@@ -71,15 +85,19 @@ export function ChatPane(props: ChatPaneProps) {
   );
   const requests = useAppStore((s) => s.runtimeRequestsByThread[thread.id] ?? EMPTY_REQUESTS);
   const project = useAppStore((s) => s.projects.find((p) => p.id === thread.projectId));
+  const branch = resolveWorktreeBranch(
+    thread.projectId,
+    thread.worktreePath ?? "",
+    thread.worktreeBranch,
+  );
+  const targetContext = useMemo(
+    () => (project ? buildFileEditorContext(project, thread.worktreePath, branch) : null),
+    [project, thread.worktreePath, branch],
+  );
+  const projectRootNames = useProjectRootNames(targetContext?.projectLocation);
 
   const paneActions: ChatPaneActions | null = useMemo(() => {
-    if (!project) return null;
-    const branch = resolveWorktreeBranch(
-      thread.projectId,
-      thread.worktreePath ?? "",
-      thread.worktreeBranch,
-    );
-    const targetContext = buildFileEditorContext(project, thread.worktreePath, branch);
+    if (!project || !targetContext) return null;
     return {
       openProjectRelativePath: (path, lineNumber) => {
         void openFileInEditor(
@@ -114,8 +132,9 @@ export function ChatPane(props: ChatPaneProps) {
         });
       },
       onContentHeightChange: () => scrollControlsRef.current?.onContentHeightChange(),
+      projectRootNames,
     };
-  }, [project, thread.projectId, thread.worktreeBranch, thread.worktreePath]);
+  }, [project, targetContext, branch, thread.worktreePath, projectRootNames]);
 
   useEffect(() => {
     void hydrateThreadRuntimeItems(thread.id);
@@ -132,7 +151,7 @@ export function ChatPane(props: ChatPaneProps) {
       <div className="flex h-full min-h-0 flex-col">
         <div className="relative min-h-0 flex-1">
           <div
-            ref={scrollRef}
+            ref={setScrollContainer}
             className="min-h-0 h-full overflow-y-auto [scrollbar-gutter:stable]"
             onWheelCapture={(event) => {
               if (event.deltaY < 0) {
@@ -153,7 +172,7 @@ export function ChatPane(props: ChatPaneProps) {
                     key={thread.id}
                     threadId={thread.id}
                     entries={timelineEntries}
-                    scrollRef={scrollRef}
+                    scrollElement={scrollEl}
                   />
                   <ApprovalRequestList threadId={thread.id} requests={requests} />
                   {showTailLoader ? <ChatTailLoader /> : null}
@@ -210,14 +229,15 @@ const ChatScrollControls = forwardRef<
     const el = scrollRef.current;
     if (!el) return;
     const isAtBottom = isElementAtBottom(el);
-    stickToBottomRef.current = isAtBottom;
-    setShowScrollDown(!isAtBottom);
+    if (isAtBottom) stickToBottomRef.current = true;
+    setShowScrollDown(!stickToBottomRef.current && !isAtBottom);
   }
 
   function disableStickToBottom() {
     if (!stickToBottomRef.current) return;
     stickToBottomRef.current = false;
-    setShowScrollDown(true);
+    const el = scrollRef.current;
+    setShowScrollDown(!el || !isElementAtBottom(el));
   }
 
   function scrollToBottom() {
@@ -255,8 +275,17 @@ const ChatScrollControls = forwardRef<
       const nextScrollTop = el.scrollTop;
       lastScrollTopRef.current = nextScrollTop;
       const isAtBottom = isElementAtBottom(el);
-      stickToBottomRef.current = nextScrollTop < prevScrollTop ? false : isAtBottom;
-      setShowScrollDown(!isAtBottom);
+      // Only release sticky when the user actually moves away from the bottom.
+      // Bare `!isAtBottom` here would race with virtualizer measurements that
+      // grow `scrollHeight` after a programmatic scroll lands — flipping sticky
+      // off in that one frame, then keeping the button stuck on because the
+      // corrective syncLayoutNow takes the non-sticky branch.
+      if (nextScrollTop < prevScrollTop && !isAtBottom) {
+        stickToBottomRef.current = false;
+      } else if (isAtBottom) {
+        stickToBottomRef.current = true;
+      }
+      setShowScrollDown(!stickToBottomRef.current && !isAtBottom);
     };
 
     lastScrollTopRef.current = el.scrollTop;
@@ -313,10 +342,12 @@ const ChatScrollControls = forwardRef<
 
 function ChatTailLoader() {
   return (
-    <div className="mx-auto flex w-full max-w-[920px] px-3 pb-2">
-      <div className="flex h-7 items-center text-foreground-muted">
-        <PixelLoader size="xs" />
-      </div>
+    <div className="mx-auto w-full max-w-[920px]">
+      <Surface variant="transparent" className={chatMessageSurfaceClass}>
+        <div className="inline-flex items-center text-foreground-muted">
+          <PixelLoader size="xxs" />
+        </div>
+      </Surface>
     </div>
   );
 }

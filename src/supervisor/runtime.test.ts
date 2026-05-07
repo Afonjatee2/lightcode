@@ -347,7 +347,7 @@ describe("writeSubmittedPrompt", () => {
     ]);
   });
 
-  it("queues GUI follow-ups, interrupts the active turn, and drains them in order", async () => {
+  it("stages GUI submit-while-working as a single pending steer with replace-latest, interrupts once, and drains the latest on idle", async () => {
     const runtime = new SupervisorRuntime(() => undefined);
     const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const interruptTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
@@ -436,6 +436,8 @@ describe("writeSubmittedPrompt", () => {
       userMessageItemId: "user-second",
     });
 
+    // Replace-latest: both submits stage into the same slot. interruptTurn
+    // fires once; startTurn waits for cancel-ack via the idle transition.
     expect(interruptTurn).toHaveBeenCalledTimes(1);
     expect(startTurn).not.toHaveBeenCalled();
 
@@ -455,22 +457,9 @@ describe("writeSubmittedPrompt", () => {
     listener.onUpdate({ status: "idle", attention: "none" });
     await Promise.resolve();
 
-    expect(startTurn).toHaveBeenNthCalledWith(
-      1,
-      "first",
-      {
-        model: "gpt-5.4",
-      },
-      undefined,
-      { userMessageItemId: "user-first" },
-    );
-
-    listener.onUpdate({ status: "working", attention: "working" });
-    listener.onUpdate({ status: "idle", attention: "none" });
-    await Promise.resolve();
-
-    expect(startTurn).toHaveBeenNthCalledWith(
-      2,
+    // Only the latest submit drains; the earlier one was replaced.
+    expect(startTurn).toHaveBeenCalledTimes(1);
+    expect(startTurn).toHaveBeenCalledWith(
       "second",
       {
         model: "gpt-5.4",

@@ -28,6 +28,47 @@ files:
   - node_modules/.pnpm/lodash.isequal@*/node_modules/**/*
   - node_modules/.pnpm/semver@*/node_modules/**/*
   - node_modules/.pnpm/tiny-typed-emitter@*/node_modules/**/*
+  # Renderer-only packages — Vite already bundles them into dist/renderer/.
+  # Excluding the source copies trims ~10k entries from the asar.
+  - "!node_modules/monaco-editor/**/*"
+  - "!node_modules/@monaco-editor/**/*"
+  - "!node_modules/lucide-react/**/*"
+  - "!node_modules/material-icon-theme/**/*"
+  - "!node_modules/shiki/**/*"
+  - "!node_modules/@shikijs/**/*"
+  - "!node_modules/react/**/*"
+  - "!node_modules/react-dom/**/*"
+  - "!node_modules/react-markdown/**/*"
+  - "!node_modules/remark-gfm/**/*"
+  - "!node_modules/rehype-raw/**/*"
+  - "!node_modules/@heroui/**/*"
+  - "!node_modules/@xterm/**/*"
+  - "!node_modules/@git-diff-view/**/*"
+  - "!node_modules/@dnd-kit/**/*"
+  - "!node_modules/@tanstack/**/*"
+  - "!node_modules/@chenglou/**/*"
+  - "!node_modules/tailwindcss/**/*"
+  - "!node_modules/@tailwindcss/**/*"
+  # And the pnpm-store mirrors of those packages.
+  - "!node_modules/.pnpm/monaco-editor@*/**/*"
+  - "!node_modules/.pnpm/@monaco-editor*/**/*"
+  - "!node_modules/.pnpm/lucide-react@*/**/*"
+  - "!node_modules/.pnpm/material-icon-theme@*/**/*"
+  - "!node_modules/.pnpm/shiki@*/**/*"
+  - "!node_modules/.pnpm/@shikijs*/**/*"
+  - "!node_modules/.pnpm/react@*/**/*"
+  - "!node_modules/.pnpm/react-dom@*/**/*"
+  - "!node_modules/.pnpm/react-markdown@*/**/*"
+  - "!node_modules/.pnpm/remark-gfm@*/**/*"
+  - "!node_modules/.pnpm/rehype-raw@*/**/*"
+  - "!node_modules/.pnpm/@heroui*/**/*"
+  - "!node_modules/.pnpm/@xterm*/**/*"
+  - "!node_modules/.pnpm/@git-diff-view*/**/*"
+  - "!node_modules/.pnpm/@dnd-kit*/**/*"
+  - "!node_modules/.pnpm/@tanstack*/**/*"
+  - "!node_modules/.pnpm/@chenglou*/**/*"
+  - "!node_modules/.pnpm/tailwindcss@*/**/*"
+  - "!node_modules/.pnpm/@tailwindcss*/**/*"
 
 extraResources:
   - from: resources/wsl-helpers
@@ -46,6 +87,12 @@ asar: true
 asarUnpack:
   - node_modules/node-pty/**/*
   - node_modules/better-sqlite3/**/*
+  # Claude SDK slash-command probe runs inside WSL via in-distro `node`, which
+  # cannot read inside an asar archive. The worker resolves
+  # `@anthropic-ai/claude-agent-sdk` from its own location, so unpack both.
+  - dist/main/claudeSdkProbeWorker.mjs
+  - dist/main/claudeSdkProbeWorker.mjs.map
+  - node_modules/@anthropic-ai/claude-agent-sdk/**/*
 
 publish:
   provider: github

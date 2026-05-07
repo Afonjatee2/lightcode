@@ -2,6 +2,7 @@ import { toast } from "@heroui/react";
 import { useEffect } from "react";
 import { PixelLoader } from "./components/common";
 import { msg } from "@/shared/messages";
+import type { RuntimeEvent } from "@/shared/contracts";
 import { readBridge } from "./bridge";
 import {
   handleThreadStateNotification,
@@ -12,6 +13,7 @@ import { useAppStore } from "./state/appStore";
 import { useAgentStatusesStore } from "./state/agentStatusesStore";
 import { useUpdateStore } from "./state/updateStore";
 import { installRuntimeItemsPersister } from "./state/chatRuntimePersister";
+import { clearRuntimeItemStoreSelectorCacheForThread } from "./components/thread/ChatPane/chatPaneSelectors";
 
 import { useAppHydration } from "@/renderer/hooks/useAppHydration";
 import { AppProvider } from "./components/ui/provider";
@@ -28,9 +30,73 @@ import { MainView } from "@/renderer/views/MainView/MainView";
 
 let threadStateNotificationsArmed = false;
 
+// ── Runtime event rAF batcher ───────────────────────────────────
+// With 6-8 concurrent streaming chats, the supervisor produces ~500
+// `thread-runtime-event(s)` IPC messages per second. Applying each one
+// synchronously triggers a Zustand `set()` and re-evaluates every subscribed
+// selector across all mounted ChatPanes. Coalescing into one apply per
+// animation frame caps store mutation rate to ~60/sec regardless of incoming
+// event rate, while preserving per-thread event order. Non-runtime events
+// (thread-state, reset, exit, …) flush the queue before applying so they
+// observe a consistent state.
+const pendingRuntimeEvents = new Map<string, RuntimeEvent[]>();
+let runtimeFlushHandle: number | null = null;
+
+function flushPendingRuntimeEvents(): void {
+  runtimeFlushHandle = null;
+  if (pendingRuntimeEvents.size === 0) return;
+  const store = useAppStore.getState();
+  for (const [threadId, events] of pendingRuntimeEvents) {
+    store.applyRuntimeEvents(threadId, events);
+  }
+  pendingRuntimeEvents.clear();
+}
+
+function enqueueRuntimeEvents(threadId: string, events: readonly RuntimeEvent[]): void {
+  if (events.length === 0) return;
+  const existing = pendingRuntimeEvents.get(threadId);
+  if (existing) {
+    for (const evt of events) existing.push(evt);
+  } else {
+    pendingRuntimeEvents.set(threadId, [...events]);
+  }
+  if (runtimeFlushHandle === null) {
+    runtimeFlushHandle = requestAnimationFrame(flushPendingRuntimeEvents);
+  }
+}
+
+function flushPendingRuntimeEventsSync(): void {
+  if (runtimeFlushHandle !== null) {
+    cancelAnimationFrame(runtimeFlushHandle);
+    runtimeFlushHandle = null;
+  }
+  if (pendingRuntimeEvents.size > 0) flushPendingRuntimeEvents();
+}
+
 const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
   if ("threadId" in event && event.threadId.startsWith("shell:")) {
     return;
+  }
+
+  if (event.type === "thread-runtime-event") {
+    enqueueRuntimeEvents(event.threadId, [event.event]);
+    return;
+  }
+  if (event.type === "thread-runtime-events") {
+    enqueueRuntimeEvents(event.threadId, event.events);
+    return;
+  }
+  if (event.type === "thread-runtime-events-multi") {
+    for (const batch of event.batches) {
+      enqueueRuntimeEvents(batch.threadId, batch.events);
+    }
+    return;
+  }
+
+  // Non-runtime event: drain pending runtime events first so the handler below
+  // observes the same ordering callers expect from the IPC stream.
+  if ("threadId" in event && pendingRuntimeEvents.has(event.threadId)) {
+    flushPendingRuntimeEventsSync();
   }
 
   if (event.type === "thread-state") {
@@ -54,15 +120,19 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
       params: event.params,
     });
   }
-  if (event.type === "thread-runtime-event") {
-    useAppStore.getState().applyRuntimeEvent(event.threadId, event.event);
+  if (event.type === "thread-pending-steer") {
+    useAppStore.getState().setPendingSteer(event.threadId, event.pending);
   }
   if (event.type === "thread-reset") {
+    pendingRuntimeEvents.delete(event.threadId);
     useAppStore.getState().clearThreadServerRequests(event.threadId);
     useAppStore.getState().clearThreadRuntimeEvents(event.threadId);
+    useAppStore.getState().clearAllPendingSteer(event.threadId);
+    clearRuntimeItemStoreSelectorCacheForThread(event.threadId);
   }
   if (event.type === "thread-exited") {
     useAppStore.getState().markThreadExited(event.threadId);
+    useAppStore.getState().clearAllPendingSteer(event.threadId);
   }
   if (event.type === "windows-agent-statuses") {
     console.log(`[renderer] event: windows-agent-statuses (${event.statuses.length} agents)`);
@@ -111,6 +181,11 @@ if (import.meta.hot) {
     unsubSupervisor();
     unsubUpdate();
     uninstallRuntimePersister();
+    if (runtimeFlushHandle !== null) {
+      cancelAnimationFrame(runtimeFlushHandle);
+      runtimeFlushHandle = null;
+    }
+    pendingRuntimeEvents.clear();
   });
 }
 

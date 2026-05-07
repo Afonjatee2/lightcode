@@ -31,6 +31,7 @@ interface PanelState {
   settingsOpen: boolean;
   projectSettingsId: string | null;
   threadSortMode: ThreadSortMode;
+  threadSearchOpen: boolean;
   setGitReviewContext: (ctx: GitReviewContext | null) => void;
   setThreadSortMode: (mode: ThreadSortMode) => void;
   setGitReviewAsPanel: (v: boolean) => void;
@@ -42,6 +43,8 @@ interface PanelState {
   closeSettings: () => void;
   openProjectSettings: (projectId: string) => void;
   closeProjectSettings: () => void;
+  openThreadSearch: () => void;
+  closeThreadSearch: () => void;
   closeAllPanels: () => void;
 }
 
@@ -66,6 +69,7 @@ export const usePanelStore = create<PanelState>((set) => ({
   settingsOpen: false,
   projectSettingsId: null,
   threadSortMode: "updated",
+  threadSearchOpen: false,
 
   setGitReviewContext: (ctx) => {
     const prev = usePanelStore.getState().gitReviewContext;
@@ -130,6 +134,10 @@ export const usePanelStore = create<PanelState>((set) => ({
     set((state) => (state.projectSettingsId === projectId ? {} : { projectSettingsId: projectId })),
   closeProjectSettings: () =>
     set((state) => (state.projectSettingsId === null ? {} : { projectSettingsId: null })),
+  openThreadSearch: () =>
+    set((state) => (state.threadSearchOpen ? {} : { threadSearchOpen: true })),
+  closeThreadSearch: () =>
+    set((state) => (state.threadSearchOpen ? { threadSearchOpen: false } : {})),
   closeAllPanels: () => {
     localStorage.removeItem(STORAGE_KEY);
     set((state) => {

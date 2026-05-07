@@ -58,6 +58,8 @@ import {
   listProjectTreePayloadSchema,
   moveProjectEntryPayloadSchema,
   interruptThreadPayloadSchema,
+  setPendingSteerPayloadSchema,
+  clearPendingSteerPayloadSchema,
   projectSchema,
   readProjectFilePayloadSchema,
   renameProjectEntryPayloadSchema,
@@ -153,6 +155,9 @@ import type {
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
   InterruptThreadPayload,
+  SetPendingSteerPayload,
+  ClearPendingSteerPayload,
+  PendingSteerState,
   ListProjectTreePayload,
   ListProjectTreeResult,
   MoveProjectEntryPayload,
@@ -391,6 +396,16 @@ export const groupedIpcProcedures = {
       "interruptThread",
       "supervisor",
       interruptThreadPayloadSchema,
+    ),
+    setPendingSteer: definePayloadProcedure<SetPendingSteerPayload, void, "supervisor">(
+      "setPendingSteer",
+      "supervisor",
+      setPendingSteerPayloadSchema,
+    ),
+    clearPendingSteer: definePayloadProcedure<ClearPendingSteerPayload, void, "supervisor">(
+      "clearPendingSteer",
+      "supervisor",
+      clearPendingSteerPayloadSchema,
     ),
     writeTerminal: definePayloadProcedure<WriteTerminalPayload, void, "supervisor">(
       "writeTerminal",
@@ -860,6 +875,8 @@ export const ipcProcedureMap = {
   startThread: groupedIpcProcedures.thread.startThread,
   sendThreadInput: groupedIpcProcedures.thread.sendThreadInput,
   interruptThread: groupedIpcProcedures.thread.interruptThread,
+  setPendingSteer: groupedIpcProcedures.thread.setPendingSteer,
+  clearPendingSteer: groupedIpcProcedures.thread.clearPendingSteer,
   writeTerminal: groupedIpcProcedures.thread.writeTerminal,
   resizeTerminal: groupedIpcProcedures.thread.resizeTerminal,
   resolveThreadServerRequest: groupedIpcProcedures.thread.resolveThreadServerRequest,
@@ -1071,6 +1088,17 @@ export type SupervisorEvent =
   | { type: "thread-reset"; threadId: string }
   | { type: "thread-output"; threadId: string; data: string; outputLength: number }
   | { type: "thread-runtime-event"; threadId: string; event: RuntimeEvent }
+  | { type: "thread-runtime-events"; threadId: string; events: RuntimeEvent[] }
+  | {
+      /**
+       * One IPC envelope carrying buffered runtime events for any number of
+       * threads. Emitted by the supervisor when more than one thread's batch
+       * is ready in the same flush window. Avoids the per-thread IPC fan-out
+       * that becomes expensive with 6-8 concurrent streaming sessions.
+       */
+      type: "thread-runtime-events-multi";
+      batches: ReadonlyArray<{ threadId: string; events: RuntimeEvent[] }>;
+    }
   | {
       type: "thread-server-request";
       threadId: string;
@@ -1089,6 +1117,16 @@ export type SupervisorEvent =
       errorMessage?: string;
       /** Terminal: structured CLI hook (L1) vs terminal parsing (L2); server agents: `server`. */
       threadStatusSource?: ThreadStatusSource;
+    }
+  | {
+      /**
+       * Single staged steer message (or `null` to clear). Renderer mirrors this
+       * into `pendingSteerByThreadId`. Only emitted for GUI-presentation
+       * threads — terminal threads never produce this event.
+       */
+      type: "thread-pending-steer";
+      threadId: string;
+      pending: PendingSteerState | null;
     }
   | { type: "thread-exited"; threadId: string; exitCode: number | null }
   | {

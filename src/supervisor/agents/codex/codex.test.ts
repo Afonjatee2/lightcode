@@ -8,6 +8,7 @@ import {
   detectCodexUpdatePrompt,
   parseCodexSocketMessage,
 } from "./index";
+import { CodexStructuredSession } from "./acp";
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import { codexIntentFor } from "./plugin/intentMap";
 import { mapCodexModels } from "./probe";
@@ -173,6 +174,57 @@ describe("CodexStdioTransport", () => {
     transport.write({ jsonrpc: "2.0", method: "initialized" });
 
     expect(writes).toEqual(['{"jsonrpc":"2.0","method":"initialized"}\n']);
+  });
+});
+
+describe("CodexStructuredSession", () => {
+  function makeStructuredSession(
+    requests: Array<{ method: string; params: Record<string, unknown> }>,
+  ): CodexStructuredSession {
+    const session = Object.create(CodexStructuredSession.prototype) as Record<string, unknown>;
+
+    session["threadId"] = "local-thread";
+    session["remoteThreadId"] = "provider-thread";
+    session["bufferedRuntimeEvents"] = [];
+    session["isDisposed"] = false;
+    session["request"] = async (method: string, params: Record<string, unknown>) => {
+      requests.push({ method, params });
+      return method === "turn/start"
+        ? { turn: { id: "turn-1", items: [], status: "inProgress" } }
+        : {};
+    };
+
+    return session as unknown as CodexStructuredSession;
+  }
+
+  it("interrupts the active Codex app-server turn", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+
+    await structuredSession.startTurn("hello", { model: "gpt-5.4" });
+    await structuredSession.interruptTurn();
+
+    expect(requests.at(-1)).toEqual({
+      method: "turn/interrupt",
+      params: {
+        threadId: "provider-thread",
+        turnId: "turn-1",
+      },
+    });
+  });
+
+  it("interrupts after turn/start when stop was requested before the turn id arrived", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+
+    await structuredSession.interruptTurn();
+    await structuredSession.startTurn("hello", { model: "gpt-5.4" });
+
+    expect(requests.map((request) => request.method)).toEqual(["turn/start", "turn/interrupt"]);
+    expect(requests.at(-1)?.params).toEqual({
+      threadId: "provider-thread",
+      turnId: "turn-1",
+    });
   });
 });
 

@@ -7,13 +7,16 @@ import type { SupervisorEvent } from "@/shared/ipc";
 import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/settings";
 import {
   type AgentKind,
+  type ClearPendingSteerPayload,
   type CloseThreadPayload,
+  type PendingSteerState,
   type PromptSegment,
   type ProjectLocation,
   type ResizeTerminalPayload,
   type ResolveThreadServerRequestPayload,
   type SendThreadInputPayload,
   type SessionRef,
+  type SetPendingSteerPayload,
   type StartShellPayload,
   type StartThreadPayload,
   type StartThreadResult,
@@ -21,8 +24,10 @@ import {
   type ThreadConfig,
   type ThreadRuntimeSnapshot,
   type WriteTerminalPayload,
+  type RuntimeEvent,
   isThreadConfigEqual,
 } from "@/shared/contracts";
+import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { terminateProcessTree } from "@/shared/processTree";
 import {
   type AgentAdapter,
@@ -37,7 +42,12 @@ import {
 import type { WindowsShellPreference } from "../shellPreference";
 import { BufferedLogWriter } from "./bufferedLogWriter";
 import { hookDebugSpawn } from "./hookDebug";
-import type { QueuedStructuredTurn, SessionRuntime, ShellSessionRuntime } from "./sessionTypes";
+import type {
+  PendingSteerSlot,
+  QueuedStructuredTurn,
+  SessionRuntime,
+  ShellSessionRuntime,
+} from "./sessionTypes";
 import { ThreadOutputPipeline, resolveThreadStatusSource } from "./threadOutputPipeline";
 import { rewriteSegmentsForWsl } from "./threadAttachments";
 
@@ -75,6 +85,7 @@ export async function writeSubmittedPrompt(
  * short enough that the UI doesn't feel stuck.
  */
 export const USER_INTERRUPT_RECOVERY_GRACE_MS = 1200;
+const RUNTIME_EVENT_BATCH_MS = 16;
 
 /**
  * True iff the user keystroke payload represents an interrupt intent the
@@ -129,6 +140,7 @@ export interface ThreadSessionManagerOptions {
   isDev: boolean;
   logsDir: string;
   settingsPath: string;
+  readDisableCliHookPlugin(): boolean;
   adapters: Map<AgentKind, AgentAdapter>;
   windowsShell: WindowsShellPreference;
   /**
@@ -152,6 +164,8 @@ export class ThreadSessionManager {
   private readonly startLocks = new Map<string, Promise<void>>();
   private readonly logWriter = new BufferedLogWriter();
   private readonly outputPipeline: ThreadOutputPipeline;
+  private readonly pendingRuntimeEvents = new Map<string, RuntimeEvent[]>();
+  private runtimeEventBatchTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor(private readonly options: ThreadSessionManagerOptions) {
     this.outputPipeline = new ThreadOutputPipeline({
@@ -160,7 +174,7 @@ export class ThreadSessionManager {
       logWriter: this.logWriter,
       resolveLogPath: (threadId) => this.resolveLogPath(threadId),
       resolveHintLogPath: (threadId) => this.resolveHintLogPath(threadId),
-      readDisableCliHookPlugin: () => this.readDisableCliHookPlugin(),
+      readDisableCliHookPlugin: this.options.readDisableCliHookPlugin,
       onRecoverInvalidSessionRef: (session) => this.recoverInvalidSessionRef(session),
       onStartQueuedLaunchPrompt: (session) => this.startQueuedLaunchPrompt(session),
       onStartSessionRefDiscovery: (session) => this.pollSessionRefDiscovery(session),
@@ -168,12 +182,7 @@ export class ThreadSessionManager {
   }
 
   private readDisableCliHookPlugin(): boolean {
-    try {
-      const raw = readFileSync(this.options.settingsPath, "utf8");
-      return normalizeSharedSettings(JSON.parse(raw)).disableCliHookPlugin;
-    } catch {
-      return defaultSharedSettings.disableCliHookPlugin;
-    }
+    return this.options.readDisableCliHookPlugin();
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
@@ -186,6 +195,51 @@ export class ThreadSessionManager {
       canResumeWithConfig: session.canResumeWithConfig,
       threadStatusSource: resolveThreadStatusSource(session, this.readDisableCliHookPlugin()),
     }));
+  }
+
+  private enqueueRuntimeEvent(threadId: string, event: RuntimeEvent): void {
+    const pending = this.pendingRuntimeEvents.get(threadId);
+    if (pending) {
+      pending.push(event);
+    } else {
+      this.pendingRuntimeEvents.set(threadId, [event]);
+    }
+    this.runtimeEventBatchTimer ??= setTimeout(() => {
+      this.flushRuntimeEvents();
+    }, RUNTIME_EVENT_BATCH_MS);
+  }
+
+  private flushRuntimeEvents(): void {
+    if (this.runtimeEventBatchTimer) {
+      clearTimeout(this.runtimeEventBatchTimer);
+      this.runtimeEventBatchTimer = undefined;
+    }
+    if (this.pendingRuntimeEvents.size === 0) return;
+
+    // Single-thread path: keep the existing per-thread IPC shape so single
+    // active stream cases stay on the cheaper non-array envelope.
+    if (this.pendingRuntimeEvents.size === 1) {
+      for (const [threadId, events] of this.pendingRuntimeEvents) {
+        if (events.length === 1) {
+          this.options.emit({ type: "thread-runtime-event", threadId, event: events[0]! });
+        } else if (events.length > 1) {
+          this.options.emit({ type: "thread-runtime-events", threadId, events: [...events] });
+        }
+      }
+      this.pendingRuntimeEvents.clear();
+      return;
+    }
+
+    // Multi-thread path: collapse into a single IPC envelope so 6-8 concurrent
+    // streams produce one round-trip per 16ms tick instead of 6-8.
+    const batches: { threadId: string; events: RuntimeEvent[] }[] = [];
+    for (const [threadId, events] of this.pendingRuntimeEvents) {
+      if (events.length > 0) batches.push({ threadId, events: [...events] });
+    }
+    if (batches.length > 0) {
+      this.options.emit({ type: "thread-runtime-events-multi", batches });
+    }
+    this.pendingRuntimeEvents.clear();
   }
 
   /**
@@ -306,19 +360,20 @@ export class ThreadSessionManager {
         ...(effectiveSegments ? { segments: effectiveSegments } : {}),
         ...(payload.userMessageItemId ? { userMessageItemId: payload.userMessageItemId } : {}),
       };
+      // GUI threads route submit-while-working through the pending-steer
+      // path. Renderers should call `setPendingSteer` directly for that case;
+      // any `sendThreadInput` that lands here while working is treated as a
+      // steer (replace-latest) for backwards compatibility.
       if (session.presentationMode === "gui" && session.status === "working") {
-        this.enqueueStructuredTurn(session, turn);
-        void this.interruptStructuredTurn(session).catch((error) => {
-          if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-            return;
-          }
-          console.error("[supervisor] failed to interrupt structured turn:", error);
-        });
+        this.stagePendingSteer(session, turn);
+        this.fireSteerInterrupt(session);
         return;
       }
-      if (session.presentationMode === "gui" && (session.queuedStructuredTurns?.length ?? 0) > 0) {
-        this.enqueueStructuredTurn(session, turn);
-        this.maybeStartQueuedStructuredTurn(session);
+      if (session.presentationMode === "gui" && session.pendingSteer !== undefined) {
+        // Drain in progress (cancel acked, slot still set). Replace it; the
+        // existing drain-on-idle hook will pick up the new content.
+        this.stagePendingSteer(session, turn);
+        this.maybeDrainPendingSteer(session);
         return;
       }
       this.startStructuredTurn(session, turn);
@@ -400,25 +455,73 @@ export class ThreadSessionManager {
     session.pty?.resize(payload.cols, payload.rows);
   }
 
-  private enqueueStructuredTurn(session: SessionRuntime, turn: QueuedStructuredTurn): void {
-    if (!session.queuedStructuredTurns) {
-      session.queuedStructuredTurns = [];
-    }
-    session.queuedStructuredTurns.push(turn);
+  /**
+   * Stage (or replace) the pending steer slot. Allocates a stable id on the
+   * first stage and emits a `thread-pending-steer` event so the renderer can
+   * paint the strip. Replace-latest semantics — a second submit-while-working
+   * overwrites the existing slot rather than queueing.
+   */
+  private stagePendingSteer(session: SessionRuntime, turn: QueuedStructuredTurn): void {
+    const id = session.pendingSteer?.id ?? `steer-${randomUUID()}`;
+    const slot: PendingSteerSlot = {
+      id,
+      stagedAt: Date.now(),
+      ...turn,
+    };
+    session.pendingSteer = slot;
+    this.emitPendingSteer(session);
   }
 
-  private maybeStartQueuedStructuredTurn(session: SessionRuntime): void {
+  private clearPendingSteerSlot(session: SessionRuntime): void {
+    if (session.pendingSteer === undefined) return;
+    session.pendingSteer = undefined;
+    this.emitPendingSteer(session);
+  }
+
+  private emitPendingSteer(session: SessionRuntime): void {
+    const slot = session.pendingSteer;
+    const pending: PendingSteerState | null = slot
+      ? {
+          id: slot.id,
+          prompt: slot.prompt,
+          stagedAt: slot.stagedAt,
+          ...(slot.segments ? { segments: slot.segments } : {}),
+        }
+      : null;
+    this.options.emit({
+      type: "thread-pending-steer",
+      threadId: session.threadId,
+      pending,
+    });
+  }
+
+  private fireSteerInterrupt(session: SessionRuntime): void {
+    void this.interruptStructuredTurn(session).catch((error) => {
+      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+        return;
+      }
+      console.error("[supervisor] failed to interrupt structured turn:", error);
+    });
+  }
+
+  private maybeDrainPendingSteer(session: SessionRuntime): void {
     if (session.presentationMode !== "gui") {
       return;
     }
     if (session.status !== "idle" && session.status !== "needs_reply") {
       return;
     }
-    const nextTurn = session.queuedStructuredTurns?.shift();
-    if (!nextTurn) {
-      return;
-    }
-    this.startStructuredTurn(session, nextTurn);
+    const slot = session.pendingSteer;
+    if (!slot) return;
+    session.pendingSteer = undefined;
+    this.emitPendingSteer(session);
+    const turn: QueuedStructuredTurn = {
+      prompt: slot.prompt,
+      config: slot.config,
+      ...(slot.segments ? { segments: slot.segments } : {}),
+      ...(slot.userMessageItemId ? { userMessageItemId: slot.userMessageItemId } : {}),
+    };
+    this.startStructuredTurn(session, turn);
   }
 
   private async interruptStructuredTurn(session: SessionRuntime): Promise<void> {
@@ -437,6 +540,56 @@ export class ThreadSessionManager {
     }
   }
 
+  /**
+   * Stage the user's steer message and fire the cancel notification. The
+   * renderer calls this when submit-while-working happens on a GUI thread.
+   * Drain is automatic on cancelled-stopReason via `maybeDrainPendingSteer`.
+   */
+  async setPendingSteer(payload: SetPendingSteerPayload): Promise<void> {
+    const session = this.requireSession(payload.threadId);
+    if (session.presentationMode !== "gui") {
+      throw new Error("Pending steer is only supported for GUI-presentation threads.");
+    }
+    const usesStructuredFlow =
+      session.adapter.capabilities.liveInputMode === "server" || session.presentationMode === "gui";
+    if (!usesStructuredFlow || !session.structuredSession?.startTurn) {
+      throw new Error("Thread does not support structured turns.");
+    }
+    const effectiveSegments = payload.segments
+      ? rewriteSegmentsForWsl(payload.segments, session.projectLocation, {
+          preserveImageAttachments: true,
+        })
+      : undefined;
+    const prompt =
+      effectiveSegments && effectiveSegments.length > 0
+        ? (session.adapter.formatPromptSegments?.(effectiveSegments) ??
+          defaultFormatPromptSegments(effectiveSegments))
+        : payload.prompt;
+    const turn: QueuedStructuredTurn = {
+      prompt,
+      config: payload.config,
+      ...(effectiveSegments ? { segments: effectiveSegments } : {}),
+    };
+    this.stagePendingSteer(session, turn);
+    if (session.status === "working") {
+      this.fireSteerInterrupt(session);
+    } else {
+      // Status was already idle/needs_reply by the time we staged. Drain now
+      // so the message doesn't sit unflushed.
+      this.maybeDrainPendingSteer(session);
+    }
+  }
+
+  /**
+   * User aborted the steer (clicked the X on the strip). Clear the slot
+   * without firing a new prompt. The cancel notification we already sent
+   * still completes — the agent just stops without a replacement.
+   */
+  async clearPendingSteer(payload: ClearPendingSteerPayload): Promise<void> {
+    const session = this.requireSession(payload.threadId);
+    this.clearPendingSteerSlot(session);
+  }
+
   private startStructuredTurn(session: SessionRuntime, turn: QueuedStructuredTurn): void {
     if (!session.structuredSession?.startTurn) {
       return;
@@ -449,7 +602,8 @@ export class ThreadSessionManager {
     // already painted the message); otherwise emit one from the supervisor.
     const optimisticItemId =
       session.presentationMode === "gui" && turn.prompt.length > 0
-        ? (turn.userMessageItemId ?? this.emitOptimisticUserMessage(session.threadId, turn.prompt))
+        ? (turn.userMessageItemId ??
+          this.emitOptimisticUserMessage(session.threadId, turn.prompt, turn.segments))
         : undefined;
     void session.structuredSession
       .startTurn(
@@ -586,6 +740,7 @@ export class ThreadSessionManager {
   }
 
   dispose(): void {
+    this.flushRuntimeEvents();
     for (const session of this.sessions.values()) {
       session.ignoreExit = true;
       void session.structuredSession?.dispose();
@@ -750,7 +905,11 @@ export class ThreadSessionManager {
    * renderer's per-id dedupe, and the supervisor still drives the rest of the
    * canonical event stream.
    */
-  private emitOptimisticUserMessage(threadId: string, prompt: string): string {
+  private emitOptimisticUserMessage(
+    threadId: string,
+    prompt: string,
+    segments?: PromptSegment[],
+  ): string {
     const turnId = `turn-${randomUUID()}`;
     const itemId = `user-${randomUUID()}`;
     this.options.emit({
@@ -766,7 +925,7 @@ export class ThreadSessionManager {
         threadId,
         itemId,
         itemType: "user_message",
-        payload: { content: [{ kind: "text", text: prompt }] },
+        payload: { content: buildPromptContentBlocks(prompt, segments) },
       },
     });
     this.options.emit({
@@ -816,7 +975,7 @@ export class ThreadSessionManager {
     const optimisticUserMessageItemId =
       !usesTerminalPresentation && initialPrompt.length > 0 && !payload.sessionRef
         ? (payload.userMessageItemId ??
-          this.emitOptimisticUserMessage(payload.threadId, initialPrompt))
+          this.emitOptimisticUserMessage(payload.threadId, initialPrompt, effectiveSegments))
         : undefined;
 
     const structuredSession = await this.createStructuredSession(
@@ -907,6 +1066,16 @@ export class ThreadSessionManager {
         .startTurn(initialPrompt, payload.config, effectiveSegments)
         .catch((error) => {
           console.error("[supervisor] initial turn failed:", error);
+          const activeSession = this.sessions.get(payload.threadId);
+          if (!activeSession) {
+            return;
+          }
+          this.outputPipeline.updateState(
+            activeSession,
+            "error",
+            "error",
+            error instanceof Error ? error.message : String(error),
+          );
         });
     }
 
@@ -1197,7 +1366,7 @@ export class ThreadSessionManager {
           (wasWorking || hadInterruptRequest) &&
           (update.status === "idle" || update.status === "needs_reply")
         ) {
-          this.maybeStartQueuedStructuredTurn(session);
+          this.maybeDrainPendingSteer(session);
         }
         if (configChanged && !stateChanged && update.errorMessage === undefined) {
           this.outputPipeline.emitState(session);
@@ -1210,11 +1379,7 @@ export class ThreadSessionManager {
         ) {
           return;
         }
-        this.options.emit({
-          type: "thread-runtime-event",
-          threadId: session.threadId,
-          event,
-        });
+        this.enqueueRuntimeEvent(session.threadId, event);
       },
     });
 

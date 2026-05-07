@@ -8,6 +8,8 @@ import {
   Search,
   X,
 } from "lucide-react";
+import { useRef } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ProjectTreeEntry } from "@/shared/contracts";
 import { ContextMenu, PixelLoader } from "@/renderer/components/common";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
@@ -18,8 +20,15 @@ import {
   useIsPathLoading,
   useProjectTreeStore,
 } from "@/renderer/state/projectTreeStore";
-import { TreeChildren } from "./parts/TreeEntryRow";
+import { InlineDraftRow } from "./parts/InlineDraftRow";
+import { TreeEntryRow } from "./parts/TreeEntryRow";
 import { useProjectTree } from "./parts/useProjectTree";
+import type { TreeDraftState } from "./parts/useProjectTree";
+
+type ProjectTreeRow =
+  | { kind: "entry"; entry: ProjectTreeEntry; depth: number }
+  | { kind: "draft"; parentPath: string; draft: TreeDraftState; depth: number }
+  | { kind: "loading"; parentPath: string; depth: number };
 
 export function ProjectTreeView(props: {
   rootContext: FileEditorRootContext;
@@ -29,9 +38,25 @@ export function ProjectTreeView(props: {
   const tree = useProjectTree(props);
   const rootIsDropTarget = useIsDropTarget("");
   const rootLoading = useIsPathLoading("");
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const directoryEntries = useProjectTreeStore((s) => s.directoryEntries);
+  const expandedPaths = useProjectTreeStore((s) => s.expandedPaths);
+  const loadingPaths = useProjectTreeStore((s) => s.loadingPaths);
   const isAnyDirectoryLoaded = useProjectTreeStore(
     (s) => Object.keys(s.directoryEntries).length > 0,
   );
+  const rows = flattenProjectTreeRows({
+    directoryEntries,
+    expandedPaths,
+    loadingPaths,
+    draft: tree.draft,
+  });
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 24,
+    overscan: 16,
+  });
 
   return (
     <ContextMenu
@@ -124,6 +149,7 @@ export function ProjectTreeView(props: {
         </div>
 
         <div
+          ref={scrollRef}
           className={`min-h-0 flex-1 overflow-auto px-0 py-2 ${
             rootIsDropTarget ? "ring-1 ring-inset ring-accent/40" : ""
           }`}
@@ -157,26 +183,128 @@ export function ProjectTreeView(props: {
                   Loading…
                 </div>
               ) : (
-                <TreeChildren
-                  parentPath=""
-                  depth={0}
-                  isLoading={rootLoading}
-                  draft={tree.draft}
-                  setDraft={tree.setDraft}
-                  onSelectFile={tree.handleSelectFile}
-                  {...(props.onPinFile ? { onPinFile: props.onPinFile } : {})}
-                  onToggleDirectory={tree.toggleDirectory}
-                  onEntryAction={tree.handleEntryAction}
-                  onMovePath={tree.handleMovePath}
-                  onHandleRename={tree.handleRenameEntry}
-                  onHandleCreate={tree.handleCreateEntry}
-                />
+                <div className="relative" style={{ height: `${virtualizer.getTotalSize()}px` }}>
+                  {virtualizer.getVirtualItems().map((virtualRow) => {
+                    const row = rows[virtualRow.index];
+                    if (!row) return null;
+                    const rowKey =
+                      row.kind === "entry" ? row.entry.path : `${row.kind}:${row.parentPath}`;
+                    return (
+                      <div
+                        key={rowKey}
+                        className="absolute left-0 top-0 w-full"
+                        style={{ transform: `translateY(${virtualRow.start}px)` }}
+                      >
+                        <ProjectTreeVirtualRow
+                          row={row}
+                          draft={tree.draft}
+                          setDraft={tree.setDraft}
+                          onSelectFile={tree.handleSelectFile}
+                          {...(props.onPinFile ? { onPinFile: props.onPinFile } : {})}
+                          onToggleDirectory={tree.toggleDirectory}
+                          onEntryAction={tree.handleEntryAction}
+                          onMovePath={tree.handleMovePath}
+                          onHandleRename={tree.handleRenameEntry}
+                          onHandleCreate={tree.handleCreateEntry}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           )}
         </div>
       </div>
     </ContextMenu>
+  );
+}
+
+function flattenProjectTreeRows(input: {
+  directoryEntries: Record<string, ProjectTreeEntry[]>;
+  expandedPaths: Record<string, boolean>;
+  loadingPaths: Record<string, boolean>;
+  draft: TreeDraftState | null;
+}): ProjectTreeRow[] {
+  const rows: ProjectTreeRow[] = [];
+
+  const visit = (parentPath: string, depth: number) => {
+    const draft = input.draft;
+    if (draft?.mode === "create" && draft.parentPath === parentPath) {
+      rows.push({ kind: "draft", parentPath, draft, depth });
+    }
+    const entries = input.directoryEntries[parentPath] ?? [];
+    if (input.loadingPaths[parentPath] && entries.length === 0) {
+      rows.push({ kind: "loading", parentPath, depth });
+      return;
+    }
+    for (const entry of entries) {
+      rows.push({ kind: "entry", entry, depth });
+      if (entry.type === "directory" && input.expandedPaths[entry.path]) {
+        visit(entry.path, depth + 1);
+      }
+    }
+  };
+
+  visit("", 0);
+  return rows;
+}
+
+function ProjectTreeVirtualRow(props: {
+  row: ProjectTreeRow;
+  draft: TreeDraftState | null;
+  setDraft: React.Dispatch<React.SetStateAction<TreeDraftState | null>>;
+  onSelectFile: (path: string) => void;
+  onPinFile?: (path: string) => void;
+  onToggleDirectory: (path: string) => void;
+  onEntryAction: (entry: ProjectTreeEntry, action: string) => void;
+  onMovePath: (sourcePath: string, nextParentPath: string) => Promise<void>;
+  onHandleRename: (path: string, nextName: string) => Promise<void>;
+  onHandleCreate: (parentPath: string, type: "file" | "directory", value: string) => Promise<void>;
+}) {
+  const { row } = props;
+  if (row.kind === "loading") {
+    return (
+      <div
+        className="flex items-center gap-1.5 px-2 py-0.5 text-xs text-muted"
+        style={{ paddingLeft: `${row.depth * 14 + 8}px` }}
+      >
+        <PixelLoader size="xs" />
+        Loading…
+      </div>
+    );
+  }
+  if (row.kind === "draft") {
+    return (
+      <InlineDraftRow
+        depth={row.depth}
+        type={row.draft.type}
+        value={row.draft.value}
+        onChange={(value) => props.setDraft((state) => (state ? { ...state, value } : state))}
+        onCancel={() => props.setDraft(null)}
+        onCommit={(value) => {
+          void props
+            .onHandleCreate(row.parentPath, row.draft.type, value)
+            .catch((error) => toast.danger(error instanceof Error ? error.message : String(error)));
+        }}
+      />
+    );
+  }
+  return (
+    <TreeEntryRow
+      entry={row.entry}
+      depth={row.depth}
+      draft={props.draft}
+      setDraft={props.setDraft}
+      onSelectFile={props.onSelectFile}
+      {...(props.onPinFile ? { onPinFile: props.onPinFile } : {})}
+      onToggleDirectory={props.onToggleDirectory}
+      onEntryAction={props.onEntryAction}
+      onMovePath={props.onMovePath}
+      onHandleRename={props.onHandleRename}
+      onHandleCreate={props.onHandleCreate}
+      renderChildren={false}
+    />
   );
 }
 

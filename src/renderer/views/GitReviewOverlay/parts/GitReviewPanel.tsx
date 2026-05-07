@@ -57,12 +57,14 @@ export function GitReviewPanel(props: {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [selectedStaged, setSelectedStaged] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
   const [wrapLines, setWrapLines] = useState(false);
   const gitStatus = useGitStore((s) =>
     statusKey ? s.worktreeStatuses[statusKey] : s.statuses[project.id],
   ) as GitStatusResult | undefined;
 
   async function fetchStatus() {
+    setRefreshing(true);
     try {
       const status = await readBridge().getGitStatus({
         projectLocation: effectiveLocation,
@@ -74,6 +76,8 @@ export function GitReviewPanel(props: {
       }
     } catch {
       // ignore
+    } finally {
+      setRefreshing(false);
     }
   }
 
@@ -125,7 +129,7 @@ export function GitReviewPanel(props: {
       >
         {/* Header — full when standalone, slim git-actions-only bar when parent provides its own header */}
         {hideHeader ? (
-          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1.5 pr-3 text-xs leading-none">
+          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1.5 pr-3 text-xs leading-tight">
             {gitStatus?.branch && (
               <>
                 {statusKey ? (
@@ -200,11 +204,11 @@ export function GitReviewPanel(props: {
               title="Refresh"
               onClick={() => void handleRefresh()}
             >
-              <RefreshCw className="size-3" />
+              <RefreshCw className={`size-3 ${refreshing ? "animate-spin" : ""}`} />
             </button>
           </div>
         ) : (
-          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3 text-xs leading-none">
+          <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3 text-xs leading-tight">
             <div className="min-w-0">
               <Tooltip delay={300}>
                 <Tooltip.Trigger tabIndex={-1} role="none">
@@ -289,7 +293,7 @@ export function GitReviewPanel(props: {
               title="Refresh"
               onClick={() => void handleRefresh()}
             >
-              <RefreshCw className="size-3" />
+              <RefreshCw className={`size-3 ${refreshing ? "animate-spin" : ""}`} />
             </button>
             <button
               type="button"

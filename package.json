@@ -37,6 +37,7 @@
     "test": "vitest run",
     "test:perf:cli-hook": "vitest run src/supervisor/runtime/cliHookEventChain.perf.test.ts",
     "update-server": "node scripts/update-server.mjs",
+    "db:clone": "node scripts/clone-db.mjs",
     "prepare": "husky"
   },
   "dependencies": {
@@ -54,6 +55,7 @@
     "@heroui/react": "^3.0.3",
     "@heroui/styles": "^3.0.3",
     "@monaco-editor/react": "^4.7.0",
+    "@opencode-ai/sdk": "^1.14.40",
     "@tanstack/react-virtual": "^3.13.24",
     "@xterm/addon-clipboard": "0.3.0-beta.216",
     "@xterm/addon-fit": "0.12.0-beta.216",

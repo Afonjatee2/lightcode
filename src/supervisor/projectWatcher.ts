@@ -60,7 +60,9 @@ const WSL_IGNORE_DIRS = [
 function isKnownGitNoisePath(value: string): boolean {
   return (
     value === "FETCH_HEAD" ||
+    value === "index" ||
     value === "index.lock" ||
+    /^worktrees\/[^/]+\/index$/.test(value) ||
     /^worktrees\/[^/]+\/index\.lock$/.test(value) ||
     /^\.watchman-cookie-/.test(value) ||
     value.startsWith("logs/") ||
@@ -179,7 +181,7 @@ export class ProjectWatcher {
       entry.gitWatcher = watch(gitDir, { recursive: true }, (_eventType, filename) => {
         if (filename) {
           const name = filename.replace(/\\/g, "/");
-          if (name === "FETCH_HEAD" || name.startsWith("objects/") || name.startsWith("logs/")) {
+          if (isKnownGitNoisePath(name)) {
             return;
           }
         }

@@ -107,6 +107,35 @@ export const interruptThreadPayloadSchema = z.object({
 });
 export type InterruptThreadPayload = z.infer<typeof interruptThreadPayloadSchema>;
 
+export const setPendingSteerPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  prompt: z.string().min(1),
+  segments: z.array(promptSegmentSchema).optional(),
+  config: threadConfigSchema,
+});
+export type SetPendingSteerPayload = z.infer<typeof setPendingSteerPayloadSchema>;
+
+export const clearPendingSteerPayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+export type ClearPendingSteerPayload = z.infer<typeof clearPendingSteerPayloadSchema>;
+
+/**
+ * Renderer-visible representation of the single staged steer message that
+ * sits in the supervisor between user submit-while-working and the agent
+ * acknowledging the cancel. `null` (in IPC) clears the slot.
+ */
+export interface PendingSteerState {
+  /** Stable id allocated by the supervisor at stage time. */
+  id: string;
+  /** Plaintext preview shown in the composer strip. */
+  prompt: string;
+  /** Optional structured segments (attachments, files, mentions). */
+  segments?: PromptSegment[];
+  /** Wall-clock timestamp the slot was staged or last edited. */
+  stagedAt: number;
+}
+
 export const writeTerminalPayloadSchema = z.object({
   threadId: z.string().min(1),
   data: z.string().min(1),
