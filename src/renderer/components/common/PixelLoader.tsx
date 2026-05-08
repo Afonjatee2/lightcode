@@ -51,8 +51,13 @@ const PATTERNS: Record<string, Frames> = {
   scatter: [[0, 5], [2, 7], [1, 6], [4, 8], [3]],
 };
 
-const KEYS = Object.keys(PATTERNS);
+const KEYS = Object.keys(PATTERNS) as (keyof typeof PATTERNS)[];
 const SESSION_PATTERN = KEYS[Math.floor(Math.random() * KEYS.length)] ?? "waveLR";
+
+const FLASHY_PATTERNS = new Set<keyof typeof PATTERNS>(["checker", "pulse", "scatter"]);
+const PATTERN_SPEED_MULTIPLIERS: Record<keyof typeof PATTERNS, number> = Object.fromEntries(
+  KEYS.map((key) => [key, FLASHY_PATTERNS.has(key) ? 1.35 : 1]),
+) as Record<keyof typeof PATTERNS, number>;
 
 /** Same Tailwind `size-*` utilities used with Lucide (`<Icon className="size-4" />`). */
 const ICON_SIZE_CLASS = {
@@ -89,11 +94,13 @@ export function PixelLoader({
   const chosen = useRef(pattern ?? SESSION_PATTERN);
   const filterId = useRef(`px-glow-${filterIdCounter++}`);
   const frames = PATTERNS[chosen.current] as Frames;
+  const speedMultiplier = PATTERN_SPEED_MULTIPLIERS[chosen.current] ?? 1;
+  const frameDuration = Math.round(speed * speedMultiplier);
 
   useEffect(() => {
-    const id = setInterval(() => setFrame((f) => (f + 1) % frames.length), speed);
+    const id = setInterval(() => setFrame((f) => (f + 1) % frames.length), frameDuration);
     return () => clearInterval(id);
-  }, [frames.length, speed]);
+  }, [frameDuration, frames.length]);
 
   const s = VIEWBOX;
   const gap = Math.round(s * 0.1);
@@ -140,7 +147,7 @@ export function PixelLoader({
               fill={fill}
               opacity={on ? 1 : 0}
               style={{
-                transition: on ? "opacity 60ms ease-in" : `opacity ${speed * 2}ms ease-out`,
+                transition: on ? "opacity 60ms ease-in" : `opacity ${frameDuration * 2}ms ease-out`,
               }}
             />
           );

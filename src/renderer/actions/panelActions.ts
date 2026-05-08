@@ -78,7 +78,11 @@ export function closeAllPanels(): void {
   usePanelStore.getState().closeAllPanels();
 }
 
-export function openFilesPanel(projectId: string, worktreePath?: string): void {
+function applyFilesPanel(
+  projectId: string,
+  worktreePath: string | undefined,
+  options: { toggleCloseIfActive: boolean },
+): void {
   const project = useAppStore.getState().projects.find((item) => item.id === projectId);
   if (!project) return;
 
@@ -106,21 +110,31 @@ export function openFilesPanel(projectId: string, worktreePath?: string): void {
   }
 
   const panelStore = usePanelStore.getState();
-  const filesPanelContext = panelStore.filesPanelContext;
-  const rightPanelTab = panelStore.rightPanelTab;
 
-  if (
-    isSameContext &&
-    filesPanelContext?.projectId === context.projectId &&
-    filesPanelContext?.worktreePath === context.worktreePath &&
-    rightPanelTab === "files"
-  ) {
-    closeAllPanels();
-    return;
+  if (options.toggleCloseIfActive) {
+    const filesPanelContext = panelStore.filesPanelContext;
+    const rightPanelTab = panelStore.rightPanelTab;
+    if (
+      isSameContext &&
+      filesPanelContext?.projectId === context.projectId &&
+      filesPanelContext?.worktreePath === context.worktreePath &&
+      rightPanelTab === "files"
+    ) {
+      closeAllPanels();
+      return;
+    }
   }
 
   panelStore.setFilesPanelContext(context);
   panelStore.setRightPanelTab("files");
+}
+
+export function openFilesPanel(projectId: string, worktreePath?: string): void {
+  applyFilesPanel(projectId, worktreePath, { toggleCloseIfActive: true });
+}
+
+export function showFilesPanel(projectId: string, worktreePath?: string): void {
+  applyFilesPanel(projectId, worktreePath, { toggleCloseIfActive: false });
 }
 
 export function openGitReview(projectId: string, worktreePath?: string): void {
@@ -148,6 +162,14 @@ export function openGitReview(projectId: string, worktreePath?: string): void {
     panelStore.setGitReviewAsPanel(false);
     panelStore.setGitOverlayOpen(true);
   }
+}
+
+export function showGitReviewPanel(projectId: string, worktreePath?: string): void {
+  const panelStore = usePanelStore.getState();
+  panelStore.setGitReviewContext({ projectId, ...(worktreePath ? { worktreePath } : {}) });
+  panelStore.setGitReviewAsPanel(true);
+  panelStore.setGitOverlayOpen(false);
+  panelStore.setRightPanelTab("git");
 }
 
 export function openGitOverlay(): void {

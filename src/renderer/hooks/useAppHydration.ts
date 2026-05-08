@@ -71,6 +71,10 @@ export function useAppHydration() {
           archiveOldDoneThreads(days);
         });
       }
+      // Warm the markdown renderer chunk so the first assistant reply renders
+      // markdown without a Suspense flicker. Heavy deps (Streamdown + remark)
+      // stay out of the synchronous startup path.
+      void import("@/renderer/components/thread/ChatPane/parts/items/ItemMarkdownInner");
     });
 
     void readBridge()

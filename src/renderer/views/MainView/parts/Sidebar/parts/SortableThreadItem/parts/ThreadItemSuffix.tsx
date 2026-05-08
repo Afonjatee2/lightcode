@@ -14,6 +14,7 @@ import {
   useIsWorktreeTerminalOpen,
 } from "@/renderer/hooks/uiSelectors";
 import { formatRelativeTime } from "@/renderer/utils/formatTime";
+import { SidebarPanelDragButton } from "../../SidebarPanelDragButton";
 
 export function ThreadItemSuffix(props: {
   thread: Thread;
@@ -33,51 +34,35 @@ export function ThreadItemSuffix(props: {
       {showWorktreeBadge && thread.worktreePath && (
         <>
           {showWorktreeFilesButton ? (
-            <div
-              role="button"
-              tabIndex={0}
-              aria-label={`Files for ${thread.worktreeBranch ?? thread.title}`}
-              className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+            <SidebarPanelDragButton
+              panel="files"
+              projectId={thread.projectId}
+              worktreePath={thread.worktreePath}
+              ariaLabel={`Files for ${thread.worktreeBranch ?? thread.title}`}
+              className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
                 isFilesActive ? "text-accent" : "text-muted/60 opacity-0 group-hover:opacity-100"
               }`}
-              onClick={(event) => {
-                event.stopPropagation();
-                openFilesPanel(thread.projectId, thread.worktreePath);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.stopPropagation();
-                  openFilesPanel(thread.projectId, thread.worktreePath);
-                }
-              }}
+              onPress={() => openFilesPanel(thread.projectId, thread.worktreePath)}
             >
               <FolderOpen className="size-3.5" />
-            </div>
+            </SidebarPanelDragButton>
           ) : null}
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label={`Terminal for ${thread.worktreeBranch}`}
-            className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+          <SidebarPanelDragButton
+            panel="terminal"
+            projectId={thread.projectId}
+            worktreePath={thread.worktreePath}
+            ariaLabel={`Terminal for ${thread.worktreeBranch}`}
+            className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
               isTerminalActive
                 ? "text-accent"
                 : isTerminalOpen
                   ? "text-foreground"
                   : "text-muted/60 opacity-0 group-hover:opacity-100"
             }`}
-            onClick={(event) => {
-              event.stopPropagation();
-              openWorktreeTerminal(thread.projectId, thread.worktreePath!);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.stopPropagation();
-                openWorktreeTerminal(thread.projectId, thread.worktreePath!);
-              }
-            }}
+            onPress={() => openWorktreeTerminal(thread.projectId, thread.worktreePath!)}
           >
             <TerminalSquare className="size-3.5" />
-          </div>
+          </SidebarPanelDragButton>
           <SyncBadge projectId={thread.projectId} worktreePath={thread.worktreePath} />
           <GitBadge
             projectId={thread.projectId}

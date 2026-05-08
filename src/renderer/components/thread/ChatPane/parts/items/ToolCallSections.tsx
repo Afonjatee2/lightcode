@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
 import { CommandOutputViewport } from "./CommandOutputViewport";
+import { ItemMarkdown } from "./ItemMarkdown";
 import type { ExtractedPart } from "./acpToolPayload";
 
 export interface ToolCallSection {
   /** Label displayed above the viewport (e.g. `args`, `result`). */
   label: string;
   part: ExtractedPart;
+  /** When true, render through `ItemMarkdown` instead of the code/plain viewport. */
+  renderAsMarkdown?: boolean;
 }
 
 interface ToolCallSectionsProps {
@@ -34,7 +37,11 @@ export function ToolCallSections({ sections, leading }: ToolCallSectionsProps) {
           <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-[color:var(--muted)]/80">
             {section.label}
           </div>
-          <CommandOutputViewport text={section.part.text} language={section.part.language} />
+          {section.renderAsMarkdown ? (
+            <ItemMarkdown text={section.part.text} />
+          ) : (
+            <CommandOutputViewport text={section.part.text} language={section.part.language} />
+          )}
         </div>
       ))}
     </div>

@@ -8,9 +8,11 @@ import {
   iterm2ProgressOscHint,
   shortenHomePath,
   type AgentAdapter,
+  type CreateStructuredSessionInput,
 } from "../base";
 import { buildClaudeArgs } from "./argv";
 import { claudeCapabilities, claudeDetectionSpec } from "./detection";
+import { ClaudeSdkSession } from "./sdkSession";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
   getClaudePluginPaths,
@@ -78,6 +80,10 @@ export function createClaudeAdapter(): AgentAdapter {
     },
     createInitialSessionRef() {
       return undefined;
+    },
+    async createStructuredSession(input: CreateStructuredSessionInput) {
+      if (input.presentationMode !== "gui") return undefined;
+      return ClaudeSdkSession.create(input);
     },
     buildDirectInput(prompt, segments) {
       const attachmentCount = segments?.filter((s) => s.kind === "attachment").length ?? 0;

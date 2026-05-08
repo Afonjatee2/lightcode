@@ -3,7 +3,7 @@ import { toast } from "@heroui/react";
 import type { GitBranchInfo, GitStatusResult, Project, ProjectLocation } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { buildWorktreeLocation } from "@/shared/worktree";
-import { msg, friendlyError } from "@/shared/messages";
+import { msg, friendlyError, friendlyErrorWithDetail } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useGitStore } from "@/renderer/state/gitStore";
@@ -28,6 +28,19 @@ export interface UseGitReviewActionsArgs {
   effectivePrKey: string | undefined;
   sourceBranch: string | null;
   branchList: readonly GitBranchInfo[];
+}
+
+const TOAST_DETAIL_MAX_LINES = 12;
+const TOAST_DETAIL_MAX_CHARS = 800;
+
+function truncateForToast(details: string): string {
+  const lines = details.split("\n");
+  const sliced = lines.length > TOAST_DETAIL_MAX_LINES;
+  let body = (sliced ? lines.slice(0, TOAST_DETAIL_MAX_LINES) : lines).join("\n");
+  if (body.length > TOAST_DETAIL_MAX_CHARS) {
+    body = body.slice(0, TOAST_DETAIL_MAX_CHARS);
+  }
+  return sliced || body.length < details.length ? `${body}\n…` : body;
 }
 
 export function useGitReviewActions(args: UseGitReviewActionsArgs) {
@@ -174,7 +187,19 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
         .finally(() => onRefresh());
     } catch (err) {
       console.error("[git] commit failed", err);
-      toast.danger(friendlyError(err));
+      const { summary, details } = friendlyErrorWithDetail(err);
+      if (details) {
+        toast.danger(summary, {
+          description: truncateForToast(details),
+          actionProps: {
+            children: "Copy details",
+            onPress: () => void navigator.clipboard.writeText(details),
+          },
+          timeout: 0,
+        });
+      } else {
+        toast.danger(summary);
+      }
     } finally {
       setIsCommitting(false);
     }

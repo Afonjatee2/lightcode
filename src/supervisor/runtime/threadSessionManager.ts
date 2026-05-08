@@ -197,6 +197,24 @@ export class ThreadSessionManager {
     }));
   }
 
+  /**
+   * Surface a structured-session failure on both axes: status (so the icon
+   * goes red) and a runtime `error` event (so `ThreadErrorDock` and the chat
+   * stream actually render the message). The supervisor stores `errorMessage`
+   * on the thread state, but no renderer surface reads `thread.errorMessage`
+   * — only the runtime error item drives `ThreadErrorDock` — so without the
+   * event the user sees a red icon and nothing else.
+   */
+  private failStructuredSession(session: SessionRuntime, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.outputPipeline.updateState(session, "error", "error", message);
+    this.enqueueRuntimeEvent(session.threadId, {
+      type: "error",
+      threadId: session.threadId,
+      message,
+    });
+  }
+
   private enqueueRuntimeEvent(threadId: string, event: RuntimeEvent): void {
     const pending = this.pendingRuntimeEvents.get(threadId);
     if (pending) {
@@ -616,12 +634,7 @@ export class ThreadSessionManager {
         if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
           return;
         }
-        this.outputPipeline.updateState(
-          session,
-          "error",
-          "error",
-          error instanceof Error ? error.message : String(error),
-        );
+        this.failStructuredSession(session, error);
       });
   }
 
@@ -936,6 +949,18 @@ export class ThreadSessionManager {
     return itemId;
   }
 
+  private emitOptimisticWorkingState(threadId: string, config: ThreadConfig): void {
+    this.options.emit({
+      type: "thread-state",
+      threadId,
+      status: "working",
+      attention: "working",
+      config,
+      canResumeWithConfig: false,
+      threadStatusSource: "server",
+    });
+  }
+
   private async startThreadInner(
     payload: StartThreadPayload & { threadId: string },
   ): Promise<StartThreadResult> {
@@ -977,6 +1002,9 @@ export class ThreadSessionManager {
         ? (payload.userMessageItemId ??
           this.emitOptimisticUserMessage(payload.threadId, initialPrompt, effectiveSegments))
         : undefined;
+    if (optimisticUserMessageItemId) {
+      this.emitOptimisticWorkingState(payload.threadId, payload.config);
+    }
 
     const structuredSession = await this.createStructuredSession(
       adapter,
@@ -1029,6 +1057,8 @@ export class ThreadSessionManager {
         structuredSession,
         ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
         presentationMode: requestedPresentation,
+        initialStatus: optimisticUserMessageItemId ? "working" : "idle",
+        initialAttention: optimisticUserMessageItemId ? "working" : "none",
       });
       if (!payload.sessionRef && initialPrompt.length > 0 && structuredSession.startTurn) {
         void structuredSession
@@ -1044,12 +1074,7 @@ export class ThreadSessionManager {
             if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
               return;
             }
-            this.outputPipeline.updateState(
-              session,
-              "error",
-              "error",
-              error instanceof Error ? error.message : String(error),
-            );
+            this.failStructuredSession(session, error);
           });
       }
       return { threadId: payload.threadId };
@@ -1070,12 +1095,7 @@ export class ThreadSessionManager {
           if (!activeSession) {
             return;
           }
-          this.outputPipeline.updateState(
-            activeSession,
-            "error",
-            "error",
-            error instanceof Error ? error.message : String(error),
-          );
+          this.failStructuredSession(activeSession, error);
         });
     }
 
@@ -1209,6 +1229,8 @@ export class ThreadSessionManager {
     pendingTerminalPrompt?: string;
     pendingTerminalSegments?: PromptSegment[];
     presentationMode?: import("@/shared/contracts").ThreadPresentationMode;
+    initialStatus?: import("@/shared/contracts").ThreadStatus;
+    initialAttention?: import("@/shared/contracts").ThreadAttention;
   }): SessionRuntime {
     // `thread-reset` is only consumed by the terminal panel (xterm scrollback
     // reset) and the renderer-side runtime-event/server-request slice clear.
@@ -1270,8 +1292,8 @@ export class ThreadSessionManager {
       terminalSize: input.initialSize,
       launchPrompt: input.launchPrompt,
       ...(input.sessionRef ? { sessionRef: input.sessionRef } : {}),
-      status: "launching",
-      attention: "none",
+      status: input.initialStatus ?? "launching",
+      attention: input.initialAttention ?? "none",
       canResumeWithConfig: input.sessionRef !== undefined,
       outputLength: 0,
       pendingLaunchPrompt: input.pendingLaunchPrompt,

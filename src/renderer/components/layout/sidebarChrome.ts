@@ -13,7 +13,7 @@ export const macosTrafficLightGutterClass = "w-[80px] shrink-0" as const;
 
 /** Shared header bar for right/bottom dock panels (project name + tab/close icons). */
 export const panelHeaderRowClass =
-  "flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-2";
+  "@container flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-2";
 
 /** Reset Tooltip.Trigger styling so it tracks an inline span tightly (used for project labels). */
 export const panelHeaderTooltipTriggerResetClass =

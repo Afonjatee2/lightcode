@@ -1,6 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { renderHook } from "@testing-library/react";
 import type { Thread } from "@/shared/contracts";
-import { resolveThreadReorder } from "./useDndHandlers";
+import { resolveThreadReorder, useDndHandlers } from "./useDndHandlers";
+
+const showFilesPanel = vi.fn<(projectId: string, worktreePath?: string) => void>();
+const showGitReviewPanel = vi.fn<(projectId: string, worktreePath?: string) => void>();
+const showTerminalPanel = vi.fn<(projectId: string, worktreePath?: string) => void>();
+
+vi.mock("@/renderer/actions/panelActions", () => ({
+  showFilesPanel: (projectId: string, worktreePath?: string) =>
+    showFilesPanel(projectId, worktreePath),
+  showGitReviewPanel: (projectId: string, worktreePath?: string) =>
+    showGitReviewPanel(projectId, worktreePath),
+}));
+vi.mock("@/renderer/actions/terminalActions", () => ({
+  showTerminalPanel: (projectId: string, worktreePath?: string) =>
+    showTerminalPanel(projectId, worktreePath),
+}));
 
 function makeThread(id: string, starred = false): Thread {
   return {
@@ -65,5 +81,73 @@ describe("resolveThreadReorder", () => {
         finalIndex: 2,
       }),
     ).toEqual({ targetId: "c", placement: "after" });
+  });
+});
+
+describe("useDndHandlers.handleMainPanelDrop", () => {
+  function getHandler() {
+    const { result } = renderHook(() => useDndHandlers());
+    return result.current.handleMainPanelDrop;
+  }
+
+  function resetMocks() {
+    showFilesPanel.mockReset();
+    showGitReviewPanel.mockReset();
+    showTerminalPanel.mockReset();
+  }
+
+  it("opens the files panel for a project drop (no worktree)", () => {
+    resetMocks();
+    getHandler()({ type: "project", projectId: "project-1" });
+    expect(showFilesPanel).toHaveBeenCalledWith("project-1", undefined);
+    expect(showGitReviewPanel).not.toHaveBeenCalled();
+    expect(showTerminalPanel).not.toHaveBeenCalled();
+  });
+
+  it("opens the files panel for a worktree-group drop with worktreePath", () => {
+    resetMocks();
+    getHandler()({
+      type: "worktree-group",
+      projectId: "project-1",
+      worktreePath: "/repo/.worktrees/feature",
+      threadIds: [],
+    });
+    expect(showFilesPanel).toHaveBeenCalledWith("project-1", "/repo/.worktrees/feature");
+  });
+
+  it("dispatches sidebar-panel `files` to showFilesPanel", () => {
+    resetMocks();
+    getHandler()({
+      type: "sidebar-panel",
+      panel: "files",
+      projectId: "project-1",
+      worktreePath: "/repo/.worktrees/feature",
+    });
+    expect(showFilesPanel).toHaveBeenCalledWith("project-1", "/repo/.worktrees/feature");
+    expect(showGitReviewPanel).not.toHaveBeenCalled();
+  });
+
+  it("dispatches sidebar-panel `git` to showGitReviewPanel", () => {
+    resetMocks();
+    getHandler()({
+      type: "sidebar-panel",
+      panel: "git",
+      projectId: "project-1",
+    });
+    expect(showGitReviewPanel).toHaveBeenCalledWith("project-1", undefined);
+    expect(showFilesPanel).not.toHaveBeenCalled();
+  });
+
+  it("dispatches sidebar-panel `terminal` to showTerminalPanel", () => {
+    resetMocks();
+    getHandler()({
+      type: "sidebar-panel",
+      panel: "terminal",
+      projectId: "project-1",
+      worktreePath: "/repo/.worktrees/feature",
+    });
+    expect(showTerminalPanel).toHaveBeenCalledWith("project-1", "/repo/.worktrees/feature");
+    expect(showFilesPanel).not.toHaveBeenCalled();
+    expect(showGitReviewPanel).not.toHaveBeenCalled();
   });
 });

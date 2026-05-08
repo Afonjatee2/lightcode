@@ -29,9 +29,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: Assista
   return (
     <Surface variant="transparent" className={chatMessageSurfaceClass}>
       <div className="min-w-0 leading-snug">
-        {rawText.length > 0 ? (
-          <ItemMarkdown text={text} mode={isStreaming ? "plain" : "markdown"} />
-        ) : null}
+        {rawText.length > 0 ? <ItemMarkdown text={text} /> : null}
         {isStreaming && rawText.length === 0 ? (
           <div className="text-foreground-muted">
             <PixelLoader size="xxs" />

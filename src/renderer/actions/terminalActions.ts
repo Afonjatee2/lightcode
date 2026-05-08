@@ -7,73 +7,60 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { writeScriptToShell } from "@/renderer/utils/shellUtils";
 import { closeAllPanels } from "./panelActions";
 
-export function openTerminal(projectId: string): void {
+function applyTerminalPanel(
+  projectId: string,
+  worktreePath: string | undefined,
+  options: { toggleCloseIfActive: boolean },
+): void {
   const project = useAppStore.getState().projects.find((p) => p.id === projectId);
   if (!project) return;
 
   const store = useDevTerminalStore.getState();
   const isBottom = useSharedSettings.getState().terminalPosition === "bottom";
-  const rightPanelTab = usePanelStore.getState().rightPanelTab;
-  const isSameTerminal =
-    store.isOpen && store.activeProjectId === projectId && !store.activeWorktreePath;
 
-  if (isSameTerminal && (isBottom || rightPanelTab === "terminal")) {
-    if (isBottom) {
+  if (options.toggleCloseIfActive) {
+    const rightPanelTab = usePanelStore.getState().rightPanelTab;
+    const isSameTerminal =
+      store.isOpen &&
+      store.activeProjectId === projectId &&
+      (store.activeWorktreePath ?? undefined) === worktreePath;
+    if (isSameTerminal && (isBottom || rightPanelTab === "terminal")) {
+      if (!isBottom) closeAllPanels();
       store.closePanel();
-    } else {
-      closeAllPanels();
-      store.closePanel();
+      return;
     }
-    return;
-  }
-  if (!isSameTerminal) store.openPanel(projectId);
-  if (!isBottom) usePanelStore.getState().setRightPanelTab("terminal");
-
-  const existingTab = store.tabs.find((t) => t.projectId === projectId && !t.worktreePath);
-  if (existingTab) {
-    store.setActiveTab(existingTab.id);
-    return;
   }
 
-  const tab = store.addTab(projectId, project.name);
-  store.setActiveTab(tab.id);
-}
-
-export function openWorktreeTerminal(projectId: string, worktreePath: string): void {
-  const project = useAppStore.getState().projects.find((p) => p.id === projectId);
-  if (!project) return;
-
-  const store = useDevTerminalStore.getState();
-  const isBottom = useSharedSettings.getState().terminalPosition === "bottom";
-  const rightPanelTab = usePanelStore.getState().rightPanelTab;
-  const isSameWorktree =
-    store.isOpen &&
-    store.activeProjectId === projectId &&
-    store.activeWorktreePath === worktreePath;
-
-  if (isSameWorktree && (isBottom || rightPanelTab === "terminal")) {
-    if (isBottom) {
-      store.closePanel();
-    } else {
-      closeAllPanels();
-      store.closePanel();
-    }
-    return;
+  if (worktreePath) {
+    store.openWorktreePanel(projectId, worktreePath);
+  } else {
+    store.openPanel(projectId);
   }
-  if (!isSameWorktree) store.openWorktreePanel(projectId, worktreePath);
   if (!isBottom) usePanelStore.getState().setRightPanelTab("terminal");
 
   const existingTab = store.tabs.find(
-    (t) => t.projectId === projectId && t.worktreePath === worktreePath,
+    (t) => t.projectId === projectId && (t.worktreePath ?? undefined) === worktreePath,
   );
   if (existingTab) {
     store.setActiveTab(existingTab.id);
     return;
   }
 
-  const branchName = worktreePath.split(/[/\\]/).pop() ?? project.name;
-  const tab = store.addTab(projectId, branchName, worktreePath);
+  const label = worktreePath ? (worktreePath.split(/[/\\]/).pop() ?? project.name) : project.name;
+  const tab = store.addTab(projectId, label, worktreePath);
   store.setActiveTab(tab.id);
+}
+
+export function openTerminal(projectId: string): void {
+  applyTerminalPanel(projectId, undefined, { toggleCloseIfActive: true });
+}
+
+export function openWorktreeTerminal(projectId: string, worktreePath: string): void {
+  applyTerminalPanel(projectId, worktreePath, { toggleCloseIfActive: true });
+}
+
+export function showTerminalPanel(projectId: string, worktreePath?: string): void {
+  applyTerminalPanel(projectId, worktreePath, { toggleCloseIfActive: false });
 }
 
 export function runProjectAction(projectId: string, actionId: string, worktreePath?: string): void {

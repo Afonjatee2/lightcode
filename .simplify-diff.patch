@@ -1,0 +1,3686 @@
+diff --git a/package.json b/package.json
+index 4fb748b..aec6ed2 100644
+--- a/package.json
++++ b/package.json
+@@ -79,6 +79,7 @@
+     "rehype-raw": "^7.0.0",
+     "remark-gfm": "^4.0.1",
+     "shiki": "^4.0.2",
++    "streamdown": "^2.5.0",
+     "tailwindcss": "^4.2.4",
+     "vscode-jsonrpc": "^8.2.1",
+     "vscode-languageserver-protocol": "^3.17.5",
+diff --git a/src/renderer/actions/panelActions.ts b/src/renderer/actions/panelActions.ts
+index 645953f..789e84c 100644
+--- a/src/renderer/actions/panelActions.ts
++++ b/src/renderer/actions/panelActions.ts
+@@ -123,6 +123,38 @@ export function openFilesPanel(projectId: string, worktreePath?: string): void {
+   panelStore.setRightPanelTab("files");
+ }
+ 
++export function showFilesPanel(projectId: string, worktreePath?: string): void {
++  const project = useAppStore.getState().projects.find((item) => item.id === projectId);
++  if (!project) return;
++
++  const context = buildFileEditorContext(
++    project,
++    worktreePath,
++    worktreePath ? resolveWorktreeBranch(projectId, worktreePath) : undefined,
++  );
++
++  const fileEditor = useFileEditorStore.getState();
++  const currentRoot = fileEditor.rootContext;
++  const hasDirtyBuffers = Object.values(fileEditor.buffers).some(
++    (buffer) => buffer.status === "ready" && buffer.isDirty,
++  );
++  const isSameContext =
++    currentRoot?.projectId === context.projectId &&
++    currentRoot?.worktreePath === context.worktreePath;
++
++  if (!isSameContext && hasDirtyBuffers && !window.confirm("Discard unsaved editor changes?")) {
++    return;
++  }
++
++  if (!isSameContext) {
++    fileEditor.setRootContext(context);
++  }
++
++  const panelStore = usePanelStore.getState();
++  panelStore.setFilesPanelContext(context);
++  panelStore.setRightPanelTab("files");
++}
++
+ export function openGitReview(projectId: string, worktreePath?: string): void {
+   const mode = useSharedSettings.getState().gitReviewMode;
+   const panelStore = usePanelStore.getState();
+@@ -150,6 +182,14 @@ export function openGitReview(projectId: string, worktreePath?: string): void {
+   }
+ }
+ 
++export function showGitReviewPanel(projectId: string, worktreePath?: string): void {
++  const panelStore = usePanelStore.getState();
++  panelStore.setGitReviewContext({ projectId, ...(worktreePath ? { worktreePath } : {}) });
++  panelStore.setGitReviewAsPanel(true);
++  panelStore.setGitOverlayOpen(false);
++  panelStore.setRightPanelTab("git");
++}
++
+ export function openGitOverlay(): void {
+   usePanelStore.getState().setGitOverlayOpen(true);
+ }
+diff --git a/src/renderer/actions/terminalActions.ts b/src/renderer/actions/terminalActions.ts
+index ad7e874..a621e25 100644
+--- a/src/renderer/actions/terminalActions.ts
++++ b/src/renderer/actions/terminalActions.ts
+@@ -76,6 +76,33 @@ export function openWorktreeTerminal(projectId: string, worktreePath: string): v
+   store.setActiveTab(tab.id);
+ }
+ 
++export function showTerminalPanel(projectId: string, worktreePath?: string): void {
++  const project = useAppStore.getState().projects.find((p) => p.id === projectId);
++  if (!project) return;
++
++  const store = useDevTerminalStore.getState();
++  const isBottom = useSharedSettings.getState().terminalPosition === "bottom";
++
++  if (worktreePath) {
++    store.openWorktreePanel(projectId, worktreePath);
++  } else {
++    store.openPanel(projectId);
++  }
++  if (!isBottom) usePanelStore.getState().setRightPanelTab("terminal");
++
++  const existingTab = store.tabs.find(
++    (t) => t.projectId === projectId && (t.worktreePath ?? undefined) === worktreePath,
++  );
++  if (existingTab) {
++    store.setActiveTab(existingTab.id);
++    return;
++  }
++
++  const label = worktreePath ? (worktreePath.split(/[/\\]/).pop() ?? project.name) : project.name;
++  const tab = store.addTab(projectId, label, worktreePath);
++  store.setActiveTab(tab.id);
++}
++
+ export function runProjectAction(projectId: string, actionId: string, worktreePath?: string): void {
+   const project = useAppStore.getState().projects.find((p) => p.id === projectId);
+   if (!project) return;
+diff --git a/src/renderer/components/common/PixelLoader.tsx b/src/renderer/components/common/PixelLoader.tsx
+index c6e6086..d37c4de 100644
+--- a/src/renderer/components/common/PixelLoader.tsx
++++ b/src/renderer/components/common/PixelLoader.tsx
+@@ -51,9 +51,14 @@ const PATTERNS: Record<string, Frames> = {
+   scatter: [[0, 5], [2, 7], [1, 6], [4, 8], [3]],
+ };
+ 
+-const KEYS = Object.keys(PATTERNS);
++const KEYS = Object.keys(PATTERNS) as (keyof typeof PATTERNS)[];
+ const SESSION_PATTERN = KEYS[Math.floor(Math.random() * KEYS.length)] ?? "waveLR";
+ 
++const FLASHY_PATTERNS = new Set<keyof typeof PATTERNS>(["checker", "pulse", "scatter"]);
++const PATTERN_SPEED_MULTIPLIERS: Record<keyof typeof PATTERNS, number> = Object.fromEntries(
++  KEYS.map((key) => [key, FLASHY_PATTERNS.has(key) ? 1.35 : 1]),
++) as Record<keyof typeof PATTERNS, number>;
++
+ /** Same Tailwind `size-*` utilities used with Lucide (`<Icon className="size-4" />`). */
+ const ICON_SIZE_CLASS = {
+   xxs: "size-3",
+@@ -89,11 +94,13 @@ export function PixelLoader({
+   const chosen = useRef(pattern ?? SESSION_PATTERN);
+   const filterId = useRef(`px-glow-${filterIdCounter++}`);
+   const frames = PATTERNS[chosen.current] as Frames;
++  const speedMultiplier = PATTERN_SPEED_MULTIPLIERS[chosen.current] ?? 1;
++  const frameDuration = Math.round(speed * speedMultiplier);
+ 
+   useEffect(() => {
+-    const id = setInterval(() => setFrame((f) => (f + 1) % frames.length), speed);
++    const id = setInterval(() => setFrame((f) => (f + 1) % frames.length), frameDuration);
+     return () => clearInterval(id);
+-  }, [frames.length, speed]);
++  }, [frameDuration, frames.length]);
+ 
+   const s = VIEWBOX;
+   const gap = Math.round(s * 0.1);
+@@ -140,7 +147,7 @@ export function PixelLoader({
+               fill={fill}
+               opacity={on ? 1 : 0}
+               style={{
+-                transition: on ? "opacity 60ms ease-in" : `opacity ${speed * 2}ms ease-out`,
++                transition: on ? "opacity 60ms ease-in" : `opacity ${frameDuration * 2}ms ease-out`,
+               }}
+             />
+           );
+diff --git a/src/renderer/components/layout/PanelHeaderProjectName.tsx b/src/renderer/components/layout/PanelHeaderProjectName.tsx
+index c33d4b3..d59f6d1 100644
+--- a/src/renderer/components/layout/PanelHeaderProjectName.tsx
++++ b/src/renderer/components/layout/PanelHeaderProjectName.tsx
+@@ -6,7 +6,7 @@ export function PanelHeaderProjectName(props: { name: string; maxWidthClass: str
+   return (
+     <Tooltip delay={300}>
+       <Tooltip.Trigger className={`${panelHeaderTooltipTriggerResetClass} ${props.maxWidthClass}`}>
+-        <span className="min-w-0 truncate text-left text-xs font-medium leading-none text-foreground">
++        <span className="min-w-0 truncate text-left text-xs font-medium leading-none text-foreground @max-[400px]:text-[11px]">
+           {props.name}
+         </span>
+       </Tooltip.Trigger>
+diff --git a/src/renderer/components/layout/SplitPaneContainer.tsx b/src/renderer/components/layout/SplitPaneContainer.tsx
+index c191b86..0ad13dc 100644
+--- a/src/renderer/components/layout/SplitPaneContainer.tsx
++++ b/src/renderer/components/layout/SplitPaneContainer.tsx
+@@ -1,18 +1,35 @@
+-import React, { useEffect, useRef, useState } from "react";
++import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+ import { useDroppable } from "@dnd-kit/react";
+ import {
+   collectPaneIds,
+-  leadPaneId,
+   type PaneLayout,
+   type PaneLayoutAxis,
+ } from "@/shared/paneLayout";
+ import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "@/renderer/dnd";
+ 
+ const MIN_PANE_PERCENT = 15;
+-const ROOT_INSERT_ZONE_SIZE = 12;
+-const ROOT_INSERT_ZONE_INSET = ROOT_INSERT_ZONE_SIZE / 2;
++const DIVIDER_SIZE = 8;
++const ROOT_INSERT_ZONE_INSET = DIVIDER_SIZE / 2;
+ const SPLIT_SIZE_STORAGE_PREFIX = "lightcode-pane-sizes";
+ 
++type Rect = { left: number; top: number; width: number; height: number };
++
++type ComputedPane = { paneId: string; rect: Rect };
++
++type ComputedDivider = {
++  zoneId: string;
++  path: number[];
++  parentAxis: PaneLayoutAxis;
++  insertIndex: number;
++  rect: Rect;
++  storageKey: string;
++  dividerIndex: number;
++  parentDim: number;
++  childCount: number;
++};
++
++type ComputedLayout = { panes: ComputedPane[]; dividers: ComputedDivider[] };
++
+ function equalSizes(count: number): number[] {
+   return Array.from({ length: count }, () => 100 / count);
+ }
+@@ -28,32 +45,20 @@ function normalizeSizes(raw: number[], count: number): number[] | null {
+   ) {
+     return null;
+   }
+-
+   const total = raw.reduce((sum, value) => sum + value, 0);
+-  if (total <= 0) {
+-    return null;
+-  }
+-
++  if (total <= 0) return null;
+   const normalized = raw.map((value) => (value / total) * 100);
+-  if (normalized.some((value) => value < MIN_PANE_PERCENT)) {
+-    return null;
+-  }
+-
++  if (normalized.some((value) => value < MIN_PANE_PERCENT)) return null;
+   return normalized;
+ }
+ 
+ function readStoredSizes(key: string, count: number): number[] {
+   try {
+     const raw = localStorage.getItem(key);
+-    if (!raw) {
+-      return equalSizes(count);
+-    }
++    if (!raw) return equalSizes(count);
+     const parsed = JSON.parse(raw);
+-    if (!Array.isArray(parsed)) {
+-      return equalSizes(count);
+-    }
+-    const normalized = normalizeSizes(parsed, count);
+-    return normalized ?? equalSizes(count);
++    if (!Array.isArray(parsed)) return equalSizes(count);
++    return normalizeSizes(parsed, count) ?? equalSizes(count);
+   } catch {
+     return equalSizes(count);
+   }
+@@ -63,42 +68,125 @@ function writeStoredSizes(key: string, sizes: number[]) {
+   try {
+     localStorage.setItem(key, JSON.stringify(sizes));
+   } catch {
+-    // Ignore storage failures; resizing should still work for the current session.
++    // ignore quota / privacy errors
+   }
+ }
+ 
+-function SplitDivider(props: {
+-  path: number[];
+-  axis: PaneLayoutAxis;
+-  index: number;
+-  onPointerDown: (event: React.MouseEvent) => void;
++function computeLayout(
++  layout: PaneLayout,
++  containerRect: Rect,
++  resolveSizes: (storageKey: string, count: number) => number[],
++): ComputedLayout {
++  const panes: ComputedPane[] = [];
++  const dividers: ComputedDivider[] = [];
++
++  function walk(node: PaneLayout, rect: Rect, path: number[]) {
++    if (node.kind === "leaf") {
++      panes.push({ paneId: node.paneId, rect });
++      return;
++    }
++
++    const storageKey = splitStorageKey(node, node.axis);
++    const sizes = resolveSizes(storageKey, node.children.length);
++    const isVertical = node.axis === "vertical";
++    const totalDim = isVertical ? rect.width : rect.height;
++    const dividerCount = node.children.length - 1;
++    const availableDim = Math.max(0, totalDim - DIVIDER_SIZE * dividerCount);
++
++    let offset = 0;
++    for (let i = 0; i < node.children.length; i++) {
++      const childDim = (sizes[i]! / 100) * availableDim;
++      const childRect: Rect = isVertical
++        ? { left: rect.left + offset, top: rect.top, width: childDim, height: rect.height }
++        : { left: rect.left, top: rect.top + offset, width: rect.width, height: childDim };
++      walk(node.children[i]!, childRect, [...path, i]);
++      offset += childDim;
++
++      if (i < dividerCount) {
++        const dividerRect: Rect = isVertical
++          ? {
++              left: rect.left + offset,
++              top: rect.top,
++              width: DIVIDER_SIZE,
++              height: rect.height,
++            }
++          : {
++              left: rect.left,
++              top: rect.top + offset,
++              width: rect.width,
++              height: DIVIDER_SIZE,
++            };
++        dividers.push({
++          zoneId: `pane-insert:${node.axis}:${path.join("-")}:${i + 1}`,
++          path,
++          parentAxis: node.axis,
++          insertIndex: i + 1,
++          rect: dividerRect,
++          storageKey,
++          dividerIndex: i + 1,
++          parentDim: totalDim,
++          childCount: node.children.length,
++        });
++        offset += DIVIDER_SIZE;
++      }
++    }
++  }
++
++  walk(layout, containerRect, []);
++  return { panes, dividers };
++}
++
++function setRectStyle(element: HTMLElement | null, rect: Rect) {
++  if (!element) return;
++  element.style.left = `${rect.left}px`;
++  element.style.top = `${rect.top}px`;
++  element.style.width = `${rect.width}px`;
++  element.style.height = `${rect.height}px`;
++}
++
++function Divider(props: {
++  divider: ComputedDivider;
++  registerRef: (zoneId: string, element: HTMLDivElement | null) => void;
++  onResizeStart: (event: React.MouseEvent, divider: ComputedDivider) => void;
+ }) {
+-  const zoneId = `split-divider:${props.axis}:${props.path.join("-")}:${props.index}`;
++  const { divider } = props;
+   const elementRef = useRef<HTMLDivElement>(null);
+   useDroppable({
+-    id: `pane-insert:${props.axis}:${props.path.join("-")}:${props.index}`,
++    id: divider.zoneId,
+     accept: ["pane", "thread", "new-thread"],
+     data: {
+       type: "pane-insert-zone",
+-      path: props.path,
+-      axis: props.axis,
+-      index: props.index,
+-      zoneId,
++      path: divider.path,
++      axis: divider.parentAxis,
++      index: divider.insertIndex,
++      zoneId: divider.zoneId,
+     },
+     element: elementRef,
+   });
+-  const isHighlighted = useIsInsertSplitHighlighted(zoneId);
++  const isHighlighted = useIsInsertSplitHighlighted(divider.zoneId);
+ 
+   return (
+     <div
+-      ref={elementRef}
++      ref={(element) => {
++        elementRef.current = element;
++        props.registerRef(divider.zoneId, element);
++      }}
+       className={`${
+-        props.axis === "vertical" ? "lightcode-pane-divider" : "lightcode-pane-divider-horizontal"
++        divider.parentAxis === "vertical"
++          ? "lightcode-pane-divider"
++          : "lightcode-pane-divider-horizontal"
+       } ${isHighlighted ? "is-highlighted" : ""}`}
+-      onMouseDown={props.onPointerDown}
++      style={{
++        position: "absolute",
++        left: divider.rect.left,
++        top: divider.rect.top,
++        width: divider.rect.width,
++        height: divider.rect.height,
++      }}
++      onMouseDown={(event) => props.onResizeStart(event, divider)}
+       role="separator"
+-      aria-orientation={props.axis === "vertical" ? "vertical" : "horizontal"}
+-      aria-label={props.axis === "vertical" ? "Resize column" : "Resize row"}
++      aria-orientation={divider.parentAxis === "vertical" ? "vertical" : "horizontal"}
++      aria-label={divider.parentAxis === "vertical" ? "Resize column" : "Resize row"}
+     />
+   );
+ }
+@@ -159,90 +247,120 @@ function RootInsertZone(props: {
+   );
+ }
+ 
+-function SplitGroup(props: {
++export function SplitPaneContainer(props: {
+   layout: PaneLayout;
+-  path: number[];
+   renderPane: (paneId: string) => React.ReactNode;
+ }) {
+-  const children = props.layout.kind === "split" ? props.layout.children : [props.layout];
+-  const axis = props.layout.kind === "split" ? props.layout.axis : "vertical";
+-  const count = children.length;
+-  const storageKey = splitStorageKey(props.layout, axis);
+-  const [sizes, setSizes] = useState(() => readStoredSizes(storageKey, count));
+   const containerRef = useRef<HTMLDivElement>(null);
+   const overlayRef = useRef<HTMLDivElement>(null);
+-  const paneRefs = useRef<Array<HTMLDivElement | null>>([]);
+-  const sizesRef = useRef(sizes);
+-  const dragRef = useRef({
+-    start: 0,
+-    beforeStart: 0,
+-    afterStart: 0,
+-    index: 0,
+-    currentSizes: sizes,
++  const paneElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
++  const dividerElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
++
++  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({
++    width: 0,
++    height: 0,
+   });
+-  const cleanupRef = useRef<(() => void) | null>(null);
+ 
+-  function applySizes(nextSizes: number[]) {
+-    for (let index = 0; index < nextSizes.length; index++) {
+-      const pane = paneRefs.current[index];
+-      if (!pane) continue;
+-      pane.style.flexBasis = `${nextSizes[index]}%`;
+-    }
+-  }
++  // Stored sizes per split, normalized lazily on first read.
++  const sizesStateRef = useRef<Record<string, number[]>>({});
++  // Transient sizes during a drag — applied imperatively, not stored.
++  const transientSizesRef = useRef<Map<string, number[]>>(new Map());
++  // Bumped when committed sizes change so positions recompute.
++  const [sizesVersion, setSizesVersion] = useState(0);
++
++  useLayoutEffect(() => {
++    const element = containerRef.current;
++    if (!element) return;
++    const observer = new ResizeObserver((entries) => {
++      for (const entry of entries) {
++        const { width, height } = entry.contentRect;
++        setContainerSize((prev) =>
++          prev.width === width && prev.height === height ? prev : { width, height },
++        );
++      }
++    });
++    observer.observe(element);
++    const rect = element.getBoundingClientRect();
++    setContainerSize({ width: rect.width, height: rect.height });
++    return () => observer.disconnect();
++  }, []);
+ 
+-  useEffect(() => {
++  function resolveSizes(storageKey: string, count: number): number[] {
++    const transient = transientSizesRef.current.get(storageKey);
++    if (transient && transient.length === count) return transient;
++    const stored = sizesStateRef.current[storageKey];
++    if (stored && stored.length === count) return stored;
+     const restored = readStoredSizes(storageKey, count);
+-    sizesRef.current = restored;
+-    dragRef.current.currentSizes = restored;
+-    setSizes(restored);
+-  }, [count, storageKey]);
++    sizesStateRef.current = { ...sizesStateRef.current, [storageKey]: restored };
++    return restored;
++  }
+ 
+-  useEffect(() => {
+-    sizesRef.current = sizes;
+-    dragRef.current.currentSizes = sizes;
+-    applySizes(sizes);
+-  }, [sizes]);
++  // Account for the inset padding around the layout.
++  const innerWidth = Math.max(0, containerSize.width - ROOT_INSERT_ZONE_INSET * 2);
++  const innerHeight = Math.max(0, containerSize.height - ROOT_INSERT_ZONE_INSET * 2);
++  const containerRect: Rect = {
++    left: 0,
++    top: 0,
++    width: innerWidth,
++    height: innerHeight,
++  };
++
++  const computed =
++    innerWidth > 0 && innerHeight > 0
++      ? computeLayout(props.layout, containerRect, resolveSizes)
++      : { panes: [], dividers: [] };
++
++  function applyTransientLayout() {
++    const layoutNow = computeLayout(props.layout, containerRect, resolveSizes);
++    for (const pane of layoutNow.panes) {
++      setRectStyle(paneElementRefs.current.get(pane.paneId) ?? null, pane.rect);
++    }
++    for (const divider of layoutNow.dividers) {
++      setRectStyle(dividerElementRefs.current.get(divider.zoneId) ?? null, divider.rect);
++    }
++  }
+ 
++  const cleanupRef = useRef<(() => void) | null>(null);
+   useEffect(() => {
+-    return () => {
+-      cleanupRef.current?.();
+-    };
++    return () => cleanupRef.current?.();
+   }, []);
+ 
+-  function handleResizeStart(event: React.MouseEvent, index: number) {
++  function handleResizeStart(event: React.MouseEvent, divider: ComputedDivider) {
+     event.preventDefault();
+     cleanupRef.current?.();
+-    const currentSizes = sizesRef.current;
+-    dragRef.current = {
+-      start: axis === "vertical" ? event.clientX : event.clientY,
+-      beforeStart: currentSizes[index]!,
+-      afterStart: currentSizes[index + 1]!,
+-      index,
+-      currentSizes,
+-    };
++
++    const isVertical = divider.parentAxis === "vertical";
++    const startPos = isVertical ? event.clientX : event.clientY;
++    const initialSizes =
++      sizesStateRef.current[divider.storageKey] ??
++      readStoredSizes(divider.storageKey, divider.childCount);
++    const beforeIndex = divider.dividerIndex - 1;
++    const afterIndex = divider.dividerIndex;
++    const beforeStart = initialSizes[beforeIndex]!;
++    const afterStart = initialSizes[afterIndex]!;
++    const dividerSpace = DIVIDER_SIZE * (divider.childCount - 1);
++    const availableDim = Math.max(1, divider.parentDim - dividerSpace);
+ 
+     const overlay = overlayRef.current;
+     if (overlay) {
+       overlay.style.display = "block";
+-      overlay.style.cursor = axis === "vertical" ? "col-resize" : "row-resize";
++      overlay.style.cursor = isVertical ? "col-resize" : "row-resize";
+     }
+ 
++    let lastSizes = initialSizes;
++
+     function onMouseMove(ev: MouseEvent) {
+-      const container = containerRef.current;
+-      if (!container) return;
+-      const isVertical = axis === "vertical";
+-      const deltaPx = (isVertical ? ev.clientX : ev.clientY) - dragRef.current.start;
+-      const containerSize = isVertical ? container.offsetWidth : container.offsetHeight;
+-      const deltaPercent = (deltaPx / containerSize) * 100;
+-      const newBefore = dragRef.current.beforeStart + deltaPercent;
+-      const newAfter = dragRef.current.afterStart - deltaPercent;
++      const deltaPx = (isVertical ? ev.clientX : ev.clientY) - startPos;
++      const deltaPercent = (deltaPx / availableDim) * 100;
++      const newBefore = beforeStart + deltaPercent;
++      const newAfter = afterStart - deltaPercent;
+       if (newBefore < MIN_PANE_PERCENT || newAfter < MIN_PANE_PERCENT) return;
+-      const next = [...sizesRef.current];
+-      next[dragRef.current.index] = newBefore;
+-      next[dragRef.current.index + 1] = newAfter;
+-      sizesRef.current = next;
+-      dragRef.current.currentSizes = next;
+-      applySizes(next);
++      const next = [...initialSizes];
++      next[beforeIndex] = newBefore;
++      next[afterIndex] = newAfter;
++      lastSizes = next;
++      transientSizesRef.current.set(divider.storageKey, next);
++      applyTransientLayout();
+     }
+ 
+     function teardown() {
+@@ -256,10 +374,14 @@ function SplitGroup(props: {
+     }
+ 
+     function onMouseUp() {
+-      const committed = dragRef.current.currentSizes;
+       teardown();
+-      writeStoredSizes(storageKey, committed);
+-      setSizes(committed);
++      transientSizesRef.current.delete(divider.storageKey);
++      sizesStateRef.current = {
++        ...sizesStateRef.current,
++        [divider.storageKey]: lastSizes,
++      };
++      writeStoredSizes(divider.storageKey, lastSizes);
++      setSizesVersion((v) => v + 1);
+     }
+ 
+     cleanupRef.current = teardown;
+@@ -267,40 +389,60 @@ function SplitGroup(props: {
+     document.addEventListener("mouseup", onMouseUp);
+   }
+ 
++  // Touch sizesVersion so committed-size changes re-run the layout pass.
++  void sizesVersion;
++
++  // Root-insert-zone indices: when the root is a split aligned with the edge,
++  // the index appends/prepends within that split; otherwise it wraps the layout.
++  const rootSplit = props.layout.kind === "split" ? props.layout : null;
++  const rightIndex = rootSplit && rootSplit.axis === "vertical" ? rootSplit.children.length : 1;
++  const bottomIndex = rootSplit && rootSplit.axis === "horizontal" ? rootSplit.children.length : 1;
++
+   return (
+-    <div
+-      ref={containerRef}
+-      className={`flex h-full min-h-0 w-full ${axis === "vertical" ? "flex-row" : "flex-col"}`}
+-    >
+-      {children.map((child, index) => (
+-        <React.Fragment key={leadPaneId(child)}>
++    <div ref={containerRef} className="relative h-full min-h-0 w-full overflow-hidden">
++      <RootInsertZone axis="horizontal" index={0} side="top" />
++      <RootInsertZone axis="horizontal" index={bottomIndex} side="bottom" />
++      <RootInsertZone axis="vertical" index={0} side="left" />
++      <RootInsertZone axis="vertical" index={rightIndex} side="right" />
++      <div
++        className="absolute"
++        style={{
++          left: ROOT_INSERT_ZONE_INSET,
++          top: ROOT_INSERT_ZONE_INSET,
++          width: innerWidth,
++          height: innerHeight,
++        }}
++      >
++        {computed.panes.map((pane) => (
+           <div
++            key={pane.paneId}
+             ref={(element) => {
+-              paneRefs.current[index] = element;
++              if (element) paneElementRefs.current.set(pane.paneId, element);
++              else paneElementRefs.current.delete(pane.paneId);
+             }}
+-            className="min-h-0 min-w-0 overflow-hidden"
++            className="absolute overflow-hidden"
+             style={{
+-              flexBasis: `${sizes[index] ?? 100 / count}%`,
+-              flexGrow: 0,
+-              flexShrink: 1,
++              left: pane.rect.left,
++              top: pane.rect.top,
++              width: pane.rect.width,
++              height: pane.rect.height,
+             }}
+           >
+-            <PaneLayoutNode
+-              layout={child}
+-              path={[...props.path, index]}
+-              renderPane={props.renderPane}
+-            />
++            {props.renderPane(pane.paneId)}
+           </div>
+-          {index < children.length - 1 ? (
+-            <SplitDivider
+-              path={props.path}
+-              axis={axis}
+-              index={index + 1}
+-              onPointerDown={(event) => handleResizeStart(event, index)}
+-            />
+-          ) : null}
+-        </React.Fragment>
+-      ))}
++        ))}
++        {computed.dividers.map((divider) => (
++          <Divider
++            key={divider.zoneId}
++            divider={divider}
++            registerRef={(zoneId, element) => {
++              if (element) dividerElementRefs.current.set(zoneId, element);
++              else dividerElementRefs.current.delete(zoneId);
++            }}
++            onResizeStart={handleResizeStart}
++          />
++        ))}
++      </div>
+       <div
+         ref={overlayRef}
+         aria-hidden="true"
+@@ -310,56 +452,3 @@ function SplitGroup(props: {
+     </div>
+   );
+ }
+-
+-function PaneLayoutNode(props: {
+-  layout: PaneLayout;
+-  path: number[];
+-  renderPane: (paneId: string) => React.ReactNode;
+-}) {
+-  if (props.layout.kind === "leaf") {
+-    return <>{props.renderPane(props.layout.paneId)}</>;
+-  }
+-
+-  return <SplitGroup layout={props.layout} path={props.path} renderPane={props.renderPane} />;
+-}
+-
+-function RootPaneLayout(props: {
+-  layout: PaneLayout;
+-  renderPane: (paneId: string) => React.ReactNode;
+-}) {
+-  return <SplitGroup layout={props.layout} path={[]} renderPane={props.renderPane} />;
+-}
+-
+-export function SplitPaneContainer(props: {
+-  layout: PaneLayout;
+-  renderPane: (paneId: string) => React.ReactNode;
+-}) {
+-  const rightIndex =
+-    props.layout.kind === "split" && props.layout.axis === "vertical"
+-      ? props.layout.children.length
+-      : 1;
+-  const bottomIndex =
+-    props.layout.kind === "split" && props.layout.axis === "horizontal"
+-      ? props.layout.children.length
+-      : 1;
+-
+-  return (
+-    <div className="relative h-full min-h-0 w-full">
+-      <RootInsertZone axis="horizontal" index={0} side="top" />
+-      <RootInsertZone axis="horizontal" index={bottomIndex} side="bottom" />
+-      <RootInsertZone axis="vertical" index={0} side="left" />
+-      <RootInsertZone axis="vertical" index={rightIndex} side="right" />
+-      <div
+-        className="h-full min-h-0 w-full"
+-        style={{
+-          paddingTop: ROOT_INSERT_ZONE_INSET,
+-          paddingRight: ROOT_INSERT_ZONE_INSET,
+-          paddingBottom: ROOT_INSERT_ZONE_INSET,
+-          paddingLeft: ROOT_INSERT_ZONE_INSET,
+-        }}
+-      >
+-        <RootPaneLayout layout={props.layout} renderPane={props.renderPane} />
+-      </div>
+-    </div>
+-  );
+-}
+diff --git a/src/renderer/components/layout/sidebarChrome.ts b/src/renderer/components/layout/sidebarChrome.ts
+index bcbba4e..e57214a 100644
+--- a/src/renderer/components/layout/sidebarChrome.ts
++++ b/src/renderer/components/layout/sidebarChrome.ts
+@@ -13,7 +13,7 @@ export const macosTrafficLightGutterClass = "w-[80px] shrink-0" as const;
+ 
+ /** Shared header bar for right/bottom dock panels (project name + tab/close icons). */
+ export const panelHeaderRowClass =
+-  "flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-2";
++  "@container flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-2";
+ 
+ /** Reset Tooltip.Trigger styling so it tracks an inline span tightly (used for project labels). */
+ export const panelHeaderTooltipTriggerResetClass =
+diff --git a/src/renderer/components/providers/opencode/index.tsx b/src/renderer/components/providers/opencode/index.tsx
+index c16cc58..2021050 100644
+--- a/src/renderer/components/providers/opencode/index.tsx
++++ b/src/renderer/components/providers/opencode/index.tsx
+@@ -1,6 +1,8 @@
+ export * from "./OpenCodeIcon";
+ 
++import { ClipboardList } from "lucide-react";
+ import { OpenCodeIcon } from "./OpenCodeIcon";
++import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
+ import {
+   registerCommitGenDefaults,
+   registerComposerControls,
+@@ -36,17 +38,41 @@ registerConflictResolverDefaults("opencode", {
+   effort: "",
+ });
+ 
+-registerComposerControls("opencode", ({ capabilities, config, isDisabled, onConfigChange }) =>
+-  capabilities.approvalPolicies.length > 0
+-    ? [
+-        {
+-          iconKind: "permission" as const,
+-          options: capabilities.approvalPolicies,
+-          hideLabelOnWrap: true,
+-          value: config.approvalPolicy ?? capabilities.approvalPolicies[0]?.id ?? "default",
+-          isDisabled,
+-          onChange: (value: string) => onConfigChange({ approvalPolicy: value }),
+-        },
+-      ]
+-    : [],
+-);
++registerComposerControls("opencode", {
++  // Plan toggle — wired on both surfaces. GUI threads forward it via
++  // `agent: "plan"` on `prompt_async`; TUI threads pass `--agent plan` at
++  // launch (see `buildOpenCodeArgs`).
++  shared: ({ capabilities, config, isDisabled, onConfigChange }) => {
++    const controls: ComposerControl[] = [];
++    if (capabilities.modes.includes("plan")) {
++      controls.push({
++        kind: "toggle",
++        label: "Plan",
++        icon: <ClipboardList className="size-3.5" />,
++        isSelected: config.mode === "plan",
++        hideLabelOnWrap: true,
++        isDisabled,
++        onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
++      });
++    }
++    return controls;
++  },
++  // Full Access (yolo) is only honored on the GUI surface, where the SDK
++  // runtime maps it to `[{ permission: "*", action: "allow" }]` via
++  // `buildOpenCodePermissionRules` on `session.create`. The default TUI
++  // command (`opencode [project]`) has no equivalent launch flag — the
++  // `--dangerously-skip-permissions` flag exists only on `opencode run`.
++  // Hide the toggle on terminal threads so it can't be set silently to no
++  // effect.
++  gui: ({ config, isDisabled, onConfigChange }) => [
++    {
++      kind: "toggle",
++      label: "Full Access",
++      iconKind: "permission",
++      isSelected: config.approvalPolicy === "yolo",
++      hideLabelOnWrap: true,
++      isDisabled,
++      onChange: (isSelected) => onConfigChange({ approvalPolicy: isSelected ? "yolo" : "default" }),
++    },
++  ],
++});
+diff --git a/src/renderer/components/terminal/XTermSurface.test.tsx b/src/renderer/components/terminal/XTermSurface.test.tsx
+index 2cd657f..43f37e2 100644
+--- a/src/renderer/components/terminal/XTermSurface.test.tsx
++++ b/src/renderer/components/terminal/XTermSurface.test.tsx
+@@ -181,6 +181,11 @@ describe("XTermSurface", () => {
+     expect(state.terminalOptions?.scrollbar).toEqual({ width: 0.01 });
+   });
+ 
++  it("does not preserve TUI full-screen redraws as scrollback", () => {
++    render(<XTermSurface terminalId="test-1" />);
++    expect(state.terminalOptions?.scrollOnEraseInDisplay).toBe(false);
++  });
++
+   it("loads the WebGL addon on non-macOS platforms", () => {
+     render(<XTermSurface terminalId="test-1" />);
+     expect(terminal().loadAddon).toHaveBeenCalledTimes(6);
+diff --git a/src/renderer/components/terminal/XTermSurface.tsx b/src/renderer/components/terminal/XTermSurface.tsx
+index 580e009..8c02843 100644
+--- a/src/renderer/components/terminal/XTermSurface.tsx
++++ b/src/renderer/components/terminal/XTermSurface.tsx
+@@ -244,7 +244,10 @@ export const XTermSurface = forwardRef<
+       scrollback: 5_000,
+       scrollSensitivity: useSharedSettings.getState().scrollSpeed,
+       fastScrollSensitivity: 10,
+-      scrollOnEraseInDisplay: true,
++      // Codex/Gemini-style TUIs redraw by clearing the screen and repainting
++      // the visible conversation. Preserving erased lines turns each redraw
++      // and resize repaint into duplicated scrollback.
++      scrollOnEraseInDisplay: false,
+       // Keep xterm's internal scrollbar gutter effectively zero; Lightcode
+       // renders the visible scrollbar outside the terminal content area.
+       scrollbar: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },
+diff --git a/src/renderer/components/thread/ChatPane/ChatPane.test.tsx b/src/renderer/components/thread/ChatPane/ChatPane.test.tsx
+index 169eaec..6f5b7c0 100644
+--- a/src/renderer/components/thread/ChatPane/ChatPane.test.tsx
++++ b/src/renderer/components/thread/ChatPane/ChatPane.test.tsx
+@@ -94,9 +94,9 @@ describe("ChatPane", () => {
+     }));
+   });
+ 
+-  it("keeps the chat pinned when the last plan item grows without changing the scroll anchor", async () => {
++  it("keeps the chat pinned when the last assistant message grows without changing the scroll anchor", async () => {
+     const thread = makeThread();
+-    seedPlanItem(thread.id, [{ step: "Inspect output", status: "in_progress" }]);
++    seedAssistantMessage(thread.id, "Inspect output");
+ 
+     const { container } = renderChatPane(thread);
+     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+@@ -115,20 +115,10 @@ describe("ChatPane", () => {
+     });
+ 
+     act(() => {
+-      useAppStore.getState().applyRuntimeEvent(thread.id, {
+-        type: "item.updated",
+-        threadId: thread.id,
+-        itemId: PLAN_ITEM_ID,
+-        payload: {
+-          steps: [
+-            { step: "Inspect output", status: "completed" },
+-            { step: "Open logs", status: "in_progress" },
+-          ],
+-        },
+-      });
++      appendAssistantText(thread.id, " — Open logs");
+     });
+ 
+-    await screen.findByText("Open logs");
++    await screen.findByText(/Open logs/);
+ 
+     act(() => {
+       metrics.setScrollHeight(300);
+@@ -205,7 +195,7 @@ describe("ChatPane", () => {
+ 
+   it("does not pull the user back to the bottom after they scroll up", async () => {
+     const thread = makeThread();
+-    seedPlanItem(thread.id, [{ step: "Inspect output", status: "in_progress" }]);
++    seedAssistantMessage(thread.id, "Inspect output");
+ 
+     const { container } = renderChatPane(thread);
+     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+@@ -229,20 +219,10 @@ describe("ChatPane", () => {
+     });
+ 
+     act(() => {
+-      useAppStore.getState().applyRuntimeEvent(thread.id, {
+-        type: "item.updated",
+-        threadId: thread.id,
+-        itemId: PLAN_ITEM_ID,
+-        payload: {
+-          steps: [
+-            { step: "Inspect output", status: "completed" },
+-            { step: "Open logs", status: "in_progress" },
+-          ],
+-        },
+-      });
++      appendAssistantText(thread.id, " — Open logs");
+     });
+ 
+-    await screen.findByText("Open logs");
++    await screen.findByText(/Open logs/);
+ 
+     act(() => {
+       metrics.setScrollHeight(300);
+@@ -395,6 +375,34 @@ function seedPlanItem(
+   });
+ }
+ 
++const ASSISTANT_ITEM_ID = "asst-grow";
++
++function seedAssistantMessage(threadId: string, initialText: string) {
++  useAppStore.getState().applyRuntimeEvent(threadId, {
++    type: "item.started",
++    threadId,
++    itemId: ASSISTANT_ITEM_ID,
++    itemType: "assistant_message",
++  });
++  useAppStore.getState().applyRuntimeEvent(threadId, {
++    type: "content.delta",
++    threadId,
++    itemId: ASSISTANT_ITEM_ID,
++    stream: "assistant_text",
++    delta: initialText,
++  });
++}
++
++function appendAssistantText(threadId: string, delta: string) {
++  useAppStore.getState().applyRuntimeEvent(threadId, {
++    type: "content.delta",
++    threadId,
++    itemId: ASSISTANT_ITEM_ID,
++    stream: "assistant_text",
++    delta,
++  });
++}
++
+ function seedCommandItem(threadId: string, itemId: string, command: string, output: string) {
+   startCommandItem(threadId, itemId, command);
+   useAppStore.getState().applyRuntimeEvent(threadId, {
+diff --git a/src/renderer/components/thread/ChatPane/ChatPane.tsx b/src/renderer/components/thread/ChatPane/ChatPane.tsx
+index 8947943..0d85c25 100644
+--- a/src/renderer/components/thread/ChatPane/ChatPane.tsx
++++ b/src/renderer/components/thread/ChatPane/ChatPane.tsx
+@@ -32,7 +32,6 @@ import { ChatPaneActionsContext, type ChatPaneActions } from "./chatPaneActionsC
+ import {
+   selectChatScrollAnchor,
+   selectChatScrollAnchorForTimeline,
+-  selectThreadHasLiveVisibleRuntimeItem,
+   selectVisibleThreadTimelineEntries,
+ } from "./chatPaneSelectors";
+ import { normalizeChatRelativePath } from "./chatPathUtils";
+@@ -80,9 +79,6 @@ export function ChatPane(props: ChatPaneProps) {
+   const timelineEntries = useAppStore(
+     useShallow((s) => selectVisibleThreadTimelineEntries(s, thread.id, hiddenRuntimeItemId)),
+   );
+-  const hasLiveItem = useAppStore((s) =>
+-    selectThreadHasLiveVisibleRuntimeItem(s, thread.id, hiddenRuntimeItemId),
+-  );
+   const requests = useAppStore((s) => s.runtimeRequestsByThread[thread.id] ?? EMPTY_REQUESTS);
+   const project = useAppStore((s) => s.projects.find((p) => p.id === thread.projectId));
+   const branch = resolveWorktreeBranch(
+@@ -143,7 +139,12 @@ export function ChatPane(props: ChatPaneProps) {
+   const requestCount = requests.length;
+   const isEmpty = timelineEntries.length === 0 && requestCount === 0 && !hasSupplementaryContent;
+   const isLive = thread.status === "launching" || thread.status === "working";
+-  const showTailLoader = isLive && !hasLiveItem && !hiddenRuntimeItemIsLive;
++  // Anchor on thread.status alone — gating on item state caused the loader to
++  // disappear in the gap between an item flipping to `completed` and the next
++  // `item.started` arriving, even though the runtime was still working the
++  // turn. The pinned plan/budget item already advertises its own running
++  // state, so suppress the tail when that's live to avoid double indicators.
++  const showTailLoader = isLive && !hiddenRuntimeItemIsLive;
+   const showEmptyHint = isEmpty && !isLive;
+ 
+   return (
+@@ -344,14 +345,52 @@ function ChatTailLoader() {
+   return (
+     <div className="mx-auto w-full max-w-[920px]">
+       <Surface variant="transparent" className={chatMessageSurfaceClass}>
+-        <div className="inline-flex items-center text-foreground-muted">
++        <div className="inline-flex items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
+           <PixelLoader size="xxs" />
++          <WorkingFor />
+         </div>
+       </Surface>
+     </div>
+   );
+ }
+ 
++/**
++ * Self-ticking "Working for Xs" label. Mutates `textContent` directly via a
++ * ref instead of calling `setState` so the per-second tick produces zero
++ * React commits — important while the rest of the chat is potentially
++ * streaming. Mirrors t3code's WorkingTimer pattern. Mount-anchored start
++ * time is sufficient because `ChatTailLoader` unmounts at turn-end and
++ * remounts on the next turn, giving us per-turn elapsed for free.
++ */
++const WorkingFor = memo(function WorkingFor() {
++  const textRef = useRef<HTMLSpanElement>(null);
++
++  useEffect(() => {
++    const startedAt = Date.now();
++    const update = () => {
++      const node = textRef.current;
++      if (!node) return;
++      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
++      node.textContent = elapsedSeconds < 1 ? "" : `Working for ${formatElapsed(elapsedSeconds)}`;
++    };
++    update();
++    const id = setInterval(update, 1000);
++    return () => clearInterval(id);
++  }, []);
++
++  return <span ref={textRef} className="lightcode-thinking-text" aria-live="polite" />;
++});
++
++function formatElapsed(totalSeconds: number): string {
++  if (totalSeconds < 60) return `${totalSeconds}s`;
++  const minutes = Math.floor(totalSeconds / 60);
++  const seconds = totalSeconds % 60;
++  if (minutes < 60) return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
++  const hours = Math.floor(minutes / 60);
++  const remMinutes = minutes % 60;
++  return remMinutes === 0 ? `${hours}h` : `${hours}h ${remMinutes}m`;
++}
++
+ function isElementAtBottom(el: HTMLDivElement): boolean {
+   return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_EPSILON_PX;
+ }
+diff --git a/src/renderer/components/thread/ChatPane/chatPaneSelectors.ts b/src/renderer/components/thread/ChatPane/chatPaneSelectors.ts
+index 00014ac..cdc8f95 100644
+--- a/src/renderer/components/thread/ChatPane/chatPaneSelectors.ts
++++ b/src/renderer/components/thread/ChatPane/chatPaneSelectors.ts
+@@ -61,10 +61,9 @@ export function selectVisibleThreadRuntimeItemIds(
+ ): readonly string[] {
+   const itemIds = state.runtimeItemIdsByThread[threadId];
+   if (!itemIds?.length) return EMPTY_THREAD_ITEM_IDS;
+-  if (!hiddenItemId) return itemIds;
+ 
+   const structuralVersion = state.runtimeStructuralVersionByThread?.[threadId] ?? 0;
+-  const cacheKey = `${threadId}\0${hiddenItemId}`;
++  const cacheKey = `${threadId}\0${hiddenItemId ?? ""}`;
+   const cached = visibleItemIdsCache.get(cacheKey);
+   if (
+     cached &&
+@@ -75,11 +74,9 @@ export function selectVisibleThreadRuntimeItemIds(
+   }
+ 
+   const items = state.runtimeItemsByIdByThread[threadId];
+-  const hiddenItem = items?.[hiddenItemId];
+   const visible = itemIds.filter((itemId) => {
+     if (itemId === hiddenItemId) return false;
+     const item = items?.[itemId];
+-    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
+     return item ? isVisibleRuntimeItem(item) : true;
+   });
+   const result =
+@@ -154,23 +151,6 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
+   );
+ }
+ 
+-export function selectThreadHasLiveVisibleRuntimeItem(
+-  state: AppStoreState,
+-  threadId: string,
+-  hiddenItemId?: string,
+-): boolean {
+-  const itemIds = state.runtimeItemIdsByThread[threadId];
+-  if (!itemIds?.length) return false;
+-  const items = state.runtimeItemsByIdByThread[threadId];
+-  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
+-  return itemIds.some((itemId) => {
+-    if (itemId === hiddenItemId) return false;
+-    const item = items?.[itemId];
+-    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
+-    return item ? isVisibleRuntimeItem(item) && item.state !== "completed" : false;
+-  });
+-}
+-
+ /**
+  * Bumps when the tail of the thread grows (streaming text/output) so the chat
+  * pane can re-stick scroll to the bottom without re-rendering on every row.
+@@ -187,11 +167,9 @@ export function selectChatScrollAnchorForTimeline(
+   const itemIds = state.runtimeItemIdsByThread[threadId];
+   if (!itemIds?.length) return "";
+   const items = state.runtimeItemsByIdByThread[threadId];
+-  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
+   const lastId = [...itemIds].reverse().find((itemId) => {
+     if (itemId === hiddenItemId) return false;
+     const item = items?.[itemId];
+-    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
+     return item ? isVisibleRuntimeItem(item) : true;
+   });
+   if (!lastId) return "";
+@@ -206,11 +184,11 @@ export function selectChatScrollAnchorForTimeline(
+   return `${last.id}:${streamLen}:${last.state}`;
+ }
+ 
+-function isVisibleRuntimeItem(_item: RuntimeChatItem): boolean {
+-  // Empty completed reasoning items are dropped at the data layer
+-  // (`runtimeEventSlice` on `item.completed`), so this selector treats every
+-  // remaining item as visible. Reasoning items with text stay so the user
+-  // can expand the "Thought" disclosure later.
++function isVisibleRuntimeItem(item: RuntimeChatItem): boolean {
++  // Plans are rendered exclusively in the todo dock — never inline in chat,
++  // even after they retire (e.g. all steps completed). Empty completed
++  // reasoning items are already dropped at the data layer.
++  if (item.type === "plan") return false;
+   return true;
+ }
+ 
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx b/src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+index 8bd0055..fb181b8 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/AssistantMessage.tsx
+@@ -29,9 +29,7 @@ export const AssistantMessage = memo(function AssistantMessage({ item }: Assista
+   return (
+     <Surface variant="transparent" className={chatMessageSurfaceClass}>
+       <div className="min-w-0 leading-snug">
+-        {rawText.length > 0 ? (
+-          <ItemMarkdown text={text} mode={isStreaming ? "plain" : "markdown"} />
+-        ) : null}
++        {rawText.length > 0 ? <ItemMarkdown text={text} /> : null}
+         {isStreaming && rawText.length === 0 ? (
+           <div className="text-foreground-muted">
+             <PixelLoader size="xxs" />
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/ChatItemAccordion.tsx b/src/renderer/components/thread/ChatPane/parts/items/ChatItemAccordion.tsx
+index d2b5e6a..fe352db 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/ChatItemAccordion.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/ChatItemAccordion.tsx
+@@ -1,5 +1,5 @@
+-import { Disclosure } from "@heroui/react";
+-import type { ReactNode } from "react";
++import { Disclosure, Tooltip } from "@heroui/react";
++import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+ import { useChatPaneActions } from "../../chatPaneActionsContext";
+ 
+ export interface ChatItemAccordionProps {
+@@ -39,6 +39,8 @@ const shellClass =
+ const triggerClass =
+   "flex w-full min-w-0 items-center gap-1.5 py-0 text-left [&>code]:!text-[color:var(--muted)]";
+ 
++const codeClass = "block truncate font-mono !text-[color:var(--muted)]";
++
+ export function ChatItemAccordion({
+   icon,
+   title,
+@@ -50,6 +52,32 @@ export function ChatItemAccordion({
+   children,
+ }: ChatItemAccordionProps) {
+   const actions = useChatPaneActions();
++  const titleString = typeof title === "string" ? title : undefined;
++  const codeRef = useRef<HTMLElement | null>(null);
++  const [isOverflowing, setIsOverflowing] = useState(false);
++
++  useLayoutEffect(() => {
++    const el = codeRef.current;
++    if (!el) return;
++    const check = () => setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
++    check();
++    const ro = new ResizeObserver(check);
++    ro.observe(el);
++    return () => ro.disconnect();
++  }, [titleString]);
++
++  const titleNode = (
++    <Tooltip delay={300} isDisabled={!isOverflowing || !titleString}>
++      <Tooltip.Trigger className="min-w-0 flex-1">
++        <code ref={codeRef} className={codeClass}>
++          {title}
++        </code>
++      </Tooltip.Trigger>
++      <Tooltip.Content placement="top" className="max-w-[80vw] break-all">
++        {titleString}
++      </Tooltip.Content>
++    </Tooltip>
++  );
+ 
+   if (!hasBody) {
+     return (
+@@ -58,9 +86,7 @@ export function ChatItemAccordion({
+           className={`${triggerClass} text-[length:var(--lc-chat-font-size-command)] leading-tight`}
+         >
+           <span className="size-3 shrink-0 text-[color:var(--muted)]">{icon}</span>
+-          <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
+-            {title}
+-          </code>
++          {titleNode}
+           {rightLabel ? (
+             <span className={`shrink-0 tabular-nums font-medium ${rightLabelClassName}`}>
+               {rightLabel}
+@@ -84,9 +110,7 @@ export function ChatItemAccordion({
+         <Disclosure.Heading>
+           <Disclosure.Trigger className={triggerClass}>
+             <span className="size-3 shrink-0 text-[color:var(--muted)]">{icon}</span>
+-            <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
+-              {title}
+-            </code>
++            {titleNode}
+             {rightLabel ? (
+               <span className={`shrink-0 tabular-nums font-medium ${rightLabelClassName}`}>
+                 {rightLabel}
+@@ -97,7 +121,7 @@ export function ChatItemAccordion({
+         </Disclosure.Heading>
+         <Disclosure.Content>
+           <div className="min-h-0 overflow-hidden">
+-            <Disclosure.Body className="mt-1.5 border-t border-[color:var(--border)] pt-1.5">
++            <Disclosure.Body className="mt-0.5 border-t border-[color:var(--border)] pt-2.5">
+               {isExpanded ? children : null}
+             </Disclosure.Body>
+           </div>
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx b/src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
+index 7efd363..396cc77 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
+@@ -33,16 +33,19 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
+   if (!payload) return null;
+   const right = formatRightLabel(payload);
+   const hasDetails = (stream && stream.length > 0) || hasAuxFields(payload);
+-  const titleNode =
+-    payload.path && payload.path.length > 0 ? (
+-      <PathDisplay
+-        path={payload.path}
+-        basenameClassName="!text-[color:var(--foreground)]"
+-        dirClassName="!text-[color:var(--muted)]"
+-      />
+-    ) : (
+-      (readPayloadString(payload, "name") ?? "Edit")
+-    );
++  const kindLabel = formatKindLabel(payload.changeKind);
++  const titleNode = (
++    <span className="flex min-w-0 items-baseline gap-1.5">
++      <span className="shrink-0 !text-[color:var(--muted)]">{kindLabel}</span>
++      {payload.path && payload.path.length > 0 ? (
++        <PathDisplay
++          path={payload.path}
++          basenameClassName="!text-[color:var(--foreground)]"
++          dirClassName="!text-[color:var(--muted)]"
++        />
++      ) : null}
++    </span>
++  );
+ 
+   return (
+     <ChatItemAccordion
+@@ -68,10 +71,15 @@ function hasAuxFields(payload: unknown): boolean {
+   return p.args !== undefined || p.result !== undefined;
+ }
+ 
+-function readPayloadString(payload: unknown, key: string): string | undefined {
+-  if (!payload || typeof payload !== "object") return undefined;
+-  const v = (payload as Record<string, unknown>)[key];
+-  return typeof v === "string" && v.length > 0 ? v : undefined;
++function formatKindLabel(kind: FileChangePayload["changeKind"]): string {
++  switch (kind) {
++    case "create":
++      return "Create:";
++    case "delete":
++      return "Delete:";
++    default:
++      return "Edit:";
++  }
+ }
+ 
+ /**
+@@ -86,10 +94,7 @@ function enrichLanguage(part: ExtractedPart, path: string): ExtractedPart {
+   return part;
+ }
+ 
+-function formatRightLabel(payload: FileChangePayload): string {
+-  const parts: string[] = [payload.changeKind];
+-  if (payload.diffSummary) {
+-    parts.push(`+${payload.diffSummary.added} -${payload.diffSummary.removed}`);
+-  }
+-  return parts.join(" · ");
++function formatRightLabel(payload: FileChangePayload): string | undefined {
++  if (!payload.diffSummary) return undefined;
++  return `+${payload.diffSummary.added} -${payload.diffSummary.removed}`;
+ }
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/ItemMarkdown.tsx b/src/renderer/components/thread/ChatPane/parts/items/ItemMarkdown.tsx
+index 241ea26..cf53f20 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/ItemMarkdown.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/ItemMarkdown.tsx
+@@ -1,73 +1,32 @@
+-import { Link, Table } from "@heroui/react";
+-import {
+-  Children,
+-  isValidElement,
+-  useMemo,
+-  type ComponentProps,
+-  type ReactElement,
+-  type ReactNode,
+-} from "react";
+-import type { Components } from "react-markdown";
+-import ReactMarkdown from "react-markdown";
+-import remarkGfm from "remark-gfm";
++import { Link } from "@heroui/react";
++import { Suspense, lazy, useMemo } from "react";
+ import { readBridge } from "@/renderer/bridge";
+ import { useChatPaneActions } from "../../chatPaneActionsContext";
+ import { normalizeChatRelativePath } from "../../chatPathUtils";
+ import { InlineFilePathChip } from "./InlineFilePathChip";
+ import { InlineFolderPathChip } from "./InlineFolderPathChip";
+-import { parseProjectPathRef, type ProjectPathRef } from "./parseProjectPathRef";
+-import {
+-  AUTO_PATH_FILE_PREFIX,
+-  AUTO_PATH_FOLDER_PREFIX,
+-  remarkAutolinkProjectPaths,
+-} from "./remarkAutolinkProjectPaths";
++import { parseProjectPathRef } from "./parseProjectPathRef";
++
++const ItemMarkdownInner = lazy(() => import("./ItemMarkdownInner"));
+ 
+ interface ItemMarkdownProps {
+   text: string;
+-  mode?: "markdown" | "plain";
+ }
+ 
+-type RemarkPlugins = ComponentProps<typeof ReactMarkdown>["remarkPlugins"];
+-
+ /**
+- * Compact markdown renderer used by chat rows.
+- *
+- * Inline `` `code` `` from markdown (CommonMark) is rendered as a subtle chip;
+- * spans that look like project paths become accent buttons that open the editor
+- * when the pane provides `ChatPaneActions`. Plain-text path tokens in markdown
+- * prose are auto-detected and chipped as well, gated on the project's
+- * top-level entry names so unrelated `@scope/name` packages don't match.
++ * Compact markdown renderer used by every chat row (assistant, user,
++ * reasoning). The heavy renderer (Streamdown + remark plugins) is lazy-loaded
++ * so it doesn't block app startup; until the chunk arrives we fall back to a
++ * plain-text view that still chips URLs and project paths so the first paint
++ * is never blank.
+  */
+-export function ItemMarkdown({ text, mode = "markdown" }: ItemMarkdownProps) {
++export function ItemMarkdown({ text }: ItemMarkdownProps) {
+   const actions = useChatPaneActions();
+   const rootNames = actions?.projectRootNames;
+-
+-  if (mode === "plain") {
+-    return <PlainText text={text} rootNames={rootNames} />;
+-  }
+-  // Escape the React Compiler: the plugin tuple contains a closure that
+-  // captures `rootNames`, which the compiler conservatively re-creates on
+-  // every render. Streaming chats re-render this component on every chunk,
+-  // so we anchor the array to `rootNames` identity so ReactMarkdown sees a
+-  // stable plugin reference.
+-  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- intentional escape hatch (see comment above)
+-  const remarkPlugins = useMemo<RemarkPlugins>(
+-    () => [
+-      remarkGfm,
+-      [
+-        remarkAutolinkProjectPaths,
+-        { parsePathRef: (token: string) => parseProjectPathRef(token, { rootNames }) },
+-      ],
+-    ],
+-    [rootNames],
+-  );
+-  const markdownText = normalizeShortCodeFenceClosers(text);
+   return (
+-    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
+-      <ReactMarkdown remarkPlugins={remarkPlugins} components={MD_COMPONENTS}>
+-        {markdownText}
+-      </ReactMarkdown>
+-    </div>
++    <Suspense fallback={<PlainText text={text} rootNames={rootNames} />}>
++      <ItemMarkdownInner text={text} />
++    </Suspense>
+   );
+ }
+ 
+@@ -81,8 +40,6 @@ function PlainText({
+   const actions = useChatPaneActions();
+   // Re-tokenizing on every render dominates the plain-text path during
+   // streaming (regex scan over the full message body for each delta).
+-  // Memoize on `(text, rootNames)` so an unchanged message in a re-rendered
+-  // parent skips the scan entirely.
+   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- intentional escape hatch
+   const nodes = useMemo(() => tokenizePlainText(text, rootNames), [text, rootNames]);
+   return (
+@@ -183,240 +140,6 @@ function trimTrailingUrlPunctuation(url: string): string {
+   return url.replace(/[),.;:!?]+$/, "");
+ }
+ 
+-const MD_COMPONENTS: Components = {
+-  code({ className, children }) {
+-    return <MdCode className={className ?? ""}>{children}</MdCode>;
+-  },
+-  a({ href, children }) {
+-    return <MdAnchor href={href ?? ""}>{children}</MdAnchor>;
+-  },
+-  table({ children }) {
+-    return <MdTable>{children}</MdTable>;
+-  },
+-};
+-
+-const inlineCodeChipClass =
+-  "rounded border-0 bg-foreground/10 px-[0.35em] py-[0.1em] font-mono text-[0.875em] leading-none align-baseline text-foreground [overflow-wrap:anywhere]";
+-
+-function MdCode(props: { className: string; children?: ReactNode }) {
+-  const actions = useChatPaneActions();
+-  const isBlock = typeof props.className === "string" && props.className.includes("language-");
+-  const text = flattenMdChildren(props.children).replace(/\n$/, "");
+-  if (isBlock) {
+-    return <code className={props.className || undefined}>{props.children}</code>;
+-  }
+-  if (actions) {
+-    const ref = parseProjectPathRef(text, { rootNames: actions.projectRootNames });
+-    if (ref) {
+-      return renderPathChip(ref, actions);
+-    }
+-  }
+-  return <code className={inlineCodeChipClass}>{props.children}</code>;
+-}
+-
+-function MdAnchor(props: { href: string; children?: ReactNode }) {
+-  const actions = useChatPaneActions();
+-  const href = props.href?.trim() ?? "";
+-  if (!href) return <span>{props.children}</span>;
+-
+-  // Links injected by the auto-path remark plugin always render as chips so
+-  // plain-text paths and inline-code paths share a single visual treatment.
+-  if (actions && href.startsWith(AUTO_PATH_FILE_PREFIX)) {
+-    const rest = href.slice(AUTO_PATH_FILE_PREFIX.length);
+-    const lineMatch = rest.match(/^(.+):(\d+)$/);
+-    const path = lineMatch ? lineMatch[1]! : rest;
+-    const ref: ProjectPathRef = lineMatch
+-      ? { kind: "file", path, line: Number.parseInt(lineMatch[2]!, 10) }
+-      : { kind: "file", path };
+-    return renderPathChip(ref, actions);
+-  }
+-  if (actions && href.startsWith(AUTO_PATH_FOLDER_PREFIX)) {
+-    const path = href.slice(AUTO_PATH_FOLDER_PREFIX.length);
+-    return renderPathChip({ kind: "folder", path }, actions);
+-  }
+-
+-  if (/^(https?|mailto):/i.test(href)) {
+-    return (
+-      <Link
+-        href={href}
+-        rel="noreferrer noopener"
+-        className="[display:inline] [width:auto] [overflow-wrap:anywhere] [word-break:break-word]"
+-        onClick={(event) => {
+-          event.preventDefault();
+-          void readBridge().openExternal(href);
+-        }}
+-      >
+-        {props.children}
+-      </Link>
+-    );
+-  }
+-  if (actions) {
+-    const ref = parseProjectPathRef(href, { rootNames: actions.projectRootNames });
+-    if (ref?.kind === "folder") {
+-      const folderPath = normalizeChatRelativePath(ref.path);
+-      return (
+-        <button
+-          type="button"
+-          className="inline cursor-pointer rounded border-0 bg-foreground/10 px-[0.35em] py-[0.1em] font-mono text-[0.875em] leading-none align-baseline text-accent underline-offset-2 [overflow-wrap:anywhere] hover:bg-foreground/15 hover:underline"
+-          onClick={() => actions.revealProjectFolderInTree(folderPath)}
+-        >
+-          {props.children}
+-        </button>
+-      );
+-    }
+-    if (ref?.kind === "file") {
+-      return (
+-        <button
+-          type="button"
+-          className="inline cursor-pointer rounded border-0 bg-foreground/10 px-[0.35em] py-[0.1em] font-mono text-[0.875em] leading-none align-baseline text-accent underline-offset-2 [overflow-wrap:anywhere] hover:bg-foreground/15 hover:underline"
+-          onClick={() =>
+-            actions.openProjectRelativePath(normalizeChatRelativePath(ref.path), ref.line)
+-          }
+-        >
+-          {props.children}
+-        </button>
+-      );
+-    }
+-  }
+-  return (
+-    <a href={href} target="_blank" rel="noreferrer noopener">
+-      {props.children}
+-    </a>
+-  );
+-}
+-
+-function renderPathChip(
+-  ref: ProjectPathRef,
+-  actions: NonNullable<ReturnType<typeof useChatPaneActions>>,
+-) {
+-  const normalized = normalizeChatRelativePath(ref.path);
+-  if (ref.kind === "file") {
+-    return (
+-      <InlineFilePathChip
+-        path={normalized}
+-        line={ref.line}
+-        onOpen={actions.openProjectRelativePath}
+-      />
+-    );
+-  }
+-  return (
+-    <InlineFolderPathChip
+-      path={normalized}
+-      onRevealInTree={actions.revealProjectFolderInTree}
+-      onShowInExplorer={actions.showProjectEntryInExplorer}
+-    />
+-  );
+-}
+-
+-function MdTable({ children }: { children?: ReactNode }) {
+-  const { headerCells, bodyRows } = extractTableParts(children);
+-  if (headerCells.length === 0 && bodyRows.length === 0) {
+-    return null;
+-  }
+-  return (
+-    <div className="not-prose my-2 min-w-0 max-w-full overflow-hidden">
+-      <Table className="min-w-0 max-w-full">
+-        <Table.ScrollContainer className="min-w-0 max-w-full overflow-x-auto">
+-          <Table.Content
+-            aria-label="Table"
+-            className="text-[length:var(--lc-chat-font-size-command)]"
+-          >
+-            <Table.Header>
+-              {headerCells.length > 0
+-                ? headerCells.map((cell, i) => (
+-                    <Table.Column key={`col-${i}`} id={`col-${i}`} isRowHeader={i === 0}>
+-                      {cell}
+-                    </Table.Column>
+-                  ))
+-                : (bodyRows[0] ?? []).map((_, i) => (
+-                    <Table.Column key={`col-${i}`} id={`col-${i}`} isRowHeader={i === 0}>
+-                      {""}
+-                    </Table.Column>
+-                  ))}
+-            </Table.Header>
+-            <Table.Body>
+-              {bodyRows.map((row, ri) => (
+-                <Table.Row key={`row-${ri}`} id={`row-${ri}`}>
+-                  {row.map((cell, ci) => (
+-                    <Table.Cell key={`cell-${ri}-${ci}`}>{cell}</Table.Cell>
+-                  ))}
+-                </Table.Row>
+-              ))}
+-            </Table.Body>
+-          </Table.Content>
+-        </Table.ScrollContainer>
+-      </Table>
+-    </div>
+-  );
+-}
+-
+-function extractTableParts(children: ReactNode): {
+-  headerCells: ReactNode[];
+-  bodyRows: ReactNode[][];
+-} {
+-  let headerCells: ReactNode[] = [];
+-  const bodyRows: ReactNode[][] = [];
+-  Children.forEach(children, (child) => {
+-    if (!isValidElement(child)) return;
+-    if (child.type === "thead") {
+-      headerCells = collectCellsFromFirstRow(getElementChildren(child), "th");
+-    } else if (child.type === "tbody") {
+-      collectRowsInto(bodyRows, getElementChildren(child));
+-    } else if (child.type === "tr") {
+-      collectRowsInto(bodyRows, [child]);
+-    }
+-  });
+-  return { headerCells, bodyRows };
+-}
+-
+-function collectRowsInto(target: ReactNode[][], nodes: ReactNode) {
+-  Children.forEach(nodes, (child) => {
+-    if (!isValidElement(child) || child.type !== "tr") return;
+-    const cells: ReactNode[] = [];
+-    Children.forEach(getElementChildren(child), (cellNode) => {
+-      if (!isValidElement(cellNode)) return;
+-      if (cellNode.type === "td" || cellNode.type === "th") {
+-        cells.push(getElementChildren(cellNode));
+-      }
+-    });
+-    if (cells.length > 0) target.push(cells);
+-  });
+-}
+-
+-function collectCellsFromFirstRow(nodes: ReactNode, cellTag: "th" | "td"): ReactNode[] {
+-  const cells: ReactNode[] = [];
+-  let firstTr: ReactElement | undefined;
+-  Children.forEach(nodes, (child) => {
+-    if (!firstTr && isValidElement(child) && child.type === "tr") {
+-      firstTr = child;
+-    }
+-  });
+-  if (!firstTr) return cells;
+-  Children.forEach(getElementChildren(firstTr), (cellNode) => {
+-    if (!isValidElement(cellNode)) return;
+-    if (cellNode.type === cellTag || cellNode.type === "td" || cellNode.type === "th") {
+-      cells.push(getElementChildren(cellNode));
+-    }
+-  });
+-  return cells;
+-}
+-
+-function getElementChildren(element: ReactElement): ReactNode {
+-  const props = element.props as { children?: ReactNode };
+-  return props.children;
+-}
+-
+-function flattenMdChildren(node: ReactNode): string {
+-  if (node == null) return "";
+-  if (typeof node === "string" || typeof node === "number") return String(node);
+-  if (Array.isArray(node)) return node.map(flattenMdChildren).join("");
+-  if (isValidElement(node)) {
+-    const p = node.props as { children?: ReactNode };
+-    return flattenMdChildren(p.children);
+-  }
+-  return "";
+-}
+-
+ export function normalizeShortCodeFenceClosers(text: string): string {
+   let inBacktickFence = false;
+   let changed = false;
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/PlanItem.tsx b/src/renderer/components/thread/ChatPane/parts/items/PlanItem.tsx
+index 04303b6..c6c68af 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/PlanItem.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/PlanItem.tsx
+@@ -1,4 +1,4 @@
+-import { Check, Circle, ListChecks } from "lucide-react";
++import { Check, Hourglass, ListChecks } from "lucide-react";
+ import type { PlanItemPayload } from "@/shared/contracts";
+ import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
+ import { getThreadTodoDockStateForItem } from "@/renderer/components/thread/threadTodoState";
+@@ -25,10 +25,12 @@ export function PlanItem({ item }: PlanItemProps) {
+           return (
+             <li
+               key={i}
+-              className={`flex items-center gap-2 rounded px-1 py-0.5 leading-none ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-foreground/5" : ""}`}
++              className={`flex items-center gap-2 rounded px-1 py-1 leading-5 ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-foreground/5" : ""}`}
+             >
+               <StatusIcon status={step.status} />
+-              <span className={`truncate ${isDone ? "text-foreground-muted" : "text-foreground"}`}>
++              <span
++                className={`truncate leading-5 ${isDone ? "text-foreground-muted" : "text-foreground"}`}
++              >
+                 {step.text}
+               </span>
+             </li>
+@@ -44,8 +46,14 @@ function StatusIcon({ status }: { status: StepStatus }) {
+     case "completed":
+       return <Check aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />;
+     case "in_progress":
+-      return <PixelLoader size="xxs" className="text-foreground" />;
++      return (
++        <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
++          <PixelLoader size="xxs" className="text-foreground" />
++        </span>
++      );
+     default:
+-      return <Circle aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/60" />;
++      return (
++        <Hourglass aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/50" />
++      );
+   }
+ }
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/Reasoning.tsx b/src/renderer/components/thread/ChatPane/parts/items/Reasoning.tsx
+index 199dd3f..f5f6b40 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/Reasoning.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/Reasoning.tsx
+@@ -1,7 +1,6 @@
+ import { memo, useDeferredValue, useState } from "react";
+ import { Surface } from "@heroui/react";
+ import { Brain, ChevronDown } from "lucide-react";
+-import { PixelLoader } from "@/renderer/components/common";
+ import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
+ import { useChatPaneActions } from "../../chatPaneActionsContext";
+ import { chatMessageSurfaceClass } from "./chatMessageSurface";
+@@ -43,7 +42,7 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
+         </button>
+         {isOpen ? (
+           <div className="mt-2 max-h-64 overflow-y-auto border-l border-dashed border-[color:var(--border)] pl-3 italic [scrollbar-gutter:stable]">
+-            <ItemMarkdown text={text} mode="plain" />
++            <ItemMarkdown text={text} />
+           </div>
+         ) : null}
+       </div>
+@@ -54,13 +53,12 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
+     <Surface variant="transparent" className={chatMessageSurfaceClass}>
+       <div className="flex min-w-0 flex-col gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
+         <div className="inline-flex items-center gap-1.5">
+-          <Brain className="size-3 shrink-0" />
+-          <span>Thinking</span>
+-          <PixelLoader size="xxs" />
++          <Brain className="lightcode-brain-thinking size-3 shrink-0" aria-label="Thinking" />
++          <span className="lightcode-thinking-text">Thinking</span>
+         </div>
+         {hasText ? (
+           <div className="max-h-64 overflow-y-auto pl-4 [scrollbar-gutter:stable]">
+-            <ItemMarkdown text={text} mode="plain" />
++            <ItemMarkdown text={text} />
+           </div>
+         ) : null}
+       </div>
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/ToolCall.tsx b/src/renderer/components/thread/ChatPane/parts/items/ToolCall.tsx
+index a559e63..623b49f 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/ToolCall.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/ToolCall.tsx
+@@ -1,4 +1,4 @@
+-import { memo, useMemo, useState } from "react";
++import { memo, useMemo, useState, type ReactNode } from "react";
+ import {
+   CircleAlert,
+   Download,
+@@ -9,12 +9,14 @@ import {
+   Pencil,
+   Plug,
+   SearchCode,
++  Sparkles,
+   Terminal,
+   Trash2,
+   Wrench,
+   type LucideIcon,
+ } from "lucide-react";
+ import type { ToolCallPayload } from "@/shared/contracts";
++import { PixelLoader } from "@/renderer/components/common";
+ import {
+   getRuntimeItemPayload,
+   type RuntimeChatItem,
+@@ -33,26 +35,28 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
+   const [isExpanded, setIsExpanded] = useState(false);
+   const sections = useMemo<ToolCallSection[]>(() => {
+     if (!isExpanded || !payload) return [];
++    const isSkill = isSkillTool(payload);
+     return [
+       { label: "args", part: extractAcpArgsPart(payload) },
+-      { label: "result", part: extractAcpResultPart(payload) },
++      {
++        label: "result",
++        part: extractAcpResultPart(payload),
++        ...(isSkill ? { renderAs: "markdown" as const } : {}),
++      },
+     ];
+   }, [isExpanded, payload]);
+   if (!payload?.name) return null;
+   if (isContextCompactionToolCall(item)) return <ContextCompaction item={item} />;
+   const hasDetails = payload.args !== undefined || payload.result !== undefined;
+   const Icon = pickToolIcon(payload);
+-  const errorLabel =
+-    payload.status === "error" ? (
+-      <CircleAlert className="size-3 text-danger" aria-label="error" />
+-    ) : undefined;
++  const status = resolveToolStatus(item, payload);
+ 
+   return (
+     <ChatItemAccordion
+       icon={<Icon className="size-3" />}
+       title={payload.name}
+-      rightLabel={errorLabel}
+-      rightLabelClassName="text-danger"
++      rightLabel={status.rightLabel}
++      rightLabelClassName={status.rightLabelClassName}
+       hasBody={hasDetails}
+       isExpanded={isExpanded}
+       onExpandedChange={setIsExpanded}
+@@ -62,6 +66,28 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
+   );
+ });
+ 
++interface ToolStatusDisplay {
++  rightLabel: ReactNode;
++  rightLabelClassName: string;
++}
++
++function resolveToolStatus(item: RuntimeChatItem, payload: ToolCallPayload): ToolStatusDisplay {
++  const isRunning = item.state !== "completed" || payload.status === "running";
++  if (isRunning) {
++    return {
++      rightLabel: <PixelLoader size="xxs" className="text-[color:var(--muted)]" />,
++      rightLabelClassName: "!text-[color:var(--muted)]",
++    };
++  }
++  if (payload.status === "error") {
++    return {
++      rightLabel: <CircleAlert className="size-3 text-danger" aria-label="error" />,
++      rightLabelClassName: "text-danger",
++    };
++  }
++  return { rightLabel: null, rightLabelClassName: "!text-[color:var(--muted)]" };
++}
++
+ /**
+  * Pick an icon based on the tool's title / name. ACP-speaking agents emit
+  * human-readable titles like `Viewing src/foo.ts` or `Searching for 'bar'`,
+@@ -70,6 +96,7 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
+  * `serverId` field) regardless of verb.
+  */
+ export function pickToolIcon(payload: ToolCallPayload): LucideIcon {
++  if (isSkillTool(payload)) return Sparkles;
+   if (isMcpTool(payload)) return Plug;
+   const t = payload.name.toLowerCase().trim();
+   if (t.startsWith("viewing") || t.startsWith("reading") || t.startsWith("read ")) return Eye;
+@@ -96,3 +123,8 @@ function isMcpTool(payload: ToolCallPayload): boolean {
+   const n = payload.name;
+   return /(^mcp__|-mcp-server-|^mcp[-_])/i.test(n);
+ }
++
++function isSkillTool(payload: ToolCallPayload): boolean {
++  const n = payload.name.trim();
++  return n === "Skill" || /^loaded skill\b/i.test(n);
++}
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx b/src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
+index 2b3fbdf..76ebfc1 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx
+@@ -214,7 +214,7 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
+     payload?.command && payload.command.length > 0
+       ? payload.command
+       : (readAcpStringField(payload, "command") ?? "");
+-  const title = command ? `Run: ${humanIntentTitle(command)}` : "Run command";
++  const title = command ? humanIntentTitle(command) : "Run command";
+   const output =
+     item.streams.command_output && item.streams.command_output.length > 0
+       ? item.streams.command_output
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/ToolCallSections.tsx b/src/renderer/components/thread/ChatPane/parts/items/ToolCallSections.tsx
+index 896324d..e2c117d 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/ToolCallSections.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/ToolCallSections.tsx
+@@ -1,11 +1,14 @@
+ import type { ReactNode } from "react";
+ import { CommandOutputViewport } from "./CommandOutputViewport";
++import { ItemMarkdown } from "./ItemMarkdown";
+ import type { ExtractedPart } from "./acpToolPayload";
+ 
+ export interface ToolCallSection {
+   /** Label displayed above the viewport (e.g. `args`, `result`). */
+   label: string;
+   part: ExtractedPart;
++  /** Override the default code/plain viewport. `"markdown"` renders through ItemMarkdown. */
++  renderAs?: "markdown";
+ }
+ 
+ interface ToolCallSectionsProps {
+@@ -34,7 +37,11 @@ export function ToolCallSections({ sections, leading }: ToolCallSectionsProps) {
+           <div className="mb-1 font-mono text-[10px] uppercase tracking-wide text-[color:var(--muted)]/80">
+             {section.label}
+           </div>
+-          <CommandOutputViewport text={section.part.text} language={section.part.language} />
++          {section.renderAs === "markdown" ? (
++            <ItemMarkdown text={section.part.text} />
++          ) : (
++            <CommandOutputViewport text={section.part.text} language={section.part.language} />
++          )}
+         </div>
+       ))}
+     </div>
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx b/src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
+index d6511e8..ca8d37f 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
++++ b/src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx
+@@ -30,7 +30,6 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
+   const text = buildUserPromptText(content);
+   const attachments = buildUserPromptAttachments(content);
+   if (content.length === 0 || (text.length === 0 && attachments.length === 0)) return null;
+-  const mode = looksLikeMarkdown(text) ? "markdown" : "plain";
+   const isCollapsible = isLongUserMessage(text);
+   const isCollapsed = isCollapsible && !isExpanded;
+   const tooltipLabel = isExpanded ? "Show less" : "Show more";
+@@ -40,7 +39,7 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
+       <div
+         className={`min-w-0 space-y-1.5 leading-snug ${isCollapsed ? collapsedMessageClass : ""}`}
+       >
+-        {text.length > 0 ? <ItemMarkdown text={text} mode={mode} /> : null}
++        {text.length > 0 ? <ItemMarkdown text={text} /> : null}
+         {attachments.length > 0 ? (
+           <div className="-mx-2 -mt-1">
+             <AttachmentBar
+@@ -133,9 +132,3 @@ function isLongUserMessage(text: string): boolean {
+     text.split(/\r\n|\r|\n/).length > COLLAPSED_LINE_COUNT || text.length > COLLAPSED_CHAR_COUNT
+   );
+ }
+-
+-function looksLikeMarkdown(text: string): boolean {
+-  return /(^|\n)#{1,6}\s|```|`[^`]+`|\[[^\]]+\]\([^)]*\)|(^|\n)\s*[-*+]\s|(^|\n)\s*\d+\.\s|\*\*[^*]+\*\*|__[^_]+__/.test(
+-    text,
+-  );
+-}
+diff --git a/src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts b/src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
+index 46ec1e5..3ad77ed 100644
+--- a/src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
++++ b/src/renderer/components/thread/ChatPane/parts/items/commandSummary.ts
+@@ -102,7 +102,7 @@ const CHECK_SCRIPTS = new Set([
+  */
+ export function humanIntentTitle(fullCommandLine: string): string {
+   const short = summarizeShellCommand(fullCommandLine);
+-  return intentFromSummarizedCommand(short) ?? short;
++  return intentFromSummarizedCommand(short) ?? `Run: ${short}`;
+ }
+ 
+ function intentFromSummarizedCommand(t: string): string | null {
+diff --git a/src/renderer/components/thread/ThreadDraftView.tsx b/src/renderer/components/thread/ThreadDraftView.tsx
+index beaa3b4..80c91e2 100644
+--- a/src/renderer/components/thread/ThreadDraftView.tsx
++++ b/src/renderer/components/thread/ThreadDraftView.tsx
+@@ -239,18 +239,31 @@ export function ThreadDraftView(props: {
+         selectedAgent.capabilities.presentationMode,
+       ])
+     : [];
+-  const supportsTerminalMode = supportedPresentationModes.includes("terminal");
+-  const supportsGuiMode = supportedPresentationModes.includes("gui");
+-  const supportsModePicker = supportedPresentationModes.length > 1;
++  // CLI/Chat reachability is aggregated across all installed providers — the
++  // picker stays enabled whenever some provider can serve the mode, even if
++  // the currently-selected one can't. Clicking an unreachable-for-this-agent
++  // tab swaps to a fallback provider rather than being blocked.
++  const anyAgentSupports = (presentation: ThreadPresentationMode): boolean =>
++    installedAgents.some((agent) => {
++      const modes = agent.capabilities.presentationModes ?? [
++        agent.capabilities.presentationMode,
++      ];
++      return modes.includes(presentation);
++    });
++  const supportsTerminalMode = anyAgentSupports("terminal");
++  const supportsGuiMode = anyAgentSupports("gui");
++  const supportsModePicker = supportsTerminalMode && supportsGuiMode;
+   const [presentationMode, setPresentationMode] = useState<ThreadPresentationMode>(() =>
+     resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent),
+   );
+-  // Re-resolve when the user switches providers — a Codex draft should not
+-  // leak its "gui" choice into a Claude draft that only supports terminal.
++  // Only re-resolve when the *current* mode isn't supported by the new
++  // provider — model-selector switches must not flip CLI/Chat behind the
++  // user's back, since the model picker already filters to providers that
++  // support the active surface.
+   useEffect(() => {
+-    if (!effectiveAgentKind) return;
+-    const next = resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent);
+-    if (next !== presentationMode) setPresentationMode(next);
++    if (!selectedAgent) return;
++    if (supportedPresentationModes.includes(presentationMode)) return;
++    setPresentationMode(resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent));
+     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on provider change
+   }, [effectiveAgentKind]);
+ 
+@@ -669,6 +682,21 @@ export function ThreadDraftView(props: {
+           supportsGui={supportsGuiMode}
+           className={`${props.compact ? alignClass : "mx-auto"} mb-1 w-full max-w-[920px]`}
+           onChange={(next) => {
++            // If the active provider can't serve this surface, swap to
++            // another installed provider that can — the provider-switch
++            // effect will then reload the per-provider config snapshot.
++            if (!supportedPresentationModes.includes(next)) {
++              const fallback = installedAgents.find((agent) => {
++                const modes = agent.capabilities.presentationModes ?? [
++                  agent.capabilities.presentationMode,
++                ];
++                return modes.includes(next);
++              });
++              if (!fallback) return;
++              setPresentationMode(next);
++              setAgentKind(fallback.kind);
++              return;
++            }
+             setPresentationMode(next);
+             // Drop config values that the new presentation surface
+             // doesn't support (e.g. Codex plan mode is ACP-only).
+diff --git a/src/renderer/components/thread/ThreadTodoDock.tsx b/src/renderer/components/thread/ThreadTodoDock.tsx
+index 3232aa4..fddd427 100644
+--- a/src/renderer/components/thread/ThreadTodoDock.tsx
++++ b/src/renderer/components/thread/ThreadTodoDock.tsx
+@@ -1,14 +1,8 @@
+ import { useEffect, useRef } from "react";
+ import { Tooltip } from "@heroui/react";
+-import {
+-  ArrowRightLeft,
+-  CheckCircle2,
+-  ChevronDown,
+-  Circle,
+-  ListChecks,
+-  Loader2,
+-} from "lucide-react";
++import { ArrowRightLeft, Check, ChevronDown, Hourglass, ListChecks } from "lucide-react";
+ import type { ThreadTodoDockPlacement } from "@/renderer/state/threadTodoDockStore";
++import { PixelLoader } from "@/renderer/components/common/PixelLoader";
+ import type { ThreadTodoDockState, ThreadTodoStepStatus } from "./threadTodoState";
+ 
+ interface ThreadTodoDockProps {
+@@ -109,13 +103,13 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
+                 key={`${state.sourceItemId}:${originalIndex}`}
+                 ref={isActive ? activeRowRef : undefined}
+                 aria-current={isActive ? "step" : undefined}
+-                className={`flex items-center gap-2 rounded px-2 py-0.5 leading-none ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-accent/10" : ""}`}
++                className={`flex items-center gap-2 rounded px-2 py-1 leading-5 ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-accent/10" : ""}`}
+                 role="listitem"
+                 title={step.text}
+               >
+                 <StatusIcon status={step.status} />
+                 <span
+-                  className={`min-w-0 flex-1 truncate ${isDone ? "text-foreground-muted" : "text-foreground"}`}
++                  className={`min-w-0 flex-1 truncate leading-5 ${isDone ? "text-foreground-muted" : "text-foreground"}`}
+                 >
+                   {step.text}
+                 </span>
+@@ -131,17 +125,16 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
+ function StatusIcon({ status }: { status: ThreadTodoStepStatus }) {
+   switch (status) {
+     case "completed":
+-      return (
+-        <CheckCircle2 aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />
+-      );
++      return <Check aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />;
+     case "in_progress":
+       return (
+-        <Loader2
+-          aria-label="in progress"
+-          className="size-3.5 shrink-0 animate-spin text-foreground"
+-        />
++        <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
++          <PixelLoader size="xxs" className="text-foreground" />
++        </span>
+       );
+     default:
+-      return <Circle aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/60" />;
++      return (
++        <Hourglass aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/50" />
++      );
+   }
+ }
+diff --git a/src/renderer/components/thread/threadTodoState.test.ts b/src/renderer/components/thread/threadTodoState.test.ts
+index bd132b1..10383f8 100644
+--- a/src/renderer/components/thread/threadTodoState.test.ts
++++ b/src/renderer/components/thread/threadTodoState.test.ts
+@@ -48,6 +48,59 @@ describe("threadTodoState", () => {
+     });
+   });
+ 
++  it("keeps the dock when a follow-up user_message arrives while the plan is unfinished", () => {
++    const state = {
++      runtimeItemIdsByThread: { t1: ["plan-1", "user-2"] },
++      runtimeItemsByIdByThread: {
++        t1: {
++          "plan-1": {
++            id: "plan-1",
++            type: "plan",
++            state: "updated",
++            payload: {
++              steps: [
++                { step: "Inspect output", status: "completed" },
++                { step: "Open logs", status: "in_progress" },
++                { step: "Patch UI", status: "pending" },
++              ],
++            },
++            streams: {},
++          },
++          "user-2": { id: "user-2", type: "user_message", state: "completed", streams: {} },
++        },
++      },
++    } as unknown as AppStoreState;
++
++    expect(selectThreadTodoDockState(state, "t1")).toMatchObject({
++      sourceItemId: "plan-1",
++      activeIndex: 1,
++    });
++  });
++
++  it("retires the dock once every step in the latest plan is completed", () => {
++    const state = {
++      runtimeItemIdsByThread: { t1: ["plan-1"] },
++      runtimeItemsByIdByThread: {
++        t1: {
++          "plan-1": {
++            id: "plan-1",
++            type: "plan",
++            state: "completed",
++            payload: {
++              steps: [
++                { step: "Step one", status: "completed" },
++                { step: "Step two", status: "completed" },
++              ],
++            },
++            streams: {},
++          },
++        },
++      },
++    } as unknown as AppStoreState;
++
++    expect(selectThreadTodoDockState(state, "t1")).toBeNull();
++  });
++
+   it("parses codex plan_text lists into todo steps when no structured steps exist", () => {
+     const todoState = getThreadTodoDockStateForItem({
+       id: "plan-codex",
+diff --git a/src/renderer/components/thread/threadTodoState.ts b/src/renderer/components/thread/threadTodoState.ts
+index b28e369..909890b 100644
+--- a/src/renderer/components/thread/threadTodoState.ts
++++ b/src/renderer/components/thread/threadTodoState.ts
+@@ -38,14 +38,16 @@ export function selectThreadTodoDockItem(
+   const itemIds = state.runtimeItemIdsByThread[threadId];
+   if (!itemIds?.length) return null;
+   const itemsById = state.runtimeItemsByIdByThread[threadId];
+-  // Walk newest → oldest. If we hit a user_message before any plan, a new turn
+-  // has started since the last plan was emitted, so suppress the dock.
++  // Walk newest → oldest, find the most recent plan with parsable steps.
++  // Keep it docked until every step is completed (or a newer plan replaces it).
++  // Follow-up user messages do not retire the dock — the plan persists across turns.
+   for (let index = itemIds.length - 1; index >= 0; index -= 1) {
+     const item = itemsById?.[itemIds[index]!];
+-    if (!item) continue;
+-    if (item.type === "user_message") return null;
+-    if (item.type !== "plan") continue;
+-    if (getThreadTodoDockStateForItem(item)) return item;
++    if (!item || item.type !== "plan") continue;
++    const dockState = getThreadTodoDockStateForItem(item);
++    if (!dockState) continue;
++    const allCompleted = dockState.steps.every((step) => step.status === "completed");
++    return allCompleted ? null : item;
+   }
+   return null;
+ }
+diff --git a/src/renderer/dnd.tsx b/src/renderer/dnd.tsx
+index d148f08..7165ba9 100644
+--- a/src/renderer/dnd.tsx
++++ b/src/renderer/dnd.tsx
+@@ -20,6 +20,12 @@ export type DragSourceData =
+   | { type: "worktree-group"; worktreePath: string; projectId: string; threadIds: string[] }
+   | { type: "pane"; paneId: string }
+   | { type: "new-thread"; projectId: string }
++  | {
++      type: "sidebar-panel";
++      panel: "files" | "git" | "terminal";
++      projectId: string;
++      worktreePath?: string;
++    }
+   | { type: "editor-tab"; path: string };
+ 
+ export type PaneDropIndicator =
+@@ -30,10 +36,12 @@ export type PaneDropIndicator =
+ type DndSnapshot = {
+   source: DragSourceData | null;
+   paneIndicator: PaneDropIndicator | null;
++  mainPanelDropActive: boolean;
+ };
+ const EMPTY_DND_SNAPSHOT: DndSnapshot = {
+   source: null,
+   paneIndicator: null,
++  mainPanelDropActive: false,
+ };
+ 
+ let dndSnapshot: DndSnapshot = EMPTY_DND_SNAPSHOT;
+@@ -69,6 +77,10 @@ function setPaneIndicatorState(paneIndicator: PaneDropIndicator | null) {
+   updateDndSnapshot({ ...dndSnapshot, paneIndicator });
+ }
+ 
++function setMainPanelDropActive(mainPanelDropActive: boolean) {
++  updateDndSnapshot({ ...dndSnapshot, mainPanelDropActive });
++}
++
+ function useDndSelector<T>(selector: (snapshot: DndSnapshot) => T) {
+   return useSyncExternalStore(
+     subscribeDndStore,
+@@ -112,6 +124,10 @@ export function useIsDraggingEditorTab(path: string) {
+   );
+ }
+ 
++export function useIsMainPanelDropActive() {
++  return useDndSelector((snapshot) => snapshot.mainPanelDropActive);
++}
++
+ export function usePaneDropIndicatorState(paneId: string) {
+   return useDndSelector((snapshot) => {
+     const paneIndicator = snapshot.paneIndicator;
+@@ -142,6 +158,32 @@ export function useIsRootInsertHighlighted(zoneId: string) {
+ }
+ 
+ const EDGE_THRESHOLD = 0.15;
++const MAIN_PANEL_DROP_ZONE_SELECTOR = "[data-lightcode-main-panel-drop-zone]";
++
++type MainPanelDropSource = Extract<
++  DragSourceData,
++  { type: "project" | "worktree-group" | "sidebar-panel" }
++>;
++
++function isMainPanelDropSource(source: DragSourceData | undefined): source is MainPanelDropSource {
++  return (
++    source?.type === "sidebar-panel" ||
++    source?.type === "project" ||
++    source?.type === "worktree-group"
++  );
++}
++
++function isPointerInMainPanelDropZone(pointerX: number, pointerY: number): boolean {
++  const element = document.querySelector(MAIN_PANEL_DROP_ZONE_SELECTOR);
++  if (!element) return false;
++  const rect = element.getBoundingClientRect();
++  return (
++    pointerX >= rect.left &&
++    pointerX <= rect.right &&
++    pointerY >= rect.top &&
++    pointerY <= rect.bottom
++  );
++}
+ 
+ function getEdgeZone(
+   element: Element,
+@@ -261,11 +303,13 @@ export function AppDndProvider(props: {
+     target: DragSourceData | null,
+   ) => void;
+   onPaneDrop: (source: DragSourceData, target: PaneDropIndicator | null) => void;
++  onMainPanelDrop: (source: MainPanelDropSource) => void;
+   paneThreadIds: string[];
+   paneLayout: PaneLayout;
+ }) {
+   const pointer = useRef({ x: 0, y: 0 });
+   const paneIndicatorRef = useRef<PaneDropIndicator | null>(null);
++  const mainPanelDropActiveRef = useRef(false);
+   const sidebarSortTargetRef = useRef<DragSourceData | null>(null);
+   const paneThreadIdsRef = useRef(props.paneThreadIds);
+   paneThreadIdsRef.current = props.paneThreadIds;
+@@ -302,6 +346,15 @@ export function AppDndProvider(props: {
+     paneIndicatorRef.current = next;
+   }
+ 
++  function updateMainPanelDropState(source: DragSourceData | undefined) {
++    const isActive =
++      isMainPanelDropSource(source) &&
++      isPointerInMainPanelDropZone(pointer.current.x, pointer.current.y);
++    mainPanelDropActiveRef.current = isActive;
++    setMainPanelDropActive(isActive);
++    return isActive;
++  }
++
+   const sensors = useMemo(
+     () => [
+       PointerSensor.configure({
+@@ -319,8 +372,14 @@ export function AppDndProvider(props: {
+         const data = event.operation.source?.data as DragSourceData | undefined;
+         if (data) setDragSource(data);
+         sidebarSortTargetRef.current = null;
++        mainPanelDropActiveRef.current = false;
+       }}
+-      onDragMove={() => {
++      onDragMove={(event) => {
++        const data = event.operation.source?.data as DragSourceData | undefined;
++        if (isMainPanelDropSource(data)) {
++          updateMainPanelDropState(data);
++          return;
++        }
+         if (activePaneTarget.current) {
+           updatePaneIndicator();
+         }
+@@ -328,16 +387,27 @@ export function AppDndProvider(props: {
+       onDragOver={(event) => {
+         const target = event.operation.target;
+         const data = event.operation.source?.data as DragSourceData | undefined;
++        if (isMainPanelDropSource(data) && updateMainPanelDropState(data)) {
++          activePaneTarget.current = null;
++          setPaneIndicatorState(null);
++          paneIndicatorRef.current = null;
++          return;
++        }
+         if (!data || !target) {
+           activePaneTarget.current = null;
+           setPaneIndicatorState(null);
+           paneIndicatorRef.current = null;
++          mainPanelDropActiveRef.current = false;
++          setMainPanelDropActive(false);
+           return;
+         }
+ 
+         const targetData = target.data as Record<string, unknown> | undefined;
+         const targetType = targetData?.type as string | undefined;
+ 
++        mainPanelDropActiveRef.current = false;
++        setMainPanelDropActive(false);
++
+         if (
+           (data.type === "project" || data.type === "thread" || data.type === "worktree-group") &&
+           (targetType === "project" || targetType === "thread" || targetType === "worktree-group")
+@@ -435,6 +505,8 @@ export function AppDndProvider(props: {
+             paneIndicatorRef.current
+           ) {
+             props.onPaneDrop(data, paneIndicatorRef.current);
++          } else if (isMainPanelDropSource(data) && updateMainPanelDropState(data)) {
++            props.onMainPanelDrop(data);
+           } else if (data.type === "editor-tab" && src && isSortable(src)) {
+             useFileEditorStore.getState().reorderTabs(src.initialIndex, src.index);
+           } else if (src && isSortable(src) && data.type !== "pane") {
+@@ -452,7 +524,9 @@ export function AppDndProvider(props: {
+         activePaneTarget.current = null;
+         setDragSource(null);
+         setPaneIndicatorState(null);
++        setMainPanelDropActive(false);
+         paneIndicatorRef.current = null;
++        mainPanelDropActiveRef.current = false;
+         sidebarSortTargetRef.current = null;
+       }}
+     >
+diff --git a/src/renderer/hooks/useAppHydration.ts b/src/renderer/hooks/useAppHydration.ts
+index 940d321..59ca905 100644
+--- a/src/renderer/hooks/useAppHydration.ts
++++ b/src/renderer/hooks/useAppHydration.ts
+@@ -71,6 +71,10 @@ export function useAppHydration() {
+           archiveOldDoneThreads(days);
+         });
+       }
++      // Warm the markdown renderer chunk so the first assistant reply renders
++      // markdown without a Suspense flicker. Heavy deps (Streamdown + remark)
++      // stay out of the synchronous startup path.
++      void import("@/renderer/components/thread/ChatPane/parts/items/ItemMarkdownInner");
+     });
+ 
+     void readBridge()
+diff --git a/src/renderer/hooks/useDndHandlers.ts b/src/renderer/hooks/useDndHandlers.ts
+index 0375202..4bc22a7 100644
+--- a/src/renderer/hooks/useDndHandlers.ts
++++ b/src/renderer/hooks/useDndHandlers.ts
+@@ -5,8 +5,14 @@ import { useAppStore } from "@/renderer/state/appStore";
+ import { useProjectIds } from "@/renderer/state/useThread";
+ import type { DragSourceData, PaneDropIndicator } from "@/renderer/dnd";
+ import type { ReorderPlacement } from "@/renderer/state/reorder";
++import { showFilesPanel, showGitReviewPanel } from "@/renderer/actions/panelActions";
++import { showTerminalPanel } from "@/renderer/actions/terminalActions";
+ 
+ type ThreadDragSource = Extract<DragSourceData, { type: "thread" }>;
++type MainPanelDropSource = Extract<
++  DragSourceData,
++  { type: "project" | "worktree-group" | "sidebar-panel" }
++>;
+ 
+ export function resolveThreadReorder(input: {
+   threads: Thread[];
+@@ -147,5 +153,19 @@ export function useDndHandlers() {
+     }
+   }
+ 
+-  return { handleSortEnd, handlePaneDrop };
++  function handleMainPanelDrop(source: MainPanelDropSource) {
++    if (source.type === "project") {
++      showFilesPanel(source.projectId);
++    } else if (source.type === "worktree-group") {
++      showFilesPanel(source.projectId, source.worktreePath);
++    } else if (source.panel === "files") {
++      showFilesPanel(source.projectId, source.worktreePath);
++    } else if (source.panel === "git") {
++      showGitReviewPanel(source.projectId, source.worktreePath);
++    } else {
++      showTerminalPanel(source.projectId, source.worktreePath);
++    }
++  }
++
++  return { handleSortEnd, handlePaneDrop, handleMainPanelDrop };
+ }
+diff --git a/src/renderer/styles.css b/src/renderer/styles.css
+index 69105ae..41732ec 100644
+--- a/src/renderer/styles.css
++++ b/src/renderer/styles.css
+@@ -563,6 +563,108 @@ body {
+   color: var(--muted);
+ }
+ 
++/* Streaming-reasoning brain icon: individual SVG paths flicker out of phase to
++   suggest neurons firing inside the brain, while the whole icon carries a
++   softer drop-shadow glow. Pure-CSS so it costs nothing per frame compared to
++   the PixelLoader it replaces. The lucide Brain icon is composed of multiple
++   `<path>` children — we stagger their animation-delay with irregular offsets
++   to avoid a marching-band cadence. */
++.lightcode-brain-thinking {
++  animation: lightcode-brain-glow 2.4s ease-in-out infinite;
++}
++
++.lightcode-brain-thinking path {
++  animation: lightcode-brain-spark 1.4s ease-in-out infinite;
++}
++
++.lightcode-brain-thinking path:nth-child(1) {
++  animation-delay: 0s;
++}
++.lightcode-brain-thinking path:nth-child(2) {
++  animation-delay: 0.42s;
++}
++.lightcode-brain-thinking path:nth-child(3) {
++  animation-delay: 0.18s;
++}
++.lightcode-brain-thinking path:nth-child(4) {
++  animation-delay: 0.66s;
++}
++.lightcode-brain-thinking path:nth-child(5) {
++  animation-delay: 0.34s;
++}
++.lightcode-brain-thinking path:nth-child(6) {
++  animation-delay: 0.9s;
++}
++.lightcode-brain-thinking path:nth-child(7) {
++  animation-delay: 0.56s;
++}
++.lightcode-brain-thinking path:nth-child(8) {
++  animation-delay: 1.08s;
++}
++.lightcode-brain-thinking path:nth-child(9) {
++  animation-delay: 0.24s;
++}
++.lightcode-brain-thinking path:nth-child(10) {
++  animation-delay: 0.78s;
++}
++.lightcode-brain-thinking path:nth-child(11) {
++  animation-delay: 1.2s;
++}
++
++@keyframes lightcode-brain-glow {
++  0%,
++  100% {
++    filter: drop-shadow(0 0 0.05rem color-mix(in oklab, currentColor 20%, transparent));
++  }
++  50% {
++    filter: drop-shadow(0 0 0.2rem color-mix(in oklab, currentColor 55%, transparent));
++  }
++}
++
++@keyframes lightcode-brain-spark {
++  0%,
++  100% {
++    opacity: 0.45;
++  }
++  25% {
++    opacity: 1;
++  }
++  55% {
++    opacity: 0.55;
++  }
++}
++
++/* "Thinking" label that pairs with the brain — a soft highlight sweeps across
++   the letters left-to-right while the rest of the word sits at the muted
++   foreground tone, in sync with the brain's outer glow. background-clip:text
++   confines the gradient to the glyphs. */
++.lightcode-thinking-text {
++  background-image: linear-gradient(
++    90deg,
++    var(--muted) 0%,
++    var(--muted) 35%,
++    var(--foreground) 50%,
++    var(--muted) 65%,
++    var(--muted) 100%
++  );
++  background-size: 250% 100%;
++  background-repeat: no-repeat;
++  background-clip: text;
++  -webkit-background-clip: text;
++  color: transparent;
++  -webkit-text-fill-color: transparent;
++  animation: lightcode-thinking-shimmer 1.92s linear infinite;
++}
++
++@keyframes lightcode-thinking-shimmer {
++  0% {
++    background-position: 100% 0;
++  }
++  100% {
++    background-position: 0% 0;
++  }
++}
++
+ /* Monaco editor — opaque backgrounds for overlaid elements (sticky scroll, etc.)
+    The editor itself uses a transparent background so var(--content-background) shows through. */
+ .monaco-editor .sticky-widget,
+@@ -1332,26 +1434,59 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
+   vertical-align: middle;
+ }
+ 
++.lc-chat-markdown h1,
++.lc-chat-markdown h2,
++.lc-chat-markdown h3,
++.lc-chat-markdown h4,
++.lc-chat-markdown h5,
++.lc-chat-markdown h6 {
++  font-weight: 600;
++  line-height: 1.3;
++  margin: 0.6em 0 0.2em;
++  color: var(--foreground, currentColor);
++}
++.lc-chat-markdown h1 {
++  font-size: 1.35em;
++}
++.lc-chat-markdown h2 {
++  font-size: 1.22em;
++}
++.lc-chat-markdown h3 {
++  font-size: 1.05em;
++}
++.lc-chat-markdown h4,
++.lc-chat-markdown h5,
++.lc-chat-markdown h6 {
++  font-size: 1em;
++}
++.lc-chat-markdown :is(h1, h2, h3, h4, h5, h6):first-child {
++  margin-top: 0;
++}
++
+ .lc-chat-markdown ol {
+   list-style: decimal outside;
+   padding-left: 1.5em;
+-  margin: 0.4em 0;
++  margin: 0.25em 0;
+ }
+ .lc-chat-markdown ul {
+   list-style: disc outside;
+   padding-left: 1.5em;
+-  margin: 0.4em 0;
++  margin: 0.25em 0;
+ }
+ .lc-chat-markdown li {
+-  margin: 0.35em 0;
++  margin: 0.1em 0;
+ }
+ .lc-chat-markdown li::marker {
+   color: var(--lc-text-muted, currentColor);
+ }
+ .lc-chat-markdown li > p {
+-  margin: 0.15em 0;
++  margin: 0.05em 0;
++}
++.lc-chat-markdown li > ol,
++.lc-chat-markdown li > ul {
++  margin: 0.1em 0;
+ }
+ .lc-chat-markdown p + ol,
+ .lc-chat-markdown p + ul {
+-  margin-top: 0.25em;
++  margin-top: 0.15em;
+ }
+diff --git a/src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts b/src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
+index 7ad19e8..8a20803 100644
+--- a/src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
++++ b/src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/useGitReviewActions.ts
+@@ -3,7 +3,7 @@ import { toast } from "@heroui/react";
+ import type { GitBranchInfo, GitStatusResult, Project, ProjectLocation } from "@/shared/contracts";
+ import { getProjectAgentStatuses } from "@/shared/agentStatus";
+ import { buildWorktreeLocation } from "@/shared/worktree";
+-import { msg, friendlyError } from "@/shared/messages";
++import { msg, friendlyError, friendlyErrorWithDetail } from "@/shared/messages";
+ import { readBridge } from "@/renderer/bridge";
+ import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
+ import { useGitStore } from "@/renderer/state/gitStore";
+@@ -30,6 +30,19 @@ export interface UseGitReviewActionsArgs {
+   branchList: readonly GitBranchInfo[];
+ }
+ 
++const TOAST_DETAIL_MAX_LINES = 12;
++const TOAST_DETAIL_MAX_CHARS = 800;
++
++function truncateForToast(details: string): string {
++  const lines = details.split("\n");
++  const sliced = lines.length > TOAST_DETAIL_MAX_LINES;
++  let body = (sliced ? lines.slice(0, TOAST_DETAIL_MAX_LINES) : lines).join("\n");
++  if (body.length > TOAST_DETAIL_MAX_CHARS) {
++    body = body.slice(0, TOAST_DETAIL_MAX_CHARS);
++  }
++  return sliced || body.length < details.length ? `${body}\n…` : body;
++}
++
+ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
+   const {
+     project,
+@@ -174,7 +187,19 @@ export function useGitReviewActions(args: UseGitReviewActionsArgs) {
+         .finally(() => onRefresh());
+     } catch (err) {
+       console.error("[git] commit failed", err);
+-      toast.danger(friendlyError(err));
++      const { summary, details } = friendlyErrorWithDetail(err);
++      if (details) {
++        toast.danger(summary, {
++          description: truncateForToast(details),
++          actionProps: {
++            children: "Copy details",
++            onPress: () => void navigator.clipboard.writeText(details),
++          },
++          timeout: 0,
++        });
++      } else {
++        toast.danger(summary);
++      }
+     } finally {
+       setIsCommitting(false);
+     }
+diff --git a/src/renderer/views/MainView/MainView.tsx b/src/renderer/views/MainView/MainView.tsx
+index 7f5d816..bcd5c34 100644
+--- a/src/renderer/views/MainView/MainView.tsx
++++ b/src/renderer/views/MainView/MainView.tsx
+@@ -31,7 +31,7 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
+   useKeyboardShortcuts();
+   useGitRefresh(storeHydrated);
+ 
+-  const { handleSortEnd, handlePaneDrop } = useDndHandlers();
++  const { handleSortEnd, handlePaneDrop, handleMainPanelDrop } = useDndHandlers();
+ 
+   useEffect(() => {
+     if (!storeHydrated) {
+@@ -64,6 +64,7 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
+       <AppDndProvider
+         onSidebarSortEnd={handleSortEnd}
+         onPaneDrop={handlePaneDrop}
++        onMainPanelDrop={handleMainPanelDrop}
+         paneThreadIds={paneThreadIds}
+         paneLayout={
+           view.kind === "thread"
+diff --git a/src/renderer/views/MainView/parts/MainPageLayout.tsx b/src/renderer/views/MainView/parts/MainPageLayout.tsx
+index 91e8126..4acc879 100644
+--- a/src/renderer/views/MainView/parts/MainPageLayout.tsx
++++ b/src/renderer/views/MainView/parts/MainPageLayout.tsx
+@@ -1,4 +1,5 @@
+-import { lazy, Suspense, useEffect } from "react";
++import { lazy, Suspense, type ReactNode, useEffect, useRef } from "react";
++import { useDroppable } from "@dnd-kit/react";
+ import { getAppName } from "@/shared/appName";
+ import { PageLayout } from "@/renderer/components/layout/PageLayout";
+ import { Sidebar } from "@/renderer/views/MainView/parts/Sidebar/Sidebar";
+@@ -10,6 +11,7 @@ import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+ import { usePanelStore } from "@/renderer/state/panelStore";
+ import { useProjectIds } from "@/renderer/state/useThread";
+ import { closeAllPanels } from "@/renderer/actions/panelActions";
++import { useIsMainPanelDropActive } from "@/renderer/dnd";
+ 
+ const FileEditorPanel = lazy(() =>
+   import("@/renderer/views/FileEditorOverlay/parts/FileEditorPanel").then((m) => ({
+@@ -28,12 +30,12 @@ export function MainPageLayout(props: { wslAvailable: boolean; onTitleClick: ()
+       sidebarHeaderChildren={<SidebarHeaderControls wslAvailable={wslAvailable} />}
+       sidebar={<Sidebar />}
+       content={
+-        <>
++        <MainPanelDropZone>
+           <AppContent />
+           <Suspense>
+             <FileEditorPanel />
+           </Suspense>
+-        </>
++        </MainPanelDropZone>
+       }
+       rightPanel={<MainRightPanel />}
+       gitPanel={<MainGitPanel />}
+@@ -41,6 +43,29 @@ export function MainPageLayout(props: { wslAvailable: boolean; onTitleClick: ()
+   );
+ }
+ 
++function MainPanelDropZone(props: { children: ReactNode }) {
++  const elementRef = useRef<HTMLDivElement>(null);
++  useDroppable({
++    id: "main-panel-drop-zone",
++    accept: "sidebar-panel",
++    data: { type: "main-panel-drop-zone" },
++    element: elementRef,
++  });
++  const isActive = useIsMainPanelDropActive();
++
++  return (
++    <div ref={elementRef} data-lightcode-main-panel-drop-zone className="relative h-full min-h-0">
++      {props.children}
++      {isActive ? (
++        <div
++          aria-hidden="true"
++          className="pointer-events-none absolute inset-2 z-20 rounded border border-accent/70 bg-accent/5 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]"
++        />
++      ) : null}
++    </div>
++  );
++}
++
+ export function StalePanelCleanup() {
+   const projectIds = useProjectIds();
+   const fileEditorRootContext = useFileEditorStore((state) => state.rootContext);
+diff --git a/src/renderer/views/MainView/parts/Sidebar/parts/GitBadge.tsx b/src/renderer/views/MainView/parts/Sidebar/parts/GitBadge.tsx
+index 7784535..07d8b7e 100644
+--- a/src/renderer/views/MainView/parts/Sidebar/parts/GitBadge.tsx
++++ b/src/renderer/views/MainView/parts/Sidebar/parts/GitBadge.tsx
+@@ -1,9 +1,12 @@
++import { useId, useRef } from "react";
+ import { GitPullRequest } from "lucide-react";
++import { useDraggable } from "@dnd-kit/react";
+ import { useGitStore } from "@/renderer/state/gitStore";
+ import { buildBranchPrKey } from "@/renderer/state/gitSelectors";
+ import { useShallow } from "zustand/shallow";
+ import { handleKeyActivate } from "@/renderer/utils/a11y";
+ import { getPrStatusTone, PR_TONE_TEXT_CLASS } from "@/renderer/utils/prStatus";
++import type { DragSourceData } from "@/renderer/dnd";
+ 
+ export function GitBadge(props: {
+   projectId: string;
+@@ -12,6 +15,20 @@ export function GitBadge(props: {
+   worktreePath?: string;
+   isActive?: boolean;
+ }) {
++  const elementRef = useRef<HTMLDivElement>(null);
++  const dragId = useId();
++  useDraggable({
++    id: `sidebar-panel:git:${props.projectId}:${props.worktreePath ?? "root"}:${dragId}`,
++    type: "sidebar-panel",
++    data: {
++      type: "sidebar-panel",
++      panel: "git",
++      projectId: props.projectId,
++      ...(props.worktreePath ? { worktreePath: props.worktreePath } : {}),
++    } satisfies DragSourceData,
++    element: elementRef,
++  });
++
+   const { isRepo, totalInsertions, totalDeletions, prState, checksStatus } = useGitStore(
+     useShallow((s) => {
+       const gitStatus = props.worktreePath
+@@ -35,10 +52,11 @@ export function GitBadge(props: {
+   const prIconColor = PR_TONE_TEXT_CLASS[getPrStatusTone(prState, checksStatus)];
+   return (
+     <div
++      ref={elementRef}
+       role="button"
+       tabIndex={0}
+       aria-label={`Git status for ${props.projectName}`}
+-      className={`shrink-0 cursor-default rounded px-1 py-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
++      className={`shrink-0 cursor-grab rounded px-1 py-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
+         props.isActive ? "bg-accent/15 ring-1 ring-accent/40" : "text-muted/60"
+       }`}
+       onClick={(e) => {
+diff --git a/src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx b/src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
+index e3cb238..39fc518 100644
+--- a/src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
++++ b/src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
+@@ -32,6 +32,7 @@ import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
+ import { resolveActionIcon } from "@/renderer/utils/actionIcons";
+ import { formatProjectLocation } from "./formatProjectLocation";
+ import { GitBadge } from "./GitBadge";
++import { SidebarPanelDragButton } from "./SidebarPanelDragButton";
+ import { SyncBadge } from "./SyncBadge";
+ 
+ export function SidebarProjectHeader(props: {
+@@ -145,52 +146,34 @@ export function SidebarProjectHeader(props: {
+         suffix={
+           isDisabled ? null : (
+             <>
+-              <div
+-                role="button"
+-                tabIndex={0}
+-                aria-label={`Files for ${project.name}`}
+-                className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
++              <SidebarPanelDragButton
++                panel="files"
++                projectId={project.id}
++                ariaLabel={`Files for ${project.name}`}
++                className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
+                   isActiveFilesPanel
+                     ? "text-accent"
+                     : "text-muted/60 opacity-0 group-hover:opacity-100"
+                 }`}
+-                onClick={(event) => {
+-                  event.stopPropagation();
+-                  openFilesPanel(project.id);
+-                }}
+-                onKeyDown={(event) => {
+-                  if (event.key === "Enter" || event.key === " ") {
+-                    event.stopPropagation();
+-                    openFilesPanel(project.id);
+-                  }
+-                }}
++                onPress={() => openFilesPanel(project.id)}
+               >
+                 <FolderOpen className="size-3.5" />
+-              </div>
+-              <div
+-                role="button"
+-                tabIndex={0}
+-                aria-label={`Terminal for ${project.name}`}
+-                className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
++              </SidebarPanelDragButton>
++              <SidebarPanelDragButton
++                panel="terminal"
++                projectId={project.id}
++                ariaLabel={`Terminal for ${project.name}`}
++                className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
+                   isActiveTerminal
+                     ? "text-accent"
+                     : hasTerminal
+                       ? "text-foreground"
+                       : "text-muted/60 opacity-0 group-hover:opacity-100"
+                 }`}
+-                onClick={(event) => {
+-                  event.stopPropagation();
+-                  openTerminal(project.id);
+-                }}
+-                onKeyDown={(event) => {
+-                  if (event.key === "Enter" || event.key === " ") {
+-                    event.stopPropagation();
+-                    openTerminal(project.id);
+-                  }
+-                }}
++                onPress={() => openTerminal(project.id)}
+               >
+                 <TerminalSquare className="size-3.5" />
+-              </div>
++              </SidebarPanelDragButton>
+               <SyncBadge projectId={project.id} />
+               <GitBadge
+                 projectId={project.id}
+diff --git a/src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx b/src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
+index 8a8e492..2cc5d94 100644
+--- a/src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
++++ b/src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/parts/ThreadItemSuffix.tsx
+@@ -14,6 +14,7 @@ import {
+   useIsWorktreeTerminalOpen,
+ } from "@/renderer/hooks/uiSelectors";
+ import { formatRelativeTime } from "@/renderer/utils/formatTime";
++import { SidebarPanelDragButton } from "../../SidebarPanelDragButton";
+ 
+ export function ThreadItemSuffix(props: {
+   thread: Thread;
+@@ -33,51 +34,35 @@ export function ThreadItemSuffix(props: {
+       {showWorktreeBadge && thread.worktreePath && (
+         <>
+           {showWorktreeFilesButton ? (
+-            <div
+-              role="button"
+-              tabIndex={0}
+-              aria-label={`Files for ${thread.worktreeBranch ?? thread.title}`}
+-              className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
++            <SidebarPanelDragButton
++              panel="files"
++              projectId={thread.projectId}
++              worktreePath={thread.worktreePath}
++              ariaLabel={`Files for ${thread.worktreeBranch ?? thread.title}`}
++              className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
+                 isFilesActive ? "text-accent" : "text-muted/60 opacity-0 group-hover:opacity-100"
+               }`}
+-              onClick={(event) => {
+-                event.stopPropagation();
+-                openFilesPanel(thread.projectId, thread.worktreePath);
+-              }}
+-              onKeyDown={(event) => {
+-                if (event.key === "Enter" || event.key === " ") {
+-                  event.stopPropagation();
+-                  openFilesPanel(thread.projectId, thread.worktreePath);
+-                }
+-              }}
++              onPress={() => openFilesPanel(thread.projectId, thread.worktreePath)}
+             >
+               <FolderOpen className="size-3.5" />
+-            </div>
++            </SidebarPanelDragButton>
+           ) : null}
+-          <div
+-            role="button"
+-            tabIndex={0}
+-            aria-label={`Terminal for ${thread.worktreeBranch}`}
+-            className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
++          <SidebarPanelDragButton
++            panel="terminal"
++            projectId={thread.projectId}
++            worktreePath={thread.worktreePath}
++            ariaLabel={`Terminal for ${thread.worktreeBranch}`}
++            className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
+               isTerminalActive
+                 ? "text-accent"
+                 : isTerminalOpen
+                   ? "text-foreground"
+                   : "text-muted/60 opacity-0 group-hover:opacity-100"
+             }`}
+-            onClick={(event) => {
+-              event.stopPropagation();
+-              openWorktreeTerminal(thread.projectId, thread.worktreePath!);
+-            }}
+-            onKeyDown={(event) => {
+-              if (event.key === "Enter" || event.key === " ") {
+-                event.stopPropagation();
+-                openWorktreeTerminal(thread.projectId, thread.worktreePath!);
+-              }
+-            }}
++            onPress={() => openWorktreeTerminal(thread.projectId, thread.worktreePath!)}
+           >
+             <TerminalSquare className="size-3.5" />
+-          </div>
++          </SidebarPanelDragButton>
+           <SyncBadge projectId={thread.projectId} worktreePath={thread.worktreePath} />
+           <GitBadge
+             projectId={thread.projectId}
+diff --git a/src/renderer/views/MainView/parts/Sidebar/parts/WorktreeGroupHeader.tsx b/src/renderer/views/MainView/parts/Sidebar/parts/WorktreeGroupHeader.tsx
+index 5971b62..3a2d0c6 100644
+--- a/src/renderer/views/MainView/parts/Sidebar/parts/WorktreeGroupHeader.tsx
++++ b/src/renderer/views/MainView/parts/Sidebar/parts/WorktreeGroupHeader.tsx
+@@ -2,6 +2,7 @@ import { FolderOpen, GitFork, TerminalSquare } from "lucide-react";
+ import { SidebarButton } from "@/renderer/components/common";
+ import { GitBadge } from "./GitBadge";
+ import { PrBadge } from "./PrBadge";
++import { SidebarPanelDragButton } from "./SidebarPanelDragButton";
+ import { SyncBadge } from "./SyncBadge";
+ 
+ export function WorktreeGroupHeader(props: {
+@@ -44,52 +45,36 @@ export function WorktreeGroupHeader(props: {
+         : {})}
+       suffix={
+         <>
+-          <div
+-            role="button"
+-            tabIndex={0}
+-            aria-label={`Files for ${props.worktreeBranch}`}
+-            className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
++          <SidebarPanelDragButton
++            panel="files"
++            projectId={props.projectId}
++            worktreePath={props.worktreePath}
++            ariaLabel={`Files for ${props.worktreeBranch}`}
++            className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
+               props.isActiveFiles
+                 ? "text-accent"
+                 : "text-muted/60 opacity-0 group-hover:opacity-100"
+             }`}
+-            onClick={(event) => {
+-              event.stopPropagation();
+-              props.onOpenFiles();
+-            }}
+-            onKeyDown={(event) => {
+-              if (event.key === "Enter" || event.key === " ") {
+-                event.stopPropagation();
+-                props.onOpenFiles();
+-              }
+-            }}
++            onPress={props.onOpenFiles}
+           >
+             <FolderOpen className="size-3.5" />
+-          </div>
+-          <div
+-            role="button"
+-            tabIndex={0}
+-            aria-label={`Terminal for ${props.worktreeBranch}`}
+-            className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
++          </SidebarPanelDragButton>
++          <SidebarPanelDragButton
++            panel="terminal"
++            projectId={props.projectId}
++            worktreePath={props.worktreePath}
++            ariaLabel={`Terminal for ${props.worktreeBranch}`}
++            className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
+               props.isActiveTerminal
+                 ? "text-accent"
+                 : props.hasTerminal
+                   ? "text-foreground"
+                   : "text-muted/60 opacity-0 group-hover:opacity-100"
+             }`}
+-            onClick={(event) => {
+-              event.stopPropagation();
+-              props.onOpenTerminal();
+-            }}
+-            onKeyDown={(event) => {
+-              if (event.key === "Enter" || event.key === " ") {
+-                event.stopPropagation();
+-                props.onOpenTerminal();
+-              }
+-            }}
++            onPress={props.onOpenTerminal}
+           >
+             <TerminalSquare className="size-3.5" />
+-          </div>
++          </SidebarPanelDragButton>
+           <PrBadge worktreePath={props.worktreePath} />
+           <SyncBadge projectId={props.projectId} worktreePath={props.worktreePath} />
+           <GitBadge
+diff --git a/src/shared/paneId.ts b/src/shared/paneId.ts
+index 1325acf..ed371f0 100644
+--- a/src/shared/paneId.ts
++++ b/src/shared/paneId.ts
+@@ -8,6 +8,17 @@ export function makeDraftPaneId(projectId: string): string {
+   return DRAFT_PREFIX + projectId;
+ }
+ 
++export function makeUniqueDraftPaneId(projectId: string): string {
++  const suffix =
++    typeof crypto !== "undefined" && "randomUUID" in crypto
++      ? crypto.randomUUID()
++      : Math.random().toString(36).slice(2);
++  return DRAFT_PREFIX + projectId + ":" + suffix;
++}
++
+ export function parseDraftProjectId(id: string): string | undefined {
+-  return id.startsWith(DRAFT_PREFIX) ? id.slice(DRAFT_PREFIX.length) : undefined;
++  if (!id.startsWith(DRAFT_PREFIX)) return undefined;
++  const rest = id.slice(DRAFT_PREFIX.length);
++  const colonIdx = rest.indexOf(":");
++  return colonIdx === -1 ? rest : rest.slice(0, colonIdx);
+ }
+diff --git a/src/supervisor/agents/acp/canonicalMapping.test.ts b/src/supervisor/agents/acp/canonicalMapping.test.ts
+index 90834ad..4fdf230 100644
+--- a/src/supervisor/agents/acp/canonicalMapping.test.ts
++++ b/src/supervisor/agents/acp/canonicalMapping.test.ts
+@@ -218,6 +218,55 @@ describe("mapAcpSessionUpdate", () => {
+     expect((events[1] as { delta: string }).delta).toBe("All set.");
+   });
+ 
++  it("drops Gemini's `update_topic` tool call entirely", () => {
++    // Gemini emits `update_topic` on nearly every user turn as a "think"-kind
++    // meta-tool to label the current conversation topic. It produces no
++    // user-facing artifact and would otherwise render as a collapsed accordion
++    // sandwiched between the user message and the assistant reply, so the
++    // mapper drops the `tool_call` and its terminal `tool_call_update`.
++    const state = createAcpMapperState("t-topic");
++    const started = mapAcpSessionUpdate(
++      note({
++        sessionUpdate: "tool_call",
++        toolCallId: "tc-topic",
++        title: 'Update topic to: "Capabilities Overview"',
++        kind: "think",
++        status: "in_progress",
++        rawInput: { title: "Capabilities Overview" },
++      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
++      state,
++    );
++    expect(started).toEqual([]);
++    expect(state.toolCallItems.has("tc-topic")).toBe(false);
++    expect(state.suppressedToolCallIds.has("tc-topic")).toBe(true);
++
++    const completed = mapAcpSessionUpdate(
++      note({
++        sessionUpdate: "tool_call_update",
++        toolCallId: "tc-topic",
++        status: "completed",
++      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
++      state,
++    );
++    expect(completed).toEqual([]);
++    expect(state.suppressedToolCallIds.has("tc-topic")).toBe(false);
++  });
++
++  it("also drops `update_topic` when the title is the raw tool name", () => {
++    const state = createAcpMapperState("t-topic-raw");
++    const events = mapAcpSessionUpdate(
++      note({
++        sessionUpdate: "tool_call",
++        toolCallId: "tc-topic-raw",
++        title: "update_topic",
++        kind: "think",
++      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
++      state,
++    );
++    expect(events).toEqual([]);
++    expect(state.suppressedToolCallIds.has("tc-topic-raw")).toBe(true);
++  });
++
+   it("ignores unknown sessionUpdate kinds without throwing", () => {
+     const state = createAcpMapperState("t-4");
+     const events = mapAcpSessionUpdate(
+diff --git a/src/supervisor/agents/acp/canonicalMapping.ts b/src/supervisor/agents/acp/canonicalMapping.ts
+index df5c706..212a236 100644
+--- a/src/supervisor/agents/acp/canonicalMapping.ts
++++ b/src/supervisor/agents/acp/canonicalMapping.ts
+@@ -208,6 +208,15 @@ export function mapAcpSessionUpdate(
+         status?: "pending" | "in_progress" | "completed" | "failed";
+         rawInput?: unknown;
+       };
++      // Gemini's `update_topic` is a meta-tool that re-titles the current
++      // conversation topic — emitted on nearly every user turn as the model's
++      // first action. It's noise in the chat stream (a "thinking" tool that
++      // produces no user-facing artifact), so drop it entirely along with its
++      // matching `tool_call_update`.
++      if (isUpdateTopicTool(toolCall.title, toolCall.kind)) {
++        state.suppressedToolCallIds.add(toolCall.toolCallId);
++        break;
++      }
+       // Copilot's `task_complete` is the end-of-turn summary, not a real tool —
+       // surface it as an assistant_message so it renders inline with the rest
+       // of the response instead of as a collapsed accordion.
+@@ -394,6 +403,21 @@ function buildAcpToolCallPayload(
+   return base;
+ }
+ 
++/**
++ * Gemini's `update_topic` tool re-titles the active conversation topic for UI
++ * grouping. ACP carries it with `kind: "think"` and `title` set to either the
++ * raw tool name (`update_topic`) or the human-readable description Gemini's
++ * `getDescription()` returns: `Update topic to: "<title>"` /
++ * `Update tactical intent: "<intent>"`. Match on either form so we drop the
++ * tool from the chat stream regardless of which Gemini build is in use.
++ */
++function isUpdateTopicTool(title: string | undefined, kind: string | undefined): boolean {
++  const t = (title ?? "").toLowerCase().trim();
++  const k = (kind ?? "").toLowerCase().trim();
++  if (t === "update_topic" || k === "update_topic") return true;
++  return t.startsWith("update topic to:") || t.startsWith("update tactical intent:");
++}
++
+ /**
+  * Copilot's ACP server emits an end-of-turn summary as a `tool_call` named
+  * `task_complete`. It isn't a tool — it's the agent's wrap-up message — so we
+diff --git a/src/supervisor/agents/claude/claude.test.ts b/src/supervisor/agents/claude/claude.test.ts
+index ad81ee0..0899a55 100644
+--- a/src/supervisor/agents/claude/claude.test.ts
++++ b/src/supervisor/agents/claude/claude.test.ts
+@@ -1,6 +1,7 @@
+ import { describe, expect, it } from "vitest";
+ import { createClaudeAdapter } from "./index";
+ import type { OscNotification, OscTitle } from "@/shared/osc";
++import type { ProjectLocation, ThreadConfig } from "@/shared/contracts";
+ 
+ function oscTitle(text: string, code: 0 | 1 | 2 = 0): OscTitle {
+   return { code, text };
+@@ -94,3 +95,37 @@ describe("createClaudeAdapter handleOscNotification (iTerm2 OSC 9;4 progress)",
+     expect(adapter.handleOscNotification?.(oscNotify("4;3;0", 99))).toBeNull();
+   });
+ });
++
++describe("createClaudeAdapter structured sessions", () => {
++  const projectLocation: ProjectLocation = { kind: "windows", path: "C:\\repo" };
++  const config: ThreadConfig = { model: "sonnet" };
++
++  it("advertises GUI as an opt-in presentation mode while keeping terminal as default", () => {
++    const adapter = createClaudeAdapter();
++
++    expect(adapter.capabilities.presentationMode).toBe("terminal");
++    expect(adapter.capabilities.presentationModes).toEqual(["terminal", "gui"]);
++  });
++
++  it("creates a structured SDK session only for GUI presentation", async () => {
++    const adapter = createClaudeAdapter();
++
++    await expect(
++      adapter.createStructuredSession?.({
++        threadId: "thread-1",
++        projectLocation,
++        config,
++        presentationMode: "terminal",
++      }),
++    ).resolves.toBeUndefined();
++
++    await expect(
++      adapter.createStructuredSession?.({
++        threadId: "thread-1",
++        projectLocation,
++        config,
++        presentationMode: "gui",
++      }),
++    ).resolves.toMatchObject({ launchOptions: { suppressResumeConfigOverrides: true } });
++  });
++});
+diff --git a/src/supervisor/agents/claude/detection.ts b/src/supervisor/agents/claude/detection.ts
+index f07f3db..5166112 100644
+--- a/src/supervisor/agents/claude/detection.ts
++++ b/src/supervisor/agents/claude/detection.ts
+@@ -46,6 +46,7 @@ export const claudeCapabilities: AgentCapability = {
+   supportsDirectInput: true,
+   liveInputMode: "terminal",
+   presentationMode: "terminal",
++  presentationModes: ["terminal", "gui"],
+   bypassApprovalPolicy: CLAUDE_DEFAULT_APPROVAL_POLICY,
+   settingDefs: [
+     {
+diff --git a/src/supervisor/agents/claude/index.ts b/src/supervisor/agents/claude/index.ts
+index 9225fb7..094165a 100644
+--- a/src/supervisor/agents/claude/index.ts
++++ b/src/supervisor/agents/claude/index.ts
+@@ -8,9 +8,11 @@ import {
+   iterm2ProgressOscHint,
+   shortenHomePath,
+   type AgentAdapter,
++  type CreateStructuredSessionInput,
+ } from "../base";
+ import { buildClaudeArgs } from "./argv";
+ import { claudeCapabilities, claudeDetectionSpec } from "./detection";
++import { ClaudeSdkSession } from "./sdkSession";
+ import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
+ import {
+   getClaudePluginPaths,
+@@ -79,6 +81,10 @@ export function createClaudeAdapter(): AgentAdapter {
+     createInitialSessionRef() {
+       return undefined;
+     },
++    async createStructuredSession(input: CreateStructuredSessionInput) {
++      if (input.presentationMode !== "gui") return undefined;
++      return ClaudeSdkSession.create(input);
++    },
+     buildDirectInput(prompt, segments) {
+       const attachmentCount = segments?.filter((s) => s.kind === "attachment").length ?? 0;
+       const wait = attachmentCount > 0 ? 800 + (attachmentCount - 1) * 150 : 60;
+diff --git a/src/supervisor/agents/opencode/argv.ts b/src/supervisor/agents/opencode/argv.ts
+index da8b336..9f3bbd7 100644
+--- a/src/supervisor/agents/opencode/argv.ts
++++ b/src/supervisor/agents/opencode/argv.ts
+@@ -20,6 +20,18 @@ export function buildOpenCodeArgs(
+   if (config.model) {
+     args.push("--model", config.model);
+   }
++  // OpenCode's `--variant` flag matches its SDK `variant` field — used to
++  // pick provider-specific reasoning effort (high, max, minimal, …) for
++  // models that publish a `variants` map in `opencode models --verbose`.
++  if (config.effort && config.effort.length > 0) {
++    args.push("--variant", config.effort);
++  }
++  // Plan mode in the TUI is just the built-in `plan` agent (`opencode agent
++  // list`). The default command accepts `--agent <name>` to pick it at
++  // launch; the SDK runtime uses the same value via `prompt_async`.
++  if (config.mode === "plan") {
++    args.push("--agent", "plan");
++  }
+   if (prompt.trim().length > 0) {
+     args.push("--prompt", prompt);
+   }
+diff --git a/src/supervisor/agents/opencode/detection.ts b/src/supervisor/agents/opencode/detection.ts
+index a65ff6f..16df792 100644
+--- a/src/supervisor/agents/opencode/detection.ts
++++ b/src/supervisor/agents/opencode/detection.ts
+@@ -3,12 +3,31 @@ import { join } from "node:path";
+ import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
+ import { configFileAuthProbe, readAgentCommandOutput, type DetectionSpec } from "../base";
+ 
++// Canonical ordering for the union effort list. Anything OpenCode reports
++// outside this set gets appended after these in discovery order so we never
++// silently hide a variant. `none` is OpenCode's "skip reasoning" variant on
++// GPT-class models — kept first so it sorts ahead of the actual effort
++// gradient.
++const CANONICAL_EFFORT_ORDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
++
++// Per-model default — preferred when the model exposes it, falling back to
++// the highest-precedence available variant. Mirrors how Claude defaults to
++// `high`; OpenCode defaults to `medium` because several Zen models (GPT-5.5,
++// Sonnet) make `medium` their lowest paid-effort tier.
++const OPENCODE_PREFERRED_DEFAULT_EFFORT = "medium";
++
+ export const opencodeDefaultCapabilities: AgentCapability = {
+   models: [],
+   efforts: [],
+   modelEfforts: {},
+-  modes: [],
+-  approvalPolicies: [],
++  // OpenCode exposes two built-in agents: `build` (default) and `plan`. The
++  // SDK accepts an `agent` field on `prompt_async`; the renderer's Plan toggle
++  // flips `ThreadConfig.mode` and the SDK session translates "plan" → agent.
++  modes: ["agent", "plan"],
++  approvalPolicies: [
++    { id: "default", label: "Default" },
++    { id: "yolo", label: "Bypass Permissions" },
++  ],
+   sandboxModes: [],
+   supportsResume: true,
+   supportsDirectInput: true,
+@@ -31,21 +50,61 @@ function opencodeNativeAuthPath(): string {
+   return join(homedir(), ".local", "share", "opencode", "auth.json");
+ }
+ 
+-// `opencode models` prints one `provider/model` per line; we surface every
+-// line as an opaque model id while deriving cleaner display metadata for UI.
++// `opencode models --verbose` interleaves `provider/model` headers with
++// pretty-printed JSON for each model. We split on header lines (column-0,
++// non-`{}`, matching the `provider/model` shape) and parse each block to pull
++// out the `variants` keys — those are the OpenCode "model variant" names that
++// `--variant` (CLI) and `prompt_async.variant` (SDK) accept and that we
++// surface as effort options in the composer.
++const OPENCODE_MODEL_HEADER_RE = /^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i;
++
++interface OpenCodeProbedModel {
++  id: string;
++  variants: string[];
++}
++
++export function parseOpenCodeVerboseModels(stdout: string): OpenCodeProbedModel[] {
++  const lines = stdout.split(/\r?\n/g);
++  const entries: { id: string; jsonLines: string[] }[] = [];
++  let currentId: string | undefined;
++  let buf: string[] = [];
++  for (const line of lines) {
++    if (OPENCODE_MODEL_HEADER_RE.test(line)) {
++      if (currentId) entries.push({ id: currentId, jsonLines: buf });
++      currentId = line;
++      buf = [];
++    } else if (currentId) {
++      buf.push(line);
++    }
++  }
++  if (currentId) entries.push({ id: currentId, jsonLines: buf });
++
++  return entries.map(({ id, jsonLines }) => {
++    const json = jsonLines.join("\n").trim();
++    if (!json) return { id, variants: [] };
++    try {
++      const obj = JSON.parse(json) as { variants?: Record<string, unknown> };
++      const variants =
++        obj.variants && typeof obj.variants === "object" ? Object.keys(obj.variants) : [];
++      return { id, variants };
++    } catch {
++      return { id, variants: [] };
++    }
++  });
++}
++
+ async function probeOpenCodeModels(
+   location: ProjectLocation,
+   executablePath: string,
+-): Promise<string[] | undefined> {
+-  const result = await readAgentCommandOutput(location, executablePath, ["models"], {
+-    timeoutMs: 8_000,
++): Promise<OpenCodeProbedModel[] | undefined> {
++  const result = await readAgentCommandOutput(location, executablePath, ["models", "--verbose"], {
++    // Verbose mode prints a JSON object per model — slower than the bare
++    // `models` listing but still bounded by OpenCode's local cache.
++    timeoutMs: 15_000,
+   });
+   if (!result.ok || !result.stdout) return undefined;
+-  const lines = result.stdout
+-    .split(/\r?\n/g)
+-    .map((line) => line.trim())
+-    .filter((line) => line.length > 0 && /\//.test(line));
+-  return lines.length > 0 ? lines : undefined;
++  const parsed = parseOpenCodeVerboseModels(result.stdout);
++  return parsed.length > 0 ? parsed : undefined;
+ }
+ 
+ const OPENCODE_TITLE_TOKEN_OVERRIDES: Record<string, string> = {
+@@ -149,15 +208,45 @@ export const opencodeDetectionSpec: DetectionSpec = {
+   ],
+   async capabilitiesProbe(ctx) {
+     if (!ctx.executablePath) return undefined;
+-    const models = await probeOpenCodeModels(ctx.location, ctx.executablePath);
+-    if (!models) return undefined;
+-    const subProviderIds = [...new Set(models.map(openCodeModelSubProvider).filter(isString))];
++    const probed = await probeOpenCodeModels(ctx.location, ctx.executablePath);
++    if (!probed) return undefined;
++    const modelIds = probed.map((m) => m.id);
++    const subProviderIds = [...new Set(modelIds.map(openCodeModelSubProvider).filter(isString))];
++
++    // Per-model variant lists feed the composer effort picker via
++    // `getAvailableEfforts(capabilities, model)` — empty arrays mean "no
++    // effort selector for this model", which is the right default for free
++    // models like `opencode/big-pickle` whose `variants: {}` we already saw.
++    const modelEfforts: Record<string, string[]> = {};
++    const seenEfforts = new Set<string>();
++    for (const m of probed) {
++      modelEfforts[m.id] = m.variants;
++      for (const v of m.variants) seenEfforts.add(v);
++    }
++    const ordered: string[] = [];
++    for (const e of CANONICAL_EFFORT_ORDER) {
++      if (seenEfforts.has(e)) {
++        ordered.push(e);
++        seenEfforts.delete(e);
++      }
++    }
++    // Append any non-canonical variant names OpenCode reported, preserving
++    // discovery order — keeps us forward-compatible with new variants.
++    for (const e of seenEfforts) ordered.push(e);
++
+     return {
+-      models: models.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
++      models: modelIds.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
+       subProviders: subProviderIds.map((id) => ({
+         id,
+         label: humanizeOpenCodeSubProviderId(id),
+       })),
++      efforts: ordered,
++      modelEfforts,
++      ...(ordered.includes(OPENCODE_PREFERRED_DEFAULT_EFFORT)
++        ? { defaultEffort: OPENCODE_PREFERRED_DEFAULT_EFFORT }
++        : ordered.length > 0
++          ? { defaultEffort: ordered[0] }
++          : {}),
+     };
+   },
+ };
+diff --git a/src/supervisor/agents/opencode/opencode.test.ts b/src/supervisor/agents/opencode/opencode.test.ts
+index 098c560..c68f106 100644
+--- a/src/supervisor/agents/opencode/opencode.test.ts
++++ b/src/supervisor/agents/opencode/opencode.test.ts
+@@ -1,7 +1,11 @@
+ import { describe, expect, it } from "vitest";
+ import { createOpenCodeAdapter } from ".";
+ import { buildOpenCodeArgs } from "./argv";
+-import { humanizeOpenCodeModelId, humanizeOpenCodeSubProviderId } from "./detection";
++import {
++  humanizeOpenCodeModelId,
++  humanizeOpenCodeSubProviderId,
++  parseOpenCodeVerboseModels,
++} from "./detection";
+ import { opencodeIntentFor } from "./plugin/intentMap";
+ import { detectOpenCodeTerminalStatus, opencodeOscHint, opencodeOscTitleHint } from "./terminal";
+ 
+@@ -41,6 +45,86 @@ describe("buildOpenCodeArgs", () => {
+   it("ignores whitespace-only prompts", () => {
+     expect(buildOpenCodeArgs({ model: "" }, "   ")).toEqual([]);
+   });
++
++  it("forwards effort via --variant", () => {
++    expect(buildOpenCodeArgs({ model: "opencode/claude-sonnet-4-6", effort: "high" }, "")).toEqual([
++      "--model",
++      "opencode/claude-sonnet-4-6",
++      "--variant",
++      "high",
++    ]);
++  });
++
++  it("omits --variant when effort is empty string", () => {
++    expect(buildOpenCodeArgs({ model: "opencode/big-pickle", effort: "" }, "")).toEqual([
++      "--model",
++      "opencode/big-pickle",
++    ]);
++  });
++
++  it("forwards plan mode via --agent plan", () => {
++    expect(buildOpenCodeArgs({ model: "opencode/big-pickle", mode: "plan" }, "")).toEqual([
++      "--model",
++      "opencode/big-pickle",
++      "--agent",
++      "plan",
++    ]);
++  });
++
++  it("does not pass --agent for the default (agent) mode", () => {
++    expect(buildOpenCodeArgs({ model: "opencode/big-pickle", mode: "agent" }, "")).toEqual([
++      "--model",
++      "opencode/big-pickle",
++    ]);
++  });
++});
++
++describe("parseOpenCodeVerboseModels", () => {
++  it("extracts variant keys per model from --verbose output", () => {
++    const sample = `opencode/big-pickle
++{
++  "id": "big-pickle",
++  "providerID": "opencode",
++  "variants": {}
++}
++opencode/claude-haiku-4-5
++{
++  "id": "claude-haiku-4-5",
++  "providerID": "opencode",
++  "variants": {
++    "high": { "thinking": { "type": "enabled" } },
++    "max": { "thinking": { "type": "enabled" } }
++  }
++}
++opencode/claude-opus-4-6
++{
++  "id": "claude-opus-4-6",
++  "providerID": "opencode",
++  "variants": {
++    "low": { "effort": "low" },
++    "medium": { "effort": "medium" },
++    "high": { "effort": "high" },
++    "max": { "effort": "max" }
++  }
++}
++`;
++    expect(parseOpenCodeVerboseModels(sample)).toEqual([
++      { id: "opencode/big-pickle", variants: [] },
++      { id: "opencode/claude-haiku-4-5", variants: ["high", "max"] },
++      { id: "opencode/claude-opus-4-6", variants: ["low", "medium", "high", "max"] },
++    ]);
++  });
++
++  it("returns empty list for unparseable JSON without throwing", () => {
++    const sample = `opencode/broken
++{ this is not json
++`;
++    expect(parseOpenCodeVerboseModels(sample)).toEqual([{ id: "opencode/broken", variants: [] }]);
++  });
++
++  it("returns no entries when stdout is empty", () => {
++    expect(parseOpenCodeVerboseModels("")).toEqual([]);
++  });
+ });
+ 
+ describe("OpenCode prompt formatting", () => {
+diff --git a/src/supervisor/git/exec.ts b/src/supervisor/git/exec.ts
+index 833bf52..1c43415 100644
+--- a/src/supervisor/git/exec.ts
++++ b/src/supervisor/git/exec.ts
+@@ -5,7 +5,7 @@ import { dirname, join, normalize, posix } from "node:path";
+ import { promisify } from "node:util";
+ import type { GitRemoteInfo, ProjectLocation, RemoteHostPlatform } from "@/shared/contracts";
+ import { resolveLightcodePaths } from "@/shared/lightcodePaths";
+-import { errorDetail, msg } from "@/shared/messages";
++import { attachErrorDetails, errorDetail, msg } from "@/shared/messages";
+ import { getProjectName } from "@/shared/wsl";
+ import { sanitizeWorktreeBranchName, sanitizeWorktreePathSegment } from "@/shared/worktree";
+ import { buildAgentCommand, readWslCommandOutputAsync } from "../agents/base";
+@@ -56,12 +56,30 @@ export async function execGit(
+         return stdout;
+       }
+     }
+-    throw new Error(msg("git.commandFailed", { command: args[0]!, detail: errorDetail(error) }), {
+-      cause: error,
+-    });
++    throw buildGitCommandError(args[0]!, error);
+   }
+ }
+ 
++/**
++ * Wrap a child_process error into a user-facing message that preserves the
++ * original stderr as a separate detail block. Node's promisified `execFile`
++ * truncates stderr inside `error.message`, so we read the full `error.stderr`
++ * field and attach it via the {@link DETAILS_SENTINEL} so the renderer can
++ * disclose it without parsing the truncated message tail.
++ */
++function buildGitCommandError(command: string, error: unknown): Error {
++  const stderr = extractStderr(error);
++  const summary = msg("git.commandFailed", { command, detail: errorDetail(error) });
++  const message = stderr ? attachErrorDetails(summary, stderr) : summary;
++  return new Error(message, { cause: error });
++}
++
++function extractStderr(error: unknown): string {
++  if (!error || typeof error !== "object" || !("stderr" in error)) return "";
++  const raw = (error as { stderr: unknown }).stderr;
++  return typeof raw === "string" ? raw.trim() : "";
++}
++
+ export function toForwardSlash(path: string): string {
+   return path.replace(/\\/g, "/");
+ }
+diff --git a/src/supervisor/runtime.test.ts b/src/supervisor/runtime.test.ts
+index e853c65..2f37097 100644
+--- a/src/supervisor/runtime.test.ts
++++ b/src/supervisor/runtime.test.ts
+@@ -1302,7 +1302,7 @@ describe("writeSubmittedPrompt", () => {
+     expect(spawnOpts).toMatchObject({ cols: 132, rows: 42 });
+   });
+ 
+-  it("starts Codex GUI presentation on the structured session without a PTY", async () => {
++  it("starts Codex GUI presentation on the structured session without a PTY and stays visually working", async () => {
+     const emitted: Array<Record<string, unknown>> = [];
+     const runtime = new SupervisorRuntime((event) => {
+       emitted.push(event as Record<string, unknown>);
+@@ -1379,12 +1379,19 @@ describe("writeSubmittedPrompt", () => {
+         "thread-gui-start",
+       )?.pty,
+     ).toBeUndefined();
+-    expect(emitted).toContainEqual(
++    const threadStates = emitted.filter(
++      (event) => event.type === "thread-state" && event.threadId === "thread-gui-start",
++    );
++    expect(threadStates[0]).toMatchObject({
++      type: "thread-state",
++      threadId: "thread-gui-start",
++      status: "working",
++      attention: "working",
++      threadStatusSource: "server",
++    });
++    expect(threadStates).not.toContainEqual(
+       expect.objectContaining({
+-        type: "thread-state",
+-        threadId: "thread-gui-start",
+         status: "launching",
+-        threadStatusSource: "server",
+       }),
+     );
+   });
+diff --git a/src/supervisor/runtime/threadSessionManager.ts b/src/supervisor/runtime/threadSessionManager.ts
+index 10723e3..ea72036 100644
+--- a/src/supervisor/runtime/threadSessionManager.ts
++++ b/src/supervisor/runtime/threadSessionManager.ts
+@@ -197,6 +197,24 @@ export class ThreadSessionManager {
+     }));
+   }
+ 
++  /**
++   * Surface a structured-session failure on both axes: status (so the icon
++   * goes red) and a runtime `error` event (so `ThreadErrorDock` and the chat
++   * stream actually render the message). The supervisor stores `errorMessage`
++   * on the thread state, but no renderer surface reads `thread.errorMessage`
++   * — only the runtime error item drives `ThreadErrorDock` — so without the
++   * event the user sees a red icon and nothing else.
++   */
++  private failStructuredSession(session: SessionRuntime, error: unknown): void {
++    const message = error instanceof Error ? error.message : String(error);
++    this.outputPipeline.updateState(session, "error", "error", message);
++    this.enqueueRuntimeEvent(session.threadId, {
++      type: "error",
++      threadId: session.threadId,
++      message,
++    });
++  }
++
+   private enqueueRuntimeEvent(threadId: string, event: RuntimeEvent): void {
+     const pending = this.pendingRuntimeEvents.get(threadId);
+     if (pending) {
+@@ -616,12 +634,7 @@ export class ThreadSessionManager {
+         if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+           return;
+         }
+-        this.outputPipeline.updateState(
+-          session,
+-          "error",
+-          "error",
+-          error instanceof Error ? error.message : String(error),
+-        );
++        this.failStructuredSession(session, error);
+       });
+   }
+ 
+@@ -936,6 +949,18 @@ export class ThreadSessionManager {
+     return itemId;
+   }
+ 
++  private emitOptimisticWorkingState(threadId: string, config: ThreadConfig): void {
++    this.options.emit({
++      type: "thread-state",
++      threadId,
++      status: "working",
++      attention: "working",
++      config,
++      canResumeWithConfig: false,
++      threadStatusSource: "server",
++    });
++  }
++
+   private async startThreadInner(
+     payload: StartThreadPayload & { threadId: string },
+   ): Promise<StartThreadResult> {
+@@ -977,6 +1002,9 @@ export class ThreadSessionManager {
+         ? (payload.userMessageItemId ??
+           this.emitOptimisticUserMessage(payload.threadId, initialPrompt, effectiveSegments))
+         : undefined;
++    if (optimisticUserMessageItemId) {
++      this.emitOptimisticWorkingState(payload.threadId, payload.config);
++    }
+ 
+     const structuredSession = await this.createStructuredSession(
+       adapter,
+@@ -1029,6 +1057,8 @@ export class ThreadSessionManager {
+         structuredSession,
+         ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
+         presentationMode: requestedPresentation,
++        initialStatus: optimisticUserMessageItemId ? "working" : "idle",
++        initialAttention: optimisticUserMessageItemId ? "working" : "none",
+       });
+       if (!payload.sessionRef && initialPrompt.length > 0 && structuredSession.startTurn) {
+         void structuredSession
+@@ -1044,12 +1074,7 @@ export class ThreadSessionManager {
+             if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+               return;
+             }
+-            this.outputPipeline.updateState(
+-              session,
+-              "error",
+-              "error",
+-              error instanceof Error ? error.message : String(error),
+-            );
++            this.failStructuredSession(session, error);
+           });
+       }
+       return { threadId: payload.threadId };
+@@ -1070,12 +1095,7 @@ export class ThreadSessionManager {
+           if (!activeSession) {
+             return;
+           }
+-          this.outputPipeline.updateState(
+-            activeSession,
+-            "error",
+-            "error",
+-            error instanceof Error ? error.message : String(error),
+-          );
++          this.failStructuredSession(activeSession, error);
+         });
+     }
+ 
+@@ -1209,6 +1229,8 @@ export class ThreadSessionManager {
+     pendingTerminalPrompt?: string;
+     pendingTerminalSegments?: PromptSegment[];
+     presentationMode?: import("@/shared/contracts").ThreadPresentationMode;
++    initialStatus?: import("@/shared/contracts").ThreadStatus;
++    initialAttention?: import("@/shared/contracts").ThreadAttention;
+   }): SessionRuntime {
+     // `thread-reset` is only consumed by the terminal panel (xterm scrollback
+     // reset) and the renderer-side runtime-event/server-request slice clear.
+@@ -1270,8 +1292,8 @@ export class ThreadSessionManager {
+       terminalSize: input.initialSize,
+       launchPrompt: input.launchPrompt,
+       ...(input.sessionRef ? { sessionRef: input.sessionRef } : {}),
+-      status: "launching",
+-      attention: "none",
++      status: input.initialStatus ?? "launching",
++      attention: input.initialAttention ?? "none",
+       canResumeWithConfig: input.sessionRef !== undefined,
+       outputLength: 0,
+       pendingLaunchPrompt: input.pendingLaunchPrompt,

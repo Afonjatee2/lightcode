@@ -214,7 +214,7 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
     payload?.command && payload.command.length > 0
       ? payload.command
       : (readAcpStringField(payload, "command") ?? "");
-  const title = command ? `Run: ${humanIntentTitle(command)}` : "Run command";
+  const title = command ? humanIntentTitle(command) : "Run command";
   const output =
     item.streams.command_output && item.streams.command_output.length > 0
       ? item.streams.command_output

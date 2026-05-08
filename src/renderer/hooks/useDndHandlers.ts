@@ -3,8 +3,10 @@ import { makeDraftPaneId } from "@/shared/paneId";
 import type { Thread } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useProjectIds } from "@/renderer/state/useThread";
-import type { DragSourceData, PaneDropIndicator } from "@/renderer/dnd";
+import type { DragSourceData, MainPanelDropSource, PaneDropIndicator } from "@/renderer/dnd";
 import type { ReorderPlacement } from "@/renderer/state/reorder";
+import { showFilesPanel, showGitReviewPanel } from "@/renderer/actions/panelActions";
+import { showTerminalPanel } from "@/renderer/actions/terminalActions";
 
 type ThreadDragSource = Extract<DragSourceData, { type: "thread" }>;
 
@@ -147,5 +149,19 @@ export function useDndHandlers() {
     }
   }
 
-  return { handleSortEnd, handlePaneDrop };
+  function handleMainPanelDrop(source: MainPanelDropSource) {
+    if (source.type === "project") {
+      showFilesPanel(source.projectId);
+    } else if (source.type === "worktree-group") {
+      showFilesPanel(source.projectId, source.worktreePath);
+    } else if (source.panel === "files") {
+      showFilesPanel(source.projectId, source.worktreePath);
+    } else if (source.panel === "git") {
+      showGitReviewPanel(source.projectId, source.worktreePath);
+    } else {
+      showTerminalPanel(source.projectId, source.worktreePath);
+    }
+  }
+
+  return { handleSortEnd, handlePaneDrop, handleMainPanelDrop };
 }

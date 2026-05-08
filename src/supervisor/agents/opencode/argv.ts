@@ -20,6 +20,18 @@ export function buildOpenCodeArgs(
   if (config.model) {
     args.push("--model", config.model);
   }
+  // OpenCode's `--variant` flag matches its SDK `variant` field — used to
+  // pick provider-specific reasoning effort (high, max, minimal, …) for
+  // models that publish a `variants` map in `opencode models --verbose`.
+  if (config.effort && config.effort.length > 0) {
+    args.push("--variant", config.effort);
+  }
+  // Plan mode in the TUI is just the built-in `plan` agent (`opencode agent
+  // list`). The default command accepts `--agent <name>` to pick it at
+  // launch; the SDK runtime uses the same value via `prompt_async`.
+  if (config.mode === "plan") {
+    args.push("--agent", "plan");
+  }
   if (prompt.trim().length > 0) {
     args.push("--prompt", prompt);
   }

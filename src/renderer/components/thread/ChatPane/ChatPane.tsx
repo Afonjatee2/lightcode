@@ -32,7 +32,6 @@ import { ChatPaneActionsContext, type ChatPaneActions } from "./chatPaneActionsC
 import {
   selectChatScrollAnchor,
   selectChatScrollAnchorForTimeline,
-  selectThreadHasLiveVisibleRuntimeItem,
   selectVisibleThreadTimelineEntries,
 } from "./chatPaneSelectors";
 import { normalizeChatRelativePath } from "./chatPathUtils";
@@ -79,9 +78,6 @@ export function ChatPane(props: ChatPaneProps) {
   const scrollControlsRef = useRef<ChatScrollControlsHandle>(null);
   const timelineEntries = useAppStore(
     useShallow((s) => selectVisibleThreadTimelineEntries(s, thread.id, hiddenRuntimeItemId)),
-  );
-  const hasLiveItem = useAppStore((s) =>
-    selectThreadHasLiveVisibleRuntimeItem(s, thread.id, hiddenRuntimeItemId),
   );
   const requests = useAppStore((s) => s.runtimeRequestsByThread[thread.id] ?? EMPTY_REQUESTS);
   const project = useAppStore((s) => s.projects.find((p) => p.id === thread.projectId));
@@ -143,7 +139,12 @@ export function ChatPane(props: ChatPaneProps) {
   const requestCount = requests.length;
   const isEmpty = timelineEntries.length === 0 && requestCount === 0 && !hasSupplementaryContent;
   const isLive = thread.status === "launching" || thread.status === "working";
-  const showTailLoader = isLive && !hasLiveItem && !hiddenRuntimeItemIsLive;
+  // Anchor on thread.status alone — gating on item state caused the loader to
+  // disappear in the gap between an item flipping to `completed` and the next
+  // `item.started` arriving, even though the runtime was still working the
+  // turn. The pinned plan/budget item already advertises its own running
+  // state, so suppress the tail when that's live to avoid double indicators.
+  const showTailLoader = isLive && !hiddenRuntimeItemIsLive;
   const showEmptyHint = isEmpty && !isLive;
 
   return (
@@ -344,12 +345,49 @@ function ChatTailLoader() {
   return (
     <div className="mx-auto w-full max-w-[920px]">
       <Surface variant="transparent" className={chatMessageSurfaceClass}>
-        <div className="inline-flex items-center text-foreground-muted">
+        <div className="inline-flex items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
           <PixelLoader size="xxs" />
+          <WorkingFor />
         </div>
       </Surface>
     </div>
   );
+}
+
+/**
+ * Self-ticking "Working for Xs" label. Mutates `textContent` directly via a
+ * ref instead of calling `setState` so the per-second tick produces zero
+ * React commits — important while the rest of the chat is potentially
+ * streaming. Mount-anchored start time is sufficient because `ChatTailLoader`
+ * unmounts at turn-end and remounts on the next turn.
+ */
+function WorkingFor() {
+  const textRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    const startedAt = Date.now();
+    const update = () => {
+      const node = textRef.current;
+      if (!node) return;
+      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      node.textContent = elapsedSeconds < 1 ? "" : `Working for ${formatElapsed(elapsedSeconds)}`;
+    };
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  return <span ref={textRef} className="lightcode-thinking-text" aria-live="polite" />;
+}
+
+function formatElapsed(totalSeconds: number): string {
+  if (totalSeconds < 60) return `${totalSeconds}s`;
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes < 60) return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
+  const hours = Math.floor(minutes / 60);
+  const remMinutes = minutes % 60;
+  return remMinutes === 0 ? `${hours}h` : `${hours}h ${remMinutes}m`;
 }
 
 function isElementAtBottom(el: HTMLDivElement): boolean {

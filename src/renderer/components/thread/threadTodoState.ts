@@ -38,14 +38,16 @@ export function selectThreadTodoDockItem(
   const itemIds = state.runtimeItemIdsByThread[threadId];
   if (!itemIds?.length) return null;
   const itemsById = state.runtimeItemsByIdByThread[threadId];
-  // Walk newest → oldest. If we hit a user_message before any plan, a new turn
-  // has started since the last plan was emitted, so suppress the dock.
+  // Walk newest → oldest, find the most recent plan with parsable steps.
+  // Keep it docked until every step is completed (or a newer plan replaces it).
+  // Follow-up user messages do not retire the dock — the plan persists across turns.
   for (let index = itemIds.length - 1; index >= 0; index -= 1) {
     const item = itemsById?.[itemIds[index]!];
-    if (!item) continue;
-    if (item.type === "user_message") return null;
-    if (item.type !== "plan") continue;
-    if (getThreadTodoDockStateForItem(item)) return item;
+    if (!item || item.type !== "plan") continue;
+    const dockState = getThreadTodoDockStateForItem(item);
+    if (!dockState) continue;
+    const allCompleted = dockState.steps.every((step) => step.status === "completed");
+    return allCompleted ? null : item;
   }
   return null;
 }

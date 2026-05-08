@@ -1302,7 +1302,7 @@ describe("writeSubmittedPrompt", () => {
     expect(spawnOpts).toMatchObject({ cols: 132, rows: 42 });
   });
 
-  it("starts Codex GUI presentation on the structured session without a PTY", async () => {
+  it("starts Codex GUI presentation on the structured session without a PTY and stays visually working", async () => {
     const emitted: Array<Record<string, unknown>> = [];
     const runtime = new SupervisorRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
@@ -1379,12 +1379,19 @@ describe("writeSubmittedPrompt", () => {
         "thread-gui-start",
       )?.pty,
     ).toBeUndefined();
-    expect(emitted).toContainEqual(
+    const threadStates = emitted.filter(
+      (event) => event.type === "thread-state" && event.threadId === "thread-gui-start",
+    );
+    expect(threadStates[0]).toMatchObject({
+      type: "thread-state",
+      threadId: "thread-gui-start",
+      status: "working",
+      attention: "working",
+      threadStatusSource: "server",
+    });
+    expect(threadStates).not.toContainEqual(
       expect.objectContaining({
-        type: "thread-state",
-        threadId: "thread-gui-start",
         status: "launching",
-        threadStatusSource: "server",
       }),
     );
   });

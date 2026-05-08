@@ -218,6 +218,55 @@ describe("mapAcpSessionUpdate", () => {
     expect((events[1] as { delta: string }).delta).toBe("All set.");
   });
 
+  it("drops Gemini's `update_topic` tool call entirely", () => {
+    // Gemini emits `update_topic` on nearly every user turn as a "think"-kind
+    // meta-tool to label the current conversation topic. It produces no
+    // user-facing artifact and would otherwise render as a collapsed accordion
+    // sandwiched between the user message and the assistant reply, so the
+    // mapper drops the `tool_call` and its terminal `tool_call_update`.
+    const state = createAcpMapperState("t-topic");
+    const started = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-topic",
+        title: 'Update topic to: "Capabilities Overview"',
+        kind: "think",
+        status: "in_progress",
+        rawInput: { title: "Capabilities Overview" },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    expect(started).toEqual([]);
+    expect(state.toolCallItems.has("tc-topic")).toBe(false);
+    expect(state.suppressedToolCallIds.has("tc-topic")).toBe(true);
+
+    const completed = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-topic",
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    expect(completed).toEqual([]);
+    expect(state.suppressedToolCallIds.has("tc-topic")).toBe(false);
+  });
+
+  it("also drops `update_topic` when the title is the raw tool name", () => {
+    const state = createAcpMapperState("t-topic-raw");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-topic-raw",
+        title: "update_topic",
+        kind: "think",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    expect(events).toEqual([]);
+    expect(state.suppressedToolCallIds.has("tc-topic-raw")).toBe(true);
+  });
+
   it("ignores unknown sessionUpdate kinds without throwing", () => {
     const state = createAcpMapperState("t-4");
     const events = mapAcpSessionUpdate(

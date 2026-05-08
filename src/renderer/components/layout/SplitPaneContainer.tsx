@@ -1,17 +1,30 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/react";
-import {
-  collectPaneIds,
-  leadPaneId,
-  type PaneLayout,
-  type PaneLayoutAxis,
-} from "@/shared/paneLayout";
+import { collectPaneIds, type PaneLayout, type PaneLayoutAxis } from "@/shared/paneLayout";
 import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "@/renderer/dnd";
 
 const MIN_PANE_PERCENT = 15;
-const ROOT_INSERT_ZONE_SIZE = 12;
-const ROOT_INSERT_ZONE_INSET = ROOT_INSERT_ZONE_SIZE / 2;
+const DIVIDER_SIZE = 8;
+const ROOT_INSERT_ZONE_INSET = DIVIDER_SIZE / 2;
 const SPLIT_SIZE_STORAGE_PREFIX = "lightcode-pane-sizes";
+
+type Rect = { left: number; top: number; width: number; height: number };
+
+type ComputedPane = { paneId: string; rect: Rect };
+
+type ComputedDivider = {
+  zoneId: string;
+  path: number[];
+  parentAxis: PaneLayoutAxis;
+  insertIndex: number;
+  rect: Rect;
+  storageKey: string;
+  dividerIndex: number;
+  parentDim: number;
+  childCount: number;
+};
+
+type ComputedLayout = { panes: ComputedPane[]; dividers: ComputedDivider[] };
 
 function equalSizes(count: number): number[] {
   return Array.from({ length: count }, () => 100 / count);
@@ -28,32 +41,20 @@ function normalizeSizes(raw: number[], count: number): number[] | null {
   ) {
     return null;
   }
-
   const total = raw.reduce((sum, value) => sum + value, 0);
-  if (total <= 0) {
-    return null;
-  }
-
+  if (total <= 0) return null;
   const normalized = raw.map((value) => (value / total) * 100);
-  if (normalized.some((value) => value < MIN_PANE_PERCENT)) {
-    return null;
-  }
-
+  if (normalized.some((value) => value < MIN_PANE_PERCENT)) return null;
   return normalized;
 }
 
 function readStoredSizes(key: string, count: number): number[] {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) {
-      return equalSizes(count);
-    }
+    if (!raw) return equalSizes(count);
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return equalSizes(count);
-    }
-    const normalized = normalizeSizes(parsed, count);
-    return normalized ?? equalSizes(count);
+    if (!Array.isArray(parsed)) return equalSizes(count);
+    return normalizeSizes(parsed, count) ?? equalSizes(count);
   } catch {
     return equalSizes(count);
   }
@@ -63,42 +64,125 @@ function writeStoredSizes(key: string, sizes: number[]) {
   try {
     localStorage.setItem(key, JSON.stringify(sizes));
   } catch {
-    // Ignore storage failures; resizing should still work for the current session.
+    // ignore quota / privacy errors
   }
 }
 
-function SplitDivider(props: {
-  path: number[];
-  axis: PaneLayoutAxis;
-  index: number;
-  onPointerDown: (event: React.MouseEvent) => void;
+export function computeLayout(
+  layout: PaneLayout,
+  containerRect: Rect,
+  resolveSizes: (storageKey: string, count: number) => number[],
+): ComputedLayout {
+  const panes: ComputedPane[] = [];
+  const dividers: ComputedDivider[] = [];
+
+  function walk(node: PaneLayout, rect: Rect, path: number[]) {
+    if (node.kind === "leaf") {
+      panes.push({ paneId: node.paneId, rect });
+      return;
+    }
+
+    const storageKey = splitStorageKey(node, node.axis);
+    const sizes = resolveSizes(storageKey, node.children.length);
+    const isVertical = node.axis === "vertical";
+    const totalDim = isVertical ? rect.width : rect.height;
+    const dividerCount = node.children.length - 1;
+    const availableDim = Math.max(0, totalDim - DIVIDER_SIZE * dividerCount);
+
+    let offset = 0;
+    for (let i = 0; i < node.children.length; i++) {
+      const childDim = (sizes[i]! / 100) * availableDim;
+      const childRect: Rect = isVertical
+        ? { left: rect.left + offset, top: rect.top, width: childDim, height: rect.height }
+        : { left: rect.left, top: rect.top + offset, width: rect.width, height: childDim };
+      walk(node.children[i]!, childRect, [...path, i]);
+      offset += childDim;
+
+      if (i < dividerCount) {
+        const dividerRect: Rect = isVertical
+          ? {
+              left: rect.left + offset,
+              top: rect.top,
+              width: DIVIDER_SIZE,
+              height: rect.height,
+            }
+          : {
+              left: rect.left,
+              top: rect.top + offset,
+              width: rect.width,
+              height: DIVIDER_SIZE,
+            };
+        dividers.push({
+          zoneId: `pane-insert:${node.axis}:${path.join("-")}:${i + 1}`,
+          path,
+          parentAxis: node.axis,
+          insertIndex: i + 1,
+          rect: dividerRect,
+          storageKey,
+          dividerIndex: i + 1,
+          parentDim: totalDim,
+          childCount: node.children.length,
+        });
+        offset += DIVIDER_SIZE;
+      }
+    }
+  }
+
+  walk(layout, containerRect, []);
+  return { panes, dividers };
+}
+
+function setRectStyle(element: HTMLElement | null, rect: Rect) {
+  if (!element) return;
+  element.style.left = `${rect.left}px`;
+  element.style.top = `${rect.top}px`;
+  element.style.width = `${rect.width}px`;
+  element.style.height = `${rect.height}px`;
+}
+
+function Divider(props: {
+  divider: ComputedDivider;
+  registerRef: (zoneId: string, element: HTMLDivElement | null) => void;
+  onResizeStart: (event: React.MouseEvent, divider: ComputedDivider) => void;
 }) {
-  const zoneId = `split-divider:${props.axis}:${props.path.join("-")}:${props.index}`;
+  const { divider } = props;
   const elementRef = useRef<HTMLDivElement>(null);
   useDroppable({
-    id: `pane-insert:${props.axis}:${props.path.join("-")}:${props.index}`,
+    id: divider.zoneId,
     accept: ["pane", "thread", "new-thread"],
     data: {
       type: "pane-insert-zone",
-      path: props.path,
-      axis: props.axis,
-      index: props.index,
-      zoneId,
+      path: divider.path,
+      axis: divider.parentAxis,
+      index: divider.insertIndex,
+      zoneId: divider.zoneId,
     },
     element: elementRef,
   });
-  const isHighlighted = useIsInsertSplitHighlighted(zoneId);
+  const isHighlighted = useIsInsertSplitHighlighted(divider.zoneId);
 
   return (
     <div
-      ref={elementRef}
+      ref={(element) => {
+        elementRef.current = element;
+        props.registerRef(divider.zoneId, element);
+      }}
       className={`${
-        props.axis === "vertical" ? "lightcode-pane-divider" : "lightcode-pane-divider-horizontal"
+        divider.parentAxis === "vertical"
+          ? "lightcode-pane-divider"
+          : "lightcode-pane-divider-horizontal"
       } ${isHighlighted ? "is-highlighted" : ""}`}
-      onMouseDown={props.onPointerDown}
+      style={{
+        position: "absolute",
+        left: divider.rect.left,
+        top: divider.rect.top,
+        width: divider.rect.width,
+        height: divider.rect.height,
+      }}
+      onMouseDown={(event) => props.onResizeStart(event, divider)}
       role="separator"
-      aria-orientation={props.axis === "vertical" ? "vertical" : "horizontal"}
-      aria-label={props.axis === "vertical" ? "Resize column" : "Resize row"}
+      aria-orientation={divider.parentAxis === "vertical" ? "vertical" : "horizontal"}
+      aria-label={divider.parentAxis === "vertical" ? "Resize column" : "Resize row"}
     />
   );
 }
@@ -159,90 +243,122 @@ function RootInsertZone(props: {
   );
 }
 
-function SplitGroup(props: {
+export function SplitPaneContainer(props: {
   layout: PaneLayout;
-  path: number[];
   renderPane: (paneId: string) => React.ReactNode;
 }) {
-  const children = props.layout.kind === "split" ? props.layout.children : [props.layout];
-  const axis = props.layout.kind === "split" ? props.layout.axis : "vertical";
-  const count = children.length;
-  const storageKey = splitStorageKey(props.layout, axis);
-  const [sizes, setSizes] = useState(() => readStoredSizes(storageKey, count));
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const paneRefs = useRef<Array<HTMLDivElement | null>>([]);
-  const sizesRef = useRef(sizes);
-  const dragRef = useRef({
-    start: 0,
-    beforeStart: 0,
-    afterStart: 0,
-    index: 0,
-    currentSizes: sizes,
-  });
-  const cleanupRef = useRef<(() => void) | null>(null);
+  const paneElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const dividerElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
 
-  function applySizes(nextSizes: number[]) {
-    for (let index = 0; index < nextSizes.length; index++) {
-      const pane = paneRefs.current[index];
-      if (!pane) continue;
-      pane.style.flexBasis = `${nextSizes[index]}%`;
+  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({
+    width: 0,
+    height: 0,
+  });
+
+  // Committed sizes per split, normalized lazily on first read.
+  const committedSizesRef = useRef<Map<string, number[]>>(new Map());
+  // Transient sizes during a drag — applied imperatively, not stored.
+  const transientSizesRef = useRef<Map<string, number[]>>(new Map());
+  // Forces a re-render after a drag commit so React's pane styles converge
+  // with the imperatively-set DOM positions. Read isn't needed; calling
+  // `bumpLayoutTick` is the only side effect.
+  const [, bumpLayoutTick] = useReducer((tick: number) => tick + 1, 0);
+
+  useLayoutEffect(() => {
+    const element = containerRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        setContainerSize((prev) =>
+          prev.width === width && prev.height === height ? prev : { width, height },
+        );
+      }
+    });
+    observer.observe(element);
+    const rect = element.getBoundingClientRect();
+    setContainerSize({ width: rect.width, height: rect.height });
+    return () => observer.disconnect();
+  }, []);
+
+  function resolveSizes(storageKey: string, count: number): number[] {
+    const transient = transientSizesRef.current.get(storageKey);
+    if (transient && transient.length === count) return transient;
+    const committed = committedSizesRef.current.get(storageKey);
+    if (committed && committed.length === count) return committed;
+    const restored = readStoredSizes(storageKey, count);
+    committedSizesRef.current.set(storageKey, restored);
+    return restored;
+  }
+
+  // Account for the inset padding around the layout.
+  const innerWidth = Math.max(0, containerSize.width - ROOT_INSERT_ZONE_INSET * 2);
+  const innerHeight = Math.max(0, containerSize.height - ROOT_INSERT_ZONE_INSET * 2);
+  const containerRect: Rect = {
+    left: 0,
+    top: 0,
+    width: innerWidth,
+    height: innerHeight,
+  };
+
+  const computed =
+    innerWidth > 0 && innerHeight > 0
+      ? computeLayout(props.layout, containerRect, resolveSizes)
+      : { panes: [], dividers: [] };
+
+  function applyTransientLayout() {
+    const layoutNow = computeLayout(props.layout, containerRect, resolveSizes);
+    for (const pane of layoutNow.panes) {
+      setRectStyle(paneElementRefs.current.get(pane.paneId) ?? null, pane.rect);
+    }
+    for (const divider of layoutNow.dividers) {
+      setRectStyle(dividerElementRefs.current.get(divider.zoneId) ?? null, divider.rect);
     }
   }
 
+  const cleanupRef = useRef<(() => void) | null>(null);
   useEffect(() => {
-    const restored = readStoredSizes(storageKey, count);
-    sizesRef.current = restored;
-    dragRef.current.currentSizes = restored;
-    setSizes(restored);
-  }, [count, storageKey]);
-
-  useEffect(() => {
-    sizesRef.current = sizes;
-    dragRef.current.currentSizes = sizes;
-    applySizes(sizes);
-  }, [sizes]);
-
-  useEffect(() => {
-    return () => {
-      cleanupRef.current?.();
-    };
+    return () => cleanupRef.current?.();
   }, []);
 
-  function handleResizeStart(event: React.MouseEvent, index: number) {
+  function handleResizeStart(event: React.MouseEvent, divider: ComputedDivider) {
     event.preventDefault();
     cleanupRef.current?.();
-    const currentSizes = sizesRef.current;
-    dragRef.current = {
-      start: axis === "vertical" ? event.clientX : event.clientY,
-      beforeStart: currentSizes[index]!,
-      afterStart: currentSizes[index + 1]!,
-      index,
-      currentSizes,
-    };
+
+    const isVertical = divider.parentAxis === "vertical";
+    const startPos = isVertical ? event.clientX : event.clientY;
+    const initialSizes =
+      committedSizesRef.current.get(divider.storageKey) ??
+      readStoredSizes(divider.storageKey, divider.childCount);
+    const beforeIndex = divider.dividerIndex - 1;
+    const afterIndex = divider.dividerIndex;
+    const beforeStart = initialSizes[beforeIndex]!;
+    const afterStart = initialSizes[afterIndex]!;
+    const dividerSpace = DIVIDER_SIZE * (divider.childCount - 1);
+    const availableDim = Math.max(1, divider.parentDim - dividerSpace);
 
     const overlay = overlayRef.current;
     if (overlay) {
       overlay.style.display = "block";
-      overlay.style.cursor = axis === "vertical" ? "col-resize" : "row-resize";
+      overlay.style.cursor = isVertical ? "col-resize" : "row-resize";
     }
 
+    let lastSizes = initialSizes;
+
     function onMouseMove(ev: MouseEvent) {
-      const container = containerRef.current;
-      if (!container) return;
-      const isVertical = axis === "vertical";
-      const deltaPx = (isVertical ? ev.clientX : ev.clientY) - dragRef.current.start;
-      const containerSize = isVertical ? container.offsetWidth : container.offsetHeight;
-      const deltaPercent = (deltaPx / containerSize) * 100;
-      const newBefore = dragRef.current.beforeStart + deltaPercent;
-      const newAfter = dragRef.current.afterStart - deltaPercent;
+      const deltaPx = (isVertical ? ev.clientX : ev.clientY) - startPos;
+      const deltaPercent = (deltaPx / availableDim) * 100;
+      const newBefore = beforeStart + deltaPercent;
+      const newAfter = afterStart - deltaPercent;
       if (newBefore < MIN_PANE_PERCENT || newAfter < MIN_PANE_PERCENT) return;
-      const next = [...sizesRef.current];
-      next[dragRef.current.index] = newBefore;
-      next[dragRef.current.index + 1] = newAfter;
-      sizesRef.current = next;
-      dragRef.current.currentSizes = next;
-      applySizes(next);
+      const next = [...initialSizes];
+      next[beforeIndex] = newBefore;
+      next[afterIndex] = newAfter;
+      lastSizes = next;
+      transientSizesRef.current.set(divider.storageKey, next);
+      applyTransientLayout();
     }
 
     function teardown() {
@@ -256,10 +372,11 @@ function SplitGroup(props: {
     }
 
     function onMouseUp() {
-      const committed = dragRef.current.currentSizes;
       teardown();
-      writeStoredSizes(storageKey, committed);
-      setSizes(committed);
+      transientSizesRef.current.delete(divider.storageKey);
+      committedSizesRef.current.set(divider.storageKey, lastSizes);
+      writeStoredSizes(divider.storageKey, lastSizes);
+      bumpLayoutTick();
     }
 
     cleanupRef.current = teardown;
@@ -267,99 +384,63 @@ function SplitGroup(props: {
     document.addEventListener("mouseup", onMouseUp);
   }
 
+  // Root-insert-zone indices: when the root is a split aligned with the edge,
+  // the index appends/prepends within that split; otherwise it wraps the layout.
+  const rootSplit = props.layout.kind === "split" ? props.layout : null;
+  const rightIndex = rootSplit && rootSplit.axis === "vertical" ? rootSplit.children.length : 1;
+  const bottomIndex = rootSplit && rootSplit.axis === "horizontal" ? rootSplit.children.length : 1;
+
   return (
-    <div
-      ref={containerRef}
-      className={`flex h-full min-h-0 w-full ${axis === "vertical" ? "flex-row" : "flex-col"}`}
-    >
-      {children.map((child, index) => (
-        <React.Fragment key={leadPaneId(child)}>
+    <div ref={containerRef} className="relative h-full min-h-0 w-full overflow-hidden">
+      <RootInsertZone axis="horizontal" index={0} side="top" />
+      <RootInsertZone axis="horizontal" index={bottomIndex} side="bottom" />
+      <RootInsertZone axis="vertical" index={0} side="left" />
+      <RootInsertZone axis="vertical" index={rightIndex} side="right" />
+      <div
+        className="absolute"
+        style={{
+          left: ROOT_INSERT_ZONE_INSET,
+          top: ROOT_INSERT_ZONE_INSET,
+          width: innerWidth,
+          height: innerHeight,
+        }}
+      >
+        {computed.panes.map((pane) => (
           <div
+            key={pane.paneId}
             ref={(element) => {
-              paneRefs.current[index] = element;
+              if (element) paneElementRefs.current.set(pane.paneId, element);
+              else paneElementRefs.current.delete(pane.paneId);
             }}
-            className="min-h-0 min-w-0 overflow-hidden"
+            className="absolute overflow-hidden"
             style={{
-              flexBasis: `${sizes[index] ?? 100 / count}%`,
-              flexGrow: 0,
-              flexShrink: 1,
+              left: pane.rect.left,
+              top: pane.rect.top,
+              width: pane.rect.width,
+              height: pane.rect.height,
             }}
           >
-            <PaneLayoutNode
-              layout={child}
-              path={[...props.path, index]}
-              renderPane={props.renderPane}
-            />
+            {props.renderPane(pane.paneId)}
           </div>
-          {index < children.length - 1 ? (
-            <SplitDivider
-              path={props.path}
-              axis={axis}
-              index={index + 1}
-              onPointerDown={(event) => handleResizeStart(event, index)}
-            />
-          ) : null}
-        </React.Fragment>
-      ))}
+        ))}
+        {computed.dividers.map((divider) => (
+          <Divider
+            key={divider.zoneId}
+            divider={divider}
+            registerRef={(zoneId, element) => {
+              if (element) dividerElementRefs.current.set(zoneId, element);
+              else dividerElementRefs.current.delete(zoneId);
+            }}
+            onResizeStart={handleResizeStart}
+          />
+        ))}
+      </div>
       <div
         ref={overlayRef}
         aria-hidden="true"
         className="fixed inset-0 z-50"
         style={{ display: "none" }}
       />
-    </div>
-  );
-}
-
-function PaneLayoutNode(props: {
-  layout: PaneLayout;
-  path: number[];
-  renderPane: (paneId: string) => React.ReactNode;
-}) {
-  if (props.layout.kind === "leaf") {
-    return <>{props.renderPane(props.layout.paneId)}</>;
-  }
-
-  return <SplitGroup layout={props.layout} path={props.path} renderPane={props.renderPane} />;
-}
-
-function RootPaneLayout(props: {
-  layout: PaneLayout;
-  renderPane: (paneId: string) => React.ReactNode;
-}) {
-  return <SplitGroup layout={props.layout} path={[]} renderPane={props.renderPane} />;
-}
-
-export function SplitPaneContainer(props: {
-  layout: PaneLayout;
-  renderPane: (paneId: string) => React.ReactNode;
-}) {
-  const rightIndex =
-    props.layout.kind === "split" && props.layout.axis === "vertical"
-      ? props.layout.children.length
-      : 1;
-  const bottomIndex =
-    props.layout.kind === "split" && props.layout.axis === "horizontal"
-      ? props.layout.children.length
-      : 1;
-
-  return (
-    <div className="relative h-full min-h-0 w-full">
-      <RootInsertZone axis="horizontal" index={0} side="top" />
-      <RootInsertZone axis="horizontal" index={bottomIndex} side="bottom" />
-      <RootInsertZone axis="vertical" index={0} side="left" />
-      <RootInsertZone axis="vertical" index={rightIndex} side="right" />
-      <div
-        className="h-full min-h-0 w-full"
-        style={{
-          paddingTop: ROOT_INSERT_ZONE_INSET,
-          paddingRight: ROOT_INSERT_ZONE_INSET,
-          paddingBottom: ROOT_INSERT_ZONE_INSET,
-          paddingLeft: ROOT_INSERT_ZONE_INSET,
-        }}
-      >
-        <RootPaneLayout layout={props.layout} renderPane={props.renderPane} />
-      </div>
     </div>
   );
 }

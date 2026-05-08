@@ -32,6 +32,7 @@ import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
 import { resolveActionIcon } from "@/renderer/utils/actionIcons";
 import { formatProjectLocation } from "./formatProjectLocation";
 import { GitBadge } from "./GitBadge";
+import { SidebarPanelDragButton } from "./SidebarPanelDragButton";
 import { SyncBadge } from "./SyncBadge";
 
 export function SidebarProjectHeader(props: {
@@ -145,52 +146,34 @@ export function SidebarProjectHeader(props: {
         suffix={
           isDisabled ? null : (
             <>
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label={`Files for ${project.name}`}
-                className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+              <SidebarPanelDragButton
+                panel="files"
+                projectId={project.id}
+                ariaLabel={`Files for ${project.name}`}
+                className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
                   isActiveFilesPanel
                     ? "text-accent"
                     : "text-muted/60 opacity-0 group-hover:opacity-100"
                 }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openFilesPanel(project.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.stopPropagation();
-                    openFilesPanel(project.id);
-                  }
-                }}
+                onPress={() => openFilesPanel(project.id)}
               >
                 <FolderOpen className="size-3.5" />
-              </div>
-              <div
-                role="button"
-                tabIndex={0}
-                aria-label={`Terminal for ${project.name}`}
-                className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+              </SidebarPanelDragButton>
+              <SidebarPanelDragButton
+                panel="terminal"
+                projectId={project.id}
+                ariaLabel={`Terminal for ${project.name}`}
+                className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
                   isActiveTerminal
                     ? "text-accent"
                     : hasTerminal
                       ? "text-foreground"
                       : "text-muted/60 opacity-0 group-hover:opacity-100"
                 }`}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openTerminal(project.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.stopPropagation();
-                    openTerminal(project.id);
-                  }
-                }}
+                onPress={() => openTerminal(project.id)}
               >
                 <TerminalSquare className="size-3.5" />
-              </div>
+              </SidebarPanelDragButton>
               <SyncBadge projectId={project.id} />
               <GitBadge
                 projectId={project.id}

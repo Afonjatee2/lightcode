@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { createOpenCodeAdapter } from ".";
 import { buildOpenCodeArgs } from "./argv";
-import { humanizeOpenCodeModelId, humanizeOpenCodeSubProviderId } from "./detection";
+import {
+  humanizeOpenCodeModelId,
+  humanizeOpenCodeSubProviderId,
+  parseOpenCodeVerboseModels,
+} from "./detection";
 import { opencodeIntentFor } from "./plugin/intentMap";
 import { detectOpenCodeTerminalStatus, opencodeOscHint, opencodeOscTitleHint } from "./terminal";
 
@@ -40,6 +44,86 @@ describe("buildOpenCodeArgs", () => {
 
   it("ignores whitespace-only prompts", () => {
     expect(buildOpenCodeArgs({ model: "" }, "   ")).toEqual([]);
+  });
+
+  it("forwards effort via --variant", () => {
+    expect(buildOpenCodeArgs({ model: "opencode/claude-sonnet-4-6", effort: "high" }, "")).toEqual([
+      "--model",
+      "opencode/claude-sonnet-4-6",
+      "--variant",
+      "high",
+    ]);
+  });
+
+  it("omits --variant when effort is empty string", () => {
+    expect(buildOpenCodeArgs({ model: "opencode/big-pickle", effort: "" }, "")).toEqual([
+      "--model",
+      "opencode/big-pickle",
+    ]);
+  });
+
+  it("forwards plan mode via --agent plan", () => {
+    expect(buildOpenCodeArgs({ model: "opencode/big-pickle", mode: "plan" }, "")).toEqual([
+      "--model",
+      "opencode/big-pickle",
+      "--agent",
+      "plan",
+    ]);
+  });
+
+  it("does not pass --agent for the default (agent) mode", () => {
+    expect(buildOpenCodeArgs({ model: "opencode/big-pickle", mode: "agent" }, "")).toEqual([
+      "--model",
+      "opencode/big-pickle",
+    ]);
+  });
+});
+
+describe("parseOpenCodeVerboseModels", () => {
+  it("extracts variant keys per model from --verbose output", () => {
+    const sample = `opencode/big-pickle
+{
+  "id": "big-pickle",
+  "providerID": "opencode",
+  "variants": {}
+}
+opencode/claude-haiku-4-5
+{
+  "id": "claude-haiku-4-5",
+  "providerID": "opencode",
+  "variants": {
+    "high": { "thinking": { "type": "enabled" } },
+    "max": { "thinking": { "type": "enabled" } }
+  }
+}
+opencode/claude-opus-4-6
+{
+  "id": "claude-opus-4-6",
+  "providerID": "opencode",
+  "variants": {
+    "low": { "effort": "low" },
+    "medium": { "effort": "medium" },
+    "high": { "effort": "high" },
+    "max": { "effort": "max" }
+  }
+}
+`;
+    expect(parseOpenCodeVerboseModels(sample)).toEqual([
+      { id: "opencode/big-pickle", variants: [] },
+      { id: "opencode/claude-haiku-4-5", variants: ["high", "max"] },
+      { id: "opencode/claude-opus-4-6", variants: ["low", "medium", "high", "max"] },
+    ]);
+  });
+
+  it("returns empty list for unparseable JSON without throwing", () => {
+    const sample = `opencode/broken
+{ this is not json
+`;
+    expect(parseOpenCodeVerboseModels(sample)).toEqual([{ id: "opencode/broken", variants: [] }]);
+  });
+
+  it("returns no entries when stdout is empty", () => {
+    expect(parseOpenCodeVerboseModels("")).toEqual([]);
   });
 });
 

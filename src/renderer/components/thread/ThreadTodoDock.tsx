@@ -1,14 +1,8 @@
 import { useEffect, useRef } from "react";
 import { Tooltip } from "@heroui/react";
-import {
-  ArrowRightLeft,
-  CheckCircle2,
-  ChevronDown,
-  Circle,
-  ListChecks,
-  Loader2,
-} from "lucide-react";
+import { ArrowRightLeft, Check, ChevronDown, Hourglass, ListChecks } from "lucide-react";
 import type { ThreadTodoDockPlacement } from "@/renderer/state/threadTodoDockStore";
+import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import type { ThreadTodoDockState, ThreadTodoStepStatus } from "./threadTodoState";
 
 interface ThreadTodoDockProps {
@@ -109,13 +103,13 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
                 key={`${state.sourceItemId}:${originalIndex}`}
                 ref={isActive ? activeRowRef : undefined}
                 aria-current={isActive ? "step" : undefined}
-                className={`flex items-center gap-2 rounded px-2 py-0.5 leading-none ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-accent/10" : ""}`}
+                className={`flex items-center gap-2 rounded px-2 py-1 leading-5 ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-accent/10" : ""}`}
                 role="listitem"
                 title={step.text}
               >
                 <StatusIcon status={step.status} />
                 <span
-                  className={`min-w-0 flex-1 truncate ${isDone ? "text-foreground-muted" : "text-foreground"}`}
+                  className={`min-w-0 flex-1 truncate leading-5 ${isDone ? "text-foreground-muted" : "text-foreground"}`}
                 >
                   {step.text}
                 </span>
@@ -131,17 +125,16 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
 function StatusIcon({ status }: { status: ThreadTodoStepStatus }) {
   switch (status) {
     case "completed":
-      return (
-        <CheckCircle2 aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />
-      );
+      return <Check aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />;
     case "in_progress":
       return (
-        <Loader2
-          aria-label="in progress"
-          className="size-3.5 shrink-0 animate-spin text-foreground"
-        />
+        <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
+          <PixelLoader size="xxs" className="text-foreground" />
+        </span>
       );
     default:
-      return <Circle aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/60" />;
+      return (
+        <Hourglass aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/50" />
+      );
   }
 }

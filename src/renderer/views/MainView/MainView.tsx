@@ -31,7 +31,7 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
   useKeyboardShortcuts();
   useGitRefresh(storeHydrated);
 
-  const { handleSortEnd, handlePaneDrop } = useDndHandlers();
+  const { handleSortEnd, handlePaneDrop, handleMainPanelDrop } = useDndHandlers();
 
   useEffect(() => {
     if (!storeHydrated) {
@@ -64,6 +64,7 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
       <AppDndProvider
         onSidebarSortEnd={handleSortEnd}
         onPaneDrop={handlePaneDrop}
+        onMainPanelDrop={handleMainPanelDrop}
         paneThreadIds={paneThreadIds}
         paneLayout={
           view.kind === "thread"

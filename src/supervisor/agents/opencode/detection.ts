@@ -3,12 +3,31 @@ import { join } from "node:path";
 import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
 import { configFileAuthProbe, readAgentCommandOutput, type DetectionSpec } from "../base";
 
+// Canonical ordering for the union effort list. Anything OpenCode reports
+// outside this set gets appended after these in discovery order so we never
+// silently hide a variant. `none` is OpenCode's "skip reasoning" variant on
+// GPT-class models — kept first so it sorts ahead of the actual effort
+// gradient.
+const CANONICAL_EFFORT_ORDER = ["none", "minimal", "low", "medium", "high", "xhigh", "max"];
+
+// Per-model default — preferred when the model exposes it, falling back to
+// the highest-precedence available variant. Mirrors how Claude defaults to
+// `high`; OpenCode defaults to `medium` because several Zen models (GPT-5.5,
+// Sonnet) make `medium` their lowest paid-effort tier.
+const OPENCODE_PREFERRED_DEFAULT_EFFORT = "medium";
+
 export const opencodeDefaultCapabilities: AgentCapability = {
   models: [],
   efforts: [],
   modelEfforts: {},
-  modes: [],
-  approvalPolicies: [],
+  // OpenCode exposes two built-in agents: `build` (default) and `plan`. The
+  // SDK accepts an `agent` field on `prompt_async`; the renderer's Plan toggle
+  // flips `ThreadConfig.mode` and the SDK session translates "plan" → agent.
+  modes: ["agent", "plan"],
+  approvalPolicies: [
+    { id: "default", label: "Default" },
+    { id: "yolo", label: "Bypass Permissions" },
+  ],
   sandboxModes: [],
   supportsResume: true,
   supportsDirectInput: true,
@@ -31,21 +50,61 @@ function opencodeNativeAuthPath(): string {
   return join(homedir(), ".local", "share", "opencode", "auth.json");
 }
 
-// `opencode models` prints one `provider/model` per line; we surface every
-// line as an opaque model id while deriving cleaner display metadata for UI.
+// `opencode models --verbose` interleaves `provider/model` headers with
+// pretty-printed JSON for each model. We split on header lines (column-0,
+// non-`{}`, matching the `provider/model` shape) and parse each block to pull
+// out the `variants` keys — those are the OpenCode "model variant" names that
+// `--variant` (CLI) and `prompt_async.variant` (SDK) accept and that we
+// surface as effort options in the composer.
+const OPENCODE_MODEL_HEADER_RE = /^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i;
+
+interface OpenCodeProbedModel {
+  id: string;
+  variants: string[];
+}
+
+export function parseOpenCodeVerboseModels(stdout: string): OpenCodeProbedModel[] {
+  const lines = stdout.split(/\r?\n/g);
+  const entries: { id: string; jsonLines: string[] }[] = [];
+  let currentId: string | undefined;
+  let buf: string[] = [];
+  for (const line of lines) {
+    if (OPENCODE_MODEL_HEADER_RE.test(line)) {
+      if (currentId) entries.push({ id: currentId, jsonLines: buf });
+      currentId = line;
+      buf = [];
+    } else if (currentId) {
+      buf.push(line);
+    }
+  }
+  if (currentId) entries.push({ id: currentId, jsonLines: buf });
+
+  return entries.map(({ id, jsonLines }) => {
+    const json = jsonLines.join("\n").trim();
+    if (!json) return { id, variants: [] };
+    try {
+      const obj = JSON.parse(json) as { variants?: Record<string, unknown> };
+      const variants =
+        obj.variants && typeof obj.variants === "object" ? Object.keys(obj.variants) : [];
+      return { id, variants };
+    } catch {
+      return { id, variants: [] };
+    }
+  });
+}
+
 async function probeOpenCodeModels(
   location: ProjectLocation,
   executablePath: string,
-): Promise<string[] | undefined> {
-  const result = await readAgentCommandOutput(location, executablePath, ["models"], {
-    timeoutMs: 8_000,
+): Promise<OpenCodeProbedModel[] | undefined> {
+  const result = await readAgentCommandOutput(location, executablePath, ["models", "--verbose"], {
+    // Verbose mode prints a JSON object per model — slower than the bare
+    // `models` listing but still bounded by OpenCode's local cache.
+    timeoutMs: 15_000,
   });
   if (!result.ok || !result.stdout) return undefined;
-  const lines = result.stdout
-    .split(/\r?\n/g)
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && /\//.test(line));
-  return lines.length > 0 ? lines : undefined;
+  const parsed = parseOpenCodeVerboseModels(result.stdout);
+  return parsed.length > 0 ? parsed : undefined;
 }
 
 const OPENCODE_TITLE_TOKEN_OVERRIDES: Record<string, string> = {
@@ -149,15 +208,45 @@ export const opencodeDetectionSpec: DetectionSpec = {
   ],
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;
-    const models = await probeOpenCodeModels(ctx.location, ctx.executablePath);
-    if (!models) return undefined;
-    const subProviderIds = [...new Set(models.map(openCodeModelSubProvider).filter(isString))];
+    const probed = await probeOpenCodeModels(ctx.location, ctx.executablePath);
+    if (!probed) return undefined;
+    const modelIds = probed.map((m) => m.id);
+    const subProviderIds = [...new Set(modelIds.map(openCodeModelSubProvider).filter(isString))];
+
+    // Per-model variant lists feed the composer effort picker via
+    // `getAvailableEfforts(capabilities, model)` — empty arrays mean "no
+    // effort selector for this model", which is the right default for free
+    // models like `opencode/big-pickle` whose `variants: {}` we already saw.
+    const modelEfforts: Record<string, string[]> = {};
+    const seenEfforts = new Set<string>();
+    for (const m of probed) {
+      modelEfforts[m.id] = m.variants;
+      for (const v of m.variants) seenEfforts.add(v);
+    }
+    const ordered: string[] = [];
+    for (const e of CANONICAL_EFFORT_ORDER) {
+      if (seenEfforts.has(e)) {
+        ordered.push(e);
+        seenEfforts.delete(e);
+      }
+    }
+    // Append any non-canonical variant names OpenCode reported, preserving
+    // discovery order — keeps us forward-compatible with new variants.
+    for (const e of seenEfforts) ordered.push(e);
+
     return {
-      models: models.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
+      models: modelIds.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
       subProviders: subProviderIds.map((id) => ({
         id,
         label: humanizeOpenCodeSubProviderId(id),
       })),
+      efforts: ordered,
+      modelEfforts,
+      ...(ordered.includes(OPENCODE_PREFERRED_DEFAULT_EFFORT)
+        ? { defaultEffort: OPENCODE_PREFERRED_DEFAULT_EFFORT }
+        : ordered.length > 0
+          ? { defaultEffort: ordered[0] }
+          : {}),
     };
   },
 };

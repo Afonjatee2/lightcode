@@ -79,6 +79,7 @@
     "rehype-raw": "^7.0.0",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.0.2",
+    "streamdown": "^2.5.0",
     "tailwindcss": "^4.2.4",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5",

@@ -1,9 +1,12 @@
+import { useId, useRef } from "react";
 import { GitPullRequest } from "lucide-react";
+import { useDraggable } from "@dnd-kit/react";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { buildBranchPrKey } from "@/renderer/state/gitSelectors";
 import { useShallow } from "zustand/shallow";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
 import { getPrStatusTone, PR_TONE_TEXT_CLASS } from "@/renderer/utils/prStatus";
+import type { DragSourceData } from "@/renderer/dnd";
 
 export function GitBadge(props: {
   projectId: string;
@@ -12,6 +15,20 @@ export function GitBadge(props: {
   worktreePath?: string;
   isActive?: boolean;
 }) {
+  const elementRef = useRef<HTMLDivElement>(null);
+  const dragId = useId();
+  useDraggable({
+    id: `sidebar-panel:git:${props.projectId}:${props.worktreePath ?? "root"}:${dragId}`,
+    type: "sidebar-panel",
+    data: {
+      type: "sidebar-panel",
+      panel: "git",
+      projectId: props.projectId,
+      ...(props.worktreePath ? { worktreePath: props.worktreePath } : {}),
+    } satisfies DragSourceData,
+    element: elementRef,
+  });
+
   const { isRepo, totalInsertions, totalDeletions, prState, checksStatus } = useGitStore(
     useShallow((s) => {
       const gitStatus = props.worktreePath
@@ -35,10 +52,11 @@ export function GitBadge(props: {
   const prIconColor = PR_TONE_TEXT_CLASS[getPrStatusTone(prState, checksStatus)];
   return (
     <div
+      ref={elementRef}
       role="button"
       tabIndex={0}
       aria-label={`Git status for ${props.projectName}`}
-      className={`shrink-0 cursor-default rounded px-1 py-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+      className={`shrink-0 cursor-grab rounded px-1 py-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
         props.isActive ? "bg-accent/15 ring-1 ring-accent/40" : "text-muted/60"
       }`}
       onClick={(e) => {

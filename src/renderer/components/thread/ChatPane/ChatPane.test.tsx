@@ -94,9 +94,9 @@ describe("ChatPane", () => {
     }));
   });
 
-  it("keeps the chat pinned when the last plan item grows without changing the scroll anchor", async () => {
+  it("keeps the chat pinned when the last assistant message grows without changing the scroll anchor", async () => {
     const thread = makeThread();
-    seedPlanItem(thread.id, [{ step: "Inspect output", status: "in_progress" }]);
+    seedAssistantMessage(thread.id, "Inspect output");
 
     const { container } = renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
@@ -115,20 +115,10 @@ describe("ChatPane", () => {
     });
 
     act(() => {
-      useAppStore.getState().applyRuntimeEvent(thread.id, {
-        type: "item.updated",
-        threadId: thread.id,
-        itemId: PLAN_ITEM_ID,
-        payload: {
-          steps: [
-            { step: "Inspect output", status: "completed" },
-            { step: "Open logs", status: "in_progress" },
-          ],
-        },
-      });
+      appendAssistantText(thread.id, " — Open logs");
     });
 
-    await screen.findByText("Open logs");
+    await screen.findByText(/Open logs/);
 
     act(() => {
       metrics.setScrollHeight(300);
@@ -205,7 +195,7 @@ describe("ChatPane", () => {
 
   it("does not pull the user back to the bottom after they scroll up", async () => {
     const thread = makeThread();
-    seedPlanItem(thread.id, [{ step: "Inspect output", status: "in_progress" }]);
+    seedAssistantMessage(thread.id, "Inspect output");
 
     const { container } = renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
@@ -229,20 +219,10 @@ describe("ChatPane", () => {
     });
 
     act(() => {
-      useAppStore.getState().applyRuntimeEvent(thread.id, {
-        type: "item.updated",
-        threadId: thread.id,
-        itemId: PLAN_ITEM_ID,
-        payload: {
-          steps: [
-            { step: "Inspect output", status: "completed" },
-            { step: "Open logs", status: "in_progress" },
-          ],
-        },
-      });
+      appendAssistantText(thread.id, " — Open logs");
     });
 
-    await screen.findByText("Open logs");
+    await screen.findByText(/Open logs/);
 
     act(() => {
       metrics.setScrollHeight(300);
@@ -392,6 +372,34 @@ function seedPlanItem(
     threadId,
     itemId: PLAN_ITEM_ID,
     payload: { steps },
+  });
+}
+
+const ASSISTANT_ITEM_ID = "asst-grow";
+
+function seedAssistantMessage(threadId: string, initialText: string) {
+  useAppStore.getState().applyRuntimeEvent(threadId, {
+    type: "item.started",
+    threadId,
+    itemId: ASSISTANT_ITEM_ID,
+    itemType: "assistant_message",
+  });
+  useAppStore.getState().applyRuntimeEvent(threadId, {
+    type: "content.delta",
+    threadId,
+    itemId: ASSISTANT_ITEM_ID,
+    stream: "assistant_text",
+    delta: initialText,
+  });
+}
+
+function appendAssistantText(threadId: string, delta: string) {
+  useAppStore.getState().applyRuntimeEvent(threadId, {
+    type: "content.delta",
+    threadId,
+    itemId: ASSISTANT_ITEM_ID,
+    stream: "assistant_text",
+    delta,
   });
 }
 

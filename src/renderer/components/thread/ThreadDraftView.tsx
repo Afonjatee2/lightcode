@@ -239,18 +239,36 @@ export function ThreadDraftView(props: {
         selectedAgent.capabilities.presentationMode,
       ])
     : [];
-  const supportsTerminalMode = supportedPresentationModes.includes("terminal");
-  const supportsGuiMode = supportedPresentationModes.includes("gui");
-  const supportsModePicker = supportedPresentationModes.length > 1;
+  // CLI/Chat reachability is aggregated across all installed providers — the
+  // picker stays enabled whenever some provider can serve the mode, even if
+  // the currently-selected one can't. Clicking an unreachable-for-this-agent
+  // tab swaps to a fallback provider rather than being blocked.
+  const anyAgentSupports = (presentation: ThreadPresentationMode): boolean =>
+    installedAgents.some((agent) => {
+      const modes = agent.capabilities.presentationModes ?? [agent.capabilities.presentationMode];
+      return modes.includes(presentation);
+    });
+  const supportsTerminalMode = anyAgentSupports("terminal");
+  const supportsGuiMode = anyAgentSupports("gui");
+  const supportsModePicker = supportsTerminalMode && supportsGuiMode;
   const [presentationMode, setPresentationMode] = useState<ThreadPresentationMode>(() =>
     resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent),
   );
-  // Re-resolve when the user switches providers — a Codex draft should not
-  // leak its "gui" choice into a Claude draft that only supports terminal.
+  // Re-resolve only on provider switches and only when the new provider
+  // can't serve the current mode. Why this set of deps:
+  //   - `lastPresentationModeByAgent` is the user's per-provider memory; we
+  //     intentionally read the *latest* value at provider-switch time but
+  //     don't want intra-session writes to retrigger this effect (the user
+  //     hasn't changed providers, so their current selection wins).
+  //   - `supportedPresentationModes` and `presentationMode` are derived from
+  //     `selectedAgent` and `effectiveAgentKind`; including them would either
+  //     duplicate the trigger or fire mid-edit on unrelated state.
+  // The model picker already filters providers to those that support the
+  // active surface, so a model swap should never flip CLI/Chat silently.
   useEffect(() => {
-    if (!effectiveAgentKind) return;
-    const next = resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent);
-    if (next !== presentationMode) setPresentationMode(next);
+    if (!selectedAgent) return;
+    if (supportedPresentationModes.includes(presentationMode)) return;
+    setPresentationMode(resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on provider change
   }, [effectiveAgentKind]);
 
@@ -669,6 +687,21 @@ export function ThreadDraftView(props: {
           supportsGui={supportsGuiMode}
           className={`${props.compact ? alignClass : "mx-auto"} mb-1 w-full max-w-[920px]`}
           onChange={(next) => {
+            // If the active provider can't serve this surface, swap to
+            // another installed provider that can — the provider-switch
+            // effect will then reload the per-provider config snapshot.
+            if (!supportedPresentationModes.includes(next)) {
+              const fallback = installedAgents.find((agent) => {
+                const modes = agent.capabilities.presentationModes ?? [
+                  agent.capabilities.presentationMode,
+                ];
+                return modes.includes(next);
+              });
+              if (!fallback) return;
+              setPresentationMode(next);
+              setAgentKind(fallback.kind);
+              return;
+            }
             setPresentationMode(next);
             // Drop config values that the new presentation surface
             // doesn't support (e.g. Codex plan mode is ACP-only).

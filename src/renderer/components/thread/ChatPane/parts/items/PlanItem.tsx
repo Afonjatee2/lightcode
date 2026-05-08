@@ -1,4 +1,4 @@
-import { Check, Circle, ListChecks } from "lucide-react";
+import { Check, Hourglass, ListChecks } from "lucide-react";
 import type { PlanItemPayload } from "@/shared/contracts";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { getThreadTodoDockStateForItem } from "@/renderer/components/thread/threadTodoState";
@@ -25,10 +25,12 @@ export function PlanItem({ item }: PlanItemProps) {
           return (
             <li
               key={i}
-              className={`flex items-center gap-2 rounded px-1 py-0.5 leading-none ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-foreground/5" : ""}`}
+              className={`flex items-center gap-2 rounded px-1 py-1 leading-5 ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-foreground/5" : ""}`}
             >
               <StatusIcon status={step.status} />
-              <span className={`truncate ${isDone ? "text-foreground-muted" : "text-foreground"}`}>
+              <span
+                className={`truncate leading-5 ${isDone ? "text-foreground-muted" : "text-foreground"}`}
+              >
                 {step.text}
               </span>
             </li>
@@ -44,8 +46,14 @@ function StatusIcon({ status }: { status: StepStatus }) {
     case "completed":
       return <Check aria-label="completed" className="size-3.5 shrink-0 text-foreground-muted" />;
     case "in_progress":
-      return <PixelLoader size="xxs" className="text-foreground" />;
+      return (
+        <span className="inline-flex size-3.5 shrink-0 items-center justify-center">
+          <PixelLoader size="xxs" className="text-foreground" />
+        </span>
+      );
     default:
-      return <Circle aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/60" />;
+      return (
+        <Hourglass aria-label="pending" className="size-3.5 shrink-0 text-foreground-muted/50" />
+      );
   }
 }

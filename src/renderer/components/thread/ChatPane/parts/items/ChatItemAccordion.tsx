@@ -1,5 +1,5 @@
-import { Disclosure } from "@heroui/react";
-import type { ReactNode } from "react";
+import { Disclosure, Tooltip } from "@heroui/react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 
 export interface ChatItemAccordionProps {
@@ -39,6 +39,8 @@ const shellClass =
 const triggerClass =
   "flex w-full min-w-0 items-center gap-1.5 py-0 text-left [&>code]:!text-[color:var(--muted)]";
 
+const codeClass = "block truncate font-mono !text-[color:var(--muted)]";
+
 export function ChatItemAccordion({
   icon,
   title,
@@ -50,6 +52,32 @@ export function ChatItemAccordion({
   children,
 }: ChatItemAccordionProps) {
   const actions = useChatPaneActions();
+  const titleString = typeof title === "string" ? title : undefined;
+  const codeRef = useRef<HTMLElement | null>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useLayoutEffect(() => {
+    const el = codeRef.current;
+    if (!el) return;
+    const check = () => setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [titleString]);
+
+  const titleNode = (
+    <Tooltip delay={300} isDisabled={!isOverflowing || !titleString}>
+      <Tooltip.Trigger className="min-w-0 flex-1">
+        <code ref={codeRef} className={codeClass}>
+          {title}
+        </code>
+      </Tooltip.Trigger>
+      <Tooltip.Content placement="top" className="max-w-[80vw] break-all">
+        {titleString}
+      </Tooltip.Content>
+    </Tooltip>
+  );
 
   if (!hasBody) {
     return (
@@ -58,9 +86,7 @@ export function ChatItemAccordion({
           className={`${triggerClass} text-[length:var(--lc-chat-font-size-command)] leading-tight`}
         >
           <span className="size-3 shrink-0 text-[color:var(--muted)]">{icon}</span>
-          <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
-            {title}
-          </code>
+          {titleNode}
           {rightLabel ? (
             <span className={`shrink-0 tabular-nums font-medium ${rightLabelClassName}`}>
               {rightLabel}
@@ -84,9 +110,7 @@ export function ChatItemAccordion({
         <Disclosure.Heading>
           <Disclosure.Trigger className={triggerClass}>
             <span className="size-3 shrink-0 text-[color:var(--muted)]">{icon}</span>
-            <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
-              {title}
-            </code>
+            {titleNode}
             {rightLabel ? (
               <span className={`shrink-0 tabular-nums font-medium ${rightLabelClassName}`}>
                 {rightLabel}
@@ -97,7 +121,7 @@ export function ChatItemAccordion({
         </Disclosure.Heading>
         <Disclosure.Content>
           <div className="min-h-0 overflow-hidden">
-            <Disclosure.Body className="mt-1.5 border-t border-[color:var(--border)] pt-1.5">
+            <Disclosure.Body className="mt-0.5 border-t border-[color:var(--border)] pt-2.5">
               {isExpanded ? children : null}
             </Disclosure.Body>
           </div>

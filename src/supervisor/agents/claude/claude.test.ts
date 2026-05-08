@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createClaudeAdapter } from "./index";
 import type { OscNotification, OscTitle } from "@/shared/osc";
+import type { ProjectLocation, ThreadConfig } from "@/shared/contracts";
 
 function oscTitle(text: string, code: 0 | 1 | 2 = 0): OscTitle {
   return { code, text };
@@ -92,5 +93,39 @@ describe("createClaudeAdapter handleOscNotification (iTerm2 OSC 9;4 progress)", 
   it("ignores OSC 777 / OSC 99 — Claude only speaks iTerm2 OSC 9", () => {
     expect(adapter.handleOscNotification?.(oscNotify("4;0", 777))).toBeNull();
     expect(adapter.handleOscNotification?.(oscNotify("4;3;0", 99))).toBeNull();
+  });
+});
+
+describe("createClaudeAdapter structured sessions", () => {
+  const projectLocation: ProjectLocation = { kind: "windows", path: "C:\\repo" };
+  const config: ThreadConfig = { model: "sonnet" };
+
+  it("advertises GUI as an opt-in presentation mode while keeping terminal as default", () => {
+    const adapter = createClaudeAdapter();
+
+    expect(adapter.capabilities.presentationMode).toBe("terminal");
+    expect(adapter.capabilities.presentationModes).toEqual(["terminal", "gui"]);
+  });
+
+  it("creates a structured SDK session only for GUI presentation", async () => {
+    const adapter = createClaudeAdapter();
+
+    await expect(
+      adapter.createStructuredSession?.({
+        threadId: "thread-1",
+        projectLocation,
+        config,
+        presentationMode: "terminal",
+      }),
+    ).resolves.toBeUndefined();
+
+    await expect(
+      adapter.createStructuredSession?.({
+        threadId: "thread-1",
+        projectLocation,
+        config,
+        presentationMode: "gui",
+      }),
+    ).resolves.toMatchObject({ launchOptions: { suppressResumeConfigOverrides: true } });
   });
 });

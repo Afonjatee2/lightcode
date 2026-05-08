@@ -33,16 +33,19 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   if (!payload) return null;
   const right = formatRightLabel(payload);
   const hasDetails = (stream && stream.length > 0) || hasAuxFields(payload);
-  const titleNode =
-    payload.path && payload.path.length > 0 ? (
-      <PathDisplay
-        path={payload.path}
-        basenameClassName="!text-[color:var(--foreground)]"
-        dirClassName="!text-[color:var(--muted)]"
-      />
-    ) : (
-      (readPayloadString(payload, "name") ?? "Edit")
-    );
+  const kindLabel = formatKindLabel(payload.changeKind);
+  const titleNode = (
+    <span className="flex min-w-0 items-baseline gap-1.5">
+      <span className="shrink-0 !text-[color:var(--muted)]">{kindLabel}</span>
+      {payload.path && payload.path.length > 0 ? (
+        <PathDisplay
+          path={payload.path}
+          basenameClassName="!text-[color:var(--foreground)]"
+          dirClassName="!text-[color:var(--muted)]"
+        />
+      ) : null}
+    </span>
+  );
 
   return (
     <ChatItemAccordion
@@ -68,10 +71,15 @@ function hasAuxFields(payload: unknown): boolean {
   return p.args !== undefined || p.result !== undefined;
 }
 
-function readPayloadString(payload: unknown, key: string): string | undefined {
-  if (!payload || typeof payload !== "object") return undefined;
-  const v = (payload as Record<string, unknown>)[key];
-  return typeof v === "string" && v.length > 0 ? v : undefined;
+function formatKindLabel(kind: FileChangePayload["changeKind"]): string {
+  switch (kind) {
+    case "create":
+      return "Create:";
+    case "delete":
+      return "Delete:";
+    default:
+      return "Edit:";
+  }
 }
 
 /**
@@ -86,10 +94,7 @@ function enrichLanguage(part: ExtractedPart, path: string): ExtractedPart {
   return part;
 }
 
-function formatRightLabel(payload: FileChangePayload): string {
-  const parts: string[] = [payload.changeKind];
-  if (payload.diffSummary) {
-    parts.push(`+${payload.diffSummary.added} -${payload.diffSummary.removed}`);
-  }
-  return parts.join(" · ");
+function formatRightLabel(payload: FileChangePayload): string | undefined {
+  if (!payload.diffSummary) return undefined;
+  return `+${payload.diffSummary.added} -${payload.diffSummary.removed}`;
 }

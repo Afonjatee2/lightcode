@@ -5,7 +5,7 @@ import { dirname, join, normalize, posix } from "node:path";
 import { promisify } from "node:util";
 import type { GitRemoteInfo, ProjectLocation, RemoteHostPlatform } from "@/shared/contracts";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
-import { errorDetail, msg } from "@/shared/messages";
+import { attachErrorDetails, errorDetail, msg } from "@/shared/messages";
 import { getProjectName } from "@/shared/wsl";
 import { sanitizeWorktreeBranchName, sanitizeWorktreePathSegment } from "@/shared/worktree";
 import { buildAgentCommand, readWslCommandOutputAsync } from "../agents/base";
@@ -56,10 +56,28 @@ export async function execGit(
         return stdout;
       }
     }
-    throw new Error(msg("git.commandFailed", { command: args[0]!, detail: errorDetail(error) }), {
-      cause: error,
-    });
+    throw buildGitCommandError(args[0]!, error);
   }
+}
+
+/**
+ * Wrap a child_process error into a user-facing message that preserves the
+ * original stderr as a separate detail block. Node's promisified `execFile`
+ * truncates stderr inside `error.message`, so we read the full `error.stderr`
+ * field and attach it via the {@link DETAILS_SENTINEL} so the renderer can
+ * disclose it without parsing the truncated message tail.
+ */
+function buildGitCommandError(command: string, error: unknown): Error {
+  const stderr = extractStderr(error);
+  const summary = msg("git.commandFailed", { command, detail: errorDetail(error) });
+  const message = stderr ? attachErrorDetails(summary, stderr) : summary;
+  return new Error(message, { cause: error });
+}
+
+function extractStderr(error: unknown): string {
+  if (!error || typeof error !== "object" || !("stderr" in error)) return "";
+  const raw = (error as { stderr: unknown }).stderr;
+  return typeof raw === "string" ? raw.trim() : "";
 }
 
 export function toForwardSlash(path: string): string {

@@ -181,6 +181,11 @@ describe("XTermSurface", () => {
     expect(state.terminalOptions?.scrollbar).toEqual({ width: 0.01 });
   });
 
+  it("does not preserve TUI full-screen redraws as scrollback", () => {
+    render(<XTermSurface terminalId="test-1" />);
+    expect(state.terminalOptions?.scrollOnEraseInDisplay).toBe(false);
+  });
+
   it("loads the WebGL addon on non-macOS platforms", () => {
     render(<XTermSurface terminalId="test-1" />);
     expect(terminal().loadAddon).toHaveBeenCalledTimes(6);

@@ -2,6 +2,7 @@ import { FolderOpen, GitFork, TerminalSquare } from "lucide-react";
 import { SidebarButton } from "@/renderer/components/common";
 import { GitBadge } from "./GitBadge";
 import { PrBadge } from "./PrBadge";
+import { SidebarPanelDragButton } from "./SidebarPanelDragButton";
 import { SyncBadge } from "./SyncBadge";
 
 export function WorktreeGroupHeader(props: {
@@ -44,52 +45,36 @@ export function WorktreeGroupHeader(props: {
         : {})}
       suffix={
         <>
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label={`Files for ${props.worktreeBranch}`}
-            className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+          <SidebarPanelDragButton
+            panel="files"
+            projectId={props.projectId}
+            worktreePath={props.worktreePath}
+            ariaLabel={`Files for ${props.worktreeBranch}`}
+            className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
               props.isActiveFiles
                 ? "text-accent"
                 : "text-muted/60 opacity-0 group-hover:opacity-100"
             }`}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onOpenFiles();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.stopPropagation();
-                props.onOpenFiles();
-              }
-            }}
+            onPress={props.onOpenFiles}
           >
             <FolderOpen className="size-3.5" />
-          </div>
-          <div
-            role="button"
-            tabIndex={0}
-            aria-label={`Terminal for ${props.worktreeBranch}`}
-            className={`shrink-0 cursor-default rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground ${
+          </SidebarPanelDragButton>
+          <SidebarPanelDragButton
+            panel="terminal"
+            projectId={props.projectId}
+            worktreePath={props.worktreePath}
+            ariaLabel={`Terminal for ${props.worktreeBranch}`}
+            className={`shrink-0 cursor-grab rounded p-0.5 transition-colors hover:bg-white/[0.04] hover:text-foreground active:cursor-grabbing ${
               props.isActiveTerminal
                 ? "text-accent"
                 : props.hasTerminal
                   ? "text-foreground"
                   : "text-muted/60 opacity-0 group-hover:opacity-100"
             }`}
-            onClick={(event) => {
-              event.stopPropagation();
-              props.onOpenTerminal();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.stopPropagation();
-                props.onOpenTerminal();
-              }
-            }}
+            onPress={props.onOpenTerminal}
           >
             <TerminalSquare className="size-3.5" />
-          </div>
+          </SidebarPanelDragButton>
           <PrBadge worktreePath={props.worktreePath} />
           <SyncBadge projectId={props.projectId} worktreePath={props.worktreePath} />
           <GitBadge

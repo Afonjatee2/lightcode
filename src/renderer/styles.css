@@ -563,6 +563,108 @@ body {
   color: var(--muted);
 }
 
+/* Streaming-reasoning brain icon: individual SVG paths flicker out of phase to
+   suggest neurons firing inside the brain, while the whole icon carries a
+   softer drop-shadow glow. Pure-CSS so it costs nothing per frame compared to
+   the PixelLoader it replaces. The lucide Brain icon is composed of multiple
+   `<path>` children — we stagger their animation-delay with irregular offsets
+   to avoid a marching-band cadence. */
+.lightcode-brain-thinking {
+  animation: lightcode-brain-glow 2.4s ease-in-out infinite;
+}
+
+.lightcode-brain-thinking path {
+  animation: lightcode-brain-spark 1.4s ease-in-out infinite;
+}
+
+.lightcode-brain-thinking path:nth-child(1) {
+  animation-delay: 0s;
+}
+.lightcode-brain-thinking path:nth-child(2) {
+  animation-delay: 0.42s;
+}
+.lightcode-brain-thinking path:nth-child(3) {
+  animation-delay: 0.18s;
+}
+.lightcode-brain-thinking path:nth-child(4) {
+  animation-delay: 0.66s;
+}
+.lightcode-brain-thinking path:nth-child(5) {
+  animation-delay: 0.34s;
+}
+.lightcode-brain-thinking path:nth-child(6) {
+  animation-delay: 0.9s;
+}
+.lightcode-brain-thinking path:nth-child(7) {
+  animation-delay: 0.56s;
+}
+.lightcode-brain-thinking path:nth-child(8) {
+  animation-delay: 1.08s;
+}
+.lightcode-brain-thinking path:nth-child(9) {
+  animation-delay: 0.24s;
+}
+.lightcode-brain-thinking path:nth-child(10) {
+  animation-delay: 0.78s;
+}
+.lightcode-brain-thinking path:nth-child(11) {
+  animation-delay: 1.2s;
+}
+
+@keyframes lightcode-brain-glow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0.05rem color-mix(in oklab, currentColor 20%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 0.2rem color-mix(in oklab, currentColor 55%, transparent));
+  }
+}
+
+@keyframes lightcode-brain-spark {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  25% {
+    opacity: 1;
+  }
+  55% {
+    opacity: 0.55;
+  }
+}
+
+/* "Thinking" label that pairs with the brain — a soft highlight sweeps across
+   the letters left-to-right while the rest of the word sits at the muted
+   foreground tone, in sync with the brain's outer glow. background-clip:text
+   confines the gradient to the glyphs. */
+.lightcode-thinking-text {
+  background-image: linear-gradient(
+    90deg,
+    var(--muted) 0%,
+    var(--muted) 35%,
+    var(--foreground) 50%,
+    var(--muted) 65%,
+    var(--muted) 100%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: lightcode-thinking-shimmer 1.92s linear infinite;
+}
+
+@keyframes lightcode-thinking-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}
+
 /* Monaco editor — opaque backgrounds for overlaid elements (sticky scroll, etc.)
    The editor itself uses a transparent background so var(--content-background) shows through. */
 .monaco-editor .sticky-widget,
@@ -1332,26 +1434,59 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
   vertical-align: middle;
 }
 
+.lc-chat-markdown h1,
+.lc-chat-markdown h2,
+.lc-chat-markdown h3,
+.lc-chat-markdown h4,
+.lc-chat-markdown h5,
+.lc-chat-markdown h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.6em 0 0.2em;
+  color: var(--foreground, currentColor);
+}
+.lc-chat-markdown h1 {
+  font-size: 1.35em;
+}
+.lc-chat-markdown h2 {
+  font-size: 1.22em;
+}
+.lc-chat-markdown h3 {
+  font-size: 1.05em;
+}
+.lc-chat-markdown h4,
+.lc-chat-markdown h5,
+.lc-chat-markdown h6 {
+  font-size: 1em;
+}
+.lc-chat-markdown :is(h1, h2, h3, h4, h5, h6):first-child {
+  margin-top: 0;
+}
+
 .lc-chat-markdown ol {
   list-style: decimal outside;
   padding-left: 1.5em;
-  margin: 0.4em 0;
+  margin: 0.25em 0;
 }
 .lc-chat-markdown ul {
   list-style: disc outside;
   padding-left: 1.5em;
-  margin: 0.4em 0;
+  margin: 0.25em 0;
 }
 .lc-chat-markdown li {
-  margin: 0.35em 0;
+  margin: 0.1em 0;
 }
 .lc-chat-markdown li::marker {
   color: var(--lc-text-muted, currentColor);
 }
 .lc-chat-markdown li > p {
-  margin: 0.15em 0;
+  margin: 0.05em 0;
+}
+.lc-chat-markdown li > ol,
+.lc-chat-markdown li > ul {
+  margin: 0.1em 0;
 }
 .lc-chat-markdown p + ol,
 .lc-chat-markdown p + ul {
-  margin-top: 0.25em;
+  margin-top: 0.15em;
 }

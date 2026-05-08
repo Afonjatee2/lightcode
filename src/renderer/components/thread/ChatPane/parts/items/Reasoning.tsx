@@ -1,7 +1,6 @@
 import { memo, useDeferredValue, useState } from "react";
 import { Surface } from "@heroui/react";
 import { Brain, ChevronDown } from "lucide-react";
-import { PixelLoader } from "@/renderer/components/common";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { chatMessageSurfaceClass } from "./chatMessageSurface";
@@ -43,7 +42,7 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
         </button>
         {isOpen ? (
           <div className="mt-2 max-h-64 overflow-y-auto border-l border-dashed border-[color:var(--border)] pl-3 italic [scrollbar-gutter:stable]">
-            <ItemMarkdown text={text} mode="plain" />
+            <ItemMarkdown text={text} />
           </div>
         ) : null}
       </div>
@@ -54,13 +53,12 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
     <Surface variant="transparent" className={chatMessageSurfaceClass}>
       <div className="flex min-w-0 flex-col gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
         <div className="inline-flex items-center gap-1.5">
-          <Brain className="size-3 shrink-0" />
-          <span>Thinking</span>
-          <PixelLoader size="xxs" />
+          <Brain className="lightcode-brain-thinking size-3 shrink-0" aria-label="Thinking" />
+          <span className="lightcode-thinking-text">Thinking</span>
         </div>
         {hasText ? (
           <div className="max-h-64 overflow-y-auto pl-4 [scrollbar-gutter:stable]">
-            <ItemMarkdown text={text} mode="plain" />
+            <ItemMarkdown text={text} />
           </div>
         ) : null}
       </div>

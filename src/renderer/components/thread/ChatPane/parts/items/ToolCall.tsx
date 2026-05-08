@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import {
   CircleAlert,
   Download,
@@ -9,12 +9,14 @@ import {
   Pencil,
   Plug,
   SearchCode,
+  Sparkles,
   Terminal,
   Trash2,
   Wrench,
   type LucideIcon,
 } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
+import { PixelLoader } from "@/renderer/components/common";
 import {
   getRuntimeItemPayload,
   type RuntimeChatItem,
@@ -33,26 +35,28 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const sections = useMemo<ToolCallSection[]>(() => {
     if (!isExpanded || !payload) return [];
+    const isSkill = isSkillTool(payload);
     return [
       { label: "args", part: extractAcpArgsPart(payload) },
-      { label: "result", part: extractAcpResultPart(payload) },
+      {
+        label: "result",
+        part: extractAcpResultPart(payload),
+        ...(isSkill ? { renderAsMarkdown: true } : {}),
+      },
     ];
   }, [isExpanded, payload]);
   if (!payload?.name) return null;
   if (isContextCompactionToolCall(item)) return <ContextCompaction item={item} />;
   const hasDetails = payload.args !== undefined || payload.result !== undefined;
   const Icon = pickToolIcon(payload);
-  const errorLabel =
-    payload.status === "error" ? (
-      <CircleAlert className="size-3 text-danger" aria-label="error" />
-    ) : undefined;
+  const status = resolveToolStatus(item, payload);
 
   return (
     <ChatItemAccordion
       icon={<Icon className="size-3" />}
       title={payload.name}
-      rightLabel={errorLabel}
-      rightLabelClassName="text-danger"
+      rightLabel={status.rightLabel}
+      rightLabelClassName={status.rightLabelClassName}
       hasBody={hasDetails}
       isExpanded={isExpanded}
       onExpandedChange={setIsExpanded}
@@ -62,6 +66,28 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
   );
 });
 
+interface ToolStatusDisplay {
+  rightLabel: ReactNode;
+  rightLabelClassName: string;
+}
+
+function resolveToolStatus(item: RuntimeChatItem, payload: ToolCallPayload): ToolStatusDisplay {
+  const isRunning = item.state !== "completed" || payload.status === "running";
+  if (isRunning) {
+    return {
+      rightLabel: <PixelLoader size="xxs" className="text-[color:var(--muted)]" />,
+      rightLabelClassName: "!text-[color:var(--muted)]",
+    };
+  }
+  if (payload.status === "error") {
+    return {
+      rightLabel: <CircleAlert className="size-3 text-danger" aria-label="error" />,
+      rightLabelClassName: "text-danger",
+    };
+  }
+  return { rightLabel: null, rightLabelClassName: "!text-[color:var(--muted)]" };
+}
+
 /**
  * Pick an icon based on the tool's title / name. ACP-speaking agents emit
  * human-readable titles like `Viewing src/foo.ts` or `Searching for 'bar'`,
@@ -70,6 +96,7 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
  * `serverId` field) regardless of verb.
  */
 export function pickToolIcon(payload: ToolCallPayload): LucideIcon {
+  if (isSkillTool(payload)) return Sparkles;
   if (isMcpTool(payload)) return Plug;
   const t = payload.name.toLowerCase().trim();
   if (t.startsWith("viewing") || t.startsWith("reading") || t.startsWith("read ")) return Eye;
@@ -95,4 +122,9 @@ function isMcpTool(payload: ToolCallPayload): boolean {
   if (payload.serverId && payload.serverId.length > 0) return true;
   const n = payload.name;
   return /(^mcp__|-mcp-server-|^mcp[-_])/i.test(n);
+}
+
+function isSkillTool(payload: ToolCallPayload): boolean {
+  const n = payload.name.trim();
+  return n === "Skill" || /^loaded skill\b/i.test(n);
 }

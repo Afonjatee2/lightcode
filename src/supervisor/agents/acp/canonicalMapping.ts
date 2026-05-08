@@ -208,6 +208,15 @@ export function mapAcpSessionUpdate(
         status?: "pending" | "in_progress" | "completed" | "failed";
         rawInput?: unknown;
       };
+      // Gemini's `update_topic` is a meta-tool that re-titles the current
+      // conversation topic — emitted on nearly every user turn as the model's
+      // first action. It's noise in the chat stream (a "thinking" tool that
+      // produces no user-facing artifact), so drop it entirely along with its
+      // matching `tool_call_update`.
+      if (isUpdateTopicTool(toolCall.title, toolCall.kind)) {
+        state.suppressedToolCallIds.add(toolCall.toolCallId);
+        break;
+      }
       // Copilot's `task_complete` is the end-of-turn summary, not a real tool —
       // surface it as an assistant_message so it renders inline with the rest
       // of the response instead of as a collapsed accordion.
@@ -392,6 +401,21 @@ function buildAcpToolCallPayload(
     return { ...base, query };
   }
   return base;
+}
+
+/**
+ * Gemini's `update_topic` tool re-titles the active conversation topic for UI
+ * grouping. ACP carries it with `kind: "think"` and `title` set to either the
+ * raw tool name (`update_topic`) or the human-readable description Gemini's
+ * `getDescription()` returns: `Update topic to: "<title>"` /
+ * `Update tactical intent: "<intent>"`. Match on either form so we drop the
+ * tool from the chat stream regardless of which Gemini build is in use.
+ */
+function isUpdateTopicTool(title: string | undefined, kind: string | undefined): boolean {
+  const t = (title ?? "").toLowerCase().trim();
+  const k = (kind ?? "").toLowerCase().trim();
+  if (t === "update_topic" || k === "update_topic") return true;
+  return t.startsWith("update topic to:") || t.startsWith("update tactical intent:");
 }
 
 /**

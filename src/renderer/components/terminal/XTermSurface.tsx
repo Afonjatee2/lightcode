@@ -244,7 +244,10 @@ export const XTermSurface = forwardRef<
       scrollback: 5_000,
       scrollSensitivity: useSharedSettings.getState().scrollSpeed,
       fastScrollSensitivity: 10,
-      scrollOnEraseInDisplay: true,
+      // Codex/Gemini-style TUIs redraw by clearing the screen and repainting
+      // the visible conversation. Preserving erased lines turns each redraw
+      // and resize repaint into duplicated scrollback.
+      scrollOnEraseInDisplay: false,
       // Keep xterm's internal scrollbar gutter effectively zero; Lightcode
       // renders the visible scrollbar outside the terminal content area.
       scrollbar: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },

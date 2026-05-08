@@ -102,7 +102,7 @@ const CHECK_SCRIPTS = new Set([
  */
 export function humanIntentTitle(fullCommandLine: string): string {
   const short = summarizeShellCommand(fullCommandLine);
-  return intentFromSummarizedCommand(short) ?? short;
+  return intentFromSummarizedCommand(short) ?? `Run: ${short}`;
 }
 
 function intentFromSummarizedCommand(t: string): string | null {

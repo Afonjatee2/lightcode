@@ -30,7 +30,6 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
   const text = buildUserPromptText(content);
   const attachments = buildUserPromptAttachments(content);
   if (content.length === 0 || (text.length === 0 && attachments.length === 0)) return null;
-  const mode = looksLikeMarkdown(text) ? "markdown" : "plain";
   const isCollapsible = isLongUserMessage(text);
   const isCollapsed = isCollapsible && !isExpanded;
   const tooltipLabel = isExpanded ? "Show less" : "Show more";
@@ -40,7 +39,7 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
       <div
         className={`min-w-0 space-y-1.5 leading-snug ${isCollapsed ? collapsedMessageClass : ""}`}
       >
-        {text.length > 0 ? <ItemMarkdown text={text} mode={mode} /> : null}
+        {text.length > 0 ? <ItemMarkdown text={text} /> : null}
         {attachments.length > 0 ? (
           <div className="-mx-2 -mt-1">
             <AttachmentBar
@@ -131,11 +130,5 @@ function buildUserPromptAttachments(content: CanonicalContentBlock[]): Attachmen
 function isLongUserMessage(text: string): boolean {
   return (
     text.split(/\r\n|\r|\n/).length > COLLAPSED_LINE_COUNT || text.length > COLLAPSED_CHAR_COUNT
-  );
-}
-
-function looksLikeMarkdown(text: string): boolean {
-  return /(^|\n)#{1,6}\s|```|`[^`]+`|\[[^\]]+\]\([^)]*\)|(^|\n)\s*[-*+]\s|(^|\n)\s*\d+\.\s|\*\*[^*]+\*\*|__[^_]+__/.test(
-    text,
   );
 }

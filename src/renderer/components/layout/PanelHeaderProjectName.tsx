@@ -6,7 +6,7 @@ export function PanelHeaderProjectName(props: { name: string; maxWidthClass: str
   return (
     <Tooltip delay={300}>
       <Tooltip.Trigger className={`${panelHeaderTooltipTriggerResetClass} ${props.maxWidthClass}`}>
-        <span className="min-w-0 truncate text-left text-xs font-medium leading-none text-foreground">
+        <span className="min-w-0 truncate text-left text-xs font-medium leading-none text-foreground @max-[400px]:text-[11px]">
           {props.name}
         </span>
       </Tooltip.Trigger>

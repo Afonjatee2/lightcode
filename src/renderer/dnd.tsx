@@ -20,6 +20,12 @@ export type DragSourceData =
   | { type: "worktree-group"; worktreePath: string; projectId: string; threadIds: string[] }
   | { type: "pane"; paneId: string }
   | { type: "new-thread"; projectId: string }
+  | {
+      type: "sidebar-panel";
+      panel: "files" | "git" | "terminal";
+      projectId: string;
+      worktreePath?: string;
+    }
   | { type: "editor-tab"; path: string };
 
 export type PaneDropIndicator =
@@ -30,10 +36,12 @@ export type PaneDropIndicator =
 type DndSnapshot = {
   source: DragSourceData | null;
   paneIndicator: PaneDropIndicator | null;
+  mainPanelDropActive: boolean;
 };
 const EMPTY_DND_SNAPSHOT: DndSnapshot = {
   source: null,
   paneIndicator: null,
+  mainPanelDropActive: false,
 };
 
 let dndSnapshot: DndSnapshot = EMPTY_DND_SNAPSHOT;
@@ -53,7 +61,8 @@ function emitDndStore() {
 function updateDndSnapshot(nextSnapshot: DndSnapshot) {
   if (
     dndSnapshot.source === nextSnapshot.source &&
-    dndSnapshot.paneIndicator === nextSnapshot.paneIndicator
+    dndSnapshot.paneIndicator === nextSnapshot.paneIndicator &&
+    dndSnapshot.mainPanelDropActive === nextSnapshot.mainPanelDropActive
   ) {
     return;
   }
@@ -67,6 +76,10 @@ function setDragSource(source: DragSourceData | null) {
 
 function setPaneIndicatorState(paneIndicator: PaneDropIndicator | null) {
   updateDndSnapshot({ ...dndSnapshot, paneIndicator });
+}
+
+function setMainPanelDropActive(mainPanelDropActive: boolean) {
+  updateDndSnapshot({ ...dndSnapshot, mainPanelDropActive });
 }
 
 function useDndSelector<T>(selector: (snapshot: DndSnapshot) => T) {
@@ -112,6 +125,10 @@ export function useIsDraggingEditorTab(path: string) {
   );
 }
 
+export function useIsMainPanelDropActive() {
+  return useDndSelector((snapshot) => snapshot.mainPanelDropActive);
+}
+
 export function usePaneDropIndicatorState(paneId: string) {
   return useDndSelector((snapshot) => {
     const paneIndicator = snapshot.paneIndicator;
@@ -142,6 +159,42 @@ export function useIsRootInsertHighlighted(zoneId: string) {
 }
 
 const EDGE_THRESHOLD = 0.15;
+
+export type MainPanelDropSource = Extract<
+  DragSourceData,
+  { type: "project" | "worktree-group" | "sidebar-panel" }
+>;
+
+let mainPanelDropZoneElement: HTMLElement | null = null;
+
+/**
+ * Registered by `MainPanelDropZone` via a ref callback. Module-level so the
+ * dnd handlers can hit-test pointer position against the live element rect
+ * without doing a `document.querySelector` on every drag move.
+ */
+export function setMainPanelDropZoneElement(element: HTMLElement | null): void {
+  mainPanelDropZoneElement = element;
+}
+
+function isMainPanelDropSource(source: DragSourceData | undefined): source is MainPanelDropSource {
+  return (
+    source?.type === "sidebar-panel" ||
+    source?.type === "project" ||
+    source?.type === "worktree-group"
+  );
+}
+
+function isPointerInMainPanelDropZone(pointerX: number, pointerY: number): boolean {
+  const element = mainPanelDropZoneElement;
+  if (!element) return false;
+  const rect = element.getBoundingClientRect();
+  return (
+    pointerX >= rect.left &&
+    pointerX <= rect.right &&
+    pointerY >= rect.top &&
+    pointerY <= rect.bottom
+  );
+}
 
 function getEdgeZone(
   element: Element,
@@ -261,11 +314,13 @@ export function AppDndProvider(props: {
     target: DragSourceData | null,
   ) => void;
   onPaneDrop: (source: DragSourceData, target: PaneDropIndicator | null) => void;
+  onMainPanelDrop: (source: MainPanelDropSource) => void;
   paneThreadIds: string[];
   paneLayout: PaneLayout;
 }) {
   const pointer = useRef({ x: 0, y: 0 });
   const paneIndicatorRef = useRef<PaneDropIndicator | null>(null);
+  const mainPanelDropActiveRef = useRef(false);
   const sidebarSortTargetRef = useRef<DragSourceData | null>(null);
   const paneThreadIdsRef = useRef(props.paneThreadIds);
   paneThreadIdsRef.current = props.paneThreadIds;
@@ -302,6 +357,15 @@ export function AppDndProvider(props: {
     paneIndicatorRef.current = next;
   }
 
+  function updateMainPanelDropState(source: DragSourceData | undefined) {
+    const isActive =
+      isMainPanelDropSource(source) &&
+      isPointerInMainPanelDropZone(pointer.current.x, pointer.current.y);
+    mainPanelDropActiveRef.current = isActive;
+    setMainPanelDropActive(isActive);
+    return isActive;
+  }
+
   const sensors = useMemo(
     () => [
       PointerSensor.configure({
@@ -319,8 +383,14 @@ export function AppDndProvider(props: {
         const data = event.operation.source?.data as DragSourceData | undefined;
         if (data) setDragSource(data);
         sidebarSortTargetRef.current = null;
+        mainPanelDropActiveRef.current = false;
       }}
-      onDragMove={() => {
+      onDragMove={(event) => {
+        const data = event.operation.source?.data as DragSourceData | undefined;
+        if (isMainPanelDropSource(data)) {
+          updateMainPanelDropState(data);
+          return;
+        }
         if (activePaneTarget.current) {
           updatePaneIndicator();
         }
@@ -328,15 +398,26 @@ export function AppDndProvider(props: {
       onDragOver={(event) => {
         const target = event.operation.target;
         const data = event.operation.source?.data as DragSourceData | undefined;
-        if (!data || !target) {
+        if (isMainPanelDropSource(data) && updateMainPanelDropState(data)) {
           activePaneTarget.current = null;
           setPaneIndicatorState(null);
           paneIndicatorRef.current = null;
           return;
         }
+        if (!data || !target) {
+          activePaneTarget.current = null;
+          setPaneIndicatorState(null);
+          paneIndicatorRef.current = null;
+          mainPanelDropActiveRef.current = false;
+          setMainPanelDropActive(false);
+          return;
+        }
 
         const targetData = target.data as Record<string, unknown> | undefined;
         const targetType = targetData?.type as string | undefined;
+
+        mainPanelDropActiveRef.current = false;
+        setMainPanelDropActive(false);
 
         if (
           (data.type === "project" || data.type === "thread" || data.type === "worktree-group") &&
@@ -435,6 +516,8 @@ export function AppDndProvider(props: {
             paneIndicatorRef.current
           ) {
             props.onPaneDrop(data, paneIndicatorRef.current);
+          } else if (isMainPanelDropSource(data) && updateMainPanelDropState(data)) {
+            props.onMainPanelDrop(data);
           } else if (data.type === "editor-tab" && src && isSortable(src)) {
             useFileEditorStore.getState().reorderTabs(src.initialIndex, src.index);
           } else if (src && isSortable(src) && data.type !== "pane") {
@@ -452,7 +535,9 @@ export function AppDndProvider(props: {
         activePaneTarget.current = null;
         setDragSource(null);
         setPaneIndicatorState(null);
+        setMainPanelDropActive(false);
         paneIndicatorRef.current = null;
+        mainPanelDropActiveRef.current = false;
         sidebarSortTargetRef.current = null;
       }}
     >

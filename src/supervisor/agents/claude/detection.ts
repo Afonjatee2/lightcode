@@ -46,6 +46,7 @@ export const claudeCapabilities: AgentCapability = {
   supportsDirectInput: true,
   liveInputMode: "terminal",
   presentationMode: "terminal",
+  presentationModes: ["terminal", "gui"],
   bypassApprovalPolicy: CLAUDE_DEFAULT_APPROVAL_POLICY,
   settingDefs: [
     {

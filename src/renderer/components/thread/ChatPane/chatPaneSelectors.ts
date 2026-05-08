@@ -61,10 +61,9 @@ export function selectVisibleThreadRuntimeItemIds(
 ): readonly string[] {
   const itemIds = state.runtimeItemIdsByThread[threadId];
   if (!itemIds?.length) return EMPTY_THREAD_ITEM_IDS;
-  if (!hiddenItemId) return itemIds;
 
   const structuralVersion = state.runtimeStructuralVersionByThread?.[threadId] ?? 0;
-  const cacheKey = `${threadId}\0${hiddenItemId}`;
+  const cacheKey = `${threadId}\0${hiddenItemId ?? ""}`;
   const cached = visibleItemIdsCache.get(cacheKey);
   if (
     cached &&
@@ -75,11 +74,9 @@ export function selectVisibleThreadRuntimeItemIds(
   }
 
   const items = state.runtimeItemsByIdByThread[threadId];
-  const hiddenItem = items?.[hiddenItemId];
   const visible = itemIds.filter((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
-    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
     return item ? isVisibleRuntimeItem(item) : true;
   });
   const result =
@@ -154,23 +151,6 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
   );
 }
 
-export function selectThreadHasLiveVisibleRuntimeItem(
-  state: AppStoreState,
-  threadId: string,
-  hiddenItemId?: string,
-): boolean {
-  const itemIds = state.runtimeItemIdsByThread[threadId];
-  if (!itemIds?.length) return false;
-  const items = state.runtimeItemsByIdByThread[threadId];
-  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
-  return itemIds.some((itemId) => {
-    if (itemId === hiddenItemId) return false;
-    const item = items?.[itemId];
-    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
-    return item ? isVisibleRuntimeItem(item) && item.state !== "completed" : false;
-  });
-}
-
 /**
  * Bumps when the tail of the thread grows (streaming text/output) so the chat
  * pane can re-stick scroll to the bottom without re-rendering on every row.
@@ -187,11 +167,9 @@ export function selectChatScrollAnchorForTimeline(
   const itemIds = state.runtimeItemIdsByThread[threadId];
   if (!itemIds?.length) return "";
   const items = state.runtimeItemsByIdByThread[threadId];
-  const hiddenItem = hiddenItemId ? items?.[hiddenItemId] : undefined;
   const lastId = [...itemIds].reverse().find((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
-    if (hiddenItem?.type === "plan" && item?.type === "plan") return false;
     return item ? isVisibleRuntimeItem(item) : true;
   });
   if (!lastId) return "";
@@ -206,11 +184,11 @@ export function selectChatScrollAnchorForTimeline(
   return `${last.id}:${streamLen}:${last.state}`;
 }
 
-function isVisibleRuntimeItem(_item: RuntimeChatItem): boolean {
-  // Empty completed reasoning items are dropped at the data layer
-  // (`runtimeEventSlice` on `item.completed`), so this selector treats every
-  // remaining item as visible. Reasoning items with text stay so the user
-  // can expand the "Thought" disclosure later.
+function isVisibleRuntimeItem(item: RuntimeChatItem): boolean {
+  // Plans are rendered exclusively in the todo dock — never inline in chat,
+  // even after they retire (e.g. all steps completed). Empty completed
+  // reasoning items are already dropped at the data layer.
+  if (item.type === "plan") return false;
   return true;
 }
 
