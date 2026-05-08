@@ -42,15 +42,16 @@ export function buildOpenCodeArgs(
 // so we mirror Codex's `buildCodexAppServerCommand`: bypass `bash -l -i` and
 // invoke the binary under `/usr/bin/env PATH=<segments>` instead. The TUI
 // launch keeps its login-shell wrapping (via `buildAgentCommand` in the
-// adapter's `buildLaunchArgv`).
+// adapter's `buildLaunchArgv`). Native Windows may also pass an already-resolved
+// absolute executable path so packaged apps are not hostage to an ambient PATH.
 export function buildOpenCodeServerCommand(
   location: ProjectLocation,
-  wslExecPath?: string,
+  resolvedExecPath?: string,
 ): CommandSpec {
   const args = ["serve", "--hostname=127.0.0.1", "--port=0", "--print-logs"];
   if (location.kind === "wsl") {
     const pathSegments = [
-      wslExecPath?.startsWith("/") ? posixDirname(wslExecPath) : undefined,
+      resolvedExecPath?.startsWith("/") ? posixDirname(resolvedExecPath) : undefined,
       DEFAULT_WSL_EXEC_PATH,
     ].filter((segment): segment is string => Boolean(segment));
     return {
@@ -63,10 +64,10 @@ export function buildOpenCodeServerCommand(
         "--",
         "/usr/bin/env",
         `PATH=${pathSegments.join(":")}`,
-        wslExecPath ?? "opencode",
+        resolvedExecPath ?? "opencode",
         ...args,
       ],
     };
   }
-  return buildAgentCommand(location, "opencode", args, wslExecPath);
+  return buildAgentCommand(location, "opencode", args, resolvedExecPath);
 }

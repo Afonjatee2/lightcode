@@ -36,6 +36,7 @@ import { resolveAgentBinaryPath } from "../binaryResolver";
 import { applyClaudeContextSuffix } from "./argv";
 import { CLAUDE_DEFAULT_APPROVAL_POLICY } from "./detection";
 import {
+  ACCEPT_SUGGESTION_OPTION_PREFIX,
   closeClaudeOpenItems,
   createClaudeMapperState,
   mapClaudePermissionRequest,
@@ -224,16 +225,30 @@ function responseOptionId(response: unknown): string | undefined {
   return undefined;
 }
 
-function permissionDecision(
-  response: unknown,
-): "accept" | "acceptForSession" | "decline" | "cancel" {
-  const option = responseOptionId(response)?.toLowerCase();
-  if (!option) return "accept";
-  if (option.includes("session") || option.includes("always")) return "acceptForSession";
-  if (option.includes("decline") || option.includes("deny") || option.includes("reject"))
-    return "decline";
-  if (option.includes("cancel")) return "cancel";
-  return "accept";
+interface PermissionDecision {
+  kind: "accept" | "acceptForSession" | "decline" | "cancel";
+  /** Index into `pending.suggestions` when the user picked a single suggestion. */
+  suggestionIndex?: number;
+}
+
+function permissionDecision(response: unknown): PermissionDecision {
+  const option = responseOptionId(response);
+  if (!option) return { kind: "accept" };
+
+  if (option.startsWith(ACCEPT_SUGGESTION_OPTION_PREFIX)) {
+    const idx = Number.parseInt(option.slice(ACCEPT_SUGGESTION_OPTION_PREFIX.length), 10);
+    if (Number.isFinite(idx) && idx >= 0) {
+      return { kind: "acceptForSession", suggestionIndex: idx };
+    }
+  }
+
+  const lower = option.toLowerCase();
+  if (lower.includes("session") || lower.includes("always")) return { kind: "acceptForSession" };
+  if (lower.includes("decline") || lower.includes("deny") || lower.includes("reject")) {
+    return { kind: "decline" };
+  }
+  if (lower.includes("cancel")) return { kind: "cancel" };
+  return { kind: "accept" };
 }
 
 function questionAnswers(response: unknown, pending: PendingQuestion): Record<string, unknown> {
@@ -269,6 +284,12 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
   // dropped by `?.` chaining. Buffer here and drain on attach.
   private bufferedRuntimeEvents: RuntimeEvent[] = [];
   private pendingError: string | undefined;
+  // Set when `interruptTurn()` runs; cleared when the next `result` arrives.
+  // Lets us classify the post-interrupt result as interrupted even when
+  // claude.exe emits subtype "error_during_execution" without "abort"/"interrupt"
+  // in the errors array — otherwise the supervisor's drain-on-idle hook would
+  // miss the steer and the staged prompt would never flush.
+  private interruptInFlight = false;
 
   private constructor(input: CreateStructuredSessionInput) {
     this.input = input;
@@ -337,6 +358,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
   }
 
   async interruptTurn(): Promise<void> {
+    this.interruptInFlight = true;
     try {
       await this.queryRuntime?.interrupt();
     } catch {
@@ -370,13 +392,21 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     }
 
     const decision = permissionDecision(response);
-    if (decision === "accept" || decision === "acceptForSession") {
+    if (decision.kind === "accept" || decision.kind === "acceptForSession") {
+      const pickedSuggestion =
+        decision.suggestionIndex !== undefined
+          ? pending.suggestions?.[decision.suggestionIndex]
+          : undefined;
+      const updatedPermissions: PermissionUpdate[] | undefined =
+        decision.kind === "acceptForSession" && pending.suggestions
+          ? pickedSuggestion
+            ? [pickedSuggestion]
+            : pending.suggestions
+          : undefined;
       pending.resolve({
         behavior: "allow",
         updatedInput: pending.toolInput,
-        ...(decision === "acceptForSession" && pending.suggestions
-          ? { updatedPermissions: pending.suggestions }
-          : {}),
+        ...(updatedPermissions ? { updatedPermissions } : {}),
       });
       this.emitRuntimeEvents([
         {
@@ -393,7 +423,9 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     pending.resolve({
       behavior: "deny",
       message:
-        decision === "cancel" ? "User cancelled tool execution." : "User declined tool execution.",
+        decision.kind === "cancel"
+          ? "User cancelled tool execution."
+          : "User declined tool execution.",
     });
     this.emitRuntimeEvents([
       {
@@ -571,6 +603,13 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           toolInput,
           ...(callbackOptions.title ? { title: callbackOptions.title } : {}),
           ...(callbackOptions.description ? { description: callbackOptions.description } : {}),
+          ...(callbackOptions.displayName ? { displayName: callbackOptions.displayName } : {}),
+          ...(callbackOptions.blockedPath ? { blockedPath: callbackOptions.blockedPath } : {}),
+          ...(callbackOptions.decisionReason
+            ? { decisionReason: callbackOptions.decisionReason }
+            : {}),
+          ...(callbackOptions.toolUseID ? { toolUseID: callbackOptions.toolUseID } : {}),
+          ...(callbackOptions.suggestions ? { suggestions: callbackOptions.suggestions } : {}),
         }),
       ]);
       this.listener?.onUpdate({ status: "needs_approval", attention: "needs_approval" });
@@ -601,8 +640,10 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     const events = mapClaudeSdkMessage(message, this.mapperState);
     this.emitRuntimeEvents(events);
     if (message.type === "result") {
-      const errorMessage = message.subtype === "success" ? undefined : message.errors[0];
-      const failed = message.subtype !== "success" && !isInterruptedResult(message);
+      const wasInterrupted = this.interruptInFlight || isInterruptedResult(message);
+      this.interruptInFlight = false;
+      const failed = message.subtype !== "success" && !wasInterrupted;
+      const errorMessage = failed ? message.errors[0] : undefined;
       this.listener?.onUpdate({
         status: failed ? "error" : "idle",
         attention: failed ? "error" : "none",

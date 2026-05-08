@@ -234,6 +234,10 @@ importers:
       wait-on:
         specifier: ^9.0.4
         version: 9.0.5
+    optionalDependencies:
+      '@anthropic-ai/claude-agent-sdk-win32-x64':
+        specifier: 0.2.126
+        version: 0.2.126
 
 packages:
 

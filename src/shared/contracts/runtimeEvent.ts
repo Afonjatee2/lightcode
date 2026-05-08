@@ -108,12 +108,29 @@ export const fileChangePayloadSchema = z.object({
 export type FileChangePayload = z.infer<typeof fileChangePayloadSchema>;
 
 export const toolCallStatusSchema = z.enum(["running", "success", "error"]);
+
+/**
+ * Live progress signal a sub-agent (e.g. Claude `Task`) emits while running.
+ * Surfaced on the parent tool_call so a collapsed sub-agent row can still
+ * show what the inner agent is doing without expanding.
+ */
+export const toolCallProgressSchema = z.object({
+  description: z.string().optional(),
+  lastToolName: z.string().optional(),
+  summary: z.string().optional(),
+  tokens: z.number().int().nonnegative().optional(),
+  toolUses: z.number().int().nonnegative().optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+});
+export type ToolCallProgress = z.infer<typeof toolCallProgressSchema>;
+
 export const toolCallPayloadSchema = z.object({
   name: z.string(),
   serverId: z.string().optional(),
   args: z.unknown().optional(),
   result: z.unknown().optional(),
   status: toolCallStatusSchema,
+  progress: toolCallProgressSchema.optional(),
 });
 export type ToolCallPayload = z.infer<typeof toolCallPayloadSchema>;
 
@@ -135,6 +152,79 @@ export const userInputOptionSchema = z.object({
   label: z.string(),
   description: z.string().optional(),
 });
+export type UserInputOption = z.infer<typeof userInputOptionSchema>;
+
+export const permissionUpdateDestinationSchema = z.enum([
+  "userSettings",
+  "projectSettings",
+  "localSettings",
+  "session",
+  "cliArg",
+]);
+export type PermissionUpdateDestination = z.infer<typeof permissionUpdateDestinationSchema>;
+
+export const permissionBehaviorSchema = z.enum(["allow", "deny", "ask"]);
+export type PermissionBehavior = z.infer<typeof permissionBehaviorSchema>;
+
+const permissionRuleSchema = z.object({
+  toolName: z.string(),
+  ruleContent: z.string().optional(),
+});
+
+export const permissionSuggestionSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("addRules"),
+    rules: z.array(permissionRuleSchema),
+    behavior: permissionBehaviorSchema,
+    destination: permissionUpdateDestinationSchema,
+  }),
+  z.object({
+    type: z.literal("replaceRules"),
+    rules: z.array(permissionRuleSchema),
+    behavior: permissionBehaviorSchema,
+    destination: permissionUpdateDestinationSchema,
+  }),
+  z.object({
+    type: z.literal("removeRules"),
+    rules: z.array(permissionRuleSchema),
+    behavior: permissionBehaviorSchema,
+    destination: permissionUpdateDestinationSchema,
+  }),
+  z.object({
+    type: z.literal("setMode"),
+    mode: z.string(),
+    destination: permissionUpdateDestinationSchema,
+  }),
+  z.object({
+    type: z.literal("addDirectories"),
+    directories: z.array(z.string()),
+    destination: permissionUpdateDestinationSchema,
+  }),
+  z.object({
+    type: z.literal("removeDirectories"),
+    directories: z.array(z.string()),
+    destination: permissionUpdateDestinationSchema,
+  }),
+]);
+export type PermissionSuggestion = z.infer<typeof permissionSuggestionSchema>;
+
+/**
+ * Typed shape for `RequestPayload.details` when the request originates from a
+ * tool-permission prompt (Claude SDK `canUseTool`, ACP equivalents). Renderers
+ * may consume this directly when present; `details` itself stays `unknown` so
+ * adapters can carry arbitrary shapes for non-permission requests.
+ */
+export const permissionRequestDetailsSchema = z.object({
+  toolName: z.string(),
+  displayName: z.string().optional(),
+  description: z.string().optional(),
+  blockedPath: z.string().optional(),
+  decisionReason: z.string().optional(),
+  toolUseID: z.string().optional(),
+  input: z.unknown().optional(),
+  suggestions: z.array(permissionSuggestionSchema).optional(),
+});
+export type PermissionRequestDetails = z.infer<typeof permissionRequestDetailsSchema>;
 
 export const requestPayloadSchema = z.object({
   /** Human-readable summary of what is being asked. */
@@ -146,6 +236,17 @@ export const requestPayloadSchema = z.object({
   multiSelect: z.boolean().optional(),
 });
 export type RequestPayload = z.infer<typeof requestPayloadSchema>;
+
+/**
+ * Decode `RequestPayload.details` as a permission-request shape. Returns
+ * `undefined` if details is absent or doesn't conform — callers should fall
+ * back to the raw `details` for non-permission requests.
+ */
+export function asPermissionRequestDetails(details: unknown): PermissionRequestDetails | undefined {
+  if (!details || typeof details !== "object") return undefined;
+  const parsed = permissionRequestDetailsSchema.safeParse(details);
+  return parsed.success ? parsed.data : undefined;
+}
 
 // ── Discriminated event union ────────────────────────────────────────
 
@@ -183,6 +284,12 @@ export const runtimeEventSchema = z.discriminatedUnion("type", [
     itemId: z.string(),
     itemType: canonicalItemTypeSchema,
     payload: z.unknown().optional(),
+    /**
+     * Set when the item was emitted by a sub-agent (e.g. Claude `Task` tool use).
+     * The renderer groups items with the same `parentItemId` under their parent
+     * tool_call row instead of rendering them at the top of the chat timeline.
+     */
+    parentItemId: z.string().optional(),
   }),
   z.object({
     type: z.literal("item.updated"),

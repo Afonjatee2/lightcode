@@ -17,6 +17,7 @@ import {
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { CommandOutputViewport } from "./CommandOutputViewport";
 import { isContextCompactionToolCall } from "./ContextCompaction";
+import { isPlanProposalToolCall } from "./PlanProposal";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import {
   extractAcpArgsPart,
@@ -25,7 +26,7 @@ import {
   readAcpStringField,
 } from "./acpToolPayload";
 import { humanIntentTitle } from "./commandSummary";
-import { pickToolIcon } from "./ToolCall";
+import { deriveToolDisplay } from "./toolDisplay";
 
 interface ToolCallGroupProps {
   threadId: string;
@@ -179,7 +180,7 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
   const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
   if (!payload?.name) return null;
   const hasDetails = payload.args !== undefined || payload.result !== undefined;
-  const Icon = pickToolIcon(payload);
+  const display = deriveToolDisplay(payload);
   const sections: ToolCallSection[] =
     isExpanded && hasDetails
       ? [
@@ -195,8 +196,8 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
     <ErrorIcon />
   ) : undefined;
   return {
-    Icon,
-    title: payload.name,
+    Icon: display.Icon,
+    title: display.title,
     rightLabel,
     rightLabelClassName: isError ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails,
@@ -336,6 +337,7 @@ function summarizeToolCalls(items: readonly RuntimeChatItem[]): { title: string 
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {
   if (isContextCompactionToolCall(item)) return false;
+  if (isPlanProposalToolCall(item)) return false;
   return (
     item.type === "tool_call" ||
     item.type === "command_execution" ||

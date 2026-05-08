@@ -35,7 +35,7 @@ export function SidebarHeaderControls(props: { wslAvailable: boolean }) {
             <Search className="size-3.5" />
           </Button>
         </Tooltip.Trigger>
-        <Tooltip.Content placement="bottom">Search threads</Tooltip.Content>
+        <Tooltip.Content placement="bottom">Search</Tooltip.Content>
       </Tooltip>
       {isWindows() ? (
         <Dropdown>

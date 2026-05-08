@@ -73,7 +73,7 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 9;
+  const SCHEMA_VERSION = 10;
 
   const storedVersion = Number(
     (
@@ -156,6 +156,18 @@ export function initDatabase(dbPath: string) {
       CREATE INDEX IF NOT EXISTS idx_runtime_items_thread_pos
         ON thread_runtime_items (thread_id, position);
     `);
+  }
+
+  if (storedVersion < 10) {
+    // Sub-agent grouping: child items (from Claude `Task` tool use) carry the
+    // parent tool_call's id so the chat timeline groups them under their
+    // parent on reload, matching live behaviour.
+    const cols = sqlite.prepare("PRAGMA table_info(thread_runtime_items)").all() as {
+      name: string;
+    }[];
+    if (!cols.some((c) => c.name === "parent_item_id")) {
+      sqlite.exec("ALTER TABLE thread_runtime_items ADD COLUMN parent_item_id TEXT");
+    }
   }
 
   if (storedVersion < SCHEMA_VERSION) {
@@ -414,13 +426,14 @@ export interface PersistedRuntimeItem {
   state: "started" | "updated" | "completed";
   payload: unknown;
   streams: Record<string, string>;
+  parentItemId?: string | undefined;
 }
 
 export function dbGetThreadRuntimeItems(threadId: string): PersistedRuntimeItem[] {
   if (!_sqlite) throw new Error("Database not initialized");
   const rows = _sqlite
     .prepare(
-      "SELECT item_id, type, state, payload, streams FROM thread_runtime_items WHERE thread_id = ? ORDER BY position ASC",
+      "SELECT item_id, type, state, payload, streams, parent_item_id FROM thread_runtime_items WHERE thread_id = ? ORDER BY position ASC",
     )
     .all(threadId) as Array<{
     item_id: string;
@@ -428,6 +441,7 @@ export function dbGetThreadRuntimeItems(threadId: string): PersistedRuntimeItem[
     state: string;
     payload: string | null;
     streams: string | null;
+    parent_item_id: string | null;
   }>;
   return rows.map((row) => ({
     id: row.item_id,
@@ -437,20 +451,22 @@ export function dbGetThreadRuntimeItems(threadId: string): PersistedRuntimeItem[
       : "started") as PersistedRuntimeItem["state"],
     payload: row.payload ? safeParse(row.payload) : undefined,
     streams: row.streams ? (safeParse(row.streams) as Record<string, string>) : {},
+    ...(row.parent_item_id ? { parentItemId: row.parent_item_id } : {}),
   }));
 }
 
 export function dbReplaceThreadRuntimeItems(threadId: string, items: PersistedRuntimeItem[]): void {
   if (!_sqlite) throw new Error("Database not initialized");
   const replace = _sqlite.prepare(
-    `INSERT INTO thread_runtime_items (thread_id, item_id, position, type, state, payload, streams)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+    `INSERT INTO thread_runtime_items (thread_id, item_id, position, type, state, payload, streams, parent_item_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(thread_id, item_id) DO UPDATE SET
        position = excluded.position,
        type = excluded.type,
        state = excluded.state,
        payload = excluded.payload,
-       streams = excluded.streams`,
+       streams = excluded.streams,
+       parent_item_id = excluded.parent_item_id`,
   );
   const incomingIds = new Set(items.map((it) => it.id));
   const existing = _sqlite
@@ -475,6 +491,7 @@ export function dbReplaceThreadRuntimeItems(threadId: string, items: PersistedRu
         it.state,
         it.payload === undefined ? null : JSON.stringify(it.payload),
         JSON.stringify(it.streams ?? {}),
+        it.parentItemId ?? null,
       );
     }
   })();

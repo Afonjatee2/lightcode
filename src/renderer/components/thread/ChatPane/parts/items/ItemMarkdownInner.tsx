@@ -1,6 +1,7 @@
 import { Link, Table } from "@heroui/react";
 import {
   Children,
+  cloneElement,
   isValidElement,
   useMemo,
   type ComponentProps,
@@ -62,8 +63,23 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
 }
 
 const MD_COMPONENTS: StreamdownComponents = {
-  code({ className, children }) {
-    return <MdCode className={className ?? ""}>{children}</MdCode>;
+  // Streamdown's default `pre` strips the `<pre>` wrapper and forwards
+  // `data-block` to its custom code block UI. We want a plain `<pre>` so the
+  // `prose-pre:*` utilities on the parent style the fenced block consistently;
+  // forward `data-block` so the inner `code` component can distinguish a
+  // language-less fenced block from inline code.
+  pre({ children }) {
+    return <pre>{markCodeChildAsBlock(children)}</pre>;
+  },
+  code({ className, children, ...rest }) {
+    const isBlock =
+      ("data-block" in rest && rest["data-block"] === "true") ||
+      (typeof className === "string" && className.includes("language-"));
+    return (
+      <MdCode className={className ?? ""} isBlock={isBlock}>
+        {children}
+      </MdCode>
+    );
   },
   a({ href, children }) {
     return <MdAnchor href={href ?? ""}>{children}</MdAnchor>;
@@ -76,9 +92,10 @@ const MD_COMPONENTS: StreamdownComponents = {
 const inlineCodeChipClass =
   "rounded border-0 bg-foreground/10 px-[0.35em] py-[0.1em] font-mono text-[0.875em] leading-none align-baseline text-foreground [overflow-wrap:anywhere]";
 
-function MdCode(props: { className: string; children?: ReactNode }) {
+function MdCode(props: { className: string; isBlock?: boolean; children?: ReactNode }) {
   const actions = useChatPaneActions();
-  const isBlock = typeof props.className === "string" && props.className.includes("language-");
+  const isBlock =
+    props.isBlock || (typeof props.className === "string" && props.className.includes("language-"));
   const text = flattenMdChildren(props.children).replace(/\n$/, "");
   if (isBlock) {
     return <code className={props.className || undefined}>{props.children}</code>;
@@ -90,6 +107,18 @@ function MdCode(props: { className: string; children?: ReactNode }) {
     }
   }
   return <code className={inlineCodeChipClass}>{props.children}</code>;
+}
+
+/**
+ * Tag the fenced-block `<code>` child with `data-block` so the `code` override
+ * can distinguish fenced blocks (no language) from inline code, which never
+ * passes through a `<pre>`.
+ */
+function markCodeChildAsBlock(children: ReactNode): ReactNode {
+  return Children.map(children, (child) => {
+    if (!isValidElement(child)) return child;
+    return cloneElement(child as ReactElement<Record<string, unknown>>, { "data-block": "true" });
+  });
 }
 
 function MdAnchor(props: { href: string; children?: ReactNode }) {

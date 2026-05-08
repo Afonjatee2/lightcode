@@ -1,12 +1,17 @@
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { memo } from "react";
 import { useAppStore } from "@/renderer/state/appStore";
-import { getRuntimeItemStoreSelector, type ChatTimelineEntry } from "../../chatPaneSelectors";
+import {
+  getChildItemIdsStoreSelector,
+  getRuntimeItemStoreSelector,
+  type ChatTimelineEntry,
+} from "../../chatPaneSelectors";
 import { AssistantMessage } from "./AssistantMessage";
 import { CommandExecution } from "./CommandExecution";
 import { FileChange } from "./FileChange";
 import { PlanItem } from "./PlanItem";
 import { Reasoning } from "./Reasoning";
+import { SubAgentToolCall } from "./SubAgentToolCall";
 import { ToolCall } from "./ToolCall";
 import { ToolCallGroup } from "./ToolCallGroup";
 import { UserMessage } from "./UserMessage";
@@ -47,6 +52,7 @@ const SingleChatItemRow = memo(function SingleChatItemRow({
   itemId: string;
 }) {
   const item = useAppStore(getRuntimeItemStoreSelector(threadId, itemId));
+  const childIds = useAppStore(getChildItemIdsStoreSelector(threadId, itemId));
   if (import.meta.env.DEV && window.localStorage.getItem("lc-chat-debug-renders") === "1") {
     console.log("[lc-chat-debug] ChatItemRow render", {
       threadId,
@@ -56,6 +62,9 @@ const SingleChatItemRow = memo(function SingleChatItemRow({
     });
   }
   if (!item) return null;
+  if (item.type === "tool_call" && childIds.length > 0) {
+    return <SubAgentToolCall threadId={threadId} item={item} />;
+  }
   return renderItem(item);
 });
 

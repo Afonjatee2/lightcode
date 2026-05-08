@@ -17,7 +17,6 @@ export function CommitSyncPanel(props: {
   commitMessage: string;
   setCommitMessage: (msg: string) => void;
   canCommitStaged: boolean;
-  canCommitAll: boolean;
   canGenerateMessage: boolean;
   isCommitting: boolean;
   isGenerating: boolean;
@@ -49,7 +48,6 @@ export function CommitSyncPanel(props: {
     commitMessage,
     setCommitMessage,
     canCommitStaged,
-    canCommitAll,
     canGenerateMessage,
     isCommitting,
     isGenerating,
@@ -147,80 +145,78 @@ export function CommitSyncPanel(props: {
             )}
           </div>
 
-          <ButtonGroup className="w-full">
-            <Button
-              variant="tertiary"
-              className="flex-1"
-              isDisabled={!canCommitStaged}
-              isPending={isCommitting}
-              onPress={() => void handleCommit(!hasStagedChanges)}
-            >
-              {({ isPending }) => (
-                <>
-                  {isPending ? <PixelLoader size="xs" /> : <Lock className="size-3.5" />}
-                  Commit
-                </>
-              )}
-            </Button>
-            <Dropdown>
+          {(() => {
+            const commitButton = (
               <Button
-                isIconOnly
                 variant="tertiary"
-                aria-label="More commit options"
-                isDisabled={!canCommitAll}
+                className="flex-1"
+                isDisabled={!canCommitStaged}
+                isPending={isCommitting}
+                onPress={() => void handleCommit(!hasStagedChanges)}
               >
-                <ButtonGroup.Separator />
-                <ChevronDown className="size-3.5" />
+                {({ isPending }) => (
+                  <>
+                    {isPending ? <PixelLoader size="xs" /> : <Lock className="size-3.5" />}
+                    Commit
+                  </>
+                )}
               </Button>
-              <Dropdown.Popover placement="top end">
-                <Dropdown.Menu
-                  aria-label="Commit options"
-                  onAction={(key) => {
-                    if (key === "add-all-commit") void handleCommit(true);
-                    if (key === "commit-and-push") void handleCommit(!hasStagedChanges, true);
-                    if (key === "add-all-commit-push") void handleCommit(true, true);
-                    if (key === "pull-from-source") void handlePullFromSource();
-                  }}
-                >
-                  <Dropdown.Item id="add-all-commit" textValue="Add all + commit">
-                    <Label>Add all + commit</Label>
-                  </Dropdown.Item>
-                  {hasRemote ? (
-                    <Dropdown.Item
-                      id="commit-and-push"
-                      textValue="Commit + push"
-                      isDisabled={!canCommitStaged}
+            );
+
+            const hasMenuItems = hasRemote || showPullFromSource;
+            if (!hasMenuItems) {
+              return <div className="flex w-full">{commitButton}</div>;
+            }
+
+            return (
+              <ButtonGroup className="w-full">
+                {commitButton}
+                <Dropdown>
+                  <Button
+                    isIconOnly
+                    variant="tertiary"
+                    aria-label="More commit options"
+                    isDisabled={!canCommitStaged}
+                  >
+                    <ButtonGroup.Separator />
+                    <ChevronDown className="size-3.5" />
+                  </Button>
+                  <Dropdown.Popover placement="top end">
+                    <Dropdown.Menu
+                      aria-label="Commit options"
+                      onAction={(key) => {
+                        if (key === "commit-and-push") void handleCommit(!hasStagedChanges, true);
+                        if (key === "pull-from-source") void handlePullFromSource();
+                      }}
                     >
-                      <ArrowUp className="size-3.5" />
-                      <Label>Commit + push</Label>
-                    </Dropdown.Item>
-                  ) : null}
-                  {hasRemote ? (
-                    <Dropdown.Item
-                      id="add-all-commit-push"
-                      textValue="Add all, commit + push"
-                      isDisabled={!canCommitAll}
-                    >
-                      <ArrowUp className="size-3.5" />
-                      <Label>Add all, commit + push</Label>
-                    </Dropdown.Item>
-                  ) : null}
-                  {showPullFromSource ? (
-                    <Dropdown.Item
-                      id="pull-from-source"
-                      textValue={`Pull from ${sourceBranch} (${sourceAhead})`}
-                      isDisabled={isPullingFromSource}
-                    >
-                      <ArrowDown className="size-3.5" />
-                      <Label>
-                        Pull from {sourceBranch} ({sourceAhead})
-                      </Label>
-                    </Dropdown.Item>
-                  ) : null}
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown>
-          </ButtonGroup>
+                      {hasRemote ? (
+                        <Dropdown.Item
+                          id="commit-and-push"
+                          textValue="Commit + push"
+                          isDisabled={!canCommitStaged}
+                        >
+                          <ArrowUp className="size-3.5" />
+                          <Label>Commit + push</Label>
+                        </Dropdown.Item>
+                      ) : null}
+                      {showPullFromSource ? (
+                        <Dropdown.Item
+                          id="pull-from-source"
+                          textValue={`Pull from ${sourceBranch} (${sourceAhead})`}
+                          isDisabled={isPullingFromSource}
+                        >
+                          <ArrowDown className="size-3.5" />
+                          <Label>
+                            Pull from {sourceBranch} ({sourceAhead})
+                          </Label>
+                        </Dropdown.Item>
+                      ) : null}
+                    </Dropdown.Menu>
+                  </Dropdown.Popover>
+                </Dropdown>
+              </ButtonGroup>
+            );
+          })()}
           {hasRemote && ahead > 0 ? (
             <Button
               variant="tertiary"

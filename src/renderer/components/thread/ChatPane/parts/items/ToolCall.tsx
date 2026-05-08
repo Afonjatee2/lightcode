@@ -1,20 +1,5 @@
 import { memo, useMemo, useState, type ReactNode } from "react";
-import {
-  CircleAlert,
-  Download,
-  Eye,
-  FilePlus,
-  FolderSearch,
-  Globe,
-  Pencil,
-  Plug,
-  SearchCode,
-  Sparkles,
-  Terminal,
-  Trash2,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
+import { CircleAlert } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
 import { PixelLoader } from "@/renderer/components/common";
 import {
@@ -23,8 +8,10 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { ChatItemAccordion } from "./ChatItemAccordion";
 import { ContextCompaction, isContextCompactionToolCall } from "./ContextCompaction";
+import { PlanProposal, isPlanProposalToolCall } from "./PlanProposal";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import { extractAcpArgsPart, extractAcpResultPart } from "./acpToolPayload";
+import { deriveToolDisplay } from "./toolDisplay";
 
 interface ToolCallProps {
   item: RuntimeChatItem;
@@ -47,14 +34,16 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
   }, [isExpanded, payload]);
   if (!payload?.name) return null;
   if (isContextCompactionToolCall(item)) return <ContextCompaction item={item} />;
+  if (isPlanProposalToolCall(item)) return <PlanProposal item={item} />;
   const hasDetails = payload.args !== undefined || payload.result !== undefined;
-  const Icon = pickToolIcon(payload);
+  const display = deriveToolDisplay(payload);
+  const Icon = display.Icon;
   const status = resolveToolStatus(item, payload);
 
   return (
     <ChatItemAccordion
       icon={<Icon className="size-3" />}
-      title={payload.name}
+      title={display.title}
       rightLabel={status.rightLabel}
       rightLabelClassName={status.rightLabelClassName}
       hasBody={hasDetails}
@@ -88,43 +77,11 @@ function resolveToolStatus(item: RuntimeChatItem, payload: ToolCallPayload): Too
   return { rightLabel: null, rightLabelClassName: "!text-[color:var(--muted)]" };
 }
 
-/**
- * Pick an icon based on the tool's title / name. ACP-speaking agents emit
- * human-readable titles like `Viewing src/foo.ts` or `Searching for 'bar'`,
- * so we match common verb prefixes. MCP tools are detected by their
- * `<server>-mcp-server-<tool>` / `mcp__server__tool` shape (or the explicit
- * `serverId` field) regardless of verb.
- */
-export function pickToolIcon(payload: ToolCallPayload): LucideIcon {
-  if (isSkillTool(payload)) return Sparkles;
-  if (isMcpTool(payload)) return Plug;
-  const t = payload.name.toLowerCase().trim();
-  if (t.startsWith("viewing") || t.startsWith("reading") || t.startsWith("read ")) return Eye;
-  if (t.startsWith("finding files") || t.startsWith("listing")) return FolderSearch;
-  if (t.startsWith("searching for") || t.startsWith("grep") || t.startsWith("searching"))
-    return SearchCode;
-  if (
-    t.startsWith("web search") ||
-    t.startsWith("searching the web") ||
-    t.startsWith("fetch") ||
-    t.startsWith("downloading")
-  )
-    return t.startsWith("download") ? Download : Globe;
-  if (t.startsWith("editing") || t.startsWith("writing") || t.startsWith("patching")) return Pencil;
-  if (t.startsWith("creating") || t.startsWith("adding file")) return FilePlus;
-  if (t.startsWith("deleting") || t.startsWith("removing")) return Trash2;
-  if (t.startsWith("running") || t.startsWith("executing") || t.startsWith("shell"))
-    return Terminal;
-  return Wrench;
-}
-
-function isMcpTool(payload: ToolCallPayload): boolean {
-  if (payload.serverId && payload.serverId.length > 0) return true;
-  const n = payload.name;
-  return /(^mcp__|-mcp-server-|^mcp[-_])/i.test(n);
-}
-
 function isSkillTool(payload: ToolCallPayload): boolean {
   const n = payload.name.trim();
-  return n === "Skill" || /^loaded skill\b/i.test(n);
+  if (n === "Skill" || /^(loaded|using) skill\b/i.test(n)) return true;
+  const args = payload.args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return false;
+  const skill = (args as Record<string, unknown>).skill;
+  return typeof skill === "string" && skill.length > 0;
 }

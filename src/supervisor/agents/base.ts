@@ -437,9 +437,13 @@ export function buildWindowsCmdCommand(cwd: string, command: string, args: strin
   };
 }
 
-export function getWslCommand(): string {
+function getWindowsSystemCommand(name: string): string {
   const systemRoot = process.env.SystemRoot ?? process.env.windir ?? "C:\\Windows";
-  return join(systemRoot, "System32", "wsl.exe");
+  return join(systemRoot, "System32", name);
+}
+
+export function getWslCommand(): string {
+  return getWindowsSystemCommand("wsl.exe");
 }
 
 /**
@@ -561,7 +565,7 @@ export function buildAgentCommand(
   location: ProjectLocation,
   command: string,
   args: string[],
-  wslExecPath?: string,
+  resolvedExecPath?: string,
   env?: Record<string, string>,
 ): CommandSpec {
   if (location.kind === "wsl") {
@@ -572,7 +576,7 @@ export function buildAgentCommand(
     // version manager and break things like `npx` (e.g. fnm shims that exec a
     // node not on PATH).
     const shellPath = resolveWslShellPath(location.distro);
-    const execCommand = wslExecPath ?? command;
+    const execCommand = resolvedExecPath ?? command;
     const exports = buildPosixExportPrefix(env);
     const script = `${exports}exec ${[execCommand, ...args].map(quotePosixShellArg).join(" ")}`;
     return {
@@ -593,26 +597,27 @@ export function buildAgentCommand(
   }
 
   if (location.kind === "windows") {
-    const spec = buildWindowsCommand(location.path, command, args);
+    const spec = buildWindowsCommand(location.path, resolvedExecPath ?? command, args);
     if (env && Object.keys(env).length > 0) spec.env = env;
     return spec;
   }
 
   // location.kind === "posix" (macOS/Linux)
-  const spec = buildPosixCommand(location.path, command, args);
+  const spec = buildPosixCommand(location.path, resolvedExecPath ?? command, args);
   if (env && Object.keys(env).length > 0) spec.env = env;
   return spec;
 }
 
 /**
  * Turn an adapter's `AgentArgvSpec` into a platform-ready `CommandSpec`.
- * Resolves the WSL binary path (cached), wraps through `buildAgentCommand`,
- * and forwards the optional `sessionRef`. Adapters stay free of WSL/shell
- * concerns — all platform branching lives here.
+ * Resolves an absolute binary path when available (WSL distro lookup, native
+ * Windows fallback PATH lookup), wraps through `buildAgentCommand`, and
+ * forwards the optional `sessionRef`. Adapters stay free of shell/platform
+ * concerns — all branching lives here.
  */
 export function resolveLaunchSpec(location: ProjectLocation, argv: AgentArgvSpec): CommandSpec {
-  const wslExecPath = resolveAgentBinaryPath(location, argv.binary);
-  const spec = buildAgentCommand(location, argv.binary, argv.args, wslExecPath, argv.env);
+  const resolvedExecPath = resolveAgentBinaryPath(location, argv.binary);
+  const spec = buildAgentCommand(location, argv.binary, argv.args, resolvedExecPath, argv.env);
   if (argv.sessionRef) {
     spec.sessionRef = argv.sessionRef;
   }
@@ -1086,30 +1091,137 @@ export function wrapWslCommand(
   location: ProjectLocation,
   command: string,
   args: string[],
-  wslExecPath?: string,
+  resolvedExecPath?: string,
   env?: Record<string, string>,
 ): CommandSpec {
-  return buildAgentCommand(location, command, args, wslExecPath, env);
+  return buildAgentCommand(location, command, args, resolvedExecPath, env);
+}
+
+let cachedWindowsSearchPath: string | undefined | null = null;
+
+function getWindowsEnvValue(name: string): string | undefined {
+  const target = name.toLowerCase();
+  for (const [key, value] of Object.entries(process.env)) {
+    if (key.toLowerCase() !== target) continue;
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  }
+  return undefined;
+}
+
+function expandWindowsEnvVariables(value: string): string {
+  return value.replaceAll(/%([^%]+)%/g, (match, rawName: string) => {
+    const resolved = getWindowsEnvValue(rawName);
+    return resolved ?? match;
+  });
+}
+
+function parseWindowsRegistryPath(stdout: string): string | undefined {
+  const match = stdout.match(/^\s*Path\s+REG_\w+\s+(.*)$/im);
+  const raw = match?.[1]?.trim();
+  if (!raw) return undefined;
+  return expandWindowsEnvVariables(raw);
+}
+
+function readWindowsRegistryPath(scope: "user" | "machine"): string | undefined {
+  const key =
+    scope === "user"
+      ? "HKCU\\Environment"
+      : "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment";
+  const result = spawnSync(getWindowsSystemCommand("reg.exe"), ["query", key, "/v", "Path"], {
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+  });
+  if (result.error || result.status !== 0) {
+    return undefined;
+  }
+  return parseWindowsRegistryPath(`${result.stdout ?? ""}`);
+}
+
+function splitWindowsPathSegments(pathValue: string | undefined): string[] {
+  return (pathValue ?? "")
+    .split(";")
+    .map((segment) => segment.trim())
+    .filter((segment) => segment.length > 0);
+}
+
+function normalizeWindowsPathSegment(segment: string): string {
+  return segment.replace(/[\\/]+$/g, "").toLowerCase();
+}
+
+function normalizeWindowsPathValue(pathValue: string | undefined): string {
+  return splitWindowsPathSegments(pathValue).map(normalizeWindowsPathSegment).join(";");
+}
+
+function buildWindowsFallbackPath(): string | undefined {
+  if (cachedWindowsSearchPath !== null) {
+    return cachedWindowsSearchPath ?? undefined;
+  }
+
+  const merged: string[] = [];
+  const seen = new Set<string>();
+  for (const segment of [
+    ...splitWindowsPathSegments(getWindowsEnvValue("Path")),
+    ...splitWindowsPathSegments(readWindowsRegistryPath("user")),
+    ...splitWindowsPathSegments(readWindowsRegistryPath("machine")),
+  ]) {
+    const key = normalizeWindowsPathSegment(segment);
+    if (key.length === 0 || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(segment);
+  }
+
+  cachedWindowsSearchPath = merged.length > 0 ? merged.join(";") : undefined;
+  return cachedWindowsSearchPath ?? undefined;
+}
+
+function buildWindowsPathOverride(): NodeJS.ProcessEnv | undefined {
+  const fallbackPath = buildWindowsFallbackPath();
+  if (!fallbackPath) return undefined;
+  if (normalizeWindowsPathValue(fallbackPath) === normalizeWindowsPathValue(getWindowsEnvValue("Path"))) {
+    return undefined;
+  }
+  return {
+    ...process.env,
+    Path: fallbackPath,
+    PATH: fallbackPath,
+  };
+}
+
+function resolveWindowsExecutablePath(
+  command: string,
+  env?: NodeJS.ProcessEnv,
+): string | undefined {
+  const result = spawnSync(getWindowsSystemCommand("where.exe"), [command], {
+    encoding: "utf8",
+    shell: false,
+    windowsHide: true,
+    ...(env ? { env } : {}),
+  });
+  if (result.error || result.status !== 0) {
+    return undefined;
+  }
+  return parseCommandOutputLine(`${result.stdout ?? ""}`);
 }
 
 export function resolveExecutablePath(command: string): string | undefined {
-  const result =
-    process.platform === "win32"
-      ? spawnSync("where.exe", [command], {
-          encoding: "utf8",
-          shell: false,
-          windowsHide: true,
-        })
-      : spawnSync(
-          process.env.SHELL || "/bin/bash",
-          getPosixLoginShellArgs(`command -v ${quotePosixShellArg(command)}`),
-          {
-            cwd: homedir(),
-            encoding: "utf8",
-            shell: false,
-            windowsHide: true,
-          },
-        );
+  if (process.platform === "win32") {
+    return (
+      resolveWindowsExecutablePath(command) ??
+      resolveWindowsExecutablePath(command, buildWindowsPathOverride())
+    );
+  }
+
+  const result = spawnSync(
+    process.env.SHELL || "/bin/bash",
+    getPosixLoginShellArgs(`command -v ${quotePosixShellArg(command)}`),
+    {
+      cwd: homedir(),
+      encoding: "utf8",
+      shell: false,
+      windowsHide: true,
+    },
+  );
   if (result.error || result.status !== 0) {
     return undefined;
   }
@@ -1328,6 +1440,7 @@ const EXEC_CACHE_TTL_MS = 60_000;
 
 export function clearExecutablePathCache(): void {
   execPathCache.clear();
+  cachedWindowsSearchPath = null;
 }
 
 export async function resolveExecutablePathAsync(command: string): Promise<string | undefined> {
@@ -1339,14 +1452,37 @@ export async function resolveExecutablePathAsync(command: string): Promise<strin
   try {
     const resolved =
       process.platform === "win32"
-        ? parseCommandOutputLine(
-            (
-              await execFileAsync("where.exe", [command], {
-                windowsHide: true,
-                timeout: 5_000,
-              })
-            ).stdout ?? "",
-          )
+        ? ((await (async () => {
+            try {
+              const ambient = parseCommandOutputLine(
+                (
+                  await execFileAsync(getWindowsSystemCommand("where.exe"), [command], {
+                    windowsHide: true,
+                    timeout: 5_000,
+                  })
+                ).stdout ?? "",
+              );
+              if (ambient) return ambient;
+            } catch {
+              // Fall through to the registry-backed PATH override below.
+            }
+            const env = buildWindowsPathOverride();
+            if (!env) return undefined;
+            try {
+              return parseCommandOutputLine(
+                (
+                  await execFileAsync(getWindowsSystemCommand("where.exe"), [command], {
+                    env,
+                    windowsHide: true,
+                    timeout: 5_000,
+                  })
+                ).stdout ?? "",
+              );
+            } catch {
+              return undefined;
+            }
+          })()) ??
+          undefined)
         : parseCommandOutputLine(
             (
               await execFileAsync(

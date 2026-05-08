@@ -14,7 +14,6 @@ import { Button, Surface } from "@heroui/react";
 import { ArrowDown } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type { Thread } from "@/shared/contracts";
-import { PixelLoader } from "@/renderer/components/common";
 import { chatMessageSurfaceClass } from "./parts/items/chatMessageSurface";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -144,7 +143,8 @@ export function ChatPane(props: ChatPaneProps) {
   // `item.started` arriving, even though the runtime was still working the
   // turn. The pinned plan/budget item already advertises its own running
   // state, so suppress the tail when that's live to avoid double indicators.
-  const showTailLoader = isLive && !hiddenRuntimeItemIsLive;
+  const turn = useTurnTimer(thread.id, isLive);
+  const showTailLoader = (isLive || turn?.endedAt != null) && !hiddenRuntimeItemIsLive;
   const showEmptyHint = isEmpty && !isLive;
 
   return (
@@ -176,7 +176,7 @@ export function ChatPane(props: ChatPaneProps) {
                     scrollElement={scrollEl}
                   />
                   <ApprovalRequestList threadId={thread.id} requests={requests} />
-                  {showTailLoader ? <ChatTailLoader /> : null}
+                  {showTailLoader && turn ? <ChatTailLoader turn={turn} /> : null}
                 </>
               )}
             </div>
@@ -341,13 +341,43 @@ const ChatScrollControls = forwardRef<
   );
 });
 
-function ChatTailLoader() {
+interface TurnTiming {
+  startedAt: number;
+  endedAt: number | null;
+}
+
+/**
+ * Tracks the most recent turn's start and end times for the tail label.
+ * Persists "Worked for N" after the turn ends until the next turn begins;
+ * resets when the active thread changes.
+ */
+function useTurnTimer(threadId: string, isLive: boolean): TurnTiming | null {
+  const [turn, setTurn] = useState<TurnTiming | null>(() =>
+    isLive ? { startedAt: Date.now(), endedAt: null } : null,
+  );
+  const prevRef = useRef({ threadId, isLive });
+
+  useEffect(() => {
+    const prev = prevRef.current;
+    if (prev.threadId !== threadId) {
+      setTurn(isLive ? { startedAt: Date.now(), endedAt: null } : null);
+    } else if (isLive && !prev.isLive) {
+      setTurn({ startedAt: Date.now(), endedAt: null });
+    } else if (!isLive && prev.isLive) {
+      setTurn((p) => (p && p.endedAt === null ? { ...p, endedAt: Date.now() } : p));
+    }
+    prevRef.current = { threadId, isLive };
+  }, [threadId, isLive]);
+
+  return turn;
+}
+
+function ChatTailLoader({ turn }: { turn: TurnTiming }) {
   return (
     <div className="mx-auto w-full max-w-[920px]">
       <Surface variant="transparent" className={chatMessageSurfaceClass}>
         <div className="inline-flex items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
-          <PixelLoader size="xxs" />
-          <WorkingFor />
+          <WorkingFor turn={turn} />
         </div>
       </Surface>
     </div>
@@ -355,29 +385,39 @@ function ChatTailLoader() {
 }
 
 /**
- * Self-ticking "Working for Xs" label. Mutates `textContent` directly via a
- * ref instead of calling `setState` so the per-second tick produces zero
- * React commits — important while the rest of the chat is potentially
- * streaming. Mount-anchored start time is sufficient because `ChatTailLoader`
- * unmounts at turn-end and remounts on the next turn.
+ * Self-ticking elapsed-time label. While `turn.endedAt` is null, ticks every
+ * second as "Working for N"; once set, freezes as "Worked for N". Mutates
+ * `textContent` directly via a ref instead of calling `setState` so the
+ * per-second tick produces zero React commits — important while the rest of
+ * the chat is potentially streaming.
  */
-function WorkingFor() {
+function WorkingFor({ turn }: { turn: TurnTiming }) {
   const textRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    const startedAt = Date.now();
     const update = () => {
       const node = textRef.current;
       if (!node) return;
-      const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+      if (turn.endedAt !== null) {
+        const elapsedSeconds = Math.max(
+          0,
+          Math.floor((turn.endedAt - turn.startedAt) / 1000),
+        );
+        node.textContent =
+          elapsedSeconds < 1 ? "" : `Worked for ${formatElapsed(elapsedSeconds)}`;
+        return;
+      }
+      const elapsedSeconds = Math.floor((Date.now() - turn.startedAt) / 1000);
       node.textContent = elapsedSeconds < 1 ? "" : `Working for ${formatElapsed(elapsedSeconds)}`;
     };
     update();
+    if (turn.endedAt !== null) return;
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [turn.startedAt, turn.endedAt]);
 
-  return <span ref={textRef} className="lightcode-thinking-text" aria-live="polite" />;
+  const className = turn.endedAt === null ? "lightcode-thinking-text" : "text-muted";
+  return <span ref={textRef} className={className} aria-live="polite" />;
 }
 
 function formatElapsed(totalSeconds: number): string {

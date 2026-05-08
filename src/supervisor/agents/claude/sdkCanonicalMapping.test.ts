@@ -13,6 +13,18 @@ function streamEvent(event: Record<string, unknown>): SDKMessage {
   return { type: "stream_event", session_id: "claude-session", event } as unknown as SDKMessage;
 }
 
+function streamEventWithParent(
+  event: Record<string, unknown>,
+  parentToolUseId: string,
+): SDKMessage {
+  return {
+    type: "stream_event",
+    session_id: "claude-session",
+    parent_tool_use_id: parentToolUseId,
+    event,
+  } as unknown as SDKMessage;
+}
+
 describe("sdkCanonicalMapping — prompt content", () => {
   it("starts a turn with the optimistic user message id and mapped attachments", () => {
     const state = createClaudeMapperState("thread-1");
@@ -192,6 +204,145 @@ describe("sdkCanonicalMapping — tool use", () => {
   });
 });
 
+describe("sdkCanonicalMapping — sub-agents", () => {
+  it("tags item.started events with parentItemId when parent_tool_use_id is set", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      streamEventWithParent(
+        { type: "content_block_start", index: 0, content_block: { type: "text", text: "" } },
+        "toolu_parent",
+      ),
+      state,
+    );
+    expect(events).toEqual([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: expect.stringMatching(/^asst-/),
+        itemType: "assistant_message",
+        parentItemId: "toolu_parent",
+      },
+    ]);
+  });
+
+  it("does not set parentItemId on top-level messages (parent_tool_use_id null)", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      }),
+      state,
+    );
+    expect(events[0]).not.toHaveProperty("parentItemId");
+  });
+});
+
+describe("sdkCanonicalMapping — task progress", () => {
+  it("absorbs task_progress into the parent Task tool_call as item.updated", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_T1",
+          name: "Task",
+          input: { description: "research" },
+        },
+      }),
+      state,
+    );
+
+    const events = mapClaudeSdkMessage(
+      {
+        type: "system",
+        subtype: "task_progress",
+        session_id: "claude-session",
+        task_id: "task-1",
+        tool_use_id: "toolu_T1",
+        description: "Searching for callers",
+        last_tool_name: "Grep",
+        usage: { total_tokens: 4200, tool_uses: 3, duration_ms: 1500 },
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(events).toMatchObject([
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "toolu_T1",
+        payload: {
+          name: "Task",
+          status: "running",
+          progress: {
+            description: "Searching for callers",
+            lastToolName: "Grep",
+            tokens: 4200,
+            toolUses: 3,
+            durationMs: 1500,
+          },
+        },
+      },
+    ]);
+  });
+
+  it("ignores task_progress for unknown tool_use_id", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      {
+        type: "system",
+        subtype: "task_progress",
+        session_id: "claude-session",
+        task_id: "task-1",
+        tool_use_id: "toolu_unknown",
+        description: "x",
+        usage: { total_tokens: 1, tool_uses: 1, duration_ms: 1 },
+      } as unknown as SDKMessage,
+      state,
+    );
+    expect(events).toEqual([]);
+  });
+});
+
+describe("sdkCanonicalMapping — compaction", () => {
+  it("synthesizes a ContextCompaction tool_call carrying compact_metadata when boundary arrives", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      {
+        type: "system",
+        subtype: "compact_boundary",
+        compact_metadata: { trigger: "auto", pre_tokens: 100000, post_tokens: 12000 },
+        session_id: "claude-session",
+      } as unknown as SDKMessage,
+      state,
+    );
+    expect(events).toMatchObject([
+      {
+        type: "item.started",
+        itemType: "tool_call",
+        payload: {
+          name: "ContextCompaction",
+          status: "success",
+          args: { trigger: "auto", pre_tokens: 100000, post_tokens: 12000 },
+        },
+      },
+      {
+        type: "item.completed",
+        payload: {
+          name: "ContextCompaction",
+          status: "success",
+          args: { trigger: "auto", pre_tokens: 100000, post_tokens: 12000 },
+        },
+      },
+    ]);
+    expect((events[0] as { itemId: string }).itemId).toBe((events[1] as { itemId: string }).itemId);
+  });
+});
+
 describe("sdkCanonicalMapping — turn completion", () => {
   it("maps a successful result to turn.completed", () => {
     const state = createClaudeMapperState("thread-1");
@@ -222,6 +373,89 @@ describe("sdkCanonicalMapping — requests", () => {
       requestId: "perm-1",
       requestType: "command_execution_approval",
       payload: { summary: "Bash: pnpm test" },
+    });
+  });
+
+  it("forwards displayName, blockedPath, decisionReason, and toolUseID into details", () => {
+    const event = mapClaudePermissionRequest({
+      threadId: "thread-1",
+      requestId: "perm-2",
+      toolName: "Read",
+      toolInput: { file_path: "/tmp/x.txt" },
+      displayName: "Read",
+      description: "/tmp/x.txt",
+      blockedPath: "/tmp",
+      decisionReason: "Path is outside allowed working directories",
+      toolUseID: "toolu_01",
+    });
+    expect(event).toMatchObject({
+      type: "request.opened",
+      payload: {
+        details: {
+          toolName: "Read",
+          displayName: "Read",
+          description: "/tmp/x.txt",
+          blockedPath: "/tmp",
+          decisionReason: "Path is outside allowed working directories",
+          toolUseID: "toolu_01",
+          input: { file_path: "/tmp/x.txt" },
+        },
+      },
+    });
+  });
+
+  it("translates suggestions into one option per suggestion plus accept/decline", () => {
+    const event = mapClaudePermissionRequest({
+      threadId: "thread-1",
+      requestId: "perm-3",
+      toolName: "Bash",
+      toolInput: { command: "ls /tmp" },
+      suggestions: [
+        {
+          type: "addRules",
+          rules: [{ toolName: "Bash", ruleContent: "ls /tmp" }],
+          behavior: "allow",
+          destination: "localSettings",
+        },
+        {
+          type: "addDirectories",
+          directories: ["/tmp"],
+          destination: "session",
+        },
+      ],
+    });
+    expect(event).toMatchObject({
+      type: "request.opened",
+      payload: {
+        options: [
+          { optionId: "accept", label: "Allow once" },
+          {
+            optionId: "accept-suggestion-0",
+            label: "Always allow Bash (local)",
+            description: "ls /tmp",
+          },
+          { optionId: "accept-suggestion-1", label: "Allow directories /tmp" },
+          { optionId: "decline", label: "Deny" },
+        ],
+      },
+    });
+  });
+
+  it("falls back to a single Always-allow option when no suggestions are present", () => {
+    const event = mapClaudePermissionRequest({
+      threadId: "thread-1",
+      requestId: "perm-4",
+      toolName: "Bash",
+      toolInput: { command: "echo hi" },
+    });
+    expect(event).toMatchObject({
+      payload: {
+        options: [
+          { optionId: "accept", label: "Allow once" },
+          { optionId: "acceptForSession", label: "Always allow" },
+          { optionId: "decline", label: "Deny" },
+        ],
+      },
     });
   });
 

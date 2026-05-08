@@ -17,6 +17,13 @@ export interface RuntimeChatItem {
   payload?: unknown;
   /** Streamed content buckets (markdown text, command output, etc.). */
   streams: Partial<Record<RuntimeContentStreamKind, string>>;
+  /**
+   * Identifier of a parent tool_call row when this item was emitted by a
+   * sub-agent (e.g. items inside a Claude `Task` tool use). Set on
+   * `item.started` and immutable thereafter. The chat timeline groups children
+   * under their parent row instead of listing them as top-level entries.
+   */
+  parentItemId?: string;
 }
 
 export interface OpenRuntimeRequest {
@@ -228,6 +235,7 @@ function applyRuntimeEventToRuntimeState(
         state: "started",
         payload: event.payload,
         streams: {},
+        ...(event.parentItemId ? { parentItemId: event.parentItemId } : {}),
       };
       return {
         runtimeItemIdsByThread: {

@@ -19,7 +19,7 @@ interface UserMessageProps {
 const COLLAPSED_LINE_COUNT = 4;
 const COLLAPSED_CHAR_COUNT = 280;
 const collapsedMessageClass =
-  "overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4]";
+  "overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [mask-image:linear-gradient(to_bottom,black_65%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_65%,transparent)]";
 
 export const UserMessage = memo(function UserMessage({ item }: UserMessageProps) {
   const actions = useChatPaneActions();
@@ -37,7 +37,13 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
   return (
     <Surface variant="tertiary" className={`${chatMessageSurfaceClass} relative`}>
       <div
-        className={`min-w-0 space-y-1.5 leading-snug ${isCollapsed ? collapsedMessageClass : ""}`}
+        className={`min-w-0 space-y-1.5 leading-snug ${
+          isCollapsed
+            ? collapsedMessageClass
+            : isCollapsible
+              ? "max-h-[50vh] overflow-y-auto"
+              : ""
+        }`}
       >
         {text.length > 0 ? <ItemMarkdown text={text} /> : null}
         {attachments.length > 0 ? (
@@ -54,26 +60,17 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
       </div>
       {isCollapsible ? (
         <>
-          {isCollapsed ? (
-            <div
-              aria-hidden
-              className="pointer-events-none absolute inset-x-3 bottom-2 h-6 rounded-b-3xl bg-gradient-to-t from-[var(--lc-surface-tertiary,var(--content-background))] to-transparent"
-            />
-          ) : null}
           <Tooltip delay={300}>
-            <Tooltip.Trigger>
-              <button
-                type="button"
-                aria-expanded={isExpanded}
-                aria-label={tooltipLabel}
-                onClick={() => {
-                  setIsExpanded((prev) => !prev);
-                  actions?.onContentHeightChange();
-                }}
-                className="absolute bottom-1.5 right-2 flex size-5 items-center justify-center rounded-full bg-[var(--content-background)]/80 text-muted backdrop-blur-sm transition-colors hover:bg-[var(--content-background)] hover:text-foreground"
-              >
-                <Icon className="size-3" />
-              </button>
+            <Tooltip.Trigger
+              aria-expanded={isExpanded}
+              aria-label={tooltipLabel}
+              onClick={() => {
+                setIsExpanded((prev) => !prev);
+                actions?.onContentHeightChange();
+              }}
+              className="absolute bottom-1 right-2 flex size-5 items-center justify-center text-muted transition-colors hover:text-foreground"
+            >
+              <Icon className="size-3.5" />
             </Tooltip.Trigger>
             <Tooltip.Content placement="top">{tooltipLabel}</Tooltip.Content>
           </Tooltip>

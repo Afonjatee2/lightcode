@@ -12,6 +12,7 @@ interface ContextCompactionProps {
 
 export const ContextCompaction = memo(function ContextCompaction({ item }: ContextCompactionProps) {
   const isRunning = item.state !== "completed";
+  const summary = isRunning ? null : formatCompactionSummary(item.payload);
 
   if (isRunning) {
     return (
@@ -29,11 +30,43 @@ export const ContextCompaction = memo(function ContextCompaction({ item }: Conte
     <div className="flex w-full flex-col items-stretch justify-center px-3 py-2 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
       <span className="inline-flex min-w-0 items-center gap-1.5 self-start leading-none italic opacity-80">
         <Layers className="size-3 shrink-0" />
-        Context compacted
+        {summary ?? "Context compacted"}
       </span>
     </div>
   );
 });
+
+interface CompactMetadata {
+  trigger?: "manual" | "auto" | string;
+  pre_tokens?: number;
+  post_tokens?: number;
+  duration_ms?: number;
+}
+
+function formatCompactionSummary(payload: unknown): string | null {
+  const meta = readCompactMetadata(payload);
+  if (!meta) return null;
+  const before = formatTokenCount(meta.pre_tokens);
+  const after = formatTokenCount(meta.post_tokens);
+  const trigger = meta.trigger === "manual" ? "manually compacted" : "compacted";
+  if (before && after) return `Context ${trigger}: ${before} → ${after} tokens`;
+  if (before) return `Context ${trigger} from ${before} tokens`;
+  return null;
+}
+
+function readCompactMetadata(payload: unknown): CompactMetadata | null {
+  if (!payload || typeof payload !== "object") return null;
+  const args = (payload as { args?: unknown }).args;
+  if (!args || typeof args !== "object") return null;
+  return args as CompactMetadata;
+}
+
+function formatTokenCount(value: number | undefined): string | null {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  if (value < 1000) return String(value);
+  if (value < 1_000_000) return `${(value / 1000).toFixed(value < 10_000 ? 1 : 0)}k`;
+  return `${(value / 1_000_000).toFixed(1)}M`;
+}
 
 /**
  * Names known to denote a context-compaction tool call. Compared

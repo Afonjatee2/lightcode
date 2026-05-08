@@ -38,6 +38,7 @@ export function installRuntimeItemsPersister(): () => void {
             state: item.state,
             payload: item.payload,
             streams: item.streams as Record<string, string>,
+            ...(item.parentItemId ? { parentItemId: item.parentItemId } : {}),
           })),
         })
         .catch((err: unknown) => {
@@ -95,6 +96,7 @@ export async function hydrateThreadRuntimeItems(threadId: string): Promise<void>
         state: row.state,
         payload: row.payload,
         streams: row.streams as RuntimeChatItem["streams"],
+        ...(row.parentItemId ? { parentItemId: row.parentItemId } : {}),
       })),
     );
     useAppStore.getState().hydrateThreadRuntimeItems(threadId, items);

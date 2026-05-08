@@ -245,6 +245,7 @@ const persistedRuntimeItemSchema = z.object({
   state: z.enum(["started", "updated", "completed"]),
   payload: z.unknown(),
   streams: z.record(z.string(), z.string()),
+  parentItemId: z.string().optional(),
 });
 export type PersistedRuntimeItem = z.infer<typeof persistedRuntimeItemSchema>;
 

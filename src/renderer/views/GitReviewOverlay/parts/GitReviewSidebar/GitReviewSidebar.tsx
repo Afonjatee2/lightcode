@@ -181,7 +181,6 @@ export function GitReviewSidebar(props: {
   const hasStagedChanges = (gitStatus?.staged.length ?? 0) > 0;
   const hasAnyChanges = hasStagedChanges || (gitStatus?.unstaged.length ?? 0) > 0;
   const canCommitStaged = hasAnyChanges && !isCommitting && !isGenerating;
-  const canCommitAll = hasAnyChanges && !isCommitting && !isGenerating;
   const hasRemote = gitStatus?.hasRemote ?? false;
   const hasTracking = Boolean(gitStatus?.tracking);
   const ahead = gitStatus?.ahead ?? 0;
@@ -321,7 +320,6 @@ export function GitReviewSidebar(props: {
               commitMessage={commitMessage}
               setCommitMessage={setCommitMessage}
               canCommitStaged={canCommitStaged}
-              canCommitAll={canCommitAll}
               canGenerateMessage={canGenerateMessage}
               isCommitting={isCommitting}
               isGenerating={isGenerating}

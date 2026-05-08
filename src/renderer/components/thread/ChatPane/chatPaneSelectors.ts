@@ -1,6 +1,7 @@
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import type { AppStoreState } from "@/renderer/state/slices/shared";
 import { isContextCompactionToolCall } from "./parts/items/ContextCompaction";
+import { isPlanProposalToolCall } from "./parts/items/PlanProposal";
 
 export const EMPTY_THREAD_ITEM_IDS = Object.freeze([]) as readonly string[];
 export const EMPTY_THREAD_TIMELINE_ENTRIES = Object.freeze([]) as readonly ChatTimelineEntry[];
@@ -77,7 +78,11 @@ export function selectVisibleThreadRuntimeItemIds(
   const visible = itemIds.filter((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
-    return item ? isVisibleRuntimeItem(item) : true;
+    if (!item) return true;
+    // Sub-agent children render embedded under their parent tool_call row, not
+    // as siblings at the top of the timeline.
+    if (item.parentItemId) return false;
+    return isVisibleRuntimeItem(item);
   });
   const result =
     visible.length === 0
@@ -112,7 +117,7 @@ export function selectVisibleThreadTimelineEntries(
   while (idx < itemIds.length) {
     const itemId = itemIds[idx]!;
     const item = items?.[itemId];
-    if (!item || !isToolGroupItem(item)) {
+    if (!item || !isToolGroupItem(item) || selectChildItemIds(state, threadId, itemId).length > 0) {
       entries.push({ kind: "item", id: itemId });
       idx += 1;
       continue;
@@ -122,7 +127,13 @@ export function selectVisibleThreadTimelineEntries(
     while (idx < itemIds.length) {
       const nextId = itemIds[idx]!;
       const next = items?.[nextId];
-      if (!next || !isToolGroupItem(next)) break;
+      if (
+        !next ||
+        !isToolGroupItem(next) ||
+        selectChildItemIds(state, threadId, nextId).length > 0
+      ) {
+        break;
+      }
       groupIds.push(nextId);
       idx += 1;
     }
@@ -143,6 +154,7 @@ export function selectVisibleThreadTimelineEntries(
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {
   if (isContextCompactionToolCall(item)) return false;
+  if (isPlanProposalToolCall(item)) return false;
   return (
     item.type === "tool_call" ||
     item.type === "command_execution" ||
@@ -189,6 +201,10 @@ function isVisibleRuntimeItem(item: RuntimeChatItem): boolean {
   // even after they retire (e.g. all steps completed). Empty completed
   // reasoning items are already dropped at the data layer.
   if (item.type === "plan") return false;
+  // Error items have no renderer in the chat row switch (ChatItemRow returns
+  // null for `error`); excluding them here keeps the virtualized list from
+  // allocating an empty slot that shows up as a gap.
+  if (item.type === "error") return false;
   return true;
 }
 
@@ -224,6 +240,60 @@ export function getRuntimeItemStoreSelector(
   return sel;
 }
 
+/**
+ * Ordered list of child item ids for a sub-agent parent (e.g. a Claude `Task`
+ * tool_call). Cached by the thread's structural version so the result reference
+ * stays stable across content-only deltas.
+ */
+const childIdsCache = new Map<
+  string,
+  {
+    sourceItemIds: readonly string[];
+    structuralVersion: number;
+    result: readonly string[];
+  }
+>();
+
+export function selectChildItemIds(
+  state: AppStoreState,
+  threadId: string,
+  parentItemId: string,
+): readonly string[] {
+  const itemIds = state.runtimeItemIdsByThread[threadId];
+  if (!itemIds?.length) return EMPTY_THREAD_ITEM_IDS;
+  const cacheKey = `${threadId}\0${parentItemId}`;
+  const structuralVersion = state.runtimeStructuralVersionByThread?.[threadId] ?? 0;
+  const cached = childIdsCache.get(cacheKey);
+  if (
+    cached &&
+    cached.sourceItemIds === itemIds &&
+    cached.structuralVersion === structuralVersion
+  ) {
+    return cached.result;
+  }
+  const items = state.runtimeItemsByIdByThread[threadId];
+  const result = itemIds.filter((id) => items?.[id]?.parentItemId === parentItemId);
+  const finalResult = result.length === 0 ? EMPTY_THREAD_ITEM_IDS : result;
+  if (childIdsCache.size > 500) childIdsCache.clear();
+  childIdsCache.set(cacheKey, { sourceItemIds: itemIds, structuralVersion, result: finalResult });
+  return finalResult;
+}
+
+const childIdsStoreSelectorCache = new Map<string, (state: AppStoreState) => readonly string[]>();
+
+export function getChildItemIdsStoreSelector(
+  threadId: string,
+  parentItemId: string,
+): (state: AppStoreState) => readonly string[] {
+  const key = `${threadId}\0${parentItemId}`;
+  let sel = childIdsStoreSelectorCache.get(key);
+  if (!sel) {
+    sel = (state) => selectChildItemIds(state, threadId, parentItemId);
+    childIdsStoreSelectorCache.set(key, sel);
+  }
+  return sel;
+}
+
 export function clearRuntimeItemStoreSelectorCacheForThread(threadId: string): void {
   const prefix = `${threadId}\0`;
   for (const key of runtimeItemStoreSelectorCache.keys()) {
@@ -236,5 +306,11 @@ export function clearRuntimeItemStoreSelectorCacheForThread(threadId: string): v
   }
   for (const key of visibleItemIdsCache.keys()) {
     if (key.startsWith(prefix)) visibleItemIdsCache.delete(key);
+  }
+  for (const key of childIdsCache.keys()) {
+    if (key.startsWith(prefix)) childIdsCache.delete(key);
+  }
+  for (const key of childIdsStoreSelectorCache.keys()) {
+    if (key.startsWith(prefix)) childIdsStoreSelectorCache.delete(key);
   }
 }

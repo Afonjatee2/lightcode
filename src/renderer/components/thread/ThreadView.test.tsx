@@ -135,6 +135,69 @@ describe("ThreadView", () => {
     });
   });
 
+  it("forwards launch rejection messages to the launch failure callback", async () => {
+    bridge.startThread.mockRejectedValueOnce(new Error("launcher boom"));
+    const onLaunchConsumed = vi.fn<() => void>();
+    const onLaunchFailed = vi.fn<(message: string) => void>();
+
+    renderThreadView({
+      thread: {
+        id: "thread-launch-error",
+        projectId: "project-1",
+        title: "Queued Codex thread",
+        agentKind: "codex",
+        config: {
+          model: "gpt-5.4",
+        },
+        status: "launching",
+        attention: "none",
+        canResumeWithConfig: false,
+        archived: false,
+        done: false,
+        starred: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "codex",
+        label: "Codex",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "read-only", label: "Read Only" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      pendingLaunchPrompt: "hi",
+      pendingServerRequests: [],
+      onConfigChange: () => undefined,
+      onLaunchConsumed,
+      onLaunchFailed,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    fireEvent.click(screen.getByText("report terminal size"));
+
+    await waitFor(() => {
+      expect(onLaunchConsumed).toHaveBeenCalledTimes(1);
+      expect(onLaunchFailed).toHaveBeenCalledWith("launcher boom");
+    });
+  });
+
   it("renders a server-mode composer for Codex live threads", () => {
     renderThreadView({
       thread: {

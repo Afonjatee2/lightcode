@@ -1,12 +1,16 @@
 import { randomUUID } from "node:crypto";
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { PermissionUpdate, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import type {
   CanonicalContentBlock,
   CanonicalItemType,
   CanonicalRequestType,
+  PermissionRequestDetails,
+  PermissionSuggestion,
   PromptSegment,
   RuntimeEvent,
+  ToolCallProgress,
   TurnState,
+  UserInputOption,
 } from "@/shared/contracts";
 
 interface TextItemState {
@@ -23,6 +27,7 @@ interface ToolItemState {
   input: Record<string, unknown>;
   partialInputJson: string;
   lastInputFingerprint?: string;
+  progress?: ToolCallProgress;
 }
 
 export interface ClaudeMapperState {
@@ -182,6 +187,8 @@ function classifyRequestType(toolName: string): CanonicalRequestType {
   return "tool_user_input";
 }
 
+export const ACCEPT_SUGGESTION_OPTION_PREFIX = "accept-suggestion-";
+
 export function mapClaudePermissionRequest(input: {
   threadId: string;
   requestId: string;
@@ -189,8 +196,24 @@ export function mapClaudePermissionRequest(input: {
   toolInput: Record<string, unknown>;
   title?: string;
   description?: string;
+  displayName?: string;
+  blockedPath?: string;
+  decisionReason?: string;
+  toolUseID?: string;
+  suggestions?: readonly PermissionUpdate[];
 }): RuntimeEvent {
   const summary = input.title ?? summarizeToolRequest(input.toolName, input.toolInput);
+  const suggestions = (input.suggestions ?? []) as PermissionSuggestion[];
+  const details: PermissionRequestDetails = {
+    toolName: input.toolName,
+    input: input.toolInput,
+    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.description ? { description: input.description } : {}),
+    ...(input.blockedPath ? { blockedPath: input.blockedPath } : {}),
+    ...(input.decisionReason ? { decisionReason: input.decisionReason } : {}),
+    ...(input.toolUseID ? { toolUseID: input.toolUseID } : {}),
+    ...(suggestions.length > 0 ? { suggestions } : {}),
+  };
   return {
     type: "request.opened",
     threadId: input.threadId,
@@ -198,18 +221,73 @@ export function mapClaudePermissionRequest(input: {
     requestType: classifyRequestType(input.toolName),
     payload: {
       summary,
-      details: {
-        toolName: input.toolName,
-        input: input.toolInput,
-        ...(input.description ? { description: input.description } : {}),
-      },
-      options: [
-        { optionId: "accept", label: "Allow" },
-        { optionId: "acceptForSession", label: "Always Allow" },
-        { optionId: "decline", label: "Deny" },
-      ],
+      details,
+      options: buildPermissionOptions(suggestions),
     },
   };
+}
+
+function buildPermissionOptions(suggestions: readonly PermissionSuggestion[]): UserInputOption[] {
+  const options: UserInputOption[] = [{ optionId: "accept", label: "Allow once" }];
+  if (suggestions.length === 0) {
+    options.push({ optionId: "acceptForSession", label: "Always allow" });
+  } else {
+    suggestions.forEach((suggestion, index) => {
+      options.push({
+        optionId: `${ACCEPT_SUGGESTION_OPTION_PREFIX}${index}`,
+        label: formatSuggestionLabel(suggestion),
+        ...(formatSuggestionDescription(suggestion)
+          ? { description: formatSuggestionDescription(suggestion) as string }
+          : {}),
+      });
+    });
+  }
+  options.push({ optionId: "decline", label: "Deny" });
+  return options;
+}
+
+function formatSuggestionLabel(s: PermissionSuggestion): string {
+  switch (s.type) {
+    case "addRules":
+    case "replaceRules":
+    case "removeRules": {
+      const tools = s.rules.map((r) => r.toolName).filter(Boolean);
+      const verb = s.behavior === "allow" ? "Always allow" : s.behavior === "deny" ? "Deny" : "Ask";
+      const scope = tools.length > 0 ? tools.join(", ") : "rule";
+      return `${verb} ${scope}${destSuffix(s.destination)}`;
+    }
+    case "setMode":
+      return `Switch to ${s.mode} mode${destSuffix(s.destination)}`;
+    case "addDirectories":
+      return `Allow directories ${formatList(s.directories)}${destSuffix(s.destination)}`;
+    case "removeDirectories":
+      return `Block directories ${formatList(s.directories)}${destSuffix(s.destination)}`;
+  }
+}
+
+function formatSuggestionDescription(s: PermissionSuggestion): string | undefined {
+  if (s.type === "addRules" || s.type === "replaceRules" || s.type === "removeRules") {
+    const patterns = s.rules
+      .map((r) => r.ruleContent)
+      .filter((v): v is string => typeof v === "string" && v.length > 0);
+    return patterns.length > 0 ? patterns.join(" · ") : undefined;
+  }
+  return undefined;
+}
+
+function formatList(values: readonly string[]): string {
+  if (values.length === 0) return "";
+  if (values.length <= 3) return values.join(", ");
+  return `${values.slice(0, 3).join(", ")} (+${values.length - 3} more)`;
+}
+
+function destSuffix(dest: string): string {
+  if (dest === "session") return "";
+  if (dest === "userSettings") return " (user settings)";
+  if (dest === "projectSettings") return " (project)";
+  if (dest === "localSettings") return " (local)";
+  if (dest === "cliArg") return " (cli arg)";
+  return "";
 }
 
 export function mapClaudeQuestionRequest(input: {
@@ -300,7 +378,13 @@ function toolPayload(
   if (tool.itemType === "plan") {
     return { steps: extractPlanSteps(tool.input) };
   }
-  return { name: tool.toolName, args: tool.input, result, status };
+  return {
+    name: tool.toolName,
+    args: tool.input,
+    result,
+    status,
+    ...(tool.progress ? { progress: tool.progress } : {}),
+  };
 }
 
 function inferFileChangeKind(toolName: string): "create" | "edit" | "delete" {
@@ -378,6 +462,70 @@ function extractText(value: unknown): string {
   return extractText(obj.content);
 }
 
+/**
+ * Absorb a `task_started` / `task_progress` / `task_notification` system
+ * message into the parent Task tool_call's progress field. Lets a collapsed
+ * sub-agent row show its current step without expanding to read the children.
+ */
+function applyTaskLifecycle(
+  message: SDKMessage,
+  state: ClaudeMapperState,
+): RuntimeEvent | undefined {
+  const obj = message as {
+    tool_use_id?: unknown;
+    description?: unknown;
+    last_tool_name?: unknown;
+    summary?: unknown;
+    usage?: unknown;
+  };
+  const toolUseId = typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined;
+  if (!toolUseId) return undefined;
+  const tool = state.toolItemsById.get(toolUseId);
+  if (!tool) return undefined;
+
+  const usage =
+    obj.usage && typeof obj.usage === "object"
+      ? (obj.usage as { total_tokens?: number; tool_uses?: number; duration_ms?: number })
+      : undefined;
+  const next: ToolCallProgress = {
+    ...tool.progress,
+    ...(typeof obj.description === "string" && obj.description.length > 0
+      ? { description: obj.description }
+      : {}),
+    ...(typeof obj.last_tool_name === "string" && obj.last_tool_name.length > 0
+      ? { lastToolName: obj.last_tool_name }
+      : {}),
+    ...(typeof obj.summary === "string" && obj.summary.length > 0 ? { summary: obj.summary } : {}),
+    ...(typeof usage?.total_tokens === "number" ? { tokens: usage.total_tokens } : {}),
+    ...(typeof usage?.tool_uses === "number" ? { toolUses: usage.tool_uses } : {}),
+    ...(typeof usage?.duration_ms === "number" ? { durationMs: usage.duration_ms } : {}),
+  };
+  if (Object.keys(next).length === 0) return undefined;
+  tool.progress = next;
+  return {
+    type: "item.updated",
+    threadId: state.threadId,
+    itemId: tool.itemId,
+    payload: toolPayload(tool, "running"),
+  };
+}
+
+function readParentToolUseId(message: SDKMessage): string | undefined {
+  const value = (message as { parent_tool_use_id?: unknown }).parent_tool_use_id;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function tagParent(events: RuntimeEvent[], parentItemId: string | undefined): RuntimeEvent[] {
+  if (!parentItemId) return events;
+  for (let i = 0; i < events.length; i += 1) {
+    const event = events[i]!;
+    if (event.type !== "item.started") continue;
+    if ("parentItemId" in event && typeof event.parentItemId === "string") continue;
+    events[i] = { ...event, parentItemId };
+  }
+  return events;
+}
+
 function mapResultState(message: Extract<SDKMessage, { type: "result" }>): TurnState {
   if (message.subtype === "success") return "completed";
   const errors =
@@ -390,6 +538,11 @@ function mapResultState(message: Extract<SDKMessage, { type: "result" }>): TurnS
 }
 
 export function mapClaudeSdkMessage(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
+  const events = mapClaudeSdkMessageInner(message, state);
+  return tagParent(events, readParentToolUseId(message));
+}
+
+function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
   const events: RuntimeEvent[] = [];
   if (message.type === "stream_event") {
     const event = message.event as unknown as Record<string, unknown>;
@@ -607,6 +760,41 @@ export function mapClaudeSdkMessage(message: SDKMessage, state: ClaudeMapperStat
       });
       delete state.currentTurnId;
     }
+    return events;
+  }
+
+  if (
+    message.type === "system" &&
+    (message.subtype === "task_started" ||
+      message.subtype === "task_progress" ||
+      message.subtype === "task_notification")
+  ) {
+    const updated = applyTaskLifecycle(message, state);
+    if (updated) events.push(updated);
+    return events;
+  }
+
+  if (message.type === "system" && message.subtype === "compact_boundary") {
+    const itemId = newItemId("compact");
+    const metadata = (message as { compact_metadata?: unknown }).compact_metadata;
+    const payload = {
+      name: "ContextCompaction",
+      status: "success" as const,
+      ...(metadata && typeof metadata === "object" ? { args: metadata } : {}),
+    };
+    events.push({
+      type: "item.started",
+      threadId: state.threadId,
+      itemId,
+      itemType: "tool_call",
+      payload,
+    });
+    events.push({
+      type: "item.completed",
+      threadId: state.threadId,
+      itemId,
+      payload,
+    });
     return events;
   }
 

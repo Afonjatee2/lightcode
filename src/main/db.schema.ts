@@ -67,4 +67,5 @@ export const threadRuntimeItems = sqliteTable("thread_runtime_items", {
   state: text("state").notNull(),
   payload: text("payload"), // JSON, nullable
   streams: text("streams"), // JSON of Partial<Record<RuntimeContentStreamKind, string>>
+  parentItemId: text("parent_item_id"), // sub-agent parent tool_call id, nullable
 });

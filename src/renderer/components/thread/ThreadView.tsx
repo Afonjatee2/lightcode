@@ -23,6 +23,25 @@ import { ThreadHeaderStatusButton } from "./ThreadHeaderStatus";
 
 const DEFAULT_HIDDEN_TERMINAL_SIZE: TerminalSize = { cols: 120, rows: 30 };
 
+function formatLaunchError(error: unknown): string {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim().length > 0) {
+    return error;
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string" &&
+    error.message.trim().length > 0
+  ) {
+    return error.message;
+  }
+  return "Thread failed to start.";
+}
+
 function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): boolean {
   return (
     prev.thread.id === next.thread.id &&
@@ -91,7 +110,7 @@ export type ThreadViewProps = {
     | undefined;
   onConfigChange: (config: ThreadConfig) => void;
   onLaunchConsumed?: (() => void) | undefined;
-  onLaunchFailed?: (() => void) | undefined;
+  onLaunchFailed?: ((message: string) => void) | undefined;
   onResolveServerRequest: (input: {
     requestId: ThreadServerRequestId;
     method: string;
@@ -218,9 +237,9 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         ...(thread.presentationMode ? { presentationMode: thread.presentationMode } : {}),
         ...(optimisticUserMessageItemId ? { userMessageItemId: optimisticUserMessageItemId } : {}),
       })
-      .catch(() => {
+      .catch((error) => {
         launchRequestRef.current = null;
-        onLaunchFailed?.();
+        onLaunchFailed?.(formatLaunchError(error));
       });
   }, [
     onLaunchConsumed,

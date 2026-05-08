@@ -39,6 +39,7 @@ export function ThreadPane(props: {
     props.threadId,
   );
   const {
+    applyRuntimeEvent,
     updateThreadConfig,
     updateThreadRuntime,
     consumeThreadLaunch,
@@ -105,8 +106,13 @@ export function ThreadPane(props: {
           : project.location
       }
       onLaunchConsumed={() => consumeThreadLaunch(thread.id)}
-      onLaunchFailed={() => {
+      onLaunchFailed={(message) => {
         startTransition(() => {
+          applyRuntimeEvent(thread.id, {
+            type: "error",
+            threadId: thread.id,
+            message,
+          });
           updateThreadRuntime(thread.id, {
             status: "error",
             attention: "error",

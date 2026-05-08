@@ -54,6 +54,11 @@
   word-break: break-all;
 }
 
+.toast__description {
+  max-height: 12rem;
+  overflow-y: auto;
+}
+
 /* HeroUI component overrides */
 [data-react-aria-pressable] {
   cursor: default;
@@ -1489,4 +1494,12 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
 .lc-chat-markdown p + ol,
 .lc-chat-markdown p + ul {
   margin-top: 0.15em;
+}
+.lc-chat-markdown > :first-child,
+.lc-chat-markdown > :first-child > :first-child {
+  margin-top: 0;
+}
+.lc-chat-markdown > :last-child,
+.lc-chat-markdown > :last-child > :last-child {
+  margin-bottom: 0;
 }

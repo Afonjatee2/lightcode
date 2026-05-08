@@ -54,11 +54,8 @@ interface PoolEntry {
 const pool = new Map<string, PoolEntry>();
 
 async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSnapshot> {
-  const wslExecPath =
-    projectLocation.kind === "wsl"
-      ? resolveAgentBinaryPath(projectLocation, "opencode")
-      : undefined;
-  const command = buildOpenCodeServerCommand(projectLocation, wslExecPath);
+  const resolvedExecPath = resolveAgentBinaryPath(projectLocation, "opencode");
+  const command = buildOpenCodeServerCommand(projectLocation, resolvedExecPath);
   const handle = spawnOpenCodeServer(command);
 
   let baseUrl: string;
