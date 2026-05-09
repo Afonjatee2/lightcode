@@ -149,13 +149,17 @@ vi.mock("./views/MainView/parts/AppShell/AppShell", () => ({
 vi.mock("./components/layout/SplitPaneContainer", () => ({
   SplitPaneContainer: (props: {
     layout: { kind: "leaf"; paneId: string } | { kind: "split"; children: unknown[] };
-    renderPane: (paneId: string) => ReactNode;
+    renderPane: (
+      paneId: string,
+      rect: { left: number; top: number; width: number; height: number },
+    ) => ReactNode;
   }) => {
+    const stubRect = { left: 0, top: 0, width: 0, height: 0 };
     const renderAll = (
       layout: { kind: "leaf"; paneId: string } | { kind: "split"; children: unknown[] },
     ): ReactNode =>
       layout.kind === "leaf"
-        ? props.renderPane(layout.paneId)
+        ? props.renderPane(layout.paneId, stubRect)
         : (
             layout.children as (
               | { kind: "leaf"; paneId: string }

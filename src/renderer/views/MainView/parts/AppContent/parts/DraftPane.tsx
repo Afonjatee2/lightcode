@@ -16,6 +16,7 @@ export function DraftPane(props: {
   projectId: string;
   paneCount: number;
   paneAlign: "left" | "center" | "right";
+  headerNeedsTrafficLightPad?: boolean;
   onClose: () => void;
   onStart: (
     project: Project,
@@ -71,6 +72,7 @@ export function DraftPane(props: {
       isDragging={isDragging}
       dropIndicator={dropIndicator}
       paneCount={props.paneCount}
+      headerNeedsTrafficLightPad={props.headerNeedsTrafficLightPad}
       droppableRef={paneElementRef}
       onClose={props.onClose}
       {...(props.paneCount > 1 ? { dragHandleRef: handleRef } : {})}

@@ -9,7 +9,15 @@ import { isWindows } from "@/renderer/bridge";
  * macOS (hiddenInset) window controls sit in the top-left. Reserve enough width + gap so the
  * sidebar wordmark and actions are not tight against the traffic lights.
  */
-export const macosTrafficLightGutterClass = "w-[80px] shrink-0" as const;
+export const macosTrafficLightGutterClass = "w-[68px] shrink-0" as const;
+
+/**
+ * Opt-in class for content elements that sit at the top-left of the main area when the sidebar
+ * is collapsed on macOS — the matching CSS rule (gated by `[data-mac-collapsed]` on
+ * `.lightcode-shell`) adds 28px of left padding so they clear the traffic-light controls. The
+ * gate is pure CSS, so descendants don't subscribe to sidebar state.
+ */
+export const macosTrafficLightPadClass = "lightcode-mac-traffic-light-pad" as const;
 
 /** Shared header bar for right/bottom dock panels (project name + tab/close icons). */
 export const panelHeaderRowClass =

@@ -1,7 +1,7 @@
-import { type RefObject, useEffect, useRef, useState } from "react";
-import { readStoredBoolean } from "@/renderer/utils/localStorage";
+import { type RefObject, useEffect, useRef } from "react";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+import { selectShouldOverlay, useSidebarOverlayStore } from "@/renderer/state/sidebarOverlayStore";
 import { CONTENT_MIN_WIDTH } from "./useResizablePanels";
 
 const SIDEBAR_COLLAPSED_WIDTH = 48;
@@ -16,117 +16,102 @@ function readAnyPanelOpen(): boolean {
   return dev.isOpen || gitPanelOpen || filesPanelOpen;
 }
 
-export function useSidebarOverlay(opts: {
+/**
+ * Wires DOM ResizeObservers and the overlay-ready raf chain to the
+ * `sidebarOverlayStore`. Sidebar overlay state lives in zustand so that the
+ * components that *render* the sidebar can subscribe to specific slices
+ * (and only those subscribers re-render on collapse). This hook owns the
+ * effects and writes to the store; it returns nothing.
+ */
+export function useSidebarOverlayEffects(opts: {
   sidebarWidth: number;
   shellRef: RefObject<HTMLDivElement | null>;
   mainRef: RefObject<HTMLElement | null>;
   onRequestClosePanels?: (() => void) | undefined;
 }) {
   const { sidebarWidth, shellRef, mainRef, onRequestClosePanels } = opts;
-
-  const [isCollapsed, setIsCollapsed] = useState(() =>
-    readStoredBoolean("lightcode-sidebar-collapsed", false),
-  );
-  const [isNarrow, setIsNarrow] = useState(false);
-  const [closingOverlay, setClosingOverlay] = useState(false);
-  const [overlayReady, setOverlayReady] = useState(false);
   const didAutoHideRef = useRef<"panels" | "sidebar" | null>(null);
-  const skipTransitionRef = useRef(false);
+  const onRequestClosePanelsRef = useRef(onRequestClosePanels);
+  onRequestClosePanelsRef.current = onRequestClosePanels;
 
-  useEffect(() => {
-    localStorage.setItem("lightcode-sidebar-collapsed", String(isCollapsed));
-  }, [isCollapsed]);
-
+  // Shell width → isNarrow (drives the overlay flag).
   useEffect(() => {
     const el = shellRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      setIsNarrow(entry.contentRect.width < CONTENT_MIN_WIDTH + sidebarWidth);
+      const next = entry.contentRect.width < CONTENT_MIN_WIDTH + sidebarWidth;
+      useSidebarOverlayStore.getState().setNarrow(next);
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, [sidebarWidth, shellRef]);
 
-  const latestRef = useRef({ isCollapsed, isNarrow });
-  latestRef.current = { isCollapsed, isNarrow };
-  const onRequestClosePanelsRef = useRef(onRequestClosePanels);
-  onRequestClosePanelsRef.current = onRequestClosePanels;
-
+  // Main width → auto-hide panels first, then sidebar, when content is squeezed.
   useEffect(() => {
     const el = mainRef.current;
     if (!el) return;
-
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
       const width = entry.contentRect.width;
-      const latest = latestRef.current;
+      const s = useSidebarOverlayStore.getState();
       if (width < CONTENT_MIN_WIDTH) {
         if (didAutoHideRef.current) return;
         if (readAnyPanelOpen()) {
           didAutoHideRef.current = "panels";
           onRequestClosePanelsRef.current?.();
-        } else if (!latest.isCollapsed && !latest.isNarrow) {
+        } else if (!s.isCollapsed && !s.isNarrow) {
           didAutoHideRef.current = "sidebar";
-          setIsCollapsed(true);
+          s.setCollapsed(true);
         }
       } else {
         didAutoHideRef.current = null;
       }
     });
-
     ro.observe(el);
     return () => ro.disconnect();
   }, [mainRef]);
 
-  const shouldOverlay = !isCollapsed && isNarrow;
-  const isOverlay = shouldOverlay || closingOverlay;
-
+  // shouldOverlay → overlayReady, with two rafs of delay (matches the
+  // original behaviour: the overlay element mounts at translateX(-full),
+  // then we flip overlayReady to slide it in). Two-phase so the browser
+  // commits the off-screen position before the transition starts.
   useEffect(() => {
-    if (!shouldOverlay) {
-      setOverlayReady(false);
-      return;
-    }
-    let cancelled = false;
-    requestAnimationFrame(() => {
-      if (cancelled) return;
-      requestAnimationFrame(() => {
-        if (cancelled) return;
-        setOverlayReady(true);
-      });
-    });
-    return () => {
-      cancelled = true;
-      setOverlayReady(false);
-    };
-  }, [shouldOverlay]);
+    let pendingFrame1: number | null = null;
+    let pendingFrame2: number | null = null;
 
-  const collapse = () => {
-    if (shouldOverlay) {
-      setClosingOverlay(true);
-      setTimeout(() => {
-        skipTransitionRef.current = true;
-        setClosingOverlay(false);
-        setIsCollapsed(true);
-        requestAnimationFrame(() => {
-          skipTransitionRef.current = false;
+    const apply = (shouldOverlay: boolean) => {
+      if (pendingFrame1 !== null) cancelAnimationFrame(pendingFrame1);
+      if (pendingFrame2 !== null) cancelAnimationFrame(pendingFrame2);
+      pendingFrame1 = null;
+      pendingFrame2 = null;
+
+      if (!shouldOverlay) {
+        useSidebarOverlayStore.getState().setOverlayReady(false);
+        return;
+      }
+      pendingFrame1 = requestAnimationFrame(() => {
+        pendingFrame1 = null;
+        pendingFrame2 = requestAnimationFrame(() => {
+          pendingFrame2 = null;
+          useSidebarOverlayStore.getState().setOverlayReady(true);
         });
-      }, 200);
-    } else {
-      setIsCollapsed(true);
-    }
-  };
-  const expand = () => setIsCollapsed(false);
+      });
+    };
 
-  return {
-    isCollapsed,
-    isOverlay,
-    closingOverlay,
-    overlayReady,
-    skipTransitionRef,
-    collapse,
-    expand,
-  };
+    apply(selectShouldOverlay(useSidebarOverlayStore.getState()));
+
+    const unsub = useSidebarOverlayStore.subscribe((state, prevState) => {
+      const cur = selectShouldOverlay(state);
+      if (cur !== selectShouldOverlay(prevState)) apply(cur);
+    });
+
+    return () => {
+      if (pendingFrame1 !== null) cancelAnimationFrame(pendingFrame1);
+      if (pendingFrame2 !== null) cancelAnimationFrame(pendingFrame2);
+      unsub();
+    };
+  }, []);
 }

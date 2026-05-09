@@ -19,3 +19,5 @@ tmp/
 resources/wsl-helpers/watcher.node
 resources/wsl-helpers/bridge.mjs
 resources/agent-plugins/
+.envrc
+.envrc.local

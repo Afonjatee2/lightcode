@@ -8,7 +8,7 @@ const DIVIDER_SIZE = 8;
 const ROOT_INSERT_ZONE_INSET = DIVIDER_SIZE / 2;
 const SPLIT_SIZE_STORAGE_PREFIX = "lightcode-pane-sizes";
 
-type Rect = { left: number; top: number; width: number; height: number };
+export type Rect = { left: number; top: number; width: number; height: number };
 
 type ComputedPane = { paneId: string; rect: Rect };
 
@@ -245,7 +245,7 @@ function RootInsertZone(props: {
 
 export function SplitPaneContainer(props: {
   layout: PaneLayout;
-  renderPane: (paneId: string) => React.ReactNode;
+  renderPane: (paneId: string, rect: Rect) => React.ReactNode;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -420,7 +420,7 @@ export function SplitPaneContainer(props: {
               height: pane.rect.height,
             }}
           >
-            {props.renderPane(pane.paneId)}
+            {props.renderPane(pane.paneId, pane.rect)}
           </div>
         ))}
         {computed.dividers.map((divider) => (

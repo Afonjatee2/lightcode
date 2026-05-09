@@ -6,9 +6,6 @@ import { isMac, isWindows } from "@/renderer/bridge";
 import { macosTrafficLightGutterClass } from "@/renderer/components/layout/sidebarChrome";
 import { AppShell, useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 
-/** When the sidebar header content is narrower than this, hide the wordmark. */
-const SIDEBAR_HEADER_WORDMARK_MIN_PX = 210;
-
 function SidebarHeaderWordmark(props: {
   title: string;
   onTitleClick?: () => void;
@@ -46,6 +43,7 @@ function SidebarHeaderRow(props: {
 }) {
   const { isCollapsed, closingOverlay } = useSidebar();
   const ref = useRef<HTMLDivElement>(null);
+  const fullContentRef = useRef<HTMLDivElement>(null);
   const [hideWordmark, setHideWordmark] = useState(false);
   const showHeaderActions = !isCollapsed || closingOverlay;
 
@@ -55,52 +53,75 @@ function SidebarHeaderRow(props: {
     if (!isMac()) return;
 
     const el = ref.current;
-    if (!el) return;
+    const fullContentEl = fullContentRef.current;
+    if (!el || !fullContentEl) return;
 
     const update = () => {
-      setHideWordmark(el.getBoundingClientRect().width < SIDEBAR_HEADER_WORDMARK_MIN_PX);
+      // Switch to icon-only mode if the available width is less than the required width
+      setHideWordmark(el.clientWidth < fullContentEl.scrollWidth);
     };
 
     update();
     const ro = new ResizeObserver(() => update());
     ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+    const ro2 = new ResizeObserver(() => update());
+    ro2.observe(fullContentEl);
+
+    return () => {
+      ro.disconnect();
+      ro2.disconnect();
+    };
+  }, [props.title]);
 
   return (
-    <div
-      ref={ref}
-      className={`flex min-h-0 min-w-0 flex-1 items-center gap-1.5${isWindows() ? " pl-1" : ""}`}
-    >
-      {isMac() && <div className={macosTrafficLightGutterClass} />}
-      {showHeaderActions ? (
-        hideWordmark && props.onTitleClick ? (
-          <Tooltip delay={150}>
-            <Tooltip.Trigger>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="ghost"
-                aria-label={props.title}
-                className="lightcode-overlay-header__controls size-6 min-w-0 shrink-0 text-muted hover:text-foreground"
-                onPress={props.onTitleClick}
-              >
-                <House className="size-3.5" />
-              </Button>
-            </Tooltip.Trigger>
-            <Tooltip.Content placement="bottom">{props.title}</Tooltip.Content>
-          </Tooltip>
-        ) : (
-          <SidebarHeaderWordmark
-            title={props.title}
-            {...(props.onTitleClick != null ? { onTitleClick: props.onTitleClick } : {})}
-            hideWordmark={hideWordmark}
-          />
-        )
-      ) : null}
-      {showHeaderActions ? props.children : null}
-      <div className="flex-1" />
-    </div>
+    <>
+      {/* Ghost container to measure uncollapsed width */}
+      <div
+        ref={fullContentRef}
+        className={`pointer-events-none absolute left-0 top-0 flex w-max items-center gap-1.5 opacity-0${
+          isWindows() ? " pl-1" : ""
+        }`}
+        aria-hidden="true"
+      >
+        {isMac() && <div className={macosTrafficLightGutterClass} />}
+        {showHeaderActions && <SidebarHeaderWordmark title={props.title} hideWordmark={false} />}
+        {showHeaderActions ? props.children : null}
+      </div>
+
+      <div
+        ref={ref}
+        className={`flex min-h-0 min-w-0 flex-1 items-center gap-1.5${isWindows() ? " pl-1" : ""}`}
+      >
+        {isMac() && <div className={macosTrafficLightGutterClass} />}
+        {showHeaderActions ? (
+          hideWordmark && props.onTitleClick ? (
+            <Tooltip delay={150}>
+              <Tooltip.Trigger>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="ghost"
+                  aria-label={props.title}
+                  className="lightcode-overlay-header__controls size-6 min-w-0 shrink-0 text-muted hover:text-foreground"
+                  onPress={props.onTitleClick}
+                >
+                  <House className="size-3.5" />
+                </Button>
+              </Tooltip.Trigger>
+              <Tooltip.Content placement="bottom">{props.title}</Tooltip.Content>
+            </Tooltip>
+          ) : (
+            <SidebarHeaderWordmark
+              title={props.title}
+              {...(props.onTitleClick != null ? { onTitleClick: props.onTitleClick } : {})}
+              hideWordmark={hideWordmark}
+            />
+          )
+        ) : null}
+        {showHeaderActions ? props.children : null}
+        <div className="flex-1" />
+      </div>
+    </>
   );
 }
 

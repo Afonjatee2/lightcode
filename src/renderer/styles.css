@@ -1249,6 +1249,15 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
   app-region: no-drag;
 }
 
+/* macOS only: when the sidebar is collapsed, the traffic-light controls sit over
+   the top-left of the content area. Elements opting in via this class get an
+   extra 28px of left padding so they clear the controls. The data-attribute
+   gate means non-Mac and expanded states match nothing — no descendant
+   subscribes to sidebar state for this. */
+[data-mac-collapsed] .lightcode-mac-traffic-light-pad {
+  padding-left: calc(0.5rem + 28px);
+}
+
 .lightcode-terminal-pane .xterm .xterm-scrollable-element > .scrollbar.vertical {
   display: none !important;
 }
