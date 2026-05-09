@@ -16,6 +16,7 @@ import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/a
 import { TuxIcon } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
+import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import type { TerminalPaneHandle } from "./TerminalPane";
 import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
 import { GuiThreadContent, TerminalThreadContent } from "./ThreadContent";
@@ -67,6 +68,7 @@ function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): 
     prev.isDragging === next.isDragging &&
     prev.dropIndicator === next.dropIndicator &&
     prev.paneCount === next.paneCount &&
+    prev.headerNeedsTrafficLightPad === next.headerNeedsTrafficLightPad &&
     prev.dragHandleRef === next.dragHandleRef &&
     prev.droppableRef === next.droppableRef &&
     prev.installedAgents === next.installedAgents &&
@@ -95,6 +97,13 @@ export type ThreadViewProps = {
     | "insert-bottom";
   paneIndex?: number;
   paneCount?: number;
+  /**
+   * True when this pane sits in the top-left and there is no group header above
+   * it — i.e., the pane's own header is the topmost row in the content area and
+   * needs to clear the macOS traffic lights when the sidebar is collapsed. Pure
+   * layout fact: stable across sidebar collapse/expand so the memo holds.
+   */
+  headerNeedsTrafficLightPad?: boolean | undefined;
   dragHandleRef?: (element: Element | null) => void;
   droppableRef?: React.RefObject<HTMLDivElement | null>;
   onClose?: (() => void) | undefined;
@@ -135,6 +144,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     dropIndicator,
     paneIndex: _paneIndex,
     paneCount = 1,
+    headerNeedsTrafficLightPad = false,
     dragHandleRef,
     droppableRef,
     onClose,
@@ -154,6 +164,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   const launchRequestRef = useRef<string | null>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
   const [isTitleTooltipOpen, setIsTitleTooltipOpen] = useState(false);
+
   // Thread-level mode wins over the adapter-declared default. Existing rows
   // load from DB with `presentationMode: "terminal"` thanks to the schema
   // default, so behaviour is preserved for everything that already shipped.
@@ -267,7 +278,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         className={`relative flex h-full min-h-0 flex-col ${isDragging ? "opacity-50" : ""}`}
       >
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
-        <div className="px-2">
+        <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}>
             <ThreadHeaderStatusButton
               threadId={thread.id}

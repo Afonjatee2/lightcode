@@ -10,6 +10,7 @@ import type {
   ThreadPresentationMode,
 } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
+import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import { getComposerControls } from "@/renderer/components/providers";
 import { getConfigNormalizer } from "@/renderer/components/providers/ProviderIcon";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
@@ -200,14 +201,27 @@ export function ThreadDraftView(props: {
     | "insert-bottom";
   paneIndex?: number;
   paneCount?: number;
+  /**
+   * True when this draft pane sits in the top-left and there is no group header
+   * above it. Adds a class so CSS can pad the header to clear the macOS
+   * traffic-light controls when the sidebar is collapsed.
+   */
+  headerNeedsTrafficLightPad?: boolean | undefined;
   droppableRef?: React.RefObject<HTMLDivElement | null>;
-  onClose?: () => void;
+  onClose?: (() => void) | undefined;
   dragHandleRef?: React.RefCallback<Element>;
   onStart: (input: DraftStartInput) => void;
 }) {
-  const { project, agentStatuses, lastDraftConfig, onStart } = props;
+  const {
+    project,
+    agentStatuses,
+    lastDraftConfig,
+    onStart,
+    headerNeedsTrafficLightPad = false,
+  } = props;
   const gitBranch = useGitStore((s) => s.statuses[project.id]?.branch);
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
+
   const installedAgents = agentStatuses.filter(
     (status) => status.installed && !disabledAgents.includes(status.kind),
   );
@@ -605,7 +619,7 @@ export function ThreadDraftView(props: {
       className={`relative flex h-full min-h-0 flex-col ${props.isDragging ? "opacity-50" : ""}`}
     >
       {props.compact && (
-        <div className="px-2">
+        <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div
             ref={props.dragHandleRef}
             className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1 ${props.dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}

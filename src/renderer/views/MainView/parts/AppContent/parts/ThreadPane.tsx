@@ -20,6 +20,7 @@ export function ThreadPane(props: {
   threadId: string;
   paneCount: number;
   paneAlign: "left" | "center" | "right";
+  headerNeedsTrafficLightPad?: boolean;
   onClose: () => void;
   onContinueInProvider?: (
     sourceThread: Thread,
@@ -81,6 +82,7 @@ export function ThreadPane(props: {
       isDragging={isDragging}
       dropIndicator={dropIndicator}
       paneCount={props.paneCount}
+      headerNeedsTrafficLightPad={props.headerNeedsTrafficLightPad}
       {...(props.paneCount > 1 ? { dragHandleRef: handleRef } : {})}
       droppableRef={paneElementRef}
       onClose={props.onClose}

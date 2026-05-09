@@ -21,7 +21,8 @@ import {
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
-import { SplitPaneContainer } from "@/renderer/components/layout/SplitPaneContainer";
+import { SplitPaneContainer, type Rect } from "@/renderer/components/layout/SplitPaneContainer";
+import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import { ThreadDraftView } from "@/renderer/components/thread/ThreadDraftView";
 import { writeScriptToShell } from "@/renderer/utils/shellUtils";
 import { generateTitleAsync } from "@/renderer/utils/titleGen";
@@ -266,10 +267,16 @@ export function AppContent() {
         </div>
       );
     }
+    const activeGroupId = view.activeGroupId;
+    const hasGroupHeader = !!(activeGroupId && activeGroupName);
 
-    function renderPane(paneId: string) {
+    function renderPane(paneId: string, rect: Rect) {
       const draftProjectId = parseDraftProjectId(paneId);
       const paneAlign = findPaneAlign(paneLayout, paneId);
+      // Only the top-left pane's own header is the topmost row in the content
+      // area when there's no group header — that's when it needs traffic-light
+      // padding on macOS. Pure layout fact: doesn't change on collapse/expand.
+      const headerNeedsTrafficLightPad = rect.left === 0 && rect.top === 0 && !hasGroupHeader;
       const paneContent = draftProjectId ? (
         <DraftPane
           key={paneId}
@@ -277,6 +284,7 @@ export function AppContent() {
           projectId={draftProjectId}
           paneCount={paneCount}
           paneAlign={paneAlign}
+          headerNeedsTrafficLightPad={headerNeedsTrafficLightPad}
           onClose={() => closePane(paneId)}
           onStart={(project, input) => void handleDraftStart(project, input, paneId)}
         />
@@ -286,6 +294,7 @@ export function AppContent() {
           threadId={paneId}
           paneCount={paneCount}
           paneAlign={paneAlign}
+          headerNeedsTrafficLightPad={headerNeedsTrafficLightPad}
           onClose={() => closePane(paneId)}
           onContinueInProvider={handleContinueInProvider}
         />
@@ -302,12 +311,12 @@ export function AppContent() {
       );
     }
 
-    const activeGroupId = view.activeGroupId;
-
     return (
       <div className="flex h-full flex-col">
         {activeGroupId && activeGroupName && (
-          <div className="flex h-[env(titlebar-area-height,32px)] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2">
+          <div
+            className={`${macosTrafficLightPadClass} flex h-[env(titlebar-area-height,32px)] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2`}
+          >
             <span className="truncate text-xs font-medium text-muted">{activeGroupName}</span>
             <button
               type="button"

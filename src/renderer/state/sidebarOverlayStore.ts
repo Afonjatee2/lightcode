@@ -1,0 +1,83 @@
+import { create } from "zustand";
+import { readStoredBoolean } from "@/renderer/utils/localStorage";
+
+const COLLAPSED_STORAGE_KEY = "lightcode-sidebar-collapsed";
+
+interface SidebarOverlayState {
+  isCollapsed: boolean;
+  isNarrow: boolean;
+  closingOverlay: boolean;
+  overlayReady: boolean;
+  /**
+   * When the sidebar transitions from overlay to collapsed, transitions on
+   * width/min-width must be suppressed for one paint so the collapsed width
+   * applies instantly. The flag is flipped on (synchronously) before the
+   * collapse render and back off in a raf, mirroring the prior ref-based
+   * behaviour.
+   */
+  skipTransition: boolean;
+  setCollapsed: (next: boolean) => void;
+  setNarrow: (next: boolean) => void;
+  setClosingOverlay: (next: boolean) => void;
+  setOverlayReady: (next: boolean) => void;
+  setSkipTransition: (next: boolean) => void;
+}
+
+export const useSidebarOverlayStore = create<SidebarOverlayState>((set) => ({
+  isCollapsed: readStoredBoolean(COLLAPSED_STORAGE_KEY, false),
+  isNarrow: false,
+  closingOverlay: false,
+  overlayReady: false,
+  skipTransition: false,
+  setCollapsed: (next) =>
+    set((s) => {
+      if (s.isCollapsed === next) return s;
+      try {
+        localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next));
+      } catch {
+        /* ignore */
+      }
+      return { isCollapsed: next };
+    }),
+  setNarrow: (next) => set((s) => (s.isNarrow === next ? s : { isNarrow: next })),
+  setClosingOverlay: (next) =>
+    set((s) => (s.closingOverlay === next ? s : { closingOverlay: next })),
+  setOverlayReady: (next) => set((s) => (s.overlayReady === next ? s : { overlayReady: next })),
+  setSkipTransition: (next) =>
+    set((s) => (s.skipTransition === next ? s : { skipTransition: next })),
+}));
+
+export function selectShouldOverlay(s: SidebarOverlayState): boolean {
+  return !s.isCollapsed && s.isNarrow;
+}
+
+export function selectIsOverlay(s: SidebarOverlayState): boolean {
+  return selectShouldOverlay(s) || s.closingOverlay;
+}
+
+/**
+ * Collapse the sidebar. When the sidebar is currently floating as an overlay
+ * (narrow viewport), play the slide-out animation first, then snap to the
+ * collapsed width without a width transition.
+ */
+export function collapseSidebar(): void {
+  const s = useSidebarOverlayStore.getState();
+  if (selectShouldOverlay(s)) {
+    s.setClosingOverlay(true);
+    setTimeout(() => {
+      const cur = useSidebarOverlayStore.getState();
+      cur.setSkipTransition(true);
+      cur.setClosingOverlay(false);
+      cur.setCollapsed(true);
+      requestAnimationFrame(() => {
+        useSidebarOverlayStore.getState().setSkipTransition(false);
+      });
+    }, 200);
+  } else {
+    s.setCollapsed(true);
+  }
+}
+
+export function expandSidebar(): void {
+  useSidebarOverlayStore.getState().setCollapsed(false);
+}

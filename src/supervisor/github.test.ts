@@ -114,6 +114,18 @@ describe("GitHubService", () => {
       expect(result).toBeNull();
     });
 
+    it("returns null when the remote repo doesn't exist on GitHub", async () => {
+      execFileAsyncMock.mockRejectedValue(
+        new Error(
+          "Command failed: gh pr list\nGraphQL: Could not resolve to a Repository with the name 'owner/missing'. (repository)\n",
+        ),
+      );
+
+      const result = await new GitHubService().getPrForBranch(location, "feature/x");
+
+      expect(result).toBeNull();
+    });
+
     it("maps draft PRs to draft state", async () => {
       const prJson = JSON.stringify([
         {

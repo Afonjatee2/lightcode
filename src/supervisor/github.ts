@@ -21,6 +21,22 @@ import { buildAgentCommand, parallelWslCommandsAsync, quotePosixShellArg } from 
 const execFileAsync = promisify(execFile);
 const GH_TIMEOUT = 30_000;
 
+// `gh` reports an unreachable remote with the GraphQL message
+// "Could not resolve to a Repository with the name '<owner>/<name>'". This
+// happens when the git remote points at a repo that doesn't exist on GitHub
+// or that the authenticated user can't see (renamed, private, transferred).
+// Polling endpoints treat this as "no PR" so the UI doesn't surface a toast
+// on every branch change.
+function isRepoNotFoundError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error);
+  const lower = msg.toLowerCase();
+  return (
+    lower.includes("could not resolve to a repository") ||
+    lower.includes("no such repository") ||
+    lower.includes("repository not found")
+  );
+}
+
 function classifyError(error: unknown, operation: string): Error {
   const msg = error instanceof Error ? error.message : String(error);
   const lower = msg.toLowerCase();
@@ -281,6 +297,7 @@ export class GitHubService {
       if (!Array.isArray(items) || items.length === 0) return null;
       return mapPrData(items[0], viewerLogin);
     } catch (err) {
+      if (isRepoNotFoundError(err)) return null;
       throw classifyError(err, "pr list");
     }
   }
