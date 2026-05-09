@@ -40,11 +40,10 @@ import type {
 import { isThreadConfigEqual } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
-  closeOpenContentItems,
+  closeOpenTurnItems,
   createAcpMapperState,
   mapAcpPermissionRequest,
   mapAcpSessionUpdate,
-  resetMapperForTurnEnd,
   type AcpMapperState,
 } from "./canonicalMapping";
 import { terminateChildProcessTree } from "@/shared/processTree";
@@ -734,7 +733,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       // Close any items still open at end-of-turn and emit turn.completed.
       const mapperState = this.ensureMapperState();
       this.emitRuntimeEvents([
-        ...closeOpenContentItems(mapperState),
+        ...closeOpenTurnItems(mapperState),
         {
           type: "turn.completed",
           threadId: this.threadId,
@@ -742,14 +741,13 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           state: result.stopReason === "cancelled" ? "cancelled" : "completed",
         },
       ]);
-      resetMapperForTurnEnd(mapperState);
     } catch (error) {
       if (this.isDisposed) return;
       const message = error instanceof Error ? error.message : String(error);
       this.listener?.onUpdate({ status: "error", attention: "error", errorMessage: message });
       const mapperState = this.ensureMapperState();
       this.emitRuntimeEvents([
-        ...closeOpenContentItems(mapperState),
+        ...closeOpenTurnItems(mapperState),
         { type: "error", threadId: this.threadId, message },
         ...(this.currentTurnId
           ? ([
@@ -762,7 +760,6 @@ export class AcpStructuredSession implements StructuredSessionHandle {
             ] as RuntimeEvent[])
           : []),
       ]);
-      resetMapperForTurnEnd(mapperState);
     } finally {
       this.promptInFlight = false;
     }
@@ -945,6 +942,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (!this.isReplayingHistory) {
       const events = mapAcpSessionUpdate(params, this.ensureMapperState());
       if (events.length > 0) this.emitRuntimeEvents(events);
+    } else {
+      return;
     }
 
     switch (update.sessionUpdate) {
@@ -1007,15 +1006,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         break;
 
       case "session_info_update": {
-        // Session metadata (title) updated — emit with sessionRef
-        const infoUpdate = update as { title?: string };
-        if (infoUpdate.title && this.sessionId) {
-          this.listener?.onUpdate({
-            status: "working",
-            attention: "working",
-            sessionRef: createKnownSessionRef(this.sessionId),
-          });
-        }
+        // Session metadata (title) updates are not evidence of active work.
         break;
       }
 

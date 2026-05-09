@@ -1,12 +1,9 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Check, ChevronDown, Lock, Sparkles } from "lucide-react";
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown, Lock, Sparkles } from "lucide-react";
 import { Button, ButtonGroup, Dropdown, Label, Tooltip } from "@heroui/react";
-import type { GitFileChange } from "@/shared/contracts";
 import { PixelLoader, TextArea } from "@/renderer/components/common";
 import { GitReviewSection } from "./GitReviewSection";
 
 export function CommitSyncPanel(props: {
-  mergeConflicting: boolean;
-  mergeConflictFiles: GitFileChange[];
   hasAnyChanges: boolean;
   hasStagedChanges: boolean;
   hasRemote: boolean;
@@ -22,8 +19,6 @@ export function CommitSyncPanel(props: {
   isGenerating: boolean;
   isSyncing: boolean;
   isPullingFromSource: boolean;
-  isAbortingMerge: boolean;
-  isFinishingMerge: boolean;
   showPullFromSource: boolean;
   sourceBranch: string | null;
   sourceAhead: number;
@@ -32,12 +27,8 @@ export function CommitSyncPanel(props: {
   handleSyncOrPush: () => Promise<void>;
   handleSyncAction: (key: "pull" | "pullRebase" | "push" | "sync" | "syncRebase") => Promise<void>;
   handlePullFromSource: () => Promise<void>;
-  handleAbortMerge: () => Promise<void>;
-  handleFinishMerge: () => Promise<void>;
 }) {
   const {
-    mergeConflicting,
-    mergeConflictFiles,
     hasAnyChanges,
     hasStagedChanges,
     hasRemote,
@@ -53,8 +44,6 @@ export function CommitSyncPanel(props: {
     isGenerating,
     isSyncing,
     isPullingFromSource,
-    isAbortingMerge,
-    isFinishingMerge,
     showPullFromSource,
     sourceBranch,
     sourceAhead,
@@ -63,45 +52,11 @@ export function CommitSyncPanel(props: {
     handleSyncOrPush,
     handleSyncAction,
     handlePullFromSource,
-    handleAbortMerge,
-    handleFinishMerge,
   } = props;
 
   return (
     <GitReviewSection gap={1}>
-      {mergeConflicting && mergeConflictFiles.length === 0 ? (
-        <>
-          <p className="text-xs font-medium text-success">All conflicts resolved</p>
-          <Button
-            variant="primary"
-            className="w-full"
-            isPending={isFinishingMerge}
-            isDisabled={isAbortingMerge}
-            onPress={() => void handleFinishMerge()}
-          >
-            {({ isPending }) => (
-              <>
-                {isPending ? <PixelLoader size="xs" /> : <Check className="size-3.5" />}
-                Finish Merge
-              </>
-            )}
-          </Button>
-          <Button
-            variant="tertiary"
-            className="w-full"
-            isPending={isAbortingMerge}
-            isDisabled={isFinishingMerge}
-            onPress={() => void handleAbortMerge()}
-          >
-            {({ isPending }) => (
-              <>
-                {isPending && <PixelLoader size="xs" />}
-                Abort Merge
-              </>
-            )}
-          </Button>
-        </>
-      ) : hasAnyChanges ? (
+      {hasAnyChanges ? (
         <>
           <div className="relative">
             <TextArea

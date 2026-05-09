@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, ChevronRight, FileEdit } from "lucide-react";
+import { ChevronDown, ChevronRight, FileEdit, Plus } from "lucide-react";
 import { DiffFile, DiffView, highlighter } from "@git-diff-view/react";
 import type { GitFileChange, Project } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { FileIcon, FileStatusBadge, PathDisplay, PixelLoader } from "@/renderer/components/common";
 import { openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
@@ -21,10 +22,23 @@ export function ConflictFileCard(props: {
   project: Project;
   worktreePath: string | undefined;
   worktreeBranch: string | undefined;
+  onRefresh: () => void;
+  storeKey: string;
+  isWorktree: boolean;
   theme: "light" | "dark";
   wrapLines: boolean;
 }) {
-  const { file, project, worktreePath, worktreeBranch, theme, wrapLines } = props;
+  const {
+    file,
+    project,
+    worktreePath,
+    worktreeBranch,
+    onRefresh,
+    storeKey,
+    isWorktree,
+    theme,
+    wrapLines,
+  } = props;
   const rowPadX = useGitReviewRowPadX();
   const [expanded, setExpanded] = useState(false);
   const [diffFile, setDiffFile] = useState<DiffFile | null>(null);
@@ -95,6 +109,14 @@ export function ConflictFileCard(props: {
     void openFileInEditor(project, worktreePath, worktreeBranch, file.path);
   }
 
+  async function handleStageConflict(e: React.MouseEvent | React.KeyboardEvent) {
+    e.stopPropagation();
+    useGitStore.getState().optimisticStageFile(storeKey, file.path, isWorktree);
+    await readBridge()
+      .gitStage({ projectLocation: project.location, filePath: file.path })
+      .catch(() => onRefresh());
+  }
+
   return (
     <div className="min-w-0">
       <div
@@ -122,6 +144,18 @@ export function ConflictFileCard(props: {
             {file.deletions > 0 && <span className="ml-0.5 text-danger">-{file.deletions}</span>}
           </span>
           <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <div
+              role="button"
+              tabIndex={0}
+              className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+              title="Stage"
+              onClick={handleStageConflict}
+              onKeyDown={(e) =>
+                handleKeyActivate(e, () => void handleStageConflict(e), { stopPropagation: true })
+              }
+            >
+              <Plus className="size-3" />
+            </div>
             <div
               role="button"
               tabIndex={0}

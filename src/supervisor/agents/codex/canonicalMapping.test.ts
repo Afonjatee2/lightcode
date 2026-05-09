@@ -190,6 +190,53 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
     expect((edit[0] as { payload: Record<string, unknown> }).payload.changeKind).toBe("edit");
   });
 
+  it("extracts file_change path from apply_patch text args", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "fc-patch",
+        item: {
+          id: "fc-patch",
+          type: "fileChange",
+          args: "*** Begin Patch\n*** Update File: src/foo.ts\n@@\n-old\n+new\n*** End Patch",
+        },
+      },
+      state,
+    );
+    expect((events[0] as { payload: Record<string, unknown> }).payload.path).toBe("src/foo.ts");
+  });
+
+  it("updates file_change path from streamed output", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification(
+      "item/started",
+      { threadId: "x", itemId: "fc-output", item: { id: "fc-output", type: "fileChange" } },
+      state,
+    );
+
+    const events = mapCodexNotification(
+      "item/fileChange/outputDelta",
+      {
+        threadId: "x",
+        itemId: "fc-output",
+        delta:
+          "Success. Updated the following files:\nM\nC:\\Users\\sdsle\\work\\lightcode\\src\\foo.ts",
+      },
+      state,
+    );
+
+    expect(events[0]).toMatchObject({
+      type: "item.updated",
+      payload: { path: "C:\\Users\\sdsle\\work\\lightcode\\src\\foo.ts" },
+    });
+    expect(events[1]).toMatchObject({
+      type: "content.delta",
+      stream: "file_change_output",
+    });
+  });
+
   it("captures web_search resultCount + name on completion", () => {
     const state = createCodexMapperState("t-codex");
     mapCodexNotification(

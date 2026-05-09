@@ -79,6 +79,7 @@ describe("MessageList", () => {
       revealProjectFolderInTree: vi.fn<(path: string) => void>(),
       showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange: vi.fn<() => void>(),
+      projectLocation: { kind: "windows" as const, path: "C:\\repo" },
       projectRootNames: new Set<string>(),
     };
 
@@ -134,6 +135,7 @@ describe("MessageList", () => {
       revealProjectFolderInTree: vi.fn<(path: string) => void>(),
       showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange,
+      projectLocation: { kind: "windows" as const, path: "C:\\repo" },
       projectRootNames: new Set<string>(),
     };
     const scrollElement = document.createElement("div");
@@ -170,6 +172,7 @@ describe("MessageList", () => {
       revealProjectFolderInTree: vi.fn<(path: string) => void>(),
       showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
       onContentHeightChange,
+      projectLocation: { kind: "windows" as const, path: "C:\\repo" },
       projectRootNames: new Set<string>(),
     };
 

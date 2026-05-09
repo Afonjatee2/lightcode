@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { SessionNotification } from "@agentclientprotocol/sdk";
-import { createAcpMapperState, mapAcpSessionUpdate } from "./canonicalMapping";
+import {
+  closeOpenTurnItems,
+  createAcpMapperState,
+  mapAcpSessionUpdate,
+} from "./canonicalMapping";
 
 /**
  * Smoke tests for the generic ACP → canonical RuntimeEvent mapper.
@@ -129,6 +133,60 @@ describe("mapAcpSessionUpdate", () => {
     expect(completed[0]?.type).toBe("item.completed");
     // Item map cleared so subsequent updates with the same id are ignored.
     expect(state.toolCallItems.has("tc-1")).toBe(false);
+  });
+
+  it("seals orphaned tool calls at turn end", () => {
+    const state = createAcpMapperState("t-stop-tool");
+    const started = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-stop",
+        title: "shell exec",
+        kind: "execute",
+        status: "in_progress",
+        rawInput: { command: "pnpm run test" },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const itemId = (started[0] as { itemId: string }).itemId;
+
+    expect(closeOpenTurnItems(state)).toEqual([
+      { type: "item.completed", threadId: "t-stop-tool", itemId },
+    ]);
+    expect(state.toolCallItems.size).toBe(0);
+  });
+
+  it("seals open plans at turn end without leaving active steps in progress", () => {
+    const state = createAcpMapperState("t-stop-plan");
+    const started = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "plan",
+        entries: [
+          { content: "Inspect output", status: "completed" },
+          { content: "Patch UI", status: "in_progress" },
+          { content: "Verify", status: "pending" },
+        ],
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const itemId = (started[0] as { itemId: string }).itemId;
+
+    expect(closeOpenTurnItems(state)).toEqual([
+      {
+        type: "item.completed",
+        threadId: "t-stop-plan",
+        itemId,
+        payload: {
+          steps: [
+            { step: "Inspect output", status: "completed" },
+            { step: "Patch UI", status: "pending" },
+            { step: "Verify", status: "pending" },
+          ],
+        },
+      },
+    ]);
+    expect(state.openPlanItemId).toBeUndefined();
+    expect(state.openPlanSteps).toBeUndefined();
   });
 
   it("extracts file_change path from apply_patch text args", () => {

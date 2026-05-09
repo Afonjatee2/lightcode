@@ -536,6 +536,12 @@ export class GitStatusService {
     if (filePath) args.push("--", filePath);
 
     let diff = await execGit(location, args, { timeout: GIT_DIFF_TIMEOUT });
+    if (filePath && /^diff --(?:cc|combined)\b/m.test(diff)) {
+      const headDiff = await execGit(location, ["diff", "HEAD", "--", filePath], {
+        timeout: GIT_DIFF_TIMEOUT,
+      }).catch(() => "");
+      if (headDiff.trim()) diff = headDiff;
+    }
     if (!diff.trim() && filePath) {
       diff = await execGit(location, ["diff", "--no-index", "--", "/dev/null", filePath], {
         timeout: GIT_DIFF_TIMEOUT,

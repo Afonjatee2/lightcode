@@ -20,6 +20,7 @@ import type {
   ToolState,
 } from "@opencode-ai/sdk/v2";
 import type { CanonicalItemType, CanonicalRequestType, RuntimeEvent } from "@/shared/contracts";
+import { readDiffSummary } from "../fileChangeSummary";
 
 export interface OpenCodeMapperState {
   threadId: string;
@@ -196,6 +197,11 @@ function toolPayload(
         : typeof state.input?.filePath === "string"
           ? state.input.filePath
           : "";
+    const diffSummary = readDiffSummary(
+      state.input,
+      result,
+      "metadata" in state ? state.metadata : undefined,
+    );
     return {
       ...base,
       // OpenCode's edit/write tools overwrite `state.title` on completion
@@ -210,6 +216,7 @@ function toolPayload(
         : /delete|rm/.test(toolName)
           ? "delete"
           : "edit",
+      ...(diffSummary ? { diffSummary } : {}),
     };
   }
   if (itemType === "web_search") {

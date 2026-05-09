@@ -1,6 +1,8 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, FileEdit } from "lucide-react";
+import { ChevronDown, ChevronRight, FileEdit, Plus } from "lucide-react";
 import type { GitFileChange, Project } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
+import { useGitStore } from "@/renderer/state/gitStore";
 import { FileIcon, FileStatusBadge, PathDisplay } from "@/renderer/components/common";
 import { compareFilesByDirThenName, openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
@@ -14,6 +16,9 @@ export function ConflictGroup(props: {
   worktreePath: string | undefined;
   worktreeBranch: string | undefined;
   onSelectFile: (path: string, staged: boolean) => void;
+  onRefresh: () => void;
+  storeKey: string;
+  isWorktree: boolean;
   mode?: "overlay" | "panel";
   diffTheme?: "light" | "dark";
   wrapLines?: boolean;
@@ -25,6 +30,9 @@ export function ConflictGroup(props: {
     worktreePath,
     worktreeBranch,
     onSelectFile,
+    onRefresh,
+    storeKey,
+    isWorktree,
     mode,
     diffTheme,
     wrapLines,
@@ -35,6 +43,13 @@ export function ConflictGroup(props: {
 
   const handleOpenInEditor = (path: string) =>
     openFileInEditor(project, worktreePath, worktreeBranch, path);
+
+  async function handleStageConflict(path: string) {
+    useGitStore.getState().optimisticStageFile(storeKey, path, isWorktree);
+    await readBridge()
+      .gitStage({ projectLocation: project.location, filePath: path })
+      .catch(() => onRefresh());
+  }
 
   const sorted = files.toSorted(compareFilesByDirThenName);
 
@@ -69,6 +84,9 @@ export function ConflictGroup(props: {
               project={project}
               worktreePath={worktreePath}
               worktreeBranch={worktreeBranch}
+              onRefresh={onRefresh}
+              storeKey={storeKey}
+              isWorktree={isWorktree}
               theme={diffTheme ?? "dark"}
               wrapLines={wrapLines ?? false}
             />
@@ -106,6 +124,23 @@ export function ConflictGroup(props: {
                     )}
                   </span>
                   <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                      title="Stage"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleStageConflict(file.path);
+                      }}
+                      onKeyDown={(e) =>
+                        handleKeyActivate(e, () => void handleStageConflict(file.path), {
+                          stopPropagation: true,
+                        })
+                      }
+                    >
+                      <Plus className="size-3" />
+                    </div>
                     <div
                       role="button"
                       tabIndex={0}

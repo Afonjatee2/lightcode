@@ -154,6 +154,25 @@ describe("gitStore batch updates", () => {
     expect(status.unstaged).toHaveLength(0);
   });
 
+  it("moves staged conflict files out of the conflict list", () => {
+    useGitStore.getState().setStatus("p1", {
+      ...baseStatus,
+      mergeInProgress: true,
+      conflictFiles: [
+        { path: "src/conflict.ts", status: "U", staged: false, insertions: 4, deletions: 2 },
+      ],
+    });
+
+    useGitStore.getState().optimisticStageFile("p1", "src/conflict.ts", false);
+
+    const status = useGitStore.getState().statuses["p1"]!;
+    expect(status.conflictFiles).toEqual([]);
+    expect(status.mergeInProgress).toBe(true);
+    expect(status.staged).toEqual([
+      { path: "src/conflict.ts", status: "M", staged: true, insertions: 4, deletions: 2 },
+    ]);
+  });
+
   it("dedupes by path when stage-all merges unstaged into already-staged entries", () => {
     useGitStore.getState().setStatus("p1", {
       ...baseStatus,

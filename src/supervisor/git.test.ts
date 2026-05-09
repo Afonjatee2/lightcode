@@ -325,6 +325,51 @@ describe("GitService.commit", () => {
   });
 });
 
+describe("GitService.getDiff", () => {
+  const location = {
+    kind: "windows" as const,
+    path: "C:\\Users\\demo\\work\\lightcode",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("falls back to a normal diff for conflict files", async () => {
+    const combinedDiff = [
+      "diff --cc src/file.ts",
+      "index bde0dab,65bea25..0000000",
+      "--- a/src/file.ts",
+      "+++ b/src/file.ts",
+      "@@@ -1,4 -1,4 +1,8 @@@",
+    ].join("\n");
+    const headDiff = [
+      "diff --git a/src/file.ts b/src/file.ts",
+      "index bde0dab..6de04f5 100644",
+      "--- a/src/file.ts",
+      "+++ b/src/file.ts",
+      "@@ -1,4 +1,8 @@",
+    ].join("\n");
+
+    mockGitCommands((args) => {
+      if (args[0] === "diff" && args[1] === "--" && args[2] === "src/file.ts") {
+        return { stdout: combinedDiff };
+      }
+      if (args[0] === "diff" && args[1] === "HEAD") {
+        return { stdout: headDiff };
+      }
+      return { stdout: "" };
+    });
+
+    const result = await new GitService().getDiff(location, "src/file.ts", false);
+
+    expect(result.diff).toBe(headDiff);
+    expect(execFileMock.mock.calls.some((call) => (call[1] as string[]).includes("HEAD"))).toBe(
+      true,
+    );
+  });
+});
+
 describe("GitService.getStatus", () => {
   const location = {
     kind: "windows" as const,

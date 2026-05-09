@@ -24,6 +24,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { CanonicalItemType, RuntimeContentStreamKind, RuntimeEvent } from "@/shared/contracts";
+import { readDiffSummary } from "../fileChangeSummary";
 
 export interface CodexMapperState {
   threadId: string;
@@ -35,10 +36,20 @@ export interface CodexMapperState {
   itemIdMap: Map<string, string>;
   /** Map Codex `itemId` → canonical type, for routing deltas + completions. */
   itemTypeMap: Map<string, CanonicalItemType>;
+  /** Accumulated file-change output, used when Codex reports the path there. */
+  fileChangeOutputMap: Map<string, string>;
+  /** Last path emitted for a file-change item, to avoid duplicate updates. */
+  fileChangePathMap: Map<string, string>;
 }
 
 export function createCodexMapperState(threadId: string): CodexMapperState {
-  return { threadId, itemIdMap: new Map(), itemTypeMap: new Map() };
+  return {
+    threadId,
+    itemIdMap: new Map(),
+    itemTypeMap: new Map(),
+    fileChangeOutputMap: new Map(),
+    fileChangePathMap: new Map(),
+  };
 }
 
 export function newItemId(prefix: string): string {
@@ -188,6 +199,8 @@ export function mapCodexNotification(
     delete state.currentTurnId;
     state.itemIdMap.clear();
     state.itemTypeMap.clear();
+    state.fileChangeOutputMap.clear();
+    state.fileChangePathMap.clear();
     return events;
   }
 
@@ -274,6 +287,8 @@ export function mapCodexNotification(
       });
       state.itemIdMap.delete(codexItemId);
       state.itemTypeMap.delete(codexItemId);
+      state.fileChangeOutputMap.delete(codexItemId);
+      state.fileChangePathMap.delete(codexItemId);
       return events;
     }
     const itemType = state.itemTypeMap.get(codexItemId) ?? canonicalTypeFor(item.type ?? item.kind);
@@ -299,6 +314,8 @@ export function mapCodexNotification(
       itemId: internalId,
       ...(completedPayload ? { payload: completedPayload } : {}),
     });
+    state.fileChangeOutputMap.delete(codexItemId);
+    state.fileChangePathMap.delete(codexItemId);
     return events;
   }
 
@@ -324,6 +341,20 @@ export function mapCodexNotification(
         itemType,
         payload: buildStartedPayload(itemType, {}),
       });
+    }
+    if (stream === "file_change_output") {
+      const text = (state.fileChangeOutputMap.get(codexItemId) ?? "") + delta;
+      state.fileChangeOutputMap.set(codexItemId, text);
+      const path = extractCodexFileChangePath(text);
+      if (path && state.fileChangePathMap.get(codexItemId) !== path) {
+        state.fileChangePathMap.set(codexItemId, path);
+        opened.push({
+          type: "item.updated",
+          threadId,
+          itemId: internalId,
+          payload: { path },
+        });
+      }
     }
     return [
       ...opened,
@@ -368,9 +399,12 @@ export function buildStartedPayload(
   }
   if (itemType === "file_change") {
     const args = pickToolInput(source);
+    const path = extractCodexFileChangePath(source);
+    const diffSummary = readDiffSummary(source, args);
     return {
-      path: typeof source.path === "string" ? source.path : "",
+      path: path ?? "",
       changeKind: classifyCodexFileChangeKind(source),
+      ...(diffSummary ? { diffSummary } : {}),
       ...(args !== undefined ? { args } : {}),
       status: "running" as const,
     };
@@ -426,9 +460,12 @@ export function buildCompletedPayload(
   }
   if (itemType === "file_change") {
     const result = pickToolOutput(source);
+    const path = extractCodexFileChangePath(source);
+    const diffSummary = readDiffSummary(source, result);
     return {
-      ...(typeof source.path === "string" ? { path: source.path } : {}),
+      ...(path ? { path } : {}),
       changeKind: classifyCodexFileChangeKind(source),
+      ...(diffSummary ? { diffSummary } : {}),
       status: codexFinalStatus(source.status),
       ...(result !== undefined ? { result } : {}),
     };
@@ -463,6 +500,36 @@ function pickToolInput(source: CodexItemPayload): unknown {
 function pickToolOutput(source: CodexItemPayload): unknown {
   if (source.result !== undefined) return source.result;
   if (source.output !== undefined) return source.output;
+  return undefined;
+}
+
+function extractCodexFileChangePath(source: CodexItemPayload | unknown): string | undefined {
+  if (source && typeof source === "object") {
+    const record = source as Record<string, unknown>;
+    if (typeof record.path === "string" && record.path.length > 0) return record.path;
+    if (typeof record.filePath === "string" && record.filePath.length > 0) return record.filePath;
+    return (
+      extractCodexFileChangePath(record.args) ??
+      extractCodexFileChangePath(record.input) ??
+      extractCodexFileChangePath(record.output) ??
+      extractCodexFileChangePath(record.result)
+    );
+  }
+  if (typeof source !== "string") return undefined;
+
+  const patchPath = /^\*\*\*\s+(?:Add|Update|Delete)\s+File:\s+(.+?)\s*$/m.exec(source);
+  if (patchPath?.[1]) return patchPath[1].trim();
+
+  const lines = source
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const fileListStart = lines.findIndex((line) => /following files:/i.test(line));
+  if (fileListStart === -1) return undefined;
+  for (const line of lines.slice(fileListStart + 1)) {
+    const path = /^[A-Z?]\s+(.+)$/.exec(line)?.[1] ?? (/^[A-Z?]$/.test(line) ? undefined : line);
+    if (path) return path.trim();
+  }
   return undefined;
 }
 

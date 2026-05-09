@@ -12,7 +12,7 @@ import { Streamdown, type Components as StreamdownComponents } from "streamdown"
 import remarkGfm from "remark-gfm";
 import { readBridge } from "@/renderer/bridge";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
-import { normalizeChatRelativePath } from "../../chatPathUtils";
+import { normalizeChatProjectPath, normalizeChatRelativePath } from "../../chatPathUtils";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { InlineFolderPathChip } from "./InlineFolderPathChip";
 import { normalizeShortCodeFenceClosers } from "./ItemMarkdown";
@@ -47,10 +47,17 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
       remarkGfm,
       [
         remarkAutolinkProjectPaths,
-        { parsePathRef: (token: string) => parseProjectPathRef(token, { rootNames }) },
+        {
+          parsePathRef: (token: string) => {
+            const ref = parseProjectPathRef(token, { rootNames });
+            if (ref || !actions) return ref;
+            const normalized = normalizeChatProjectPath(token, actions.projectLocation);
+            return normalized === token ? null : parseProjectPathRef(normalized, { rootNames });
+          },
+        },
       ],
     ],
-    [rootNames],
+    [actions, rootNames],
   );
   const markdownText = normalizeShortCodeFenceClosers(text);
   return (

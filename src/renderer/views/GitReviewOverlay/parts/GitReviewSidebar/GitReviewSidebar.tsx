@@ -125,7 +125,6 @@ export function GitReviewSidebar(props: {
     isMerging,
     isPullingFromSource,
     isAbortingMerge,
-    isFinishingMerge,
     prTitle,
     setPrTitle,
     prBody,
@@ -142,7 +141,6 @@ export function GitReviewSidebar(props: {
     handleMergeAndRemove,
     handlePullFromSource,
     handleAbortMerge,
-    handleFinishMerge,
     handleCreatePr,
     handleMergePr,
     handleClosePr,
@@ -245,6 +243,9 @@ export function GitReviewSidebar(props: {
                 worktreePath={worktreePath}
                 worktreeBranch={worktreeBranch}
                 onSelectFile={onSelectFile}
+                onRefresh={onRefresh}
+                storeKey={storeKey}
+                isWorktree={isWorktreeStatus}
                 mode={mode}
                 diffTheme={diffTheme}
                 wrapLines={wrapLines}
@@ -305,12 +306,8 @@ export function GitReviewSidebar(props: {
             />
           )}
 
-          {(hasAnyChanges ||
-            hasRemote ||
-            (mergeConflicting && mergeConflictFiles.length === 0)) && (
+          {(hasAnyChanges || hasRemote) && (
             <CommitSyncPanel
-              mergeConflicting={mergeConflicting}
-              mergeConflictFiles={mergeConflictFiles}
               hasAnyChanges={hasAnyChanges}
               hasStagedChanges={hasStagedChanges}
               hasRemote={hasRemote}
@@ -325,8 +322,6 @@ export function GitReviewSidebar(props: {
               isGenerating={isGenerating}
               isSyncing={isSyncing}
               isPullingFromSource={isPullingFromSource}
-              isAbortingMerge={isAbortingMerge}
-              isFinishingMerge={isFinishingMerge}
               showPullFromSource={showPullFromSource}
               sourceBranch={sourceBranch}
               sourceAhead={sourceAhead}
@@ -336,8 +331,6 @@ export function GitReviewSidebar(props: {
               handleSyncAction={handleSyncAction}
               hasTracking={hasTracking}
               handlePullFromSource={handlePullFromSource}
-              handleAbortMerge={handleAbortMerge}
-              handleFinishMerge={handleFinishMerge}
             />
           )}
 

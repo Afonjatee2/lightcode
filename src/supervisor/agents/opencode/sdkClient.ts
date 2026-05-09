@@ -1,4 +1,4 @@
-import type { OpencodeClient } from "@opencode-ai/sdk/v2";
+import type { OpencodeClient } from "@opencode-ai/sdk/v2/client";
 import type { ProjectLocation } from "@/shared/contracts";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { buildOpenCodeServerCommand } from "./argv";
@@ -66,7 +66,7 @@ async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSna
     throw err;
   }
 
-  const { createOpencodeClient } = await import("@opencode-ai/sdk/v2");
+  const { createOpencodeClient } = await import("@opencode-ai/sdk/v2/client");
   const client = createOpencodeClient({
     baseUrl,
     directory: resolveSessionCwd(projectLocation),

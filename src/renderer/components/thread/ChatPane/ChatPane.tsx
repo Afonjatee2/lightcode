@@ -127,6 +127,7 @@ export function ChatPane(props: ChatPaneProps) {
         });
       },
       onContentHeightChange: () => scrollControlsRef.current?.onContentHeightChange(),
+      projectLocation: targetContext.projectLocation,
       projectRootNames,
     };
   }, [project, targetContext, branch, thread.worktreePath, projectRootNames]);

@@ -12,6 +12,7 @@ import type {
   TurnState,
   UserInputOption,
 } from "@/shared/contracts";
+import { readDiffSummary } from "../fileChangeSummary";
 
 interface TextItemState {
   itemId: string;
@@ -366,7 +367,12 @@ function toolPayload(
         : typeof tool.input.path === "string"
           ? tool.input.path
           : "";
-    return { path, changeKind: inferFileChangeKind(tool.toolName) };
+    const diffSummary = readDiffSummary(tool.input, result);
+    return {
+      path,
+      changeKind: inferFileChangeKind(tool.toolName),
+      ...(diffSummary ? { diffSummary } : {}),
+    };
   }
   if (tool.itemType === "web_search") {
     const query =
@@ -526,14 +532,35 @@ function tagParent(events: RuntimeEvent[], parentItemId: string | undefined): Ru
   return events;
 }
 
+/**
+ * `[ede_diagnostic] ...` lines are emitted by claude.exe when a turn is cut
+ * short before the assistant produced content (the typical interrupt path
+ * during steering). The SDK itself filters them out as informational — see
+ * the `errors.filter(e => !e.startsWith("[ede_diagnostic]"))` step in the
+ * agent-sdk binary. We mirror that here so an interrupted steer doesn't
+ * surface as a user-visible error.
+ */
+function isDiagnosticOnlyError(error: string): boolean {
+  return error.startsWith("[ede_diagnostic]");
+}
+
+export function nonDiagnosticErrors(message: SDKMessage): string[] {
+  if (!("errors" in message) || !Array.isArray(message.errors)) return [];
+  return message.errors.filter(
+    (error): error is string => typeof error === "string" && !isDiagnosticOnlyError(error),
+  );
+}
+
 function mapResultState(message: Extract<SDKMessage, { type: "result" }>): TurnState {
   if (message.subtype === "success") return "completed";
-  const errors =
-    "errors" in message && Array.isArray(message.errors)
-      ? message.errors.join(" ").toLowerCase()
-      : "";
-  if (errors.includes("abort") || errors.includes("interrupt")) return "interrupted";
-  if (errors.includes("cancel")) return "cancelled";
+  const filtered = nonDiagnosticErrors(message);
+  // All errors were diagnostics — claude.exe was interrupted before producing
+  // assistant content. Treat it as a user-initiated interrupt rather than a
+  // failure (the diagnostic itself is informational).
+  if (filtered.length === 0) return "interrupted";
+  const joined = filtered.join(" ").toLowerCase();
+  if (joined.includes("abort") || joined.includes("interrupt")) return "interrupted";
+  if (joined.includes("cancel")) return "cancelled";
   return "failed";
 }
 
@@ -745,10 +772,8 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
     const stateValue = mapResultState(message);
     events.push(...closeClaudeOpenItems(state));
     if (stateValue === "failed") {
-      const msg =
-        "errors" in message && Array.isArray(message.errors) && message.errors[0]
-          ? String(message.errors[0])
-          : "Claude turn failed.";
+      const remaining = nonDiagnosticErrors(message);
+      const msg = remaining[0] ?? "Claude turn failed.";
       events.push({ type: "error", threadId: state.threadId, message: msg });
     }
     if (state.currentTurnId) {

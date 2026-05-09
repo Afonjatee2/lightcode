@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { ProjectLocation } from "@/shared/contracts";
 
 export type ChatPaneActions = {
   openProjectRelativePath: (path: string, lineNumber?: number) => void;
@@ -7,6 +8,7 @@ export type ChatPaneActions = {
   /** Reveal a file or folder in the OS file explorer (Finder/Explorer/Nautilus). */
   showProjectEntryInExplorer: (path: string) => void;
   onContentHeightChange: () => void;
+  projectLocation: ProjectLocation;
   /**
    * Top-level entry names for the chat's project, used to validate path-like
    * tokens before chipping them. Empty until the project tree responds.

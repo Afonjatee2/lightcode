@@ -23,6 +23,7 @@ import type {
   CanonicalRequestType,
   RuntimeEvent,
 } from "@/shared/contracts";
+import { readDiffSummary } from "../fileChangeSummary";
 
 /** Per-session state — tracks open items so deltas land on the right item id. */
 export interface AcpMapperState {
@@ -37,6 +38,8 @@ export interface AcpMapperState {
   toolCallItems: Map<string, string>;
   /** Item id of the most recent plan, if open. */
   openPlanItemId?: string;
+  /** Last plan steps emitted for the open plan item. */
+  openPlanSteps?: Array<{ step: string; status: "pending" | "in_progress" | "completed" }>;
   /** ACP `toolCallId`s rerouted to other item types (e.g. assistant_message
    * for Copilot's `task_complete` summary). Their `tool_call_update`s must be
    * dropped so we don't emit ghost updates against the wrong item. */
@@ -74,16 +77,38 @@ export function closeOpenContentItems(state: AcpMapperState): RuntimeEvent[] {
   return events;
 }
 
+export function closeOpenTurnItems(state: AcpMapperState): RuntimeEvent[] {
+  const events = closeOpenContentItems(state);
+  for (const itemId of state.toolCallItems.values()) {
+    events.push({ type: "item.completed", threadId: state.threadId, itemId });
+  }
+  if (state.openPlanItemId) {
+    events.push({
+      type: "item.completed",
+      threadId: state.threadId,
+      itemId: state.openPlanItemId,
+      payload: {
+        steps: (state.openPlanSteps ?? []).map((step) => ({
+          ...step,
+          status: step.status === "in_progress" ? "pending" : step.status,
+        })),
+      },
+    });
+  }
+  resetMapperForTurnEnd(state);
+  return events;
+}
+
 /**
  * Drop per-turn bookkeeping that wouldn't otherwise be released — orphaned
  * tool-call ids (the agent never sent a terminal status), plan id (plan was
- * abandoned mid-turn). Call from the session at end-of-turn after
- * `closeOpenContentItems`.
+ * abandoned mid-turn).
  */
 export function resetMapperForTurnEnd(state: AcpMapperState): void {
   state.toolCallItems.clear();
   state.suppressedToolCallIds.clear();
   delete state.openPlanItemId;
+  delete state.openPlanSteps;
 }
 
 function acpContentBlockToCanonical(block: ContentBlock): CanonicalContentBlock | undefined {
@@ -305,6 +330,7 @@ export function mapAcpSessionUpdate(
       };
       const steps =
         plan.entries?.map((entry) => ({ step: entry.content, status: entry.status })) ?? [];
+      state.openPlanSteps = steps;
       if (!state.openPlanItemId) {
         events.push(...closeOpenContentItems(state));
         state.openPlanItemId = newItemId("plan");
@@ -332,6 +358,7 @@ export function mapAcpSessionUpdate(
           payload: { steps },
         });
         delete state.openPlanItemId;
+        delete state.openPlanSteps;
       }
       break;
     }
@@ -390,10 +417,12 @@ function buildAcpToolCallPayload(
   }
   if (itemType === "file_change") {
     const path = readStringField(toolCall.rawInput, "path") ?? extractPatchPath(toolCall.rawInput);
+    const diffSummary = readDiffSummary(toolCall.rawInput);
     return {
       ...base,
       path: path ?? "",
       changeKind: classifyFileChangeKind(toolCall.kind, toolCall.title, toolCall.rawInput),
+      ...(diffSummary ? { diffSummary } : {}),
     };
   }
   if (itemType === "web_search") {

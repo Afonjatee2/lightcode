@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
+import { createRequire } from "node:module";
 import type {
   CanUseTool,
   Options as ClaudeQueryOptions,
@@ -42,11 +43,15 @@ import {
   mapClaudePermissionRequest,
   mapClaudeQuestionRequest,
   mapClaudeSdkMessage,
+  nonDiagnosticErrors,
   parseClaudeQuestions,
   startClaudeTurn,
   type ClaudeMapperState,
   type ClaudeQuestion,
 } from "./sdkCanonicalMapping";
+
+const require = createRequire(import.meta.url);
+const claudeSdkRequire = createRequire(require.resolve("@anthropic-ai/claude-agent-sdk"));
 
 type PendingPermission = {
   kind: "permission";
@@ -146,6 +151,32 @@ function spawnClaudeInWsl(location: ProjectLocation, options: SpawnOptions): Spa
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   }) as unknown as SpawnedProcess;
+}
+
+function unpackedAsarPath(p: string): string {
+  return p.replace(/([\\/])app\.asar([\\/])/, "$1app.asar.unpacked$2");
+}
+
+function bundledClaudeExecutablePaths(): string[] {
+  const binary = process.platform === "win32" ? "claude.exe" : "claude";
+  if (process.platform === "linux") {
+    return [
+      `@anthropic-ai/claude-agent-sdk-linux-${process.arch}-musl/${binary}`,
+      `@anthropic-ai/claude-agent-sdk-linux-${process.arch}/${binary}`,
+    ];
+  }
+  return [`@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/${binary}`];
+}
+
+function bundledClaudeExecutablePath(): string | undefined {
+  for (const candidate of bundledClaudeExecutablePaths()) {
+    try {
+      return unpackedAsarPath(claudeSdkRequire.resolve(candidate));
+    } catch {
+      // Try the next platform package candidate.
+    }
+  }
+  return undefined;
 }
 
 function isImageSegment(
@@ -483,6 +514,8 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         this.input.projectLocation.kind === "wsl"
           ? { CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode", BROWSER: "/bin/true" }
           : { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode" };
+      const claudeExecutablePath =
+        this.input.projectLocation.kind === "wsl" ? undefined : bundledClaudeExecutablePath();
       const options: ClaudeQueryOptions = {
         cwd: projectCwd(this.input.projectLocation),
         model: applyClaudeContextSuffix(this.currentConfig.model, this.currentConfig.contextSize),
@@ -503,6 +536,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         ...(this.currentConfig.effort
           ? { effort: this.currentConfig.effort as NonNullable<ClaudeQueryOptions["effort"]> }
           : {}),
+        ...(claudeExecutablePath ? { pathToClaudeCodeExecutable: claudeExecutablePath } : {}),
         ...(this.input.projectLocation.kind === "wsl"
           ? {
               spawnClaudeCodeProcess: (spawnOptions) =>
@@ -642,8 +676,13 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     if (message.type === "result") {
       const wasInterrupted = this.interruptInFlight || isInterruptedResult(message);
       this.interruptInFlight = false;
-      const failed = message.subtype !== "success" && !wasInterrupted;
-      const errorMessage = failed ? message.errors[0] : undefined;
+      const remaining = nonDiagnosticErrors(message);
+      // Only diagnostic lines remained → treat as interrupted, matching
+      // `mapResultState`. claude.exe emits `[ede_diagnostic] ...` whenever a
+      // turn ends before the assistant produced content, including external
+      // (in-CLI) Esc interrupts where `interruptInFlight` is false.
+      const failed = message.subtype !== "success" && !wasInterrupted && remaining.length > 0;
+      const errorMessage = failed ? remaining[0] : undefined;
       this.listener?.onUpdate({
         status: failed ? "error" : "idle",
         attention: failed ? "error" : "none",
@@ -676,11 +715,14 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 }
 
 function isInterruptedResult(message: Extract<SDKMessage, { type: "result" }>): boolean {
-  const errors =
-    "errors" in message && Array.isArray(message.errors)
-      ? message.errors.join(" ").toLowerCase()
-      : "";
-  return errors.includes("abort") || errors.includes("interrupt");
+  const filtered = nonDiagnosticErrors(message);
+  // claude.exe emits an `error_during_execution` result whose only error is
+  // an `[ede_diagnostic]` line when a turn was interrupted before producing
+  // assistant content. Treat that as an interrupt — the SDK itself filters
+  // those lines out as informational.
+  if (filtered.length === 0) return true;
+  const joined = filtered.join(" ").toLowerCase();
+  return joined.includes("abort") || joined.includes("interrupt");
 }
 
 function mapSessionState(messageState: string): {

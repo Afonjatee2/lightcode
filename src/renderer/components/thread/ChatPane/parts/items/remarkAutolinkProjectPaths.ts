@@ -44,6 +44,10 @@ function visit(node: MdNode, options: PluginOptions): void {
   for (const child of node.children) {
     if (child.type === "text" && typeof child.value === "string") {
       next.push(...transformText(child.value, options));
+    } else if (child.type === "link" && typeof child.url === "string") {
+      const ref = options.parsePathRef(child.url);
+      if (ref) child.url = pathRefUrl(ref);
+      next.push(child);
     } else if (SKIP_PARENT_TYPES.has(child.type)) {
       next.push(child);
     } else {
@@ -67,13 +71,9 @@ function transformText(text: string, options: PluginOptions): MdNode[] {
     if (match.index > cursor) {
       out.push({ type: "text", value: text.slice(cursor, match.index) });
     }
-    const url =
-      ref.kind === "file"
-        ? `${AUTO_PATH_FILE_PREFIX}${ref.path}${ref.line !== undefined ? `:${ref.line}` : ""}`
-        : `${AUTO_PATH_FOLDER_PREFIX}${ref.path}`;
     out.push({
       type: "link",
-      url,
+      url: pathRefUrl(ref),
       children: [{ type: "text", value: fullMatch }],
     });
     cursor = match.index + fullMatch.length;
@@ -83,4 +83,10 @@ function transformText(text: string, options: PluginOptions): MdNode[] {
     out.push({ type: "text", value: text.slice(cursor) });
   }
   return out;
+}
+
+function pathRefUrl(ref: ProjectPathRef): string {
+  return ref.kind === "file"
+    ? `${AUTO_PATH_FILE_PREFIX}${ref.path}${ref.line !== undefined ? `:${ref.line}` : ""}`
+    : `${AUTO_PATH_FOLDER_PREFIX}${ref.path}`;
 }

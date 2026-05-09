@@ -252,9 +252,9 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
   const rightLabel: ReactNode = isRunning ? (
     <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
   ) : payload.diffSummary ? (
-    `${payload.changeKind} +${payload.diffSummary.added} -${payload.diffSummary.removed}`
+    `+${payload.diffSummary.added} -${payload.diffSummary.removed}`
   ) : (
-    payload.changeKind
+    undefined
   );
   // ACP can emit file_change items without an extractable path (path === "").
   // Fall back to the human-readable tool title carried on the ACP payload so

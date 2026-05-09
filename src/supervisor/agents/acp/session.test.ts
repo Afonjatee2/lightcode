@@ -236,6 +236,35 @@ describe("ACP turn config sync", () => {
     );
   });
 
+  it("does not mark restored session replay as working", () => {
+    const { listener, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["isReplayingHistory"] = true;
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "tool-1",
+        title: "Read file",
+        status: "completed",
+      },
+    });
+
+    expect(listener.onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("does not treat session metadata updates as working", () => {
+    const { listener, session } = makeConfigSyncSession();
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "session_info_update",
+        title: "Restored topic",
+      },
+    });
+
+    expect(listener.onUpdate).not.toHaveBeenCalled();
+  });
+
   it("cancels active ACP turns immediately when a prompt is in flight", async () => {
     const { connection, session } = makeConfigSyncSession();
     (session as unknown as Record<string, unknown>)["promptInFlight"] = true;
