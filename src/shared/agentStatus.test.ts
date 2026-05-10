@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AgentStatus, ProjectLocation } from "./contracts";
-import { getProjectAgentStatuses } from "./agentStatus";
+import { getProjectAgentStatuses, getSettingsInstalledAgents } from "./agentStatus";
 
 const capabilities = {
   models: [],
@@ -67,5 +67,34 @@ describe("getProjectAgentStatuses", () => {
     const legacyStatuses = [makeStatus("gemini", { envKind: "wsl" })];
 
     expect(getProjectAgentStatuses(location, [], legacyStatuses)).toEqual(legacyStatuses);
+  });
+});
+
+describe("getSettingsInstalledAgents", () => {
+  it("includes WSL-only installed agents after native ones", () => {
+    expect(
+      getSettingsInstalledAgents(
+        [makeStatus("codex", { envKind: "windows" })],
+        [makeStatus("gemini", { envKind: "wsl", envDistro: "Ubuntu" })],
+      ).map((status) => status.kind),
+    ).toEqual(["codex", "gemini"]);
+  });
+
+  it("dedupes providers installed in both native and WSL, preferring native", () => {
+    const nativeGemini = makeStatus("gemini", { envKind: "windows", label: "Gemini Native" });
+    const wslGemini = makeStatus("gemini", {
+      envKind: "wsl",
+      envDistro: "Ubuntu",
+      label: "Gemini WSL",
+    });
+
+    expect(getSettingsInstalledAgents([nativeGemini], [wslGemini])).toEqual([nativeGemini]);
+  });
+
+  it("keeps only the first WSL-installed entry for navigation when no native install exists", () => {
+    const ubuntu = makeStatus("gemini", { envKind: "wsl", envDistro: "Ubuntu" });
+    const debian = makeStatus("gemini", { envKind: "wsl", envDistro: "Debian" });
+
+    expect(getSettingsInstalledAgents([], [ubuntu, debian])).toEqual([ubuntu]);
   });
 });

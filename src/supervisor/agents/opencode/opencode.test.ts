@@ -1,8 +1,11 @@
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createOpenCodeAdapter } from ".";
 import { buildOpenCodeArgs } from "./argv";
 import {
   humanizeOpenCodeModelId,
+  parseOpenCodeProvidersList,
   humanizeOpenCodeSubProviderId,
   parseOpenCodeVerboseModels,
 } from "./detection";
@@ -127,12 +130,33 @@ opencode/claude-opus-4-6
   });
 });
 
+describe("parseOpenCodeProvidersList", () => {
+  it("extracts connected upstream providers and auth type", () => {
+    expect(
+      parseOpenCodeProvidersList(`┌  Credentials ~/.local/share/opencode/auth.json
+│
+●  OpenCode Zen api
+│
+●  GitHub Copilot oauth
+│
+●  OpenAI oauth
+│
+└  3 credentials`),
+    ).toEqual([
+      { label: "OpenCode Zen", detail: "API" },
+      { label: "GitHub Copilot", detail: "OAuth" },
+      { label: "OpenAI", detail: "OAuth" },
+    ]);
+  });
+});
+
 describe("OpenCode prompt formatting", () => {
   it("places attachments on their own line with \\n\\n separator", () => {
     const adapter = createOpenCodeAdapter();
+    const attachmentPath = join(homedir(), ".lightcode", "attachments", "draft", "image.png");
     const prompt = adapter.formatPromptSegments?.([
       { kind: "text", content: "can you see this image?" },
-      { kind: "attachment", path: "C:\\Users\\sdsle\\.lightcode\\attachments\\draft\\image.png" },
+      { kind: "attachment", path: attachmentPath },
     ]);
 
     expect(prompt).toBe("can you see this image?\n\n@~/.lightcode/attachments/draft/image.png ");

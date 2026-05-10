@@ -1,6 +1,5 @@
-import { memo, useCallback, useMemo, useRef, useState } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { CircleAlert, type LucideIcon } from "lucide-react";
+import { memo, type ReactNode } from "react";
+import { ChevronRight, CircleAlert, type LucideIcon } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
 import { PixelLoader } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -8,8 +7,6 @@ import {
   getRuntimeItemPayload,
   type RuntimeChatItem,
 } from "@/renderer/state/slices/runtimeEventSlice";
-import { ChatItemAccordion } from "./ChatItemAccordion";
-import { ChatItemRow } from "./ChatItemRow";
 import { getChildItemIdsStoreSelector } from "../../chatPaneSelectors";
 import { deriveToolDisplay } from "./toolDisplay";
 
@@ -18,85 +15,51 @@ interface SubAgentToolCallProps {
   item: RuntimeChatItem;
 }
 
-const SCROLL_MAX_HEIGHT_PX = 480;
-const ESTIMATED_CHILD_ROW_PX = 80;
-const VIRTUAL_OVERSCAN = 4;
-
-/**
- * Tool-call row for a sub-agent parent (e.g. Claude `Task`). Renders the
- * standard tool header but attaches its child items inline; collapsed by
- * default, expandable to a virtualized scroll-pane that reuses the chat row
- * components for each child step.
- */
 export const SubAgentToolCall = memo(function SubAgentToolCall({
   threadId,
   item,
 }: SubAgentToolCallProps) {
   const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
-  const childIds = useAppStore(getChildItemIdsStoreSelector(threadId, item.id));
-  const [isExpanded, setIsExpanded] = useState(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const getScrollElement = useCallback(() => scrollRef.current, []);
-  const estimateSize = useCallback(() => ESTIMATED_CHILD_ROW_PX, []);
-  const getItemKey = useCallback((index: number) => childIds[index] ?? index, [childIds]);
-
-  const virtualizer = useVirtualizer({
-    count: childIds.length,
-    getScrollElement,
-    estimateSize,
-    getItemKey,
-    overscan: VIRTUAL_OVERSCAN,
-    useFlushSync: false,
-  });
-
-  const childCount = childIds.length;
-  const status = useMemo(
-    () => resolveStatus(item, payload, childCount),
-    [item, payload, childCount],
-  );
+  const childCount = useAppStore(getChildItemIdsStoreSelector(threadId, item.id)).length;
+  const openSubAgent = useAppStore((s) => s.openSubAgent);
 
   if (!payload?.name) return null;
   const display = deriveToolDisplay(payload);
   const Icon: LucideIcon = display.Icon;
-
-  const virtualItems = isExpanded ? virtualizer.getVirtualItems() : [];
-  const totalSize = isExpanded ? virtualizer.getTotalSize() : 0;
+  const status = resolveStatus(item, payload, childCount);
 
   return (
-    <ChatItemAccordion
-      icon={<Icon className="size-3" />}
-      title={display.title}
-      rightLabel={status.rightLabel}
-      rightLabelClassName={status.rightLabelClassName}
-      hasBody={childCount > 0}
-      isExpanded={isExpanded}
-      onExpandedChange={setIsExpanded}
+    <button
+      type="button"
+      onClick={() => openSubAgent(threadId, item.id)}
+      className="group flex w-full min-w-0 items-center gap-1.5 rounded-2xl border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-left text-[length:var(--lc-chat-font-size-command)] leading-tight transition-colors hover:bg-foreground/5"
+      aria-label={`Open subagent: ${display.title}`}
     >
-      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: SCROLL_MAX_HEIGHT_PX }}>
-        <div className="relative w-full" style={{ height: totalSize }}>
-          {virtualItems.map((vi) => {
-            const childId = childIds[vi.index];
-            if (!childId) return null;
-            return (
-              <div
-                key={vi.key}
-                ref={(el) => virtualizer.measureElement(el)}
-                data-index={vi.index}
-                className="absolute left-0 top-0 w-full pb-1"
-                style={{ transform: `translateY(${vi.start}px)` }}
-              >
-                <ChatItemRow threadId={threadId} entry={{ kind: "item", id: childId }} />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </ChatItemAccordion>
+      <span className="size-3 shrink-0 text-[color:var(--muted)]">
+        <Icon className="size-3" />
+      </span>
+      {display.parts ? (
+        <code className="flex min-w-0 flex-1 items-baseline overflow-hidden font-mono text-[color:var(--muted)]">
+          <span className="shrink-0 whitespace-pre">{display.parts.prefix}</span>
+          <span className="lc-truncate-start flex-1">{display.parts.path}</span>
+        </code>
+      ) : (
+        <code className="block min-w-0 flex-1 truncate font-mono text-[color:var(--muted)]">
+          {display.title}
+        </code>
+      )}
+      {status.rightLabel ? (
+        <span className={`shrink-0 tabular-nums font-medium ${status.rightLabelClassName}`}>
+          {status.rightLabel}
+        </span>
+      ) : null}
+      <ChevronRight className="size-3.5 shrink-0 text-[color:var(--muted)] opacity-60 transition-opacity group-hover:opacity-100" />
+    </button>
   );
 });
 
 interface SubAgentStatus {
-  rightLabel: React.ReactNode;
+  rightLabel: ReactNode;
   rightLabelClassName: string;
 }
 
@@ -108,9 +71,13 @@ function resolveStatus(
   const isRunning = item.state !== "completed" || payload?.status === "running";
   const progress = payload?.progress;
   const liveLabel = progress?.lastToolName ?? progress?.description;
-  const stepLabel = `${childCount} step${childCount === 1 ? "" : "s"}`;
+  // Prefer the supervisor-reported counter — it survives child-event gating
+  // (overlay closed); fall back to local children count when the supervisor
+  // hasn't populated stepCount yet.
+  const stepCount = progress?.stepCount ?? childCount;
 
   if (isRunning) {
+    const stepLabel = `${stepCount} step${stepCount === 1 ? "" : "s"}`;
     return {
       rightLabel: (
         <span className="inline-flex min-w-0 items-center gap-1.5 text-[color:var(--muted)]">
@@ -133,7 +100,7 @@ function resolveStatus(
     };
   }
   return {
-    rightLabel: <span title={progress?.summary ?? undefined}>{stepLabel}</span>,
+    rightLabel: <span className="text-[color:var(--muted)]">done</span>,
     rightLabelClassName: "!text-[color:var(--muted)]",
   };
 }

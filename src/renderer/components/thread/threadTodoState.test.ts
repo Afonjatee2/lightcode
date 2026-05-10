@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { AppStoreState } from "@/renderer/state/appStore";
-import { getThreadTodoDockStateForItem, selectThreadTodoDockState } from "./threadTodoState";
+import {
+  areThreadTodoStepsEqual,
+  getThreadTodoDockStateForItem,
+  selectThreadTodoDockState,
+} from "./threadTodoState";
+import type { ThreadTodoDockState } from "./threadTodoState";
 
 describe("threadTodoState", () => {
   it("selects the latest structured plan item and tracks the active step", () => {
@@ -15,7 +20,7 @@ describe("threadTodoState", () => {
             type: "plan",
             state: "completed",
             payload: {
-              steps: [{ step: "Old plan", status: "completed" }],
+              steps: [{ step: "Old step", status: "completed" }],
             },
             streams: {},
           },
@@ -25,9 +30,9 @@ describe("threadTodoState", () => {
             state: "updated",
             payload: {
               steps: [
-                { step: "Inspect output", status: "completed" },
-                { step: "Open logs", status: "in_progress" },
-                { step: "Patch UI", status: "pending" },
+                { step: "Step one", status: "completed" },
+                { step: "Step two", status: "in_progress" },
+                { step: "Step three", status: "pending" },
               ],
             },
             streams: {},
@@ -39,16 +44,98 @@ describe("threadTodoState", () => {
     expect(selectThreadTodoDockState(state, "t1")).toMatchObject({
       sourceItemId: "plan-new",
       activeIndex: 1,
-      sourceKind: "steps",
       steps: [
-        { text: "Inspect output", status: "completed" },
-        { text: "Open logs", status: "in_progress" },
-        { text: "Patch UI", status: "pending" },
+        { text: "Step one", status: "completed" },
+        { text: "Step two", status: "in_progress" },
+        { text: "Step three", status: "pending" },
       ],
     });
   });
 
-  it("keeps the dock when a follow-up user_message arrives while the plan is unfinished", () => {
+  it("carries forward completion status from previous plans with compatible steps", () => {
+    const state = {
+      runtimeItemIdsByThread: {
+        t1: ["plan-1", "plan-2"],
+      },
+      runtimeItemsByIdByThread: {
+        t1: {
+          "plan-1": {
+            id: "plan-1",
+            type: "plan",
+            state: "completed",
+            payload: {
+              steps: [
+                { step: "Analyze project", status: "completed" },
+                { step: "Apply fix", status: "completed" },
+              ],
+            },
+            streams: {},
+          },
+          "plan-2": {
+            id: "plan-2",
+            type: "plan",
+            state: "updated",
+            payload: {
+              steps: [
+                { step: "Analyze project", status: "pending" },
+                { step: "Apply fix", status: "pending" },
+                { step: "Validate fix", status: "pending" },
+              ],
+            },
+            streams: {},
+          },
+        },
+      },
+    } as unknown as AppStoreState;
+
+    expect(selectThreadTodoDockState(state, "t1")).toMatchObject({
+      sourceItemId: "plan-2",
+      activeIndex: 2,
+      steps: [
+        { text: "Analyze project", status: "completed" },
+        { text: "Apply fix", status: "completed" },
+        { text: "Validate fix", status: "pending" },
+      ],
+    });
+  });
+
+  it("does not carry forward completion status if plans are incompatible", () => {
+    const state = {
+      runtimeItemIdsByThread: {
+        t1: ["plan-1", "plan-2"],
+      },
+      runtimeItemsByIdByThread: {
+        t1: {
+          "plan-1": {
+            id: "plan-1",
+            type: "plan",
+            state: "completed",
+            payload: {
+              steps: [{ step: "Task A", status: "completed" }],
+            },
+            streams: {},
+          },
+          "plan-2": {
+            id: "plan-2",
+            type: "plan",
+            state: "updated",
+            payload: {
+              steps: [{ step: "Task B", status: "pending" }],
+            },
+            streams: {},
+          },
+        },
+      },
+    } as unknown as AppStoreState;
+
+    expect(selectThreadTodoDockState(state, "t1")).toMatchObject({
+      sourceItemId: "plan-2",
+      activeIndex: 0,
+      steps: [{ text: "Task B", status: "pending" }],
+    });
+  });
+
+  it("persists the plan across follow-up user messages", () => {
     const state = {
       runtimeItemIdsByThread: { t1: ["plan-1", "user-2"] },
       runtimeItemsByIdByThread: {
@@ -58,22 +145,23 @@ describe("threadTodoState", () => {
             type: "plan",
             state: "updated",
             payload: {
-              steps: [
-                { step: "Inspect output", status: "completed" },
-                { step: "Open logs", status: "in_progress" },
-                { step: "Patch UI", status: "pending" },
-              ],
+              steps: [{ step: "Work", status: "in_progress" }],
             },
             streams: {},
           },
-          "user-2": { id: "user-2", type: "user_message", state: "completed", streams: {} },
+          "user-2": {
+            id: "user-2",
+            type: "user_message",
+            state: "completed",
+            streams: { assistant_text: "Go!" },
+          },
         },
       },
     } as unknown as AppStoreState;
 
     expect(selectThreadTodoDockState(state, "t1")).toMatchObject({
       sourceItemId: "plan-1",
-      activeIndex: 1,
+      steps: [{ text: "Work", status: "in_progress" }],
     });
   });
 
@@ -101,25 +189,74 @@ describe("threadTodoState", () => {
     expect(selectThreadTodoDockState(state, "t1")).toBeNull();
   });
 
+  describe("areThreadTodoStepsEqual", () => {
+    const s1: ThreadTodoDockState = {
+      sourceItemId: "p1",
+      itemState: "started",
+      steps: [{ text: "Step 1", status: "pending" }],
+      activeIndex: 0,
+      sourceKind: "steps",
+    };
+
+    it("returns true for identical states", () => {
+      expect(areThreadTodoStepsEqual(s1, { ...s1 })).toBe(true);
+      expect(areThreadTodoStepsEqual(null, null)).toBe(true);
+    });
+
+    it("returns false for different sourceItemIds", () => {
+      expect(areThreadTodoStepsEqual(s1, { ...s1, sourceItemId: "p2" })).toBe(false);
+    });
+
+    it("returns false for different activeIndex", () => {
+      expect(areThreadTodoStepsEqual(s1, { ...s1, activeIndex: 1 })).toBe(false);
+    });
+
+    it("returns false for different step status", () => {
+      const s2: ThreadTodoDockState = {
+        ...s1,
+        steps: [{ text: "Step 1", status: "in_progress" as const }],
+      };
+      expect(areThreadTodoStepsEqual(s1, s2)).toBe(false);
+    });
+
+    it("returns false for different step text", () => {
+      const s2: ThreadTodoDockState = {
+        ...s1,
+        steps: [{ text: "Step 2", status: "pending" as const }],
+      };
+      expect(areThreadTodoStepsEqual(s1, s2)).toBe(false);
+    });
+
+    it("returns false for different step count", () => {
+      const s2: ThreadTodoDockState = {
+        ...s1,
+        steps: [
+          { text: "Step 1", status: "pending" as const },
+          { text: "Step 2", status: "pending" as const },
+        ],
+      };
+      expect(areThreadTodoStepsEqual(s1, s2)).toBe(false);
+    });
+  });
+
   it("parses codex plan_text lists into todo steps when no structured steps exist", () => {
     const todoState = getThreadTodoDockStateForItem({
       id: "plan-codex",
       type: "plan",
       state: "updated",
-      payload: { steps: [] },
+      payload: {},
       streams: {
-        plan_text: "- [x] Inspect output\n- [>] Open logs\n3. Patch UI",
+        plan_text: "1. [x] Done\n- [ ] Working\n* [ ] Pending",
       },
     });
-
     expect(todoState).toMatchObject({
       sourceItemId: "plan-codex",
-      activeIndex: 1,
       sourceKind: "plan_text",
+      activeIndex: 1,
       steps: [
-        { text: "Inspect output", status: "completed" },
-        { text: "Open logs", status: "in_progress" },
-        { text: "Patch UI", status: "pending" },
+        { text: "Done", status: "completed" },
+        { text: "Working", status: "pending" },
+        { text: "Pending", status: "pending" },
       ],
     });
   });

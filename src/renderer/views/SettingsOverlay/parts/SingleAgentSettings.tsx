@@ -10,7 +10,9 @@ import {
   Virtualizer,
 } from "@heroui/react";
 import type { AgentSettingDef, AgentStatus } from "@/shared/contracts";
+import { useAppStore } from "@/renderer/state/appStore";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
+import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
 import { Select } from "@/renderer/components/common";
@@ -141,15 +143,88 @@ function envLabel(status: AgentStatus): string {
   return "";
 }
 
+function MetadataDetailRow(props: {
+  label: string;
+  description?: string;
+  value: string | readonly string[];
+}) {
+  const lines = Array.isArray(props.value) ? props.value : [props.value];
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-sm font-medium text-foreground">{props.label}</p>
+        {props.description ? <p className="text-xs text-muted">{props.description}</p> : null}
+      </div>
+      <div className="min-w-0 max-w-[320px] text-right text-sm text-muted">
+        {lines.map((line, index) => (
+          <p key={`${props.label}-${index}`} className="truncate">
+            {line}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function formatConnectedProviders(status: AgentStatus): string[] {
+  return (status.providerMetadata?.connectedProviders ?? []).map((provider) =>
+    provider.detail ? `${provider.label} · ${provider.detail}` : provider.label,
+  );
+}
+
+function AgentMetadataSection(props: { status: AgentStatus; showEnvironmentLabel: boolean }) {
+  const metadata = props.status.providerMetadata;
+  const connectedProviders = formatConnectedProviders(props.status);
+  if (
+    !metadata?.authenticatedAs &&
+    !metadata?.organization &&
+    !metadata?.plan &&
+    !metadata?.authMethod &&
+    connectedProviders.length === 0
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-4">
+      {props.showEnvironmentLabel ? (
+        <p className="text-xs font-medium uppercase tracking-wide text-muted">
+          {envLabel(props.status)}
+        </p>
+      ) : null}
+      {metadata?.authenticatedAs ? (
+        <MetadataDetailRow label="Authenticated as" value={metadata.authenticatedAs} />
+      ) : null}
+      {metadata?.organization ? (
+        <MetadataDetailRow label="Organization" value={metadata.organization} />
+      ) : null}
+      {metadata?.plan ? <MetadataDetailRow label="Plan" value={metadata.plan} /> : null}
+      {metadata?.authMethod ? (
+        <MetadataDetailRow label="Auth method" value={metadata.authMethod} />
+      ) : null}
+      {connectedProviders.length > 0 ? (
+        <MetadataDetailRow
+          label="Connected providers"
+          description={`${connectedProviders.length} connected through ${props.status.label}.`}
+          value={connectedProviders}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function SingleAgentSettings(props: { agentKind: string }) {
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
+  const wslProjectDistrosKey = useAppStore((state) => buildWslProjectDistrosKey(state.projects));
   const platform = navigator.platform.toLowerCase().includes("win") ? "win32" : "posix";
   const installedHere = agentStatuses.filter((a) => a.kind === props.agentKind && a.installed);
   const installedWsl = wslAgentStatuses.filter((a) => a.kind === props.agentKind && a.installed);
+  const installedStatuses = [...installedHere, ...installedWsl];
   const agent = installedHere[0] ?? installedWsl[0];
   const isDisabled = useSharedSettings((s) => s.disabledAgents.includes(props.agentKind));
   const setAgentDisabled = useSharedSettings((s) => s.setAgentDisabled);
+  const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
 
   if (!agent) {
     return (
@@ -172,6 +247,10 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     for (const s of installedHere) versionRows.push({ label: envLabel(s), version: s.version });
     for (const s of installedWsl) versionRows.push({ label: envLabel(s), version: s.version });
   }
+  const metadataStatuses = installedStatuses.filter(
+    (status) => status.providerMetadata !== undefined,
+  );
+  const showEnvironmentMetadataLabels = installedStatuses.length > 1;
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
@@ -192,6 +271,18 @@ export function SingleAgentSettings(props: { agentKind: string }) {
           )}
         </div>
 
+        {metadataStatuses.length > 0 ? (
+          <div className="mb-8 space-y-6">
+            {metadataStatuses.map((status, index) => (
+              <AgentMetadataSection
+                key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}`}
+                status={status}
+                showEnvironmentLabel={showEnvironmentMetadataLabels}
+              />
+            ))}
+          </div>
+        ) : null}
+
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
@@ -208,7 +299,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                 });
                 if (selected) {
                   void readBridge()
-                    .getAgentStatuses()
+                    .refreshAgentStatuses(wslDistros)
                     .catch(() => undefined);
                 }
               }}

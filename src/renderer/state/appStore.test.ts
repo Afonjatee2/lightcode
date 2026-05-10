@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "./appStore";
 
 describe("appStore runtime config sync", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     localStorage.clear();
     useAppStore.setState((state) => ({
       ...state,
@@ -37,6 +38,108 @@ describe("appStore runtime config sync", () => {
         effort: "high",
       },
       canResumeWithConfig: true,
+    });
+
+    expect(useAppStore.getState().threads[0]?.config.effort).toBe("high");
+  });
+
+  it("preserves a user's pending composer change when runtime echoes the prior config", () => {
+    // Reproduces the bug where a thread-state event from the supervisor (which
+    // re-sends `session.config` on every status update) clobbered a pending
+    // composer change made while the agent was working.
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "gpt-5.4", effort: "low" },
+      prompt: "hello",
+    });
+
+    // Initial runtime sync seeds the supervisor's known config.
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "working",
+      attention: "working",
+      config: { model: "gpt-5.4", effort: "low" },
+      canResumeWithConfig: false,
+    });
+
+    // User flips effort in the composer mid-run.
+    useAppStore.getState().updateThreadConfig(thread.id, {
+      model: "gpt-5.4",
+      effort: "high",
+    });
+    expect(useAppStore.getState().threads[0]?.config.effort).toBe("high");
+
+    // Supervisor emits another status update echoing the *old* session.config.
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "needs_approval",
+      attention: "needs_approval",
+      config: { model: "gpt-5.4", effort: "low" },
+      canResumeWithConfig: false,
+    });
+
+    expect(useAppStore.getState().threads[0]?.config.effort).toBe("high");
+  });
+
+  it("refreshes updatedAt when marking old threads done before auto-archive", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-10T12:00:00.000Z"));
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "gpt-5.4" },
+      prompt: "hello",
+    });
+    useAppStore.setState((state) => ({
+      threads: state.threads.map((t) =>
+        t.id === thread.id ? { ...t, updatedAt: "2026-04-01T00:00:00.000Z" } : t,
+      ),
+    }));
+
+    useAppStore.getState().markThreadDone(thread.id);
+    useAppStore.getState().archiveOldDoneThreads(7);
+
+    const stored = useAppStore.getState().threads.find((t) => t.id === thread.id);
+    expect(stored?.done).toBe(true);
+    expect(stored?.archived).toBe(false);
+    expect(stored?.updatedAt).toBe("2026-05-10T12:00:00.000Z");
+  });
+
+  it("accepts a real runtime config change after the pending edit is submitted", () => {
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "gpt-5.4", effort: "low" },
+      prompt: "hello",
+    });
+
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "working",
+      attention: "working",
+      config: { model: "gpt-5.4", effort: "low" },
+      canResumeWithConfig: false,
+    });
+
+    // Once the user submits, the supervisor's session.config catches up and
+    // the next echo carries the new effort — that should land.
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "working",
+      attention: "working",
+      config: { model: "gpt-5.4", effort: "high" },
+      canResumeWithConfig: false,
     });
 
     expect(useAppStore.getState().threads[0]?.config.effort).toBe("high");
@@ -328,6 +431,8 @@ describe("appStore runtime config sync", () => {
   });
 
   it("working→idle on non-visible thread sets finished", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
     const project = useAppStore.getState().addProject({
       kind: "windows",
       path: "C:\\repo",
@@ -349,13 +454,18 @@ describe("appStore runtime config sync", () => {
       canResumeWithConfig: false,
     });
     expect(useAppStore.getState().threads[0]?.status).toBe("working");
+    expect(useAppStore.getState().threads[0]?.activeTurnStartedAt).toBe("2026-05-01T12:00:00.000Z");
 
+    vi.setSystemTime(new Date("2026-05-01T12:01:15.000Z"));
     useAppStore.getState().updateThreadRuntime(t1.id, {
       status: "idle",
       attention: "none",
       canResumeWithConfig: true,
     });
     expect(useAppStore.getState().threads[0]?.status).toBe("finished");
+    expect(useAppStore.getState().threads[0]?.activeTurnStartedAt).toBeUndefined();
+    expect(useAppStore.getState().threads[0]?.lastTurnStartedAt).toBe("2026-05-01T12:00:00.000Z");
+    expect(useAppStore.getState().threads[0]?.lastTurnEndedAt).toBe("2026-05-01T12:01:15.000Z");
   });
 
   it("working→idle on visible thread stays idle", () => {
@@ -450,6 +560,84 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.status).toBe("finished");
   });
 
+  it("new live runtime overwrites stale active turn timing", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-02T09:00:00.000Z"));
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "m" },
+      prompt: "a",
+    });
+
+    useAppStore.setState((state) => ({
+      ...state,
+      threads: state.threads.map((current) =>
+        current.id === thread.id
+          ? {
+              ...current,
+              status: "inactive",
+              attention: "none",
+              activeTurnStartedAt: "2026-04-01T08:00:00.000Z",
+            }
+          : current,
+      ),
+    }));
+
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "working",
+      attention: "working",
+      canResumeWithConfig: true,
+    });
+
+    expect(useAppStore.getState().threads[0]?.activeTurnStartedAt).toBe("2026-05-02T09:00:00.000Z");
+  });
+
+  it("reconcileRuntimeSnapshots preserves the live turn start across hydration", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-02T09:00:00.000Z"));
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "m" },
+      prompt: "a",
+    });
+
+    useAppStore.setState((state) => ({
+      ...state,
+      threads: state.threads.map((current) =>
+        current.id === thread.id
+          ? {
+              ...current,
+              status: "inactive",
+              attention: "none",
+              activeTurnStartedAt: "2026-05-02T08:57:00.000Z",
+            }
+          : current,
+      ),
+    }));
+
+    useAppStore.getState().reconcileRuntimeSnapshots([
+      {
+        threadId: thread.id,
+        status: "working",
+        attention: "working",
+        canResumeWithConfig: true,
+      },
+    ]);
+
+    expect(useAppStore.getState().threads[0]?.status).toBe("working");
+    expect(useAppStore.getState().threads[0]?.activeTurnStartedAt).toBe("2026-05-02T08:57:00.000Z");
+  });
+
   it("tracks and clears non-persisted thread server requests", () => {
     const project = useAppStore.getState().addProject({
       kind: "windows",
@@ -491,10 +679,33 @@ describe("appStore runtime config sync", () => {
     useAppStore.getState().markThreadExited(thread.id);
     expect(useAppStore.getState().pendingServerRequests).toHaveLength(0);
   });
+
+  it("markThreadExited finalizes an active turn", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "m" },
+      prompt: "a",
+    });
+
+    vi.setSystemTime(new Date("2026-05-01T12:00:30.000Z"));
+    useAppStore.getState().markThreadExited(thread.id);
+
+    expect(useAppStore.getState().threads[0]?.status).toBe("inactive");
+    expect(useAppStore.getState().threads[0]?.lastTurnStartedAt).toBe("2026-05-01T12:00:00.000Z");
+    expect(useAppStore.getState().threads[0]?.lastTurnEndedAt).toBe("2026-05-01T12:00:30.000Z");
+  });
 });
 
 describe("markThreadDone / unmarkThreadDone", () => {
   beforeEach(() => {
+    vi.useRealTimers();
     localStorage.clear();
     useAppStore.setState((state) => ({
       ...state,
@@ -555,6 +766,8 @@ describe("markThreadDone / unmarkThreadDone", () => {
   });
 
   it("markThreadExited preserves done flag", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
     const thread = createTestThread();
     useAppStore.getState().updateThreadRuntime(thread.id, {
       status: "idle",
@@ -564,6 +777,7 @@ describe("markThreadDone / unmarkThreadDone", () => {
     useAppStore.getState().markThreadDone(thread.id);
     expect(useAppStore.getState().threads[0]?.done).toBe(true);
 
+    vi.setSystemTime(new Date("2026-05-01T12:00:30.000Z"));
     useAppStore.getState().markThreadExited(thread.id);
     expect(useAppStore.getState().threads[0]?.done).toBe(true);
     expect(useAppStore.getState().threads[0]?.status).toBe("inactive");

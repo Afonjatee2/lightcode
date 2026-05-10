@@ -13,7 +13,7 @@ import {
   useIsWorktreeTerminalActive,
   useIsWorktreeTerminalOpen,
 } from "@/renderer/hooks/uiSelectors";
-import { formatRelativeTime } from "@/renderer/utils/formatTime";
+import { RelativeTime } from "@/renderer/components/common/RelativeTime";
 import { SidebarPanelDragButton } from "../../SidebarPanelDragButton";
 
 export function ThreadItemSuffix(props: {
@@ -82,9 +82,10 @@ export function ThreadItemSuffix(props: {
         </>
       )}
       <span className="relative w-[2.4ch] shrink-0">
-        <span className="block text-center font-mono text-[10px] tabular-nums text-muted group-hover:invisible">
-          {formatRelativeTime(thread.updatedAt)}
-        </span>
+        <RelativeTime
+          iso={thread.updatedAt}
+          className="block text-center font-mono text-[10px] tabular-nums text-muted group-hover:invisible"
+        />
         <div
           role="button"
           tabIndex={0}

@@ -61,6 +61,7 @@ import {
   setPendingSteerPayloadSchema,
   clearPendingSteerPayloadSchema,
   projectSchema,
+  readAbsoluteFilePayloadSchema,
   readProjectFilePayloadSchema,
   renameProjectEntryPayloadSchema,
   resizeTerminalPayloadSchema,
@@ -163,6 +164,8 @@ import type {
   MoveProjectEntryPayload,
   PrData,
   Project,
+  ReadAbsoluteFilePayload,
+  ReadAbsoluteFileResult,
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
@@ -177,6 +180,7 @@ import type {
   StartShellPayload,
   StartThreadPayload,
   StartThreadResult,
+  AgentSlashCommand,
   Thread,
   ThreadAttention,
   ThreadConfig,
@@ -222,6 +226,21 @@ const readThreadPayloadSchema = z.object({
   threadId: z.string().min(1),
 });
 
+const subAgentSubscribePayloadSchema = z.object({
+  threadId: z.string().min(1),
+  parentItemId: z.string().min(1),
+});
+export type SubAgentSubscribePayload = z.infer<typeof subAgentSubscribePayloadSchema>;
+export interface SubAgentSubscribeResult {
+  /**
+   * Buffered child events (item.started/updated/completed/content.delta) for
+   * this sub-agent. Drains on subscribe; further events stream live via
+   * `thread-runtime-event(s)` until the renderer unsubscribes (or the parent
+   * completes, at which point the supervisor drops the buffer).
+   */
+  history: RuntimeEvent[];
+}
+
 const dbStateKeySchema = z.string().min(1);
 const dbStatePayloadSchema = z.object({
   key: z.string().min(1),
@@ -255,6 +274,26 @@ const dbReplaceRuntimeItemsPayloadSchema = z.object({
 });
 const dbGetRuntimeItemsPayloadSchema = z.object({
   threadId: z.string().min(1),
+});
+
+const persistedCompletedTurnSchema = z.object({
+  startedAt: z.string().min(1),
+  endedAt: z.string().min(1),
+  anchorItemId: z.string().nullable(),
+});
+export type PersistedCompletedTurn = z.infer<typeof persistedCompletedTurnSchema>;
+
+const dbGetCompletedTurnsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+const dbReplaceCompletedTurnsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  turns: z.array(persistedCompletedTurnSchema),
+});
+const dbReplaceRuntimeSnapshotPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  items: z.array(persistedRuntimeItemSchema),
+  turns: z.array(persistedCompletedTurnSchema),
 });
 
 const openExternalPayloadSchema = z.string().min(1);
@@ -379,6 +418,14 @@ export const groupedIpcProcedures = {
     >("getAgentStatuses", "supervisor", getAgentStatusesPayloadSchema, (wslDistros) =>
       getAgentStatusesPayloadSchema.parse({ wslDistros: wslDistros ?? [] }),
     ),
+    refreshAgentStatuses: defineIpcProcedure<
+      [string[]?],
+      GetAgentStatusesPayload,
+      AgentStatusesResponse,
+      "supervisor"
+    >("refreshAgentStatuses", "supervisor", getAgentStatusesPayloadSchema, (wslDistros) =>
+      getAgentStatusesPayloadSchema.parse({ wslDistros: wslDistros ?? [] }),
+    ),
     getThreadSnapshots: defineNoArgProcedure<ThreadRuntimeSnapshot[], "supervisor">(
       "getThreadSnapshots",
       "supervisor",
@@ -447,6 +494,16 @@ export const groupedIpcProcedures = {
       "readTerminalScrollback",
       "supervisor",
       readThreadPayloadSchema,
+    ),
+    subagentSubscribe: definePayloadProcedure<
+      SubAgentSubscribePayload,
+      SubAgentSubscribeResult,
+      "supervisor"
+    >("subagentSubscribe", "supervisor", subAgentSubscribePayloadSchema),
+    subagentUnsubscribe: definePayloadProcedure<SubAgentSubscribePayload, void, "supervisor">(
+      "subagentUnsubscribe",
+      "supervisor",
+      subAgentSubscribePayloadSchema,
     ),
   },
   git: {
@@ -657,6 +714,11 @@ export const groupedIpcProcedures = {
       ReadProjectFileResult,
       "supervisor"
     >("readProjectFile", "supervisor", readProjectFilePayloadSchema),
+    readAbsoluteFile: definePayloadProcedure<
+      ReadAbsoluteFilePayload,
+      ReadAbsoluteFileResult,
+      "supervisor"
+    >("readAbsoluteFile", "supervisor", readAbsoluteFilePayloadSchema),
     writeProjectFile: definePayloadProcedure<
       WriteProjectFilePayload,
       WriteProjectFileResult,
@@ -835,6 +897,24 @@ export const groupedIpcProcedures = {
       void,
       "main-local"
     >("dbReplaceThreadRuntimeItems", "main-local", dbReplaceRuntimeItemsPayloadSchema),
+    dbGetThreadCompletedTurns: defineIpcProcedure<
+      [string],
+      z.infer<typeof dbGetCompletedTurnsPayloadSchema>,
+      PersistedCompletedTurn[],
+      "main-local"
+    >("dbGetThreadCompletedTurns", "main-local", dbGetCompletedTurnsPayloadSchema, (threadId) =>
+      dbGetCompletedTurnsPayloadSchema.parse({ threadId }),
+    ),
+    dbReplaceThreadCompletedTurns: definePayloadProcedure<
+      z.infer<typeof dbReplaceCompletedTurnsPayloadSchema>,
+      void,
+      "main-local"
+    >("dbReplaceThreadCompletedTurns", "main-local", dbReplaceCompletedTurnsPayloadSchema),
+    dbReplaceThreadRuntimeSnapshot: definePayloadProcedure<
+      z.infer<typeof dbReplaceRuntimeSnapshotPayloadSchema>,
+      void,
+      "main-local"
+    >("dbReplaceThreadRuntimeSnapshot", "main-local", dbReplaceRuntimeSnapshotPayloadSchema),
   },
   updates: {
     checkForUpdate: defineNoArgProcedure<void, "main-local">("checkForUpdate", "main-local"),
@@ -872,6 +952,7 @@ export const ipcProcedureMap = {
   openExternal: groupedIpcProcedures.app.openExternal,
   focusWindow: groupedIpcProcedures.app.focusWindow,
   getAgentStatuses: groupedIpcProcedures.thread.getAgentStatuses,
+  refreshAgentStatuses: groupedIpcProcedures.thread.refreshAgentStatuses,
   getThreadSnapshots: groupedIpcProcedures.thread.getThreadSnapshots,
   startThread: groupedIpcProcedures.thread.startThread,
   sendThreadInput: groupedIpcProcedures.thread.sendThreadInput,
@@ -886,6 +967,8 @@ export const ipcProcedureMap = {
   extractContext: groupedIpcProcedures.thread.extractContext,
   cancelExtractContext: groupedIpcProcedures.thread.cancelExtractContext,
   readTerminalScrollback: groupedIpcProcedures.thread.readTerminalScrollback,
+  subagentSubscribe: groupedIpcProcedures.thread.subagentSubscribe,
+  subagentUnsubscribe: groupedIpcProcedures.thread.subagentUnsubscribe,
   getGitStatus: groupedIpcProcedures.git.getGitStatus,
   getGitDiff: groupedIpcProcedures.git.getGitDiff,
   getGitDiffBatch: groupedIpcProcedures.git.getGitDiffBatch,
@@ -927,6 +1010,7 @@ export const ipcProcedureMap = {
   listProjectTree: groupedIpcProcedures.projectTree.listProjectTree,
   searchProjectTree: groupedIpcProcedures.projectTree.searchProjectTree,
   readProjectFile: groupedIpcProcedures.projectTree.readProjectFile,
+  readAbsoluteFile: groupedIpcProcedures.projectTree.readAbsoluteFile,
   writeProjectFile: groupedIpcProcedures.projectTree.writeProjectFile,
   createProjectEntry: groupedIpcProcedures.projectTree.createProjectEntry,
   renameProjectEntry: groupedIpcProcedures.projectTree.renameProjectEntry,
@@ -960,6 +1044,9 @@ export const ipcProcedureMap = {
   dbSyncAll: groupedIpcProcedures.db.dbSyncAll,
   dbGetThreadRuntimeItems: groupedIpcProcedures.db.dbGetThreadRuntimeItems,
   dbReplaceThreadRuntimeItems: groupedIpcProcedures.db.dbReplaceThreadRuntimeItems,
+  dbGetThreadCompletedTurns: groupedIpcProcedures.db.dbGetThreadCompletedTurns,
+  dbReplaceThreadCompletedTurns: groupedIpcProcedures.db.dbReplaceThreadCompletedTurns,
+  dbReplaceThreadRuntimeSnapshot: groupedIpcProcedures.db.dbReplaceThreadRuntimeSnapshot,
   checkForUpdate: groupedIpcProcedures.updates.checkForUpdate,
   startUpdateDownload: groupedIpcProcedures.updates.startUpdateDownload,
   installUpdate: groupedIpcProcedures.updates.installUpdate,
@@ -1001,6 +1088,9 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "dbSyncAll",
   "dbGetThreadRuntimeItems",
   "dbReplaceThreadRuntimeItems",
+  "dbGetThreadCompletedTurns",
+  "dbReplaceThreadCompletedTurns",
+  "dbReplaceThreadRuntimeSnapshot",
   "checkForUpdate",
   "startUpdateDownload",
   "installUpdate",
@@ -1116,6 +1206,7 @@ export type SupervisorEvent =
       sessionRef?: { providerSessionId: string; discoveredAt: string };
       canResumeWithConfig: boolean;
       errorMessage?: string;
+      slashCommands?: AgentSlashCommand[];
       /** Terminal: structured CLI hook (L1) vs terminal parsing (L2); server agents: `server`. */
       threadStatusSource?: ThreadStatusSource;
     }
@@ -1143,6 +1234,13 @@ export type SupervisorEvent =
     }
   | { type: "windows-agent-statuses"; statuses: AgentStatus[] }
   | { type: "wsl-agent-statuses"; statuses: AgentStatus[] }
+  | {
+      // Streamed per adapter as native detection completes, before the
+      // terminal `windows-agent-statuses` event. Used by the first-launch
+      // discovery screen to reveal tiles incrementally instead of all at once.
+      type: "agent-detected";
+      status: AgentStatus;
+    }
   | { type: "git-changed"; projectId: string }
   | { type: "project-tree-changed"; projectId: string }
   | { type: "lsp-message"; sessionId: string; message: unknown }

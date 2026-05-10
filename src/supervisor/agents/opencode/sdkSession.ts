@@ -51,6 +51,7 @@ interface PendingPermission {
 interface PendingQuestion {
   kind: "question";
   requestID: string;
+  optionValues: Record<string, string>;
 }
 
 type PendingRequest = PendingPermission | PendingQuestion;
@@ -300,7 +301,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
 
     if (pending.kind === "question") {
-      const answers = parseQuestionAnswers(response);
+      const answers = parseQuestionAnswers(response, pending);
       try {
         if (answers === undefined) {
           await acquired.client.question.reject({ requestID: pending.requestID });
@@ -421,6 +422,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       this.pendingRequests.set(requestId, {
         kind: "question",
         requestID: event.properties.id,
+        optionValues: buildQuestionOptionValueMap(event.properties),
       });
       this.listener?.onServerRequest({
         requestId,
@@ -482,16 +484,63 @@ function parsePermissionReply(response: unknown): "once" | "always" | "reject" {
   return "once";
 }
 
-function parseQuestionAnswers(response: unknown): Array<Array<string>> | undefined {
+function buildQuestionOptionValueMap(properties: { questions?: unknown }): Record<string, string> {
+  const values: Record<string, string> = {};
+  const questions = Array.isArray(properties.questions) ? properties.questions : [];
+  for (let qi = 0; qi < questions.length; qi += 1) {
+    const question = questions[qi];
+    if (!question || typeof question !== "object") continue;
+    const options = (question as { options?: unknown }).options;
+    if (!Array.isArray(options)) continue;
+    for (let oi = 0; oi < options.length; oi += 1) {
+      const option = options[oi];
+      if (!option || typeof option !== "object") continue;
+      const label = (option as { label?: unknown }).label;
+      if (typeof label === "string") {
+        values[`q${qi}.${oi}`] = label;
+      }
+    }
+  }
+  return values;
+}
+
+function parseQuestionAnswers(
+  response: unknown,
+  pending: PendingQuestion,
+): Array<Array<string>> | undefined {
   if (response === undefined || response === null) return undefined;
   if (Array.isArray(response)) {
     return response.map((row) => (Array.isArray(row) ? row.map(String) : [String(row)]));
   }
   if (typeof response === "object") {
-    const obj = response as { answers?: unknown };
+    const obj = response as { answers?: unknown; optionId?: unknown; optionIds?: unknown };
     if (Array.isArray(obj.answers)) {
       return obj.answers.map((row) => (Array.isArray(row) ? row.map(String) : [String(row)]));
     }
+    if (Array.isArray(obj.optionIds)) {
+      return answerRowsForOptionIds(
+        obj.optionIds.filter((optionId): optionId is string => typeof optionId === "string"),
+        pending.optionValues,
+      );
+    }
+    if (typeof obj.optionId === "string") {
+      return answerRowsForOptionIds([obj.optionId], pending.optionValues);
+    }
   }
   return undefined;
+}
+
+function answerRowsForOptionIds(
+  optionIds: readonly string[],
+  optionValues: Record<string, string>,
+): Array<Array<string>> {
+  const rows: Array<Array<string>> = [];
+  for (const optionId of optionIds) {
+    const value = optionValues[optionId] ?? optionId;
+    const match = /^q(\d+)\.\d+$/.exec(optionId);
+    const questionIndex = match ? Number.parseInt(match[1]!, 10) : 0;
+    while (rows.length <= questionIndex) rows.push([]);
+    rows[questionIndex]!.push(value);
+  }
+  return rows;
 }

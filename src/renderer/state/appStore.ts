@@ -9,6 +9,7 @@ import { createPendingSteerSlice } from "./slices/pendingSteerSlice";
 import { createProjectSlice } from "./slices/projectSlice";
 import { createRuntimeEventSlice } from "./slices/runtimeEventSlice";
 import type { AppStoreState } from "./slices/shared";
+import { createSubAgentOverlaySlice } from "./slices/subAgentOverlaySlice";
 import { createThreadSlice } from "./slices/threadSlice";
 import { createViewSlice } from "./slices/viewSlice";
 
@@ -27,6 +28,7 @@ export const useAppStore = create<AppStoreState>()(
         ...createViewSlice(...a),
         ...createRuntimeEventSlice(...a),
         ...createPendingSteerSlice(...a),
+        ...createSubAgentOverlaySlice(...a),
       }),
       {
         name: "lightcode-app-v2",
@@ -37,13 +39,17 @@ export const useAppStore = create<AppStoreState>()(
             (persistedState as (Partial<AppStoreState> & { threads?: Thread[] }) | undefined) ??
             ({} as Partial<AppStoreState>);
 
+          const threads = (state.threads ?? currentState.threads).map((t) => ({
+            ...normalizeStoredThreadStatus(t),
+            done: t.done ?? false,
+          }));
           return {
             ...currentState,
             ...state,
-            threads: (state.threads ?? currentState.threads).map((t) => ({
-              ...normalizeStoredThreadStatus(t),
-              done: t.done ?? false,
-            })),
+            threads,
+            lastRuntimeConfigByThreadId: Object.fromEntries(
+              threads.map((thread) => [thread.id, thread.config]),
+            ),
           };
         },
         partialize: (state) => ({

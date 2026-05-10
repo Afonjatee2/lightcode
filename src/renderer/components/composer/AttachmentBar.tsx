@@ -20,14 +20,16 @@ function AttachmentChip(props: {
           draggable={false}
         />
       ) : (
-        <img
-          className="lightcode-attachment-chip__icon"
-          src={getEntryIconUrl(att.name, false)}
-          alt=""
-          draggable={false}
-        />
+        <>
+          <img
+            className="lightcode-attachment-chip__icon"
+            src={getEntryIconUrl(att.name, false)}
+            alt=""
+            draggable={false}
+          />
+          <span className="lightcode-attachment-chip__name">{att.name}</span>
+        </>
       )}
-      <span className="lightcode-attachment-chip__name">{att.name}</span>
       {onRemove ? (
         <button
           type="button"
@@ -45,19 +47,17 @@ function AttachmentChip(props: {
     </>
   );
 
+  const className = `lightcode-attachment-chip ${att.isImage ? "lightcode-attachment-chip--image" : ""}`;
+
   if (att.isImage && onPreviewImage) {
     return (
-      <button
-        type="button"
-        className="lightcode-attachment-chip"
-        onClick={() => onPreviewImage(att)}
-      >
+      <button type="button" className={className} onClick={() => onPreviewImage(att)}>
         {content}
       </button>
     );
   }
 
-  return <div className="lightcode-attachment-chip">{content}</div>;
+  return <div className={className}>{content}</div>;
 }
 
 export function AttachmentBar(props: {

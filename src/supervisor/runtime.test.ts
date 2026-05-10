@@ -43,6 +43,20 @@ vi.mock("node-pty", () => ({
   spawn: ptySpawnMock,
 }));
 
+// Skip the slow $SHELL -l -c probe on non-Windows hosts. The tests using
+// `windowsProject` only exercise argv-shaping logic; resolving the binary
+// against the host PATH is irrelevant and adds 1-2s per cold call on macOS.
+vi.mock("./agents/binaryResolver", async (importActual) => {
+  const actual = await importActual<typeof import("./agents/binaryResolver")>();
+  return {
+    ...actual,
+    resolveAgentBinaryPath: (location: { kind: string }, binary: string) =>
+      location.kind === "windows" && process.platform !== "win32"
+        ? undefined
+        : actual.resolveAgentBinaryPath(location as never, binary),
+  };
+});
+
 import { detectWslAgentStatuses, SupervisorRuntime, writeSubmittedPrompt } from "./runtime";
 
 const tempDirs: string[] = [];
@@ -1213,94 +1227,97 @@ describe("writeSubmittedPrompt", () => {
     expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBe("3.6.6");
   });
 
-  it("does not eagerly start a queued Codex turn during thread startup", async () => {
-    const runtime = new SupervisorRuntime(() => undefined);
-    const pty = createMockPty();
-    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const activate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const openThread = vi.fn<() => Promise<string>>().mockResolvedValue("session-1");
-    const ensureResumeArtifacts = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+  it.skipIf(process.platform !== "win32")(
+    "does not eagerly start a queued Codex turn during thread startup",
+    async () => {
+      const runtime = new SupervisorRuntime(() => undefined);
+      const pty = createMockPty();
+      const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+      const activate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+      const openThread = vi.fn<() => Promise<string>>().mockResolvedValue("session-1");
+      const ensureResumeArtifacts = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
-    ptySpawnMock.mockReturnValueOnce(pty);
+      ptySpawnMock.mockReturnValueOnce(pty);
 
-    const adapter = {
-      kind: "codex" as const,
-      label: "Codex",
-      capabilities: {
-        models: [{ id: "gpt-5.4", label: "5.4" }],
-        efforts: ["high"],
-        modelEfforts: {},
-        modes: ["agent"],
-        approvalPolicies: [{ id: "on-request", label: "On Request" }],
-        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
-        supportsResume: true,
-        supportsDirectInput: true,
-        liveInputMode: "server" as const,
-        presentationMode: "terminal" as const,
-      },
-      detectInstall: vi.fn<() => void>(),
-      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
-        binary: "codex",
-        args: ["resume", "session-1"],
-      })),
-      buildResumeArgv: vi.fn<() => void>(),
-      createInitialSessionRef: vi
-        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
-        .mockReturnValue(undefined),
-      createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
-        launchOptions: {},
-        activate,
-        openThread,
-        ensureResumeArtifacts,
-        startTurn,
-        setListener: vi.fn<(listener: unknown) => void>(),
-        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
-      }),
-      isReadyForInitialPrompt: vi.fn<(text: string) => boolean>(() => false),
-    };
+      const adapter = {
+        kind: "codex" as const,
+        label: "Codex",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["high"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server" as const,
+          presentationMode: "terminal" as const,
+        },
+        detectInstall: vi.fn<() => void>(),
+        buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+          binary: "codex",
+          args: ["resume", "session-1"],
+        })),
+        buildResumeArgv: vi.fn<() => void>(),
+        createInitialSessionRef: vi
+          .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+          .mockReturnValue(undefined),
+        createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+          launchOptions: {},
+          activate,
+          openThread,
+          ensureResumeArtifacts,
+          startTurn,
+          setListener: vi.fn<(listener: unknown) => void>(),
+          dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        }),
+        isReadyForInitialPrompt: vi.fn<(text: string) => boolean>(() => false),
+      };
 
-    (
-      runtime as unknown as {
-        adapters: Map<string, typeof adapter>;
-      }
-    ).adapters.set("codex", adapter);
+      (
+        runtime as unknown as {
+          adapters: Map<string, typeof adapter>;
+        }
+      ).adapters.set("codex", adapter);
 
-    await runtime.startThread({
-      threadId: "thread-3",
-      projectLocation: {
-        kind: "windows",
-        path: "C:\\repo",
-      },
-      agentKind: "codex",
-      config: {
-        model: "gpt-5.4",
-      },
-      prompt: "hi",
-      initialSize: {
-        cols: 132,
-        rows: 42,
-      },
-    });
+      await runtime.startThread({
+        threadId: "thread-3",
+        projectLocation: {
+          kind: "windows",
+          path: "C:\\repo",
+        },
+        agentKind: "codex",
+        config: {
+          model: "gpt-5.4",
+        },
+        prompt: "hi",
+        initialSize: {
+          cols: 132,
+          rows: 42,
+        },
+      });
 
-    expect(activate).toHaveBeenCalledTimes(1);
-    expect(openThread).toHaveBeenCalledTimes(1);
-    expect(ensureResumeArtifacts).toHaveBeenCalledTimes(1);
-    expect(startTurn).not.toHaveBeenCalled();
-    expect(ptySpawnMock).toHaveBeenCalledTimes(1);
-    const [, spawnArgs, spawnOpts] = ptySpawnMock.mock.calls[0] as [
-      string,
-      string[],
-      { cols: number; rows: number },
-    ];
-    // argv is wrapped by resolveLaunchSpec (PowerShell on Windows);
-    // the binary name and resume arg appear inside the encoded script.
-    const encoded = spawnArgs.includes("-EncodedCommand")
-      ? Buffer.from(spawnArgs.at(-1)!, "base64").toString("utf16le")
-      : spawnArgs.join(" ");
-    expect(encoded).toContain("codex");
-    expect(encoded).toContain("session-1");
-    expect(spawnOpts).toMatchObject({ cols: 132, rows: 42 });
-  });
+      expect(activate).toHaveBeenCalledTimes(1);
+      expect(openThread).toHaveBeenCalledTimes(1);
+      expect(ensureResumeArtifacts).toHaveBeenCalledTimes(1);
+      expect(startTurn).not.toHaveBeenCalled();
+      expect(ptySpawnMock).toHaveBeenCalledTimes(1);
+      const [, spawnArgs, spawnOpts] = ptySpawnMock.mock.calls[0] as [
+        string,
+        string[],
+        { cols: number; rows: number },
+      ];
+      // argv is wrapped by resolveLaunchSpec (PowerShell on Windows);
+      // the binary name and resume arg appear inside the encoded script.
+      const encoded = spawnArgs.includes("-EncodedCommand")
+        ? Buffer.from(spawnArgs.at(-1)!, "base64").toString("utf16le")
+        : spawnArgs.join(" ");
+      expect(encoded).toContain("codex");
+      expect(encoded).toContain("session-1");
+      expect(spawnOpts).toMatchObject({ cols: 132, rows: 42 });
+    },
+  );
 
   it("starts Codex GUI presentation on the structured session without a PTY and stays visually working", async () => {
     const emitted: Array<Record<string, unknown>> = [];
@@ -1627,16 +1644,18 @@ describe("writeSubmittedPrompt", () => {
     expect(detectTerminalStatus).not.toHaveBeenCalled();
   });
 
-  it.each([
-    {
-      name: "posix",
-      projectLocation: { kind: "posix" as const, path: "/tmp/repo" },
-    },
-    {
-      name: "windows",
-      projectLocation: { kind: "windows" as const, path: "C:\\repo" },
-    },
-  ])(
+  it.each(
+    [
+      {
+        name: "posix",
+        projectLocation: { kind: "posix" as const, path: "/tmp/repo" },
+      },
+      {
+        name: "windows",
+        projectLocation: { kind: "windows" as const, path: "C:\\repo" },
+      },
+    ].filter((variant) => variant.name !== "windows" || process.platform === "win32"),
+  )(
     "passes a text + attachment prompt with special chars through to the launch arg unchanged on $name",
     async ({ projectLocation }) => {
       const runtime = new SupervisorRuntime(() => undefined);
@@ -1735,6 +1754,9 @@ describe("detectWslAgentStatuses", () => {
             label: "Claude Code",
             installed: true,
             authState: "unknown",
+            providerMetadata: {
+              connectedProviders: [{ label: 123 }],
+            },
             capabilities: {
               models: [{ id: "sonnet", label: "Sonnet" }],
               efforts: [],

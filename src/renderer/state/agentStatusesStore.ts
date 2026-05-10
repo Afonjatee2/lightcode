@@ -1,5 +1,9 @@
 import { create } from "zustand";
-import type { AgentStatus, ProjectLocation } from "@/shared/contracts";
+import {
+  areAgentProviderMetadataEqual,
+  type AgentStatus,
+  type ProjectLocation,
+} from "@/shared/contracts";
 
 interface AgentStatusesStore {
   agentStatuses: AgentStatus[];
@@ -11,6 +15,16 @@ interface AgentStatusesStore {
   windowsLoaded: boolean;
   /** True once a wsl-agent-statuses event (or cache) has been applied. */
   wslLoaded: boolean;
+  /**
+   * On first launch (no cache) we render a discovery screen that reveals
+   * agent tiles as the supervisor streams `agent-detected` events. Once the
+   * terminal `windows-agent-statuses` event arrives the discovery screen
+   * fades out into the regular ThreadDraft. Stays false on subsequent
+   * launches where the cache is loaded eagerly.
+   */
+  inFirstLaunchDiscovery: boolean;
+  /** Statuses streamed from `agent-detected` events during first-launch scan. */
+  discoveredAgents: AgentStatus[];
   setAgentStatuses: (statuses: AgentStatus[]) => void;
   setWslAgentStatuses: (statuses: AgentStatus[]) => void;
   /**
@@ -19,6 +33,9 @@ interface AgentStatusesStore {
    * the empty initial state.
    */
   hydrateFromCache: (cached: { windows: AgentStatus[]; wsl: AgentStatus[] }) => void;
+  beginFirstLaunchDiscovery: () => void;
+  resetDiscoveredAgents: () => void;
+  pushDiscoveredAgent: (status: AgentStatus) => void;
 }
 
 function capabilitiesEqual(
@@ -44,6 +61,7 @@ function statusesEqual(a: AgentStatus[], b: AgentStatus[]): boolean {
       x.installed === b[i]!.installed &&
       x.version === b[i]!.version &&
       x.authState === b[i]!.authState &&
+      areAgentProviderMetadataEqual(x.providerMetadata, b[i]!.providerMetadata) &&
       capabilitiesEqual(x.capabilities, b[i]!.capabilities),
   );
 }
@@ -53,15 +71,18 @@ export const useAgentStatusesStore = create<AgentStatusesStore>()((set) => ({
   wslAgentStatuses: [],
   windowsLoaded: false,
   wslLoaded: false,
+  inFirstLaunchDiscovery: false,
+  discoveredAgents: [],
   setAgentStatuses: (incoming) =>
     set((prev) => {
       const equal = statusesEqual(prev.agentStatuses, incoming);
       if (equal && prev.windowsLoaded) {
-        return prev;
+        return prev.inFirstLaunchDiscovery ? { inFirstLaunchDiscovery: false } : {};
       }
       return {
         ...(equal ? {} : { agentStatuses: incoming }),
         windowsLoaded: true,
+        inFirstLaunchDiscovery: false,
       };
     }),
   setWslAgentStatuses: (incoming) =>
@@ -81,7 +102,31 @@ export const useAgentStatusesStore = create<AgentStatusesStore>()((set) => ({
       wslAgentStatuses: wsl,
       windowsLoaded: true,
       wslLoaded: true,
+      inFirstLaunchDiscovery: false,
     })),
+  beginFirstLaunchDiscovery: () =>
+    set((prev) => {
+      if (prev.windowsLoaded) {
+        return prev;
+      }
+      return { inFirstLaunchDiscovery: true, discoveredAgents: [] };
+    }),
+  resetDiscoveredAgents: () =>
+    set((prev) =>
+      prev.discoveredAgents.length === 0 && !prev.inFirstLaunchDiscovery
+        ? prev
+        : { discoveredAgents: [], inFirstLaunchDiscovery: false },
+    ),
+  pushDiscoveredAgent: (status) =>
+    set((prev) => {
+      if (status.envKind === "wsl") {
+        return prev;
+      }
+      if (prev.discoveredAgents.some((existing) => existing.kind === status.kind)) {
+        return prev;
+      }
+      return { discoveredAgents: [...prev.discoveredAgents, status] };
+    }),
 }));
 
 /**

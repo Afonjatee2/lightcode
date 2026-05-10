@@ -1,5 +1,13 @@
 import { Tooltip } from "@heroui/react";
-import { Download, House, PanelLeft, PanelLeftClose, RefreshCw, Settings2 } from "lucide-react";
+import {
+  Download,
+  House,
+  PanelLeft,
+  PanelLeftClose,
+  RefreshCw,
+  Search,
+  Settings2,
+} from "lucide-react";
 import { startTransition, useEffect } from "react";
 import { useShallow } from "zustand/shallow";
 import { getAppName } from "@/shared/appName";
@@ -146,10 +154,13 @@ export function Sidebar() {
   const currentProjectId = useCurrentProjectId();
   const currentWorktreePath = useCurrentWorktreePath();
   const sortMode = usePanelStore((s) => s.threadSortMode);
+  const threadSearchOpen = usePanelStore((s) => s.threadSearchOpen);
+  const openThreadSearch = usePanelStore((s) => s.openThreadSearch);
   const setProjectCollapsed = useSidebarUiStore((s) => s.setProjectCollapsed);
   const setWorktreeCollapsed = useSidebarUiStore((s) => s.setWorktreeCollapsed);
   const { isCollapsed, collapse, expand } = useSidebar();
   const openHome = useAppStore((s) => s.openHome);
+  const appView = useAppStore((s) => s.view);
   const appNameForHome = getAppName(import.meta.env.DEV);
 
   useEffect(() => {
@@ -168,12 +179,20 @@ export function Sidebar() {
     <div className="relative h-full">
       {isCollapsed && (
         <div className="absolute inset-y-0 left-0 z-10 flex h-full min-h-0 w-12 flex-col items-start gap-3 pl-2 pb-0 pt-0">
-          <div className="shrink-0">
+          <div className="flex shrink-0 flex-col gap-0.5">
             <SidebarButton
               iconOnly
               icon={<House className="size-3.5" />}
               label={appNameForHome}
+              isActive={appView.kind === "home"}
               onPress={() => startTransition(() => openHome())}
+            />
+            <SidebarButton
+              iconOnly
+              icon={<Search className="size-3.5" />}
+              label="Search"
+              isActive={threadSearchOpen}
+              onPress={openThreadSearch}
             />
           </div>
           <CollapsedThreadRail />

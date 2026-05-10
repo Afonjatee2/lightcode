@@ -23,7 +23,9 @@ import {
   type BranchSelection,
 } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
+import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
+import { filterSlashCommands, resolveAvailableSlashCommands } from "./threadSlashCommands";
 
 export type DraftStartInput = {
   agentKind: AgentStatus["kind"];
@@ -59,6 +61,8 @@ export function ThreadDraftComposerArea(props: {
   const attachments = useAttachments();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [branchSelection, setBranchSelection] = useState<BranchSelection | null>(null);
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   const imageAttachments = attachments.attachments.filter((a) => a.isImage);
   const saveDraftContent = useAppStore((s) => s.saveDraftContent);
   const clearDraftContent = useAppStore((s) => s.clearDraftContent);
@@ -66,6 +70,12 @@ export function ThreadDraftComposerArea(props: {
   const attachmentsRef = useRef(attachments.attachments);
   attachmentsRef.current = attachments.attachments;
   const initialDraftRef = useRef(useAppStore.getState().draftContents[props.project.id]);
+  const availableCommands = resolveAvailableSlashCommands(
+    undefined,
+    props.selectedAgent.capabilities.slashCommands,
+  );
+  const filteredCommands = filterSlashCommands(availableCommands, slashQuery);
+  const showCommandPanel = filteredCommands.length > 0;
 
   function resetDraftRefs() {
     latestSegmentsRef.current = [];
@@ -86,7 +96,7 @@ export function ThreadDraftComposerArea(props: {
       config: props.config,
       prompt: flatPrompt,
       ...(allSegments.length > 0 ? { segments: allSegments } : {}),
-      ...(props.supportsModePicker ? { presentationMode: props.presentationMode } : {}),
+      presentationMode: props.presentationMode,
       ...(useWorktree
         ? branchSelection?.worktreePath
           ? {
@@ -131,12 +141,47 @@ export function ThreadDraftComposerArea(props: {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cleanup-only effect keyed on project
   }, [props.project.id, saveDraftContent]);
 
+  useEffect(() => {
+    setSlashActiveIndex(0);
+  }, [slashQuery]);
+
+  useEffect(() => {
+    if (filteredCommands.length === 0) {
+      if (slashActiveIndex !== 0) {
+        setSlashActiveIndex(0);
+      }
+      return;
+    }
+    if (slashActiveIndex >= filteredCommands.length) {
+      setSlashActiveIndex(filteredCommands.length - 1);
+    }
+  }, [filteredCommands.length, slashActiveIndex]);
+
+  useEffect(() => {
+    setSlashQuery(null);
+    setSlashActiveIndex(0);
+  }, [props.project.id, props.selectedAgent.kind]);
+
   return (
     <>
       <ThreadComposer
         autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
         compact={props.compact ?? false}
+        variant="draft"
         controls={props.controls}
+        fixedContent={
+          showCommandPanel ? (
+            <ThreadCommandPanel
+              commands={filteredCommands}
+              activeIndex={slashActiveIndex}
+              onActiveIndexChange={setSlashActiveIndex}
+              onSelect={(cmd) => {
+                mentionRef.current?.insertSlashCommand(cmd.id);
+                setSlashQuery(null);
+              }}
+            />
+          ) : null
+        }
         attachmentBar={
           <AttachmentBar
             attachments={attachments.attachments}
@@ -165,6 +210,39 @@ export function ThreadDraftComposerArea(props: {
             onSubmit={(segments) => {
               submitSegments([...attachments.toSegments(), ...segments]);
             }}
+            onInterceptKey={(e) => {
+              if (!showCommandPanel) {
+                return false;
+              }
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setSlashActiveIndex((prev) => (prev + 1) % filteredCommands.length);
+                return true;
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setSlashActiveIndex(
+                  (prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length,
+                );
+                return true;
+              }
+              if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                const selected = filteredCommands[slashActiveIndex];
+                if (selected) {
+                  e.preventDefault();
+                  mentionRef.current?.insertSlashCommand(selected.id);
+                  setSlashQuery(null);
+                  return true;
+                }
+              }
+              if (e.key === "Escape") {
+                e.preventDefault();
+                setSlashQuery(null);
+                return true;
+              }
+              return false;
+            }}
+            onSlashCommandChange={setSlashQuery}
           />
         }
         placeholder="Send a message..."

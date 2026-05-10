@@ -115,15 +115,11 @@ function showToastNotification(
 
   toast[variant](projectName, {
     description: `${threadTitle}\n${detail}`,
-    actionProps: {
-      children: "Open",
-      variant: "tertiary",
-      onPress: () => {
-        openThread(threadId, { focusComposer: true });
-      },
+    onPress: () => {
+      openThread(threadId, { focusComposer: true });
     },
     timeout: 6000,
-  });
+  } as any);
   playSound();
 }
 

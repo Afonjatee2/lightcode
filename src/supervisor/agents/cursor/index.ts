@@ -44,6 +44,7 @@ export function createCursorAdapter(): AgentAdapter {
   return {
     kind: "cursor",
     label: "Cursor CLI",
+    binary: "cursor-agent",
     get capabilities() {
       return capabilities;
     },

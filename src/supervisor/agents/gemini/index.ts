@@ -45,6 +45,7 @@ export function createGeminiAdapter(): AgentAdapter {
   return {
     kind: "gemini",
     label: "Gemini",
+    binary: "gemini",
     get capabilities() {
       return capabilities;
     },

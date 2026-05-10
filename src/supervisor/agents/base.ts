@@ -11,6 +11,8 @@ import type { OscNotification, OscShellEvent, OscTitle } from "@/shared/osc";
 import type {
   AgentCapability,
   AgentKind,
+  AgentProviderMetadata,
+  AgentSlashCommand,
   AgentStatus,
   AuthState,
   ProjectLocation,
@@ -24,6 +26,7 @@ import type {
   ThreadStatus,
 } from "@/shared/contracts";
 import { primeAgentBinaryPath, resolveAgentBinaryPath } from "./binaryResolver";
+import { clearProjectNodeBinCache, resolveProjectNodeBin } from "./projectNodeResolver";
 
 export interface CommandSpec {
   command: string;
@@ -61,6 +64,7 @@ export interface StructuredSessionUpdate {
   config?: ThreadConfig;
   sessionRef?: SessionRef;
   errorMessage?: string;
+  slashCommands?: AgentSlashCommand[];
 }
 
 export interface StructuredSessionListener {
@@ -153,6 +157,13 @@ export interface DetectProbeCtx {
 
 export type AuthProbe = (ctx: DetectProbeCtx) => Promise<AuthState | undefined>;
 
+export interface StatusProbeResult {
+  authState?: AuthState;
+  providerMetadata?: AgentProviderMetadata;
+}
+
+export type StatusProbe = (ctx: DetectProbeCtx) => Promise<StatusProbeResult | undefined>;
+
 /**
  * Declarative install-detection for a provider. Replaces the WSL vs native
  * branching + `command -v` probe + version fetch + auth/capability probe
@@ -162,6 +173,10 @@ export type AuthProbe = (ctx: DetectProbeCtx) => Promise<AuthState | undefined>;
  * `"unknown"` and `"missing"` are recorded but let later probes override
  * with `"authenticated"`. `undefined` skips the probe.
  *
+ * `statusProbe` can return richer provider-account metadata alongside an
+ * auth-state hint from a first-party CLI command. It runs in parallel with the
+ * optional capability probe.
+ *
  * `capabilitiesProbe` returns a partial merged on top of `capabilities`.
  */
 export interface DetectionSpec {
@@ -170,6 +185,7 @@ export interface DetectionSpec {
   binary: string;
   capabilities: AgentCapability;
   versionArgs?: string[];
+  statusProbe?: StatusProbe;
   authProbes?: AuthProbe[];
   capabilitiesProbe?: (ctx: DetectProbeCtx) => Promise<Partial<AgentCapability> | undefined>;
 }
@@ -180,6 +196,13 @@ export interface DetectionSpec {
 export interface AgentMetadata {
   kind: AgentKind;
   label: string;
+  /**
+   * The CLI command name (e.g. `claude`, `codex`). Used by AgentStatusService
+   * to batch-resolve every adapter's binary in a single login-shell call —
+   * without this we'd spawn one cold zsh per adapter and macOS GUI launches
+   * would intermittently time out.
+   */
+  binary?: string;
   capabilities: AgentCapability;
   /**
    * Extra process env the runtime should merge into the PTY spawn. Static —
@@ -540,16 +563,51 @@ export function buildWindowsCommand(
 
 /**
  * Build a command spec for POSIX systems (macOS/Linux).
- * Uses the user's default shell from $SHELL, or falls back to /bin/bash.
+ *
+ * Fast path: when given an absolute binary path, spawn directly and inject
+ * the user's full shell env (captured once during `primeExecutablePathCache`).
+ * This skips the interactive login shell init — on macOS with oh-my-zsh /
+ * fnm / asdf / starship that's ~1.3-1.9s per spawn — while still giving the
+ * child the same env it would inherit from the user's terminal: PATH plus
+ * NVM_DIR, HOMEBREW_PREFIX, EDITOR, LANG, custom exports, etc. Bare names
+ * still wrap in `$SHELL -l [-i] -c` so unprimed binaries are resolvable.
  */
 function buildPosixCommand(cwd: string, command: string, args: string[]): CommandSpec {
+  if (command.startsWith("/")) {
+    const env = withProjectNodeBin(cwd, primedPosixEnv);
+    return {
+      command,
+      args,
+      cwd,
+      ...(env ? { env: { ...env } } : {}),
+    };
+  }
+
   const shell = process.env.SHELL || "/bin/bash";
   const script = `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
+  const env = withProjectNodeBin(cwd, undefined);
   return {
     command: shell,
     args: getPosixLoginShellArgs(script),
     cwd,
+    ...(env ? { env } : {}),
   };
+}
+
+/**
+ * Prepend the project's pinned Node bin (from .nvmrc / .node-version) to
+ * `PATH`. Without this, agents launched in a project that pins Node 24
+ * inherit the supervisor's home-shell Node when shelling out to npx/node.
+ */
+function withProjectNodeBin(
+  cwd: string,
+  baseEnv: Record<string, string> | undefined,
+): Record<string, string> | undefined {
+  const projectBin = resolveProjectNodeBin(cwd, baseEnv?.NVM_DIR);
+  if (!projectBin) return baseEnv;
+  const basePath = baseEnv?.PATH ?? process.env.PATH ?? "";
+  const merged = basePath ? `${projectBin}:${basePath}` : projectBin;
+  return { ...(baseEnv ?? {}), PATH: merged };
 }
 
 /**
@@ -604,7 +662,9 @@ export function buildAgentCommand(
 
   // location.kind === "posix" (macOS/Linux)
   const spec = buildPosixCommand(location.path, resolvedExecPath ?? command, args);
-  if (env && Object.keys(env).length > 0) spec.env = env;
+  if (env && Object.keys(env).length > 0) {
+    spec.env = { ...spec.env, ...env };
+  }
   return spec;
 }
 
@@ -739,7 +799,9 @@ async function readDetectedVersion(
   const result = await readCommandOutputAsync(
     spec.command,
     spec.args,
-    spec.cwd ? { cwd: spec.cwd } : undefined,
+    spec.cwd || spec.env
+      ? { ...(spec.cwd ? { cwd: spec.cwd } : {}), ...(spec.env ? { env: spec.env } : {}) }
+      : undefined,
   );
   return result.ok ? extractSemverFromVersionOutput(result.stdout) : undefined;
 }
@@ -769,7 +831,13 @@ export async function readAgentCommandOutput(
     );
   }
   const spec = buildAgentCommand(location, executablePath, args);
-  return readCommandOutputAsync(spec.command, spec.args, spec.cwd ? { cwd: spec.cwd } : undefined);
+  return readCommandOutputAsync(
+    spec.command,
+    spec.args,
+    spec.cwd || spec.env
+      ? { ...(spec.cwd ? { cwd: spec.cwd } : {}), ...(spec.env ? { env: spec.env } : {}) }
+      : undefined,
+  );
 }
 
 // ── OSC notification helpers (shared across providers) ───────────────────
@@ -1034,8 +1102,9 @@ export function createRecursiveDirWatcher(
  *      this lookup instead of probing again.
  *   2. Fetch the version via `spec.versionArgs` (default `["--version"]`).
  *   3. Run `capabilitiesProbe` and merge its partial into `spec.capabilities`.
- *   4. Run `authProbes` in order; first `"authenticated"` wins.
- *   5. Assemble the `AgentStatus`.
+ *   4. Run `statusProbe` + `capabilitiesProbe` in parallel.
+ *   5. Run `authProbes` in order; first `"authenticated"` wins.
+ *   6. Assemble the `AgentStatus`.
  */
 export async function detectAgentInstall(
   ctx: AgentEnvContext | undefined,
@@ -1048,27 +1117,35 @@ export async function detectAgentInstall(
   const version = await readDetectedVersion(location, spec.binary, executablePath, versionArgs);
 
   let capabilities = spec.capabilities;
-  if (executablePath && spec.capabilitiesProbe) {
-    const partial = await spec.capabilitiesProbe({ location, executablePath, version });
-    if (partial) {
-      capabilities = { ...capabilities, ...partial };
+  let statusProbeResult: StatusProbeResult | undefined;
+  if (executablePath) {
+    const probeCtx: DetectProbeCtx = { location, executablePath, version };
+    const [capabilityPartial, nextStatusProbeResult] = await Promise.all([
+      spec.capabilitiesProbe ? spec.capabilitiesProbe(probeCtx) : Promise.resolve(undefined),
+      spec.statusProbe ? spec.statusProbe(probeCtx) : Promise.resolve(undefined),
+    ]);
+    if (capabilityPartial) {
+      capabilities = { ...capabilities, ...capabilityPartial };
     }
+    statusProbeResult = nextStatusProbeResult;
   }
 
   let authState: AuthState;
   if (!executablePath) {
     authState = "missing";
   } else {
-    authState = "unknown";
+    authState = statusProbeResult?.authState ?? "unknown";
     const probeCtx: DetectProbeCtx = { location, executablePath, version };
-    for (const probe of spec.authProbes ?? []) {
-      const result = await probe(probeCtx);
-      if (result === "authenticated") {
-        authState = "authenticated";
-        break;
-      }
-      if (result !== undefined) {
-        authState = result;
+    if (authState !== "authenticated") {
+      for (const probe of spec.authProbes ?? []) {
+        const result = await probe(probeCtx);
+        if (result === "authenticated") {
+          authState = "authenticated";
+          break;
+        }
+        if (result !== undefined) {
+          authState = result;
+        }
       }
     }
   }
@@ -1080,6 +1157,9 @@ export async function detectAgentInstall(
     ...(executablePath ? { executablePath } : {}),
     ...(version ? { version } : {}),
     authState,
+    ...(statusProbeResult?.providerMetadata
+      ? { providerMetadata: statusProbeResult.providerMetadata }
+      : {}),
     capabilities,
   };
 }
@@ -1178,7 +1258,10 @@ function buildWindowsFallbackPath(): string | undefined {
 function buildWindowsPathOverride(): NodeJS.ProcessEnv | undefined {
   const fallbackPath = buildWindowsFallbackPath();
   if (!fallbackPath) return undefined;
-  if (normalizeWindowsPathValue(fallbackPath) === normalizeWindowsPathValue(getWindowsEnvValue("Path"))) {
+  if (
+    normalizeWindowsPathValue(fallbackPath) ===
+    normalizeWindowsPathValue(getWindowsEnvValue("Path"))
+  ) {
     return undefined;
   }
   return {
@@ -1438,9 +1521,148 @@ export function readWslCommandOutput(
 const execPathCache = new Map<string, { path: string | undefined; ts: number }>();
 const EXEC_CACHE_TTL_MS = 60_000;
 
+/**
+ * Full env captured from the user's login shell during `primeExecutablePathCache`.
+ * Lets `buildPosixCommand` spawn absolute binaries directly while preserving
+ * the user's shell env (PATH, NVM_DIR, HOMEBREW_PREFIX, EDITOR, LANG, custom
+ * exports like OPENAI_API_KEY, etc.). Without it, Electron-from-Finder spawns
+ * inherit only launchd's skeleton env and tools relying on user-set vars
+ * silently break.
+ */
+let primedPosixEnv: Record<string, string> | undefined;
+
+/** Shell-internal / per-process vars that must not leak into spawned children. */
+const PRIMED_ENV_SKIP = new Set([
+  "PWD",
+  "OLDPWD",
+  "SHLVL",
+  "_",
+  "OPTIND",
+  "LINENO",
+  "PS1",
+  "PS2",
+  "PROMPT",
+]);
+
 export function clearExecutablePathCache(): void {
   execPathCache.clear();
   cachedWindowsSearchPath = null;
+  primedPosixEnv = undefined;
+  clearProjectNodeBinCache();
+}
+
+/** Sync read of the cached binary path. Returns undefined if absent or stale. */
+export function getCachedExecutablePath(command: string): string | undefined {
+  const cached = execPathCache.get(command);
+  if (!cached) return undefined;
+  if (Date.now() - cached.ts > EXEC_CACHE_TTL_MS) return undefined;
+  return cached.path;
+}
+
+/** Env captured from the user's login shell during prime; undefined until then. */
+export function getPrimedPosixEnv(): Record<string, string> | undefined {
+  return primedPosixEnv;
+}
+
+const PRIMED_ENV_MARKER = "__LIGHTCODE_ENV_BEGIN__";
+/** Matches a line that opens a new exported var: `NAME=value`. */
+const PRIMED_ENV_VAR_RE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
+
+/**
+ * Parse the trailing `env` dump emitted by the prime script. `env` outputs one
+ * `KEY=VALUE` per line; values containing newlines wrap onto continuation
+ * lines that don't match the `KEY=` shape. Recover those by appending until we
+ * hit the next assignment.
+ */
+function parsePrimedEnvDump(lines: string[]): Record<string, string> {
+  const env: Record<string, string> = {};
+  let currentKey: string | undefined;
+  for (const line of lines) {
+    const match = PRIMED_ENV_VAR_RE.exec(line);
+    if (match) {
+      const [, key, value] = match;
+      if (PRIMED_ENV_SKIP.has(key!)) {
+        currentKey = undefined;
+        continue;
+      }
+      env[key!] = value!;
+      currentKey = key;
+    } else if (currentKey !== undefined) {
+      env[currentKey] = `${env[currentKey] ?? ""}\n${line}`;
+    }
+  }
+  return env;
+}
+
+/**
+ * Resolve multiple binary paths through a single login shell invocation and
+ * prime the per-command cache. Detection runs N parallel adapters, each of
+ * which would otherwise spawn its own `zsh -l -i -c command -v <bin>` — on
+ * macOS GUI launches that means N cold interactive shells (nvm + oh-my-zsh +
+ * starship + plugins ≈ 2-3s each), and the parallel load pushes individual
+ * probes past the 5s timeout, leaving random subsets marked as missing.
+ *
+ * One shell, N lookups: the slow shell startup is paid once, every subsequent
+ * `resolveExecutablePathAsync(cmd)` for a primed name returns from cache.
+ * The same call also captures the full shell env so later spawns can skip
+ * the login-shell wrapper without losing user-set exports.
+ *
+ * Windows is skipped — `where.exe` is fast and doesn't pay the shell cost.
+ */
+export async function primeExecutablePathCache(commands: readonly string[]): Promise<void> {
+  if (process.platform === "win32" || commands.length === 0) {
+    return;
+  }
+  const unique = [...new Set(commands)];
+  // After the binary lookups, dump the full env so direct-spawn calls inherit
+  // PATH, NVM_DIR, HOMEBREW_PREFIX, EDITOR, custom exports, etc. — same as a
+  // process started from the user's terminal.
+  const probeLines = [
+    ...unique.map(
+      (cmd) =>
+        `printf '%s\\t' ${quotePosixShellArg(cmd)}; command -v ${quotePosixShellArg(cmd)} 2>/dev/null || true; printf '\\n'`,
+    ),
+    `printf '%s\\n' ${quotePosixShellArg(PRIMED_ENV_MARKER)}`,
+    `env`,
+  ];
+  const script = probeLines.join("; ");
+  try {
+    const { stdout } = await execFileAsync(
+      process.env.SHELL || "/bin/bash",
+      getPosixLoginShellArgs(script),
+      {
+        cwd: homedir(),
+        windowsHide: true,
+        timeout: 15_000,
+      },
+    );
+    const ts = Date.now();
+    const allLines = (stdout ?? "").split(/\r?\n/g);
+    const markerIdx = allLines.indexOf(PRIMED_ENV_MARKER);
+    const lookupLines = markerIdx >= 0 ? allLines.slice(0, markerIdx) : allLines;
+    const envLines = markerIdx >= 0 ? allLines.slice(markerIdx + 1) : [];
+
+    const resolved = new Map<string, string | undefined>();
+    for (const line of lookupLines) {
+      const tab = line.indexOf("\t");
+      if (tab < 0) continue;
+      const name = line.slice(0, tab);
+      const value = line.slice(tab + 1).trim();
+      resolved.set(name, value.length > 0 ? value : undefined);
+    }
+    for (const cmd of unique) {
+      execPathCache.set(cmd, { path: resolved.get(cmd), ts });
+    }
+
+    if (envLines.length > 0) {
+      const parsed = parsePrimedEnvDump(envLines);
+      if (Object.keys(parsed).length > 0) {
+        primedPosixEnv = parsed;
+      }
+    }
+  } catch {
+    // Leave cache untouched on failure; per-binary fallback paths still run.
+  }
 }
 
 export async function resolveExecutablePathAsync(command: string): Promise<string | undefined> {
@@ -1481,8 +1703,7 @@ export async function resolveExecutablePathAsync(command: string): Promise<strin
             } catch {
               return undefined;
             }
-          })()) ??
-          undefined)
+          })()) ?? undefined)
         : parseCommandOutputLine(
             (
               await execFileAsync(

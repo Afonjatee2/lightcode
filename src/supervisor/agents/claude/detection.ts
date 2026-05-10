@@ -1,5 +1,5 @@
-import type { AgentCapability } from "@/shared/contracts";
-import { cliSubcommandAuthProbe, type DetectionSpec } from "../base";
+import { compactAgentProviderMetadata, type AgentCapability } from "@/shared/contracts";
+import { readAgentCommandOutput, type DetectionSpec, type StatusProbeResult } from "../base";
 import { probeClaudeCapabilities } from "./probe";
 
 /** Default `--permission-mode` when `ThreadConfig.approvalPolicy` is omitted. */
@@ -81,11 +81,72 @@ export const claudeCapabilities: AgentCapability = {
   ],
 };
 
+interface ClaudeAuthStatusResponse {
+  loggedIn?: boolean;
+  authMethod?: string;
+  email?: string;
+  orgName?: string;
+  subscriptionType?: string;
+}
+
+function titleCaseWords(value: string): string {
+  return value
+    .split(/[\s_-]+/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
+function formatClaudePlan(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return /subscription$/i.test(trimmed)
+    ? titleCaseWords(trimmed)
+    : `${titleCaseWords(trimmed)} Subscription`;
+}
+
+export function parseClaudeAuthStatusJson(output: string): StatusProbeResult | undefined {
+  const trimmed = output.trim();
+  if (!trimmed) return undefined;
+
+  let parsed: ClaudeAuthStatusResponse;
+  try {
+    parsed = JSON.parse(trimmed) as ClaudeAuthStatusResponse;
+  } catch {
+    return undefined;
+  }
+
+  const providerMetadata = compactAgentProviderMetadata({
+    ...(parsed.email?.trim() ? { authenticatedAs: parsed.email.trim() } : {}),
+    ...(parsed.orgName?.trim() ? { organization: parsed.orgName.trim() } : {}),
+    ...(formatClaudePlan(parsed.subscriptionType)
+      ? { plan: formatClaudePlan(parsed.subscriptionType) }
+      : {}),
+    ...(parsed.authMethod?.trim()
+      ? { authMethod: parsed.authMethod === "claude.ai" ? "Claude.ai" : parsed.authMethod.trim() }
+      : {}),
+  });
+
+  return {
+    ...(parsed.loggedIn === true ? { authState: "authenticated" as const } : {}),
+    ...(parsed.loggedIn === false ? { authState: "missing" as const } : {}),
+    ...(providerMetadata ? { providerMetadata } : {}),
+  };
+}
+
+async function probeClaudeStatus(ctx: Parameters<NonNullable<DetectionSpec["statusProbe"]>>[0]) {
+  if (!ctx.executablePath) return undefined;
+  const result = await readAgentCommandOutput(ctx.location, ctx.executablePath, ["auth", "status"]);
+  const parsed = parseClaudeAuthStatusJson(result.stdout || result.stderr);
+  if (parsed) return parsed;
+  return result.ok ? { authState: "authenticated" as const } : { authState: "unknown" as const };
+}
+
 export const claudeDetectionSpec: DetectionSpec = {
   kind: "claude",
   label: "Claude Code",
   binary: "claude",
   capabilities: claudeCapabilities,
-  authProbes: [cliSubcommandAuthProbe(["auth", "status"])],
+  statusProbe: probeClaudeStatus,
   capabilitiesProbe: (ctx) => probeClaudeCapabilities(ctx),
 };

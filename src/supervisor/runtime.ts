@@ -89,6 +89,8 @@ import type {
   ListProjectTreeResult,
   MoveProjectEntryPayload,
   PrData,
+  ReadAbsoluteFilePayload,
+  ReadAbsoluteFileResult,
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
@@ -373,6 +375,10 @@ export class SupervisorRuntime {
     return this.agentStatusService.getAgentStatuses(payload);
   }
 
+  async refreshAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
+    return this.agentStatusService.refreshAgentStatuses(payload);
+  }
+
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
     return this.threadSessionManager.getThreadSnapshots();
   }
@@ -419,6 +425,16 @@ export class SupervisorRuntime {
 
   readTerminalScrollback(threadId: string): string {
     return this.threadSessionManager.readTerminalScrollback(threadId);
+  }
+
+  subagentSubscribe(payload: { threadId: string; parentItemId: string }): {
+    history: import("@/shared/contracts").RuntimeEvent[];
+  } {
+    return this.threadSessionManager.subagentSubscribe(payload);
+  }
+
+  subagentUnsubscribe(payload: { threadId: string; parentItemId: string }): void {
+    this.threadSessionManager.subagentUnsubscribe(payload);
   }
 
   async getGitStatus(payload: GetGitStatusPayload): Promise<GitStatusResult> {
@@ -839,6 +855,10 @@ export class SupervisorRuntime {
 
   async readProjectFile(payload: ReadProjectFilePayload): Promise<ReadProjectFileResult> {
     return this.projectTreeService.readProjectFile(payload);
+  }
+
+  async readAbsoluteFile(payload: ReadAbsoluteFilePayload): Promise<ReadAbsoluteFileResult> {
+    return this.projectTreeService.readAbsoluteFile(payload);
   }
 
   async writeProjectFile(payload: WriteProjectFilePayload): Promise<WriteProjectFileResult> {

@@ -39,6 +39,22 @@ export const threadStatusSchema = z.enum([
 ]);
 export type ThreadStatus = z.infer<typeof threadStatusSchema>;
 
+/**
+ * "Turn-active" — the agent is mid-turn from the user's perspective. Spans
+ * from the first input until the agent fully finishes and the thread settles
+ * back to idle/finished. Mid-turn pauses (needs_approval, needs_reply) and
+ * user steers stay inside the same turn, so they don't close the turn-timing
+ * window.
+ */
+export function isThreadTurnActive(status: ThreadStatus): boolean {
+  return (
+    status === "launching" ||
+    status === "working" ||
+    status === "needs_approval" ||
+    status === "needs_reply"
+  );
+}
+
 export const threadAttentionSchema = z.enum([
   "none",
   "working",

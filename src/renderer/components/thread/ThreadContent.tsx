@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -7,6 +7,7 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
 } from "@/shared/contracts";
+import { useShallow } from "zustand/react/shallow";
 import { PixelLoader } from "../common";
 import type { PendingThreadServerRequest } from "@/renderer/state/appStore";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -20,7 +21,7 @@ import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposerSection } from "./ThreadComposerSection";
 import { ThreadTodoDock } from "./ThreadTodoDock";
 import { getThreadErrorDockStateForItem, selectThreadLatestErrorItem } from "./threadErrorState";
-import { getThreadTodoDockStateForItem, selectThreadTodoDockItem } from "./threadTodoState";
+import { getThreadTodoDockStateFromThreadItems } from "./threadTodoState";
 
 type CommonContentProps = {
   threadId: string;
@@ -46,6 +47,7 @@ const emptyTodoComposerProps = {
   errorDockState: null,
   onTodoDockCollapsedChange: () => undefined,
   onTodoDockPlacementChange: () => undefined,
+  onDismissError: () => undefined,
 };
 
 export function TerminalThreadContent(
@@ -84,19 +86,55 @@ export function GuiThreadContent(
   const { runtimeDebugOpen } = props;
   const thread = useThread(props.threadId) ?? props.fallbackThread;
   const guiChatFontSize = useSharedSettings((s) => s.guiChatFontSize);
-  const todoDockPlacement = useThreadTodoDockStore((s) => s.placement);
-  const todoDockCollapsed = useThreadTodoDockStore((s) => s.collapsed);
+  const todoDockPlacement = useThreadTodoDockStore(
+    (s) => s.byThreadId[thread.id]?.placement ?? s.defaultPlacement,
+  );
+  const todoDockCollapsed = useThreadTodoDockStore(
+    (s) => s.byThreadId[thread.id]?.collapsed ?? s.defaultCollapsed,
+  );
+  const retiredSourceItemId = useThreadTodoDockStore(
+    (s) => s.byThreadId[thread.id]?.retiredSourceItemId,
+  );
   const setTodoDockPlacement = useThreadTodoDockStore((s) => s.setPlacement);
   const setTodoDockCollapsed = useThreadTodoDockStore((s) => s.setCollapsed);
-  const todoDockItem = useAppStore((s) => selectThreadTodoDockItem(s, props.threadId));
-  const todoDockState = todoDockItem ? getThreadTodoDockStateForItem(todoDockItem) : null;
+  const retireTodoDock = useThreadTodoDockStore((s) => s.retire);
+  const { runtimeItemIds, runtimeItemsById } = useAppStore(
+    useShallow((s) => ({
+      runtimeItemIds: s.runtimeItemIdsByThread[props.threadId],
+      runtimeItemsById: s.runtimeItemsByIdByThread[props.threadId],
+    })),
+  );
+  const todoDockState = getThreadTodoDockStateFromThreadItems(runtimeItemIds, runtimeItemsById);
+  const todoItem = todoDockState ? runtimeItemsById?.[todoDockState.sourceItemId] : undefined;
+
+  // If the plan is retired, but the agent sends an update (new object reference
+  // in the store), un-retire it so the user sees the progress.
+  const lastTodoItemRef = useRef(todoItem);
+  useEffect(() => {
+    if (
+      retiredSourceItemId &&
+      todoItem?.id === retiredSourceItemId &&
+      todoItem !== lastTodoItemRef.current
+    ) {
+      retireTodoDock(thread.id, undefined);
+    }
+    lastTodoItemRef.current = todoItem;
+  }, [todoItem, retiredSourceItemId, thread.id, retireTodoDock]);
+
   const errorItem = useAppStore((s) => selectThreadLatestErrorItem(s, props.threadId));
-  const errorDockState = errorItem ? getThreadErrorDockStateForItem(errorItem) : null;
-  const showTodoDock = todoDockState !== null;
+  const [dismissedErrorItemId, setDismissedErrorItemId] = useState<string | null>(null);
+  const errorDockState =
+    errorItem && errorItem.id !== dismissedErrorItemId
+      ? getThreadErrorDockStateForItem(errorItem)
+      : null;
+  const showTodoDock = todoDockState !== null && todoDockState.sourceItemId !== retiredSourceItemId;
   const showTodoInRightRail = showTodoDock && todoDockPlacement === "right";
   const showThreadSideRail = runtimeDebugOpen || showTodoInRightRail;
-  const hiddenRuntimeItemId = todoDockState?.sourceItemId;
-  const hiddenRuntimeItemIsLive = todoDockState !== null && todoDockState.itemState !== "completed";
+  const hiddenRuntimeItemId = showTodoDock ? todoDockState?.sourceItemId : undefined;
+  const hiddenRuntimeItemIsLive = showTodoDock && todoDockState.itemState !== "completed";
+  const todoDockLayoutToken = !showTodoDock
+    ? null
+    : `${todoDockState.sourceItemId}:${todoDockPlacement}:${todoDockCollapsed ? "collapsed" : "expanded"}`;
 
   return (
     <>
@@ -110,6 +148,7 @@ export function GuiThreadContent(
               hasSupplementaryContent={showTodoDock}
               hiddenRuntimeItemId={hiddenRuntimeItemId}
               hiddenRuntimeItemIsLive={hiddenRuntimeItemIsLive}
+              layoutChangeToken={todoDockLayoutToken}
               thread={thread}
             />
           </div>
@@ -127,8 +166,9 @@ export function GuiThreadContent(
                     collapsed={todoDockCollapsed}
                     placement={todoDockPlacement}
                     state={todoDockState!}
-                    onCollapsedChange={setTodoDockCollapsed}
-                    onPlacementChange={setTodoDockPlacement}
+                    onCollapsedChange={(collapsed) => setTodoDockCollapsed(thread.id, collapsed)}
+                    onPlacementChange={(placement) => setTodoDockPlacement(thread.id, placement)}
+                    onRetire={() => retireTodoDock(thread.id, todoDockState!.sourceItemId)}
                   />
                 </div>
               ) : null}
@@ -146,10 +186,14 @@ export function GuiThreadContent(
         {...props}
         todoDockCollapsed={todoDockCollapsed}
         todoDockPlacement={todoDockPlacement}
-        todoDockState={todoDockState}
+        todoDockState={showTodoDock ? todoDockState : null}
         errorDockState={errorDockState}
-        onTodoDockCollapsedChange={setTodoDockCollapsed}
-        onTodoDockPlacementChange={setTodoDockPlacement}
+        onDismissError={() => errorItem && setDismissedErrorItemId(errorItem.id)}
+        onTodoDockCollapsedChange={(collapsed) => setTodoDockCollapsed(thread.id, collapsed)}
+        onTodoDockPlacementChange={(placement) => setTodoDockPlacement(thread.id, placement)}
+        onTodoDockRetire={() =>
+          todoDockState && retireTodoDock(thread.id, todoDockState.sourceItemId)
+        }
       />
     </>
   );

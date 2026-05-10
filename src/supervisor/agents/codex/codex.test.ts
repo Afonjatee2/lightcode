@@ -8,6 +8,7 @@ import {
   detectCodexUpdatePrompt,
   parseCodexSocketMessage,
 } from "./index";
+import { parseCodexLoginStatusOutput } from "./detection";
 import { CodexStructuredSession } from "./acp";
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import { codexIntentFor } from "./plugin/intentMap";
@@ -224,6 +225,17 @@ describe("CodexStructuredSession", () => {
     expect(requests.at(-1)?.params).toEqual({
       threadId: "provider-thread",
       turnId: "turn-1",
+    });
+  });
+});
+
+describe("parseCodexLoginStatusOutput", () => {
+  it("extracts the login method when Codex reports it", () => {
+    expect(parseCodexLoginStatusOutput("Logged in using ChatGPT")).toEqual({
+      authState: "authenticated",
+      providerMetadata: {
+        authMethod: "ChatGPT",
+      },
     });
   });
 });

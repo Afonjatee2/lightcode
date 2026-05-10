@@ -1,6 +1,16 @@
 import { Disclosure } from "@heroui/react";
-import { memo, useEffect, useState, type ReactNode } from "react";
-import { CircleAlert, FileEdit, Globe, Terminal, Wrench, type LucideIcon } from "lucide-react";
+import { Fragment, memo, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  CircleAlert,
+  Eye,
+  FileEdit,
+  Globe,
+  Pencil,
+  SearchCode,
+  Terminal,
+  Wrench,
+  type LucideIcon,
+} from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import type {
   CommandExecutionPayload,
@@ -17,6 +27,7 @@ import {
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { CommandOutputViewport } from "./CommandOutputViewport";
 import { isContextCompactionToolCall } from "./ContextCompaction";
+import { formatKindLabel } from "./FileChange";
 import { isPlanProposalToolCall } from "./PlanProposal";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import {
@@ -35,8 +46,6 @@ interface ToolCallGroupProps {
   isLive?: boolean;
 }
 
-const VISIBLE_TOOL_CALLS = 5;
-
 export const ToolCallGroup = memo(function ToolCallGroup({
   threadId,
   itemIds,
@@ -54,14 +63,21 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   // automatically once another item arrives after the group (isLive flips
   // false). Manual toggles still apply afterwards.
   const [isExpanded, setIsExpanded] = useState(isLive);
-  const [showAll, setShowAll] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!isLive) setIsExpanded(false);
   }, [isLive]);
+
+  // Auto-scroll to bottom when new items arrive in live mode
+  useEffect(() => {
+    if (isLive && isExpanded && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [items.length, isLive, isExpanded]);
+
   if (items.length === 0) return null;
-  const summary = summarizeToolCalls(items);
-  const GroupIcon = pickGroupIcon(items);
-  const visibleItems = showAll ? items : items.slice(-VISIBLE_TOOL_CALLS);
+  const sections = summarizeToolCalls(items);
 
   return (
     <div className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1">
@@ -74,30 +90,34 @@ export const ToolCallGroup = memo(function ToolCallGroup({
         }}
       >
         <Disclosure.Heading>
-          <Disclosure.Trigger className="flex w-full min-w-0 items-center gap-1.5 py-0 text-left">
-            <GroupIcon className="size-3 shrink-0 text-[color:var(--muted)]" />
-            <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
-              {summary.title}
-            </code>
+          <Disclosure.Trigger className="flex w-full min-w-0 items-center gap-2 py-0 text-left">
+            <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap text-[color:var(--muted)]">
+              {sections.map((section, idx) => (
+                <Fragment key={section.category}>
+                  {idx > 0 ? (
+                    <span aria-hidden="true" className="select-none opacity-40">
+                      ·
+                    </span>
+                  ) : null}
+                  <span className="flex shrink-0 items-center gap-1">
+                    <section.Icon className="size-3" />
+                    <code className="font-mono tabular-nums !text-[color:var(--muted)]">
+                      {section.count} {section.label}
+                    </code>
+                  </span>
+                </Fragment>
+              ))}
+            </div>
             <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
           </Disclosure.Trigger>
         </Disclosure.Heading>
         <Disclosure.Content>
           <Disclosure.Body className="mt-0.5 border-t border-[color:var(--border)] pt-1">
-            <div className="flex max-h-[420px] flex-col gap-1 overflow-y-auto pr-1">
-              {items.length > VISIBLE_TOOL_CALLS ? (
-                <div className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={() => setShowAll((prev) => !prev)}
-                    className="text-[length:var(--lc-chat-font-size-command)] !text-[color:var(--muted)] hover:!text-foreground"
-                  >
-                    {showAll ? "Show less" : `Show ${items.length - VISIBLE_TOOL_CALLS} more`}
-                  </button>
+            <div ref={scrollRef} className="flex max-h-[420px] flex-col gap-1 overflow-y-auto pr-1">
+              {items.map((item) => (
+                <div key={item.id} className="animate-tool-call-enter">
+                  <ToolCallInline item={item} />
                 </div>
-              ) : null}
-              {visibleItems.map((item) => (
-                <ToolCallInline key={item.id} item={item} />
               ))}
             </div>
           </Disclosure.Body>
@@ -117,9 +137,10 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
     return (
       <div className="flex min-w-0 items-center gap-1.5 py-0.5 text-[length:var(--lc-chat-font-size-command)] leading-tight">
         <Icon className="size-3 shrink-0 text-[color:var(--muted)]" />
-        <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
-          {row.title}
-        </code>
+        <InlineRowTitle
+          title={row.title}
+          {...(row.titleParts ? { titleParts: row.titleParts } : {})}
+        />
         {row.rightLabel ? (
           <span className={`shrink-0 tabular-nums font-medium ${row.rightLabelClassName}`}>
             {row.rightLabel}
@@ -138,9 +159,10 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
       <Disclosure.Heading>
         <Disclosure.Trigger className="flex w-full min-w-0 items-center gap-1.5 py-0.5 text-left">
           <Icon className="size-3 shrink-0 text-[color:var(--muted)]" />
-          <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">
-            {row.title}
-          </code>
+          <InlineRowTitle
+            title={row.title}
+            {...(row.titleParts ? { titleParts: row.titleParts } : {})}
+          />
           {row.rightLabel ? (
             <span className={`shrink-0 tabular-nums font-medium ${row.rightLabelClassName}`}>
               {row.rightLabel}
@@ -162,12 +184,37 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
 type InlineRow = {
   Icon: LucideIcon;
   title: string;
+  /**
+   * Optional structured title — see `ToolDisplay.parts`. When present the row
+   * keeps `prefix` fully visible and truncates `path` from the start.
+   */
+  titleParts?: { prefix: string; path: string };
   rightLabel?: ReactNode;
   rightLabelClassName: string;
   hasDetails: boolean;
   sections: ToolCallSection[];
   bodyText?: string | undefined;
 };
+
+function InlineRowTitle({
+  title,
+  titleParts,
+}: {
+  title: string;
+  titleParts?: { prefix: string; path: string };
+}) {
+  if (titleParts) {
+    return (
+      <code className="flex min-w-0 flex-1 items-baseline overflow-hidden font-mono !text-[color:var(--muted)]">
+        <span className="shrink-0 whitespace-pre">{titleParts.prefix}</span>
+        <span className="lc-truncate-start flex-1">{titleParts.path}</span>
+      </code>
+    );
+  }
+  return (
+    <code className="min-w-0 flex-1 truncate font-mono !text-[color:var(--muted)]">{title}</code>
+  );
+}
 
 function getInlineRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | null {
   if (item.type === "command_execution") return getCommandRow(item, isExpanded);
@@ -198,6 +245,7 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
   return {
     Icon: display.Icon,
     title: display.title,
+    ...(display.parts ? { titleParts: display.parts } : {}),
     rightLabel,
     rightLabelClassName: isError ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails,
@@ -253,19 +301,22 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
     <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
   ) : payload.diffSummary ? (
     `+${payload.diffSummary.added} -${payload.diffSummary.removed}`
-  ) : (
-    undefined
-  );
+  ) : undefined;
+  const kindLabel = formatKindLabel(payload.changeKind);
   // ACP can emit file_change items without an extractable path (path === "").
   // Fall back to the human-readable tool title carried on the ACP payload so
   // the row stays visible inside the group instead of silently dropping out.
-  const title =
-    payload.path && payload.path.length > 0
-      ? payload.path
-      : (readPayloadString(payload, "name") ?? "Edit");
+  const pathOrName =
+    payload.path && payload.path.length > 0 ? payload.path : readPayloadString(payload, "name");
+  const title = pathOrName ? `${kindLabel} ${pathOrName}` : kindLabel.replace(/:$/, "");
+  const titleParts =
+    pathOrName && payload.path && payload.path.length > 0
+      ? { prefix: `${kindLabel} `, path: pathOrName }
+      : undefined;
   return {
     Icon: FileEdit,
     title,
+    ...(titleParts ? { titleParts } : {}),
     rightLabel,
     rightLabelClassName: "text-[color:var(--muted)]",
     hasDetails: !!item.streams.file_change_output || hasAuxFields(payload),
@@ -301,38 +352,51 @@ function getWebSearchRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow 
   };
 }
 
-/**
- * When every item in the group is the same underlying type, surface the icon
- * the individual row would use; mixed groups stay on the generic Wrench.
- */
-function pickGroupIcon(items: readonly RuntimeChatItem[]): LucideIcon {
-  const types = new Set<RuntimeChatItem["type"]>();
-  for (const item of items) {
-    types.add(item.type);
-    if (types.size > 1) return Wrench;
-  }
-  const [only] = [...types];
-  if (only === "command_execution") return Terminal;
-  if (only === "file_change") return FileEdit;
-  if (only === "web_search") return Globe;
-  return Wrench;
+type GroupCategory = "viewed" | "searched" | "edited" | "executed" | "other";
+
+interface CategoryMeta {
+  Icon: LucideIcon;
+  singular: string;
+  plural: string;
+  /** Tiebreaker when two categories share a count — lower wins. */
+  priority: number;
 }
 
-function summarizeToolCalls(items: readonly RuntimeChatItem[]): { title: string } {
-  const counts = new Map<string, number>();
+const CATEGORY_META: Record<GroupCategory, CategoryMeta> = {
+  viewed: { Icon: Eye, singular: "view", plural: "views", priority: 0 },
+  searched: { Icon: SearchCode, singular: "search", plural: "searches", priority: 1 },
+  edited: { Icon: Pencil, singular: "edit", plural: "edits", priority: 2 },
+  executed: { Icon: Terminal, singular: "command", plural: "commands", priority: 3 },
+  other: { Icon: Wrench, singular: "tool", plural: "tools", priority: 4 },
+};
+
+interface GroupSection {
+  category: GroupCategory;
+  count: number;
+  label: string;
+  Icon: LucideIcon;
+}
+
+function summarizeToolCalls(items: readonly RuntimeChatItem[]): GroupSection[] {
+  const counts = new Map<GroupCategory, number>();
   for (const item of items) {
     const category = categorizeItem(item);
     counts.set(category, (counts.get(category) ?? 0) + 1);
   }
-  const topCounts = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
-  const parts = topCounts.map(
-    ([label, count]) => `${count} ${count === 1 ? label : pluralizeLabel(label)}`,
-  );
-  const rest = items.length - topCounts.reduce((sum, [, count]) => sum + count, 0);
-  if (rest > 0) parts.push(`${rest} other`);
-  return {
-    title: parts.length > 0 ? parts.join(", ") : `${items.length} tools`,
-  };
+  return [...counts.entries()]
+    .sort(
+      ([aCat, aCount], [bCat, bCount]) =>
+        bCount - aCount || CATEGORY_META[aCat].priority - CATEGORY_META[bCat].priority,
+    )
+    .map(([category, count]) => {
+      const meta = CATEGORY_META[category];
+      return {
+        category,
+        count,
+        label: count === 1 ? meta.singular : meta.plural,
+        Icon: meta.Icon,
+      };
+    });
 }
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {
@@ -346,12 +410,59 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
   );
 }
 
-function categorizeItem(item: RuntimeChatItem): string {
-  if (item.type === "command_execution") return "command";
-  if (item.type === "file_change") return "edit";
-  if (item.type === "web_search") return "search";
+function categorizeItem(item: RuntimeChatItem): GroupCategory {
+  if (item.type === "command_execution") return "executed";
+  if (item.type === "file_change") return "edited";
+  if (item.type === "web_search") return "searched";
   const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
-  return categorizeToolName(payload?.name ?? "");
+  if (!payload) return "other";
+
+  switch (payload.kind) {
+    case "read":
+      return "viewed";
+    case "search":
+    case "fetch":
+      return "searched";
+    case "edit":
+    case "delete":
+    case "move":
+      return "edited";
+    case "execute":
+      return "executed";
+  }
+
+  const byName = categorizeToolName(payload.name ?? "");
+  if (byName !== "other") return byName;
+  return categorizeVerbPrefix(payload.name ?? "");
+}
+
+function categorizeToolName(name: string): GroupCategory {
+  switch (name) {
+    case "Read":
+    case "NotebookRead":
+      return "viewed";
+    case "Grep":
+    case "Glob":
+    case "LS":
+    case "List":
+    case "WebSearch":
+    case "WebFetch":
+    case "ToolSearch":
+      return "searched";
+    case "Edit":
+    case "Write":
+    case "MultiEdit":
+    case "NotebookEdit":
+    case "Patch":
+      return "edited";
+    case "Bash":
+    case "BashOutput":
+    case "KillBash":
+    case "KillShell":
+      return "executed";
+    default:
+      return "other";
+  }
 }
 
 function hasAuxFields(payload: unknown): boolean {
@@ -375,23 +486,30 @@ function deriveResultCount(payload: unknown): number | undefined {
   return undefined;
 }
 
-function categorizeToolName(name: string): string {
+function categorizeVerbPrefix(name: string): GroupCategory {
   const t = name.toLowerCase().trim();
   if (t.startsWith("viewing") || t.startsWith("reading") || t.startsWith("read ")) return "viewed";
-  if (t.startsWith("searching") || t.startsWith("finding") || t.startsWith("grep")) {
-    return "search";
+  if (
+    t.startsWith("searching") ||
+    t.startsWith("finding") ||
+    t.startsWith("grep") ||
+    t.startsWith("listing") ||
+    t.startsWith("fetch")
+  ) {
+    return "searched";
   }
-  if (t.startsWith("editing") || t.startsWith("writing") || t.startsWith("patching")) {
-    return "edit";
+  if (
+    t.startsWith("editing") ||
+    t.startsWith("writing") ||
+    t.startsWith("patching") ||
+    t.startsWith("creating") ||
+    t.startsWith("deleting") ||
+    t.startsWith("removing")
+  ) {
+    return "edited";
   }
   if (t.startsWith("running") || t.startsWith("executing") || t.startsWith("shell")) {
-    return "command";
+    return "executed";
   }
-  return "tool";
-}
-
-function pluralizeLabel(label: string): string {
-  if (label === "search") return "searches";
-  if (label === "viewed") return "viewed";
-  return `${label}s`;
+  return "other";
 }

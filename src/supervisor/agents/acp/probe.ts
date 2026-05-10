@@ -15,9 +15,10 @@ import {
   ndJsonStream,
   PROTOCOL_VERSION,
   type ModelInfo,
+  type SessionNotification,
   type SessionMode,
 } from "@agentclientprotocol/sdk";
-import type { ThreadMode } from "@/shared/contracts";
+import type { AgentSlashCommand, ThreadMode } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
 
 // ── Types ────────────────────────────────────────────────────────
@@ -29,6 +30,7 @@ export interface AcpProbeResult {
   modelEfforts?: Record<string, string[]>;
   modes?: ThreadMode[];
   approvalPolicies?: Array<{ id: string; label: string }>;
+  slashCommands?: AgentSlashCommand[];
 }
 
 type AcpConfigOptionLike = {
@@ -45,6 +47,14 @@ type AcpConfigSelectOptionLike = {
 
 type AcpConfigSelectGroupLike = {
   options?: unknown;
+};
+
+type AcpAvailableCommandLike = {
+  name?: string;
+  description?: string | null;
+  input?: {
+    hint?: string | null;
+  } | null;
 };
 
 // ── Mode mapping ─────────────────────────────────────────────────
@@ -126,6 +136,23 @@ export function mapAcpModels(availableModels: ModelInfo[]): Array<{ id: string; 
   }));
 }
 
+export function mapAcpSlashCommands(commands: AcpAvailableCommandLike[]): AgentSlashCommand[] {
+  return commands.flatMap((command) => {
+    const name = command.name?.trim();
+    if (!name) {
+      return [];
+    }
+    return [
+      {
+        id: name,
+        label: command.description?.trim() ? `${name} — ${command.description}` : name,
+        ...(command.description?.trim() ? { description: command.description } : {}),
+        ...(command.input?.hint?.trim() ? { argumentHint: command.input.hint } : {}),
+      },
+    ];
+  });
+}
+
 function isSelectOption(value: unknown): value is AcpConfigSelectOptionLike {
   return typeof value === "object" && value !== null && "value" in value;
 }
@@ -205,6 +232,23 @@ export async function probeAcpCapabilities(
   let child: ReturnType<typeof spawn> | undefined;
 
   try {
+    const probeResult: AcpProbeResult = {};
+    let latestSlashCommands: AgentSlashCommand[] | undefined;
+    let resolveInitialSlashCommands:
+      | ((commands: AgentSlashCommand[] | undefined) => void)
+      | undefined;
+    let initialSlashCommandsResolved = false;
+    const initialSlashCommands = new Promise<AgentSlashCommand[] | undefined>((resolve) => {
+      resolveInitialSlashCommands = resolve;
+    });
+    const rememberSlashCommands = (commands: AgentSlashCommand[] | undefined) => {
+      latestSlashCommands = commands;
+      if (!initialSlashCommandsResolved) {
+        initialSlashCommandsResolved = true;
+        resolveInitialSlashCommands?.(commands);
+      }
+    };
+
     child = spawn(command, args, {
       cwd: options?.processCwd,
       stdio: ["pipe", "pipe", "pipe"],
@@ -231,7 +275,12 @@ export async function probeAcpCapabilities(
     const connection = new ClientSideConnection(
       () => ({
         requestPermission: () => Promise.resolve({ outcome: { outcome: "cancelled" as const } }),
-        sessionUpdate: () => Promise.resolve(),
+        sessionUpdate: (params: SessionNotification) => {
+          if (params.update.sessionUpdate === "available_commands_update") {
+            rememberSlashCommands(mapAcpSlashCommands(params.update.availableCommands));
+          }
+          return Promise.resolve();
+        },
       }),
       stream,
     );
@@ -243,6 +292,13 @@ export async function probeAcpCapabilities(
           clientInfo: { name: "lightcode-probe", version: "0.1.0" },
           clientCapabilities: {},
         });
+
+        // Non-spec compatibility fallback for agents that still expose
+        // commands during initialize instead of session/update.
+        const rawCommands = (initResult as { commands?: AcpAvailableCommandLike[] }).commands;
+        if (Array.isArray(rawCommands) && rawCommands.length > 0) {
+          latestSlashCommands = mapAcpSlashCommands(rawCommands);
+        }
 
         // Authenticate if the agent advertises auth methods (e.g. Cursor's
         // cursor_login). Best-effort: some agents (OpenCode) advertise
@@ -273,8 +329,16 @@ export async function probeAcpCapabilities(
         setTimeout(() => reject(new Error("ACP probe timed out")), timeoutMs),
       ),
     ]);
-
-    const probeResult: AcpProbeResult = {};
+    const initialCommandUpdate = await Promise.race([
+      initialSlashCommands,
+      new Promise<undefined>((resolve) => {
+        setTimeout(() => resolve(undefined), 250);
+      }),
+    ]);
+    const resolvedSlashCommands = initialCommandUpdate ?? latestSlashCommands;
+    if (resolvedSlashCommands !== undefined) {
+      probeResult.slashCommands = resolvedSlashCommands;
+    }
 
     if (result.models?.availableModels?.length) {
       probeResult.models = mapAcpModels(result.models.availableModels);
@@ -302,6 +366,7 @@ export async function probeAcpCapabilities(
         `  defaultEffort: ${probeResult.defaultEffort ?? "(none)"}`,
         `  modes: ${probeResult.modes?.join(", ") ?? "(none)"}`,
         `  approvalPolicies: ${probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(none)"}`,
+        `  slashCommands: ${probeResult.slashCommands?.length ?? 0}`,
         `  raw ACP modes: ${result.modes?.availableModes?.map((m) => m.id).join(", ") ?? "(none)"}`,
       ].join("\n"),
     );

@@ -25,6 +25,7 @@ import {
   type ThreadRuntimeSnapshot,
   type WriteTerminalPayload,
   type RuntimeEvent,
+  areAgentSlashCommandsEqual,
   isThreadConfigEqual,
 } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
@@ -156,6 +157,14 @@ export interface ThreadSessionManagerOptions {
   }): Promise<{ env: Record<string, string>; extraArgs: string[] } | undefined>;
 }
 
+function subAgentKey(threadId: string, parentItemId: string): string {
+  return `${threadId}\0${parentItemId}`;
+}
+
+function childKey(threadId: string, itemId: string): string {
+  return `${threadId}\0${itemId}`;
+}
+
 export class ThreadSessionManager {
   readonly sessions = new Map<string, SessionRuntime>();
   readonly shellSessions = new Map<string, ShellSessionRuntime>();
@@ -166,6 +175,20 @@ export class ThreadSessionManager {
   private readonly outputPipeline: ThreadOutputPipeline;
   private readonly pendingRuntimeEvents = new Map<string, RuntimeEvent[]>();
   private runtimeEventBatchTimer: ReturnType<typeof setTimeout> | undefined;
+  /**
+   * `${threadId}\0${itemId}` → `parentItemId`. Built from `item.started`
+   * events with `parentItemId` set (sub-agent children). Used to look up the
+   * parent for any later event on the same `itemId` so we can route it through
+   * the gating layer.
+   */
+  private readonly subAgentChildToParent = new Map<string, string>();
+  /** Renderer-subscribed sub-agents (`${threadId}\0${parentItemId}`). */
+  private readonly subscribedSubAgents = new Set<string>();
+  /**
+   * Buffered child events per sub-agent parent (`${threadId}\0${parentItemId}`).
+   * Drained on subscribe; cleared on parent completion.
+   */
+  private readonly subAgentBuffers = new Map<string, RuntimeEvent[]>();
 
   constructor(private readonly options: ThreadSessionManagerOptions) {
     this.outputPipeline = new ThreadOutputPipeline({
@@ -192,6 +215,7 @@ export class ThreadSessionManager {
       attention: session.attention,
       config: session.config,
       ...(session.sessionRef ? { sessionRef: session.sessionRef } : {}),
+      ...(session.slashCommands ? { slashCommands: session.slashCommands } : {}),
       canResumeWithConfig: session.canResumeWithConfig,
       threadStatusSource: resolveThreadStatusSource(session, this.readDisableCliHookPlugin()),
     }));
@@ -216,6 +240,43 @@ export class ThreadSessionManager {
   }
 
   private enqueueRuntimeEvent(threadId: string, event: RuntimeEvent): void {
+    // Sub-agent gating: child events stream live only when the renderer has
+    // the overlay open (subscribed). Otherwise they're buffered per-parent
+    // and drained when the renderer subscribes. The parent's own events
+    // (item.started/updated/completed for the `Task`/`Agent` row) always flow
+    // so the closed pill keeps showing live status.
+    const parentItemId = this.resolveSubAgentParent(threadId, event);
+    if (parentItemId) {
+      const subKey = subAgentKey(threadId, parentItemId);
+      if (!this.subscribedSubAgents.has(subKey)) {
+        const buffer = this.subAgentBuffers.get(subKey);
+        if (buffer) {
+          buffer.push(event);
+        } else {
+          this.subAgentBuffers.set(subKey, [event]);
+        }
+        return;
+      }
+    }
+    this.appendPendingRuntimeEvent(threadId, event);
+    // When a sub-agent parent completes, drop its buffer + subscription state
+    // — the renderer evicts the children locally and reads the final result
+    // from the parent's payload. Detected by checking whether this completed
+    // itemId is a known sub-agent parent (has a buffer/subscription keyed to
+    // it). Children themselves return early via the gating branch above and
+    // never reach this point.
+    if (event.type === "item.completed") {
+      const itemId = (event as { itemId?: unknown }).itemId;
+      if (typeof itemId === "string") {
+        const key = subAgentKey(threadId, itemId);
+        if (this.subscribedSubAgents.has(key) || this.subAgentBuffers.has(key)) {
+          this.clearSubAgentState(threadId, itemId);
+        }
+      }
+    }
+  }
+
+  private appendPendingRuntimeEvent(threadId: string, event: RuntimeEvent): void {
     const pending = this.pendingRuntimeEvents.get(threadId);
     if (pending) {
       pending.push(event);
@@ -225,6 +286,95 @@ export class ThreadSessionManager {
     this.runtimeEventBatchTimer ??= setTimeout(() => {
       this.flushRuntimeEvents();
     }, RUNTIME_EVENT_BATCH_MS);
+  }
+
+  /**
+   * For a runtime event that targets a known sub-agent CHILD item, return the
+   * parent item id; otherwise undefined. Maintains the child→parent lookup
+   * map opportunistically as events flow through:
+   *  - `item.started` with `parentItemId` registers the child
+   *  - `item.completed` for a registered child evicts it from the map
+   *  - any other event on a registered child is matched against the map
+   *
+   * Events on the sub-agent PARENT itself (the `Task`/`Agent` tool_call row)
+   * are never gated — they keep flowing so the closed pill stays live.
+   */
+  private resolveSubAgentParent(threadId: string, event: RuntimeEvent): string | undefined {
+    if (event.type === "item.started") {
+      if (!("parentItemId" in event) || typeof event.parentItemId !== "string") return undefined;
+      this.subAgentChildToParent.set(childKey(threadId, event.itemId), event.parentItemId);
+      return event.parentItemId;
+    }
+    if (
+      event.type !== "item.updated" &&
+      event.type !== "item.completed" &&
+      event.type !== "content.delta"
+    ) {
+      return undefined;
+    }
+    const itemId = (event as { itemId?: unknown }).itemId;
+    if (typeof itemId !== "string") return undefined;
+    const ckey = childKey(threadId, itemId);
+    const parentItemId = this.subAgentChildToParent.get(ckey);
+    if (!parentItemId) return undefined;
+    if (event.type === "item.completed") this.subAgentChildToParent.delete(ckey);
+    return parentItemId;
+  }
+
+  /**
+   * Renderer-facing: subscribe a sub-agent overlay. Returns the buffered
+   * child-event history so the renderer can hydrate the overlay; subsequent
+   * child events stream live via the regular runtime-event channels.
+   */
+  subagentSubscribe(payload: { threadId: string; parentItemId: string }): {
+    history: RuntimeEvent[];
+  } {
+    const key = subAgentKey(payload.threadId, payload.parentItemId);
+    this.subscribedSubAgents.add(key);
+    const buffered = this.subAgentBuffers.get(key) ?? [];
+    this.subAgentBuffers.delete(key);
+    return { history: buffered };
+  }
+
+  /**
+   * Renderer-facing: unsubscribe a sub-agent overlay. Subsequent child events
+   * are buffered again until the parent completes (which drops the buffer
+   * along with any state for that parent).
+   */
+  subagentUnsubscribe(payload: { threadId: string; parentItemId: string }): void {
+    this.subscribedSubAgents.delete(subAgentKey(payload.threadId, payload.parentItemId));
+  }
+
+  private clearAllSubAgentStateForThread(threadId: string): void {
+    const subPrefix = `${threadId}\0`;
+    for (const key of this.subscribedSubAgents) {
+      if (key.startsWith(subPrefix)) this.subscribedSubAgents.delete(key);
+    }
+    for (const key of this.subAgentBuffers.keys()) {
+      if (key.startsWith(subPrefix)) this.subAgentBuffers.delete(key);
+    }
+    for (const key of this.subAgentChildToParent.keys()) {
+      if (key.startsWith(subPrefix)) this.subAgentChildToParent.delete(key);
+    }
+  }
+
+  /**
+   * Drop all sub-agent state for a parent: subscription, buffered events, and
+   * its child→parent index entries. Called when the parent `tool_call`
+   * completes — at that point the renderer evicts children and reads the
+   * final result from the parent payload.
+   */
+  private clearSubAgentState(threadId: string, parentItemId: string): void {
+    const key = subAgentKey(threadId, parentItemId);
+    this.subscribedSubAgents.delete(key);
+    this.subAgentBuffers.delete(key);
+    const childPrefix = `${threadId}\0`;
+    for (const ckey of this.subAgentChildToParent.keys()) {
+      if (!ckey.startsWith(childPrefix)) continue;
+      if (this.subAgentChildToParent.get(ckey) === parentItemId) {
+        this.subAgentChildToParent.delete(ckey);
+      }
+    }
   }
 
   private flushRuntimeEvents(): void {
@@ -660,6 +810,7 @@ export class ThreadSessionManager {
     if (existing.sessionRef?.providerSessionId) {
       this.sessionsBySessionId.delete(existing.sessionRef.providerSessionId);
     }
+    this.clearAllSubAgentStateForThread(payload.threadId);
     await existing.structuredSession?.dispose();
     if (existing.structuredSession) {
       await sleep(150);
@@ -1276,6 +1427,7 @@ export class ThreadSessionManager {
           cwd: command.cwd ?? process.cwd(),
           env: {
             ...process.env,
+            ...(command.env ?? {}),
             TERM: "xterm-256color",
             ...agentEnv,
           },
@@ -1366,12 +1518,18 @@ export class ThreadSessionManager {
 
         const configChanged =
           update.config !== undefined && !isThreadConfigEqual(session.config, update.config);
+        const slashCommandsChanged =
+          update.slashCommands !== undefined &&
+          !areAgentSlashCommandsEqual(session.slashCommands, update.slashCommands);
         const stateChanged =
           session.status !== update.status ||
           session.attention !== update.attention ||
           update.errorMessage !== undefined;
         if (update.config) {
           session.config = update.config;
+        }
+        if (update.slashCommands !== undefined) {
+          session.slashCommands = update.slashCommands;
         }
 
         this.outputPipeline.updateState(
@@ -1390,7 +1548,11 @@ export class ThreadSessionManager {
         ) {
           this.maybeDrainPendingSteer(session);
         }
-        if (configChanged && !stateChanged && update.errorMessage === undefined) {
+        if (
+          (configChanged || slashCommandsChanged) &&
+          !stateChanged &&
+          update.errorMessage === undefined
+        ) {
           this.outputPipeline.emitState(session);
         }
       },

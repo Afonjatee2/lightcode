@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { Tooltip } from "@heroui/react";
-import { ArrowRightLeft, Check, ChevronDown, Hourglass, ListChecks } from "lucide-react";
+import { ArrowRightLeft, Check, ChevronDown, Hourglass, ListChecks, X } from "lucide-react";
 import type { ThreadTodoDockPlacement } from "@/renderer/state/threadTodoDockStore";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import type { ThreadTodoDockState, ThreadTodoStepStatus } from "./threadTodoState";
@@ -11,11 +11,11 @@ interface ThreadTodoDockProps {
   collapsed: boolean;
   onPlacementChange: (placement: ThreadTodoDockPlacement) => void;
   onCollapsedChange: (collapsed: boolean) => void;
+  onRetire: () => void;
 }
 
 export function ThreadTodoDock(props: ThreadTodoDockProps) {
-  const { state, placement, collapsed, onPlacementChange, onCollapsedChange } = props;
-  const activeStep = state.steps[state.activeIndex] ?? state.steps[0];
+  const { state, placement, collapsed, onPlacementChange, onCollapsedChange, onRetire } = props;
   const activeRowRef = useRef<HTMLLIElement>(null);
 
   useEffect(() => {
@@ -25,12 +25,25 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
     }
   }, [collapsed, state.activeIndex, state.sourceItemId, state.steps.length]);
 
-  if (!activeStep) return null;
+  const inProgressStepIndices = state.steps
+    .map((s, i) => (s.status === "in_progress" ? i : -1))
+    .filter((i) => i !== -1);
 
-  const displayedSteps = collapsed ? [activeStep] : state.steps;
+  const displayedStepIndices = collapsed
+    ? inProgressStepIndices.length > 0
+      ? inProgressStepIndices
+      : [state.activeIndex]
+    : state.steps.map((_, i) => i);
+
+  if (displayedStepIndices.length === 0) return null;
+
   const moveLabel =
     placement === "composer" ? "Move todo dock to right panel" : "Attach todo dock to composer";
-  const countLabel = `${state.steps.length} ${state.steps.length === 1 ? "task" : "tasks"}`;
+  const completedCount = state.steps.reduce(
+    (count, step) => (step.status === "completed" ? count + 1 : count),
+    0,
+  );
+  const countLabel = `${completedCount}/${state.steps.length}`;
 
   return (
     <section
@@ -79,6 +92,19 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
           </Tooltip.Trigger>
           <Tooltip.Content>{collapsed ? "Expand" : "Collapse"}</Tooltip.Content>
         </Tooltip>
+        <Tooltip delay={0}>
+          <Tooltip.Trigger>
+            <button
+              aria-label="Close plan"
+              className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-danger-500/10 hover:text-danger-500"
+              type="button"
+              onClick={onRetire}
+            >
+              <X className="size-3.5" />
+            </button>
+          </Tooltip.Trigger>
+          <Tooltip.Content>Close plan</Tooltip.Content>
+        </Tooltip>
       </div>
 
       <div
@@ -94,13 +120,14 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
           }
           role="list"
         >
-          {displayedSteps.map((step, index) => {
-            const originalIndex = collapsed ? state.activeIndex : index;
-            const isActive = originalIndex === state.activeIndex;
+          {displayedStepIndices.map((index) => {
+            const step = state.steps[index];
+            if (!step) return null;
+            const isActive = index === state.activeIndex;
             const isDone = step.status === "completed";
             return (
               <li
-                key={`${state.sourceItemId}:${originalIndex}`}
+                key={`${state.sourceItemId}:${index}`}
                 ref={isActive ? activeRowRef : undefined}
                 aria-current={isActive ? "step" : undefined}
                 className={`flex items-center gap-2 rounded px-2 py-1 leading-5 ${isDone ? "opacity-60" : ""} ${isActive && !isDone ? "bg-accent/10" : ""}`}

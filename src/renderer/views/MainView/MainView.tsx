@@ -18,8 +18,6 @@ import { WorktreeDeleteDialogs } from "@/renderer/views/MainView/parts/WorktreeD
 import { MainPageLayout, StalePanelCleanup } from "@/renderer/views/MainView/parts/MainPageLayout";
 import { ThreadSearchOverlayHost } from "@/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay";
 
-const EMPTY_PANES: string[] = [];
-
 export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
   const { storeHydrated, loadT0 } = props;
   const view = useAppStore((state) => state.view);
@@ -51,12 +49,12 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
             windows: response.windows,
             wsl: response.wsl,
           });
+        } else {
+          useAgentStatusesStore.getState().beginFirstLaunchDiscovery();
         }
       })
       .catch(() => undefined);
   }, [storeHydrated, wslProjectDistrosKey]);
-
-  const paneThreadIds = view.kind === "thread" ? view.panes : EMPTY_PANES;
 
   console.log(`[renderer] +${Date.now() - loadT0}ms: rendering main UI`);
   return (
@@ -65,7 +63,6 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
         onSidebarSortEnd={handleSortEnd}
         onPaneDrop={handlePaneDrop}
         onMainPanelDrop={handleMainPanelDrop}
-        paneThreadIds={paneThreadIds}
         paneLayout={
           view.kind === "thread"
             ? (view.paneLayout ?? buildPaneLayoutFromLegacy(view.panes, view.rowLayout))

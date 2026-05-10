@@ -79,6 +79,7 @@ afterAll(() => {
 describe("ChatPane", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers();
     MockResizeObserver.reset();
     localStorage.clear();
     Reflect.deleteProperty(window, "lightcode");
@@ -232,6 +233,72 @@ describe("ChatPane", () => {
     await waitFor(() => expect(metrics.getScrollTop()).toBe(80));
   });
 
+  it("re-pins after todo dock layout changes when the thread was already at the bottom", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container, rerender } = renderChatPane(thread, { layoutChangeToken: "collapsed" });
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 200,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(200);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      metrics.setScrollTop(80);
+      rerender(
+        <AppProvider>
+          <ChatPane thread={thread} layoutChangeToken="expanded" />
+        </AppProvider>,
+      );
+    });
+
+    expect(metrics.getScrollTop()).toBe(200);
+  });
+
+  it("keeps the user's place after todo dock layout changes when they already scrolled up", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container, rerender } = renderChatPane(thread, { layoutChangeToken: "collapsed" });
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 200,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(200);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      metrics.setScrollTop(80);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      rerender(
+        <AppProvider>
+          <ChatPane thread={thread} layoutChangeToken="expanded" />
+        </AppProvider>,
+      );
+    });
+
+    expect(metrics.getScrollTop()).toBe(80);
+  });
+
   it("keeps running command accordions closed until clicked", async () => {
     const thread = makeThread();
     seedCommandItem(thread.id, "cmd-1", "npm run test", "command output");
@@ -345,12 +412,39 @@ describe("ChatPane", () => {
 
     expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
+
+  it("uses the persisted live turn start when reopening a working thread", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:01:10.000Z"));
+
+    renderChatPane({
+      ...makeThread(),
+      activeTurnStartedAt: "2026-05-01T12:00:00.000Z",
+    });
+
+    expect(screen.getByText("Working for 1m 10s")).toBeInTheDocument();
+  });
+
+  it("shows the last worked duration for a reopened completed thread", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:02:00.000Z"));
+
+    renderChatPane({
+      ...makeThread(),
+      status: "idle",
+      activeTurnStartedAt: undefined,
+      lastTurnStartedAt: "2026-05-01T12:00:00.000Z",
+      lastTurnEndedAt: "2026-05-01T12:01:15.000Z",
+    });
+
+    expect(screen.getByText("Worked for 1m 15s")).toBeInTheDocument();
+  });
 });
 
-function renderChatPane(thread: Thread) {
+function renderChatPane(thread: Thread, props: Partial<Parameters<typeof ChatPane>[0]> = {}) {
   return render(
     <AppProvider>
-      <ChatPane thread={thread} />
+      <ChatPane thread={thread} {...props} />
     </AppProvider>,
   );
 }

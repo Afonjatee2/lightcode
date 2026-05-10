@@ -50,7 +50,11 @@ describe("ThreadView", () => {
     vi.clearAllMocks();
     localStorage.clear();
     useSharedSettings.setState({ collapseTerminalComposer: false });
-    useThreadTodoDockStore.setState({ placement: "composer", collapsed: false });
+    useThreadTodoDockStore.setState({
+      defaultPlacement: "composer",
+      defaultCollapsed: false,
+      byThreadId: {},
+    });
     useAppStore.setState({
       runtimeItemIdsByThread: {},
       runtimeItemsByIdByThread: {},
@@ -966,6 +970,163 @@ describe("ThreadView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Collapse todo dock" }));
     expect(screen.getByLabelText("Thread todo dock")).toHaveAttribute("data-collapsed", "true");
     expect(screen.queryByText("Wire ACP todo placement")).not.toBeInTheDocument();
+  });
+
+  it("keeps todo dock placement and collapse scoped to each thread", () => {
+    useAppStore.setState({
+      runtimeItemIdsByThread: {
+        "thread-gui-plan-a": ["plan-a"],
+        "thread-gui-plan-b": ["plan-b"],
+      },
+      runtimeItemsByIdByThread: {
+        "thread-gui-plan-a": {
+          "plan-a": {
+            id: "plan-a",
+            type: "plan",
+            state: "updated",
+            payload: {
+              steps: [
+                { step: "Plan A active step", status: "in_progress" },
+                { step: "Plan A pending step", status: "pending" },
+              ],
+            },
+            streams: {},
+          },
+        },
+        "thread-gui-plan-b": {
+          "plan-b": {
+            id: "plan-b",
+            type: "plan",
+            state: "updated",
+            payload: {
+              steps: [
+                { step: "Plan B active step", status: "in_progress" },
+                { step: "Plan B pending step", status: "pending" },
+              ],
+            },
+            streams: {},
+          },
+        },
+      },
+    });
+
+    const { rerender } = renderThreadView({
+      thread: {
+        id: "thread-gui-plan-a",
+        projectId: "project-1",
+        title: "GUI Codex thread A",
+        agentKind: "codex",
+        config: {
+          model: "gpt-5.4",
+        },
+        status: "idle",
+        attention: "none",
+        canResumeWithConfig: true,
+        archived: false,
+        done: false,
+        starred: false,
+        presentationMode: "gui",
+        sessionRef: {
+          providerSessionId: "session-gui-plan-a",
+          discoveredAt: new Date().toISOString(),
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "codex",
+        label: "Codex",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "read-only", label: "Read Only" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "gui",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      pendingServerRequests: [],
+      onConfigChange: () => undefined,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Move todo dock to right panel" }));
+    fireEvent.click(screen.getByRole("button", { name: "Collapse todo dock" }));
+
+    expect(screen.getByLabelText("Thread todo dock")).toHaveAttribute("data-placement", "right");
+    expect(screen.getByLabelText("Thread todo dock")).toHaveAttribute("data-collapsed", "true");
+
+    rerender(
+      <AppProvider>
+        <ThreadView
+          thread={{
+            id: "thread-gui-plan-b",
+            projectId: "project-1",
+            title: "GUI Codex thread B",
+            agentKind: "codex",
+            config: {
+              model: "gpt-5.4",
+            },
+            status: "idle",
+            attention: "none",
+            canResumeWithConfig: true,
+            archived: false,
+            done: false,
+            starred: false,
+            presentationMode: "gui",
+            sessionRef: {
+              providerSessionId: "session-gui-plan-b",
+              discoveredAt: new Date().toISOString(),
+            },
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }}
+          agentStatus={{
+            kind: "codex",
+            label: "Codex",
+            installed: true,
+            authState: "authenticated",
+            capabilities: {
+              models: [{ id: "gpt-5.4", label: "5.4" }],
+              efforts: ["low"],
+              modelEfforts: {},
+              modes: ["agent"],
+              approvalPolicies: [{ id: "on-request", label: "On Request" }],
+              sandboxModes: [{ id: "read-only", label: "Read Only" }],
+              supportsResume: true,
+              supportsDirectInput: true,
+              liveInputMode: "server",
+              presentationMode: "gui",
+              settingDefs: [],
+            },
+          }}
+          projectLocation={{
+            kind: "windows",
+            path: "C:\\repo",
+          }}
+          pendingServerRequests={[]}
+          onConfigChange={() => undefined}
+          onResolveServerRequest={async () => undefined}
+          onSubmitInput={async () => undefined}
+        />
+      </AppProvider>,
+    );
+
+    expect(screen.getByLabelText("Thread todo dock")).toHaveAttribute("data-placement", "composer");
+    expect(screen.getByLabelText("Thread todo dock")).toHaveAttribute("data-collapsed", "false");
+    expect(screen.getByText("Plan B pending step")).toBeInTheDocument();
   });
 
   it("shows the runtime debug inspector toggle for GUI ACP threads in production builds", () => {

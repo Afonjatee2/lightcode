@@ -2,7 +2,7 @@ import { ArrowRight, FolderOpen, Plus, TerminalSquare } from "lucide-react";
 import { useShallow } from "zustand/shallow";
 import { useAppStore } from "@/renderer/state/appStore";
 import { ProviderIcon, getStatusTone } from "@/renderer/components/providers";
-import { formatRelativeTime } from "@/renderer/utils/formatTime";
+import { RelativeTime } from "@/renderer/components/common/RelativeTime";
 
 export function HomeView() {
   const projects = useAppStore(useShallow((state) => state.projects));
@@ -81,9 +81,10 @@ export function HomeView() {
                           {project ? (
                             <span className="ml-3 shrink-0 text-xs text-muted">{project.name}</span>
                           ) : null}
-                          <span className="ml-3 w-[3ch] shrink-0 text-right font-mono text-xs tabular-nums text-muted">
-                            {formatRelativeTime(thread.updatedAt)}
-                          </span>
+                          <RelativeTime
+                            iso={thread.updatedAt}
+                            className="ml-3 w-[3ch] shrink-0 text-right font-mono text-xs tabular-nums text-muted"
+                          />
                           <ArrowRight className="size-3.5 shrink-0 text-muted opacity-0 transition-opacity group-hover:opacity-100" />
                         </button>
                       );

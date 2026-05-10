@@ -1,11 +1,14 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState } from "react";
 import { FileEdit } from "lucide-react";
-import type { FileChangePayload } from "@/shared/contracts";
+import type { FileChangePayload, ProjectLocation } from "@/shared/contracts";
 import { PathDisplay } from "@/renderer/components/common";
+import { readBridge } from "@/renderer/bridge";
 import {
   getRuntimeItemPayload,
   type RuntimeChatItem,
 } from "@/renderer/state/slices/runtimeEventSlice";
+import { resolveAbsolutePath as resolveAbsolutePathForLocation } from "@/renderer/utils/resolveAbsolutePath";
+import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { ChatItemAccordion } from "./ChatItemAccordion";
 import { CommandOutputViewport } from "./CommandOutputViewport";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
@@ -20,8 +23,27 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
   const [isExpanded, setIsExpanded] = useState(false);
   const stream = item.streams.file_change_output;
+  const hasStream = !!stream && stream.length > 0;
+  const isCreate = payload?.changeKind === "create";
+  const argContent = isCreate && !hasStream ? extractCreateContent(payload) : undefined;
+  const paneActions = useChatPaneActions();
+
+  // Some SDKs (e.g. Claude `Write`) don't surface the new file contents on
+  // `args.content`; fall back to an on-demand disk read when expanded.
+  const fetchTarget =
+    isCreate &&
+    !hasStream &&
+    argContent === undefined &&
+    payload?.path &&
+    payload.path.length > 0 &&
+    paneActions?.projectLocation
+      ? { path: payload.path, projectLocation: paneActions.projectLocation }
+      : null;
+  const fetched = useReadAbsoluteFile(isExpanded ? fetchTarget : null);
+
   const sections = useMemo<ToolCallSection[]>(() => {
-    if (!isExpanded || !payload || (stream && stream.length > 0)) return [];
+    if (!isExpanded || !payload) return [];
+    if (hasStream || argContent !== undefined || fetched.content !== undefined) return [];
     const argsPart = extractAcpArgsPart(payload);
     const resultPart = extractAcpResultPart(payload);
     const path = payload.path;
@@ -29,23 +51,29 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
       { label: "args", part: enrichLanguage(argsPart, path) },
       { label: "result", part: resultPart },
     ];
-  }, [isExpanded, payload, stream]);
+  }, [isExpanded, payload, hasStream, argContent, fetched.content]);
   if (!payload) return null;
   const right = formatRightLabel(payload);
-  const hasDetails = (stream && stream.length > 0) || hasAuxFields(payload);
+  const fallbackTitle = readPayloadString(payload, "title") ?? readPayloadString(payload, "name");
+  const hasDetails =
+    hasStream || argContent !== undefined || fetchTarget !== null || hasAuxFields(payload);
   const kindLabel = formatKindLabel(payload.changeKind);
   const titleNode = (
-    <span className="flex min-w-0 items-baseline gap-1.5">
+    <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
       <span className="shrink-0 !text-[color:var(--muted)]">{kindLabel}</span>
       {payload.path && payload.path.length > 0 ? (
         <PathDisplay
+          className="flex-1"
           path={payload.path}
           basenameClassName="!text-[color:var(--foreground)]"
           dirClassName="!text-[color:var(--muted)]"
         />
+      ) : fallbackTitle ? (
+        <span className="min-w-0 truncate !text-[color:var(--muted)]">{fallbackTitle}</span>
       ) : null}
     </span>
   );
+  const language = detectLanguageFromPath(payload.path);
 
   return (
     <ChatItemAccordion
@@ -57,7 +85,13 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
       onExpandedChange={setIsExpanded}
     >
       {stream && stream.length > 0 ? (
-        <CommandOutputViewport text={stream} language={detectLanguageFromPath(payload.path)} />
+        <CommandOutputViewport text={stream} language={language} />
+      ) : argContent !== undefined ? (
+        <CommandOutputViewport text={argContent} language={language} />
+      ) : fetched.content !== undefined ? (
+        <CommandOutputViewport text={fetched.content} language={language} />
+      ) : fetchTarget !== null ? (
+        <FileContentPlaceholder state={fetched.state} reason={fetched.reason} />
       ) : (
         <ToolCallSections sections={sections} />
       )}
@@ -65,13 +99,116 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   );
 });
 
+interface FetchTarget {
+  path: string;
+  projectLocation: ProjectLocation;
+}
+
+type ReadState =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "missing"
+  | "binary"
+  | "too_large"
+  | "unsupported"
+  | "error";
+
+interface ReadResult {
+  state: ReadState;
+  content?: string;
+  reason?: string;
+}
+
+function useReadAbsoluteFile(target: FetchTarget | null): ReadResult {
+  const [result, setResult] = useState<ReadResult>({ state: "idle" });
+  const path = target?.path;
+  const projectLocation = target?.projectLocation;
+
+  useEffect(() => {
+    if (!path || !projectLocation) {
+      setResult({ state: "idle" });
+      return;
+    }
+    let cancelled = false;
+    setResult({ state: "loading" });
+    const absolutePath = resolveAbsolutePath(path, projectLocation);
+    readBridge()
+      .readAbsoluteFile({ projectLocation, absolutePath })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.status === "ready") {
+          setResult({ state: "ready", content: res.content ?? "" });
+        } else {
+          setResult({ state: res.status });
+        }
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setResult({ state: "error", reason: err instanceof Error ? err.message : String(err) });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [path, projectLocation]);
+
+  return result;
+}
+
+interface FileContentPlaceholderProps {
+  state: ReadState;
+  reason?: string | undefined;
+}
+
+function FileContentPlaceholder({ state, reason }: FileContentPlaceholderProps) {
+  const message =
+    state === "loading" || state === "idle"
+      ? "Loading file…"
+      : state === "missing"
+        ? "File no longer exists on disk."
+        : state === "binary"
+          ? "Binary file — preview unavailable."
+          : state === "too_large"
+            ? "File is too large to preview."
+            : state === "unsupported"
+              ? "File uses an unsupported encoding."
+              : (reason ?? "Could not read file.");
+  return <div className="font-mono text-[color:var(--muted)]/80 text-xs">{message}</div>;
+}
+
+function resolveAbsolutePath(rawPath: string, location: ProjectLocation): string {
+  if (isAbsolutePath(rawPath)) return rawPath;
+  return resolveAbsolutePathForLocation(location, rawPath.replace(/^[\\/]+/, ""));
+}
+
+function isAbsolutePath(p: string): boolean {
+  if (p.startsWith("/")) return true;
+  if (/^[a-zA-Z]:[\\/]/.test(p)) return true;
+  if (p.startsWith("\\\\")) return true;
+  return false;
+}
+
+function extractCreateContent(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const args = (payload as Record<string, unknown>).args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
+  const content = (args as Record<string, unknown>).content;
+  return typeof content === "string" && content.length > 0 ? content : undefined;
+}
+
 function hasAuxFields(payload: unknown): boolean {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
   return p.args !== undefined || p.result !== undefined;
 }
 
-function formatKindLabel(kind: FileChangePayload["changeKind"]): string {
+function readPayloadString(payload: unknown, key: string): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const value = (payload as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+export function formatKindLabel(kind: FileChangePayload["changeKind"]): string {
   switch (kind) {
     case "create":
       return "Create:";

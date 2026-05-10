@@ -6,11 +6,12 @@ import {
   transparentBgTransformer,
   type ShikiTheme,
 } from "./shikiClient";
+import type { HighlightLanguage } from "./languageDetect";
 
 interface CodeBlockProps {
   text: string;
   /** Language id (Shiki bundled language) — falls back to a plain `<pre>` if unsupported. */
-  lang: string;
+  lang: HighlightLanguage;
   className?: string;
 }
 

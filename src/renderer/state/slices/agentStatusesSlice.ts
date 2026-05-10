@@ -1,5 +1,5 @@
 import type { StateCreator } from "zustand";
-import type { AgentStatus } from "@/shared/contracts";
+import { areAgentProviderMetadataEqual, type AgentStatus } from "@/shared/contracts";
 
 export interface AgentStatusesSlice {
   agentStatuses: AgentStatus[];
@@ -15,7 +15,8 @@ function statusesEqual(a: AgentStatus[], b: AgentStatus[]): boolean {
       x.kind === b[i]!.kind &&
       x.installed === b[i]!.installed &&
       x.version === b[i]!.version &&
-      x.authState === b[i]!.authState,
+      x.authState === b[i]!.authState &&
+      areAgentProviderMetadataEqual(x.providerMetadata, b[i]!.providerMetadata),
   );
 }
 

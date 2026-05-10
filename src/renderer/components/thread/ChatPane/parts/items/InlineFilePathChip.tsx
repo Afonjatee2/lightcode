@@ -4,6 +4,7 @@ import { getBasename } from "@/shared/pathUtils";
 interface InlineFilePathChipProps {
   path: string;
   line?: number | undefined;
+  endLine?: number | undefined;
   onOpen?: ((path: string, lineNumber?: number) => void) | undefined;
 }
 
@@ -13,10 +14,12 @@ interface InlineFilePathChipProps {
  * inline without clipping descenders. Mirrors the visual language of
  * `.lightcode-mention-chip` used in the composer.
  */
-export function InlineFilePathChip({ path, line, onOpen }: InlineFilePathChipProps) {
+export function InlineFilePathChip({ path, line, endLine, onOpen }: InlineFilePathChipProps) {
   const basename = getBasename(path);
   const iconUrl = getEntryIconUrl(basename, false);
-  const title = line !== undefined ? `${path}:${line}` : path;
+  const lineLabel =
+    line !== undefined ? `${line}${endLine !== undefined ? `-${endLine}` : ""}` : "";
+  const title = line !== undefined ? `${path}:${lineLabel}` : path;
   return (
     <button
       type="button"
@@ -31,7 +34,7 @@ export function InlineFilePathChip({ path, line, onOpen }: InlineFilePathChipPro
       <img className="lightcode-inline-path-chip__icon" src={iconUrl} alt="" draggable={false} />
       <span className="lightcode-inline-path-chip__name">{basename}</span>
       {line !== undefined ? (
-        <span className="lightcode-inline-path-chip__line">{`· L${line}`}</span>
+        <span className="lightcode-inline-path-chip__line">{`· L${lineLabel}`}</span>
       ) : null}
     </button>
   );

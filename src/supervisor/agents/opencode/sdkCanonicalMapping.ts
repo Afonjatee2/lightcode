@@ -465,6 +465,14 @@ function questionRequestPayload(req: QuestionRequest): {
   return { summary, options, multiSelect };
 }
 
+function permissionRequestId(id: string): string {
+  return `opencode-perm-${id}`;
+}
+
+function questionRequestId(id: string): string {
+  return `opencode-q-${id}`;
+}
+
 /**
  * Map a single OpenCode SSE event to canonical RuntimeEvents. Returns an
  * empty array for events that are not surfaced (or are session-status only —
@@ -589,7 +597,7 @@ export function mapOpenCodeEvent(
       events.push({
         type: "request.opened",
         threadId: state.threadId,
-        requestId: req.id,
+        requestId: permissionRequestId(req.id),
         requestType,
         payload: { summary, details },
       });
@@ -600,7 +608,7 @@ export function mapOpenCodeEvent(
       events.push({
         type: "request.resolved",
         threadId: state.threadId,
-        requestId: requestID,
+        requestId: permissionRequestId(requestID),
         outcome: reply === "reject" ? "declined" : "accepted",
       });
       return events;
@@ -611,7 +619,7 @@ export function mapOpenCodeEvent(
       events.push({
         type: "request.opened",
         threadId: state.threadId,
-        requestId: req.id,
+        requestId: questionRequestId(req.id),
         requestType: "tool_user_input",
         payload: { summary, options, multiSelect },
       });
@@ -621,7 +629,7 @@ export function mapOpenCodeEvent(
       events.push({
         type: "request.resolved",
         threadId: state.threadId,
-        requestId: event.properties.requestID,
+        requestId: questionRequestId(event.properties.requestID),
         outcome: "answered",
       });
       return events;
@@ -630,7 +638,7 @@ export function mapOpenCodeEvent(
       events.push({
         type: "request.resolved",
         threadId: state.threadId,
-        requestId: event.properties.requestID,
+        requestId: questionRequestId(event.properties.requestID),
         outcome: "declined",
       });
       return events;

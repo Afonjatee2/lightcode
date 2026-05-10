@@ -1,6 +1,13 @@
-import { useState, type ComponentType, type ReactNode, type SVGProps } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 import { ButtonGroup } from "@heroui/react";
-import { HelpCircle, Plug, ShieldAlert } from "lucide-react";
+import { HelpCircle, ListChecks, Plug, ShieldAlert } from "lucide-react";
 import type { ThreadServerRequestId } from "@/shared/contracts";
 import type { PendingThreadServerRequest } from "@/renderer/state/appStore";
 import { Button, Input, PathDisplay, Select, TextArea } from "@/renderer/components/common";
@@ -11,6 +18,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function asString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function getParamField(params: unknown, key: string): unknown {
+  return isRecord(params) ? params[key] : undefined;
 }
 
 function getQuestionAnswerRecord(questions: RequestQuestion[]): Record<string, string> {
@@ -522,6 +533,32 @@ function RequestShell(props: {
   icon?: LucideIcon;
 }) {
   const { title, description, details = [], body, footer, icon: Icon = ShieldAlert } = props;
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+
+    const updateFades = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const topFade = Math.min(24, scrollTop);
+      const bottomFade = Math.min(24, Math.max(0, scrollHeight - scrollTop - clientHeight));
+
+      el.style.setProperty("--top-fade-size", `${topFade}px`);
+      el.style.setProperty("--bottom-fade-size", `${bottomFade}px`);
+    };
+
+    updateFades();
+    el.addEventListener("scroll", updateFades, { passive: true });
+
+    const observer = new ResizeObserver(updateFades);
+    observer.observe(el);
+
+    return () => {
+      el.removeEventListener("scroll", updateFades);
+      observer.disconnect();
+    };
+  }, []);
 
   return (
     <section
@@ -545,7 +582,16 @@ function RequestShell(props: {
       ) : null}
 
       {body ? (
-        <div className="max-h-[55vh] overflow-y-auto px-2.5 pb-2 [scrollbar-gutter:stable]">
+        <div
+          ref={scrollRef}
+          className="max-h-[55vh] overflow-y-auto px-2.5 pb-2 [scrollbar-gutter:stable]"
+          style={{
+            WebkitMaskImage:
+              "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)",
+            maskImage:
+              "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)",
+          }}
+        >
           {body}
         </div>
       ) : null}
@@ -879,7 +925,7 @@ type RawAction = {
 function AcpPermissionRequestCard(props: {
   params: AcpPermissionRequestParams;
   agentLabel?: string | undefined;
-  onResolve: (response: unknown) => Promise<void>;
+  onResolve: (response: unknown, polarity: DecisionPolarity) => Promise<void>;
 }) {
   const { params, agentLabel, onResolve } = props;
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -896,22 +942,31 @@ function AcpPermissionRequestCard(props: {
   const cancelRaw = negatives[0];
   const extraNegativesRaw = negatives.slice(1);
 
-  const resolveWith = async (response: unknown) => {
+  const resolveWith = async (action: RawAction) => {
     setIsSubmitting(true);
     try {
-      await onResolve(response);
+      await onResolve(action.response, action.polarity);
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const isPlanExit =
+    params.toolCall.kind === "exit_plan_mode" || params.toolCall.kind === "ExitPlanMode";
+  const title = isPlanExit ? "Plan approval" : "Permission requested";
+  const description = isPlanExit
+    ? `${agentLead} is waiting for you to review and approve the proposed plan.`
+    : `${agentLead} is waiting for approval to run ${toolTitle}.`;
+  const icon = isPlanExit ? ListChecks : ShieldAlert;
+
   return (
     <RequestShell
-      title="Permission requested"
-      description={`${agentLead} is waiting for approval to run ${toolTitle}.`}
+      icon={icon}
+      title={title}
+      description={description}
       details={[...(params.toolCall.kind ? [{ label: "Tool", value: params.toolCall.kind }] : [])]}
       body={
-        Object.hasOwn(params.toolCall, "rawInput") ? (
+        !isPlanExit && Object.hasOwn(params.toolCall, "rawInput") ? (
           <pre className="overflow-x-auto rounded border border-[color:var(--border)] bg-foreground/[0.04] p-2 text-[11px] text-muted">
             {formatJson(params.toolCall.rawInput)}
           </pre>
@@ -925,19 +980,19 @@ function AcpPermissionRequestCard(props: {
               ? {
                   key: cancelRaw.key,
                   label: cancelRaw.label,
-                  onPress: () => void resolveWith(cancelRaw.response),
+                  onPress: () => void resolveWith(cancelRaw),
                 }
               : null
           }
           extraNegatives={extraNegativesRaw.map((action) => ({
             key: action.key,
             label: action.label,
-            onPress: () => void resolveWith(action.response),
+            onPress: () => void resolveWith(action),
           }))}
           positives={positives.map((action) => ({
             key: action.key,
             label: action.label,
-            onPress: () => void resolveWith(action.response),
+            onPress: () => void resolveWith(action),
           }))}
         />
       }
@@ -949,15 +1004,25 @@ function ApprovalRequestCard(props: {
   request: PendingThreadServerRequest;
   agentLabel?: string | undefined;
   onResolve: (response: unknown) => Promise<void>;
+  onPlanApproved?: (() => void) | undefined;
 }) {
-  const { request, agentLabel, onResolve } = props;
+  const { request, agentLabel, onResolve, onPlanApproved } = props;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const params = parseCommandApprovalParams(request.params);
   const agentLead = resolveAgentLead(agentLabel);
 
-  const resolveWith = async (response: unknown) => {
+  const resolveWith = async (response: unknown, polarity: DecisionPolarity) => {
     setIsSubmitting(true);
     try {
+      if (polarity === "positive") {
+        const name = asString(getParamField(request.params, "name"));
+        const isPlanExit =
+          request.method === "item/tool/requestApproval" &&
+          (name === "ExitPlanMode" || name === "exit_plan_mode");
+        if (isPlanExit) {
+          onPlanApproved?.();
+        }
+      }
       await onResolve(response);
     } finally {
       setIsSubmitting(false);
@@ -982,19 +1047,25 @@ function ApprovalRequestCard(props: {
                 key: "turn",
                 label: "Allow this turn",
                 onPress: () =>
-                  void resolveWith({
-                    permissions: params.permissions ?? {},
-                    scope: "turn",
-                  }),
+                  void resolveWith(
+                    {
+                      permissions: params.permissions ?? {},
+                      scope: "turn",
+                    },
+                    "positive",
+                  ),
               },
               {
                 key: "session",
                 label: "Allow for session",
                 onPress: () =>
-                  void resolveWith({
-                    permissions: params.permissions ?? {},
-                    scope: "session",
-                  }),
+                  void resolveWith(
+                    {
+                      permissions: params.permissions ?? {},
+                      scope: "session",
+                    },
+                    "positive",
+                  ),
               },
             ]}
           />
@@ -1005,9 +1076,21 @@ function ApprovalRequestCard(props: {
 
   const isFileChange =
     request.method === "item/fileChange/requestApproval" || request.method === "applyPatchApproval";
-  const title = isFileChange ? "File changes need approval" : "Command needs approval";
-  const description =
-    params.reason ?? `${agentLead} is waiting for approval before it can continue.`;
+
+  const toolName = asString(getParamField(request.params, "name"));
+  const isPlanExit =
+    request.method === "item/tool/requestApproval" &&
+    (toolName === "ExitPlanMode" || toolName === "exit_plan_mode");
+
+  const title = isPlanExit
+    ? "Plan approval"
+    : isFileChange
+      ? "File changes need approval"
+      : "Command needs approval";
+  const description = isPlanExit
+    ? `${agentLead} is waiting for you to review and approve the proposed plan.`
+    : (params.reason ?? `${agentLead} is waiting for approval before it can continue.`);
+  const icon = isPlanExit ? ListChecks : ShieldAlert;
 
   const actions: RawAction[] =
     request.method === "item/commandExecution/requestApproval"
@@ -1019,7 +1102,8 @@ function ApprovalRequestCard(props: {
             polarity: classifyDecision(decision),
           }),
         )
-      : request.method === "item/fileChange/requestApproval"
+      : request.method === "item/fileChange/requestApproval" ||
+          request.method === "item/tool/requestApproval"
         ? ["accept", "acceptForSession", "decline", "cancel"].map((decision) => ({
             key: decision,
             label: getCommandDecisionLabel(decision),
@@ -1043,10 +1127,12 @@ function ApprovalRequestCard(props: {
     ...(params.command ? [{ label: "Command", value: params.command, mono: true }] : []),
     ...(params.cwd ? [{ label: "Directory", value: params.cwd, isPath: true }] : []),
     ...(params.grantRoot ? [{ label: "Grant root", value: params.grantRoot, isPath: true }] : []),
+    ...(isPlanExit && toolName ? [{ label: "Tool", value: toolName }] : []),
   ];
 
   return (
     <RequestShell
+      icon={icon}
       title={title}
       description={description}
       details={details}
@@ -1054,6 +1140,10 @@ function ApprovalRequestCard(props: {
         params.permissions ? (
           <pre className="overflow-x-auto rounded border border-[color:var(--border)] bg-foreground/[0.04] p-2 text-[11px] text-muted">
             {formatJson(params.permissions)}
+          </pre>
+        ) : !isPlanExit && Object.hasOwn(request.params ?? {}, "args") ? (
+          <pre className="overflow-x-auto rounded border border-[color:var(--border)] bg-foreground/[0.04] p-2 text-[11px] text-muted">
+            {formatJson(getParamField(request.params, "args"))}
           </pre>
         ) : null
       }
@@ -1065,19 +1155,19 @@ function ApprovalRequestCard(props: {
               ? {
                   key: cancelRaw.key,
                   label: cancelRaw.label,
-                  onPress: () => void resolveWith(cancelRaw.response),
+                  onPress: () => void resolveWith(cancelRaw.response, cancelRaw.polarity),
                 }
               : null
           }
           extraNegatives={extraNegativesRaw.map((a) => ({
             key: a.key,
             label: a.label,
-            onPress: () => void resolveWith(a.response),
+            onPress: () => void resolveWith(a.response, a.polarity),
           }))}
           positives={positives.map((a) => ({
             key: a.key,
             label: a.label,
-            onPress: () => void resolveWith(a.response),
+            onPress: () => void resolveWith(a.response, a.polarity),
           }))}
         />
       }
@@ -1093,21 +1183,28 @@ export function ThreadServerRequestPanel(props: {
     method: string;
     response: unknown;
   }) => Promise<void>;
+  onPlanApproved?: () => void;
 }) {
-  const { request, agentLabel, onResolve } = props;
+  const { request, agentLabel, onResolve, onPlanApproved } = props;
   const acpPermissionParams = parseAcpPermissionRequestParams(request.params);
   if (request.method === "requestPermission" && acpPermissionParams) {
     return (
       <AcpPermissionRequestCard
         params={acpPermissionParams}
         agentLabel={agentLabel}
-        onResolve={(response) =>
-          onResolve({
+        onResolve={(response, polarity) => {
+          const isPlanExit =
+            acpPermissionParams.toolCall.kind === "exit_plan_mode" ||
+            acpPermissionParams.toolCall.kind === "ExitPlanMode";
+          if (isPlanExit && polarity === "positive") {
+            onPlanApproved?.();
+          }
+          return onResolve({
             requestId: request.requestId,
             method: request.method,
             response,
-          })
-        }
+          });
+        }}
       />
     );
   }
@@ -1149,6 +1246,7 @@ export function ThreadServerRequestPanel(props: {
     <ApprovalRequestCard
       request={request}
       agentLabel={agentLabel}
+      onPlanApproved={onPlanApproved}
       onResolve={(response) =>
         onResolve({
           requestId: request.requestId,

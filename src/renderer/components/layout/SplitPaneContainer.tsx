@@ -1,12 +1,16 @@
 import React, { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
 import { useDroppable } from "@dnd-kit/react";
-import { collectPaneIds, type PaneLayout, type PaneLayoutAxis } from "@/shared/paneLayout";
+import { type PaneLayout, type PaneLayoutAxis } from "@/shared/paneLayout";
 import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "@/renderer/dnd";
+import {
+  MIN_PANE_PERCENT,
+  readStoredSizes,
+  splitStorageKey,
+  writeStoredSizes,
+} from "./paneSizeStorage";
 
-const MIN_PANE_PERCENT = 15;
 const DIVIDER_SIZE = 8;
 const ROOT_INSERT_ZONE_INSET = DIVIDER_SIZE / 2;
-const SPLIT_SIZE_STORAGE_PREFIX = "lightcode-pane-sizes";
 
 export type Rect = { left: number; top: number; width: number; height: number };
 
@@ -25,48 +29,6 @@ type ComputedDivider = {
 };
 
 type ComputedLayout = { panes: ComputedPane[]; dividers: ComputedDivider[] };
-
-function equalSizes(count: number): number[] {
-  return Array.from({ length: count }, () => 100 / count);
-}
-
-function splitStorageKey(layout: PaneLayout, axis: PaneLayoutAxis): string {
-  return `${SPLIT_SIZE_STORAGE_PREFIX}:${axis}:${collectPaneIds(layout).join("\0")}`;
-}
-
-function normalizeSizes(raw: number[], count: number): number[] | null {
-  if (
-    raw.length !== count ||
-    raw.some((value) => !Number.isFinite(value) || value < MIN_PANE_PERCENT)
-  ) {
-    return null;
-  }
-  const total = raw.reduce((sum, value) => sum + value, 0);
-  if (total <= 0) return null;
-  const normalized = raw.map((value) => (value / total) * 100);
-  if (normalized.some((value) => value < MIN_PANE_PERCENT)) return null;
-  return normalized;
-}
-
-function readStoredSizes(key: string, count: number): number[] {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return equalSizes(count);
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return equalSizes(count);
-    return normalizeSizes(parsed, count) ?? equalSizes(count);
-  } catch {
-    return equalSizes(count);
-  }
-}
-
-function writeStoredSizes(key: string, sizes: number[]) {
-  try {
-    localStorage.setItem(key, JSON.stringify(sizes));
-  } catch {
-    // ignore quota / privacy errors
-  }
-}
 
 export function computeLayout(
   layout: PaneLayout,

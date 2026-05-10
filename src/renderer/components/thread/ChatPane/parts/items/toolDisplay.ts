@@ -15,11 +15,20 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
+import { extractLeadingPath } from "@/shared/extractLeadingPath";
 
 export interface ToolDisplay {
   title: string;
   Icon: LucideIcon;
+  /**
+   * When set, the renderer should display the title as `prefix + path` with
+   * the `path` portion truncated from the start (ellipsis at the beginning),
+   * so the meaningful tail of a path stays visible.
+   */
+  parts?: { prefix: string; path: string };
 }
+
+type AcpLocation = NonNullable<ToolCallPayload["locations"]>[number];
 
 /**
  * Pick a human-readable title and icon for a `tool_call` row.
@@ -32,6 +41,17 @@ export interface ToolDisplay {
  *   3. ACP-style human-readable titles (`Viewing src/foo.ts`, `Searching for…`)
  *      — the verb prefix selects an icon and the title is passed through.
  */
+/**
+ * Whether a tool_call payload represents a sub-agent invocation. Used by the
+ * timeline reducer to evict child items on completion (we keep only the final
+ * result on the parent), and by the chat row router to render the sub-agent
+ * pill from the moment the call starts — even before any child events arrive.
+ */
+export function isSubAgentTool(payload: ToolCallPayload | undefined): boolean {
+  if (!payload) return false;
+  return payload.isSubAgent === true || readSubAgentType(readArgsObject(payload)) !== undefined;
+}
+
 export function deriveToolDisplay(payload: ToolCallPayload): ToolDisplay {
   const args = readArgsObject(payload);
 
@@ -48,6 +68,16 @@ export function deriveToolDisplay(payload: ToolCallPayload): ToolDisplay {
   const claude = mapClaudeRawTool(payload.name, args);
   if (claude) return claude;
 
+  if (payload.isSubAgent === true) {
+    return {
+      title: formatAgentTitle(args, payload.title?.trim() || payload.name.trim()),
+      Icon: Bot,
+    };
+  }
+
+  const acp = mapAcpTool(payload, args);
+  if (acp) return acp;
+
   return { title: payload.name, Icon: pickIconByVerbPrefix(payload.name) };
 }
 
@@ -58,14 +88,14 @@ function mapClaudeRawTool(
   switch (name) {
     case "Read":
     case "NotebookRead":
-      return { title: titleWithPath("Read", args, "file_path", "notebook_path"), Icon: Eye };
+      return withPath("Read", args, ["file_path", "notebook_path"], Eye);
     case "Grep":
-      return { title: formatGrepTitle(args), Icon: SearchCode };
+      return formatGrepDisplay(args);
     case "Glob":
-      return { title: titleWithValue("Glob", args, "pattern"), Icon: FolderSearch };
+      return withPath("Glob", args, ["pattern"], FolderSearch);
     case "LS":
     case "List":
-      return { title: titleWithPath("List", args, "path"), Icon: FolderSearch };
+      return withPath("List", args, ["path"], FolderSearch);
     case "Task":
     case "Agent":
       return { title: formatAgentTitle(args), Icon: Bot };
@@ -79,7 +109,7 @@ function mapClaudeRawTool(
     case "EnterPlanMode":
       return { title: "Enter plan mode", Icon: Wrench };
     case "WebFetch":
-      return { title: titleWithValue("Fetch", args, "url"), Icon: Globe };
+      return withPath("Fetch", args, ["url"], Globe);
     case "WebSearch":
       return { title: titleWithValue("Web search", args, "query"), Icon: Globe };
     case "ToolSearch":
@@ -101,6 +131,18 @@ function mapClaudeRawTool(
   }
 }
 
+function withPath(
+  verb: string,
+  args: Record<string, unknown> | undefined,
+  keys: string[],
+  Icon: LucideIcon,
+): ToolDisplay {
+  const path = readStr(args, ...keys);
+  if (!path) return { title: verb, Icon };
+  const prefix = `${verb}: `;
+  return { title: `${prefix}${path}`, Icon, parts: { prefix, path } };
+}
+
 function readArgsObject(payload: ToolCallPayload): Record<string, unknown> | undefined {
   const a = payload.args;
   if (!a || typeof a !== "object" || Array.isArray(a)) return undefined;
@@ -116,15 +158,6 @@ function readStr(args: Record<string, unknown> | undefined, ...keys: string[]): 
   return undefined;
 }
 
-function titleWithPath(
-  verb: string,
-  args: Record<string, unknown> | undefined,
-  ...keys: string[]
-): string {
-  const path = readStr(args, ...keys);
-  return path ? `${verb}: ${path}` : verb;
-}
-
 function titleWithValue(
   verb: string,
   args: Record<string, unknown> | undefined,
@@ -134,22 +167,74 @@ function titleWithValue(
   return value ? `${verb}: ${value}` : verb;
 }
 
-function formatGrepTitle(args: Record<string, unknown> | undefined): string {
+function formatGrepDisplay(args: Record<string, unknown> | undefined): ToolDisplay {
   const pattern = readStr(args, "pattern");
-  if (!pattern) return "Grep";
+  if (!pattern) return { title: "Grep", Icon: SearchCode };
   const path = readStr(args, "path");
   const glob = readStr(args, "glob");
   const scope = path ?? glob;
-  return scope ? `Grep: "${pattern}" in ${scope}` : `Grep: "${pattern}"`;
+  if (!scope) return { title: `Grep: "${pattern}"`, Icon: SearchCode };
+  const prefix = `Grep: "${pattern}" in `;
+  return {
+    title: `${prefix}${scope}`,
+    Icon: SearchCode,
+    parts: { prefix, path: scope },
+  };
 }
 
-function formatAgentTitle(args: Record<string, unknown> | undefined): string {
-  const description = readStr(args, "description");
-  const subagent = readStr(args, "subagent_type");
+function formatAgentTitle(
+  args: Record<string, unknown> | undefined,
+  fallbackDescription?: string,
+): string {
+  const description = readStr(args, "description") ?? fallbackDescription;
+  const subagent = readSubAgentType(args);
   if (description) {
     return subagent ? `Agent (${subagent}): ${description}` : `Agent: ${description}`;
   }
   return subagent ? `Agent: ${subagent}` : "Agent";
+}
+
+function readSubAgentType(args: Record<string, unknown> | undefined): string | undefined {
+  return readStr(args, "subagent_type", "agent_type", "agentType");
+}
+
+function mapAcpTool(
+  payload: ToolCallPayload,
+  args: Record<string, unknown> | undefined,
+): ToolDisplay | null {
+  const kind = payload.kind?.trim().toLowerCase();
+  const title = payload.title?.trim() || payload.name.trim();
+  const locations = payload.locations ?? [];
+  const locationPath = pickAcpLocationPath(kind, locations);
+  const titlePath = extractLeadingPath(title);
+  const path = locationPath ?? titlePath;
+
+  switch (kind) {
+    case "read":
+      return formatAcpPathDisplay("Read", path, title, Eye);
+    case "edit":
+      return formatAcpPathDisplay("Edit", path, title, Pencil);
+    case "delete":
+      return formatAcpPathDisplay("Delete", path, title, Trash2);
+    case "move":
+      return formatAcpMoveDisplay(locations, path, title);
+    case "search":
+      return formatAcpSearchDisplay(args, title, locationPath);
+    case "fetch":
+      return withTarget("Fetch", readStr(args, "url") ?? title, Globe);
+    case "switch_mode":
+      return { title: title ? `Switch mode: ${title}` : "Switch mode", Icon: Wrench };
+    case "execute":
+      return {
+        title: readStr(args, "command") ? titleWithValue("Run", args, "command") : `Run: ${title}`,
+        Icon: Terminal,
+      };
+    case "think":
+    case "other":
+      return title ? { title, Icon: pickIconByVerbPrefix(title) } : null;
+    default:
+      return null;
+  }
 }
 
 interface McpInfo {
@@ -182,11 +267,88 @@ function prettyMcpServer(s: string): string {
   return core.replace(/_/g, " ");
 }
 
-function isSkillTool(payload: ToolCallPayload): boolean {
+export function isSkillTool(payload: ToolCallPayload): boolean {
   const n = payload.name.trim();
   if (n === "Skill" || /^(loaded|using) skill\b/i.test(n)) return true;
   const args = readArgsObject(payload);
   return readStr(args, "skill") !== undefined;
+}
+
+function formatAcpPathDisplay(
+  verb: string,
+  path: string | undefined,
+  title: string,
+  Icon: LucideIcon,
+): ToolDisplay {
+  if (path) return withTarget(verb, path, Icon);
+  if (title.length === 0) return { title: verb, Icon };
+  return title.toLowerCase().startsWith(verb.toLowerCase())
+    ? { title, Icon }
+    : { title: `${verb}: ${title}`, Icon };
+}
+
+function formatAcpMoveDisplay(
+  locations: readonly AcpLocation[],
+  path: string | undefined,
+  title: string,
+): ToolDisplay {
+  if (locations.length >= 2) {
+    const from = locations[0]!.path;
+    const to = locations[locations.length - 1]!.path;
+    return { title: `Move: ${from} -> ${to}`, Icon: Pencil };
+  }
+  return formatAcpPathDisplay("Move", path, title, Pencil);
+}
+
+function formatAcpSearchDisplay(
+  args: Record<string, unknown> | undefined,
+  title: string,
+  locationPath: string | undefined,
+): ToolDisplay {
+  const query = readStr(args, "query", "needle", "term");
+  const pattern = readStr(args, "pattern");
+  const scope = readScope(args) ?? locationPath;
+  const searchTerm = query ?? pattern;
+  if (searchTerm && scope) {
+    const prefix = `Search: "${searchTerm}" in `;
+    return {
+      title: `${prefix}${scope}`,
+      Icon: SearchCode,
+      parts: { prefix, path: scope },
+    };
+  }
+  if (searchTerm) return { title: `Search: "${searchTerm}"`, Icon: SearchCode };
+  if (scope) return withTarget("Search", scope, SearchCode);
+  return title.toLowerCase().startsWith("search")
+    ? { title, Icon: SearchCode }
+    : { title: `Search: ${title}`, Icon: SearchCode };
+}
+
+function pickAcpLocationPath(
+  kind: string | undefined,
+  locations: readonly AcpLocation[],
+): string | undefined {
+  if (locations.length === 0) return undefined;
+  return kind === "move" ? locations[locations.length - 1]!.path : locations[0]!.path;
+}
+
+function readScope(args: Record<string, unknown> | undefined): string | undefined {
+  const direct = readStr(args, "path", "glob");
+  if (direct) return direct;
+  const paths = args?.paths;
+  if (Array.isArray(paths)) {
+    const first = paths.find(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    );
+    if (first) return first;
+  }
+  return undefined;
+}
+
+function withTarget(verb: string, target: string | undefined, Icon: LucideIcon): ToolDisplay {
+  if (!target) return { title: verb, Icon };
+  const prefix = `${verb}: `;
+  return { title: `${prefix}${target}`, Icon, parts: { prefix, path: target } };
 }
 
 /**

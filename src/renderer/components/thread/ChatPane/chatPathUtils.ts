@@ -40,9 +40,8 @@ function getProjectRoots(projectLocation: ProjectLocation): string[] {
 function pathStartsWithRoot(path: string, root: string): boolean {
   const normalizedRoot = root.replace(/\/+$/, "");
   if (!normalizedRoot) return false;
-  if (path.length === normalizedRoot.length) return path.toLowerCase() === normalizedRoot.toLowerCase();
-  return (
-    path.toLowerCase().startsWith(`${normalizedRoot.toLowerCase()}/`) ||
-    path.startsWith(`${normalizedRoot}/`)
-  );
+  const lcPath = path.toLowerCase();
+  const lcRoot = normalizedRoot.toLowerCase();
+  if (path.length === normalizedRoot.length) return lcPath === lcRoot;
+  return lcPath.startsWith(`${lcRoot}/`) || path.startsWith(`${normalizedRoot}/`);
 }

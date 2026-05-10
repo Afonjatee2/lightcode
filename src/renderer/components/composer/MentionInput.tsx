@@ -15,48 +15,25 @@ export interface MentionInputHandle {
   restoreFromSegments(segments: PromptSegment[]): void;
   focus(): void;
   clear(): void;
+  insertSlashCommand(id: string): void;
 }
 
-// Store only serializable data, not a live DOM Range (#8 fix)
 interface MentionState {
   query: string;
 }
 
-/**
- * Scan backward from the current cursor position to find an active `@query`.
- * Returns the query string, or null if no active mention trigger is found.
- */
-function detectMentionQuery(): string | null {
-  const sel = window.getSelection();
-  if (!sel || !sel.isCollapsed || !sel.anchorNode) return null;
-
-  const textNode = sel.anchorNode;
-  if (textNode.nodeType !== Node.TEXT_NODE) return null;
-
-  const text = textNode.textContent ?? "";
-  const offset = sel.anchorOffset;
-
-  let atIndex = -1;
-  for (let i = offset - 1; i >= 0; i--) {
-    const ch = text[i]!;
-    if (ch === "@") {
-      if (i === 0 || /\s/.test(text[i - 1]!)) {
-        atIndex = i;
-      }
-      break;
-    }
-    if (/\s/.test(ch)) break;
-  }
-
-  if (atIndex < 0) return null;
-  return text.slice(atIndex + 1, offset);
+interface TriggerContext {
+  textNode: Text;
+  triggerIndex: number;
+  cursorOffset: number;
 }
 
 /**
- * Re-detect the live Range covering `@query` from the current cursor position.
- * Called at insertion time to avoid stale Range references (#8 fix).
+ * Scan backward from the current cursor position to find an active trigger
+ * character (`@` or `/`) at start-of-line or after whitespace, with no
+ * intervening whitespace between the trigger and the cursor.
  */
-function detectMentionRange(): Range | null {
+function detectTriggerContext(triggerChar: string): TriggerContext | null {
   const sel = window.getSelection();
   if (!sel || !sel.isCollapsed || !sel.anchorNode) return null;
 
@@ -66,31 +43,39 @@ function detectMentionRange(): Range | null {
   const text = textNode.textContent ?? "";
   const offset = sel.anchorOffset;
 
-  let atIndex = -1;
+  let triggerIndex = -1;
   for (let i = offset - 1; i >= 0; i--) {
     const ch = text[i]!;
-    if (ch === "@") {
+    if (ch === triggerChar) {
       if (i === 0 || /\s/.test(text[i - 1]!)) {
-        atIndex = i;
+        triggerIndex = i;
       }
       break;
     }
     if (/\s/.test(ch)) break;
   }
 
-  if (atIndex < 0) return null;
+  if (triggerIndex < 0) return null;
+  return { textNode: textNode as Text, triggerIndex, cursorOffset: offset };
+}
 
+function detectTriggerQuery(triggerChar: string): string | null {
+  const ctx = detectTriggerContext(triggerChar);
+  if (!ctx) return null;
+  return (ctx.textNode.textContent ?? "").slice(ctx.triggerIndex + 1, ctx.cursorOffset);
+}
+
+function detectTriggerRange(triggerChar: string): Range | null {
+  const ctx = detectTriggerContext(triggerChar);
+  if (!ctx) return null;
   const range = document.createRange();
-  range.setStart(textNode, atIndex);
-  range.setEnd(textNode, offset);
+  range.setStart(ctx.textNode, ctx.triggerIndex);
+  range.setEnd(ctx.textNode, ctx.cursorOffset);
   return range;
 }
 
-/** Check if the editor has any meaningful content (text or chips). */
 function hasEditorContent(editor: HTMLDivElement): boolean {
-  // Check for chip nodes (#9 fix: chip-only content is valid)
   if (editor.querySelector("[data-mention-path]")) return true;
-  // Check for non-whitespace text
   return (editor.textContent ?? "").trim().length > 0;
 }
 
@@ -106,6 +91,7 @@ export const MentionInput = forwardRef<
     onTextChange: (hasText: boolean) => void;
     onSubmit: (segments: PromptSegment[]) => void;
     onPasteImage?: (file: File) => void;
+    onSlashCommandChange?: (query: string | null) => void;
     /**
      * Called before MentionInput's own key handling (after the mention popover
      * absorbs navigation keys). Return `true` to indicate the key was handled
@@ -124,9 +110,11 @@ export const MentionInput = forwardRef<
     onTextChange,
     onSubmit,
     onPasteImage,
+    onSlashCommandChange,
     onInterceptKey,
   } = props;
   const editorRef = useRef<HTMLDivElement>(null);
+  const lastSlashQueryRef = useRef<string | null>(null);
   const [mention, setMention] = useState<MentionState | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
 
@@ -180,7 +168,39 @@ export const MentionInput = forwardRef<
       if (editorRef.current) {
         editorRef.current.innerHTML = "";
         setMention(null);
+        if (lastSlashQueryRef.current !== null) {
+          lastSlashQueryRef.current = null;
+          onSlashCommandChange?.(null);
+        }
       }
+    },
+    insertSlashCommand(id: string) {
+      if (!editorRef.current) return;
+
+      const range = detectTriggerRange("/");
+      if (!range) return;
+
+      const sel = window.getSelection();
+      if (!sel) return;
+
+      sel.removeAllRanges();
+      sel.addRange(range);
+      range.deleteContents();
+
+      const textNode = document.createTextNode(`/${id} `);
+      range.insertNode(textNode);
+
+      const newRange = document.createRange();
+      newRange.setStartAfter(textNode);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+
+      if (lastSlashQueryRef.current !== null) {
+        lastSlashQueryRef.current = null;
+        onSlashCommandChange?.(null);
+      }
+      notifyTextChange();
     },
   }));
 
@@ -191,8 +211,13 @@ export const MentionInput = forwardRef<
   }, [autoFocus]);
 
   function checkMentionState() {
-    const query = detectMentionQuery();
+    const query = detectTriggerQuery("@");
     setMention(query !== null ? { query } : null);
+    const nextSlash = query === null ? detectTriggerQuery("/") : null;
+    if (lastSlashQueryRef.current !== nextSlash) {
+      lastSlashQueryRef.current = nextSlash;
+      onSlashCommandChange?.(nextSlash);
+    }
   }
 
   function notifyTextChange() {
@@ -203,8 +228,7 @@ export const MentionInput = forwardRef<
   function insertMention(entry: FileEntry) {
     if (!editorRef.current) return;
 
-    // Re-detect the range fresh at insertion time (#8 fix)
-    const range = detectMentionRange();
+    const range = detectTriggerRange("@");
     if (!range) return;
 
     const mentionData: FileMentionData = {
@@ -312,13 +336,10 @@ export const MentionInput = forwardRef<
     }
   }
 
-  // #7 fix: use Range-based insertion instead of deprecated document.execCommand
   function handlePaste(e: React.ClipboardEvent<HTMLDivElement>) {
-    // Detect pasted images from clipboard (screenshots, copied images)
     const imageFile =
       Array.from(e.clipboardData.files).find((f) => f.type.startsWith("image/")) ??
       (() => {
-        // Fallback: check clipboardData.items for Windows compatibility
         for (const item of e.clipboardData.items) {
           if (item.type.startsWith("image/")) {
             return item.getAsFile();
@@ -350,8 +371,7 @@ export const MentionInput = forwardRef<
     ? "lightcode-mention-input lightcode-mention-input--compact"
     : "lightcode-mention-input";
 
-  // For the popover, re-detect the live range for positioning
-  const liveRange = mention ? detectMentionRange() : null;
+  const liveRange = mention ? detectTriggerRange("@") : null;
 
   return (
     <div className="relative">

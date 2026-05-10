@@ -21,8 +21,15 @@ function makeInput(
 
 type TestableAcpSession = {
   applyTurnConfig(config: ThreadConfig): Promise<void>;
+  startTurn(
+    prompt: string,
+    config: ThreadConfig,
+    segments?: import("@/shared/contracts").PromptSegment[],
+    options?: { userMessageItemId?: string },
+  ): Promise<void>;
   interruptTurn(): Promise<void>;
   handleSessionUpdate(params: { update: unknown }): void;
+  setListener(listener: unknown): void;
 };
 
 function makeConfigSyncSession(
@@ -41,6 +48,9 @@ function makeConfigSyncSession(
     setSessionConfigOption: vi
       .fn<(args: { sessionId: string; configId: string; value: string }) => Promise<void>>()
       .mockResolvedValue(undefined),
+    prompt: vi
+      .fn<(args: { sessionId: string; prompt: unknown[] }) => Promise<{ stopReason: string }>>()
+      .mockResolvedValue({ stopReason: "end_turn" }),
     cancel: vi.fn<(args: { sessionId: string }) => Promise<void>>().mockResolvedValue(undefined),
   };
   const listener = {
@@ -54,6 +64,7 @@ function makeConfigSyncSession(
   session["connection"] = connection;
   session["sessionId"] = "session-1";
   session["threadId"] = "thread-1";
+  session["projectLocation"] = { kind: "windows", path: "C:\\repo" };
   session["listener"] = listener;
   session["availableModeIds"] = overrides.availableModeIds ?? [
     "default",
@@ -69,8 +80,17 @@ function makeConfigSyncSession(
     mode: "agent",
     approvalPolicy: "default",
   };
+  session["currentSlashCommands"] = undefined;
+  session["currentStatus"] = "idle";
+  session["currentAttention"] = "none";
   session["bufferedRuntimeEvents"] = [];
   session["isReplayingHistory"] = false;
+  session["isDisposed"] = false;
+  session["promptInFlight"] = false;
+  session["pendingPromptInterrupt"] = false;
+  session["currentTurnInterruptRequested"] = false;
+  session["recentInterruptAckTextTail"] = "";
+  session["mapperState"] = undefined;
   session["pendingPermissionResolvers"] = new Map();
   return { connection, listener, session: session as unknown as TestableAcpSession };
 }
@@ -147,10 +167,16 @@ describe("ACP resource path helpers", () => {
     ).toBe("C:\\Users\\me\\Pictures\\diagram.png");
   });
 
-  it("builds ACP-safe file URIs for relative paths", () => {
-    expect(
-      toAcpResourceUri({ kind: "windows", path: "C:\\repo" }, ".agents/docs/ui patterns.md"),
-    ).toBe("file:///C:/repo/.agents/docs/ui%20patterns.md");
+  it.skipIf(process.platform !== "win32")(
+    "builds ACP-safe file URIs for Windows relative paths",
+    () => {
+      expect(
+        toAcpResourceUri({ kind: "windows", path: "C:\\repo" }, ".agents/docs/ui patterns.md"),
+      ).toBe("file:///C:/repo/.agents/docs/ui%20patterns.md");
+    },
+  );
+
+  it("builds ACP-safe file URIs for WSL relative paths", () => {
     expect(
       toAcpResourceUri(
         {
@@ -236,6 +262,68 @@ describe("ACP turn config sync", () => {
     );
   });
 
+  it("preserves the live status when the agent echoes a current_mode_update mid-turn", () => {
+    const { listener, session } = makeConfigSyncSession({
+      currentConfig: {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "default",
+      },
+    });
+    (session as unknown as Record<string, unknown>)["currentStatus"] = "working";
+    (session as unknown as Record<string, unknown>)["currentAttention"] = "working";
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "current_mode_update",
+        currentModeId: "autopilot",
+      },
+    });
+
+    expect(listener.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "working",
+        attention: "working",
+      }),
+    );
+  });
+
+  it("preserves the live status when a config_option_update arrives mid-turn", () => {
+    const { listener, session } = makeConfigSyncSession({
+      currentConfig: {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "default",
+      },
+    });
+    (session as unknown as Record<string, unknown>)["currentStatus"] = "working";
+    (session as unknown as Record<string, unknown>)["currentAttention"] = "working";
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "config_option_update",
+        configOptions: [
+          {
+            id: "thought-level",
+            category: "thought_level",
+            type: "select",
+            currentValue: "high",
+          },
+        ],
+      },
+    });
+
+    expect(listener.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: "working",
+        attention: "working",
+        config: expect.objectContaining({ effort: "high" }),
+      }),
+    );
+  });
+
   it("does not mark restored session replay as working", () => {
     const { listener, session } = makeConfigSyncSession();
     (session as unknown as Record<string, unknown>)["isReplayingHistory"] = true;
@@ -250,6 +338,63 @@ describe("ACP turn config sync", () => {
     });
 
     expect(listener.onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("surfaces available ACP slash commands from session updates", () => {
+    const { listener, session } = makeConfigSyncSession();
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "available_commands_update",
+        availableCommands: [
+          {
+            name: "plan",
+            description: "Create a plan",
+            input: { hint: "<topic>" },
+          },
+        ],
+      },
+    });
+
+    expect(listener.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slashCommands: [
+          {
+            id: "plan",
+            label: "plan — Create a plan",
+            description: "Create a plan",
+            argumentHint: "<topic>",
+          },
+        ],
+      }),
+    );
+  });
+
+  it("replays slash commands that arrive before the listener is attached", () => {
+    const { listener, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["listener"] = undefined;
+    (session as unknown as Record<string, unknown>)["isReplayingHistory"] = true;
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "available_commands_update",
+        availableCommands: [{ name: "review", description: "Review the changes" }],
+      },
+    });
+
+    session.setListener(listener);
+
+    expect(listener.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slashCommands: [
+          {
+            id: "review",
+            label: "review — Review the changes",
+            description: "Review the changes",
+          },
+        ],
+      }),
+    );
   });
 
   it("does not treat session metadata updates as working", () => {
@@ -300,5 +445,78 @@ describe("ACP turn config sync", () => {
       await internal.connection.cancel({ sessionId: internal.sessionId });
     }
     expect(connection.cancel).toHaveBeenCalledWith({ sessionId: "session-1" });
+  });
+
+  it("keeps ordinary end_turn results completed when no interrupt was requested", async () => {
+    const { listener, session } = makeConfigSyncSession();
+
+    await session.startTurn("hello", {
+      model: "model-a",
+      effort: "low",
+      mode: "agent",
+      approvalPolicy: "default",
+    });
+
+    expect(listener.onRuntimeEvent.mock.calls.at(-1)?.[0]).toMatchObject({
+      type: "turn.completed",
+      state: "completed",
+    });
+  });
+
+  it("preserves native cancelled stop reasons for other ACP agents", async () => {
+    const { connection, listener, session } = makeConfigSyncSession();
+    connection.prompt.mockResolvedValueOnce({ stopReason: "cancelled" });
+
+    await session.startTurn("hello", {
+      model: "model-a",
+      effort: "low",
+      mode: "agent",
+      approvalPolicy: "default",
+    });
+
+    expect(listener.onRuntimeEvent.mock.calls.at(-1)?.[0]).toMatchObject({
+      type: "turn.completed",
+      state: "cancelled",
+    });
+  });
+
+  it("normalizes interrupt-acknowledged end_turn results to cancelled", async () => {
+    const { connection, listener, session } = makeConfigSyncSession();
+    let resolvePrompt: ((value: { stopReason: string }) => void) | undefined;
+    connection.prompt.mockReturnValueOnce(
+      new Promise<{ stopReason: string }>((resolve) => {
+        resolvePrompt = resolve;
+      }),
+    );
+
+    const turnPromise = session.startTurn("hello", {
+      model: "model-a",
+      effort: "low",
+      mode: "agent",
+      approvalPolicy: "default",
+    });
+    await Promise.resolve();
+
+    await session.interruptTurn();
+    expect(connection.cancel).toHaveBeenCalledWith({ sessionId: "session-1" });
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "Info: Operation cancelled by user" },
+      },
+    });
+
+    resolvePrompt?.({ stopReason: "end_turn" });
+    await turnPromise;
+
+    expect(listener.onRuntimeEvent.mock.calls.at(-1)?.[0]).toMatchObject({
+      type: "turn.completed",
+      state: "cancelled",
+    });
+    expect(listener.onUpdate).toHaveBeenLastCalledWith({
+      status: "idle",
+      attention: "none",
+    });
   });
 });

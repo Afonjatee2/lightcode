@@ -79,6 +79,33 @@ export const readProjectFilePayloadSchema = z.object({
 });
 export type ReadProjectFilePayload = z.infer<typeof readProjectFilePayloadSchema>;
 
+export type AbsoluteFileReadStatus = ProjectFileReadStatus | "missing";
+
+export interface ReadAbsoluteFileResult {
+  status: AbsoluteFileReadStatus;
+  modifiedAtMs?: number;
+  content?: string;
+}
+
+/**
+ * Read a file inside the project root through the project's location context
+ * (native FS for Windows/POSIX projects; the WSL bridge for WSL projects).
+ *
+ * Used by the chat UI to surface a just-created file's content even when the
+ * agent didn't stream it. Path resolution:
+ * - WSL projects: pass an absolute Linux path (POSIX, starts with `/`).
+ * - Windows projects: pass an absolute Windows path.
+ * - POSIX projects: pass an absolute POSIX path.
+ *
+ * Relative paths are resolved against the project root for convenience. Absolute
+ * paths are rejected unless they remain inside the same project root.
+ */
+export const readAbsoluteFilePayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  absolutePath: z.string().min(1),
+});
+export type ReadAbsoluteFilePayload = z.infer<typeof readAbsoluteFilePayloadSchema>;
+
 export interface WriteProjectFileResult {
   modifiedAtMs: number;
 }

@@ -74,10 +74,12 @@ registerComposerControls("copilot", {
         ]
       : [],
   // ACP exposes Plan/Agent/Autopilot as a single mutually-exclusive
-  // session-mode field, so hide Autopilot while Plan is on to avoid
-  // suggesting a combination the protocol can't represent.
-  gui: ({ config, isDisabled, onConfigChange }) =>
-    config.mode === "plan" ? [] : [copilotAutopilotToggle({ config, isDisabled, onConfigChange })],
+  // session-mode field. Autopilot is now visible even while Plan is on
+  // so users can pre-configure it; the runtime handles mapping this
+  // to the correct implementation mode upon plan approval.
+  gui: ({ config, isDisabled, onConfigChange }) => [
+    copilotAutopilotToggle({ config, isDisabled, onConfigChange }),
+  ],
   // CLI: `/plan` and `--yolo` are independent flags, so Autopilot is always
   // available regardless of Plan state.
   terminal: ({ config, isDisabled, onConfigChange }) => [

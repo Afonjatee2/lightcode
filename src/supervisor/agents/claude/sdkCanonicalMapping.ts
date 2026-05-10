@@ -111,9 +111,16 @@ function ensureTextItem(
   index: number,
   itemType: "assistant_message" | "reasoning",
   events: RuntimeEvent[],
-): TextItemState {
+): TextItemState | undefined {
   const existing = map.get(index);
-  if (existing && !existing.completed) return existing;
+  if (existing) {
+    // Same-index slot already filled. If still streaming, reuse it. If
+    // already completed, this is a duplicate event for the same logical
+    // block within the current message frame — skip silently rather than
+    // creating a second item with the same content. New messages clear
+    // the map on `message_start`, so a fresh frame will see no `existing`.
+    return existing.completed ? undefined : existing;
+  }
   const item: TextItemState = {
     itemId: newItemId(itemType === "assistant_message" ? "asst" : "reason"),
     emittedText: false,
@@ -521,14 +528,38 @@ function readParentToolUseId(message: SDKMessage): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-function tagParent(events: RuntimeEvent[], parentItemId: string | undefined): RuntimeEvent[] {
+function tagParent(
+  events: RuntimeEvent[],
+  parentItemId: string | undefined,
+  state: ClaudeMapperState,
+): RuntimeEvent[] {
   if (!parentItemId) return events;
+  let taggedStarts = 0;
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i]!;
     if (event.type !== "item.started") continue;
     if ("parentItemId" in event && typeof event.parentItemId === "string") continue;
     events[i] = { ...event, parentItemId };
+    taggedStarts += 1;
   }
+  if (taggedStarts === 0) return events;
+  // Bump the sub-agent parent's step counter and emit an `item.updated` on the
+  // parent so a closed overlay (which gates child events off IPC for perf)
+  // still sees the count tick on the pill.
+  const parent = state.toolItemsById.get(parentItemId);
+  if (!parent) return events;
+  const prevCount = parent.progress?.stepCount ?? 0;
+  const nextProgress: ToolCallProgress = {
+    ...(parent.progress ?? {}),
+    stepCount: prevCount + taggedStarts,
+  };
+  parent.progress = nextProgress;
+  events.push({
+    type: "item.updated",
+    threadId: state.threadId,
+    itemId: parent.itemId,
+    payload: toolPayload(parent, "running"),
+  });
   return events;
 }
 
@@ -566,7 +597,7 @@ function mapResultState(message: Extract<SDKMessage, { type: "result" }>): TurnS
 
 export function mapClaudeSdkMessage(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
   const events = mapClaudeSdkMessageInner(message, state);
-  return tagParent(events, readParentToolUseId(message));
+  return tagParent(events, readParentToolUseId(message), state);
 }
 
 function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
@@ -575,6 +606,20 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
     const event = message.event as unknown as Record<string, unknown>;
     const type = event.type;
     const index = typeof event.index === "number" ? event.index : 0;
+
+    if (type === "message_start") {
+      // Each new assistant message gets its own per-block-index frame. The
+      // SDK reuses index 0 for the first text/thinking block of every
+      // message; without this reset, a second message (or an SDK retry that
+      // re-emits earlier blocks) would see the prior message's completed
+      // item at the same slot and produce a second item with duplicate
+      // content. Items already emitted to the renderer stay there — only
+      // our local index map is cleared.
+      state.assistantTextItems.clear();
+      state.reasoningItems.clear();
+      state.toolItemsByIndex.clear();
+      return events;
+    }
 
     if (type === "content_block_start") {
       const block = event.content_block as Record<string, unknown> | undefined;
@@ -586,6 +631,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
           "assistant_message",
           events,
         );
+        if (!item) return events;
         const text = typeof block.text === "string" ? block.text : "";
         if (text.length > 0) item.fallbackText = text;
         return events;
@@ -606,6 +652,9 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
             ? (block.input as Record<string, unknown>)
             : {};
         const itemId = typeof block.id === "string" ? block.id : newItemId("tool");
+        // Same tool_use id means the SDK is replaying a block we already
+        // opened — skip rather than overwrite the live ToolItemState.
+        if (state.toolItemsById.has(itemId)) return events;
         const tool: ToolItemState = {
           itemId,
           itemType,
@@ -643,6 +692,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
           "assistant_message",
           events,
         );
+        if (!item) return events;
         item.emittedText = true;
         events.push({
           type: "content.delta",
@@ -657,6 +707,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         const text = typeof delta.thinking === "string" ? delta.thinking : "";
         if (!text) return events;
         const item = ensureTextItem(state, state.reasoningItems, index, "reasoning", events);
+        if (!item) return events;
         item.emittedText = true;
         events.push({
           type: "content.delta",
@@ -715,6 +766,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
           "assistant_message",
           events,
         );
+        if (!item) continue;
         if (!item.emittedText) item.fallbackText = obj.text;
         completeTextItem(state, item, "assistant_text", events);
       }

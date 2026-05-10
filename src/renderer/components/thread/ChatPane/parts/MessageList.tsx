@@ -1,19 +1,31 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useAppStore } from "@/renderer/state/appStore";
+import type { CompletedTurnRecord } from "@/renderer/state/slices/runtimeEventSlice";
 import type { AppStoreState } from "@/renderer/state/slices/shared";
+import { formatElapsed } from "../formatElapsed";
 import {
   ChatPaneActionsContext,
   type ChatPaneActions,
   useChatPaneActions,
 } from "../chatPaneActionsContext";
-import { selectRuntimeItemById, type ChatTimelineEntry } from "../chatPaneSelectors";
+import {
+  selectCompletedTurnForEntry,
+  selectRuntimeItemById,
+  type ChatTimelineEntry,
+} from "../chatPaneSelectors";
 import { ChatItemRow } from "./items/ChatItemRow";
 
 interface MessageListProps {
   threadId: string;
   entries: readonly ChatTimelineEntry[];
   scrollElement: HTMLDivElement | null;
+  /**
+   * If set, the inline "Worked for X" indicator anchored to this item id is
+   * suppressed because the parent tail loader is already showing it (matches
+   * the most recent completed turn while the thread is idle).
+   */
+  suppressInlineTurnAnchorId?: string | null;
 }
 
 const CHAT_TRANSCRIPT_OVERSCAN = 8;
@@ -32,6 +44,7 @@ export const MessageList = memo(function MessageList({
   threadId,
   entries,
   scrollElement,
+  suppressInlineTurnAnchorId = null,
 }: MessageListProps) {
   const hasItems = entries.length > 0;
   const parentActions = useChatPaneActions();
@@ -143,6 +156,7 @@ export const MessageList = memo(function MessageList({
                   index={virtualRow.index}
                   isLastEntry={virtualRow.index === lastLiveIndex}
                   measureElement={measureRowElement}
+                  suppressInlineTurnAnchorId={suppressInlineTurnAnchorId}
                 />
               );
             })}
@@ -159,6 +173,7 @@ type VirtualChatListRowProps = {
   index: number;
   isLastEntry: boolean;
   measureElement: (index: number, element: HTMLDivElement | null) => void;
+  suppressInlineTurnAnchorId: string | null;
 };
 
 const VirtualChatListRow = memo(function VirtualChatListRow({
@@ -167,6 +182,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   index,
   isLastEntry,
   measureElement,
+  suppressInlineTurnAnchorId,
 }: VirtualChatListRowProps) {
   const ref = useCallback(
     (element: HTMLDivElement | null) => {
@@ -174,6 +190,17 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
     },
     [index, measureElement],
   );
+  const isUserMessage = useAppStore((state) =>
+    entry.kind === "item"
+      ? state.runtimeItemsByIdByThread[threadId]?.[entry.id]?.type === "user_message"
+      : false,
+  );
+  const showTurnGap = isUserMessage && index > 0;
+  const completedTurn = useAppStore((state) => selectCompletedTurnForEntry(state, threadId, entry));
+  const showInlineTurn =
+    completedTurn !== undefined &&
+    completedTurn.anchorItemId !== null &&
+    completedTurn.anchorItemId !== suppressInlineTurnAnchorId;
 
   return (
     <div
@@ -183,12 +210,23 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
       data-item-id={entry.id}
       className="w-full"
     >
-      <div className="w-full pb-1">
+      <div className={`w-full pb-1 ${showTurnGap ? "pt-3" : ""}`}>
         <ChatItemRow threadId={threadId} entry={entry} isLastEntry={isLastEntry} />
+        {showInlineTurn ? <CompletedTurnIndicator record={completedTurn} /> : null}
       </div>
     </div>
   );
 });
+
+function CompletedTurnIndicator({ record }: { record: CompletedTurnRecord }) {
+  const elapsedSeconds = Math.max(0, Math.floor((record.endedAt - record.startedAt) / 1000));
+  if (elapsedSeconds < 1) return null;
+  return (
+    <div className="px-1 pt-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
+      <span className="text-muted">Worked for {formatElapsed(elapsedSeconds)}</span>
+    </div>
+  );
+}
 
 function computeLiveTailIndex(
   state: AppStoreState,

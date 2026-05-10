@@ -250,6 +250,7 @@ async function probeCapabilities(
       : {}),
     ...(modelEffortProbe.modelEfforts ? { modelEfforts: modelEffortProbe.modelEfforts } : {}),
     ...(probe?.modes?.length ? { modes: probe.modes } : {}),
+    ...(probe?.slashCommands?.length ? { slashCommands: probe.slashCommands } : {}),
     approvalPolicies: [...mergedPolicies.values()],
   };
 }

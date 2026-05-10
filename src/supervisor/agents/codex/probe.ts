@@ -10,7 +10,7 @@
  */
 
 import { spawn, type ChildProcess } from "node:child_process";
-import type { ProjectLocation } from "@/shared/contracts";
+import type { AgentSlashCommand, ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { resolveNodeForDistro } from "../../wsl/runtime";
 import { buildCodexAppServerCommand } from "./argv";
@@ -42,6 +42,7 @@ export interface CodexProbeResult {
   modelEfforts?: Record<string, string[]>;
   approvalPolicies?: Array<{ id: string; label: string }>;
   sandboxModes?: Array<{ id: string; label: string }>;
+  slashCommands?: AgentSlashCommand[];
 }
 
 // ── Label maps ──────────────────────────────────────────────────
@@ -171,6 +172,35 @@ export function mapCodexModels(
   };
 }
 
+interface CodexRawSlashCommand {
+  name?: string;
+  id?: string;
+  description?: string;
+  argumentHint?: string;
+}
+
+function readInitCommands(initResult: unknown): CodexRawSlashCommand[] {
+  if (!initResult || typeof initResult !== "object") return [];
+  const commands = (initResult as { commands?: unknown }).commands;
+  if (!Array.isArray(commands)) return [];
+  return commands.filter(
+    (c): c is CodexRawSlashCommand => typeof c === "object" && c !== null,
+  );
+}
+
+export function mapCodexSlashCommands(commands: readonly CodexRawSlashCommand[]): AgentSlashCommand[] {
+  return commands.map((c) => {
+    const id = c.name ?? c.id ?? "";
+    const description = c.description?.trim();
+    return {
+      id,
+      label: description ? `${id} — ${c.description}` : id,
+      ...(description ? { description: c.description } : {}),
+      ...(c.argumentHint ? { argumentHint: c.argumentHint } : {}),
+    };
+  });
+}
+
 /**
  * Map `configRequirements/read` response to approval policies and sandbox modes.
  *
@@ -298,7 +328,7 @@ export async function probeCodexCapabilities(
 
     appServer = spawn(cmd.command, cmd.args, {
       cwd: cmd.cwd ?? undefined,
-      env: { ...process.env, TERM: "xterm-256color" },
+      env: { ...process.env, ...cmd.env, TERM: "xterm-256color" },
       stdio: ["pipe", "pipe", "pipe"],
       shell: false,
       windowsHide: true,
@@ -323,28 +353,30 @@ export async function probeCodexCapabilities(
       (async () => {
         client = new ProbeClient(transport);
 
-        // Handshake
-        await client.request("initialize", {
+        const initResult = await client.request("initialize", {
           clientInfo: { name: "lightcode-probe", version: "0.1.0" },
           capabilities: { experimentalApi: true },
         });
         client.notify("initialized");
 
-        // Query models and requirements in parallel
         const [modelResult, requirementsResult] = await Promise.all([
           client.request("model/list", { includeHidden: false }),
           client.request("configRequirements/read", {}).catch(() => undefined),
         ]);
 
-        return { modelResult, requirementsResult };
+        return { initResult, modelResult, requirementsResult };
       })(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Codex probe timed out")), timeoutMs),
       ),
     ]);
 
-    // Map model/list response
     const probeResult: CodexProbeResult = {};
+
+    const initCommands = readInitCommands(result.initResult);
+    if (initCommands.length > 0) {
+      probeResult.slashCommands = mapCodexSlashCommands(initCommands);
+    }
 
     const modelData =
       result.modelResult && typeof result.modelResult === "object" && "data" in result.modelResult

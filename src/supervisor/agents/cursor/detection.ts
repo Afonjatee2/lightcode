@@ -1,16 +1,18 @@
 import { stripAnsi } from "@/shared/ansi";
 import type {
   AgentCapability,
+  AgentProviderMetadata,
   AuthState,
   LabeledOption,
   ProjectLocation,
 } from "@/shared/contracts";
+import { compactAgentProviderMetadata } from "@/shared/contracts";
 import {
   buildAgentCommand,
+  readAgentCommandOutput,
   readCommandOutputAsync,
   readWslLoginShellCommandOutputAsync,
   type AgentEnvContext,
-  type AuthProbe,
   type CommandSpec,
   type DetectionSpec,
 } from "../base";
@@ -208,40 +210,75 @@ export function sortCursorModels(models: LabeledOption[]): LabeledOption[] {
   return [...auto, ...composers, ...sorted];
 }
 
-function resolveCursorAuthState(
-  result: { ok: boolean; stdout: string; stderr: string } | undefined,
-): AuthState {
-  if (!result) {
-    return "missing";
-  }
-
-  const text = `${result.stdout}\n${result.stderr}`.toLowerCase();
-  if (/not\s+logged\s+in|login required|sign in/i.test(text)) {
-    return "unknown";
-  }
-
-  return result.ok ? "authenticated" : "unknown";
+function normalizeCursorField(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
-// Cursor's `status` subcommand exits 0 even when signed out and prints
-// "Not logged in" / "sign in" — so parse the output rather than trust exit code.
-const cursorAuthProbe: AuthProbe = async (ctx) => {
+function parseCursorAboutField(output: string, label: string): string | undefined {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`^${escaped}\\s+(.+)$`, "im").exec(stripAnsi(output));
+  return normalizeCursorField(match?.[1]);
+}
+
+export function parseCursorWhoamiOutput(output: string): {
+  authState?: AuthState;
+  authenticatedAs?: string;
+} {
+  const text = stripAnsi(output).trim();
+  if (!text) return {};
+
+  const emailMatch = /logged in as\s+(.+)$/im.exec(text);
+  if (emailMatch) {
+    const authenticatedAs = normalizeCursorField(emailMatch[1]);
+    return {
+      authState: "authenticated",
+      ...(authenticatedAs ? { authenticatedAs } : {}),
+    };
+  }
+
+  if (/not\s+logged\s+in|login required|sign in/i.test(text)) {
+    return { authState: "unknown" };
+  }
+
+  return {};
+}
+
+export function parseCursorAboutOutput(output: string): AgentProviderMetadata | undefined {
+  const authenticatedAs = parseCursorAboutField(output, "User Email");
+  const plan = parseCursorAboutField(output, "Subscription Tier");
+  return compactAgentProviderMetadata({
+    ...(authenticatedAs ? { authenticatedAs } : {}),
+    ...(plan ? { plan } : {}),
+  });
+}
+
+async function probeCursorStatus(ctx: Parameters<NonNullable<DetectionSpec["statusProbe"]>>[0]) {
   if (!ctx.executablePath) return undefined;
-  const result =
-    ctx.location.kind === "wsl"
-      ? await readWslLoginShellCommandOutputAsync(ctx.location.distro, "/tmp", ctx.executablePath, [
-          "status",
-        ])
-      : await readCursorProbeOutputAsync(ctx.executablePath, ["status"]);
-  return resolveCursorAuthState(result);
-};
+  const [whoamiResult, aboutResult] = await Promise.all([
+    readAgentCommandOutput(ctx.location, ctx.executablePath, ["whoami"]),
+    readAgentCommandOutput(ctx.location, ctx.executablePath, ["about"]),
+  ]);
+
+  const whoami = parseCursorWhoamiOutput(`${whoamiResult.stdout}\n${whoamiResult.stderr}`);
+  const about = parseCursorAboutOutput(`${aboutResult.stdout}\n${aboutResult.stderr}`);
+  const providerMetadata = compactAgentProviderMetadata({
+    ...(about ?? {}),
+    ...(whoami.authenticatedAs ? { authenticatedAs: whoami.authenticatedAs } : {}),
+  });
+
+  return {
+    authState: whoami.authState ?? (whoamiResult.ok ? "authenticated" : "unknown"),
+    ...(providerMetadata ? { providerMetadata } : {}),
+  };
+}
 
 export const cursorDetectionSpec: DetectionSpec = {
   kind: "cursor",
   label: "Cursor CLI",
   binary: "cursor-agent",
   capabilities: cursorDefaultCapabilities,
-  authProbes: [cursorAuthProbe],
+  statusProbe: probeCursorStatus,
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;
     const result =

@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  memo,
   useCallback,
   useEffect,
   useEffectEvent,
@@ -13,7 +12,7 @@ import {
 import { Button, Surface } from "@heroui/react";
 import { ArrowDown } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
-import type { Thread } from "@/shared/contracts";
+import { isThreadTurnActive, type Thread } from "@/shared/contracts";
 import { chatMessageSurfaceClass } from "./parts/items/chatMessageSurface";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -21,7 +20,6 @@ import { hydrateThreadRuntimeItems } from "@/renderer/state/chatRuntimePersister
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useProjectRootNames } from "@/renderer/state/projectRootNamesStore";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
-import type { OpenRuntimeRequest } from "@/renderer/state/slices/runtimeEventSlice";
 import {
   buildFileEditorContext,
   openFileInEditor,
@@ -34,14 +32,16 @@ import {
   selectVisibleThreadTimelineEntries,
 } from "./chatPaneSelectors";
 import { normalizeChatRelativePath } from "./chatPathUtils";
-import { ApprovalCard } from "./parts/ApprovalCard";
+import { formatElapsed } from "./formatElapsed";
 import { MessageList } from "./parts/MessageList";
+import { SubAgentOverlay } from "./parts/items/SubAgentOverlay";
 
 interface ChatPaneProps {
   thread: Thread;
   hiddenRuntimeItemId?: string | undefined;
   hiddenRuntimeItemIsLive?: boolean;
   hasSupplementaryContent?: boolean;
+  layoutChangeToken?: string | null;
 }
 
 const BOTTOM_EPSILON_PX = 4;
@@ -51,8 +51,8 @@ const BOTTOM_EPSILON_PX = 4;
  *
  * Pulls canonical chat items from the Zustand `runtimeEventSlice` (populated
  * by IPC `thread-runtime-event` notifications) and renders them as a dense
- * vertical list. Pending approval / user-input requests render inline at the
- * bottom; resolution flows through the same RPC terminal mode uses.
+ * vertical list. Pending approval / user-input requests are surfaced in the
+ * composer (see `ThreadRuntimeRequestPanel`), not in the chat list.
  */
 export function ChatPane(props: ChatPaneProps) {
   const {
@@ -60,6 +60,7 @@ export function ChatPane(props: ChatPaneProps) {
     hiddenRuntimeItemId,
     hiddenRuntimeItemIsLive = false,
     hasSupplementaryContent = false,
+    layoutChangeToken,
   } = props;
   const scrollRef = useRef<HTMLDivElement>(null);
   // `scrollEl` mirrors `scrollRef.current` as React state so the virtualizer
@@ -74,11 +75,40 @@ export function ChatPane(props: ChatPaneProps) {
     setScrollEl(el);
   }, []);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const el = scrollEl;
+    if (!el) return;
+
+    const updateFades = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const topFade = Math.min(32, scrollTop);
+      const bottomFade = Math.min(32, Math.max(0, scrollHeight - scrollTop - clientHeight));
+
+      el.style.setProperty("--top-fade-size", `${topFade}px`);
+      el.style.setProperty("--bottom-fade-size", `${bottomFade}px`);
+    };
+
+    updateFades();
+    el.addEventListener("scroll", updateFades, { passive: true });
+
+    // Re-check when the container or its content resizes.
+    const observer = new ResizeObserver(updateFades);
+    observer.observe(el);
+    if (contentRef.current) {
+      observer.observe(contentRef.current);
+    }
+
+    return () => {
+      el.removeEventListener("scroll", updateFades);
+      observer.disconnect();
+    };
+  }, [scrollEl]);
+
   const scrollControlsRef = useRef<ChatScrollControlsHandle>(null);
   const timelineEntries = useAppStore(
     useShallow((s) => selectVisibleThreadTimelineEntries(s, thread.id, hiddenRuntimeItemId)),
   );
-  const requests = useAppStore((s) => s.runtimeRequestsByThread[thread.id] ?? EMPTY_REQUESTS);
   const project = useAppStore((s) => s.projects.find((p) => p.id === thread.projectId));
   const branch = resolveWorktreeBranch(
     thread.projectId,
@@ -136,17 +166,24 @@ export function ChatPane(props: ChatPaneProps) {
     void hydrateThreadRuntimeItems(thread.id);
   }, [thread.id]);
 
-  const requestCount = requests.length;
-  const isEmpty = timelineEntries.length === 0 && requestCount === 0 && !hasSupplementaryContent;
-  const isLive = thread.status === "launching" || thread.status === "working";
+  const isEmpty = timelineEntries.length === 0 && !hasSupplementaryContent;
+  const isLive = isThreadTurnActive(thread.status);
   // Anchor on thread.status alone — gating on item state caused the loader to
   // disappear in the gap between an item flipping to `completed` and the next
   // `item.started` arriving, even though the runtime was still working the
   // turn. The pinned plan/budget item already advertises its own running
   // state, so suppress the tail when that's live to avoid double indicators.
-  const turn = useTurnTimer(thread.id, isLive);
+  const turn = resolveTurnTiming(thread);
   const showTailLoader = (isLive || turn?.endedAt != null) && !hiddenRuntimeItemIsLive;
   const showEmptyHint = isEmpty && !isLive;
+  // The tail loader displays the most recent completed turn's frozen elapsed
+  // time when the thread is idle. Suppress that turn's inline indicator so we
+  // don't render the same "Worked for X" twice.
+  const mostRecentCompletedTurnAnchor = useAppStore((s) => {
+    if (isLive || !showTailLoader) return null;
+    const records = s.runtimeCompletedTurnsByThread[thread.id];
+    return records && records.length > 0 ? (records[records.length - 1]?.anchorItemId ?? null) : null;
+  });
 
   return (
     <ChatPaneActionsContext.Provider value={paneActions}>
@@ -155,13 +192,19 @@ export function ChatPane(props: ChatPaneProps) {
           <div
             ref={setScrollContainer}
             className="min-h-0 h-full overflow-y-auto [scrollbar-gutter:stable]"
+            style={{
+              WebkitMaskImage:
+                "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)",
+              maskImage:
+                "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)",
+            }}
             onWheelCapture={(event) => {
               if (event.deltaY < 0) {
                 scrollControlsRef.current?.disableStickToBottom();
               }
             }}
           >
-            <div ref={contentRef} className="min-h-full">
+            <div ref={contentRef} className="min-h-full pb-8">
               {isEmpty && !showTailLoader ? (
                 showEmptyHint ? (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-foreground-muted">
@@ -175,8 +218,8 @@ export function ChatPane(props: ChatPaneProps) {
                     threadId={thread.id}
                     entries={timelineEntries}
                     scrollElement={scrollEl}
+                    suppressInlineTurnAnchorId={mostRecentCompletedTurnAnchor}
                   />
-                  <ApprovalRequestList threadId={thread.id} requests={requests} />
                   {showTailLoader && turn ? <ChatTailLoader turn={turn} /> : null}
                 </>
               )}
@@ -187,17 +230,16 @@ export function ChatPane(props: ChatPaneProps) {
             scrollRef={scrollRef}
             contentRef={contentRef}
             hiddenRuntimeItemId={hiddenRuntimeItemId}
+            layoutChangeToken={layoutChangeToken}
             threadId={thread.id}
-            requestCount={requestCount}
             tailLoaderVisible={showTailLoader}
           />
+          <SubAgentOverlay threadId={thread.id} />
         </div>
       </div>
     </ChatPaneActionsContext.Provider>
   );
 }
-
-const EMPTY_REQUESTS = Object.freeze([]) as ReadonlyArray<never>;
 
 type ChatScrollControlsHandle = {
   disableStickToBottom(): void;
@@ -210,18 +252,26 @@ const ChatScrollControls = forwardRef<
     scrollRef: React.RefObject<HTMLDivElement | null>;
     contentRef: React.RefObject<HTMLDivElement | null>;
     hiddenRuntimeItemId?: string | undefined;
+    layoutChangeToken: string | null | undefined;
     threadId: string;
-    requestCount: number;
     tailLoaderVisible: boolean;
   }
 >(function ChatScrollControls(props, ref) {
-  const { scrollRef, contentRef, hiddenRuntimeItemId, threadId, requestCount, tailLoaderVisible } =
-    props;
+  const {
+    scrollRef,
+    contentRef,
+    hiddenRuntimeItemId,
+    layoutChangeToken,
+    threadId,
+    tailLoaderVisible,
+  } = props;
   const scrollAnchor = useAppStore((s) =>
     hiddenRuntimeItemId
       ? selectChatScrollAnchorForTimeline(s, threadId, hiddenRuntimeItemId)
       : selectChatScrollAnchor(s, threadId),
   );
+  const scrollToBottomToken = useAppStore((s) => s.chatScrollToBottomTokens[threadId] ?? 0);
+  const initialLayoutChangeTokenRef = useRef(layoutChangeToken);
   const lastScrollTopRef = useRef(0);
   const stickToBottomRef = useRef(true);
   const pinRafRef = useRef<number | null>(null);
@@ -268,6 +318,25 @@ const ChatScrollControls = forwardRef<
     scrollToBottom();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- scroll reset is keyed to thread changes; the helper reads refs/state setters only.
   }, [threadId]);
+
+  // Preserve the bottom pin when the surrounding thread layout changes, but
+  // keep the user's place if they already scrolled up.
+  useLayoutEffect(() => {
+    if (layoutChangeToken === initialLayoutChangeTokenRef.current) return;
+    initialLayoutChangeTokenRef.current = layoutChangeToken;
+    syncLayoutNow();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- effect is keyed to layout token changes; the helper reads refs/state setters only.
+  }, [layoutChangeToken]);
+
+  // Scroll to bottom when the composer signals a fresh user submission.
+  // Token increments per submit, so consecutive sends still re-trigger.
+  const initialScrollTokenRef = useRef(scrollToBottomToken);
+  useEffect(() => {
+    if (scrollToBottomToken === initialScrollTokenRef.current) return;
+    initialScrollTokenRef.current = scrollToBottomToken;
+    scrollToBottom();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- helper reads refs/state setters only.
+  }, [scrollToBottomToken]);
 
   useEffect(() => {
     const el = scrollRef.current;
@@ -324,7 +393,7 @@ const ChatScrollControls = forwardRef<
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinning is keyed to chat content changes; the helper reads refs/state setters only.
-  }, [requestCount, scrollAnchor, tailLoaderVisible]);
+  }, [scrollAnchor, tailLoaderVisible]);
 
   return (
     <Button
@@ -347,30 +416,34 @@ interface TurnTiming {
   endedAt: number | null;
 }
 
+function parseTurnTimestamp(iso: string | undefined): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
 /**
- * Tracks the most recent turn's start and end times for the tail label.
- * Persists "Worked for N" after the turn ends until the next turn begins;
- * resets when the active thread changes.
+ * Derives the current or last completed run window from persisted thread timing
+ * so reopening a thread doesn't reseed the footer timer from mount time.
  */
-function useTurnTimer(threadId: string, isLive: boolean): TurnTiming | null {
-  const [turn, setTurn] = useState<TurnTiming | null>(() =>
-    isLive ? { startedAt: Date.now(), endedAt: null } : null,
-  );
-  const prevRef = useRef({ threadId, isLive });
+function resolveTurnTiming(thread: Thread): TurnTiming | null {
+  const isLive = isThreadTurnActive(thread.status);
 
-  useEffect(() => {
-    const prev = prevRef.current;
-    if (prev.threadId !== threadId) {
-      setTurn(isLive ? { startedAt: Date.now(), endedAt: null } : null);
-    } else if (isLive && !prev.isLive) {
-      setTurn({ startedAt: Date.now(), endedAt: null });
-    } else if (!isLive && prev.isLive) {
-      setTurn((p) => (p && p.endedAt === null ? { ...p, endedAt: Date.now() } : p));
-    }
-    prevRef.current = { threadId, isLive };
-  }, [threadId, isLive]);
+  if (isLive) {
+    const startedAt = parseTurnTimestamp(thread.activeTurnStartedAt ?? thread.updatedAt);
+    return startedAt === null ? null : { startedAt, endedAt: null };
+  }
 
-  return turn;
+  const startedAt = parseTurnTimestamp(thread.lastTurnStartedAt);
+  const endedAt = parseTurnTimestamp(thread.lastTurnEndedAt);
+  if (startedAt === null || endedAt === null) {
+    return null;
+  }
+
+  return {
+    startedAt,
+    endedAt: Math.max(startedAt, endedAt),
+  };
 }
 
 function ChatTailLoader({ turn }: { turn: TurnTiming }) {
@@ -400,12 +473,8 @@ function WorkingFor({ turn }: { turn: TurnTiming }) {
       const node = textRef.current;
       if (!node) return;
       if (turn.endedAt !== null) {
-        const elapsedSeconds = Math.max(
-          0,
-          Math.floor((turn.endedAt - turn.startedAt) / 1000),
-        );
-        node.textContent =
-          elapsedSeconds < 1 ? "" : `Worked for ${formatElapsed(elapsedSeconds)}`;
+        const elapsedSeconds = Math.max(0, Math.floor((turn.endedAt - turn.startedAt) / 1000));
+        node.textContent = elapsedSeconds < 1 ? "" : `Worked for ${formatElapsed(elapsedSeconds)}`;
         return;
       }
       const elapsedSeconds = Math.floor((Date.now() - turn.startedAt) / 1000);
@@ -421,16 +490,6 @@ function WorkingFor({ turn }: { turn: TurnTiming }) {
   return <span ref={textRef} className={className} aria-live="polite" />;
 }
 
-function formatElapsed(totalSeconds: number): string {
-  if (totalSeconds < 60) return `${totalSeconds}s`;
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  if (minutes < 60) return seconds === 0 ? `${minutes}m` : `${minutes}m ${seconds}s`;
-  const hours = Math.floor(minutes / 60);
-  const remMinutes = minutes % 60;
-  return remMinutes === 0 ? `${hours}h` : `${hours}h ${remMinutes}m`;
-}
-
 function isElementAtBottom(el: HTMLDivElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_EPSILON_PX;
 }
@@ -444,18 +503,3 @@ function collectPathAncestors(path: string): string[] {
   }
   return ancestors;
 }
-
-const ApprovalRequestList = memo(function ApprovalRequestList(props: {
-  threadId: string;
-  requests: ReadonlyArray<OpenRuntimeRequest>;
-}) {
-  const { threadId, requests } = props;
-  if (requests.length === 0) return null;
-  return (
-    <div className="mx-auto w-full max-w-[920px] px-3">
-      {requests.map((request) => (
-        <ApprovalCard key={request.requestId} threadId={threadId} request={request} />
-      ))}
-    </div>
-  );
-});

@@ -13,9 +13,11 @@ import remarkGfm from "remark-gfm";
 import { readBridge } from "@/renderer/bridge";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { normalizeChatProjectPath, normalizeChatRelativePath } from "../../chatPathUtils";
+import { CodeBlock } from "./CodeBlock";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { InlineFolderPathChip } from "./InlineFolderPathChip";
 import { normalizeShortCodeFenceClosers } from "./ItemMarkdown";
+import { normalizeHighlightLanguage } from "./languageDetect";
 import { parseProjectPathRef, type ProjectPathRef } from "./parseProjectPathRef";
 import {
   AUTO_PATH_FILE_PREFIX,
@@ -61,7 +63,7 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
   );
   const markdownText = normalizeShortCodeFenceClosers(text);
   return (
-    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
+    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-li:whitespace-pre-wrap prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
       <Streamdown remarkPlugins={remarkPlugins} components={MD_COMPONENTS} parseIncompleteMarkdown>
         {markdownText}
       </Streamdown>
@@ -70,12 +72,13 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
 }
 
 const MD_COMPONENTS: StreamdownComponents = {
-  // Streamdown's default `pre` strips the `<pre>` wrapper and forwards
-  // `data-block` to its custom code block UI. We want a plain `<pre>` so the
-  // `prose-pre:*` utilities on the parent style the fenced block consistently;
-  // forward `data-block` so the inner `code` component can distinguish a
-  // language-less fenced block from inline code.
   pre({ children }) {
+    const block = extractMarkdownCodeBlock(children);
+    if (block && block.language) {
+      return (
+        <CodeBlock text={block.text} lang={block.language} className={markdownCodeBlockClass} />
+      );
+    }
     return <pre>{markCodeChildAsBlock(children)}</pre>;
   },
   code({ className, children, ...rest }) {
@@ -98,6 +101,8 @@ const MD_COMPONENTS: StreamdownComponents = {
 
 const inlineCodeChipClass =
   "rounded border-0 bg-foreground/10 px-[0.35em] py-[0.1em] font-mono text-[0.875em] leading-none align-baseline text-foreground [overflow-wrap:anywhere]";
+const markdownCodeBlockClass =
+  "not-prose my-2 min-w-0 overflow-x-hidden rounded bg-foreground/10 px-[0.5em] py-[0.25em] font-mono text-[0.875em] leading-snug text-foreground";
 
 function MdCode(props: { className: string; isBlock?: boolean; children?: ReactNode }) {
   const actions = useChatPaneActions();
@@ -116,6 +121,19 @@ function MdCode(props: { className: string; isBlock?: boolean; children?: ReactN
   return <code className={inlineCodeChipClass}>{props.children}</code>;
 }
 
+function extractMarkdownCodeBlock(children: ReactNode): {
+  text: string;
+  language: ReturnType<typeof normalizeHighlightLanguage>;
+} | null {
+  const codeChild = findCodeChild(children);
+  if (!codeChild) return null;
+  const props = codeChild.props as { className?: string; children?: ReactNode };
+  return {
+    text: flattenMdChildren(props.children).replace(/\r?\n$/, ""),
+    language: normalizeHighlightLanguage(props.className),
+  };
+}
+
 /**
  * Tag the fenced-block `<code>` child with `data-block` so the `code` override
  * can distinguish fenced blocks (no language) from inline code, which never
@@ -128,6 +146,19 @@ function markCodeChildAsBlock(children: ReactNode): ReactNode {
   });
 }
 
+function findCodeChild(children: ReactNode): ReactElement | null {
+  for (const child of Children.toArray(children)) {
+    if (!isValidElement(child)) continue;
+    const props = child.props as { className?: string; children?: ReactNode };
+    if (child.type === "code" || typeof props.className === "string") {
+      return child as ReactElement;
+    }
+    const nested = findCodeChild(props.children);
+    if (nested) return nested;
+  }
+  return null;
+}
+
 function MdAnchor(props: { href: string; children?: ReactNode }) {
   const actions = useChatPaneActions();
   const href = props.href?.trim() ?? "";
@@ -135,10 +166,15 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
 
   if (actions && href.startsWith(AUTO_PATH_FILE_PREFIX)) {
     const rest = href.slice(AUTO_PATH_FILE_PREFIX.length);
-    const lineMatch = rest.match(/^(.+):(\d+)$/);
+    const lineMatch = rest.match(/^(.+):(\d+)(?:-(\d+))?$/);
     const path = lineMatch ? lineMatch[1]! : rest;
     const ref: ProjectPathRef = lineMatch
-      ? { kind: "file", path, line: Number.parseInt(lineMatch[2]!, 10) }
+      ? {
+          kind: "file",
+          path,
+          line: Number.parseInt(lineMatch[2]!, 10),
+          ...(lineMatch[3] ? { endLine: Number.parseInt(lineMatch[3], 10) } : {}),
+        }
       : { kind: "file", path };
     return renderPathChip(ref, actions);
   }
@@ -207,6 +243,7 @@ function renderPathChip(
       <InlineFilePathChip
         path={normalized}
         line={ref.line}
+        endLine={ref.endLine}
         onOpen={actions.openProjectRelativePath}
       />
     );

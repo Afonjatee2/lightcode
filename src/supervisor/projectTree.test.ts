@@ -77,6 +77,37 @@ describe("ProjectTreeService", () => {
     expect(result.status).toBe("binary");
   });
 
+  it("reads absolute file paths only when they stay inside the project root", async () => {
+    const insidePath = join(tempDir, "inside.txt");
+    const outsidePath = join(tempDir, "..", "outside.txt");
+    writeFileSync(insidePath, "inside\n", "utf8");
+
+    await expect(
+      service.readAbsoluteFile({
+        projectLocation: location,
+        absolutePath: insidePath,
+      }),
+    ).resolves.toMatchObject({ status: "ready", content: "inside\n" });
+
+    await expect(
+      service.readAbsoluteFile({
+        projectLocation: location,
+        absolutePath: outsidePath,
+      }),
+    ).rejects.toThrow("Path escapes the project root.");
+  });
+
+  it("resolves relative readAbsoluteFile paths against the project root", async () => {
+    writeFileSync(join(tempDir, "relative.txt"), "relative\n", "utf8");
+
+    await expect(
+      service.readAbsoluteFile({
+        projectLocation: location,
+        absolutePath: "relative.txt",
+      }),
+    ).resolves.toMatchObject({ status: "ready", content: "relative\n" });
+  });
+
   it("creates, renames, moves, and deletes entries", async () => {
     mkdirSync(join(tempDir, "src"), { recursive: true });
 

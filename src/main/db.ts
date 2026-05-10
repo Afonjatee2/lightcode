@@ -30,6 +30,7 @@ export function initDatabase(dbPath: string) {
       location_unc_path TEXT,
       last_draft_config TEXT,
       scripts TEXT,
+      disabled INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL
     );
@@ -51,7 +52,10 @@ export function initDatabase(dbPath: string) {
       done INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      active_turn_started_at TEXT,
+      last_turn_started_at TEXT,
+      last_turn_ended_at TEXT
     );
     CREATE TABLE IF NOT EXISTS app_state (
       key TEXT PRIMARY KEY,
@@ -69,11 +73,19 @@ export function initDatabase(dbPath: string) {
     );
     CREATE INDEX IF NOT EXISTS idx_runtime_items_thread_pos
       ON thread_runtime_items (thread_id, position);
+    CREATE TABLE IF NOT EXISTS thread_completed_turns (
+      thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+      idx INTEGER NOT NULL,
+      started_at TEXT NOT NULL,
+      ended_at TEXT NOT NULL,
+      anchor_item_id TEXT,
+      PRIMARY KEY (thread_id, idx)
+    );
   `);
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 10;
+  const SCHEMA_VERSION = 13;
 
   const storedVersion = Number(
     (
@@ -170,7 +182,40 @@ export function initDatabase(dbPath: string) {
     }
   }
 
+  if (storedVersion < 11) {
+    const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+    if (!cols.some((c) => c.name === "active_turn_started_at")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN active_turn_started_at TEXT");
+    }
+    if (!cols.some((c) => c.name === "last_turn_started_at")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN last_turn_started_at TEXT");
+    }
+    if (!cols.some((c) => c.name === "last_turn_ended_at")) {
+      sqlite.exec("ALTER TABLE threads ADD COLUMN last_turn_ended_at TEXT");
+    }
+  }
+
+  if (storedVersion < 12) {
+    sqlite.exec(`
+      CREATE TABLE IF NOT EXISTS thread_completed_turns (
+        thread_id TEXT NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+        idx INTEGER NOT NULL,
+        started_at TEXT NOT NULL,
+        ended_at TEXT NOT NULL,
+        anchor_item_id TEXT,
+        PRIMARY KEY (thread_id, idx)
+      );
+    `);
+  }
+
   if (storedVersion < SCHEMA_VERSION) {
+    if (storedVersion < 13) {
+      const cols = sqlite.prepare("PRAGMA table_info(projects)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "disabled")) {
+        sqlite.exec("ALTER TABLE projects ADD COLUMN disabled INTEGER NOT NULL DEFAULT 0");
+      }
+    }
+
     sqlite
       .prepare(
         "INSERT INTO app_state (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -260,6 +305,7 @@ function rowToProject(row: typeof schema.projects.$inferSelect): Project {
     ...(row.lastDraftConfig ? { lastDraftConfig: JSON.parse(row.lastDraftConfig) } : {}),
     ...(row.scripts ? { scripts: JSON.parse(row.scripts) } : {}),
     ...(row.searchSettings ? { searchSettings: JSON.parse(row.searchSettings) } : {}),
+    ...(row.disabled ? { disabled: true } : {}),
     createdAt: row.createdAt,
   };
 }
@@ -289,6 +335,9 @@ function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
       : "terminal") as Thread["presentationMode"],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
+    ...(row.activeTurnStartedAt ? { activeTurnStartedAt: row.activeTurnStartedAt } : {}),
+    ...(row.lastTurnStartedAt ? { lastTurnStartedAt: row.lastTurnStartedAt } : {}),
+    ...(row.lastTurnEndedAt ? { lastTurnEndedAt: row.lastTurnEndedAt } : {}),
   };
 }
 
@@ -338,6 +387,7 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
       lastDraftConfig: project.lastDraftConfig ? JSON.stringify(project.lastDraftConfig) : null,
       scripts: project.scripts ? JSON.stringify(project.scripts) : null,
       searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
+      disabled: !!project.disabled,
       sortOrder,
       createdAt: project.createdAt,
     })
@@ -349,6 +399,7 @@ export function dbUpsertProject(project: Project, sortOrder: number): void {
         lastDraftConfig: project.lastDraftConfig ? JSON.stringify(project.lastDraftConfig) : null,
         scripts: project.scripts ? JSON.stringify(project.scripts) : null,
         searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
+        disabled: !!project.disabled,
         sortOrder,
       },
     })
@@ -382,6 +433,9 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       sortOrder,
       createdAt: thread.createdAt,
       updatedAt: thread.updatedAt,
+      activeTurnStartedAt: thread.activeTurnStartedAt ?? null,
+      lastTurnStartedAt: thread.lastTurnStartedAt ?? null,
+      lastTurnEndedAt: thread.lastTurnEndedAt ?? null,
     })
     .onConflictDoUpdate({
       target: schema.threads.id,
@@ -398,12 +452,16 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         worktreeBranch: thread.worktreeBranch ?? null,
         prNumber: thread.prNumber ?? null,
         groupId: thread.groupId ?? null,
+        groupName: thread.groupName ?? null,
         archived: thread.archived,
         done: thread.done,
         starred: thread.starred,
         presentationMode: thread.presentationMode ?? "terminal",
         sortOrder,
         updatedAt: thread.updatedAt,
+        activeTurnStartedAt: thread.activeTurnStartedAt ?? null,
+        lastTurnStartedAt: thread.lastTurnStartedAt ?? null,
+        lastTurnEndedAt: thread.lastTurnEndedAt ?? null,
       },
     })
     .run();
@@ -457,7 +515,17 @@ export function dbGetThreadRuntimeItems(threadId: string): PersistedRuntimeItem[
 
 export function dbReplaceThreadRuntimeItems(threadId: string, items: PersistedRuntimeItem[]): void {
   if (!_sqlite) throw new Error("Database not initialized");
-  const replace = _sqlite.prepare(
+  _sqlite.transaction(() => {
+    replaceThreadRuntimeItemsInSqlite(_sqlite!, threadId, items);
+  })();
+}
+
+function replaceThreadRuntimeItemsInSqlite(
+  sqlite: InstanceType<typeof Database>,
+  threadId: string,
+  items: PersistedRuntimeItem[],
+): void {
+  const replace = sqlite.prepare(
     `INSERT INTO thread_runtime_items (thread_id, item_id, position, type, state, payload, streams, parent_item_id)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(thread_id, item_id) DO UPDATE SET
@@ -469,37 +537,109 @@ export function dbReplaceThreadRuntimeItems(threadId: string, items: PersistedRu
        parent_item_id = excluded.parent_item_id`,
   );
   const incomingIds = new Set(items.map((it) => it.id));
-  const existing = _sqlite
+  const existing = sqlite
     .prepare("SELECT item_id FROM thread_runtime_items WHERE thread_id = ?")
     .all(threadId) as Array<{ item_id: string }>;
-  const removeStmt = _sqlite.prepare(
+  const removeStmt = sqlite.prepare(
     "DELETE FROM thread_runtime_items WHERE thread_id = ? AND item_id = ?",
   );
-  _sqlite.transaction(() => {
-    for (const row of existing) {
-      if (!incomingIds.has(row.item_id)) {
-        removeStmt.run(threadId, row.item_id);
-      }
+  for (const row of existing) {
+    if (!incomingIds.has(row.item_id)) {
+      removeStmt.run(threadId, row.item_id);
     }
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i]!;
-      replace.run(
-        threadId,
-        it.id,
-        i,
-        it.type,
-        it.state,
-        it.payload === undefined ? null : JSON.stringify(it.payload),
-        JSON.stringify(it.streams ?? {}),
-        it.parentItemId ?? null,
-      );
-    }
-  })();
+  }
+  for (let i = 0; i < items.length; i++) {
+    const it = items[i]!;
+    replace.run(
+      threadId,
+      it.id,
+      i,
+      it.type,
+      it.state,
+      it.payload === undefined ? null : JSON.stringify(it.payload),
+      JSON.stringify(it.streams ?? {}),
+      it.parentItemId ?? null,
+    );
+  }
 }
 
 export function dbClearThreadRuntimeItems(threadId: string): void {
   if (!_sqlite) throw new Error("Database not initialized");
   _sqlite.prepare("DELETE FROM thread_runtime_items WHERE thread_id = ?").run(threadId);
+}
+
+/**
+ * Frozen per-turn timing window. One row per completed turn (first user
+ * input → thread settles back to idle). Mirrors the renderer's
+ * `CompletedTurnRecord` shape.
+ */
+export interface PersistedCompletedTurn {
+  startedAt: string;
+  endedAt: string;
+  anchorItemId: string | null;
+}
+
+export function dbGetThreadCompletedTurns(threadId: string): PersistedCompletedTurn[] {
+  if (!_sqlite) throw new Error("Database not initialized");
+  const rows = _sqlite
+    .prepare(
+      "SELECT started_at, ended_at, anchor_item_id FROM thread_completed_turns WHERE thread_id = ? ORDER BY idx ASC",
+    )
+    .all(threadId) as Array<{
+    started_at: string;
+    ended_at: string;
+    anchor_item_id: string | null;
+  }>;
+  return rows.map((row) => ({
+    startedAt: row.started_at,
+    endedAt: row.ended_at,
+    anchorItemId: row.anchor_item_id,
+  }));
+}
+
+export function dbReplaceThreadCompletedTurns(
+  threadId: string,
+  turns: PersistedCompletedTurn[],
+): void {
+  if (!_sqlite) throw new Error("Database not initialized");
+  _sqlite.transaction(() => {
+    replaceThreadCompletedTurnsInSqlite(_sqlite!, threadId, turns);
+  })();
+}
+
+export function dbReplaceThreadRuntimeSnapshot(
+  threadId: string,
+  items: PersistedRuntimeItem[],
+  turns: PersistedCompletedTurn[],
+): void {
+  if (!_sqlite) throw new Error("Database not initialized");
+  _sqlite.transaction(() => {
+    replaceThreadRuntimeItemsInSqlite(_sqlite!, threadId, items);
+    replaceThreadCompletedTurnsInSqlite(_sqlite!, threadId, turns);
+  })();
+}
+
+function replaceThreadCompletedTurnsInSqlite(
+  sqlite: InstanceType<typeof Database>,
+  threadId: string,
+  turns: PersistedCompletedTurn[],
+): void {
+  const insert = sqlite.prepare(
+    `INSERT INTO thread_completed_turns (thread_id, idx, started_at, ended_at, anchor_item_id)
+       VALUES (?, ?, ?, ?, ?)
+     ON CONFLICT(thread_id, idx) DO UPDATE SET
+       started_at = excluded.started_at,
+       ended_at = excluded.ended_at,
+       anchor_item_id = excluded.anchor_item_id`,
+  );
+  const remove = sqlite.prepare(
+    "DELETE FROM thread_completed_turns WHERE thread_id = ? AND idx >= ?",
+  );
+  remove.run(threadId, turns.length);
+  for (let i = 0; i < turns.length; i++) {
+    const turn = turns[i]!;
+    insert.run(threadId, i, turn.startedAt, turn.endedAt, turn.anchorItemId ?? null);
+  }
 }
 
 function safeParse(json: string): unknown {

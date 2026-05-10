@@ -1,7 +1,12 @@
-import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
+import type {
+  CompletedTurnRecord,
+  RuntimeChatItem,
+} from "@/renderer/state/slices/runtimeEventSlice";
 import type { AppStoreState } from "@/renderer/state/slices/shared";
+import type { ToolCallPayload } from "@/shared/contracts";
 import { isContextCompactionToolCall } from "./parts/items/ContextCompaction";
 import { isPlanProposalToolCall } from "./parts/items/PlanProposal";
+import { isSubAgentTool } from "./parts/items/toolDisplay";
 
 export const EMPTY_THREAD_ITEM_IDS = Object.freeze([]) as readonly string[];
 export const EMPTY_THREAD_TIMELINE_ENTRIES = Object.freeze([]) as readonly ChatTimelineEntry[];
@@ -155,11 +160,17 @@ export function selectVisibleThreadTimelineEntries(
 function isToolGroupItem(item: RuntimeChatItem): boolean {
   if (isContextCompactionToolCall(item)) return false;
   if (isPlanProposalToolCall(item)) return false;
+  // Sub-agent parents render as their own pill (with overlay) — never fold
+  // them into a tool-call group.
+  if (item.type === "tool_call" && isSubAgentTool(item.payload as ToolCallPayload | undefined)) {
+    return false;
+  }
+  // File changes (Create / Edit / Delete) always render as their own row so
+  // the diff summary, path, and inline content stay glanceable instead of
+  // disappearing behind a group header.
+  if (item.type === "file_change") return false;
   return (
-    item.type === "tool_call" ||
-    item.type === "command_execution" ||
-    item.type === "file_change" ||
-    item.type === "web_search"
+    item.type === "tool_call" || item.type === "command_execution" || item.type === "web_search"
   );
 }
 
@@ -292,6 +303,55 @@ export function getChildItemIdsStoreSelector(
     childIdsStoreSelectorCache.set(key, sel);
   }
   return sel;
+}
+
+/**
+ * Per-thread Map<anchorItemId, CompletedTurnRecord>. Cached against the source
+ * array reference so per-row lookups stay O(1) without rebuilding the map on
+ * every render. The most-recent record is intentionally included — callers can
+ * skip it (e.g. when the live tail loader is already showing it).
+ */
+const completedTurnsByAnchorCache = new WeakMap<
+  ReadonlyArray<CompletedTurnRecord>,
+  ReadonlyMap<string, CompletedTurnRecord>
+>();
+
+const EMPTY_TURN_ANCHOR_MAP: ReadonlyMap<string, CompletedTurnRecord> = new Map();
+
+export function selectCompletedTurnsByAnchorItem(
+  state: AppStoreState,
+  threadId: string,
+): ReadonlyMap<string, CompletedTurnRecord> {
+  const records = state.runtimeCompletedTurnsByThread[threadId];
+  if (!records || records.length === 0) return EMPTY_TURN_ANCHOR_MAP;
+  const cached = completedTurnsByAnchorCache.get(records);
+  if (cached) return cached;
+  const map = new Map<string, CompletedTurnRecord>();
+  for (const record of records) {
+    if (record.anchorItemId) map.set(record.anchorItemId, record);
+  }
+  completedTurnsByAnchorCache.set(records, map);
+  return map;
+}
+
+/**
+ * Lookup helper: given a timeline entry, return the frozen turn record (if
+ * any) that should render its "Worked for X" line beneath this row. For
+ * tool-call groups, any of the grouped item ids may be the anchor.
+ */
+export function selectCompletedTurnForEntry(
+  state: AppStoreState,
+  threadId: string,
+  entry: ChatTimelineEntry,
+): CompletedTurnRecord | undefined {
+  const anchorMap = selectCompletedTurnsByAnchorItem(state, threadId);
+  if (anchorMap.size === 0) return undefined;
+  if (entry.kind === "item") return anchorMap.get(entry.id);
+  for (const itemId of entry.itemIds) {
+    const record = anchorMap.get(itemId);
+    if (record) return record;
+  }
+  return undefined;
 }
 
 export function clearRuntimeItemStoreSelectorCacheForThread(threadId: string): void {

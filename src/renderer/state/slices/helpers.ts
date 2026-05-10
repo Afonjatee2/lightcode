@@ -18,6 +18,7 @@ import {
   paneIndexToRowCol,
   removeIndicesFromRowLayout,
 } from "@/shared/rowLayout";
+import { migratePaneSizeStorage } from "@/renderer/components/layout/paneSizeStorage";
 import type { SavedGroupLayout } from "./types";
 
 /**
@@ -165,6 +166,11 @@ export function replacePaneInView(
   oldPaneId: string,
   newPaneId: string,
 ): Extract<AppView, { kind: "thread" }> {
+  // Split-size proportions are persisted under a key derived from the pane id
+  // list, so a pane id swap (e.g., draft → real thread) would otherwise reset
+  // the user's custom sizes back to an equal split.
+  migratePaneSizeStorage(oldPaneId, newPaneId);
+
   if (!view.paneLayout) {
     const panes = [...view.panes] as [string, ...string[]];
     const idx = panes.indexOf(oldPaneId);

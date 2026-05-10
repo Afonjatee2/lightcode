@@ -22,8 +22,22 @@ import type {
   CanonicalItemType,
   CanonicalRequestType,
   RuntimeEvent,
+  ToolCallPayload,
 } from "@/shared/contracts";
+import { extractLeadingPath } from "@/shared/extractLeadingPath";
 import { readDiffSummary } from "../fileChangeSummary";
+
+interface AcpToolCallItemState {
+  itemId: string;
+  itemType: CanonicalItemType;
+  payload: Record<string, unknown>;
+  isSubAgent: boolean;
+}
+
+interface ActiveAcpSubAgent {
+  toolCallId: string;
+  itemId: string;
+}
 
 /** Per-session state — tracks open items so deltas land on the right item id. */
 export interface AcpMapperState {
@@ -34,8 +48,13 @@ export interface AcpMapperState {
   openReasoningItemId?: string;
   /** Item id of the currently-streaming user message, if any. */
   openUserItemId?: string;
-  /** Map ACP `toolCallId` → our internal item id. */
-  toolCallItems: Map<string, string>;
+  /** Map ACP `toolCallId` → our internal item id + canonical item type + payload. */
+  toolCallItems: Map<string, AcpToolCallItemState>;
+  /**
+   * ACP does not expose an explicit `parentItemId` for sub-agent children, so
+   * we conservatively infer nesting from active sub-agent tool-call lifetimes.
+   */
+  activeSubAgents: ActiveAcpSubAgent[];
   /** Item id of the most recent plan, if open. */
   openPlanItemId?: string;
   /** Last plan steps emitted for the open plan item. */
@@ -50,6 +69,7 @@ export function createAcpMapperState(threadId: string): AcpMapperState {
   return {
     threadId,
     toolCallItems: new Map(),
+    activeSubAgents: [],
     suppressedToolCallIds: new Set(),
   };
 }
@@ -79,7 +99,7 @@ export function closeOpenContentItems(state: AcpMapperState): RuntimeEvent[] {
 
 export function closeOpenTurnItems(state: AcpMapperState): RuntimeEvent[] {
   const events = closeOpenContentItems(state);
-  for (const itemId of state.toolCallItems.values()) {
+  for (const { itemId } of state.toolCallItems.values()) {
     events.push({ type: "item.completed", threadId: state.threadId, itemId });
   }
   if (state.openPlanItemId) {
@@ -106,6 +126,7 @@ export function closeOpenTurnItems(state: AcpMapperState): RuntimeEvent[] {
  */
 export function resetMapperForTurnEnd(state: AcpMapperState): void {
   state.toolCallItems.clear();
+  state.activeSubAgents.length = 0;
   state.suppressedToolCallIds.clear();
   delete state.openPlanItemId;
   delete state.openPlanSteps;
@@ -139,6 +160,8 @@ export function mapAcpSessionUpdate(
   const update: SessionUpdate = notification.update;
   const events: RuntimeEvent[] = [];
   const { threadId } = state;
+  const activeSubAgent = getActiveSubAgent(state);
+  let pendingSubAgent: ActiveAcpSubAgent | undefined;
 
   switch (update.sessionUpdate) {
     case "agent_message_chunk": {
@@ -228,10 +251,11 @@ export function mapAcpSessionUpdate(
       events.push(...closeOpenContentItems(state));
       const toolCall = update as {
         toolCallId: string;
-        title?: string;
-        kind?: string;
+        title?: string | null;
+        kind?: string | null;
         status?: "pending" | "in_progress" | "completed" | "failed";
         rawInput?: unknown;
+        locations?: Array<{ path?: string | null; line?: number | null }> | null;
       };
       // Gemini's `update_topic` is a meta-tool that re-titles the current
       // conversation topic — emitted on nearly every user turn as the model's
@@ -268,30 +292,38 @@ export function mapAcpSessionUpdate(
         break;
       }
       const itemId = newItemId("tool");
-      state.toolCallItems.set(toolCall.toolCallId, itemId);
       const status =
         toolCall.status === "completed"
           ? "success"
           : toolCall.status === "failed"
             ? "error"
             : "running";
-      const itemType = classifyToolCallItemType(toolCall.kind, toolCall.title);
+      const itemType = classifyToolCallItemType(toolCall.kind, toolCall.title, toolCall.locations);
+      const isSubAgent = isAcpSubAgentToolCall(toolCall);
+      const payload = buildAcpToolCallPayload(itemType, toolCall, status, isSubAgent);
+      state.toolCallItems.set(toolCall.toolCallId, { itemId, itemType, payload, isSubAgent });
       events.push({
         type: "item.started",
         threadId,
         itemId,
         itemType,
-        payload: buildAcpToolCallPayload(itemType, toolCall, status),
+        payload,
       });
+      if (isSubAgent) {
+        pendingSubAgent = { toolCallId: toolCall.toolCallId, itemId };
+      }
       break;
     }
 
     case "tool_call_update": {
       const toolCall = update as {
         toolCallId: string;
-        title?: string;
+        title?: string | null;
+        kind?: string | null;
         status?: "pending" | "in_progress" | "completed" | "failed";
+        rawInput?: unknown;
         rawOutput?: unknown;
+        locations?: Array<{ path?: string | null; line?: number | null }> | null;
       };
       if (state.suppressedToolCallIds.has(toolCall.toolCallId)) {
         if (toolCall.status === "completed" || toolCall.status === "failed") {
@@ -299,8 +331,8 @@ export function mapAcpSessionUpdate(
         }
         break;
       }
-      const itemId = state.toolCallItems.get(toolCall.toolCallId);
-      if (!itemId) break;
+      const item = state.toolCallItems.get(toolCall.toolCallId);
+      if (!item) break;
       const isTerminal = toolCall.status === "completed" || toolCall.status === "failed";
       const status =
         toolCall.status === "completed"
@@ -308,18 +340,19 @@ export function mapAcpSessionUpdate(
           : toolCall.status === "failed"
             ? "error"
             : "running";
+      const payload = buildAcpToolCallUpdatePayload(item, toolCall, status);
+      item.payload = mergeToolPayload(item.payload, payload);
       events.push({
         type: isTerminal ? "item.completed" : "item.updated",
         threadId,
-        itemId,
-        payload: {
-          ...(toolCall.title ? { name: toolCall.title } : {}),
-          ...(toolCall.rawOutput !== undefined ? { result: toolCall.rawOutput } : {}),
-          status,
-        },
+        itemId: item.itemId,
+        payload,
       });
       if (isTerminal) {
         state.toolCallItems.delete(toolCall.toolCallId);
+        if (item.isSubAgent) {
+          removeActiveSubAgent(state, toolCall.toolCallId);
+        }
       }
       break;
     }
@@ -327,9 +360,12 @@ export function mapAcpSessionUpdate(
     case "plan": {
       const plan = update as {
         entries?: Array<{ content: string; status: "pending" | "in_progress" | "completed" }>;
+        content?: {
+          entries?: Array<{ content: string; status: "pending" | "in_progress" | "completed" }>;
+        };
       };
-      const steps =
-        plan.entries?.map((entry) => ({ step: entry.content, status: entry.status })) ?? [];
+      const rawEntries = plan.entries ?? plan.content?.entries ?? [];
+      const steps = rawEntries.map((entry) => ({ step: entry.content, status: entry.status }));
       state.openPlanSteps = steps;
       if (!state.openPlanItemId) {
         events.push(...closeOpenContentItems(state));
@@ -382,6 +418,12 @@ export function mapAcpSessionUpdate(
       break;
   }
 
+  if (activeSubAgent) {
+    tagSubAgentChildStarts(events, activeSubAgent, state);
+  }
+  if (pendingSubAgent) {
+    state.activeSubAgents.push(pendingSubAgent);
+  }
   return events;
 }
 
@@ -397,14 +439,27 @@ export function mapAcpSessionUpdate(
  */
 function buildAcpToolCallPayload(
   itemType: CanonicalItemType,
-  toolCall: { title?: string; kind?: string; rawInput?: unknown },
+  toolCall: {
+    title?: string | null;
+    kind?: string | null;
+    rawInput?: unknown;
+    locations?: Array<{ path?: string | null; line?: number | null }> | null;
+  },
   status: "running" | "success" | "error",
+  isSubAgent: boolean,
 ): Record<string, unknown> {
-  const name = toolCall.title ?? toolCall.kind ?? "tool";
+  const title = normalizeToolText(toolCall.title);
+  const kind = normalizeToolText(toolCall.kind);
+  const locations = extractToolLocations(toolCall.locations);
+  const name = title ?? kind ?? "tool";
   const base: Record<string, unknown> = {
     name,
     args: toolCall.rawInput,
     status,
+    ...(title ? { title } : {}),
+    ...(kind ? { kind } : {}),
+    ...(locations.length > 0 ? { locations } : {}),
+    ...(isSubAgent ? { isSubAgent: true } : {}),
   };
   if (itemType === "command_execution") {
     const cmd = readStringField(toolCall.rawInput, "command");
@@ -416,20 +471,102 @@ function buildAcpToolCallPayload(
     };
   }
   if (itemType === "file_change") {
-    const path = readStringField(toolCall.rawInput, "path") ?? extractPatchPath(toolCall.rawInput);
+    const path = extractFileChangePath(toolCall.rawInput, title, kind, locations);
     const diffSummary = readDiffSummary(toolCall.rawInput);
     return {
       ...base,
       path: path ?? "",
-      changeKind: classifyFileChangeKind(toolCall.kind, toolCall.title, toolCall.rawInput),
+      changeKind: classifyFileChangeKind(kind, title, toolCall.rawInput),
       ...(diffSummary ? { diffSummary } : {}),
     };
   }
   if (itemType === "web_search") {
-    const query = readStringField(toolCall.rawInput, "query") ?? name;
+    const query = readStringField(toolCall.rawInput, "query") ?? title ?? kind ?? name;
     return { ...base, query };
   }
   return base;
+}
+
+function buildAcpToolCallUpdatePayload(
+  item: AcpToolCallItemState,
+  toolCall: {
+    title?: string | null;
+    kind?: string | null;
+    rawOutput?: unknown;
+    locations?: Array<{ path?: string | null; line?: number | null }> | null;
+  },
+  status: "running" | "success" | "error",
+): Record<string, unknown> {
+  const title = normalizeToolText(toolCall.title);
+  const kind = normalizeToolText(toolCall.kind);
+  const locations = extractToolLocations(toolCall.locations);
+  const payload: Record<string, unknown> = {
+    status,
+    ...(toolCall.rawOutput !== undefined ? { result: toolCall.rawOutput } : {}),
+    ...(title || kind ? { name: title ?? kind } : {}),
+    ...(title ? { title } : {}),
+    ...(kind ? { kind } : {}),
+    ...(locations.length > 0 ? { locations } : {}),
+    ...(item.isSubAgent ? { isSubAgent: true } : {}),
+  };
+  if (item.itemType === "file_change") {
+    const path = extractFileChangePath(undefined, title, kind, locations);
+    if (path) payload.path = path;
+  }
+  return payload;
+}
+
+function getActiveSubAgent(state: AcpMapperState): ActiveAcpSubAgent | undefined {
+  return state.activeSubAgents.at(-1);
+}
+
+function removeActiveSubAgent(state: AcpMapperState, toolCallId: string): void {
+  for (let index = state.activeSubAgents.length - 1; index >= 0; index -= 1) {
+    if (state.activeSubAgents[index]?.toolCallId !== toolCallId) continue;
+    state.activeSubAgents.splice(index, 1);
+    break;
+  }
+}
+
+function tagSubAgentChildStarts(
+  events: RuntimeEvent[],
+  parent: ActiveAcpSubAgent,
+  state: AcpMapperState,
+): void {
+  let taggedStarts = 0;
+  for (let index = 0; index < events.length; index += 1) {
+    const event = events[index];
+    if (!event || event.type !== "item.started") continue;
+    if ("parentItemId" in event && typeof event.parentItemId === "string") continue;
+    events[index] = { ...event, parentItemId: parent.itemId };
+    taggedStarts += 1;
+  }
+  if (taggedStarts === 0) return;
+  const parentTool = state.toolCallItems.get(parent.toolCallId);
+  if (!parentTool) return;
+  parentTool.payload = withBumpedSubAgentStepCount(parentTool.payload, taggedStarts);
+  events.push({
+    type: "item.updated",
+    threadId: state.threadId,
+    itemId: parent.itemId,
+    payload: parentTool.payload,
+  });
+}
+
+function withBumpedSubAgentStepCount(
+  payload: Record<string, unknown>,
+  stepDelta: number,
+): Record<string, unknown> {
+  const progress =
+    payload.progress && typeof payload.progress === "object" && !Array.isArray(payload.progress)
+      ? { ...(payload.progress as Record<string, unknown>) }
+      : {};
+  const prevCount =
+    typeof progress.stepCount === "number" && Number.isFinite(progress.stepCount)
+      ? Math.max(0, Math.trunc(progress.stepCount))
+      : 0;
+  progress.stepCount = prevCount + stepDelta;
+  return { ...payload, status: "running", progress };
 }
 
 /**
@@ -440,7 +577,10 @@ function buildAcpToolCallPayload(
  * `Update tactical intent: "<intent>"`. Match on either form so we drop the
  * tool from the chat stream regardless of which Gemini build is in use.
  */
-function isUpdateTopicTool(title: string | undefined, kind: string | undefined): boolean {
+function isUpdateTopicTool(
+  title: string | null | undefined,
+  kind: string | null | undefined,
+): boolean {
   const t = (title ?? "").toLowerCase().trim();
   const k = (kind ?? "").toLowerCase().trim();
   if (t === "update_topic" || k === "update_topic") return true;
@@ -452,7 +592,10 @@ function isUpdateTopicTool(title: string | undefined, kind: string | undefined):
  * `task_complete`. It isn't a tool — it's the agent's wrap-up message — so we
  * detect it here and reroute it to an assistant_message item instead.
  */
-function isTaskCompleteSummary(title: string | undefined, kind: string | undefined): boolean {
+function isTaskCompleteSummary(
+  title: string | null | undefined,
+  kind: string | null | undefined,
+): boolean {
   const t = (title ?? "").toLowerCase().trim();
   const k = (kind ?? "").toLowerCase().trim();
   return t === "task_complete" || k === "task_complete";
@@ -475,10 +618,88 @@ function extractTaskCompleteSummary(input: unknown): string | undefined {
   return undefined;
 }
 
+function isAcpSubAgentToolCall(toolCall: {
+  title?: string | null;
+  kind?: string | null;
+  rawInput?: unknown;
+}): boolean {
+  if (readStringField(toolCall.rawInput, "agent_type")) return true;
+  if (readStringField(toolCall.rawInput, "subagent_type")) return true;
+  return (
+    readStringField(toolCall.rawInput, "prompt") !== undefined &&
+    readStringField(toolCall.rawInput, "name") !== undefined &&
+    readStringField(toolCall.rawInput, "description") !== undefined
+  );
+}
+
 function readStringField(input: unknown, key: string): string | undefined {
   if (!input || typeof input !== "object") return undefined;
   const v = (input as Record<string, unknown>)[key];
   return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
+function mergeToolPayload(
+  prev: Record<string, unknown>,
+  next: Record<string, unknown>,
+): Record<string, unknown> {
+  const merged = { ...prev, ...next };
+  const prevProgress = prev.progress;
+  const nextProgress = next.progress;
+  if (
+    prevProgress &&
+    typeof prevProgress === "object" &&
+    !Array.isArray(prevProgress) &&
+    nextProgress &&
+    typeof nextProgress === "object" &&
+    !Array.isArray(nextProgress)
+  ) {
+    merged.progress = {
+      ...(prevProgress as ToolCallPayload["progress"]),
+      ...(nextProgress as ToolCallPayload["progress"]),
+    };
+  }
+  return merged;
+}
+
+function normalizeToolText(value: string | null | undefined): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function extractToolLocations(
+  locations: Array<{ path?: string | null; line?: number | null }> | null | undefined,
+): Array<{ path: string; line?: number }> {
+  if (!Array.isArray(locations)) return [];
+  return locations.flatMap((location) => {
+    const path = normalizeToolText(location?.path);
+    if (!path) return [];
+    const line = typeof location?.line === "number" ? location.line : undefined;
+    return [{ path, ...(line != null ? { line } : {}) }];
+  });
+}
+
+function extractFileChangePath(
+  input: unknown,
+  title: string | undefined,
+  kind: string | undefined,
+  locations: readonly { path: string }[],
+): string | undefined {
+  return (
+    readStringField(input, "path") ??
+    readToolLocationPath(kind, locations) ??
+    extractPatchPath(input) ??
+    extractLeadingPath(title)
+  );
+}
+
+function readToolLocationPath(
+  kind: string | undefined,
+  locations: readonly { path: string }[],
+): string | undefined {
+  if (locations.length === 0) return undefined;
+  const lowerKind = (kind ?? "").toLowerCase();
+  return lowerKind === "move" ? locations[locations.length - 1]?.path : locations[0]?.path;
 }
 
 /** `apply_patch`-style tool calls pass the patch as a single string arg; pull
@@ -514,16 +735,32 @@ function classifyFileChangeKind(
  * - everything else → tool_call
  */
 function classifyToolCallItemType(
-  kind: string | undefined,
-  title: string | undefined,
+  kind: string | null | undefined,
+  title: string | null | undefined,
+  locations?: Array<{ path?: string | null; line?: number | null }> | null,
 ): CanonicalItemType {
   const k = (kind ?? "").toLowerCase();
   const t = (title ?? "").toLowerCase();
   if (k === "execute" || k === "shell" || /^(run|exec|shell)\b/.test(t)) return "command_execution";
-  if (k === "edit" || k === "write" || /\b(edit|write|create|delete|patch)\b/.test(t))
+  if (
+    k === "edit" ||
+    k === "delete" ||
+    k === "move" ||
+    /\b(edit|write|create|delete|patch|move|rename)\b/.test(t)
+  ) {
     return "file_change";
-  if (k === "search" || /\bsearch\b/.test(t)) return "web_search";
+  }
+  if (k === "search") {
+    return extractToolLocations(locations).length > 0 || !isWebSearchTitle(t)
+      ? "tool_call"
+      : "web_search";
+  }
+  if (isWebSearchTitle(t)) return "web_search";
   return "tool_call";
+}
+
+function isWebSearchTitle(title: string): boolean {
+  return /\b(web[_ ]search|search(?:ing)? the web|internet search|search online)\b/.test(title);
 }
 
 /**

@@ -1,5 +1,5 @@
 export type ProjectPathRef =
-  | { kind: "file"; path: string; line?: number }
+  | { kind: "file"; path: string; line?: number; endLine?: number }
   | { kind: "folder"; path: string };
 
 const PATH_EXTENSION_RE =
@@ -17,7 +17,7 @@ interface ParseOptions {
 }
 
 /**
- * Recognize a project path with an optional `:<line>` suffix.
+ * Recognize a project path with an optional `:<line>` or `:<start>-<end>` suffix.
  * Distinguishes files (extension or `:line`) from folders (separator with a
  * non-extension last segment, or trailing slash). Returns null for plain
  * words, URLs, or `name:digits` shapes that don't look like file paths.
@@ -31,7 +31,7 @@ export function parseProjectPathRef(s: string, options: ParseOptions = {}): Proj
   if (t.length < 2 || /\s/.test(t)) return null;
   if (/^https?:\/\//i.test(t)) return null;
 
-  const lineMatch = t.match(/^(.+):(\d+)$/);
+  const lineMatch = t.match(/^(.+):(\d+)(?:-(\d+))?$/);
   const candidate = lineMatch ? lineMatch[1]! : t;
   const hasSeparator = candidate.includes("/") || candidate.includes("\\");
   const hasExtension = PATH_EXTENSION_RE.test(candidate);
@@ -49,8 +49,11 @@ export function parseProjectPathRef(s: string, options: ParseOptions = {}): Proj
 
   if (lineMatch && Number.isFinite(Number.parseInt(lineMatch[2]!, 10))) {
     const line = Number.parseInt(lineMatch[2]!, 10);
+    const endLine = lineMatch[3] ? Number.parseInt(lineMatch[3], 10) : undefined;
     if (line > 0) {
-      return { kind: "file", path: candidate, line };
+      return endLine && endLine > line
+        ? { kind: "file", path: candidate, line, endLine }
+        : { kind: "file", path: candidate, line };
     }
   }
 

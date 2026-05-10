@@ -1,4 +1,12 @@
-import { memo, useDeferredValue, useState } from "react";
+import {
+  memo,
+  useDeferredValue,
+  useEffect,
+  useEffectEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react";
 import { Surface } from "@heroui/react";
 import { Brain, ChevronDown } from "lucide-react";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
@@ -16,8 +24,66 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
   const text = deferredText;
   const hasText = rawText.trim().length > 0;
   const isStreaming = item.state !== "completed";
+  const shouldAutoScroll = isStreaming && hasText;
   const [isOpen, setIsOpen] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const lastScrollTopRef = useRef(0);
+  const stickToBottomRef = useRef(true);
   const actions = useChatPaneActions();
+
+  const scrollToBottom = useEffectEvent(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    lastScrollTopRef.current = el.scrollTop;
+  });
+
+  useLayoutEffect(() => {
+    if (!shouldAutoScroll) return;
+    stickToBottomRef.current = true;
+    scrollToBottom();
+  }, [shouldAutoScroll]);
+
+  useEffect(() => {
+    if (!shouldAutoScroll) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    const handleScroll = () => {
+      const prevScrollTop = lastScrollTopRef.current;
+      const nextScrollTop = el.scrollTop;
+      lastScrollTopRef.current = nextScrollTop;
+      const isAtBottom = isElementAtBottom(el);
+      if (nextScrollTop < prevScrollTop && !isAtBottom) {
+        stickToBottomRef.current = false;
+      } else if (isAtBottom) {
+        stickToBottomRef.current = true;
+      }
+    };
+
+    lastScrollTopRef.current = el.scrollTop;
+    handleScroll();
+    el.addEventListener("scroll", handleScroll, { passive: true });
+    return () => el.removeEventListener("scroll", handleScroll);
+  }, [shouldAutoScroll]);
+
+  const syncStickyScroll = useEffectEvent(() => {
+    if (!stickToBottomRef.current) return;
+    scrollToBottom();
+  });
+
+  useEffect(() => {
+    if (!shouldAutoScroll) return;
+    const content = contentRef.current;
+    if (!content) return;
+    const observer = new ResizeObserver(() => {
+      // ResizeObserver fires after layout and before paint, so syncing here
+      // keeps the viewport pinned without a visible one-frame catch-up.
+      syncStickyScroll();
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, [shouldAutoScroll]);
 
   if (!isStreaming) {
     // Compact toggle — visually distinct from tool-call accordions: no border
@@ -57,11 +123,19 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
           <span className="lightcode-thinking-text">Thinking</span>
         </div>
         {hasText ? (
-          <div className="max-h-64 overflow-y-auto pl-4 [scrollbar-gutter:stable]">
-            <ItemMarkdown text={text} />
+          <div ref={scrollRef} className="max-h-64 overflow-y-auto pl-4 [scrollbar-gutter:stable]">
+            <div ref={contentRef}>
+              <ItemMarkdown text={text} />
+            </div>
           </div>
         ) : null}
       </div>
     </Surface>
   );
 });
+
+const BOTTOM_EPSILON_PX = 4;
+
+function isElementAtBottom(element: HTMLElement): boolean {
+  return element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_EPSILON_PX;
+}

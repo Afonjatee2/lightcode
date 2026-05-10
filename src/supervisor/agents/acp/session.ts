@@ -28,6 +28,7 @@ import {
   type SessionUpdate,
 } from "@agentclientprotocol/sdk";
 import type {
+  AgentSlashCommand,
   ProjectLocation,
   PromptSegment,
   RuntimeEvent,
@@ -37,7 +38,7 @@ import type {
   ThreadServerRequestId,
   ThreadStatus,
 } from "@/shared/contracts";
-import { isThreadConfigEqual } from "@/shared/contracts";
+import { areAgentSlashCommandsEqual, isThreadConfigEqual } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
   closeOpenTurnItems,
@@ -55,8 +56,9 @@ import {
   type StartTurnOptions,
   type StructuredSessionHandle,
   type StructuredSessionListener,
+  type StructuredSessionUpdate,
 } from "../base";
-import { normalizeAcpModeId } from "./probe";
+import { mapAcpSlashCommands, normalizeAcpModeId } from "./probe";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -194,6 +196,30 @@ function guessMimeType(path: string): string {
   }
 }
 
+const INTERRUPT_ACK_TEXT_TAIL_LIMIT = 512;
+const USER_INTERRUPT_ACK_RE = /\boperation cancelled by user\b/i;
+
+function appendInterruptAckTextTail(current: string, next: string): string {
+  if (next.length === 0) return current;
+  const combined = current.length === 0 ? next : current + next;
+  return combined.slice(-INTERRUPT_ACK_TEXT_TAIL_LIMIT);
+}
+
+export function normalizeAcpStopReason(
+  stopReason: string,
+  input: { interruptRequested: boolean; recentAgentText?: string },
+): string {
+  if (
+    stopReason === "end_turn" &&
+    input.interruptRequested &&
+    input.recentAgentText &&
+    USER_INTERRUPT_ACK_RE.test(input.recentAgentText)
+  ) {
+    return "cancelled";
+  }
+  return stopReason;
+}
+
 /**
  * Resolve the ACP mode ID from Lightcode's ThreadConfig.
  *
@@ -264,7 +290,7 @@ function applyAcpModeUpdateToConfig(currentConfig: ThreadConfig, modeId: string)
   const normalized = normalizeAcpModeId(modeId).toLowerCase();
 
   if (normalized === "plan" || normalized === "architect") {
-    return { ...currentConfig, mode: "plan", approvalPolicy: undefined };
+    return { ...currentConfig, mode: "plan" };
   }
 
   if (normalized === "autoedit") {
@@ -306,6 +332,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private sessionId: string | undefined;
   private isDisposed = false;
   private currentConfig: ThreadConfig | undefined;
+  private currentSlashCommands: AgentSlashCommand[] | undefined;
+  private currentStatus: ThreadStatus = "idle";
+  private currentAttention: ThreadAttention = "none";
   private spawnReady: Promise<void> = Promise.resolve();
   private currentTurnId: string | undefined;
   /**
@@ -318,6 +347,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    */
   private promptInFlight = false;
   private pendingPromptInterrupt = false;
+  private currentTurnInterruptRequested = false;
+  private recentInterruptAckTextTail = "";
   private availableModeIds: string[] = [];
   private thoughtLevelConfigId: string | undefined;
 
@@ -370,6 +401,38 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     for (const event of events) {
       this.listener.onRuntimeEvent(event);
     }
+  }
+
+  private emitListenerUpdate(update: StructuredSessionUpdate): void {
+    this.currentStatus = update.status;
+    this.currentAttention = update.attention;
+    this.listener?.onUpdate(update);
+  }
+
+  private emitCurrentState(listener: StructuredSessionListener): void {
+    listener.onUpdate({
+      status: this.currentStatus,
+      attention: this.currentAttention,
+      ...(this.currentConfig ? { config: this.currentConfig } : {}),
+      ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+      ...(this.currentSlashCommands !== undefined
+        ? { slashCommands: this.currentSlashCommands }
+        : {}),
+    });
+  }
+
+  private updateSlashCommands(commands: AgentSlashCommand[]): void {
+    if (areAgentSlashCommandsEqual(this.currentSlashCommands, commands)) {
+      return;
+    }
+    this.currentSlashCommands = commands;
+    this.emitListenerUpdate({
+      status: this.currentStatus,
+      attention: this.currentAttention,
+      ...(this.currentConfig ? { config: this.currentConfig } : {}),
+      ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+      slashCommands: commands,
+    });
   }
 
   private rememberSessionOptions(availableModeIds: string[], configOptions: unknown): void {
@@ -556,12 +619,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
 
     // Re-emit current state for late listeners
-    if (this.sessionId) {
-      listener.onUpdate({
-        status: "idle",
-        attention: "none",
-        sessionRef: createKnownSessionRef(this.sessionId),
-      });
+    if (this.sessionId || this.currentConfig || this.currentSlashCommands !== undefined) {
+      this.emitCurrentState(listener);
     }
   }
 
@@ -631,6 +690,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     let availableModeIds: string[] = [];
     let configOptions: unknown[] = [];
     this.currentConfig = undefined;
+    this.currentSlashCommands = undefined;
 
     if (sessionRef) {
       console.log("[acp] loading session:", sessionRef.providerSessionId);
@@ -682,6 +742,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (!this.sessionId) {
       throw new Error("ACP session not opened yet.");
     }
+    this.currentTurnInterruptRequested = false;
+    this.recentInterruptAckTextTail = "";
 
     await this.applyTurnConfig(config);
 
@@ -707,7 +769,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     ]);
 
     // Signal working state immediately
-    this.listener?.onUpdate({ status: "working", attention: "working" });
+    this.emitListenerUpdate({ status: "working", attention: "working" });
 
     const contentBlocks = await segmentsToContentBlocks(prompt, this.projectLocation, segments);
 
@@ -727,8 +789,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       });
 
       // Map stopReason to Lightcode status
-      const { status, attention } = this.mapStopReason(result.stopReason);
-      this.listener?.onUpdate({ status, attention });
+      const normalizedStopReason = normalizeAcpStopReason(result.stopReason, {
+        interruptRequested: this.currentTurnInterruptRequested,
+        recentAgentText: this.recentInterruptAckTextTail,
+      });
+      const { status, attention } = this.mapStopReason(normalizedStopReason);
+      this.emitListenerUpdate({ status, attention });
 
       // Close any items still open at end-of-turn and emit turn.completed.
       const mapperState = this.ensureMapperState();
@@ -738,13 +804,13 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           type: "turn.completed",
           threadId: this.threadId,
           turnId: this.currentTurnId,
-          state: result.stopReason === "cancelled" ? "cancelled" : "completed",
+          state: normalizedStopReason === "cancelled" ? "cancelled" : "completed",
         },
       ]);
     } catch (error) {
       if (this.isDisposed) return;
       const message = error instanceof Error ? error.message : String(error);
-      this.listener?.onUpdate({ status: "error", attention: "error", errorMessage: message });
+      this.emitListenerUpdate({ status: "error", attention: "error", errorMessage: message });
       const mapperState = this.ensureMapperState();
       this.emitRuntimeEvents([
         ...closeOpenTurnItems(mapperState),
@@ -762,6 +828,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       ]);
     } finally {
       this.promptInFlight = false;
+      this.pendingPromptInterrupt = false;
+      this.currentTurnInterruptRequested = false;
+      this.recentInterruptAckTextTail = "";
     }
   }
 
@@ -785,6 +854,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
 
     this.cancelPendingPermissionRequests();
+    this.currentTurnInterruptRequested = true;
     // Race guard: if interrupt fires before `connection.prompt()` has been
     // entered (e.g. the supervisor stages a steer in the same microtask as
     // a fresh startTurn), set a flag instead of issuing the cancel directly.
@@ -918,7 +988,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       this.emitRuntimeEvents([mapAcpPermissionRequest(params, mapperState, String(requestId))]);
 
       // Also signal that the thread needs approval
-      this.listener?.onUpdate({ status: "needs_approval", attention: "needs_approval" });
+      this.emitListenerUpdate({ status: "needs_approval", attention: "needs_approval" });
     });
   }
 
@@ -930,6 +1000,13 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    */
   private handleSessionUpdate(params: SessionNotification): void {
     const update: SessionUpdate = params.update;
+
+    if (update.sessionUpdate === "available_commands_update") {
+      this.updateSlashCommands(mapAcpSlashCommands(update.availableCommands));
+      if (this.isReplayingHistory) {
+        return;
+      }
+    }
 
     // Emit canonical events for chat-mode renderers. The legacy text/status
     // path below stays in place — terminal-mode threads still get all the
@@ -947,7 +1024,20 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
 
     switch (update.sessionUpdate) {
-      case "agent_message_chunk":
+      case "agent_message_chunk": {
+        const content = (update as { content?: ContentBlock }).content;
+        if (
+          this.currentTurnInterruptRequested &&
+          content?.type === "text" &&
+          content.text.length > 0
+        ) {
+          this.recentInterruptAckTextTail = appendInterruptAckTextTail(
+            this.recentInterruptAckTextTail,
+            content.text,
+          );
+        }
+      }
+      // fallthrough
       case "agent_thought_chunk":
       case "user_message_chunk":
         // Agent is producing output — stay in "working" state
@@ -955,7 +1045,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
       case "tool_call":
         // Agent started a tool call — working state
-        this.listener?.onUpdate({ status: "working", attention: "working" });
+        this.emitListenerUpdate({ status: "working", attention: "working" });
         break;
 
       case "tool_call_update":
@@ -964,6 +1054,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
       case "plan":
         // Agent shared its plan — working state
+        break;
+
+      case "available_commands_update":
         break;
 
       case "current_mode_update":
@@ -975,9 +1068,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           const nextConfig = applyAcpModeUpdateToConfig(this.currentConfig, update.currentModeId);
           if (!isThreadConfigEqual(this.currentConfig, nextConfig)) {
             this.currentConfig = nextConfig;
-            this.listener?.onUpdate({
-              status: "idle",
-              attention: "none",
+            // Mode-change confirmations are metadata, not turn boundaries —
+            // preserve the live status so the renderer's working-time clock
+            // doesn't reset when the agent echoes back a setSessionMode call.
+            this.emitListenerUpdate({
+              status: this.currentStatus,
+              attention: this.currentAttention,
               config: nextConfig,
               ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
             });
@@ -995,9 +1091,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           ) {
             const nextConfig = { ...this.currentConfig, effort: thoughtLevelConfig.currentValue };
             this.currentConfig = nextConfig;
-            this.listener?.onUpdate({
-              status: "idle",
-              attention: "none",
+            this.emitListenerUpdate({
+              status: this.currentStatus,
+              attention: this.currentAttention,
               config: nextConfig,
               ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
             });

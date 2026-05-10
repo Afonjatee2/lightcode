@@ -1,6 +1,12 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
+import { stripAnsi } from "@/shared/ansi";
+import {
+  compactAgentProviderMetadata,
+  type AgentCapability,
+  type AgentConnectedProvider,
+  type ProjectLocation,
+} from "@/shared/contracts";
 import { configFileAuthProbe, readAgentCommandOutput, type DetectionSpec } from "../base";
 
 // Canonical ordering for the union effort list. Anything OpenCode reports
@@ -187,6 +193,56 @@ function openCodeModelSubProvider(id: string): string | undefined {
   return slash > 0 ? id.slice(0, slash) : undefined;
 }
 
+function formatOpenCodeCredentialType(value: string | undefined): string | undefined {
+  const trimmed = value?.trim().toLowerCase();
+  if (!trimmed) return undefined;
+  if (trimmed === "api") return "API";
+  if (trimmed === "oauth") return "OAuth";
+  return trimmed;
+}
+
+export function parseOpenCodeProvidersList(output: string): AgentConnectedProvider[] {
+  const providers: AgentConnectedProvider[] = [];
+  for (const rawLine of stripAnsi(output).split(/\r?\n/g)) {
+    const line = rawLine.trim();
+    const bullet = /^[●•]\s+(.+)$/.exec(line);
+    if (!bullet) continue;
+    const text = bullet[1]!.trim();
+    const match = /^(.*?)\s+(api|oauth)$/i.exec(text);
+    providers.push({
+      label: (match?.[1] ?? text).trim(),
+      ...(formatOpenCodeCredentialType(match?.[2])
+        ? { detail: formatOpenCodeCredentialType(match?.[2]) }
+        : {}),
+    });
+  }
+  return providers;
+}
+
+async function probeOpenCodeStatus(ctx: Parameters<NonNullable<DetectionSpec["statusProbe"]>>[0]) {
+  if (!ctx.executablePath) return undefined;
+  const result = await readAgentCommandOutput(ctx.location, ctx.executablePath, [
+    "providers",
+    "list",
+  ]);
+  const text = `${result.stdout}\n${result.stderr}`.trim();
+  const connectedProviders = parseOpenCodeProvidersList(text);
+  const credentialsCountMatch = /(\d+)\s+credentials\b/i.exec(text);
+  const credentialsCount = credentialsCountMatch ? Number(credentialsCountMatch[1]) : undefined;
+  const providerMetadata = compactAgentProviderMetadata({
+    ...(connectedProviders.length > 0 ? { connectedProviders } : {}),
+  });
+
+  return {
+    ...(connectedProviders.length > 0 || (credentialsCount ?? 0) > 0
+      ? { authState: "authenticated" as const }
+      : /0\s+credentials\b/i.test(text)
+        ? { authState: "missing" as const }
+        : {}),
+    ...(providerMetadata ? { providerMetadata } : {}),
+  };
+}
+
 export function humanizeOpenCodeModelId(id: string): string {
   return titleizeOpenCodeName(openCodeModelNamePart(id));
 }
@@ -200,6 +256,7 @@ export const opencodeDetectionSpec: DetectionSpec = {
   label: "OpenCode",
   binary: "opencode",
   capabilities: opencodeDefaultCapabilities,
+  statusProbe: probeOpenCodeStatus,
   authProbes: [
     // Auth file lives on the host; for WSL projects we report "unknown"
     // (`undefined` skips the probe) because the WSL distro has its own

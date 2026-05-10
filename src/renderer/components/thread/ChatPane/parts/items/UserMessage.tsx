@@ -38,16 +38,11 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
     <Surface variant="tertiary" className={`${chatMessageSurfaceClass} relative`}>
       <div
         className={`min-w-0 space-y-1.5 leading-snug ${
-          isCollapsed
-            ? collapsedMessageClass
-            : isCollapsible
-              ? "max-h-[50vh] overflow-y-auto"
-              : ""
+          isCollapsed ? collapsedMessageClass : isCollapsible ? "max-h-[50vh] overflow-y-auto" : ""
         }`}
       >
-        {text.length > 0 ? <ItemMarkdown text={text} /> : null}
         {attachments.length > 0 ? (
-          <div className="-mx-2 -mt-1">
+          <div className="-mt-1">
             <AttachmentBar
               attachments={attachments}
               onPreviewImage={(att) => {
@@ -57,6 +52,7 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
             />
           </div>
         ) : null}
+        {text.length > 0 ? <ItemMarkdown text={text} /> : null}
       </div>
       {isCollapsible ? (
         <>

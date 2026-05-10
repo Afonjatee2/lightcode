@@ -373,27 +373,30 @@ describe("buildCopilotArgs", () => {
 });
 
 describe("createCopilotAdapter", () => {
-  it("skips ACP session setup when resuming an existing TUI session", async () => {
-    const adapter = createCopilotAdapter();
+  it.skipIf(process.platform !== "win32")(
+    "skips ACP session setup when resuming an existing TUI session",
+    async () => {
+      const adapter = createCopilotAdapter();
 
-    await expect(
-      adapter.createStructuredSession?.({
-        threadId: "thread-1",
-        projectLocation: {
-          kind: "windows",
-          path: "C:\\repo",
-        },
-        config: {
-          model: "gpt-5.4",
-          effort: "high",
-        },
-        sessionRef: {
-          providerSessionId: "session-1",
-          discoveredAt: new Date().toISOString(),
-        },
-      }),
-    ).resolves.toBeUndefined();
-  });
+      await expect(
+        adapter.createStructuredSession?.({
+          threadId: "thread-1",
+          projectLocation: {
+            kind: "windows",
+            path: "C:\\repo",
+          },
+          config: {
+            model: "gpt-5.4",
+            effort: "high",
+          },
+          sessionRef: {
+            providerSessionId: "session-1",
+            discoveredAt: new Date().toISOString(),
+          },
+        }),
+      ).resolves.toBeUndefined();
+    },
+  );
 
   it("prefixes plan-mode interactive prompts with /plan", () => {
     const adapter = createCopilotAdapter();

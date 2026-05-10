@@ -4,8 +4,11 @@ import {
   dbDeleteThread,
   dbGetProjects,
   dbGetState,
+  dbGetThreadCompletedTurns,
   dbGetThreadRuntimeItems,
   dbGetThreads,
+  dbReplaceThreadCompletedTurns,
+  dbReplaceThreadRuntimeSnapshot,
   dbReplaceThreadRuntimeItems,
   dbSetState,
   dbSyncAll,
@@ -34,6 +37,22 @@ interface CreateLocalIpcHandlersOptions {
   autoUpdater: AutoUpdaterController;
 }
 
+const ALLOWED_EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+function assertSafeExternalUrl(rawUrl: string): string {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error("Invalid external URL");
+  }
+
+  if (!ALLOWED_EXTERNAL_PROTOCOLS.has(parsed.protocol)) {
+    throw new Error(`External URL protocol is not allowed: ${parsed.protocol}`);
+  }
+  return parsed.toString();
+}
+
 export function createLocalIpcHandlers(
   options: CreateLocalIpcHandlersOptions,
 ): MainLocalIpcHandlerMap {
@@ -59,7 +78,7 @@ export function createLocalIpcHandlers(
     saveHandoffContext: (payload) =>
       saveHandoffContextFile(options.requireLightcodePaths(), payload),
     openExternal: async (url) => {
-      await shell.openExternal(url);
+      await shell.openExternal(assertSafeExternalUrl(url));
     },
     focusWindow: () => {
       const win = options.getMainWindow();
@@ -113,6 +132,11 @@ export function createLocalIpcHandlers(
     dbGetThreadRuntimeItems: ({ threadId }) => dbGetThreadRuntimeItems(threadId),
     dbReplaceThreadRuntimeItems: ({ threadId, items }) =>
       dbReplaceThreadRuntimeItems(threadId, items),
+    dbGetThreadCompletedTurns: ({ threadId }) => dbGetThreadCompletedTurns(threadId),
+    dbReplaceThreadCompletedTurns: ({ threadId, turns }) =>
+      dbReplaceThreadCompletedTurns(threadId, turns),
+    dbReplaceThreadRuntimeSnapshot: ({ threadId, items, turns }) =>
+      dbReplaceThreadRuntimeSnapshot(threadId, items, turns),
     checkForUpdate: () => options.autoUpdater.checkForUpdate(),
     startUpdateDownload: () => options.autoUpdater.startUpdateDownload(),
     installUpdate: () => options.autoUpdater.installUpdate(),

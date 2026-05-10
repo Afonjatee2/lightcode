@@ -17,7 +17,11 @@ vi.mock("node:child_process", async () => {
   };
 });
 
-import { clearExecutablePathCache, resolveExecutablePath, resolveExecutablePathAsync } from "./base";
+import {
+  clearExecutablePathCache,
+  resolveExecutablePath,
+  resolveExecutablePathAsync,
+} from "./base";
 
 const USER_REG_QUERY = [
   "HKEY_CURRENT_USER\\Environment",
@@ -29,7 +33,7 @@ const MACHINE_REG_QUERY = [
   "    Path    REG_EXPAND_SZ    C:\\Windows\\System32;C:\\Program Files\\Git\\cmd",
 ].join("\r\n");
 
-describe("Windows executable path fallback", () => {
+describe.skipIf(process.platform !== "win32")("Windows executable path fallback", () => {
   const originalPlatform = process.platform;
   const originalPath = process.env.Path;
   const originalPATH = process.env.PATH;
@@ -100,12 +104,10 @@ describe("Windows executable path fallback", () => {
   });
 
   it("applies the same fallback to async resolution", async () => {
-    execFileAsyncMock
-      .mockRejectedValueOnce(new Error("not found"))
-      .mockResolvedValueOnce({
-        stdout: "C:\\Users\\demo\\scoop\\shims\\opencode.exe\r\n",
-        stderr: "",
-      });
+    execFileAsyncMock.mockRejectedValueOnce(new Error("not found")).mockResolvedValueOnce({
+      stdout: "C:\\Users\\demo\\scoop\\shims\\opencode.exe\r\n",
+      stderr: "",
+    });
     spawnSyncMock
       .mockReturnValueOnce({ error: undefined, status: 0, stdout: USER_REG_QUERY, stderr: "" })
       .mockReturnValueOnce({ error: undefined, status: 0, stdout: MACHINE_REG_QUERY, stderr: "" });

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isCursorSemverSupportedForHooks, parseCursorVersionLine } from "./detection";
+import {
+  isCursorSemverSupportedForHooks,
+  parseCursorAboutOutput,
+  parseCursorVersionLine,
+  parseCursorWhoamiOutput,
+} from "./detection";
 import {
   buildCursorProbeSpec,
   createCursorAdapter,
@@ -300,4 +305,27 @@ describe("buildCursorProbeSpec", () => {
       expect(cmdArgs).toEqual(["--list-models"]);
     },
   );
+});
+
+describe("parseCursor account output", () => {
+  it("extracts auth and email from whoami output", () => {
+    expect(parseCursorWhoamiOutput("✓ Logged in as user@example.com")).toEqual({
+      authState: "authenticated",
+      authenticatedAs: "user@example.com",
+    });
+  });
+
+  it("extracts plan and email from about output", () => {
+    expect(
+      parseCursorAboutOutput(`About Cursor CLI
+
+CLI Version         2026.04.17-787b533
+Model               Kimi K2.5
+Subscription Tier   Pro
+User Email          user@example.com`),
+    ).toEqual({
+      authenticatedAs: "user@example.com",
+      plan: "Pro",
+    });
+  });
 });

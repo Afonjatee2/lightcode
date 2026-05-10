@@ -121,16 +121,46 @@ export const toolCallProgressSchema = z.object({
   tokens: z.number().int().nonnegative().optional(),
   toolUses: z.number().int().nonnegative().optional(),
   durationMs: z.number().int().nonnegative().optional(),
+  /**
+   * Number of child items the sub-agent has started so far. Surfaced on the
+   * collapsed sub-agent pill so closing the overlay (which gates child events
+   * off the IPC stream for perf) doesn't lose the live counter.
+   */
+  stepCount: z.number().int().nonnegative().optional(),
 });
 export type ToolCallProgress = z.infer<typeof toolCallProgressSchema>;
 
+export const acpToolKindSchema = z.enum([
+  "read",
+  "edit",
+  "delete",
+  "move",
+  "search",
+  "execute",
+  "think",
+  "fetch",
+  "switch_mode",
+  "other",
+]);
+export type AcpToolKind = z.infer<typeof acpToolKindSchema>;
+
+export const acpToolLocationSchema = z.object({
+  path: z.string(),
+  line: z.number().int().optional(),
+});
+export type AcpToolLocation = z.infer<typeof acpToolLocationSchema>;
+
 export const toolCallPayloadSchema = z.object({
   name: z.string(),
+  title: z.string().optional(),
+  kind: acpToolKindSchema.optional(),
+  locations: z.array(acpToolLocationSchema).optional(),
   serverId: z.string().optional(),
   args: z.unknown().optional(),
   result: z.unknown().optional(),
   status: toolCallStatusSchema,
   progress: toolCallProgressSchema.optional(),
+  isSubAgent: z.boolean().optional(),
 });
 export type ToolCallPayload = z.infer<typeof toolCallPayloadSchema>;
 

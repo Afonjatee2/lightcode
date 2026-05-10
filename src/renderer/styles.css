@@ -2,6 +2,18 @@
 @import "@heroui/styles";
 @import "@xterm/xterm/css/xterm.css";
 
+@property --composer-border-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@keyframes lightcode-composer-border-spin {
+  to {
+    --composer-border-angle: 360deg;
+  }
+}
+
 /* Shiki output (tool-call / file_change accordion bodies). The wrapper
    provides the scroll/font sizing; the inner <pre class="shiki"> needs to
    inherit those and shed Shiki's default block styling so it lines up with
@@ -44,6 +56,26 @@
 
 /* HeroUI toast: allow the close button (positioned at -top-1 -right-1) to
    render outside the toast rect, and let long URLs/paths wrap inside. */
+.lc-toast {
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.1),
+    0 2px 4px rgba(0, 0, 0, 0.05),
+    0 12px 24px -4px rgba(0, 0, 0, 0.2),
+    0 20px 48px -8px rgba(0, 0, 0, 0.3);
+  transition:
+    transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.2s ease;
+}
+
+.lc-toast:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 1px rgba(0, 0, 0, 0.1),
+    0 4px 8px rgba(0, 0, 0, 0.1),
+    0 16px 32px -4px rgba(0, 0, 0, 0.25),
+    0 24px 64px -8px rgba(0, 0, 0, 0.35);
+}
+
 .toast__content {
   min-width: 0;
 }
@@ -170,6 +202,21 @@
   padding-left: 0.5rem;
 }
 
+/* Truncate a single-line element at the START (ellipsis at the beginning)
+   instead of the end. Used for path-like text in tool-call titles where the
+   tail (filename) is more informative than the head. The bidi flip works
+   because ASCII paths/URLs are LTR runs that the bidi algorithm preserves
+   even inside an RTL container; only the truncation side is affected. */
+.lc-truncate-start {
+  direction: rtl;
+  text-align: left;
+  unicode-bidi: plaintext;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
 /* HeroUI Disclosure: drop the default expand/collapse height/opacity
    transition and indicator rotation easing. Long chat threads can host
    hundreds of disclosures (one per tool_call, file_change, web_search,
@@ -197,6 +244,7 @@
     --radius: 0.125rem;
     --field-radius: calc(var(--radius) * 2);
     --link: var(--accent);
+    --focus: var(--foreground);
     --surface-shadow: 0 20px 60px rgba(0, 0, 0, 0.08);
     --overlay-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 
@@ -702,9 +750,42 @@ body {
 }
 
 .lightcode-composer-shell {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius-4xl);
   background: color-mix(in oklab, var(--composer-surface) 94%, transparent);
+  transition: border-color 0.15s ease;
+}
+
+.lightcode-composer-shell--draft::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--composer-border-angle),
+    transparent 0%,
+    var(--foreground) 15%,
+    var(--foreground) 35%,
+    transparent 50%,
+    var(--foreground) 65%,
+    var(--foreground) 85%,
+    transparent 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  animation: lightcode-composer-border-spin 6s linear infinite;
+  animation-play-state: paused;
 }
 
 .is-wrapping .lightcode-composer-label-hideable {
@@ -712,11 +793,22 @@ body {
 }
 
 .lightcode-composer-shell:focus-within {
-  border-color: var(--accent);
+  border-color: color-mix(in oklab, var(--focus) 70%, transparent);
   outline: none !important;
   box-shadow: none !important;
   --tw-ring-shadow: 0 0 #0000 !important;
   --tw-ring-offset-shadow: 0 0 #0000 !important;
+  transition: border-color 0.12s ease;
+}
+
+.lightcode-composer-shell--draft:focus-within {
+  border-color: transparent;
+}
+
+.lightcode-composer-shell--draft:focus-within::before {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+  animation-play-state: running;
 }
 
 .lightcode-model-menu-listbox:focus-visible,
@@ -1018,7 +1110,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 0.35rem;
-  padding: 0.65rem 0.85rem 0;
+  padding: 0.65rem 0 0;
   max-height: 6.5rem;
   overflow-y: auto;
 }
@@ -1037,6 +1129,17 @@ body {
   cursor: default;
   user-select: none;
   max-width: 12rem;
+}
+
+.lightcode-attachment-chip--image {
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.lightcode-attachment-chip--image .lightcode-attachment-chip__thumb {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.25rem;
 }
 
 .lightcode-attachment-chip[role="button"] {
@@ -1511,4 +1614,102 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
 .lc-chat-markdown > :last-child,
 .lc-chat-markdown > :last-child > :last-child {
   margin-bottom: 0;
+}
+
+/* Agent discovery screen — first-launch detection.
+ *
+ * Tiles default to a dim "searching" state and animate to a found state when
+ * `data-found="true"` is applied (driven by streamed `agent-detected` events).
+ * The pop animation only runs on the found→true transition because we apply
+ * it via `data-found="true"` instead of mounting a new node, so unfound tiles
+ * don't replay it on every re-render.
+ */
+.agent-discovery-tile {
+  position: relative;
+  overflow: hidden;
+  filter: grayscale(0.85) brightness(0.7);
+  opacity: 0.55;
+  transition:
+    filter 320ms ease,
+    opacity 320ms ease,
+    border-color 320ms ease,
+    background-color 320ms ease,
+    transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.agent-discovery-tile[data-found="true"] {
+  filter: none;
+  opacity: 1;
+  border-color: var(--color-border);
+  background-color: color-mix(in oklch, var(--color-surface) 92%, var(--color-foreground) 8%);
+  animation: lightcode-agent-tile-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.agent-discovery-tile[data-found="true"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    color-mix(in oklch, var(--color-foreground) 18%, transparent) 50%,
+    transparent 100%
+  );
+  transform: translateX(-110%);
+  animation: lightcode-agent-tile-shine 720ms ease-out 80ms both;
+  pointer-events: none;
+}
+
+@keyframes lightcode-agent-tile-pop {
+  0% {
+    transform: scale(0.92);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.04);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes lightcode-agent-tile-shine {
+  to {
+    transform: translateX(110%);
+  }
+}
+
+@keyframes lightcode-tool-call-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-tool-call-enter {
+  animation: lightcode-tool-call-enter 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lightcode-composer-shell--draft::before {
+    transition: none;
+    animation: none;
+  }
+  .lightcode-composer-shell--draft:focus-within::before {
+    animation: none;
+  }
+  .agent-discovery-tile {
+    transition: none;
+  }
+  .agent-discovery-tile[data-found="true"] {
+    animation: none;
+  }
+  .agent-discovery-tile[data-found="true"]::before {
+    animation: none;
+  }
 }

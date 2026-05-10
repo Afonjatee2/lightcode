@@ -5,6 +5,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
   return defineSupervisorIpcHandlers({
     listWslDistros: () => runtime.listWslDistros(),
     getAgentStatuses: (payload) => runtime.getAgentStatuses(payload),
+    refreshAgentStatuses: (payload) => runtime.refreshAgentStatuses(payload),
     getThreadSnapshots: () => runtime.getThreadSnapshots(),
     startThread: (payload) => runtime.startThread(payload),
     sendThreadInput: (payload) => runtime.sendThreadInput(payload),
@@ -19,6 +20,10 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     extractContext: (payload) => runtime.extractContext(payload),
     cancelExtractContext: ({ threadId }) => runtime.cancelExtractContext(threadId),
     readTerminalScrollback: ({ threadId }) => runtime.readTerminalScrollback(threadId),
+    subagentSubscribe: (payload) => runtime.subagentSubscribe(payload),
+    subagentUnsubscribe: async (payload) => {
+      runtime.subagentUnsubscribe(payload);
+    },
     getGitStatus: (payload) => runtime.getGitStatus(payload),
     getGitDiff: (payload) => runtime.getGitDiff(payload),
     getGitDiffBatch: (payload) => runtime.getGitDiffBatch(payload),
@@ -60,6 +65,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     listProjectTree: (payload) => runtime.listProjectTree(payload),
     searchProjectTree: (payload) => runtime.searchProjectTree(payload),
     readProjectFile: (payload) => runtime.readProjectFile(payload),
+    readAbsoluteFile: (payload) => runtime.readAbsoluteFile(payload),
     writeProjectFile: (payload) => runtime.writeProjectFile(payload),
     createProjectEntry: (payload) => runtime.createProjectEntry(payload),
     renameProjectEntry: (payload) => runtime.renameProjectEntry(payload),

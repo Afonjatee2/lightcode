@@ -112,6 +112,91 @@ describe("sdkCanonicalMapping — text streaming", () => {
 
     expect(snapshot).toEqual([]);
   });
+
+  it("ignores a repeat content_block_start at the same index after the block already completed", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      }),
+      state,
+    );
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Good idea" },
+      }),
+      state,
+    );
+    mapClaudeSdkMessage(streamEvent({ type: "content_block_stop", index: 0 }), state);
+
+    // SDK redelivers the same block (e.g. retry / replay). Without the
+    // dedup, ensureTextItem would create a second assistant_message item
+    // with duplicate content.
+    const replayStart = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "text", text: "" },
+      }),
+      state,
+    );
+    const replayDelta = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Good idea" },
+      }),
+      state,
+    );
+
+    expect(replayStart).toEqual([]);
+    expect(replayDelta).toEqual([]);
+  });
+
+  it("starts a fresh per-index frame when message_start arrives between assistant messages", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "First" },
+      }),
+      state,
+    );
+    mapClaudeSdkMessage(streamEvent({ type: "content_block_stop", index: 0 }), state);
+
+    // A new assistant message begins. The next content_block at index 0
+    // must produce a NEW assistant_message item — not be skipped as a
+    // duplicate of the prior message's idx 0.
+    const reset = mapClaudeSdkMessage(
+      streamEvent({
+        type: "message_start",
+        message: { id: "msg_2", role: "assistant", content: [] },
+      }),
+      state,
+    );
+    const second = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Second" },
+      }),
+      state,
+    );
+
+    expect(reset).toEqual([]);
+    expect(second).toHaveLength(2);
+    expect(second[0]).toMatchObject({ type: "item.started", itemType: "assistant_message" });
+    expect(second[1]).toMatchObject({
+      type: "content.delta",
+      stream: "assistant_text",
+      delta: "Second",
+    });
+  });
 });
 
 describe("sdkCanonicalMapping — tool use", () => {

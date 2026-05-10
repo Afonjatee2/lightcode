@@ -1,3 +1,4 @@
+import { Button, Spinner } from "@heroui/react";
 import {
   Archive,
   ArrowLeft,
@@ -7,6 +8,7 @@ import {
   Info,
   PanelLeft,
   PanelLeftClose,
+  RefreshCw,
   Search,
   Settings2,
   Sparkles,
@@ -31,8 +33,17 @@ export function SettingsSidebar(props: {
   onSectionChange: (section: SettingsSection) => void;
   onClose: () => void;
   installedAgents: AgentStatus[];
+  isRefreshingAgents: boolean;
+  onRefreshAgents: () => void;
 }) {
-  const { activeSection, onSectionChange, onClose, installedAgents } = props;
+  const {
+    activeSection,
+    onSectionChange,
+    onClose,
+    installedAgents,
+    isRefreshingAgents,
+    onRefreshAgents,
+  } = props;
   const { isCollapsed, collapse, expand } = useSidebar();
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
   const isAgentsActive = activeSection === "agents" || activeSection.startsWith("agents:");
@@ -83,6 +94,21 @@ export function SettingsSidebar(props: {
               isActive={isAgentsActive}
               onPress={selectFirstAgent}
             />
+            {isAgentsActive && (
+              <SidebarButton
+                iconOnly
+                icon={
+                  isRefreshingAgents ? (
+                    <Spinner size="sm" color="current" className="size-4" />
+                  ) : (
+                    <RefreshCw className="size-4" />
+                  )
+                }
+                label="Refresh detected agents"
+                isDisabled={isRefreshingAgents}
+                onPress={onRefreshAgents}
+              />
+            )}
             {isAgentsActive &&
               installedAgents.map((agent) => (
                 <SidebarButton
@@ -169,12 +195,34 @@ export function SettingsSidebar(props: {
               isActive={activeSection === "search"}
               onPress={() => onSectionChange("search")}
             />
-            <SidebarButton
-              icon={<Bot className="size-4" />}
-              label="Agents"
-              isActive={isAgentsActive && !activeSection.startsWith("agents:")}
-              onPress={selectFirstAgent}
-            />
+            <div className="flex items-center gap-1">
+              <div className="min-w-0 flex-1">
+                <SidebarButton
+                  icon={<Bot className="size-4" />}
+                  label="Agents"
+                  className="pr-1"
+                  isActive={isAgentsActive && !activeSection.startsWith("agents:")}
+                  onPress={selectFirstAgent}
+                />
+              </div>
+              <Button
+                aria-label="Refresh detected agents"
+                className="h-7 min-h-7 w-7 min-w-7 shrink-0 rounded-full text-muted hover:text-foreground"
+                isIconOnly
+                isPending={isRefreshingAgents}
+                size="sm"
+                variant="tertiary"
+                onPress={onRefreshAgents}
+              >
+                {({ isPending }) =>
+                  isPending ? (
+                    <Spinner color="current" size="sm" />
+                  ) : (
+                    <RefreshCw className="size-3.5" />
+                  )
+                }
+              </Button>
+            </div>
             {isAgentsActive && (
               <div className="space-y-0.5 pl-4">
                 {installedAgents.map((agent) => {

@@ -11,6 +11,20 @@ vi.mock("./codex/session", async (importOriginal) => {
   };
 });
 
+// Skip the slow $SHELL -l -c probe on non-Windows hosts. The tests using
+// `windowsProject` only exercise argv-shaping logic; resolving the binary
+// against the host PATH is irrelevant and adds 1-2s per cold call on macOS.
+vi.mock("./binaryResolver", async (importActual) => {
+  const actual = await importActual<typeof import("./binaryResolver")>();
+  return {
+    ...actual,
+    resolveAgentBinaryPath: (location: { kind: string }, binary: string) =>
+      location.kind === "windows" && process.platform !== "win32"
+        ? undefined
+        : actual.resolveAgentBinaryPath(location as never, binary),
+  };
+});
+
 import {
   buildWindowsCommand,
   getWslCommand,
@@ -91,7 +105,7 @@ const config: ThreadConfig = {
 };
 
 describe("agent command builders", () => {
-  it("builds a Windows Codex launch command", () => {
+  it.skipIf(process.platform !== "win32")("builds a Windows Codex launch command", () => {
     const spec = launch(createCodexAdapter(), windowsProject, config, "hello");
     expect(spec.cwd).toBe("C:\\Users\\demo\\project");
     const { cmd, cmdArgs } = parseWindowsSpec(spec);
@@ -270,77 +284,89 @@ describe("agent command builders", () => {
     });
   });
 
-  it("builds a Copilot launch command with a pre-assigned session id", () => {
-    const spec = launch(
-      createCopilotAdapter(),
-      windowsProject,
-      { model: "gpt-5", effort: "high", approvalPolicy: "never" },
-      "hello",
-    );
-    const { cmd, cmdArgs } = parseWindowsSpec(spec);
+  it.skipIf(process.platform !== "win32")(
+    "builds a Copilot launch command with a pre-assigned session id",
+    () => {
+      const spec = launch(
+        createCopilotAdapter(),
+        windowsProject,
+        { model: "gpt-5", effort: "high", approvalPolicy: "never" },
+        "hello",
+      );
+      const { cmd, cmdArgs } = parseWindowsSpec(spec);
 
-    expect(cmd).toBe("copilot");
-    expect(cmdArgs.some((arg) => arg.startsWith("--resume="))).toBe(true);
-    expect(cmdArgs).toContain("--model");
-    expect(cmdArgs).toContain("gpt-5");
-    expect(cmdArgs).toContain("--effort");
-    expect(cmdArgs).toContain("high");
-    expect(cmdArgs).toContain("--yolo");
-    expect(cmdArgs).not.toContain("--autopilot");
-    expect(cmdArgs).toContain("hello");
-    expect(spec.sessionRef).toBeDefined();
-  });
+      expect(cmd).toBe("copilot");
+      expect(cmdArgs.some((arg) => arg.startsWith("--resume="))).toBe(true);
+      expect(cmdArgs).toContain("--model");
+      expect(cmdArgs).toContain("gpt-5");
+      expect(cmdArgs).toContain("--effort");
+      expect(cmdArgs).toContain("high");
+      expect(cmdArgs).toContain("--yolo");
+      expect(cmdArgs).not.toContain("--autopilot");
+      expect(cmdArgs).toContain("hello");
+      expect(spec.sessionRef).toBeDefined();
+    },
+  );
 
-  it("omits --yolo for default approval policy on Copilot", () => {
-    const spec = launch(
-      createCopilotAdapter(),
-      windowsProject,
-      { model: "gpt-5", approvalPolicy: "default" },
-      "hello",
-    );
-    const { cmdArgs } = parseWindowsSpec(spec);
+  it.skipIf(process.platform !== "win32")(
+    "omits --yolo for default approval policy on Copilot",
+    () => {
+      const spec = launch(
+        createCopilotAdapter(),
+        windowsProject,
+        { model: "gpt-5", approvalPolicy: "default" },
+        "hello",
+      );
+      const { cmdArgs } = parseWindowsSpec(spec);
 
-    expect(cmdArgs).not.toContain("--yolo");
-    expect(cmdArgs).not.toContain("--autopilot");
-    expect(cmdArgs).not.toContain("--allow-all");
-  });
+      expect(cmdArgs).not.toContain("--yolo");
+      expect(cmdArgs).not.toContain("--autopilot");
+      expect(cmdArgs).not.toContain("--allow-all");
+    },
+  );
 
-  it("keeps Copilot model and effort flags when resuming an ACP-backed session", () => {
-    const spec = launch(
-      createCopilotAdapter(),
-      windowsProject,
-      { model: "gpt-5.4", effort: "high", approvalPolicy: "never" },
-      "",
-      undefined,
-      {
-        suppressResumeConfigOverrides: true,
-        resumeThreadId: "019d19c4-8050-7270-b8fc-589eee8136c2",
-      },
-    );
-    const { cmd, cmdArgs } = parseWindowsSpec(spec);
+  it.skipIf(process.platform !== "win32")(
+    "keeps Copilot model and effort flags when resuming an ACP-backed session",
+    () => {
+      const spec = launch(
+        createCopilotAdapter(),
+        windowsProject,
+        { model: "gpt-5.4", effort: "high", approvalPolicy: "never" },
+        "",
+        undefined,
+        {
+          suppressResumeConfigOverrides: true,
+          resumeThreadId: "019d19c4-8050-7270-b8fc-589eee8136c2",
+        },
+      );
+      const { cmd, cmdArgs } = parseWindowsSpec(spec);
 
-    expect(cmd).toBe("copilot");
-    expect(cmdArgs).toContain("--resume=019d19c4-8050-7270-b8fc-589eee8136c2");
-    expect(cmdArgs).toContain("--model");
-    expect(cmdArgs).toContain("gpt-5.4");
-    expect(cmdArgs).toContain("--effort");
-    expect(cmdArgs).toContain("high");
-  });
+      expect(cmd).toBe("copilot");
+      expect(cmdArgs).toContain("--resume=019d19c4-8050-7270-b8fc-589eee8136c2");
+      expect(cmdArgs).toContain("--model");
+      expect(cmdArgs).toContain("gpt-5.4");
+      expect(cmdArgs).toContain("--effort");
+      expect(cmdArgs).toContain("high");
+    },
+  );
 
-  it("prefixes the initial Copilot interactive prompt with /plan in plan mode", () => {
-    const spec = launch(
-      createCopilotAdapter(),
-      windowsProject,
-      { model: "claude-haiku-4.5", effort: "high", mode: "plan", approvalPolicy: "never" },
-      "hi",
-    );
-    const { cmd, cmdArgs } = parseWindowsSpec(spec);
+  it.skipIf(process.platform !== "win32")(
+    "prefixes the initial Copilot interactive prompt with /plan in plan mode",
+    () => {
+      const spec = launch(
+        createCopilotAdapter(),
+        windowsProject,
+        { model: "claude-haiku-4.5", effort: "high", mode: "plan", approvalPolicy: "never" },
+        "hi",
+      );
+      const { cmd, cmdArgs } = parseWindowsSpec(spec);
 
-    expect(cmd).toBe("copilot");
-    expect(cmdArgs).toContain("-i");
-    expect(cmdArgs).toContain("/plan hi");
-    expect(cmdArgs).not.toContain("hi");
-  });
+      expect(cmd).toBe("copilot");
+      expect(cmdArgs).toContain("-i");
+      expect(cmdArgs).toContain("/plan hi");
+      expect(cmdArgs).not.toContain("hi");
+    },
+  );
 
   it.skipIf(process.platform !== "win32")(
     "prefers pwsh, then powershell, then cmd on Windows",
@@ -394,7 +420,7 @@ describe("agent command builders", () => {
     expect(script).not.toContain(", ''");
   });
 
-  it("builds a Windows Cursor launch command", () => {
+  it.skipIf(process.platform !== "win32")("builds a Windows Cursor launch command", () => {
     const spec = launch(createCursorAdapter(), windowsProject, { model: "auto" }, "hello");
     expect(spec.cwd).toBe("C:\\Users\\demo\\project");
     const { cmd, cmdArgs } = parseWindowsSpec(spec);
@@ -416,7 +442,7 @@ describe("agent command builders", () => {
     expect(cmdArgs).not.toContain("");
   });
 
-  it("builds a Cursor launch command with plan mode", () => {
+  it.skipIf(process.platform !== "win32")("builds a Cursor launch command with plan mode", () => {
     const spec = launch(
       createCursorAdapter(),
       windowsProject,

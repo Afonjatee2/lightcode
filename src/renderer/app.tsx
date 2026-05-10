@@ -134,6 +134,9 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
     useAppStore.getState().markThreadExited(event.threadId);
     useAppStore.getState().clearAllPendingSteer(event.threadId);
   }
+  if (event.type === "agent-detected") {
+    useAgentStatusesStore.getState().pushDiscoveredAgent(event.status);
+  }
   if (event.type === "windows-agent-statuses") {
     console.log(`[renderer] event: windows-agent-statuses (${event.statuses.length} agents)`);
     useAgentStatusesStore.getState().setAgentStatuses(event.statuses);

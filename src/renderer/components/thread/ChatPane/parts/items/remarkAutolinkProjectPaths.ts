@@ -23,7 +23,7 @@ interface PluginOptions {
 const SKIP_PARENT_TYPES = new Set(["code", "inlineCode", "link", "linkReference", "html"]);
 
 const PATH_TOKEN_RE =
-  /(?<![A-Za-z0-9_:/@.\\-])([A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+))?/g;
+  /(?<![A-Za-z0-9_:/@.\\-])([A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+)(?:-\d+)?)?/g;
 
 /**
  * Markdown plugin that auto-links plain-text path tokens (e.g.
@@ -87,6 +87,10 @@ function transformText(text: string, options: PluginOptions): MdNode[] {
 
 function pathRefUrl(ref: ProjectPathRef): string {
   return ref.kind === "file"
-    ? `${AUTO_PATH_FILE_PREFIX}${ref.path}${ref.line !== undefined ? `:${ref.line}` : ""}`
+    ? `${AUTO_PATH_FILE_PREFIX}${ref.path}${
+        ref.line !== undefined
+          ? `:${ref.line}${ref.endLine !== undefined ? `-${ref.endLine}` : ""}`
+          : ""
+      }`
     : `${AUTO_PATH_FOLDER_PREFIX}${ref.path}`;
 }

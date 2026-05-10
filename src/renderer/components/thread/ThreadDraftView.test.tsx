@@ -71,6 +71,14 @@ const codexStatus: AgentStatus = {
   },
 };
 
+const dualModeCodexStatus: AgentStatus = {
+  ...codexStatus,
+  capabilities: {
+    ...codexStatus.capabilities,
+    presentationModes: ["terminal", "gui"],
+  },
+};
+
 const geminiStatus: AgentStatus = {
   kind: "gemini",
   label: "Gemini",
@@ -132,6 +140,7 @@ describe("ThreadDraftView", () => {
       providerConfigs: {},
       hiddenModels: {},
       disabledAgents: [],
+      lastPresentationModeByAgent: {},
     });
   });
 
@@ -179,7 +188,9 @@ describe("ThreadDraftView", () => {
   it("submits codex defaults on first launch", async () => {
     const onStart = vi.fn<(input: unknown) => void>();
 
-    render(<ThreadDraftView project={project} agentStatuses={[codexStatus]} onStart={onStart} />);
+    render(
+      <ThreadDraftView project={project} agentStatuses={[dualModeCodexStatus]} onStart={onStart} />,
+    );
 
     await waitFor(() => {
       const props = composerSpy.mock.lastCall?.[0] as {
@@ -198,11 +209,7 @@ describe("ThreadDraftView", () => {
       expect(providerModel?.currentModel).toBe("gpt-5.4");
       const effortContext = props.controls.find((c) => c.kind === "effort-context");
       expect(effortContext?.effortValue).toBe("high");
-      expect(
-        props.controls.some(
-          (control) => control.label === "Full Access" && control.isSelected === true,
-        ),
-      ).toBe(true);
+      expect(props.controls.some((control) => control.value === "full-access")).toBe(true);
     });
 
     fireEvent.click(screen.getByText("set-prompt"));
@@ -217,7 +224,58 @@ describe("ThreadDraftView", () => {
         approvalPolicy: "never",
         sandboxMode: "danger-full-access",
       },
+      presentationMode: "gui",
       prompt: "hello world",
+    });
+  });
+
+  it("renders Chat first and selects it by default for dual-mode agents", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(
+      <ThreadDraftView project={project} agentStatuses={[dualModeCodexStatus]} onStart={onStart} />,
+    );
+
+    await waitFor(() => {
+      const tabs = screen.getAllByRole("tab");
+      expect(tabs.map((tab) => tab.textContent?.replace(/\s+/g, " ").trim())).toEqual([
+        "Chat",
+        "CLI",
+      ]);
+      expect(screen.getByRole("tab", { name: "Chat" })).toHaveAttribute("aria-selected", "true");
+    });
+  });
+
+  it("keeps Chat as the default when a dual-mode agent resolves after mount", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+    const { rerender } = render(
+      <ThreadDraftView project={project} agentStatuses={[]} onStart={onStart} />,
+    );
+
+    rerender(
+      <ThreadDraftView project={project} agentStatuses={[dualModeCodexStatus]} onStart={onStart} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "Chat" })).toHaveAttribute("aria-selected", "true");
+    });
+  });
+
+  it("respects a saved CLI choice for dual-mode agents", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    act(() => {
+      useSharedSettings.setState({
+        lastPresentationModeByAgent: { codex: "terminal" },
+      });
+    });
+
+    render(
+      <ThreadDraftView project={project} agentStatuses={[dualModeCodexStatus]} onStart={onStart} />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("tab", { name: "CLI" })).toHaveAttribute("aria-selected", "true");
     });
   });
 

@@ -23,10 +23,10 @@ export const PlanProposal = memo(function PlanProposal({ item }: PlanProposalPro
   const payload = item.payload as ToolCallPayload | undefined;
   const args = readArgsObject(payload);
   const plan = readString(args, "plan");
-  const planFilePath = readString(args, "planFilePath");
+  const planFilePath = readString(args, "planFilePath") ?? readString(args, "plan_filename");
   const isStreaming = item.state !== "completed";
 
-  if (!plan && !isStreaming) return null;
+  if (!plan && !isStreaming && !planFilePath) return null;
 
   return (
     <div className="my-1 flex flex-col gap-1">
@@ -48,7 +48,7 @@ export const PlanProposal = memo(function PlanProposal({ item }: PlanProposalPro
 export function isPlanProposalToolCall(item: RuntimeChatItem): boolean {
   if (item.type !== "tool_call") return false;
   const name = (item.payload as ToolCallPayload | undefined)?.name;
-  return name === "ExitPlanMode";
+  return name === "ExitPlanMode" || name === "exit_plan_mode";
 }
 
 function readArgsObject(payload: ToolCallPayload | undefined): Record<string, unknown> | undefined {

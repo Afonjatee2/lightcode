@@ -24,23 +24,29 @@ export type ViewportLanguage =
   | "sql"
   | "diff";
 
-const EXT_TO_LANGUAGE: Record<string, ViewportLanguage> = {
+export type HighlightLanguage = Exclude<ViewportLanguage, "plain">;
+
+const LANGUAGE_ALIASES: Record<string, HighlightLanguage> = {
   json: "json",
   jsonc: "jsonc",
   json5: "jsonc",
   geojson: "json",
+  javascript: "javascript",
   js: "javascript",
   mjs: "javascript",
   cjs: "javascript",
   jsx: "jsx",
+  typescript: "typescript",
   ts: "typescript",
   mts: "typescript",
   cts: "typescript",
   tsx: "tsx",
+  python: "python",
   py: "python",
   pyw: "python",
-  sh: "bash",
   bash: "bash",
+  sh: "bash",
+  shell: "shell",
   zsh: "shell",
   fish: "shell",
   yaml: "yaml",
@@ -49,14 +55,34 @@ const EXT_TO_LANGUAGE: Record<string, ViewportLanguage> = {
   htm: "html",
   css: "css",
   go: "go",
+  rust: "rust",
   rs: "rust",
+  markdown: "markdown",
   md: "markdown",
   mdx: "markdown",
-  markdown: "markdown",
   sql: "sql",
   diff: "diff",
   patch: "diff",
 };
+
+export function normalizeHighlightLanguage(
+  value: string | undefined | null,
+): HighlightLanguage | null {
+  if (!value) return null;
+  for (const rawToken of value.trim().split(/\s+/)) {
+    if (rawToken.length === 0) continue;
+    const normalized = rawToken.toLowerCase();
+    const token = normalized.startsWith("language-")
+      ? normalized.slice("language-".length)
+      : normalized.startsWith("lang-")
+        ? normalized.slice("lang-".length)
+        : normalized;
+    if (token.length === 0) continue;
+    const language = LANGUAGE_ALIASES[token];
+    if (language) return language;
+  }
+  return null;
+}
 
 export function detectLanguageFromPath(path: string | undefined): ViewportLanguage {
   if (!path) return "plain";
@@ -65,5 +91,5 @@ export function detectLanguageFromPath(path: string | undefined): ViewportLangua
   const dot = base.lastIndexOf(".");
   if (dot < 0) return "plain";
   const ext = base.slice(dot + 1).toLowerCase();
-  return EXT_TO_LANGUAGE[ext] ?? "plain";
+  return normalizeHighlightLanguage(ext) ?? "plain";
 }

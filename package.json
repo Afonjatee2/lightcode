@@ -86,9 +86,6 @@
     "zod": "^4.4.2",
     "zustand": "^5.0.12"
   },
-  "optionalDependencies": {
-    "@anthropic-ai/claude-agent-sdk-win32-x64": "0.2.126"
-  },
   "devDependencies": {
     "@babel/core": "^7.29.0",
     "@electron/rebuild": "^4.0.4",
@@ -122,10 +119,14 @@
     "vitest": "^4.1.5",
     "wait-on": "^9.0.4"
   },
+  "optionalDependencies": {
+    "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.2.126",
+    "@anthropic-ai/claude-agent-sdk-win32-x64": "0.2.126"
+  },
   "engines": {
     "node": ">=24.10.0"
   },
-  "packageManager": "pnpm@10.33.0+sha512.10568bb4a6afb58c9eb3630da90cc9516417abebd3fabbe6739f0ae795728da1491e9db5a544c76ad8eb7570f5c4bb3d6c637b2cb41bfdcdb47fa823c8649319",
+  "packageManager": "pnpm@11.0.9+sha512.34ce82e6780233cf9cad8685029a8f81d2e06196c5a9bad98879f7424940c6817c4e4524fb7d38b8553ceed48b9758b8ebaf1abd3600c232c4c8cf7366086f38",
   "electronmon": {
     "patterns": [
       "!src/**",

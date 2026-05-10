@@ -17,6 +17,15 @@ describe("parseProjectPathRef", () => {
     });
   });
 
+  it("recognizes a file path with line range suffix", () => {
+    expect(parseProjectPathRef("src/foo/bar.ts:42-57")).toEqual({
+      kind: "file",
+      path: "src/foo/bar.ts",
+      line: 42,
+      endLine: 57,
+    });
+  });
+
   it("recognizes a folder path with trailing separator", () => {
     expect(parseProjectPathRef("src/foo/")).toEqual({ kind: "folder", path: "src/foo" });
   });

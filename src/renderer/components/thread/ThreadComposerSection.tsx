@@ -20,12 +20,15 @@ import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/a
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
+import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import { ThreadErrorDock } from "./ThreadErrorDock";
 import { ThreadPendingSteerStrip } from "./ThreadPendingSteerStrip";
+import { ThreadRuntimeRequestPanel } from "./ThreadRuntimeRequestPanel";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 import { ThreadTodoDock } from "./ThreadTodoDock";
 import { filterHiddenModels } from "./threadComposerOptions";
+import { filterSlashCommands, resolveAvailableSlashCommands } from "./threadSlashCommands";
 import type { ThreadErrorDockState } from "./threadErrorState";
 import type { ThreadTodoDockState } from "./threadTodoState";
 import type { TerminalPaneHandle } from "./TerminalPane";
@@ -157,6 +160,7 @@ type ThreadComposerSectionProps = {
   todoDockPlacement: "composer" | "right";
   todoDockState: ThreadTodoDockState | null;
   errorDockState: ThreadErrorDockState | null;
+  onDismissError: () => void;
   onConfigChange: (config: ThreadConfig) => void;
   onResolveServerRequest: (input: {
     requestId: ThreadServerRequestId;
@@ -166,6 +170,7 @@ type ThreadComposerSectionProps = {
   onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
   onTodoDockCollapsedChange: (collapsed: boolean) => void;
   onTodoDockPlacementChange: (placement: "composer" | "right") => void;
+  onTodoDockRetire?: () => void;
 };
 
 export function ThreadComposerSection(props: ThreadComposerSectionProps) {
@@ -191,11 +196,19 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInterrupting, setIsInterrupting] = useState(false);
   const attachments = useAttachments();
+  const [slashQuery, setSlashQuery] = useState<string | null>(null);
+  const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const imageAttachments = attachments.attachments.filter((a) => a.isImage);
   const presentationMode =
     thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
   const usesTerminalPresentation = presentationMode === "terminal";
+  const availableCommands = resolveAvailableSlashCommands(
+    thread.slashCommands,
+    agentStatus?.capabilities.slashCommands,
+  );
+  const filteredCommands = filterSlashCommands(availableCommands, slashQuery);
+  const showCommandPanel = filteredCommands.length > 0;
   const isServerControlled =
     agentStatus?.capabilities.liveInputMode === "server" || !usesTerminalPresentation;
   const isTerminalInput = agentStatus?.capabilities.liveInputMode === "terminal";
@@ -209,7 +222,10 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const canSubmitServerInput =
     isServerControlled &&
     thread.sessionRef !== undefined &&
-    (thread.status === "idle" || thread.status === "needs_reply" || canQueueServerInput);
+    (thread.status === "idle" ||
+      thread.status === "needs_reply" ||
+      thread.status === "error" ||
+      canQueueServerInput);
   const canSubmitTerminalInput =
     usesTerminalPresentation &&
     isTerminalInput &&
@@ -243,6 +259,8 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     !usesTerminalPresentation && thread.sessionRef !== undefined && thread.status === "working";
   const pendingSteer = useAppStore((s) => s.pendingSteerByThreadId[thread.id]);
   const usesPendingSteerPath = !usesTerminalPresentation && thread.status === "working";
+  const runtimeRequests = useAppStore((s) => s.runtimeRequestsByThread[thread.id]);
+  const activeRuntimeRequest = !usesTerminalPresentation ? runtimeRequests?.[0] : undefined;
 
   function handleInterrupt() {
     if (isInterrupting) return;
@@ -292,6 +310,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     const flat = flattenSegments(allSegments);
     if (flat.length === 0 || !canSubmit) return;
     setIsSubmitting(true);
+    if (!usesTerminalPresentation) {
+      useAppStore.getState().requestChatScrollToBottom(thread.id);
+    }
 
     const focusPromise = needsFocusBeforeInput
       ? (props.terminalPaneRef.current?.focus(), new Promise<void>((r) => setTimeout(r, 80)))
@@ -338,14 +359,38 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   }
 
   useEffect(() => {
+    setSlashActiveIndex(0);
+  }, [slashQuery]);
+
+  useEffect(() => {
+    if (filteredCommands.length === 0) {
+      if (slashActiveIndex !== 0) {
+        setSlashActiveIndex(0);
+      }
+      return;
+    }
+    if (slashActiveIndex >= filteredCommands.length) {
+      setSlashActiveIndex(filteredCommands.length - 1);
+    }
+  }, [filteredCommands.length, slashActiveIndex]);
+
+  useEffect(() => {
     setPrompt("");
     setIsInterrupting(false);
+    setSlashQuery(null);
+    setSlashActiveIndex(0);
     setComposerCollapsed(collapseTerminalComposerSetting);
   }, [thread.id, collapseTerminalComposerSetting]);
 
   useEffect(() => {
     if (thread.status !== "working") setIsInterrupting(false);
   }, [thread.status]);
+
+  useEffect(() => {
+    if (isComposerCollapsed) {
+      setSlashQuery(null);
+    }
+  }, [isComposerCollapsed]);
 
   useEffect(() => {
     function handlePasteToComposer(e: Event) {
@@ -373,6 +418,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
           agentLabel={agentStatus?.label}
           request={activeServerRequest}
           onResolve={props.onResolveServerRequest}
+          onPlanApproved={() => props.onConfigChange({ ...thread.config, mode: "agent" })}
         />
       ) : null}
 
@@ -396,9 +442,18 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                   compact
                   fixedContent={
-                    showErrorInComposer || showTodoInComposer || pendingSteer ? (
+                    showErrorInComposer ||
+                    showTodoInComposer ||
+                    pendingSteer ||
+                    activeRuntimeRequest ||
+                    showCommandPanel ? (
                       <>
-                        {showErrorInComposer ? <ThreadErrorDock state={errorDockState!} /> : null}
+                        {showErrorInComposer ? (
+                          <ThreadErrorDock
+                            state={errorDockState!}
+                            onDismiss={props.onDismissError}
+                          />
+                        ) : null}
                         {showTodoInComposer ? (
                           <ThreadTodoDock
                             collapsed={todoDockCollapsed}
@@ -406,12 +461,34 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                             state={todoDockState!}
                             onCollapsedChange={props.onTodoDockCollapsedChange}
                             onPlacementChange={props.onTodoDockPlacementChange}
+                            onRetire={() => props.onTodoDockRetire?.()}
                           />
                         ) : null}
                         {pendingSteer ? (
                           <ThreadPendingSteerStrip
                             pending={pendingSteer}
                             onCancel={handleCancelPendingSteer}
+                          />
+                        ) : null}
+                        {activeRuntimeRequest ? (
+                          <ThreadRuntimeRequestPanel
+                            threadId={thread.id}
+                            request={activeRuntimeRequest}
+                            onResolve={props.onResolveServerRequest}
+                            onPlanApproved={() =>
+                              props.onConfigChange({ ...thread.config, mode: "agent" })
+                            }
+                          />
+                        ) : null}
+                        {showCommandPanel ? (
+                          <ThreadCommandPanel
+                            commands={filteredCommands}
+                            activeIndex={slashActiveIndex}
+                            onActiveIndexChange={setSlashActiveIndex}
+                            onSelect={(cmd) => {
+                              mentionRef.current?.insertSlashCommand(cmd.id);
+                              setSlashQuery(null);
+                            }}
                           />
                         ) : null}
                       </>
@@ -445,34 +522,63 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                       onPasteImage={(file) => {
                         void attachments.addClipboardImage(file, thread.id);
                       }}
-                      {...(showTerminalComposer
-                        ? {
-                            onInterceptKey: (e) => {
-                              if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                                e.preventDefault();
-                                void readBridge().writeTerminal({
-                                  threadId: thread.id,
-                                  data: "\x1b[Z",
-                                });
-                                return true;
-                              }
-                              if (
-                                (e.ctrlKey || e.metaKey) &&
-                                !e.shiftKey &&
-                                !e.altKey &&
-                                e.key.toLowerCase() === "t"
-                              ) {
-                                e.preventDefault();
-                                void readBridge().writeTerminal({
-                                  threadId: thread.id,
-                                  data: "\x14",
-                                });
-                                return true;
-                              }
-                              return false;
-                            },
+                      onInterceptKey={(e) => {
+                        if (showCommandPanel) {
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setSlashActiveIndex((prev) => (prev + 1) % filteredCommands.length);
+                            return true;
                           }
-                        : {})}
+                          if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            setSlashActiveIndex(
+                              (prev) =>
+                                (prev - 1 + filteredCommands.length) % filteredCommands.length,
+                            );
+                            return true;
+                          }
+                          if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+                            const selected = filteredCommands[slashActiveIndex];
+                            if (selected) {
+                              e.preventDefault();
+                              mentionRef.current?.insertSlashCommand(selected.id);
+                              setSlashQuery(null);
+                              return true;
+                            }
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setSlashQuery(null);
+                            return true;
+                          }
+                        }
+
+                        if (showTerminalComposer) {
+                          if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                            e.preventDefault();
+                            void readBridge().writeTerminal({
+                              threadId: thread.id,
+                              data: "\x1b[Z",
+                            });
+                            return true;
+                          }
+                          if (
+                            (e.ctrlKey || e.metaKey) &&
+                            !e.shiftKey &&
+                            !e.altKey &&
+                            e.key.toLowerCase() === "t"
+                          ) {
+                            e.preventDefault();
+                            void readBridge().writeTerminal({
+                              threadId: thread.id,
+                              data: "\x14",
+                            });
+                            return true;
+                          }
+                        }
+                        return false;
+                      }}
+                      onSlashCommandChange={setSlashQuery}
                     />
                   }
                   controls={controls}

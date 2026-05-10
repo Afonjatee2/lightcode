@@ -68,6 +68,7 @@ function PlainText({
               key={i}
               path={normalizeChatRelativePath(node.path)}
               line={node.line}
+              endLine={node.endLine}
               onOpen={actions?.openProjectRelativePath}
             />
           );
@@ -88,11 +89,11 @@ function PlainText({
 type PlainTextNode =
   | { kind: "text"; value: string }
   | { kind: "url"; href: string }
-  | { kind: "file"; path: string; line?: number }
+  | { kind: "file"; path: string; line?: number; endLine?: number }
   | { kind: "folder"; path: string };
 
 const PLAIN_TOKEN_RE =
-  /https?:\/\/[^\s<>"']+|(?<![A-Za-z0-9_:/@.\\-])([A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+))?/g;
+  /https?:\/\/[^\s<>"']+|(?<![A-Za-z0-9_:/@.\\-])([A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+)(?:-\d+)?)?/g;
 
 function tokenizePlainText(
   text: string,
@@ -123,7 +124,12 @@ function tokenizePlainText(
     if (ref.kind === "file") {
       out.push(
         ref.line !== undefined
-          ? { kind: "file", path: ref.path, line: ref.line }
+          ? {
+              kind: "file",
+              path: ref.path,
+              line: ref.line,
+              ...(ref.endLine !== undefined ? { endLine: ref.endLine } : {}),
+            }
           : { kind: "file", path: ref.path },
       );
     } else {

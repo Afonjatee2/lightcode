@@ -37,6 +37,13 @@ describe("serializeComposerContent", () => {
     ]);
   });
 
+  it("does not treat scoped package names as file mentions", () => {
+    container.textContent = "install @tanstack/react-virtual please";
+    expect(serializeToSegments(container)).toEqual([
+      { kind: "text", content: "install @tanstack/react-virtual please" },
+    ]);
+  });
+
   it("trims whitespace", () => {
     container.textContent = "  hello  ";
     expect(serializeComposerContent(container)).toBe("hello");

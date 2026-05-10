@@ -1,6 +1,11 @@
 import { useState, type ReactNode } from "react";
+import { AgentDiscoveryScreen } from "@/renderer/components/thread/AgentDiscoveryScreen";
+import { readBridge } from "@/renderer/bridge";
+import { useAppStore } from "@/renderer/state/appStore";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
+import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { PageLayout } from "@/renderer/components/layout/PageLayout";
+import { getSettingsInstalledAgents } from "@/shared/agentStatus";
 import { GeneralSettings } from "./parts/GeneralSettings";
 import { NotificationSettings } from "./parts/NotificationSettings";
 import { AISettings } from "./parts/AISettings";
@@ -33,8 +38,34 @@ function renderSection(activeSection: SettingsSection): ReactNode {
 export function SettingsOverlay(props: { onClose: () => void }) {
   const { onClose } = props;
   const [activeSection, setActiveSection] = useState<SettingsSection>("general");
+  const [isRefreshingAgents, setIsRefreshingAgents] = useState(false);
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
-  const installedAgents = agentStatuses.filter((a) => a.installed);
+  const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
+  const wslProjectDistrosKey = useAppStore((state) => buildWslProjectDistrosKey(state.projects));
+  const installedAgents = getSettingsInstalledAgents(agentStatuses, wslAgentStatuses);
+  const isAgentsSectionActive = activeSection === "agents" || activeSection.startsWith("agents:");
+  const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
+
+  const refreshAgents = () => {
+    if (isRefreshingAgents) {
+      return;
+    }
+    setActiveSection((prev) => {
+      if (prev === "agents" || prev.startsWith("agents:")) {
+        return prev;
+      }
+      const firstInstalled = installedAgents[0];
+      return firstInstalled ? `agents:${firstInstalled.kind}` : "agents";
+    });
+    useAgentStatusesStore.getState().resetDiscoveredAgents();
+    setIsRefreshingAgents(true);
+    void readBridge()
+      .refreshAgentStatuses(wslDistros)
+      .catch(() => undefined)
+      .finally(() => {
+        setIsRefreshingAgents(false);
+      });
+  };
 
   return (
     <PageLayout
@@ -45,9 +76,20 @@ export function SettingsOverlay(props: { onClose: () => void }) {
           onSectionChange={setActiveSection}
           onClose={onClose}
           installedAgents={installedAgents}
+          isRefreshingAgents={isRefreshingAgents}
+          onRefreshAgents={refreshAgents}
         />
       }
-      content={renderSection(activeSection)}
+      content={
+        <div className="relative h-full min-h-0">
+          {renderSection(activeSection)}
+          {isAgentsSectionActive && isRefreshingAgents ? (
+            <div className="absolute inset-0 z-20 bg-background/90 backdrop-blur-sm">
+              <AgentDiscoveryScreen />
+            </div>
+          ) : null}
+        </div>
+      }
     />
   );
 }

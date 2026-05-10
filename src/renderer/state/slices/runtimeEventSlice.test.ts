@@ -193,6 +193,43 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     );
   });
 
+  it("drops Copilot-style subagent children when the parent completes", () => {
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "tool-parent",
+      itemType: "tool_call",
+      payload: {
+        name: "Critiquing path fixes",
+        title: "Critiquing path fixes",
+        status: "running",
+        isSubAgent: true,
+        args: {
+          description: "Critiquing path fixes",
+          agent_type: "rubber-duck",
+          name: "path-fix-duck",
+          prompt: "We need to get a clean green run.",
+        },
+      },
+    });
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "child-1",
+      itemType: "assistant_message",
+      parentItemId: "tool-parent",
+    });
+    apply("t1", {
+      type: "item.completed",
+      threadId: "t1",
+      itemId: "tool-parent",
+      payload: { status: "success" },
+    });
+    const state = store.getState();
+    expect(state.runtimeItemIdsByThread["t1"]).toEqual(["tool-parent"]);
+    expect(state.runtimeItemsByIdByThread["t1"]?.["child-1"]).toBeUndefined();
+  });
+
   it("opens and resolves runtime requests", () => {
     apply("t1", {
       type: "request.opened",
@@ -220,7 +257,7 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     });
   });
 
-  it("clearThreadRuntimeEvents drops items and requests for that thread only", () => {
+  it("clearThreadRuntimeEvents drops items and requests for that thread only and marks persistence dirty", () => {
     apply("t1", {
       type: "item.started",
       threadId: "t1",
@@ -247,5 +284,21 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     expect(store.getState().runtimeItemsByIdByThread["t1"]).toBeUndefined();
     expect(store.getState().runtimeRequestsByThread["t1"]).toBeUndefined();
     expect(store.getState().runtimeItemIdsByThread["t2"]).toEqual(["i2"]);
+    expect(store.getState().runtimeDirtyThreadIds).toContain("t1");
+  });
+
+  it("merges persisted completed turns with live turns during hydration", () => {
+    store
+      .getState()
+      .hydrateThreadCompletedTurns("t1", [{ startedAt: 20, endedAt: 30, anchorItemId: "live" }]);
+    store.getState().hydrateThreadCompletedTurns("t1", [
+      { startedAt: 1, endedAt: 10, anchorItemId: "old" },
+      { startedAt: 20, endedAt: 30, anchorItemId: "live" },
+    ]);
+
+    expect(store.getState().runtimeCompletedTurnsByThread["t1"]).toEqual([
+      { startedAt: 1, endedAt: 10, anchorItemId: "old" },
+      { startedAt: 20, endedAt: 30, anchorItemId: "live" },
+    ]);
   });
 });

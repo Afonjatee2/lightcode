@@ -80,7 +80,56 @@ export function AppProvider(props: { children: ReactNode }) {
 
   return (
     <AppearanceContext.Provider value={appearance}>
-      <Toast.Provider placement="bottom end" maxVisibleToasts={5} />
+      <Toast.Provider placement="bottom end" maxVisibleToasts={5}>
+        {({ toast: toastItem }) => {
+          const content = toastItem.content;
+          const isObject = typeof content === "object" && content !== null;
+          const title = isObject ? (content as any).title : content;
+          const description = isObject ? (content as any).description : undefined;
+          const variant = isObject ? (content as any).variant : "default";
+          const onPress = isObject ? (content as any).onPress : undefined;
+          const hasOnPress = typeof onPress === "function";
+
+          return (
+            <Toast
+              toast={toastItem}
+              variant={variant}
+              className={`lc-toast min-w-80 border border-border/40 ${hasOnPress ? "cursor-pointer" : ""}`}
+            >
+              {hasOnPress ? (
+                <button
+                  type="button"
+                  onClick={onPress}
+                  className="flex w-full items-start gap-3 p-3 text-left"
+                >
+                  <Toast.Indicator variant={variant} />
+                  <Toast.Content className="p-0">
+                    {title && <Toast.Title>{title}</Toast.Title>}
+                    {description && (
+                      <Toast.Description className="whitespace-pre-wrap">
+                        {description}
+                      </Toast.Description>
+                    )}
+                  </Toast.Content>
+                </button>
+              ) : (
+                <div className="flex w-full items-start gap-3 p-3">
+                  <Toast.Indicator variant={variant} />
+                  <Toast.Content className="p-0">
+                    {title && <Toast.Title>{title}</Toast.Title>}
+                    {description && (
+                      <Toast.Description className="whitespace-pre-wrap">
+                        {description}
+                      </Toast.Description>
+                    )}
+                  </Toast.Content>
+                </div>
+              )}
+              <Toast.CloseButton className="absolute top-3 right-3" />
+            </Toast>
+          );
+        }}
+      </Toast.Provider>
       {children}
     </AppearanceContext.Provider>
   );

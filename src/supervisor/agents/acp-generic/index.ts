@@ -78,6 +78,7 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
   const adapter: AgentAdapter = {
     kind,
     label,
+    binary: cfg.binary,
     capabilities,
     async detectInstall(_ctx?: AgentEnvContext): Promise<AgentStatus> {
       const installed = isProbablyInstalled(cfg.binary);

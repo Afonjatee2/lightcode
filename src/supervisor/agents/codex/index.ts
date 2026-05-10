@@ -85,6 +85,7 @@ export function createCodexAdapter(): AgentAdapter {
   return {
     kind: "codex",
     label: "Codex",
+    binary: "codex",
     get capabilities() {
       return capabilities;
     },

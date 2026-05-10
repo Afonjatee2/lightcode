@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { Tooltip } from "@heroui/react";
-import { AlertTriangle, ChevronDown } from "lucide-react";
+import { AlertTriangle, ChevronDown, X } from "lucide-react";
 import type { ThreadErrorDockState } from "./threadErrorState";
 
 interface ThreadErrorDockProps {
   state: ThreadErrorDockState;
+  onDismiss?: () => void;
 }
 
 export function ThreadErrorDock(props: ThreadErrorDockProps) {
-  const { state } = props;
+  const { state, onDismiss } = props;
   const [collapsed, setCollapsed] = useState(true);
   const isMultiline = state.message.includes("\n") || state.message.length > 120;
   const canExpand = isMultiline;
@@ -43,6 +44,21 @@ export function ThreadErrorDock(props: ThreadErrorDockProps) {
               </button>
             </Tooltip.Trigger>
             <Tooltip.Content>{collapsed ? "Expand" : "Collapse"}</Tooltip.Content>
+          </Tooltip>
+        ) : null}
+        {onDismiss ? (
+          <Tooltip delay={0}>
+            <Tooltip.Trigger>
+              <button
+                aria-label="Dismiss error"
+                className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                type="button"
+                onClick={onDismiss}
+              >
+                <X className="size-3.5" />
+              </button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>Dismiss</Tooltip.Content>
           </Tooltip>
         ) : null}
       </div>

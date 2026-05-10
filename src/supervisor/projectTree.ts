@@ -1,6 +1,6 @@
 import type { Dirent, Stats } from "node:fs";
 import { readdir, readFile, rename, rm, stat, writeFile, mkdir } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { dirname, isAbsolute, posix, relative, resolve } from "node:path";
 import micromatch from "micromatch";
 import { readWslCommandOutputAsync } from "./agents/base";
 import type {
@@ -11,6 +11,8 @@ import type {
   MoveProjectEntryPayload,
   ProjectLocation,
   ProjectTreeEntry,
+  ReadAbsoluteFilePayload,
+  ReadAbsoluteFileResult,
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
@@ -239,6 +241,109 @@ export class ProjectTreeService {
       content,
       lineEnding: detectLineEnding(content),
       hasBom,
+    };
+  }
+
+  /**
+   * Read a file inside the project's root from the project's location context.
+   * Used by the chat UI to surface a just-created file's content when the
+   * agent didn't stream it. Native FS for Windows/POSIX projects; the WSL
+   * bridge for WSL projects.
+   *
+   * Returns `{ status: "missing" }` for ENOENT instead of throwing, since the
+   * file may have been deleted between the agent run and the renderer fetch
+   * — common enough that a per-row error toast would be noise.
+   */
+  async readAbsoluteFile(payload: ReadAbsoluteFilePayload): Promise<ReadAbsoluteFileResult> {
+    let raw: RawFileRead;
+    try {
+      raw =
+        payload.projectLocation.kind === "wsl" && this.wslClient
+          ? await this.readAbsoluteFileBufferWsl(
+              payload.projectLocation,
+              this.resolveProjectLinuxReadPath(payload.projectLocation, payload.absolutePath),
+              this.wslClient,
+            )
+          : await this.readAbsoluteFileBufferNative(
+              this.resolveProjectNativeReadPath(payload.projectLocation, payload.absolutePath),
+            );
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") return { status: "missing" };
+      throw err;
+    }
+
+    if (raw.kind === "tooLarge") {
+      return { status: "too_large", modifiedAtMs: raw.modifiedAtMs };
+    }
+
+    if (isBinaryBuffer(raw.buffer)) {
+      return { status: "binary", modifiedAtMs: raw.modifiedAtMs };
+    }
+
+    const hasBom = raw.buffer.subarray(0, BOM.length).equals(BOM);
+    const contentBuffer = hasBom ? raw.buffer.subarray(BOM.length) : raw.buffer;
+
+    let content: string;
+    try {
+      content = new TextDecoder("utf-8", { fatal: true }).decode(contentBuffer);
+    } catch {
+      return { status: "unsupported", modifiedAtMs: raw.modifiedAtMs };
+    }
+
+    return { status: "ready", modifiedAtMs: raw.modifiedAtMs, content };
+  }
+
+  private resolveProjectNativeReadPath(location: ProjectLocation, path: string): string {
+    if (!isAbsolute(path)) {
+      return this.resolveEntryPath(location, path);
+    }
+    const rootPath = resolve(getProjectFsPath(location));
+    const candidatePath = resolve(path);
+    const relativePath = relative(rootPath, candidatePath);
+    if (relativePath.startsWith("..") || relativePath === ".." || isAbsolute(relativePath)) {
+      throw new Error("Path escapes the project root.");
+    }
+    return candidatePath;
+  }
+
+  private resolveProjectLinuxReadPath(
+    location: Extract<ProjectLocation, { kind: "wsl" }>,
+    path: string,
+  ): string {
+    const root = posix.resolve(location.linuxPath);
+    const linuxPath = path.startsWith("/") ? posix.resolve(path) : posix.resolve(root, path);
+    if (linuxPath !== root && !linuxPath.startsWith(`${root}/`)) {
+      throw new Error("Path escapes the project root.");
+    }
+    return linuxPath;
+  }
+
+  private async readAbsoluteFileBufferNative(absolutePath: string): Promise<RawFileRead> {
+    if (!isAbsolute(absolutePath)) throw new Error("Path must be absolute.");
+    const fileStat = await stat(absolutePath);
+    if (!fileStat.isFile()) throw new Error("Only files can be read.");
+    if (fileStat.size > MAX_EDITABLE_FILE_SIZE) {
+      return { kind: "tooLarge", modifiedAtMs: fileStat.mtimeMs };
+    }
+    const buffer = await readFile(absolutePath);
+    return { kind: "ok", buffer, modifiedAtMs: fileStat.mtimeMs };
+  }
+
+  private async readAbsoluteFileBufferWsl(
+    location: Extract<ProjectLocation, { kind: "wsl" }>,
+    absolutePath: string,
+    wslClient: WslBridgeClient,
+  ): Promise<RawFileRead> {
+    const result = await wslClient.readFile(location, absolutePath, {
+      maxBytes: MAX_EDITABLE_FILE_SIZE,
+    });
+    if (result.tooLarge) {
+      return { kind: "tooLarge", modifiedAtMs: result.mtimeMs };
+    }
+    return {
+      kind: "ok",
+      buffer: Buffer.from(result.contentBase64, "base64"),
+      modifiedAtMs: result.mtimeMs,
     };
   }
 

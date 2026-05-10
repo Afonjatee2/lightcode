@@ -11,7 +11,7 @@ import { ContextCompaction, isContextCompactionToolCall } from "./ContextCompact
 import { PlanProposal, isPlanProposalToolCall } from "./PlanProposal";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import { extractAcpArgsPart, extractAcpResultPart } from "./acpToolPayload";
-import { deriveToolDisplay } from "./toolDisplay";
+import { deriveToolDisplay, isSkillTool } from "./toolDisplay";
 
 interface ToolCallProps {
   item: RuntimeChatItem;
@@ -44,6 +44,7 @@ export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
     <ChatItemAccordion
       icon={<Icon className="size-3" />}
       title={display.title}
+      {...(display.parts ? { titleParts: display.parts } : {})}
       rightLabel={status.rightLabel}
       rightLabelClassName={status.rightLabelClassName}
       hasBody={hasDetails}
@@ -75,13 +76,4 @@ function resolveToolStatus(item: RuntimeChatItem, payload: ToolCallPayload): Too
     };
   }
   return { rightLabel: null, rightLabelClassName: "!text-[color:var(--muted)]" };
-}
-
-function isSkillTool(payload: ToolCallPayload): boolean {
-  const n = payload.name.trim();
-  if (n === "Skill" || /^(loaded|using) skill\b/i.test(n)) return true;
-  const args = payload.args;
-  if (!args || typeof args !== "object" || Array.isArray(args)) return false;
-  const skill = (args as Record<string, unknown>).skill;
-  return typeof skill === "string" && skill.length > 0;
 }

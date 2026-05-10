@@ -116,7 +116,7 @@ describe("sdkCanonicalMapping — permission/question events", () => {
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({
       type: "request.opened",
-      requestId: "perm_1",
+      requestId: "opencode-perm-perm_1",
       requestType: "command_execution_approval",
     });
   });
@@ -148,6 +148,7 @@ describe("sdkCanonicalMapping — permission/question events", () => {
     expect(events).toHaveLength(1);
     const ev = events[0];
     if (ev?.type !== "request.opened") throw new Error("unexpected event");
+    expect(ev.requestId).toBe("opencode-q-q_1");
     expect(ev.requestType).toBe("tool_user_input");
     expect(ev.payload.multiSelect).toBe(true);
     expect(ev.payload.options).toHaveLength(2);

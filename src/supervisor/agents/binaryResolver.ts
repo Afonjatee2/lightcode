@@ -1,5 +1,5 @@
 import type { ProjectLocation } from "@/shared/contracts";
-import { resolveExecutablePath, resolveWslExecutablePath } from "./base";
+import { getCachedExecutablePath, resolveExecutablePath, resolveWslExecutablePath } from "./base";
 
 // Single process-wide cache, keyed by `${distro}\0${binary}`.
 // Replaces per-adapter `detectedWslExecPaths` maps so detection probes and
@@ -29,16 +29,18 @@ export function resolveAgentBinaryPath(
     cache.set(key, resolved);
     return resolved;
   }
-  if (location.kind !== "wsl") {
-    return undefined;
+  if (location.kind === "wsl") {
+    const key = keyOf(location.distro, binary);
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    const resolved = resolveWslExecutablePath(location.distro, binary);
+    cache.set(key, resolved);
+    return resolved;
   }
-  const key = keyOf(location.distro, binary);
-  if (cache.has(key)) {
-    return cache.get(key);
-  }
-  const resolved = resolveWslExecutablePath(location.distro, binary);
-  cache.set(key, resolved);
-  return resolved;
+  // posix: piggy-back on the shared exec-path cache populated by
+  // primeExecutablePathCache during agent detection.
+  return getCachedExecutablePath(binary);
 }
 
 /**

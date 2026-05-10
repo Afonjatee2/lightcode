@@ -4,8 +4,25 @@ import type {
   RequestPayload,
   RuntimeContentStreamKind,
   RuntimeEvent,
+  ToolCallPayload,
 } from "@/shared/contracts";
 import type { AppStoreState, SliceCreator } from "./shared";
+
+/**
+ * Frozen "Worked for X" record for a turn that has finished. Persisted so the
+ * chat can keep prior turn timings visible across reloads. The most recent
+ * turn is normally displayed by the live tail loader; this list lets older
+ * turns keep their indicator in place.
+ *
+ * `anchorItemId` is the last canonical item present in the thread at the
+ * moment the turn closed — the renderer hangs the inline indicator beneath
+ * that row in the timeline.
+ */
+export interface CompletedTurnRecord {
+  startedAt: number;
+  endedAt: number;
+  anchorItemId: string | null;
+}
 
 /** Per-thread record of canonical chat items, derived from RuntimeEvent streams. */
 export interface RuntimeChatItem {
@@ -51,12 +68,22 @@ export interface RuntimeEventSlice {
    * validation instead of recomputing a per-item fingerprint on every read.
    */
   runtimeStructuralVersionByThread: Record<string, number>;
+  /** Frozen per-turn timing windows accumulated during the session. */
+  runtimeCompletedTurnsByThread: Record<string, ReadonlyArray<CompletedTurnRecord>>;
   applyRuntimeEvent(threadId: string, event: RuntimeEvent): void;
   applyRuntimeEvents(threadId: string, events: RuntimeEvent[]): void;
   clearRuntimeDirtyThreadIds(threadIds: readonly string[]): void;
   clearThreadRuntimeEvents(threadId: string): void;
   /** Replace the persisted item list for a thread (used during DB hydration). */
   hydrateThreadRuntimeItems(threadId: string, items: RuntimeChatItem[]): void;
+  /** Replace the persisted completed-turn list (used during DB hydration). */
+  hydrateThreadCompletedTurns(threadId: string, turns: ReadonlyArray<CompletedTurnRecord>): void;
+  /**
+   * Drop all child items of a sub-agent parent from the thread. Called when
+   * the renderer closes the overlay (so re-opening reloads from the supervisor
+   * buffer cleanly) and is a no-op if no children are present.
+   */
+  evictSubAgentChildren(threadId: string, parentItemId: string): void;
 }
 
 /**
@@ -77,6 +104,7 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
   runtimeRequestsByThread: {},
   runtimeDirtyThreadIds: [],
   runtimeStructuralVersionByThread: {},
+  runtimeCompletedTurnsByThread: {},
 
   applyRuntimeEvent: (threadId, event) =>
     set((state) => applyRuntimeEventsToState(state, threadId, [event])),
@@ -99,7 +127,10 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
       if (
         !(threadId in state.runtimeItemIdsByThread) &&
         !(threadId in state.runtimeItemsByIdByThread) &&
-        !(threadId in state.runtimeRequestsByThread)
+        !(threadId in state.runtimeRequestsByThread) &&
+        !(threadId in state.runtimeStructuralVersionByThread) &&
+        !(threadId in state.runtimeCompletedTurnsByThread) &&
+        !state.runtimeDirtyThreadIds.includes(threadId)
       ) {
         return {};
       }
@@ -111,11 +142,18 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         state.runtimeRequestsByThread;
       const { [threadId]: _droppedVersion, ...runtimeStructuralVersionByThread } =
         state.runtimeStructuralVersionByThread;
+      const { [threadId]: _droppedTurns, ...runtimeCompletedTurnsByThread } =
+        state.runtimeCompletedTurnsByThread;
+      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.includes(threadId)
+        ? state.runtimeDirtyThreadIds
+        : [...state.runtimeDirtyThreadIds, threadId];
       return {
         runtimeItemIdsByThread,
         runtimeItemsByIdByThread,
         runtimeRequestsByThread,
         runtimeStructuralVersionByThread,
+        runtimeCompletedTurnsByThread,
+        runtimeDirtyThreadIds,
       };
     }),
 
@@ -134,6 +172,54 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         runtimeItemsByIdByThread: {
           ...state.runtimeItemsByIdByThread,
           [threadId]: itemsById,
+        },
+        runtimeStructuralVersionByThread: {
+          ...state.runtimeStructuralVersionByThread,
+          [threadId]: (state.runtimeStructuralVersionByThread[threadId] ?? 0) + 1,
+        },
+      };
+    }),
+
+  hydrateThreadCompletedTurns: (threadId, turns) =>
+    set((state) => {
+      if (turns.length === 0) return {};
+      const existing = state.runtimeCompletedTurnsByThread[threadId] ?? [];
+      const merged = mergeCompletedTurns(existing, turns);
+      if (merged === existing) return {};
+      return {
+        runtimeCompletedTurnsByThread: {
+          ...state.runtimeCompletedTurnsByThread,
+          [threadId]: merged,
+        },
+      };
+    }),
+
+  evictSubAgentChildren: (threadId, parentItemId) =>
+    set((state) => {
+      const ids = state.runtimeItemIdsByThread[threadId];
+      const items = state.runtimeItemsByIdByThread[threadId];
+      if (!ids?.length || !items) return {};
+      const remainingIds: string[] = [];
+      const remainingItems: Record<string, RuntimeChatItem> = {};
+      let evicted = 0;
+      for (const id of ids) {
+        const item = items[id];
+        if (item?.parentItemId === parentItemId) {
+          evicted += 1;
+          continue;
+        }
+        remainingIds.push(id);
+        if (item) remainingItems[id] = item;
+      }
+      if (evicted === 0) return {};
+      return {
+        runtimeItemIdsByThread: {
+          ...state.runtimeItemIdsByThread,
+          [threadId]: remainingIds,
+        },
+        runtimeItemsByIdByThread: {
+          ...state.runtimeItemsByIdByThread,
+          [threadId]: remainingItems,
         },
         runtimeStructuralVersionByThread: {
           ...state.runtimeStructuralVersionByThread,
@@ -295,6 +381,40 @@ function applyRuntimeEventToRuntimeState(
           },
         };
       }
+      // A completing sub-agent parent (Claude `Task`/`Agent`) keeps only the
+      // final result on the parent payload — the child step trail is dropped
+      // both in-memory and on persistence (the persister mirrors this slice).
+      // The overlay renders `payload.result` for completed sub-agents, so the
+      // history is no longer needed.
+      if (isSubAgentToolCallItem(next)) {
+        const ids = state.runtimeItemIdsByThread[threadId];
+        if (ids) {
+          const childIds = new Set<string>();
+          for (const id of ids) {
+            if (items[id]?.parentItemId === event.itemId) childIds.add(id);
+          }
+          if (childIds.size > 0) {
+            const remainingItems: Record<string, RuntimeChatItem> = {};
+            for (const [id, value] of Object.entries(items)) {
+              if (id === event.itemId) {
+                remainingItems[id] = next;
+              } else if (!childIds.has(id)) {
+                remainingItems[id] = value;
+              }
+            }
+            return {
+              runtimeItemIdsByThread: {
+                ...state.runtimeItemIdsByThread,
+                [threadId]: ids.filter((id) => !childIds.has(id)),
+              },
+              runtimeItemsByIdByThread: {
+                ...state.runtimeItemsByIdByThread,
+                [threadId]: remainingItems,
+              },
+            };
+          }
+        }
+      }
       return {
         runtimeItemsByIdByThread: {
           ...state.runtimeItemsByIdByThread,
@@ -412,6 +532,45 @@ function coalesceRuntimeEvents(events: RuntimeEvent[]): RuntimeEvent[] {
 
   flushPendingDelta();
   return coalesced;
+}
+
+function isSubAgentToolCallItem(item: RuntimeChatItem): boolean {
+  if (item.type !== "tool_call") return false;
+  const payload = item.payload as ToolCallPayload | undefined;
+  if (!payload) return false;
+  if (payload.isSubAgent === true) return true;
+  const args = payload.args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return false;
+  const argRecord = args as Record<string, unknown>;
+  return (
+    typeof argRecord.subagent_type === "string" ||
+    typeof argRecord.agent_type === "string" ||
+    typeof argRecord.agentType === "string"
+  );
+}
+
+function mergeCompletedTurns(
+  existing: ReadonlyArray<CompletedTurnRecord>,
+  incoming: ReadonlyArray<CompletedTurnRecord>,
+): ReadonlyArray<CompletedTurnRecord> {
+  if (incoming.length === 0) return existing;
+  const byWindow = new Map<string, CompletedTurnRecord>();
+  for (const turn of existing) {
+    byWindow.set(completedTurnKey(turn), turn);
+  }
+  let changed = false;
+  for (const turn of incoming) {
+    const key = completedTurnKey(turn);
+    if (byWindow.has(key)) continue;
+    byWindow.set(key, turn);
+    changed = true;
+  }
+  if (!changed) return existing;
+  return [...byWindow.values()].sort((a, b) => a.startedAt - b.startedAt || a.endedAt - b.endedAt);
+}
+
+function completedTurnKey(turn: CompletedTurnRecord): string {
+  return `${turn.startedAt}:${turn.endedAt}:${turn.anchorItemId ?? ""}`;
 }
 
 /** Shallow-merge two payloads so item.updated layers on top of started. */

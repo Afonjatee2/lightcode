@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { agentSlashCommandSchema } from "./agent";
 import { agentInstanceIdSchema } from "./agentInstance";
 import {
   agentKindSchema,
@@ -38,8 +39,15 @@ export const threadSchema = z.object({
   presentationMode: threadPresentationModeSchema.optional(),
   createdAt: z.string().min(1),
   updatedAt: z.string().min(1),
+  /** Start time of the currently live run window, if the thread is actively working. */
+  activeTurnStartedAt: z.string().min(1).optional(),
+  /** Start time of the most recently completed run window, if known. */
+  lastTurnStartedAt: z.string().min(1).optional(),
+  /** End time of the most recently completed run window, if known. */
+  lastTurnEndedAt: z.string().min(1).optional(),
   /** Set by supervisor `thread-state`; not user-editable. */
   threadStatusSource: threadStatusSourceSchema.optional(),
+  slashCommands: z.array(agentSlashCommandSchema).optional(),
 });
 export type Thread = z.infer<typeof threadSchema>;
 
@@ -52,6 +60,7 @@ export interface ThreadRuntimeSnapshot {
   canResumeWithConfig: boolean;
   errorMessage?: string;
   threadStatusSource?: ThreadStatusSource;
+  slashCommands?: z.infer<typeof agentSlashCommandSchema>[];
 }
 
 export const terminalSizeSchema = z.object({

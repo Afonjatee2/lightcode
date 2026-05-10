@@ -1,6 +1,7 @@
 import type { PromptSegment } from "@/shared/contracts";
 
 const INLINE_FILE_TOKEN_REGEX = /(^|\s)@([^\s@]+)(?=\s|$)/g;
+const PATH_PREFIX_REGEX = /^(\.{1,2}\/|\.|\/|~\/|[A-Za-z]:[\\/])/;
 
 function pushTextSegment(segments: PromptSegment[], content: string): void {
   if (content.length === 0) {
@@ -30,8 +31,10 @@ function pushTextBufferSegments(segments: PromptSegment[], content: string): voi
     if (mentionStart > cursor) {
       pushTextSegment(segments, content.slice(cursor, mentionStart));
     }
-    if (path.length > 0) {
+    if (isLikelyInlineFilePath(path)) {
       segments.push({ kind: "file", path });
+    } else {
+      pushTextSegment(segments, content.slice(mentionStart, mentionEnd));
     }
     cursor = mentionEnd;
   }
@@ -39,6 +42,14 @@ function pushTextBufferSegments(segments: PromptSegment[], content: string): voi
   if (cursor < content.length) {
     pushTextSegment(segments, content.slice(cursor));
   }
+}
+
+function isLikelyInlineFilePath(path: string): boolean {
+  if (path.length === 0) return false;
+  if (PATH_PREFIX_REGEX.test(path)) return true;
+  const normalized = path.replace(/\\/g, "/");
+  const lastSegment = normalized.split("/").at(-1) ?? normalized;
+  return lastSegment.includes(".");
 }
 
 /**
@@ -68,6 +79,12 @@ export function serializeToSegments(container: HTMLDivElement): PromptSegment[] 
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     const el = node as HTMLElement;
 
+    // contentEditable creates <div> or <p> for new lines
+    const isBlock = (el.tagName === "DIV" || el.tagName === "P") && el !== container;
+    if (isBlock && (textBuffer.length > 0 || segments.length > 0)) {
+      textBuffer += "\n";
+    }
+
     if (el.dataset.mentionPath) {
       flushText();
       segments.push({ kind: "file", path: el.dataset.mentionPath });
@@ -82,11 +99,6 @@ export function serializeToSegments(container: HTMLDivElement): PromptSegment[] 
     // Recurse into child nodes (e.g. divs created by Enter key)
     for (const child of el.childNodes) {
       walk(child);
-    }
-
-    // contentEditable creates <div> for new lines
-    if (el.tagName === "DIV" && el !== container) {
-      textBuffer += "\n";
     }
   }
 

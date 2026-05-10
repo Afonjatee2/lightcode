@@ -100,7 +100,20 @@ export function ThreadPane(props: {
           markThreadDone(latestThread.id);
         }
       }}
-      onConfigChange={(config) => updateThreadConfig(thread.id, config)}
+      onConfigChange={(config) => {
+        updateThreadConfig(thread.id, config);
+        // If the thread was in an error state, clearing it now lets the user
+        // see the header status return to normal (non-red) as they've taken
+        // action to address the failure (e.g. by switching models).
+        if (thread.status === "error") {
+          updateThreadRuntime(thread.id, {
+            status: "idle",
+            attention: "none",
+            canResumeWithConfig: thread.canResumeWithConfig,
+            ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
+          });
+        }
+      }}
       pendingServerRequests={pendingServerRequests}
       projectLocation={
         thread.worktreePath

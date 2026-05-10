@@ -23,6 +23,8 @@ import { friendlyError } from "@/shared/messages";
 import { PresentationModeTabs } from "./PresentationModeTabs";
 import { ThreadDraftComposerArea, type DraftStartInput } from "./ThreadDraftComposerArea";
 import type { ComposerControl } from "./ThreadComposer";
+import { AgentDiscoveryScreen } from "./AgentDiscoveryScreen";
+import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 
 function resolvePreferredAgentKind(
   installedAgents: AgentStatus[],
@@ -141,11 +143,12 @@ function resolveInitialPresentationMode(
   agent: AgentStatus | undefined,
   lastByAgent: Record<string, ThreadPresentationMode>,
 ): ThreadPresentationMode {
-  if (!agent) return "terminal";
+  if (!agent) return "gui";
   const supported = agent.capabilities.presentationModes ?? [agent.capabilities.presentationMode];
   const last = lastByAgent[agent.kind];
   if (last && supported.includes(last)) return last;
-  return supported[0] ?? agent.capabilities.presentationMode ?? "terminal";
+  if (supported.includes("gui")) return "gui";
+  return supported[0] ?? agent.capabilities.presentationMode ?? "gui";
 }
 
 function resolveProviderDraftConfig(
@@ -221,6 +224,7 @@ export function ThreadDraftView(props: {
   } = props;
   const gitBranch = useGitStore((s) => s.statuses[project.id]?.branch);
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
+  const inFirstLaunchDiscovery = useAgentStatusesStore((s) => s.inFirstLaunchDiscovery);
 
   const installedAgents = agentStatuses.filter(
     (status) => status.installed && !disabledAgents.includes(status.kind),
@@ -268,8 +272,12 @@ export function ThreadDraftView(props: {
   const [presentationMode, setPresentationMode] = useState<ThreadPresentationMode>(() =>
     resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent),
   );
-  // Re-resolve only on provider switches and only when the new provider
-  // can't serve the current mode. Why this set of deps:
+  const previousPresentationAgentKindRef = useRef<AgentStatus["kind"] | undefined>(
+    selectedAgent?.kind,
+  );
+  // Re-resolve when the first provider arrives after an empty draft, or on a
+  // provider switch when the new provider can't serve the current mode. Why
+  // this set of deps:
   //   - `lastPresentationModeByAgent` is the user's per-provider memory; we
   //     intentionally read the *latest* value at provider-switch time but
   //     don't want intra-session writes to retrigger this effect (the user
@@ -280,7 +288,15 @@ export function ThreadDraftView(props: {
   // The model picker already filters providers to those that support the
   // active surface, so a model swap should never flip CLI/Chat silently.
   useEffect(() => {
+    const previousAgentKind = previousPresentationAgentKindRef.current;
+    previousPresentationAgentKindRef.current = selectedAgent?.kind;
     if (!selectedAgent) return;
+    if (!previousAgentKind) {
+      setPresentationMode(
+        resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent),
+      );
+      return;
+    }
     if (supportedPresentationModes.includes(presentationMode)) return;
     setPresentationMode(resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only re-run on provider change
@@ -552,6 +568,13 @@ export function ThreadDraftView(props: {
 
   if (!selectedAgent) {
     if (props.isDetectingAgents) {
+      // First-launch fancy reveal: tiles fade in as `agent-detected` events
+      // arrive. Subsequent reloads (cache present, but the user opted out of
+      // every agent or none are installed) fall back to the lightweight
+      // pixel loader.
+      if (inFirstLaunchDiscovery) {
+        return <AgentDiscoveryScreen />;
+      }
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">
           <PixelLoader size="md" />
@@ -625,26 +648,30 @@ export function ThreadDraftView(props: {
             className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1 ${props.dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
           >
             <TerminalSquare className="size-3.5 shrink-0 text-muted/60" />
-            <span className="flex-1 truncate text-sm font-medium leading-tight text-muted">
-              New thread {project.name}
+            <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-muted">
+              New thread
             </span>
-            {props.showCloseButton && props.onClose && (
-              <button
-                type="button"
-                className="shrink-0 rounded p-0.5 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  props.onClose?.();
-                }}
-              >
-                <X className="size-3.5" />
-              </button>
-            )}
+            <div className="flex shrink-0 items-center">
+              <span className="px-1 text-sm leading-tight text-muted/60">{project.name}</span>
+              {props.showCloseButton && props.onClose && (
+                <button
+                  type="button"
+                  aria-label="Close pane"
+                  className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onClose?.();
+                  }}
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
       <div
-        className={`${props.compact ? alignClass : "mx-auto"} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-3 ${props.compact ? "pb-2" : "py-8"}`}
+        className={`${props.compact ? alignClass : "mx-auto"} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-3 pb-2 ${props.compact ? "" : "pt-2"}`}
       >
         {props.dropIndicator === "replace" && (
           <div

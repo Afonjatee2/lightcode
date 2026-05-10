@@ -49,6 +49,7 @@ export function createOpenCodeAdapter(): AgentAdapter {
   return {
     kind: "opencode",
     label: "OpenCode",
+    binary: "opencode",
     get capabilities() {
       return capabilities;
     },

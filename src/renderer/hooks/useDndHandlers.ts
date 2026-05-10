@@ -139,7 +139,6 @@ export function useDndHandlers() {
       }
     } else if (source.type === "new-thread") {
       const draftPaneId = makeDraftPaneId(source.projectId);
-      if (panes.includes(draftPaneId)) return;
       startTransition(() => {
         if (target.kind === "replace") replacePaneById(draftPaneId, target.paneId);
         else if (target.kind === "split-pane")

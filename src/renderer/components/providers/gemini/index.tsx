@@ -46,8 +46,8 @@ registerComposerControls("gemini", ({ capabilities, config, isDisabled, onConfig
         },
       ]
     : []),
-  // Approval policy (hidden in plan mode — plan has its own approval semantics)
-  ...(capabilities.approvalPolicies.length > 0 && (config.mode ?? "agent") === "agent"
+  // Approval policy (always visible if supported)
+  ...(capabilities.approvalPolicies.length > 0
     ? [
         {
           iconKind: "permission" as const,

@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { PointerActivationConstraints } from "@dnd-kit/dom";
 import { DragDropProvider, KeyboardSensor, PointerSensor } from "@dnd-kit/react";
 import { isSortable } from "@dnd-kit/react/sortable";
-import { makeDraftPaneId } from "@/shared/paneId";
 import type { PaneLayout, PaneLayoutAxis, PaneLayoutInsertTarget } from "@/shared/paneLayout";
 import { findPanePath } from "@/shared/paneLayout";
 import { useFileEditorStore } from "./state/fileEditorStore";
@@ -315,15 +314,12 @@ export function AppDndProvider(props: {
   ) => void;
   onPaneDrop: (source: DragSourceData, target: PaneDropIndicator | null) => void;
   onMainPanelDrop: (source: MainPanelDropSource) => void;
-  paneThreadIds: string[];
   paneLayout: PaneLayout;
 }) {
   const pointer = useRef({ x: 0, y: 0 });
   const paneIndicatorRef = useRef<PaneDropIndicator | null>(null);
   const mainPanelDropActiveRef = useRef(false);
   const sidebarSortTargetRef = useRef<DragSourceData | null>(null);
-  const paneThreadIdsRef = useRef(props.paneThreadIds);
-  paneThreadIdsRef.current = props.paneThreadIds;
 
   const activePaneTarget = useRef<{
     paneId: string;
@@ -443,16 +439,6 @@ export function AppDndProvider(props: {
           targetType === "pane-drop-zone" &&
           (data.type === "thread" || data.type === "pane" || data.type === "new-thread")
         ) {
-          if (data.type === "new-thread") {
-            const draftId = makeDraftPaneId(data.projectId);
-            if (paneThreadIdsRef.current.includes(draftId)) {
-              activePaneTarget.current = null;
-              setPaneIndicatorState(null);
-              paneIndicatorRef.current = null;
-              return;
-            }
-          }
-
           const paneId = targetData?.paneId as string | undefined;
           const element = target.element;
           if (paneId && element) {

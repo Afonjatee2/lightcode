@@ -39,6 +39,7 @@ describe("ThreadTodoDock", () => {
           state={state}
           onCollapsedChange={onCollapsedChange}
           onPlacementChange={onPlacementChange}
+          onRetire={() => undefined}
         />
       </AppProvider>,
     );
@@ -61,6 +62,7 @@ describe("ThreadTodoDock", () => {
           state={state}
           onCollapsedChange={() => undefined}
           onPlacementChange={() => undefined}
+          onRetire={() => undefined}
         />
       </AppProvider>,
     );
@@ -69,5 +71,38 @@ describe("ThreadTodoDock", () => {
     expect(screen.getByText("Wire ACP todo placement")).toBeInTheDocument();
     expect(screen.queryByText("Build ACP todo dock")).not.toBeInTheDocument();
     expect(screen.queryByText("Cover ACP todo dock behavior")).not.toBeInTheDocument();
+  });
+
+  it("shows all in-progress rows when collapsed", () => {
+    const multiInProgressState = {
+      sourceItemId: "plan-1",
+      itemState: "updated" as const,
+      sourceKind: "steps" as const,
+      activeIndex: 1,
+      steps: [
+        { text: "Task 1", status: "completed" as const },
+        { text: "Task 2", status: "in_progress" as const },
+        { text: "Task 3", status: "in_progress" as const },
+        { text: "Task 4", status: "pending" as const },
+      ],
+    };
+
+    render(
+      <AppProvider>
+        <ThreadTodoDock
+          collapsed
+          placement="right"
+          state={multiInProgressState}
+          onCollapsedChange={() => undefined}
+          onPlacementChange={() => undefined}
+          onRetire={() => undefined}
+        />
+      </AppProvider>,
+    );
+
+    expect(screen.getByText("Task 2")).toBeInTheDocument();
+    expect(screen.getByText("Task 3")).toBeInTheDocument();
+    expect(screen.queryByText("Task 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("Task 4")).not.toBeInTheDocument();
   });
 });

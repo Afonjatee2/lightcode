@@ -1,4 +1,8 @@
-import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
+import {
+  getRuntimeItemPayload,
+  type RuntimeChatItem,
+} from "@/renderer/state/slices/runtimeEventSlice";
+import type { ToolCallPayload } from "@/shared/contracts";
 import { memo } from "react";
 import { useAppStore } from "@/renderer/state/appStore";
 import {
@@ -16,6 +20,7 @@ import { ToolCall } from "./ToolCall";
 import { ToolCallGroup } from "./ToolCallGroup";
 import { UserMessage } from "./UserMessage";
 import { WebSearchItem } from "./WebSearchItem";
+import { isSubAgentTool } from "./toolDisplay";
 
 interface ChatItemRowProps {
   threadId: string;
@@ -62,8 +67,11 @@ const SingleChatItemRow = memo(function SingleChatItemRow({
     });
   }
   if (!item) return null;
-  if (item.type === "tool_call" && childIds.length > 0) {
-    return <SubAgentToolCall threadId={threadId} item={item} />;
+  if (item.type === "tool_call") {
+    const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+    if (childIds.length > 0 || isSubAgentTool(payload)) {
+      return <SubAgentToolCall threadId={threadId} item={item} />;
+    }
   }
   return renderItem(item);
 });

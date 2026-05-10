@@ -7,6 +7,13 @@ export interface ChatItemAccordionProps {
   icon: ReactNode;
   /** Single-line title; truncated with ellipsis when too long. */
   title: ReactNode;
+  /**
+   * Optional structured title. When provided the row renders `prefix` (kept
+   * fully visible) followed by `path` truncated from the START — the ellipsis
+   * appears at the beginning of the path so the tail (filename) stays
+   * readable. `title` is still used as the tooltip / accessible label.
+   */
+  titleParts?: { prefix: string; path: string };
   /** Optional muted/danger label rendered on the right of the trigger row. */
   rightLabel?: ReactNode;
   /** Tailwind class applied to `rightLabel` (e.g. `"text-danger"`). */
@@ -44,6 +51,7 @@ const codeClass = "block truncate font-mono !text-[color:var(--muted)]";
 export function ChatItemAccordion({
   icon,
   title,
+  titleParts,
   rightLabel,
   rightLabelClassName = "!text-[color:var(--muted)]",
   hasBody = true,
@@ -52,27 +60,42 @@ export function ChatItemAccordion({
   children,
 }: ChatItemAccordionProps) {
   const actions = useChatPaneActions();
-  const titleString = typeof title === "string" ? title : undefined;
+  const titleString =
+    typeof title === "string"
+      ? title
+      : titleParts
+        ? `${titleParts.prefix}${titleParts.path}`
+        : undefined;
   const codeRef = useRef<HTMLElement | null>(null);
+  const pathRef = useRef<HTMLSpanElement | null>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
 
   useLayoutEffect(() => {
-    const el = codeRef.current;
+    const el = titleParts ? pathRef.current : codeRef.current;
     if (!el) return;
     const check = () => setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
     check();
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [titleString]);
+  }, [titleString, titleParts]);
+
+  const titleContent = titleParts ? (
+    <code className={`${codeClass} flex items-baseline overflow-hidden`}>
+      <span className="shrink-0 whitespace-pre">{titleParts.prefix}</span>
+      <span ref={pathRef} className="lc-truncate-start flex-1">
+        {titleParts.path}
+      </span>
+    </code>
+  ) : (
+    <code ref={codeRef} className={codeClass}>
+      {title}
+    </code>
+  );
 
   const titleNode = (
     <Tooltip delay={300} isDisabled={!isOverflowing || !titleString}>
-      <Tooltip.Trigger className="min-w-0 flex-1">
-        <code ref={codeRef} className={codeClass}>
-          {title}
-        </code>
-      </Tooltip.Trigger>
+      <Tooltip.Trigger className="min-w-0 flex-1">{titleContent}</Tooltip.Trigger>
       <Tooltip.Content placement="top" className="max-w-[80vw] break-all">
         {titleString}
       </Tooltip.Content>

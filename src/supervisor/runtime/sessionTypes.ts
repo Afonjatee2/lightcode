@@ -1,6 +1,7 @@
 import type { IPty } from "node-pty";
 import type {
   AgentKind,
+  AgentSlashCommand,
   ProjectLocation,
   PromptSegment,
   SessionRef,
@@ -45,6 +46,7 @@ export interface SessionRuntime {
   projectLocation: ProjectLocation;
   config: ThreadConfig;
   sessionRef?: SessionRef;
+  slashCommands?: AgentSlashCommand[];
   status: ThreadStatus;
   attention: ThreadAttention;
   canResumeWithConfig: boolean;

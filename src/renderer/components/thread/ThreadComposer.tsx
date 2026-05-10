@@ -114,6 +114,7 @@ function resolveIcon(control: ComposerControl): ReactNode | undefined {
 export function ThreadComposer(props: {
   autoFocus?: boolean;
   compact?: boolean;
+  variant?: "draft" | "active";
   prompt: string;
   placeholder: string;
   fixedContent?: ReactNode;
@@ -133,6 +134,7 @@ export function ThreadComposer(props: {
   const {
     autoFocus = false,
     compact = false,
+    variant = "active",
     prompt,
     placeholder,
     fixedContent,
@@ -453,7 +455,13 @@ export function ThreadComposer(props: {
 
   return (
     <div>
-      <div className="lightcode-composer-shell overflow-hidden">
+      <div
+        className={
+          variant === "draft"
+            ? "lightcode-composer-shell lightcode-composer-shell--draft overflow-hidden"
+            : "lightcode-composer-shell overflow-hidden"
+        }
+      >
         {fixedContent}
         {attachmentBar}
         <div ref={editorHostRef}>{renderEditor()}</div>

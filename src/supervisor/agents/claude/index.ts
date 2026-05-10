@@ -32,6 +32,7 @@ export function createClaudeAdapter(): AgentAdapter {
   return {
     kind: "claude",
     label: "Claude Code",
+    binary: "claude",
     capabilities: claudeCapabilities,
     // WSL OAuth flows try to open a browser; no-op it so the PTY doesn't hang.
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },

@@ -49,6 +49,7 @@ export function createCopilotAdapter(): AgentAdapter {
   return {
     kind: "copilot",
     label: "GitHub Copilot",
+    binary: "copilot",
     get capabilities() {
       return capabilities;
     },

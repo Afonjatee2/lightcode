@@ -1,10 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionNotification } from "@agentclientprotocol/sdk";
-import {
-  closeOpenTurnItems,
-  createAcpMapperState,
-  mapAcpSessionUpdate,
-} from "./canonicalMapping";
+import { closeOpenTurnItems, createAcpMapperState, mapAcpSessionUpdate } from "./canonicalMapping";
 
 /**
  * Smoke tests for the generic ACP → canonical RuntimeEvent mapper.
@@ -110,6 +106,8 @@ describe("mapAcpSessionUpdate", () => {
     // Original ACP fields stay on the payload so the accordion body can show
     // both the request and the eventual result.
     expect(startedPayload.name).toBe("shell exec");
+    expect(startedPayload.title).toBe("shell exec");
+    expect(startedPayload.kind).toBe("execute");
     expect(startedPayload.args).toEqual({ command: "pnpm run test", cwd: "C:\\repo" });
 
     const updated = mapAcpSessionUpdate(
@@ -208,13 +206,53 @@ describe("mapAcpSessionUpdate", () => {
     expect(started.payload.changeKind).toBe("edit");
   });
 
+  it("extracts file_change path from ACP locations when rawInput.path is missing", () => {
+    const state = createAcpMapperState("t-fc-loc");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-fc-loc",
+        title: "edit symbol",
+        kind: "edit",
+        status: "in_progress",
+        rawInput: { oldText: "before", newText: "after" },
+        locations: [{ path: "src/renderer/notifications.ts", line: 12 }],
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const started = events[0] as { itemType: string; payload: Record<string, unknown> };
+    expect(started.itemType).toBe("file_change");
+    expect(started.payload.path).toBe("src/renderer/notifications.ts");
+    expect(started.payload.locations).toEqual([
+      { path: "src/renderer/notifications.ts", line: 12 },
+    ]);
+  });
+
+  it("extracts file_change path from a Gemini title when no structured path is present", () => {
+    const state = createAcpMapperState("t-fc-title");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-fc-title",
+        title: "src/renderer/notifications.ts: function showToast => function showToast",
+        kind: "edit",
+        status: "in_progress",
+        rawInput: { oldText: "before", newText: "after" },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const started = events[0] as { itemType: string; payload: Record<string, unknown> };
+    expect(started.itemType).toBe("file_change");
+    expect(started.payload.path).toBe("src/renderer/notifications.ts");
+  });
+
   it("extracts web_search query from rawInput.query", () => {
     const state = createAcpMapperState("t-ws");
     const events = mapAcpSessionUpdate(
       note({
         sessionUpdate: "tool_call",
         toolCallId: "tc-ws",
-        title: "github-mcp-server-search_code",
+        title: 'Searching the web for "repo:foo bar"',
         kind: "search",
         status: "in_progress",
         rawInput: { query: "repo:foo bar", page: 1 },
@@ -224,6 +262,242 @@ describe("mapAcpSessionUpdate", () => {
     const started = events[0] as { itemType: string; payload: Record<string, unknown> };
     expect(started.itemType).toBe("web_search");
     expect(started.payload.query).toBe("repo:foo bar");
+  });
+
+  it("keeps local ACP search tools as generic tool_call rows", () => {
+    const state = createAcpMapperState("t-search-local");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-search-local",
+        title: "'attachment' in src/renderer/**",
+        kind: "search",
+        status: "in_progress",
+        rawInput: { query: "attachment", path: "src/renderer/**" },
+        locations: [{ path: "src/renderer" }],
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const started = events[0] as { itemType: string; payload: Record<string, unknown> };
+    expect(started.itemType).toBe("tool_call");
+    expect(started.payload.kind).toBe("search");
+    expect(started.payload.locations).toEqual([{ path: "src/renderer" }]);
+  });
+
+  it("infers Copilot task tools as subagents and tags their child items", () => {
+    const state = createAcpMapperState("t-subagent");
+    const started = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-subagent",
+        title: "Critiquing path fixes",
+        status: "in_progress",
+        rawInput: {
+          description: "Critiquing path fixes",
+          agent_type: "rubber-duck",
+          name: "path-fix-duck",
+          prompt: "We need to get a clean green run.",
+        },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const parentItemId = (started[0] as { itemId: string }).itemId;
+    expect((started[0] as { payload: Record<string, unknown> }).payload.isSubAgent).toBe(true);
+
+    const child = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "Looking for edge cases." },
+      }),
+      state,
+    );
+    expect(child).toMatchObject([
+      {
+        type: "item.started",
+        threadId: "t-subagent",
+        itemType: "assistant_message",
+        parentItemId,
+      },
+      {
+        type: "content.delta",
+        threadId: "t-subagent",
+        stream: "assistant_text",
+        delta: "Looking for edge cases.",
+      },
+      {
+        type: "item.updated",
+        threadId: "t-subagent",
+        itemId: parentItemId,
+        payload: {
+          isSubAgent: true,
+          progress: { stepCount: 1 },
+          status: "running",
+        },
+      },
+    ]);
+  });
+
+  it("switches the inferred ACP parent for nested subagents", () => {
+    const state = createAcpMapperState("t-nested-subagent");
+    const outer = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-outer",
+        title: "Outer review",
+        status: "in_progress",
+        rawInput: {
+          description: "Outer review",
+          agent_type: "general-purpose",
+          name: "outer-agent",
+          prompt: "Review the patch",
+        },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const outerItemId = (outer[0] as { itemId: string }).itemId;
+
+    const inner = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-inner",
+        title: "Inner critique",
+        status: "in_progress",
+        rawInput: {
+          description: "Inner critique",
+          agent_type: "rubber-duck",
+          name: "inner-agent",
+          prompt: "Find blind spots",
+        },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const innerStart = inner[0] as { itemId: string; parentItemId?: string };
+    expect(innerStart.parentItemId).toBe(outerItemId);
+    const innerItemId = innerStart.itemId;
+
+    const innerChild = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "Inspecting the path handling." },
+      }),
+      state,
+    );
+    expect((innerChild[0] as { parentItemId?: string }).parentItemId).toBe(innerItemId);
+
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-inner",
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    const outerChild = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-outer-shell",
+        title: "shell exec",
+        kind: "execute",
+        status: "in_progress",
+        rawInput: { command: "pnpm run test" },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const outerStart = outerChild.find(
+      (event): event is Extract<(typeof outerChild)[number], { type: "item.started" }> =>
+        event.type === "item.started",
+    );
+    expect(outerStart?.parentItemId).toBe(outerItemId);
+  });
+
+  it("clears inferred ACP subagent parents at turn end", () => {
+    const state = createAcpMapperState("t-subagent-reset");
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-reset",
+        title: "Reset parent",
+        status: "in_progress",
+        rawInput: {
+          description: "Reset parent",
+          agent_type: "rubber-duck",
+          name: "reset-agent",
+          prompt: "Critique this plan",
+        },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    closeOpenTurnItems(state);
+
+    const nextTurn = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "Fresh top-level reply." },
+      }),
+      state,
+    );
+    expect(nextTurn[0]).not.toHaveProperty("parentItemId");
+  });
+
+  it("uses update metadata to heal a missing file_change path", () => {
+    const state = createAcpMapperState("t-fc-heal");
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-fc-heal",
+        title: "edit symbol",
+        kind: "edit",
+        status: "in_progress",
+        rawInput: { oldText: "before", newText: "after" },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    const completed = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-fc-heal",
+        title: "src/renderer/notifications.ts: function showToast => function showToast",
+        kind: "edit",
+        locations: [{ path: "src/renderer/notifications.ts" }],
+        rawOutput: { ok: true },
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const terminal = completed[0] as { type: string; payload: Record<string, unknown> };
+    expect(terminal.type).toBe("item.completed");
+    expect(terminal.payload.path).toBe("src/renderer/notifications.ts");
+    expect(terminal.payload.result).toEqual({ ok: true });
+  });
+
+  it("ignores null update locations so reducer merges keep the original file path", () => {
+    const state = createAcpMapperState("t-fc-null");
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-fc-null",
+        title: "src/foo.ts: function before => function after",
+        kind: "edit",
+        status: "in_progress",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    const completed = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-fc-null",
+        locations: null,
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const terminalPayload = (completed[0] as { payload: Record<string, unknown> }).payload;
+    expect(terminalPayload).not.toHaveProperty("locations");
+    expect(terminalPayload).not.toHaveProperty("path");
   });
 
   it("reroutes Copilot's `task_complete` tool call to an assistant_message", () => {

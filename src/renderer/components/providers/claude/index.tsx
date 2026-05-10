@@ -37,8 +37,8 @@ registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfig
           },
         ]
       : []),
-    // Approval policy (hidden when plan mode overrides it)
-    ...(capabilities.approvalPolicies.length > 0 && (config.mode ?? "agent") === "agent"
+    // Approval policy (always visible if supported)
+    ...(capabilities.approvalPolicies.length > 0
       ? [
           {
             iconKind: "permission" as const,

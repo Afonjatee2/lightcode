@@ -71,6 +71,7 @@ function spawnAppServer(command: CommandSpec): ChildProcess {
     cwd: command.cwd ?? process.cwd(),
     env: {
       ...process.env,
+      ...command.env,
       TERM: "xterm-256color",
     },
     stdio: ["pipe", "pipe", "pipe"],
@@ -808,15 +809,22 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   }
 
   private async initialize(): Promise<void> {
-    await this.request("initialize", {
-      clientInfo: {
-        name: "lightcode",
-        version: "0.1.0",
+    // Cold start runs through an interactive login shell + Rust binary load +
+    // first-launch Gatekeeper checks on macOS, which can exceed the default
+    // 5s timeout. The probe path uses 12s for the same handshake.
+    await this.request(
+      "initialize",
+      {
+        clientInfo: {
+          name: "lightcode",
+          version: "0.1.0",
+        },
+        capabilities: {
+          experimentalApi: true,
+        },
       },
-      capabilities: {
-        experimentalApi: true,
-      },
-    });
+      30_000,
+    );
 
     this.transport.write({
       jsonrpc: "2.0",
@@ -881,14 +889,18 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     }
   }
 
-  private request(method: string, params: Record<string, unknown>): Promise<unknown> {
+  private request(
+    method: string,
+    params: Record<string, unknown>,
+    timeoutMs = 5_000,
+  ): Promise<unknown> {
     const id = `lightcode-${this.requestSequence++}`;
 
     const pending = new Promise<unknown>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pendingRequests.delete(id);
         reject(new Error(`Timed out waiting for Codex app-server response to ${method}.`));
-      }, 5_000);
+      }, timeoutMs);
 
       this.pendingRequests.set(id, {
         resolve,

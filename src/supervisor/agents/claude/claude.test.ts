@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createClaudeAdapter } from "./index";
+import { parseClaudeAuthStatusJson } from "./detection";
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import type { ProjectLocation, ThreadConfig } from "@/shared/contracts";
 
@@ -127,5 +128,31 @@ describe("createClaudeAdapter structured sessions", () => {
         presentationMode: "gui",
       }),
     ).resolves.toMatchObject({ launchOptions: { suppressResumeConfigOverrides: true } });
+  });
+});
+
+describe("parseClaudeAuthStatusJson", () => {
+  it("extracts account metadata from Claude's auth-status JSON", () => {
+    expect(
+      parseClaudeAuthStatusJson(`{
+        "loggedIn": true,
+        "authMethod": "claude.ai",
+        "email": "user@example.com",
+        "orgName": "Yieldmo",
+        "subscriptionType": "team"
+      }`),
+    ).toEqual({
+      authState: "authenticated",
+      providerMetadata: {
+        authenticatedAs: "user@example.com",
+        organization: "Yieldmo",
+        plan: "Team Subscription",
+        authMethod: "Claude.ai",
+      },
+    });
+  });
+
+  it("returns undefined for non-JSON output", () => {
+    expect(parseClaudeAuthStatusJson("not json")).toBeUndefined();
   });
 });

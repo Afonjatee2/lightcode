@@ -29,7 +29,7 @@ const agentSelectSettingDefSchema = z.object({
   platforms: z.array(z.string()).optional(),
 });
 
-/** Slash commands reported by Claude Code SDK initialization (optional metadata). */
+/** Optional slash-command metadata surfaced by providers and/or active sessions. */
 export const agentSlashCommandSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
@@ -37,6 +37,21 @@ export const agentSlashCommandSchema = z.object({
   argumentHint: z.string().optional(),
 });
 export type AgentSlashCommand = z.infer<typeof agentSlashCommandSchema>;
+
+export const agentConnectedProviderSchema = z.object({
+  label: z.string().min(1),
+  detail: z.string().min(1).optional(),
+});
+export type AgentConnectedProvider = z.infer<typeof agentConnectedProviderSchema>;
+
+export const agentProviderMetadataSchema = z.object({
+  authenticatedAs: z.string().min(1).optional(),
+  organization: z.string().min(1).optional(),
+  plan: z.string().min(1).optional(),
+  authMethod: z.string().min(1).optional(),
+  connectedProviders: z.array(agentConnectedProviderSchema).optional(),
+});
+export type AgentProviderMetadata = z.infer<typeof agentProviderMetadataSchema>;
 
 export const agentSettingDefSchema = z.discriminatedUnion("type", [
   agentToggleSettingDefSchema,
@@ -89,6 +104,7 @@ export const agentStatusSchema = z.object({
   executablePath: z.string().optional(),
   version: z.string().optional(),
   authState: authStateSchema,
+  providerMetadata: agentProviderMetadataSchema.optional(),
   capabilities: agentCapabilitySchema,
   envKind: z.enum(["windows", "wsl", "posix"]).optional(),
   envDistro: z.string().optional(),
@@ -111,3 +127,79 @@ export const agentStatusesResponseSchema = z.object({
   fromCache: z.boolean(),
 });
 export type AgentStatusesResponse = z.infer<typeof agentStatusesResponseSchema>;
+
+export function areAgentSlashCommandsEqual(
+  left: readonly AgentSlashCommand[] | undefined,
+  right: readonly AgentSlashCommand[] | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return left === right;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftCommand = left[index]!;
+    const rightCommand = right[index]!;
+    if (
+      leftCommand.id !== rightCommand.id ||
+      leftCommand.label !== rightCommand.label ||
+      leftCommand.description !== rightCommand.description ||
+      leftCommand.argumentHint !== rightCommand.argumentHint
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function areAgentConnectedProvidersEqual(
+  left: readonly AgentConnectedProvider[] | undefined,
+  right: readonly AgentConnectedProvider[] | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return left === right;
+  if (left.length !== right.length) return false;
+  for (let index = 0; index < left.length; index += 1) {
+    const leftProvider = left[index]!;
+    const rightProvider = right[index]!;
+    if (
+      leftProvider.label !== rightProvider.label ||
+      leftProvider.detail !== rightProvider.detail
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+export function areAgentProviderMetadataEqual(
+  left: AgentProviderMetadata | undefined,
+  right: AgentProviderMetadata | undefined,
+): boolean {
+  if (left === right) return true;
+  if (!left || !right) return left === right;
+  return (
+    left.authenticatedAs === right.authenticatedAs &&
+    left.organization === right.organization &&
+    left.plan === right.plan &&
+    left.authMethod === right.authMethod &&
+    areAgentConnectedProvidersEqual(left.connectedProviders, right.connectedProviders)
+  );
+}
+
+export function compactAgentProviderMetadata(
+  metadata: AgentProviderMetadata | undefined,
+): AgentProviderMetadata | undefined {
+  if (!metadata) return undefined;
+  const connectedProviders = metadata.connectedProviders?.filter(
+    (provider) => provider.label.trim().length > 0,
+  );
+  const compacted: AgentProviderMetadata = {
+    ...(metadata.authenticatedAs?.trim()
+      ? { authenticatedAs: metadata.authenticatedAs.trim() }
+      : {}),
+    ...(metadata.organization?.trim() ? { organization: metadata.organization.trim() } : {}),
+    ...(metadata.plan?.trim() ? { plan: metadata.plan.trim() } : {}),
+    ...(metadata.authMethod?.trim() ? { authMethod: metadata.authMethod.trim() } : {}),
+    ...(connectedProviders?.length ? { connectedProviders } : {}),
+  };
+  return Object.keys(compacted).length > 0 ? compacted : undefined;
+}

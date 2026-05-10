@@ -120,11 +120,12 @@ export function CreatePrModal(props: {
             </div>
           </Modal.Body>
           <Modal.Footer>
-            <Button slot="close" variant="tertiary">
+            <Button slot="close" variant="ghost">
               Cancel
             </Button>
             <ButtonGroup>
               <Button
+                variant="tertiary"
                 isDisabled={prLoading || !prTitle.trim()}
                 isPending={prLoading}
                 onPress={() => void handleCreatePr(false).then(() => onOpenChange(false))}
@@ -143,6 +144,7 @@ export function CreatePrModal(props: {
               <Dropdown>
                 <Button
                   isIconOnly
+                  variant="tertiary"
                   aria-label="More PR options"
                   isDisabled={prLoading || !prTitle.trim()}
                 >

@@ -4,6 +4,7 @@ import { promisify } from "node:util";
 import { z } from "zod";
 import {
   agentCapabilitySchema,
+  agentProviderMetadataSchema,
   agentSettingDefSchema,
   agentStatusSchema,
   type AgentStatus,
@@ -13,7 +14,12 @@ import {
 import type { SupervisorEvent } from "@/shared/ipc";
 import { normalizeSharedSettings } from "@/shared/settings";
 import { normalizeWslListOutput } from "@/shared/wsl";
-import { type AgentAdapter, type AgentEnvContext, getWslCommand } from "../agents/base";
+import {
+  primeExecutablePathCache,
+  type AgentAdapter,
+  type AgentEnvContext,
+  getWslCommand,
+} from "../agents/base";
 
 const execFileAsync = promisify(execFile);
 
@@ -58,6 +64,15 @@ function parseCachedStatuses(entries: unknown[] | undefined): AgentStatus[] {
           );
         }
       }
+      const record = entry as Record<string, unknown>;
+      if ("providerMetadata" in record) {
+        const metadata = agentProviderMetadataSchema.safeParse(record.providerMetadata);
+        if (metadata.success) {
+          record.providerMetadata = metadata.data;
+        } else {
+          delete record.providerMetadata;
+        }
+      }
     }
 
     const parsed = cachedAgentStatusSchema.safeParse(entry);
@@ -76,12 +91,9 @@ function filterWslStatusesForDistros(
     return [];
   }
   const distroSet = new Set(distros);
-  return statuses.filter((status) => {
-    if (status.envDistro === undefined) {
-      return true;
-    }
-    return distroSet.has(status.envDistro);
-  });
+  return statuses.filter(
+    (status) => status.envDistro !== undefined && distroSet.has(status.envDistro),
+  );
 }
 
 export async function detectWslAgentStatuses(
@@ -139,8 +151,13 @@ export interface AgentStatusServiceOptions {
   emit(event: SupervisorEvent): void;
 }
 
+interface DetectionResults {
+  windows: AgentStatus[];
+  wsl: AgentStatus[];
+}
+
 export class AgentStatusService {
-  private pendingDetection: Promise<void> | undefined;
+  private pendingDetection: Promise<DetectionResults> | undefined;
 
   constructor(private readonly options: AgentStatusServiceOptions) {}
 
@@ -165,6 +182,18 @@ export class AgentStatusService {
     const cached = this.readCachedStatuses(wslDistros);
     this.detectAllAgentStatusesBackground(wslDistros);
     return cached;
+  }
+
+  async refreshAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
+    const wslDistros = [...new Set(payload.wslDistros)];
+    const previousDetection = this.pendingDetection;
+    const fresh = await this.runDetectionTask(async () => {
+      if (previousDetection) {
+        await previousDetection.catch(() => ({ windows: [], wsl: [] }));
+      }
+      return this.runDetection(wslDistros);
+    });
+    return { ...fresh, fromCache: false };
   }
 
   /**
@@ -221,84 +250,112 @@ export class AgentStatusService {
     }
   }
 
+  private runDetectionTask(task: () => Promise<DetectionResults>): Promise<DetectionResults> {
+    const pending = task().finally(() => {
+      if (this.pendingDetection === pending) {
+        this.pendingDetection = undefined;
+      }
+    });
+    this.pendingDetection = pending;
+    return pending;
+  }
+
   private detectAllAgentStatusesBackground(wslDistros: readonly string[]): void {
     if (this.pendingDetection) {
       return;
     }
+    void this.runDetectionTask(() => this.runDetection(wslDistros));
+  }
 
-    this.pendingDetection = (async () => {
-      try {
-        const adapters = [...this.options.adapters.values()];
-        const disabled = this.readDisabledAgents();
+  private async runDetection(wslDistros: readonly string[]): Promise<DetectionResults> {
+    const adapters = [...this.options.adapters.values()];
+    const disabled = this.readDisabledAgents();
 
-        const nativePromise = Promise.all(
-          adapters.map(async (adapter) => {
-            if (disabled.has(adapter.kind)) {
-              return {
-                kind: adapter.kind,
-                label: adapter.label,
-                installed: true,
-                authState: "unknown" as const,
-                capabilities: adapter.capabilities,
-                envKind: process.platform === "win32" ? ("windows" as const) : ("posix" as const),
-              };
-            }
-            try {
-              const status = await adapter.detectInstall();
-              return {
-                ...status,
-                envKind: process.platform === "win32" ? ("windows" as const) : ("posix" as const),
-              };
-            } catch (error) {
-              console.error(`[supervisor] detectInstall(${adapter.kind}) failed`, error);
-              return {
-                kind: adapter.kind,
-                label: adapter.label,
-                installed: false,
-                authState: "unknown" as const,
-                capabilities: adapter.capabilities,
-                envKind: process.platform === "win32" ? ("windows" as const) : ("posix" as const),
-              };
-            }
-          }),
-        ).then((statuses) => {
-          this.options.emit({ type: "windows-agent-statuses", statuses });
-          return statuses;
-        });
+    // Native detection on macOS spawns the user's interactive login shell
+    // once per binary lookup (nvm + plugin-heavy zshrc ≈ 2-3s each). N
+    // parallel adapters then push individual probes past their 5s timeout
+    // and a random subset is marked missing. Pay the shell startup once
+    // by batching every adapter's binary into a single shell invocation.
+    if (process.platform !== "win32") {
+      const enabledBinaries = adapters
+        .filter((adapter) => !disabled.has(adapter.kind))
+        .map((adapter) => adapter.binary)
+        .filter((binary): binary is string => typeof binary === "string");
+      // copilot's auth probe additionally resolves `gh` — prime it too so
+      // we don't fall back to a per-call shell spawn.
+      await primeExecutablePathCache([...enabledBinaries, "gh"]);
+    }
 
-        const wslPromise = detectWslAgentStatuses(adapters, wslDistros, disabled)
-          .then((statuses) => {
-            this.options.emit({ type: "wsl-agent-statuses", statuses });
-            return statuses;
-          })
-          .catch((error) => {
-            // Ensure the renderer always gets a terminal event for WSL —
-            // otherwise its loading state would hang forever on detection
-            // failure.  Emit an empty list and surface the error in logs.
-            console.error("[supervisor] detectWslAgentStatuses failed", error);
-            this.options.emit({ type: "wsl-agent-statuses", statuses: [] });
-            return [] as AgentStatus[];
-          });
-
-        const [nativeResult, wslResult] = await Promise.allSettled([nativePromise, wslPromise]);
-        const nativeStatuses = nativeResult.status === "fulfilled" ? nativeResult.value : [];
-        const wslStatuses = wslResult.status === "fulfilled" ? wslResult.value : [];
-
-        // Native detection may have thrown before emitting — ensure the
-        // renderer always gets a terminal windows-agent-statuses event.
-        if (nativeResult.status === "rejected") {
-          console.error("[supervisor] native detection failed", nativeResult.reason);
-          this.options.emit({ type: "windows-agent-statuses", statuses: [] });
+    const nativeEnvKind: "windows" | "posix" = process.platform === "win32" ? "windows" : "posix";
+    const nativePromise = Promise.all(
+      adapters.map(async (adapter) => {
+        let status: AgentStatus;
+        if (disabled.has(adapter.kind)) {
+          status = {
+            kind: adapter.kind,
+            label: adapter.label,
+            installed: true,
+            authState: "unknown",
+            capabilities: adapter.capabilities,
+            envKind: nativeEnvKind,
+          };
+        } else {
+          try {
+            const detected = await adapter.detectInstall();
+            status = { ...detected, envKind: nativeEnvKind };
+          } catch (error) {
+            console.error(`[supervisor] detectInstall(${adapter.kind}) failed`, error);
+            status = {
+              kind: adapter.kind,
+              label: adapter.label,
+              installed: false,
+              authState: "unknown",
+              capabilities: adapter.capabilities,
+              envKind: nativeEnvKind,
+            };
+          }
         }
+        // Stream per adapter so the first-launch discovery screen can reveal
+        // tiles in real time. The terminal `windows-agent-statuses` event
+        // still fires below with the full list.
+        this.options.emit({ type: "agent-detected", status });
+        return status;
+      }),
+    ).then((statuses) => {
+      this.options.emit({ type: "windows-agent-statuses", statuses });
+      return statuses;
+    });
 
-        if (wslDistros.length === 0) {
-          this.options.emit({ type: "wsl-agent-statuses", statuses: [] });
-        }
+    const wslPromise = detectWslAgentStatuses(adapters, wslDistros, disabled)
+      .then((statuses) => {
+        this.options.emit({ type: "wsl-agent-statuses", statuses });
+        return statuses;
+      })
+      .catch((error) => {
+        // Ensure the renderer always gets a terminal event for WSL — otherwise
+        // its loading state would hang forever on detection failure. Emit an
+        // empty list and surface the error in logs.
+        console.error("[supervisor] detectWslAgentStatuses failed", error);
+        this.options.emit({ type: "wsl-agent-statuses", statuses: [] });
+        return [] as AgentStatus[];
+      });
 
-        this.writeDiskCache(nativeStatuses, wslStatuses);
-      } finally {
-        this.pendingDetection = undefined;
-      }
-    })();
+    const [nativeResult, wslResult] = await Promise.allSettled([nativePromise, wslPromise]);
+    const nativeStatuses = nativeResult.status === "fulfilled" ? nativeResult.value : [];
+    const wslStatuses = wslResult.status === "fulfilled" ? wslResult.value : [];
+
+    // Native detection may have thrown before emitting — ensure the renderer
+    // always gets a terminal windows-agent-statuses event.
+    if (nativeResult.status === "rejected") {
+      console.error("[supervisor] native detection failed", nativeResult.reason);
+      this.options.emit({ type: "windows-agent-statuses", statuses: [] });
+    }
+
+    if (wslDistros.length === 0) {
+      this.options.emit({ type: "wsl-agent-statuses", statuses: [] });
+    }
+
+    this.writeDiskCache(nativeStatuses, wslStatuses);
+    return { windows: nativeStatuses, wsl: wslStatuses };
   }
 }

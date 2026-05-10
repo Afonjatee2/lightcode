@@ -10,7 +10,9 @@ import {
   type ThreadServerRequestId,
   type ThreadStatus,
   type ThreadStatusSource,
+  areAgentSlashCommandsEqual,
   isThreadConfigEqual,
+  isThreadTurnActive,
 } from "@/shared/contracts";
 import {
   reorderThreadBlockInProject,
@@ -18,10 +20,21 @@ import {
   type ReorderPlacement,
 } from "../reorder";
 import { makeThreadTitle, removePaneFromView, replacePaneInView, stripPlanMode } from "./helpers";
-import type { SliceCreator } from "./shared";
+import type { CompletedTurnRecord } from "./runtimeEventSlice";
+import type { AppStoreState, SliceCreator } from "./shared";
 
 export interface ThreadSlice {
   threads: Thread[];
+  /**
+   * Per-thread snapshot of the supervisor's last-reported `session.config`.
+   * Used to distinguish "supervisor truly changed the config" from "supervisor
+   * echoed the same stale config in a status update". The composer mutates
+   * `thread.config` locally for the next-turn draft; we must not let stale
+   * echoes (which arrive on every status/attention change) overwrite that
+   * draft. Only when this snapshot differs from `input.config` do we treat
+   * the runtime as authoritative.
+   */
+  lastRuntimeConfigByThreadId: Record<string, ThreadConfig>;
   markThreadsInactiveOnLaunch: () => void;
   createThread: (input: {
     projectId: string;
@@ -46,6 +59,7 @@ export interface ThreadSlice {
       attention: ThreadAttention;
       config?: ThreadConfig;
       sessionRef?: SessionRef;
+      slashCommands?: Thread["slashCommands"];
       canResumeWithConfig: boolean;
       threadStatusSource?: ThreadStatusSource;
     },
@@ -65,8 +79,105 @@ export interface ThreadSlice {
   reorderThreadBlock: (blockIds: string[], targetId: string, placement: ReorderPlacement) => void;
 }
 
+const isThreadLiveStatus = isThreadTurnActive;
+
+function parseTurnIso(iso: string | undefined): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime();
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * If the previous status was live but the next turn timing has flipped to
+ * "no active turn" (i.e. a turn just closed), append a frozen record of that
+ * turn's window to `runtimeCompletedTurnsByThread` anchored to the last item
+ * currently in the thread's timeline. Returns the existing map untouched when
+ * no turn just closed.
+ *
+ * The persister snapshots these records after each close so prior "Worked for
+ * X" indicators survive reloads in addition to staying visible in-session.
+ */
+interface TurnCloseUpdate {
+  runtimeCompletedTurnsByThread: AppStoreState["runtimeCompletedTurnsByThread"];
+  runtimeDirtyThreadIds: AppStoreState["runtimeDirtyThreadIds"];
+}
+
+function appendCompletedTurnIfClosed(
+  state: AppStoreState,
+  threadId: string,
+  prevThread: Thread,
+  nextTurnTiming: Pick<Thread, "activeTurnStartedAt" | "lastTurnStartedAt" | "lastTurnEndedAt">,
+): TurnCloseUpdate {
+  const wasLive = isThreadLiveStatus(prevThread.status);
+  const willBeLive = nextTurnTiming.activeTurnStartedAt !== undefined;
+  const unchanged: TurnCloseUpdate = {
+    runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
+    runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
+  };
+  if (!wasLive || willBeLive) return unchanged;
+
+  const startedAt = parseTurnIso(nextTurnTiming.lastTurnStartedAt);
+  const endedAt = parseTurnIso(nextTurnTiming.lastTurnEndedAt);
+  if (startedAt === null || endedAt === null) return unchanged;
+  if (
+    prevThread.lastTurnStartedAt === nextTurnTiming.lastTurnStartedAt &&
+    prevThread.lastTurnEndedAt === nextTurnTiming.lastTurnEndedAt
+  ) {
+    return unchanged;
+  }
+
+  const itemIds = state.runtimeItemIdsByThread[threadId];
+  const anchorItemId = itemIds && itemIds.length > 0 ? (itemIds[itemIds.length - 1] ?? null) : null;
+
+  const record: CompletedTurnRecord = { startedAt, endedAt, anchorItemId };
+  const existing = state.runtimeCompletedTurnsByThread[threadId] ?? [];
+  return {
+    runtimeCompletedTurnsByThread: {
+      ...state.runtimeCompletedTurnsByThread,
+      [threadId]: [...existing, record],
+    },
+    runtimeDirtyThreadIds: state.runtimeDirtyThreadIds.includes(threadId)
+      ? state.runtimeDirtyThreadIds
+      : [...state.runtimeDirtyThreadIds, threadId],
+  };
+}
+
+function deriveTurnTiming(
+  thread: Thread,
+  nextStatus: ThreadStatus,
+  options: { enteredLiveAt: string; nowIso: string },
+): Pick<Thread, "activeTurnStartedAt" | "lastTurnStartedAt" | "lastTurnEndedAt"> {
+  const wasLive = isThreadLiveStatus(thread.status);
+  const willBeLive = isThreadLiveStatus(nextStatus);
+
+  if (willBeLive) {
+    return {
+      activeTurnStartedAt: wasLive
+        ? (thread.activeTurnStartedAt ?? thread.updatedAt ?? options.enteredLiveAt)
+        : options.enteredLiveAt,
+      lastTurnStartedAt: thread.lastTurnStartedAt,
+      lastTurnEndedAt: thread.lastTurnEndedAt,
+    };
+  }
+
+  if (wasLive) {
+    return {
+      activeTurnStartedAt: undefined,
+      lastTurnStartedAt: thread.activeTurnStartedAt ?? thread.updatedAt ?? options.nowIso,
+      lastTurnEndedAt: options.nowIso,
+    };
+  }
+
+  return {
+    activeTurnStartedAt: thread.activeTurnStartedAt,
+    lastTurnStartedAt: thread.lastTurnStartedAt,
+    lastTurnEndedAt: thread.lastTurnEndedAt,
+  };
+}
+
 export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
   threads: [],
+  lastRuntimeConfigByThreadId: {},
   markThreadsInactiveOnLaunch: () =>
     set((state) => {
       let changed = false;
@@ -121,6 +232,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       ...(groupName ? { groupName } : {}),
       createdAt: now,
       updatedAt: now,
+      activeTurnStartedAt: now,
     };
 
     set((state) => {
@@ -135,7 +247,14 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       } else {
         nextView = { kind: "thread", panes: [thread.id] };
       }
-      return { threads: [thread, ...state.threads], view: nextView };
+      return {
+        threads: [thread, ...state.threads],
+        view: nextView,
+        lastRuntimeConfigByThreadId: {
+          ...state.lastRuntimeConfigByThreadId,
+          [thread.id]: thread.config,
+        },
+      };
     });
 
     return thread;
@@ -159,6 +278,13 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         state.runtimeItemsByIdByThread;
       const { [threadId]: _droppedReqs, ...runtimeRequestsByThread } =
         state.runtimeRequestsByThread;
+      const { [threadId]: _droppedVersion, ...runtimeStructuralVersionByThread } =
+        state.runtimeStructuralVersionByThread;
+      const { [threadId]: _droppedTurns, ...runtimeCompletedTurnsByThread } =
+        state.runtimeCompletedTurnsByThread;
+      const { [threadId]: _droppedRuntimeConfig, ...lastRuntimeConfigByThreadId } =
+        state.lastRuntimeConfigByThreadId;
+      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.filter((id) => id !== threadId);
       return {
         threads: nextThreads,
         pendingServerRequests: state.pendingServerRequests.filter(
@@ -173,6 +299,10 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         runtimeItemIdsByThread,
         runtimeItemsByIdByThread,
         runtimeRequestsByThread,
+        runtimeStructuralVersionByThread,
+        runtimeCompletedTurnsByThread,
+        runtimeDirtyThreadIds,
+        lastRuntimeConfigByThreadId,
         view: nextView,
       };
     }),
@@ -201,7 +331,22 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
   updateThreadRuntime: (threadId, input) =>
     set((state) => {
       let changed = false;
+      let turnUpdate: TurnCloseUpdate = {
+        runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
+        runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
+      };
       const isVisible = state.view.kind === "thread" && state.view.panes.includes(threadId);
+      const nowIso = new Date().toISOString();
+
+      // Treat `input.config` as authoritative only when the supervisor truly
+      // changed it (compared to its last echoed value). Plain status/attention
+      // updates re-send the same `session.config` and would otherwise wipe
+      // the user's pending composer change while a turn is still working.
+      const lastRuntimeConfig = state.lastRuntimeConfigByThreadId[threadId];
+      const runtimeConfigChanged =
+        input.config !== undefined &&
+        (lastRuntimeConfig === undefined || !isThreadConfigEqual(lastRuntimeConfig, input.config));
+      const nextLastRuntimeConfig = runtimeConfigChanged ? input.config : lastRuntimeConfig;
 
       const threads: Thread[] = state.threads.map((thread): Thread => {
         if (thread.id !== threadId) {
@@ -226,10 +371,18 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           input.threadStatusSource === undefined ||
           thread.threadStatusSource === input.threadStatusSource;
 
+        const configFromRuntime = runtimeConfigChanged ? input.config : undefined;
         const nextConfig =
           thread.presentationMode === "gui"
-            ? (input.config ?? thread.config)
-            : stripPlanMode(input.config ?? thread.config);
+            ? (configFromRuntime ?? thread.config)
+            : stripPlanMode(configFromRuntime ?? thread.config);
+        const nextTurnTiming = deriveTurnTiming(thread, effectiveStatus, {
+          enteredLiveAt: nowIso,
+          nowIso,
+        });
+        const slashCommandsChanged =
+          input.slashCommands !== undefined &&
+          !areAgentSlashCommandsEqual(thread.slashCommands, input.slashCommands);
 
         if (
           thread.status === effectiveStatus &&
@@ -237,10 +390,21 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           isThreadConfigEqual(thread.config, nextConfig) &&
           thread.canResumeWithConfig === input.canResumeWithConfig &&
           statusSourceMatch &&
-          !sessionRefChanged
+          !slashCommandsChanged &&
+          !sessionRefChanged &&
+          thread.activeTurnStartedAt === nextTurnTiming.activeTurnStartedAt &&
+          thread.lastTurnStartedAt === nextTurnTiming.lastTurnStartedAt &&
+          thread.lastTurnEndedAt === nextTurnTiming.lastTurnEndedAt
         ) {
           return thread;
         }
+
+        turnUpdate = appendCompletedTurnIfClosed(
+          { ...state, ...turnUpdate },
+          thread.id,
+          thread,
+          nextTurnTiming,
+        );
 
         changed = true;
         return {
@@ -253,13 +417,33 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
             ? { threadStatusSource: input.threadStatusSource }
             : {}),
           ...(input.sessionRef ? { sessionRef: input.sessionRef } : {}),
+          ...(input.slashCommands !== undefined ? { slashCommands: input.slashCommands } : {}),
           ...(input.status === "working" && thread.status !== "working"
-            ? { updatedAt: new Date().toISOString() }
+            ? { updatedAt: nowIso }
             : {}),
+          ...nextTurnTiming,
         };
       });
 
-      return changed ? { threads } : {};
+      const runtimeConfigMapPatch = runtimeConfigChanged
+        ? {
+            lastRuntimeConfigByThreadId: {
+              ...state.lastRuntimeConfigByThreadId,
+              [threadId]: nextLastRuntimeConfig!,
+            },
+          }
+        : undefined;
+
+      if (!changed) {
+        return runtimeConfigMapPatch ?? {};
+      }
+      const turnsChanged =
+        turnUpdate.runtimeCompletedTurnsByThread !== state.runtimeCompletedTurnsByThread;
+      return {
+        threads,
+        ...(turnsChanged ? turnUpdate : {}),
+        ...(runtimeConfigMapPatch ?? {}),
+      };
     }),
   archiveThread: (threadId) =>
     set((state) => {
@@ -372,15 +556,38 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
   markThreadExited: (threadId) =>
     set((state) => {
       let changed = false;
+      let turnUpdate: TurnCloseUpdate = {
+        runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
+        runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
+      };
+      const nowIso = new Date().toISOString();
 
       const threads: Thread[] = state.threads.map((thread): Thread => {
         if (thread.id !== threadId) {
           return thread;
         }
 
-        if (thread.status === "inactive" && thread.attention === "none") {
+        const nextTurnTiming = deriveTurnTiming(thread, "inactive", {
+          enteredLiveAt: nowIso,
+          nowIso,
+        });
+
+        if (
+          thread.status === "inactive" &&
+          thread.attention === "none" &&
+          thread.activeTurnStartedAt === nextTurnTiming.activeTurnStartedAt &&
+          thread.lastTurnStartedAt === nextTurnTiming.lastTurnStartedAt &&
+          thread.lastTurnEndedAt === nextTurnTiming.lastTurnEndedAt
+        ) {
           return thread;
         }
+
+        turnUpdate = appendCompletedTurnIfClosed(
+          { ...state, ...turnUpdate },
+          thread.id,
+          thread,
+          nextTurnTiming,
+        );
 
         changed = true;
         return {
@@ -388,21 +595,21 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           status: "inactive",
           attention: "none",
           threadStatusSource: undefined,
+          ...nextTurnTiming,
         };
       });
 
-      return changed
-        ? {
-            threads,
-            pendingServerRequests: state.pendingServerRequests.filter(
-              (request) => request.threadId !== threadId,
-            ),
-          }
-        : {
-            pendingServerRequests: state.pendingServerRequests.filter(
-              (request) => request.threadId !== threadId,
-            ),
-          };
+      const pendingServerRequests = state.pendingServerRequests.filter(
+        (request) => request.threadId !== threadId,
+      );
+      const turnsChanged =
+        turnUpdate.runtimeCompletedTurnsByThread !== state.runtimeCompletedTurnsByThread;
+      if (!changed) {
+        return turnsChanged ? { pendingServerRequests, ...turnUpdate } : { pendingServerRequests };
+      }
+      return turnsChanged
+        ? { threads, pendingServerRequests, ...turnUpdate }
+        : { threads, pendingServerRequests };
     }),
   touchThread: (threadId) =>
     set((state) => ({
@@ -414,20 +621,54 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
     set((state) => {
       const snapshotsById = new Map(snapshots.map((snapshot) => [snapshot.threadId, snapshot]));
       let changed = false;
+      let turnUpdate: TurnCloseUpdate = {
+        runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
+        runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
+      };
+      const nowIso = new Date().toISOString();
+
+      let lastRuntimeConfigByThreadId = state.lastRuntimeConfigByThreadId;
+      let runtimeConfigMapChanged = false;
+
+      function recordRuntimeConfig(threadId: string, config: ThreadConfig): void {
+        const prev = lastRuntimeConfigByThreadId[threadId];
+        if (prev !== undefined && isThreadConfigEqual(prev, config)) return;
+        if (!runtimeConfigMapChanged) {
+          lastRuntimeConfigByThreadId = { ...lastRuntimeConfigByThreadId };
+          runtimeConfigMapChanged = true;
+        }
+        lastRuntimeConfigByThreadId[threadId] = config;
+      }
 
       const threads = state.threads.map((thread) => {
         const snapshot = snapshotsById.get(thread.id);
 
         if (snapshot) {
+          const lastRuntimeConfig = lastRuntimeConfigByThreadId[thread.id] ?? thread.config;
+          const runtimeConfigChanged =
+            snapshot.config !== undefined &&
+            !isThreadConfigEqual(lastRuntimeConfig, snapshot.config);
+          if (snapshot.config !== undefined) {
+            recordRuntimeConfig(thread.id, snapshot.config);
+          }
           const sessionRefChanged =
             (thread.sessionRef?.providerSessionId ?? "") !==
               (snapshot.sessionRef?.providerSessionId ?? "") ||
             (thread.sessionRef?.discoveredAt ?? "") !== (snapshot.sessionRef?.discoveredAt ?? "");
 
+          const configFromRuntime = runtimeConfigChanged ? snapshot.config : undefined;
           const nextConfig =
             thread.presentationMode === "gui"
-              ? (snapshot.config ?? thread.config)
-              : stripPlanMode(snapshot.config ?? thread.config);
+              ? (configFromRuntime ?? thread.config)
+              : stripPlanMode(configFromRuntime ?? thread.config);
+          const nextTurnTiming = deriveTurnTiming(thread, snapshot.status, {
+            enteredLiveAt: thread.activeTurnStartedAt ?? thread.updatedAt ?? nowIso,
+            nowIso,
+          });
+          const slashCommandsChanged = !areAgentSlashCommandsEqual(
+            thread.slashCommands,
+            snapshot.slashCommands,
+          );
 
           if (
             thread.status === snapshot.status &&
@@ -435,10 +676,21 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
             isThreadConfigEqual(thread.config, nextConfig) &&
             thread.canResumeWithConfig === snapshot.canResumeWithConfig &&
             thread.threadStatusSource === snapshot.threadStatusSource &&
+            thread.activeTurnStartedAt === nextTurnTiming.activeTurnStartedAt &&
+            thread.lastTurnStartedAt === nextTurnTiming.lastTurnStartedAt &&
+            thread.lastTurnEndedAt === nextTurnTiming.lastTurnEndedAt &&
+            !slashCommandsChanged &&
             !sessionRefChanged
           ) {
             return thread;
           }
+
+          turnUpdate = appendCompletedTurnIfClosed(
+            { ...state, ...turnUpdate },
+            thread.id,
+            thread,
+            nextTurnTiming,
+          );
 
           changed = true;
           return {
@@ -451,6 +703,10 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
               ? { threadStatusSource: snapshot.threadStatusSource }
               : {}),
             ...(snapshot.sessionRef ? { sessionRef: snapshot.sessionRef } : {}),
+            ...(snapshot.slashCommands !== undefined
+              ? { slashCommands: snapshot.slashCommands }
+              : {}),
+            ...nextTurnTiming,
           };
         }
 
@@ -470,7 +726,21 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         };
       });
 
-      return changed ? { threads } : {};
+      const turnsChanged =
+        turnUpdate.runtimeCompletedTurnsByThread !== state.runtimeCompletedTurnsByThread;
+      const runtimeConfigPatch = runtimeConfigMapChanged
+        ? { lastRuntimeConfigByThreadId }
+        : undefined;
+      if (!changed) {
+        if (turnsChanged && runtimeConfigPatch) return { ...turnUpdate, ...runtimeConfigPatch };
+        if (turnsChanged) return turnUpdate;
+        return runtimeConfigPatch ?? {};
+      }
+      return {
+        threads,
+        ...(turnsChanged ? turnUpdate : {}),
+        ...(runtimeConfigPatch ?? {}),
+      };
     }),
   reorderThreads: (sourceId, targetId, placement) =>
     set((state) => {
