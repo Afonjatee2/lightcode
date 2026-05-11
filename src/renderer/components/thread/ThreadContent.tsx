@@ -145,11 +145,11 @@ export function GuiThreadContent(
         >
           <div className="min-h-0 min-w-0 flex-1">
             <ChatPane
+              thread={thread}
               hasSupplementaryContent={showTodoDock}
               hiddenRuntimeItemId={hiddenRuntimeItemId}
               hiddenRuntimeItemIsLive={hiddenRuntimeItemIsLive}
               layoutChangeToken={todoDockLayoutToken}
-              thread={thread}
             />
           </div>
           {showThreadSideRail ? (

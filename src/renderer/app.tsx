@@ -18,6 +18,7 @@ import { clearRuntimeItemStoreSelectorCacheForThread } from "./components/thread
 import { useAppHydration } from "@/renderer/hooks/useAppHydration";
 import { AppProvider } from "./components/ui/provider";
 import { MainView } from "@/renderer/views/MainView/MainView";
+import { CommandPalette } from "@/renderer/commands/CommandPalette";
 
 // ── Module-level IPC listeners ──────────────────────────────────
 // Subscribes to supervisor events as soon as the module loads,
@@ -139,7 +140,15 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
   }
   if (event.type === "windows-agent-statuses") {
     console.log(`[renderer] event: windows-agent-statuses (${event.statuses.length} agents)`);
-    useAgentStatusesStore.getState().setAgentStatuses(event.statuses);
+    const store = useAgentStatusesStore.getState();
+    if (store.inFirstLaunchDiscovery) {
+      const statuses = event.statuses;
+      setTimeout(() => {
+        useAgentStatusesStore.getState().setAgentStatuses(statuses);
+      }, 1000);
+    } else {
+      store.setAgentStatuses(event.statuses);
+    }
   }
   if (event.type === "wsl-agent-statuses") {
     console.log(`[renderer] event: wsl-agent-statuses (${event.statuses.length} agents)`);
@@ -226,6 +235,7 @@ export function App() {
   return (
     <AppProvider>
       <MainView storeHydrated={storeHydrated} loadT0={loadT0} />
+      <CommandPalette />
     </AppProvider>
   );
 }

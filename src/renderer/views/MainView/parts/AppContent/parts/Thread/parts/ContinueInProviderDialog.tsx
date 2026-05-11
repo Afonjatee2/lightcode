@@ -37,7 +37,9 @@ function renderComposerControl(control: ComposerControl, index: number) {
     return (
       <Tooltip key={`toggle-${index}`}>
         <ToggleButton
-          className="lightcode-composer-toggle min-w-0 px-2.5"
+          className={`lightcode-composer-toggle ${
+            control.isCurrentState ? "lightcode-composer-toggle--current " : ""
+          }min-w-0 px-2.5`}
           isDisabled={control.isDisabled ?? false}
           isSelected={control.isSelected}
           size="sm"

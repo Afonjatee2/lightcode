@@ -19,6 +19,7 @@ const UNCORROBORATED_EXTRA_DELAY: Partial<Record<ThreadStatus, number>> = {
 };
 
 const DEFAULT_WORKING_SILENCE_TIMEOUT = 2000;
+const CLI_HOOK_FIRST_EVENT_GRACE_MS = 600;
 
 function isLightcodeOscDebugEnabled(): boolean {
   const v = process.env.LIGHTCODE_DEBUG_OSC;
@@ -53,7 +54,13 @@ export function resolveThreadStatusSource(
   if (disableCliHookPlugin) {
     return "terminal_parse";
   }
-  if (session.hasCliHookPluginActivity || session.cliHookEnvInjected) {
+  if (session.hasCliHookPluginActivity) {
+    return "cli_hook";
+  }
+  if (session.cliHookTerminalFallbackActive) {
+    return "terminal_parse";
+  }
+  if (session.cliHookEnvInjected) {
     return "cli_hook";
   }
   return "terminal_parse";
@@ -72,7 +79,7 @@ export class ThreadOutputPipeline {
       presentationMode === "terminal" &&
       !session.structuredSession &&
       !(disableCliHookPlugin ?? this.options.readDisableCliHookPlugin()) &&
-      (session.hasCliHookPluginActivity || session.cliHookEnvInjected === true)
+      session.hasCliHookPluginActivity === true
     );
   }
 
@@ -93,10 +100,17 @@ export class ThreadOutputPipeline {
     );
   }
 
-  clearSessionTimers(session: SessionRuntime): void {
+  clearSessionTimers(
+    session: SessionRuntime,
+    options: { preserveCliHookTerminalFallback?: boolean } = {},
+  ): void {
     if (session.pendingStatusHint) {
       clearTimeout(session.pendingStatusHint.timer);
       session.pendingStatusHint = undefined;
+    }
+    if (!options.preserveCliHookTerminalFallback) {
+      this.clearPendingCliHookTerminalFallback(session);
+      session.cliHookTerminalFallbackActive = false;
     }
     if (session.workingSilenceTimer) {
       clearTimeout(session.workingSilenceTimer);
@@ -147,6 +161,20 @@ export class ThreadOutputPipeline {
     });
   }
 
+  /**
+   * A routed hook event, including bookkeeping-only events, means L1 is real.
+   * Cancel the pre-first-hook L2 fallback probe and restore the source badge if
+   * this session had already demoted itself to terminal parsing.
+   */
+  noteCliHookPluginActivity(session: SessionRuntime): void {
+    const wasTerminalFallbackActive = session.cliHookTerminalFallbackActive === true;
+    this.clearPendingCliHookTerminalFallback(session);
+    session.cliHookTerminalFallbackActive = false;
+    if (wasTerminalFallbackActive) {
+      this.emitState(session);
+    }
+  }
+
   updateState(
     session: SessionRuntime,
     status: ThreadStatus,
@@ -161,7 +189,7 @@ export class ThreadOutputPipeline {
       return;
     }
 
-    this.clearSessionTimers(session);
+    this.clearSessionTimers(session, { preserveCliHookTerminalFallback: true });
     if (session.workingSilenceTimer && status !== "working") {
       clearTimeout(session.workingSilenceTimer);
       session.workingSilenceTimer = undefined;
@@ -176,9 +204,8 @@ export class ThreadOutputPipeline {
   /**
    * Apply a CLI hook plugin state transition. Hook events are treated as 100%
    * authoritative — we bypass L2 stabilization timers and emit immediately.
-   * When hooks own the thread status (hook env injected or a routed hook has
-   * posted), L2 does not run, so idle-gated terminal writes are flushed here
-   * on hook idle.
+   * Once a routed hook has posted, L2 does not run, so idle-gated terminal
+   * writes are flushed here on hook idle.
    */
   applyCliHookPluginState(
     session: SessionRuntime,
@@ -195,9 +222,15 @@ export class ThreadOutputPipeline {
       clearTimeout(session.userInterruptRecoveryTimer);
       session.userInterruptRecoveryTimer = undefined;
     }
+    const wasTerminalFallbackActive = session.cliHookTerminalFallbackActive === true;
+    this.clearPendingCliHookTerminalFallback(session);
+    session.cliHookTerminalFallbackActive = false;
     const statusChanged =
       session.status !== change.status || session.attention !== change.attention;
     this.updateState(session, change.status, change.attention);
+    if (wasTerminalFallbackActive && !statusChanged) {
+      this.emitState(session);
+    }
     if (change.status === "idle") {
       this.flushPendingTerminalWritesIfIdle(session);
     }
@@ -281,10 +314,11 @@ export class ThreadOutputPipeline {
     const hookOwnsStatus = this.cliHookOwnsStatus(session, disableCliHookPlugin);
 
     const applyOscHint = (hint: TerminalStatusHint): void => {
-      if (hookOwnsStatus) {
+      if (this.shouldSuppressLaunchWorkingHint(session, hint)) {
         return;
       }
-      if (this.shouldSuppressLaunchWorkingHint(session, hint)) {
+      this.armCliHookTerminalFallback(session);
+      if (hookOwnsStatus) {
         return;
       }
       this.updateState(session, hint.status, hint.attention);
@@ -398,8 +432,8 @@ export class ThreadOutputPipeline {
       (session.adapter.isReadyForInitialPrompt || session.adapter.detectTerminalStatus)
     ) {
       // Hook-owned fast path: keep streaming + launch-queue + invalid session
-      // ref recovery only — skip all status parsing / timers once hooks are
-      // wired for this spawn.
+      // ref recovery only — skip general status parsing / timers once a real
+      // hook event has landed for this spawn.
       if (hookOwnsStatus) {
         if (session.workingSilenceTimer) {
           clearTimeout(session.workingSilenceTimer);
@@ -505,6 +539,8 @@ export class ThreadOutputPipeline {
         rawHint && this.shouldSuppressLaunchWorkingHint(session, rawHint) ? null : rawHint;
 
       if (hint) {
+        this.armCliHookTerminalFallback(session);
+
         const nextConfig = session.adapter.syncConfigFromTerminalState?.({
           config: session.config,
           previousStatus: session.status,
@@ -645,5 +681,43 @@ export class ThreadOutputPipeline {
       "",
     ].join("\n");
     this.options.logWriter.append(this.options.resolveHintLogPath(session.threadId), entry);
+  }
+
+  private clearPendingCliHookTerminalFallback(session: SessionRuntime): void {
+    if (!session.cliHookTerminalFallbackTimer) {
+      return;
+    }
+    clearTimeout(session.cliHookTerminalFallbackTimer);
+    session.cliHookTerminalFallbackTimer = undefined;
+  }
+
+  private armCliHookTerminalFallback(session: SessionRuntime): void {
+    if (
+      !session.cliHookEnvInjected ||
+      session.hasCliHookPluginActivity ||
+      session.cliHookTerminalFallbackActive ||
+      session.cliHookTerminalFallbackTimer ||
+      this.options.readDisableCliHookPlugin()
+    ) {
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      session.cliHookTerminalFallbackTimer = undefined;
+
+      if (
+        !session.cliHookEnvInjected ||
+        session.hasCliHookPluginActivity ||
+        this.options.readDisableCliHookPlugin()
+      ) {
+        return;
+      }
+
+      session.cliHookTerminalFallbackActive = true;
+      this.emitState(session);
+    }, CLI_HOOK_FIRST_EVENT_GRACE_MS);
+    (timer as { unref?: () => void }).unref?.();
+
+    session.cliHookTerminalFallbackTimer = timer;
   }
 }

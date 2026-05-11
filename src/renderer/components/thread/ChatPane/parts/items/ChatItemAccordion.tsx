@@ -1,5 +1,6 @@
 import { Disclosure, Tooltip } from "@heroui/react";
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { PathDisplay } from "@/renderer/components/common";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 
 export interface ChatItemAccordionProps {
@@ -11,9 +12,11 @@ export interface ChatItemAccordionProps {
    * Optional structured title. When provided the row renders `prefix` (kept
    * fully visible) followed by `path` truncated from the START — the ellipsis
    * appears at the beginning of the path so the tail (filename) stays
-   * readable. `title` is still used as the tooltip / accessible label.
+   * readable. When `filePath` is true the path renders as `<basename> <muted
+   * dir>` with head-ellipsis on the directory. `title` is still used as the
+   * tooltip / accessible label.
    */
-  titleParts?: { prefix: string; path: string };
+  titleParts?: { prefix: string; path: string; filePath?: boolean };
   /** Optional muted/danger label rendered on the right of the trigger row. */
   rightLabel?: ReactNode;
   /** Tailwind class applied to `rightLabel` (e.g. `"text-danger"`). */
@@ -70,7 +73,16 @@ export function ChatItemAccordion({
   const pathRef = useRef<HTMLSpanElement | null>(null);
   const [isOverflowing, setIsOverflowing] = useState(false);
 
+  // PathDisplay handles its own truncation (basename always visible, head-
+  // ellipsis on the dir), so the wrapping `<code>` never overflows in that
+  // mode — skip the overflow-tooltip dance.
+  const usesPathDisplay = !!titleParts?.filePath;
+
   useLayoutEffect(() => {
+    if (usesPathDisplay) {
+      setIsOverflowing(false);
+      return;
+    }
     const el = titleParts ? pathRef.current : codeRef.current;
     if (!el) return;
     const check = () => setIsOverflowing(el.scrollWidth > el.clientWidth + 1);
@@ -78,14 +90,23 @@ export function ChatItemAccordion({
     const ro = new ResizeObserver(check);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [titleString, titleParts]);
+  }, [titleString, titleParts, usesPathDisplay]);
 
   const titleContent = titleParts ? (
     <code className={`${codeClass} flex items-baseline overflow-hidden`}>
       <span className="shrink-0 whitespace-pre">{titleParts.prefix}</span>
-      <span ref={pathRef} className="lc-truncate-start flex-1">
-        {titleParts.path}
-      </span>
+      {titleParts.filePath ? (
+        <PathDisplay
+          className="flex-1"
+          path={titleParts.path}
+          basenameClassName="!text-[color:var(--foreground)]"
+          dirClassName="!text-[color:var(--muted)]"
+        />
+      ) : (
+        <span ref={pathRef} className="lc-truncate-start flex-1">
+          {titleParts.path}
+        </span>
+      )}
     </code>
   ) : (
     <code ref={codeRef} className={codeClass}>

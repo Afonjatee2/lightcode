@@ -18,6 +18,7 @@ interface DevTerminalState {
   activeWorktreePath: string | null;
   tabs: DevTerminalTab[];
   activeTabId: string | null;
+  focusRequestId: number;
   /** Tab IDs with unseen output. Ephemeral — not persisted. */
   tabActivity: Record<string, true>;
 }
@@ -48,19 +49,34 @@ export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>
   activeWorktreePath: null,
   tabs: [],
   activeTabId: null,
+  focusRequestId: 0,
   tabActivity: {},
 
   openPanel: (projectId) =>
-    set({ isOpen: true, activeProjectId: projectId, activeWorktreePath: null }),
+    set((state) => ({
+      isOpen: true,
+      activeProjectId: projectId,
+      activeWorktreePath: null,
+      focusRequestId: state.focusRequestId + 1,
+    })),
   openWorktreePanel: (projectId, worktreePath) =>
-    set({ isOpen: true, activeProjectId: projectId, activeWorktreePath: worktreePath }),
+    set((state) => ({
+      isOpen: true,
+      activeProjectId: projectId,
+      activeWorktreePath: worktreePath,
+      focusRequestId: state.focusRequestId + 1,
+    })),
   closePanel: () => set({ isOpen: false, activeProjectId: null, activeWorktreePath: null }),
   togglePanel: (projectId) =>
     set((state) => {
       if (state.isOpen && state.activeProjectId === projectId) {
         return { isOpen: false, activeWorktreePath: null };
       }
-      return { isOpen: true, activeProjectId: projectId ?? state.activeProjectId };
+      return {
+        isOpen: true,
+        activeProjectId: projectId ?? state.activeProjectId,
+        focusRequestId: state.focusRequestId + 1,
+      };
     }),
 
   setActiveProject: (projectId) => {
@@ -99,13 +115,13 @@ export const useDevTerminalStore = create<DevTerminalState & DevTerminalActions>
     }),
 
   setActiveTab: (tabId) => {
-    const { tabActivity } = get();
+    const { focusRequestId, tabActivity } = get();
     if (tabActivity[tabId]) {
       const next = { ...tabActivity };
       delete next[tabId];
-      return set({ activeTabId: tabId, tabActivity: next });
+      return set({ activeTabId: tabId, focusRequestId: focusRequestId + 1, tabActivity: next });
     }
-    set({ activeTabId: tabId });
+    set({ activeTabId: tabId, focusRequestId: focusRequestId + 1 });
   },
 
   removeTabsForProject: (projectId: string) => {

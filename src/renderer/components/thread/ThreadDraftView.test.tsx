@@ -133,6 +133,39 @@ const claudeStatus: AgentStatus = {
   },
 };
 
+const cursorStatus: AgentStatus = {
+  kind: "cursor",
+  label: "Cursor",
+  installed: true,
+  authState: "authenticated",
+  capabilities: {
+    models: [
+      { id: "composer-2", label: "Composer 2" },
+      { id: "gpt-5.5", label: "GPT-5.5" },
+    ],
+    efforts: ["high"],
+    modelEfforts: { "composer-2": [], "gpt-5.5": ["high"] },
+    contextSizes: [
+      { id: "272k", label: "272K" },
+      { id: "1m", label: "1M" },
+    ],
+    modelContextSizes: {
+      "gpt-5.5": ["272k", "1m"],
+    },
+    fastModels: ["composer-2", "gpt-5.5"],
+    thinkingModels: ["gpt-5.5"],
+    modes: ["agent", "plan"],
+    approvalPolicies: [{ id: "default", label: "Default" }],
+    sandboxModes: [],
+    supportsResume: true,
+    supportsDirectInput: true,
+    liveInputMode: "terminal",
+    presentationMode: "terminal",
+    presentationModes: ["terminal", "gui"],
+    settingDefs: [],
+  },
+};
+
 describe("ThreadDraftView", () => {
   beforeEach(() => {
     composerSpy.mockClear();
@@ -141,6 +174,7 @@ describe("ThreadDraftView", () => {
       hiddenModels: {},
       disabledAgents: [],
       lastPresentationModeByAgent: {},
+      sharedSettingsHydrated: true,
     });
   });
 
@@ -281,6 +315,7 @@ describe("ThreadDraftView", () => {
 
   it("applies a saved codex effort after shared settings load", async () => {
     const onStart = vi.fn<(input: unknown) => void>();
+    useSharedSettings.setState({ sharedSettingsHydrated: false, providerConfigs: {} });
 
     render(<ThreadDraftView project={project} agentStatuses={[codexStatus]} onStart={onStart} />);
 
@@ -303,6 +338,7 @@ describe("ThreadDraftView", () => {
             sandboxMode: "danger-full-access",
           },
         },
+        sharedSettingsHydrated: true,
       });
     });
 
@@ -314,6 +350,121 @@ describe("ThreadDraftView", () => {
       const effortContext = props.controls.find((c) => c.kind === "effort-context");
       expect(providerModel?.currentModel).toBe("gpt-5.4");
       expect(effortContext?.effortValue).toBe("medium");
+    });
+  });
+
+  it("keeps simultaneously open draft configs independent while saving defaults for later drafts", async () => {
+    render(
+      <>
+        <ThreadDraftView
+          project={project}
+          agentStatuses={[dualModeCodexStatus]}
+          onStart={vi.fn<(input: unknown) => void>()}
+        />
+        <ThreadDraftView
+          project={project}
+          agentStatuses={[dualModeCodexStatus]}
+          onStart={vi.fn<(input: unknown) => void>()}
+        />
+      </>,
+    );
+
+    await waitFor(() => {
+      const recentCalls = composerSpy.mock.calls.slice(-2) as Array<
+        [
+          {
+            controls: Array<{
+              label?: string;
+              onChange?: (selected: boolean) => void;
+            }>;
+          },
+        ]
+      >;
+      expect(recentCalls).toHaveLength(2);
+      expect(recentCalls.every(([props]) => props.controls.some((c) => c.label === "Work"))).toBe(
+        true,
+      );
+    });
+
+    const firstDraftProps = composerSpy.mock.calls.at(-2)?.[0] as {
+      controls: Array<{
+        label?: string;
+        onChange?: (selected: boolean) => void;
+      }>;
+    };
+    const firstModeToggle = firstDraftProps.controls.find((control) => control.label === "Work");
+
+    composerSpy.mockClear();
+    act(() => {
+      firstModeToggle?.onChange?.(true);
+    });
+
+    await waitFor(() => {
+      expect(composerSpy).toHaveBeenCalled();
+      const lastProps = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{ label?: string }>;
+      };
+      expect(lastProps.controls.some((control) => control.label === "Plan")).toBe(true);
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+
+    expect(composerSpy.mock.calls).toHaveLength(1);
+    expect(useSharedSettings.getState().providerConfigs.codex?.mode).toBe("plan");
+  });
+
+  it("does not show effort/context control for Cursor models without those capabilities", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(<ThreadDraftView project={project} agentStatuses={[cursorStatus]} onStart={onStart} />);
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentModel?: string;
+          label?: string;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentModel).toBe("composer-2");
+      expect(props.controls.some((control) => control.kind === "effort-context")).toBe(false);
+      expect(props.controls.some((control) => control.label === "Fast")).toBe(true);
+    });
+  });
+
+  it("normalizes saved Cursor effort variants into base model plus effort", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    act(() => {
+      useSharedSettings.setState({
+        providerConfigs: {
+          cursor: {
+            model: "gpt-5.5-high",
+            effort: "",
+            mode: "agent",
+            approvalPolicy: "default",
+          },
+        },
+      });
+    });
+
+    render(<ThreadDraftView project={project} agentStatuses={[cursorStatus]} onStart={onStart} />);
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentModel?: string;
+          effortValue?: string;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      const effortContext = props.controls.find((c) => c.kind === "effort-context");
+      expect(providerModel?.currentModel).toBe("gpt-5.5");
+      expect(effortContext?.effortValue).toBe("high");
     });
   });
 
@@ -394,5 +545,58 @@ describe("ThreadDraftView", () => {
 
     expect(claudeRenderModels.length).toBeGreaterThan(0);
     expect(claudeRenderModels).toEqual(claudeRenderModels.map(() => "claude-opus-4-7"));
+  });
+
+  it("keeps a local plan-mode selection while deferred persistence catches up", async () => {
+    render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[dualModeCodexStatus]}
+        onStart={vi.fn<(input: unknown) => void>()}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          label?: string;
+          onChange?: (selected: boolean) => void;
+        }>;
+      };
+      expect(props.controls.some((control) => control.label === "Work")).toBe(true);
+    });
+
+    const initialProps = composerSpy.mock.lastCall?.[0] as {
+      controls: Array<{
+        kind?: string;
+        label?: string;
+        onChange?: (selected: boolean) => void;
+      }>;
+    };
+    const modeToggle = initialProps.controls.find((control) => control.label === "Work");
+
+    composerSpy.mockClear();
+    act(() => {
+      modeToggle?.onChange?.(true);
+    });
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{ label?: string }>;
+      };
+      expect(props.controls.some((control) => control.label === "Plan")).toBe(true);
+      expect(props.controls.some((control) => control.label === "Work")).toBe(false);
+    });
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+    });
+
+    const settledProps = composerSpy.mock.lastCall?.[0] as {
+      controls: Array<{ label?: string }>;
+    };
+    expect(settledProps.controls.some((control) => control.label === "Plan")).toBe(true);
+    expect(settledProps.controls.some((control) => control.label === "Work")).toBe(false);
   });
 });

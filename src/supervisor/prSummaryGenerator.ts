@@ -1,5 +1,6 @@
 import type { ProjectLocation } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
+import { buildDiffPromptContext, getFilesFromDiff } from "./diffPromptContext";
 import { GitService } from "./git";
 import { buildOneShotSpec, spawnAgent } from "./oneShotSpawn";
 
@@ -9,6 +10,8 @@ const PROMPT =
   "- The title should be a single line, at most 72 characters, imperative mood\n" +
   "- The description should be a concise markdown summary (2-5 bullet points)\n" +
   "- Focus on the what and why, not the how\n" +
+  "- Use the changed files list as the source of truth for coverage\n" +
+  "- Cover every major area; do not focus only on the largest or first diff\n" +
   "- Detect the PR type from the branch name and changes:\n" +
   "  - fix/, bugfix/, hotfix/ prefixes or bug-related changes → Bugfix\n" +
   "  - feat/, feature/ prefixes or new functionality → Feature\n" +
@@ -22,7 +25,7 @@ const PROMPT =
   "DESCRIPTION:\n" +
   "<description>\n\n";
 
-const MAX_DIFF_CHARS = 8000;
+const MAX_DIFF_CONTEXT_CHARS = 24_000;
 const MAX_LOG_CHARS = 4000;
 const PR_SUMMARY_TIMEOUT_MS = 120_000;
 
@@ -100,7 +103,14 @@ export async function generatePrSummary(
   prompt += `Branch: ${branch} → ${baseBranch}\n\n`;
   prompt += "Git log:\n" + truncate(log, MAX_LOG_CHARS);
   if (diff.trim()) {
-    prompt += "\n\nDiff:\n" + truncate(diff, MAX_DIFF_CHARS);
+    prompt +=
+      "\n\n" +
+      buildDiffPromptContext({
+        diff,
+        files: getFilesFromDiff(diff),
+        sourceLabel: `Branch diff: ${baseBranch}...${branch}`,
+        maxTotalDiffChars: MAX_DIFF_CONTEXT_CHARS,
+      });
   }
 
   const cmd = adapter.buildOneShotCommand(effectiveModel, effort, prompt);

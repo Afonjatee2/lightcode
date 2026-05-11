@@ -26,6 +26,8 @@ export interface BranchSelectorProps {
   trigger?: ReactNode;
   hideWorktreeToggle?: boolean;
   popoverPlacement?: "top" | "bottom";
+  forceHideLabel?: boolean;
+  iconOnly?: boolean;
 }
 
 export function BranchSelector(props: BranchSelectorProps) {
@@ -43,6 +45,8 @@ export function BranchSelector(props: BranchSelectorProps) {
     trigger,
     hideWorktreeToggle,
     popoverPlacement = "top",
+    forceHideLabel = false,
+    iconOnly = false,
   } = props;
 
   const [isOpen, setIsOpen] = useState(false);
@@ -175,8 +179,26 @@ export function BranchSelector(props: BranchSelectorProps) {
                 ) : (
                   <GitBranch className="size-3.5 text-muted" />
                 )}
-                <span className="truncate">{value}</span>
-                <ChevronDown className="size-3.5 text-muted" />
+                {!iconOnly && (
+                  <span
+                    className={
+                      forceHideLabel
+                        ? "lightcode-composer-label-hideable truncate is-hidden"
+                        : "truncate"
+                    }
+                  >
+                    {value}
+                  </span>
+                )}
+                {!iconOnly && (
+                  <ChevronDown
+                    className={
+                      forceHideLabel
+                        ? "lightcode-composer-label-hideable size-3.5 text-muted is-hidden"
+                        : "size-3.5 text-muted"
+                    }
+                  />
+                )}
               </Button>
               <Tooltip.Content placement="top">{value}</Tooltip.Content>
             </Tooltip>

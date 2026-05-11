@@ -1,4 +1,10 @@
-import type { AgentSlashCommand } from "@/shared/contracts";
+import type { AgentSlashCommand, AgentStatus, ThreadPresentationMode } from "@/shared/contracts";
+import {
+  getGuiSlashCommands,
+  type LocalSlashCommandAction,
+} from "@/renderer/components/providers/ProviderIcon";
+
+export type { LocalSlashCommandAction };
 
 const EMPTY_SLASH_COMMANDS: AgentSlashCommand[] = [];
 
@@ -10,8 +16,36 @@ const EMPTY_SLASH_COMMANDS: AgentSlashCommand[] = [];
 export function resolveAvailableSlashCommands(
   threadCommands: readonly AgentSlashCommand[] | undefined,
   capabilityCommands: readonly AgentSlashCommand[] | undefined,
+  context?: {
+    agentKind?: AgentStatus["kind"] | undefined;
+    presentationMode?: ThreadPresentationMode | undefined;
+    hasEffort?: boolean | undefined;
+    supportsFast?: boolean | undefined;
+  },
 ): readonly AgentSlashCommand[] {
-  return threadCommands ?? capabilityCommands ?? EMPTY_SLASH_COMMANDS;
+  if (threadCommands) return threadCommands;
+  if (context && context.agentKind && context.presentationMode !== "terminal") {
+    const registration = getGuiSlashCommands(context.agentKind);
+    if (registration) {
+      return registration.buildCommands({
+        hasEffort: context.hasEffort ?? false,
+        supportsFast: context.supportsFast ?? false,
+      });
+    }
+  }
+  return capabilityCommands ?? EMPTY_SLASH_COMMANDS;
+}
+
+export function resolveLocalSlashCommandAction(
+  input: string,
+  context: {
+    agentKind?: AgentStatus["kind"] | undefined;
+    presentationMode?: ThreadPresentationMode | undefined;
+  },
+): LocalSlashCommandAction | null {
+  if (!context.agentKind || context.presentationMode === "terminal") return null;
+  const registration = getGuiSlashCommands(context.agentKind);
+  return registration ? registration.resolveLocalAction(input) : null;
 }
 
 export function filterSlashCommands(

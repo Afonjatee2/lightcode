@@ -1,34 +1,23 @@
 import { PixelLoader } from "@/renderer/components/common";
-import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import { getRegisteredProviders, ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import type { AgentStatus } from "@/shared/contracts";
 
-const KNOWN_AGENTS: ReadonlyArray<{ kind: string; label: string }> = [
-  { kind: "claude", label: "Claude Code" },
-  { kind: "codex", label: "Codex" },
-  { kind: "copilot", label: "GitHub Copilot" },
-  { kind: "gemini", label: "Gemini" },
-  { kind: "cursor", label: "Cursor CLI" },
-  { kind: "opencode", label: "OpenCode" },
-];
-
-function authBadge(status: AgentStatus): { label: string; toneClass: string } {
-  if (!status.installed) {
-    return { label: "Not installed", toneClass: "text-muted" };
+function readyBadge(status: AgentStatus): { label: string; toneClass: string } | null {
+  if (!status.installed) return null;
+  if (status.authState === "missing") {
+    return { label: "Sign in needed", toneClass: "text-warning" };
   }
-  switch (status.authState) {
-    case "authenticated":
-      return { label: "Ready", toneClass: "text-success" };
-    case "missing":
-      return { label: "Sign in needed", toneClass: "text-warning" };
-    default:
-      return { label: "Detected", toneClass: "text-foreground" };
-  }
+  return { label: "Ready", toneClass: "text-success" };
 }
 
 export function AgentDiscoveryScreen() {
   const discovered = useAgentStatusesStore((s) => s.discoveredAgents);
   const byKind = new Map(discovered.map((status) => [status.kind, status]));
+  const installedCount = discovered.reduce((n, s) => n + (s.installed ? 1 : 0), 0);
+  // Provider plugins self-register at module-load time; reading the registry
+  // each render keeps this screen in sync as new agent kinds are added.
+  const providers = getRegisteredProviders();
 
   return (
     <div className="agent-discovery-screen flex h-full flex-col items-center justify-center gap-8 px-6 text-center">
@@ -40,29 +29,29 @@ export function AgentDiscoveryScreen() {
         </p>
       </div>
 
-      <div className="grid w-full max-w-[34rem] grid-cols-2 gap-3 sm:grid-cols-3">
-        {KNOWN_AGENTS.map(({ kind, label }) => {
+      <div className="flex w-full max-w-[36rem] flex-wrap items-start justify-center gap-x-10 gap-y-6">
+        {providers.map(({ kind, label }) => {
           const status = byKind.get(kind);
-          const isFound = status !== undefined;
-          const badge = status ? authBadge(status) : null;
+          const probed = status !== undefined;
+          const isInstalled = status?.installed === true;
+          const badge = status ? readyBadge(status) : null;
           return (
             <div
               key={kind}
-              data-found={isFound ? "true" : "false"}
-              className="agent-discovery-tile flex flex-col items-center justify-center gap-2 rounded-md border border-border/60 bg-surface/50 px-3 py-4"
+              data-found={isInstalled ? "true" : "false"}
+              data-probed={probed ? "true" : "false"}
+              className="agent-discovery-item flex w-24 flex-col items-center gap-2"
             >
-              <div className="agent-discovery-tile__icon flex size-9 items-center justify-center">
-                <ProviderIcon
-                  kind={kind}
-                  tone={isFound ? "active" : "inactive"}
-                  className="size-9"
-                />
-              </div>
+              <ProviderIcon kind={kind} className="agent-discovery-item__icon size-12" />
               <div className="text-sm font-medium leading-tight">{label}</div>
               <div
                 className={`min-h-[1rem] text-xs leading-tight ${badge ? badge.toneClass : "text-muted/60"}`}
               >
-                {badge ? badge.label : <span className="opacity-60">Searching…</span>}
+                {badge ? (
+                  badge.label
+                ) : !probed ? (
+                  <span className="opacity-60">Searching…</span>
+                ) : null}
               </div>
             </div>
           );
@@ -72,7 +61,11 @@ export function AgentDiscoveryScreen() {
       <div className="text-xs text-muted/70" aria-live="polite">
         {discovered.length === 0
           ? "Warming up shell environment…"
-          : `Found ${discovered.length} of ${KNOWN_AGENTS.length}`}
+          : installedCount === 0
+            ? "No agents installed yet"
+            : installedCount === 1
+              ? "1 agent ready"
+              : `${installedCount} agents ready`}
       </div>
     </div>
   );

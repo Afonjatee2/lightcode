@@ -5,6 +5,13 @@
 
 const MAX_TITLE_LEN = 120;
 
+export type CommandIntentKind = "command" | "search" | "view";
+
+export interface CommandIntentDisplay {
+  title: string;
+  kind: CommandIntentKind;
+}
+
 export function summarizeShellCommand(full: string): string {
   const s = full.trim().replace(/\r\n/g, "\n");
   if (!s) return "(command)";
@@ -56,10 +63,10 @@ function extractPowerShellQuotedCommand(s: string): string | null {
 
 /** `-c '…'` / `-c "…"` (pwsh/bash). */
 function extractDashCQuoted(s: string): string | null {
-  const reSq = /(?:^|[\s;])-c\s+'((?:\\.|[^'])*)'/i;
+  const reSq = /(?:^|[\s;])-[A-Za-z]*c\s+'((?:\\.|[^'])*)'/i;
   const m = reSq.exec(s);
   if (m?.[1] != null) return m[1]!.replace(/\\'/g, "'");
-  const reDq = /(?:^|[\s;])-c\s+"((?:\\.|[^"\\])*)"/i;
+  const reDq = /(?:^|[\s;])-[A-Za-z]*c\s+"((?:\\.|[^"\\])*)"/i;
   const m2 = reDq.exec(s);
   if (m2?.[1] != null) return m2[1]!.replace(/\\"/g, '"');
   return null;
@@ -101,11 +108,15 @@ const CHECK_SCRIPTS = new Set([
  * tool, otherwise the shortened shell line. Payload has no separate title field today.
  */
 export function humanIntentTitle(fullCommandLine: string): string {
-  const short = summarizeShellCommand(fullCommandLine);
-  return intentFromSummarizedCommand(short) ?? `Run: ${short}`;
+  return commandIntentDisplay(fullCommandLine).title;
 }
 
-function intentFromSummarizedCommand(t: string): string | null {
+export function commandIntentDisplay(fullCommandLine: string): CommandIntentDisplay {
+  const short = summarizeShellCommand(fullCommandLine);
+  return intentFromSummarizedCommand(short) ?? { title: `Run: ${short}`, kind: "command" };
+}
+
+function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
   const trimmed = t.trim();
 
   const gc = /^Get-Content\s+(.+)$/i.exec(trimmed);
@@ -113,14 +124,32 @@ function intentFromSummarizedCommand(t: string): string | null {
     let p = gc[1]!.trim().replace(/^['"]|['"]$/g, "");
     p = (p.split(/\s+/)[0] ?? p).replace(/^['"]|['"]$/g, "");
     const base = p.split(/[/\\]/).pop() ?? p;
-    return `Read file: ${base}`;
+    return { title: `Read file: ${base}`, kind: "view" };
   }
 
   const typeCmd = /^type\s+(.+)$/i.exec(trimmed);
   if (typeCmd) {
     const p = typeCmd[1]!.trim().replace(/^['"]|['"]$/g, "");
     const base = p.split(/[/\\]/).pop() ?? p;
-    return `Read file: ${base}`;
+    return { title: `Read file: ${base}`, kind: "view" };
+  }
+
+  const sedView = parseSedView(trimmed);
+  if (sedView) {
+    return {
+      title: `View lines ${sedView.lines}: ${sedView.path}`,
+      kind: "view",
+    };
+  }
+
+  const rgSearch = parseRipgrepSearch(trimmed);
+  if (rgSearch) {
+    return {
+      title: rgSearch.scope
+        ? `Search: "${rgSearch.pattern}" in ${rgSearch.scope}`
+        : `Search: "${rgSearch.pattern}"`,
+      kind: "search",
+    };
   }
 
   const run = /^(pnpm|npm|yarn)\s+run\s+(\S+)/i.exec(trimmed);
@@ -128,22 +157,151 @@ function intentFromSummarizedCommand(t: string): string | null {
     const pm = run[1]!.toLowerCase();
     const script = run[2]!.replace(/['",]/g, "");
     if (CHECK_SCRIPTS.has(script)) {
-      return `Check: ${pm} run ${script}`;
+      return { title: `Check: ${pm} run ${script}`, kind: "command" };
     }
-    return `Run: ${pm} run ${script}`;
+    return { title: `Run: ${pm} run ${script}`, kind: "command" };
   }
 
   const exec = /^(pnpm|npm)\s+exec\s+(.+)$/i.exec(trimmed);
   if (exec) {
     const rest = exec[2]!.trim();
-    if (/^oxfmt\b/i.test(rest)) return "Format files";
+    if (/^oxfmt\b/i.test(rest)) return { title: "Format files", kind: "command" };
     const shortRest = rest.length > 72 ? `${rest.slice(0, 71)}…` : rest;
-    return `Run: ${shortRest}`;
+    return { title: `Run: ${shortRest}`, kind: "command" };
   }
 
   if (/^git\s+/i.test(trimmed)) {
-    return trimmed.length > 72 ? `Git: ${trimmed.slice(0, 71)}…` : `Git: ${trimmed}`;
+    return {
+      title: trimmed.length > 72 ? `Git: ${trimmed.slice(0, 71)}…` : `Git: ${trimmed}`,
+      kind: "command",
+    };
   }
 
   return null;
+}
+
+interface SedView {
+  path: string;
+  lines: string;
+}
+
+interface RipgrepSearch {
+  pattern: string;
+  scope: string | undefined;
+}
+
+function parseSedView(command: string): SedView | null {
+  const words = splitShellWords(command);
+  if (words.length < 3) return null;
+  const executable = words[0]!.split(/[/\\]/).pop()?.toLowerCase();
+  if (executable !== "sed" && executable !== "gsed") return null;
+
+  let script: string | undefined;
+  let path: string | undefined;
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]!;
+    if (word === "--") continue;
+    if (word === "-e") {
+      script = words[++i];
+      continue;
+    }
+    if (word.startsWith("-")) continue;
+    if (script === undefined) {
+      script = word;
+      continue;
+    }
+    path = word;
+    break;
+  }
+
+  if (!script || !path || path === "-") return null;
+  const range = /^(\d+)(?:,(\d+))?p$/.exec(script.trim());
+  if (!range) return null;
+  const start = range[1]!;
+  const end = range[2];
+  return { path, lines: end ? `${start}-${end}` : start };
+}
+
+function parseRipgrepSearch(command: string): RipgrepSearch | null {
+  const words = splitShellWords(command);
+  if (words.length < 2) return null;
+  const executable = words[0]!.split(/[/\\]/).pop()?.toLowerCase();
+  if (executable !== "rg" && executable !== "ripgrep") return null;
+
+  let pattern: string | undefined;
+  const paths: string[] = [];
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]!;
+    if (word === "--") {
+      if (pattern === undefined) {
+        pattern = words[++i];
+      } else {
+        paths.push(...words.slice(i + 1));
+      }
+      break;
+    }
+    if (word === "-e" || word === "--regexp") {
+      pattern = words[++i];
+      continue;
+    }
+    if (word.startsWith("--regexp=")) {
+      pattern = word.slice("--regexp=".length);
+      continue;
+    }
+    if (word === "-g" || word === "--glob" || word === "--type" || word === "-t") {
+      i++;
+      continue;
+    }
+    if (word.startsWith("-")) continue;
+    if (pattern === undefined) {
+      pattern = word;
+      continue;
+    }
+    paths.push(word);
+  }
+
+  if (!pattern) return null;
+  return { pattern, scope: paths.length > 0 ? paths.join(" ") : undefined };
+}
+
+function splitShellWords(input: string): string[] {
+  const words: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+
+  for (const ch of input) {
+    if (escaped) {
+      current += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && quote !== "'") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (current.length > 0) {
+        words.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += ch;
+  }
+
+  if (current.length > 0) words.push(current);
+  return words;
 }

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  codexHooksFeatureFlagForSemver,
   getCodexPluginPaths,
   isCodexSemverSupportedForHooks,
   mergeCodexHooksDocument,
@@ -62,6 +63,14 @@ describe("parseCodexVersionLine + isCodexSemverSupportedForHooks", () => {
     expect(isCodexSemverSupportedForHooks([0, 122, 0])).toBe(true);
     expect(isCodexSemverSupportedForHooks([0, 123, 0])).toBe(true);
     expect(isCodexSemverSupportedForHooks(null)).toBe(false);
+  });
+
+  it("uses the renamed hooks feature flag from 0.130.0 onward", () => {
+    expect(codexHooksFeatureFlagForSemver([0, 129, 99])).toBe("codex_hooks");
+    expect(codexHooksFeatureFlagForSemver([0, 130, 0])).toBe("hooks");
+    expect(codexHooksFeatureFlagForSemver([0, 131, 0])).toBe("hooks");
+    expect(codexHooksFeatureFlagForSemver([1, 0, 0])).toBe("hooks");
+    expect(codexHooksFeatureFlagForSemver(null)).toBe("codex_hooks");
   });
 });
 

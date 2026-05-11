@@ -1,14 +1,45 @@
 import { startTransition } from "react";
 import { makeDraftPaneId } from "@/shared/paneId";
-import type { Thread } from "@/shared/contracts";
+import type { Project, Thread } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
-import { useProjectIds } from "@/renderer/state/useThread";
 import type { DragSourceData, MainPanelDropSource, PaneDropIndicator } from "@/renderer/dnd";
 import type { ReorderPlacement } from "@/renderer/state/reorder";
 import { showFilesPanel, showGitReviewPanel } from "@/renderer/actions/panelActions";
 import { showTerminalPanel } from "@/renderer/actions/terminalActions";
 
 type ThreadDragSource = Extract<DragSourceData, { type: "thread" }>;
+type ProjectDragSource = Extract<DragSourceData, { type: "project" }>;
+
+export function resolveProjectReorder(input: {
+  projects: Project[];
+  source: ProjectDragSource;
+  target: DragSourceData | null;
+  initialIndex: number;
+  finalIndex: number;
+}): { targetId: string; placement: ReorderPlacement } | null {
+  const { projects, source, target, initialIndex, finalIndex } = input;
+  const projectIds = projects.map((project) => project.id);
+
+  if (target?.type === "project" && target.projectId !== source.projectId) {
+    const sourceIndex = projectIds.indexOf(source.projectId);
+    const targetIndex = projectIds.indexOf(target.projectId);
+    if (sourceIndex === -1 || targetIndex === -1) return null;
+    return {
+      targetId: target.projectId,
+      placement: sourceIndex < targetIndex ? "after" : "before",
+    };
+  }
+
+  if (initialIndex === finalIndex) return null;
+
+  const targetId = projectIds[finalIndex];
+  if (!targetId || targetId === source.projectId) return null;
+
+  return {
+    targetId,
+    placement: initialIndex < finalIndex ? "after" : "before",
+  };
+}
 
 export function resolveThreadReorder(input: {
   threads: Thread[];
@@ -53,7 +84,6 @@ export function resolveThreadReorder(input: {
 }
 
 export function useDndHandlers() {
-  const projectIds = useProjectIds();
   const reorderProjects = useAppStore((s) => s.reorderProjects);
   const reorderThreads = useAppStore((s) => s.reorderThreads);
   const replacePaneById = useAppStore((s) => s.replacePaneById);
@@ -71,12 +101,16 @@ export function useDndHandlers() {
     target: DragSourceData | null,
   ) {
     if (source.type === "project") {
-      if (initialIndex === finalIndex) return;
-      const projectId = source.projectId;
-      const targetId = projectIds[finalIndex];
-      if (!targetId || targetId === projectId) return;
-      const placement = initialIndex < finalIndex ? ("after" as const) : ("before" as const);
-      startTransition(() => reorderProjects(projectId, targetId, placement));
+      const projects = useAppStore.getState().projects;
+      const reorder = resolveProjectReorder({
+        projects,
+        source,
+        target,
+        initialIndex,
+        finalIndex,
+      });
+      if (!reorder) return;
+      startTransition(() => reorderProjects(source.projectId, reorder.targetId, reorder.placement));
     } else if (source.type === "thread") {
       const allThreads = useAppStore.getState().threads;
       const reorder = resolveThreadReorder({

@@ -24,7 +24,7 @@ describe("getActiveWorktreeBranchNames", () => {
     const threads = [
       makeThread({ id: "t1", projectId: "p1", worktreeBranch: "feature/b" }),
       makeThread({ id: "t2", projectId: "p1", worktreeBranch: "feature/a" }),
-      makeThread({ id: "t3", projectId: "p1", worktreeBranch: "feature/a" }),
+      makeThread({ id: "thread-three", projectId: "p1", worktreeBranch: "feature/a" }),
       makeThread({ id: "t4", projectId: "p2", worktreeBranch: "feature/c" }),
       makeThread({ id: "t5", projectId: "p1", archived: true, worktreeBranch: "feature/d" }),
       makeThread({ id: "t6", projectId: "p1" }),

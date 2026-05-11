@@ -1,12 +1,13 @@
 import type { SVGProps } from "react";
 
+type BarCount = 1 | 2 | 3 | 4 | 5;
+
 /**
  * Signal-bar icon using thin stroked lines. Active bars use `currentColor`,
  * inactive bars are drawn at low opacity so the full scale is always visible.
  *
- * Renders 4 or 5 bars depending on how many effort levels the provider
- * exposes. The effort's position within the list determines how many bars
- * are lit.
+ * Renders one bar per non-none effort level, capped at five. The effort's
+ * position within the list determines how many bars are lit.
  */
 export function EffortIcon(
   props: SVGProps<SVGSVGElement> & { effort: string; efforts: readonly string[] },
@@ -14,33 +15,49 @@ export function EffortIcon(
   const { effort, efforts, ...svgProps } = props;
   const index = efforts.indexOf(effort);
   const count = efforts.length;
-  const totalBars = count >= 5 ? 5 : 4;
+  const hasNone = efforts.includes("none");
+  const scaleCount = hasNone ? count - 1 : count;
+  const totalBars = Math.min(5, Math.max(1, scaleCount)) as BarCount;
 
   let active: number;
-  if (count <= 1) {
+  if (index < 0 || effort === "none") {
+    active = 0;
+  } else if (count <= 1) {
     active = totalBars;
   } else {
-    active = Math.min(
-      totalBars,
-      Math.max(1, Math.round((index / (count - 1)) * (totalBars - 1)) + 1),
-    );
+    const offset = hasNone ? 1 : 0;
+    const position = Math.max(0, index - offset);
+    const steps = Math.max(1, count - 1 - offset);
+    active = Math.min(totalBars, Math.max(1, Math.round((position / steps) * (totalBars - 1)) + 1));
   }
 
-  const bars =
-    totalBars === 5
-      ? [
-          { x: 3.5, y1: 20, y2: 17 },
-          { x: 7.25, y1: 20, y2: 14 },
-          { x: 11, y1: 20, y2: 10 },
-          { x: 14.75, y1: 20, y2: 6 },
-          { x: 18.5, y1: 20, y2: 3 },
-        ]
-      : [
-          { x: 5, y1: 20, y2: 16 },
-          { x: 9.5, y1: 20, y2: 12 },
-          { x: 14, y1: 20, y2: 8 },
-          { x: 18.5, y1: 20, y2: 4 },
-        ];
+  const barsByCount = {
+    1: [{ x: 12, y1: 20, y2: 8 }],
+    2: [
+      { x: 8, y1: 20, y2: 14 },
+      { x: 16, y1: 20, y2: 6 },
+    ],
+    3: [
+      { x: 6, y1: 20, y2: 16 },
+      { x: 12, y1: 20, y2: 10 },
+      { x: 18, y1: 20, y2: 4 },
+    ],
+    4: [
+      { x: 5, y1: 20, y2: 16 },
+      { x: 9.5, y1: 20, y2: 12 },
+      { x: 14, y1: 20, y2: 8 },
+      { x: 18.5, y1: 20, y2: 4 },
+    ],
+    5: [
+      { x: 3.5, y1: 20, y2: 17 },
+      { x: 7.25, y1: 20, y2: 14 },
+      { x: 11, y1: 20, y2: 10 },
+      { x: 14.75, y1: 20, y2: 6 },
+      { x: 18.5, y1: 20, y2: 3 },
+    ],
+  } satisfies Record<number, { x: number; y1: number; y2: number }[]>;
+
+  const bars = barsByCount[totalBars];
 
   return (
     <svg

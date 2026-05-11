@@ -7,6 +7,8 @@ import type { ProjectPathRef } from "./parseProjectPathRef";
  */
 export const AUTO_PATH_FILE_PREFIX = "lightcode:path:";
 export const AUTO_PATH_FOLDER_PREFIX = "lightcode:folder:";
+export const AUTO_PATH_FILE_HREF_PREFIX = "https://lightcode.local/path/";
+export const AUTO_PATH_FOLDER_HREF_PREFIX = "https://lightcode.local/folder/";
 
 interface MdNode {
   type: string;
@@ -17,6 +19,7 @@ interface MdNode {
 }
 
 interface PluginOptions {
+  cacheKey?: string;
   parsePathRef: (token: string) => ProjectPathRef | null;
 }
 
@@ -86,11 +89,15 @@ function transformText(text: string, options: PluginOptions): MdNode[] {
 }
 
 function pathRefUrl(ref: ProjectPathRef): string {
+  const target =
+    ref.kind === "file"
+      ? `${ref.path}${
+          ref.line !== undefined
+            ? `:${ref.line}${ref.endLine !== undefined ? `-${ref.endLine}` : ""}`
+            : ""
+        }`
+      : ref.path;
   return ref.kind === "file"
-    ? `${AUTO_PATH_FILE_PREFIX}${ref.path}${
-        ref.line !== undefined
-          ? `:${ref.line}${ref.endLine !== undefined ? `-${ref.endLine}` : ""}`
-          : ""
-      }`
-    : `${AUTO_PATH_FOLDER_PREFIX}${ref.path}`;
+    ? `${AUTO_PATH_FILE_HREF_PREFIX}${encodeURIComponent(target)}`
+    : `${AUTO_PATH_FOLDER_HREF_PREFIX}${encodeURIComponent(target)}`;
 }

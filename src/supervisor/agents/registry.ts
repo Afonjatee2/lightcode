@@ -5,8 +5,7 @@
  *
  * For runtime-extensible ACP-speaking agents, pass `userInstances` to
  * `buildAgentRegistry` — each `acp-generic` instance becomes a discrete
- * adapter via `createAcpGenericAdapter`. Mirrors t3code's
- * `ProviderInstanceConfigMap` registration pattern.
+ * adapter via `createAcpGenericAdapter`.
  */
 import type { AgentInstanceConfig } from "@/shared/contracts";
 import { createAcpGenericAdapter } from "./acp-generic";

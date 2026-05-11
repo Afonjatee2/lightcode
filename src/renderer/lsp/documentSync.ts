@@ -4,6 +4,19 @@ import { getLanguageFromPath } from "../views/FileEditorOverlay/parts/FileEditor
 
 type IDisposable = { dispose(): void };
 
+function getLspDocumentLanguageId(filePath: string): string {
+  const fileName = filePath.split("/").pop()?.toLowerCase() ?? "";
+  const ext = fileName.split(".").pop() ?? "";
+  switch (ext) {
+    case "tsx":
+      return "typescriptreact";
+    case "jsx":
+      return "javascriptreact";
+    default:
+      return getLanguageFromPath(filePath);
+  }
+}
+
 /**
  * Manages LSP document synchronization — sends didOpen, didChange, didClose,
  * didSave notifications to the language server.
@@ -25,7 +38,7 @@ export class DocumentSyncManager {
       params: {
         textDocument: {
           uri,
-          languageId: getLanguageFromPath(filePath),
+          languageId: getLspDocumentLanguageId(filePath),
           version: 1,
           text: content,
         },

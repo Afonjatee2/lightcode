@@ -8,11 +8,15 @@ import {
   detectCodexUpdatePrompt,
   parseCodexSocketMessage,
 } from "./index";
-import { parseCodexLoginStatusOutput } from "./detection";
+import {
+  codexDefaultCapabilities,
+  formatCodexPlanLabel,
+  parseCodexLoginStatusOutput,
+} from "./detection";
 import { CodexStructuredSession } from "./acp";
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import { codexIntentFor } from "./plugin/intentMap";
-import { mapCodexModels } from "./probe";
+import { mapCodexModels, mapCodexSlashCommands } from "./probe";
 import { CodexStdioTransport } from "./stdioTransport";
 
 describe("deriveCodexStructuredState", () => {
@@ -188,6 +192,7 @@ describe("CodexStructuredSession", () => {
     session["remoteThreadId"] = "provider-thread";
     session["bufferedRuntimeEvents"] = [];
     session["isDisposed"] = false;
+    session["currentThreadStatus"] = { type: "idle" };
     session["request"] = async (method: string, params: Record<string, unknown>) => {
       requests.push({ method, params });
       return method === "turn/start"
@@ -227,6 +232,72 @@ describe("CodexStructuredSession", () => {
       turnId: "turn-1",
     });
   });
+
+  it("surfaces Codex app-server commands as slash commands during initialize", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+    const updates: unknown[] = [];
+    (structuredSession as unknown as Record<string, unknown>)["transport"] = {
+      write: () => {},
+    };
+    (structuredSession as unknown as Record<string, unknown>)["listener"] = {
+      onUpdate: (update: unknown) => updates.push(update),
+    };
+    (structuredSession as unknown as Record<string, unknown>)["request"] = async (
+      method: string,
+      params: Record<string, unknown>,
+    ) => {
+      requests.push({ method, params });
+      return {
+        commands: [
+          {
+            name: "review",
+            description: "Review changes",
+            argumentHint: "<scope>",
+          },
+        ],
+      };
+    };
+
+    await (structuredSession as unknown as { initialize(): Promise<void> }).initialize();
+
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        slashCommands: [
+          {
+            id: "review",
+            label: "review — Review changes",
+            description: "Review changes",
+            argumentHint: "<scope>",
+          },
+        ],
+      }),
+    );
+  });
+});
+
+describe("mapCodexSlashCommands", () => {
+  it("keeps built-in Codex slash commands available when app-server init omits commands", () => {
+    expect(codexDefaultCapabilities.slashCommands?.map((cmd) => cmd.id)).toEqual(
+      expect.arrayContaining(["status", "model", "review", "compact", "permissions"]),
+    );
+  });
+
+  it("normalizes Codex app-server command metadata", () => {
+    expect(
+      mapCodexSlashCommands([
+        { name: "review", description: "Review changes", argumentHint: " <scope> " },
+        { id: "  " },
+      ]),
+    ).toEqual([
+      {
+        id: "review",
+        label: "review — Review changes",
+        description: "Review changes",
+        argumentHint: "<scope>",
+      },
+    ]);
+  });
 });
 
 describe("parseCodexLoginStatusOutput", () => {
@@ -237,6 +308,29 @@ describe("parseCodexLoginStatusOutput", () => {
         authMethod: "ChatGPT",
       },
     });
+  });
+});
+
+describe("formatCodexPlanLabel", () => {
+  it.each([
+    ["free", "ChatGPT Free"],
+    ["go", "ChatGPT Go"],
+    ["plus", "ChatGPT Plus"],
+    ["pro", "ChatGPT Pro 20x"],
+    ["prolite", "ChatGPT Pro 5x"],
+    ["team", "ChatGPT Team"],
+    ["business", "ChatGPT Business"],
+    ["self_serve_business_usage_based", "ChatGPT Business"],
+    ["enterprise", "ChatGPT Enterprise"],
+    ["enterprise_cbp_usage_based", "ChatGPT Enterprise"],
+    ["edu", "ChatGPT Edu"],
+    ["unknown", "ChatGPT"],
+  ])("maps known plan token %s to %s", (token, label) => {
+    expect(formatCodexPlanLabel(token)).toBe(label);
+  });
+
+  it("falls back to a title-cased label for unrecognised plan tokens", () => {
+    expect(formatCodexPlanLabel("atlas")).toBe("Atlas");
   });
 });
 

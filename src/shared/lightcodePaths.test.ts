@@ -14,6 +14,7 @@ describe("lightcodePaths", () => {
       baseDir,
       dbPath: join(baseDir, "state.sqlite"),
       settingsPath: join(baseDir, "settings.json"),
+      keybindingsPath: join(baseDir, "keybindings.json"),
       worktreesDir: join(baseDir, "worktrees"),
       attachmentsDir: join(baseDir, "attachments"),
       logsDir: join(baseDir, "logs"),

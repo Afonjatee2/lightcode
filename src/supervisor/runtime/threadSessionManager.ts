@@ -450,6 +450,11 @@ export class ThreadSessionManager {
     this.outputPipeline.applyCliHookPluginState(session, change);
   }
 
+  /** Mark hook ownership for routed bookkeeping events that do not carry state. */
+  noteCliHookPluginActivity(session: SessionRuntime): void {
+    this.outputPipeline.noteCliHookPluginActivity(session);
+  }
+
   /**
    * Update the `sessionsBySessionId` index when a session's `sessionRef`
    * changes. Idempotent — clears any stale id mapping before writing the new
@@ -940,7 +945,7 @@ export class ThreadSessionManager {
   /**
    * Hook-launch flags must stay in the option section of the argv. Appending
    * them after positional session ids / prompts makes Codex treat
-   * `--enable codex_hooks` as trailing user input instead of a real flag.
+   * `--enable <hooks-feature>` as trailing user input instead of a real flag.
    */
   private mergeCliHookExtraArgs(
     adapter: AgentAdapter,
@@ -1210,6 +1215,7 @@ export class ThreadSessionManager {
         presentationMode: requestedPresentation,
         initialStatus: optimisticUserMessageItemId ? "working" : "idle",
         initialAttention: optimisticUserMessageItemId ? "working" : "none",
+        suppressInitialStructuredIdle: optimisticUserMessageItemId !== undefined,
       });
       if (!payload.sessionRef && initialPrompt.length > 0 && structuredSession.startTurn) {
         void structuredSession
@@ -1382,6 +1388,7 @@ export class ThreadSessionManager {
     presentationMode?: import("@/shared/contracts").ThreadPresentationMode;
     initialStatus?: import("@/shared/contracts").ThreadStatus;
     initialAttention?: import("@/shared/contracts").ThreadAttention;
+    suppressInitialStructuredIdle?: boolean;
   }): SessionRuntime {
     // `thread-reset` is only consumed by the terminal panel (xterm scrollback
     // reset) and the renderer-side runtime-event/server-request slice clear.
@@ -1453,6 +1460,7 @@ export class ThreadSessionManager {
       pendingTerminalPrompt: input.pendingTerminalPrompt,
       pendingTerminalSegments: input.pendingTerminalSegments,
       ...(input.presentationMode ? { presentationMode: input.presentationMode } : {}),
+      ...(input.suppressInitialStructuredIdle ? { suppressInitialStructuredIdle: true } : {}),
       prevChunk: "",
       lastStrippedPtyChunk: "",
       ptyOscCarry: "",
@@ -1530,6 +1538,20 @@ export class ThreadSessionManager {
         }
         if (update.slashCommands !== undefined) {
           session.slashCommands = update.slashCommands;
+        }
+
+        if (
+          session.suppressInitialStructuredIdle === true &&
+          update.status === "idle" &&
+          session.status === "working"
+        ) {
+          if (update.sessionRef || configChanged || slashCommandsChanged) {
+            this.outputPipeline.emitState(session);
+          }
+          return;
+        }
+        if (session.suppressInitialStructuredIdle === true && update.status !== "idle") {
+          session.suppressInitialStructuredIdle = undefined;
         }
 
         this.outputPipeline.updateState(

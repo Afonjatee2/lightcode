@@ -143,74 +143,32 @@ function envLabel(status: AgentStatus): string {
   return "";
 }
 
-function MetadataDetailRow(props: {
-  label: string;
-  description?: string;
-  value: string | readonly string[];
-}) {
-  const lines = Array.isArray(props.value) ? props.value : [props.value];
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-foreground">{props.label}</p>
-        {props.description ? <p className="text-xs text-muted">{props.description}</p> : null}
-      </div>
-      <div className="min-w-0 max-w-[320px] text-right text-sm text-muted">
-        {lines.map((line, index) => (
-          <p key={`${props.label}-${index}`} className="truncate">
-            {line}
-          </p>
-        ))}
-      </div>
-    </div>
-  );
-}
+export function formatAgentMetadataSummary(status: AgentStatus): string | undefined {
+  const metadata = status.providerMetadata;
+  const identityParts: string[] = [];
+  if (metadata?.authenticatedAs) identityParts.push(metadata.authenticatedAs);
+  if (metadata?.organization) identityParts.push(metadata.organization);
+  if (metadata?.plan) identityParts.push(metadata.plan);
 
-function formatConnectedProviders(status: AgentStatus): string[] {
-  return (status.providerMetadata?.connectedProviders ?? []).map((provider) =>
-    provider.detail ? `${provider.label} · ${provider.detail}` : provider.label,
-  );
-}
+  if (identityParts.length > 0) return identityParts.join(" · ");
 
-function AgentMetadataSection(props: { status: AgentStatus; showEnvironmentLabel: boolean }) {
-  const metadata = props.status.providerMetadata;
-  const connectedProviders = formatConnectedProviders(props.status);
-  if (
-    !metadata?.authenticatedAs &&
-    !metadata?.organization &&
-    !metadata?.plan &&
-    !metadata?.authMethod &&
-    connectedProviders.length === 0
-  ) {
-    return null;
+  const providers = metadata?.connectedProviders ?? [];
+  if (providers.length > 0) {
+    const labels = providers.map((p) => p.label).join(", ");
+    const noun = providers.length === 1 ? "provider" : "providers";
+    return `${providers.length} ${noun} · ${labels}`;
   }
 
-  return (
-    <div className="space-y-4">
-      {props.showEnvironmentLabel ? (
-        <p className="text-xs font-medium uppercase tracking-wide text-muted">
-          {envLabel(props.status)}
-        </p>
-      ) : null}
-      {metadata?.authenticatedAs ? (
-        <MetadataDetailRow label="Authenticated as" value={metadata.authenticatedAs} />
-      ) : null}
-      {metadata?.organization ? (
-        <MetadataDetailRow label="Organization" value={metadata.organization} />
-      ) : null}
-      {metadata?.plan ? <MetadataDetailRow label="Plan" value={metadata.plan} /> : null}
-      {metadata?.authMethod ? (
-        <MetadataDetailRow label="Auth method" value={metadata.authMethod} />
-      ) : null}
-      {connectedProviders.length > 0 ? (
-        <MetadataDetailRow
-          label="Connected providers"
-          description={`${connectedProviders.length} connected through ${props.status.label}.`}
-          value={connectedProviders}
-        />
-      ) : null}
-    </div>
-  );
+  if (metadata?.authMethod) return `via ${metadata.authMethod}`;
+  if (status.authState === "authenticated") return "Signed in";
+  return undefined;
+}
+
+function AgentMetadataLine(props: { status: AgentStatus; showEnvironmentLabel: boolean }) {
+  const summary = formatAgentMetadataSummary(props.status);
+  if (!summary) return null;
+  const prefix = props.showEnvironmentLabel ? `${envLabel(props.status)} · ` : "";
+  return <p className="truncate text-xs text-muted">{`${prefix}${summary}`}</p>;
 }
 
 export function SingleAgentSettings(props: { agentKind: string }) {
@@ -248,7 +206,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     for (const s of installedWsl) versionRows.push({ label: envLabel(s), version: s.version });
   }
   const metadataStatuses = installedStatuses.filter(
-    (status) => status.providerMetadata !== undefined,
+    (status) => formatAgentMetadataSummary(status) !== undefined,
   );
   const showEnvironmentMetadataLabels = installedStatuses.length > 1;
 
@@ -269,19 +227,18 @@ export function SingleAgentSettings(props: { agentKind: string }) {
           ) : (
             agent.version && <p className="mt-0.5 text-xs text-muted">v{agent.version}</p>
           )}
+          {metadataStatuses.length > 0 ? (
+            <div className="mt-1 space-y-0.5">
+              {metadataStatuses.map((status, index) => (
+                <AgentMetadataLine
+                  key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}`}
+                  status={status}
+                  showEnvironmentLabel={showEnvironmentMetadataLabels}
+                />
+              ))}
+            </div>
+          ) : null}
         </div>
-
-        {metadataStatuses.length > 0 ? (
-          <div className="mb-8 space-y-6">
-            {metadataStatuses.map((status, index) => (
-              <AgentMetadataSection
-                key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}`}
-                status={status}
-                showEnvironmentLabel={showEnvironmentMetadataLabels}
-              />
-            ))}
-          </div>
-        ) : null}
 
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-4">

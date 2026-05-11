@@ -1,13 +1,14 @@
 export * from "./OpenCodeIcon";
 
-import { ClipboardList } from "lucide-react";
 import { OpenCodeIcon } from "./OpenCodeIcon";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
+import { fullAccessToggle, planWorkToggle } from "../composerControlBuilders";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
   registerConflictResolverDefaults,
   registerProviderIcon,
+  registerProviderLabel,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
 
@@ -19,6 +20,7 @@ import {
 const OPENCODE_DEFAULT_MODEL = "opencode/big-pickle";
 
 registerProviderIcon("opencode", OpenCodeIcon);
+registerProviderLabel("opencode", "OpenCode");
 registerCommitGenDefaults("opencode", {
   label: "OpenCode",
   hint: "Big Pickle",
@@ -45,15 +47,13 @@ registerComposerControls("opencode", {
   shared: ({ capabilities, config, isDisabled, onConfigChange }) => {
     const controls: ComposerControl[] = [];
     if (capabilities.modes.includes("plan")) {
-      controls.push({
-        kind: "toggle",
-        label: "Plan",
-        icon: <ClipboardList className="size-3.5" />,
-        isSelected: config.mode === "plan",
-        hideLabelOnWrap: true,
-        isDisabled,
-        onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
-      });
+      controls.push(
+        planWorkToggle({
+          isPlanMode: config.mode === "plan",
+          isDisabled,
+          onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
+        }),
+      );
     }
     return controls;
   },
@@ -65,14 +65,10 @@ registerComposerControls("opencode", {
   // Hide the toggle on terminal threads so it can't be set silently to no
   // effect.
   gui: ({ config, isDisabled, onConfigChange }) => [
-    {
-      kind: "toggle",
-      label: "Full Access",
-      iconKind: "permission",
-      isSelected: config.approvalPolicy === "yolo",
-      hideLabelOnWrap: true,
+    fullAccessToggle({
+      isFullAccess: config.approvalPolicy === "yolo",
       isDisabled,
       onChange: (isSelected) => onConfigChange({ approvalPolicy: isSelected ? "yolo" : "default" }),
-    },
+    }),
   ],
 });

@@ -78,6 +78,7 @@
 
 .toast__content {
   min-width: 0;
+  scrollbar-gutter: stable;
 }
 
 .toast__title,
@@ -86,9 +87,12 @@
   word-break: break-all;
 }
 
-.toast__description {
-  max-height: 12rem;
-  overflow-y: auto;
+.lc-toast__title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  text-overflow: ellipsis;
 }
 
 /* HeroUI component overrides */
@@ -428,6 +432,25 @@ body {
   app-region: drag;
   user-select: none;
   z-index: 10;
+}
+
+.lightcode-content-drag-region {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(titlebar-area-height, 32px);
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+  z-index: 10;
+}
+
+.lightcode-content-over-drag-region {
+  position: relative;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
+  z-index: 20;
 }
 
 .lightcode-window-header {
@@ -788,7 +811,13 @@ body {
   animation-play-state: paused;
 }
 
-.is-wrapping .lightcode-composer-label-hideable {
+.lightcode-composer-shell--draft:focus-within::before {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+  animation-play-state: running;
+}
+
+.lightcode-composer-label-hideable.is-hidden {
   display: none;
 }
 
@@ -803,12 +832,6 @@ body {
 
 .lightcode-composer-shell--draft:focus-within {
   border-color: transparent;
-}
-
-.lightcode-composer-shell--draft:focus-within::before {
-  opacity: 0.7;
-  transition: opacity 0.3s ease;
-  animation-play-state: running;
 }
 
 .lightcode-model-menu-listbox:focus-visible,
@@ -925,13 +948,30 @@ body {
 }
 
 .lightcode-composer-toggle {
+  --toggle-button-bg-selected: transparent;
+  --toggle-button-bg-selected-hover: var(--toggle-button-bg-hover);
+  --toggle-button-bg-selected-pressed: var(--toggle-button-bg-pressed);
+  --toggle-button-fg-selected: var(--snow, white);
+
   color: var(--muted);
   height: 2.25rem;
   padding-inline: 0.75rem;
 }
 
 .lightcode-composer-toggle[data-selected="true"] {
-  color: var(--foreground);
+  color: var(--snow, white);
+}
+
+.lightcode-composer-toggle--current {
+  color: var(--snow, white);
+}
+
+.lightcode-composer-toggle--fill-icon-selected[data-selected="true"] svg {
+  fill: currentColor;
+}
+
+.lightcode-composer-toggle[data-selected="true"] svg {
+  filter: drop-shadow(0 0 0.45rem color-mix(in oklab, currentColor 35%, transparent));
 }
 
 .lightcode-composer-utility {
@@ -1115,6 +1155,11 @@ body {
   overflow-y: auto;
 }
 
+.lightcode-attachment-bar--inset {
+  padding-left: 0.85rem;
+  padding-right: 0.85rem;
+}
+
 .lightcode-attachment-chip {
   position: relative;
   display: inline-flex;
@@ -1129,17 +1174,6 @@ body {
   cursor: default;
   user-select: none;
   max-width: 12rem;
-}
-
-.lightcode-attachment-chip--image {
-  background: transparent !important;
-  padding: 0 !important;
-}
-
-.lightcode-attachment-chip--image .lightcode-attachment-chip__thumb {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.25rem;
 }
 
 .lightcode-attachment-chip[role="button"] {
@@ -1618,65 +1652,44 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
 
 /* Agent discovery screen — first-launch detection.
  *
- * Tiles default to a dim "searching" state and animate to a found state when
- * `data-found="true"` is applied (driven by streamed `agent-detected` events).
- * The pop animation only runs on the found→true transition because we apply
- * it via `data-found="true"` instead of mounting a new node, so unfound tiles
- * don't replay it on every re-render.
+ * Each agent is just an icon + label. The icon defaults to a dim "searching"
+ * state and animates to a bright, full-color state when `data-found="true"`
+ * is applied (driven by streamed `agent-detected` events). The pop animation
+ * runs only on the found→true transition because we toggle `data-found` on a
+ * persistent node, so unfound items don't replay it on every re-render.
  */
-.agent-discovery-tile {
-  position: relative;
-  overflow: hidden;
-  filter: grayscale(0.85) brightness(0.7);
-  opacity: 0.55;
+.agent-discovery-item {
+  transition:
+    opacity 320ms ease,
+    transform 320ms ease;
+}
+
+.agent-discovery-item .agent-discovery-item__icon {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.45;
   transition:
     filter 320ms ease,
     opacity 320ms ease,
-    border-color 320ms ease,
-    background-color 320ms ease,
     transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.agent-discovery-tile[data-found="true"] {
+.agent-discovery-item[data-found="true"] .agent-discovery-item__icon {
   filter: none;
   opacity: 1;
-  border-color: var(--color-border);
-  background-color: color-mix(in oklch, var(--color-surface) 92%, var(--color-foreground) 8%);
-  animation: lightcode-agent-tile-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation: lightcode-agent-icon-pop 480ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
 }
 
-.agent-discovery-tile[data-found="true"]::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    transparent 0%,
-    color-mix(in oklch, var(--color-foreground) 18%, transparent) 50%,
-    transparent 100%
-  );
-  transform: translateX(-110%);
-  animation: lightcode-agent-tile-shine 720ms ease-out 80ms both;
-  pointer-events: none;
-}
-
-@keyframes lightcode-agent-tile-pop {
+@keyframes lightcode-agent-icon-pop {
   0% {
-    transform: scale(0.92);
+    transform: scale(0.82);
     opacity: 0;
   }
   60% {
-    transform: scale(1.04);
+    transform: scale(1.12);
     opacity: 1;
   }
   100% {
     transform: scale(1);
-  }
-}
-
-@keyframes lightcode-agent-tile-shine {
-  to {
-    transform: translateX(110%);
   }
 }
 
@@ -1703,13 +1716,29 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
   .lightcode-composer-shell--draft:focus-within::before {
     animation: none;
   }
-  .agent-discovery-tile {
+  .agent-discovery-item,
+  .agent-discovery-item .agent-discovery-item__icon {
     transition: none;
   }
-  .agent-discovery-tile[data-found="true"] {
+  .agent-discovery-item[data-found="true"] .agent-discovery-item__icon {
     animation: none;
   }
-  .agent-discovery-tile[data-found="true"]::before {
-    animation: none;
+}
+
+/* Context Compaction - Deck Icon Squeeze Animation */
+@keyframes lightcode-compacting-deck {
+  0%,
+  100% {
+    transform: scaleY(1) translateY(0);
   }
+  30% {
+    transform: scaleY(0.75) translateY(10%);
+  }
+  70% {
+    transform: scaleY(1.1) translateY(-5%);
+  }
+}
+
+.lightcode-compacting-icon {
+  animation: lightcode-compacting-deck 1.5s ease-in-out infinite;
 }

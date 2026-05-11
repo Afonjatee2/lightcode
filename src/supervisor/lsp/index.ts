@@ -45,7 +45,12 @@ export class LanguageServerManager {
     );
 
     this.sessions.set(sessionId, instance);
-    await instance.start();
+    try {
+      await instance.start();
+    } catch (error) {
+      this.sessions.delete(sessionId);
+      throw error;
+    }
   }
 
   async stop(payload: LspStopPayload): Promise<void> {

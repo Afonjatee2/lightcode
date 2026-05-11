@@ -5,13 +5,19 @@ import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/setting
 import type {
   AgentKind,
   AgentStatusesResponse,
+  AcpRegistryListResult,
+  AcpRegistryMutationResult,
   CloseThreadPayload,
+  CreateFileCheckpointPayload,
+  CreateFileCheckpointResult,
   CreateProjectEntryPayload,
   DeleteProjectEntryPayload,
   DetectSetupScriptPayload,
   DetectSetupScriptResult,
   ExtractContextPayload,
   ExtractContextResult,
+  FinalizeFileCheckpointPayload,
+  FinalizeFileCheckpointResult,
   GenerateCommitMessagePayload,
   GenerateCommitMessageResult,
   GeneratePrSummaryPayload,
@@ -58,6 +64,8 @@ import type {
   GitProjectSnapshotResult,
   GitWorktreeStatusBatchPayload,
   GitWorktreeStatusBatchResult,
+  ListFileCheckpointsPayload,
+  ListFileCheckpointsResult,
   GitListWorktreesPayload,
   GitMergeToSourcePayload,
   GitMergeToSourceResult,
@@ -83,6 +91,7 @@ import type {
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
   InterruptThreadPayload,
+  InstallAcpRegistryAgentPayload,
   SetPendingSteerPayload,
   ClearPendingSteerPayload,
   ListProjectTreePayload,
@@ -94,8 +103,10 @@ import type {
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
+  RemoveAcpRegistryAgentPayload,
   ResizeTerminalPayload,
   ResolveThreadServerRequestPayload,
+  RestoreFileCheckpointPayload,
   SearchProjectFilesPayload,
   SearchProjectFilesResult,
   SearchProjectTreePayload,
@@ -113,9 +124,15 @@ import type { SupervisorEvent } from "@/shared/ipc";
 import type { LspMessagePayload, LspStartPayload, LspStopPayload } from "@/shared/lsp";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { joinProjectPosixPath } from "@/shared/wsl";
-import { createAgentRegistry } from "./agents/registry";
+import { buildAgentRegistry } from "./agents/registry";
+import {
+  fetchAcpRegistry,
+  installAcpRegistryAgent as installAcpRegistryAgentFromRegistry,
+  readAcpRegistrySettings,
+  removeAcpRegistryAgent as removeAcpRegistryAgentFromRegistry,
+} from "./agents/acpRegistry";
 import { prefetchNativeNodeRuntime } from "./runtime/prefetchNativeNode";
-import { readWslCommandOutputAsync } from "./agents/base";
+import { readWslCommandOutputAsync, type AgentAdapter } from "./agents/base";
 import { generateCommitMessage } from "./commitMessageGenerator";
 import {
   extractContext as extractContextFn,
@@ -123,6 +140,7 @@ import {
 } from "./contextExtractor";
 import { FileIndexService } from "./fileIndex";
 import { GitService } from "./git";
+import { GitCheckpointService } from "./git/checkpointService";
 import { GitHubService } from "./github";
 import { ProjectWatcher } from "./projectWatcher";
 import { LanguageServerManager } from "./lsp";
@@ -163,6 +181,10 @@ class SupervisorSharedSettingsCache {
     return this.cached;
   }
 
+  invalidate(): void {
+    this.cached = undefined;
+  }
+
   dispose(): void {
     this.watcher?.close();
     this.watcher = undefined;
@@ -188,17 +210,17 @@ class SupervisorSharedSettingsCache {
 
 export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+  private readonly baseDir: string;
   private readonly logsDir: string;
   private readonly settingsPath: string;
   private readonly sharedSettingsCache: SupervisorSharedSettingsCache;
   private readonly gitService = new GitService();
+  private readonly gitCheckpointService = new GitCheckpointService();
   private _projectWatcher: ProjectWatcher | undefined;
   private readonly githubService = new GitHubService();
   private readonly fileIndexService = new FileIndexService();
   private readonly projectTreeService = new ProjectTreeService();
-  private readonly adapters = new Map(
-    createAgentRegistry().map((adapter) => [adapter.kind, adapter]),
-  );
+  private readonly adapters = new Map<AgentKind, AgentAdapter>();
   private readonly windowsShell: WindowsShellPreference;
   private readonly agentStatusService: AgentStatusService;
   private readonly threadSessionManager: ThreadSessionManager;
@@ -239,10 +261,12 @@ export class SupervisorRuntime {
     const envBaseDir =
       rawBaseDir && rawBaseDir !== "undefined" && isAbsolute(rawBaseDir) ? rawBaseDir : undefined;
     const baseDir = envBaseDir ?? join(homedir(), ".lightcode");
+    this.baseDir = baseDir;
     const paths = resolveLightcodePaths(baseDir);
     this.logsDir = paths.terminalLogsDir;
     this.settingsPath = paths.settingsPath;
     this.sharedSettingsCache = new SupervisorSharedSettingsCache(this.settingsPath);
+    this.refreshAgentRegistryAdapters();
     mkdirSync(paths.cacheDir, { recursive: true });
     mkdirSync(this.logsDir, { recursive: true });
 
@@ -294,6 +318,7 @@ export class SupervisorRuntime {
         lookupSession: (input) => this.threadSessionManager.findSessionForCliHookPlugin(input),
         applyCliHookPluginState: (session, change) =>
           this.threadSessionManager.applyCliHookPluginState(session, change),
+        onRoutedEvent: (session) => this.threadSessionManager.noteCliHookPluginActivity(session),
         onUnroutable: (env) => {
           if (isLightcodeHookDebug()) {
             console.warn(
@@ -371,12 +396,55 @@ export class SupervisorRuntime {
     return this.agentStatusService.listWslDistros();
   }
 
+  private refreshAgentRegistryAdapters(): void {
+    const settings = readAcpRegistrySettings(this.settingsPath);
+    const adapters = buildAgentRegistry(Object.values(settings.agentInstances));
+    const nextKinds = new Set(adapters.map((adapter) => adapter.kind));
+    for (const kind of [...this.adapters.keys()]) {
+      if (!nextKinds.has(kind)) {
+        this.adapters.delete(kind);
+      }
+    }
+    for (const adapter of adapters) {
+      this.adapters.set(adapter.kind, adapter);
+    }
+  }
+
   async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     return this.agentStatusService.getAgentStatuses(payload);
   }
 
   async refreshAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     return this.agentStatusService.refreshAgentStatuses(payload);
+  }
+
+  async listAcpRegistry(): Promise<AcpRegistryListResult> {
+    return fetchAcpRegistry();
+  }
+
+  async installAcpRegistryAgent(
+    payload: InstallAcpRegistryAgentPayload,
+  ): Promise<AcpRegistryMutationResult> {
+    const installed = await installAcpRegistryAgentFromRegistry({
+      agentId: payload.agentId,
+      baseDir: this.baseDir,
+      settingsPath: this.settingsPath,
+    });
+    this.sharedSettingsCache.invalidate();
+    this.refreshAgentRegistryAdapters();
+    return { installed };
+  }
+
+  async removeAcpRegistryAgent(
+    payload: RemoveAcpRegistryAgentPayload,
+  ): Promise<AcpRegistryMutationResult> {
+    const installed = removeAcpRegistryAgentFromRegistry({
+      agentId: payload.agentId,
+      settingsPath: this.settingsPath,
+    });
+    this.sharedSettingsCache.invalidate();
+    this.refreshAgentRegistryAdapters();
+    return { installed };
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
@@ -439,6 +507,32 @@ export class SupervisorRuntime {
 
   async getGitStatus(payload: GetGitStatusPayload): Promise<GitStatusResult> {
     return this.gitService.getStatus(payload.projectLocation);
+  }
+
+  async createFileCheckpoint(
+    payload: CreateFileCheckpointPayload,
+  ): Promise<CreateFileCheckpointResult> {
+    return {
+      checkpoint: await this.gitCheckpointService.create(payload),
+    };
+  }
+
+  async finalizeFileCheckpoint(
+    payload: FinalizeFileCheckpointPayload,
+  ): Promise<FinalizeFileCheckpointResult> {
+    return {
+      checkpoint: await this.gitCheckpointService.finalize(payload),
+    };
+  }
+
+  async listFileCheckpoints(
+    payload: ListFileCheckpointsPayload,
+  ): Promise<ListFileCheckpointsResult> {
+    return this.gitCheckpointService.list(payload);
+  }
+
+  async restoreFileCheckpoint(payload: RestoreFileCheckpointPayload): Promise<void> {
+    await this.gitCheckpointService.restore(payload);
   }
 
   async getGitDiff(payload: GetGitDiffPayload): Promise<GitDiffResult> {

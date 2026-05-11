@@ -18,6 +18,7 @@ export function SidebarProjectSection(props: {
     index: props.projectIndex,
     type: "project",
     accept: "project",
+    group: "projects",
     data: { type: "project", projectId: props.projectId } satisfies DragSourceData,
   });
   const isDragging = useIsDraggingProject(props.projectId);

@@ -9,6 +9,7 @@ import { getSettingsInstalledAgents } from "@/shared/agentStatus";
 import { GeneralSettings } from "./parts/GeneralSettings";
 import { NotificationSettings } from "./parts/NotificationSettings";
 import { AISettings } from "./parts/AISettings";
+import { AcpRegistrySettings } from "./parts/AcpRegistrySettings";
 import { SearchSettings } from "./parts/SearchSettings";
 import { ArchivedThreadsSettings } from "./parts/ArchivedThreadsSettings";
 import { AboutSettings } from "./parts/AboutSettings";
@@ -21,6 +22,7 @@ const SECTION_VIEWS: Partial<Record<SettingsSection, () => ReactNode>> = {
   general: () => <GeneralSettings />,
   notifications: () => <NotificationSettings />,
   ai: () => <AISettings />,
+  acpRegistry: () => <AcpRegistrySettings />,
   search: () => <SearchSettings />,
   agents: () => <AgentSettingsEmpty />,
   archived: () => <ArchivedThreadsSettings />,
@@ -63,7 +65,9 @@ export function SettingsOverlay(props: { onClose: () => void }) {
       .refreshAgentStatuses(wslDistros)
       .catch(() => undefined)
       .finally(() => {
-        setIsRefreshingAgents(false);
+        setTimeout(() => {
+          setIsRefreshingAgents(false);
+        }, 1000);
       });
   };
 

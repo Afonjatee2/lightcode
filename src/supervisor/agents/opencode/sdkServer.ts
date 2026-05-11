@@ -27,7 +27,7 @@ export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHan
     env: {
       ...process.env,
       ...commandSpec.env,
-      // Match t3code: neutralise any user `~/.config/opencode/config.json`
+      // Neutralise any user `~/.config/opencode/config.json`
       // so server behaviour is hermetic and not influenced by global config.
       OPENCODE_CONFIG_CONTENT: "{}",
     },

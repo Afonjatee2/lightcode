@@ -1,6 +1,7 @@
+import { useRef } from "react";
 import { useShallow } from "zustand/shallow";
 import { useAppStore } from "./appStore";
-import type { Project, Thread } from "@/shared/contracts";
+import type { Project, ProjectDraftConfig, Thread } from "@/shared/contracts";
 
 const threadMapCache = new WeakMap<Thread[], Map<string, Thread>>();
 const projectMapCache = new WeakMap<Project[], Map<string, Project>>();
@@ -36,6 +37,60 @@ export function useThread(threadId: string | undefined) {
 
 export function useProject(projectId: string | undefined) {
   return useAppStore((s) => (projectId ? getProjectMap(s.projects).get(projectId) : undefined));
+}
+
+function withoutDraftConfig(project: Project): Project {
+  return {
+    id: project.id,
+    name: project.name,
+    location: project.location,
+    createdAt: project.createdAt,
+    ...(project.scripts ? { scripts: project.scripts } : {}),
+    ...(project.searchSettings ? { searchSettings: project.searchSettings } : {}),
+    ...(project.disabled !== undefined ? { disabled: project.disabled } : {}),
+  };
+}
+
+/**
+ * Subscribe to project fields used by live draft panes, excluding
+ * `lastDraftConfig`. Draft config writes happen on every composer selection;
+ * they should persist settings without redrawing the active composer.
+ */
+export function useProjectWithoutDraftConfig(projectId: string | undefined) {
+  return useAppStore(
+    useShallow((s) => {
+      const project = projectId ? getProjectMap(s.projects).get(projectId) : undefined;
+      return project ? withoutDraftConfig(project) : undefined;
+    }),
+  );
+}
+
+export function useInitialProjectDraftConfig(
+  projectId: string | undefined,
+): ProjectDraftConfig | undefined {
+  const snapshotRef = useRef<{
+    projectId?: string;
+    hasProject: boolean;
+    value?: ProjectDraftConfig;
+  }>({ hasProject: false });
+
+  if (!projectId) {
+    snapshotRef.current = { hasProject: false };
+    return undefined;
+  }
+
+  if (snapshotRef.current.projectId !== projectId || !snapshotRef.current.hasProject) {
+    const project = getProjectMap(useAppStore.getState().projects).get(projectId);
+    if (project) {
+      snapshotRef.current = {
+        projectId,
+        hasProject: true,
+        ...(project.lastDraftConfig ? { value: project.lastDraftConfig } : {}),
+      };
+    }
+  }
+
+  return snapshotRef.current.value;
 }
 
 export function useProjectIds() {

@@ -49,10 +49,74 @@ export interface GitFileContentResult {
   newContent: string;
 }
 
+export const fileCheckpointChangedFileSchema = z.object({
+  path: z.string().min(1),
+  oldPath: z.string().min(1).optional(),
+  status: z.string().min(1),
+});
+export type FileCheckpointChangedFile = z.infer<typeof fileCheckpointChangedFileSchema>;
+
+export const fileCheckpointRecordSchema = z.object({
+  threadId: z.string().min(1),
+  checkpointItemId: z.string().min(1),
+  ref: z.string().min(1),
+  commit: z.string().min(1),
+  capturedAt: z.string().min(1),
+});
+export type FileCheckpointRecord = z.infer<typeof fileCheckpointRecordSchema>;
+
+export const fileCheckpointTurnSchema = fileCheckpointRecordSchema.extend({
+  baseCheckpointItemId: z.string().min(1),
+  baseRef: z.string().min(1),
+  changedFiles: z.array(fileCheckpointChangedFileSchema),
+});
+export type FileCheckpointTurn = z.infer<typeof fileCheckpointTurnSchema>;
+
 export const getGitStatusPayloadSchema = z.object({
   projectLocation: projectLocationSchema,
 });
 export type GetGitStatusPayload = z.infer<typeof getGitStatusPayloadSchema>;
+
+export const createFileCheckpointPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  checkpointItemId: z.string().min(1),
+  projectLocation: projectLocationSchema,
+});
+export type CreateFileCheckpointPayload = z.infer<typeof createFileCheckpointPayloadSchema>;
+
+export interface CreateFileCheckpointResult {
+  checkpoint: FileCheckpointRecord;
+}
+
+export const finalizeFileCheckpointPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  checkpointItemId: z.string().min(1),
+  baseCheckpointItemId: z.string().min(1),
+  projectLocation: projectLocationSchema,
+});
+export type FinalizeFileCheckpointPayload = z.infer<typeof finalizeFileCheckpointPayloadSchema>;
+
+export interface FinalizeFileCheckpointResult {
+  checkpoint: FileCheckpointTurn;
+}
+
+export const listFileCheckpointsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  projectLocation: projectLocationSchema,
+});
+export type ListFileCheckpointsPayload = z.infer<typeof listFileCheckpointsPayloadSchema>;
+
+export interface ListFileCheckpointsResult {
+  checkpoints: FileCheckpointRecord[];
+  turns: FileCheckpointTurn[];
+}
+
+export const restoreFileCheckpointPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  checkpointItemId: z.string().min(1),
+  projectLocation: projectLocationSchema,
+});
+export type RestoreFileCheckpointPayload = z.infer<typeof restoreFileCheckpointPayloadSchema>;
 
 export const gitWorktreeStatusBatchPayloadSchema = z.object({
   projectLocation: projectLocationSchema,

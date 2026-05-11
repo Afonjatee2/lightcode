@@ -27,7 +27,7 @@ vi.mock("../acp", () => ({
   probeAcpCapabilities: probeAcpCapabilitiesMock,
 }));
 
-import { geminiDetectionSpec } from "./detection";
+import { geminiDetectionSpec, parseGeminiGoogleAccountsJson } from "./detection";
 
 describe("geminiDetectionSpec", () => {
   beforeEach(() => {
@@ -61,5 +61,24 @@ describe("geminiDetectionSpec", () => {
         timeoutMs: 15_000,
       }),
     );
+  });
+});
+
+describe("parseGeminiGoogleAccountsJson", () => {
+  it("returns the active account email", () => {
+    expect(
+      parseGeminiGoogleAccountsJson(
+        JSON.stringify({ active: "user@gmail.com", old: ["other@gmail.com"] }),
+      ),
+    ).toBe("user@gmail.com");
+  });
+
+  it("returns undefined when no active account is set", () => {
+    expect(parseGeminiGoogleAccountsJson(JSON.stringify({ old: [] }))).toBeUndefined();
+    expect(parseGeminiGoogleAccountsJson(JSON.stringify({ active: "" }))).toBeUndefined();
+  });
+
+  it("returns undefined for malformed JSON", () => {
+    expect(parseGeminiGoogleAccountsJson("not json")).toBeUndefined();
   });
 });

@@ -17,6 +17,10 @@ import { chatMessageSurfaceClass } from "./parts/items/chatMessageSurface";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { hydrateThreadRuntimeItems } from "@/renderer/state/chatRuntimePersister";
+import {
+  finalizeFileCheckpoint,
+  hydrateFileCheckpoints,
+} from "@/renderer/state/fileCheckpointActions";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useProjectRootNames } from "@/renderer/state/projectRootNamesStore";
 import { useProjectTreeStore } from "@/renderer/state/projectTreeStore";
@@ -45,6 +49,14 @@ interface ChatPaneProps {
 }
 
 const BOTTOM_EPSILON_PX = 4;
+const USER_SCROLL_INTENT_MS = 750;
+const EMPTY_COMPLETED_TURNS: NonNullable<
+  ReturnType<typeof useAppStore.getState>["runtimeCompletedTurnsByThread"][string]
+> = [];
+const EMPTY_ITEM_IDS: readonly string[] = [];
+const EMPTY_FILE_CHECKPOINT_TURNS: NonNullable<
+  ReturnType<typeof useAppStore.getState>["fileCheckpointTurnsByThread"][string]
+> = {};
 
 /**
  * Renderer-native chat surface for `presentationMode === "gui"` threads.
@@ -62,6 +74,7 @@ export function ChatPane(props: ChatPaneProps) {
     hasSupplementaryContent = false,
     layoutChangeToken,
   } = props;
+  const { id: threadId, projectId, status, worktreePath, worktreeBranch } = thread;
   const scrollRef = useRef<HTMLDivElement>(null);
   // `scrollEl` mirrors `scrollRef.current` as React state so the virtualizer
   // in `MessageList` sees the element transition from `null` to mounted across
@@ -107,17 +120,13 @@ export function ChatPane(props: ChatPaneProps) {
 
   const scrollControlsRef = useRef<ChatScrollControlsHandle>(null);
   const timelineEntries = useAppStore(
-    useShallow((s) => selectVisibleThreadTimelineEntries(s, thread.id, hiddenRuntimeItemId)),
+    useShallow((s) => selectVisibleThreadTimelineEntries(s, threadId, hiddenRuntimeItemId)),
   );
-  const project = useAppStore((s) => s.projects.find((p) => p.id === thread.projectId));
-  const branch = resolveWorktreeBranch(
-    thread.projectId,
-    thread.worktreePath ?? "",
-    thread.worktreeBranch,
-  );
+  const project = useAppStore((s) => s.projects.find((p) => p.id === projectId));
+  const branch = resolveWorktreeBranch(projectId, worktreePath ?? "", worktreeBranch);
   const targetContext = useMemo(
-    () => (project ? buildFileEditorContext(project, thread.worktreePath, branch) : null),
-    [project, thread.worktreePath, branch],
+    () => (project ? buildFileEditorContext(project, worktreePath, branch) : null),
+    [project, worktreePath, branch],
   );
   const projectRootNames = useProjectRootNames(targetContext?.projectLocation);
 
@@ -127,7 +136,7 @@ export function ChatPane(props: ChatPaneProps) {
       openProjectRelativePath: (path, lineNumber) => {
         void openFileInEditor(
           project,
-          thread.worktreePath,
+          worktreePath,
           branch,
           normalizeChatRelativePath(path),
           lineNumber,
@@ -160,14 +169,64 @@ export function ChatPane(props: ChatPaneProps) {
       projectLocation: targetContext.projectLocation,
       projectRootNames,
     };
-  }, [project, targetContext, branch, thread.worktreePath, projectRootNames]);
+  }, [project, targetContext, branch, worktreePath, projectRootNames]);
 
   useEffect(() => {
-    void hydrateThreadRuntimeItems(thread.id);
-  }, [thread.id]);
+    void hydrateThreadRuntimeItems(threadId);
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!targetContext) return;
+    void hydrateFileCheckpoints({
+      threadId,
+      projectLocation: targetContext.projectLocation,
+    });
+  }, [targetContext, threadId]);
+
+  const completedTurns = useAppStore(
+    (s) => s.runtimeCompletedTurnsByThread[threadId] ?? EMPTY_COMPLETED_TURNS,
+  );
+  const runtimeItemIds = useAppStore((s) => s.runtimeItemIdsByThread[threadId] ?? EMPTY_ITEM_IDS);
+  const runtimeItemsById = useAppStore((s) => s.runtimeItemsByIdByThread[threadId]);
+  const fileCheckpointTurns = useAppStore(
+    (s) => s.fileCheckpointTurnsByThread[threadId] ?? EMPTY_FILE_CHECKPOINT_TURNS,
+  );
+  const finalizingFileCheckpointIdsRef = useRef(new Set<string>());
+
+  useEffect(() => {
+    if (!targetContext || completedTurns.length === 0) return;
+    for (const turn of completedTurns) {
+      const checkpointItemId = turn.anchorItemId;
+      if (!checkpointItemId) continue;
+      if (fileCheckpointTurns[checkpointItemId]) continue;
+      if (finalizingFileCheckpointIdsRef.current.has(checkpointItemId)) continue;
+      const baseCheckpointItemId = findBaseCheckpointItemId(
+        runtimeItemIds,
+        runtimeItemsById,
+        checkpointItemId,
+      );
+      if (!baseCheckpointItemId) continue;
+      finalizingFileCheckpointIdsRef.current.add(checkpointItemId);
+      void finalizeFileCheckpoint({
+        threadId,
+        checkpointItemId,
+        baseCheckpointItemId,
+        projectLocation: targetContext.projectLocation,
+      }).finally(() => {
+        finalizingFileCheckpointIdsRef.current.delete(checkpointItemId);
+      });
+    }
+  }, [
+    completedTurns,
+    fileCheckpointTurns,
+    runtimeItemIds,
+    runtimeItemsById,
+    targetContext,
+    threadId,
+  ]);
 
   const isEmpty = timelineEntries.length === 0 && !hasSupplementaryContent;
-  const isLive = isThreadTurnActive(thread.status);
+  const isLive = isThreadTurnActive(status);
   // Anchor on thread.status alone — gating on item state caused the loader to
   // disappear in the gap between an item flipping to `completed` and the next
   // `item.started` arriving, even though the runtime was still working the
@@ -181,9 +240,21 @@ export function ChatPane(props: ChatPaneProps) {
   // don't render the same "Worked for X" twice.
   const mostRecentCompletedTurnAnchor = useAppStore((s) => {
     if (isLive || !showTailLoader) return null;
-    const records = s.runtimeCompletedTurnsByThread[thread.id];
-    return records && records.length > 0 ? (records[records.length - 1]?.anchorItemId ?? null) : null;
+    const records = s.runtimeCompletedTurnsByThread[threadId];
+    return records && records.length > 0
+      ? (records[records.length - 1]?.anchorItemId ?? null)
+      : null;
   });
+  const checkpointGuard = useAppStore(
+    useShallow((s) =>
+      resolveCheckpointGuard({
+        threads: s.threads,
+        threadId,
+        projectId,
+        worktreePath,
+      }),
+    ),
+  );
 
   return (
     <ChatPaneActionsContext.Provider value={paneActions}>
@@ -200,7 +271,16 @@ export function ChatPane(props: ChatPaneProps) {
             }}
             onWheelCapture={(event) => {
               if (event.deltaY < 0) {
+                scrollControlsRef.current?.markUserScrollIntent();
                 scrollControlsRef.current?.disableStickToBottom();
+              }
+            }}
+            onPointerDownCapture={() => {
+              scrollControlsRef.current?.markUserScrollIntent();
+            }}
+            onKeyDownCapture={(event) => {
+              if (isScrollNavigationKey(event.key)) {
+                scrollControlsRef.current?.markUserScrollIntent();
               }
             }}
           >
@@ -214,11 +294,14 @@ export function ChatPane(props: ChatPaneProps) {
               ) : (
                 <>
                   <MessageList
-                    key={thread.id}
-                    threadId={thread.id}
+                    key={threadId}
+                    threadId={threadId}
                     entries={timelineEntries}
                     scrollElement={scrollEl}
                     suppressInlineTurnAnchorId={mostRecentCompletedTurnAnchor}
+                    canRevertCheckpoints={!isLive}
+                    checkpointGuard={checkpointGuard}
+                    projectLocation={targetContext?.projectLocation}
                   />
                   {showTailLoader && turn ? <ChatTailLoader turn={turn} /> : null}
                 </>
@@ -231,10 +314,10 @@ export function ChatPane(props: ChatPaneProps) {
             contentRef={contentRef}
             hiddenRuntimeItemId={hiddenRuntimeItemId}
             layoutChangeToken={layoutChangeToken}
-            threadId={thread.id}
+            threadId={threadId}
             tailLoaderVisible={showTailLoader}
           />
-          <SubAgentOverlay threadId={thread.id} />
+          <SubAgentOverlay threadId={threadId} />
         </div>
       </div>
     </ChatPaneActionsContext.Provider>
@@ -243,6 +326,7 @@ export function ChatPane(props: ChatPaneProps) {
 
 type ChatScrollControlsHandle = {
   disableStickToBottom(): void;
+  markUserScrollIntent(): void;
   onContentHeightChange(): void;
 };
 
@@ -275,6 +359,9 @@ const ChatScrollControls = forwardRef<
   const lastScrollTopRef = useRef(0);
   const stickToBottomRef = useRef(true);
   const pinRafRef = useRef<number | null>(null);
+  const layoutSyncRafRef = useRef<number | null>(null);
+  const layoutSyncSecondRafRef = useRef<number | null>(null);
+  const userScrollIntentUntilRef = useRef(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
   function syncBottomStateFromLayout() {
@@ -290,6 +377,14 @@ const ChatScrollControls = forwardRef<
     stickToBottomRef.current = false;
     const el = scrollRef.current;
     setShowScrollDown(!el || !isElementAtBottom(el));
+  }
+
+  function markUserScrollIntent() {
+    userScrollIntentUntilRef.current = performance.now() + USER_SCROLL_INTENT_MS;
+  }
+
+  function hasRecentUserScrollIntent() {
+    return performance.now() <= userScrollIntentUntilRef.current;
   }
 
   function scrollToBottom() {
@@ -309,9 +404,34 @@ const ChatScrollControls = forwardRef<
     syncBottomStateFromLayout();
   });
 
+  function cancelScheduledLayoutSync() {
+    if (layoutSyncRafRef.current !== null) {
+      cancelAnimationFrame(layoutSyncRafRef.current);
+      layoutSyncRafRef.current = null;
+    }
+    if (layoutSyncSecondRafRef.current !== null) {
+      cancelAnimationFrame(layoutSyncSecondRafRef.current);
+      layoutSyncSecondRafRef.current = null;
+    }
+  }
+
+  const syncLayoutNowAndAfterPaint = useEffectEvent(() => {
+    syncLayoutNow();
+    cancelScheduledLayoutSync();
+    layoutSyncRafRef.current = requestAnimationFrame(() => {
+      layoutSyncRafRef.current = null;
+      syncLayoutNow();
+      layoutSyncSecondRafRef.current = requestAnimationFrame(() => {
+        layoutSyncSecondRafRef.current = null;
+        syncLayoutNow();
+      });
+    });
+  });
+
   useImperativeHandle(ref, () => ({
     disableStickToBottom,
-    onContentHeightChange: syncLayoutNow,
+    markUserScrollIntent,
+    onContentHeightChange: syncLayoutNowAndAfterPaint,
   }));
 
   useLayoutEffect(() => {
@@ -324,7 +444,7 @@ const ChatScrollControls = forwardRef<
   useLayoutEffect(() => {
     if (layoutChangeToken === initialLayoutChangeTokenRef.current) return;
     initialLayoutChangeTokenRef.current = layoutChangeToken;
-    syncLayoutNow();
+    syncLayoutNowAndAfterPaint();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- effect is keyed to layout token changes; the helper reads refs/state setters only.
   }, [layoutChangeToken]);
 
@@ -351,7 +471,7 @@ const ChatScrollControls = forwardRef<
       // grow `scrollHeight` after a programmatic scroll lands — flipping sticky
       // off in that one frame, then keeping the button stuck on because the
       // corrective syncLayoutNow takes the non-sticky branch.
-      if (nextScrollTop < prevScrollTop && !isAtBottom) {
+      if (nextScrollTop < prevScrollTop && !isAtBottom && hasRecentUserScrollIntent()) {
         stickToBottomRef.current = false;
       } else if (isAtBottom) {
         stickToBottomRef.current = true;
@@ -371,7 +491,7 @@ const ChatScrollControls = forwardRef<
     const observer = new ResizeObserver(() => {
       // ResizeObserver already runs after layout and before paint, so syncing
       // immediately here avoids a visible one-frame catch-up when rows collapse.
-      syncLayoutNow();
+      syncLayoutNowAndAfterPaint();
     });
     observer.observe(content);
     return () => observer.disconnect();
@@ -394,6 +514,8 @@ const ChatScrollControls = forwardRef<
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinning is keyed to chat content changes; the helper reads refs/state setters only.
   }, [scrollAnchor, tailLoaderVisible]);
+
+  useEffect(() => cancelScheduledLayoutSync, []);
 
   return (
     <Button
@@ -430,7 +552,7 @@ function resolveTurnTiming(thread: Thread): TurnTiming | null {
   const isLive = isThreadTurnActive(thread.status);
 
   if (isLive) {
-    const startedAt = parseTurnTimestamp(thread.activeTurnStartedAt ?? thread.updatedAt);
+    const startedAt = parseTurnTimestamp(thread.activeTurnStartedAt ?? thread.createdAt);
     return startedAt === null ? null : { startedAt, endedAt: null };
   }
 
@@ -494,6 +616,18 @@ function isElementAtBottom(el: HTMLDivElement): boolean {
   return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_EPSILON_PX;
 }
 
+function isScrollNavigationKey(key: string): boolean {
+  return (
+    key === "ArrowUp" ||
+    key === "ArrowDown" ||
+    key === "PageUp" ||
+    key === "PageDown" ||
+    key === "Home" ||
+    key === "End" ||
+    key === " "
+  );
+}
+
 /** ["", "src", "src/foo", "src/foo/bar"] for "src/foo/bar". Empty string is the tree root. */
 function collectPathAncestors(path: string): string[] {
   const segments = path.split("/").filter(Boolean);
@@ -502,4 +636,50 @@ function collectPathAncestors(path: string): string[] {
     ancestors.push(segments.slice(0, i + 1).join("/"));
   }
   return ancestors;
+}
+
+type CheckpointGuard = {
+  scopeLabel: string;
+  hasSharedTree: boolean;
+  sharedThreadCount: number;
+};
+
+function resolveCheckpointGuard(input: {
+  threads: readonly Thread[];
+  threadId: string;
+  projectId: string;
+  worktreePath?: string | undefined;
+}): CheckpointGuard {
+  const treeKey = checkpointTreeKey(input.projectId, input.worktreePath);
+  const sharedThreadCount = input.threads.filter(
+    (thread) =>
+      thread.id !== input.threadId &&
+      !thread.archived &&
+      checkpointTreeKey(thread.projectId, thread.worktreePath) === treeKey,
+  ).length;
+  return {
+    scopeLabel: input.worktreePath ? "this worktree" : "the main project tree",
+    hasSharedTree: sharedThreadCount > 0,
+    sharedThreadCount,
+  };
+}
+
+function checkpointTreeKey(projectId: string, worktreePath: string | undefined): string {
+  return `${projectId}\0${worktreePath ?? ""}`;
+}
+
+function findBaseCheckpointItemId(
+  itemIds: readonly string[],
+  itemsById:
+    | ReturnType<typeof useAppStore.getState>["runtimeItemsByIdByThread"][string]
+    | undefined,
+  checkpointItemId: string,
+): string | null {
+  const checkpointIndex = itemIds.indexOf(checkpointItemId);
+  if (checkpointIndex < 0) return null;
+  for (let idx = checkpointIndex; idx >= 0; idx -= 1) {
+    const itemId = itemIds[idx]!;
+    if (itemsById?.[itemId]?.type === "user_message") return itemId;
+  }
+  return null;
 }

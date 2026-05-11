@@ -1,8 +1,18 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { Surface } from "@heroui/react";
+import type { FileCheckpointChangedFile, ProjectLocation } from "@/shared/contracts";
+import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { CompletedTurnRecord } from "@/renderer/state/slices/runtimeEventSlice";
 import type { AppStoreState } from "@/renderer/state/slices/shared";
+import {
+  CheckpointRevertButton,
+  DEFAULT_CHECKPOINT_GUARD,
+  RevertCheckpointDialog,
+  type CheckpointGuard,
+  type RevertScope,
+} from "./CheckpointRevertControls";
 import { formatElapsed } from "../formatElapsed";
 import {
   ChatPaneActionsContext,
@@ -15,11 +25,19 @@ import {
   type ChatTimelineEntry,
 } from "../chatPaneSelectors";
 import { ChatItemRow } from "./items/ChatItemRow";
+import { chatMessageSurfaceClass } from "./items/chatMessageSurface";
 
 interface MessageListProps {
   threadId: string;
   entries: readonly ChatTimelineEntry[];
   scrollElement: HTMLDivElement | null;
+  /**
+   * Reverting is transcript-local today. Disable it while a turn is live so
+   * late provider events cannot append onto a truncated timeline.
+   */
+  canRevertCheckpoints?: boolean;
+  checkpointGuard?: CheckpointGuard;
+  projectLocation?: ProjectLocation | undefined;
   /**
    * If set, the inline "Worked for X" indicator anchored to this item id is
    * suppressed because the parent tail loader is already showing it (matches
@@ -30,6 +48,7 @@ interface MessageListProps {
 
 const CHAT_TRANSCRIPT_OVERSCAN = 8;
 const DEFAULT_ROW_ESTIMATE_PX = 96;
+const SKIP_REVERT_CONFIRM_PREF_KEY = "lightcode-chat-checkpoint-revert-skip-confirm";
 
 /**
  * Virtualized chat transcript for the thread. Scroll lives on the parent pane,
@@ -44,12 +63,18 @@ export const MessageList = memo(function MessageList({
   threadId,
   entries,
   scrollElement,
+  canRevertCheckpoints = true,
+  checkpointGuard,
+  projectLocation,
   suppressInlineTurnAnchorId = null,
 }: MessageListProps) {
   const hasItems = entries.length > 0;
   const parentActions = useChatPaneActions();
   const rowElementsRef = useRef(new Map<number, HTMLDivElement>());
   const [measureEpoch, setMeasureEpoch] = useState(0);
+  const [pendingRevertItemId, setPendingRevertItemId] = useState<string | null>(null);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
+  const [revertScope, setRevertScope] = useState<RevertScope>("transcript");
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: useCallback(() => scrollElement, [scrollElement]),
@@ -116,6 +141,51 @@ export const MessageList = memo(function MessageList({
     [virtualizer],
   );
 
+  const performRevert = useCallback(
+    async (itemId: string, scope: RevertScope) => {
+      if (scope === "files" && projectLocation) {
+        await readBridge().restoreFileCheckpoint({
+          threadId,
+          checkpointItemId: itemId,
+          projectLocation,
+        });
+      }
+      useAppStore.getState().truncateThreadRuntimeAfter(threadId, itemId);
+      parentActions?.onContentHeightChange();
+    },
+    [parentActions, projectLocation, threadId],
+  );
+
+  const requestRevert = useCallback(
+    (itemId: string) => {
+      if (localStorage.getItem(SKIP_REVERT_CONFIRM_PREF_KEY) === "1") {
+        void performRevert(itemId, "transcript");
+        return;
+      }
+      setDontAskAgain(false);
+      setRevertScope("transcript");
+      setPendingRevertItemId(itemId);
+    },
+    [performRevert],
+  );
+
+  const confirmRevert = useCallback(() => {
+    if (!pendingRevertItemId) return;
+    if (dontAskAgain) {
+      localStorage.setItem(SKIP_REVERT_CONFIRM_PREF_KEY, "1");
+    }
+    void performRevert(pendingRevertItemId, revertScope);
+    setPendingRevertItemId(null);
+    setDontAskAgain(false);
+    setRevertScope("transcript");
+  }, [dontAskAgain, pendingRevertItemId, performRevert, revertScope]);
+
+  const pendingCheckpoint = useAppStore((state) =>
+    pendingRevertItemId
+      ? state.fileCheckpointsByThread[threadId]?.[pendingRevertItemId]
+      : undefined,
+  );
+
   // Row actions bubble up through ChatPaneActionsContext so disclosure rows can
   // notify the parent scroll controls when their height changes. We do NOT call
   // virtualizer.measure() here — that would reset the entire size cache back to
@@ -157,12 +227,30 @@ export const MessageList = memo(function MessageList({
                   isLastEntry={virtualRow.index === lastLiveIndex}
                   measureElement={measureRowElement}
                   suppressInlineTurnAnchorId={suppressInlineTurnAnchorId}
+                  canRevertCheckpoints={canRevertCheckpoints}
+                  onRequestRevert={requestRevert}
                 />
               );
             })}
           </div>
         </div>
       </div>
+      <RevertCheckpointDialog
+        isOpen={pendingRevertItemId !== null}
+        dontAskAgain={dontAskAgain}
+        revertScope={revertScope}
+        checkpointGuard={checkpointGuard ?? DEFAULT_CHECKPOINT_GUARD}
+        fileCheckpoint={pendingCheckpoint}
+        canRestoreFiles={projectLocation !== undefined && pendingCheckpoint !== undefined}
+        onDontAskAgainChange={setDontAskAgain}
+        onRevertScopeChange={setRevertScope}
+        onClose={() => {
+          setPendingRevertItemId(null);
+          setDontAskAgain(false);
+          setRevertScope("transcript");
+        }}
+        onConfirm={confirmRevert}
+      />
     </ChatPaneActionsContext.Provider>
   );
 });
@@ -174,6 +262,8 @@ type VirtualChatListRowProps = {
   isLastEntry: boolean;
   measureElement: (index: number, element: HTMLDivElement | null) => void;
   suppressInlineTurnAnchorId: string | null;
+  canRevertCheckpoints: boolean;
+  onRequestRevert: (itemId: string) => void;
 };
 
 const VirtualChatListRow = memo(function VirtualChatListRow({
@@ -183,6 +273,8 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   isLastEntry,
   measureElement,
   suppressInlineTurnAnchorId,
+  canRevertCheckpoints,
+  onRequestRevert,
 }: VirtualChatListRowProps) {
   const ref = useCallback(
     (element: HTMLDivElement | null) => {
@@ -195,6 +287,11 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
       ? state.runtimeItemsByIdByThread[threadId]?.[entry.id]?.type === "user_message"
       : false,
   );
+  const isCheckpointMessage = useAppStore((state) => {
+    if (!canRevertCheckpoints || entry.kind !== "item" || index === 0) return false;
+    const type = state.runtimeItemsByIdByThread[threadId]?.[entry.id]?.type;
+    return type === "user_message" || type === "assistant_message";
+  });
   const showTurnGap = isUserMessage && index > 0;
   const completedTurn = useAppStore((state) => selectCompletedTurnForEntry(state, threadId, entry));
   const showInlineTurn =
@@ -210,21 +307,56 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
       data-item-id={entry.id}
       className="w-full"
     >
-      <div className={`w-full pb-1 ${showTurnGap ? "pt-3" : ""}`}>
+      <div className={`group/checkpoint relative w-full pb-1 ${showTurnGap ? "pt-3" : ""}`}>
         <ChatItemRow threadId={threadId} entry={entry} isLastEntry={isLastEntry} />
-        {showInlineTurn ? <CompletedTurnIndicator record={completedTurn} /> : null}
+        {isCheckpointMessage && entry.kind === "item" ? (
+          <CheckpointRevertButton itemId={entry.id} onRequestRevert={onRequestRevert} />
+        ) : null}
+        {showInlineTurn ? (
+          <CompletedTurnIndicator threadId={threadId} record={completedTurn} />
+        ) : null}
       </div>
     </div>
   );
 });
 
-function CompletedTurnIndicator({ record }: { record: CompletedTurnRecord }) {
+function CompletedTurnIndicator({
+  threadId,
+  record,
+}: {
+  threadId: string;
+  record: CompletedTurnRecord;
+}) {
   const elapsedSeconds = Math.max(0, Math.floor((record.endedAt - record.startedAt) / 1000));
-  if (elapsedSeconds < 1) return null;
+  const checkpoint = useAppStore((state) =>
+    record.anchorItemId
+      ? state.fileCheckpointTurnsByThread[threadId]?.[record.anchorItemId]
+      : undefined,
+  );
+  if (elapsedSeconds < 1 && !checkpoint) return null;
   return (
-    <div className="px-1 pt-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
-      <span className="text-muted">Worked for {formatElapsed(elapsedSeconds)}</span>
-    </div>
+    <Surface variant="transparent" className={chatMessageSurfaceClass}>
+      <div className="flex flex-col gap-0.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
+        {elapsedSeconds >= 1 ? (
+          <span className="text-muted">Worked for {formatElapsed(elapsedSeconds)}</span>
+        ) : null}
+        {checkpoint ? <ChangedFilesSummary files={checkpoint.changedFiles} /> : null}
+      </div>
+    </Surface>
+  );
+}
+
+function ChangedFilesSummary({ files }: { files: readonly FileCheckpointChangedFile[] }) {
+  if (files.length === 0) {
+    return <span className="text-muted">No file changes</span>;
+  }
+  const preview = files.slice(0, 3).map((file) => file.path);
+  const suffix = files.length > preview.length ? ` +${files.length - preview.length} more` : "";
+  return (
+    <span className="text-muted">
+      Changed {files.length} {files.length === 1 ? "file" : "files"}: {preview.join(", ")}
+      {suffix}
+    </span>
   );
 }
 

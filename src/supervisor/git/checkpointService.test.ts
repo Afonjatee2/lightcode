@@ -1,0 +1,82 @@
+import { execFileSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import type { ProjectLocation } from "@/shared/contracts";
+import { GitCheckpointService } from "./checkpointService";
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function makeRepo(): { dir: string; location: ProjectLocation } {
+  const dir = mkdtempSync(join(tmpdir(), "lightcode-checkpoints-"));
+  tempDirs.push(dir);
+  git(dir, "init");
+  git(dir, "config", "user.email", "test@example.com");
+  git(dir, "config", "user.name", "Lightcode Test");
+  writeFileSync(join(dir, "README.md"), "before\n");
+  git(dir, "add", "README.md");
+  git(dir, "commit", "-m", "init");
+  const location: ProjectLocation =
+    process.platform === "win32" ? { kind: "windows", path: dir } : { kind: "posix", path: dir };
+  return { dir, location };
+}
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf8" });
+}
+
+describe("GitCheckpointService", () => {
+  it("captures turn snapshots and restores tracked plus untracked files", async () => {
+    const { dir, location } = makeRepo();
+    const service = new GitCheckpointService();
+
+    const before = await service.create({
+      threadId: "thread-1",
+      checkpointItemId: "user-1",
+      projectLocation: location,
+    });
+
+    writeFileSync(join(dir, "README.md"), "after\n");
+    writeFileSync(join(dir, "new.txt"), "new\n");
+
+    const after = await service.finalize({
+      threadId: "thread-1",
+      checkpointItemId: "assistant-1",
+      baseCheckpointItemId: "user-1",
+      projectLocation: location,
+    });
+
+    expect(after.baseRef).toBe(before.ref);
+    expect(after.changedFiles.map((file) => file.path).sort()).toEqual(["README.md", "new.txt"]);
+
+    await service.restore({
+      threadId: "thread-1",
+      checkpointItemId: "user-1",
+      projectLocation: location,
+    });
+
+    expect(readFileSync(join(dir, "README.md"), "utf8")).toBe("before\n");
+    expect(existsSync(join(dir, "new.txt"))).toBe(false);
+    expect(git(dir, "status", "--porcelain").trim()).toBe("");
+
+    await service.restore({
+      threadId: "thread-1",
+      checkpointItemId: "assistant-1",
+      projectLocation: location,
+    });
+
+    expect(readFileSync(join(dir, "README.md"), "utf8")).toBe("after\n");
+    expect(readFileSync(join(dir, "new.txt"), "utf8")).toBe("new\n");
+    expect(git(dir, "status", "--porcelain").split(/\r?\n/).filter(Boolean).sort()).toEqual([
+      " M README.md",
+      "?? new.txt",
+    ]);
+  });
+});

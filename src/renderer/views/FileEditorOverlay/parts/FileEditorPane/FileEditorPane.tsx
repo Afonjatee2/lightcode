@@ -10,6 +10,8 @@ import {
   useIsActiveBufferDirty,
   useTabPaths,
 } from "@/renderer/state/fileEditorSelectors";
+import type { ProjectLocation } from "@/shared/contracts";
+import { createLspFileUri } from "@/shared/lsp";
 import { getBasename } from "@/shared/pathUtils";
 import { getLanguageFromPath, isMarkdownFile } from "./parts/langMap";
 import { defineAppThemes, useResolvedTheme } from "./parts/monacoThemes";
@@ -26,16 +28,19 @@ export function FileEditorPane(props: {
   onClose?: () => void;
 }) {
   const activePath = useFileEditorStore((state) => state.activePath);
+  const rootProjectLocation = useFileEditorStore(
+    (state) => state.rootContext?.projectLocation ?? null,
+  );
   const isDirty = useIsActiveBufferDirty();
   const bufferStatus = useActiveBufferStatus();
-  const monacoRef = useRef<Monaco | null>(null);
+  const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
   const theme = useResolvedTheme();
 
   const [showPreview, setShowPreview] = useState(false);
 
   const isMarkdown = activePath ? isMarkdownFile(activePath) : false;
 
-  const { notifyDidSave } = useLspSync({ monacoRef, activePath, bufferStatus });
+  const { notifyDidSave } = useLspSync({ monaco: monacoInstance, activePath, bufferStatus });
 
   useEffect(() => {
     setShowPreview(false);
@@ -128,9 +133,10 @@ export function FileEditorPane(props: {
 
           <EditorBody
             activePath={activePath}
+            projectLocation={rootProjectLocation}
             bufferStatus={bufferStatus}
             monacoTheme={monacoTheme}
-            monacoRef={monacoRef}
+            onMonacoReady={setMonacoInstance}
             showPreview={showPreview}
             isMarkdown={isMarkdown}
             onSave={handleSave}
@@ -198,14 +204,15 @@ function TabStripHeader(props: {
 
 function EditorBody(props: {
   activePath: string;
+  projectLocation: ProjectLocation | null;
   bufferStatus: NonNullable<ReturnType<typeof useActiveBufferStatus>>;
   monacoTheme: string;
-  monacoRef: React.MutableRefObject<Monaco | null>;
+  onMonacoReady: (monaco: Monaco) => void;
   showPreview: boolean;
   isMarkdown: boolean;
   onSave: (path: string) => void;
 }) {
-  const { activePath, bufferStatus, monacoTheme, monacoRef, showPreview, isMarkdown } = props;
+  const { activePath, projectLocation, bufferStatus, monacoTheme, showPreview, isMarkdown } = props;
   const content = useActiveBufferContent();
   const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
   const [editorInstance, setEditorInstance] = useState<MonacoEditor.IStandaloneCodeEditor | null>(
@@ -233,7 +240,7 @@ function EditorBody(props: {
 
   const handleEditorMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
-    monacoRef.current = monaco;
+    props.onMonacoReady(monaco);
     setEditorInstance(editor);
     setMonacoInstance(monaco);
     // eslint-disable-next-line no-bitwise -- Monaco uses bitmask key combos
@@ -249,7 +256,7 @@ function EditorBody(props: {
         <MarkdownPreview content={content ?? ""} />
       ) : bufferStatus === "ready" ? (
         <Editor
-          path={activePath}
+          path={projectLocation ? createLspFileUri(projectLocation, activePath) : activePath}
           language={getLanguageFromPath(activePath)}
           theme={monacoTheme}
           value={content ?? ""}

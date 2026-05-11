@@ -20,6 +20,11 @@ import {
 } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import {
+  useInitialProjectDraftConfig,
+  useProjectIds,
+  useProjectWithoutDraftConfig,
+} from "@/renderer/state/useThread";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { SplitPaneContainer, type Rect } from "@/renderer/components/layout/SplitPaneContainer";
 import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
@@ -32,7 +37,10 @@ import { DraftPane } from "./parts/DraftPane";
 
 export function AppContent() {
   const view = useAppStore((state) => state.view);
-  const projects = useAppStore((state) => state.projects);
+  const projectIds = useProjectIds();
+  const draftProjectId = view.kind === "draft" ? view.projectId : undefined;
+  const draftProject = useProjectWithoutDraftConfig(draftProjectId);
+  const draftLastDraftConfig = useInitialProjectDraftConfig(draftProjectId);
   const createThread = useAppStore((state) => state.createThread);
   const queueThreadLaunch = useAppStore((state) => state.queueThreadLaunch);
   const updateProjectDraftConfig = useAppStore((state) => state.updateProjectDraftConfig);
@@ -233,15 +241,15 @@ export function AppContent() {
   }
 
   if (view.kind === "draft") {
-    const project = projects.find((item) => item.id === view.projectId);
-    if (!project) {
+    if (!draftProject) {
       return <HomeView />;
     }
     return (
       <div className="h-full">
         <DraftViewContent
-          project={project}
-          onStart={(input) => void handleDraftStart(project, input)}
+          project={draftProject}
+          lastDraftConfig={draftLastDraftConfig}
+          onStart={(input) => void handleDraftStart(draftProject, input)}
         />
       </div>
     );
@@ -256,7 +264,7 @@ export function AppContent() {
     const storeThreads = useAppStore.getState().threads;
     const hasValidPanes = view.panes.some((id) =>
       isDraftPaneId(id)
-        ? projects.some((p) => p.id === parseDraftProjectId(id))
+        ? projectIds.includes(parseDraftProjectId(id) ?? "")
         : storeThreads.some((t) => t.id === id),
     );
 
@@ -271,17 +279,17 @@ export function AppContent() {
     const hasGroupHeader = !!(activeGroupId && activeGroupName);
 
     function renderPane(paneId: string, rect: Rect) {
-      const draftProjectId = parseDraftProjectId(paneId);
+      const paneDraftProjectId = parseDraftProjectId(paneId);
       const paneAlign = findPaneAlign(paneLayout, paneId);
       // Only the top-left pane's own header is the topmost row in the content
       // area when there's no group header — that's when it needs traffic-light
       // padding on macOS. Pure layout fact: doesn't change on collapse/expand.
       const headerNeedsTrafficLightPad = rect.left === 0 && rect.top === 0 && !hasGroupHeader;
-      const paneContent = draftProjectId ? (
+      const paneContent = paneDraftProjectId ? (
         <DraftPane
           key={paneId}
           paneId={paneId}
-          projectId={draftProjectId}
+          projectId={paneDraftProjectId}
           paneCount={paneCount}
           paneAlign={paneAlign}
           headerNeedsTrafficLightPad={headerNeedsTrafficLightPad}
@@ -315,7 +323,7 @@ export function AppContent() {
       <div className="flex h-full flex-col">
         {activeGroupId && activeGroupName && (
           <div
-            className={`${macosTrafficLightPadClass} flex h-[env(titlebar-area-height,32px)] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2`}
+            className={`lightcode-content-over-drag-region ${macosTrafficLightPadClass} flex h-[env(titlebar-area-height,32px)] shrink-0 items-center gap-1 border-b border-white/[0.06] px-2`}
           >
             <span className="truncate text-xs font-medium text-muted">{activeGroupName}</span>
             <button
@@ -350,6 +358,7 @@ export function AppContent() {
  */
 function DraftViewContent(props: {
   project: Project;
+  lastDraftConfig?: Project["lastDraftConfig"];
   onStart: (input: {
     agentKind: AgentStatus["kind"];
     config: ThreadConfig;
@@ -361,7 +370,7 @@ function DraftViewContent(props: {
     worktreeIsNewBranch?: boolean;
   }) => void;
 }) {
-  const { project, onStart } = props;
+  const { project, lastDraftConfig, onStart } = props;
   const projectAgentStatuses = useAgentStatusesStore(
     useShallow((s) =>
       getProjectAgentStatuses(project.location, s.agentStatuses, s.wslAgentStatuses),
@@ -375,7 +384,7 @@ function DraftViewContent(props: {
       project={project}
       agentStatuses={projectAgentStatuses}
       isDetectingAgents={isDetectingAgents}
-      {...(project.lastDraftConfig ? { lastDraftConfig: project.lastDraftConfig } : {})}
+      {...(lastDraftConfig ? { lastDraftConfig } : {})}
       onStart={onStart}
     />
   );

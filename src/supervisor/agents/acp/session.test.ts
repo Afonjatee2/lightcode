@@ -46,7 +46,13 @@ function makeConfigSyncSession(
       .fn<(args: { sessionId: string; modelId: string }) => Promise<void>>()
       .mockResolvedValue(undefined),
     setSessionConfigOption: vi
-      .fn<(args: { sessionId: string; configId: string; value: string }) => Promise<void>>()
+      .fn<
+        (args: {
+          sessionId: string;
+          configId: string;
+          value: string;
+        }) => Promise<{ configOptions: unknown[] } | void>
+      >()
       .mockResolvedValue(undefined),
     prompt: vi
       .fn<(args: { sessionId: string; prompt: unknown[] }) => Promise<{ stopReason: string }>>()
@@ -73,6 +79,9 @@ function makeConfigSyncSession(
     "autoEdit",
     "autopilot",
   ];
+  session["currentConfigOptions"] = [];
+  session["modeConfigId"] = undefined;
+  session["modelConfigValue"] = undefined;
   session["thoughtLevelConfigId"] = "thought-level";
   session["currentConfig"] = overrides.currentConfig ?? {
     model: "model-a",
@@ -233,6 +242,135 @@ describe("ACP turn config sync", () => {
       sessionId: "session-1",
       modeId: "autopilot",
     });
+  });
+
+  it("uses ACP session config options for Cursor-style model aliases", async () => {
+    const { connection, session } = makeConfigSyncSession();
+    connection.setSessionConfigOption.mockResolvedValueOnce({
+      configOptions: [
+        {
+          id: "model",
+          category: "model",
+          type: "select",
+          currentValue: "composer-2[fast=true]",
+          options: [{ value: "composer-2[fast=true]", name: "composer-2" }],
+        },
+      ],
+    });
+    Object.assign(session as unknown as Record<string, unknown>, {
+      currentConfigOptions: [
+        {
+          id: "model",
+          category: "model",
+          type: "select",
+          currentValue: "kimi-k2.5[]",
+          options: [
+            { value: "default[]", name: "Auto" },
+            { value: "composer-2[fast=true]", name: "composer-2" },
+          ],
+        },
+      ],
+      modelConfigValue: "kimi-k2.5[]",
+    });
+
+    await session.applyTurnConfig({
+      model: "composer-2",
+      fast: true,
+      effort: "low",
+      mode: "agent",
+      approvalPolicy: "default",
+    });
+
+    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      configId: "model",
+      value: "composer-2[fast=true]",
+    });
+    expect(connection.unstable_setSessionModel).not.toHaveBeenCalled();
+  });
+
+  it("prioritizes Cursor-style effort aliases over the base ACP model alias", async () => {
+    const { connection, session } = makeConfigSyncSession();
+    Object.assign(session as unknown as Record<string, unknown>, {
+      currentConfigOptions: [
+        {
+          id: "model",
+          category: "model",
+          type: "select",
+          currentValue: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
+          options: [
+            {
+              value: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
+              name: "GPT-5.5",
+            },
+            {
+              value: "gpt-5.5[context=272k,reasoning=high,fast=true]",
+              name: "GPT-5.5 High Fast",
+            },
+          ],
+        },
+      ],
+      modelConfigValue: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
+    });
+
+    await session.applyTurnConfig({
+      model: "gpt-5.5",
+      effort: "high",
+      fast: true,
+      mode: "agent",
+      approvalPolicy: "default",
+    });
+
+    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      configId: "model",
+      value: "gpt-5.5[context=272k,reasoning=high,fast=true]",
+    });
+    expect(connection.unstable_setSessionModel).not.toHaveBeenCalled();
+  });
+
+  it("uses ACP session config options for mode when the agent exposes one", async () => {
+    const { connection, session } = makeConfigSyncSession();
+    connection.setSessionConfigOption.mockResolvedValueOnce({
+      configOptions: [
+        {
+          id: "mode",
+          category: "mode",
+          type: "select",
+          currentValue: "plan",
+          options: [{ value: "plan", name: "Plan" }],
+        },
+      ],
+    });
+    Object.assign(session as unknown as Record<string, unknown>, {
+      currentConfigOptions: [
+        {
+          id: "mode",
+          category: "mode",
+          type: "select",
+          currentValue: "agent",
+          options: [
+            { value: "agent", name: "Agent" },
+            { value: "plan", name: "Plan" },
+          ],
+        },
+      ],
+      modeConfigId: "mode",
+    });
+
+    await session.applyTurnConfig({
+      model: "model-a",
+      effort: "low",
+      mode: "plan",
+      approvalPolicy: "default",
+    });
+
+    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      configId: "mode",
+      value: "plan",
+    });
+    expect(connection.setSessionMode).not.toHaveBeenCalled();
   });
 
   it("maps ACP autopilot updates back to agent approval config", () => {

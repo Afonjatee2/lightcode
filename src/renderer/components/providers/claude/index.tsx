@@ -1,16 +1,18 @@
 export * from "./ClaudeIcon";
 
-import { ClipboardList } from "lucide-react";
 import { ClaudeIcon } from "./ClaudeIcon";
+import { planWorkToggle } from "../composerControlBuilders";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
   registerConflictResolverDefaults,
   registerProviderIcon,
+  registerProviderLabel,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
 
 registerProviderIcon("claude", ClaudeIcon);
+registerProviderLabel("claude", "Claude Code");
 registerCommitGenDefaults("claude", { label: "Claude", hint: "Haiku", model: "haiku", effort: "" });
 registerTitleGenDefaults("claude", { label: "Claude", hint: "Haiku", model: "haiku", effort: "" });
 registerConflictResolverDefaults("claude", {
@@ -21,23 +23,17 @@ registerConflictResolverDefaults("claude", {
 });
 
 registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfigChange }) => {
+  const isPlanMode = (config.mode ?? "agent") !== "agent";
   return [
-    // Plan toggle
     ...(capabilities.modes.length === 2
       ? [
-          {
-            kind: "toggle" as const,
-            icon: <ClipboardList className="size-3.5" />,
-            label: "Plan",
-            hideLabelOnWrap: true,
-            isSelected: (config.mode ?? "agent") !== "agent",
+          planWorkToggle({
+            isPlanMode,
             isDisabled,
-            onChange: (isSelected: boolean) =>
-              onConfigChange({ mode: isSelected ? "plan" : "agent" }),
-          },
+            onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
+          }),
         ]
       : []),
-    // Approval policy (always visible if supported)
     ...(capabilities.approvalPolicies.length > 0
       ? [
           {

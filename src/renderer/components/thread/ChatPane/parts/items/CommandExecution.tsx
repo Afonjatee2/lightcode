@@ -1,5 +1,5 @@
 import { memo, useMemo, useState, type ReactNode } from "react";
-import { Terminal } from "lucide-react";
+import { Eye, SearchCode, Terminal } from "lucide-react";
 import type { CommandExecutionPayload } from "@/shared/contracts";
 import { stripAnsiPreservingLayout } from "@/shared/ansi";
 import { PixelLoader } from "@/renderer/components/common";
@@ -9,7 +9,7 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { ChatItemAccordion } from "./ChatItemAccordion";
 import { CommandOutputViewport } from "./CommandOutputViewport";
-import { humanIntentTitle } from "./commandSummary";
+import { commandIntentDisplay } from "./commandSummary";
 import { extractAcpResultText, readAcpStringField } from "./acpToolPayload";
 
 interface CommandExecutionProps {
@@ -30,7 +30,8 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
   const [isExpanded, setIsExpanded] = useState(false);
   const status = resolveCommandStatus(isRunning, payload?.exitCode, payload?.durationMs);
   const fullCommandLine = formatShellInvocation(cwd, command);
-  const title = humanIntentTitle(fullCommandLine);
+  const display = commandIntentDisplay(fullCommandLine);
+  const Icon = display.kind === "view" ? Eye : display.kind === "search" ? SearchCode : Terminal;
 
   const rawOutput = item.streams.command_output ?? "";
   const plainOutput = useMemo(() => {
@@ -55,8 +56,8 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
 
   return (
     <ChatItemAccordion
-      icon={<Terminal className="size-3" />}
-      title={title}
+      icon={<Icon className="size-3" />}
+      title={display.title}
       rightLabel={status.rightLabel}
       rightLabelClassName={status.textClass}
       isExpanded={isExpanded}

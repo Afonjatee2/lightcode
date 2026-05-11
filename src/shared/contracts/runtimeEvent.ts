@@ -7,8 +7,7 @@ import { z } from "zod";
  * Each provider's adapter is responsible for translating its native protocol
  * into this vocabulary (`acp/canonicalMapping.ts`, `codex/canonicalMapping.ts`).
  *
- * Modelled on t3code's `ProviderRuntimeEventV2` (packages/contracts/src/providerRuntime.ts):
- * a discriminated `type` union with `itemId`-addressed updates so streaming
+ * A discriminated `type` union with `itemId`-addressed updates so streaming
  * deltas append to a known item rather than re-emitting the whole message.
  */
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Terminal } from "lucide-react";
 import type { AgentSlashCommand } from "@/shared/contracts";
+import { ThreadDockHeader, ThreadDockSection } from "./ThreadDockUI";
 
 interface ThreadCommandPanelProps {
   commands: AgentSlashCommand[];
@@ -22,17 +23,8 @@ export function ThreadCommandPanel(props: ThreadCommandPanelProps) {
   if (commands.length === 0) return null;
 
   return (
-    <section
-      aria-label="Slash commands"
-      className="flex flex-col border-b border-[color:var(--border)] bg-transparent text-xs"
-    >
-      <div className="flex items-center gap-2 px-2 py-1 leading-none">
-        <Terminal className="size-3.5 shrink-0 text-foreground-muted" />
-        <div className="flex min-w-0 flex-1 items-center gap-2 leading-none">
-          <span className="font-semibold text-foreground">Commands</span>
-          <span className="text-[0.85em] text-[color:var(--muted)]">{commands.length}</span>
-        </div>
-      </div>
+    <ThreadDockSection placement="composer" collapsed={false}>
+      <ThreadDockHeader icon={Terminal} title="Commands" countLabel={String(commands.length)} />
 
       <div className="px-1 pb-1">
         <ul
@@ -50,7 +42,7 @@ export function ThreadCommandPanel(props: ThreadCommandPanelProps) {
                 <button
                   ref={isActive ? activeRowRef : undefined}
                   aria-selected={isActive}
-                  className={`flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1 text-left leading-5 transition-colors hover:bg-foreground/5 ${
+                  className={`flex w-full cursor-pointer items-center gap-3 rounded px-2 py-1 text-left leading-5 transition-colors hover:bg-foreground/5 ${
                     isActive ? "bg-accent/10" : ""
                   }`}
                   role="option"
@@ -59,9 +51,9 @@ export function ThreadCommandPanel(props: ThreadCommandPanelProps) {
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => onSelect(cmd)}
                 >
-                  <span className="font-medium text-foreground">/{cmd.id}</span>
+                  <span className="shrink-0 font-bold text-foreground">/{cmd.id}</span>
                   {cmd.description && (
-                    <span className="min-w-0 flex-1 truncate text-foreground-muted">
+                    <span className="min-w-0 flex-1 truncate font-normal text-[color:var(--muted)]">
                       {cmd.description}
                     </span>
                   )}
@@ -74,6 +66,6 @@ export function ThreadCommandPanel(props: ThreadCommandPanelProps) {
           })}
         </ul>
       </div>
-    </section>
+    </ThreadDockSection>
   );
 }

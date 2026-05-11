@@ -65,6 +65,28 @@ describe("resolveThreadStatusSource", () => {
       ),
     ).toBe("terminal_parse");
   });
+
+  it("returns terminal_parse after a silent hook spawn falls back to terminal status", () => {
+    expect(
+      resolveThreadStatusSource({
+        cliHookEnvInjected: true,
+        cliHookTerminalFallbackActive: true,
+        hasCliHookPluginActivity: false,
+        adapter: { capabilities: { presentationMode: "terminal" } },
+      } as never),
+    ).toBe("terminal_parse");
+  });
+
+  it("returns cli_hook when a real hook arrives after terminal fallback was active", () => {
+    expect(
+      resolveThreadStatusSource({
+        cliHookEnvInjected: true,
+        cliHookTerminalFallbackActive: true,
+        hasCliHookPluginActivity: true,
+        adapter: { capabilities: { presentationMode: "terminal" } },
+      } as never),
+    ).toBe("cli_hook");
+  });
 });
 
 describe("ThreadOutputPipeline / CLI hook disables L2", () => {
@@ -132,6 +154,7 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
       attention: "working",
       config: {},
       cliHookEnvInjected: true,
+      hasCliHookPluginActivity: true,
       prevChunk: "",
       outputLength: 0,
       adapter: {
@@ -166,6 +189,7 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
       attention: "working",
       config: {},
       cliHookEnvInjected: true,
+      hasCliHookPluginActivity: true,
       prevChunk: "",
       outputLength: 0,
       adapter: {
@@ -270,7 +294,7 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
     expect(emittedStates).toHaveLength(0);
   });
 
-  it("suppresses OSC-derived status transitions when hook env was injected before the first hook POST", () => {
+  it("applies OSC-derived status before the first hook POST but keeps the source as cli_hook", () => {
     const emit = vi.fn<() => void>();
     const p = new ThreadOutputPipeline({
       emit,
@@ -308,11 +332,16 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
     p.handlePtyData(session, "\x1b]9;agent-turn-complete\x07");
 
     expect(handleOscNotification).toHaveBeenCalled();
-    expect(session.status).toBe("working");
+    expect(session.status).toBe("idle");
     const emittedStates = (emit.mock.calls as unknown as Array<[{ type: string }]>)
       .map((c) => c[0])
       .filter((e) => e.type === "thread-state");
-    expect(emittedStates).toHaveLength(0);
+    expect(emittedStates.at(-1)).toMatchObject({
+      type: "thread-state",
+      status: "idle",
+      attention: "none",
+      threadStatusSource: "cli_hook",
+    });
   });
 
   it("ignores launch-time working titles for empty resumes so the restored thread can settle idle", () => {
@@ -372,33 +401,176 @@ describe("ThreadOutputPipeline / CLI hook disables L2", () => {
     expect(session.attention).toBe("working");
   });
 
-  it("ignores Codex spinner titles while hook env is present and no hook event has landed yet", () => {
-    const p = pipeline();
-    const session = {
-      threadId: "t1",
-      status: "idle",
-      attention: "none",
-      config: {},
-      cliHookEnvInjected: true,
-      launchPrompt: "",
-      prevChunk: "",
-      outputLength: 0,
-      ptyOscCarry: "",
-      adapter: {
-        capabilities: { presentationMode: "terminal" },
-        handleOscTitle: () => ({
-          status: "working" as const,
-          attention: "working" as const,
-          corroborated: true,
-        }),
-      },
-      pty: { write: vi.fn<(data: string) => void>() },
-    } as unknown as SessionRuntime;
+  it("uses Codex spinner titles as L2 fallback when hook env is present but hooks stay silent", async () => {
+    vi.useFakeTimers();
+    try {
+      const emit = vi.fn<() => void>();
+      const p = new ThreadOutputPipeline({
+        emit,
+        isDev: false,
+        logWriter: { append: vi.fn<() => void>() } as never,
+        resolveLogPath: () => "",
+        resolveHintLogPath: () => "",
+        readDisableCliHookPlugin: () => false,
+        onRecoverInvalidSessionRef: vi.fn<() => void>(),
+        onStartQueuedLaunchPrompt: vi.fn<() => void>(),
+        onStartSessionRefDiscovery: vi.fn<() => void>(),
+      });
+      const session = {
+        threadId: "t1",
+        status: "idle",
+        attention: "none",
+        config: {},
+        cliHookEnvInjected: true,
+        launchPrompt: "",
+        prevChunk: "",
+        outputLength: 0,
+        ptyOscCarry: "",
+        adapter: {
+          capabilities: { presentationMode: "terminal" },
+          handleOscTitle: () => ({
+            status: "working" as const,
+            attention: "working" as const,
+            corroborated: true,
+          }),
+        },
+        pty: { write: vi.fn<(data: string) => void>() },
+      } as unknown as SessionRuntime;
 
-    p.handlePtyData(session, "\x1b]0;⠴ lightcode\x07");
+      p.handlePtyData(session, "\x1b]0;⠴ lightcode\x07");
 
-    expect(session.status).toBe("idle");
-    expect(session.attention).toBe("none");
+      expect(session.status).toBe("working");
+      expect(session.attention).toBe("working");
+      expect(resolveThreadStatusSource(session)).toBe("cli_hook");
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(session.cliHookTerminalFallbackActive).toBe(true);
+      expect(session.status).toBe("working");
+      expect(session.attention).toBe("working");
+      expect(resolveThreadStatusSource(session)).toBe("terminal_parse");
+      const emittedStates = (emit.mock.calls as unknown as Array<[{ type: string }]>)
+        .map((c) => c[0])
+        .filter((e) => e.type === "thread-state");
+      expect(emittedStates.at(-1)).toMatchObject({
+        type: "thread-state",
+        status: "working",
+        attention: "working",
+        threadStatusSource: "terminal_parse",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps hooks authoritative when a hook arrives before the title fallback grace expires", async () => {
+    vi.useFakeTimers();
+    try {
+      const emit = vi.fn<() => void>();
+      const p = new ThreadOutputPipeline({
+        emit,
+        isDev: false,
+        logWriter: { append: vi.fn<() => void>() } as never,
+        resolveLogPath: () => "",
+        resolveHintLogPath: () => "",
+        readDisableCliHookPlugin: () => false,
+        onRecoverInvalidSessionRef: vi.fn<() => void>(),
+        onStartQueuedLaunchPrompt: vi.fn<() => void>(),
+        onStartSessionRefDiscovery: vi.fn<() => void>(),
+      });
+      const session = {
+        threadId: "t1",
+        status: "idle",
+        attention: "none",
+        config: {},
+        cliHookEnvInjected: true,
+        launchPrompt: "",
+        prevChunk: "",
+        outputLength: 0,
+        ptyOscCarry: "",
+        adapter: {
+          capabilities: { presentationMode: "terminal" },
+          handleOscTitle: () => ({
+            status: "working" as const,
+            attention: "working" as const,
+            corroborated: true,
+          }),
+        },
+        pty: { write: vi.fn<(data: string) => void>() },
+      } as unknown as SessionRuntime;
+
+      p.handlePtyData(session, "\x1b]0;⠴ lightcode\x07");
+      session.hasCliHookPluginActivity = true;
+      p.applyCliHookPluginState(session, { status: "idle", attention: "none" });
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(session.cliHookTerminalFallbackActive).toBe(false);
+      expect(session.cliHookTerminalFallbackTimer).toBeUndefined();
+      expect(session.status).toBe("idle");
+      expect(session.attention).toBe("none");
+      expect(resolveThreadStatusSource(session)).toBe("cli_hook");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("restores L1 source when a bookkeeping hook arrives after L2 fallback activated", async () => {
+    vi.useFakeTimers();
+    try {
+      const emit = vi.fn<() => void>();
+      const p = new ThreadOutputPipeline({
+        emit,
+        isDev: false,
+        logWriter: { append: vi.fn<() => void>() } as never,
+        resolveLogPath: () => "",
+        resolveHintLogPath: () => "",
+        readDisableCliHookPlugin: () => false,
+        onRecoverInvalidSessionRef: vi.fn<() => void>(),
+        onStartQueuedLaunchPrompt: vi.fn<() => void>(),
+        onStartSessionRefDiscovery: vi.fn<() => void>(),
+      });
+      const session = {
+        threadId: "t1",
+        status: "idle",
+        attention: "none",
+        config: {},
+        cliHookEnvInjected: true,
+        prevChunk: "",
+        outputLength: 0,
+        ptyOscCarry: "",
+        adapter: {
+          capabilities: { presentationMode: "terminal" },
+          handleOscTitle: () => ({
+            status: "working" as const,
+            attention: "working" as const,
+            corroborated: true,
+          }),
+        },
+        pty: { write: vi.fn<(data: string) => void>() },
+      } as unknown as SessionRuntime;
+
+      p.handlePtyData(session, "\x1b]0;⠴ lightcode\x07");
+      await vi.advanceTimersByTimeAsync(600);
+      expect(resolveThreadStatusSource(session)).toBe("terminal_parse");
+
+      session.hasCliHookPluginActivity = true;
+      p.noteCliHookPluginActivity(session);
+
+      expect(session.cliHookTerminalFallbackActive).toBe(false);
+      expect(resolveThreadStatusSource(session)).toBe("cli_hook");
+      const emittedStates = (emit.mock.calls as unknown as Array<[{ type: string }]>)
+        .map((c) => c[0])
+        .filter((e) => e.type === "thread-state");
+      expect(emittedStates.at(-1)).toMatchObject({
+        type: "thread-state",
+        status: "working",
+        attention: "working",
+        threadStatusSource: "cli_hook",
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

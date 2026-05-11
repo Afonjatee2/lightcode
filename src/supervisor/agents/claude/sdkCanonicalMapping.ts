@@ -19,6 +19,7 @@ interface TextItemState {
   emittedText: boolean;
   fallbackText: string;
   completed: boolean;
+  messageId?: string;
 }
 
 interface ToolItemState {
@@ -38,6 +39,8 @@ export interface ClaudeMapperState {
   reasoningItems: Map<number, TextItemState>;
   toolItemsByIndex: Map<number, ToolItemState>;
   toolItemsById: Map<string, ToolItemState>;
+  currentAssistantMessageId?: string;
+  streamedAssistantMessageIds: Set<string>;
 }
 
 export function createClaudeMapperState(threadId: string): ClaudeMapperState {
@@ -47,6 +50,7 @@ export function createClaudeMapperState(threadId: string): ClaudeMapperState {
     reasoningItems: new Map(),
     toolItemsByIndex: new Map(),
     toolItemsById: new Map(),
+    streamedAssistantMessageIds: new Set(),
   };
 }
 
@@ -90,6 +94,8 @@ export function startClaudeTurn(
   state.reasoningItems.clear();
   state.toolItemsByIndex.clear();
   state.toolItemsById.clear();
+  delete state.currentAssistantMessageId;
+  state.streamedAssistantMessageIds.clear();
 
   const userItemId = userMessageItemId ?? newItemId("user");
   return [
@@ -126,6 +132,9 @@ function ensureTextItem(
     emittedText: false,
     fallbackText: "",
     completed: false,
+    ...(itemType === "assistant_message" && state.currentAssistantMessageId
+      ? { messageId: state.currentAssistantMessageId }
+      : {}),
   };
   map.set(index, item);
   events.push({ type: "item.started", threadId: state.threadId, itemId: item.itemId, itemType });
@@ -139,6 +148,9 @@ function completeTextItem(
   events: RuntimeEvent[],
 ): void {
   if (item.completed) return;
+  if (stream === "assistant_text" && item.messageId && (item.emittedText || item.fallbackText)) {
+    state.streamedAssistantMessageIds.add(item.messageId);
+  }
   if (!item.emittedText && item.fallbackText.length > 0) {
     events.push({
       type: "content.delta",
@@ -528,6 +540,12 @@ function readParentToolUseId(message: SDKMessage): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
+function readClaudeAssistantMessageId(message: unknown): string | undefined {
+  if (!message || typeof message !== "object") return undefined;
+  const value = (message as { id?: unknown }).id;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
 function tagParent(
   events: RuntimeEvent[],
   parentItemId: string | undefined,
@@ -618,6 +636,9 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
       state.assistantTextItems.clear();
       state.reasoningItems.clear();
       state.toolItemsByIndex.clear();
+      const nextMessageId = readClaudeAssistantMessageId(event.message);
+      if (nextMessageId) state.currentAssistantMessageId = nextMessageId;
+      else delete state.currentAssistantMessageId;
       return events;
     }
 
@@ -694,6 +715,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         );
         if (!item) return events;
         item.emittedText = true;
+        if (item.messageId) state.streamedAssistantMessageIds.add(item.messageId);
         events.push({
           type: "content.delta",
           threadId: state.threadId,
@@ -750,6 +772,8 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
   }
 
   if (message.type === "assistant") {
+    const messageId = readClaudeAssistantMessageId(message.message);
+    if (messageId && state.streamedAssistantMessageIds.has(messageId)) return events;
     const content = (message.message as { content?: unknown }).content;
     if (Array.isArray(content)) {
       for (let blockIndex = 0; blockIndex < content.length; blockIndex += 1) {

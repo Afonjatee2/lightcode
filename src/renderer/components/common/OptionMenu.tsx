@@ -19,6 +19,7 @@ export interface OptionMenuProps {
   className?: string;
   buttonVariant?: ButtonProps["variant"];
   hideLabelOnWrap?: boolean;
+  forceHideLabel?: boolean;
   iconOnly?: boolean;
   tooltip?: string | undefined;
   onOpenChange?: (open: boolean) => void;
@@ -35,6 +36,7 @@ export function OptionMenu(props: OptionMenuProps) {
     className,
     buttonVariant = "secondary",
     hideLabelOnWrap = false,
+    forceHideLabel = false,
     iconOnly = false,
     tooltip,
     onOpenChange,
@@ -61,7 +63,11 @@ export function OptionMenu(props: OptionMenuProps) {
       {icon}
       {!iconOnly && (
         <span
-          className={hideLabelOnWrap ? "lightcode-composer-label-hideable truncate" : "truncate"}
+          className={
+            hideLabelOnWrap
+              ? `lightcode-composer-label-hideable truncate${forceHideLabel ? " is-hidden" : ""}`
+              : "truncate"
+          }
         >
           {currentValue}
         </span>
@@ -70,7 +76,7 @@ export function OptionMenu(props: OptionMenuProps) {
         <ChevronDown
           className={
             hideLabelOnWrap
-              ? "lightcode-composer-label-hideable size-3.5 text-muted"
+              ? `lightcode-composer-label-hideable size-3.5 text-muted${forceHideLabel ? " is-hidden" : ""}`
               : "size-3.5 text-muted"
           }
         />

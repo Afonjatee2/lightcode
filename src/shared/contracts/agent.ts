@@ -59,6 +59,34 @@ export const agentSettingDefSchema = z.discriminatedUnion("type", [
 ]);
 export type AgentSettingDef = z.infer<typeof agentSettingDefSchema>;
 
+const agentPresentationCapabilityOverrideSchema = z
+  .object({
+    models: z.array(labeledOptionSchema),
+    efforts: z.array(z.string().min(1)),
+    defaultEffort: z.string().optional(),
+    modelEfforts: z.record(z.string(), z.array(z.string().min(1))),
+    subProviders: z.array(labeledOptionSchema).optional(),
+    modelSubProvider: z.record(z.string(), z.string()).optional(),
+    contextSizes: z.array(labeledOptionSchema).optional(),
+    modelContextSizes: z.record(z.string(), z.array(z.string().min(1))).optional(),
+    defaultContextSize: z.string().optional(),
+    fastModels: z.array(z.string().min(1)).optional(),
+    thinkingModels: z.array(z.string().min(1)).optional(),
+    modes: z.array(threadModeSchema),
+    approvalPolicies: z.array(labeledOptionSchema),
+    sandboxModes: z.array(labeledOptionSchema),
+    supportsResume: z.boolean(),
+    supportsDirectInput: z.boolean(),
+    liveInputMode: liveInputModeSchema,
+    presentationMode: threadPresentationModeSchema,
+    presentationModes: z.array(threadPresentationModeSchema).optional(),
+    requiresTerminalFocusBeforeInput: z.boolean().optional(),
+    bypassApprovalPolicy: z.string().optional(),
+    settingDefs: z.array(agentSettingDefSchema),
+    slashCommands: z.array(agentSlashCommandSchema).optional(),
+  })
+  .partial();
+
 export const agentCapabilitySchema = z.object({
   models: z.array(labeledOptionSchema).default([]),
   efforts: z.array(z.string().min(1)).default([]),
@@ -76,6 +104,8 @@ export const agentCapabilitySchema = z.object({
   defaultContextSize: z.string().optional(),
   /** Model ids that support a fast/turbo execution mode. */
   fastModels: z.array(z.string().min(1)).optional(),
+  /** Model ids that support a thinking/reasoning toggle separate from effort level. */
+  thinkingModels: z.array(z.string().min(1)).optional(),
   modes: z.array(threadModeSchema).default([]),
   approvalPolicies: z.array(labeledOptionSchema).default([]),
   sandboxModes: z.array(labeledOptionSchema).default([]),
@@ -94,6 +124,17 @@ export const agentCapabilitySchema = z.object({
   settingDefs: z.array(agentSettingDefSchema).default([]),
   /** Populated when the Claude Agent SDK init probe succeeds (install detection). */
   slashCommands: z.array(agentSlashCommandSchema).optional(),
+  /**
+   * Optional capability overrides for providers whose terminal and GUI runtimes
+   * expose different model surfaces. Consumers merge the active presentation's
+   * override over the root capability object.
+   */
+  presentationCapabilities: z
+    .object({
+      terminal: agentPresentationCapabilityOverrideSchema.optional(),
+      gui: agentPresentationCapabilityOverrideSchema.optional(),
+    })
+    .optional(),
 });
 export type AgentCapability = z.infer<typeof agentCapabilitySchema>;
 
@@ -127,6 +168,68 @@ export const agentStatusesResponseSchema = z.object({
   fromCache: z.boolean(),
 });
 export type AgentStatusesResponse = z.infer<typeof agentStatusesResponseSchema>;
+
+const acpRegistryPackageDistributionSchema = z.object({
+  package: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+});
+
+const acpRegistryBinaryTargetSchema = z.object({
+  archive: z.string().url(),
+  cmd: z.string().min(1),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+});
+
+export const acpRegistryAgentSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  version: z.string().min(1),
+  description: z.string().min(1),
+  repository: z.string().url().optional(),
+  website: z.string().url().optional(),
+  authors: z.array(z.string()).optional(),
+  license: z.string().optional(),
+  icon: z.string().optional(),
+  distribution: z.object({
+    npx: acpRegistryPackageDistributionSchema.optional(),
+    uvx: acpRegistryPackageDistributionSchema.optional(),
+    binary: z.record(z.string(), acpRegistryBinaryTargetSchema).optional(),
+  }),
+});
+export type AcpRegistryAgent = z.infer<typeof acpRegistryAgentSchema>;
+
+export const acpRegistryListResultSchema = z.object({
+  version: z.string().min(1),
+  agents: z.array(acpRegistryAgentSchema),
+});
+export type AcpRegistryListResult = z.infer<typeof acpRegistryListResultSchema>;
+
+export const installedAcpRegistryAgentSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  version: z.string().min(1),
+  installedAt: z.string().min(1),
+  adapterKind: agentKindSchema,
+  installKind: z.enum(["first-class", "generic"]),
+});
+export type InstalledAcpRegistryAgent = z.infer<typeof installedAcpRegistryAgentSchema>;
+
+export const installAcpRegistryAgentPayloadSchema = z.object({
+  agentId: z.string().min(1),
+});
+export type InstallAcpRegistryAgentPayload = z.infer<typeof installAcpRegistryAgentPayloadSchema>;
+
+export const removeAcpRegistryAgentPayloadSchema = z.object({
+  agentId: z.string().min(1),
+});
+export type RemoveAcpRegistryAgentPayload = z.infer<typeof removeAcpRegistryAgentPayloadSchema>;
+
+export const acpRegistryMutationResultSchema = z.object({
+  installed: z.array(installedAcpRegistryAgentSchema),
+});
+export type AcpRegistryMutationResult = z.infer<typeof acpRegistryMutationResultSchema>;
 
 export function areAgentSlashCommandsEqual(
   left: readonly AgentSlashCommand[] | undefined,

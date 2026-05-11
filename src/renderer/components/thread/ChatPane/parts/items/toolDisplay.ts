@@ -23,9 +23,11 @@ export interface ToolDisplay {
   /**
    * When set, the renderer should display the title as `prefix + path` with
    * the `path` portion truncated from the start (ellipsis at the beginning),
-   * so the meaningful tail of a path stays visible.
+   * so the meaningful tail of a path stays visible. When `filePath` is true
+   * the path is a real filesystem path and renders as `<basename> <muted dir>`
+   * with head-ellipsis on the directory.
    */
-  parts?: { prefix: string; path: string };
+  parts?: { prefix: string; path: string; filePath?: boolean };
 }
 
 type AcpLocation = NonNullable<ToolCallPayload["locations"]>[number];
@@ -88,7 +90,7 @@ function mapClaudeRawTool(
   switch (name) {
     case "Read":
     case "NotebookRead":
-      return withPath("Read", args, ["file_path", "notebook_path"], Eye);
+      return withPath("Read", args, ["file_path", "notebook_path"], Eye, { filePath: true });
     case "Grep":
       return formatGrepDisplay(args);
     case "Glob":
@@ -136,11 +138,14 @@ function withPath(
   args: Record<string, unknown> | undefined,
   keys: string[],
   Icon: LucideIcon,
+  options?: { filePath?: boolean },
 ): ToolDisplay {
   const path = readStr(args, ...keys);
   if (!path) return { title: verb, Icon };
   const prefix = `${verb}: `;
-  return { title: `${prefix}${path}`, Icon, parts: { prefix, path } };
+  const parts: NonNullable<ToolDisplay["parts"]> = { prefix, path };
+  if (options?.filePath) parts.filePath = true;
+  return { title: `${prefix}${path}`, Icon, parts };
 }
 
 function readArgsObject(payload: ToolCallPayload): Record<string, unknown> | undefined {
@@ -280,7 +285,7 @@ function formatAcpPathDisplay(
   title: string,
   Icon: LucideIcon,
 ): ToolDisplay {
-  if (path) return withTarget(verb, path, Icon);
+  if (path) return withTarget(verb, path, Icon, { filePath: true });
   if (title.length === 0) return { title: verb, Icon };
   return title.toLowerCase().startsWith(verb.toLowerCase())
     ? { title, Icon }
@@ -345,10 +350,17 @@ function readScope(args: Record<string, unknown> | undefined): string | undefine
   return undefined;
 }
 
-function withTarget(verb: string, target: string | undefined, Icon: LucideIcon): ToolDisplay {
+function withTarget(
+  verb: string,
+  target: string | undefined,
+  Icon: LucideIcon,
+  options?: { filePath?: boolean },
+): ToolDisplay {
   if (!target) return { title: verb, Icon };
   const prefix = `${verb}: `;
-  return { title: `${prefix}${target}`, Icon, parts: { prefix, path: target } };
+  const parts: NonNullable<ToolDisplay["parts"]> = { prefix, path: target };
+  if (options?.filePath) parts.filePath = true;
+  return { title: `${prefix}${target}`, Icon, parts };
 }
 
 /**

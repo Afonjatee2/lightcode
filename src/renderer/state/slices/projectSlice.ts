@@ -23,6 +23,7 @@ function projectDraftConfigEqual(
     a.effort === b.effort &&
     a.contextSize === b.contextSize &&
     a.fast === b.fast &&
+    a.thinking === b.thinking &&
     a.mode === b.mode &&
     a.approvalPolicy === b.approvalPolicy &&
     a.sandboxMode === b.sandboxMode &&

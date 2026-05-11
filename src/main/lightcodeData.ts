@@ -33,6 +33,10 @@ export function cleanupOrphanedAttachments(attachmentsDir: string, validThreadId
   }
 
   for (const entry of entries) {
+    // Draft-pane attachments live under directories prefixed with `draft-` and
+    // are referenced by file path from persisted user messages once the draft
+    // is sent. Keep them so re-opened threads can still resolve their images.
+    if (entry.startsWith("draft-")) continue;
     if (!validDirNames.has(entry)) {
       rmSync(join(attachmentsDir, entry), { recursive: true, force: true });
     }

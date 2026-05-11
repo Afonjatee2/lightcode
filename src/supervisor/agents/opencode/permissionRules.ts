@@ -3,9 +3,8 @@ import type { PermissionRule } from "@opencode-ai/sdk/v2";
 /**
  * Map our `approvalPolicy` config to OpenCode's `PermissionRuleset`.
  *
- * Mirrors t3code's `buildOpenCodePermissionRules` (apps/server/src/provider/
- * opencodeRuntime.ts:209-225). Question prompts are auto-allowed in both
- * modes — they're informational, not gating.
+ * Mirrors the upstream OpenCode permission mapping. Question prompts are
+ * auto-allowed in both modes — they're informational, not gating.
  */
 export function buildOpenCodePermissionRules(approvalPolicy: string | undefined): PermissionRule[] {
   const isFullAccess = approvalPolicy === "yolo" || approvalPolicy === "never";

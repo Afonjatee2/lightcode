@@ -21,3 +21,9 @@ resources/wsl-helpers/bridge.mjs
 resources/agent-plugins/
 .envrc
 .envrc.local
+
+# Next.js (website)
+website/.next/
+website/out/
+.vercel/
+.env*.local

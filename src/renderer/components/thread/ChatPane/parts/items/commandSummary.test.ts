@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { humanIntentTitle, summarizeShellCommand } from "./commandSummary";
+import { commandIntentDisplay, humanIntentTitle, summarizeShellCommand } from "./commandSummary";
 
 describe("summarizeShellCommand", () => {
   it("pulls PowerShell -Command single-quoted script", () => {
@@ -7,6 +7,11 @@ describe("summarizeShellCommand", () => {
     expect(summarizeShellCommand(full)).toBe(
       "Get-Content src/renderer/state/slices/runtimeEventSlice.ts",
     );
+  });
+
+  it("pulls POSIX shell -lc double-quoted script", () => {
+    const full = `/bin/zsh -lc "sed -n '1,260p' src/supervisor/runtime.ts"`;
+    expect(summarizeShellCommand(full)).toBe("sed -n '1,260p' src/supervisor/runtime.ts");
   });
 
   it("unescapes doubled single-quotes inside PS -Command", () => {
@@ -43,5 +48,19 @@ describe("humanIntentTitle", () => {
   it("strips PowerShell cd …; before intent", () => {
     const full = 'cd "c:\\Users\\me\\work\\lightcode"; pnpm exec oxfmt src/a.ts';
     expect(humanIntentTitle(full)).toBe("Format files");
+  });
+
+  it("describes sed -n ranges as viewed lines", () => {
+    const full = `/bin/zsh -lc "sed -n '1,260p' src/supervisor/runtime.ts"`;
+    expect(humanIntentTitle(full)).toBe("View lines 1-260: src/supervisor/runtime.ts");
+    expect(commandIntentDisplay(full).kind).toBe("view");
+  });
+
+  it("describes ripgrep commands as searches", () => {
+    const full = `/bin/zsh -lc 'rg -n "agent status|AgentStatus" src/main src/supervisor src/shared -S'`;
+    expect(humanIntentTitle(full)).toBe(
+      'Search: "agent status|AgentStatus" in src/main src/supervisor src/shared',
+    );
+    expect(commandIntentDisplay(full).kind).toBe("search");
   });
 });

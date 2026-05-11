@@ -287,6 +287,39 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     expect(store.getState().runtimeDirtyThreadIds).toContain("t1");
   });
 
+  it("truncates a thread transcript to a checkpoint item and marks persistence dirty", () => {
+    for (const itemId of ["user-1", "assistant-1", "user-2", "assistant-2"]) {
+      apply("t1", {
+        type: "item.started",
+        threadId: "t1",
+        itemId,
+        itemType: itemId.startsWith("user") ? "user_message" : "assistant_message",
+      });
+    }
+    apply("t1", {
+      type: "request.opened",
+      threadId: "t1",
+      requestId: "r1",
+      requestType: "tool_user_input",
+      payload: { summary: "Pick" },
+    });
+    store.getState().hydrateThreadCompletedTurns("t1", [
+      { startedAt: 1, endedAt: 2, anchorItemId: "assistant-1" },
+      { startedAt: 3, endedAt: 4, anchorItemId: "assistant-2" },
+    ]);
+
+    store.getState().clearRuntimeDirtyThreadIds(["t1"]);
+    store.getState().truncateThreadRuntimeAfter("t1", "assistant-1");
+
+    expect(store.getState().runtimeItemIdsByThread["t1"]).toEqual(["user-1", "assistant-1"]);
+    expect(store.getState().runtimeItemsByIdByThread["t1"]?.["user-2"]).toBeUndefined();
+    expect(store.getState().runtimeRequestsByThread["t1"]).toEqual([]);
+    expect(store.getState().runtimeCompletedTurnsByThread["t1"]).toEqual([
+      { startedAt: 1, endedAt: 2, anchorItemId: "assistant-1" },
+    ]);
+    expect(store.getState().runtimeDirtyThreadIds).toContain("t1");
+  });
+
   it("merges persisted completed turns with live turns during hydration", () => {
     store
       .getState()

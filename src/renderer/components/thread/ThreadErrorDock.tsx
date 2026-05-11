@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tooltip } from "@heroui/react";
 import { AlertTriangle, ChevronDown, X } from "lucide-react";
 import type { ThreadErrorDockState } from "./threadErrorState";
+import { ThreadDockHeader, ThreadDockSection } from "./ThreadDockUI";
 
 interface ThreadErrorDockProps {
   state: ThreadErrorDockState;
@@ -16,58 +17,59 @@ export function ThreadErrorDock(props: ThreadErrorDockProps) {
   const { title, body } = splitErrorTitle(state.message);
 
   return (
-    <section
-      aria-label="Thread error"
-      className="flex flex-col border-b border-[color:var(--border)] bg-transparent py-1.5 text-xs"
-      data-collapsed={collapsed ? "true" : "false"}
-    >
-      <div className="flex items-center gap-2 px-2 py-1 leading-normal">
-        <AlertTriangle className="size-3.5 shrink-0 text-danger" />
-        <div className="flex min-w-0 flex-1 items-center gap-2 leading-normal">
-          <span className="font-semibold text-foreground">{title}</span>
-          <span className="min-w-0 flex-1 truncate text-[color:var(--muted)]" title={state.message}>
-            {body}
-          </span>
-        </div>
-        {canExpand ? (
-          <Tooltip delay={0}>
-            <Tooltip.Trigger>
-              <button
-                aria-label={collapsed ? "Expand error" : "Collapse error"}
-                className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
-                type="button"
-                onClick={() => setCollapsed(!collapsed)}
-              >
-                <ChevronDown
-                  className={`size-3.5 transition-transform ${collapsed ? "-rotate-90" : "rotate-0"}`}
-                />
-              </button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>{collapsed ? "Expand" : "Collapse"}</Tooltip.Content>
-          </Tooltip>
-        ) : null}
-        {onDismiss ? (
-          <Tooltip delay={0}>
-            <Tooltip.Trigger>
-              <button
-                aria-label="Dismiss error"
-                className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
-                type="button"
-                onClick={onDismiss}
-              >
-                <X className="size-3.5" />
-              </button>
-            </Tooltip.Trigger>
-            <Tooltip.Content>Dismiss</Tooltip.Content>
-          </Tooltip>
-        ) : null}
-      </div>
+    <ThreadDockSection placement="composer" collapsed={collapsed}>
+      <ThreadDockHeader
+        icon={AlertTriangle}
+        iconClassName="text-danger"
+        title={title}
+        actions={
+          <>
+            {canExpand ? (
+              <Tooltip delay={0}>
+                <Tooltip.Trigger>
+                  <button
+                    aria-label={collapsed ? "Expand error" : "Collapse error"}
+                    className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                    type="button"
+                    onClick={() => setCollapsed(!collapsed)}
+                  >
+                    <ChevronDown
+                      className={`size-3.5 transition-transform ${collapsed ? "-rotate-90" : "rotate-0"}`}
+                    />
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>{collapsed ? "Expand" : "Collapse"}</Tooltip.Content>
+              </Tooltip>
+            ) : null}
+            {onDismiss ? (
+              <Tooltip delay={0}>
+                <Tooltip.Trigger>
+                  <button
+                    aria-label="Dismiss error"
+                    className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                    type="button"
+                    onClick={onDismiss}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>Dismiss</Tooltip.Content>
+              </Tooltip>
+            ) : null}
+          </>
+        }
+      >
+        <span className="min-w-0 flex-1 truncate text-[color:var(--muted)]" title={state.message}>
+          {body}
+        </span>
+      </ThreadDockHeader>
+
       {canExpand && !collapsed ? (
         <div className="max-h-[min(12rem,32vh)] overflow-y-auto whitespace-pre-wrap break-words px-2 pb-1.5 text-[color:var(--muted)] [scrollbar-gutter:stable]">
           {state.message}
         </div>
       ) : null}
-    </section>
+    </ThreadDockSection>
   );
 }
 

@@ -85,7 +85,7 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.config.effort).toBe("high");
   });
 
-  it("refreshes updatedAt when marking old threads done before auto-archive", () => {
+  it("keeps updatedAt stable and uses doneAt when marking old threads done before auto-archive", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-10T12:00:00.000Z"));
     const project = useAppStore.getState().addProject({
@@ -110,7 +110,8 @@ describe("appStore runtime config sync", () => {
     const stored = useAppStore.getState().threads.find((t) => t.id === thread.id);
     expect(stored?.done).toBe(true);
     expect(stored?.archived).toBe(false);
-    expect(stored?.updatedAt).toBe("2026-05-10T12:00:00.000Z");
+    expect(stored?.updatedAt).toBe("2026-04-01T00:00:00.000Z");
+    expect(stored?.doneAt).toBe("2026-05-10T12:00:00.000Z");
   });
 
   it("accepts a real runtime config change after the pending edit is submitted", () => {
@@ -170,7 +171,7 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.config.effort).toBe("low");
   });
 
-  it("updates the saved draft config when only context size and fast change", () => {
+  it("updates the saved draft config when only context size, fast, and thinking change", () => {
     const project = useAppStore.getState().addProject({
       kind: "windows",
       path: "C:\\repo",
@@ -190,12 +191,14 @@ describe("appStore runtime config sync", () => {
       effort: "high",
       contextSize: "200k",
       fast: true,
+      thinking: true,
       mode: "agent",
     });
 
     expect(useAppStore.getState().projects[0]?.lastDraftConfig).toMatchObject({
       contextSize: "200k",
       fast: true,
+      thinking: true,
     });
   });
 
@@ -242,7 +245,7 @@ describe("appStore runtime config sync", () => {
       view: { kind: "thread", panes: [t1.id, t2.id] as [string, ...string[]] },
     }));
 
-    const t3 = useAppStore.getState().createThread({
+    const threadThree = useAppStore.getState().createThread({
       projectId: project.id,
       agentKind: "codex",
       config: { model: "m" },
@@ -252,7 +255,7 @@ describe("appStore runtime config sync", () => {
     // createThread replaces entirely
     expect(useAppStore.getState().view).toEqual({
       kind: "thread",
-      panes: [t3.id],
+      panes: [threadThree.id],
     });
 
     // Set up split again, then openThread replaces panes[0]
@@ -261,9 +264,9 @@ describe("appStore runtime config sync", () => {
       view: { kind: "thread", panes: [t1.id, t2.id] as [string, ...string[]] },
     }));
 
-    useAppStore.getState().openThread(t3.id);
+    useAppStore.getState().openThread(threadThree.id);
     const view = useAppStore.getState().view;
-    expect(view).toEqual({ kind: "thread", panes: [t3.id, t2.id] });
+    expect(view).toEqual({ kind: "thread", panes: [threadThree.id, t2.id] });
   });
 
   it("openThread is no-op when thread is already in panes", () => {
@@ -701,6 +704,107 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.lastTurnStartedAt).toBe("2026-05-01T12:00:00.000Z");
     expect(useAppStore.getState().threads[0]?.lastTurnEndedAt).toBe("2026-05-01T12:00:30.000Z");
   });
+
+  it("keeps GUI startup idle blips from closing the active turn before assistant output", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "m" },
+      prompt: "a",
+      presentationMode: "gui",
+    });
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "working",
+      attention: "working",
+      canResumeWithConfig: false,
+    });
+
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "user-1",
+      itemType: "user_message",
+    });
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.completed",
+      threadId: thread.id,
+      itemId: "user-1",
+    });
+
+    vi.setSystemTime(new Date("2026-05-01T12:00:01.000Z"));
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "idle",
+      attention: "none",
+      canResumeWithConfig: true,
+    });
+
+    expect(useAppStore.getState().threads[0]).toMatchObject({
+      status: "working",
+      attention: "working",
+      activeTurnStartedAt: "2026-05-01T12:00:00.000Z",
+    });
+    expect(useAppStore.getState().runtimeCompletedTurnsByThread[thread.id]).toBeUndefined();
+
+    vi.setSystemTime(new Date("2026-05-01T12:00:05.000Z"));
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "working",
+      attention: "working",
+      canResumeWithConfig: true,
+    });
+
+    expect(useAppStore.getState().threads[0]?.activeTurnStartedAt).toBe("2026-05-01T12:00:00.000Z");
+  });
+
+  it("anchors completed turns to assistant output when present", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "codex",
+      config: { model: "m" },
+      prompt: "a",
+      presentationMode: "gui",
+    });
+
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "user-1",
+      itemType: "user_message",
+    });
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.completed",
+      threadId: thread.id,
+      itemId: "user-1",
+    });
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "assistant-1",
+      itemType: "assistant_message",
+    });
+
+    vi.setSystemTime(new Date("2026-05-01T12:00:30.000Z"));
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "idle",
+      attention: "none",
+      canResumeWithConfig: true,
+    });
+
+    expect(useAppStore.getState().runtimeCompletedTurnsByThread[thread.id]?.[0]).toMatchObject({
+      anchorItemId: "assistant-1",
+    });
+  });
 });
 
 describe("markThreadDone / unmarkThreadDone", () => {
@@ -740,12 +844,55 @@ describe("markThreadDone / unmarkThreadDone", () => {
     expect(useAppStore.getState().threads[0]?.done).toBe(true);
   });
 
+  it("markThreadDone preserves updatedAt", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-10T12:00:00.000Z"));
+    const thread = createTestThread();
+    useAppStore.setState((state) => ({
+      threads: state.threads.map((t) =>
+        t.id === thread.id ? { ...t, updatedAt: "2026-04-01T00:00:00.000Z" } : t,
+      ),
+    }));
+
+    useAppStore.getState().markThreadDone(thread.id);
+
+    const stored = useAppStore.getState().threads[0];
+    expect(stored?.done).toBe(true);
+    expect(stored?.updatedAt).toBe("2026-04-01T00:00:00.000Z");
+    expect(stored?.doneAt).toBe("2026-05-10T12:00:00.000Z");
+  });
+
   it("unmarkThreadDone sets done to false", () => {
     const thread = createTestThread();
     useAppStore.getState().markThreadDone(thread.id);
     expect(useAppStore.getState().threads[0]?.done).toBe(true);
     useAppStore.getState().unmarkThreadDone(thread.id);
     expect(useAppStore.getState().threads[0]?.done).toBe(false);
+  });
+
+  it("unmarkThreadDone preserves updatedAt", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-10T12:00:00.000Z"));
+    const thread = createTestThread();
+    useAppStore.setState((state) => ({
+      threads: state.threads.map((t) =>
+        t.id === thread.id
+          ? {
+              ...t,
+              done: true,
+              doneAt: "2026-05-01T00:00:00.000Z",
+              updatedAt: "2026-04-01T00:00:00.000Z",
+            }
+          : t,
+      ),
+    }));
+
+    useAppStore.getState().unmarkThreadDone(thread.id);
+
+    const stored = useAppStore.getState().threads[0];
+    expect(stored?.done).toBe(false);
+    expect(stored?.updatedAt).toBe("2026-04-01T00:00:00.000Z");
+    expect(stored?.doneAt).toBeUndefined();
   });
 
   it("markThreadDone is a no-op if already done", () => {

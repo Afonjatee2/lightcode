@@ -5,6 +5,7 @@ export interface LightcodePaths {
   baseDir: string;
   dbPath: string;
   settingsPath: string;
+  keybindingsPath: string;
   worktreesDir: string;
   attachmentsDir: string;
   logsDir: string;
@@ -25,6 +26,7 @@ export function resolveLightcodePaths(baseDir: string = resolveLightcodeBaseDir(
     baseDir,
     dbPath: join(baseDir, "state.sqlite"),
     settingsPath: join(baseDir, "settings.json"),
+    keybindingsPath: join(baseDir, "keybindings.json"),
     worktreesDir: join(baseDir, "worktrees"),
     attachmentsDir: join(baseDir, "attachments"),
     logsDir,

@@ -29,9 +29,31 @@ interface TriggerContext {
 }
 
 /**
- * Scan backward from the current cursor position to find an active trigger
- * character (`@` or `/`) at start-of-line or after whitespace, with no
- * intervening whitespace between the trigger and the cursor.
+ * Returns true when the given text node is positioned at the very beginning of
+ * its enclosing contentEditable host (no preceding siblings up the ancestor
+ * chain). Used to anchor slash-command detection to the start of the input.
+ */
+function isAtEditorStart(textNode: Text): boolean {
+  let node: Node = textNode;
+  while (node.parentNode) {
+    if (node.previousSibling) return false;
+    const parent = node.parentNode;
+    if (parent instanceof HTMLElement) {
+      const editable = parent.getAttribute("contenteditable") ?? parent.contentEditable;
+      if (editable === "true" || editable === "plaintext-only") {
+        return true;
+      }
+    }
+    node = parent;
+  }
+  return false;
+}
+
+/**
+ * Scan backward from the current cursor position to find an active trigger.
+ * `@` mentions activate at start-of-line or after whitespace anywhere in the
+ * input. `/` slash commands only activate when the slash is the first
+ * character of the editor, so typing "foo /bar" never opens the command list.
  */
 function detectTriggerContext(triggerChar: string): TriggerContext | null {
   const sel = window.getSelection();
@@ -42,12 +64,17 @@ function detectTriggerContext(triggerChar: string): TriggerContext | null {
 
   const text = textNode.textContent ?? "";
   const offset = sel.anchorOffset;
+  const slashOnly = triggerChar === "/";
 
   let triggerIndex = -1;
   for (let i = offset - 1; i >= 0; i--) {
     const ch = text[i]!;
     if (ch === triggerChar) {
-      if (i === 0 || /\s/.test(text[i - 1]!)) {
+      if (slashOnly) {
+        if (i === 0 && isAtEditorStart(textNode as Text)) {
+          triggerIndex = i;
+        }
+      } else if (i === 0 || /\s/.test(text[i - 1]!)) {
         triggerIndex = i;
       }
       break;

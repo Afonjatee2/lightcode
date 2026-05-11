@@ -1,0 +1,53 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Shimmer text effect — ported from Lightcode desktop "working" indicator */
+.lightcode-shimmer-text {
+  background-image: linear-gradient(
+    90deg,
+    #9ca3af 0%,
+    #9ca3af 35%,
+    #ffffff 50%,
+    #9ca3af 65%,
+    #9ca3af 100%
+  );
+  background-size: 250% 100%;
+  background-repeat: no-repeat;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  animation: lightcode-shimmer 2.4s linear infinite;
+}
+
+@keyframes lightcode-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0% 0;
+  }
+}

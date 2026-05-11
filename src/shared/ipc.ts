@@ -2,12 +2,16 @@ import { z } from "zod";
 import type { LspMessagePayload, LspSessionStatus, LspStartPayload, LspStopPayload } from "./lsp";
 import type { OscShellEvent } from "./osc";
 import type { SharedSettings, SharedSettingsInput } from "./settings";
+import type { KeybindingsConfig } from "./keybindings";
 import {
   closeThreadPayloadSchema,
+  installAcpRegistryAgentPayloadSchema,
+  createFileCheckpointPayloadSchema,
   createProjectEntryPayloadSchema,
   deleteProjectEntryPayloadSchema,
   detectSetupScriptPayloadSchema,
   extractContextPayloadSchema,
+  finalizeFileCheckpointPayloadSchema,
   generateCommitMessagePayloadSchema,
   generatePrSummaryPayloadSchema,
   generateTitlePayloadSchema,
@@ -55,9 +59,11 @@ import {
   gitUnwatchProjectPayloadSchema,
   gitWatchProjectPayloadSchema,
   gitWatchWorktreesPayloadSchema,
+  listFileCheckpointsPayloadSchema,
   listProjectTreePayloadSchema,
   moveProjectEntryPayloadSchema,
   interruptThreadPayloadSchema,
+  removeAcpRegistryAgentPayloadSchema,
   setPendingSteerPayloadSchema,
   clearPendingSteerPayloadSchema,
   projectSchema,
@@ -66,6 +72,7 @@ import {
   renameProjectEntryPayloadSchema,
   resizeTerminalPayloadSchema,
   resolveThreadServerRequestPayloadSchema,
+  restoreFileCheckpointPayloadSchema,
   revealProjectEntryPayloadSchema,
   searchProjectFilesPayloadSchema,
   searchProjectTreePayloadSchema,
@@ -79,12 +86,16 @@ import {
 import type {
   AgentStatus,
   AgentStatusesResponse,
+  CreateFileCheckpointPayload,
+  CreateFileCheckpointResult,
   CreateProjectEntryPayload,
   DeleteProjectEntryPayload,
   DetectSetupScriptPayload,
   DetectSetupScriptResult,
   ExtractContextPayload,
   ExtractContextResult,
+  FinalizeFileCheckpointPayload,
+  FinalizeFileCheckpointResult,
   GenerateCommitMessagePayload,
   GenerateCommitMessageResult,
   GeneratePrSummaryPayload,
@@ -156,6 +167,8 @@ import type {
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
   InterruptThreadPayload,
+  ListFileCheckpointsPayload,
+  ListFileCheckpointsResult,
   SetPendingSteerPayload,
   ClearPendingSteerPayload,
   PendingSteerState,
@@ -171,6 +184,7 @@ import type {
   RenameProjectEntryPayload,
   ResizeTerminalPayload,
   ResolveThreadServerRequestPayload,
+  RestoreFileCheckpointPayload,
   RevealProjectEntryPayload,
   SearchProjectFilesPayload,
   SearchProjectFilesResult,
@@ -192,6 +206,10 @@ import type {
   WriteProjectFileResult,
   WriteTerminalPayload,
   RuntimeEvent,
+  AcpRegistryListResult,
+  AcpRegistryMutationResult,
+  InstallAcpRegistryAgentPayload,
+  RemoveAcpRegistryAgentPayload,
 } from "./contracts";
 
 const emptyPayloadSchema = z.object({});
@@ -408,6 +426,10 @@ export const groupedIpcProcedures = {
       (url) => openExternalPayloadSchema.parse(url),
     ),
     focusWindow: defineNoArgProcedure<void, "main-local">("focusWindow", "main-local"),
+    getKeybindings: defineNoArgProcedure<KeybindingsConfig, "main-local">(
+      "getKeybindings",
+      "main-local",
+    ),
   },
   thread: {
     getAgentStatuses: defineIpcProcedure<
@@ -426,6 +448,20 @@ export const groupedIpcProcedures = {
     >("refreshAgentStatuses", "supervisor", getAgentStatusesPayloadSchema, (wslDistros) =>
       getAgentStatusesPayloadSchema.parse({ wslDistros: wslDistros ?? [] }),
     ),
+    listAcpRegistry: defineNoArgProcedure<AcpRegistryListResult, "supervisor">(
+      "listAcpRegistry",
+      "supervisor",
+    ),
+    installAcpRegistryAgent: definePayloadProcedure<
+      InstallAcpRegistryAgentPayload,
+      AcpRegistryMutationResult,
+      "supervisor"
+    >("installAcpRegistryAgent", "supervisor", installAcpRegistryAgentPayloadSchema),
+    removeAcpRegistryAgent: definePayloadProcedure<
+      RemoveAcpRegistryAgentPayload,
+      AcpRegistryMutationResult,
+      "supervisor"
+    >("removeAcpRegistryAgent", "supervisor", removeAcpRegistryAgentPayloadSchema),
     getThreadSnapshots: defineNoArgProcedure<ThreadRuntimeSnapshot[], "supervisor">(
       "getThreadSnapshots",
       "supervisor",
@@ -507,6 +543,26 @@ export const groupedIpcProcedures = {
     ),
   },
   git: {
+    createFileCheckpoint: definePayloadProcedure<
+      CreateFileCheckpointPayload,
+      CreateFileCheckpointResult,
+      "supervisor"
+    >("createFileCheckpoint", "supervisor", createFileCheckpointPayloadSchema),
+    finalizeFileCheckpoint: definePayloadProcedure<
+      FinalizeFileCheckpointPayload,
+      FinalizeFileCheckpointResult,
+      "supervisor"
+    >("finalizeFileCheckpoint", "supervisor", finalizeFileCheckpointPayloadSchema),
+    listFileCheckpoints: definePayloadProcedure<
+      ListFileCheckpointsPayload,
+      ListFileCheckpointsResult,
+      "supervisor"
+    >("listFileCheckpoints", "supervisor", listFileCheckpointsPayloadSchema),
+    restoreFileCheckpoint: definePayloadProcedure<RestoreFileCheckpointPayload, void, "supervisor">(
+      "restoreFileCheckpoint",
+      "supervisor",
+      restoreFileCheckpointPayloadSchema,
+    ),
     getGitStatus: definePayloadProcedure<GetGitStatusPayload, GitStatusResult, "supervisor">(
       "getGitStatus",
       "supervisor",
@@ -935,7 +991,7 @@ export const groupedIpcProcedures = {
       "supervisor",
       z.custom<LspStopPayload>(),
     ),
-    lspSendMessage: definePayloadProcedure<LspMessagePayload, void, "supervisor">(
+    lspSendMessage: definePayloadProcedure<LspMessagePayload, unknown, "supervisor">(
       "lspSendMessage",
       "supervisor",
       z.custom<LspMessagePayload>(),
@@ -951,8 +1007,12 @@ export const ipcProcedureMap = {
   listWslDistros: groupedIpcProcedures.app.listWslDistros,
   openExternal: groupedIpcProcedures.app.openExternal,
   focusWindow: groupedIpcProcedures.app.focusWindow,
+  getKeybindings: groupedIpcProcedures.app.getKeybindings,
   getAgentStatuses: groupedIpcProcedures.thread.getAgentStatuses,
   refreshAgentStatuses: groupedIpcProcedures.thread.refreshAgentStatuses,
+  listAcpRegistry: groupedIpcProcedures.thread.listAcpRegistry,
+  installAcpRegistryAgent: groupedIpcProcedures.thread.installAcpRegistryAgent,
+  removeAcpRegistryAgent: groupedIpcProcedures.thread.removeAcpRegistryAgent,
   getThreadSnapshots: groupedIpcProcedures.thread.getThreadSnapshots,
   startThread: groupedIpcProcedures.thread.startThread,
   sendThreadInput: groupedIpcProcedures.thread.sendThreadInput,
@@ -969,6 +1029,10 @@ export const ipcProcedureMap = {
   readTerminalScrollback: groupedIpcProcedures.thread.readTerminalScrollback,
   subagentSubscribe: groupedIpcProcedures.thread.subagentSubscribe,
   subagentUnsubscribe: groupedIpcProcedures.thread.subagentUnsubscribe,
+  createFileCheckpoint: groupedIpcProcedures.git.createFileCheckpoint,
+  finalizeFileCheckpoint: groupedIpcProcedures.git.finalizeFileCheckpoint,
+  listFileCheckpoints: groupedIpcProcedures.git.listFileCheckpoints,
+  restoreFileCheckpoint: groupedIpcProcedures.git.restoreFileCheckpoint,
   getGitStatus: groupedIpcProcedures.git.getGitStatus,
   getGitDiff: groupedIpcProcedures.git.getGitDiff,
   getGitDiffBatch: groupedIpcProcedures.git.getGitDiffBatch,
@@ -1073,6 +1137,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "saveHandoffContext",
   "openExternal",
   "focusWindow",
+  "getKeybindings",
   "revealProjectEntry",
   "getSharedSettings",
   "setSharedSettings",

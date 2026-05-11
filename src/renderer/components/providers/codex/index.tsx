@@ -1,18 +1,21 @@
 export * from "./CodexStatusIcon";
 
-import { ClipboardList } from "lucide-react";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import { CodexStatusIcon } from "./CodexStatusIcon";
+import { fullAccessToggle, planWorkToggle } from "../composerControlBuilders";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
   registerConfigNormalizer,
   registerConflictResolverDefaults,
+  registerGuiSlashCommands,
   registerProviderIcon,
+  registerProviderLabel,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
 
 registerProviderIcon("codex", CodexStatusIcon);
+registerProviderLabel("codex", "Codex");
 registerCommitGenDefaults("codex", {
   label: "Codex",
   hint: "GPT-5.5",
@@ -38,6 +41,43 @@ registerConfigNormalizer("codex", ({ config, presentationMode }) => {
     return { mode: "agent" };
   }
   return {};
+});
+
+registerGuiSlashCommands("codex", {
+  buildCommands: ({ hasEffort, supportsFast }) => [
+    { id: "model", label: "model - Open the model picker", description: "Open the model picker" },
+    {
+      id: "plan",
+      label: "plan - Switch this chat to plan mode",
+      description: "Switch this chat to plan mode",
+    },
+    {
+      id: "agent",
+      label: "agent - Switch this chat to agent mode",
+      description: "Switch this chat to agent mode",
+    },
+    ...(hasEffort
+      ? [
+          {
+            id: "effort",
+            label: "effort - Open the effort picker",
+            description: "Open the effort picker",
+          },
+        ]
+      : []),
+    ...(supportsFast
+      ? [{ id: "fast", label: "fast - Toggle Fast mode", description: "Toggle Fast mode" }]
+      : []),
+  ],
+  resolveLocalAction: (typed) => {
+    const normalized = typed.trim().toLowerCase();
+    if (normalized === "/model") return { kind: "open-control", target: "model" };
+    if (normalized === "/effort") return { kind: "open-control", target: "effort" };
+    if (normalized === "/fast") return { kind: "toggle-fast" };
+    if (normalized === "/plan") return { kind: "set-mode", mode: "plan" };
+    if (normalized === "/agent") return { kind: "set-mode", mode: "agent" };
+    return null;
+  },
 });
 
 const CODEX_PERMISSION_PRESETS = [
@@ -79,16 +119,13 @@ function resolveCodexPermissionPreset(
 registerComposerControls("codex", {
   // ACP exposes plan mode and the coupled approval/sandbox preset selector.
   gui: ({ capabilities, config, isDisabled, onConfigChange }) => {
+    const isPlanMode = (config.mode ?? "agent") !== "agent";
     const controls: ComposerControl[] = [
-      {
-        kind: "toggle",
-        icon: <ClipboardList className="size-3.5" />,
-        label: "Plan",
-        hideLabelOnWrap: true,
-        isSelected: (config.mode ?? "agent") !== "agent",
+      planWorkToggle({
+        isPlanMode,
         isDisabled,
         onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
-      },
+      }),
     ];
 
     const approvalIds = new Set(capabilities.approvalPolicies.map((policy) => policy.id));
@@ -135,12 +172,8 @@ registerComposerControls("codex", {
     const isFullAccess =
       config.approvalPolicy === "never" && config.sandboxMode === "danger-full-access";
     return [
-      {
-        kind: "toggle",
-        iconKind: "permission",
-        label: "Full Access",
-        hideLabelOnWrap: true,
-        isSelected: isFullAccess,
+      fullAccessToggle({
+        isFullAccess,
         isDisabled,
         onChange: (selected) => {
           if (selected) {
@@ -152,7 +185,7 @@ registerComposerControls("codex", {
             });
           }
         },
-      },
+      }),
     ];
   },
 });

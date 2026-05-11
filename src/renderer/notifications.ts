@@ -114,6 +114,13 @@ function showToastNotification(
   const detail = getStatusDetail(category, status);
 
   toast[variant](projectName, {
+    actionProps: {
+      children: "Open",
+      onPress: () => {
+        openThread(threadId, { focusComposer: true });
+      },
+      variant: "ghost",
+    },
     description: `${threadTitle}\n${detail}`,
     onPress: () => {
       openThread(threadId, { focusComposer: true });

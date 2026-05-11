@@ -18,12 +18,14 @@ import { codexDefaultCapabilities, codexDetectionSpec } from "./detection";
 import { detectRateLimitPrompt } from "./rateLimitPrompt";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
+  codexHooksFeatureFlagForSemver,
   getCodexPluginPaths,
   installCodexPlugin,
   isCodexPluginInstalled,
   isCodexSemverSupportedForHooks,
   isCodexVersionSupportedForHooks,
   parseCodexVersionLine,
+  probeCodexCliSemver,
   readBundledCodexPluginVersion,
 } from "./plugin/install";
 import {
@@ -78,6 +80,22 @@ function codexOscHint(notification: OscNotification): TerminalStatusHint | null 
   return null;
 }
 
+async function resolveCodexHooksFeatureFlag(ctx: {
+  envKind: "windows" | "wsl" | "posix";
+  wslDistro?: string;
+}): Promise<string> {
+  if (ctx.envKind === "wsl" && ctx.wslDistro) {
+    const [verOut] = await batchWslCommandsAsync(ctx.wslDistro, ["codex --version"]);
+    const versionLine =
+      verOut?.stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .find((line) => line.length > 0) ?? "";
+    return codexHooksFeatureFlagForSemver(parseCodexVersionLine(versionLine));
+  }
+  return codexHooksFeatureFlagForSemver(probeCodexCliSemver());
+}
+
 export function createCodexAdapter(): AgentAdapter {
   let capabilities: AgentCapability = codexDefaultCapabilities;
   let preSpawnRolloutIds = new Set<string>();
@@ -130,8 +148,9 @@ export function createCodexAdapter(): AgentAdapter {
     },
     async pluginLaunchExtras(ctx) {
       const paths = getCodexPluginPaths(ctx);
+      const hooksFeatureFlag = await resolveCodexHooksFeatureFlag(ctx);
       return {
-        args: ["--enable", "codex_hooks"],
+        args: ["--enable", hooksFeatureFlag],
         env: { CODEX_HOME: paths.codexHomeDir },
       };
     },

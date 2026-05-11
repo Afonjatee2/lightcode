@@ -158,6 +158,7 @@ interface DetectionResults {
 
 export class AgentStatusService {
   private pendingDetection: Promise<DetectionResults> | undefined;
+  private startupDetectionLaunched = false;
 
   constructor(private readonly options: AgentStatusServiceOptions) {}
 
@@ -180,12 +181,13 @@ export class AgentStatusService {
   async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     const wslDistros = [...new Set(payload.wslDistros)];
     const cached = this.readCachedStatuses(wslDistros);
-    this.detectAllAgentStatusesBackground(wslDistros);
+    this.detectStartupAgentStatusesBackground(wslDistros);
     return cached;
   }
 
   async refreshAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     const wslDistros = [...new Set(payload.wslDistros)];
+    this.startupDetectionLaunched = true;
     const previousDetection = this.pendingDetection;
     const fresh = await this.runDetectionTask(async () => {
       if (previousDetection) {
@@ -217,15 +219,32 @@ export class AgentStatusService {
         wsl?: unknown[];
       };
 
-      const windows = parseCachedStatuses(cache.windows).filter(
-        (status) => status.envKind !== "wsl",
+      const windows = parseCachedStatuses(cache.windows)
+        .filter((status) => status.envKind !== "wsl")
+        .map((status) => this.withCachedCapabilityDefaults(status));
+      const wsl = filterWslStatusesForDistros(parseCachedStatuses(cache.wsl), wslDistros).map(
+        (status) => this.withCachedCapabilityDefaults(status),
       );
-      const wsl = filterWslStatusesForDistros(parseCachedStatuses(cache.wsl), wslDistros);
 
       return { windows, wsl, fromCache: true };
     } catch {
       return { windows: [], wsl: [], fromCache: false };
     }
+  }
+
+  private withCachedCapabilityDefaults(status: AgentStatus): AgentStatus {
+    const adapter = this.options.adapters.get(status.kind);
+    const fallbackSlashCommands = adapter?.capabilities.slashCommands;
+    if (status.capabilities.slashCommands !== undefined || fallbackSlashCommands === undefined) {
+      return status;
+    }
+    return {
+      ...status,
+      capabilities: {
+        ...status.capabilities,
+        slashCommands: fallbackSlashCommands,
+      },
+    };
   }
 
   private writeDiskCache(windows: AgentStatus[], wsl: AgentStatus[]): void {
@@ -260,10 +279,12 @@ export class AgentStatusService {
     return pending;
   }
 
-  private detectAllAgentStatusesBackground(wslDistros: readonly string[]): void {
-    if (this.pendingDetection) {
+  private detectStartupAgentStatusesBackground(wslDistros: readonly string[]): void {
+    if (this.startupDetectionLaunched) {
       return;
     }
+    this.startupDetectionLaunched = true;
+    if (this.pendingDetection) return;
     void this.runDetectionTask(() => this.runDetection(wslDistros));
   }
 

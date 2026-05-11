@@ -11,6 +11,8 @@
  * lack them and that's fine.
  */
 
+import type { ViewportLanguage } from "./languageDetect";
+
 export interface AcpToolResult {
   /** Short preview text. */
   content?: unknown;
@@ -19,8 +21,6 @@ export interface AcpToolResult {
   /** Typed content blocks (mostly used by web_search). */
   contents?: Array<{ type?: string; text?: unknown } | undefined>;
 }
-
-import type { ViewportLanguage } from "./languageDetect";
 
 /** A rendered tool-call section. `language` selects how the viewport highlights the body. */
 export interface ExtractedPart {
@@ -75,6 +75,33 @@ export function extractAcpArgsPart(payload: unknown): ExtractedPart {
   return { text: safeJson(args), language: "json" };
 }
 
+/** Return only ACP result bodies that are unified diffs, or synthesize one from edit args. */
+export function extractAcpDiffResultPart(payload: unknown): ExtractedPart {
+  const resultPart = extractAcpResultPart(payload);
+  if (resultPart.language === "diff") return resultPart;
+  const synthesized = synthesizeEditDiff(payload);
+  return synthesized ? { text: synthesized, language: "diff" } : emptyPart();
+}
+
+/** Reconstruct the added file body from an apply_patch add-file section. */
+export function extractAcpAddedFileText(payload: unknown, filePath: string): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const args = (payload as Record<string, unknown>).args;
+  if (typeof args !== "string") return undefined;
+
+  const lines = args.split("\n");
+  const header = `*** Add File: ${filePath}`;
+  const start = lines.findIndex((line) => line === header);
+  if (start < 0) return undefined;
+
+  const content: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (line.startsWith("*** ")) break;
+    if (line.startsWith("+")) content.push(line.slice(1));
+  }
+  return content.length > 0 ? `${content.join("\n")}\n` : "";
+}
+
 /** Back-compat: text-only accessors for callers that don't need the language. */
 export function extractAcpResultText(payload: unknown): string {
   return extractAcpResultPart(payload).text;
@@ -89,7 +116,53 @@ function emptyPart(): ExtractedPart {
 }
 
 function asPart(text: string): ExtractedPart {
+  if (isUnifiedDiff(text)) return { text, language: "diff" };
   return { text, language: isJsonText(text) ? "json" : "plain" };
+}
+
+function synthesizeEditDiff(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const p = payload as Record<string, unknown>;
+  const args = p.args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
+  const a = args as Record<string, unknown>;
+  const oldText = readString(a.oldString) ?? readString(a.old_string);
+  const newText = readString(a.newString) ?? readString(a.new_string);
+  if (oldText === undefined || newText === undefined) return undefined;
+  const path = readString(a.filePath) ?? readString(a.file_path) ?? readString(p.path);
+  if (!path) return undefined;
+
+  const oldLines = splitPatchLines(oldText);
+  const newLines = splitPatchLines(newText);
+  const oldRange = formatRange(oldLines.length, oldLines.length === 0 ? 0 : 1);
+  const newRange = formatRange(newLines.length, newLines.length === 0 ? 0 : 1);
+  return [
+    `diff --git a/${path} b/${path}`,
+    `--- a/${path}`,
+    `+++ b/${path}`,
+    `@@ -${oldRange} +${newRange} @@`,
+    ...oldLines.map((line) => `-${line}`),
+    ...newLines.map((line) => `+${line}`),
+    "",
+  ].join("\n");
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function splitPatchLines(text: string): string[] {
+  if (text.length === 0) return [];
+  const withoutTrailingFinalNewline = text.endsWith("\n") ? text.slice(0, -1) : text;
+  return withoutTrailingFinalNewline.split("\n");
+}
+
+function formatRange(count: number, start: number): string {
+  return count === 1 ? String(start) : `${start},${count}`;
+}
+
+function isUnifiedDiff(text: string): boolean {
+  return /^diff --git [^\n]+$/m.test(text) && /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/m.test(text);
 }
 
 function isJsonText(text: string): boolean {

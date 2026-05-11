@@ -1,5 +1,6 @@
-import type { ProjectLocation } from "@/shared/contracts";
+import type { GitFileChange, ProjectLocation } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
+import { buildDiffPromptContext } from "./diffPromptContext";
 import { GitService } from "./git";
 import { buildOneShotSpec, spawnAgent } from "./oneShotSpawn";
 
@@ -11,11 +12,12 @@ const PROMPT =
   "- Scope is optional, infer from the changed files/modules if clear\n" +
   "- Use imperative mood for the description\n" +
   "- Keep the subject line under 72 characters\n" +
-  "- If the change is complex, add a blank line then a brief body (1-3 lines)\n" +
+  "- Use the changed files list as the source of truth for coverage\n" +
+  "- If multiple major areas changed, add a blank line then concise body bullets\n" +
+  "- Cover every major area; do not focus only on the largest or first diff\n" +
   "- If there are breaking changes, add a BREAKING CHANGE footer or use ! after the type\n" +
   "- Reply with only the commit message, nothing else\n\n";
 
-const MAX_DIFF_CHARS = 8000;
 const COMMIT_MESSAGE_TIMEOUT_MS = 120_000;
 
 function extractJsonResult(raw: string): string | undefined {
@@ -52,9 +54,28 @@ export function cleanCommitMessage(raw: string): string {
   return text.trim();
 }
 
-function truncateDiff(diff: string): string {
-  if (diff.length <= MAX_DIFF_CHARS) return diff;
-  return diff.slice(0, MAX_DIFF_CHARS) + "\n\n[diff truncated]";
+async function appendUntrackedDiffs(
+  gitService: GitService,
+  location: ProjectLocation,
+  diff: string,
+  files: GitFileChange[],
+): Promise<string> {
+  const untracked = files.filter((file) => file.status === "?");
+  if (untracked.length === 0) {
+    return diff;
+  }
+
+  const untrackedDiffs = await Promise.all(
+    untracked.map(async (file) => {
+      try {
+        return (await gitService.getDiff(location, file.path, false)).diff;
+      } catch {
+        return "";
+      }
+    }),
+  );
+
+  return [diff, ...untrackedDiffs].filter((entry) => entry.trim()).join("\n\n");
 }
 
 export async function generateCommitMessage(
@@ -74,15 +95,26 @@ export async function generateCommitMessage(
 
   const gitService = new GitService();
 
+  const status = await gitService.getStatus(location);
+  let source: "staged" | "unstaged" = "staged";
+  let files = status.staged;
   let diff = await gitService.getStagedDiff(location);
-  if (!diff.trim()) {
-    diff = await gitService.getAllDiff(location);
+  if (!diff.trim() && files.length === 0) {
+    source = "unstaged";
+    files = status.unstaged;
+    diff = await appendUntrackedDiffs(
+      gitService,
+      location,
+      await gitService.getAllDiff(location),
+      files,
+    );
   }
-  if (!diff.trim()) {
+  if (!diff.trim() && files.length === 0) {
     throw new Error("No changes to describe");
   }
 
-  const prompt = PROMPT + truncateDiff(diff);
+  const prompt =
+    PROMPT + buildDiffPromptContext({ diff, files, sourceLabel: `Change source: ${source}` });
   const cmd = adapter.buildOneShotCommand(effectiveModel, effort, prompt);
   if (!cmd) {
     throw new Error(`${adapter.label} does not support one-shot generation`);

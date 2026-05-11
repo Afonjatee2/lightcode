@@ -34,6 +34,7 @@ export const threadSchema = z.object({
   groupName: z.string().optional(),
   archived: z.boolean().default(false),
   done: z.boolean().default(false),
+  doneAt: z.string().min(1).optional(),
   starred: z.boolean().default(false),
   /** "terminal" → xterm-backed PTY (current default); "gui" → renderer-native chat. */
   presentationMode: threadPresentationModeSchema.optional(),

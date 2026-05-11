@@ -135,7 +135,7 @@ describe("SingleAgentSettings", () => {
     sharedSettingsState.setAgentSetting.mockReset();
   });
 
-  it("shows authenticated-as and plan metadata", () => {
+  it("renders identity metadata as a single compact summary line", () => {
     statusesState.agentStatuses = [
       makeStatus("claude", {
         label: "Claude Code",
@@ -151,23 +151,20 @@ describe("SingleAgentSettings", () => {
 
     render(<SingleAgentSettings agentKind="claude" />);
 
-    expect(screen.getByText("Authenticated as")).toBeInTheDocument();
-    expect(screen.getByText("user@example.com")).toBeInTheDocument();
-    expect(screen.getByText("Organization")).toBeInTheDocument();
-    expect(screen.getByText("Yieldmo")).toBeInTheDocument();
-    expect(screen.getByText("Plan")).toBeInTheDocument();
-    expect(screen.getByText("Team Subscription")).toBeInTheDocument();
-    expect(screen.getByText("Auth method")).toBeInTheDocument();
-    expect(screen.getByText("Claude.ai")).toBeInTheDocument();
+    expect(screen.getByText("user@example.com · Yieldmo · Team Subscription")).toBeInTheDocument();
+    // Auth method is intentionally omitted from the summary when richer
+    // identity fields are available.
+    expect(screen.queryByText("Auth method")).not.toBeInTheDocument();
+    expect(screen.queryByText("Claude.ai")).not.toBeInTheDocument();
   });
 
-  it("shows OpenCode connected providers", () => {
+  it("summarizes OpenCode connected providers on a single line", () => {
     statusesState.agentStatuses = [
       makeStatus("opencode", {
         label: "OpenCode",
         providerMetadata: {
           connectedProviders: [
-            { label: "GitHub Copilot", detail: "OAuth" },
+            { label: "Copilot", detail: "OAuth" },
             { label: "OpenAI", detail: "OAuth" },
           ],
         },
@@ -176,9 +173,19 @@ describe("SingleAgentSettings", () => {
 
     render(<SingleAgentSettings agentKind="opencode" />);
 
-    expect(screen.getByText("Connected providers")).toBeInTheDocument();
-    expect(screen.getByText("2 connected through OpenCode.")).toBeInTheDocument();
-    expect(screen.getByText("GitHub Copilot · OAuth")).toBeInTheDocument();
-    expect(screen.getByText("OpenAI · OAuth")).toBeInTheDocument();
+    expect(screen.getByText("2 providers · Copilot, OpenAI")).toBeInTheDocument();
+  });
+
+  it("falls back to the auth method when no identity is available", () => {
+    statusesState.agentStatuses = [
+      makeStatus("codex", {
+        label: "Codex",
+        providerMetadata: { authMethod: "ChatGPT" },
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="codex" />);
+
+    expect(screen.getByText("via ChatGPT")).toBeInTheDocument();
   });
 });

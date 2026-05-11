@@ -16,6 +16,7 @@ export function BottomTerminalLayout(props: {
   activeProject: Project | undefined;
   selectedTabId: string;
   activeTab: DevTerminalTab | undefined;
+  focusRequestId: number;
   markTabActive: (tabId: string) => void;
   updateTabTitle: (tabId: string, title: string) => void;
   fadeStyle: { opacity: number; transition: string };
@@ -34,6 +35,7 @@ export function BottomTerminalLayout(props: {
     activeProject,
     selectedTabId,
     activeTab,
+    focusRequestId,
     markTabActive,
     updateTabTitle,
     fadeStyle,
@@ -135,6 +137,7 @@ export function BottomTerminalLayout(props: {
           tabs={tabs}
           selectedTabId={selectedTabId}
           activeTab={activeTab}
+          focusRequestId={focusRequestId}
           markTabActive={markTabActive}
           updateTabTitle={updateTabTitle}
         />

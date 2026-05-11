@@ -42,6 +42,7 @@ export const useAppStore = create<AppStoreState>()(
           const threads = (state.threads ?? currentState.threads).map((t) => ({
             ...normalizeStoredThreadStatus(t),
             done: t.done ?? false,
+            doneAt: t.done ? (t.doneAt ?? t.updatedAt) : undefined,
           }));
           return {
             ...currentState,

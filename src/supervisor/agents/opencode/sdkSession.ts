@@ -17,6 +17,7 @@
 import { pathToFileURL } from "node:url";
 import type { Event } from "@opencode-ai/sdk/v2";
 import type {
+  AgentSlashCommand,
   ProjectLocation,
   PromptSegment,
   RuntimeEvent,
@@ -26,6 +27,7 @@ import type {
   ThreadServerRequestId,
   ThreadStatus,
 } from "@/shared/contracts";
+import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,
@@ -34,6 +36,7 @@ import {
   type StructuredSessionHandle,
   type StructuredSessionListener,
 } from "../base";
+import { mapOpenCodeSlashCommands } from "./detection";
 import { buildOpenCodePermissionRules } from "./permissionRules";
 import { acquireOpenCodeServer, type AcquiredOpenCodeServer } from "./sdkClient";
 import {
@@ -162,6 +165,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
   private activated = false;
   private disposed = false;
   private pendingRequests = new Map<ThreadServerRequestId, PendingRequest>();
+  private currentSlashCommands: AgentSlashCommand[] | undefined;
 
   private constructor(input: CreateStructuredSessionInput) {
     this.input = input;
@@ -187,6 +191,15 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
         status: "idle",
         attention: "none",
         sessionRef: createKnownSessionRef(this.sessionId),
+        ...(this.currentSlashCommands !== undefined
+          ? { slashCommands: this.currentSlashCommands }
+          : {}),
+      });
+    } else if (this.currentSlashCommands !== undefined) {
+      listener.onUpdate({
+        status: "idle",
+        attention: "none",
+        slashCommands: this.currentSlashCommands,
       });
     }
   }
@@ -222,6 +235,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       const id = existing.data?.id;
       if (!id) throw new Error("opencode session.get returned no id");
       this.sessionId = id;
+      await this.refreshSlashCommands();
       return id;
     }
 
@@ -232,6 +246,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     const id = created.data?.id;
     if (!id) throw new Error("opencode session.create returned no id");
     this.sessionId = id;
+    await this.refreshSlashCommands();
     return id;
   }
 
@@ -354,6 +369,33 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       throw new Error("OpencodeSdkSession.openThread has not completed.");
     }
     return this.sessionId;
+  }
+
+  private updateSlashCommands(commands: AgentSlashCommand[]): void {
+    if (areAgentSlashCommandsEqual(this.currentSlashCommands, commands)) {
+      return;
+    }
+    this.currentSlashCommands = commands;
+    this.listener?.onUpdate({
+      status: "idle",
+      attention: "none",
+      ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+      slashCommands: commands,
+    });
+  }
+
+  private async refreshSlashCommands(): Promise<void> {
+    const acquired = this.requireAcquired();
+    try {
+      const result = await acquired.client.command.list();
+      const commands = Array.isArray(result.data) ? mapOpenCodeSlashCommands(result.data) : [];
+      this.updateSlashCommands(commands);
+    } catch (error) {
+      console.log(
+        "[opencode] command list probe rejected, continuing: %s",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   private startEventStream(): void {

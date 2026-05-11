@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { TerminalSquare, X, Zap } from "lucide-react";
 import { toast } from "@heroui/react";
 import type {
@@ -15,10 +15,11 @@ import { getComposerControls } from "@/renderer/components/providers";
 import { getConfigNormalizer } from "@/renderer/components/providers/ProviderIcon";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { useGitStore } from "@/renderer/state/gitStore";
+import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId";
 import { PixelLoader } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useAppStore } from "@/renderer/state/appStore";
-import { filterHiddenModels } from "./threadComposerOptions";
+import { capabilitiesForPresentation, filterHiddenModels } from "./threadComposerOptions";
 import { friendlyError } from "@/shared/messages";
 import { PresentationModeTabs } from "./PresentationModeTabs";
 import { ThreadDraftComposerArea, type DraftStartInput } from "./ThreadDraftComposerArea";
@@ -38,6 +39,18 @@ function resolvePreferredAgentKind(
   }
 
   return installedAgents[0]?.kind;
+}
+
+function resolveSavedProviderDraftConfig(
+  agentKind: AgentStatus["kind"],
+  lastDraftConfig: ProjectDraftConfig | undefined,
+  providerConfigs: Record<string, ProviderDraftConfig>,
+): Partial<ProviderDraftConfig> | undefined {
+  if (lastDraftConfig?.agentKind === agentKind && lastDraftConfig.model.trim()) {
+    return lastDraftConfig;
+  }
+
+  return providerConfigs[agentKind];
 }
 
 function resolveModelValue(agent: AgentStatus, preferred?: string): string {
@@ -78,6 +91,11 @@ function resolveFastValue(agent: AgentStatus, model: string, preferred?: boolean
   return preferred === true;
 }
 
+function resolveThinkingValue(agent: AgentStatus, model: string, preferred?: boolean): boolean {
+  if (!agent.capabilities.thinkingModels?.includes(model)) return false;
+  return preferred === true;
+}
+
 function resolveModeValue(agent: AgentStatus, preferred?: string): string {
   const modes = agent.capabilities.modes;
   return preferred && modes.includes(preferred as "agent" | "plan" | "autopilot")
@@ -87,6 +105,11 @@ function resolveModeValue(agent: AgentStatus, preferred?: string): string {
 
 function normalizeOptionName(value: string): string {
   return value.trim().toLowerCase();
+}
+
+function formatEffortLabel(id: string): string {
+  if (id === "xhigh") return "Extra High";
+  return id.charAt(0).toUpperCase() + id.slice(1);
 }
 
 function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
@@ -151,26 +174,68 @@ function resolveInitialPresentationMode(
   return supported[0] ?? agent.capabilities.presentationMode ?? "gui";
 }
 
+function normalizeCursorPreferredDraft(
+  agent: AgentStatus,
+  preferred?: Partial<ProviderDraftConfig>,
+): Partial<ProviderDraftConfig> | undefined {
+  if (agent.kind !== "cursor" || !preferred?.model) {
+    return preferred;
+  }
+  if (agent.capabilities.models.some((model) => model.id === preferred.model)) {
+    return preferred;
+  }
+
+  const parsed = parseCursorModelId(preferred.model);
+  const baseModel = migrateCursorBaseId(parsed.baseId);
+  if (!agent.capabilities.models.some((model) => model.id === baseModel)) {
+    return preferred;
+  }
+
+  return {
+    ...preferred,
+    model: baseModel,
+    ...(parsed.effort && !preferred.effort ? { effort: parsed.effort } : {}),
+    fast: preferred.fast ?? parsed.fast,
+    thinking: preferred.thinking ?? parsed.thinking,
+  };
+}
+
 function resolveProviderDraftConfig(
   agent: AgentStatus,
   preferred?: Partial<ProviderDraftConfig>,
 ): ProviderDraftConfig {
-  const nextModel = resolveModelValue(agent, preferred?.model);
-  const nextEffort = resolveEffortValue(agent, nextModel, preferred?.effort);
-  const nextContext = resolveContextSizeValue(agent, nextModel, preferred?.contextSize);
-  const nextFast = resolveFastValue(agent, nextModel, preferred?.fast);
-  const nextMode = resolveModeValue(agent, preferred?.mode) as "agent" | "plan" | "autopilot";
-  const nextApproval = resolveApprovalPolicyValue(agent, preferred?.approvalPolicy);
-  const nextSandbox = resolveSandboxModeValue(agent, preferred?.sandboxMode);
+  const normalizedPreferred = normalizeCursorPreferredDraft(agent, preferred);
+  const nextModel = resolveModelValue(agent, normalizedPreferred?.model);
+  const nextEffort = resolveEffortValue(agent, nextModel, normalizedPreferred?.effort);
+  const nextContext = resolveContextSizeValue(agent, nextModel, normalizedPreferred?.contextSize);
+  const nextFast = resolveFastValue(agent, nextModel, normalizedPreferred?.fast);
+  const nextThinking = resolveThinkingValue(agent, nextModel, normalizedPreferred?.thinking);
+  const nextMode = resolveModeValue(agent, normalizedPreferred?.mode) as
+    | "agent"
+    | "plan"
+    | "autopilot";
+  const nextApproval = resolveApprovalPolicyValue(agent, normalizedPreferred?.approvalPolicy);
+  const nextSandbox = resolveSandboxModeValue(agent, normalizedPreferred?.sandboxMode);
 
   return {
     model: nextModel,
     effort: nextEffort,
     ...(nextContext ? { contextSize: nextContext } : {}),
     ...(nextFast ? { fast: nextFast } : {}),
+    ...(nextThinking ? { thinking: nextThinking } : {}),
     mode: nextMode,
     approvalPolicy: nextApproval,
     sandboxMode: nextSandbox,
+  };
+}
+
+function agentWithCapabilities(
+  agent: AgentStatus,
+  presentationMode: ThreadPresentationMode,
+): AgentStatus {
+  return {
+    ...agent,
+    capabilities: capabilitiesForPresentation(agent.capabilities, presentationMode),
   };
 }
 
@@ -224,10 +289,16 @@ export function ThreadDraftView(props: {
   } = props;
   const gitBranch = useGitStore((s) => s.statuses[project.id]?.branch);
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
+  const sharedSettingsHydrated = useSharedSettings((s) => s.sharedSettingsHydrated);
   const inFirstLaunchDiscovery = useAgentStatusesStore((s) => s.inFirstLaunchDiscovery);
 
-  const installedAgents = agentStatuses.filter(
-    (status) => status.installed && !disabledAgents.includes(status.kind),
+  // Debugging showed config-only edits were rebuilding the provider/model
+  // payload. Keep the installed-agent list stable unless the source inputs
+  // actually change.
+  const installedAgents = useMemo(
+    () =>
+      agentStatuses.filter((status) => status.installed && !disabledAgents.includes(status.kind)),
+    [agentStatuses, disabledAgents],
   );
   const preferredAgentKind = resolvePreferredAgentKind(installedAgents, lastDraftConfig);
   const [agentKind, setAgentKind] = useState<AgentStatus["kind"] | undefined>(preferredAgentKind);
@@ -240,6 +311,7 @@ export function ThreadDraftView(props: {
   const [effort, setEffort] = useState("");
   const [contextSize, setContextSize] = useState<string | undefined>(undefined);
   const [fast, setFast] = useState(false);
+  const [thinking, setThinking] = useState(false);
   const [mode, setMode] = useState<"agent" | "plan" | "autopilot">("agent");
   const [approvalPolicy, setApprovalPolicy] = useState("");
   const [sandboxMode, setSandboxMode] = useState("");
@@ -271,6 +343,10 @@ export function ThreadDraftView(props: {
   const supportsModePicker = supportsTerminalMode && supportsGuiMode;
   const [presentationMode, setPresentationMode] = useState<ThreadPresentationMode>(() =>
     resolveInitialPresentationMode(selectedAgent, lastPresentationModeByAgent),
+  );
+  const selectedAgentForConfig = useMemo(
+    () => (selectedAgent ? agentWithCapabilities(selectedAgent, presentationMode) : undefined),
+    [selectedAgent, presentationMode],
   );
   const previousPresentationAgentKindRef = useRef<AgentStatus["kind"] | undefined>(
     selectedAgent?.kind,
@@ -305,12 +381,23 @@ export function ThreadDraftView(props: {
   // --- Per-provider config memory (app-wide via shared settings) ---
   const updateProjectDraftConfig = useAppStore((s) => s.updateProjectDraftConfig);
   const setProviderConfig = useSharedSettings((s) => s.setProviderConfig);
-  const providerConfigs = useSharedSettings((s) => s.providerConfigs);
+  const effectiveAgentKindRef = useRef(effectiveAgentKind);
   const providerConfigsRef = useRef<Record<string, ProviderDraftConfig>>({});
+  const hasLocalConfigEditRef = useRef(false);
+  effectiveAgentKindRef.current = effectiveAgentKind;
   // Spread is required: the effects below mutate `providerConfigsRef.current[kind]`
   // in place to keep effort/model selections in sync mid-render. Assigning the
   // store reference directly would mutate Zustand state and skip subscribers.
-  providerConfigsRef.current = { ...providerConfigs };
+  providerConfigsRef.current = { ...useSharedSettings.getState().providerConfigs };
+
+  function persistProviderConfig(providerKind: string, config: ProviderDraftConfig) {
+    providerConfigsRef.current[providerKind] = config;
+    setProviderConfig(providerKind, config);
+  }
+
+  function persistProjectDraftConfig(draftConfig: ProjectDraftConfig) {
+    updateProjectDraftConfig(project.id, draftConfig);
+  }
 
   function handleSwitchBranch(branch: string, createNew: boolean) {
     readBridge()
@@ -347,7 +434,7 @@ export function ThreadDraftView(props: {
   }, [agentKind, effectiveAgentKind]);
 
   useEffect(() => {
-    if (!selectedAgent || !effectiveAgentKind) {
+    if (!selectedAgentForConfig || !effectiveAgentKind) {
       return;
     }
 
@@ -355,48 +442,33 @@ export function ThreadDraftView(props: {
       return;
     }
 
-    const saved = providerConfigsRef.current?.[effectiveAgentKind];
-    const preferredModel = saved?.model;
-    const preferredEffort = saved?.effort;
-    const preferredContext = saved?.contextSize;
-    const preferredFast = saved?.fast;
-    const preferredMode = saved?.mode;
-    const preferredApproval = saved?.approvalPolicy;
-    const preferredSandbox = saved?.sandboxMode;
-
-    const nextModel = resolveModelValue(selectedAgent, preferredModel);
-    const nextEffort = resolveEffortValue(selectedAgent, nextModel, preferredEffort);
-    const nextContext = resolveContextSizeValue(selectedAgent, nextModel, preferredContext);
-    const nextFast = resolveFastValue(selectedAgent, nextModel, preferredFast);
-    const nextMode = resolveModeValue(selectedAgent, preferredMode) as
-      | "agent"
-      | "plan"
-      | "autopilot";
-    const nextApproval = resolveApprovalPolicyValue(selectedAgent, preferredApproval);
-    const nextSandbox = resolveSandboxModeValue(selectedAgent, preferredSandbox);
+    const saved = resolveSavedProviderDraftConfig(
+      effectiveAgentKind,
+      lastDraftConfig,
+      providerConfigsRef.current,
+    );
+    const resolved = resolveProviderDraftConfig(selectedAgentForConfig, saved);
+    const nextModel = resolved.model;
+    const nextEffort = resolved.effort ?? "";
+    const nextContext = resolved.contextSize;
+    const nextFast = resolved.fast ?? false;
+    const nextThinking = resolved.thinking ?? false;
+    const nextMode = (resolved.mode ?? "agent") as "agent" | "plan" | "autopilot";
+    const nextApproval = resolved.approvalPolicy ?? "";
+    const nextSandbox = resolved.sandboxMode ?? "";
 
     setModel(nextModel);
     setEffort(nextEffort);
     setContextSize(nextContext);
     setFast(nextFast);
+    setThinking(nextThinking);
     setMode(nextMode);
     setApprovalPolicy(nextApproval);
     setSandboxMode(nextSandbox);
     lastAppliedAgentKindRef.current = effectiveAgentKind;
 
-    // Persist per-provider config app-wide, last-used provider per project
-    const resolved: ProviderDraftConfig = {
-      model: nextModel,
-      effort: nextEffort,
-      ...(nextContext ? { contextSize: nextContext } : {}),
-      ...(nextFast ? { fast: nextFast } : {}),
-      mode: nextMode,
-      approvalPolicy: nextApproval,
-      sandboxMode: nextSandbox,
-    };
-    if (providerConfigsRef.current) {
-      providerConfigsRef.current[effectiveAgentKind] = resolved;
-    }
+    // Persist per-provider config app-wide, last-used provider per project.
+    providerConfigsRef.current[effectiveAgentKind] = resolved;
     setProviderConfig(effectiveAgentKind, resolved);
     updateProjectDraftConfig(project.id, {
       agentKind: effectiveAgentKind,
@@ -404,6 +476,7 @@ export function ThreadDraftView(props: {
       effort: nextEffort,
       ...(nextContext ? { contextSize: nextContext } : {}),
       ...(nextFast ? { fast: nextFast } : {}),
+      ...(nextThinking ? { thinking: nextThinking } : {}),
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
@@ -411,44 +484,58 @@ export function ThreadDraftView(props: {
     });
   }, [
     effectiveAgentKind,
-    selectedAgent,
+    selectedAgentForConfig,
     project.id,
+    lastDraftConfig,
     worktreeMode,
     updateProjectDraftConfig,
     setProviderConfig,
   ]);
 
   useEffect(() => {
-    if (!selectedAgent || !effectiveAgentKind) {
+    if (!selectedAgentForConfig || !effectiveAgentKind) {
+      return;
+    }
+    if (!model) {
       return;
     }
 
-    const nextEffort = resolveEffortValue(selectedAgent, model, effort);
-    const nextContext = resolveContextSizeValue(selectedAgent, model, contextSize);
-    const nextFast = resolveFastValue(selectedAgent, model, fast);
-    if (nextEffort !== effort || nextContext !== contextSize || nextFast !== fast) {
+    const nextModel = resolveModelValue(selectedAgentForConfig, model);
+    const nextEffort = resolveEffortValue(selectedAgentForConfig, nextModel, effort);
+    const nextContext = resolveContextSizeValue(selectedAgentForConfig, nextModel, contextSize);
+    const nextFast = resolveFastValue(selectedAgentForConfig, nextModel, fast);
+    const nextThinking = resolveThinkingValue(selectedAgentForConfig, nextModel, thinking);
+    if (
+      nextModel !== model ||
+      nextEffort !== effort ||
+      nextContext !== contextSize ||
+      nextFast !== fast ||
+      nextThinking !== thinking
+    ) {
+      if (nextModel !== model) setModel(nextModel);
       if (nextEffort !== effort) setEffort(nextEffort);
       if (nextContext !== contextSize) setContextSize(nextContext);
       if (nextFast !== fast) setFast(nextFast);
+      if (nextThinking !== thinking) setThinking(nextThinking);
 
       // Persist the corrected values
       const corrected: ProviderDraftConfig = {
         ...providerConfigsRef.current?.[effectiveAgentKind],
-        model,
+        model: nextModel,
         effort: nextEffort,
         ...(nextContext ? { contextSize: nextContext } : {}),
         ...(nextFast ? { fast: nextFast } : {}),
+        ...(nextThinking ? { thinking: nextThinking } : {}),
       };
-      if (providerConfigsRef.current) {
-        providerConfigsRef.current[effectiveAgentKind] = corrected;
-      }
+      providerConfigsRef.current[effectiveAgentKind] = corrected;
       setProviderConfig(effectiveAgentKind, corrected);
       updateProjectDraftConfig(project.id, {
         agentKind: effectiveAgentKind,
-        model,
+        model: nextModel,
         effort: nextEffort,
         ...(nextContext ? { contextSize: nextContext } : {}),
         ...(nextFast ? { fast: nextFast } : {}),
+        ...(nextThinking ? { thinking: nextThinking } : {}),
         mode,
         approvalPolicy,
         sandboxMode,
@@ -459,8 +546,9 @@ export function ThreadDraftView(props: {
     effort,
     contextSize,
     fast,
+    thinking,
     model,
-    selectedAgent,
+    selectedAgentForConfig,
     effectiveAgentKind,
     mode,
     approvalPolicy,
@@ -472,28 +560,38 @@ export function ThreadDraftView(props: {
   ]);
 
   useEffect(() => {
-    if (!selectedAgent || !effectiveAgentKind) {
+    if (!sharedSettingsHydrated || hasLocalConfigEditRef.current) {
+      return;
+    }
+    if (!selectedAgentForConfig || !effectiveAgentKind) {
+      return;
+    }
+    if (lastDraftConfig?.agentKind === effectiveAgentKind && lastDraftConfig.model.trim()) {
       return;
     }
 
-    const saved = providerConfigs[effectiveAgentKind];
+    const saved = useSharedSettings.getState().providerConfigs[effectiveAgentKind];
     if (!saved) {
       return;
     }
+    providerConfigsRef.current = { ...useSharedSettings.getState().providerConfigs };
 
-    const nextModel = resolveModelValue(selectedAgent, saved.model);
-    const nextEffort = resolveEffortValue(selectedAgent, nextModel, saved.effort);
-    const nextContext = resolveContextSizeValue(selectedAgent, nextModel, saved.contextSize);
-    const nextFast = resolveFastValue(selectedAgent, nextModel, saved.fast);
-    const nextMode = resolveModeValue(selectedAgent, saved.mode) as "agent" | "plan" | "autopilot";
-    const nextApproval = resolveApprovalPolicyValue(selectedAgent, saved.approvalPolicy);
-    const nextSandbox = resolveSandboxModeValue(selectedAgent, saved.sandboxMode);
+    const resolved = resolveProviderDraftConfig(selectedAgentForConfig, saved);
+    const nextModel = resolved.model;
+    const nextEffort = resolved.effort ?? "";
+    const nextContext = resolved.contextSize;
+    const nextFast = resolved.fast ?? false;
+    const nextThinking = resolved.thinking ?? false;
+    const nextMode = (resolved.mode ?? "agent") as "agent" | "plan" | "autopilot";
+    const nextApproval = resolved.approvalPolicy ?? "";
+    const nextSandbox = resolved.sandboxMode ?? "";
 
     if (
       nextModel === model &&
       nextEffort === effort &&
       nextContext === contextSize &&
       nextFast === fast &&
+      nextThinking === thinking &&
       nextMode === mode &&
       nextApproval === approvalPolicy &&
       nextSandbox === sandboxMode
@@ -505,26 +603,18 @@ export function ThreadDraftView(props: {
     setEffort(nextEffort);
     setContextSize(nextContext);
     setFast(nextFast);
+    setThinking(nextThinking);
     setMode(nextMode);
     setApprovalPolicy(nextApproval);
     setSandboxMode(nextSandbox);
     lastAppliedAgentKindRef.current = effectiveAgentKind;
-
-    const resolved: ProviderDraftConfig = {
-      model: nextModel,
-      effort: nextEffort,
-      ...(nextContext ? { contextSize: nextContext } : {}),
-      ...(nextFast ? { fast: nextFast } : {}),
-      mode: nextMode,
-      approvalPolicy: nextApproval,
-      sandboxMode: nextSandbox,
-    };
 
     if (
       saved.model !== nextModel ||
       saved.effort !== nextEffort ||
       saved.contextSize !== nextContext ||
       saved.fast !== nextFast ||
+      saved.thinking !== nextThinking ||
       saved.mode !== nextMode ||
       saved.approvalPolicy !== nextApproval ||
       saved.sandboxMode !== nextSandbox
@@ -539,19 +629,22 @@ export function ThreadDraftView(props: {
       effort: nextEffort,
       ...(nextContext ? { contextSize: nextContext } : {}),
       ...(nextFast ? { fast: nextFast } : {}),
+      ...(nextThinking ? { thinking: nextThinking } : {}),
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
       worktreeMode,
     });
   }, [
-    providerConfigs,
-    selectedAgent,
+    sharedSettingsHydrated,
+    selectedAgentForConfig,
     effectiveAgentKind,
+    lastDraftConfig,
     model,
     effort,
     contextSize,
     fast,
+    thinking,
     mode,
     approvalPolicy,
     sandboxMode,
@@ -565,6 +658,286 @@ export function ThreadDraftView(props: {
     selectedAgent ? s.hiddenModels[selectedAgent.kind] : undefined,
   );
   const allHiddenModels = useSharedSettings((s) => s.hiddenModels);
+  const selectedAgentFilteredCapabilities = useMemo(
+    () =>
+      selectedAgentForConfig
+        ? filterHiddenModels(selectedAgentForConfig.capabilities, hiddenModelIds)
+        : undefined,
+    [selectedAgentForConfig, hiddenModelIds],
+  );
+  const providerModelProviders = useMemo(
+    () =>
+      installedAgents
+        .filter((agent) => {
+          const supported = agent.capabilities.presentationModes ?? [
+            agent.capabilities.presentationMode,
+          ];
+          return supported.includes(presentationMode);
+        })
+        .map((agent) => ({
+          kind: agent.kind,
+          label: agent.label,
+          capabilities: filterHiddenModels(
+            capabilitiesForPresentation(agent.capabilities, presentationMode),
+            allHiddenModels[agent.kind],
+          ),
+        })),
+    [installedAgents, presentationMode, allHiddenModels],
+  );
+  const selectedAgentKind = selectedAgent?.kind;
+  const factory = useMemo(
+    () => (selectedAgentKind ? getComposerControls(selectedAgentKind) : undefined),
+    [selectedAgentKind],
+  );
+  const latestConfigPatchRef = useRef<(patch: Partial<ThreadConfig>) => void>(() => undefined);
+  const latestProviderModelChangeRef = useRef<(next: { agentKind: string; model: string }) => void>(
+    () => undefined,
+  );
+  const onConfigPatch = (patch: Partial<ThreadConfig>) => {
+    if (!selectedAgentForConfig) return;
+    hasLocalConfigEditRef.current = true;
+    const resolved = resolveProviderDraftConfig(selectedAgentForConfig, {
+      model: patch.model ?? model,
+      effort: patch.effort ?? effort,
+      ...(patch.contextSize !== undefined ? { contextSize: patch.contextSize } : { contextSize }),
+      ...(patch.fast !== undefined ? { fast: patch.fast } : { fast }),
+      ...(patch.thinking !== undefined ? { thinking: patch.thinking } : { thinking }),
+      mode: patch.mode ?? mode,
+      approvalPolicy: patch.approvalPolicy ?? approvalPolicy,
+      sandboxMode: patch.sandboxMode ?? sandboxMode,
+    });
+
+    setModel(resolved.model);
+    setEffort(resolved.effort ?? "");
+    setContextSize(resolved.contextSize);
+    setFast(resolved.fast ?? false);
+    setThinking(resolved.thinking ?? false);
+    setMode((resolved.mode ?? "agent") as "agent" | "plan" | "autopilot");
+    setApprovalPolicy(resolved.approvalPolicy ?? "");
+    setSandboxMode(resolved.sandboxMode ?? "");
+
+    // Keep local state and persisted config in one transaction so menu
+    // selection animations do not receive a second delayed state update.
+    if (effectiveAgentKind) {
+      if (providerConfigsRef.current) {
+        providerConfigsRef.current[effectiveAgentKind] = resolved;
+      }
+      persistProviderConfig(effectiveAgentKind, resolved);
+      persistProjectDraftConfig({
+        agentKind: effectiveAgentKind,
+        model: resolved.model,
+        effort: resolved.effort,
+        ...(resolved.contextSize ? { contextSize: resolved.contextSize } : {}),
+        ...(resolved.fast ? { fast: resolved.fast } : {}),
+        ...(resolved.thinking ? { thinking: resolved.thinking } : {}),
+        mode: resolved.mode,
+        approvalPolicy: resolved.approvalPolicy,
+        sandboxMode: resolved.sandboxMode,
+        worktreeMode,
+      });
+    }
+  };
+  latestConfigPatchRef.current = onConfigPatch;
+
+  latestProviderModelChangeRef.current = ({ agentKind: nextKind, model: nextModel }) => {
+    if (!selectedAgent) return;
+    hasLocalConfigEditRef.current = true;
+    if (nextKind !== selectedAgent.kind) {
+      const targetAgent = installedAgents.find((agent) => agent.kind === nextKind);
+      if (!targetAgent) return;
+      const targetAgentForConfig = agentWithCapabilities(targetAgent, presentationMode);
+
+      // Snapshot current provider before switching, then attach the
+      // newly chosen model to the target provider's saved draft so
+      // resolveModelValue prefers it on the next effect run.
+      if (effectiveAgentKind) {
+        const snapshot: ProviderDraftConfig = {
+          model,
+          effort,
+          ...(contextSize ? { contextSize } : {}),
+          ...(fast ? { fast } : {}),
+          ...(thinking ? { thinking } : {}),
+          mode,
+          approvalPolicy,
+          sandboxMode,
+        };
+        persistProviderConfig(effectiveAgentKind, snapshot);
+      }
+      const targetSaved = providerConfigsRef.current[nextKind];
+      const resolved = resolveProviderDraftConfig(targetAgentForConfig, {
+        ...(targetSaved ?? {}),
+        model: nextModel,
+      });
+      persistProviderConfig(nextKind, resolved);
+      setModel(resolved.model);
+      setEffort(resolved.effort ?? "");
+      setContextSize(resolved.contextSize);
+      setFast(resolved.fast ?? false);
+      setThinking(resolved.thinking ?? false);
+      setMode((resolved.mode ?? "agent") as "agent" | "plan" | "autopilot");
+      setApprovalPolicy(resolved.approvalPolicy ?? "");
+      setSandboxMode(resolved.sandboxMode ?? "");
+      lastAppliedAgentKindRef.current = nextKind as AgentStatus["kind"];
+      setAgentKind(nextKind as AgentStatus["kind"]);
+      persistProjectDraftConfig({
+        agentKind: nextKind as AgentStatus["kind"],
+        model: resolved.model,
+        effort: resolved.effort,
+        ...(resolved.contextSize ? { contextSize: resolved.contextSize } : {}),
+        ...(resolved.fast ? { fast: resolved.fast } : {}),
+        ...(resolved.thinking ? { thinking: resolved.thinking } : {}),
+        mode: resolved.mode,
+        approvalPolicy: resolved.approvalPolicy,
+        sandboxMode: resolved.sandboxMode,
+        worktreeMode,
+      });
+    } else {
+      latestConfigPatchRef.current({ model: nextModel });
+    }
+  };
+
+  const baseDraftControls = useMemo(() => {
+    if (!selectedAgent || !selectedAgentForConfig) return [];
+    const filteredCaps = selectedAgentFilteredCapabilities ?? selectedAgentForConfig.capabilities;
+    const providers = providerModelProviders;
+    const currentEfforts = (filteredCaps.modelEfforts?.[model] ?? filteredCaps.efforts ?? []).map(
+      (id) => ({
+        id,
+        label: formatEffortLabel(id),
+      }),
+    );
+    const currentContextIds = filteredCaps.modelContextSizes?.[model];
+    const currentContextSizes = currentContextIds
+      ? (filteredCaps.contextSizes?.filter((c) => currentContextIds.includes(c.id)) ?? [])
+      : [];
+    const supportsFast = filteredCaps.fastModels?.includes(model) ?? false;
+    const supportsThinking = filteredCaps.thinkingModels?.includes(model) ?? false;
+    const ctrls: ComposerControl[] = [
+      {
+        kind: "provider-model",
+        providers,
+        currentAgentKind: selectedAgent.kind,
+        currentModel: model,
+        hideLabelOnWrap: true,
+        tier: 5,
+        onChange: (next) => latestProviderModelChangeRef.current(next),
+      },
+    ];
+    if (currentEfforts.length > 0 || currentContextSizes.length > 0 || supportsThinking) {
+      ctrls.push({
+        kind: "effort-context",
+        efforts: currentEfforts,
+        ...(effort ? { effortValue: effort } : {}),
+        onEffortChange: (value) => latestConfigPatchRef.current({ effort: value }),
+        contextSizes: currentContextSizes,
+        ...(contextSize ? { contextValue: contextSize } : {}),
+        onContextChange: (value) => latestConfigPatchRef.current({ contextSize: value }),
+        thinkingSupported: supportsThinking,
+        thinkingValue: thinking,
+        onThinkingChange: (value) => latestConfigPatchRef.current({ thinking: value }),
+        hideLabelOnWrap: true,
+        tier: 4,
+        icon:
+          currentEfforts.length > 0 ? (
+            <EffortIcon
+              className="size-4 text-foreground"
+              effort={effort}
+              efforts={currentEfforts.map((e) => e.id)}
+            />
+          ) : undefined,
+      });
+    }
+    if (supportsFast) {
+      if (presentationMode === "gui") {
+        ctrls.push({
+          kind: "toggle",
+          label: "Fast",
+          icon: <Zap className="size-3.5" />,
+          iconOnly: true,
+          fillIconOnSelect: true,
+          isSelected: fast,
+          onChange: (selected) => latestConfigPatchRef.current({ fast: selected }),
+        });
+      } else {
+        ctrls.push({
+          kind: "toggle",
+          label: "Fast",
+          icon: <Zap className="size-3.5" />,
+          fillIconOnSelect: true,
+          hideLabelOnWrap: true,
+          tier: 3,
+          isSelected: fast,
+          onChange: (selected) => latestConfigPatchRef.current({ fast: selected }),
+        });
+      }
+    }
+    return ctrls;
+  }, [
+    selectedAgent,
+    selectedAgentForConfig,
+    selectedAgentFilteredCapabilities,
+    providerModelProviders,
+    model,
+    effort,
+    contextSize,
+    fast,
+    thinking,
+    presentationMode,
+  ]);
+
+  const providerDraftControls = useMemo(() => {
+    if (!selectedAgent || !selectedAgentForConfig || !factory) return [];
+    const filteredCaps = selectedAgentFilteredCapabilities ?? selectedAgentForConfig.capabilities;
+    const controls = factory({
+      capabilities: filteredCaps,
+      config: {
+        model,
+        effort,
+        ...(contextSize ? { contextSize } : {}),
+        ...(fast ? { fast } : {}),
+        ...(thinking ? { thinking } : {}),
+        mode,
+        approvalPolicy,
+        sandboxMode,
+      },
+      isDisabled: false,
+      onConfigChange: (patch) => latestConfigPatchRef.current(patch),
+      presentationMode,
+    }).map((control) => {
+      let tier = control.tier;
+      if (tier === undefined) {
+        if (control.kind === "toggle" && (control.label === "Plan" || control.label === "Work")) {
+          tier = 2;
+        } else if (
+          (control.kind === undefined || control.kind === "toggle" || control.kind === "menu") &&
+          control.iconKind === "permission"
+        ) {
+          tier = 1;
+        }
+      }
+      return { ...control, tier };
+    });
+    return controls;
+  }, [
+    selectedAgent,
+    selectedAgentForConfig,
+    selectedAgentFilteredCapabilities,
+    factory,
+    model,
+    effort,
+    contextSize,
+    fast,
+    thinking,
+    mode,
+    approvalPolicy,
+    sandboxMode,
+    presentationMode,
+  ]);
+
+  const draftControls = useMemo(
+    () => [...baseDraftControls, ...providerDraftControls],
+    [baseDraftControls, providerDraftControls],
+  );
 
   if (!selectedAgent) {
     if (props.isDetectingAgents) {
@@ -592,46 +965,6 @@ export function ThreadDraftView(props: {
     );
   }
 
-  const factory = getComposerControls(selectedAgent.kind);
-  const onConfigPatch = (patch: Partial<ThreadConfig>) => {
-    const resolved = resolveProviderDraftConfig(selectedAgent, {
-      model: patch.model ?? model,
-      effort: patch.effort ?? effort,
-      ...(patch.contextSize !== undefined ? { contextSize: patch.contextSize } : { contextSize }),
-      ...(patch.fast !== undefined ? { fast: patch.fast } : { fast }),
-      mode: patch.mode ?? mode,
-      approvalPolicy: patch.approvalPolicy ?? approvalPolicy,
-      sandboxMode: patch.sandboxMode ?? sandboxMode,
-    });
-
-    setModel(resolved.model);
-    setEffort(resolved.effort ?? "");
-    setContextSize(resolved.contextSize);
-    setFast(resolved.fast ?? false);
-    setMode((resolved.mode ?? "agent") as "agent" | "plan" | "autopilot");
-    setApprovalPolicy(resolved.approvalPolicy ?? "");
-    setSandboxMode(resolved.sandboxMode ?? "");
-
-    // Eagerly persist per-provider config (app-wide) + project draft
-    if (effectiveAgentKind) {
-      if (providerConfigsRef.current) {
-        providerConfigsRef.current[effectiveAgentKind] = resolved;
-      }
-      setProviderConfig(effectiveAgentKind, resolved);
-      updateProjectDraftConfig(project.id, {
-        agentKind: effectiveAgentKind,
-        model: resolved.model,
-        effort: resolved.effort,
-        ...(resolved.contextSize ? { contextSize: resolved.contextSize } : {}),
-        ...(resolved.fast ? { fast: resolved.fast } : {}),
-        mode: resolved.mode,
-        approvalPolicy: resolved.approvalPolicy,
-        sandboxMode: resolved.sandboxMode,
-        worktreeMode,
-      });
-    }
-  };
-
   const alignClass =
     props.paneAlign === "right" ? "ml-auto" : props.paneAlign === "left" ? "mr-auto" : "mx-auto";
   const paddingClass = "px-2";
@@ -645,7 +978,7 @@ export function ThreadDraftView(props: {
         <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div
             ref={props.dragHandleRef}
-            className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1 ${props.dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
+            className={`lightcode-content-over-drag-region ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1 ${props.dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
           >
             <TerminalSquare className="size-3.5 shrink-0 text-muted/60" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-muted">
@@ -751,12 +1084,13 @@ export function ThreadDraftView(props: {
               : undefined;
             if (!normalizer) return;
             const patch = normalizer({
-              capabilities: selectedAgent.capabilities,
+              capabilities: capabilitiesForPresentation(selectedAgent.capabilities, next),
               config: {
                 model,
                 effort,
                 ...(contextSize ? { contextSize } : {}),
                 ...(fast ? { fast } : {}),
+                ...(thinking ? { thinking } : {}),
                 mode,
                 approvalPolicy,
                 sandboxMode,
@@ -772,166 +1106,13 @@ export function ThreadDraftView(props: {
           <ThreadDraftComposerArea
             project={project}
             selectedAgent={selectedAgent}
-            controls={(() => {
-              const filteredCaps = filterHiddenModels(selectedAgent.capabilities, hiddenModelIds);
-              // Only surface providers that support the active CLI/chat
-              // presentation; the model picker shouldn't offer agents the
-              // user can't actually run in this mode.
-              const providers = installedAgents
-                .filter((agent) => {
-                  const supported = agent.capabilities.presentationModes ?? [
-                    agent.capabilities.presentationMode,
-                  ];
-                  return supported.includes(presentationMode);
-                })
-                .map((agent) => ({
-                  kind: agent.kind,
-                  label: agent.label,
-                  capabilities: filterHiddenModels(agent.capabilities, allHiddenModels[agent.kind]),
-                }));
-              const currentEfforts = (
-                filteredCaps.modelEfforts?.[model] ??
-                filteredCaps.efforts ??
-                []
-              ).map((id) => ({
-                id,
-                label: id.charAt(0).toUpperCase() + id.slice(1),
-              }));
-              const currentContextIds = filteredCaps.modelContextSizes?.[model];
-              const currentContextSizes = currentContextIds
-                ? (filteredCaps.contextSizes?.filter((c) => currentContextIds.includes(c.id)) ?? [])
-                : [];
-              const supportsFast = filteredCaps.fastModels?.includes(model) ?? false;
-              const ctrls: ComposerControl[] = [
-                {
-                  kind: "provider-model",
-                  providers,
-                  currentAgentKind: selectedAgent.kind,
-                  currentModel: model,
-                  hideLabelOnWrap: true,
-                  onChange: ({ agentKind: nextKind, model: nextModel }) => {
-                    if (nextKind !== selectedAgent.kind) {
-                      const targetAgent = installedAgents.find((agent) => agent.kind === nextKind);
-                      if (!targetAgent) return;
-
-                      // Snapshot current provider before switching, then attach the
-                      // newly chosen model to the target provider's saved draft so
-                      // resolveModelValue prefers it on the next effect run.
-                      if (effectiveAgentKind) {
-                        const snapshot: ProviderDraftConfig = {
-                          model,
-                          effort,
-                          ...(contextSize ? { contextSize } : {}),
-                          ...(fast ? { fast } : {}),
-                          mode,
-                          approvalPolicy,
-                          sandboxMode,
-                        };
-                        if (providerConfigsRef.current) {
-                          providerConfigsRef.current[effectiveAgentKind] = snapshot;
-                        }
-                        setProviderConfig(effectiveAgentKind, snapshot);
-                      }
-                      const targetSaved = providerConfigsRef.current[nextKind];
-                      const resolved = resolveProviderDraftConfig(targetAgent, {
-                        ...(targetSaved ?? {}),
-                        model: nextModel,
-                      });
-                      providerConfigsRef.current[nextKind] = resolved;
-                      setProviderConfig(nextKind, resolved);
-                      setModel(resolved.model);
-                      setEffort(resolved.effort ?? "");
-                      setContextSize(resolved.contextSize);
-                      setFast(resolved.fast ?? false);
-                      setMode((resolved.mode ?? "agent") as "agent" | "plan" | "autopilot");
-                      setApprovalPolicy(resolved.approvalPolicy ?? "");
-                      setSandboxMode(resolved.sandboxMode ?? "");
-                      lastAppliedAgentKindRef.current = nextKind as AgentStatus["kind"];
-                      setAgentKind(nextKind as AgentStatus["kind"]);
-                      updateProjectDraftConfig(project.id, {
-                        agentKind: nextKind as AgentStatus["kind"],
-                        model: resolved.model,
-                        effort: resolved.effort,
-                        ...(resolved.contextSize ? { contextSize: resolved.contextSize } : {}),
-                        ...(resolved.fast ? { fast: resolved.fast } : {}),
-                        mode: resolved.mode,
-                        approvalPolicy: resolved.approvalPolicy,
-                        sandboxMode: resolved.sandboxMode,
-                        worktreeMode,
-                      });
-                    } else {
-                      onConfigPatch({ model: nextModel });
-                    }
-                  },
-                },
-              ];
-              if (currentEfforts.length > 0 || currentContextSizes.length > 0) {
-                ctrls.push({
-                  kind: "effort-context",
-                  efforts: currentEfforts,
-                  ...(effort ? { effortValue: effort } : {}),
-                  onEffortChange: (value) => onConfigPatch({ effort: value }),
-                  contextSizes: currentContextSizes,
-                  ...(contextSize ? { contextValue: contextSize } : {}),
-                  onContextChange: (value) => onConfigPatch({ contextSize: value }),
-                  hideLabelOnWrap: true,
-                  icon:
-                    currentEfforts.length > 0 ? (
-                      <EffortIcon
-                        className="size-4 text-foreground"
-                        effort={effort}
-                        efforts={currentEfforts.map((e) => e.id)}
-                      />
-                    ) : undefined,
-                });
-              }
-              if (supportsFast) {
-                if (presentationMode === "gui") {
-                  ctrls.push({
-                    kind: "toggle",
-                    label: "Fast",
-                    icon: <Zap className="size-3.5" />,
-                    iconOnly: true,
-                    isSelected: fast,
-                    onChange: (selected) => onConfigPatch({ fast: selected }),
-                  });
-                } else {
-                  ctrls.push({
-                    kind: "toggle",
-                    label: "Fast",
-                    icon: <Zap className="size-3.5" />,
-                    hideLabelOnWrap: true,
-                    isSelected: fast,
-                    onChange: (selected) => onConfigPatch({ fast: selected }),
-                  });
-                }
-              }
-              if (factory) {
-                ctrls.push(
-                  ...factory({
-                    capabilities: filteredCaps,
-                    config: {
-                      model,
-                      effort,
-                      ...(contextSize ? { contextSize } : {}),
-                      ...(fast ? { fast } : {}),
-                      mode,
-                      approvalPolicy,
-                      sandboxMode,
-                    },
-                    isDisabled: false,
-                    onConfigChange: onConfigPatch,
-                    presentationMode,
-                  }),
-                );
-              }
-              return ctrls;
-            })()}
+            controls={draftControls}
             config={{
               model,
               ...(effort ? { effort } : {}),
               ...(contextSize ? { contextSize } : {}),
               ...(fast ? { fast } : {}),
+              ...(thinking ? { thinking } : {}),
               ...(mode ? { mode } : {}),
               ...(approvalPolicy ? { approvalPolicy } : {}),
               ...(sandboxMode ? { sandboxMode } : {}),
@@ -942,6 +1123,7 @@ export function ThreadDraftView(props: {
             worktreeMode={worktreeMode}
             supportsModePicker={supportsModePicker}
             presentationMode={presentationMode}
+            onConfigChange={onConfigPatch}
             onWorktreeModeChange={setWorktreeMode}
             onSwitchBranch={handleSwitchBranch}
             onRememberPresentationMode={() => {

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ProjectPathRef } from "./parseProjectPathRef";
-import { AUTO_PATH_FILE_PREFIX, remarkAutolinkProjectPaths } from "./remarkAutolinkProjectPaths";
+import {
+  AUTO_PATH_FILE_HREF_PREFIX,
+  remarkAutolinkProjectPaths,
+} from "./remarkAutolinkProjectPaths";
 
 interface MdNode {
   type: string;
@@ -35,7 +38,9 @@ describe("remarkAutolinkProjectPaths", () => {
     })(tree);
 
     expect(tree.children?.[0]?.children?.[0]?.url).toBe(
-      `${AUTO_PATH_FILE_PREFIX}src/supervisor/agents/acp/session.ts:945`,
+      `${AUTO_PATH_FILE_HREF_PREFIX}${encodeURIComponent(
+        "src/supervisor/agents/acp/session.ts:945",
+      )}`,
     );
   });
 
@@ -68,7 +73,9 @@ describe("remarkAutolinkProjectPaths", () => {
     })(tree);
 
     expect(tree.children?.[0]?.children?.[1]?.url).toBe(
-      `${AUTO_PATH_FILE_PREFIX}src/renderer/components/thread/ChatPane/chatPaneSelectors.ts:157-172`,
+      `${AUTO_PATH_FILE_HREF_PREFIX}${encodeURIComponent(
+        "src/renderer/components/thread/ChatPane/chatPaneSelectors.ts:157-172",
+      )}`,
     );
   });
 });

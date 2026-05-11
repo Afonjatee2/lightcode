@@ -6,6 +6,9 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     listWslDistros: () => runtime.listWslDistros(),
     getAgentStatuses: (payload) => runtime.getAgentStatuses(payload),
     refreshAgentStatuses: (payload) => runtime.refreshAgentStatuses(payload),
+    listAcpRegistry: () => runtime.listAcpRegistry(),
+    installAcpRegistryAgent: (payload) => runtime.installAcpRegistryAgent(payload),
+    removeAcpRegistryAgent: (payload) => runtime.removeAcpRegistryAgent(payload),
     getThreadSnapshots: () => runtime.getThreadSnapshots(),
     startThread: (payload) => runtime.startThread(payload),
     sendThreadInput: (payload) => runtime.sendThreadInput(payload),
@@ -24,6 +27,10 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     subagentUnsubscribe: async (payload) => {
       runtime.subagentUnsubscribe(payload);
     },
+    createFileCheckpoint: (payload) => runtime.createFileCheckpoint(payload),
+    finalizeFileCheckpoint: (payload) => runtime.finalizeFileCheckpoint(payload),
+    listFileCheckpoints: (payload) => runtime.listFileCheckpoints(payload),
+    restoreFileCheckpoint: (payload) => runtime.restoreFileCheckpoint(payload),
     getGitStatus: (payload) => runtime.getGitStatus(payload),
     getGitDiff: (payload) => runtime.getGitDiff(payload),
     getGitDiffBatch: (payload) => runtime.getGitDiffBatch(payload),
@@ -86,8 +93,6 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     ghUpdatePrBranch: (payload) => runtime.ghUpdatePrBranch(payload),
     lspStart: (payload) => runtime.lspStart(payload),
     lspStop: (payload) => runtime.lspStop(payload),
-    lspSendMessage: async (payload) => {
-      await runtime.lspSendMessage(payload);
-    },
+    lspSendMessage: (payload) => runtime.lspSendMessage(payload),
   });
 }

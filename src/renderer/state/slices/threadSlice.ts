@@ -126,8 +126,7 @@ function appendCompletedTurnIfClosed(
     return unchanged;
   }
 
-  const itemIds = state.runtimeItemIdsByThread[threadId];
-  const anchorItemId = itemIds && itemIds.length > 0 ? (itemIds[itemIds.length - 1] ?? null) : null;
+  const anchorItemId = resolveCompletedTurnAnchorItemId(state, threadId);
 
   const record: CompletedTurnRecord = { startedAt, endedAt, anchorItemId };
   const existing = state.runtimeCompletedTurnsByThread[threadId] ?? [];
@@ -140,6 +139,25 @@ function appendCompletedTurnIfClosed(
       ? state.runtimeDirtyThreadIds
       : [...state.runtimeDirtyThreadIds, threadId],
   };
+}
+
+function resolveCompletedTurnAnchorItemId(state: AppStoreState, threadId: string): string | null {
+  const itemIds = state.runtimeItemIdsByThread[threadId];
+  if (!itemIds?.length) return null;
+
+  const items = state.runtimeItemsByIdByThread[threadId];
+  for (let idx = itemIds.length - 1; idx >= 0; idx -= 1) {
+    const itemId = itemIds[idx]!;
+    const item = items?.[itemId];
+    if (!item) return itemId;
+    // A short startup status blip can close before the provider emits any
+    // assistant/tool output. Anchoring that synthetic window to the optimistic
+    // user_message makes chat show a stale "Worked for 1s" under the prompt.
+    if (item.type === "user_message" || item.type === "plan" || item.type === "error") continue;
+    return itemId;
+  }
+
+  return null;
 }
 
 function deriveTurnTiming(
@@ -354,12 +372,22 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         }
 
         let effectiveStatus = input.status;
+        let effectiveAttention = input.attention;
         if (
           input.status === "idle" &&
           (thread.status === "working" || thread.status === "finished") &&
           !isVisible
         ) {
           effectiveStatus = "finished";
+        }
+        if (
+          input.status === "idle" &&
+          thread.presentationMode === "gui" &&
+          isThreadLiveStatus(thread.status) &&
+          resolveCompletedTurnAnchorItemId(state, thread.id) === null
+        ) {
+          effectiveStatus = thread.status;
+          effectiveAttention = thread.attention;
         }
 
         const sessionRefChanged =
@@ -386,7 +414,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
 
         if (
           thread.status === effectiveStatus &&
-          thread.attention === input.attention &&
+          thread.attention === effectiveAttention &&
           isThreadConfigEqual(thread.config, nextConfig) &&
           thread.canResumeWithConfig === input.canResumeWithConfig &&
           statusSourceMatch &&
@@ -410,7 +438,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         return {
           ...thread,
           status: effectiveStatus,
-          attention: input.attention,
+          attention: effectiveAttention,
           config: nextConfig,
           canResumeWithConfig: input.canResumeWithConfig,
           ...(input.threadStatusSource !== undefined
@@ -479,7 +507,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
 
       const now = new Date().toISOString();
       const threads = state.threads.map((t) =>
-        t.id === threadId ? { ...t, done: true, starred: false, updatedAt: now } : t,
+        t.id === threadId ? { ...t, done: true, doneAt: now, starred: false } : t,
       );
 
       let nextView = state.view;
@@ -493,10 +521,9 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
     set((state) => {
       const thread = state.threads.find((t) => t.id === threadId);
       if (!thread || !thread.done) return {};
-      const now = new Date().toISOString();
       return {
         threads: state.threads.map((t) =>
-          t.id === threadId ? { ...t, done: false, updatedAt: now } : t,
+          t.id === threadId ? { ...t, done: false, doneAt: undefined } : t,
         ),
       };
     }),
@@ -535,7 +562,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
 
       const threads = state.threads.map((t) => {
         if (!t.done || t.archived || t.starred) return t;
-        if (new Date(t.updatedAt).getTime() > cutoff) return t;
+        if (new Date(t.doneAt ?? t.updatedAt).getTime() > cutoff) return t;
         changed = true;
         return { ...t, archived: true };
       });

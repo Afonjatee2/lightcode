@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DevTerminalTab } from "@/renderer/state/devTerminalStore";
-import { XTermSurface } from "@/renderer/components/terminal/XTermSurface";
+import { XTermSurface, type XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const SPLIT_MIN_PERCENT = 15;
@@ -30,12 +30,15 @@ export function TerminalSurfaces(props: {
   tabs: DevTerminalTab[];
   selectedTabId: string;
   activeTab: DevTerminalTab | undefined;
+  focusRequestId: number;
   markTabActive: (tabId: string) => void;
   updateTabTitle: (tabId: string, title: string) => void;
 }) {
-  const { tabs, selectedTabId, activeTab, markTabActive, updateTabTitle } = props;
+  const { tabs, selectedTabId, activeTab, focusRequestId, markTabActive, updateTabTitle } = props;
   const fontSize = useSharedSettings((state) => state.terminalPanelFontSize);
   const [splitPercent, setSplitPercent] = useState(readSplitPercent);
+  const terminalRefs = useRef(new Map<string, XTermSurfaceHandle>());
+  const activeTabId = activeTab?.id;
   const containerRef = useRef<HTMLDivElement>(null);
   const firstPaneRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -59,6 +62,23 @@ export function TerminalSurfaces(props: {
       cleanupRef.current?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!activeTabId || selectedTabId === "__add__") return;
+    let frame = 0;
+    let settledFrame = 0;
+
+    frame = requestAnimationFrame(() => {
+      settledFrame = requestAnimationFrame(() => {
+        terminalRefs.current.get(selectedTabId)?.focus();
+      });
+    });
+
+    return () => {
+      if (frame !== 0) cancelAnimationFrame(frame);
+      if (settledFrame !== 0) cancelAnimationFrame(settledFrame);
+    };
+  }, [activeTabId, focusRequestId, selectedTabId]);
 
   function handleResizeStart(e: React.MouseEvent) {
     e.preventDefault();
@@ -114,6 +134,10 @@ export function TerminalSurfaces(props: {
               className={`absolute inset-0 ${tab.id === selectedTabId ? "" : "invisible"}`}
             >
               <XTermSurface
+                ref={(handle) => {
+                  if (handle) terminalRefs.current.set(tab.id, handle);
+                  else terminalRefs.current.delete(tab.id);
+                }}
                 terminalId={tab.id}
                 baseFontSize={fontSize}
                 onActivity={() => markTabActive(tab.id)}
@@ -139,6 +163,10 @@ export function TerminalSurfaces(props: {
                 className={`absolute inset-0 ${tab.id === selectedTabId ? "" : "invisible"}`}
               >
                 <XTermSurface
+                  ref={(handle) => {
+                    if (handle) terminalRefs.current.set(tab.splitId!, handle);
+                    else terminalRefs.current.delete(tab.splitId!);
+                  }}
                   terminalId={tab.splitId!}
                   baseFontSize={fontSize}
                   onActivity={() => markTabActive(tab.id)}
@@ -166,6 +194,10 @@ export function TerminalSurfaces(props: {
           className={`absolute inset-0 ${tab.id === selectedTabId ? "" : "invisible"}`}
         >
           <XTermSurface
+            ref={(handle) => {
+              if (handle) terminalRefs.current.set(tab.id, handle);
+              else terminalRefs.current.delete(tab.id);
+            }}
             terminalId={tab.id}
             baseFontSize={fontSize}
             onActivity={() => markTabActive(tab.id)}

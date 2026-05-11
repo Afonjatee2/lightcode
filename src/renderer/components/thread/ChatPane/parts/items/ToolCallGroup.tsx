@@ -18,7 +18,7 @@ import type {
   ToolCallPayload,
   WebSearchPayload,
 } from "@/shared/contracts";
-import { PixelLoader } from "@/renderer/components/common";
+import { PathDisplay, PixelLoader } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
 import {
   getRuntimeItemPayload,
@@ -27,11 +27,12 @@ import {
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { CommandOutputViewport } from "./CommandOutputViewport";
 import { isContextCompactionToolCall } from "./ContextCompaction";
-import { formatKindLabel } from "./FileChange";
+import { formatDiffSummaryLabel, formatKindVerb } from "./FileChange";
 import { isPlanProposalToolCall } from "./PlanProposal";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import {
   extractAcpArgsPart,
+  extractAcpDiffResultPart,
   extractAcpResultPart,
   extractAcpResultText,
   readAcpStringField,
@@ -45,6 +46,8 @@ interface ToolCallGroupProps {
   /** True while this group is the tail of the timeline. Drives default expand state. */
   isLive?: boolean;
 }
+
+const TOOL_CALL_GROUP_MAX_VISIBLE_ROWS = 8;
 
 export const ToolCallGroup = memo(function ToolCallGroup({
   threadId,
@@ -63,21 +66,30 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   // automatically once another item arrives after the group (isLive flips
   // false). Manual toggles still apply afterwards.
   const [isExpanded, setIsExpanded] = useState(isLive);
+  const [showAll, setShowAll] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const hasOverflowRows = items.length > TOOL_CALL_GROUP_MAX_VISIBLE_ROWS;
 
   useEffect(() => {
     if (!isLive) setIsExpanded(false);
   }, [isLive]);
 
-  // Auto-scroll to bottom when new items arrive in live mode
   useEffect(() => {
-    if (isLive && isExpanded && scrollRef.current) {
+    if (!hasOverflowRows) setShowAll(false);
+  }, [hasOverflowRows]);
+
+  // Auto-scroll to bottom when new items arrive in live mode (only relevant
+  // when the full list is scrollable; collapsed mode slices to the latest rows).
+  useEffect(() => {
+    if (isLive && isExpanded && showAll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [items.length, isLive, isExpanded]);
+  }, [items.length, isLive, isExpanded, showAll]);
 
   if (items.length === 0) return null;
   const sections = summarizeToolCalls(items);
+  const visibleItems =
+    !showAll && hasOverflowRows ? items.slice(-TOOL_CALL_GROUP_MAX_VISIBLE_ROWS) : items;
 
   return (
     <div className="w-full rounded-2xl border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1">
@@ -113,8 +125,28 @@ export const ToolCallGroup = memo(function ToolCallGroup({
         </Disclosure.Heading>
         <Disclosure.Content>
           <Disclosure.Body className="mt-0.5 border-t border-[color:var(--border)] pt-1">
-            <div ref={scrollRef} className="flex max-h-[420px] flex-col gap-1 overflow-y-auto pr-1">
-              {items.map((item) => (
+            {hasOverflowRows ? (
+              <div className="mb-1 flex justify-center">
+                <button
+                  type="button"
+                  aria-expanded={showAll}
+                  className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:bg-foreground/5 hover:text-foreground"
+                  onClick={() => {
+                    setShowAll((prev) => !prev);
+                    actions?.onContentHeightChange();
+                  }}
+                >
+                  {showAll ? "Show less" : "Show all"}
+                </button>
+              </div>
+            ) : null}
+            <div
+              ref={scrollRef}
+              className={`lightcode-tool-call-group-viewport flex flex-col gap-1 pr-1 ${
+                showAll ? "max-h-[420px] overflow-y-auto" : ""
+              }`}
+            >
+              {visibleItems.map((item) => (
                 <div key={item.id} className="animate-tool-call-enter">
                   <ToolCallInline item={item} />
                 </div>
@@ -128,6 +160,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
 });
 
 function ToolCallInline({ item }: { item: RuntimeChatItem }) {
+  const actions = useChatPaneActions();
   const [isExpanded, setIsExpanded] = useState(false);
   const row = getInlineRow(item, isExpanded);
   if (!row) return null;
@@ -154,7 +187,10 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
     <Disclosure
       className="text-[length:var(--lc-chat-font-size-command)] leading-tight"
       isExpanded={isExpanded}
-      onExpandedChange={setIsExpanded}
+      onExpandedChange={(next) => {
+        setIsExpanded(next);
+        actions?.onContentHeightChange();
+      }}
     >
       <Disclosure.Heading>
         <Disclosure.Trigger className="flex w-full min-w-0 items-center gap-1.5 py-0.5 text-left">
@@ -173,7 +209,12 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
       </Disclosure.Heading>
       <Disclosure.Content>
         <Disclosure.Body className="pb-1 pl-4 pt-1">
-          {row.bodyText ? <CommandOutputViewport text={row.bodyText} /> : null}
+          {row.bodyText ? (
+            <CommandOutputViewport
+              text={row.bodyText}
+              {...(row.bodyLanguage ? { language: row.bodyLanguage } : {})}
+            />
+          ) : null}
           <ToolCallSections sections={row.sections} />
         </Disclosure.Body>
       </Disclosure.Content>
@@ -186,14 +227,16 @@ type InlineRow = {
   title: string;
   /**
    * Optional structured title — see `ToolDisplay.parts`. When present the row
-   * keeps `prefix` fully visible and truncates `path` from the start.
+   * keeps `prefix` fully visible and truncates `path` from the start. When
+   * `filePath` is set the path renders as `<basename> <muted dir>`.
    */
-  titleParts?: { prefix: string; path: string };
+  titleParts?: { prefix: string; path: string; filePath?: boolean };
   rightLabel?: ReactNode;
   rightLabelClassName: string;
   hasDetails: boolean;
   sections: ToolCallSection[];
   bodyText?: string | undefined;
+  bodyLanguage?: "diff" | undefined;
 };
 
 function InlineRowTitle({
@@ -201,13 +244,25 @@ function InlineRowTitle({
   titleParts,
 }: {
   title: string;
-  titleParts?: { prefix: string; path: string };
+  titleParts?: { prefix: string; path: string; filePath?: boolean };
 }) {
   if (titleParts) {
     return (
       <code className="flex min-w-0 flex-1 items-baseline overflow-hidden font-mono !text-[color:var(--muted)]">
         <span className="shrink-0 whitespace-pre">{titleParts.prefix}</span>
-        <span className="lc-truncate-start flex-1">{titleParts.path}</span>
+        {titleParts.filePath ? (
+          <>
+            <span className="sr-only">{titleParts.path}</span>
+            <PathDisplay
+              className="flex-1"
+              path={titleParts.path}
+              basenameClassName="!text-[color:var(--foreground)]"
+              dirClassName="!text-[color:var(--muted)]"
+            />
+          </>
+        ) : (
+          <span className="lc-truncate-start flex-1">{titleParts.path}</span>
+        )}
       </code>
     );
   }
@@ -289,8 +344,10 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
 function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | null {
   const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
   if (!payload) return null;
+  const diffPart = extractAcpDiffResultPart(payload);
+  const diffText = diffPart.text || undefined;
   const sections: ToolCallSection[] =
-    isExpanded && (hasAuxFields(payload) || !item.streams.file_change_output)
+    isExpanded && !diffText && (hasAuxFields(payload) || !item.streams.file_change_output)
       ? [
           { label: "args", part: extractAcpArgsPart(payload) },
           { label: "result", part: extractAcpResultPart(payload) },
@@ -300,19 +357,20 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
   const rightLabel: ReactNode = isRunning ? (
     <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
   ) : payload.diffSummary ? (
-    `+${payload.diffSummary.added} -${payload.diffSummary.removed}`
+    formatDiffSummaryLabel(payload.diffSummary)
   ) : undefined;
-  const kindLabel = formatKindLabel(payload.changeKind);
+  const kindVerb = formatKindVerb(payload.changeKind);
   // ACP can emit file_change items without an extractable path (path === "").
   // Fall back to the human-readable tool title carried on the ACP payload so
   // the row stays visible inside the group instead of silently dropping out.
-  const pathOrName =
-    payload.path && payload.path.length > 0 ? payload.path : readPayloadString(payload, "name");
-  const title = pathOrName ? `${kindLabel} ${pathOrName}` : kindLabel.replace(/:$/, "");
-  const titleParts =
-    pathOrName && payload.path && payload.path.length > 0
-      ? { prefix: `${kindLabel} `, path: pathOrName }
-      : undefined;
+  const hasPath = !!payload.path && payload.path.length > 0;
+  const fallbackName = readPayloadString(payload, "name");
+  const fallbackUsable = !!fallbackName && fallbackName.toLowerCase() !== kindVerb.toLowerCase();
+  const pathOrName = hasPath ? payload.path : fallbackUsable ? fallbackName : undefined;
+  const title = pathOrName ? `${kindVerb}: ${pathOrName}` : kindVerb;
+  const titleParts = hasPath
+    ? { prefix: `${kindVerb}: `, path: payload.path, filePath: true }
+    : undefined;
   return {
     Icon: FileEdit,
     title,
@@ -321,7 +379,8 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
     rightLabelClassName: "text-[color:var(--muted)]",
     hasDetails: !!item.streams.file_change_output || hasAuxFields(payload),
     sections,
-    bodyText: isExpanded ? item.streams.file_change_output : undefined,
+    bodyText: isExpanded ? (diffText ?? item.streams.file_change_output) : undefined,
+    bodyLanguage: diffText ? "diff" : undefined,
   };
 }
 

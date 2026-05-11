@@ -1,7 +1,7 @@
 import { memo, type ReactNode } from "react";
 import { ChevronRight, CircleAlert, type LucideIcon } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
-import { PixelLoader } from "@/renderer/components/common";
+import { PathDisplay, PixelLoader } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
 import {
   getRuntimeItemPayload,
@@ -41,7 +41,16 @@ export const SubAgentToolCall = memo(function SubAgentToolCall({
       {display.parts ? (
         <code className="flex min-w-0 flex-1 items-baseline overflow-hidden font-mono text-[color:var(--muted)]">
           <span className="shrink-0 whitespace-pre">{display.parts.prefix}</span>
-          <span className="lc-truncate-start flex-1">{display.parts.path}</span>
+          {display.parts.filePath ? (
+            <PathDisplay
+              className="flex-1"
+              path={display.parts.path}
+              basenameClassName="!text-[color:var(--foreground)]"
+              dirClassName="!text-[color:var(--muted)]"
+            />
+          ) : (
+            <span className="lc-truncate-start flex-1">{display.parts.path}</span>
+          )}
         </code>
       ) : (
         <code className="block min-w-0 flex-1 truncate font-mono text-[color:var(--muted)]">

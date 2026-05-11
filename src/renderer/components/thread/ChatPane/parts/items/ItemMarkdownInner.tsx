@@ -21,7 +21,9 @@ import { normalizeHighlightLanguage } from "./languageDetect";
 import { parseProjectPathRef, type ProjectPathRef } from "./parseProjectPathRef";
 import {
   AUTO_PATH_FILE_PREFIX,
+  AUTO_PATH_FILE_HREF_PREFIX,
   AUTO_PATH_FOLDER_PREFIX,
+  AUTO_PATH_FOLDER_HREF_PREFIX,
   remarkAutolinkProjectPaths,
 } from "./remarkAutolinkProjectPaths";
 
@@ -50,6 +52,10 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
       [
         remarkAutolinkProjectPaths,
         {
+          cacheKey: JSON.stringify({
+            projectLocation: actions?.projectLocation ?? null,
+            rootNames: rootNames ? [...rootNames].sort() : null,
+          }),
           parsePathRef: (token: string) => {
             const ref = parseProjectPathRef(token, { rootNames });
             if (ref || !actions) return ref;
@@ -61,7 +67,7 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
     ],
     [actions, rootNames],
   );
-  const markdownText = normalizeShortCodeFenceClosers(text);
+  const markdownText = normalizeIncompleteProjectLinkTail(normalizeShortCodeFenceClosers(text));
   return (
     <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-li:whitespace-pre-wrap prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
       <Streamdown remarkPlugins={remarkPlugins} components={MD_COMPONENTS} parseIncompleteMarkdown>
@@ -164,8 +170,15 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
   const href = props.href?.trim() ?? "";
   if (!href) return <span>{props.children}</span>;
 
-  if (actions && href.startsWith(AUTO_PATH_FILE_PREFIX)) {
-    const rest = href.slice(AUTO_PATH_FILE_PREFIX.length);
+  if (
+    actions &&
+    (href.startsWith(AUTO_PATH_FILE_PREFIX) || href.startsWith(AUTO_PATH_FILE_HREF_PREFIX))
+  ) {
+    const rest = decodeAutoPathHref(
+      href.startsWith(AUTO_PATH_FILE_HREF_PREFIX)
+        ? href.slice(AUTO_PATH_FILE_HREF_PREFIX.length)
+        : href.slice(AUTO_PATH_FILE_PREFIX.length),
+    );
     const lineMatch = rest.match(/^(.+):(\d+)(?:-(\d+))?$/);
     const path = lineMatch ? lineMatch[1]! : rest;
     const ref: ProjectPathRef = lineMatch
@@ -178,8 +191,15 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
       : { kind: "file", path };
     return renderPathChip(ref, actions);
   }
-  if (actions && href.startsWith(AUTO_PATH_FOLDER_PREFIX)) {
-    const path = href.slice(AUTO_PATH_FOLDER_PREFIX.length);
+  if (
+    actions &&
+    (href.startsWith(AUTO_PATH_FOLDER_PREFIX) || href.startsWith(AUTO_PATH_FOLDER_HREF_PREFIX))
+  ) {
+    const path = decodeAutoPathHref(
+      href.startsWith(AUTO_PATH_FOLDER_HREF_PREFIX)
+        ? href.slice(AUTO_PATH_FOLDER_HREF_PREFIX.length)
+        : href.slice(AUTO_PATH_FOLDER_PREFIX.length),
+    );
     return renderPathChip({ kind: "folder", path }, actions);
   }
 
@@ -199,7 +219,7 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
     );
   }
   if (actions) {
-    const ref = parseProjectPathRef(href, { rootNames: actions.projectRootNames });
+    const ref = parseHrefProjectPathRef(href, actions);
     if (ref?.kind === "folder") {
       const folderPath = normalizeChatRelativePath(ref.path);
       return (
@@ -226,11 +246,39 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
       );
     }
   }
+  if (href.startsWith("/") || href.startsWith("file:")) {
+    return <span>{props.children}</span>;
+  }
   return (
     <a href={href} target="_blank" rel="noreferrer noopener">
       {props.children}
     </a>
   );
+}
+
+function decodeAutoPathHref(encoded: string): string {
+  try {
+    return decodeURIComponent(encoded);
+  } catch {
+    return encoded;
+  }
+}
+
+function normalizeIncompleteProjectLinkTail(text: string): string {
+  return text.replace(/\[([^\]\n]+)\]\((?:\/|file:[^\s)]*)?$/u, "$1");
+}
+
+function parseHrefProjectPathRef(
+  href: string,
+  actions: NonNullable<ReturnType<typeof useChatPaneActions>>,
+): ProjectPathRef | null {
+  const rootNames = actions.projectRootNames;
+  const direct = parseProjectPathRef(href, { rootNames });
+  if (direct) return direct;
+
+  const normalized = normalizeChatProjectPath(href, actions.projectLocation);
+  if (normalized === href) return null;
+  return parseProjectPathRef(normalized, { rootNames });
 }
 
 function renderPathChip(

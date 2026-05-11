@@ -5,6 +5,7 @@ import { createOpenCodeAdapter } from ".";
 import { buildOpenCodeArgs } from "./argv";
 import {
   humanizeOpenCodeModelId,
+  mapOpenCodeSlashCommands,
   parseOpenCodeProvidersList,
   humanizeOpenCodeSubProviderId,
   parseOpenCodeVerboseModels,
@@ -144,8 +145,31 @@ describe("parseOpenCodeProvidersList", () => {
 └  3 credentials`),
     ).toEqual([
       { label: "OpenCode Zen", detail: "API" },
-      { label: "GitHub Copilot", detail: "OAuth" },
+      { label: "Copilot", detail: "OAuth" },
       { label: "OpenAI", detail: "OAuth" },
+    ]);
+  });
+});
+
+describe("mapOpenCodeSlashCommands", () => {
+  it("normalizes OpenCode command-list entries to slash commands", () => {
+    expect(
+      mapOpenCodeSlashCommands([
+        {
+          name: "review",
+          description: "Review the current diff",
+          hints: ["<scope>", " --fix"],
+          template: "",
+        },
+        { name: "   ", template: "" },
+      ]),
+    ).toEqual([
+      {
+        id: "review",
+        label: "review — Review the current diff",
+        description: "Review the current diff",
+        argumentHint: "<scope> --fix",
+      },
     ]);
   });
 });
@@ -193,7 +217,7 @@ describe("humanizeOpenCodeModelId", () => {
 describe("humanizeOpenCodeSubProviderId", () => {
   it("normalizes sub-provider labels", () => {
     expect(humanizeOpenCodeSubProviderId("opencode")).toBe("OpenCode");
-    expect(humanizeOpenCodeSubProviderId("github-copilot")).toBe("GitHub Copilot");
+    expect(humanizeOpenCodeSubProviderId("github-copilot")).toBe("Copilot");
     expect(humanizeOpenCodeSubProviderId("openrouter")).toBe("OpenRouter");
   });
 });

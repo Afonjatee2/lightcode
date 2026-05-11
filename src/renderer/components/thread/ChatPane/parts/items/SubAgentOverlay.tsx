@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Button } from "@heroui/react";
 import { Bot, X } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
@@ -105,7 +105,7 @@ function SubAgentOverlayBody({ threadId, parentItemId, onClose }: SubAgentOverla
   return (
     <Shell
       title={title}
-      icon={<Icon className="size-4 shrink-0 text-[color:var(--muted)]" />}
+      icon={<Icon className="size-3.5 shrink-0 text-[color:var(--muted)]" />}
       onClose={onClose}
     >
       {isCompleted ? (
@@ -128,21 +128,30 @@ function Shell({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const titleId = useId();
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex shrink-0 items-center gap-2 border-b border-[color:var(--border)] bg-[var(--composer-surface)] px-3 py-2">
-        {icon ?? <Bot className="size-4 shrink-0 text-[color:var(--muted)]" />}
-        <h2 className="min-w-0 flex-1 truncate text-sm font-medium">{title}</h2>
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby={titleId}
+      className="flex h-full min-h-0 flex-col bg-[var(--content-background)]"
+    >
+      <div className="flex h-7 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1">
+        {icon ?? <Bot className="size-3.5 shrink-0 text-[color:var(--muted)]" />}
+        <h2 id={titleId} className="min-w-0 flex-1 truncate text-sm font-medium">
+          {title}
+        </h2>
         <Button
           isIconOnly
           variant="tertiary"
           size="sm"
+          className="rounded p-0.5 text-muted"
           aria-label="Close subagent"
           onPress={onClose}
         >
           <X className="size-3.5" />
         </Button>
-      </header>
+      </div>
       <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     </div>
   );

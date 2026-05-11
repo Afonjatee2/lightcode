@@ -1,16 +1,18 @@
 export * from "./GeminiIcon";
 
-import { ClipboardList } from "lucide-react";
 import { GeminiIcon } from "./GeminiIcon";
+import { planWorkToggle } from "../composerControlBuilders";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
   registerConflictResolverDefaults,
   registerProviderIcon,
+  registerProviderLabel,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
 
 registerProviderIcon("gemini", GeminiIcon);
+registerProviderLabel("gemini", "Gemini");
 registerCommitGenDefaults("gemini", {
   label: "Gemini",
   hint: "Flash",
@@ -30,33 +32,29 @@ registerConflictResolverDefaults("gemini", {
   effort: "",
 });
 
-registerComposerControls("gemini", ({ capabilities, config, isDisabled, onConfigChange }) => [
-  // Plan toggle
-  ...(capabilities.modes.length === 2
-    ? [
-        {
-          kind: "toggle" as const,
-          icon: <ClipboardList className="size-3.5" />,
-          label: "Plan",
-          hideLabelOnWrap: true,
-          isSelected: (config.mode ?? "agent") !== "agent",
-          isDisabled,
-          onChange: (isSelected: boolean) =>
-            onConfigChange({ mode: isSelected ? "plan" : "agent" }),
-        },
-      ]
-    : []),
-  // Approval policy (always visible if supported)
-  ...(capabilities.approvalPolicies.length > 0
-    ? [
-        {
-          iconKind: "permission" as const,
-          options: capabilities.approvalPolicies,
-          hideLabelOnWrap: true,
-          value: config.approvalPolicy ?? capabilities.approvalPolicies[0]?.id ?? "default",
-          isDisabled,
-          onChange: (value: string) => onConfigChange({ approvalPolicy: value }),
-        },
-      ]
-    : []),
-]);
+registerComposerControls("gemini", ({ capabilities, config, isDisabled, onConfigChange }) => {
+  const isPlanMode = (config.mode ?? "agent") !== "agent";
+  return [
+    ...(capabilities.modes.length === 2
+      ? [
+          planWorkToggle({
+            isPlanMode,
+            isDisabled,
+            onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
+          }),
+        ]
+      : []),
+    ...(capabilities.approvalPolicies.length > 0
+      ? [
+          {
+            iconKind: "permission" as const,
+            options: capabilities.approvalPolicies,
+            hideLabelOnWrap: true,
+            value: config.approvalPolicy ?? capabilities.approvalPolicies[0]?.id ?? "default",
+            isDisabled,
+            onChange: (value: string) => onConfigChange({ approvalPolicy: value }),
+          },
+        ]
+      : []),
+  ];
+});

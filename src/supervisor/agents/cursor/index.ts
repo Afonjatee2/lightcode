@@ -1,10 +1,14 @@
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
+import { createAcpStructuredSession } from "../acp";
 import {
+  buildAgentCommand,
   createKnownSessionRef,
   detectAgentInstall,
   type AgentAdapter,
+  type CreateStructuredSessionInput,
   type TerminalStatusHint,
 } from "../base";
+import { resolveAgentBinaryPath } from "../binaryResolver";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import { buildCursorArgs } from "./argv";
 import {
@@ -20,7 +24,13 @@ import {
 import { createCursorChatSync } from "./session";
 import { CURSOR_IDLE_RE, CURSOR_WORKING_RE, detectCursorTerminalStatus } from "./terminal";
 
-export { buildCursorProbeSpec, parseCursorModels, sortCursorModels } from "./detection";
+export {
+  buildCursorAcpModelPickerCapabilities,
+  buildCursorModelPickerCapabilities,
+  buildCursorProbeSpec,
+  parseCursorModels,
+  sortCursorModels,
+} from "./detection";
 export { detectCursorTerminalStatus } from "./terminal";
 
 const CURSOR_PLUGIN_VERSION = readBundledCursorPluginVersion();
@@ -43,7 +53,7 @@ export function createCursorAdapter(): AgentAdapter {
 
   return {
     kind: "cursor",
-    label: "Cursor CLI",
+    label: "Cursor",
     binary: "cursor-agent",
     get capabilities() {
       return capabilities;
@@ -87,6 +97,15 @@ export function createCursorAdapter(): AgentAdapter {
     },
     createInitialSessionRef() {
       return undefined;
+    },
+    async createStructuredSession(input: CreateStructuredSessionInput) {
+      const command = buildAgentCommand(
+        input.projectLocation,
+        "cursor-agent",
+        ["acp"],
+        resolveAgentBinaryPath(input.projectLocation, "cursor-agent"),
+      );
+      return createAcpStructuredSession(command, input);
     },
     buildDirectInput(prompt, _segments, _config, projectLocation) {
       // Cursor's TUI debounces fast incoming bytes as a paste burst. With

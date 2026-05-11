@@ -7,8 +7,10 @@ function AttachmentChip(props: {
   attachment: Attachment;
   onRemove?: ((id: string) => void) | undefined;
   onPreviewImage?: ((attachment: Attachment) => void) | undefined;
+  hideImageName?: boolean;
 }) {
-  const { attachment: att, onRemove, onPreviewImage } = props;
+  const { attachment: att, onRemove, onPreviewImage, hideImageName } = props;
+  const showName = !att.isImage || !hideImageName;
 
   const content = (
     <>
@@ -20,16 +22,14 @@ function AttachmentChip(props: {
           draggable={false}
         />
       ) : (
-        <>
-          <img
-            className="lightcode-attachment-chip__icon"
-            src={getEntryIconUrl(att.name, false)}
-            alt=""
-            draggable={false}
-          />
-          <span className="lightcode-attachment-chip__name">{att.name}</span>
-        </>
+        <img
+          className="lightcode-attachment-chip__icon"
+          src={getEntryIconUrl(att.name, false)}
+          alt=""
+          draggable={false}
+        />
       )}
+      {showName ? <span className="lightcode-attachment-chip__name">{att.name}</span> : null}
       {onRemove ? (
         <button
           type="button"
@@ -47,35 +47,45 @@ function AttachmentChip(props: {
     </>
   );
 
-  const className = `lightcode-attachment-chip ${att.isImage ? "lightcode-attachment-chip--image" : ""}`;
-
   if (att.isImage && onPreviewImage) {
     return (
-      <button type="button" className={className} onClick={() => onPreviewImage(att)}>
+      <button
+        type="button"
+        className="lightcode-attachment-chip"
+        onClick={() => onPreviewImage(att)}
+      >
         {content}
       </button>
     );
   }
 
-  return <div className={className}>{content}</div>;
+  return <div className="lightcode-attachment-chip">{content}</div>;
 }
 
 export function AttachmentBar(props: {
   attachments: Attachment[];
   onRemove?: ((id: string) => void) | undefined;
   onPreviewImage?: (attachment: Attachment) => void;
+  layout?: "inset" | "flush";
+  hideImageNames?: boolean;
 }) {
-  const { attachments, onRemove, onPreviewImage } = props;
+  const { attachments, onRemove, onPreviewImage, layout = "inset", hideImageNames } = props;
   if (attachments.length === 0) return null;
 
+  const className =
+    layout === "inset"
+      ? "lightcode-attachment-bar lightcode-attachment-bar--inset"
+      : "lightcode-attachment-bar";
+
   return (
-    <div className="lightcode-attachment-bar">
+    <div className={className}>
       {attachments.map((att) => (
         <AttachmentChip
           key={att.id}
           attachment={att}
           onRemove={onRemove}
           onPreviewImage={onPreviewImage}
+          {...(hideImageNames === undefined ? {} : { hideImageName: hideImageNames })}
         />
       ))}
     </div>

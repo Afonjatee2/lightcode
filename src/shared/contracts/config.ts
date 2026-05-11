@@ -6,6 +6,7 @@ const threadConfigShape = {
   effort: z.string().optional(),
   contextSize: z.string().optional(),
   fast: z.boolean().optional(),
+  thinking: z.boolean().optional(),
   mode: threadModeSchema.optional(),
   approvalPolicy: z.string().optional(),
   sandboxMode: z.string().optional(),
@@ -45,6 +46,7 @@ export function isThreadConfigEqual(
     left.effort === right.effort &&
     left.contextSize === right.contextSize &&
     left.fast === right.fast &&
+    left.thinking === right.thinking &&
     left.mode === right.mode &&
     left.approvalPolicy === right.approvalPolicy &&
     left.sandboxMode === right.sandboxMode

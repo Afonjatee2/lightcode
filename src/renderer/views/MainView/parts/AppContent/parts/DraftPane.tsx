@@ -5,7 +5,10 @@ import {
   isDetectingAgentsForLocation,
   useAgentStatusesStore,
 } from "@/renderer/state/agentStatusesStore";
-import { useProject } from "@/renderer/state/useThread";
+import {
+  useInitialProjectDraftConfig,
+  useProjectWithoutDraftConfig,
+} from "@/renderer/state/useThread";
 import { ThreadDraftView } from "@/renderer/components/thread/ThreadDraftView";
 import { useDraggable, useDroppable } from "@dnd-kit/react";
 import { useShallow } from "zustand/shallow";
@@ -32,7 +35,8 @@ export function DraftPane(props: {
     },
   ) => void;
 }) {
-  const project = useProject(props.projectId);
+  const project = useProjectWithoutDraftConfig(props.projectId);
+  const initialLastDraftConfig = useInitialProjectDraftConfig(props.projectId);
   const projectAgentStatuses = useAgentStatusesStore(
     useShallow((s) =>
       project ? getProjectAgentStatuses(project.location, s.agentStatuses, s.wslAgentStatuses) : [],
@@ -76,7 +80,7 @@ export function DraftPane(props: {
       droppableRef={paneElementRef}
       onClose={props.onClose}
       {...(props.paneCount > 1 ? { dragHandleRef: handleRef } : {})}
-      {...(project.lastDraftConfig ? { lastDraftConfig: project.lastDraftConfig } : {})}
+      {...(initialLastDraftConfig ? { lastDraftConfig: initialLastDraftConfig } : {})}
       onStart={(input) => props.onStart(project, input)}
     />
   );

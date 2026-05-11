@@ -141,4 +141,76 @@ describe("chatPaneSelectors", () => {
       { kind: "item", id: "tool-3" },
     ]);
   });
+
+  it("groups adjacent canonical file changes with other tool calls", () => {
+    const state = {
+      runtimeItemIdsByThread: {
+        t1: ["assistant-1", "edit-1", "edit-2", "command-1", "assistant-2", "edit-3"],
+      },
+      runtimeItemsByIdByThread: {
+        t1: {
+          "assistant-1": {
+            id: "assistant-1",
+            type: "assistant_message",
+            state: "completed",
+            streams: { assistant_text: "before" },
+          },
+          "edit-1": {
+            id: "edit-1",
+            type: "file_change",
+            state: "completed",
+            payload: {
+              path: "src/renderer/components/thread/ThreadComposer.tsx",
+              changeKind: "edit",
+            },
+            streams: {},
+          },
+          "edit-2": {
+            id: "edit-2",
+            type: "file_change",
+            state: "completed",
+            payload: {
+              path: "src/renderer/components/thread/ThreadComposer.tsx",
+              changeKind: "edit",
+            },
+            streams: {},
+          },
+          "command-1": {
+            id: "command-1",
+            type: "command_execution",
+            state: "completed",
+            payload: { command: "pnpm run typecheck" },
+            streams: {},
+          },
+          "assistant-2": {
+            id: "assistant-2",
+            type: "assistant_message",
+            state: "completed",
+            streams: { assistant_text: "after" },
+          },
+          "edit-3": {
+            id: "edit-3",
+            type: "file_change",
+            state: "completed",
+            payload: {
+              path: "src/renderer/components/thread/ThreadComposer.tsx",
+              changeKind: "edit",
+            },
+            streams: {},
+          },
+        },
+      },
+    } as unknown as AppStoreState;
+
+    expect(selectVisibleThreadTimelineEntries(state, "t1")).toEqual([
+      { kind: "item", id: "assistant-1" },
+      {
+        kind: "tool_call_group",
+        id: "tool-call-group:edit-1:command-1:3",
+        itemIds: ["edit-1", "edit-2", "command-1"],
+      },
+      { kind: "item", id: "assistant-2" },
+      { kind: "item", id: "edit-3" },
+    ]);
+  });
 });

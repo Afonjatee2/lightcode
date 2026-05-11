@@ -93,6 +93,13 @@ describe("sdkCanonicalMapping — text streaming", () => {
     const state = createClaudeMapperState("thread-1");
     mapClaudeSdkMessage(
       streamEvent({
+        type: "message_start",
+        message: { id: "msg_1", role: "assistant", content: [] },
+      }),
+      state,
+    );
+    mapClaudeSdkMessage(
+      streamEvent({
         type: "content_block_delta",
         index: 0,
         delta: { type: "text_delta", text: "Hello" },
@@ -105,7 +112,45 @@ describe("sdkCanonicalMapping — text streaming", () => {
       {
         type: "assistant",
         session_id: "claude-session",
-        message: { role: "assistant", content: [{ type: "text", text: "Hello" }] },
+        message: { id: "msg_1", role: "assistant", content: [{ type: "text", text: "Hello" }] },
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(snapshot).toEqual([]);
+  });
+
+  it("does not duplicate a final assistant snapshot when a replayed message_start reset the index map", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "message_start",
+        message: { id: "msg_1", role: "assistant", content: [] },
+      }),
+      state,
+    );
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "text_delta", text: "Done" },
+      }),
+      state,
+    );
+    mapClaudeSdkMessage(streamEvent({ type: "content_block_stop", index: 0 }), state);
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "message_start",
+        message: { id: "msg_1", role: "assistant", content: [] },
+      }),
+      state,
+    );
+
+    const snapshot = mapClaudeSdkMessage(
+      {
+        type: "assistant",
+        session_id: "claude-session",
+        message: { id: "msg_1", role: "assistant", content: [{ type: "text", text: "Done" }] },
       } as unknown as SDKMessage,
       state,
     );

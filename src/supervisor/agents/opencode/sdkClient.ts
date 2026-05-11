@@ -80,7 +80,7 @@ async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSna
  * Spawn (or reuse) an `opencode serve` for the given project, wait for the
  * ready URL, and return a wired-up SDK client. The local loopback server is
  * unauthenticated by design (no `OPENCODE_SERVER_PASSWORD` is set), matching
- * t3code's pattern.
+ * OpenCode's local app-server usage.
  *
  * Disposal is per-acquisition: each acquire returns its own `dispose()` that
  * decrements the refcount. The underlying server stays alive until the last

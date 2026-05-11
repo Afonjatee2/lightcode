@@ -66,7 +66,7 @@ export function clearFinishedAndDone(threads: Thread[], panes: string[]): Thread
       return {
         ...t,
         ...(t.status === "finished" ? { status: "idle" as ThreadStatus } : {}),
-        ...(t.done ? { done: false } : {}),
+        ...(t.done ? { done: false, doneAt: undefined } : {}),
       };
     }
     return t;

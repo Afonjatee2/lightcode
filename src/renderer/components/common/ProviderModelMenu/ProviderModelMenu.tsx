@@ -11,6 +11,7 @@ import { Check, ChevronDown, Search, Star } from "lucide-react";
 import { Popover, Tooltip } from "@heroui/react";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId";
 import { Button } from "../Button";
 import {
   buildProviderModelItems,
@@ -34,6 +35,7 @@ interface WindowedItemsMeta {
   modelPositionByIndex: Map<number, number>;
   firstModelId: string | null;
   stickyHeaderIndexByRow: number[];
+  stickySubHeaderIndexByRow: number[];
   itemTopByIndex: number[];
   totalHeight: number;
 }
@@ -49,6 +51,8 @@ export interface ProviderModelMenuProps {
   lockedAgentKind?: string;
   isDisabled?: boolean;
   hideLabelOnWrap?: boolean;
+  forceHideLabel?: boolean;
+  openSignal?: number;
   onChange: (next: { agentKind: string; model: string }) => void;
   onOpenChange?: (open: boolean) => void;
 }
@@ -60,6 +64,22 @@ function parseShortcutId(itemId: string): { agentKind: string; modelId: string }
   const sep = rest.indexOf(":");
   if (sep < 0) return undefined;
   return { agentKind: rest.slice(0, sep), modelId: rest.slice(sep + 1) };
+}
+
+function normalizeCurrentModelForProvider(
+  provider: ProviderModelMenuProvider | undefined,
+  modelId: string,
+): string {
+  if (!provider || provider.capabilities.models.some((model) => model.id === modelId)) {
+    return modelId;
+  }
+  if (provider.kind !== "cursor") {
+    return modelId;
+  }
+  const normalized = migrateCursorBaseId(parseCursorModelId(modelId).baseId);
+  return provider.capabilities.models.some((model) => model.id === normalized)
+    ? normalized
+    : modelId;
 }
 
 function windowedItemHeight(item: ProviderModelItem): number {
@@ -95,6 +115,18 @@ function itemTop(meta: WindowedItemsMeta, index: number): number {
   return meta.itemTopByIndex[index] ?? 0;
 }
 
+function isPrimaryHeader(
+  item: ProviderModelItem | undefined,
+): item is Extract<ProviderModelItem, { type: "header-plain" | "header-provider" }> {
+  return item?.type === "header-plain" || item?.type === "header-provider";
+}
+
+function isSubHeader(
+  item: ProviderModelItem | undefined,
+): item is Extract<ProviderModelItem, { type: "header-sub" }> {
+  return item?.type === "header-sub";
+}
+
 function getWindowedItemsMeta(items: ProviderModelItem[]): WindowedItemsMeta {
   const cached = windowedItemsMetaCache.get(items);
   if (cached) return cached;
@@ -104,9 +136,11 @@ function getWindowedItemsMeta(items: ProviderModelItem[]): WindowedItemsMeta {
   const itemIndexById = new Map<string, number>();
   const modelPositionByIndex = new Map<number, number>();
   const stickyHeaderIndexByRow: number[] = [];
+  const stickySubHeaderIndexByRow: number[] = [];
   const itemTopByIndex: number[] = [];
   let firstModelId: string | null = null;
   let currentStickyHeaderIndex = -1;
+  let currentStickySubHeaderIndex = -1;
   let totalHeight = 0;
 
   for (let index = 0; index < items.length; index += 1) {
@@ -117,6 +151,9 @@ function getWindowedItemsMeta(items: ProviderModelItem[]): WindowedItemsMeta {
 
     if (item.type === "header-plain" || item.type === "header-provider") {
       currentStickyHeaderIndex = index;
+      currentStickySubHeaderIndex = -1;
+    } else if (item.type === "header-sub") {
+      currentStickySubHeaderIndex = index;
     } else if (item.type === "model") {
       if (firstModelId === null) firstModelId = item.id;
       modelPositionByIndex.set(index, modelRowIndices.length);
@@ -124,6 +161,7 @@ function getWindowedItemsMeta(items: ProviderModelItem[]): WindowedItemsMeta {
     }
 
     stickyHeaderIndexByRow.push(currentStickyHeaderIndex);
+    stickySubHeaderIndexByRow.push(currentStickySubHeaderIndex);
     totalHeight += windowedItemHeight(item);
   }
 
@@ -134,6 +172,7 @@ function getWindowedItemsMeta(items: ProviderModelItem[]): WindowedItemsMeta {
     modelPositionByIndex,
     firstModelId,
     stickyHeaderIndexByRow,
+    stickySubHeaderIndexByRow,
     itemTopByIndex,
     totalHeight,
   };
@@ -159,6 +198,8 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
     lockedAgentKind,
     isDisabled,
     hideLabelOnWrap,
+    forceHideLabel = false,
+    openSignal,
     onChange,
     onOpenChange,
   } = props;
@@ -181,10 +222,12 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
   const latestRecentsRef = useRef(recents);
 
   const currentProvider = providers.find((p) => p.kind === currentAgentKind);
+  const effectiveCurrentModel = normalizeCurrentModelForProvider(currentProvider, currentModel);
   const currentLabel =
-    currentProvider?.capabilities.models.find((m) => m.id === currentModel)?.label ?? currentModel;
+    currentProvider?.capabilities.models.find((m) => m.id === effectiveCurrentModel)?.label ??
+    effectiveCurrentModel;
   const currentSubProvider = currentProvider
-    ? deriveSubProvider(currentModel, currentProvider.capabilities)
+    ? deriveSubProvider(effectiveCurrentModel, currentProvider.capabilities)
     : undefined;
   const currentDisplayLabel = currentSubProvider
     ? `${currentLabel} · ${currentSubProvider.label}`
@@ -204,6 +247,11 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
     setSessionRecents(undefined);
   }, [isOpen]);
 
+  useEffect(() => {
+    if (openSignal === undefined || isDisabled) return;
+    setIsOpen(true);
+  }, [openSignal, isDisabled]);
+
   function handleOpenChange(open: boolean) {
     setIsOpen(open);
     onOpenChange?.(open);
@@ -213,7 +261,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
   // this control twice for wrap measurement, so closed menus should stay as
   // cheap as a trigger label lookup.
   const deferredAgentKind = useDeferredValue(currentAgentKind);
-  const deferredModel = useDeferredValue(currentModel);
+  const deferredModel = useDeferredValue(effectiveCurrentModel);
   const sectionFavorites = isOpen ? (sessionFavorites ?? favorites) : favorites;
   const sectionRecents = isOpen ? (sessionRecents ?? recents) : recents;
   const items = isOpen
@@ -231,15 +279,15 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
 
   // Highlight the current model wherever it appears (provider section, favorites, recents).
   const selectedKeys = new Set<string>([
-    `fav:${currentAgentKind}:${currentModel}`,
-    `recent:${currentAgentKind}:${currentModel}`,
-    `model:${currentAgentKind}:${currentModel}`,
+    `fav:${currentAgentKind}:${effectiveCurrentModel}`,
+    `recent:${currentAgentKind}:${effectiveCurrentModel}`,
+    `model:${currentAgentKind}:${effectiveCurrentModel}`,
   ]);
 
   function handleSelect(itemId: string) {
     const parsed = parseShortcutId(itemId);
     if (!parsed) return;
-    if (parsed.agentKind === currentAgentKind && parsed.modelId === currentModel) {
+    if (parsed.agentKind === currentAgentKind && parsed.modelId === effectiveCurrentModel) {
       handleOpenChange(false);
       return;
     }
@@ -264,7 +312,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
       <span
         className={
           hideLabelOnWrap
-            ? "lightcode-composer-label-hideable flex min-w-0 flex-col items-start justify-center gap-0.5"
+            ? `lightcode-composer-label-hideable flex min-w-0 flex-col items-start justify-center gap-0.5${forceHideLabel ? " is-hidden" : ""}`
             : "flex min-w-0 flex-col items-start justify-center gap-0.5"
         }
       >
@@ -278,7 +326,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
       <ChevronDown
         className={
           hideLabelOnWrap
-            ? "lightcode-composer-label-hideable size-3.5 text-muted"
+            ? `lightcode-composer-label-hideable size-3.5 text-muted${forceHideLabel ? " is-hidden" : ""}`
             : "size-3.5 text-muted"
         }
       />
@@ -350,8 +398,25 @@ function WindowedProviderModelList(props: {
 }) {
   const { domIdPrefix, items, selectedKeys, scrollRef, toggleFavorite, onSelect } = props;
   const [visibleRow, setVisibleRow] = useState(0);
-  const [activeRowId, setActiveRowId] = useState<string | null>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [activeRowId, setActiveRowId] = useState<string | null>(() => {
+    const initialMeta = getWindowedItemsMeta(items);
+    const initialSelectedIndex = selectedModelIndex(selectedKeys, initialMeta);
+    return (
+      (initialSelectedIndex >= 0 ? items[initialSelectedIndex]?.id : undefined) ??
+      initialMeta.firstModelId
+    );
+  });
   const shouldAutoScrollRef = useRef(true);
+  const ignorePointerRef = useRef(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      ignorePointerRef.current = false;
+    }, 150);
+    return () => clearTimeout(timer);
+  }, []);
+
   const meta = getWindowedItemsMeta(items);
   const modelRowIndices = meta.modelRowIndices;
   const selectedIndex = selectedModelIndex(selectedKeys, meta);
@@ -374,15 +439,19 @@ function WindowedProviderModelList(props: {
     startIndex + visibleRowCount + MODEL_MENU_OVERSCAN_ROWS * 2,
   );
   const stickyHeaderIndex = meta.stickyHeaderIndexByRow[clampedVisibleRow] ?? -1;
-  const stickyHeader =
-    stickyHeaderIndex >= 0 &&
-    (items[stickyHeaderIndex]?.type === "header-plain" ||
-      items[stickyHeaderIndex]?.type === "header-provider")
-      ? items[stickyHeaderIndex]
-      : null;
-  const stickyHeaderIsRendered = stickyHeaderIndex >= startIndex && stickyHeaderIndex < endIndex;
+  const stickyHeader = items[stickyHeaderIndex];
+  const stickySubHeaderIndex = meta.stickySubHeaderIndexByRow[clampedVisibleRow] ?? -1;
+  const stickySubHeader = items[stickySubHeaderIndex];
+  const visibleItemIsPastTop = scrollTop > itemTop(meta, clampedVisibleRow);
+
   const shouldShowStickyHeader =
-    stickyHeader !== null && stickyHeaderIndex < clampedVisibleRow && !stickyHeaderIsRendered;
+    (isPrimaryHeader(stickyHeader) &&
+      (stickyHeaderIndex < clampedVisibleRow ||
+        (stickyHeaderIndex === clampedVisibleRow && visibleItemIsPastTop))) ||
+    (isSubHeader(stickySubHeader) &&
+      (stickySubHeaderIndex < clampedVisibleRow ||
+        (stickySubHeaderIndex === clampedVisibleRow && visibleItemIsPastTop)));
+
   const topSpacerHeight = itemTop(meta, startIndex);
   const bottomSpacerHeight = Math.max(0, totalHeight - itemTop(meta, endIndex));
   const visibleItems = items.slice(startIndex, endIndex);
@@ -393,6 +462,7 @@ function WindowedProviderModelList(props: {
     const maxScrollTop = Math.max(0, totalHeight - viewportHeight);
     if (element.scrollTop > maxScrollTop) {
       element.scrollTop = maxScrollTop;
+      setScrollTop(maxScrollTop);
       setVisibleRow(itemIndexAtOffset(meta, maxScrollTop));
     }
   }, [meta, scrollRef, totalHeight, viewportHeight]);
@@ -401,6 +471,7 @@ function WindowedProviderModelList(props: {
     const element = scrollRef.current;
     if (!element) return;
     element.scrollTop = 0;
+    setScrollTop(0);
     setVisibleRow(0);
     shouldAutoScrollRef.current = true;
   }, [scrollRef, meta.structureKey]);
@@ -419,12 +490,14 @@ function WindowedProviderModelList(props: {
     const viewBottom = viewTop + visibleHeight;
     if (rowTop < viewTop) {
       element.scrollTop = rowTop;
+      setScrollTop(rowTop);
       setVisibleRow(itemIndexAtOffset(meta, rowTop));
       return;
     }
     if (rowBottom > viewBottom) {
       const nextScrollTop = rowBottom - visibleHeight;
       element.scrollTop = nextScrollTop;
+      setScrollTop(nextScrollTop);
       setVisibleRow(itemIndexAtOffset(meta, nextScrollTop));
     }
   }, [activeIndex, items, meta, scrollRef, viewportHeight]);
@@ -455,6 +528,9 @@ function WindowedProviderModelList(props: {
       onScroll={(event) => {
         const nextScrollTop = event.currentTarget.scrollTop;
         const nextVisibleRow = itemIndexAtOffset(meta, nextScrollTop);
+        setScrollTop((currentScrollTop) =>
+          currentScrollTop === nextScrollTop ? currentScrollTop : nextScrollTop,
+        );
         setVisibleRow((currentVisibleRow) =>
           currentVisibleRow === nextVisibleRow ? currentVisibleRow : nextVisibleRow,
         );
@@ -508,43 +584,30 @@ function WindowedProviderModelList(props: {
         }
       }}
     >
-      {shouldShowStickyHeader ? <StickyWindowedHeader item={stickyHeader} /> : null}
+      {shouldShowStickyHeader ? (
+        <StickyWindowedHeader
+          headerItem={isPrimaryHeader(stickyHeader) ? stickyHeader : null}
+          subHeaderItem={isSubHeader(stickySubHeader) ? stickySubHeader : null}
+        />
+      ) : null}
       <div style={{ height: topSpacerHeight }} aria-hidden="true" />
       {visibleItems.map((item, visibleIndex) => {
         const itemIndex = startIndex + visibleIndex;
+        const isStickyHeaderDuplicate =
+          shouldShowStickyHeader &&
+          (itemIndex === stickyHeaderIndex || itemIndex === stickySubHeaderIndex);
+        const primaryHeaderClassName = isStickyHeaderDuplicate
+          ? "invisible mb-1"
+          : "relative z-30 mb-1";
+        const subHeaderClassName = isStickyHeaderDuplicate ? "invisible mb-1" : "mb-1";
         if (item.type === "header-plain") {
-          return (
-            <div
-              key={item.id}
-              role="presentation"
-              className="sticky top-0 z-10 mb-1 flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
-            >
-              {item.label}
-            </div>
-          );
+          return <HeaderPlain key={item.id} item={item} className={primaryHeaderClassName} />;
         }
         if (item.type === "header-provider") {
-          return (
-            <div
-              key={item.id}
-              role="presentation"
-              className="sticky top-0 z-10 mb-1 flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
-            >
-              <ProviderIcon kind={item.providerKind} tone="active" className="size-3" />
-              {item.label}
-            </div>
-          );
+          return <HeaderProvider key={item.id} item={item} className={primaryHeaderClassName} />;
         }
         if (item.type === "header-sub") {
-          return (
-            <div
-              key={item.id}
-              role="presentation"
-              className="mb-1 flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
-            >
-              {item.label}
-            </div>
-          );
+          return <HeaderSub key={item.id} item={item} className={subHeaderClassName} />;
         }
         const isSelected = selectedKeys.has(item.id);
         const isActive = itemIndex === activeIndex;
@@ -556,7 +619,10 @@ function WindowedProviderModelList(props: {
             aria-selected={isSelected}
             data-active={isActive ? "true" : undefined}
             className="lightcode-menu-item group mx-1.5 flex h-7 cursor-default items-center text-foreground"
-            onMouseEnter={() => {
+            onPointerMove={(event) => {
+              if (ignorePointerRef.current) return;
+              if (event.movementX === 0 && event.movementY === 0) return;
+              if (isActive) return;
               shouldAutoScrollRef.current = false;
               setActiveRowId(item.id);
             }}
@@ -576,15 +642,15 @@ function WindowedProviderModelList(props: {
             <span className="min-w-0 flex-1 truncate">{item.label}</span>
             {item.showProviderIcon || item.subProviderLabel ? (
               <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 text-muted/70">
+                {item.subProviderLabel ? (
+                  <span className="truncate text-[10px]">{item.subProviderLabel}</span>
+                ) : null}
                 {item.showProviderIcon ? (
                   <ProviderIcon
                     kind={item.providerKind}
                     tone="inactive"
                     className="size-3 shrink-0"
                   />
-                ) : null}
-                {item.subProviderLabel ? (
-                  <span className="truncate text-[10px]">{item.subProviderLabel}</span>
                 ) : null}
               </span>
             ) : null}
@@ -616,25 +682,85 @@ function WindowedProviderModelList(props: {
 }
 
 function StickyWindowedHeader(props: {
-  item: Extract<ProviderModelItem, { type: "header-plain" | "header-provider" }>;
+  headerItem: Extract<ProviderModelItem, { type: "header-plain" | "header-provider" }> | null;
+  subHeaderItem: Extract<ProviderModelItem, { type: "header-sub" }> | null;
 }) {
-  const { item } = props;
-  if (item.type === "header-plain") {
-    return (
-      <div
-        role="presentation"
-        className="sticky top-0 z-20 flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
-      >
-        {item.label}
-      </div>
+  const { headerItem, subHeaderItem } = props;
+  let content;
+  if (headerItem?.type === "header-plain") {
+    content = <HeaderPlain item={headerItem} />;
+  } else if (headerItem?.type === "header-provider") {
+    content = (
+      <HeaderProvider
+        item={headerItem}
+        {...(subHeaderItem?.label ? { subProviderLabel: subHeaderItem.label } : {})}
+      />
     );
+  } else if (subHeaderItem?.type === "header-sub") {
+    content = <HeaderSub item={subHeaderItem} />;
+  } else {
+    return null;
   }
+
+  return (
+    <div
+      data-sticky-windowed-header=""
+      className="sticky top-0 z-20 h-0 overflow-visible"
+      aria-hidden="true"
+    >
+      {content}
+    </div>
+  );
+}
+
+function HeaderPlain(props: {
+  item: Extract<ProviderModelItem, { type: "header-plain" }>;
+  className?: string;
+}) {
+  const { item, className = "" } = props;
   return (
     <div
       role="presentation"
-      className="sticky top-0 z-20 flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
+      className={`${className} flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80`}
+    >
+      {item.label}
+    </div>
+  );
+}
+
+function HeaderProvider(props: {
+  item: Extract<ProviderModelItem, { type: "header-provider" }>;
+  subProviderLabel?: string;
+  className?: string;
+}) {
+  const { item, subProviderLabel, className = "" } = props;
+  return (
+    <div
+      role="presentation"
+      className={`${className} flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80`}
     >
       <ProviderIcon kind={item.providerKind} tone="active" className="size-3" />
+      <span className="min-w-0 truncate">{item.label}</span>
+      {subProviderLabel ? (
+        <>
+          <span className="text-muted/55">·</span>
+          <span className="min-w-0 truncate text-muted/70">{subProviderLabel}</span>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function HeaderSub(props: {
+  item: Extract<ProviderModelItem, { type: "header-sub" }>;
+  className?: string;
+}) {
+  const { item, className = "" } = props;
+  return (
+    <div
+      role="presentation"
+      className={`${className} flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80`}
+    >
       {item.label}
     </div>
   );

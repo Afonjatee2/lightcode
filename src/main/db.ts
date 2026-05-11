@@ -50,6 +50,7 @@ export function initDatabase(dbPath: string) {
       pr_number INTEGER,
       archived INTEGER NOT NULL DEFAULT 0,
       done INTEGER NOT NULL DEFAULT 0,
+      done_at TEXT,
       sort_order INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
@@ -85,7 +86,7 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 13;
+  const SCHEMA_VERSION = 14;
 
   const storedVersion = Number(
     (
@@ -216,6 +217,13 @@ export function initDatabase(dbPath: string) {
       }
     }
 
+    if (storedVersion < 14) {
+      const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "done_at")) {
+        sqlite.exec("ALTER TABLE threads ADD COLUMN done_at TEXT");
+      }
+    }
+
     sqlite
       .prepare(
         "INSERT INTO app_state (key, value) VALUES ('schema_version', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -329,6 +337,7 @@ function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
     ...(row.groupName ? { groupName: row.groupName } : {}),
     archived: row.archived,
     done: row.done,
+    ...(row.doneAt ? { doneAt: row.doneAt } : {}),
     starred: row.starred,
     presentationMode: (row.presentationMode === "gui"
       ? "gui"
@@ -428,6 +437,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       groupName: thread.groupName ?? null,
       archived: thread.archived,
       done: thread.done,
+      doneAt: thread.doneAt ?? null,
       starred: thread.starred,
       presentationMode: thread.presentationMode ?? "terminal",
       sortOrder,
@@ -455,6 +465,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         groupName: thread.groupName ?? null,
         archived: thread.archived,
         done: thread.done,
+        doneAt: thread.doneAt ?? null,
         starred: thread.starred,
         presentationMode: thread.presentationMode ?? "terminal",
         sortOrder,

@@ -25,7 +25,7 @@ describe("sharedSettingsStore", () => {
     expect(useSharedSettings.getState().staleThreadUnloadMinutes).toBe(30);
   });
 
-  it("updates provider config when only context size and fast change", () => {
+  it("updates provider config when only context size, fast, and thinking change", () => {
     useSharedSettings.getState().setProviderConfig("claude", {
       model: "claude-opus-4-7",
       effort: "high",
@@ -39,6 +39,7 @@ describe("sharedSettingsStore", () => {
       effort: "high",
       contextSize: "200k",
       fast: true,
+      thinking: true,
       mode: "agent",
       approvalPolicy: "auto",
     });
@@ -46,6 +47,7 @@ describe("sharedSettingsStore", () => {
     expect(useSharedSettings.getState().providerConfigs.claude).toMatchObject({
       contextSize: "200k",
       fast: true,
+      thinking: true,
     });
   });
 });

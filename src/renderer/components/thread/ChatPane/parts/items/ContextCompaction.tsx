@@ -1,7 +1,6 @@
 import { memo } from "react";
 import { Surface } from "@heroui/react";
 import { Layers } from "lucide-react";
-import { PixelLoader } from "@/renderer/components/common";
 import type { ToolCallPayload } from "@/shared/contracts";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { chatMessageSurfaceClass } from "./chatMessageSurface";
@@ -18,9 +17,8 @@ export const ContextCompaction = memo(function ContextCompaction({ item }: Conte
     return (
       <Surface variant="transparent" className={chatMessageSurfaceClass}>
         <div className="inline-flex min-w-0 items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
-          <Layers className="size-3 shrink-0" />
-          <span>Compacting context</span>
-          <PixelLoader size="xxs" />
+          <Layers className="size-3 shrink-0 lightcode-compacting-icon" />
+          <span className="lightcode-thinking-text">Compacting context</span>
         </div>
       </Surface>
     );

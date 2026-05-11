@@ -9,6 +9,17 @@ describe("mapCodexNotification — turn lifecycle", () => {
     expect(state.currentTurnId).toBe("abc");
   });
 
+  it("emits turn.started with the real app-server nested turn id", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "turn/started",
+      { threadId: "x", turn: { id: "turn-real", status: "inProgress" } },
+      state,
+    );
+    expect(events).toEqual([{ type: "turn.started", threadId: "t-codex", turnId: "turn-real" }]);
+    expect(state.currentTurnId).toBe("turn-real");
+  });
+
   it("closes any open assistant item when a turn completes", () => {
     const state = createCodexMapperState("t-codex");
     mapCodexNotification("turn/started", { turnId: "t-1", threadId: "x" }, state);
@@ -208,6 +219,102 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
     expect((events[0] as { payload: Record<string, unknown> }).payload.path).toBe("src/foo.ts");
   });
 
+  it("extracts file_change path from edit tool file_path args", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "fc-edit",
+        item: {
+          id: "fc-edit",
+          type: "fileChange",
+          args: { file_path: "src/supervisor/agents/codex/canonicalMapping.ts" },
+        },
+      },
+      state,
+    );
+    expect((events[0] as { payload: Record<string, unknown> }).payload.path).toBe(
+      "src/supervisor/agents/codex/canonicalMapping.ts",
+    );
+  });
+
+  it("extracts file_change metadata from real Codex app-server changes arrays", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "fc-changes",
+        item: {
+          id: "fc-changes",
+          type: "fileChange",
+          changes: [
+            {
+              path: "/tmp/lightcode-codex-probe/probe.txt",
+              kind: { type: "update", move_path: null },
+              diff: "@@ -1 +1 @@\n-before\n+after\n",
+            },
+          ],
+          status: "inProgress",
+        },
+      },
+      state,
+    );
+
+    expect((events[0] as { payload: Record<string, unknown> }).payload).toMatchObject({
+      path: "/tmp/lightcode-codex-probe/probe.txt",
+      changeKind: "edit",
+      diffSummary: { added: 1, removed: 1 },
+      args: {
+        changes: [
+          {
+            path: "/tmp/lightcode-codex-probe/probe.txt",
+            kind: { type: "update", move_path: null },
+            diff: "@@ -1 +1 @@\n-before\n+after\n",
+          },
+        ],
+      },
+    });
+  });
+
+  it("extracts file_change path from Codex title/name fallbacks", () => {
+    const state = createCodexMapperState("t-codex");
+    const titleEvents = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "fc-title",
+        item: {
+          id: "fc-title",
+          type: "fileChange",
+          title: "src/renderer/App.tsx: render => render",
+        },
+      },
+      state,
+    );
+    expect((titleEvents[0] as { payload: Record<string, unknown> }).payload.path).toBe(
+      "src/renderer/App.tsx",
+    );
+
+    const nameEvents = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "fc-name",
+        item: {
+          id: "fc-name",
+          type: "fileChange",
+          name: "Writing to src/supervisor/agents/codex/canonicalMapping.ts",
+        },
+      },
+      state,
+    );
+    expect((nameEvents[0] as { payload: Record<string, unknown> }).payload.path).toBe(
+      "src/supervisor/agents/codex/canonicalMapping.ts",
+    );
+  });
+
   it("updates file_change path from streamed output", () => {
     const state = createCodexMapperState("t-codex");
     mapCodexNotification(
@@ -287,6 +394,82 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
       exitCode: 0,
       durationMs: 42,
     });
+  });
+
+  it("emits completed command aggregatedOutput when no output delta was observed", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "cmd-agg",
+        item: { id: "cmd-agg", type: "commandExecution", command: "pwd" },
+      },
+      state,
+    );
+
+    const events = mapCodexNotification(
+      "item/completed",
+      {
+        threadId: "x",
+        itemId: "cmd-agg",
+        item: {
+          id: "cmd-agg",
+          type: "commandExecution",
+          status: "completed",
+          aggregatedOutput: "/tmp/project\n",
+          exitCode: 0,
+        },
+      },
+      state,
+    );
+
+    expect(events.map((event) => event.type)).toEqual(["content.delta", "item.completed"]);
+    expect(events[0]).toMatchObject({
+      type: "content.delta",
+      stream: "command_output",
+      delta: "/tmp/project\n",
+    });
+  });
+
+  it("does not duplicate completed command aggregatedOutput after output deltas", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "cmd-streamed",
+        item: { id: "cmd-streamed", type: "commandExecution", command: "pwd" },
+      },
+      state,
+    );
+    mapCodexNotification(
+      "item/commandExecution/outputDelta",
+      {
+        threadId: "x",
+        itemId: "cmd-streamed",
+        delta: "/tmp/project\n",
+      },
+      state,
+    );
+
+    const events = mapCodexNotification(
+      "item/completed",
+      {
+        threadId: "x",
+        itemId: "cmd-streamed",
+        item: {
+          id: "cmd-streamed",
+          type: "commandExecution",
+          status: "completed",
+          aggregatedOutput: "/tmp/project\n",
+          exitCode: 0,
+        },
+      },
+      state,
+    );
+
+    expect(events.map((event) => event.type)).toEqual(["item.completed"]);
   });
 
   it("synthesises started+completed when only item/completed is observed", () => {

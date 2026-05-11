@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import {
+  areAgentSlashCommandsEqual,
   areAgentProviderMetadataEqual,
   type AgentStatus,
   type ProjectLocation,
@@ -50,6 +51,7 @@ function capabilitiesEqual(
   for (let i = 0; i < a.efforts.length; i++) {
     if (a.efforts[i] !== b.efforts[i]) return false;
   }
+  if (!areAgentSlashCommandsEqual(a.slashCommands, b.slashCommands)) return false;
   return true;
 }
 

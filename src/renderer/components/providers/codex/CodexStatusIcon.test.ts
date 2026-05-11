@@ -37,4 +37,15 @@ describe("getStatusTone", () => {
       }),
     ).toBe("working");
   });
+
+  it("renders done over stale runtime statuses", () => {
+    for (const status of ["idle", "finished", "working", "needs_reply", "error"] as const) {
+      expect(
+        getStatusTone({
+          done: true,
+          status,
+        }),
+      ).toBe("done");
+    }
+  });
 });

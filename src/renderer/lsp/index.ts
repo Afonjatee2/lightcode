@@ -1,5 +1,6 @@
 import type { Monaco } from "@monaco-editor/react";
 import type { ProjectLocation } from "@/shared/contracts";
+import { createLspRootUri } from "@/shared/lsp";
 import { readBridge } from "../bridge";
 import { getLanguageFromPath } from "../views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane";
 import { LspIpcTransport } from "./ipcTransport";
@@ -85,7 +86,12 @@ export class LspOrchestrator {
     }
 
     const monacoLanguages = getMonacoLanguages(languageId);
-    const providerDisposables = registerLspProviders(monaco, transport, monacoLanguages);
+    const providerDisposables = registerLspProviders(
+      monaco,
+      transport,
+      monacoLanguages,
+      createLspRootUri(projectLocation),
+    );
     const docSync = new DocumentSyncManager(transport);
 
     const session: LspSession = { transport, docSync, providerDisposables };

@@ -22,10 +22,36 @@ export function ProviderIcon(props: { kind: string; tone?: StatusTone; className
   );
 }
 
+// --- Provider label registry ---
+//
+// Each provider plugin registers its long-form display label here. Consumers
+// like the first-launch discovery screen enumerate the registry to render an
+// up-to-date list of supported agents — no central hardcoded list to update
+// when a new provider is added.
+
+const LABEL_REGISTRY = new Map<string, string>();
+
+export function registerProviderLabel(kind: string, label: string) {
+  LABEL_REGISTRY.set(kind, label);
+}
+
+export function getProviderLabel(kind: string): string | undefined {
+  return LABEL_REGISTRY.get(kind);
+}
+
+export function getRegisteredProviders(): { kind: string; label: string }[] {
+  return Array.from(LABEL_REGISTRY, ([kind, label]) => ({ kind, label }));
+}
+
 // --- Composer controls registry ---
 
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
-import type { AgentCapability, ThreadConfig, ThreadPresentationMode } from "@/shared/contracts";
+import type {
+  AgentCapability,
+  AgentSlashCommand,
+  ThreadConfig,
+  ThreadPresentationMode,
+} from "@/shared/contracts";
 
 export interface ComposerControlsInput {
   capabilities: AgentCapability;
@@ -82,6 +108,39 @@ export function getComposerControls(kind: string): ComposerControlsFactory | und
     }
     return out;
   };
+}
+
+// --- GUI slash-command registry ---
+//
+// Some providers expose a GUI-only slash-command palette (open the model
+// picker, toggle Fast, switch plan/agent). Adapters register a builder so
+// the composer can offer these autocomplete entries and route the matching
+// `/command` typed in the input to a local action without dispatching to
+// the agent process.
+
+export interface GuiSlashCommandContext {
+  hasEffort: boolean;
+  supportsFast: boolean;
+}
+
+export type LocalSlashCommandAction =
+  | { kind: "set-mode"; mode: "agent" | "plan" }
+  | { kind: "open-control"; target: "model" | "effort" }
+  | { kind: "toggle-fast" };
+
+export interface GuiSlashCommandRegistration {
+  buildCommands: (context: GuiSlashCommandContext) => readonly AgentSlashCommand[];
+  resolveLocalAction: (typedCommand: string) => LocalSlashCommandAction | null;
+}
+
+const GUI_SLASH_COMMAND_REGISTRY = new Map<string, GuiSlashCommandRegistration>();
+
+export function registerGuiSlashCommands(kind: string, registration: GuiSlashCommandRegistration) {
+  GUI_SLASH_COMMAND_REGISTRY.set(kind, registration);
+}
+
+export function getGuiSlashCommands(kind: string): GuiSlashCommandRegistration | undefined {
+  return GUI_SLASH_COMMAND_REGISTRY.get(kind);
 }
 
 // --- Config normalizer registry ---

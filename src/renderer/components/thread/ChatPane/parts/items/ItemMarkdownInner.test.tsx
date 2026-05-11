@@ -1,6 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppProvider } from "@/renderer/components/ui/provider";
+import { ChatPaneActionsContext, type ChatPaneActions } from "../../chatPaneActionsContext";
 import ItemMarkdownInner from "./ItemMarkdownInner";
 
 const { codeBlockSpy } = vi.hoisted(() => ({
@@ -85,4 +86,55 @@ describe("ItemMarkdownInner", () => {
 
     expect(container.querySelector("p")?.textContent).toBe("line 1\nline 2");
   });
+
+  it("normalizes absolute markdown link hrefs to project file chips", () => {
+    const actions = makeActions();
+
+    const { container } = render(
+      <AppProvider>
+        <ChatPaneActionsContext.Provider value={actions}>
+          <ItemMarkdownInner
+            text={
+              "Changed [styles.css](/Users/serhiivecherenko/work/lightcode/src/renderer/styles.css)"
+            }
+          />
+        </ChatPaneActionsContext.Provider>
+      </AppProvider>,
+    );
+
+    const chip = screen.getByRole("button", { name: /styles\.css/ });
+    expect(chip).toHaveAttribute("title", "src/renderer/styles.css");
+    expect(container.querySelector('a[href^="/Users/"]')).toBeNull();
+
+    fireEvent.click(chip);
+    expect(actions.openProjectRelativePath).toHaveBeenCalledWith(
+      "src/renderer/styles.css",
+      undefined,
+    );
+  });
+
+  it("does not render incomplete absolute markdown hrefs as browser links", () => {
+    const { container } = render(
+      <AppProvider>
+        <ChatPaneActionsContext.Provider value={makeActions()}>
+          <ItemMarkdownInner text={"Changed [styles.css](/"} />
+        </ChatPaneActionsContext.Provider>
+      </AppProvider>,
+    );
+
+    expect(container.querySelector('a[href="/"]')).toBeNull();
+    expect(container).toHaveTextContent("Changed styles.css");
+    expect(screen.queryByText(/\[blocked\]/)).not.toBeInTheDocument();
+  });
 });
+
+function makeActions(): ChatPaneActions {
+  return {
+    openProjectRelativePath: vi.fn<(path: string, lineNumber?: number) => void>(),
+    revealProjectFolderInTree: vi.fn<(path: string) => void>(),
+    showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
+    onContentHeightChange: vi.fn<() => void>(),
+    projectLocation: { kind: "posix", path: "/Users/serhiivecherenko/work/lightcode" },
+    projectRootNames: new Set(["src"]),
+  };
+}

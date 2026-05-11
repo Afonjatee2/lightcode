@@ -13,6 +13,7 @@ import type {
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 
 import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
+import { captureFileCheckpoint } from "@/renderer/state/fileCheckpointActions";
 import { TuxIcon } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
@@ -44,6 +45,8 @@ function formatLaunchError(error: unknown): string {
 }
 
 function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): boolean {
+  const configAffectsLaunch =
+    prev.pendingLaunchPrompt !== undefined || next.pendingLaunchPrompt !== undefined;
   return (
     prev.thread.id === next.thread.id &&
     prev.thread.projectId === next.thread.projectId &&
@@ -55,7 +58,7 @@ function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): 
     prev.thread.done === next.thread.done &&
     prev.thread.canResumeWithConfig === next.thread.canResumeWithConfig &&
     prev.thread.sessionRef?.providerSessionId === next.thread.sessionRef?.providerSessionId &&
-    prev.thread.config === next.thread.config &&
+    (!configAffectsLaunch || prev.thread.config === next.thread.config) &&
     prev.agentStatus === next.agentStatus &&
     prev.projectLocation === next.projectLocation &&
     prev.projectName === next.projectName &&
@@ -234,8 +237,15 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
       });
     }
 
-    void readBridge()
-      .startThread({
+    void (async () => {
+      if (optimisticUserMessageItemId) {
+        await captureFileCheckpoint({
+          threadId: thread.id,
+          checkpointItemId: optimisticUserMessageItemId,
+          projectLocation,
+        });
+      }
+      await readBridge().startThread({
         threadId: thread.id,
         projectLocation,
         agentKind: thread.agentKind,
@@ -247,11 +257,11 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
         ...(thread.presentationMode ? { presentationMode: thread.presentationMode } : {}),
         ...(optimisticUserMessageItemId ? { userMessageItemId: optimisticUserMessageItemId } : {}),
-      })
-      .catch((error) => {
-        launchRequestRef.current = null;
-        onLaunchFailed?.(formatLaunchError(error));
       });
+    })().catch((error) => {
+      launchRequestRef.current = null;
+      onLaunchFailed?.(formatLaunchError(error));
+    });
   }, [
     onLaunchConsumed,
     onLaunchFailed,
@@ -279,7 +289,9 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
       >
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
         <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
-          <div className={`${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}>
+          <div
+            className={`lightcode-content-over-drag-region ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
+          >
             <ThreadHeaderStatusButton
               threadId={thread.id}
               fallbackThread={thread}

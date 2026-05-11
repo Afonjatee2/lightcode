@@ -10,6 +10,7 @@ import type {
   ThreadServerRequestId,
 } from "@/shared/contracts";
 import { ProviderModelMenuProvider, BranchSelector, type BranchSelection, Button } from "../common";
+import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId";
 import { AttachmentBar, ImageLightbox, MentionInput, useAttachments } from "../composer";
 import type { MentionInputHandle } from "../composer";
 import { flattenSegments } from "../composer/serializeMentions";
@@ -20,6 +21,8 @@ import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/a
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
+import { ActiveSubAgentTile } from "./ChatPane/parts/items/ActiveSubAgentTile";
+import { selectActiveSubAgentParentItemIds } from "./ChatPane/chatPaneSelectors";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import { ThreadErrorDock } from "./ThreadErrorDock";
@@ -27,11 +30,54 @@ import { ThreadPendingSteerStrip } from "./ThreadPendingSteerStrip";
 import { ThreadRuntimeRequestPanel } from "./ThreadRuntimeRequestPanel";
 import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 import { ThreadTodoDock } from "./ThreadTodoDock";
-import { filterHiddenModels } from "./threadComposerOptions";
-import { filterSlashCommands, resolveAvailableSlashCommands } from "./threadSlashCommands";
+import { capabilitiesForPresentation, filterHiddenModels } from "./threadComposerOptions";
+import {
+  filterSlashCommands,
+  resolveAvailableSlashCommands,
+  resolveLocalSlashCommandAction,
+} from "./threadSlashCommands";
 import type { ThreadErrorDockState } from "./threadErrorState";
 import type { ThreadTodoDockState } from "./threadTodoState";
 import type { TerminalPaneHandle } from "./TerminalPane";
+
+function normalizeCursorComposerConfig(
+  agentKind: string,
+  config: ThreadConfig,
+  capabilities: AgentStatus["capabilities"],
+): ThreadConfig {
+  if (agentKind !== "cursor" || capabilities.models.some((model) => model.id === config.model)) {
+    return config;
+  }
+
+  const parsed = parseCursorModelId(config.model);
+  const baseModel = migrateCursorBaseId(parsed.baseId);
+  if (!capabilities.models.some((model) => model.id === baseModel)) {
+    const fallback = capabilities.models[0]?.id;
+    return fallback
+      ? {
+          ...config,
+          model: fallback,
+          effort: undefined,
+          contextSize: undefined,
+          fast: false,
+          thinking: false,
+        }
+      : config;
+  }
+
+  return {
+    ...config,
+    model: baseModel,
+    ...(parsed.effort && !config.effort ? { effort: parsed.effort } : {}),
+    fast: config.fast ?? parsed.fast,
+    thinking: config.thinking ?? parsed.thinking,
+  };
+}
+
+function formatEffortLabel(id: string): string {
+  if (id === "xhigh") return "Extra High";
+  return id.charAt(0).toUpperCase() + id.slice(1);
+}
 
 function buildControls(
   thread: Thread,
@@ -45,9 +91,19 @@ function buildControls(
   if (isCliThread) return [];
   if (!agentStatus) return [];
 
-  const filteredCaps = filterHiddenModels(agentStatus.capabilities, hiddenModelIds);
+  const presentationCapabilities = capabilitiesForPresentation(
+    agentStatus.capabilities,
+    presentationMode,
+  );
+  const filteredCaps = filterHiddenModels(presentationCapabilities, hiddenModelIds);
+  const effectiveConfig = normalizeCursorComposerConfig(
+    thread.agentKind,
+    thread.config,
+    filteredCaps,
+  );
   const isDisabled = !thread.canResumeWithConfig;
-  const onPatch = (patch: Partial<ThreadConfig>) => onConfigChange({ ...thread.config, ...patch });
+  const onPatch = (patch: Partial<ThreadConfig>) =>
+    onConfigChange({ ...thread.config, ...effectiveConfig, ...patch });
   const provider: ProviderModelMenuProvider = {
     kind: thread.agentKind,
     label: agentStatus.label,
@@ -55,65 +111,72 @@ function buildControls(
   };
 
   const efforts = (
-    filteredCaps.modelEfforts?.[thread.config.model] ??
+    filteredCaps.modelEfforts?.[effectiveConfig.model] ??
     filteredCaps.efforts ??
     []
   ).map((id) => ({
     id,
-    label: id.charAt(0).toUpperCase() + id.slice(1),
+    label: formatEffortLabel(id),
   }));
-  const modelContext = filteredCaps.modelContextSizes?.[thread.config.model];
+  const modelContext = filteredCaps.modelContextSizes?.[effectiveConfig.model];
   const contextSizes =
     (modelContext
       ? filteredCaps.contextSizes?.filter((c) => modelContext.includes(c.id))
       : undefined) ?? [];
-  const supportsFast = filteredCaps.fastModels?.includes(thread.config.model) ?? false;
+  const supportsFast = filteredCaps.fastModels?.includes(effectiveConfig.model) ?? false;
+  const supportsThinking = filteredCaps.thinkingModels?.includes(effectiveConfig.model) ?? false;
 
   const controls: ComposerControl[] = [
     {
       kind: "provider-model",
       providers: [provider],
       currentAgentKind: thread.agentKind,
-      currentModel: thread.config.model,
+      currentModel: effectiveConfig.model,
       lockedAgentKind: thread.agentKind,
       isDisabled,
       hideLabelOnWrap: true,
+      tier: 5,
       onChange: ({ model }) => {
         const nextEfforts = filteredCaps.modelEfforts?.[model] ?? filteredCaps.efforts ?? [];
-        const effortValid = thread.config.effort
-          ? nextEfforts.includes(thread.config.effort)
+        const effortValid = effectiveConfig.effort
+          ? nextEfforts.includes(effectiveConfig.effort)
           : true;
         const nextContextIds = filteredCaps.modelContextSizes?.[model];
         const contextValid =
-          !thread.config.contextSize ||
-          (nextContextIds ? nextContextIds.includes(thread.config.contextSize) : false);
+          !effectiveConfig.contextSize ||
+          (nextContextIds ? nextContextIds.includes(effectiveConfig.contextSize) : false);
         const nextContextDefault = nextContextIds?.[0] ?? filteredCaps.defaultContextSize;
         onPatch({
           model,
           ...(!effortValid && nextEfforts.length > 0 ? { effort: nextEfforts[0] } : {}),
           ...(!contextValid && nextContextDefault ? { contextSize: nextContextDefault } : {}),
           ...(filteredCaps.fastModels?.includes(model) ? {} : { fast: false }),
+          ...(filteredCaps.thinkingModels?.includes(model) ? {} : { thinking: false }),
         });
       },
     },
   ];
 
-  if (efforts.length > 0 || contextSizes.length > 0) {
+  if (efforts.length > 0 || contextSizes.length > 0 || supportsThinking) {
     controls.push({
       kind: "effort-context",
       efforts,
-      ...(thread.config.effort ? { effortValue: thread.config.effort } : {}),
+      ...(effectiveConfig.effort ? { effortValue: effectiveConfig.effort } : {}),
       onEffortChange: (value) => onPatch({ effort: value }),
       contextSizes,
-      ...(thread.config.contextSize ? { contextValue: thread.config.contextSize } : {}),
+      ...(effectiveConfig.contextSize ? { contextValue: effectiveConfig.contextSize } : {}),
       onContextChange: (value) => onPatch({ contextSize: value }),
+      thinkingSupported: supportsThinking,
+      thinkingValue: effectiveConfig.thinking === true,
+      onThinkingChange: (value) => onPatch({ thinking: value }),
       isDisabled,
       hideLabelOnWrap: true,
+      tier: 4,
       icon:
         efforts.length > 0 ? (
           <EffortIcon
             className="size-4 text-foreground"
-            effort={thread.config.effort ?? ""}
+            effort={effectiveConfig.effort ?? ""}
             efforts={efforts.map((e) => e.id)}
           />
         ) : undefined,
@@ -126,21 +189,39 @@ function buildControls(
       label: "Fast",
       icon: <Zap className="size-3.5" />,
       iconOnly: true,
-      isSelected: thread.config.fast === true,
+      fillIconOnSelect: true,
+      isSelected: effectiveConfig.fast === true,
       isDisabled,
+      tier: 3,
       onChange: (selected) => onPatch({ fast: selected }),
     });
   }
 
   const factory = getComposerControls(thread.agentKind);
   if (factory) {
+    const providerControls = factory({
+      capabilities: filteredCaps,
+      config: thread.config,
+      isDisabled,
+      onConfigChange: onPatch,
+      presentationMode,
+    });
+
     controls.push(
-      ...factory({
-        capabilities: filteredCaps,
-        config: thread.config,
-        isDisabled,
-        onConfigChange: onPatch,
-        presentationMode,
+      ...providerControls.map((c) => {
+        // Assign tiers to provider-specific controls
+        let tier = c.tier;
+        if (tier === undefined) {
+          if (c.kind === "toggle" && (c.label === "Plan" || c.label === "Work")) {
+            tier = 2;
+          } else if (
+            (c.kind === undefined || c.kind === "toggle" || c.kind === "menu") &&
+            c.iconKind === "permission"
+          ) {
+            tier = 1;
+          }
+        }
+        return { ...c, tier };
       }),
     );
   }
@@ -198,6 +279,10 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const attachments = useAttachments();
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
+  const [controlOpenRequest, setControlOpenRequest] = useState<{
+    target: "model" | "effort";
+    nonce: number;
+  } | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const imageAttachments = attachments.attachments.filter((a) => a.isImage);
   const presentationMode =
@@ -206,6 +291,17 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const availableCommands = resolveAvailableSlashCommands(
     thread.slashCommands,
     agentStatus?.capabilities.slashCommands,
+    {
+      agentKind: thread.agentKind,
+      presentationMode,
+      hasEffort:
+        ((
+          agentStatus?.capabilities.modelEfforts?.[thread.config.model] ??
+          agentStatus?.capabilities.efforts ??
+          []
+        ).length ?? 0) > 0,
+      supportsFast: agentStatus?.capabilities.fastModels?.includes(thread.config.model) ?? false,
+    },
   );
   const filteredCommands = filterSlashCommands(availableCommands, slashQuery);
   const showCommandPanel = filteredCommands.length > 0;
@@ -240,6 +336,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const showTodoInComposer =
     !usesTerminalPresentation && todoDockState !== null && todoDockPlacement === "composer";
   const showErrorInComposer = !usesTerminalPresentation && errorDockState !== null;
+  const hasActiveSubAgent = useAppStore(
+    (s) => !usesTerminalPresentation && selectActiveSubAgentParentItemIds(s, thread.id).length > 0,
+  );
   const collapseTerminalComposerSetting = useSharedSettings((s) => s.collapseTerminalComposer);
   const [composerCollapsed, setComposerCollapsed] = useState(collapseTerminalComposerSetting);
   const canCollapseComposer = showTerminalComposer;
@@ -253,6 +352,15 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   );
   const hiddenModelIds = useSharedSettings((s) => s.hiddenModels[thread.agentKind]);
   const controls = buildControls(thread, agentStatus, hiddenModelIds, props.onConfigChange);
+  const controlsWithOpenSignal = controls.map((control): ComposerControl => {
+    if (controlOpenRequest?.target === "model" && control.kind === "provider-model") {
+      return { ...control, openSignal: controlOpenRequest.nonce };
+    }
+    if (controlOpenRequest?.target === "effort" && control.kind === "effort-context") {
+      return { ...control, openSignal: controlOpenRequest.nonce };
+    }
+    return control;
+  });
   const isCliThread = usesTerminalPresentation;
   const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
   const canInterruptStructuredTurn =
@@ -309,6 +417,38 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     const allSegments = [...attachmentSegments, ...segments];
     const flat = flattenSegments(allSegments);
     if (flat.length === 0 || !canSubmit) return;
+    const localAction = resolveLocalSlashCommandAction(flat, {
+      agentKind: thread.agentKind,
+      presentationMode,
+    });
+    if (localAction?.kind === "set-mode") {
+      props.onConfigChange({ ...thread.config, mode: localAction.mode });
+      mentionRef.current?.clear();
+      mentionRef.current?.focus();
+      setPrompt("");
+      setHasContent(false);
+      return;
+    }
+    if (localAction?.kind === "open-control") {
+      setControlOpenRequest((prev) => ({
+        target: localAction.target,
+        nonce: (prev?.nonce ?? 0) + 1,
+      }));
+      mentionRef.current?.clear();
+      setPrompt("");
+      setHasContent(false);
+      return;
+    }
+    if (localAction?.kind === "toggle-fast") {
+      if (agentStatus?.capabilities.fastModels?.includes(thread.config.model)) {
+        props.onConfigChange({ ...thread.config, fast: thread.config.fast !== true });
+      }
+      mentionRef.current?.clear();
+      mentionRef.current?.focus();
+      setPrompt("");
+      setHasContent(false);
+      return;
+    }
     setIsSubmitting(true);
     if (!usesTerminalPresentation) {
       useAppStore.getState().requestChatScrollToBottom(thread.id);
@@ -442,12 +582,14 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                   compact
                   fixedContent={
+                    hasActiveSubAgent ||
                     showErrorInComposer ||
                     showTodoInComposer ||
                     pendingSteer ||
                     activeRuntimeRequest ||
                     showCommandPanel ? (
                       <>
+                        {hasActiveSubAgent ? <ActiveSubAgentTile threadId={thread.id} /> : null}
                         {showErrorInComposer ? (
                           <ThreadErrorDock
                             state={errorDockState!}
@@ -581,7 +723,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                       onSlashCommandChange={setSlashQuery}
                     />
                   }
-                  controls={controls}
+                  controls={controlsWithOpenSignal}
                   placeholder="Send a message..."
                   prompt={prompt}
                   promptDisabled={!(showServerComposer || showTerminalComposer)}
@@ -590,7 +732,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   submitLabel="Send message"
                   onStop={canInterruptStructuredTurn ? handleInterrupt : undefined}
                   {...(() => {
-                    const extras = (
+                    const renderExtras = (level: number) => (
                       <>
                         <Button
                           isIconOnly
@@ -614,8 +756,8 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                               <Tooltip.Trigger tabIndex={-1} role="none">
                                 <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
                                   <GitFork className="size-3.5 text-muted" />
-                                  <span className="truncate">{branchName}</span>
-                                  {thread.prNumber ? (
+                                  {level < 3 && <span className="truncate">{branchName}</span>}
+                                  {level < 3 && thread.prNumber ? (
                                     <span className="shrink-0 text-muted/60">
                                       PR #{thread.prNumber}
                                     </span>
@@ -632,12 +774,16 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                               onSelect={handleBranchSelect}
                               onSwitchBranch={handleSwitchBranch}
                               hideWorktreeToggle
+                              forceHideLabel={level >= 3}
+                              iconOnly={level >= 3}
                             />
                           )
                         ) : null}
                       </>
                     );
-                    return isCliThread ? { leadingControls: extras } : { afterControls: extras };
+                    return isCliThread
+                      ? { leadingControls: renderExtras }
+                      : { afterControls: renderExtras };
                   })()}
                   onPromptChange={setPrompt}
                   onSubmit={() => {

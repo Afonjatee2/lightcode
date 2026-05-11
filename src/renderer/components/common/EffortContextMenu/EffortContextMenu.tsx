@@ -1,4 +1,4 @@
-import { startTransition, useState, type ReactNode } from "react";
+import { startTransition, useEffect, useState, type ReactNode } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Header, Label, ListBox, Popover, Tooltip } from "@heroui/react";
 import type { LabeledOption } from "@/shared/contracts";
@@ -11,10 +11,15 @@ export interface EffortContextMenuProps {
   contextSizes: readonly LabeledOption[];
   contextValue?: string;
   onContextChange?: (value: string) => void;
+  thinkingSupported?: boolean;
+  thinkingValue?: boolean;
+  onThinkingChange?: (value: boolean) => void;
   /** Optional icon to show in the trigger (e.g., effort indicator). */
   icon?: ReactNode;
   isDisabled?: boolean;
   hideLabelOnWrap?: boolean;
+  forceHideLabel?: boolean;
+  openSignal?: number;
   onOpenChange?: (open: boolean) => void;
 }
 
@@ -26,9 +31,14 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
     contextSizes,
     contextValue,
     onContextChange,
+    thinkingSupported = false,
+    thinkingValue = false,
+    onThinkingChange,
     icon,
     isDisabled,
     hideLabelOnWrap,
+    forceHideLabel = false,
+    openSignal,
     onOpenChange,
   } = props;
 
@@ -36,7 +46,16 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
 
   const hasEffort = efforts.length > 0;
   const hasContext = contextSizes.length > 0;
-  if (!hasEffort && !hasContext) return null;
+  const hasThinking = thinkingSupported;
+
+  useEffect(() => {
+    if (openSignal === undefined || isDisabled || (!hasEffort && !hasContext && !hasThinking)) {
+      return;
+    }
+    setIsOpen(true);
+  }, [openSignal, isDisabled, hasEffort, hasContext, hasThinking]);
+
+  if (!hasEffort && !hasContext && !hasThinking) return null;
 
   const effortLabel = hasEffort
     ? (efforts.find((o) => o.id === effortValue)?.label ?? effortValue ?? "")
@@ -74,13 +93,19 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
       className="lightcode-composer-menu min-w-0 px-2.5"
     >
       {icon}
-      <span className={hideLabelOnWrap ? "lightcode-composer-label-hideable truncate" : "truncate"}>
+      <span
+        className={
+          hideLabelOnWrap
+            ? `lightcode-composer-label-hideable truncate${forceHideLabel ? " is-hidden" : ""}`
+            : "truncate"
+        }
+      >
         {triggerLabel}
       </span>
       <ChevronDown
         className={
           hideLabelOnWrap
-            ? "lightcode-composer-label-hideable size-3.5 text-muted"
+            ? `lightcode-composer-label-hideable size-3.5 text-muted${forceHideLabel ? " is-hidden" : ""}`
             : "size-3.5 text-muted"
         }
       />
@@ -104,29 +129,58 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
       </Popover.Trigger>
       <Popover.Content placement="top start" className={`${popoverWidth} p-0`}>
         <Popover.Dialog className="flex max-h-[24rem] flex-col overflow-hidden">
-          <div
-            className="grid"
-            style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
-          >
-            {hasEffort ? (
-              <Column
-                label="Effort"
-                options={efforts}
-                value={effortValue}
-                hasNeighbor={hasContext}
-                onSelect={handleEffort}
-              />
-            ) : null}
-            {hasContext ? (
-              <Column
-                label="Context"
-                options={contextSizes}
-                value={contextValue}
-                hasNeighbor={false}
-                onSelect={handleContext}
-              />
-            ) : null}
-          </div>
+          {columnCount > 0 ? (
+            <div
+              className="grid"
+              style={{ gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))` }}
+            >
+              {hasContext ? (
+                <Column
+                  label="Context"
+                  options={contextSizes}
+                  value={contextValue}
+                  hasNeighbor={hasEffort}
+                  onSelect={handleContext}
+                />
+              ) : null}
+              {hasEffort ? (
+                <Column
+                  label="Reasoning"
+                  options={efforts}
+                  value={effortValue}
+                  hasNeighbor={false}
+                  onSelect={handleEffort}
+                />
+              ) : null}
+            </div>
+          ) : null}
+          {hasThinking ? (
+            <div className={columnCount > 0 ? "border-t border-border" : ""}>
+              <Header className="block border-b border-border px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted/80">
+                Options
+              </Header>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={thinkingValue}
+                className="flex h-9 w-full items-center justify-between gap-3 px-3 text-left text-sm text-foreground hover:bg-surface-hover focus-visible:outline-none"
+                onClick={() => startTransition(() => onThinkingChange?.(!thinkingValue))}
+              >
+                <span className="truncate">Thinking</span>
+                <span
+                  className={`relative h-5 w-9 shrink-0 rounded-full transition-colors ${
+                    thinkingValue ? "bg-success" : "bg-surface-tertiary"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 size-4 rounded-full bg-white transition-transform ${
+                      thinkingValue ? "translate-x-[18px]" : "translate-x-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
+            </div>
+          ) : null}
         </Popover.Dialog>
       </Popover.Content>
     </Popover>

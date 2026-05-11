@@ -22,6 +22,7 @@ import {
   saveHandoffContextFile,
 } from "../attachments/localFiles";
 import { readSharedSettingsFile, writeSharedSettingsFile } from "../sharedSettingsFile";
+import { readKeybindingsFile } from "../keybindingsFile";
 import type { AutoUpdaterController } from "../updates/autoUpdater";
 import {
   defineMainLocalIpcHandlers,
@@ -88,6 +89,7 @@ export function createLocalIpcHandlers(
       }
       win.focus();
     },
+    getKeybindings: () => readKeybindingsFile(options.requireLightcodePaths().keybindingsPath),
     revealProjectEntry: async (payload) => {
       shell.showItemInFolder(resolveProjectFsPath(payload));
     },

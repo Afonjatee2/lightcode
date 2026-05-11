@@ -164,7 +164,9 @@ function AddPatternInput(props: { onAdd: (pattern: string) => void }) {
           }
         }}
       />
-      <Button onPress={commit}>Add</Button>
+      <Button variant="secondary" onPress={commit}>
+        Add
+      </Button>
     </div>
   );
 }

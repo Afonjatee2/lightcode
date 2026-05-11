@@ -7,6 +7,7 @@ import type {
   ProjectLocation,
 } from "@/shared/contracts";
 import { compactAgentProviderMetadata } from "@/shared/contracts";
+import { parseCursorModelId } from "@/shared/cursorModelId";
 import {
   buildAgentCommand,
   readAgentCommandOutput,
@@ -16,6 +17,8 @@ import {
   type CommandSpec,
   type DetectionSpec,
 } from "../base";
+import { probeAcpCapabilities } from "../acp";
+import { getProjectPosixPath } from "@/shared/wsl";
 
 export const cursorDefaultCapabilities: AgentCapability = {
   models: [],
@@ -31,6 +34,7 @@ export const cursorDefaultCapabilities: AgentCapability = {
   supportsDirectInput: true,
   liveInputMode: "terminal",
   presentationMode: "terminal",
+  presentationModes: ["terminal", "gui"],
   bypassApprovalPolicy: "never",
   settingDefs: [],
 };
@@ -92,6 +96,342 @@ export function parseCursorModels(output: string): LabeledOption[] {
   return models.length > 0 ? sortCursorModels(models) : [{ id: "auto", label: "Auto" }];
 }
 
+function stripCursorModelModifiers(label: string): string {
+  const cleaned = label
+    .replace(/\bFast\b/gi, "")
+    .replace(/\b1M\b/gi, "")
+    .replace(/\bThinking\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return cleaned.length > 0 ? cleaned : label;
+}
+
+function cursorBaseModelId(id: string): string {
+  return parseCursorModelId(id).baseId;
+}
+
+function isCursorFastModel(model: LabeledOption): boolean {
+  return /\bfast\b/i.test(model.label) || /-fast$/i.test(model.id);
+}
+
+function cursorDefaultContextId(baseId: string, label: string): string {
+  if (/^gpt-/i.test(baseId)) return "272k";
+  if (/^claude-opus-4-7\b/i.test(baseId) || /\bopus\s+4\.7\b/i.test(label)) return "300k";
+  if (/^claude-/i.test(baseId) || /\b(?:opus|sonnet|haiku)\b/i.test(label)) return "200k";
+  return "default";
+}
+
+function cursorContextId(baseId: string, model: LabeledOption): string {
+  return /\b1M\b/i.test(model.label) ? "1m" : cursorDefaultContextId(baseId, model.label);
+}
+
+function cursorEffortId(model: LabeledOption): string | undefined {
+  const label = model.label.toLowerCase();
+  if (/-max(?=$|-thinking(?:-fast)?$|-fast$)/i.test(model.id)) {
+    return "max";
+  }
+  if (
+    /\bextra\s+high\b/.test(label) ||
+    /-(?:xhigh|extra-high)(?=$|-thinking(?:-fast)?$|-fast$)/i.test(model.id)
+  ) {
+    return "xhigh";
+  }
+  if (/\bhigh\b/.test(label) || /-high(?=$|-thinking(?:-fast)?$|-fast$)/i.test(model.id)) {
+    return "high";
+  }
+  if (/\blow\b/.test(label) || /-low(?=$|-thinking(?:-fast)?$|-fast$)/i.test(model.id)) {
+    return "low";
+  }
+  if (/\bnone\b/.test(label) || /-none(?=$|-thinking(?:-fast)?$|-fast$)/i.test(model.id)) {
+    return "none";
+  }
+  if (/\bmedium\b/.test(label) || /-medium(?=$|-thinking(?:-fast)?$|-fast$)/i.test(model.id)) {
+    return "medium";
+  }
+  return undefined;
+}
+
+function stripCursorEffort(label: string, effort?: string): string {
+  const pattern =
+    effort === "xhigh"
+      ? /\bExtra\s+High\b/gi
+      : effort === "max"
+        ? /\bMax\b/gi
+        : effort
+          ? new RegExp(`\\b${effort}\\b`, "gi")
+          : undefined;
+  const cleaned = (pattern ? label.replace(pattern, "") : label).replace(/\s+/g, " ").trim();
+  return cleaned.length > 0 ? cleaned : label;
+}
+
+function isCursorThinkingModel(model: LabeledOption): boolean {
+  return /\bthinking\b/i.test(model.label) || /-thinking(?:-fast)?$/i.test(model.id);
+}
+
+export function buildCursorModelPickerCapabilities(
+  models: LabeledOption[],
+): Pick<
+  AgentCapability,
+  | "models"
+  | "efforts"
+  | "defaultEffort"
+  | "modelEfforts"
+  | "contextSizes"
+  | "modelContextSizes"
+  | "defaultContextSize"
+  | "fastModels"
+  | "thinkingModels"
+> {
+  const grouped = new Map<
+    string,
+    {
+      model: LabeledOption;
+      contexts: string[];
+      efforts: string[];
+      fast: boolean;
+      thinking: boolean;
+    }
+  >();
+
+  for (const model of models) {
+    const baseId = cursorBaseModelId(model.id);
+    const context = cursorContextId(baseId, model);
+    const effort = cursorEffortId(model);
+    let group = grouped.get(baseId);
+    if (!group) {
+      group = {
+        model: {
+          id: baseId,
+          label: stripCursorEffort(stripCursorModelModifiers(model.label), effort),
+        },
+        contexts: [],
+        efforts: [],
+        fast: false,
+        thinking: false,
+      };
+      grouped.set(baseId, group);
+    }
+    if (!group.contexts.includes(context)) {
+      group.contexts.push(context);
+    }
+    if (isCursorFastModel(model)) {
+      group.fast = true;
+    }
+    if (isCursorThinkingModel(model)) {
+      group.thinking = true;
+    }
+    if (effort && !group.efforts.includes(effort)) {
+      group.efforts.push(effort);
+    }
+  }
+
+  const displayModels = [...grouped.values()].map((group) => group.model);
+  const contextIds = new Set<string>();
+  const effortIds = new Set<string>();
+  const modelEfforts: Record<string, string[]> = {};
+  const modelContextSizes: Record<string, string[]> = {};
+  const fastModels: string[] = [];
+  const thinkingModels: string[] = [];
+  for (const [modelId, group] of grouped) {
+    const defaultContext = cursorDefaultContextId(modelId, group.model.label);
+    if (
+      defaultContext !== "default" &&
+      group.contexts.includes("1m") &&
+      !group.contexts.includes(defaultContext)
+    ) {
+      group.contexts.push(defaultContext);
+    }
+    const orderedEfforts = sortCursorEffortIds(group.efforts);
+    modelEfforts[modelId] = orderedEfforts;
+    for (const effort of orderedEfforts) {
+      effortIds.add(effort);
+    }
+    if (group.contexts.length > 1) {
+      const orderedContexts = sortCursorContextIds(group.contexts);
+      modelContextSizes[modelId] = orderedContexts;
+      for (const context of orderedContexts) {
+        contextIds.add(context);
+      }
+    }
+    if (group.fast) {
+      fastModels.push(modelId);
+    }
+    if (group.thinking) {
+      thinkingModels.push(modelId);
+    }
+  }
+
+  const contextSizes = [
+    ...(contextIds.has("default") ? [{ id: "default", label: "Default" }] : []),
+    ...(contextIds.has("200k") ? [{ id: "200k", label: "200K" }] : []),
+    ...(contextIds.has("272k") ? [{ id: "272k", label: "272K" }] : []),
+    ...(contextIds.has("300k") ? [{ id: "300k", label: "300K" }] : []),
+    ...(contextIds.has("1m") ? [{ id: "1m", label: "1M" }] : []),
+  ];
+
+  return {
+    models: displayModels,
+    efforts: sortCursorEffortIds([...effortIds]),
+    ...(effortIds.has("medium") ? { defaultEffort: "medium" } : {}),
+    modelEfforts,
+    ...(contextSizes.length > 1 ? { contextSizes } : {}),
+    ...(Object.keys(modelContextSizes).length > 0 ? { modelContextSizes } : {}),
+    defaultContextSize: "default",
+    ...(fastModels.length > 0 ? { fastModels } : {}),
+    ...(thinkingModels.length > 0 ? { thinkingModels } : {}),
+  };
+}
+
+function parseCursorAcpModelParams(id: string): Record<string, string> {
+  const match = /\[([^\]]*)\]/.exec(id);
+  const raw = match?.[1]?.trim();
+  if (!raw) return {};
+
+  const params: Record<string, string> = {};
+  for (const part of raw.split(",")) {
+    const [rawKey, rawValue] = part.split("=");
+    const key = rawKey?.trim();
+    const value = rawValue?.trim();
+    if (key && value) params[key] = value;
+  }
+  return params;
+}
+
+function cursorAcpBaseModelId(id: string): string {
+  return id.replace(/\[[^\]]*\]/g, "");
+}
+
+function formatCursorAcpBaseLabel(baseId: string, fallbackLabel: string): string {
+  if (baseId === "default") return "Auto";
+  if (/^composer-(\d+)$/i.test(baseId)) {
+    return baseId.replace(/^composer-(\d+)$/i, "Composer $1");
+  }
+
+  const codexMatch = /^gpt-(\d+(?:\.\d+)?)-codex(?:-(spark|max|mini))?$/i.exec(baseId);
+  if (codexMatch) {
+    const suffix = codexMatch[2]
+      ? ` ${codexMatch[2].charAt(0).toUpperCase()}${codexMatch[2].slice(1)}`
+      : "";
+    return `Codex ${codexMatch[1]}${suffix}`;
+  }
+
+  const gptMatch = /^gpt-(\d+(?:\.\d+)?)(?:-(mini|nano))?$/i.exec(baseId);
+  if (gptMatch) {
+    const suffix = gptMatch[2]
+      ? ` ${gptMatch[2].charAt(0).toUpperCase()}${gptMatch[2].slice(1)}`
+      : "";
+    return `GPT-${gptMatch[1]}${suffix}`;
+  }
+
+  const claudeMatch = /^claude-(opus|sonnet|haiku)-(\d+)(?:-(\d+))?$/i.exec(baseId);
+  if (claudeMatch) {
+    const family = claudeMatch[1]!;
+    const version = claudeMatch[3] ? `${claudeMatch[2]}.${claudeMatch[3]}` : claudeMatch[2]!;
+    return `${family.charAt(0).toUpperCase()}${family.slice(1)} ${version}`;
+  }
+
+  const familyMatch = /^(gemini|grok|kimi)-(.+)$/i.exec(baseId);
+  const labelSource = familyMatch ? `${familyMatch[1]}-${familyMatch[2]}` : fallbackLabel || baseId;
+  return labelSource
+    .replace(/\[[^\]]*\]/g, "")
+    .split(/[-_]/g)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function formatCursorAcpParamLabel(key: string, value: string): string | undefined {
+  if (key === "context") return value.toUpperCase();
+  if (key === "reasoning" || key === "effort") {
+    if (value === "xhigh") return "Extra High";
+    return value.charAt(0).toUpperCase() + value.slice(1);
+  }
+  if (key === "thinking") return undefined;
+  if (key === "fast") return value === "true" ? "Fast" : undefined;
+  return undefined;
+}
+
+function formatCursorAcpModelLabel(model: LabeledOption): string {
+  const baseId = cursorAcpBaseModelId(model.id);
+  const baseLabel = formatCursorAcpBaseLabel(baseId, model.label);
+  const params = parseCursorAcpModelParams(model.id);
+  const paramLabels = ["context", "reasoning", "effort", "thinking", "fast"]
+    .map((key) => {
+      const value = params[key];
+      return value ? formatCursorAcpParamLabel(key, value) : undefined;
+    })
+    .filter((label): label is string => Boolean(label));
+  return paramLabels.length > 0 ? `${baseLabel} · ${paramLabels.join(" · ")}` : baseLabel;
+}
+
+export function buildCursorAcpModelPickerCapabilities(
+  models: LabeledOption[],
+): Pick<AgentCapability, "models" | "efforts" | "modelEfforts"> {
+  const displayModels = models.map((model) => ({
+    id: model.id,
+    label: formatCursorAcpModelLabel(model),
+  }));
+  const sortedModels = sortCursorModels(displayModels);
+
+  return {
+    models: sortedModels,
+    efforts: [],
+    modelEfforts: Object.fromEntries(sortedModels.map((model) => [model.id, []])),
+  };
+}
+
+async function probeCursorAcpModelPickerCapabilities(
+  ctx: Parameters<NonNullable<DetectionSpec["capabilitiesProbe"]>>[0],
+): Promise<Partial<AgentCapability> | undefined> {
+  if (!ctx.executablePath) return undefined;
+  const spec = buildAgentCommand(ctx.location, "cursor-agent", ["acp"], ctx.executablePath);
+  const result = await probeAcpCapabilities(
+    spec.command,
+    spec.args,
+    getProjectPosixPath(ctx.location),
+    {
+      ...(spec.cwd ? { processCwd: spec.cwd } : {}),
+      timeoutMs: 15_000,
+      label:
+        ctx.location.kind === "wsl"
+          ? `cursor-acp:wsl:${ctx.location.distro}`
+          : `cursor-acp:${ctx.location.kind}`,
+    },
+  );
+  if (!result?.models?.length) return undefined;
+  return buildCursorAcpModelPickerCapabilities(result.models);
+}
+
+const CURSOR_EFFORT_ORDER: Record<string, number> = {
+  none: 0,
+  low: 1,
+  medium: 2,
+  high: 3,
+  xhigh: 4,
+  max: 5,
+};
+
+function sortCursorEffortIds(efforts: string[]): string[] {
+  return [...efforts].sort(
+    (left, right) =>
+      (CURSOR_EFFORT_ORDER[left] ?? 99) - (CURSOR_EFFORT_ORDER[right] ?? 99) ||
+      left.localeCompare(right),
+  );
+}
+
+function sortCursorContextIds(contexts: string[]): string[] {
+  const order: Record<string, number> = {
+    default: 0,
+    "200k": 1,
+    "272k": 2,
+    "300k": 3,
+    "1m": 4,
+  };
+  return [...contexts].sort(
+    (left, right) => (order[left] ?? 99) - (order[right] ?? 99) || left.localeCompare(right),
+  );
+}
+
 /**
  * Sort models: Auto first, then Composer, then all others grouped by family.
  * Groups sorted by version descending. Within each group:
@@ -100,8 +440,10 @@ export function parseCursorModels(output: string): LabeledOption[] {
  * within the same tier.
  */
 export function sortCursorModels(models: LabeledOption[]): LabeledOption[] {
-  const auto = models.filter((m) => m.id === "auto");
-  const rest = models.filter((m) => m.id !== "auto");
+  const isAutoModel = (model: LabeledOption): boolean =>
+    model.id === "auto" || model.label === "Auto";
+  const auto = models.filter(isAutoModel);
+  const rest = models.filter((m) => !isAutoModel(m));
 
   const versionOf = (label: string): number => {
     const m = /(\d+(?:\.\d+)?)/.exec(label);
@@ -275,24 +617,30 @@ async function probeCursorStatus(ctx: Parameters<NonNullable<DetectionSpec["stat
 
 export const cursorDetectionSpec: DetectionSpec = {
   kind: "cursor",
-  label: "Cursor CLI",
+  label: "Cursor",
   binary: "cursor-agent",
   capabilities: cursorDefaultCapabilities,
   statusProbe: probeCursorStatus,
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;
-    const result =
+    const cliResultPromise =
       ctx.location.kind === "wsl"
-        ? await readWslLoginShellCommandOutputAsync(
-            ctx.location.distro,
-            "/tmp",
-            ctx.executablePath,
-            ["--list-models"],
-          )
-        : await readCursorProbeOutputAsync(ctx.executablePath, ["--list-models"]);
-    if (!result.ok) return undefined;
-    const models = parseCursorModels(result.stdout);
-    return models.length > 0 ? { models } : undefined;
+        ? readWslLoginShellCommandOutputAsync(ctx.location.distro, "/tmp", ctx.executablePath, [
+            "--list-models",
+          ])
+        : readCursorProbeOutputAsync(ctx.executablePath, ["--list-models"]);
+    const [cliResult, acpCapabilities] = await Promise.all([
+      cliResultPromise,
+      probeCursorAcpModelPickerCapabilities(ctx).catch(() => undefined),
+    ]);
+    const cliModels = cliResult.ok ? parseCursorModels(cliResult.stdout) : [];
+    const terminalCapabilities =
+      cliModels.length > 0 ? buildCursorModelPickerCapabilities(cliModels) : undefined;
+    if (!terminalCapabilities && !acpCapabilities) return undefined;
+    return {
+      ...(terminalCapabilities ?? {}),
+      ...(acpCapabilities ? { presentationCapabilities: { gui: acpCapabilities } } : {}),
+    };
   },
 };
 

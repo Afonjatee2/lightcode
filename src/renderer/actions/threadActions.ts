@@ -43,6 +43,12 @@ export function openThread(threadId: string, options?: { focusComposer?: boolean
     if (options?.focusComposer) {
       useAppStore.getState().requestComposerFocus(threadId);
     }
+    // Late-rendering items (virtualizer measurement, hydration, streaming) can
+    // leave the chat slightly above the bottom on reopen. Re-arm stick-to-bottom
+    // so any post-mount growth keeps the view pinned.
+    if (thread?.presentationMode === "gui") {
+      useAppStore.getState().requestChatScrollToBottom(threadId);
+    }
   });
 
   if (thread?.status === "inactive") {
@@ -58,14 +64,16 @@ export function reopenStoredThread(threadId: string): void {
     return;
   }
 
-  startTransition(() => {
-    store.updateThreadRuntime(thread.id, {
-      status: "launching",
-      attention: "none",
-      ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
-      canResumeWithConfig: thread.canResumeWithConfig || thread.sessionRef !== undefined,
+  if (thread.presentationMode !== "gui") {
+    startTransition(() => {
+      store.updateThreadRuntime(thread.id, {
+        status: "launching",
+        attention: "none",
+        ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
+        canResumeWithConfig: thread.canResumeWithConfig || thread.sessionRef !== undefined,
+      });
     });
-  });
+  }
   store.queueThreadLaunch(thread.id, "");
 }
 
@@ -74,12 +82,7 @@ export async function unloadStoredThread(
   options?: { closeThreadPane?: boolean; keepSidePanels?: boolean },
 ): Promise<void> {
   const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
-  if (
-    !thread ||
-    thread.status === "inactive" ||
-    thread.status === "launching" ||
-    !thread.sessionRef
-  ) {
+  if (!thread || thread.status === "inactive") {
     return;
   }
 
@@ -129,14 +132,19 @@ export function unloadThread(threadId: string): void {
   void unloadStoredThread(threadId, { closeThreadPane: true }).catch(() => undefined);
 }
 
-export function toggleMarkThreadDone(threadId: string): void {
+export function toggleMarkThreadDone(
+  threadId: string,
+  options?: { keepSidePanels?: boolean },
+): void {
   const store = useAppStore.getState();
   const thread = store.threads.find((t) => t.id === threadId);
   if (!thread) return;
   if (thread.done) {
     store.unmarkThreadDone(threadId);
   } else {
-    void unloadStoredThread(threadId, { keepSidePanels: true }).catch(() => undefined);
+    void unloadStoredThread(threadId, { keepSidePanels: options?.keepSidePanels ?? true }).catch(
+      () => undefined,
+    );
     store.markThreadDone(threadId);
   }
 }

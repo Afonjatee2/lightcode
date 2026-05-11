@@ -3,8 +3,9 @@ import type { ExtractContextResult, Thread, ThreadConfig } from "@/shared/contra
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { readBridge } from "@/renderer/bridge";
-import { closePanelsForUnloadedThread } from "@/renderer/actions/panelActions";
+import { toggleMarkThreadDone } from "@/renderer/actions/threadActions";
 import { useAppStore } from "@/renderer/state/appStore";
+import { captureFileCheckpoint } from "@/renderer/state/fileCheckpointActions";
 import { useProject, useThread } from "@/renderer/state/useThread";
 import { ThreadView } from "@/renderer/components/thread/ThreadView";
 import { useDraggable, useDroppable } from "@dnd-kit/react";
@@ -46,8 +47,6 @@ export function ThreadPane(props: {
     consumeThreadLaunch,
     removeThreadServerRequest,
     touchThread,
-    markThreadDone,
-    unmarkThreadDone,
   } = useAppStore.getState();
 
   const paneElementRef = useRef<HTMLDivElement>(null);
@@ -70,6 +69,9 @@ export function ThreadPane(props: {
 
   if (!thread) return null;
   if (!project) return null;
+  const projectLocation = thread.worktreePath
+    ? buildWorktreeLocation(project.location, thread.worktreePath)
+    : project.location;
   return (
     <ThreadView
       key={props.threadId}
@@ -87,18 +89,7 @@ export function ThreadPane(props: {
       droppableRef={paneElementRef}
       onClose={props.onClose}
       onMarkDone={() => {
-        const latestThread = useAppStore.getState().threads.find((t) => t.id === props.threadId);
-        if (!latestThread) return;
-        if (latestThread.done) {
-          unmarkThreadDone(latestThread.id);
-        } else {
-          if (latestThread.status !== "inactive" && latestThread.sessionRef) {
-            void readBridge().closeThread({ threadId: latestThread.id });
-            useAppStore.getState().markThreadExited(latestThread.id);
-            closePanelsForUnloadedThread(latestThread);
-          }
-          markThreadDone(latestThread.id);
-        }
+        toggleMarkThreadDone(props.threadId, { keepSidePanels: false });
       }}
       onConfigChange={(config) => {
         updateThreadConfig(thread.id, config);
@@ -115,11 +106,7 @@ export function ThreadPane(props: {
         }
       }}
       pendingServerRequests={pendingServerRequests}
-      projectLocation={
-        thread.worktreePath
-          ? buildWorktreeLocation(project.location, thread.worktreePath)
-          : project.location
-      }
+      projectLocation={projectLocation}
       onLaunchConsumed={() => consumeThreadLaunch(thread.id)}
       onLaunchFailed={(message) => {
         startTransition(() => {
@@ -169,6 +156,11 @@ export function ThreadPane(props: {
             type: "item.completed",
             threadId: thread.id,
             itemId: optimisticUserMessageItemId,
+          });
+          await captureFileCheckpoint({
+            threadId: thread.id,
+            checkpointItemId: optimisticUserMessageItemId,
+            projectLocation,
           });
         }
         await readBridge().sendThreadInput({

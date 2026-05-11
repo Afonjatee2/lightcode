@@ -1,5 +1,6 @@
 import { spawn, type ChildProcess } from "node:child_process";
-import { resolve } from "node:path";
+import { existsSync } from "node:fs";
+import { extname, resolve } from "node:path";
 import {
   createMessageConnection,
   StreamMessageReader,
@@ -7,17 +8,11 @@ import {
   type MessageConnection,
 } from "vscode-jsonrpc/node";
 import type { ProjectLocation } from "@/shared/contracts";
-import type { LspSessionStatus } from "@/shared/lsp";
+import { createLspRootUri, type LspSessionStatus } from "@/shared/lsp";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { getProjectFsPath } from "@/shared/wsl";
-import { quotePosixShellArg, resolveWslShellPath } from "../agents/base";
+import { buildAgentCommand } from "../agents/base";
 import type { LanguageServerConfig } from "./serverRegistry";
-
-function getRootUri(location: ProjectLocation): string {
-  if (location.kind === "wsl") return `file:///${location.linuxPath}`;
-  const absPath = resolve(location.path).replace(/\\/g, "/");
-  return `file:///${absPath}`;
-}
 
 /**
  * For native projects, resolve `node_modules/...` against the project root
@@ -25,7 +20,15 @@ function getRootUri(location: ProjectLocation): string {
  */
 function resolveNativeCommand(cmd: string, projectRoot: string): string {
   if (cmd.startsWith("node_modules/")) {
-    return resolve(projectRoot, cmd);
+    const resolved = resolve(projectRoot, cmd);
+    if (process.platform !== "win32" || existsSync(resolved) || extname(resolved)) {
+      return resolved;
+    }
+    for (const extension of [".cmd", ".exe", ".bat"]) {
+      const candidate = `${resolved}${extension}`;
+      if (existsSync(candidate)) return candidate;
+    }
+    return resolved;
   }
   return cmd;
 }
@@ -65,39 +68,17 @@ export class ServerInstance {
 
     for (const candidate of this.config.commands) {
       try {
-        const isWsl = this.projectLocation.kind === "wsl";
-
-        let proc: ChildProcess;
-        if (isWsl) {
-          const wslCmd = resolveWslCommand(candidate.command, this.projectLocation.linuxPath);
-          // Route through the user's actual login shell (bash / zsh / fish /
-          // whatever their passwd entry says) so nvm / fnm / user PATH is
-          // sourced — otherwise `typescript-language-server` et al. installed
-          // via nvm are invisible.
-          const shellPath = resolveWslShellPath(this.projectLocation.distro);
-          const shellCmd = [wslCmd, ...candidate.args].map(quotePosixShellArg).join(" ");
-          proc = spawn(
-            "wsl.exe",
-            [
-              "-d",
-              this.projectLocation.distro,
-              "--cd",
-              this.projectLocation.linuxPath,
-              "--",
-              shellPath,
-              "-l",
-              "-c",
-              `exec ${shellCmd}`,
-            ],
-            { stdio: ["pipe", "pipe", "pipe"] },
-          );
-        } else {
-          const cmd = resolveNativeCommand(candidate.command, projectRoot);
-          proc = spawn(cmd, candidate.args, {
-            cwd: projectRoot,
-            stdio: ["pipe", "pipe", "pipe"],
-          });
-        }
+        const command =
+          this.projectLocation.kind === "wsl"
+            ? resolveWslCommand(candidate.command, this.projectLocation.linuxPath)
+            : resolveNativeCommand(candidate.command, projectRoot);
+        const spec = buildAgentCommand(this.projectLocation, command, candidate.args);
+        const proc = spawn(spec.command, spec.args, {
+          ...(spec.cwd ? { cwd: spec.cwd } : {}),
+          ...(spec.env ? { env: { ...process.env, ...spec.env } } : {}),
+          stdio: ["pipe", "pipe", "pipe"],
+          windowsHide: true,
+        });
 
         // Wait briefly to see if the process crashes immediately
         const earlyExit = await Promise.race([
@@ -122,11 +103,9 @@ export class ServerInstance {
     }
 
     if (!spawned || !this.process?.stdout || !this.process?.stdin) {
-      this.onStatus(
-        "error",
-        `No language server found for "${this.config.languageId}". Install one of: ${this.config.commands.map((c) => c.command).join(", ")}`,
-      );
-      return;
+      const message = `No language server found for "${this.config.languageId}". Install one of: ${this.config.commands.map((c) => c.command).join(", ")}`;
+      this.onStatus("error", message);
+      throw new Error(message);
     }
 
     // Set up JSON-RPC connection over stdio
@@ -144,6 +123,27 @@ export class ServerInstance {
       });
     });
 
+    const rootUri = createLspRootUri(this.projectLocation);
+    const rootName =
+      this.projectLocation.kind === "wsl"
+        ? this.projectLocation.linuxPath
+        : this.projectLocation.path;
+
+    connection.onRequest((method) => {
+      switch (method) {
+        case "workspace/configuration":
+          return [];
+        case "workspace/workspaceFolders":
+          return [{ uri: rootUri, name: rootName }];
+        case "client/registerCapability":
+        case "client/unregisterCapability":
+        case "window/showMessageRequest":
+          return null;
+        default:
+          return null;
+      }
+    });
+
     connection.onError(([error]) => {
       console.error(`[LSP ${this.sessionId}] Connection error:`, error);
     });
@@ -153,7 +153,6 @@ export class ServerInstance {
 
     // Send LSP initialize request
     try {
-      const rootUri = getRootUri(this.projectLocation);
       await connection.sendRequest("initialize", {
         processId: process.pid,
         rootUri,
@@ -202,10 +201,7 @@ export class ServerInstance {
         workspaceFolders: [
           {
             uri: rootUri,
-            name:
-              this.projectLocation.kind === "wsl"
-                ? this.projectLocation.linuxPath
-                : this.projectLocation.path,
+            name: rootName,
           },
         ],
         ...(this.config.initializationOptions
@@ -216,9 +212,10 @@ export class ServerInstance {
       connection.sendNotification("initialized", {});
       this.onStatus("ready");
     } catch (error) {
-      this.onStatus("error", error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      this.onStatus("error", message);
       this.dispose();
-      return;
+      throw new Error(message, { cause: error });
     }
 
     // Handle process exit — attempt restart
@@ -232,7 +229,11 @@ export class ServerInstance {
         this.restartCount++;
         const delay = Math.min(1000 * 2 ** this.restartCount, 10000);
         setTimeout(() => {
-          if (!this.disposed) void this.start();
+          if (!this.disposed) {
+            void this.start().catch((error: unknown) => {
+              this.onStatus("error", error instanceof Error ? error.message : String(error));
+            });
+          }
         }, delay);
       } else {
         this.onStatus("error", "Language server crashed too many times");
@@ -244,7 +245,7 @@ export class ServerInstance {
   async sendMessage(message: unknown): Promise<unknown> {
     if (!this.connection) return undefined;
 
-    const msg = message as { method?: string; id?: number; params?: unknown };
+    const msg = message as { method?: string; id?: number | string; params?: unknown };
     if (!msg.method) return undefined;
 
     if (msg.id !== undefined) {

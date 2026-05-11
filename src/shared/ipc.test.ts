@@ -37,6 +37,7 @@ describe("ipcProcedureMap", () => {
           worktreesDir: "C:\\tmp\\worktrees",
           cacheDir: "C:\\tmp\\cache",
           settingsPath: "C:\\tmp\\settings.json",
+          keybindingsPath: "C:\\tmp\\keybindings.json",
           statusCachePath: "C:\\tmp\\status-cache.json",
         }) as never,
       updatePowerSaveBlocker: vi.fn<() => void>(),
@@ -64,5 +65,18 @@ describe("ipcProcedureMap", () => {
     );
 
     expect(Object.keys(handlers).sort()).toEqual(supervisorProcedureNames.sort());
+  });
+
+  it("returns LSP request results from the supervisor dispatcher", async () => {
+    const result = { items: [{ label: "completion" }] };
+    const runtime = {
+      lspSendMessage: vi.fn<() => Promise<unknown>>().mockResolvedValue(result),
+    } as never;
+
+    const handlers = createSupervisorIpcHandlers(runtime);
+
+    await expect(handlers.lspSendMessage({ sessionId: "session", message: {} })).resolves.toBe(
+      result,
+    );
   });
 });

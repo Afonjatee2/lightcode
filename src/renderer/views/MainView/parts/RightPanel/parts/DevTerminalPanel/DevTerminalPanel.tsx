@@ -15,6 +15,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
   const activeProjectId = useDevTerminalStore((s) => s.activeProjectId);
   const activeWorktreePath = useDevTerminalStore((s) => s.activeWorktreePath);
   const activeTabId = useDevTerminalStore((s) => s.activeTabId);
+  const focusRequestId = useDevTerminalStore((s) => s.focusRequestId);
   const removeTab = useDevTerminalStore((s) => s.removeTab);
   const setActiveTab = useDevTerminalStore((s) => s.setActiveTab);
   const addTab = useDevTerminalStore((s) => s.addTab);
@@ -200,6 +201,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
         activeProject={activeProject}
         selectedTabId={selectedTabId}
         activeTab={activeTab}
+        focusRequestId={focusRequestId}
         markTabActive={markTabActive}
         updateTabTitle={updateTabTitle}
         fadeStyle={fadeStyle}
@@ -220,6 +222,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
       activeProject={activeProject}
       selectedTabId={selectedTabId}
       activeTab={activeTab}
+      focusRequestId={focusRequestId}
       markTabActive={markTabActive}
       updateTabTitle={updateTabTitle}
       fadeStyle={fadeStyle}

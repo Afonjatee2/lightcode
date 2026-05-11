@@ -1,18 +1,20 @@
 export * from "./CopilotIcon";
 
-import { ClipboardList } from "lucide-react";
 import { CopilotIcon } from "./CopilotIcon";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import type { ThreadConfig } from "@/shared/contracts";
+import { fullAccessToggle, planWorkToggle } from "../composerControlBuilders";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
   registerConflictResolverDefaults,
   registerProviderIcon,
+  registerProviderLabel,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
 
 registerProviderIcon("copilot", CopilotIcon);
+registerProviderLabel("copilot", "Copilot");
 registerCommitGenDefaults("copilot", {
   label: "Copilot",
   hint: "first available model",
@@ -32,10 +34,9 @@ registerConflictResolverDefaults("copilot", {
   effort: "",
 });
 
-// Copilot calls this "Autopilot" in its CLI/docs (`--yolo` flag, `autopilot`
-// ACP session mode). We surface Copilot's own terminology rather than the
-// generic "Bypass Approvals" label other adapters use.
-function copilotAutopilotToggle({
+// Copilot calls the unrestricted state "Autopilot" in its CLI/docs, but the
+// composer uses the shared permission wording across providers.
+function copilotPermissionToggle({
   config,
   isDisabled,
   onConfigChange,
@@ -44,15 +45,11 @@ function copilotAutopilotToggle({
   isDisabled: boolean;
   onConfigChange: (patch: Partial<ThreadConfig>) => void;
 }): ComposerControl {
-  return {
-    kind: "toggle",
-    label: "Autopilot",
-    iconKind: "permission",
-    isSelected: (config.approvalPolicy ?? "never") === "never",
-    hideLabelOnWrap: true,
+  return fullAccessToggle({
+    isFullAccess: (config.approvalPolicy ?? "never") === "never",
     isDisabled,
     onChange: (isSelected) => onConfigChange({ approvalPolicy: isSelected ? "never" : "default" }),
-  };
+  });
 }
 
 registerComposerControls("copilot", {
@@ -62,27 +59,23 @@ registerComposerControls("copilot", {
   shared: ({ capabilities, config, isDisabled, onConfigChange }) =>
     capabilities.modes.includes("plan")
       ? [
-          {
-            kind: "toggle",
-            label: "Plan",
-            icon: <ClipboardList className="size-3.5" />,
-            isSelected: config.mode === "plan",
-            hideLabelOnWrap: true,
+          planWorkToggle({
+            isPlanMode: config.mode === "plan",
             isDisabled,
             onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
-          },
+          }),
         ]
       : [],
   // ACP exposes Plan/Agent/Autopilot as a single mutually-exclusive
-  // session-mode field. Autopilot is now visible even while Plan is on
+  // session-mode field. Full access is now visible even while Plan is on
   // so users can pre-configure it; the runtime handles mapping this
   // to the correct implementation mode upon plan approval.
   gui: ({ config, isDisabled, onConfigChange }) => [
-    copilotAutopilotToggle({ config, isDisabled, onConfigChange }),
+    copilotPermissionToggle({ config, isDisabled, onConfigChange }),
   ],
-  // CLI: `/plan` and `--yolo` are independent flags, so Autopilot is always
+  // CLI: `/plan` and `--yolo` are independent flags, so full access is always
   // available regardless of Plan state.
   terminal: ({ config, isDisabled, onConfigChange }) => [
-    copilotAutopilotToggle({ config, isDisabled, onConfigChange }),
+    copilotPermissionToggle({ config, isDisabled, onConfigChange }),
   ],
 });

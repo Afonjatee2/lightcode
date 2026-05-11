@@ -5,7 +5,7 @@
 <h1 align="center">Lightcode</h1>
 
 <p align="center">
-  A desktop app for running AI coding agents — Claude and Gemini — in real terminal sessions.
+  The universal desktop orchestrator for AI agents. Run terminal-native agents and structured chat agents side-by-side.
 </p>
 
 <p align="center">
@@ -16,12 +16,13 @@
 
 ## What is Lightcode?
 
-Lightcode gives you one window to manage multiple AI coding agents. Each agent runs in a real terminal (PTY) — what you see is exactly what the agent sees. Switch between Claude, Codex, and Gemini without juggling terminal tabs.
+Lightcode gives you one window to manage multiple AI coding agents. Whether it's a CLI agent running in a real terminal (PTY) or a modern agent utilizing a native chat UI, Lightcode orchestrates them all seamlessly. Switch between Claude, Codex, and Gemini without juggling terminal tabs or separate web apps.
 
 ## Features
 
-- **Multi-agent** — Run Claude Code and Gemini CLI side by side
-- **Real terminals** — Every agent session is a live PTY, not a simulated UI
+- **Universal Orchestration** — Run Claude, Codex, and Gemini side by side in either mode
+- **Terminal Fidelity** — CLI sessions use real live PTYs, giving you exactly what the agent sees
+- **Native Chat UI** — Rich markdown, syntax highlighting, and structured tool displays for API-based agents
 - **Git review** — View diffs, stage files, and commit without leaving the app
 - **Built-in shell** — Open terminal tabs alongside your agent sessions
 - **Project management** — Organize threads by project and workspace

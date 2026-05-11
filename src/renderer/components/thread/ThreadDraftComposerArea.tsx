@@ -25,7 +25,11 @@ import {
 import { useAppStore } from "@/renderer/state/appStore";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
-import { filterSlashCommands, resolveAvailableSlashCommands } from "./threadSlashCommands";
+import {
+  filterSlashCommands,
+  resolveAvailableSlashCommands,
+  resolveLocalSlashCommandAction,
+} from "./threadSlashCommands";
 
 export type DraftStartInput = {
   agentKind: AgentStatus["kind"];
@@ -50,6 +54,7 @@ export function ThreadDraftComposerArea(props: {
   worktreeMode: boolean;
   supportsModePicker: boolean;
   presentationMode: ThreadPresentationMode;
+  onConfigChange: (patch: Partial<ThreadConfig>) => void;
   onWorktreeModeChange: (worktreeMode: boolean) => void;
   onSwitchBranch: (branch: string, createNew: boolean) => void;
   onRememberPresentationMode: () => void;
@@ -63,6 +68,10 @@ export function ThreadDraftComposerArea(props: {
   const [branchSelection, setBranchSelection] = useState<BranchSelection | null>(null);
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
+  const [controlOpenRequest, setControlOpenRequest] = useState<{
+    target: "model" | "effort";
+    nonce: number;
+  } | null>(null);
   const imageAttachments = attachments.attachments.filter((a) => a.isImage);
   const saveDraftContent = useAppStore((s) => s.saveDraftContent);
   const clearDraftContent = useAppStore((s) => s.clearDraftContent);
@@ -73,10 +82,49 @@ export function ThreadDraftComposerArea(props: {
   const availableCommands = resolveAvailableSlashCommands(
     undefined,
     props.selectedAgent.capabilities.slashCommands,
+    {
+      agentKind: props.selectedAgent.kind,
+      presentationMode: props.presentationMode,
+      hasEffort:
+        ((
+          props.selectedAgent.capabilities.modelEfforts?.[props.config.model] ??
+          props.selectedAgent.capabilities.efforts ??
+          []
+        ).length ?? 0) > 0,
+      supportsFast:
+        props.selectedAgent.capabilities.fastModels?.includes(props.config.model) ?? false,
+    },
   );
   const filteredCommands = filterSlashCommands(availableCommands, slashQuery);
   const showCommandPanel = filteredCommands.length > 0;
-
+  const controls: ComposerControl[] = controlOpenRequest
+    ? props.controls.map((control) => {
+        if (controlOpenRequest.target === "model" && control.kind === "provider-model") {
+          return { ...control, openSignal: controlOpenRequest.nonce };
+        }
+        if (controlOpenRequest.target === "effort" && control.kind === "effort-context") {
+          return { ...control, openSignal: controlOpenRequest.nonce };
+        }
+        return control;
+      })
+    : props.controls;
+  const controlKinds = controls.map((control) => control.kind ?? "menu").join(",");
+  const toolbarLayoutKey = [
+    props.selectedAgent.kind,
+    props.presentationMode,
+    props.config.model,
+    props.config.effort ?? "",
+    props.config.contextSize ?? "",
+    props.selectedAgent.capabilities.fastModels?.includes(props.config.model)
+      ? "fast-control"
+      : "no-fast-control",
+    props.gitBranch ?? "",
+    props.worktreeMode ? "worktree" : "branch",
+    branchSelection?.branch ?? "",
+    branchSelection?.baseBranch ?? "",
+    branchSelection?.isWorktree ? "selection-worktree" : "selection-branch",
+    controlKinds,
+  ].join("|");
   function resetDraftRefs() {
     latestSegmentsRef.current = [];
     attachmentsRef.current = [];
@@ -84,7 +132,42 @@ export function ThreadDraftComposerArea(props: {
 
   function submitSegments(allSegments: PromptSegment[], fallbackPrompt = "") {
     const flatPrompt = flattenSegments(allSegments) || fallbackPrompt.trim();
-    if (flatPrompt.length === 0) return;
+    if (flatPrompt.length === 0) {
+      return;
+    }
+    const localAction = resolveLocalSlashCommandAction(flatPrompt, {
+      agentKind: props.selectedAgent.kind,
+      presentationMode: props.presentationMode,
+    });
+    if (localAction?.kind === "set-mode") {
+      props.onConfigChange({ mode: localAction.mode });
+      mentionRef.current?.clear();
+      setPrompt("");
+      setHasContent(false);
+      resetDraftRefs();
+      return;
+    }
+    if (localAction?.kind === "open-control") {
+      setControlOpenRequest((prev) => ({
+        target: localAction.target,
+        nonce: (prev?.nonce ?? 0) + 1,
+      }));
+      mentionRef.current?.clear();
+      setPrompt("");
+      setHasContent(false);
+      resetDraftRefs();
+      return;
+    }
+    if (localAction?.kind === "toggle-fast") {
+      if (props.selectedAgent.capabilities.fastModels?.includes(props.config.model)) {
+        props.onConfigChange({ fast: props.config.fast !== true });
+      }
+      mentionRef.current?.clear();
+      setPrompt("");
+      setHasContent(false);
+      resetDraftRefs();
+      return;
+    }
 
     resetDraftRefs();
     const useWorktree = branchSelection?.isWorktree ?? props.worktreeMode;
@@ -117,7 +200,9 @@ export function ThreadDraftComposerArea(props: {
 
   useLayoutEffect(() => {
     const saved = initialDraftRef.current;
-    if (!saved) return;
+    if (!saved) {
+      return;
+    }
     if (saved.segments.length > 0) {
       mentionRef.current?.restoreFromSegments(saved.segments);
       latestSegmentsRef.current = saved.segments;
@@ -168,7 +253,8 @@ export function ThreadDraftComposerArea(props: {
         autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
         compact={props.compact ?? false}
         variant="draft"
-        controls={props.controls}
+        controls={controls}
+        toolbarLayoutKey={toolbarLayoutKey}
         fixedContent={
           showCommandPanel ? (
             <ThreadCommandPanel
@@ -254,7 +340,7 @@ export function ThreadDraftComposerArea(props: {
           const segments = mentionRef.current?.serializeSegments() ?? [];
           submitSegments([...attachments.toSegments(), ...segments], prompt);
         }}
-        afterControls={
+        afterControls={(level) => (
           <>
             <Button
               isIconOnly
@@ -283,10 +369,12 @@ export function ThreadDraftComposerArea(props: {
                 onWorktreeModeChange={props.onWorktreeModeChange}
                 onSelect={setBranchSelection}
                 onSwitchBranch={props.onSwitchBranch}
+                forceHideLabel={level >= 3}
+                iconOnly={level >= 3}
               />
             ) : null}
           </>
-        }
+        )}
       />
       {lightboxIndex !== null && imageAttachments.length > 0 ? (
         <ImageLightbox

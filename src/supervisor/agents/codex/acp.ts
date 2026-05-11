@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type {
+import {
   PromptSegment,
   RuntimeEvent,
   SessionRef,
@@ -10,6 +10,8 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
   ThreadStatus,
+  areAgentSlashCommandsEqual,
+  type AgentSlashCommand,
 } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { terminateChildProcessTree } from "@/shared/processTree";
@@ -31,6 +33,7 @@ import {
   type CodexMapperState,
 } from "./canonicalMapping";
 import { CodexStdioTransport } from "./stdioTransport";
+import { mapCodexSlashCommands, readCodexInitCommands } from "./probe";
 
 export type CodexThreadStatus =
   | { type: "active"; activeFlags?: string[] }
@@ -273,6 +276,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   private wslDistro: string | undefined;
   private currentThreadStatus: CodexThreadStatus = { type: "idle" };
   private activeTurnId: string | undefined;
+  private currentSlashCommands: AgentSlashCommand[] | undefined;
   private pendingTurnInterrupt = false;
   // Sticky-error gate: once a turn fails, derived status updates from
   // `thread/status/changed` (which Codex emits as `idle` after an aborted
@@ -326,6 +330,18 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     }
   }
 
+  private updateSlashCommands(commands: AgentSlashCommand[]): void {
+    if (areAgentSlashCommandsEqual(this.currentSlashCommands, commands)) {
+      return;
+    }
+    this.currentSlashCommands = commands;
+    this.listener?.onUpdate({
+      ...deriveCodexStructuredState(this.currentThreadStatus),
+      ...(this.remoteThreadId ? { sessionRef: toSessionRef(this.remoteThreadId) } : {}),
+      slashCommands: commands,
+    });
+  }
+
   static async create(
     input: CreateStructuredSessionInput,
     wslExecPath?: string,
@@ -377,6 +393,14 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       listener.onUpdate({
         ...deriveCodexStructuredState(this.currentThreadStatus),
         sessionRef,
+        ...(this.currentSlashCommands !== undefined
+          ? { slashCommands: this.currentSlashCommands }
+          : {}),
+      });
+    } else if (this.currentSlashCommands !== undefined) {
+      listener.onUpdate({
+        ...deriveCodexStructuredState(this.currentThreadStatus),
+        slashCommands: this.currentSlashCommands,
       });
     }
   }
@@ -585,7 +609,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     // `collaborationMode.settings` is a *required* field and its three
     // string members (model / reasoning_effort / developer_instructions)
     // reject `null`s and empty objects — Codex's JSON-RPC validator wants
-    // real strings on every turn. Mirrors the working shape used by t3code.
+    // real strings on every turn.
     const collaborationMode = {
       mode: config.mode === "plan" ? "plan" : "default",
       settings: {
@@ -812,7 +836,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     // Cold start runs through an interactive login shell + Rust binary load +
     // first-launch Gatekeeper checks on macOS, which can exceed the default
     // 5s timeout. The probe path uses 12s for the same handshake.
-    await this.request(
+    const initResult = await this.request(
       "initialize",
       {
         clientInfo: {
@@ -825,6 +849,11 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       },
       30_000,
     );
+
+    const commands = mapCodexSlashCommands(readCodexInitCommands(initResult));
+    if (commands.length > 0) {
+      this.updateSlashCommands(commands);
+    }
 
     this.transport.write({
       jsonrpc: "2.0",

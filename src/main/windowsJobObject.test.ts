@@ -70,7 +70,7 @@ function createMockChild() {
   return child;
 }
 
-describe("WindowsJobObjectManager", () => {
+describe.skipIf(process.platform !== "win32")("WindowsJobObjectManager", () => {
   const platformDescriptor = Object.getOwnPropertyDescriptor(process, "platform");
 
   beforeEach(() => {

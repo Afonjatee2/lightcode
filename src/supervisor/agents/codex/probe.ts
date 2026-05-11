@@ -45,6 +45,16 @@ export interface CodexProbeResult {
   slashCommands?: AgentSlashCommand[];
 }
 
+/** Account info from Codex `account/read`. */
+export interface CodexAccountInfo {
+  /** "chatgpt" | "apiKey" | "amazonBedrock" | other future variants. */
+  type?: string;
+  /** Present when `type === "chatgpt"` and the user signed in via ChatGPT. */
+  email?: string;
+  /** Raw plan type token from `account/read` (`pro`, `plus`, `team`, ...). */
+  planType?: string;
+}
+
 // ── Label maps ──────────────────────────────────────────────────
 
 /** Default approval policies when no enterprise requirements restrict the list. */
@@ -172,32 +182,35 @@ export function mapCodexModels(
   };
 }
 
-interface CodexRawSlashCommand {
+export interface CodexRawSlashCommand {
   name?: string;
   id?: string;
   description?: string;
   argumentHint?: string;
 }
 
-function readInitCommands(initResult: unknown): CodexRawSlashCommand[] {
+export function readCodexInitCommands(initResult: unknown): CodexRawSlashCommand[] {
   if (!initResult || typeof initResult !== "object") return [];
   const commands = (initResult as { commands?: unknown }).commands;
   if (!Array.isArray(commands)) return [];
-  return commands.filter(
-    (c): c is CodexRawSlashCommand => typeof c === "object" && c !== null,
-  );
+  return commands.filter((c): c is CodexRawSlashCommand => typeof c === "object" && c !== null);
 }
 
-export function mapCodexSlashCommands(commands: readonly CodexRawSlashCommand[]): AgentSlashCommand[] {
-  return commands.map((c) => {
-    const id = c.name ?? c.id ?? "";
+export function mapCodexSlashCommands(
+  commands: readonly CodexRawSlashCommand[],
+): AgentSlashCommand[] {
+  return commands.flatMap((c) => {
+    const id = (c.name ?? c.id ?? "").trim();
+    if (!id) return [];
     const description = c.description?.trim();
-    return {
-      id,
-      label: description ? `${id} — ${c.description}` : id,
-      ...(description ? { description: c.description } : {}),
-      ...(c.argumentHint ? { argumentHint: c.argumentHint } : {}),
-    };
+    return [
+      {
+        id,
+        label: description ? `${id} — ${description}` : id,
+        ...(description ? { description } : {}),
+        ...(c.argumentHint?.trim() ? { argumentHint: c.argumentHint.trim() } : {}),
+      },
+    ];
   });
 }
 
@@ -305,17 +318,28 @@ class ProbeClient {
 
 // ── Probe ───────────────────────────────────────────────────────
 
+interface CodexAppServerSession {
+  client: ProbeClient;
+  initResult: unknown;
+}
+
+interface RunWithCodexAppServerOptions {
+  wslExecPath?: string;
+  timeoutMs?: number;
+  label?: string;
+}
+
 /**
- * Spawn a temporary Codex app-server, discover its capabilities,
- * then kill it.
- *
- * Returns `undefined` on any failure (timeout, auth issues,
- * missing CLI, etc.).
+ * Spawn a temporary Codex app-server, run `initialize` + `initialized`, then
+ * hand the connected client to `fn`. Tears the process down on success or
+ * failure. Returns `undefined` on any failure (spawn error, init timeout,
+ * exception thrown by `fn`).
  */
-export async function probeCodexCapabilities(
+async function runWithCodexAppServer<T>(
   location: ProjectLocation,
-  options?: { wslExecPath?: string; timeoutMs?: number; label?: string },
-): Promise<CodexProbeResult | undefined> {
+  options: RunWithCodexAppServerOptions | undefined,
+  fn: (session: CodexAppServerSession) => Promise<T>,
+): Promise<T | undefined> {
   const timeoutMs = options?.timeoutMs ?? 12_000;
   const tag = options?.label ? `[codex-probe:${options.label}]` : "[codex-probe]";
   let appServer: ChildProcess | undefined;
@@ -335,7 +359,6 @@ export async function probeCodexCapabilities(
     });
     const transport = new CodexStdioTransport(appServer);
 
-    // Bail early if the process fails to start
     const spawnError = await new Promise<Error | undefined>((resolve) => {
       appServer!.once("error", (err) => resolve(err));
       setImmediate(() => resolve(undefined));
@@ -349,67 +372,20 @@ export async function probeCodexCapabilities(
       return undefined;
     }
 
-    const result = await Promise.race([
+    return await Promise.race([
       (async () => {
         client = new ProbeClient(transport);
-
         const initResult = await client.request("initialize", {
           clientInfo: { name: "lightcode-probe", version: "0.1.0" },
           capabilities: { experimentalApi: true },
         });
         client.notify("initialized");
-
-        const [modelResult, requirementsResult] = await Promise.all([
-          client.request("model/list", { includeHidden: false }),
-          client.request("configRequirements/read", {}).catch(() => undefined),
-        ]);
-
-        return { initResult, modelResult, requirementsResult };
+        return await fn({ client, initResult });
       })(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("Codex probe timed out")), timeoutMs),
       ),
     ]);
-
-    const probeResult: CodexProbeResult = {};
-
-    const initCommands = readInitCommands(result.initResult);
-    if (initCommands.length > 0) {
-      probeResult.slashCommands = mapCodexSlashCommands(initCommands);
-    }
-
-    const modelData =
-      result.modelResult && typeof result.modelResult === "object" && "data" in result.modelResult
-        ? (result.modelResult as { data: CodexModelEntry[] }).data
-        : undefined;
-
-    if (modelData?.length) {
-      Object.assign(probeResult, mapCodexModels(modelData));
-    }
-
-    // Map configRequirements/read response
-    const requirements =
-      result.requirementsResult &&
-      typeof result.requirementsResult === "object" &&
-      "requirements" in result.requirementsResult
-        ? (result.requirementsResult as { requirements: CodexConfigRequirements | null })
-            .requirements
-        : undefined;
-
-    Object.assign(probeResult, mapCodexRequirements(requirements));
-
-    console.log(
-      "%s success — models: %d, efforts: %s, defaultEffort: %s, modelEfforts: %d, approvalPolicies: %s, sandboxModes: %s",
-      tag,
-      probeResult.models?.length ?? 0,
-      probeResult.efforts?.join(", ") ?? "(default)",
-      probeResult.defaultEffort ?? "(default)",
-      probeResult.modelEfforts ? Object.keys(probeResult.modelEfforts).length : 0,
-      probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(default)",
-      probeResult.sandboxModes?.map((m) => m.id).join(", ") ?? "(default)",
-    );
-
-    return probeResult;
   } catch (err) {
     console.log("%s failed: %s", tag, err instanceof Error ? err.message : err);
     return undefined;
@@ -419,4 +395,100 @@ export async function probeCodexCapabilities(
       terminateChildProcessTree(appServer);
     }
   }
+}
+
+function extractCodexAccountInfo(rawResponse: unknown): CodexAccountInfo | undefined {
+  if (!rawResponse || typeof rawResponse !== "object") return undefined;
+  const account = (rawResponse as { account?: unknown }).account;
+  if (!account || typeof account !== "object") return undefined;
+  const accountObj = account as Record<string, unknown>;
+  const type = typeof accountObj.type === "string" ? accountObj.type : undefined;
+  const email = typeof accountObj.email === "string" ? accountObj.email.trim() : undefined;
+  const planType = typeof accountObj.planType === "string" ? accountObj.planType.trim() : undefined;
+  if (!type && !email && !planType) return undefined;
+  return {
+    ...(type ? { type } : {}),
+    ...(email ? { email } : {}),
+    ...(planType ? { planType } : {}),
+  };
+}
+
+/**
+ * Spawn a temporary Codex app-server, query `account/read`, then kill it.
+ * Returns the (typed but loosely-validated) account info, or `undefined` on
+ * any failure.
+ */
+export async function probeCodexAccount(
+  location: ProjectLocation,
+  options?: RunWithCodexAppServerOptions,
+): Promise<CodexAccountInfo | undefined> {
+  return runWithCodexAppServer(
+    location,
+    { ...options, label: options?.label ?? "account" },
+    async ({ client }) => {
+      const response = await client.request("account/read", {});
+      return extractCodexAccountInfo(response);
+    },
+  );
+}
+
+/**
+ * Spawn a temporary Codex app-server, discover its capabilities,
+ * then kill it.
+ *
+ * Returns `undefined` on any failure (timeout, auth issues,
+ * missing CLI, etc.).
+ */
+export async function probeCodexCapabilities(
+  location: ProjectLocation,
+  options?: { wslExecPath?: string; timeoutMs?: number; label?: string },
+): Promise<CodexProbeResult | undefined> {
+  const tag = options?.label ? `[codex-probe:${options.label}]` : "[codex-probe]";
+  const result = await runWithCodexAppServer(location, options, async ({ client, initResult }) => {
+    const [modelResult, requirementsResult] = await Promise.all([
+      client.request("model/list", { includeHidden: false }),
+      client.request("configRequirements/read", {}).catch(() => undefined),
+    ]);
+    return { initResult, modelResult, requirementsResult };
+  });
+
+  if (!result) return undefined;
+
+  const probeResult: CodexProbeResult = {};
+
+  const initCommands = readCodexInitCommands(result.initResult);
+  if (initCommands.length > 0) {
+    probeResult.slashCommands = mapCodexSlashCommands(initCommands);
+  }
+
+  const modelData =
+    result.modelResult && typeof result.modelResult === "object" && "data" in result.modelResult
+      ? (result.modelResult as { data: CodexModelEntry[] }).data
+      : undefined;
+
+  if (modelData?.length) {
+    Object.assign(probeResult, mapCodexModels(modelData));
+  }
+
+  const requirements =
+    result.requirementsResult &&
+    typeof result.requirementsResult === "object" &&
+    "requirements" in result.requirementsResult
+      ? (result.requirementsResult as { requirements: CodexConfigRequirements | null }).requirements
+      : undefined;
+
+  Object.assign(probeResult, mapCodexRequirements(requirements));
+
+  console.log(
+    "%s success — models: %d, efforts: %s, defaultEffort: %s, modelEfforts: %d, approvalPolicies: %s, sandboxModes: %s",
+    tag,
+    probeResult.models?.length ?? 0,
+    probeResult.efforts?.join(", ") ?? "(default)",
+    probeResult.defaultEffort ?? "(default)",
+    probeResult.modelEfforts ? Object.keys(probeResult.modelEfforts).length : 0,
+    probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(default)",
+    probeResult.sandboxModes?.map((m) => m.id).join(", ") ?? "(default)",
+  );
+
+  return probeResult;
 }

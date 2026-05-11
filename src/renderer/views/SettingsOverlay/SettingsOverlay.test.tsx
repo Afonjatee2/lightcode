@@ -52,10 +52,14 @@ vi.mock("@/renderer/components/layout/PageLayout", () => ({
 }));
 
 vi.mock("@/renderer/components/common", () => ({
-  SidebarButton: (props: { label: string; onPress?: () => void }) => (
-    <button type="button" onClick={props.onPress}>
-      {props.label}
-    </button>
+  PixelLoader: () => <span />,
+  SidebarButton: (props: { label: string; onPress?: () => void; suffix?: ReactNode }) => (
+    <>
+      <button type="button" onClick={props.onPress}>
+        {props.label}
+      </button>
+      {props.suffix}
+    </>
   ),
 }));
 
@@ -209,8 +213,11 @@ describe("SettingsOverlay", () => {
 
     resolveRefresh?.();
 
-    await waitFor(() => {
-      expect(screen.queryByText("Discovering coding agents…")).not.toBeInTheDocument();
-    });
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Discovering coding agents…")).not.toBeInTheDocument();
+      },
+      { timeout: 2500 },
+    );
   });
 });

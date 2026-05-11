@@ -11,6 +11,7 @@ import {
 } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { OpenRuntimeRequest } from "@/renderer/state/slices/runtimeEventSlice";
+import { ThreadDockSection } from "./ThreadDockUI";
 
 interface ThreadRuntimeRequestPanelProps {
   threadId: string;
@@ -80,11 +81,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
   const detailText = !permissionDetails ? formatRawDetails(request.payload.details) : undefined;
 
   return (
-    <section
-      aria-label={isQuestion ? "Input requested" : "Approval requested"}
-      className="flex flex-col border-b border-[color:var(--border)] bg-transparent text-xs"
-      data-runtime-request-id={request.requestId}
-    >
+    <ThreadDockSection className="!text-xs" placement="composer" collapsed={false}>
       <div className="flex items-start gap-2 px-2 pt-1.5 pb-1 leading-snug">
         <Icon
           className={`mt-0.5 size-3.5 shrink-0 ${isQuestion ? "text-foreground-muted" : "text-warning"}`}
@@ -116,7 +113,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
           onSelect={(optionId) => decide([optionId])}
         />
       )}
-    </section>
+    </ThreadDockSection>
   );
 }
 

@@ -27,6 +27,7 @@ describe("deriveToolDisplay", () => {
     expect(display.parts).toEqual({
       prefix: "Read: ",
       path: "src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx",
+      filePath: true,
     });
     expect(display.Icon).toBe(Eye);
   });
@@ -44,6 +45,7 @@ describe("deriveToolDisplay", () => {
     expect(display.parts).toEqual({
       prefix: "Edit: ",
       path: "src/renderer/notifications.ts",
+      filePath: true,
     });
     expect(display.Icon).toBe(Pencil);
   });
@@ -75,7 +77,7 @@ describe("deriveToolDisplay", () => {
     );
 
     expect(display.title).toBe("Read: src/foo.ts");
-    expect(display.parts).toEqual({ prefix: "Read: ", path: "src/foo.ts" });
+    expect(display.parts).toEqual({ prefix: "Read: ", path: "src/foo.ts", filePath: true });
     expect(display.Icon).toBe(Eye);
   });
 

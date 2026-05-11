@@ -40,6 +40,7 @@ export const threads = sqliteTable("threads", {
   groupName: text("group_name"),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
+  doneAt: text("done_at"),
   starred: integer("starred", { mode: "boolean" }).notNull().default(false),
   /** "terminal" (xterm-backed PTY) vs "gui" (renderer-native chat). */
   presentationMode: text("presentation_mode").notNull().default("terminal"),

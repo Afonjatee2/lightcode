@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { Surface, Tooltip } from "@heroui/react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { CanonicalContentBlock, MessageItemPayload } from "@/shared/contracts";
@@ -17,26 +17,58 @@ interface UserMessageProps {
 }
 
 const COLLAPSED_LINE_COUNT = 4;
-const COLLAPSED_CHAR_COUNT = 280;
+const FALLBACK_LINE_HEIGHT_RATIO = 1.375;
+const OVERFLOW_EPSILON_PX = 2;
 const collapsedMessageClass =
   "overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [mask-image:linear-gradient(to_bottom,black_65%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_65%,transparent)]";
 
 export const UserMessage = memo(function UserMessage({ item }: UserMessageProps) {
   const actions = useChatPaneActions();
   const [isExpanded, setIsExpanded] = useState(false);
+  const [hasVisualOverflow, setHasVisualOverflow] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const payload = getRuntimeItemPayload<MessageItemPayload>(item, "user_message");
   const content = payload?.content ?? [];
   const text = buildUserPromptText(content);
   const attachments = buildUserPromptAttachments(content);
+
+  const syncVisualOverflow = useEffectEvent(() => {
+    const element = contentRef.current;
+    if (!element) return;
+    const nextHasVisualOverflow = measureUserMessageOverflow(element);
+    setHasVisualOverflow((prev) => {
+      if (prev === nextHasVisualOverflow) return prev;
+      actions?.onContentHeightChange();
+      return nextHasVisualOverflow;
+    });
+    if (!nextHasVisualOverflow) setIsExpanded(false);
+  });
+
+  useLayoutEffect(() => {
+    syncVisualOverflow();
+  }, [text, attachments.length]);
+
+  useLayoutEffect(() => {
+    const element = contentRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(() => {
+      syncVisualOverflow();
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
   if (content.length === 0 || (text.length === 0 && attachments.length === 0)) return null;
-  const isCollapsible = isLongUserMessage(text);
+  const isCollapsible = hasVisualOverflow;
   const isCollapsed = isCollapsible && !isExpanded;
   const tooltipLabel = isExpanded ? "Show less" : "Show more";
   const Icon = isExpanded ? ChevronUp : ChevronDown;
   return (
     <Surface variant="tertiary" className={`${chatMessageSurfaceClass} relative`}>
       <div
+        ref={contentRef}
+        data-user-message-content="true"
         className={`min-w-0 space-y-1.5 leading-snug ${
           isCollapsed ? collapsedMessageClass : isCollapsible ? "max-h-[50vh] overflow-y-auto" : ""
         }`}
@@ -45,6 +77,8 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
           <div className="-mt-1">
             <AttachmentBar
               attachments={attachments}
+              layout="flush"
+              hideImageNames
               onPreviewImage={(att) => {
                 const idx = attachments.filter((a) => a.isImage).findIndex((a) => a.id === att.id);
                 if (idx >= 0) setLightboxIndex(idx);
@@ -120,8 +154,27 @@ function buildUserPromptAttachments(content: CanonicalContentBlock[]): Attachmen
   });
 }
 
-function isLongUserMessage(text: string): boolean {
-  return (
-    text.split(/\r\n|\r|\n/).length > COLLAPSED_LINE_COUNT || text.length > COLLAPSED_CHAR_COUNT
-  );
+function measureUserMessageOverflow(element: HTMLElement): boolean {
+  const fullHeight = Math.max(element.scrollHeight, element.getBoundingClientRect().height);
+  return fullHeight - getCollapsedHeight(element) > OVERFLOW_EPSILON_PX;
+}
+
+function getCollapsedHeight(element: HTMLElement): number {
+  const style = window.getComputedStyle(element);
+  const fontSize = parseCssPx(style.fontSize) ?? 16;
+  const lineHeight = parseCssLineHeight(style.lineHeight, fontSize);
+  return lineHeight * COLLAPSED_LINE_COUNT;
+}
+
+function parseCssLineHeight(value: string, fontSize: number): number {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) return fontSize * FALLBACK_LINE_HEIGHT_RATIO;
+  if (value.trim().endsWith("px")) return parsed;
+  if (parsed <= 4) return parsed * fontSize;
+  return parsed;
+}
+
+function parseCssPx(value: string): number | null {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }

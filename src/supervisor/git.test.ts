@@ -14,7 +14,7 @@ const { execFileMock, mkdirMock, readFileMock, readWslCommandOutputAsync, rmMock
         ) => void
       >(),
     mkdirMock: vi.fn<() => Promise<void>>(),
-    readFileMock: vi.fn<() => Promise<string>>(),
+    readFileMock: vi.fn<() => Promise<string | Buffer>>(),
     readWslCommandOutputAsync:
       vi.fn<() => Promise<{ ok: boolean; stdout: string; stderr: string }>>(),
     rmMock: vi.fn<() => Promise<void>>(),
@@ -1012,6 +1012,40 @@ describe("GitService.getStatus", () => {
     await service.getStatus(location);
 
     expect(readFileMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not count binary untracked files as inserted text lines", async () => {
+    readFileMock.mockResolvedValue(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]),
+    );
+
+    mockGitCommands((args) => {
+      if (args[0] === "rev-parse") return { stdout: "true\n" };
+      if (args[0] === "status")
+        return {
+          stdout: [
+            "# branch.head main",
+            "# branch.ab +0 -0",
+            "? website/public/hero-screenshot.png",
+          ].join("\n"),
+        };
+      if (args[0] === "remote") return { stdout: "" };
+      if (args[0] === "diff") return { stdout: "" };
+      if (args[0] === "ls-files") return { stdout: "website/public/hero-screenshot.png\0" };
+      return { stdout: "" };
+    });
+
+    const status = await new GitService().getStatus(location);
+
+    expect(status.unstaged).toEqual([
+      expect.objectContaining({
+        path: "website/public/hero-screenshot.png",
+        status: "?",
+        insertions: 0,
+        deletions: 0,
+      }),
+    ]);
+    expect(status.totalInsertions).toBe(0);
   });
 
   it("refreshes cached untracked file stats when file metadata changes", async () => {

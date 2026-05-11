@@ -74,7 +74,10 @@ function readVersion(file: string): string | undefined {
       .map((l) => l.trim())
       .find((l) => l.length > 0 && !l.startsWith("#"));
     if (!line) return undefined;
-    return line.replace(/^node-?/i, "").replace(/^v/i, "").trim();
+    return line
+      .replace(/^node-?/i, "")
+      .replace(/^v/i, "")
+      .trim();
   } catch {
     return undefined;
   }

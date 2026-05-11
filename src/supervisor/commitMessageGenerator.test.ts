@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ProjectLocation } from "@/shared/contracts";
+import type { GitStatusResult, ProjectLocation } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 
 const spawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
@@ -19,6 +19,18 @@ const buildAgentCommandMock = vi.hoisted(() =>
 );
 const getStagedDiffMock = vi.hoisted(() => vi.fn<() => Promise<string>>());
 const getAllDiffMock = vi.hoisted(() => vi.fn<() => Promise<string>>());
+const getStatusMock = vi.hoisted(() => vi.fn<() => Promise<GitStatusResult>>());
+const getDiffMock = vi.hoisted(() =>
+  vi.fn<
+    (
+      location: ProjectLocation,
+      filePath?: string,
+      staged?: boolean,
+    ) => Promise<{
+      diff: string;
+    }>
+  >(),
+);
 
 vi.mock("node:child_process", () => ({
   spawn: spawnMock,
@@ -30,8 +42,10 @@ vi.mock("./agents/base", () => ({
 
 vi.mock("./git", () => ({
   GitService: class MockGitService {
+    getStatus = getStatusMock;
     getStagedDiff = getStagedDiffMock;
     getAllDiff = getAllDiffMock;
+    getDiff = getDiffMock;
   },
 }));
 
@@ -54,8 +68,10 @@ function createMockChildProcess(): MockChildProcess {
 }
 
 async function flushPromises(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+  for (let i = 0; i < 5; i++) {
+    await Promise.resolve();
+  }
+  await new Promise((resolve) => setImmediate(resolve));
 }
 
 const windowsProject: ProjectLocation = {
@@ -68,6 +84,20 @@ const wslProject: ProjectLocation = {
   distro: "Ubuntu",
   linuxPath: "/home/demo/project",
   uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\project",
+};
+
+const cleanStatus: GitStatusResult = {
+  isRepo: true,
+  branch: "main",
+  tracking: "",
+  hasRemote: false,
+  remoteInfo: null,
+  ahead: 0,
+  behind: 0,
+  staged: [],
+  unstaged: [],
+  totalInsertions: 0,
+  totalDeletions: 0,
 };
 
 function createAdapter(): AgentAdapter {
@@ -154,6 +184,20 @@ describe("generateCommitMessage", () => {
     );
     getStagedDiffMock.mockResolvedValue("diff --git a/file.ts b/file.ts");
     getAllDiffMock.mockResolvedValue("");
+    getStatusMock.mockResolvedValue({
+      ...cleanStatus,
+      staged: [
+        {
+          path: "file.ts",
+          status: "M",
+          staged: true,
+          insertions: 1,
+          deletions: 0,
+        },
+      ],
+      totalInsertions: 1,
+    });
+    getDiffMock.mockResolvedValue({ diff: "" });
   });
 
   it("pipes the generated prompt over stdin and uses the project cwd on Windows", async () => {
@@ -259,6 +303,125 @@ describe("generateCommitMessage", () => {
     child.emit("close", 0);
 
     await expect(pending).resolves.toBe("fix(cursor): add cursor-agent adapter");
+  });
+
+  it("lists all changed files and keeps later-file diff excerpts when the first file is large", async () => {
+    const child = createMockChildProcess();
+    spawnMock.mockReturnValue(child);
+    getStatusMock.mockResolvedValue({
+      ...cleanStatus,
+      staged: [
+        {
+          path: "src/large.ts",
+          status: "M",
+          staged: true,
+          insertions: 500,
+          deletions: 12,
+        },
+        {
+          path: "src/settings file.ts",
+          status: "M",
+          staged: true,
+          insertions: 8,
+          deletions: 2,
+        },
+      ],
+      totalInsertions: 508,
+      totalDeletions: 14,
+    });
+    getStagedDiffMock.mockResolvedValue(
+      [
+        "diff --git a/src/large.ts b/src/large.ts",
+        "@@ -1,1 +1,500 @@",
+        " existing",
+        ...Array.from({ length: 700 }, (_, index) => `+large generated line ${index}`),
+        'diff --git "a/src/settings file.ts" "b/src/settings file.ts"',
+        "@@ -1,3 +1,4 @@",
+        "-oldSetting: false",
+        "+newSetting: true",
+      ].join("\n"),
+    );
+
+    const pending = generateCommitMessage(windowsProject, createAdapter());
+    await flushPromises();
+
+    expect(child.stdin.end).toHaveBeenCalledWith(expect.stringContaining("Changed files (2):"));
+    expect(child.stdin.end).toHaveBeenCalledWith(expect.stringContaining("M src/large.ts"));
+    expect(child.stdin.end).toHaveBeenCalledWith(expect.stringContaining("M src/settings file.ts"));
+    expect(child.stdin.end).toHaveBeenCalledWith(
+      expect.stringContaining("--- src/settings file.ts (2/2) ---"),
+    );
+    expect(child.stdin.end).toHaveBeenCalledWith(expect.stringContaining("+newSetting: true"));
+
+    child.stdout.emit("data", Buffer.from("feat(settings): update generated settings"));
+    child.emit("close", 0);
+
+    await expect(pending).resolves.toBe("feat(settings): update generated settings");
+  });
+
+  it("includes untracked file diffs when generating for unstaged add-all changes", async () => {
+    const child = createMockChildProcess();
+    spawnMock.mockReturnValue(child);
+    getStatusMock.mockResolvedValue({
+      ...cleanStatus,
+      unstaged: [
+        {
+          path: "src/tracked.ts",
+          status: "M",
+          staged: false,
+          insertions: 2,
+          deletions: 1,
+        },
+        {
+          path: "src/newFeature.ts",
+          status: "?",
+          staged: false,
+          insertions: 20,
+          deletions: 0,
+        },
+      ],
+      totalInsertions: 22,
+      totalDeletions: 1,
+    });
+    getStagedDiffMock.mockResolvedValue("");
+    getAllDiffMock.mockResolvedValue(
+      "diff --git a/src/tracked.ts b/src/tracked.ts\n@@ -1 +1 @@\n-old\n+new",
+    );
+    getDiffMock.mockResolvedValue({
+      diff: [
+        "diff --git a/src/newFeature.ts b/src/newFeature.ts",
+        "new file mode 100644",
+        "@@ -0,0 +1,2 @@",
+        "+export function newFeature() {}",
+      ].join("\n"),
+    });
+
+    const pending = generateCommitMessage(windowsProject, createAdapter());
+    await flushPromises();
+
+    expect(getDiffMock).toHaveBeenCalledWith(windowsProject, "src/newFeature.ts", false);
+    expect(child.stdin.end).toHaveBeenCalledWith(
+      expect.stringContaining("Change source: unstaged"),
+    );
+    expect(child.stdin.end).toHaveBeenCalledWith(expect.stringContaining("? src/newFeature.ts"));
+    expect(child.stdin.end).toHaveBeenCalledWith(
+      expect.stringContaining("+export function newFeature() {}"),
+    );
+
+    child.stdout.emit("data", Buffer.from("feat: add tracked and new feature changes"));
+    child.emit("close", 0);
+
+    await expect(pending).resolves.toBe("feat: add tracked and new feature changes");
+  });
+
+  it("rejects when no staged or unstaged changes exist", async () => {
+    getStatusMock.mockResolvedValue(cleanStatus);
+    getStagedDiffMock.mockResolvedValue("");
+    getAllDiffMock.mockResolvedValue("");
+
+    await expect(generateCommitMessage(windowsProject, createAdapter())).rejects.toThrow(
+      "No changes to describe",
+    );
   });
 
   it("turns a killed child process into a timeout error", async () => {

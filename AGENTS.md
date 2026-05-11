@@ -1,6 +1,6 @@
 # Lightcode
 
-Terminal-native AI agent orchestrator — Electron desktop app managing Claude, Codex, and Gemini CLIs via real PTY sessions plus provider structured runtimes.
+Universal AI agent orchestrator — Electron desktop app managing Claude, Codex, and Gemini via real PTY sessions (terminal-native) and structured runtimes (native chat).
 
 ## Quick Reference
 

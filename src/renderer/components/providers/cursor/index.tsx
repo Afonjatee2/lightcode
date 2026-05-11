@@ -1,17 +1,19 @@
 export * from "./CursorIcon";
 
-import { ClipboardList } from "lucide-react";
 import { CursorIcon } from "./CursorIcon";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
+import { fullAccessToggle, planWorkToggle } from "../composerControlBuilders";
 import {
   registerCommitGenDefaults,
   registerComposerControls,
   registerConflictResolverDefaults,
   registerProviderIcon,
+  registerProviderLabel,
   registerTitleGenDefaults,
 } from "../ProviderIcon";
 
 registerProviderIcon("cursor", CursorIcon);
+registerProviderLabel("cursor", "Cursor");
 registerCommitGenDefaults("cursor", {
   label: "Cursor",
   hint: "Composer 2 Fast",
@@ -33,34 +35,27 @@ registerConflictResolverDefaults("cursor", {
 
 registerComposerControls("cursor", ({ capabilities, config, isDisabled, onConfigChange }) => {
   const hasPlanMode = capabilities.modes.includes("plan");
+  const isPlanMode = config.mode === "plan";
+  const isFullAccess = (config.approvalPolicy ?? "default") === "never";
 
   const controls: ComposerControl[] = [
     ...(hasPlanMode
       ? [
-          {
-            kind: "toggle" as const,
-            label: "Plan",
-            icon: <ClipboardList className="size-3.5" />,
-            isSelected: config.mode === "plan",
-            hideLabelOnWrap: true,
+          planWorkToggle({
+            isPlanMode,
             isDisabled,
-            onChange: (isSelected: boolean) =>
-              onConfigChange({ mode: isSelected ? "plan" : "agent" }),
-          },
+            onChange: (isSelected) => onConfigChange({ mode: isSelected ? "plan" : "agent" }),
+          }),
         ]
       : []),
     ...(capabilities.approvalPolicies.length > 0
       ? [
-          {
-            kind: "toggle" as const,
-            label: "YOLO",
-            iconKind: "permission" as const,
-            isSelected: (config.approvalPolicy ?? "default") === "never",
-            hideLabelOnWrap: true,
+          fullAccessToggle({
+            isFullAccess,
             isDisabled,
-            onChange: (isSelected: boolean) =>
+            onChange: (isSelected) =>
               onConfigChange({ approvalPolicy: isSelected ? "never" : "default" }),
-          },
+          }),
         ]
       : []),
   ];

@@ -2,6 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { AgentStatus } from "@/shared/contracts";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 
 const taskkillSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
@@ -1325,7 +1326,18 @@ describe("writeSubmittedPrompt", () => {
       emitted.push(event as Record<string, unknown>);
     });
     const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const setListener = vi.fn<(listener: unknown) => void>();
+    const setListener = vi.fn<
+      (listener: { onUpdate(update: Record<string, unknown>): void }) => void
+    >((listener) => {
+      listener.onUpdate({
+        status: "idle",
+        attention: "none",
+        sessionRef: {
+          providerSessionId: "session-1",
+          discoveredAt: "2026-05-10T12:00:00.000Z",
+        },
+      });
+    });
 
     const adapter = {
       kind: "codex" as const,
@@ -1411,6 +1423,17 @@ describe("writeSubmittedPrompt", () => {
         status: "launching",
       }),
     );
+    expect(threadStates).not.toContainEqual(
+      expect.objectContaining({
+        status: "idle",
+      }),
+    );
+    expect(threadStates.at(-1)).toMatchObject({
+      status: "working",
+      sessionRef: {
+        providerSessionId: "session-1",
+      },
+    });
   });
 
   it("inserts Codex hook enable flags before the positional prompt", async () => {
@@ -1462,7 +1485,7 @@ describe("writeSubmittedPrompt", () => {
       (input: unknown) => Promise<{ env: Record<string, string>; extraArgs: string[] }>
     >(async () => ({
       env: { LIGHTCODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event" },
-      extraArgs: ["--enable", "codex_hooks"],
+      extraArgs: ["--enable", "hooks"],
     }));
 
     await runtime.startThread({
@@ -1485,8 +1508,8 @@ describe("writeSubmittedPrompt", () => {
     const [, spawnArgs] = ptySpawnMock.mock.calls[0] as [string, string[]];
     const command = decodeSpawnCommand(spawnArgs);
     expect(command.indexOf("--enable")).toBeGreaterThan(-1);
-    expect(command.indexOf("codex_hooks")).toBeGreaterThan(command.indexOf("--enable"));
-    expect(command.indexOf("hello")).toBeGreaterThan(command.indexOf("codex_hooks"));
+    expect(command.indexOf("hooks")).toBeGreaterThan(command.indexOf("--enable"));
+    expect(command.indexOf("hello")).toBeGreaterThan(command.indexOf("hooks"));
   });
 
   it("inserts Codex hook enable flags before the resume session id", async () => {
@@ -1538,7 +1561,7 @@ describe("writeSubmittedPrompt", () => {
       (input: unknown) => Promise<{ env: Record<string, string>; extraArgs: string[] }>
     >(async () => ({
       env: { LIGHTCODE_HOOK_URL: "http://127.0.0.1:43123/v1/agent-event" },
-      extraArgs: ["--enable", "codex_hooks"],
+      extraArgs: ["--enable", "hooks"],
     }));
 
     await runtime.startThread({
@@ -1565,8 +1588,8 @@ describe("writeSubmittedPrompt", () => {
     const [, spawnArgs] = ptySpawnMock.mock.calls[0] as [string, string[]];
     const command = decodeSpawnCommand(spawnArgs);
     expect(command.indexOf("--enable")).toBeGreaterThan(-1);
-    expect(command.indexOf("codex_hooks")).toBeGreaterThan(command.indexOf("--enable"));
-    expect(command.indexOf("session-123")).toBeGreaterThan(command.indexOf("codex_hooks"));
+    expect(command.indexOf("hooks")).toBeGreaterThan(command.indexOf("--enable"));
+    expect(command.indexOf("session-123")).toBeGreaterThan(command.indexOf("hooks"));
     expect(command.indexOf("next prompt")).toBeGreaterThan(command.indexOf("session-123"));
   });
 
@@ -1853,6 +1876,56 @@ describe("detectWslAgentStatuses", () => {
       ],
       wsl: [],
     });
+  });
+
+  it("adds adapter default slash commands to stale cached statuses", () => {
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+
+    const { cacheDir, statusCachePath } = resolveLightcodePaths(dataDir);
+    mkdirSync(cacheDir, { recursive: true });
+    writeFileSync(
+      statusCachePath,
+      JSON.stringify({
+        windows: [
+          {
+            kind: "codex",
+            label: "Codex",
+            installed: true,
+            authState: "authenticated",
+            capabilities: {
+              models: [{ id: "gpt-5.5", label: "5.5" }],
+              efforts: ["low", "medium"],
+              modelEfforts: {},
+              modes: ["agent", "plan"],
+              approvalPolicies: [],
+              sandboxModes: [],
+              supportsResume: true,
+              supportsDirectInput: true,
+              liveInputMode: "terminal",
+              presentationMode: "terminal",
+              presentationModes: ["terminal", "gui"],
+              settingDefs: [],
+            },
+          },
+        ],
+      }),
+    );
+
+    const runtime = new SupervisorRuntime(() => {});
+    const cached = (
+      runtime as unknown as {
+        readCachedStatuses: (wslDistros: readonly string[]) => {
+          windows: AgentStatus[];
+          wsl: AgentStatus[];
+          fromCache: boolean;
+        };
+      }
+    ).readCachedStatuses([]);
+
+    expect(cached.windows[0]?.capabilities.slashCommands?.map((command) => command.id)).toEqual(
+      expect.arrayContaining(["status", "model", "review", "compact", "permissions"]),
+    );
   });
 
   it("detects statuses for every adapter in every distro", async () => {

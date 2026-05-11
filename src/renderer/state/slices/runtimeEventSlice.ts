@@ -1,6 +1,8 @@
 import type {
   CanonicalItemType,
   CanonicalRequestType,
+  FileCheckpointRecord,
+  FileCheckpointTurn,
   RequestPayload,
   RuntimeContentStreamKind,
   RuntimeEvent,
@@ -70,14 +72,30 @@ export interface RuntimeEventSlice {
   runtimeStructuralVersionByThread: Record<string, number>;
   /** Frozen per-turn timing windows accumulated during the session. */
   runtimeCompletedTurnsByThread: Record<string, ReadonlyArray<CompletedTurnRecord>>;
+  /** File-backed checkpoint snapshots keyed by checkpoint item id. */
+  fileCheckpointsByThread: Record<string, Record<string, FileCheckpointRecord>>;
+  /** Completed turn file diffs keyed by the turn anchor/checkpoint item id. */
+  fileCheckpointTurnsByThread: Record<string, Record<string, FileCheckpointTurn>>;
   applyRuntimeEvent(threadId: string, event: RuntimeEvent): void;
   applyRuntimeEvents(threadId: string, events: RuntimeEvent[]): void;
   clearRuntimeDirtyThreadIds(threadIds: readonly string[]): void;
   clearThreadRuntimeEvents(threadId: string): void;
+  /**
+   * Revert the visible chat transcript to a checkpoint item, preserving that
+   * item and everything before it. Used by GUI chat checkpoints.
+   */
+  truncateThreadRuntimeAfter(threadId: string, checkpointItemId: string): void;
   /** Replace the persisted item list for a thread (used during DB hydration). */
   hydrateThreadRuntimeItems(threadId: string, items: RuntimeChatItem[]): void;
   /** Replace the persisted completed-turn list (used during DB hydration). */
   hydrateThreadCompletedTurns(threadId: string, turns: ReadonlyArray<CompletedTurnRecord>): void;
+  hydrateThreadFileCheckpoints(
+    threadId: string,
+    checkpoints: readonly FileCheckpointRecord[],
+    turns: readonly FileCheckpointTurn[],
+  ): void;
+  upsertThreadFileCheckpoint(threadId: string, checkpoint: FileCheckpointRecord): void;
+  upsertThreadFileCheckpointTurn(threadId: string, checkpoint: FileCheckpointTurn): void;
   /**
    * Drop all child items of a sub-agent parent from the thread. Called when
    * the renderer closes the overlay (so re-opening reloads from the supervisor
@@ -105,6 +123,8 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
   runtimeDirtyThreadIds: [],
   runtimeStructuralVersionByThread: {},
   runtimeCompletedTurnsByThread: {},
+  fileCheckpointsByThread: {},
+  fileCheckpointTurnsByThread: {},
 
   applyRuntimeEvent: (threadId, event) =>
     set((state) => applyRuntimeEventsToState(state, threadId, [event])),
@@ -157,6 +177,56 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
       };
     }),
 
+  truncateThreadRuntimeAfter: (threadId, checkpointItemId) =>
+    set((state) => {
+      const itemIds = state.runtimeItemIdsByThread[threadId];
+      const items = state.runtimeItemsByIdByThread[threadId];
+      if (!itemIds?.length || !items) return {};
+
+      const checkpointIndex = itemIds.indexOf(checkpointItemId);
+      if (checkpointIndex < 0 || checkpointIndex === itemIds.length - 1) return {};
+
+      const keptIds = itemIds.slice(0, checkpointIndex + 1);
+      const keptIdSet = new Set(keptIds);
+      const keptItems: Record<string, RuntimeChatItem> = {};
+      for (const id of keptIds) {
+        const item = items[id];
+        if (item) keptItems[id] = item;
+      }
+
+      const completedTurns = state.runtimeCompletedTurnsByThread[threadId] ?? [];
+      const keptCompletedTurns = completedTurns.filter(
+        (turn) => turn.anchorItemId === null || keptIdSet.has(turn.anchorItemId),
+      );
+      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.includes(threadId)
+        ? state.runtimeDirtyThreadIds
+        : [...state.runtimeDirtyThreadIds, threadId];
+
+      return {
+        runtimeItemIdsByThread: {
+          ...state.runtimeItemIdsByThread,
+          [threadId]: keptIds,
+        },
+        runtimeItemsByIdByThread: {
+          ...state.runtimeItemsByIdByThread,
+          [threadId]: keptItems,
+        },
+        runtimeRequestsByThread: {
+          ...state.runtimeRequestsByThread,
+          [threadId]: [],
+        },
+        runtimeStructuralVersionByThread: {
+          ...state.runtimeStructuralVersionByThread,
+          [threadId]: (state.runtimeStructuralVersionByThread[threadId] ?? 0) + 1,
+        },
+        runtimeCompletedTurnsByThread: {
+          ...state.runtimeCompletedTurnsByThread,
+          [threadId]: keptCompletedTurns,
+        },
+        runtimeDirtyThreadIds,
+      };
+    }),
+
   hydrateThreadRuntimeItems: (threadId, items) =>
     set((state) => {
       // Don't clobber items that already streamed in for an active thread —
@@ -190,6 +260,77 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         runtimeCompletedTurnsByThread: {
           ...state.runtimeCompletedTurnsByThread,
           [threadId]: merged,
+        },
+      };
+    }),
+
+  hydrateThreadFileCheckpoints: (threadId, checkpoints, turns) =>
+    set((state) => {
+      const existingCheckpoints = state.fileCheckpointsByThread[threadId] ?? {};
+      const existingTurns = state.fileCheckpointTurnsByThread[threadId] ?? {};
+      const nextCheckpoints = { ...existingCheckpoints };
+      const nextTurns = { ...existingTurns };
+      let changed = false;
+      for (const checkpoint of checkpoints) {
+        if (existingCheckpoints[checkpoint.checkpointItemId]?.commit === checkpoint.commit) {
+          continue;
+        }
+        nextCheckpoints[checkpoint.checkpointItemId] = checkpoint;
+        changed = true;
+      }
+      for (const turn of turns) {
+        if (existingTurns[turn.checkpointItemId]?.commit === turn.commit) continue;
+        nextTurns[turn.checkpointItemId] = turn;
+        nextCheckpoints[turn.checkpointItemId] = turn;
+        changed = true;
+      }
+      if (!changed) return {};
+      return {
+        fileCheckpointsByThread: {
+          ...state.fileCheckpointsByThread,
+          [threadId]: nextCheckpoints,
+        },
+        fileCheckpointTurnsByThread: {
+          ...state.fileCheckpointTurnsByThread,
+          [threadId]: nextTurns,
+        },
+      };
+    }),
+
+  upsertThreadFileCheckpoint: (threadId, checkpoint) =>
+    set((state) => {
+      const existing = state.fileCheckpointsByThread[threadId] ?? {};
+      if (existing[checkpoint.checkpointItemId]?.commit === checkpoint.commit) return {};
+      return {
+        fileCheckpointsByThread: {
+          ...state.fileCheckpointsByThread,
+          [threadId]: {
+            ...existing,
+            [checkpoint.checkpointItemId]: checkpoint,
+          },
+        },
+      };
+    }),
+
+  upsertThreadFileCheckpointTurn: (threadId, checkpoint) =>
+    set((state) => {
+      const existingCheckpoints = state.fileCheckpointsByThread[threadId] ?? {};
+      const existingTurns = state.fileCheckpointTurnsByThread[threadId] ?? {};
+      if (existingTurns[checkpoint.checkpointItemId]?.commit === checkpoint.commit) return {};
+      return {
+        fileCheckpointsByThread: {
+          ...state.fileCheckpointsByThread,
+          [threadId]: {
+            ...existingCheckpoints,
+            [checkpoint.checkpointItemId]: checkpoint,
+          },
+        },
+        fileCheckpointTurnsByThread: {
+          ...state.fileCheckpointTurnsByThread,
+          [threadId]: {
+            ...existingTurns,
+            [checkpoint.checkpointItemId]: checkpoint,
+          },
         },
       };
     }),

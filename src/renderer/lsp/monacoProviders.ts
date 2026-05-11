@@ -6,6 +6,8 @@ type ITextModel = MonacoEditor.ITextModel;
 type IPosition = { lineNumber: number; column: number };
 
 type IDisposable = { dispose(): void };
+type LspPosition = { line: number; character: number };
+type LspRange = { start: LspPosition; end: LspPosition };
 
 // ── LSP ↔ Monaco type translation ───────────────────────────
 
@@ -14,13 +16,7 @@ function toLspPosition(monacoPos: { lineNumber: number; column: number }) {
   return { line: monacoPos.lineNumber - 1, character: monacoPos.column - 1 };
 }
 
-function toMonacoRange(
-  lspRange: {
-    start: { line: number; character: number };
-    end: { line: number; character: number };
-  },
-  monaco: Monaco,
-): InstanceType<typeof monaco.Range> {
+function toMonacoRange(lspRange: LspRange, monaco: Monaco): InstanceType<typeof monaco.Range> {
   return new monaco.Range(
     lspRange.start.line + 1,
     lspRange.start.character + 1,
@@ -80,6 +76,37 @@ function mapSeverity(lspSeverity: number | undefined, monaco: Monaco): number {
   }
 }
 
+function completionLabelText(label: LspCompletionItem["label"]): string {
+  return typeof label === "string" ? label : label.label;
+}
+
+function documentationToMarkdown(
+  documentation: string | LspMarkupContent | undefined,
+): string | { value: string } | undefined {
+  if (!documentation) return undefined;
+  return typeof documentation === "string" ? documentation : { value: documentation.value };
+}
+
+function completionTextEditRange(textEdit: LspCompletionTextEdit | undefined): LspRange | null {
+  if (!textEdit) return null;
+  if ("range" in textEdit) return textEdit.range;
+  return textEdit.insert;
+}
+
+function hoverContentToMarkdown(content: LspHoverContent): { value: string } {
+  if (typeof content === "string") return { value: content };
+  if ("kind" in content) return { value: content.value };
+  return { value: `\`\`\`${content.language}\n${content.value}\n\`\`\`` };
+}
+
+function isLocationLink(location: LspLocation | LspLocationLink): location is LspLocationLink {
+  return "targetUri" in location;
+}
+
+function isUriInRoot(uri: string, rootUri: string): boolean {
+  return uri === rootUri || uri.startsWith(`${rootUri}/`);
+}
+
 // ── Provider registration ───────────────────────────────────
 
 /**
@@ -90,6 +117,7 @@ export function registerLspProviders(
   monaco: Monaco,
   transport: LspIpcTransport,
   languageIds: string[],
+  rootUri: string,
 ): IDisposable[] {
   const disposables: IDisposable[] = [];
 
@@ -99,39 +127,52 @@ export function registerLspProviders(
       monaco.languages.registerCompletionItemProvider(lang, {
         triggerCharacters: [".", "/", "<", '"', "'", "@", "#"],
         provideCompletionItems: async (model: ITextModel, position: IPosition) => {
-          const result = (await transport.sendMessage({
-            jsonrpc: "2.0",
-            id: Date.now(),
-            method: "textDocument/completion",
-            params: {
-              textDocument: { uri: model.uri.toString() },
-              position: toLspPosition(position),
-            },
-          })) as { items?: unknown[]; isIncomplete?: boolean } | unknown[] | null;
+          if (!isUriInRoot(model.uri.toString(), rootUri)) return { suggestions: [] };
+
+          let result: { items?: unknown[]; isIncomplete?: boolean } | unknown[] | null;
+          try {
+            result = (await transport.sendMessage({
+              jsonrpc: "2.0",
+              id: Date.now(),
+              method: "textDocument/completion",
+              params: {
+                textDocument: { uri: model.uri.toString() },
+                position: toLspPosition(position),
+              },
+            })) as { items?: unknown[]; isIncomplete?: boolean } | unknown[] | null;
+          } catch {
+            return { suggestions: [] };
+          }
 
           if (!result) return { suggestions: [] };
           const items = Array.isArray(result) ? result : (result.items ?? []);
+          const word = model.getWordUntilPosition(position);
+          const fallbackRange = new monaco.Range(
+            position.lineNumber,
+            word.startColumn,
+            position.lineNumber,
+            word.endColumn,
+          );
 
           return {
-            suggestions: (items as LspCompletionItem[]).map((item) => ({
-              label: item.label,
-              kind: mapCompletionKind(item.kind, monaco),
-              insertText:
-                item.insertText ?? (typeof item.label === "string" ? item.label : item.label.label),
-              insertTextRules:
-                item.insertTextFormat === 2
-                  ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-                  : undefined,
-              detail: item.detail,
-              documentation: item.documentation
-                ? typeof item.documentation === "string"
-                  ? item.documentation
-                  : { value: (item.documentation as { value: string }).value }
-                : undefined,
-              sortText: item.sortText,
-              filterText: item.filterText,
-              range: undefined as unknown as InstanceType<typeof monaco.Range>,
-            })),
+            suggestions: (items as LspCompletionItem[]).map((item) => {
+              const textEditRange = completionTextEditRange(item.textEdit);
+              return {
+                label: item.label,
+                kind: mapCompletionKind(item.kind, monaco),
+                insertText:
+                  item.textEdit?.newText ?? item.insertText ?? completionLabelText(item.label),
+                insertTextRules:
+                  item.insertTextFormat === 2
+                    ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
+                    : undefined,
+                detail: item.detail,
+                documentation: documentationToMarkdown(item.documentation),
+                sortText: item.sortText,
+                filterText: item.filterText,
+                range: textEditRange ? toMonacoRange(textEditRange, monaco) : fallbackRange,
+              };
+            }),
           };
         },
       }),
@@ -141,25 +182,28 @@ export function registerLspProviders(
     disposables.push(
       monaco.languages.registerHoverProvider(lang, {
         provideHover: async (model: ITextModel, position: IPosition) => {
-          const result = (await transport.sendMessage({
-            jsonrpc: "2.0",
-            id: Date.now(),
-            method: "textDocument/hover",
-            params: {
-              textDocument: { uri: model.uri.toString() },
-              position: toLspPosition(position),
-            },
-          })) as LspHover | null;
+          if (!isUriInRoot(model.uri.toString(), rootUri)) return null;
+
+          let result: LspHover | null;
+          try {
+            result = (await transport.sendMessage({
+              jsonrpc: "2.0",
+              id: Date.now(),
+              method: "textDocument/hover",
+              params: {
+                textDocument: { uri: model.uri.toString() },
+                position: toLspPosition(position),
+              },
+            })) as LspHover | null;
+          } catch {
+            return null;
+          }
 
           if (!result?.contents) return null;
 
           const contents = Array.isArray(result.contents) ? result.contents : [result.contents];
           return {
-            contents: contents.map((c) => {
-              if (typeof c === "string") return { value: c };
-              if ("value" in c) return { value: `\`\`\`${c.language ?? ""}\n${c.value}\n\`\`\`` };
-              return { value: String(c) };
-            }),
+            contents: contents.map(hoverContentToMarkdown),
             range: result.range ? toMonacoRange(result.range, monaco) : undefined,
           };
         },
@@ -170,22 +214,36 @@ export function registerLspProviders(
     disposables.push(
       monaco.languages.registerDefinitionProvider(lang, {
         provideDefinition: async (model: ITextModel, position: IPosition) => {
-          const result = (await transport.sendMessage({
-            jsonrpc: "2.0",
-            id: Date.now(),
-            method: "textDocument/definition",
-            params: {
-              textDocument: { uri: model.uri.toString() },
-              position: toLspPosition(position),
-            },
-          })) as LspLocation | LspLocation[] | null;
+          if (!isUriInRoot(model.uri.toString(), rootUri)) return null;
+
+          let result: LspDefinitionResult | null;
+          try {
+            result = (await transport.sendMessage({
+              jsonrpc: "2.0",
+              id: Date.now(),
+              method: "textDocument/definition",
+              params: {
+                textDocument: { uri: model.uri.toString() },
+                position: toLspPosition(position),
+              },
+            })) as LspDefinitionResult | null;
+          } catch {
+            return null;
+          }
 
           if (!result) return null;
           const locations = Array.isArray(result) ? result : [result];
-          return locations.map((loc) => ({
-            uri: monaco.Uri.parse(loc.uri),
-            range: toMonacoRange(loc.range, monaco),
-          }));
+          return locations.map((loc) =>
+            isLocationLink(loc)
+              ? {
+                  uri: monaco.Uri.parse(loc.targetUri),
+                  range: toMonacoRange(loc.targetSelectionRange ?? loc.targetRange, monaco),
+                }
+              : {
+                  uri: monaco.Uri.parse(loc.uri),
+                  range: toMonacoRange(loc.range, monaco),
+                },
+          );
         },
       }),
     );
@@ -195,33 +253,32 @@ export function registerLspProviders(
       monaco.languages.registerSignatureHelpProvider(lang, {
         signatureHelpTriggerCharacters: ["(", ","],
         provideSignatureHelp: async (model: ITextModel, position: IPosition) => {
-          const result = (await transport.sendMessage({
-            jsonrpc: "2.0",
-            id: Date.now(),
-            method: "textDocument/signatureHelp",
-            params: {
-              textDocument: { uri: model.uri.toString() },
-              position: toLspPosition(position),
-            },
-          })) as LspSignatureHelp | null;
+          if (!isUriInRoot(model.uri.toString(), rootUri)) return null;
+
+          let result: LspSignatureHelp | null;
+          try {
+            result = (await transport.sendMessage({
+              jsonrpc: "2.0",
+              id: Date.now(),
+              method: "textDocument/signatureHelp",
+              params: {
+                textDocument: { uri: model.uri.toString() },
+                position: toLspPosition(position),
+              },
+            })) as LspSignatureHelp | null;
+          } catch {
+            return null;
+          }
 
           if (!result) return null;
           return {
             value: {
               signatures: result.signatures.map((sig) => ({
                 label: sig.label,
-                documentation: sig.documentation
-                  ? typeof sig.documentation === "string"
-                    ? sig.documentation
-                    : { value: (sig.documentation as { value: string }).value }
-                  : undefined,
+                documentation: documentationToMarkdown(sig.documentation),
                 parameters: (sig.parameters ?? []).map((p) => ({
                   label: p.label as string | [number, number],
-                  documentation: p.documentation
-                    ? typeof p.documentation === "string"
-                      ? p.documentation
-                      : { value: (p.documentation as { value: string }).value }
-                    : undefined,
+                  documentation: documentationToMarkdown(p.documentation),
                 })),
               })),
               activeSignature: result.activeSignature ?? 0,
@@ -239,6 +296,8 @@ export function registerLspProviders(
     const msg = message as { method?: string; params?: unknown };
     if (msg.method === "textDocument/publishDiagnostics") {
       const params = msg.params as LspPublishDiagnostics;
+      if (!isUriInRoot(params.uri, rootUri)) return;
+
       const uri = monaco.Uri.parse(params.uri);
       const model = monaco.editor.getModel(uri);
       if (!model) return;
@@ -267,33 +326,50 @@ interface LspCompletionItem {
   label: string | { label: string; detail?: string };
   kind?: number;
   detail?: string;
-  documentation?: string | { kind: string; value: string };
+  documentation?: string | LspMarkupContent;
   insertText?: string;
   insertTextFormat?: number;
   sortText?: string;
   filterText?: string;
+  textEdit?: LspCompletionTextEdit;
 }
 
+interface LspMarkupContent {
+  kind: "markdown" | "plaintext";
+  value: string;
+}
+
+type LspHoverContent = string | LspMarkupContent | { language: string; value: string };
+
+type LspCompletionTextEdit =
+  | { range: LspRange; newText: string }
+  | { insert: LspRange; replace: LspRange; newText: string };
+
 interface LspHover {
-  contents:
-    | string
-    | { language?: string; value: string }
-    | (string | { language?: string; value: string })[];
-  range?: { start: { line: number; character: number }; end: { line: number; character: number } };
+  contents: LspHoverContent | LspHoverContent[];
+  range?: LspRange;
 }
 
 interface LspLocation {
   uri: string;
-  range: { start: { line: number; character: number }; end: { line: number; character: number } };
+  range: LspRange;
 }
+
+interface LspLocationLink {
+  targetUri: string;
+  targetRange: LspRange;
+  targetSelectionRange?: LspRange;
+}
+
+type LspDefinitionResult = LspLocation | LspLocation[] | LspLocationLink | LspLocationLink[];
 
 interface LspSignatureHelp {
   signatures: {
     label: string;
-    documentation?: string | { kind: string; value: string };
+    documentation?: string | LspMarkupContent;
     parameters?: {
       label: string | [number, number];
-      documentation?: string | { kind: string; value: string };
+      documentation?: string | LspMarkupContent;
     }[];
   }[];
   activeSignature?: number;
@@ -303,7 +379,7 @@ interface LspSignatureHelp {
 interface LspPublishDiagnostics {
   uri: string;
   diagnostics: {
-    range: { start: { line: number; character: number }; end: { line: number; character: number } };
+    range: LspRange;
     severity?: number;
     code?: number | string;
     source?: string;

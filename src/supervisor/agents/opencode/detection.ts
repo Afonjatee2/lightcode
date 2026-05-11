@@ -2,6 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { stripAnsi } from "@/shared/ansi";
 import {
+  type AgentSlashCommand,
   compactAgentProviderMetadata,
   type AgentCapability,
   type AgentConnectedProvider,
@@ -67,6 +68,36 @@ const OPENCODE_MODEL_HEADER_RE = /^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i;
 interface OpenCodeProbedModel {
   id: string;
   variants: string[];
+}
+
+interface OpenCodeCommandLike {
+  name?: string;
+  description?: string;
+  hints?: string[];
+  source?: string;
+  template?: string;
+}
+
+export function mapOpenCodeSlashCommands(
+  commands: readonly OpenCodeCommandLike[],
+): AgentSlashCommand[] {
+  return commands.flatMap((command) => {
+    const id = command.name?.trim();
+    if (!id) return [];
+    const description = command.description?.trim();
+    const argumentHint = command.hints
+      ?.map((hint) => hint.trim())
+      .filter(Boolean)
+      .join(" ");
+    return [
+      {
+        id,
+        label: description ? `${id} — ${description}` : id,
+        ...(description ? { description } : {}),
+        ...(argumentHint ? { argumentHint } : {}),
+      },
+    ];
+  });
 }
 
 export function parseOpenCodeVerboseModels(stdout: string): OpenCodeProbedModel[] {
@@ -209,8 +240,9 @@ export function parseOpenCodeProvidersList(output: string): AgentConnectedProvid
     if (!bullet) continue;
     const text = bullet[1]!.trim();
     const match = /^(.*?)\s+(api|oauth)$/i.exec(text);
+    const label = (match?.[1] ?? text).trim();
     providers.push({
-      label: (match?.[1] ?? text).trim(),
+      label: label === "GitHub Copilot" ? "Copilot" : label,
       ...(formatOpenCodeCredentialType(match?.[2])
         ? { detail: formatOpenCodeCredentialType(match?.[2]) }
         : {}),
@@ -248,6 +280,7 @@ export function humanizeOpenCodeModelId(id: string): string {
 }
 
 export function humanizeOpenCodeSubProviderId(id: string): string {
+  if (id === "github-copilot") return "Copilot";
   return titleizeOpenCodeName(id);
 }
 

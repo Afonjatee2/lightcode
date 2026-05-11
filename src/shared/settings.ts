@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  agentInstanceConfigMapSchema,
+  installedAcpRegistryAgentSchema,
   gitReviewModeSchema,
   newThreadModeSchema,
   notificationFilterSchema,
@@ -57,6 +59,10 @@ export const sharedSettingsSchema = z.object({
   hiddenModels: z.record(z.string(), z.array(z.string())),
   /** Agent kinds that the user has disabled (hidden from the agent picker). */
   disabledAgents: z.array(z.string()),
+  /** User-installed registry agents keyed by ACP registry id. */
+  acpRegistryInstalledAgents: z.record(z.string(), installedAcpRegistryAgentSchema),
+  /** User-registered agent instances, currently used by generic ACP registry installs. */
+  agentInstances: agentInstanceConfigMapSchema,
   /** When true, the composer in terminal-native threads starts collapsed. */
   collapseTerminalComposer: z.boolean(),
   /** Idle minutes before a hidden resumable thread is unloaded. 0 disables auto-unload. */
@@ -156,6 +162,8 @@ export const defaultSharedSettings: SharedSettings = {
   agentSettings: {},
   hiddenModels: {},
   disabledAgents: [],
+  acpRegistryInstalledAgents: {},
+  agentInstances: {},
   collapseTerminalComposer: false,
   staleThreadUnloadMinutes: 20,
   autoArchiveDoneAfterDays: 7,

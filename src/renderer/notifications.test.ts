@@ -163,6 +163,11 @@ describe("handleThreadStateNotification", () => {
     expect(toastMock.success).toHaveBeenCalledWith(
       "Unknown project",
       expect.objectContaining({
+        actionProps: expect.objectContaining({
+          children: "Open",
+          variant: "ghost",
+          onPress: expect.any(Function),
+        }),
         description: "Thread\nFinished · Waiting for your input",
       }),
     );

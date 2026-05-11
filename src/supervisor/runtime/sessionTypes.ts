@@ -75,6 +75,13 @@ export interface SessionRuntime {
    */
   pendingSteer?: PendingSteerSlot | undefined;
   structuredTurnInterruptRequested?: boolean | undefined;
+  /**
+   * GUI Codex launches optimistically enter `working` before the app-server
+   * listener is attached. Codex then replays the newly opened thread's idle
+   * state before the first turn has been submitted; suppress that transient
+   * idle so the renderer does not close and reopen the same launch turn.
+   */
+  suppressInitialStructuredIdle?: boolean | undefined;
   prevChunk: string;
   /**
    * ANSI-stripped text from the **latest** PTY `data` chunk (post OSC extract).
@@ -100,9 +107,9 @@ export interface SessionRuntime {
   /**
    * True when `LIGHTCODE_HOOK_URL` (and related vars) were injected into the
    * agent PTY at spawn (L1 path: host or WSL bridge → HookIngress). Used so the
-   * UI can show Enhanced (Hooks) before the first routed hook event; once set,
-   * PTY status parsing stays off unless the dev toggle disables L1. Cleared on
-   * PTY exit.
+   * UI can show Enhanced (Hooks) before the first routed hook event. If the CLI
+   * blocks hooks from running, OSC/title hints can promote the session back to
+   * terminal parsing until a real hook event arrives. Cleared on PTY exit.
    */
   cliHookEnvInjected?: boolean;
   /**
@@ -114,6 +121,13 @@ export interface SessionRuntime {
   hasCliHookPluginActivity?: boolean;
   /** Timestamp of the last CLI hook plugin event — diagnostic / cache freshness. */
   lastCliHookPluginActivityAt?: number;
+  /**
+   * True after OSC/title status hints prove that hook env was injected but no
+   * hook event is actually arriving. While this is true, L2 terminal parsing is
+   * allowed again; any real hook event takes ownership back.
+   */
+  cliHookTerminalFallbackActive?: boolean;
+  cliHookTerminalFallbackTimer?: ReturnType<typeof setTimeout> | undefined;
   /**
    * Armed when the user sends an interrupt keystroke (Esc alone, or Ctrl+C)
    * while hooks are active and the session is in a busy status. Claude Code

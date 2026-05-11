@@ -1,9 +1,9 @@
-import { Button, Spinner } from "@heroui/react";
 import {
   Archive,
   ArrowLeft,
   Bell,
   Bot,
+  Boxes,
   FlaskConical,
   Info,
   PanelLeft,
@@ -23,7 +23,7 @@ import {
   sidebarIconRailFooterClass,
 } from "@/renderer/components/layout/sidebarChrome";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
-import { SidebarButton } from "@/renderer/components/common";
+import { PixelLoader, SidebarButton } from "@/renderer/components/common";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import { isDevApp } from "@/renderer/bridge";
 import type { SettingsSection } from "./types";
@@ -82,6 +82,13 @@ export function SettingsSidebar(props: {
             />
             <SidebarButton
               iconOnly
+              icon={<Boxes className="size-4" />}
+              label="ACP Registry"
+              isActive={activeSection === "acpRegistry"}
+              onPress={() => onSectionChange("acpRegistry")}
+            />
+            <SidebarButton
+              iconOnly
               icon={<Search className="size-4" />}
               label="Search"
               isActive={activeSection === "search"}
@@ -98,11 +105,7 @@ export function SettingsSidebar(props: {
               <SidebarButton
                 iconOnly
                 icon={
-                  isRefreshingAgents ? (
-                    <Spinner size="sm" color="current" className="size-4" />
-                  ) : (
-                    <RefreshCw className="size-4" />
-                  )
+                  isRefreshingAgents ? <PixelLoader size="sm" /> : <RefreshCw className="size-4" />
                 }
                 label="Refresh detected agents"
                 isDisabled={isRefreshingAgents}
@@ -190,39 +193,41 @@ export function SettingsSidebar(props: {
               onPress={() => onSectionChange("ai")}
             />
             <SidebarButton
+              icon={<Boxes className="size-4" />}
+              label="ACP Registry"
+              isActive={activeSection === "acpRegistry"}
+              onPress={() => onSectionChange("acpRegistry")}
+            />
+            <SidebarButton
               icon={<Search className="size-4" />}
               label="Search"
               isActive={activeSection === "search"}
               onPress={() => onSectionChange("search")}
             />
-            <div className="flex items-center gap-1">
-              <div className="min-w-0 flex-1">
-                <SidebarButton
-                  icon={<Bot className="size-4" />}
-                  label="Agents"
-                  className="pr-1"
-                  isActive={isAgentsActive && !activeSection.startsWith("agents:")}
-                  onPress={selectFirstAgent}
-                />
-              </div>
-              <Button
-                aria-label="Refresh detected agents"
-                className="h-7 min-h-7 w-7 min-w-7 shrink-0 rounded-full text-muted hover:text-foreground"
-                isIconOnly
-                isPending={isRefreshingAgents}
-                size="sm"
-                variant="tertiary"
-                onPress={onRefreshAgents}
-              >
-                {({ isPending }) =>
-                  isPending ? (
-                    <Spinner color="current" size="sm" />
+            <SidebarButton
+              icon={<Bot className="size-4" />}
+              label="Agents"
+              isActive={isAgentsActive && !activeSection.startsWith("agents:")}
+              onPress={selectFirstAgent}
+              suffix={
+                <button
+                  type="button"
+                  aria-label="Refresh detected agents"
+                  className="flex size-5 shrink-0 cursor-default items-center justify-center text-muted/70 transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:text-muted/40"
+                  disabled={isRefreshingAgents}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRefreshAgents();
+                  }}
+                >
+                  {isRefreshingAgents ? (
+                    <PixelLoader size="xs" />
                   ) : (
                     <RefreshCw className="size-3.5" />
-                  )
-                }
-              </Button>
-            </div>
+                  )}
+                </button>
+              }
+            />
             {isAgentsActive && (
               <div className="space-y-0.5 pl-4">
                 {installedAgents.map((agent) => {

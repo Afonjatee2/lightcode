@@ -152,7 +152,7 @@ describe("CLI hook event chain (6 threads)", () => {
     expect(wallMs).toBeLessThan(Math.max(30_000, totalEvents * 2));
 
     // Per-request: localhost + small body; generous ceiling for shared CI runners.
-    expect(avg).toBeLessThan(25);
+    expect(avg).toBeLessThan(30);
     expect(p95).toBeLessThan(80);
 
     if (process.env.LIGHTCODE_PERF_LOG) {

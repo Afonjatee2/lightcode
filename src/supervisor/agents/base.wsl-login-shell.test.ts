@@ -24,7 +24,7 @@ vi.mock("node:child_process", async () => {
 
 import { readWslLoginShellCommandOutputAsync } from "./base";
 
-describe("readWslLoginShellCommandOutputAsync", () => {
+describe.skipIf(process.platform !== "win32")("readWslLoginShellCommandOutputAsync", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     spawnSyncMock.mockReturnValue({

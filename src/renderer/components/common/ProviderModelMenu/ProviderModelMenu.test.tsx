@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import "@/renderer/components/providers/opencode";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { ProviderModelMenu, type ProviderModelMenuProvider } from "./ProviderModelMenu";
 
@@ -32,6 +33,86 @@ function makeNamedProvider(
       settingDefs: [],
     },
   };
+}
+
+function makeSubProviderBackedProvider(): ProviderModelMenuProvider {
+  const models = [
+    ...Array.from({ length: 40 }, (_, index) => ({
+      id: `github-copilot/model-${index + 1}`,
+      label: `Copilot Model ${index + 1}`,
+    })),
+    ...Array.from({ length: 40 }, (_, index) => ({
+      id: `openai/model-${index + 1}`,
+      label: `OpenAI Model ${index + 1}`,
+    })),
+  ];
+
+  return {
+    kind: "opencode",
+    label: "OpenCode",
+    capabilities: {
+      models,
+      subProviders: [
+        { id: "github-copilot", label: "Copilot" },
+        { id: "openai", label: "OpenAI" },
+      ],
+      efforts: [],
+      modelEfforts: {},
+      modes: ["agent"],
+      approvalPolicies: [],
+      sandboxModes: [],
+      supportsResume: true,
+      supportsDirectInput: true,
+      liveInputMode: "terminal",
+      presentationMode: "terminal",
+      settingDefs: [],
+    },
+  };
+}
+
+function makeCursorProvider(): ProviderModelMenuProvider {
+  return {
+    kind: "cursor",
+    label: "Cursor",
+    capabilities: {
+      models: [
+        { id: "auto", label: "Auto" },
+        { id: "composer-2", label: "Composer 2" },
+        { id: "gpt-5.5", label: "GPT-5.5" },
+        { id: "gpt-5.1-codex-max", label: "Codex 5.1 Max" },
+      ],
+      contextSizes: [
+        { id: "272k", label: "272K" },
+        { id: "1m", label: "1M" },
+      ],
+      modelContextSizes: {
+        "gpt-5.5": ["272k", "1m"],
+      },
+      fastModels: ["composer-2", "gpt-5.5"],
+      efforts: ["high"],
+      modelEfforts: {
+        auto: [],
+        "composer-2": [],
+        "gpt-5.5": ["high"],
+        "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
+      },
+      modes: ["agent"],
+      approvalPolicies: [],
+      sandboxModes: [],
+      supportsResume: true,
+      supportsDirectInput: true,
+      liveInputMode: "terminal",
+      presentationMode: "terminal",
+      settingDefs: [],
+    },
+  };
+}
+
+function hasComposedHeader(providerLabel: string, subProviderLabel: string): boolean {
+  return screen.getAllByText(providerLabel).some((element) => {
+    const headerText = element.closest('[role="presentation"]')?.textContent ?? "";
+    return headerText.includes(providerLabel) && headerText.includes(subProviderLabel);
+  });
 }
 
 describe("ProviderModelMenu", () => {
@@ -82,6 +163,96 @@ describe("ProviderModelMenu", () => {
     fireEvent.scroll(listbox, { target: { scrollTop: 220 * 28 } });
 
     expect(await screen.findByText("Codex Long")).toBeInTheDocument();
+  });
+
+  it("keeps the outgoing sticky header until the next provider header fully reaches the top", async () => {
+    render(
+      <ProviderModelMenu
+        providers={[
+          makeNamedProvider("claude", "Claude", 3),
+          makeNamedProvider("codex", "Codex", 3),
+        ]}
+        currentAgentKind="claude"
+        currentModel="model-1"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    fireEvent.scroll(listbox, { target: { scrollTop: 32 + 3 * 28 - 1 } });
+
+    await waitFor(() => {
+      const stickyHeader = document.body.querySelector("[data-sticky-windowed-header]");
+      expect(stickyHeader).not.toBeNull();
+      expect(stickyHeader).toHaveClass("h-0");
+      expect(stickyHeader).toHaveTextContent("Claude");
+    });
+    expect(
+      within(listbox)
+        .getAllByText("Claude")
+        .some((element) =>
+          element.closest('[role="presentation"]')?.classList.contains("invisible"),
+        ),
+    ).toBe(true);
+    expect(within(listbox).getByText("Codex").closest('[role="presentation"]')).toHaveClass(
+      "relative",
+      "z-30",
+    );
+
+    fireEvent.scroll(listbox, { target: { scrollTop: 32 + 3 * 28 } });
+
+    await waitFor(() => {
+      expect(document.body.querySelector("[data-sticky-windowed-header]")).toBeNull();
+    });
+    const codexHeaderAtBoundary = within(listbox)
+      .getByText("Codex")
+      .closest('[role="presentation"]');
+    expect(codexHeaderAtBoundary).toHaveClass("relative", "z-30");
+    expect(codexHeaderAtBoundary).not.toHaveClass("invisible");
+
+    fireEvent.scroll(listbox, { target: { scrollTop: 32 + 3 * 28 + 1 } });
+
+    await waitFor(() => {
+      const stickyHeader = document.body.querySelector("[data-sticky-windowed-header]");
+      expect(stickyHeader).not.toBeNull();
+      expect(stickyHeader).toHaveTextContent("Codex");
+    });
+    expect(
+      within(listbox)
+        .getAllByText("Codex")
+        .some((element) =>
+          element.closest('[role="presentation"]')?.classList.contains("invisible"),
+        ),
+    ).toBe(true);
+  });
+
+  it("renders the active sub-provider in the sticky provider header while scrolling", async () => {
+    render(
+      <ProviderModelMenu
+        providers={[makeSubProviderBackedProvider(), makeNamedProvider("claude", "Claude", 3)]}
+        currentAgentKind="opencode"
+        currentModel="github-copilot/model-1"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    fireEvent.scroll(listbox, { target: { scrollTop: 8 * 28 } });
+
+    await waitFor(() => expect(hasComposedHeader("OpenCode", "Copilot")).toBe(true));
+
+    fireEvent.scroll(listbox, { target: { scrollTop: 32 + 32 + 40 * 28 - 1 } });
+
+    const incomingSubHeader = within(listbox).getByText("OpenAI").closest('[role="presentation"]');
+    expect(incomingSubHeader).not.toHaveClass("relative", "z-30", "invisible");
+
+    fireEvent.scroll(listbox, { target: { scrollTop: 52 * 28 } });
+
+    await waitFor(() => expect(hasComposedHeader("OpenCode", "OpenAI")).toBe(true));
   });
 
   it("filters long model lists by search", async () => {
@@ -174,6 +345,45 @@ describe("ProviderModelMenu", () => {
     fireEvent.click(trigger);
 
     expect(await screen.findByText("Favorites")).toBeInTheDocument();
+  });
+
+  it("shows shortcut sub-provider labels before provider icons", async () => {
+    useSharedSettings.setState({
+      favoriteModels: [{ agentKind: "opencode", modelId: "github-copilot/model-1" }],
+      recentModels: [{ agentKind: "opencode", modelId: "openai/model-1" }],
+    });
+
+    render(
+      <ProviderModelMenu
+        providers={[makeSubProviderBackedProvider(), makeNamedProvider("claude", "Claude", 3)]}
+        currentAgentKind="opencode"
+        currentModel="github-copilot/model-2"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    const assertShortcutRailOrder = async (modelLabel: string, subProviderLabel: string) => {
+      let row: Element | null | undefined;
+      await waitFor(() => {
+        row = screen
+          .getAllByText(modelLabel)
+          .map((element) => element.closest('[role="option"]'))
+          .find((option) => option?.textContent?.includes(subProviderLabel));
+        expect(row).not.toBeUndefined();
+      });
+      expect(row).not.toBeNull();
+      const label = within(row as HTMLElement).getByText(subProviderLabel);
+      const providerIcon = (row as HTMLElement).querySelector(".lightcode-provider-icon");
+      expect(providerIcon).not.toBeNull();
+      expect(label.compareDocumentPosition(providerIcon as Element)).toBe(
+        Node.DOCUMENT_POSITION_FOLLOWING,
+      );
+    };
+
+    await assertShortcutRailOrder("Copilot Model 1", "Copilot");
+    await assertShortcutRailOrder("OpenAI Model 1", "OpenAI");
   });
 
   it("does not duplicate favorites into a separate section when only one provider is visible", async () => {
@@ -271,5 +481,66 @@ describe("ProviderModelMenu", () => {
     const trigger = screen.getByRole("button", { name: "Select model" });
     expect(within(trigger).getByText("Big Pickle")).toBeInTheDocument();
     expect(within(trigger).getByText("OpenCode")).toBeInTheDocument();
+  });
+
+  it("shows Cursor base model rows without embedding speed or context controls", async () => {
+    render(
+      <ProviderModelMenu
+        providers={[makeCursorProvider()]}
+        currentAgentKind="cursor"
+        currentModel="gpt-5.5"
+        lockedAgentKind="cursor"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Select model" });
+    expect(within(trigger).getByText("GPT-5.5")).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    expect(within(listbox).getByText("GPT-5.5")).toBeInTheDocument();
+    expect(screen.queryByText("Speed")).not.toBeInTheDocument();
+    expect(screen.queryByText("Context")).not.toBeInTheDocument();
+  });
+
+  it("uses Cursor base model rows even when other providers are present", async () => {
+    render(
+      <ProviderModelMenu
+        providers={[makeNamedProvider("codex", "Codex", 2), makeCursorProvider()]}
+        currentAgentKind="cursor"
+        currentModel="composer-2"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    expect(within(listbox).getByText("Composer 2")).toBeInTheDocument();
+  });
+
+  it("normalizes old Cursor variant current models without injecting extra rows", async () => {
+    render(
+      <ProviderModelMenu
+        providers={[makeCursorProvider()]}
+        currentAgentKind="cursor"
+        currentModel="gpt-5.1-codex-xhigh"
+        lockedAgentKind="cursor"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Select model" });
+    expect(within(trigger).getByText("Codex 5.1 Max")).toBeInTheDocument();
+
+    fireEvent.click(trigger);
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    expect(within(listbox).getByText("Codex 5.1 Max")).toBeInTheDocument();
+    expect(within(listbox).queryByText("Gpt 5.1 Codex Xhigh")).not.toBeInTheDocument();
+    expect(within(listbox).queryByText("Gpt 5.1 Codex Max Xhigh")).not.toBeInTheDocument();
+    expect(within(listbox).queryByText("Codex 5.1 Extra High")).not.toBeInTheDocument();
   });
 });

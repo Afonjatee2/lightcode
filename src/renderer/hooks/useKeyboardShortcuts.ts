@@ -1,38 +1,54 @@
 import { useEffect } from "react";
-import { useAppStore } from "@/renderer/state/appStore";
-import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
-import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
-import { usePanelStore } from "@/renderer/state/panelStore";
+import { readBridge } from "@/renderer/bridge";
+import { useKeybindingStore } from "@/renderer/commands/keybindingStore";
+import {
+  bindingForPlatform,
+  canonicalizeKeybinding,
+  eventToKeybinding,
+} from "@/renderer/commands/keybindingMatcher";
+import {
+  buildCommandRegistry,
+  buildWhenContext,
+  isCommandAvailable,
+} from "@/renderer/commands/registry";
+import { evaluateWhenClause } from "@/renderer/commands/when";
 
 export function useKeyboardShortcuts() {
   useEffect(() => {
+    void useKeybindingStore
+      .getState()
+      .load()
+      .catch((error) => {
+        console.error("[renderer] failed to load keybindings:", error);
+      });
+
     function onKeyDown(e: KeyboardEvent) {
-      if (e.ctrlKey && e.key === "`") {
+      const eventKey = eventToKeybinding(e, readBridge().platform);
+      if (!eventKey) return;
+
+      const bindings = useKeybindingStore.getState().keybindings;
+      const whenContext = buildWhenContext(e.target);
+      const commands = buildCommandRegistry();
+
+      for (const binding of bindings) {
+        const rawBinding = bindingForPlatform(binding, readBridge().platform);
+        const normalized = rawBinding
+          ? canonicalizeKeybinding(rawBinding, readBridge().platform)
+          : undefined;
+        if (normalized !== eventKey) continue;
+        if (!evaluateWhenClause(binding.when, whenContext)) continue;
+
+        const command = commands.find((item) => item.id === binding.command);
+        if (!command || !isCommandAvailable(command, whenContext)) continue;
+
         e.preventDefault();
-        useDevTerminalStore.getState().togglePanel();
-      }
-
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        usePanelStore.getState().openThreadSearch();
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "w") {
-        if (useFileEditorStore.getState().activePath) return;
-
-        const state = useAppStore.getState();
-        if (state.view.kind === "thread") {
-          e.preventDefault();
-          const { panes } = state.view;
-          const target =
-            state.focusedPaneId && panes.includes(state.focusedPaneId)
-              ? state.focusedPaneId
-              : panes.at(-1)!;
-          state.closePane(target);
-        }
+        e.stopPropagation();
+        void command.run(binding.args);
+        return;
       }
     }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+
+    window.addEventListener("keydown", onKeyDown, { capture: true });
+    return () => window.removeEventListener("keydown", onKeyDown, { capture: true });
   }, []);
 }

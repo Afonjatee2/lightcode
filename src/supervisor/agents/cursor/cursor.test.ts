@@ -6,11 +6,14 @@ import {
   parseCursorWhoamiOutput,
 } from "./detection";
 import {
+  buildCursorAcpModelPickerCapabilities,
+  buildCursorModelPickerCapabilities,
   buildCursorProbeSpec,
   createCursorAdapter,
   detectCursorTerminalStatus,
   sortCursorModels,
 } from "./index";
+import { buildCursorArgs } from "./argv";
 
 function decodePowerShellEncodedCommand(encoded: string): string {
   return Buffer.from(encoded, "base64").toString("utf16le");
@@ -34,6 +37,8 @@ describe("createCursorAdapter capabilities", () => {
     const adapter = createCursorAdapter();
     expect(adapter.capabilities.approvalPolicies.length).toBeGreaterThan(0);
     expect(adapter.capabilities.approvalPolicies.some((p) => p.id === "never")).toBe(true);
+    expect(adapter.capabilities.presentationModes).toEqual(["terminal", "gui"]);
+    expect(adapter.createStructuredSession).toBeTypeOf("function");
   });
 });
 
@@ -257,6 +262,170 @@ describe("sortCursorModels", () => {
       "GPT-5.1 Codex Max Medium", // was "GPT-5.1 Codex Max"
       "GPT-5.1 Codex Max Low",
     ]);
+  });
+});
+
+describe("buildCursorModelPickerCapabilities", () => {
+  it("collapses fast and 1M variants into base models plus capability controls", () => {
+    const capabilities = buildCursorModelPickerCapabilities([
+      { id: "auto", label: "Auto" },
+      { id: "composer-2-fast", label: "Composer 2 Fast" },
+      { id: "composer-2", label: "Composer 2" },
+      { id: "gpt-5.5-high", label: "GPT-5.5 1M High" },
+      { id: "gpt-5.5-high-fast", label: "GPT-5.5 High Fast" },
+    ]);
+
+    expect(capabilities.models).toEqual([
+      { id: "auto", label: "Auto" },
+      { id: "composer-2", label: "Composer 2" },
+      { id: "gpt-5.5", label: "GPT-5.5" },
+    ]);
+    expect(capabilities.efforts).toEqual(["high"]);
+    expect(capabilities.modelEfforts).toMatchObject({
+      auto: [],
+      "composer-2": [],
+      "gpt-5.5": ["high"],
+    });
+    expect(capabilities.contextSizes).toEqual([
+      { id: "272k", label: "272K" },
+      { id: "1m", label: "1M" },
+    ]);
+    expect(capabilities.modelContextSizes).toMatchObject({
+      "gpt-5.5": ["272k", "1m"],
+    });
+    expect(capabilities.fastModels).toEqual(["composer-2", "gpt-5.5"]);
+  });
+
+  it("does not expose a context selector for Cursor models without 1M variants", () => {
+    const capabilities = buildCursorModelPickerCapabilities([
+      { id: "gpt-5.2", label: "GPT-5.2" },
+      { id: "kimi-k2.5", label: "Kimi K2.5" },
+    ]);
+
+    expect(capabilities.contextSizes).toBeUndefined();
+    expect(capabilities.modelContextSizes).toBeUndefined();
+  });
+
+  it("keeps Codex Max as part of the base model name", () => {
+    const capabilities = buildCursorModelPickerCapabilities([
+      { id: "gpt-5.1-codex-max-low", label: "Codex 5.1 Max Low" },
+      { id: "gpt-5.1-codex-max-medium", label: "Codex 5.1 Max" },
+      { id: "gpt-5.1-codex-max-high", label: "Codex 5.1 Max High" },
+      { id: "gpt-5.1-codex-max-xhigh", label: "Codex 5.1 Max Extra High" },
+    ]);
+
+    expect(capabilities.models).toEqual([{ id: "gpt-5.1-codex-max", label: "Codex 5.1 Max" }]);
+    expect(capabilities.modelEfforts).toMatchObject({
+      "gpt-5.1-codex-max": ["low", "medium", "high", "xhigh"],
+    });
+  });
+
+  it("extracts Cursor max and thinking variants into effort and option capabilities", () => {
+    const capabilities = buildCursorModelPickerCapabilities([
+      { id: "claude-opus-4-7-high", label: "Opus 4.7 1M High" },
+      { id: "claude-opus-4-7-thinking-high", label: "Opus 4.7 1M High Thinking" },
+      { id: "claude-opus-4-7-max", label: "Opus 4.7 1M Max" },
+      { id: "claude-opus-4-7-thinking-max", label: "Opus 4.7 1M Max Thinking" },
+    ]);
+
+    expect(capabilities.models).toEqual([{ id: "claude-opus-4-7", label: "Opus 4.7" }]);
+    expect(capabilities.modelEfforts).toMatchObject({
+      "claude-opus-4-7": ["high", "max"],
+    });
+    expect(capabilities.contextSizes).toEqual([
+      { id: "300k", label: "300K" },
+      { id: "1m", label: "1M" },
+    ]);
+    expect(capabilities.modelContextSizes).toMatchObject({
+      "claude-opus-4-7": ["300k", "1m"],
+    });
+    expect(capabilities.thinkingModels).toEqual(["claude-opus-4-7"]);
+  });
+
+  it("uses 200K/1M context choices for non-4.7 Claude families with 1M variants", () => {
+    const capabilities = buildCursorModelPickerCapabilities([
+      { id: "claude-4.6-sonnet-medium", label: "Sonnet 4.6 1M" },
+      { id: "claude-4.6-sonnet-medium-thinking", label: "Sonnet 4.6 1M Thinking" },
+    ]);
+
+    expect(capabilities.contextSizes).toEqual([
+      { id: "200k", label: "200K" },
+      { id: "1m", label: "1M" },
+    ]);
+    expect(capabilities.modelContextSizes).toMatchObject({
+      "claude-4.6-sonnet": ["200k", "1m"],
+    });
+    expect(capabilities.thinkingModels).toEqual(["claude-4.6-sonnet"]);
+  });
+});
+
+describe("buildCursorAcpModelPickerCapabilities", () => {
+  it("keeps exact ACP values and folds default parameters into labels", () => {
+    const capabilities = buildCursorAcpModelPickerCapabilities([
+      { id: "default[]", label: "Auto" },
+      { id: "composer-2[fast=true]", label: "composer-2" },
+      {
+        id: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
+        label: "gpt-5.5",
+      },
+      {
+        id: "gpt-5.1-codex-max[reasoning=medium,fast=false]",
+        label: "gpt-5.1-codex-max",
+      },
+      {
+        id: "claude-opus-4-7[thinking=true,context=300k,effort=xhigh]",
+        label: "claude-opus-4-7",
+      },
+      {
+        id: "claude-sonnet-4[thinking=false,context=200k]",
+        label: "claude-sonnet-4",
+      },
+    ]);
+
+    expect(capabilities.models).toEqual([
+      { id: "default[]", label: "Auto" },
+      { id: "composer-2[fast=true]", label: "Composer 2 · Fast" },
+      {
+        id: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
+        label: "GPT-5.5 · 272K · Medium",
+      },
+      {
+        id: "gpt-5.1-codex-max[reasoning=medium,fast=false]",
+        label: "Codex 5.1 Max · Medium",
+      },
+      {
+        id: "claude-opus-4-7[thinking=true,context=300k,effort=xhigh]",
+        label: "Opus 4.7 · 300K · Extra High",
+      },
+      {
+        id: "claude-sonnet-4[thinking=false,context=200k]",
+        label: "Sonnet 4 · 200K",
+      },
+    ]);
+    expect(capabilities.efforts).toEqual([]);
+    expect(capabilities.modelEfforts).toMatchObject({
+      "gpt-5.5[context=272k,reasoning=medium,fast=false]": [],
+    });
+  });
+});
+
+describe("buildCursorArgs", () => {
+  it("composes Cursor fast model ids at the CLI boundary", () => {
+    expect(buildCursorArgs({ model: "composer-2", fast: true }, "", undefined)).toContain(
+      "composer-2-fast",
+    );
+  });
+
+  it("composes Cursor effort and fast model ids at the CLI boundary", () => {
+    expect(
+      buildCursorArgs({ model: "gpt-5.4", effort: "high", fast: true }, "", undefined),
+    ).toContain("gpt-5.4-high-fast");
+    expect(buildCursorArgs({ model: "gpt-5.5", effort: "xhigh" }, "", undefined)).toContain(
+      "gpt-5.5-extra-high",
+    );
+    expect(
+      buildCursorArgs({ model: "claude-opus-4-7", effort: "high", thinking: true }, "", undefined),
+    ).toContain("claude-opus-4-7-thinking-high");
   });
 });
 

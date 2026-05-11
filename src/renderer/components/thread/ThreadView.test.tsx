@@ -785,12 +785,12 @@ describe("ThreadView", () => {
     expect(screen.getAllByText("Medium").length).toBeGreaterThan(0);
     expect(screen.queryByText("Normal")).not.toBeInTheDocument();
     expect(screen.getAllByLabelText("Fast").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Plan").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Work").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Full access").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Collapse composer")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Show composer")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Plan" }));
+    fireEvent.click(screen.getByRole("button", { name: "Work" }));
     expect(onConfigChange).toHaveBeenCalledWith(
       expect.objectContaining({
         mode: "plan",
@@ -855,7 +855,7 @@ describe("ThreadView", () => {
       },
       agentStatus: {
         kind: "copilot",
-        label: "GitHub Copilot",
+        label: "Copilot",
         installed: true,
         authState: "authenticated",
         capabilities: {

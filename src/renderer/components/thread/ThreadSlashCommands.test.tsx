@@ -1,10 +1,11 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentStatus, Project, Thread } from "@/shared/contracts";
+import type { AgentStatus, Project, Thread, ThreadPresentationMode } from "@/shared/contracts";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { ThreadDraftComposerArea } from "./ThreadDraftComposerArea";
+import type { ComposerControl } from "./ThreadComposer";
 import { ThreadView } from "./ThreadView";
 
 const { bridge } = vi.hoisted(() => ({
@@ -118,20 +119,27 @@ function renderThread(thread: Thread, agentStatus: AgentStatus) {
 function renderDraftComposer(
   selectedAgent: AgentStatus,
   onStart = vi.fn<(input: unknown) => void>(),
+  presentationMode: ThreadPresentationMode = "terminal",
+  onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>(),
+  controls: ComposerControl[] = [],
+  config: Thread["config"] = {
+    model: selectedAgent.capabilities.models[0]?.id ?? "gemini-2.5-pro",
+  },
 ) {
   render(
     <AppProvider>
       <ThreadDraftComposerArea
         project={draftProject}
         selectedAgent={selectedAgent}
-        controls={[]}
-        config={{ model: selectedAgent.capabilities.models[0]?.id ?? "gemini-2.5-pro" }}
+        controls={controls}
+        config={config}
         compact={false}
         paneCount={1}
         gitBranch={undefined}
         worktreeMode={false}
         supportsModePicker={false}
-        presentationMode="terminal"
+        presentationMode={presentationMode}
+        onConfigChange={onConfigChange}
         onWorktreeModeChange={() => {}}
         onSwitchBranch={() => {}}
         onRememberPresentationMode={() => {}}
@@ -278,6 +286,195 @@ describe("ThreadSlashCommands", () => {
 
     expect(screen.getByText("Commands")).toBeInTheDocument();
     expect(screen.getByText("/help")).toBeInTheDocument();
+  });
+
+  it("shows Lightcode Codex server commands instead of CLI commands in GUI chat composer", () => {
+    const baseCapabilities = makeAgentStatus().capabilities;
+    renderThread(
+      makeThread({
+        agentKind: "codex",
+        presentationMode: "gui",
+      }),
+      makeAgentStatus({
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          ...baseCapabilities,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          presentationModes: ["terminal", "gui"],
+          slashCommands: [
+            {
+              id: "status",
+              label: "status - Display session configuration and token usage",
+              description: "Display session configuration and token usage",
+            },
+          ],
+        },
+      }),
+    );
+
+    const editor = screen.getByRole("textbox");
+    typeSlashQuery(editor, "/");
+
+    expect(screen.getByText("Commands")).toBeInTheDocument();
+    expect(screen.getByText("/model")).toBeInTheDocument();
+    expect(screen.getByText("/plan")).toBeInTheDocument();
+    expect(screen.getByText("/agent")).toBeInTheDocument();
+    expect(screen.queryByText("/status")).not.toBeInTheDocument();
+  });
+
+  it("shows Lightcode Codex server commands instead of CLI commands in GUI draft composer", () => {
+    const baseCapabilities = makeAgentStatus().capabilities;
+    renderDraftComposer(
+      makeAgentStatus({
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          ...baseCapabilities,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          presentationModes: ["terminal", "gui"],
+          slashCommands: [
+            {
+              id: "status",
+              label: "status - Display session configuration and token usage",
+              description: "Display session configuration and token usage",
+            },
+          ],
+        },
+      }),
+      undefined,
+      "gui",
+    );
+
+    const editor = screen.getByRole("textbox");
+    typeSlashQuery(editor, "/");
+
+    expect(screen.getByText("Commands")).toBeInTheDocument();
+    expect(screen.getByText("/model")).toBeInTheDocument();
+    expect(screen.getByText("/plan")).toBeInTheDocument();
+    expect(screen.getByText("/agent")).toBeInTheDocument();
+    expect(screen.queryByText("/status")).not.toBeInTheDocument();
+  });
+
+  it("runs Codex GUI draft commands locally without launching a thread", () => {
+    const baseCapabilities = makeAgentStatus().capabilities;
+    const onStart = vi.fn<(input: unknown) => void>();
+    const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
+    renderDraftComposer(
+      makeAgentStatus({
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          ...baseCapabilities,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          presentationModes: ["terminal", "gui"],
+          slashCommands: [
+            {
+              id: "status",
+              label: "status - Display session configuration and token usage",
+              description: "Display session configuration and token usage",
+            },
+          ],
+        },
+      }),
+      onStart,
+      "gui",
+      onConfigChange,
+    );
+
+    const editor = screen.getByRole("textbox");
+    typeSlashQuery(editor, "/plan");
+
+    fireEvent.keyDown(editor, { key: "Enter" });
+    expect(editor.textContent).toBe("/plan ");
+
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    expect(onConfigChange).toHaveBeenCalledWith({ mode: "plan" });
+    expect(onStart).not.toHaveBeenCalled();
+    expect(editor.textContent).toBe("");
+  });
+
+  it("toggles Fast locally for Codex GUI draft commands", () => {
+    const baseCapabilities = makeAgentStatus().capabilities;
+    const onStart = vi.fn<(input: unknown) => void>();
+    const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
+    renderDraftComposer(
+      makeAgentStatus({
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          ...baseCapabilities,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          presentationModes: ["terminal", "gui"],
+          fastModels: ["gemini-2.5-pro"],
+        },
+      }),
+      onStart,
+      "gui",
+      onConfigChange,
+      [],
+      { model: "gemini-2.5-pro", fast: false },
+    );
+
+    const editor = screen.getByRole("textbox");
+    typeSlashQuery(editor, "/fast");
+
+    fireEvent.keyDown(editor, { key: "Enter" });
+    expect(editor.textContent).toBe("/fast ");
+
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    expect(onConfigChange).toHaveBeenCalledWith({ fast: true });
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
+  it("opens the model picker for Codex GUI draft commands", async () => {
+    const baseCapabilities = makeAgentStatus().capabilities;
+    const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
+    renderDraftComposer(
+      makeAgentStatus({
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          ...baseCapabilities,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          presentationModes: ["terminal", "gui"],
+        },
+      }),
+      undefined,
+      "gui",
+      onConfigChange,
+      [
+        {
+          kind: "provider-model",
+          providers: [
+            {
+              kind: "codex",
+              label: "Codex",
+              capabilities: baseCapabilities,
+            },
+          ],
+          currentAgentKind: "codex",
+          currentModel: "gemini-2.5-pro",
+          onChange: () => undefined,
+        },
+      ],
+    );
+
+    const editor = screen.getByRole("textbox");
+    typeSlashQuery(editor, "/model");
+
+    fireEvent.keyDown(editor, { key: "Enter" });
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    expect(await screen.findByPlaceholderText("Search models...")).toBeInTheDocument();
+    expect(onConfigChange).not.toHaveBeenCalled();
   });
 
   it("selects draft slash commands without submitting the draft", () => {

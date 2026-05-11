@@ -161,6 +161,37 @@ interface UntrackedStatsCacheEntry {
   insertions: number;
 }
 
+const BINARY_SCAN_BYTES = 8000;
+
+function isProbablyBinary(buffer: Buffer): boolean {
+  const scanLength = Math.min(buffer.length, BINARY_SCAN_BYTES);
+  if (scanLength === 0) {
+    return false;
+  }
+
+  let suspiciousBytes = 0;
+  for (let i = 0; i < scanLength; i++) {
+    const byte = buffer[i]!;
+    if (byte === 0) {
+      return true;
+    }
+    if (byte < 7 || (byte > 13 && byte < 32)) {
+      suspiciousBytes++;
+    }
+  }
+
+  return suspiciousBytes / scanLength > 0.3;
+}
+
+function countTextLines(buffer: Buffer): number {
+  if (buffer.length === 0) {
+    return 0;
+  }
+
+  const content = buffer.toString("utf-8");
+  return content.endsWith("\n") ? content.split("\n").length - 1 : content.split("\n").length;
+}
+
 /**
  * Assemble a {@link GitStatusResult} from raw git outputs collected by
  * `git status --porcelain=v2 -b`, `git remote -v`, `git diff --cached --numstat`,
@@ -669,8 +700,9 @@ export class GitStatusService {
       if (cached?.signature === signature) {
         return cached.insertions;
       }
-      const content = await readFile(absolutePath, "utf-8");
-      const insertions = content.split("\n").length;
+      const content = await readFile(absolutePath);
+      const buffer = typeof content === "string" ? Buffer.from(content) : content;
+      const insertions = isProbablyBinary(buffer) ? 0 : countTextLines(buffer);
       this.untrackedStatsCache.set(cacheKey, { signature, insertions });
       return insertions;
     } catch {

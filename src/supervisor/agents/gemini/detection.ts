@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AgentCapability } from "@/shared/contracts";
@@ -38,36 +38,63 @@ const configDirAuthProbe: AuthProbe = async (ctx) => {
   return result?.ok && result.stdout.trim() === "yes" ? "authenticated" : "unknown";
 };
 
+/**
+ * Gemini's CLI writes the active Google account email to
+ * `~/.gemini/google_accounts.json` after `gemini auth login`. Shape:
+ *   { "active": "user@gmail.com", "old": [ ... ] }
+ * Returns the active email when the file is well-formed.
+ */
+export function parseGeminiGoogleAccountsJson(raw: string): string | undefined {
+  try {
+    const parsed = JSON.parse(raw) as { active?: unknown };
+    return typeof parsed.active === "string" && parsed.active.trim().length > 0
+      ? parsed.active.trim()
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function probeGeminiMetadata(ctx: Parameters<NonNullable<DetectionSpec["statusProbe"]>>[0]) {
   if (ctx.location.kind === "wsl") {
-    const [apiKeyResult, configDirResult] = await batchWslCommandsAsync(ctx.location.distro, [
-      'printf %s "$GEMINI_API_KEY"',
-      "test -d ~/.gemini && echo yes",
-    ]);
+    const [apiKeyResult, configDirResult, accountsResult] = await batchWslCommandsAsync(
+      ctx.location.distro,
+      [
+        'printf %s "$GEMINI_API_KEY"',
+        "test -d ~/.gemini && echo yes",
+        'cat ~/.gemini/google_accounts.json 2>/dev/null || printf ""',
+      ],
+    );
+    const apiKeySet = !!(apiKeyResult?.ok && apiKeyResult.stdout.trim().length > 0);
+    const configDirPresent = !!(configDirResult?.ok && configDirResult.stdout.trim() === "yes");
+    const activeAccount =
+      !apiKeySet && accountsResult?.ok && accountsResult.stdout.length > 0
+        ? parseGeminiGoogleAccountsJson(accountsResult.stdout)
+        : undefined;
     const providerMetadata = compactAgentProviderMetadata({
-      ...(apiKeyResult?.ok && apiKeyResult.stdout.trim().length > 0
-        ? { authMethod: "API key" }
-        : {}),
-      ...(configDirResult?.ok &&
-      configDirResult.stdout.trim() === "yes" &&
-      !(apiKeyResult?.ok && apiKeyResult.stdout.trim().length > 0)
-        ? { authMethod: "CLI login" }
-        : {}),
+      ...(activeAccount ? { authenticatedAs: activeAccount } : {}),
+      ...(apiKeySet ? { authMethod: "API key" } : {}),
+      ...(!apiKeySet && configDirPresent && !activeAccount ? { authMethod: "Google account" } : {}),
     });
     return providerMetadata ? { providerMetadata } : undefined;
   }
 
+  const apiKeySet =
+    typeof process.env.GEMINI_API_KEY === "string" && process.env.GEMINI_API_KEY.trim().length > 0;
+  const accountsPath = join(homedir(), ".gemini", "google_accounts.json");
+  let activeAccount: string | undefined;
+  if (!apiKeySet) {
+    try {
+      activeAccount = parseGeminiGoogleAccountsJson(readFileSync(accountsPath, "utf8"));
+    } catch {
+      activeAccount = undefined;
+    }
+  }
+  const configDirPresent = existsSync(join(homedir(), ".gemini"));
   const providerMetadata = compactAgentProviderMetadata({
-    ...(typeof process.env.GEMINI_API_KEY === "string" &&
-    process.env.GEMINI_API_KEY.trim().length > 0
-      ? { authMethod: "API key" }
-      : {}),
-    ...(existsSync(join(homedir(), ".gemini")) &&
-    !(
-      typeof process.env.GEMINI_API_KEY === "string" && process.env.GEMINI_API_KEY.trim().length > 0
-    )
-      ? { authMethod: "CLI login" }
-      : {}),
+    ...(activeAccount ? { authenticatedAs: activeAccount } : {}),
+    ...(apiKeySet ? { authMethod: "API key" } : {}),
+    ...(!apiKeySet && configDirPresent && !activeAccount ? { authMethod: "Google account" } : {}),
   });
   return providerMetadata ? { providerMetadata } : undefined;
 }

@@ -45,7 +45,7 @@ describe("quotePosixShellArg", () => {
   });
 });
 
-describe("buildWindowsCommand", () => {
+describe.skipIf(process.platform !== "win32")("buildWindowsCommand", () => {
   const originalPlatform = process.platform;
 
   beforeEach(() => {
@@ -96,7 +96,7 @@ describe("buildWindowsCommand", () => {
   });
 });
 
-describe("buildWindowsCmdCommand", () => {
+describe.skipIf(process.platform !== "win32")("buildWindowsCmdCommand", () => {
   it("preserves the prompt as a single trailing arg for the cmd.exe path", () => {
     // node-pty/Windows applies CommandLineToArgvW reverse quoting per arg, so
     // each arg here is what cmd.exe sees (one quoted token). `%var%` in the

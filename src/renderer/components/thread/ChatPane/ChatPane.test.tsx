@@ -8,9 +8,18 @@ import { ChatPane } from "./ChatPane";
 const { hydrateThreadRuntimeItems } = vi.hoisted(() => ({
   hydrateThreadRuntimeItems: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
 }));
+const { hydrateFileCheckpoints, finalizeFileCheckpoint } = vi.hoisted(() => ({
+  hydrateFileCheckpoints: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+  finalizeFileCheckpoint: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
 
 vi.mock("@/renderer/state/chatRuntimePersister", () => ({
   hydrateThreadRuntimeItems,
+}));
+
+vi.mock("@/renderer/state/fileCheckpointActions", () => ({
+  hydrateFileCheckpoints,
+  finalizeFileCheckpoint,
 }));
 
 vi.mock("@tanstack/react-virtual", () => ({
@@ -92,6 +101,9 @@ describe("ChatPane", () => {
       runtimeItemIdsByThread: {},
       runtimeItemsByIdByThread: {},
       runtimeRequestsByThread: {},
+      runtimeCompletedTurnsByThread: {},
+      fileCheckpointsByThread: {},
+      fileCheckpointTurnsByThread: {},
     }));
   });
 
@@ -215,6 +227,7 @@ describe("ChatPane", () => {
     });
 
     act(() => {
+      fireEvent.wheel(scrollElement, { deltaY: -120 });
       metrics.setScrollTop(80);
       fireEvent.scroll(scrollElement);
     });
@@ -231,6 +244,43 @@ describe("ChatPane", () => {
     });
 
     await waitFor(() => expect(metrics.getScrollTop()).toBe(80));
+  });
+
+  it("does not release sticky mode for layout-driven upward scroll during tail collapse", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const contentElement = getContentElement(scrollElement);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 320,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(320);
+      fireEvent.scroll(scrollElement);
+    });
+
+    // Collapsing/removing tail content can make the browser lower scrollTop
+    // before the ResizeObserver correction runs. That is not user intent and
+    // must not turn off bottom stickiness.
+    act(() => {
+      metrics.setScrollHeight(220);
+      metrics.setScrollTop(80);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      metrics.setScrollHeight(300);
+      MockResizeObserver.notify(contentElement);
+    });
+
+    await waitFor(() => expect(metrics.getScrollTop()).toBe(300));
   });
 
   it("re-pins after todo dock layout changes when the thread was already at the bottom", async () => {
@@ -256,7 +306,7 @@ describe("ChatPane", () => {
       metrics.setScrollTop(80);
       rerender(
         <AppProvider>
-          <ChatPane thread={thread} layoutChangeToken="expanded" />
+          <ChatPane {...chatPaneProps(thread)} layoutChangeToken="expanded" />
         </AppProvider>,
       );
     });
@@ -284,6 +334,7 @@ describe("ChatPane", () => {
     });
 
     act(() => {
+      fireEvent.wheel(scrollElement, { deltaY: -120 });
       metrics.setScrollTop(80);
       fireEvent.scroll(scrollElement);
     });
@@ -291,7 +342,7 @@ describe("ChatPane", () => {
     act(() => {
       rerender(
         <AppProvider>
-          <ChatPane thread={thread} layoutChangeToken="expanded" />
+          <ChatPane {...chatPaneProps(thread)} layoutChangeToken="expanded" />
         </AppProvider>,
       );
     });
@@ -329,8 +380,14 @@ describe("ChatPane", () => {
       ].join("\n"),
     );
 
-    renderChatPane(thread);
+    const { container } = renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const content = getUserMessageContent(container);
+    installElementHeightMetrics(content, { scrollHeight: 120, clientHeight: 88 });
+    act(() => {
+      MockResizeObserver.notify(content);
+    });
 
     const button = await screen.findByRole("button", { name: "Show more" });
     expect(button).toHaveAttribute("aria-expanded", "false");
@@ -341,6 +398,48 @@ describe("ChatPane", () => {
       "aria-expanded",
       "true",
     );
+  });
+
+  it("does not collapse a long raw prompt when it only renders as two rows", async () => {
+    const thread = makeThread();
+    seedUserMessage(
+      thread.id,
+      "yesh we do not need recreate them, because we just changing 1 value, that can affect also another value, but we should keep object same, just change some values in it",
+    );
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const content = getUserMessageContent(container);
+    installElementHeightMetrics(content, { scrollHeight: 44, clientHeight: 44 });
+    act(() => {
+      MockResizeObserver.notify(content);
+    });
+
+    expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+  });
+
+  it("updates user message collapse state when resize changes visual overflow", async () => {
+    const thread = makeThread();
+    seedUserMessage(thread.id, "Resize can wrap this prompt into more visual rows.");
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const content = getUserMessageContent(container);
+    const metrics = installElementHeightMetrics(content, { scrollHeight: 44, clientHeight: 44 });
+    act(() => {
+      MockResizeObserver.notify(content);
+    });
+
+    expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+
+    act(() => {
+      metrics.setScrollHeight(120);
+      MockResizeObserver.notify(content);
+    });
+
+    expect(await screen.findByRole("button", { name: "Show more" })).toBeInTheDocument();
   });
 
   it("keeps ACP command accordions closed while live output streams in", async () => {
@@ -439,14 +538,128 @@ describe("ChatPane", () => {
 
     expect(screen.getByText("Worked for 1m 15s")).toBeInTheDocument();
   });
+
+  it("renders anchored completed turn duration inside a chat surface", () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+    useAppStore.getState().hydrateThreadCompletedTurns(thread.id, [
+      {
+        startedAt: new Date("2026-05-01T12:00:00.000Z").getTime(),
+        endedAt: new Date("2026-05-01T12:01:15.000Z").getTime(),
+        anchorItemId: ASSISTANT_ITEM_ID,
+      },
+    ]);
+
+    renderChatPane(thread);
+
+    const label = screen.getByText("Worked for 1m 15s");
+    expect(label.closest(".surface")).not.toBeNull();
+  });
+
+  it("shows checkpoint buttons only after the initial message and reverts with confirmation", async () => {
+    const thread = { ...makeThread(), status: "idle" as const };
+    seedUserMessage(thread.id, "Initial prompt", "user-1");
+    seedAssistantMessage(thread.id, "First answer", "assistant-1");
+    seedUserMessage(thread.id, "Follow-up prompt", "user-2");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const buttons = screen.getAllByRole("button", { name: "Revert to this checkpoint" });
+    expect(buttons).toHaveLength(2);
+
+    fireEvent.click(buttons[0]!);
+    expect(await screen.findByText("Revert to checkpoint?")).toBeInTheDocument();
+    expect(screen.getByText(/Workspace files are not changed/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Revert" }));
+
+    await waitFor(() => expect(screen.queryByText("Follow-up prompt")).not.toBeInTheDocument());
+    expect(screen.getByText("Initial prompt")).toBeInTheDocument();
+    expect(screen.getByText("First answer")).toBeInTheDocument();
+  });
+
+  it("warns when checkpoint file restore would affect another chat on the main tree", async () => {
+    const thread = { ...makeThread(), status: "idle" as const };
+    const sibling = {
+      ...makeThread(),
+      id: "thread-sibling",
+      title: "Sibling thread",
+      status: "idle" as const,
+    };
+    useAppStore.setState((state) => ({ ...state, threads: [thread, sibling] }));
+    seedUserMessage(thread.id, "Initial prompt", "user-1");
+    seedAssistantMessage(thread.id, "First answer", "assistant-1");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Revert to this checkpoint" })[0]!);
+
+    expect(await screen.findByText("Chat only")).toBeInTheDocument();
+    expect(screen.getByText("Chat and files")).toBeInTheDocument();
+    expect(screen.getByText(/No file checkpoint is stored/)).toBeInTheDocument();
+    expect(screen.getByText(/Another chat uses this same tree/)).toBeInTheDocument();
+  });
+
+  it("does not expose checkpoint revert controls while the thread is working", async () => {
+    const thread = makeThread();
+    seedUserMessage(thread.id, "Initial prompt", "user-1");
+    seedAssistantMessage(thread.id, "Streaming answer", "assistant-1");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    expect(
+      screen.queryByRole("button", { name: "Revert to this checkpoint" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("skips checkpoint confirmation after the user opts out", async () => {
+    const thread = { ...makeThread(), status: "idle" as const };
+    seedUserMessage(thread.id, "Initial prompt", "user-1");
+    seedAssistantMessage(thread.id, "First answer", "assistant-1");
+    seedUserMessage(thread.id, "Follow-up prompt", "user-2");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Revert to this checkpoint" })[0]!);
+    fireEvent.click(await screen.findByLabelText("Don't ask again"));
+    fireEvent.click(screen.getByRole("button", { name: "Revert" }));
+
+    await waitFor(() =>
+      expect(localStorage.getItem("lightcode-chat-checkpoint-revert-skip-confirm")).toBe("1"),
+    );
+
+    act(() => {
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "item.started",
+        threadId: thread.id,
+        itemId: "user-3",
+        itemType: "user_message",
+        payload: { content: [{ kind: "text", text: "Another prompt" }] },
+      });
+    });
+    await screen.findByText("Another prompt");
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Revert to this checkpoint" })[0]!);
+
+    expect(screen.queryByText("Revert to checkpoint?")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText("Another prompt")).not.toBeInTheDocument());
+  });
 });
 
 function renderChatPane(thread: Thread, props: Partial<Parameters<typeof ChatPane>[0]> = {}) {
   return render(
     <AppProvider>
-      <ChatPane thread={thread} {...props} />
+      <ChatPane {...chatPaneProps(thread)} {...props} />
     </AppProvider>,
   );
+}
+
+function chatPaneProps(thread: Thread): Parameters<typeof ChatPane>[0] {
+  return { thread };
 }
 
 const PLAN_ITEM_ID = "plan-1";
@@ -471,17 +684,17 @@ function seedPlanItem(
 
 const ASSISTANT_ITEM_ID = "asst-grow";
 
-function seedAssistantMessage(threadId: string, initialText: string) {
+function seedAssistantMessage(threadId: string, initialText: string, itemId = ASSISTANT_ITEM_ID) {
   useAppStore.getState().applyRuntimeEvent(threadId, {
     type: "item.started",
     threadId,
-    itemId: ASSISTANT_ITEM_ID,
+    itemId,
     itemType: "assistant_message",
   });
   useAppStore.getState().applyRuntimeEvent(threadId, {
     type: "content.delta",
     threadId,
-    itemId: ASSISTANT_ITEM_ID,
+    itemId,
     stream: "assistant_text",
     delta: initialText,
   });
@@ -518,11 +731,11 @@ function startCommandItem(threadId: string, itemId: string, command: string) {
   });
 }
 
-function seedUserMessage(threadId: string, text: string) {
+function seedUserMessage(threadId: string, text: string, itemId = "user-1") {
   useAppStore.getState().applyRuntimeEvent(threadId, {
     type: "item.started",
     threadId,
-    itemId: "user-1",
+    itemId,
     itemType: "user_message",
     payload: { content: [{ kind: "text", text }] },
   });
@@ -564,6 +777,42 @@ function getContentElement(scrollElement: HTMLDivElement): HTMLDivElement {
     throw new Error("missing chat content wrapper");
   }
   return element;
+}
+
+function getUserMessageContent(container: HTMLElement): HTMLDivElement {
+  const element = container.querySelector("[data-user-message-content='true']");
+  if (!(element instanceof HTMLDivElement)) {
+    throw new Error("missing user message content element");
+  }
+  return element;
+}
+
+function installElementHeightMetrics(
+  element: HTMLElement,
+  initial: { scrollHeight: number; clientHeight: number },
+) {
+  let scrollHeight = initial.scrollHeight;
+  let clientHeight = initial.clientHeight;
+
+  Object.defineProperties(element, {
+    scrollHeight: {
+      configurable: true,
+      get: () => scrollHeight,
+    },
+    clientHeight: {
+      configurable: true,
+      get: () => clientHeight,
+    },
+  });
+
+  return {
+    setClientHeight: (value: number) => {
+      clientHeight = value;
+    },
+    setScrollHeight: (value: number) => {
+      scrollHeight = value;
+    },
+  };
 }
 
 function installScrollMetrics(

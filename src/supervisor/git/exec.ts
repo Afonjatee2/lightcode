@@ -24,14 +24,17 @@ export const GIT_HOOK_TIMEOUT = 300_000;
 export async function execGit(
   location: ProjectLocation,
   args: string[],
-  options?: { timeout?: number; allowNonZeroExit?: boolean },
+  options?: { timeout?: number; allowNonZeroExit?: boolean; env?: Record<string, string> },
 ): Promise<string> {
   const timeout = options?.timeout ?? GIT_DEFAULT_TIMEOUT;
   const maxBuffer = 50 * 1024 * 1024;
 
   try {
     if (location.kind === "wsl") {
-      const spec = buildAgentCommand(location, "git", args, undefined, { GIT_OPTIONAL_LOCKS: "0" });
+      const spec = buildAgentCommand(location, "git", args, undefined, {
+        GIT_OPTIONAL_LOCKS: "0",
+        ...(options?.env ?? {}),
+      });
       const { stdout } = await execFileAsync(spec.command, spec.args, {
         windowsHide: true,
         timeout,
@@ -40,7 +43,7 @@ export async function execGit(
       return stdout;
     }
 
-    const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+    const env = { ...process.env, GIT_OPTIONAL_LOCKS: "0", ...(options?.env ?? {}) };
     const { stdout } = await execFileAsync("git", args, {
       cwd: location.path,
       env,

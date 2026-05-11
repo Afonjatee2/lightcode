@@ -10,6 +10,10 @@ export type StatusTone =
   | "done";
 
 export function getStatusTone(thread: Pick<Thread, "status" | "done">): StatusTone {
+  if (thread.done) {
+    return "done";
+  }
+
   if (thread.status === "error") {
     return "error";
   }
@@ -28,10 +32,6 @@ export function getStatusTone(thread: Pick<Thread, "status" | "done">): StatusTo
 
   if (thread.status === "idle") {
     return "active";
-  }
-
-  if (thread.done) {
-    return "done";
   }
 
   return "inactive";

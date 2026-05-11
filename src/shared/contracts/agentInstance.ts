@@ -3,9 +3,6 @@ import { z } from "zod";
 /**
  * Driver / instance model for user-registered agents.
  *
- * Mirrors t3code's `ProviderDriverKind` + `ProviderInstanceConfigMap`
- * (`packages/contracts/src/{provider,providerInstance}.ts`).
- *
  * - `AgentDriverKind` is an open branded slug: built-in adapters reserve
  *   well-known values (`claude`, `codex`, ...) and users can register
  *   additional instances of the special `acp-generic` driver to plug any

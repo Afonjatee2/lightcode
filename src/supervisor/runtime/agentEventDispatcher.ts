@@ -58,11 +58,11 @@ export function dispatchAgentEvent(
   // this stays true so hooks remain the sole source of status.
   session.hasCliHookPluginActivity = true;
   session.lastCliHookPluginActivityAt = envelope.ts || Date.now();
-  hooks.onRoutedEvent?.(session, envelope);
 
   const change = intentToState(envelope.intent);
   if (!change) {
     hookDebugRouted(session.threadId, envelope.intent, null);
+    hooks.onRoutedEvent?.(session, envelope);
     return;
   }
   hookDebugRouted(session.threadId, envelope.intent, {
@@ -70,4 +70,5 @@ export function dispatchAgentEvent(
     attention: change.attention,
   });
   hooks.applyCliHookPluginState(session, change);
+  hooks.onRoutedEvent?.(session, envelope);
 }

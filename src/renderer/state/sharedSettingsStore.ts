@@ -20,6 +20,7 @@ import type {
 const STORAGE_KEY = "lightcode-shared-settings";
 
 interface SharedSettingsState extends SharedSettings {
+  sharedSettingsHydrated: boolean;
   setThemeMode: (mode: ThemeMode) => void;
   setTerminalPosition: (position: TerminalPosition) => void;
   setCommitGenConfig: (provider: string, model: string, effort: string) => void;
@@ -110,6 +111,7 @@ function providerDraftConfigEqual(
     a.effort === b.effort &&
     a.contextSize === b.contextSize &&
     a.fast === b.fast &&
+    a.thinking === b.thinking &&
     a.mode === b.mode &&
     a.approvalPolicy === b.approvalPolicy &&
     a.sandboxMode === b.sandboxMode
@@ -120,6 +122,7 @@ const initialSettings = loadFallbackSettings();
 
 export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
   ...initialSettings,
+  sharedSettingsHydrated: initialLoadDone,
   setThemeMode: (themeMode) => {
     set({ themeMode });
     persistSettings(selectSharedSettings(get()));
@@ -345,6 +348,8 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     agentSettings: state.agentSettings,
     hiddenModels: state.hiddenModels,
     disabledAgents: state.disabledAgents,
+    acpRegistryInstalledAgents: state.acpRegistryInstalledAgents,
+    agentInstances: state.agentInstances,
     collapseTerminalComposer: state.collapseTerminalComposer,
     staleThreadUnloadMinutes: state.staleThreadUnloadMinutes,
     autoArchiveDoneAfterDays: state.autoArchiveDoneAfterDays,
@@ -380,11 +385,13 @@ if (hasBridge()) {
       useSharedSettings.setState((state) => ({
         ...state,
         ...normalized,
+        sharedSettingsHydrated: true,
       }));
       localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
       initialLoadDone = true;
     })
     .catch(() => {
       initialLoadDone = true;
+      useSharedSettings.setState({ sharedSettingsHydrated: true });
     });
 }

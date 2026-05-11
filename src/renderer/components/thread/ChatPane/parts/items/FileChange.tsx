@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { FileEdit } from "lucide-react";
 import type { FileChangePayload, ProjectLocation } from "@/shared/contracts";
 import { PathDisplay } from "@/renderer/components/common";
@@ -12,7 +12,14 @@ import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { ChatItemAccordion } from "./ChatItemAccordion";
 import { CommandOutputViewport } from "./CommandOutputViewport";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
-import { extractAcpArgsPart, extractAcpResultPart, type ExtractedPart } from "./acpToolPayload";
+import {
+  extractAcpAddedFileText,
+  extractAcpArgsPart,
+  extractAcpDiffResultPart,
+  extractAcpResultPart,
+  type ExtractedPart,
+} from "./acpToolPayload";
+import { InlineDiffView } from "./InlineDiffView";
 import { detectLanguageFromPath } from "./languageDetect";
 
 interface FileChangeProps {
@@ -26,6 +33,8 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   const hasStream = !!stream && stream.length > 0;
   const isCreate = payload?.changeKind === "create";
   const argContent = isCreate && !hasStream ? extractCreateContent(payload) : undefined;
+  const diffPart = !hasStream && !isCreate ? extractAcpDiffResultPart(payload) : undefined;
+  const diffText = diffPart?.text ? diffPart.text : undefined;
   const paneActions = useChatPaneActions();
 
   // Some SDKs (e.g. Claude `Write`) don't surface the new file contents on
@@ -34,6 +43,7 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
     isCreate &&
     !hasStream &&
     argContent === undefined &&
+    diffText === undefined &&
     payload?.path &&
     payload.path.length > 0 &&
     paneActions?.projectLocation
@@ -43,7 +53,13 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
 
   const sections = useMemo<ToolCallSection[]>(() => {
     if (!isExpanded || !payload) return [];
-    if (hasStream || argContent !== undefined || fetched.content !== undefined) return [];
+    if (
+      hasStream ||
+      argContent !== undefined ||
+      diffText !== undefined ||
+      fetched.content !== undefined
+    )
+      return [];
     const argsPart = extractAcpArgsPart(payload);
     const resultPart = extractAcpResultPart(payload);
     const path = payload.path;
@@ -51,24 +67,32 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
       { label: "args", part: enrichLanguage(argsPart, path) },
       { label: "result", part: resultPart },
     ];
-  }, [isExpanded, payload, hasStream, argContent, fetched.content]);
+  }, [isExpanded, payload, hasStream, argContent, diffText, fetched.content]);
   if (!payload) return null;
   const right = formatRightLabel(payload);
   const fallbackTitle = readPayloadString(payload, "title") ?? readPayloadString(payload, "name");
   const hasDetails =
-    hasStream || argContent !== undefined || fetchTarget !== null || hasAuxFields(payload);
-  const kindLabel = formatKindLabel(payload.changeKind);
+    hasStream ||
+    argContent !== undefined ||
+    diffText !== undefined ||
+    fetchTarget !== null ||
+    hasAuxFields(payload);
+  const kindVerb = formatKindVerb(payload.changeKind);
+  const hasPath = !!payload.path && payload.path.length > 0;
+  const showsFallback =
+    !hasPath && !!fallbackTitle && fallbackTitle.toLowerCase() !== kindVerb.toLowerCase();
+  const kindLabel = hasPath || showsFallback ? `${kindVerb}:` : `${kindVerb} file`;
   const titleNode = (
     <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
       <span className="shrink-0 !text-[color:var(--muted)]">{kindLabel}</span>
-      {payload.path && payload.path.length > 0 ? (
+      {hasPath ? (
         <PathDisplay
           className="flex-1"
           path={payload.path}
           basenameClassName="!text-[color:var(--foreground)]"
           dirClassName="!text-[color:var(--muted)]"
         />
-      ) : fallbackTitle ? (
+      ) : showsFallback ? (
         <span className="min-w-0 truncate !text-[color:var(--muted)]">{fallbackTitle}</span>
       ) : null}
     </span>
@@ -86,6 +110,8 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
     >
       {stream && stream.length > 0 ? (
         <CommandOutputViewport text={stream} language={language} />
+      ) : diffText !== undefined ? (
+        <InlineDiffView diffText={diffText} filePath={payload.path} />
       ) : argContent !== undefined ? (
         <CommandOutputViewport text={argContent} language={language} />
       ) : fetched.content !== undefined ? (
@@ -190,6 +216,11 @@ function isAbsolutePath(p: string): boolean {
 
 function extractCreateContent(payload: unknown): string | undefined {
   if (!payload || typeof payload !== "object") return undefined;
+  const path = readPayloadString(payload, "path");
+  if (path) {
+    const patchContent = extractAcpAddedFileText(payload, path);
+    if (patchContent !== undefined) return patchContent;
+  }
   const args = (payload as Record<string, unknown>).args;
   if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
   const content = (args as Record<string, unknown>).content;
@@ -208,15 +239,19 @@ function readPayloadString(payload: unknown, key: string): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-export function formatKindLabel(kind: FileChangePayload["changeKind"]): string {
+export function formatKindVerb(kind: FileChangePayload["changeKind"]): string {
   switch (kind) {
     case "create":
-      return "Create:";
+      return "Create";
     case "delete":
-      return "Delete:";
+      return "Delete";
     default:
-      return "Edit:";
+      return "Edit";
   }
+}
+
+export function formatKindLabel(kind: FileChangePayload["changeKind"]): string {
+  return `${formatKindVerb(kind)}:`;
 }
 
 /**
@@ -231,7 +266,20 @@ function enrichLanguage(part: ExtractedPart, path: string): ExtractedPart {
   return part;
 }
 
-function formatRightLabel(payload: FileChangePayload): string | undefined {
-  if (!payload.diffSummary) return undefined;
-  return `+${payload.diffSummary.added} -${payload.diffSummary.removed}`;
+export function formatDiffSummaryLabel(
+  diffSummary: FileChangePayload["diffSummary"],
+): ReactNode | undefined {
+  if (!diffSummary || (diffSummary.added === 0 && diffSummary.removed === 0)) {
+    return undefined;
+  }
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {diffSummary.added > 0 ? <span className="text-success">+{diffSummary.added}</span> : null}
+      {diffSummary.removed > 0 ? <span className="text-danger">-{diffSummary.removed}</span> : null}
+    </span>
+  );
+}
+
+function formatRightLabel(payload: FileChangePayload): ReactNode | undefined {
+  return formatDiffSummaryLabel(payload.diffSummary);
 }

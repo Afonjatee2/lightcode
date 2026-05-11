@@ -400,6 +400,9 @@ export function AppShell(props: {
             className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${isBottom && rightPanel ? "flex-col" : ""}`}
           >
             <main ref={mainRef} className="relative h-full min-h-0 min-w-0 flex-1 overflow-hidden">
+              {isMac() && !contentHeader && (
+                <div aria-hidden="true" className="lightcode-content-drag-region" />
+              )}
               <div className="relative h-full min-h-0">{content}</div>
             </main>
 

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import type { Thread } from "@/shared/contracts";
-import { resolveThreadReorder, useDndHandlers } from "./useDndHandlers";
+import type { Project, Thread } from "@/shared/contracts";
+import { resolveProjectReorder, resolveThreadReorder, useDndHandlers } from "./useDndHandlers";
 
 const showFilesPanel = vi.fn<(projectId: string, worktreePath?: string) => void>();
 const showGitReviewPanel = vi.fn<(projectId: string, worktreePath?: string) => void>();
@@ -35,6 +35,41 @@ function makeThread(id: string, starred = false): Thread {
     updatedAt: "2026-03-21T10:00:00.000Z",
   };
 }
+
+function makeProject(id: string): Project {
+  return {
+    id,
+    name: id,
+    location: { kind: "posix", path: `/tmp/${id}` },
+    createdAt: "2026-03-21T10:00:00.000Z",
+  };
+}
+
+describe("resolveProjectReorder", () => {
+  it("uses the hovered project when the sortable final index did not move", () => {
+    expect(
+      resolveProjectReorder({
+        projects: [makeProject("a"), makeProject("b"), makeProject("c")],
+        source: { type: "project", projectId: "a" },
+        target: { type: "project", projectId: "c" },
+        initialIndex: 0,
+        finalIndex: 0,
+      }),
+    ).toEqual({ targetId: "c", placement: "after" });
+  });
+
+  it("falls back to the sortable final index when no hovered project is available", () => {
+    expect(
+      resolveProjectReorder({
+        projects: [makeProject("a"), makeProject("b"), makeProject("c")],
+        source: { type: "project", projectId: "c" },
+        target: null,
+        initialIndex: 2,
+        finalIndex: 0,
+      }),
+    ).toEqual({ targetId: "a", placement: "before" });
+  });
+});
 
 describe("resolveThreadReorder", () => {
   it("uses the hovered thread instead of the virtualized final index", () => {
