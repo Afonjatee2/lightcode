@@ -190,6 +190,15 @@ function selectedModelIndex(selectedKeys: Set<string>, meta: WindowedItemsMeta):
   return -1;
 }
 
+function splitModelLabel(label: string): { name: string; hint?: string } {
+  const separatorIdx = label.indexOf(" · ");
+  if (separatorIdx < 0) return { name: label };
+  return {
+    name: label.slice(0, separatorIdx),
+    hint: label.slice(separatorIdx + 3),
+  };
+}
+
 export function ProviderModelMenu(props: ProviderModelMenuProps) {
   const {
     providers,
@@ -226,12 +235,13 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
   const currentLabel =
     currentProvider?.capabilities.models.find((m) => m.id === effectiveCurrentModel)?.label ??
     effectiveCurrentModel;
+  const currentLabelParts = splitModelLabel(currentLabel);
   const currentSubProvider = currentProvider
     ? deriveSubProvider(effectiveCurrentModel, currentProvider.capabilities)
     : undefined;
   const currentDisplayLabel = currentSubProvider
-    ? `${currentLabel} · ${currentSubProvider.label}`
-    : currentLabel;
+    ? `${currentLabelParts.name} · ${currentSubProvider.label}`
+    : currentLabelParts.name;
   latestFavoritesRef.current = favorites;
   latestRecentsRef.current = recents;
 
@@ -316,7 +326,9 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
             : "flex min-w-0 flex-col items-start justify-center gap-0.5"
         }
       >
-        <span className="max-w-full truncate leading-none">{currentLabel || "Select model"}</span>
+        <span className="max-w-full truncate leading-none">
+          {currentLabelParts.name || "Select model"}
+        </span>
         {currentSubProvider ? (
           <span className="max-w-full truncate text-[10px] font-medium leading-none text-muted/70">
             {currentSubProvider.label}
@@ -658,13 +670,11 @@ function WindowedProviderModelList(props: {
               // Some providers (Cursor ACP) bake their parameter chips into
               // the label string itself (e.g. "GPT-5.5 · 272K · Medium").
               // Render the head as the model name and the tail as muted hint.
-              const separatorIdx = item.label.indexOf(" · ");
-              const head = separatorIdx >= 0 ? item.label.slice(0, separatorIdx) : item.label;
-              const labelTail = separatorIdx >= 0 ? item.label.slice(separatorIdx + 3) : undefined;
-              const mutedHint = labelTail ?? item.contextDescription;
+              const { name, hint } = splitModelLabel(item.label);
+              const mutedHint = hint ?? item.contextDescription;
               return (
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="min-w-0 truncate">{head}</span>
+                  <span className="min-w-0 truncate">{name}</span>
                   {mutedHint ? (
                     <span className="shrink-0 text-[10px] leading-none text-muted/60">
                       · {mutedHint}

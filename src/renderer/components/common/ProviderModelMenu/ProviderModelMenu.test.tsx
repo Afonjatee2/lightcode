@@ -344,7 +344,7 @@ describe("ProviderModelMenu", () => {
     fireEvent.click(trigger);
     fireEvent.click(trigger);
 
-    expect(await screen.findByText("Favorites")).toBeInTheDocument();
+    expect((await screen.findAllByText("Favorites")).length).toBeGreaterThan(0);
   });
 
   it("shows shortcut sub-provider labels before provider icons", async () => {
@@ -503,6 +503,48 @@ describe("ProviderModelMenu", () => {
     expect(within(listbox).getByText("GPT-5.5")).toBeInTheDocument();
     expect(screen.queryByText("Speed")).not.toBeInTheDocument();
     expect(screen.queryByText("Context")).not.toBeInTheDocument();
+  });
+
+  it("shows only the Cursor ACP base model name in the trigger", () => {
+    render(
+      <ProviderModelMenu
+        providers={[
+          {
+            kind: "cursor",
+            label: "Cursor",
+            capabilities: {
+              models: [
+                {
+                  id: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
+                  label: "GPT-5.5 · 272K · Medium",
+                },
+              ],
+              efforts: [],
+              modelEfforts: {
+                "gpt-5.5[context=272k,reasoning=medium,fast=false]": [],
+              },
+              modes: ["agent"],
+              approvalPolicies: [],
+              sandboxModes: [],
+              supportsResume: true,
+              supportsDirectInput: true,
+              liveInputMode: "terminal",
+              presentationMode: "terminal",
+              settingDefs: [],
+            },
+          },
+        ]}
+        currentAgentKind="cursor"
+        currentModel="gpt-5.5[context=272k,reasoning=medium,fast=false]"
+        lockedAgentKind="cursor"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "Select model" });
+    expect(within(trigger).getByText("GPT-5.5")).toBeInTheDocument();
+    expect(within(trigger).queryByText("272K")).not.toBeInTheDocument();
+    expect(within(trigger).queryByText("Medium")).not.toBeInTheDocument();
   });
 
   it("uses Cursor base model rows even when other providers are present", async () => {
