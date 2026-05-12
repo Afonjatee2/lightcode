@@ -78,9 +78,9 @@ export function handleComposerControlShortcut(
     onOpenModelPicker: () => void;
   },
 ): boolean {
-  if (!event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
-
   if (event.key === "Tab") {
+    if (!event.shiftKey || event.ctrlKey || event.metaKey || event.altKey) return false;
+
     return handleAction(event, () => {
       const control = input.controls.find(
         (candidate) =>
@@ -89,6 +89,8 @@ export function handleComposerControlShortcut(
       return control ? toggleControl(control) : false;
     });
   }
+
+  if (event.shiftKey || event.altKey || (!event.ctrlKey && !event.metaKey)) return false;
 
   const key = event.key.toLowerCase();
   if (key === "t") {
