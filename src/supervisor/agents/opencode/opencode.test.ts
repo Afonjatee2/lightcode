@@ -84,7 +84,7 @@ describe("buildOpenCodeArgs", () => {
 });
 
 describe("parseOpenCodeVerboseModels", () => {
-  it("extracts variant keys per model from --verbose output", () => {
+  it("extracts variant keys and context limit per model from --verbose output", () => {
     const sample = `opencode/big-pickle
 {
   "id": "big-pickle",
@@ -98,7 +98,8 @@ opencode/claude-haiku-4-5
   "variants": {
     "high": { "thinking": { "type": "enabled" } },
     "max": { "thinking": { "type": "enabled" } }
-  }
+  },
+  "limit": { "context": 200000, "output": 8192 }
 }
 opencode/claude-opus-4-6
 {
@@ -109,13 +110,26 @@ opencode/claude-opus-4-6
     "medium": { "effort": "medium" },
     "high": { "effort": "high" },
     "max": { "effort": "max" }
-  }
+  },
+  "limit": { "context": 1000000, "output": 64000 }
+}
+opencode/deepseek-v4
+{
+  "id": "deepseek-v4",
+  "providerID": "opencode",
+  "variants": {},
+  "limit": { "context": 131072, "output": 8192 }
 }
 `;
     expect(parseOpenCodeVerboseModels(sample)).toEqual([
       { id: "opencode/big-pickle", variants: [] },
-      { id: "opencode/claude-haiku-4-5", variants: ["high", "max"] },
-      { id: "opencode/claude-opus-4-6", variants: ["low", "medium", "high", "max"] },
+      { id: "opencode/claude-haiku-4-5", variants: ["high", "max"], contextLimit: 200000 },
+      {
+        id: "opencode/claude-opus-4-6",
+        variants: ["low", "medium", "high", "max"],
+        contextLimit: 1000000,
+      },
+      { id: "opencode/deepseek-v4", variants: [], contextLimit: 131072 },
     ]);
   });
 

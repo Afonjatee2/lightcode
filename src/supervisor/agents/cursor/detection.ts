@@ -252,6 +252,13 @@ export function buildCursorModelPickerCapabilities(
       for (const context of orderedContexts) {
         contextIds.add(context);
       }
+    } else if (group.contexts.length === 1 && group.contexts[0] !== "default") {
+      // Single-context models get a display-only mapping (the concrete size
+      // id like "200k"); we deliberately don't add it to `contextIds`, so the
+      // composer's filter on `contextSizes` yields empty and no single-option
+      // picker shows. The renderer's model row falls back to `id.toUpperCase()`
+      // to render "200K" / "1M" in the muted description.
+      modelContextSizes[modelId] = [group.contexts[0]!];
     }
     if (group.fast) {
       fastModels.push(modelId);

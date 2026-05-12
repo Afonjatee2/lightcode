@@ -9,6 +9,7 @@ import {
   type ProjectLocation,
 } from "@/shared/contracts";
 import { configFileAuthProbe, readAgentCommandOutput, type DetectionSpec } from "../base";
+import { buildContextSizeCapabilities } from "../contextWindowLabel";
 
 // Canonical ordering for the union effort list. Anything OpenCode reports
 // outside this set gets appended after these in discovery order so we never
@@ -68,6 +69,7 @@ const OPENCODE_MODEL_HEADER_RE = /^[a-z0-9][a-z0-9_-]*\/[a-z0-9][a-z0-9_.-]*$/i;
 interface OpenCodeProbedModel {
   id: string;
   variants: string[];
+  contextLimit?: number;
 }
 
 interface OpenCodeCommandLike {
@@ -120,10 +122,22 @@ export function parseOpenCodeVerboseModels(stdout: string): OpenCodeProbedModel[
     const json = jsonLines.join("\n").trim();
     if (!json) return { id, variants: [] };
     try {
-      const obj = JSON.parse(json) as { variants?: Record<string, unknown> };
+      const obj = JSON.parse(json) as {
+        variants?: Record<string, unknown>;
+        limit?: { context?: unknown };
+      };
       const variants =
         obj.variants && typeof obj.variants === "object" ? Object.keys(obj.variants) : [];
-      return { id, variants };
+      const rawContext = obj.limit?.context;
+      const contextLimit =
+        typeof rawContext === "number" && Number.isFinite(rawContext) && rawContext > 0
+          ? Math.trunc(rawContext)
+          : undefined;
+      return {
+        id,
+        variants,
+        ...(contextLimit !== undefined ? { contextLimit } : {}),
+      };
     } catch {
       return { id, variants: [] };
     }
@@ -325,6 +339,15 @@ export const opencodeDetectionSpec: DetectionSpec = {
     // discovery order — keeps us forward-compatible with new variants.
     for (const e of seenEfforts) ordered.push(e);
 
+    // Map each model to its registry-reported context limit so the renderer's
+    // context-usage dock can show "X / Y tokens" before any message has flowed
+    // through `context.updated`. OpenCode's `models --verbose` emits a Model
+    // object whose `limit.context` is the upstream context window in tokens.
+    const modelTokens = new Map<string, number>();
+    for (const m of probed) {
+      if (m.contextLimit !== undefined) modelTokens.set(m.id, m.contextLimit);
+    }
+
     return {
       models: modelIds.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
       subProviders: subProviderIds.map((id) => ({
@@ -338,6 +361,7 @@ export const opencodeDetectionSpec: DetectionSpec = {
         : ordered.length > 0
           ? { defaultEffort: ordered[0] }
           : {}),
+      ...buildContextSizeCapabilities(modelTokens),
     };
   },
 };

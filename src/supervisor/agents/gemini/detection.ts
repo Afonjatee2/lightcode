@@ -11,6 +11,28 @@ import {
   type AuthProbe,
   type DetectionSpec,
 } from "../base";
+import { buildContextSizeCapabilities } from "../contextWindowLabel";
+
+// Gemini's ACP probe reports the selectable model ids/names, but not token
+// limits. Keep this as an exact documented allowlist so new ids do not inherit
+// a context label until we have a real source for that model.
+const GEMINI_MODEL_CONTEXT_TOKENS = new Map<string, number>([
+  ["gemini-3.1-pro-preview", 1_048_576],
+  ["gemini-3-flash-preview", 1_048_576],
+  ["gemini-3.1-flash-lite-preview", 1_048_576],
+  ["gemini-2.5-pro", 1_048_576],
+  ["gemini-2.5-flash", 1_048_576],
+  ["gemini-2.5-flash-lite", 1_048_576],
+  ["gemini-2.0-flash", 1_048_576],
+  ["gemini-2.0-flash-lite", 1_048_576],
+  ["gemini-1.5-pro", 2_000_000],
+  ["gemini-1.5-flash", 1_048_576],
+  ["gemini-1.5-flash-8b", 1_048_576],
+]);
+
+function geminiModelContextTokens(modelId: string): number | undefined {
+  return GEMINI_MODEL_CONTEXT_TOKENS.get(modelId.toLowerCase());
+}
 
 export const defaultGeminiCapabilities: AgentCapability = {
   models: [],
@@ -129,6 +151,11 @@ export const geminiDetectionSpec: DetectionSpec = {
       ...(ctx.location.kind === "wsl" ? {} : { env: trustEnv }),
     });
     if (!probeResult) return undefined;
+    const modelTokens = new Map<string, number>();
+    for (const model of probeResult.models ?? []) {
+      const tokens = geminiModelContextTokens(model.id);
+      if (tokens !== undefined) modelTokens.set(model.id, tokens);
+    }
     return {
       ...(probeResult.models?.length ? { models: probeResult.models } : {}),
       ...(probeResult.efforts?.length ? { efforts: probeResult.efforts } : {}),
@@ -138,6 +165,7 @@ export const geminiDetectionSpec: DetectionSpec = {
         ? { approvalPolicies: probeResult.approvalPolicies }
         : {}),
       ...(probeResult.slashCommands?.length ? { slashCommands: probeResult.slashCommands } : {}),
+      ...buildContextSizeCapabilities(modelTokens),
     };
   },
 };

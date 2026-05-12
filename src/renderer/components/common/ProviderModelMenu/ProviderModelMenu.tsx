@@ -408,6 +408,7 @@ function WindowedProviderModelList(props: {
     );
   });
   const shouldAutoScrollRef = useRef(true);
+  const shouldCenterActiveRef = useRef(true);
   const ignorePointerRef = useRef(true);
 
   useEffect(() => {
@@ -474,6 +475,7 @@ function WindowedProviderModelList(props: {
     setScrollTop(0);
     setVisibleRow(0);
     shouldAutoScrollRef.current = true;
+    shouldCenterActiveRef.current = true;
   }, [scrollRef, meta.structureKey]);
 
   useEffect(() => {
@@ -484,10 +486,23 @@ function WindowedProviderModelList(props: {
     const activeItem = items[activeIndex];
     if (!activeItem) return;
     const rowTop = itemTop(meta, activeIndex);
-    const rowBottom = rowTop + windowedItemHeight(activeItem);
+    const rowHeight = windowedItemHeight(activeItem);
+    const rowBottom = rowTop + rowHeight;
     const viewTop = element.scrollTop;
     const visibleHeight = element.clientHeight || viewportHeight;
     const viewBottom = viewTop + visibleHeight;
+    const maxScrollTop = Math.max(0, totalHeight - visibleHeight);
+    if (shouldCenterActiveRef.current) {
+      shouldCenterActiveRef.current = false;
+      const centered = rowTop + rowHeight / 2 - visibleHeight / 2;
+      const nextScrollTop = Math.max(0, Math.min(maxScrollTop, centered));
+      if (nextScrollTop !== viewTop) {
+        element.scrollTop = nextScrollTop;
+        setScrollTop(nextScrollTop);
+        setVisibleRow(itemIndexAtOffset(meta, nextScrollTop));
+      }
+      return;
+    }
     if (rowTop < viewTop) {
       element.scrollTop = rowTop;
       setScrollTop(rowTop);
@@ -500,7 +515,7 @@ function WindowedProviderModelList(props: {
       setScrollTop(nextScrollTop);
       setVisibleRow(itemIndexAtOffset(meta, nextScrollTop));
     }
-  }, [activeIndex, items, meta, scrollRef, viewportHeight]);
+  }, [activeIndex, items, meta, scrollRef, totalHeight, viewportHeight]);
 
   function moveActive(delta: number) {
     if (modelRowIndices.length === 0) return;
@@ -639,7 +654,25 @@ function WindowedProviderModelList(props: {
             <Check
               className={`size-3 shrink-0 transition-opacity ${isSelected ? "opacity-100" : "opacity-0"}`}
             />
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            {(() => {
+              // Some providers (Cursor ACP) bake their parameter chips into
+              // the label string itself (e.g. "GPT-5.5 · 272K · Medium").
+              // Render the head as the model name and the tail as muted hint.
+              const separatorIdx = item.label.indexOf(" · ");
+              const head = separatorIdx >= 0 ? item.label.slice(0, separatorIdx) : item.label;
+              const labelTail = separatorIdx >= 0 ? item.label.slice(separatorIdx + 3) : undefined;
+              const mutedHint = labelTail ?? item.contextDescription;
+              return (
+                <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                  <span className="min-w-0 truncate">{head}</span>
+                  {mutedHint ? (
+                    <span className="shrink-0 text-[10px] leading-none text-muted/60">
+                      · {mutedHint}
+                    </span>
+                  ) : null}
+                </span>
+              );
+            })()}
             {item.showProviderIcon || item.subProviderLabel ? (
               <span className="ml-auto flex min-w-0 shrink-0 items-center gap-1 text-muted/70">
                 {item.subProviderLabel ? (

@@ -96,8 +96,6 @@ function renderItem(item: RuntimeChatItem, checkpointRevertControl: ReactNode | 
       return <Reasoning item={item} />;
     case "plan":
       return <PlanItem item={item} />;
-    case "goal":
-      return null;
     case "command_execution":
       return <CommandExecution item={item} />;
     case "file_change":

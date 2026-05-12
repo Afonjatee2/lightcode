@@ -27,6 +27,8 @@ export interface ProviderModelRow {
   label: string;
   /** Tail hint shown to the right of the model label. */
   subProviderLabel?: string;
+  /** Context-window hint (e.g. "200K", "272K / 1M"). Rendered muted next to the label. */
+  contextDescription?: string;
   /** When true, show the provider icon in the row right rail. */
   showProviderIcon?: boolean;
   /** When true, the row's persisted favorite state is true (drives the star icon). */

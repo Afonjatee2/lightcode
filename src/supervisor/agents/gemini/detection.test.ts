@@ -62,6 +62,33 @@ describe("geminiDetectionSpec", () => {
       }),
     );
   });
+
+  it("adds context labels only for exact documented Gemini model ids", async () => {
+    const location: ProjectLocation = { kind: "posix", path: "/Users/demo/project" };
+    probeAcpCapabilitiesMock.mockResolvedValue({
+      models: [
+        { id: "auto-gemini-3", label: "Auto (Gemini 3)" },
+        { id: "gemini-3.1-pro-preview", label: "3.1 Pro Preview" },
+        { id: "gemini-2.5-flash", label: "2.5 Flash" },
+        { id: "gemini-9-pro", label: "9 Pro" },
+      ],
+    });
+
+    const result = await geminiDetectionSpec.capabilitiesProbe?.({
+      location,
+      executablePath: "/Users/demo/.local/bin/gemini",
+    });
+
+    expect(result).toMatchObject({
+      contextSizes: [{ id: "1M", label: "1M" }],
+      modelContextSizes: {
+        "gemini-3.1-pro-preview": ["1M"],
+        "gemini-2.5-flash": ["1M"],
+      },
+    });
+    expect(result?.modelContextSizes).not.toHaveProperty("auto-gemini-3");
+    expect(result?.modelContextSizes).not.toHaveProperty("gemini-9-pro");
+  });
 });
 
 describe("parseGeminiGoogleAccountsJson", () => {

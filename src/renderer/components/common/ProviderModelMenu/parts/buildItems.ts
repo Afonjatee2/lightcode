@@ -57,7 +57,30 @@ interface ModelEntry {
   label: string;
   subId?: string;
   subLabel?: string;
+  contextDescription?: string;
   searchText: string;
+}
+
+// Surface the model's reported context window(s) as a muted secondary hint in
+// the row. Cursor models with multiple selectable sizes show "272K / 1M";
+// OpenCode models with a single registry context show "128K". Filters out the
+// abstract "Default" id so we don't pollute rows with non-informative text.
+function pickContextDescription(modelId: string, capability: AgentCapability): string | undefined {
+  const ids = capability.modelContextSizes?.[modelId];
+  if (!ids || ids.length === 0) return undefined;
+  const labels: string[] = [];
+  for (const id of ids) {
+    if (id.toLowerCase() === "default") continue;
+    // Prefer the explicit `contextSizes` label when present; otherwise fall
+    // back to the id itself uppercased so Cursor's "200k" / "1m" ids render
+    // as "200K" / "1M" without the provider having to publish a label entry
+    // (which would otherwise spawn a single-option context picker).
+    const label =
+      capability.contextSizes?.find((option) => option.id === id)?.label ?? id.toUpperCase();
+    if (!label) continue;
+    if (!labels.includes(label)) labels.push(label);
+  }
+  return labels.length > 0 ? labels.join(" / ") : undefined;
 }
 
 interface ProviderModelCache {
@@ -86,6 +109,7 @@ interface ResolvedModelRef {
   label: string;
   providerLabel: string;
   subProviderLabel?: string;
+  contextDescription?: string;
   searchText: string;
   providerSearchText: string;
 }
@@ -98,6 +122,10 @@ function makeModelEntry(id: string, label: string, capability: AgentCapability):
     entry.subId = sub.id;
     entry.subLabel = sub.label;
     searchParts.push(sub.id, sub.label);
+  }
+  const contextDescription = pickContextDescription(id, capability);
+  if (contextDescription) {
+    entry.contextDescription = contextDescription;
   }
   entry.searchText = searchParts.join("\n").toLowerCase();
   return entry;
@@ -144,6 +172,7 @@ function resolveModelRef(
     providerSearchText: visibleProvider.searchText,
   };
   if (model.subLabel) resolved.subProviderLabel = model.subLabel;
+  if (model.contextDescription) resolved.contextDescription = model.contextDescription;
   return resolved;
 }
 
@@ -220,6 +249,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         modelId: m.ref.modelId,
         label: m.label,
         ...(m.subProviderLabel ? { subProviderLabel: m.subProviderLabel } : {}),
+        ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
         showProviderIcon: true,
         isFavorite: favoriteStateSet.has(refKey(m.ref)),
       });
@@ -278,6 +308,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           modelId: m.id,
           label: m.label,
           ...(m.subLabel ? { subProviderLabel: m.subLabel } : {}),
+          ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
           showProviderIcon: true,
           isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
         });
@@ -307,6 +338,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         providerKind: provider.kind,
         modelId: m.id,
         label: m.label,
+        ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
         isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
       });
     }
@@ -330,6 +362,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           providerKind: provider.kind,
           modelId: m.id,
           label: m.label,
+          ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
           isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
         });
       }

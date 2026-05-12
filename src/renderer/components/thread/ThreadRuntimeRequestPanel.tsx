@@ -44,23 +44,20 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
   function submitRaw(response: unknown, outcome: RequestOutcome) {
     if (resolving) return;
     setResolving(true);
+    useAppStore.getState().applyRuntimeEvent(threadId, {
+      type: "request.resolved",
+      threadId,
+      requestId: request.requestId,
+      outcome,
+    });
     void onResolve({
       requestId: request.requestId,
       method: "requestPermission",
       response,
-    })
-      .then(() => {
-        useAppStore.getState().applyRuntimeEvent(threadId, {
-          type: "request.resolved",
-          threadId,
-          requestId: request.requestId,
-          outcome,
-        });
-      })
-      .catch((err) => {
-        console.error("[chat] request resolution failed", err);
-        setResolving(false);
-      });
+    }).catch((err) => {
+      console.error("[chat] request resolution failed", err);
+      setResolving(false);
+    });
   }
 
   function decide(optionIds: readonly string[]) {
@@ -662,7 +659,7 @@ function OpenCodePermissionDetailsLine({ details }: { details: OpenCodePermissio
       {details.patterns.length > 0 ? (
         <div className="break-words">
           <span className="text-foreground/60">
-            {details.patterns.length === 1 ? "pattern" : "patterns"}
+            {details.patterns.length === 1 ? "target" : "targets"}
           </span>
           <span className="ml-1 text-foreground">{details.patterns.join(", ")}</span>
         </div>
@@ -801,7 +798,7 @@ function ApprovalActions(props: {
   const positiveAlternates = positives.slice(1);
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[color:var(--border)] px-2 py-1.5">
+    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--border)] px-2 py-1.5">
       <div className="flex flex-wrap items-center gap-1">
         {negatives.map((option) => (
           <Button
@@ -818,7 +815,7 @@ function ApprovalActions(props: {
       <div className="flex items-center gap-1">
         {primary ? (
           positiveAlternates.length > 0 ? (
-            <ButtonGroup size="sm" variant="secondary">
+            <ButtonGroup size="sm" variant="tertiary">
               <Button isDisabled={isDisabled} onPress={() => onSelect(primary.optionId)}>
                 {primary.label}
               </Button>
@@ -846,7 +843,7 @@ function ApprovalActions(props: {
             <Button
               isDisabled={isDisabled}
               size="sm"
-              variant="secondary"
+              variant="tertiary"
               onPress={() => onSelect(primary.optionId)}
             >
               {primary.label}

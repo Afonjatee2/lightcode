@@ -302,8 +302,12 @@ describe("buildCursorModelPickerCapabilities", () => {
       { id: "kimi-k2.5", label: "Kimi K2.5" },
     ]);
 
+    // `contextSizes` stays undefined so the composer's filter yields no picker
+    // entries; the per-model map still gets populated for concrete defaults
+    // (gpt-5.2 → 272k) so the model row can render a muted "272K" description.
+    // Models that resolve to the abstract "default" id (kimi-k2.5) get no entry.
     expect(capabilities.contextSizes).toBeUndefined();
-    expect(capabilities.modelContextSizes).toBeUndefined();
+    expect(capabilities.modelContextSizes).toEqual({ "gpt-5.2": ["272k"] });
   });
 
   it("keeps Codex Max as part of the base model name", () => {
