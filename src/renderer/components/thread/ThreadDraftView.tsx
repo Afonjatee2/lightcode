@@ -806,10 +806,12 @@ export function ThreadDraftView(props: {
         label: formatEffortLabel(id),
       }),
     );
+    const selectableEfforts = currentEfforts.length > 1 ? currentEfforts : [];
     const currentContextIds = filteredCaps.modelContextSizes?.[model];
     const currentContextSizes = currentContextIds
       ? (filteredCaps.contextSizes?.filter((c) => currentContextIds.includes(c.id)) ?? [])
       : [];
+    const selectableContextSizes = currentContextSizes.length > 1 ? currentContextSizes : [];
     const supportsFast = filteredCaps.fastModels?.includes(model) ?? false;
     const supportsThinking = filteredCaps.thinkingModels?.includes(model) ?? false;
     const ctrls: ComposerControl[] = [
@@ -823,14 +825,14 @@ export function ThreadDraftView(props: {
         onChange: (next) => latestProviderModelChangeRef.current(next),
       },
     ];
-    if (currentEfforts.length > 0 || currentContextSizes.length > 0 || supportsThinking) {
+    if (selectableEfforts.length > 0 || selectableContextSizes.length > 0 || supportsThinking) {
       ctrls.push({
         kind: "effort-context",
-        efforts: currentEfforts,
-        ...(effort ? { effortValue: effort } : {}),
+        efforts: selectableEfforts,
+        ...(selectableEfforts.length > 0 && effort ? { effortValue: effort } : {}),
         onEffortChange: (value) => latestConfigPatchRef.current({ effort: value }),
-        contextSizes: currentContextSizes,
-        ...(contextSize ? { contextValue: contextSize } : {}),
+        contextSizes: selectableContextSizes,
+        ...(selectableContextSizes.length > 0 && contextSize ? { contextValue: contextSize } : {}),
         onContextChange: (value) => latestConfigPatchRef.current({ contextSize: value }),
         thinkingSupported: supportsThinking,
         thinkingValue: thinking,
@@ -838,38 +840,26 @@ export function ThreadDraftView(props: {
         hideLabelOnWrap: true,
         tier: 4,
         icon:
-          currentEfforts.length > 0 ? (
+          selectableEfforts.length > 0 ? (
             <EffortIcon
               className="size-4 text-foreground"
               effort={effort}
-              efforts={currentEfforts.map((e) => e.id)}
+              efforts={selectableEfforts.map((e) => e.id)}
             />
           ) : undefined,
       });
     }
     if (supportsFast) {
-      if (presentationMode === "gui") {
-        ctrls.push({
-          kind: "toggle",
-          label: "Fast",
-          icon: <Zap className="size-3.5" />,
-          iconOnly: true,
-          fillIconOnSelect: true,
-          isSelected: fast,
-          onChange: (selected) => latestConfigPatchRef.current({ fast: selected }),
-        });
-      } else {
-        ctrls.push({
-          kind: "toggle",
-          label: "Fast",
-          icon: <Zap className="size-3.5" />,
-          fillIconOnSelect: true,
-          hideLabelOnWrap: true,
-          tier: 3,
-          isSelected: fast,
-          onChange: (selected) => latestConfigPatchRef.current({ fast: selected }),
-        });
-      }
+      ctrls.push({
+        kind: "toggle",
+        label: "Fast",
+        icon: <Zap className="size-3.5" />,
+        iconOnly: true,
+        fillIconOnSelect: true,
+        tier: 3,
+        isSelected: fast,
+        onChange: (selected) => latestConfigPatchRef.current({ fast: selected }),
+      });
     }
     return ctrls;
   }, [
@@ -882,7 +872,6 @@ export function ThreadDraftView(props: {
     contextSize,
     fast,
     thinking,
-    presentationMode,
   ]);
 
   const providerDraftControls = useMemo(() => {

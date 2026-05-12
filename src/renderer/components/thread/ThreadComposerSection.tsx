@@ -123,11 +123,13 @@ function buildControls(
     id,
     label: formatEffortLabel(id),
   }));
+  const selectableEfforts = efforts.length > 1 ? efforts : [];
   const modelContext = filteredCaps.modelContextSizes?.[effectiveConfig.model];
   const contextSizes =
     (modelContext
       ? filteredCaps.contextSizes?.filter((c) => modelContext.includes(c.id))
       : undefined) ?? [];
+  const selectableContextSizes = contextSizes.length > 1 ? contextSizes : [];
   const supportsFast = filteredCaps.fastModels?.includes(effectiveConfig.model) ?? false;
   const supportsThinking = filteredCaps.thinkingModels?.includes(effectiveConfig.model) ?? false;
 
@@ -162,14 +164,18 @@ function buildControls(
     },
   ];
 
-  if (efforts.length > 0 || contextSizes.length > 0 || supportsThinking) {
+  if (selectableEfforts.length > 0 || selectableContextSizes.length > 0 || supportsThinking) {
     controls.push({
       kind: "effort-context",
-      efforts,
-      ...(effectiveConfig.effort ? { effortValue: effectiveConfig.effort } : {}),
+      efforts: selectableEfforts,
+      ...(selectableEfforts.length > 0 && effectiveConfig.effort
+        ? { effortValue: effectiveConfig.effort }
+        : {}),
       onEffortChange: (value) => onPatch({ effort: value }),
-      contextSizes,
-      ...(effectiveConfig.contextSize ? { contextValue: effectiveConfig.contextSize } : {}),
+      contextSizes: selectableContextSizes,
+      ...(selectableContextSizes.length > 0 && effectiveConfig.contextSize
+        ? { contextValue: effectiveConfig.contextSize }
+        : {}),
       onContextChange: (value) => onPatch({ contextSize: value }),
       thinkingSupported: supportsThinking,
       thinkingValue: effectiveConfig.thinking === true,
@@ -178,11 +184,11 @@ function buildControls(
       hideLabelOnWrap: true,
       tier: 4,
       icon:
-        efforts.length > 0 ? (
+        selectableEfforts.length > 0 ? (
           <EffortIcon
             className="size-4 text-foreground"
             effort={effectiveConfig.effort ?? ""}
-            efforts={efforts.map((e) => e.id)}
+            efforts={selectableEfforts.map((e) => e.id)}
           />
         ) : undefined,
     });

@@ -64,7 +64,9 @@ export function EffortContextMenu(props: EffortContextMenuProps) {
     ? (contextSizes.find((o) => o.id === contextValue)?.label ?? contextValue ?? "")
     : "";
 
-  const triggerLabel = [effortLabel, contextLabel].filter((p) => p.length > 0).join(" · ");
+  const triggerLabel =
+    [effortLabel, contextLabel].filter((p) => p.length > 0).join(" · ") ||
+    (hasThinking ? "Thinking" : "");
 
   function handleOpenChange(open: boolean) {
     setIsOpen(open);

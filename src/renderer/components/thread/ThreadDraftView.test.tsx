@@ -143,8 +143,8 @@ const cursorStatus: AgentStatus = {
       { id: "composer-2", label: "Composer 2" },
       { id: "gpt-5.5", label: "GPT-5.5" },
     ],
-    efforts: ["high"],
-    modelEfforts: { "composer-2": [], "gpt-5.5": ["high"] },
+    efforts: ["low", "high"],
+    modelEfforts: { "composer-2": [], "gpt-5.5": ["low", "high"] },
     contextSizes: [
       { id: "272k", label: "272K" },
       { id: "1m", label: "1M" },
@@ -163,6 +163,41 @@ const cursorStatus: AgentStatus = {
     presentationMode: "terminal",
     presentationModes: ["terminal", "gui"],
     settingDefs: [],
+  },
+};
+
+const singleContextThinkingCursorStatus: AgentStatus = {
+  ...cursorStatus,
+  capabilities: {
+    ...cursorStatus.capabilities,
+    models: [{ id: "claude-4.5-sonnet", label: "Sonnet 4.5" }],
+    efforts: [],
+    modelEfforts: { "claude-4.5-sonnet": [] },
+    contextSizes: [{ id: "200k", label: "200K" }],
+    modelContextSizes: {
+      "claude-4.5-sonnet": ["200k"],
+    },
+    fastModels: [],
+    thinkingModels: ["claude-4.5-sonnet"],
+  },
+};
+
+const singleEffortMultiContextCursorStatus: AgentStatus = {
+  ...cursorStatus,
+  capabilities: {
+    ...cursorStatus.capabilities,
+    models: [{ id: "claude-4.6-sonnet", label: "Sonnet 4.6" }],
+    efforts: ["medium"],
+    modelEfforts: { "claude-4.6-sonnet": ["medium"] },
+    contextSizes: [
+      { id: "200k", label: "200K" },
+      { id: "1m", label: "1M" },
+    ],
+    modelContextSizes: {
+      "claude-4.6-sonnet": ["200k", "1m"],
+    },
+    fastModels: [],
+    thinkingModels: ["claude-4.6-sonnet"],
   },
 };
 
@@ -426,12 +461,14 @@ describe("ThreadDraftView", () => {
           kind?: string;
           currentModel?: string;
           label?: string;
+          iconOnly?: boolean;
         }>;
       };
       const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      const fast = props.controls.find((control) => control.label === "Fast");
       expect(providerModel?.currentModel).toBe("composer-2");
       expect(props.controls.some((control) => control.kind === "effort-context")).toBe(false);
-      expect(props.controls.some((control) => control.label === "Fast")).toBe(true);
+      expect(fast?.iconOnly).toBe(true);
     });
   });
 
@@ -465,6 +502,73 @@ describe("ThreadDraftView", () => {
       const effortContext = props.controls.find((c) => c.kind === "effort-context");
       expect(providerModel?.currentModel).toBe("gpt-5.5");
       expect(effortContext?.effortValue).toBe("high");
+    });
+  });
+
+  it("does not expose a single Cursor context option as a dropdown control", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[singleContextThinkingCursorStatus]}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentModel?: string;
+          contextSizes?: Array<{ id: string; label: string }>;
+          contextValue?: string;
+          thinkingSupported?: boolean;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      const effortContext = props.controls.find((c) => c.kind === "effort-context");
+      expect(providerModel?.currentModel).toBe("claude-4.5-sonnet");
+      expect(effortContext?.contextSizes).toEqual([]);
+      expect(effortContext?.contextValue).toBeUndefined();
+      expect(effortContext?.thinkingSupported).toBe(true);
+    });
+  });
+
+  it("does not expose a single Cursor reasoning option as a dropdown control", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[singleEffortMultiContextCursorStatus]}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentModel?: string;
+          efforts?: Array<{ id: string; label: string }>;
+          effortValue?: string;
+          contextSizes?: Array<{ id: string; label: string }>;
+          contextValue?: string;
+          thinkingSupported?: boolean;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      const effortContext = props.controls.find((c) => c.kind === "effort-context");
+      expect(providerModel?.currentModel).toBe("claude-4.6-sonnet");
+      expect(effortContext?.efforts).toEqual([]);
+      expect(effortContext?.effortValue).toBeUndefined();
+      expect(effortContext?.contextSizes).toEqual([
+        { id: "200k", label: "200K" },
+        { id: "1m", label: "1M" },
+      ]);
+      expect(effortContext?.contextValue).toBe("200k");
+      expect(effortContext?.thinkingSupported).toBe(true);
     });
   });
 

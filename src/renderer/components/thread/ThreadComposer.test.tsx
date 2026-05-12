@@ -145,4 +145,20 @@ describe("ThreadComposer", () => {
     expect(visibleText("Full access")).toHaveClass("is-hidden");
     expect(visibleText("Work")).not.toHaveClass("is-hidden");
   });
+
+  it("labels a thinking-only effort context control", () => {
+    renderComposer([
+      {
+        kind: "effort-context",
+        efforts: [],
+        contextSizes: [],
+        thinkingSupported: true,
+        thinkingValue: false,
+        onThinkingChange: vi.fn<(selected: boolean) => void>(),
+        hideLabelOnWrap: true,
+      },
+    ]);
+
+    expect(visibleText("Thinking")).toBeVisible();
+  });
 });
