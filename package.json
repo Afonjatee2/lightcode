@@ -3,6 +3,7 @@
   "version": "0.1.7",
   "private": true,
   "description": "The universal desktop orchestrator for AI agents. Run terminal-native and structured chat agents side-by-side.",
+  "author": "SDSLeon",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
