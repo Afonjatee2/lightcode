@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Button } from "@heroui/react";
 import {
   Terminal,
   Zap,
@@ -221,28 +220,21 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.4 }}
             className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
           >
-            <Button
-              as="a"
+            <a
               href={`/api/download/${platform.slug}`}
-              className="w-full sm:w-auto font-medium px-8 bg-white text-black gap-2"
-              size="lg"
-              radius="sm"
-              startContent={<Download className="w-4 h-4" />}
+              className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-sm bg-white px-8 font-medium text-black transition-colors hover:bg-gray-200 sm:w-auto"
             >
+              <Download className="w-4 h-4" />
               Download for {platform.label}
-            </Button>
-            <Button
-              as="a"
+            </a>
+            <a
               href="https://github.com/SDSLeon/lightcode"
               target="_blank"
               rel="noreferrer"
-              variant="bordered"
-              size="lg"
-              className="w-full sm:w-auto font-medium px-8 border-white/20 text-white hover:bg-white/5"
-              radius="sm"
+              className="inline-flex h-12 w-full items-center justify-center rounded-sm border border-white/20 px-8 font-medium text-white transition-colors hover:bg-white/5 sm:w-auto"
             >
               View on GitHub
-            </Button>
+            </a>
             <a
               href="/download"
               className="text-sm text-gray-500 hover:text-gray-300 transition-colors underline underline-offset-4"
