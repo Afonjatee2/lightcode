@@ -290,7 +290,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
         <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div
-            className={`lightcode-content-over-drag-region ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
+            className={`lightcode-content-over-drag-region @container ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
           >
             <ThreadHeaderStatusButton
               threadId={thread.id}
@@ -319,7 +319,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                 <Tooltip.Trigger className="min-w-0 flex-1" tabIndex={-1} role="none">
                   <span
                     ref={titleRef}
-                    className="block truncate text-sm font-medium leading-tight text-foreground"
+                    className="block truncate text-sm font-medium leading-tight text-foreground @max-[560px]:text-xs @max-[360px]:text-[11px]"
                   >
                     {thread.title}
                   </span>
@@ -330,7 +330,9 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
               </Tooltip>
               <div className="flex shrink-0 items-center">
                 {projectName ? (
-                  <span className="px-1 text-sm leading-tight text-muted/60">{projectName}</span>
+                  <span className="px-1 text-sm leading-tight text-muted/60 @max-[560px]:text-xs @max-[360px]:text-[11px]">
+                    {projectName}
+                  </span>
                 ) : null}
                 {isWsl ? <TuxIcon className="h-3 w-auto shrink-0 px-1 text-muted/60" /> : null}
                 {onContinueInProvider &&

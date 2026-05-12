@@ -85,9 +85,7 @@ export function SortableThreadItem(props: {
       ? "Thread is already unloaded."
       : thread.status === "launching"
         ? "Wait for the thread to finish starting."
-        : !thread.sessionRef
-          ? "This thread can't be resumed yet."
-          : undefined;
+        : undefined;
 
   const { ref } = useSortable({
     id: `thread:${thread.id}`,

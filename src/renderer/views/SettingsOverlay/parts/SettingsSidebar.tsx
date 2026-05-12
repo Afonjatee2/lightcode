@@ -46,7 +46,10 @@ export function SettingsSidebar(props: {
   } = props;
   const { isCollapsed, collapse, expand } = useSidebar();
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
-  const isAgentsActive = activeSection === "agents" || activeSection.startsWith("agents:");
+  const isAgentsActive =
+    activeSection === "agents" ||
+    activeSection === "acpRegistry" ||
+    activeSection.startsWith("agents:");
   const devMode = isDevApp();
 
   const selectFirstAgent = () => {
@@ -82,13 +85,6 @@ export function SettingsSidebar(props: {
             />
             <SidebarButton
               iconOnly
-              icon={<Boxes className="size-4" />}
-              label="ACP Registry"
-              isActive={activeSection === "acpRegistry"}
-              onPress={() => onSectionChange("acpRegistry")}
-            />
-            <SidebarButton
-              iconOnly
               icon={<Search className="size-4" />}
               label="Search"
               isActive={activeSection === "search"}
@@ -112,6 +108,15 @@ export function SettingsSidebar(props: {
                 onPress={onRefreshAgents}
               />
             )}
+            {isAgentsActive && (
+              <SidebarButton
+                iconOnly
+                icon={<Boxes className="size-4" />}
+                label="Agent Registry"
+                isActive={activeSection === "acpRegistry"}
+                onPress={() => onSectionChange("acpRegistry")}
+              />
+            )}
             {isAgentsActive &&
               installedAgents.map((agent) => (
                 <SidebarButton
@@ -120,6 +125,8 @@ export function SettingsSidebar(props: {
                   icon={
                     <ProviderIcon
                       kind={agent.kind}
+                      icon={agent.icon}
+                      fallbackLabel={agent.label}
                       className={`size-4 ${disabledAgents.includes(agent.kind) ? "opacity-35" : ""}`}
                     />
                   }
@@ -193,12 +200,6 @@ export function SettingsSidebar(props: {
               onPress={() => onSectionChange("ai")}
             />
             <SidebarButton
-              icon={<Boxes className="size-4" />}
-              label="ACP Registry"
-              isActive={activeSection === "acpRegistry"}
-              onPress={() => onSectionChange("acpRegistry")}
-            />
-            <SidebarButton
               icon={<Search className="size-4" />}
               label="Search"
               isActive={activeSection === "search"}
@@ -207,7 +208,7 @@ export function SettingsSidebar(props: {
             <SidebarButton
               icon={<Bot className="size-4" />}
               label="Agents"
-              isActive={isAgentsActive && !activeSection.startsWith("agents:")}
+              isActive={activeSection === "agents"}
               onPress={selectFirstAgent}
               suffix={
                 <button
@@ -230,6 +231,12 @@ export function SettingsSidebar(props: {
             />
             {isAgentsActive && (
               <div className="space-y-0.5 pl-4">
+                <SidebarButton
+                  icon={<Boxes className="size-4" />}
+                  label="Agent Registry"
+                  isActive={activeSection === "acpRegistry"}
+                  onPress={() => onSectionChange("acpRegistry")}
+                />
                 {installedAgents.map((agent) => {
                   const agentDisabled = disabledAgents.includes(agent.kind);
                   return (
@@ -238,6 +245,8 @@ export function SettingsSidebar(props: {
                       icon={
                         <ProviderIcon
                           kind={agent.kind}
+                          icon={agent.icon}
+                          fallbackLabel={agent.label}
                           className={`size-4 ${agentDisabled ? "opacity-35" : ""}`}
                         />
                       }

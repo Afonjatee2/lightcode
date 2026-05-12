@@ -61,8 +61,10 @@ function statusesEqual(a: AgentStatus[], b: AgentStatus[]): boolean {
     (x, i) =>
       x.kind === b[i]!.kind &&
       x.installed === b[i]!.installed &&
+      x.icon === b[i]!.icon &&
       x.version === b[i]!.version &&
       x.authState === b[i]!.authState &&
+      x.loginCommand === b[i]!.loginCommand &&
       areAgentProviderMetadataEqual(x.providerMetadata, b[i]!.providerMetadata) &&
       capabilitiesEqual(x.capabilities, b[i]!.capabilities),
   );

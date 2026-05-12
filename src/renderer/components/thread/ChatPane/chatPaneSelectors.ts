@@ -4,6 +4,7 @@ import type {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import type { AppStoreState } from "@/renderer/state/slices/shared";
 import type { ToolCallPayload } from "@/shared/contracts";
+import { canShareRuntimeToolGroup } from "@/renderer/state/runtimeToolGrouping";
 import { isContextCompactionToolCall } from "./parts/items/ContextCompaction";
 import { isPlanProposalToolCall } from "./parts/items/PlanProposal";
 import { isSubAgentTool } from "./parts/items/toolDisplay";
@@ -137,6 +138,9 @@ export function selectVisibleThreadTimelineEntries(
         !isToolGroupItem(next) ||
         selectChildItemIds(state, threadId, nextId).length > 0
       ) {
+        break;
+      }
+      if (!canShareRuntimeToolGroup(item, next)) {
         break;
       }
       groupIds.push(nextId);

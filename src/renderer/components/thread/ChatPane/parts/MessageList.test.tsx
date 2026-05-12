@@ -17,7 +17,7 @@ type MockVirtualizer = {
   shouldAdjustScrollPositionOnItemSizeChange?: (
     item: { start: number; size: number },
     delta: number,
-    instance: unknown,
+    instance: { isScrolling: boolean; scrollDirection: "forward" | "backward" | null },
   ) => boolean;
 };
 
@@ -124,8 +124,58 @@ describe("MessageList", () => {
     const virtualizer = useVirtualizerMock.mock.results[0]!.value;
     const shouldAdjust = virtualizer.shouldAdjustScrollPositionOnItemSizeChange!;
 
-    expect(shouldAdjust({ start: 0, size: 80 }, 40, {})).toBe(true);
-    expect(shouldAdjust({ start: 96, size: 100 }, 40, {})).toBe(false);
+    const idleVirtualizer = { isScrolling: false, scrollDirection: null } as const;
+    expect(shouldAdjust({ start: 0, size: 80 }, 40, idleVirtualizer)).toBe(true);
+    expect(shouldAdjust({ start: 96, size: 100 }, 40, idleVirtualizer)).toBe(false);
+  });
+
+  it("does not adjust scroll for rows above the viewport during active upward scroll", () => {
+    const scrollElement = document.createElement("div");
+    scrollElement.scrollTop = 160;
+
+    render(
+      <MessageList
+        threadId="thread-1"
+        entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
+        scrollElement={scrollElement}
+      />,
+    );
+
+    const virtualizer = useVirtualizerMock.mock.results[0]!.value;
+    const shouldAdjust = virtualizer.shouldAdjustScrollPositionOnItemSizeChange!;
+
+    expect(
+      shouldAdjust({ start: 0, size: 80 }, -40, {
+        isScrolling: true,
+        scrollDirection: "backward",
+      }),
+    ).toBe(false);
+  });
+
+  it("does not adjust scroll for delayed row measurements after scrolling upward", () => {
+    const scrollElement = document.createElement("div");
+    scrollElement.scrollTop = 160;
+
+    render(
+      <MessageList
+        threadId="thread-1"
+        entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
+        scrollElement={scrollElement}
+      />,
+    );
+
+    const virtualizer = useVirtualizerMock.mock.results[0]!.value;
+    const shouldAdjust = virtualizer.shouldAdjustScrollPositionOnItemSizeChange!;
+
+    scrollElement.scrollTop = 120;
+    fireEvent.scroll(scrollElement);
+
+    expect(
+      shouldAdjust({ start: 0, size: 80 }, -40, {
+        isScrolling: false,
+        scrollDirection: null,
+      }),
+    ).toBe(false);
   });
 
   it("reports virtual total size changes to parent actions", () => {

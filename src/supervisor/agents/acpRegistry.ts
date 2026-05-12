@@ -30,7 +30,7 @@ const execFileAsync = promisify(execFile);
 const ACP_REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
 const ACP_REGISTRY_INSTALL_DIR = "acp-registry";
 
-const FIRST_CLASS_REGISTRY_AGENT_KIND: Record<string, AgentKind> = {
+const REGISTRY_AGENT_FAMILY_KIND: Record<string, AgentKind> = {
   "claude-acp": "claude",
   "codex-acp": "codex",
   cursor: "cursor",
@@ -40,8 +40,8 @@ const FIRST_CLASS_REGISTRY_AGENT_KIND: Record<string, AgentKind> = {
   opencode: "opencode",
 };
 
-export function resolveFirstClassRegistryAgentKind(agentId: string): AgentKind | undefined {
-  return FIRST_CLASS_REGISTRY_AGENT_KIND[agentId];
+export function resolveRegistryAgentFamilyKind(agentId: string): AgentKind | undefined {
+  return REGISTRY_AGENT_FAMILY_KIND[agentId];
 }
 
 export async function fetchAcpRegistry(): Promise<AcpRegistryListResult> {
@@ -50,6 +50,40 @@ export async function fetchAcpRegistry(): Promise<AcpRegistryListResult> {
     throw new Error(`Failed to fetch ACP registry: HTTP ${response.status}`);
   }
   return acpRegistryListResultSchema.parse(await response.json());
+}
+
+export function backfillAcpRegistryAgentIcons(input: {
+  registry: AcpRegistryListResult;
+  settingsPath: string;
+}): boolean {
+  const settings = readAcpRegistrySettings(input.settingsPath);
+  const agentsById = new Map(input.registry.agents.map((agent) => [agent.id, agent]));
+  let changed = false;
+
+  const installedAgents = { ...settings.acpRegistryInstalledAgents };
+  for (const [id, record] of Object.entries(installedAgents)) {
+    const icon = agentsById.get(id)?.icon;
+    if (!icon || record.icon === icon) continue;
+    installedAgents[id] = { ...record, icon };
+    changed = true;
+  }
+
+  const instances = { ...settings.agentInstances };
+  for (const [id, instance] of Object.entries(instances)) {
+    if (instance.driver !== "acp-generic") continue;
+    const icon = agentsById.get(id)?.icon;
+    if (!icon || instance.icon === icon) continue;
+    instances[id] = { ...instance, icon };
+    changed = true;
+  }
+
+  if (!changed) return false;
+  writeAcpRegistrySettings(input.settingsPath, {
+    ...settings,
+    acpRegistryInstalledAgents: installedAgents,
+    agentInstances: instances,
+  });
+  return true;
 }
 
 export function readAcpRegistrySettings(settingsPath: string): SharedSettings {
@@ -74,6 +108,7 @@ function registryInstallRecord(
     id: agent.id,
     name: agent.name,
     version: agent.version,
+    ...(agent.icon ? { icon: agent.icon } : {}),
     installedAt: new Date().toISOString(),
     adapterKind,
     installKind,
@@ -94,6 +129,7 @@ function packageInstance(agent: AcpRegistryAgent, command: "npx" | "uvx"): Agent
     id: agent.id,
     driver: "acp-generic",
     displayName: agent.name,
+    ...(agent.icon ? { icon: agent.icon } : {}),
     enabled: true,
     ...(env ? { environment: env } : {}),
     config: {
@@ -198,6 +234,7 @@ async function binaryInstance(
     id: agent.id,
     driver: "acp-generic",
     displayName: agent.name,
+    ...(agent.icon ? { icon: agent.icon } : {}),
     enabled: true,
     ...(env ? { environment: env } : {}),
     config: {
@@ -231,21 +268,12 @@ export async function installAcpRegistryAgent(input: {
   }
 
   const settings = readAcpRegistrySettings(input.settingsPath);
-  const firstClassKind = resolveFirstClassRegistryAgentKind(agent.id);
-  if (firstClassKind) {
-    delete settings.agentInstances[agent.id];
-    settings.acpRegistryInstalledAgents = {
-      ...settings.acpRegistryInstalledAgents,
-      [agent.id]: registryInstallRecord(agent, firstClassKind, "first-class"),
-    };
-  } else {
-    const instance = await genericInstance(agent, input.baseDir);
-    settings.agentInstances = { ...settings.agentInstances, [agent.id]: instance };
-    settings.acpRegistryInstalledAgents = {
-      ...settings.acpRegistryInstalledAgents,
-      [agent.id]: registryInstallRecord(agent, `acp-generic:${agent.id}`, "generic"),
-    };
-  }
+  const instance = await genericInstance(agent, input.baseDir);
+  settings.agentInstances = { ...settings.agentInstances, [agent.id]: instance };
+  settings.acpRegistryInstalledAgents = {
+    ...settings.acpRegistryInstalledAgents,
+    [agent.id]: registryInstallRecord(agent, `acp-generic:${agent.id}`, "generic"),
+  };
   writeAcpRegistrySettings(input.settingsPath, settings);
   return Object.values(settings.acpRegistryInstalledAgents);
 }

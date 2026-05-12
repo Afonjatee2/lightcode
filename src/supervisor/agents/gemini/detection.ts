@@ -28,10 +28,12 @@ export const defaultGeminiCapabilities: AgentCapability = {
   settingDefs: [],
 };
 
-// WSL-only: Gemini stores a config dir at ~/.gemini after first login —
-// treat its presence as authenticated even without GEMINI_API_KEY set.
+// Gemini stores a config dir at ~/.gemini after first login; treat its
+// presence as authenticated even without GEMINI_API_KEY set.
 const configDirAuthProbe: AuthProbe = async (ctx) => {
-  if (ctx.location.kind !== "wsl") return undefined;
+  if (ctx.location.kind !== "wsl") {
+    return existsSync(join(homedir(), ".gemini")) ? "authenticated" : "unknown";
+  }
   const [result] = await batchWslCommandsAsync(ctx.location.distro, [
     "test -d ~/.gemini && echo yes",
   ]);
@@ -103,6 +105,7 @@ export const geminiDetectionSpec: DetectionSpec = {
   kind: "gemini",
   label: "Gemini",
   binary: "gemini",
+  loginCommand: "gemini auth login",
   capabilities: defaultGeminiCapabilities,
   statusProbe: probeGeminiMetadata,
   authProbes: [envVarAuthProbe(["GEMINI_API_KEY"]), configDirAuthProbe],

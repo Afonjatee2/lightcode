@@ -50,6 +50,7 @@ export const agentInstanceConfigSchema = z.object({
   id: agentInstanceIdSchema,
   driver: agentDriverKindSchema,
   displayName: z.string().min(1).max(120).optional(),
+  icon: z.string().optional(),
   accentColor: z.string().optional(),
   enabled: z.boolean().optional(),
   environment: z.record(z.string(), agentInstanceEnvVarSchema).optional(),

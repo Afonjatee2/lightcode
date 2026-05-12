@@ -183,6 +183,7 @@ export interface DetectionSpec {
   kind: AgentKind;
   label: string;
   binary: string;
+  loginCommand?: string;
   capabilities: AgentCapability;
   versionArgs?: string[];
   statusProbe?: StatusProbe;
@@ -1154,6 +1155,7 @@ export async function detectAgentInstall(
     kind: spec.kind,
     label: spec.label,
     installed: executablePath !== undefined,
+    ...(spec.loginCommand ? { loginCommand: spec.loginCommand } : {}),
     ...(executablePath ? { executablePath } : {}),
     ...(version ? { version } : {}),
     authState,

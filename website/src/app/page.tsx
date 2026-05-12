@@ -16,19 +16,41 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
-/** Detect Apple Silicon via WebGL renderer string (works in Safari + Chrome). */
-function detectAppleSiliconViaWebGL(): boolean {
+type NavigatorWithUserAgentData = Navigator & {
+  userAgentData?: {
+    getHighEntropyValues: (hints: string[]) => Promise<{ architecture?: string }>;
+  };
+};
+
+/** Detect Apple Silicon via WebGL renderer string when the browser exposes it. */
+function detectAppleSiliconViaWebGL(): boolean | undefined {
   try {
     const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl");
-    if (!gl) return false;
+    const gl =
+      (canvas.getContext("webgl2") as WebGL2RenderingContext | null) ??
+      (canvas.getContext("webgl") as WebGLRenderingContext | null) ??
+      (canvas.getContext("experimental-webgl") as WebGLRenderingContext | null);
+    if (!gl) return undefined;
     const dbg = gl.getExtension("WEBGL_debug_renderer_info");
-    if (!dbg) return false;
+    if (!dbg) return undefined;
     const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) as string;
-    // Apple Silicon GPUs report "Apple M1", "Apple M2 Pro", "Apple M3 Max", etc.
-    return /Apple M\d/i.test(renderer);
+    // Safari often reports a generic "Apple GPU" on M-series Macs.
+    if (/Apple\s+(?:GPU|M\d)/i.test(renderer)) return true;
+    if (/(?:Intel|AMD|Radeon|NVIDIA)/i.test(renderer)) return false;
+    return undefined;
   } catch {
-    return false;
+    return undefined;
+  }
+}
+
+async function getBrowserArchitecture(): Promise<string | undefined> {
+  try {
+    const uaData = await (
+      navigator as NavigatorWithUserAgentData
+    ).userAgentData?.getHighEntropyValues(["architecture"]);
+    return uaData?.architecture;
+  } catch {
+    return undefined;
   }
 }
 
@@ -50,21 +72,17 @@ export default function Home() {
         // Detect Apple Silicon vs Intel.
         // Chrome & Safari on M1 both include "Intel" in the UA string, so
         // we can't rely on the UA alone.
-        let isArm = false;
+        let isArm = true;
 
         // 1. Try userAgentData (Chrome/Edge — not available in Safari)
-        try {
-          const uaData = await (navigator as any).userAgentData?.getHighEntropyValues([
-            "architecture",
-          ]);
-          if (uaData?.architecture) {
-            isArm = uaData.architecture === "arm";
-          } else {
-            // userAgentData unavailable (Safari) — fall back to WebGL renderer
-            isArm = detectAppleSiliconViaWebGL();
-          }
-        } catch {
-          isArm = detectAppleSiliconViaWebGL();
+        const architecture = await getBrowserArchitecture();
+        if (architecture) {
+          isArm = /^(?:arm|arm64|aarch64)$/i.test(architecture);
+        } else {
+          // userAgentData unavailable (Safari) — fall back to WebGL renderer.
+          // If Safari hides the renderer too, prefer the Apple Silicon build
+          // because Safari's Mac UA still says Intel on M-series machines.
+          isArm = detectAppleSiliconViaWebGL() ?? true;
         }
 
         setPlatform(
@@ -75,12 +93,10 @@ export default function Home() {
       } else if (ua.includes("Win")) {
         // Windows ARM detection
         let isArm = false;
-        try {
-          const uaData = await (navigator as any).userAgentData?.getHighEntropyValues([
-            "architecture",
-          ]);
-          isArm = uaData?.architecture === "arm";
-        } catch {
+        const architecture = await getBrowserArchitecture();
+        if (architecture) {
+          isArm = /^(?:arm|arm64|aarch64)$/i.test(architecture);
+        } else {
           isArm = ua.includes("ARM") || ua.includes("Aarch64");
         }
         setPlatform(

@@ -49,6 +49,7 @@ export type ComposerControl =
       isCurrentState?: boolean;
       hideLabelOnWrap?: boolean;
       tier?: number | undefined;
+      className?: string;
     }
   | {
       kind: "static";
@@ -369,7 +370,7 @@ export function ThreadComposer(props: {
             control.fillIconOnSelect ? "lightcode-composer-toggle--fill-icon-selected " : ""
           }${control.isCurrentState ? "lightcode-composer-toggle--current " : ""}${
             control.iconOnly ? "min-w-9 px-2" : "min-w-0 px-2.5"
-          }`}
+          }${control.className ? ` ${control.className}` : ""}`}
           isDisabled={control.isDisabled ?? false}
           isSelected={control.isSelected}
           size="sm"

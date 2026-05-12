@@ -87,6 +87,7 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
         kind,
         label,
         installed,
+        ...(instance.icon ? { icon: instance.icon } : {}),
         authState,
         capabilities,
       };

@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentStatus } from "@/shared/contracts";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
+import type { SessionRuntime } from "./runtime/sessionTypes";
 
 const taskkillSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
 const ptySpawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
@@ -520,6 +521,157 @@ describe("writeSubmittedPrompt", () => {
 
     expect(session.pty.write).toHaveBeenCalledWith("hello\r");
     expect(emitted).toHaveLength(0);
+  });
+
+  it("promotes routed CLI hook session ids into resumable thread session refs", () => {
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const session = createRuntimeSession({
+      sessionRef: undefined,
+      canResumeWithConfig: false,
+      hasCliHookPluginActivity: true,
+    }) as unknown as SessionRuntime;
+
+    (runtime as unknown as { sessions: Map<string, SessionRuntime> }).sessions.set(
+      session.threadId,
+      session,
+    );
+
+    const manager = (
+      runtime as unknown as {
+        threadSessionManager: {
+          findSessionForCliHookPlugin(input: {
+            threadId?: string;
+            sessionId?: string;
+          }): SessionRuntime | undefined;
+          noteCliHookPluginActivity(
+            runtimeSession: SessionRuntime,
+            envelope: {
+              protocolVersion: 1;
+              agentKind: "codex";
+              pluginVersion: string;
+              threadId: string;
+              sessionId: string;
+              ts: number;
+              intent: "session.started";
+            },
+          ): void;
+        };
+      }
+    ).threadSessionManager;
+
+    manager.noteCliHookPluginActivity(session, {
+      protocolVersion: 1,
+      agentKind: "codex",
+      pluginVersion: "1.0.0",
+      threadId: session.threadId,
+      sessionId: "codex-session-1",
+      ts: Date.now(),
+      intent: "session.started",
+    });
+
+    expect(session.sessionRef?.providerSessionId).toBe("codex-session-1");
+    expect(session.canResumeWithConfig).toBe(true);
+    expect(manager.findSessionForCliHookPlugin({ sessionId: "codex-session-1" })).toBe(session);
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: session.threadId,
+        canResumeWithConfig: true,
+        sessionRef: expect.objectContaining({
+          providerSessionId: "codex-session-1",
+        }),
+      }),
+    );
+  });
+
+  it("starts terminal session ref discovery immediately after spawn without hooks", async () => {
+    vi.useFakeTimers();
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const pty = createMockPty();
+    const discoverSessionRef = vi
+      .fn<() => Promise<{ providerSessionId: string; discoveredAt: string } | undefined>>()
+      .mockResolvedValue({
+        providerSessionId: "codex-rollout-session-1",
+        discoveredAt: "2026-05-11T00:00:00.000Z",
+      });
+
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: { kind: "windows"; path: string };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          command: { command: string; args: string[] };
+        }) => SessionRuntime;
+      }
+    ).spawnThread({
+      threadId: "thread-codex-no-hooks",
+      agentKind: "codex",
+      adapter: {
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["high"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+        },
+        initialSessionRefDiscoveryDelayMs: 1000,
+        discoverSessionRef,
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      config: {
+        model: "gpt-5.4",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      command: {
+        command: "codex",
+        args: [],
+      },
+    });
+
+    expect(discoverSessionRef).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(discoverSessionRef).toHaveBeenCalledTimes(1);
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-codex-no-hooks",
+        canResumeWithConfig: true,
+        sessionRef: {
+          providerSessionId: "codex-rollout-session-1",
+          discoveredAt: "2026-05-11T00:00:00.000Z",
+        },
+      }),
+    );
+    vi.useRealTimers();
   });
 
   it("keeps terminal scrollback in a capped transcript buffer", () => {

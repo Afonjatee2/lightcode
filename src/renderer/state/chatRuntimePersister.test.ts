@@ -29,14 +29,18 @@ describe("prepareRuntimeSnapshotForPersistence", () => {
           type: "tool_call",
           payload: { name: "Viewing src/a.ts", status: "success" },
         }),
-        makeItem({ id: "file-1", type: "file_change" }),
         makeItem({ id: "search-1", type: "web_search" }),
+        makeItem({
+          id: "command-1",
+          type: "command_execution",
+          payload: { command: "pnpm run test", exitCode: 0 },
+        }),
         makeItem({ id: "assistant-2", type: "assistant_message" }),
       ],
-      [makeTurn("tool-1"), makeTurn("file-1"), makeTurn("search-1")],
+      [makeTurn("tool-1"), makeTurn("search-1"), makeTurn("command-1")],
     );
 
-    const summaryId = "tool-call-summary:tool-1:search-1:3";
+    const summaryId = "tool-call-summary:tool-1:command-1:3";
     expect(snapshot.items.map((item) => item.id)).toEqual([
       "assistant-1",
       summaryId,
@@ -46,6 +50,55 @@ describe("prepareRuntimeSnapshotForPersistence", () => {
       summaryId,
       summaryId,
       summaryId,
+    ]);
+  });
+
+  it("does not compact edits together with other tool calls", () => {
+    const snapshot = prepareRuntimeSnapshotForPersistence(
+      [
+        makeItem({ id: "assistant-1", type: "assistant_message" }),
+        makeItem({
+          id: "edit-1",
+          type: "file_change",
+          payload: { path: "src/foo.ts", changeKind: "edit" },
+        }),
+        makeItem({
+          id: "edit-2",
+          type: "file_change",
+          payload: { path: "src/foo.ts", changeKind: "edit" },
+        }),
+        makeItem({
+          id: "command-1",
+          type: "command_execution",
+          payload: { command: "pnpm run typecheck", exitCode: 0 },
+        }),
+        makeItem({
+          id: "command-2",
+          type: "command_execution",
+          payload: { command: "pnpm run lint", exitCode: 0 },
+        }),
+        makeItem({
+          id: "edit-3",
+          type: "file_change",
+          payload: { path: "src/bar.ts", changeKind: "edit" },
+        }),
+      ],
+      [makeTurn("edit-1"), makeTurn("edit-2"), makeTurn("command-1"), makeTurn("edit-3")],
+    );
+
+    const editSummaryId = "tool-call-summary:edit-1:edit-2:2";
+    const commandSummaryId = "tool-call-summary:command-1:command-2:2";
+    expect(snapshot.items.map((item) => item.id)).toEqual([
+      "assistant-1",
+      editSummaryId,
+      commandSummaryId,
+      "edit-3",
+    ]);
+    expect(snapshot.turns.map((turn) => turn.anchorItemId)).toEqual([
+      editSummaryId,
+      editSummaryId,
+      commandSummaryId,
+      "edit-3",
     ]);
   });
 

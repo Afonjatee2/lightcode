@@ -193,6 +193,78 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     );
   });
 
+  it("drops trailing reasoning when a turn is interrupted before the agent finishes it", () => {
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "tool-1",
+      itemType: "command_execution",
+    });
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "reason-1",
+      itemType: "reasoning",
+    });
+    apply("t1", {
+      type: "content.delta",
+      threadId: "t1",
+      itemId: "reason-1",
+      stream: "reasoning_text",
+      delta: "still thinking",
+    });
+    apply("t1", {
+      type: "item.completed",
+      threadId: "t1",
+      itemId: "reason-1",
+    });
+    apply("t1", {
+      type: "turn.completed",
+      threadId: "t1",
+      turnId: "turn-1",
+      state: "interrupted",
+    });
+    const state = store.getState();
+    expect(state.runtimeItemIdsByThread["t1"]).toEqual(["tool-1"]);
+    expect(state.runtimeItemsByIdByThread["t1"]?.["reason-1"]).toBeUndefined();
+  });
+
+  it("keeps completed reasoning that is followed by real agent output on interrupted turns", () => {
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "reason-1",
+      itemType: "reasoning",
+    });
+    apply("t1", {
+      type: "content.delta",
+      threadId: "t1",
+      itemId: "reason-1",
+      stream: "reasoning_text",
+      delta: "finished thought",
+    });
+    apply("t1", {
+      type: "item.completed",
+      threadId: "t1",
+      itemId: "reason-1",
+    });
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "asst-1",
+      itemType: "assistant_message",
+    });
+    apply("t1", {
+      type: "turn.completed",
+      threadId: "t1",
+      turnId: "turn-1",
+      state: "cancelled",
+    });
+    const state = store.getState();
+    expect(state.runtimeItemIdsByThread["t1"]).toEqual(["reason-1", "asst-1"]);
+    expect(state.runtimeItemsByIdByThread["t1"]?.["reason-1"]).toBeDefined();
+  });
+
   it("drops Copilot-style subagent children when the parent completes", () => {
     apply("t1", {
       type: "item.started",

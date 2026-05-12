@@ -9,13 +9,16 @@ import {
   type Selection,
   Virtualizer,
 } from "@heroui/react";
-import type { AgentSettingDef, AgentStatus } from "@/shared/contracts";
+import { AlertTriangle, LogIn } from "lucide-react";
+import type { AgentSettingDef, AgentStatus, Project } from "@/shared/contracts";
+import { runAgentLoginCommand } from "@/renderer/actions/agentLoginActions";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
 import { Select } from "@/renderer/components/common";
+import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import {
   LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD,
   MENU_DROPDOWN_ROW_HEIGHT,
@@ -171,10 +174,27 @@ function AgentMetadataLine(props: { status: AgentStatus; showEnvironmentLabel: b
   return <p className="truncate text-xs text-muted">{`${prefix}${summary}`}</p>;
 }
 
+function findProjectForAgentStatus(
+  status: AgentStatus | undefined,
+  projects: readonly Project[],
+): Project | undefined {
+  if (!status) return undefined;
+  if (status.envKind === "wsl" && status.envDistro) {
+    return projects.find(
+      (project) => project.location.kind === "wsl" && project.location.distro === status.envDistro,
+    );
+  }
+  if (status.envKind === "windows") {
+    return projects.find((project) => project.location.kind === "windows");
+  }
+  return undefined;
+}
+
 export function SingleAgentSettings(props: { agentKind: string }) {
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
-  const wslProjectDistrosKey = useAppStore((state) => buildWslProjectDistrosKey(state.projects));
+  const projects = useAppStore((state) => state.projects);
+  const wslProjectDistrosKey = buildWslProjectDistrosKey(projects);
   const platform = navigator.platform.toLowerCase().includes("win") ? "win32" : "posix";
   const installedHere = agentStatuses.filter((a) => a.kind === props.agentKind && a.installed);
   const installedWsl = wslAgentStatuses.filter((a) => a.kind === props.agentKind && a.installed);
@@ -209,12 +229,24 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     (status) => formatAgentMetadataSummary(status) !== undefined,
   );
   const showEnvironmentMetadataLabels = installedStatuses.length > 1;
+  const missingAuthStatuses = installedStatuses.filter((status) => status.authState === "missing");
+  const loginStatus = missingAuthStatuses.find((status) => status.loginCommand);
+  const loginCommand = loginStatus?.loginCommand;
+  const loginProject = findProjectForAgentStatus(loginStatus, projects);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
       <div className="mx-auto max-w-[720px]">
         <div className="mb-6">
-          <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
+          <div className="flex items-center gap-2">
+            <ProviderIcon
+              kind={agent.kind}
+              icon={agent.icon}
+              fallbackLabel={agent.label}
+              className="size-5"
+            />
+            <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
+          </div>
           {versionRows.length > 0 ? (
             <div className="mt-1 space-y-0.5">
               {versionRows.map((row, i) => (
@@ -241,6 +273,38 @@ export function SingleAgentSettings(props: { agentKind: string }) {
         </div>
 
         <div className="space-y-4">
+          {missingAuthStatuses.length > 0 ? (
+            <div className="flex items-center justify-between gap-4 rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-warning">
+              <div className="flex min-w-0 items-start gap-2">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">Login required</p>
+                  <p className="text-xs text-warning/85">
+                    {loginCommand
+                      ? `Run ${loginCommand} to sign in.`
+                      : "Sign in with the agent CLI, then refresh detected agents."}
+                  </p>
+                </div>
+              </div>
+              {loginStatus && loginCommand ? (
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  onPress={() =>
+                    runAgentLoginCommand({
+                      label: loginStatus.label,
+                      command: loginCommand,
+                      ...(loginProject ? { project: loginProject } : {}),
+                    })
+                  }
+                >
+                  <LogIn className="size-4" />
+                  Login
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
               <p className="text-sm font-medium text-foreground">Enabled</p>

@@ -619,6 +619,7 @@ export const cursorDetectionSpec: DetectionSpec = {
   kind: "cursor",
   label: "Cursor",
   binary: "cursor-agent",
+  loginCommand: "cursor-agent login",
   capabilities: cursorDefaultCapabilities,
   statusProbe: probeCursorStatus,
   async capabilitiesProbe(ctx) {

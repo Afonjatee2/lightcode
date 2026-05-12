@@ -7,8 +7,8 @@
  * `path`, `query`), the rest of the request/response stays around so the
  * accordion body can show what was actually sent and what came back.
  *
- * These helpers read those auxiliary fields tolerantly — codex-shaped rows
- * lack them and that's fine.
+ * These helpers read those auxiliary fields tolerantly — rows without those
+ * fields lack extra body details and that's fine.
  */
 
 import type { ViewportLanguage } from "./languageDetect";
@@ -26,6 +26,11 @@ export interface AcpToolResult {
 export interface ExtractedPart {
   text: string;
   language: ViewportLanguage;
+}
+
+export interface DiffSummary {
+  added: number;
+  removed: number;
 }
 
 /** Pull a string from `args[key]` when args is an object (not a string blob). */
@@ -87,19 +92,28 @@ export function extractAcpDiffResultPart(payload: unknown): ExtractedPart {
 export function extractAcpAddedFileText(payload: unknown, filePath: string): string | undefined {
   if (!payload || typeof payload !== "object") return undefined;
   const args = (payload as Record<string, unknown>).args;
-  if (typeof args !== "string") return undefined;
-
-  const lines = args.split("\n");
-  const header = `*** Add File: ${filePath}`;
-  const start = lines.findIndex((line) => line === header);
-  if (start < 0) return undefined;
-
-  const content: string[] = [];
-  for (const line of lines.slice(start + 1)) {
-    if (line.startsWith("*** ")) break;
-    if (line.startsWith("+")) content.push(line.slice(1));
+  if (typeof args === "string") {
+    const lines = args.split("\n");
+    const header = `*** Add File: ${filePath}`;
+    const start = lines.findIndex((line) => line === header);
+    if (start >= 0) {
+      const content: string[] = [];
+      for (const line of lines.slice(start + 1)) {
+        if (line.startsWith("*** ")) break;
+        if (line.startsWith("+")) content.push(line.slice(1));
+      }
+      return content.length > 0 ? `${content.join("\n")}\n` : "";
+    }
   }
-  return content.length > 0 ? `${content.join("\n")}\n` : "";
+
+  return extractStructuredAddedFileText(payload, filePath);
+}
+
+export function extractAcpDiffSummary(payload: unknown): DiffSummary | undefined {
+  const changesSummary = summarizeStructuredFileChanges(payload);
+  if (changesSummary) return changesSummary;
+  const diffPart = extractAcpDiffResultPart(payload);
+  return diffPart.text ? summarizeDiffText(diffPart.text) : undefined;
 }
 
 /** Back-compat: text-only accessors for callers that don't need the language. */
@@ -123,6 +137,9 @@ function asPart(text: string): ExtractedPart {
 function synthesizeEditDiff(payload: unknown): string | undefined {
   if (!payload || typeof payload !== "object") return undefined;
   const p = payload as Record<string, unknown>;
+  const changesDiff = synthesizeStructuredFileChangesDiff(payload);
+  if (changesDiff) return changesDiff;
+
   const args = p.args;
   if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
   const a = args as Record<string, unknown>;
@@ -145,6 +162,149 @@ function synthesizeEditDiff(payload: unknown): string | undefined {
     ...newLines.map((line) => `+${line}`),
     "",
   ].join("\n");
+}
+
+interface StructuredFileChange {
+  path: string | undefined;
+  kindType: string;
+  diff: string;
+}
+
+function readStructuredFileChanges(payload: unknown): StructuredFileChange[] {
+  if (!payload || typeof payload !== "object") return [];
+  const p = payload as Record<string, unknown>;
+  const containers = [p, p.args, p.result];
+  for (const container of containers) {
+    if (!container || typeof container !== "object" || Array.isArray(container)) continue;
+    const changes = (container as Record<string, unknown>).changes;
+    if (!Array.isArray(changes)) continue;
+    return changes
+      .map((change) => readStructuredFileChange(change))
+      .filter((change): change is StructuredFileChange => change !== null);
+  }
+  return [];
+}
+
+function readStructuredFileChange(change: unknown): StructuredFileChange | null {
+  if (!change || typeof change !== "object") return null;
+  const record = change as Record<string, unknown>;
+  const diff = record.diff;
+  if (typeof diff !== "string" || diff.length === 0) return null;
+  const kind = record.kind;
+  const kindType =
+    kind && typeof kind === "object"
+      ? String((kind as Record<string, unknown>).type ?? "").toLowerCase()
+      : "";
+  return {
+    path: readStructuredFileChangePath(record),
+    kindType,
+    diff,
+  };
+}
+
+function readStructuredFileChangePath(record: Record<string, unknown>): string | undefined {
+  const kind = record.kind;
+  if (kind && typeof kind === "object") {
+    const movePath = (kind as Record<string, unknown>).move_path;
+    if (typeof movePath === "string" && movePath.trim().length > 0) return movePath.trim();
+  }
+  for (const key of ["path", "file_path", "filePath", "relative_path", "relativePath"]) {
+    const value = record[key];
+    if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  }
+  return undefined;
+}
+
+function selectStructuredFileChanges(
+  payload: unknown,
+  filePath: string | undefined,
+): StructuredFileChange[] {
+  const changes = readStructuredFileChanges(payload);
+  if (!filePath) return changes;
+  const matching = changes.filter((change) => change.path === filePath);
+  return matching.length > 0 ? matching : changes;
+}
+
+function synthesizeStructuredFileChangesDiff(payload: unknown): string | undefined {
+  const filePath = readPayloadString(payload, "path");
+  const changes = selectStructuredFileChanges(payload, filePath);
+  if (changes.length === 0) return undefined;
+
+  const parts: string[] = [];
+  for (const change of changes) {
+    const path = change.path ?? filePath;
+    if (!path) continue;
+    if (isUnifiedDiff(change.diff)) {
+      parts.push(change.diff.trimEnd());
+      continue;
+    }
+    const isCreate = change.kindType === "add" || change.kindType === "create";
+    const isDelete = change.kindType === "delete" || change.kindType === "remove";
+    parts.push(
+      [
+        `diff --git a/${path} b/${path}`,
+        isCreate ? "--- /dev/null" : `--- a/${path}`,
+        isDelete ? "+++ /dev/null" : `+++ b/${path}`,
+        change.diff.trimEnd(),
+      ].join("\n"),
+    );
+  }
+  return parts.length > 0 ? `${parts.join("\n")}\n` : undefined;
+}
+
+function extractStructuredAddedFileText(payload: unknown, filePath: string): string | undefined {
+  const changes = selectStructuredFileChanges(payload, filePath).filter(
+    (change) => change.kindType === "add" || change.kindType === "create",
+  );
+  if (changes.length === 0) return undefined;
+
+  const content: string[] = [];
+  for (const change of changes) {
+    for (const line of change.diff.split(/\r?\n/)) {
+      if (line.startsWith("+++") || line.startsWith("---")) continue;
+      if (line.startsWith("+")) content.push(line.slice(1));
+    }
+  }
+  return content.length > 0 ? `${content.join("\n")}\n` : "";
+}
+
+function summarizeStructuredFileChanges(payload: unknown): DiffSummary | undefined {
+  const changes = selectStructuredFileChanges(payload, readPayloadString(payload, "path"));
+  if (changes.length === 0) return undefined;
+  let sawDiff = false;
+  let added = 0;
+  let removed = 0;
+  for (const change of changes) {
+    const summary = summarizeDiffText(change.diff);
+    if (!summary) continue;
+    sawDiff = true;
+    added += summary.added;
+    removed += summary.removed;
+  }
+  return sawDiff ? { added, removed } : undefined;
+}
+
+function summarizeDiffText(diff: string): DiffSummary | undefined {
+  let sawLine = false;
+  let added = 0;
+  let removed = 0;
+  for (const line of diff.split(/\r?\n/)) {
+    if (line.startsWith("+++") || line.startsWith("---")) continue;
+    if (line.startsWith("+")) {
+      sawLine = true;
+      added++;
+    } else if (line.startsWith("-")) {
+      sawLine = true;
+      removed++;
+    }
+  }
+  return sawLine ? { added, removed } : undefined;
+}
+
+function readPayloadString(payload: unknown, key: string): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const value = (payload as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 function readString(value: unknown): string | undefined {

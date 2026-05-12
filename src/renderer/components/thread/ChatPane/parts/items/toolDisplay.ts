@@ -67,6 +67,9 @@ export function deriveToolDisplay(payload: ToolCallPayload): ToolDisplay {
     return { title: skill ? `Skill: ${skill}` : payload.name, Icon: Sparkles };
   }
 
+  const summary = mapPersistedToolSummary(payload.name);
+  if (summary) return summary;
+
   const claude = mapClaudeRawTool(payload.name, args);
   if (claude) return claude;
 
@@ -363,12 +366,69 @@ function withTarget(
   return { title: `${prefix}${target}`, Icon, parts };
 }
 
+type ToolSummaryCategory = "viewed" | "searched" | "edited" | "executed" | "other";
+
+const TOOL_SUMMARY_META: Record<
+  ToolSummaryCategory,
+  { Icon: LucideIcon; labels: readonly string[]; priority: number }
+> = {
+  viewed: { Icon: Eye, labels: ["view", "views"], priority: 0 },
+  searched: { Icon: SearchCode, labels: ["search", "searches"], priority: 1 },
+  edited: { Icon: Pencil, labels: ["edit", "edits"], priority: 2 },
+  executed: { Icon: Terminal, labels: ["command", "commands"], priority: 3 },
+  other: { Icon: Wrench, labels: ["tool", "tools"], priority: 4 },
+};
+
+function mapPersistedToolSummary(name: string): ToolDisplay | null {
+  const category = parsePersistedToolSummaryCategory(name);
+  if (!category) return null;
+  return { title: name, Icon: TOOL_SUMMARY_META[category].Icon };
+}
+
+function parsePersistedToolSummaryCategory(name: string): ToolSummaryCategory | null {
+  const parts = name
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+
+  const counts = new Map<ToolSummaryCategory, number>();
+  for (const part of parts) {
+    const match = /^(\d+)\s+([a-z]+)$/i.exec(part);
+    if (!match) return null;
+    const count = Number(match[1]);
+    const category = categoryFromSummaryLabel(match[2]!);
+    if (!Number.isFinite(count) || !category) return null;
+    counts.set(category, (counts.get(category) ?? 0) + count);
+  }
+
+  return (
+    [...counts.entries()].sort(
+      ([aCat, aCount], [bCat, bCount]) =>
+        bCount - aCount || TOOL_SUMMARY_META[aCat].priority - TOOL_SUMMARY_META[bCat].priority,
+    )[0]?.[0] ?? null
+  );
+}
+
+function categoryFromSummaryLabel(label: string): ToolSummaryCategory | null {
+  const normalized = label.toLowerCase();
+  for (const [category, meta] of Object.entries(TOOL_SUMMARY_META) as Array<
+    [ToolSummaryCategory, (typeof TOOL_SUMMARY_META)[ToolSummaryCategory]]
+  >) {
+    if (meta.labels.includes(normalized)) return category;
+  }
+  return null;
+}
+
 /**
  * Verb-prefix icon resolver for ACP-style human-readable titles
  * (`Viewing src/foo.ts`, `Searching for 'bar'`). Used as a fallback for
  * payloads that don't match an MCP, Skill, or Claude raw shape.
  */
 function pickIconByVerbPrefix(name: string): LucideIcon {
+  const summary = parsePersistedToolSummaryCategory(name);
+  if (summary) return TOOL_SUMMARY_META[summary].Icon;
+
   const t = name.toLowerCase().trim();
   if (t.startsWith("viewing") || t.startsWith("reading") || t.startsWith("read ")) return Eye;
   if (t.startsWith("finding files") || t.startsWith("listing")) return FolderSearch;

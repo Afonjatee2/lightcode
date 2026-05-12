@@ -31,11 +31,11 @@ export function CheckpointRevertButton(props: {
 }) {
   return (
     <Tooltip delay={300}>
-      <Tooltip.Trigger>
+      <Tooltip.Trigger className="absolute right-2 top-2 z-10 opacity-0 transition-opacity group-hover/checkpoint:opacity-100 focus-within:opacity-100">
         <button
           type="button"
           aria-label="Revert to this checkpoint"
-          className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded text-muted/70 opacity-0 transition-colors transition-opacity hover:bg-foreground/5 hover:text-foreground group-hover/checkpoint:opacity-100 focus-visible:opacity-100"
+          className="flex size-6 items-center justify-center rounded text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
           onClick={(event) => {
             event.stopPropagation();
             props.onRequestRevert(props.itemId);
@@ -44,7 +44,7 @@ export function CheckpointRevertButton(props: {
           <RotateCcw className="size-3.5" />
         </button>
       </Tooltip.Trigger>
-      <Tooltip.Content>Revert to this checkpoint</Tooltip.Content>
+      <Tooltip.Content placement="left">Revert to this checkpoint</Tooltip.Content>
     </Tooltip>
   );
 }
@@ -64,21 +64,22 @@ export function RevertCheckpointDialog(props: {
   const filesDisabled = !props.canRestoreFiles;
   return (
     <AlertDialog.Backdrop isOpen={props.isOpen} onOpenChange={(open) => !open && props.onClose()}>
-      <AlertDialog.Container>
-        <AlertDialog.Dialog>
-          <AlertDialog.Header>
-            <AlertDialog.Icon status="warning" />
+      <AlertDialog.Container size="sm">
+        <AlertDialog.Dialog className="sm:max-w-[420px] !p-4">
+          <AlertDialog.Header className="gap-1">
             <AlertDialog.Heading>Revert to checkpoint?</AlertDialog.Heading>
+            <p className="text-sm leading-5 text-muted">
+              Choose what to revert for this checkpoint.
+            </p>
           </AlertDialog.Header>
           <AlertDialog.Body>
-            <p>Choose what to revert for this checkpoint.</p>
             <RadioGroup
               aria-label="Revert scope"
-              className="mt-3 gap-2"
+              className="gap-1.5"
               value={props.revertScope}
               onChange={(value) => props.onRevertScopeChange(value as RevertScope)}
             >
-              <Radio value="transcript" className="items-start">
+              <Radio value="transcript" className="items-start rounded-lg px-2 py-1.5">
                 <Radio.Control className="mt-0.5">
                   <Radio.Indicator />
                 </Radio.Control>
@@ -89,7 +90,11 @@ export function RevertCheckpointDialog(props: {
                   </Description>
                 </Radio.Content>
               </Radio>
-              <Radio value="files" className="items-start" isDisabled={filesDisabled}>
+              <Radio
+                value="files"
+                className="items-start rounded-lg px-2 py-1.5"
+                isDisabled={filesDisabled}
+              >
                 <Radio.Control className="mt-0.5">
                   <Radio.Indicator />
                 </Radio.Control>
@@ -104,13 +109,13 @@ export function RevertCheckpointDialog(props: {
               </Radio>
             </RadioGroup>
             {props.checkpointGuard.hasSharedTree ? (
-              <div className="mt-3 rounded border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-foreground">
+              <div className="mt-2 rounded-lg border border-warning-soft-foreground/20 bg-warning-soft/60 px-2.5 py-2 text-xs leading-5 text-warning-soft-foreground">
                 {props.checkpointGuard.sharedThreadCount === 1
                   ? "Another chat uses this same tree. File restore could overwrite that chat's changes."
                   : `${props.checkpointGuard.sharedThreadCount} other chats use this same tree. File restore could overwrite their changes.`}
               </div>
             ) : null}
-            <div className="mt-3">
+            <div className="mt-2">
               <Checkbox isSelected={props.dontAskAgain} onChange={props.onDontAskAgainChange}>
                 <Checkbox.Control>
                   <Checkbox.Indicator />
@@ -120,10 +125,11 @@ export function RevertCheckpointDialog(props: {
             </div>
           </AlertDialog.Body>
           <AlertDialog.Footer>
-            <Button slot="close" variant="tertiary">
+            <Button slot="close" variant="ghost">
               Cancel
             </Button>
-            <Button variant="danger" onPress={props.onConfirm}>
+            <Button variant="tertiary" onPress={props.onConfirm}>
+              <RotateCcw className="size-3.5" />
               Revert
             </Button>
           </AlertDialog.Footer>

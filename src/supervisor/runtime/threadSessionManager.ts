@@ -8,6 +8,7 @@ import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/setting
 import {
   type AgentKind,
   type ClearPendingSteerPayload,
+  type AgentEventEnvelope,
   type CloseThreadPayload,
   type PendingSteerState,
   type PromptSegment,
@@ -451,7 +452,16 @@ export class ThreadSessionManager {
   }
 
   /** Mark hook ownership for routed bookkeeping events that do not carry state. */
-  noteCliHookPluginActivity(session: SessionRuntime): void {
+  noteCliHookPluginActivity(session: SessionRuntime, envelope?: AgentEventEnvelope): void {
+    const nextId = envelope?.sessionId;
+    if (nextId && !session.sessionRef) {
+      session.sessionRef = createKnownSessionRef(nextId);
+      session.canResumeWithConfig = true;
+      this.indexSessionRef(session, undefined);
+      session.stopSessionRefWatcher?.();
+      session.stopSessionRefWatcher = undefined;
+      this.outputPipeline.emitState(session);
+    }
     this.outputPipeline.noteCliHookPluginActivity(session);
   }
 
@@ -1473,6 +1483,15 @@ export class ThreadSessionManager {
       this.sessionsBySessionId.set(session.sessionRef.providerSessionId, session);
     }
     this.outputPipeline.emitState(session);
+    if (
+      pty &&
+      !session.sessionRef &&
+      !session.sessionRefDiscoveryStarted &&
+      input.adapter.discoverSessionRef
+    ) {
+      session.sessionRefDiscoveryStarted = true;
+      this.pollSessionRefDiscovery(session);
+    }
 
     input.structuredSession?.setListener({
       onClose: () => {

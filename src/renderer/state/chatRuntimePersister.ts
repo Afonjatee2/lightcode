@@ -2,6 +2,7 @@ import type { ToolCallPayload } from "@/shared/contracts";
 import { isSubAgentTool } from "../components/thread/ChatPane/parts/items/toolDisplay";
 import { readBridge } from "../bridge";
 import { useAppStore } from "./appStore";
+import { canShareRuntimeToolGroup } from "./runtimeToolGrouping";
 import type { CompletedTurnRecord, RuntimeChatItem } from "./slices/runtimeEventSlice";
 
 const FLUSH_DEBOUNCE_MS = 300;
@@ -201,6 +202,7 @@ function compactRuntimeItemsForPersistence(
     while (idx < items.length) {
       const next = items[idx]!;
       if (!isToolGroupItem(next) || next.state !== "completed") break;
+      if (!canShareRuntimeToolGroup(run[0]!, next)) break;
       run.push(next);
       idx += 1;
     }
@@ -307,6 +309,7 @@ function categorizeItem(item: RuntimeChatItem): SummaryCategory {
   if (item.type === "web_search") return "searched";
   const payload = item.payload as Partial<ToolCallPayload> | undefined;
   if (!payload) return "other";
+  if (isSubAgentTool(payload as ToolCallPayload)) return "executed";
 
   switch (payload.kind) {
     case "read":
@@ -321,6 +324,9 @@ function categorizeItem(item: RuntimeChatItem): SummaryCategory {
     case "execute":
       return "executed";
   }
+
+  const summary = categorizePersistedToolSummary(payload.name ?? "");
+  if (summary) return summary;
 
   const byName = categorizeToolName(payload.name ?? "");
   if (byName !== "other") return byName;
@@ -354,6 +360,49 @@ function categorizeToolName(name: string): SummaryCategory {
     default:
       return "other";
   }
+}
+
+const SUMMARY_CATEGORY_LABELS: Record<SummaryCategory, readonly string[]> = {
+  viewed: ["view", "views"],
+  searched: ["search", "searches"],
+  edited: ["edit", "edits"],
+  executed: ["command", "commands"],
+  other: ["tool", "tools"],
+};
+
+function categorizePersistedToolSummary(name: string): SummaryCategory | null {
+  const parts = name
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+
+  const counts = new Map<SummaryCategory, number>();
+  for (const part of parts) {
+    const match = /^(\d+)\s+([a-z]+)$/i.exec(part);
+    if (!match) return null;
+    const count = Number(match[1]);
+    const category = categoryFromSummaryLabel(match[2]!);
+    if (!Number.isFinite(count) || !category) return null;
+    counts.set(category, (counts.get(category) ?? 0) + count);
+  }
+
+  return (
+    [...counts.entries()].sort(
+      ([aCat, aCount], [bCat, bCount]) =>
+        bCount - aCount || CATEGORY_PRIORITY[aCat] - CATEGORY_PRIORITY[bCat],
+    )[0]?.[0] ?? null
+  );
+}
+
+function categoryFromSummaryLabel(label: string): SummaryCategory | null {
+  const normalized = label.toLowerCase();
+  for (const [category, labels] of Object.entries(SUMMARY_CATEGORY_LABELS) as Array<
+    [SummaryCategory, readonly string[]]
+  >) {
+    if (labels.includes(normalized)) return category;
+  }
+  return null;
 }
 
 function categorizeVerbPrefix(name: string): SummaryCategory {

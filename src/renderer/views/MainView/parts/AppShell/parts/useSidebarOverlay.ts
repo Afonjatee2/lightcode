@@ -8,6 +8,13 @@ const SIDEBAR_COLLAPSED_WIDTH = 48;
 
 export { SIDEBAR_COLLAPSED_WIDTH };
 
+function readStableObservedWidth(entry: ResizeObserverEntry): number | null {
+  if (!entry.target.isConnected) return null;
+  const width = entry.contentRect.width;
+  if (width <= 0) return null;
+  return width;
+}
+
 function readAnyPanelOpen(): boolean {
   const dev = useDevTerminalStore.getState();
   const panel = usePanelStore.getState();
@@ -41,7 +48,9 @@ export function useSidebarOverlayEffects(opts: {
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      const next = entry.contentRect.width < CONTENT_MIN_WIDTH + sidebarWidth;
+      const width = readStableObservedWidth(entry);
+      if (width === null) return;
+      const next = width < CONTENT_MIN_WIDTH + sidebarWidth;
       useSidebarOverlayStore.getState().setNarrow(next);
     });
     ro.observe(el);
@@ -55,7 +64,8 @@ export function useSidebarOverlayEffects(opts: {
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;
-      const width = entry.contentRect.width;
+      const width = readStableObservedWidth(entry);
+      if (width === null) return;
       const s = useSidebarOverlayStore.getState();
       if (width < CONTENT_MIN_WIDTH) {
         if (didAutoHideRef.current) return;

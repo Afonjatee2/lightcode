@@ -1,7 +1,7 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentStatus } from "@/shared/contracts";
+import type { AgentStatus, Project } from "@/shared/contracts";
 
 const statusesState = {
   agentStatuses: [] as AgentStatus[],
@@ -17,9 +17,17 @@ const sharedSettingsState = {
   setAgentSetting: vi.fn<(kind: string, key: string, value: unknown) => void>(),
 };
 
+const appState = {
+  projects: [] as Project[],
+};
+
 vi.mock("@heroui/react", () => {
-  function Button(props: { children?: ReactNode }) {
-    return <button type="button">{props.children}</button>;
+  function Button(props: { children?: ReactNode; onPress?: () => void }) {
+    return (
+      <button type="button" onClick={props.onPress}>
+        {props.children}
+      </button>
+    );
   }
 
   function Switch(props: {
@@ -77,8 +85,16 @@ vi.mock("@/renderer/bridge", () => ({
   }),
 }));
 
+const runAgentLoginCommandMock = vi.hoisted(() =>
+  vi.fn<(input: { label: string; command: string; project?: Project }) => void>(),
+);
+
+vi.mock("@/renderer/actions/agentLoginActions", () => ({
+  runAgentLoginCommand: runAgentLoginCommandMock,
+}));
+
 vi.mock("@/renderer/state/appStore", () => ({
-  useAppStore: (selector: (state: { projects: [] }) => unknown) => selector({ projects: [] }),
+  useAppStore: (selector: (state: typeof appState) => unknown) => selector(appState),
 }));
 
 vi.mock("@/renderer/state/agentStatusesStore", () => ({
@@ -123,16 +139,28 @@ function makeStatus(kind: AgentStatus["kind"], input: Partial<AgentStatus> = {})
   };
 }
 
+function makeProject(input: { id: string; name: string; location: Project["location"] }): Project {
+  return {
+    id: input.id,
+    name: input.name,
+    disabled: false,
+    createdAt: new Date(0).toISOString(),
+    location: input.location,
+  };
+}
+
 describe("SingleAgentSettings", () => {
   beforeEach(() => {
     statusesState.agentStatuses = [];
     statusesState.wslAgentStatuses = [];
+    appState.projects = [];
     sharedSettingsState.disabledAgents = [];
     sharedSettingsState.hiddenModels = {};
     sharedSettingsState.agentSettings = {};
     sharedSettingsState.setAgentDisabled.mockReset();
     sharedSettingsState.setHiddenModels.mockReset();
     sharedSettingsState.setAgentSetting.mockReset();
+    runAgentLoginCommandMock.mockReset();
   });
 
   it("renders identity metadata as a single compact summary line", () => {
@@ -187,5 +215,56 @@ describe("SingleAgentSettings", () => {
     render(<SingleAgentSettings agentKind="codex" />);
 
     expect(screen.getByText("via ChatGPT")).toBeInTheDocument();
+  });
+
+  it("shows a login action when the agent reports missing auth", () => {
+    statusesState.agentStatuses = [
+      makeStatus("gemini", {
+        label: "Gemini",
+        authState: "missing",
+        loginCommand: "gemini auth login",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="gemini" />);
+
+    expect(screen.getByText("Login required")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /login/i }));
+    expect(runAgentLoginCommandMock).toHaveBeenCalledWith({
+      label: "Gemini",
+      command: "gemini auth login",
+    });
+  });
+
+  it("opens WSL login actions in the matching project distro", () => {
+    const wslProject = makeProject({
+      id: "wsl-project",
+      name: "WSL Project",
+      location: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/project",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\project",
+      },
+    });
+    appState.projects = [wslProject];
+    statusesState.wslAgentStatuses = [
+      makeStatus("codex", {
+        label: "Codex WSL",
+        authState: "missing",
+        loginCommand: "codex login",
+        envKind: "wsl",
+        envDistro: "Ubuntu",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="codex" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /login/i }));
+    expect(runAgentLoginCommandMock).toHaveBeenCalledWith({
+      label: "Codex WSL",
+      command: "codex login",
+      project: wslProject,
+    });
   });
 });

@@ -126,6 +126,7 @@ import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { joinProjectPosixPath } from "@/shared/wsl";
 import { buildAgentRegistry } from "./agents/registry";
 import {
+  backfillAcpRegistryAgentIcons,
   fetchAcpRegistry,
   installAcpRegistryAgent as installAcpRegistryAgentFromRegistry,
   readAcpRegistrySettings,
@@ -318,7 +319,8 @@ export class SupervisorRuntime {
         lookupSession: (input) => this.threadSessionManager.findSessionForCliHookPlugin(input),
         applyCliHookPluginState: (session, change) =>
           this.threadSessionManager.applyCliHookPluginState(session, change),
-        onRoutedEvent: (session) => this.threadSessionManager.noteCliHookPluginActivity(session),
+        onRoutedEvent: (session, env) =>
+          this.threadSessionManager.noteCliHookPluginActivity(session, env),
         onUnroutable: (env) => {
           if (isLightcodeHookDebug()) {
             console.warn(
@@ -419,7 +421,12 @@ export class SupervisorRuntime {
   }
 
   async listAcpRegistry(): Promise<AcpRegistryListResult> {
-    return fetchAcpRegistry();
+    const registry = await fetchAcpRegistry();
+    if (backfillAcpRegistryAgentIcons({ registry, settingsPath: this.settingsPath })) {
+      this.sharedSettingsCache.invalidate();
+      this.refreshAgentRegistryAdapters();
+    }
+    return registry;
   }
 
   async installAcpRegistryAgent(

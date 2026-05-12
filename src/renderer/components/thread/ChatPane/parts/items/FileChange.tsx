@@ -15,6 +15,7 @@ import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import {
   extractAcpAddedFileText,
   extractAcpArgsPart,
+  extractAcpDiffSummary,
   extractAcpDiffResultPart,
   extractAcpResultPart,
   type ExtractedPart,
@@ -32,8 +33,8 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   const stream = item.streams.file_change_output;
   const hasStream = !!stream && stream.length > 0;
   const isCreate = payload?.changeKind === "create";
-  const argContent = isCreate && !hasStream ? extractCreateContent(payload) : undefined;
-  const diffPart = !hasStream && !isCreate ? extractAcpDiffResultPart(payload) : undefined;
+  const argContent = isCreate ? extractCreateContent(payload) : undefined;
+  const diffPart = !isCreate ? extractAcpDiffResultPart(payload) : undefined;
   const diffText = diffPart?.text ? diffPart.text : undefined;
   const paneActions = useChatPaneActions();
 
@@ -41,7 +42,6 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   // `args.content`; fall back to an on-demand disk read when expanded.
   const fetchTarget =
     isCreate &&
-    !hasStream &&
     argContent === undefined &&
     diffText === undefined &&
     payload?.path &&
@@ -108,14 +108,14 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
       isExpanded={isExpanded}
       onExpandedChange={setIsExpanded}
     >
-      {stream && stream.length > 0 ? (
-        <CommandOutputViewport text={stream} language={language} />
-      ) : diffText !== undefined ? (
+      {diffText !== undefined ? (
         <InlineDiffView diffText={diffText} filePath={payload.path} />
       ) : argContent !== undefined ? (
         <CommandOutputViewport text={argContent} language={language} />
       ) : fetched.content !== undefined ? (
         <CommandOutputViewport text={fetched.content} language={language} />
+      ) : stream && stream.length > 0 ? (
+        <CommandOutputViewport text={stream} language={language} />
       ) : fetchTarget !== null ? (
         <FileContentPlaceholder state={fetched.state} reason={fetched.reason} />
       ) : (
@@ -281,5 +281,5 @@ export function formatDiffSummaryLabel(
 }
 
 function formatRightLabel(payload: FileChangePayload): ReactNode | undefined {
-  return formatDiffSummaryLabel(payload.diffSummary);
+  return formatDiffSummaryLabel(payload.diffSummary ?? extractAcpDiffSummary(payload));
 }

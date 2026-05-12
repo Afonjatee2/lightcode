@@ -26,19 +26,24 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { CommandOutputViewport } from "./CommandOutputViewport";
+import { iconForCommandIntent } from "./CommandExecution";
 import { isContextCompactionToolCall } from "./ContextCompaction";
 import { formatDiffSummaryLabel, formatKindVerb } from "./FileChange";
 import { isPlanProposalToolCall } from "./PlanProposal";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import {
+  extractAcpAddedFileText,
   extractAcpArgsPart,
+  extractAcpDiffSummary,
   extractAcpDiffResultPart,
   extractAcpResultPart,
   extractAcpResultText,
   readAcpStringField,
 } from "./acpToolPayload";
-import { humanIntentTitle } from "./commandSummary";
-import { deriveToolDisplay } from "./toolDisplay";
+import { commandIntentDisplay } from "./commandSummary";
+import { InlineDiffView } from "./InlineDiffView";
+import { detectLanguageFromPath, type ViewportLanguage } from "./languageDetect";
+import { deriveToolDisplay, isSubAgentTool } from "./toolDisplay";
 
 interface ToolCallGroupProps {
   threadId: string;
@@ -210,10 +215,14 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
       <Disclosure.Content>
         <Disclosure.Body className="pb-1 pl-4 pt-1">
           {row.bodyText ? (
-            <CommandOutputViewport
-              text={row.bodyText}
-              {...(row.bodyLanguage ? { language: row.bodyLanguage } : {})}
-            />
+            row.bodyKind === "diff" ? (
+              <InlineDiffView diffText={row.bodyText} filePath={row.bodyFilePath ?? ""} />
+            ) : (
+              <CommandOutputViewport
+                text={row.bodyText}
+                {...(row.bodyLanguage ? { language: row.bodyLanguage } : {})}
+              />
+            )
           ) : null}
           <ToolCallSections sections={row.sections} />
         </Disclosure.Body>
@@ -236,7 +245,9 @@ type InlineRow = {
   hasDetails: boolean;
   sections: ToolCallSection[];
   bodyText?: string | undefined;
-  bodyLanguage?: "diff" | undefined;
+  bodyLanguage?: ViewportLanguage | undefined;
+  bodyKind?: "text" | "diff" | undefined;
+  bodyFilePath?: string | undefined;
 };
 
 function InlineRowTitle({
@@ -314,11 +325,8 @@ function ErrorIcon() {
 
 function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | null {
   const payload = getRuntimeItemPayload<CommandExecutionPayload>(item, "command_execution");
-  const command =
-    payload?.command && payload.command.length > 0
-      ? payload.command
-      : (readAcpStringField(payload, "command") ?? "");
-  const title = command ? humanIntentTitle(command) : "Run command";
+  const command = readCommandPayloadCommand(payload);
+  const display = command ? commandIntentDisplay(command) : undefined;
   const output =
     item.streams.command_output && item.streams.command_output.length > 0
       ? item.streams.command_output
@@ -331,8 +339,8 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
     <ErrorIcon />
   ) : undefined;
   return {
-    Icon: Terminal,
-    title,
+    Icon: display ? iconForCommandIntent(display.kind) : Terminal,
+    title: display?.title ?? "Run command",
     rightLabel,
     rightLabelClassName: isErrorExit ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails: output.length > 0,
@@ -344,20 +352,26 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
 function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | null {
   const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
   if (!payload) return null;
-  const diffPart = extractAcpDiffResultPart(payload);
-  const diffText = diffPart.text || undefined;
+  const isCreate = payload.changeKind === "create";
+  const createContent = isCreate ? extractCreateContent(payload) : undefined;
+  const diffPart = !isCreate ? extractAcpDiffResultPart(payload) : undefined;
+  const diffText = diffPart?.text || undefined;
   const sections: ToolCallSection[] =
-    isExpanded && !diffText && (hasAuxFields(payload) || !item.streams.file_change_output)
+    isExpanded &&
+    !diffText &&
+    createContent === undefined &&
+    (hasAuxFields(payload) || !item.streams.file_change_output)
       ? [
           { label: "args", part: extractAcpArgsPart(payload) },
           { label: "result", part: extractAcpResultPart(payload) },
         ]
       : [];
   const isRunning = item.state !== "completed";
+  const diffSummary = payload.diffSummary ?? extractAcpDiffSummary(payload);
   const rightLabel: ReactNode = isRunning ? (
     <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
-  ) : payload.diffSummary ? (
-    formatDiffSummaryLabel(payload.diffSummary)
+  ) : diffSummary ? (
+    formatDiffSummaryLabel(diffSummary)
   ) : undefined;
   const kindVerb = formatKindVerb(payload.changeKind);
   // ACP can emit file_change items without an extractable path (path === "").
@@ -377,10 +391,15 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
     ...(titleParts ? { titleParts } : {}),
     rightLabel,
     rightLabelClassName: "text-[color:var(--muted)]",
-    hasDetails: !!item.streams.file_change_output || hasAuxFields(payload),
+    hasDetails:
+      !!item.streams.file_change_output || createContent !== undefined || hasAuxFields(payload),
     sections,
-    bodyText: isExpanded ? (diffText ?? item.streams.file_change_output) : undefined,
-    bodyLanguage: diffText ? "diff" : undefined,
+    bodyText: isExpanded
+      ? (diffText ?? createContent ?? item.streams.file_change_output)
+      : undefined,
+    bodyLanguage: createContent !== undefined ? detectLanguageFromPath(payload.path) : undefined,
+    bodyKind: diffText ? "diff" : "text",
+    bodyFilePath: payload.path,
   };
 }
 
@@ -470,11 +489,12 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
 }
 
 function categorizeItem(item: RuntimeChatItem): GroupCategory {
-  if (item.type === "command_execution") return "executed";
+  if (item.type === "command_execution") return categorizeCommandExecution(item);
   if (item.type === "file_change") return "edited";
   if (item.type === "web_search") return "searched";
   const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
   if (!payload) return "other";
+  if (isSubAgentTool(payload)) return "executed";
 
   switch (payload.kind) {
     case "read":
@@ -490,9 +510,33 @@ function categorizeItem(item: RuntimeChatItem): GroupCategory {
       return "executed";
   }
 
+  const summary = categorizePersistedToolSummary(payload.name ?? "");
+  if (summary) return summary;
+
   const byName = categorizeToolName(payload.name ?? "");
   if (byName !== "other") return byName;
   return categorizeVerbPrefix(payload.name ?? "");
+}
+
+function categorizeCommandExecution(item: RuntimeChatItem): GroupCategory {
+  const payload = getRuntimeItemPayload<CommandExecutionPayload>(item, "command_execution");
+  const command = readCommandPayloadCommand(payload);
+  if (!command) return "executed";
+  switch (commandIntentDisplay(command).kind) {
+    case "view":
+    case "list":
+      return "viewed";
+    case "search":
+      return "searched";
+    default:
+      return "executed";
+  }
+}
+
+function readCommandPayloadCommand(payload: CommandExecutionPayload | undefined): string {
+  return payload?.command && payload.command.length > 0
+    ? payload.command
+    : (readAcpStringField(payload, "command") ?? "");
 }
 
 function categorizeToolName(name: string): GroupCategory {
@@ -524,10 +568,66 @@ function categorizeToolName(name: string): GroupCategory {
   }
 }
 
+const SUMMARY_CATEGORY_LABELS: Record<GroupCategory, readonly string[]> = {
+  viewed: ["view", "views"],
+  searched: ["search", "searches"],
+  edited: ["edit", "edits"],
+  executed: ["command", "commands"],
+  other: ["tool", "tools"],
+};
+
+function categorizePersistedToolSummary(name: string): GroupCategory | null {
+  const parts = name
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+
+  const counts = new Map<GroupCategory, number>();
+  for (const part of parts) {
+    const match = /^(\d+)\s+([a-z]+)$/i.exec(part);
+    if (!match) return null;
+    const count = Number(match[1]);
+    const category = categoryFromSummaryLabel(match[2]!);
+    if (!Number.isFinite(count) || !category) return null;
+    counts.set(category, (counts.get(category) ?? 0) + count);
+  }
+
+  return (
+    [...counts.entries()].sort(
+      ([aCat, aCount], [bCat, bCount]) =>
+        bCount - aCount || CATEGORY_META[aCat].priority - CATEGORY_META[bCat].priority,
+    )[0]?.[0] ?? null
+  );
+}
+
+function categoryFromSummaryLabel(label: string): GroupCategory | null {
+  const normalized = label.toLowerCase();
+  for (const [category, labels] of Object.entries(SUMMARY_CATEGORY_LABELS) as Array<
+    [GroupCategory, readonly string[]]
+  >) {
+    if (labels.includes(normalized)) return category;
+  }
+  return null;
+}
+
 function hasAuxFields(payload: unknown): boolean {
   if (!payload || typeof payload !== "object") return false;
   const p = payload as Record<string, unknown>;
   return p.args !== undefined || p.result !== undefined;
+}
+
+function extractCreateContent(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const path = readPayloadString(payload, "path");
+  if (path) {
+    const patchContent = extractAcpAddedFileText(payload, path);
+    if (patchContent !== undefined) return patchContent;
+  }
+  const args = (payload as Record<string, unknown>).args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
+  const content = (args as Record<string, unknown>).content;
+  return typeof content === "string" && content.length > 0 ? content : undefined;
 }
 
 function readPayloadString(payload: unknown, key: string): string | undefined {

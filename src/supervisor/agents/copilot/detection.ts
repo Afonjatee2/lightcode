@@ -259,6 +259,7 @@ export const copilotDetectionSpec: DetectionSpec = {
   kind: "copilot",
   label: "GitHub Copilot",
   binary: "copilot",
+  loginCommand: "gh auth login",
   capabilities: copilotDefaultCapabilities,
   authProbes: [envVarAuthProbe(["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"]), ghAuthProbe],
   async capabilitiesProbe(ctx) {

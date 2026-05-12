@@ -142,10 +142,19 @@ describe("chatPaneSelectors", () => {
     ]);
   });
 
-  it("groups adjacent canonical file changes with other tool calls", () => {
+  it("groups edits only with edits to the same file", () => {
     const state = {
       runtimeItemIdsByThread: {
-        t1: ["assistant-1", "edit-1", "edit-2", "command-1", "assistant-2", "edit-3"],
+        t1: [
+          "assistant-1",
+          "edit-1",
+          "edit-2",
+          "command-1",
+          "command-2",
+          "assistant-2",
+          "edit-3",
+          "edit-4",
+        ],
       },
       runtimeItemsByIdByThread: {
         t1: {
@@ -182,6 +191,13 @@ describe("chatPaneSelectors", () => {
             payload: { command: "pnpm run typecheck" },
             streams: {},
           },
+          "command-2": {
+            id: "command-2",
+            type: "command_execution",
+            state: "completed",
+            payload: { command: "pnpm run lint" },
+            streams: {},
+          },
           "assistant-2": {
             id: "assistant-2",
             type: "assistant_message",
@@ -190,6 +206,16 @@ describe("chatPaneSelectors", () => {
           },
           "edit-3": {
             id: "edit-3",
+            type: "file_change",
+            state: "completed",
+            payload: {
+              path: "src/renderer/components/thread/ThreadSlashCommands.tsx",
+              changeKind: "edit",
+            },
+            streams: {},
+          },
+          "edit-4": {
+            id: "edit-4",
             type: "file_change",
             state: "completed",
             payload: {
@@ -206,11 +232,82 @@ describe("chatPaneSelectors", () => {
       { kind: "item", id: "assistant-1" },
       {
         kind: "tool_call_group",
-        id: "tool-call-group:edit-1:command-1:3",
-        itemIds: ["edit-1", "edit-2", "command-1"],
+        id: "tool-call-group:edit-1:edit-2:2",
+        itemIds: ["edit-1", "edit-2"],
+      },
+      {
+        kind: "tool_call_group",
+        id: "tool-call-group:command-1:command-2:2",
+        itemIds: ["command-1", "command-2"],
       },
       { kind: "item", id: "assistant-2" },
       { kind: "item", id: "edit-3" },
+      { kind: "item", id: "edit-4" },
+    ]);
+  });
+
+  it("applies the same edit grouping rule to generic edit tool calls", () => {
+    const state = {
+      runtimeItemIdsByThread: {
+        t1: ["tool-edit-1", "tool-edit-2", "tool-read-1", "tool-edit-3"],
+      },
+      runtimeItemsByIdByThread: {
+        t1: {
+          "tool-edit-1": {
+            id: "tool-edit-1",
+            type: "tool_call",
+            state: "completed",
+            payload: {
+              name: "Edit",
+              kind: "edit",
+              status: "success",
+              locations: [{ path: "src/foo.ts" }],
+            },
+            streams: {},
+          },
+          "tool-edit-2": {
+            id: "tool-edit-2",
+            type: "tool_call",
+            state: "completed",
+            payload: {
+              name: "Edit",
+              kind: "edit",
+              status: "success",
+              locations: [{ path: "src/foo.ts" }],
+            },
+            streams: {},
+          },
+          "tool-read-1": {
+            id: "tool-read-1",
+            type: "tool_call",
+            state: "completed",
+            payload: { name: "Read", kind: "read", status: "success" },
+            streams: {},
+          },
+          "tool-edit-3": {
+            id: "tool-edit-3",
+            type: "tool_call",
+            state: "completed",
+            payload: {
+              name: "Edit",
+              kind: "edit",
+              status: "success",
+              locations: [{ path: "src/bar.ts" }],
+            },
+            streams: {},
+          },
+        },
+      },
+    } as unknown as AppStoreState;
+
+    expect(selectVisibleThreadTimelineEntries(state, "t1")).toEqual([
+      {
+        kind: "tool_call_group",
+        id: "tool-call-group:tool-edit-1:tool-edit-2:2",
+        itemIds: ["tool-edit-1", "tool-edit-2"],
+      },
+      { kind: "item", id: "tool-read-1" },
+      { kind: "item", id: "tool-edit-3" },
     ]);
   });
 });

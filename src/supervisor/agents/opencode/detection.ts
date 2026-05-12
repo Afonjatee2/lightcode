@@ -288,6 +288,7 @@ export const opencodeDetectionSpec: DetectionSpec = {
   kind: "opencode",
   label: "OpenCode",
   binary: "opencode",
+  loginCommand: "opencode auth login",
   capabilities: opencodeDefaultCapabilities,
   statusProbe: probeOpenCodeStatus,
   authProbes: [

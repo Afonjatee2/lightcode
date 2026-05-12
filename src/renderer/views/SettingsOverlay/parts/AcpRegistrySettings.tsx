@@ -1,35 +1,41 @@
 import { useEffect, useState } from "react";
-import { Button, Input, ToggleButton, ToggleButtonGroup, Tooltip } from "@heroui/react";
+import { Button, Input, Tooltip, Card, Dropdown, Label } from "@heroui/react";
 import {
+  AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   Download,
-  ExternalLink,
   GitFork,
-  HardDrive,
   Link,
+  LogIn,
   RefreshCw,
   Search,
   Trash2,
 } from "lucide-react";
-import type { AcpRegistryAgent, InstalledAcpRegistryAgent } from "@/shared/contracts";
-import { readBridge } from "@/renderer/bridge";
+import type {
+  AcpRegistryAgent,
+  AgentStatus,
+  InstalledAcpRegistryAgent,
+  Project,
+} from "@/shared/contracts";
+import { isWindows, readBridge } from "@/renderer/bridge";
+import {
+  runAgentLoginCommand,
+  runAgentTerminalCommand,
+} from "@/renderer/actions/agentLoginActions";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { PixelLoader } from "@/renderer/components/common";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
-
-type RegistryFilter = "all" | "installed" | "notInstalled";
-
-const FIRST_CLASS_REGISTRY_AGENT_KIND: Record<string, string> = {
-  "claude-acp": "claude",
-  "codex-acp": "codex",
-  cursor: "cursor",
-  gemini: "gemini",
-  "github-copilot": "copilot",
-  "github-copilot-cli": "copilot",
-  opencode: "opencode",
-};
+import {
+  APP_SUPPORTED_ACP_AGENT_IDS,
+  KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS,
+  NATIVE_AGENT_REGISTRY_ENTRIES,
+  REGISTRY_AGENT_FAMILY_KIND,
+  type NativeAgentRegistryEntry,
+} from "./agentRegistryNative";
 
 function registrySearchText(agent: AcpRegistryAgent): string {
   return [
@@ -52,27 +58,34 @@ function distributionLabel(agent: AcpRegistryAgent): string {
   return "Custom";
 }
 
-function AgentIcon(props: { agent: AcpRegistryAgent; installedKind?: string }) {
-  if (props.installedKind) {
-    return <ProviderIcon kind={props.installedKind} className="size-5" />;
-  }
-  if (props.agent.icon) {
-    return (
-      <img alt="" className="size-5 shrink-0 rounded-sm" src={props.agent.icon} loading="lazy" />
-    );
-  }
+function registryAdapterKind(agentId: string): string {
+  return `acp-generic:${agentId}`;
+}
+
+interface InstallTarget {
+  id: string;
+  label: string;
+  project?: Project;
+}
+
+function AgentIcon(props: {
+  agent: AcpRegistryAgent;
+  installedKind?: string;
+  isInstalled?: boolean;
+}) {
   return (
-    <div className="flex size-5 shrink-0 items-center justify-center rounded border border-border text-[10px] font-semibold text-muted">
-      {props.agent.name.slice(0, 1).toUpperCase()}
-    </div>
+    <ProviderIcon
+      kind={props.installedKind ?? `acp-registry:${props.agent.id}`}
+      icon={props.agent.icon}
+      fallbackLabel={props.agent.name}
+      className={`size-8 shrink-0 rounded-lg ${props.isInstalled ? "!text-white !opacity-100" : ""}`}
+    />
   );
 }
 
 export function AcpRegistrySettings() {
   const [agents, setAgents] = useState<AcpRegistryAgent[]>([]);
-  const [version, setVersion] = useState("");
   const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<RegistryFilter>("all");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
   const [pendingAgentId, setPendingAgentId] = useState<string | undefined>();
@@ -81,8 +94,19 @@ export function AcpRegistrySettings() {
   const settingsInstalled = useSharedSettings((s) => s.acpRegistryInstalledAgents);
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
+  const projects = useAppStore((state) => state.projects);
   const wslProjectDistrosKey = useAppStore((state) => buildWslProjectDistrosKey(state.projects));
   const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
+  const isWindowsPlatform = isWindows();
+
+  const refreshStatuses = (options?: { reset?: boolean }) => {
+    if (options?.reset !== false) {
+      useAgentStatusesStore.getState().resetDiscoveredAgents();
+    }
+    void readBridge()
+      .refreshAgentStatuses(wslDistros)
+      .catch(() => undefined);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -93,7 +117,9 @@ export function AcpRegistrySettings() {
       .then((result) => {
         if (cancelled) return;
         setAgents(result.agents);
-        setVersion(result.version);
+        void readBridge()
+          .refreshAgentStatuses(wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [])
+          .catch(() => undefined);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -105,32 +131,59 @@ export function AcpRegistrySettings() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [wslProjectDistrosKey]);
 
   const installedRecords = mutatedInstalled ?? Object.values(settingsInstalled);
   const installedById = new Map(installedRecords.map((record) => [record.id, record]));
-  const detectedInstalledKinds = new Set(
-    [...agentStatuses, ...wslAgentStatuses]
-      .filter((status) => status.installed)
-      .map((status) => status.kind),
-  );
-  const normalizedQuery = query.trim().toLowerCase();
-  const filteredAgents = agents.filter((agent) => {
-    if (normalizedQuery && !registrySearchText(agent).includes(normalizedQuery)) return false;
-    const registryInstalled = installedById.has(agent.id);
-    const firstClassKind = FIRST_CLASS_REGISTRY_AGENT_KIND[agent.id];
-    const localInstalled = firstClassKind ? detectedInstalledKinds.has(firstClassKind) : false;
-    if (filter === "installed") return registryInstalled || localInstalled;
-    if (filter === "notInstalled") return !registryInstalled && !localInstalled;
-    return true;
-  });
+  const detectedInstalledByKind = new Map<string, AgentStatus[]>();
+  for (const status of [...agentStatuses, ...wslAgentStatuses]) {
+    if (!status.installed) continue;
+    const existing = detectedInstalledByKind.get(status.kind);
+    if (existing) {
+      existing.push(status);
+    } else {
+      detectedInstalledByKind.set(status.kind, [status]);
+    }
+  }
 
-  const refreshStatuses = () => {
-    useAgentStatusesStore.getState().resetDiscoveredAgents();
-    void readBridge()
-      .refreshAgentStatuses(wslDistros)
-      .catch(() => undefined);
-  };
+  const normalizedQuery = query.trim().toLowerCase();
+  const wslProjectsByDistro = new Map<string, Project>();
+  let firstWindowsProject: Project | undefined;
+  for (const project of projects) {
+    if (project.location.kind === "windows" && !firstWindowsProject) {
+      firstWindowsProject = project;
+      continue;
+    }
+    if (project.location.kind === "wsl" && !wslProjectsByDistro.has(project.location.distro)) {
+      wslProjectsByDistro.set(project.location.distro, project);
+    }
+  }
+  const visibleNativeAgents = NATIVE_AGENT_REGISTRY_ENTRIES.filter((agent) => {
+    if (!normalizedQuery) return true;
+    return [agent.id, agent.label, agent.description]
+      .join(" ")
+      .toLowerCase()
+      .includes(normalizedQuery);
+  });
+  const installedAgents: AcpRegistryAgent[] = [];
+  const availableAgents: AcpRegistryAgent[] = [];
+
+  for (const agent of agents) {
+    if (normalizedQuery && !registrySearchText(agent).includes(normalizedQuery)) continue;
+    const registryInstalled = installedById.has(agent.id);
+    const familyKind = REGISTRY_AGENT_FAMILY_KIND[agent.id];
+    const localInstalled =
+      hasDetectedInstalledKind(registryAdapterKind(agent.id)) ||
+      (familyKind ? hasDetectedInstalledKind(familyKind) : false);
+    if (KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS.has(agent.id) && !registryInstalled) {
+      continue;
+    }
+    if (registryInstalled || localInstalled) {
+      installedAgents.push(agent);
+    } else {
+      availableAgents.push(agent);
+    }
+  }
 
   const installAgent = (agentId: string) => {
     setPendingAgentId(agentId);
@@ -162,58 +215,444 @@ export function AcpRegistrySettings() {
       .finally(() => setPendingAgentId(undefined));
   };
 
-  return (
-    <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
-      <div className="mx-auto max-w-[980px]">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-foreground">ACP Registry</h1>
-            {version ? <p className="mt-0.5 text-xs text-muted">Registry v{version}</p> : null}
-          </div>
-          <div className="flex items-center gap-2">
-            <Tooltip>
-              <Tooltip.Trigger>
-                <Button
-                  isIconOnly
-                  size="sm"
-                  variant="secondary"
-                  onPress={() => {
-                    setIsLoading(true);
-                    setError(undefined);
-                    readBridge()
-                      .listAcpRegistry()
-                      .then((result) => {
-                        setAgents(result.agents);
-                        setVersion(result.version);
-                      })
-                      .catch((err: unknown) => {
-                        setError(err instanceof Error ? err.message : String(err));
-                      })
-                      .finally(() => setIsLoading(false));
-                  }}
-                >
-                  <RefreshCw className="size-4" />
-                </Button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>Refresh registry</Tooltip.Content>
-            </Tooltip>
-            <Button
-              size="sm"
-              variant="secondary"
-              onPress={() =>
-                void readBridge().openExternal(
-                  "https://agentclientprotocol.com/get-started/registry",
-                )
-              }
+  const renderTag = (label: string) => (
+    <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted">
+      {label}
+    </span>
+  );
+
+  function hasDetectedInstalledKind(kind: string): boolean {
+    return (detectedInstalledByKind.get(kind)?.length ?? 0) > 0;
+  }
+
+  function findDetectedStatus(...kinds: Array<string | undefined>): AgentStatus | undefined {
+    const statuses = kinds.flatMap((kind) =>
+      kind ? (detectedInstalledByKind.get(kind) ?? []) : [],
+    );
+    return (
+      statuses.find((status) => status.authState === "missing" && status.loginCommand) ??
+      statuses.find((status) => status.authState === "missing") ??
+      statuses.find((status) => status.envKind !== "wsl") ??
+      statuses[0]
+    );
+  }
+
+  function projectForStatus(status: AgentStatus | undefined): Project | undefined {
+    if (!status) return undefined;
+    if (status.envKind === "wsl" && status.envDistro) {
+      return wslProjectsByDistro.get(status.envDistro);
+    }
+    if (status.envKind === "windows") return firstWindowsProject;
+    return undefined;
+  }
+
+  function detectionScopeLabel(status: AgentStatus): string {
+    if (status.envKind === "wsl") {
+      return status.envDistro ? `WSL (${status.envDistro})` : "WSL";
+    }
+    if (status.envKind === "windows") return "Windows";
+    return "local";
+  }
+
+  const renderNativeAgentCard = (agent: NativeAgentRegistryEntry) => {
+    const nativeStatus = agentStatuses.find(
+      (status) => status.kind === agent.id && status.installed,
+    );
+    const installedWslStatuses = wslAgentStatuses.filter(
+      (status) => status.kind === agent.id && status.installed,
+    );
+    const installedWslDistros = new Set(
+      installedWslStatuses.flatMap((status) => (status.envDistro ? [status.envDistro] : [])),
+    );
+    const isInstalled = nativeStatus !== undefined || installedWslStatuses.length > 0;
+    const authStatuses = [nativeStatus, ...installedWslStatuses].filter(
+      (status): status is AgentStatus => status !== undefined,
+    );
+    const missingAuthStatus = authStatuses.find((status) => status.authState === "missing");
+    const loginCommand = missingAuthStatus?.loginCommand;
+    const loginProject = projectForStatus(missingAuthStatus);
+    const installTargets: InstallTarget[] = [];
+    const shouldOfferWslTargets = isWindowsPlatform && wslProjectsByDistro.size > 0;
+    if (shouldOfferWslTargets) {
+      if (!nativeStatus && firstWindowsProject) {
+        installTargets.push({
+          id: "windows",
+          label: "Install on Windows",
+          project: firstWindowsProject,
+        });
+      }
+      for (const [distro, project] of wslProjectsByDistro) {
+        if (installedWslDistros.has(distro)) continue;
+        installTargets.push({
+          id: `wsl:${distro}`,
+          label: `Install in WSL: ${distro}`,
+          project,
+        });
+      }
+    } else if (!nativeStatus) {
+      installTargets.push({ id: "default", label: "Install" });
+    }
+
+    const runInstallTarget = (target: InstallTarget | undefined) => {
+      runAgentTerminalCommand({
+        label: agent.label,
+        command: agent.installCommand,
+        ...(target?.project ? { project: target.project } : {}),
+        tabPurpose: "install",
+        toastPurpose: "install",
+      });
+    };
+
+    const renderInstallControl = () => {
+      if (installTargets.length === 0) return null;
+      if (installTargets.length === 1) {
+        const target = installTargets[0];
+        return (
+          <Button size="sm" variant="tertiary" onPress={() => runInstallTarget(target)}>
+            <Download className="size-4" />
+            {target?.label ?? "Install"}
+          </Button>
+        );
+      }
+      const targetsById = new Map(installTargets.map((target) => [target.id, target]));
+      return (
+        <Dropdown>
+          <Button size="sm" variant="tertiary">
+            <Download className="size-4" />
+            Install
+            <ChevronDown className="size-3.5" />
+          </Button>
+          <Dropdown.Popover placement="bottom end">
+            <Dropdown.Menu
+              aria-label={`${agent.label} install targets`}
+              onAction={(key) => runInstallTarget(targetsById.get(String(key)))}
             >
-              Learn More
-              <ExternalLink className="size-4" />
-            </Button>
+              {installTargets.map((target) => (
+                <Dropdown.Item key={target.id} id={target.id} textValue={target.label}>
+                  <Label>{target.label}</Label>
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+        </Dropdown>
+      );
+    };
+
+    return (
+      <Card
+        key={`native-${agent.id}`}
+        className="w-full rounded-lg bg-surface-secondary shadow-none border border-border p-4"
+      >
+        <div className="flex items-start gap-4">
+          <ProviderIcon
+            kind={agent.id}
+            fallbackLabel={agent.label}
+            className={`size-8 shrink-0 rounded-lg ${isInstalled ? "!text-white !opacity-100" : ""}`}
+          />
+
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex items-start justify-between gap-4">
+              <Card.Header className="flex min-w-0 flex-1 flex-col items-start gap-1 p-0">
+                <div className="flex items-center gap-2">
+                  <Card.Title className="truncate text-base font-semibold">
+                    {agent.label}
+                  </Card.Title>
+                  {renderTag("Native")}
+                </div>
+                <Card.Description className="line-clamp-2 text-sm text-foreground/85">
+                  {agent.description}
+                </Card.Description>
+              </Card.Header>
+
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {isInstalled ? (
+                  <div className="flex flex-col items-end gap-1">
+                    {nativeStatus ? (
+                      <span className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted">
+                        <CheckCircle2 className="size-3.5 text-white" />
+                        Detected <span className="text-muted/70">(local)</span>
+                      </span>
+                    ) : null}
+                    {installedWslStatuses.map((status) => (
+                      <span
+                        key={`${agent.id}-${status.envDistro ?? "wsl"}`}
+                        className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted"
+                      >
+                        <CheckCircle2 className="size-3.5 text-white" />
+                        Detected{" "}
+                        <span className="text-muted/70">
+                          {status.envDistro ? `WSL (${status.envDistro})` : "WSL"}
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {renderInstallControl()}
+                {isInstalled && missingAuthStatus ? (
+                  <div className="flex max-w-[13rem] flex-col items-end gap-1 text-right text-xs text-warning">
+                    <span className="inline-flex items-center gap-1">
+                      <AlertTriangle className="size-3.5" />
+                      Sign in required
+                    </span>
+                    {loginCommand ? (
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        onPress={() =>
+                          runAgentLoginCommand({
+                            label: missingAuthStatus.label ?? agent.label,
+                            command: loginCommand,
+                            ...(loginProject ? { project: loginProject } : {}),
+                          })
+                        }
+                      >
+                        <LogIn className="size-3.5" />
+                        Login
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <Card.Footer className="flex flex-wrap items-center gap-x-4 gap-y-2 p-0 text-xs text-muted">
+              <span className="font-medium">ID: {agent.id}</span>
+              {nativeStatus?.version ? <span>v{nativeStatus.version}</span> : null}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 text-muted transition-colors hover:text-foreground"
+                onClick={() => void readBridge().openExternal(agent.docsUrl)}
+              >
+                <Link className="size-3.5" />
+                Docs
+              </button>
+            </Card.Footer>
           </div>
         </div>
+      </Card>
+    );
+  };
 
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center">
-          <div className="relative min-w-0 flex-1">
+  const renderAgentCard = (agent: AcpRegistryAgent) => {
+    const installedRecord = installedById.get(agent.id);
+    const adapterKind = registryAdapterKind(agent.id);
+    const familyKind = REGISTRY_AGENT_FAMILY_KIND[agent.id];
+    const localStatus = findDetectedStatus(adapterKind, familyKind);
+    const localInstalled = localStatus !== undefined;
+    const rowInstalledKind = installedRecord?.adapterKind ?? familyKind;
+    const isAgentPending = pendingAgentId === agent.id;
+    const canRemove = installedRecord !== undefined;
+    const isAvailable = installedRecord !== undefined || localInstalled;
+    const needsLogin = localStatus?.authState === "missing";
+    const loginCommand = localStatus?.loginCommand;
+    const loginProject = projectForStatus(localStatus);
+
+    return (
+      <Card
+        key={agent.id}
+        className="w-full rounded-lg bg-surface-secondary shadow-none border border-border p-4"
+      >
+        <div className="flex items-start gap-4">
+          <AgentIcon
+            agent={agent}
+            {...(rowInstalledKind ? { installedKind: rowInstalledKind } : {})}
+            isInstalled={isAvailable}
+          />
+
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex items-start justify-between gap-4">
+              <Card.Header className="flex min-w-0 flex-1 flex-col items-start gap-1 p-0">
+                <div className="flex items-center gap-2">
+                  <Card.Title className="truncate text-base font-semibold">{agent.name}</Card.Title>
+                  <span className="text-sm font-medium tabular-nums text-muted">
+                    v{agent.version}
+                  </span>
+                  {renderTag("ACP")}
+                  {APP_SUPPORTED_ACP_AGENT_IDS.has(agent.id) ? renderTag("Native support") : null}
+                </div>
+                <Card.Description className="line-clamp-2 text-sm text-foreground/85">
+                  {agent.description}
+                </Card.Description>
+              </Card.Header>
+
+              <div className="flex shrink-0 flex-col items-end gap-2">
+                {canRemove ? (
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    className="text-danger hover:bg-danger hover:text-white"
+                    isPending={isAgentPending}
+                    onPress={() => removeAgent(agent.id)}
+                  >
+                    {({ isPending }) => (
+                      <>
+                        {isPending ? <PixelLoader size="xs" /> : <Trash2 className="size-4" />}
+                        {isPending ? "Removing" : "Remove"}
+                      </>
+                    )}
+                  </Button>
+                ) : localInstalled ? (
+                  <span className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted">
+                    <CheckCircle2 className="size-3.5 text-white" />
+                    Detected{" "}
+                    <span className="text-muted/70">({detectionScopeLabel(localStatus)})</span>
+                  </span>
+                ) : (
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    isPending={isAgentPending}
+                    onPress={() => installAgent(agent.id)}
+                  >
+                    {({ isPending }) => (
+                      <>
+                        {isPending ? <PixelLoader size="xs" /> : <Download className="size-4" />}
+                        {isPending ? "Installing" : "Install"}
+                      </>
+                    )}
+                  </Button>
+                )}
+                {isAvailable && needsLogin ? (
+                  <div className="flex max-w-[13rem] flex-col items-end gap-1 text-right text-xs text-warning">
+                    <span className="inline-flex items-center gap-1">
+                      <AlertTriangle className="size-3.5" />
+                      Sign in required
+                    </span>
+                    {loginCommand ? (
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        onPress={() =>
+                          runAgentLoginCommand({
+                            label: localStatus?.label ?? agent.name,
+                            command: loginCommand,
+                            ...(loginProject ? { project: loginProject } : {}),
+                          })
+                        }
+                      >
+                        <LogIn className="size-3.5" />
+                        Login
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <Card.Footer className="flex flex-wrap items-center gap-x-4 gap-y-2 p-0 text-xs text-muted">
+              <span className="font-medium">ID: {agent.id}</span>
+              <span>{distributionLabel(agent)}</span>
+              {agent.repository ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-muted transition-colors hover:text-foreground"
+                  onClick={() => void readBridge().openExternal(agent.repository!)}
+                >
+                  <GitFork className="size-3.5" />
+                  Repository
+                </button>
+              ) : null}
+              {agent.website ? (
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 text-muted transition-colors hover:text-foreground"
+                  onClick={() => void readBridge().openExternal(agent.website!)}
+                >
+                  <Link className="size-3.5" />
+                  Website
+                </button>
+              ) : null}
+            </Card.Footer>
+          </div>
+        </div>
+      </Card>
+    );
+  };
+
+  const renderAgentList = () => {
+    if (isLoading) {
+      return <div className="py-10 text-sm text-muted">Loading registry...</div>;
+    }
+
+    if (
+      visibleNativeAgents.length === 0 &&
+      installedAgents.length === 0 &&
+      availableAgents.length === 0
+    ) {
+      return <div className="py-10 text-sm text-muted">No matching agents.</div>;
+    }
+
+    return (
+      <div className="flex flex-col gap-8">
+        {visibleNativeAgents.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-muted">Native Providers</h2>
+            {visibleNativeAgents.map(renderNativeAgentCard)}
+          </div>
+        )}
+
+        {installedAgents.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-muted">ACP Agents</h2>
+            {installedAgents.map(renderAgentCard)}
+          </div>
+        )}
+
+        {availableAgents.length > 0 && (
+          <div className="flex flex-col gap-3">
+            <h2 className="text-sm font-semibold text-muted">Available ACP Agents</h2>
+            {availableAgents.map(renderAgentCard)}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex h-full min-h-0 flex-col px-6 pb-8 pt-4">
+      <div className="mx-auto flex w-full max-w-[980px] flex-col overflow-hidden">
+        <div className="mb-6 flex flex-col gap-4 shrink-0">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-xl font-semibold text-foreground">Agent Registry</h1>
+              <p className="text-sm text-muted">
+                Install native providers first; use ACP for additional protocol agents.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <Tooltip>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="tertiary"
+                    isPending={isLoading}
+                    onPress={() => {
+                      setIsLoading(true);
+                      setError(undefined);
+                      readBridge()
+                        .listAcpRegistry()
+                        .then((result) => {
+                          setAgents(result.agents);
+                          refreshStatuses({ reset: false });
+                        })
+                        .catch((err: unknown) => {
+                          setError(err instanceof Error ? err.message : String(err));
+                        })
+                        .finally(() => setIsLoading(false));
+                    }}
+                  >
+                    {({ isPending }) =>
+                      isPending ? <PixelLoader size="xs" /> : <RefreshCw className="size-4" />
+                    }
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>Refresh registry</Tooltip.Content>
+              </Tooltip>
+            </div>
+          </div>
+
+          <div className="relative w-full shrink-0">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted" />
             <Input
               aria-label="Search agents"
@@ -223,141 +662,15 @@ export function AcpRegistrySettings() {
               onChange={(event) => setQuery(event.target.value)}
             />
           </div>
-          <ToggleButtonGroup
-            aria-label="Registry filter"
-            selectionMode="single"
-            disallowEmptySelection
-            selectedKeys={[filter]}
-            onSelectionChange={(keys) => {
-              const next = [...keys][0] as RegistryFilter | undefined;
-              if (next) setFilter(next);
-            }}
-          >
-            <ToggleButton id="all">All</ToggleButton>
-            <ToggleButton id="installed">Installed</ToggleButton>
-            <ToggleButton id="notInstalled">Not Installed</ToggleButton>
-          </ToggleButtonGroup>
         </div>
 
         {error ? (
-          <div className="mb-4 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
+          <div className="mb-4 shrink-0 rounded-md border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
             {error}
           </div>
         ) : null}
 
-        {isLoading ? (
-          <div className="py-10 text-sm text-muted">Loading registry...</div>
-        ) : (
-          <div className="space-y-3">
-            {filteredAgents.map((agent) => {
-              const installedRecord = installedById.get(agent.id);
-              const firstClassKind = FIRST_CLASS_REGISTRY_AGENT_KIND[agent.id];
-              const localInstalled = firstClassKind
-                ? detectedInstalledKinds.has(firstClassKind)
-                : false;
-              const rowInstalledKind =
-                installedRecord?.installKind === "first-class"
-                  ? installedRecord.adapterKind
-                  : firstClassKind;
-              const isPending = pendingAgentId === agent.id;
-              const canRemove = installedRecord !== undefined;
-              const isAvailable = installedRecord !== undefined || localInstalled;
-
-              return (
-                <div
-                  key={agent.id}
-                  className="rounded-lg border border-border bg-surface-secondary px-4 py-4"
-                >
-                  <div className="flex items-start gap-4">
-                    <AgentIcon
-                      agent={agent}
-                      {...(rowInstalledKind ? { installedKind: rowInstalledKind } : {})}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
-                        <h2 className="truncate text-base font-semibold text-foreground">
-                          {agent.name}
-                        </h2>
-                        <span className="text-sm font-medium tabular-nums text-muted">
-                          v{agent.version}
-                        </span>
-                        {installedRecord?.installKind === "first-class" ? (
-                          <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted">
-                            First class
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="mt-2 line-clamp-2 text-sm text-foreground/85">
-                        {agent.description}
-                      </p>
-                      <div className="mt-3 flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted">
-                        <span className="font-medium">ID: {agent.id}</span>
-                        <span>{distributionLabel(agent)}</span>
-                        {agent.repository ? (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 text-muted transition-colors hover:text-foreground"
-                            onClick={() => void readBridge().openExternal(agent.repository!)}
-                          >
-                            <GitFork className="size-3.5" />
-                            Repository
-                          </button>
-                        ) : null}
-                        {agent.website ? (
-                          <button
-                            type="button"
-                            className="inline-flex items-center gap-1 text-muted transition-colors hover:text-foreground"
-                            onClick={() => void readBridge().openExternal(agent.website!)}
-                          >
-                            <Link className="size-3.5" />
-                            Website
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-2">
-                      {canRemove ? (
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          isPending={isPending}
-                          onPress={() => removeAgent(agent.id)}
-                        >
-                          <Trash2 className="size-4" />
-                          Remove
-                        </Button>
-                      ) : localInstalled ? (
-                        <Button size="sm" variant="secondary" isDisabled>
-                          <HardDrive className="size-4" />
-                          Local
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          isPending={isPending}
-                          onPress={() => installAgent(agent.id)}
-                        >
-                          <Download className="size-4" />
-                          Install
-                        </Button>
-                      )}
-                      {isAvailable && !canRemove ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-muted">
-                          <CheckCircle2 className="size-3.5" />
-                          Detected
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-            {filteredAgents.length === 0 ? (
-              <div className="py-10 text-sm text-muted">No matching agents.</div>
-            ) : null}
-          </div>
-        )}
+        <div className="flex-1 overflow-y-auto pr-2 pb-4">{renderAgentList()}</div>
       </div>
     </div>
   );

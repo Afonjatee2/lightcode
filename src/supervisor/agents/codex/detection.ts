@@ -315,6 +315,7 @@ export const codexDetectionSpec: DetectionSpec = {
   kind: "codex",
   label: "Codex",
   binary: "codex",
+  loginCommand: "codex login",
   capabilities: codexDefaultCapabilities,
   statusProbe: probeCodexStatus,
   authProbes: [

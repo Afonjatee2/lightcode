@@ -133,7 +133,7 @@ export function AppProvider(props: { children: ReactNode }) {
                   </div>
                 </div>
               ) : (
-                <div className="flex w-full items-start gap-3 p-3">
+                <div className="flex w-full flex-col gap-3 p-3">
                   <div className="flex min-w-0 flex-1 items-start gap-3">
                     <Toast.Indicator variant={variant} />
                     <Toast.Content
@@ -163,8 +163,9 @@ export function AppProvider(props: { children: ReactNode }) {
                     <Toast.ActionButton
                       size="sm"
                       variant="ghost"
+                      fullWidth
                       {...actionProps}
-                      className={`shrink-0 mr-6 ${actionProps.className ?? ""}`}
+                      className={`w-full justify-center ${actionProps.className ?? ""}`}
                     />
                   ) : null}
                 </div>

@@ -146,6 +146,7 @@ export const claudeDetectionSpec: DetectionSpec = {
   kind: "claude",
   label: "Claude Code",
   binary: "claude",
+  loginCommand: "claude auth login",
   capabilities: claudeCapabilities,
   statusProbe: probeClaudeStatus,
   capabilitiesProbe: (ctx) => probeClaudeCapabilities(ctx),

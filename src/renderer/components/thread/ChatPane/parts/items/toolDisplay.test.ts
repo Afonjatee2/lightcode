@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Eye, Pencil, SearchCode } from "lucide-react";
+import { Eye, Pencil, SearchCode, Terminal } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
 import { deriveToolDisplay, isSubAgentTool } from "./toolDisplay";
 
@@ -79,6 +79,17 @@ describe("deriveToolDisplay", () => {
     expect(display.title).toBe("Read: src/foo.ts");
     expect(display.parts).toEqual({ prefix: "Read: ", path: "src/foo.ts", filePath: true });
     expect(display.Icon).toBe(Eye);
+  });
+
+  it("uses the dominant persisted summary category for compacted tool runs", () => {
+    const display = deriveToolDisplay(
+      makePayload({
+        name: "2 commands, 1 edit",
+      }),
+    );
+
+    expect(display.title).toBe("2 commands, 1 edit");
+    expect(display.Icon).toBe(Terminal);
   });
 
   it("recognizes Copilot-style subagent payloads", () => {

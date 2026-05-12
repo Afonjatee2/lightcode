@@ -39,6 +39,7 @@ describe("humanIntentTitle", () => {
   it("uses Check: for lint/typecheck scripts", () => {
     expect(humanIntentTitle(`cd /x && pnpm run lint`)).toBe("Check: pnpm run lint");
     expect(humanIntentTitle(`npm run typecheck`)).toBe("Check: npm run typecheck");
+    expect(commandIntentDisplay(`pnpm run test`).kind).toBe("check");
   });
 
   it("labels oxfmt via pnpm exec", () => {
@@ -62,5 +63,36 @@ describe("humanIntentTitle", () => {
       'Search: "agent status|AgentStatus" in src/main src/supervisor src/shared',
     );
     expect(commandIntentDisplay(full).kind).toBe("search");
+  });
+
+  it("describes cat piped through sed as viewed lines", () => {
+    const full = `cat node_modules/.modules.yaml 2>/dev/null | sed -n '1,180p'`;
+    expect(humanIntentTitle(full)).toBe("View lines 1-180: node_modules/.modules.yaml");
+    expect(commandIntentDisplay(full).kind).toBe("view");
+  });
+
+  it("describes find commands as searches", () => {
+    const full = `find node_modules/.pnpm -maxdepth 4 -type f -name 'vitest.mjs' | sed -n '1,80p'`;
+    expect(humanIntentTitle(full)).toBe('Search files: "vitest.mjs" in node_modules/.pnpm');
+    expect(commandIntentDisplay(full).kind).toBe("search");
+  });
+
+  it("describes directory listings and package manager commands", () => {
+    expect(humanIntentTitle("ls -la node_modules/.pnpm/vitest@4.1.5")).toBe(
+      "List: node_modules/.pnpm/vitest@4.1.5",
+    );
+    expect(commandIntentDisplay("ls -la node_modules").kind).toBe("list");
+
+    expect(humanIntentTitle("pnpm install --force --offline")).toBe(
+      "Install packages: pnpm install",
+    );
+    expect(commandIntentDisplay("pnpm install --prod=false").kind).toBe("install");
+    expect(humanIntentTitle("pnpm config list")).toBe("Package config: pnpm config list");
+    expect(commandIntentDisplay("pnpm list --depth 0").kind).toBe("list");
+    expect(commandIntentDisplay("pnpm --version").kind).toBe("package");
+  });
+
+  it("marks git commands with git intent", () => {
+    expect(commandIntentDisplay("git diff -- src/foo.ts").kind).toBe("git");
   });
 });

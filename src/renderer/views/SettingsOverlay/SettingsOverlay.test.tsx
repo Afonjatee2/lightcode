@@ -99,6 +99,10 @@ vi.mock("./parts/AISettings", () => ({
   AISettings: () => <div>AI</div>,
 }));
 
+vi.mock("./parts/AcpRegistrySettings", () => ({
+  AcpRegistrySettings: () => <div>Agent Registry Settings</div>,
+}));
+
 vi.mock("./parts/SearchSettings", () => ({
   SearchSettings: () => <div>Search</div>,
 }));
@@ -172,6 +176,33 @@ describe("SettingsOverlay", () => {
 
     expect(screen.getByRole("button", { name: "Gemini" })).toBeInTheDocument();
     expect(screen.getByText("Agent gemini")).toBeInTheDocument();
+  });
+
+  it("nests Agent Registry as the first agents subsection", () => {
+    statusesState.agentStatuses = [
+      makeStatus("claude", {
+        label: "Claude Code",
+        envKind: "posix",
+      }),
+    ];
+
+    render(<SettingsOverlay onClose={() => undefined} />);
+
+    expect(screen.queryByRole("button", { name: "Agent Registry" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Agents" }));
+
+    const buttons = screen
+      .getAllByRole("button")
+      .map((button) => button.textContent)
+      .filter(Boolean);
+    expect(buttons.slice(buttons.indexOf("Agents") + 1, buttons.indexOf("Claude Code"))).toEqual([
+      "Agent Registry",
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: "Agent Registry" }));
+
+    expect(screen.getByText("Agent Registry Settings")).toBeInTheDocument();
   });
 
   it("refreshes agent probing from the agents sidebar and shows the discovery overlay", async () => {

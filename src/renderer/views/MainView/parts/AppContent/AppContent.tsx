@@ -32,6 +32,7 @@ import { ThreadDraftView } from "@/renderer/components/thread/ThreadDraftView";
 import { writeScriptToShell } from "@/renderer/utils/shellUtils";
 import { generateTitleAsync } from "@/renderer/utils/titleGen";
 import { HomeView } from "@/renderer/views/HomeView";
+import { buildProjectDraftConfig } from "./draftConfig";
 import { ThreadPane } from "./parts/ThreadPane";
 import { DraftPane } from "./parts/DraftPane";
 
@@ -77,15 +78,14 @@ export function AppContent() {
       presentationMode,
     } = input;
 
-    updateProjectDraftConfig(project.id, {
-      agentKind,
-      model: config.model,
-      effort: config.effort,
-      mode: config.mode,
-      approvalPolicy: config.approvalPolicy,
-      sandboxMode: config.sandboxMode,
-      worktreeMode: Boolean(worktreeBranch || existingWorktreePath),
-    });
+    updateProjectDraftConfig(
+      project.id,
+      buildProjectDraftConfig({
+        agentKind,
+        config,
+        worktreeMode: Boolean(worktreeBranch || existingWorktreePath),
+      }),
+    );
 
     let worktreePath: string | undefined;
     if (existingWorktreePath) {

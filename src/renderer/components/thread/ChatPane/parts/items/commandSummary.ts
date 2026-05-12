@@ -5,7 +5,15 @@
 
 const MAX_TITLE_LEN = 120;
 
-export type CommandIntentKind = "command" | "search" | "view";
+export type CommandIntentKind =
+  | "check"
+  | "command"
+  | "git"
+  | "install"
+  | "list"
+  | "package"
+  | "search"
+  | "view";
 
 export interface CommandIntentDisplay {
   title: string;
@@ -142,6 +150,14 @@ function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
     };
   }
 
+  const pipedFileView = parsePipedFileView(trimmed);
+  if (pipedFileView) {
+    return {
+      title: `View lines ${pipedFileView.lines}: ${pipedFileView.path}`,
+      kind: "view",
+    };
+  }
+
   const rgSearch = parseRipgrepSearch(trimmed);
   if (rgSearch) {
     return {
@@ -152,15 +168,33 @@ function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
     };
   }
 
+  const findSearch = parseFindSearch(trimmed);
+  if (findSearch) {
+    return {
+      title: findSearch.pattern
+        ? `Search files: "${findSearch.pattern}" in ${findSearch.scope}`
+        : `Search files: ${findSearch.scope}`,
+      kind: "search",
+    };
+  }
+
+  const listDir = parseListDirectory(trimmed);
+  if (listDir) {
+    return { title: `List: ${listDir}`, kind: "list" };
+  }
+
   const run = /^(pnpm|npm|yarn)\s+run\s+(\S+)/i.exec(trimmed);
   if (run) {
     const pm = run[1]!.toLowerCase();
     const script = run[2]!.replace(/['",]/g, "");
     if (CHECK_SCRIPTS.has(script)) {
-      return { title: `Check: ${pm} run ${script}`, kind: "command" };
+      return { title: `Check: ${pm} run ${script}`, kind: "check" };
     }
     return { title: `Run: ${pm} run ${script}`, kind: "command" };
   }
+
+  const packageManager = parsePackageManager(trimmed);
+  if (packageManager) return packageManager;
 
   const exec = /^(pnpm|npm)\s+exec\s+(.+)$/i.exec(trimmed);
   if (exec) {
@@ -173,7 +207,7 @@ function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
   if (/^git\s+/i.test(trimmed)) {
     return {
       title: trimmed.length > 72 ? `Git: ${trimmed.slice(0, 71)}…` : `Git: ${trimmed}`,
-      kind: "command",
+      kind: "git",
     };
   }
 
@@ -188,6 +222,16 @@ interface SedView {
 interface RipgrepSearch {
   pattern: string;
   scope: string | undefined;
+}
+
+interface PipedFileView {
+  path: string;
+  lines: string;
+}
+
+interface FindSearch {
+  scope: string;
+  pattern: string | undefined;
 }
 
 function parseSedView(command: string): SedView | null {
@@ -220,6 +264,30 @@ function parseSedView(command: string): SedView | null {
   const start = range[1]!;
   const end = range[2];
   return { path, lines: end ? `${start}-${end}` : start };
+}
+
+function parsePipedFileView(command: string): PipedFileView | null {
+  const parts = splitShellPipeline(command);
+  if (parts.length < 2) return null;
+  const first = parts[0]!;
+  const last = parts[parts.length - 1]!;
+  const firstWords = splitShellWords(first);
+  const lastWords = splitShellWords(last);
+  const firstExecutable = firstWords[0]?.split(/[/\\]/).pop()?.toLowerCase();
+  if (firstExecutable !== "cat" && firstExecutable !== "type") return null;
+  const lastExecutable = lastWords[0]?.split(/[/\\]/).pop()?.toLowerCase();
+  if (lastExecutable !== "sed" && lastExecutable !== "gsed") return null;
+
+  const path = firstWords.find((word, index) => {
+    if (index === 0) return false;
+    if (word.startsWith("-")) return false;
+    if (/^\d*>/.test(word)) return false;
+    return true;
+  });
+  if (!path) return null;
+
+  const sed = parseSedView(`${lastWords.join(" ")} ${path}`);
+  return sed ? { path, lines: sed.lines } : null;
 }
 
 function parseRipgrepSearch(command: string): RipgrepSearch | null {
@@ -262,6 +330,121 @@ function parseRipgrepSearch(command: string): RipgrepSearch | null {
 
   if (!pattern) return null;
   return { pattern, scope: paths.length > 0 ? paths.join(" ") : undefined };
+}
+
+function parseFindSearch(command: string): FindSearch | null {
+  const words = splitShellWords(splitShellPipeline(command)[0] ?? command);
+  if (words.length < 2) return null;
+  const executable = words[0]!.split(/[/\\]/).pop()?.toLowerCase();
+  if (executable !== "find" && executable !== "gfind") return null;
+
+  const scopes: string[] = [];
+  let pattern: string | undefined;
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]!;
+    if (word === "-name" || word === "-iname" || word === "-path" || word === "-regex") {
+      pattern = words[++i];
+      continue;
+    }
+    if (word.startsWith("-")) {
+      const nextConsumesValue =
+        word === "-maxdepth" ||
+        word === "-mindepth" ||
+        word === "-type" ||
+        word === "-perm" ||
+        word === "-mtime" ||
+        word === "-size";
+      if (nextConsumesValue) i++;
+      continue;
+    }
+    if (word === "-o" || word === "(" || word === ")") continue;
+    if (!word.startsWith("!")) scopes.push(word);
+  }
+
+  if (scopes.length === 0) return null;
+  return { scope: scopes.join(" "), pattern };
+}
+
+function parseListDirectory(command: string): string | null {
+  const words = splitShellWords(splitShellPipeline(command)[0] ?? command);
+  if (words.length < 2) return null;
+  const executable = words[0]!.split(/[/\\]/).pop()?.toLowerCase();
+  if (executable !== "ls" && executable !== "dir") return null;
+
+  const path = words.find((word, index) => index > 0 && !word.startsWith("-"));
+  return path ?? ".";
+}
+
+function parsePackageManager(command: string): CommandIntentDisplay | null {
+  const words = splitShellWords(command);
+  if (words.length < 1) return null;
+  const pm = words[0]?.toLowerCase();
+  if (pm !== "pnpm" && pm !== "npm" && pm !== "yarn") return null;
+  const firstArg = words[1]?.toLowerCase();
+  if (firstArg === "--version" || firstArg === "-v") {
+    return { title: `Package manager: ${pm} ${firstArg}`, kind: "package" };
+  }
+
+  const sub = words.find((word, index) => index > 0 && !word.startsWith("-"))?.toLowerCase();
+  if (!sub) return null;
+  if (sub === "install" || sub === "add") {
+    return { title: `Install packages: ${pm} ${sub}`, kind: "install" };
+  }
+  if (sub === "list" || sub === "ls") {
+    return { title: `List packages: ${pm} ${sub}`, kind: "list" };
+  }
+  if (sub === "config") {
+    const action = words.find((word, index) => index > 1 && !word.startsWith("-")) ?? "";
+    return {
+      title: action ? `Package config: ${pm} config ${action}` : `Package config: ${pm}`,
+      kind: "package",
+    };
+  }
+  if (sub === "version") {
+    return { title: `Package manager: ${pm} ${sub}`, kind: "package" };
+  }
+  return null;
+}
+
+function splitShellPipeline(command: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+
+  for (const ch of command) {
+    if (escaped) {
+      current += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && quote !== "'") {
+      current += ch;
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      current += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      current += ch;
+      quote = ch;
+      continue;
+    }
+    if (ch === "|") {
+      const part = current.trim();
+      if (part.length > 0) parts.push(part);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+
+  const tail = current.trim();
+  if (tail.length > 0) parts.push(tail);
+  return parts;
 }
 
 function splitShellWords(input: string): string[] {

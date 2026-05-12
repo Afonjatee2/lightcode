@@ -1,5 +1,14 @@
 import { memo, useMemo, useState, type ReactNode } from "react";
-import { Eye, SearchCode, Terminal } from "lucide-react";
+import {
+  Check,
+  Eye,
+  FolderSearch,
+  GitBranch,
+  Package,
+  SearchCode,
+  Terminal,
+  type LucideIcon,
+} from "lucide-react";
 import type { CommandExecutionPayload } from "@/shared/contracts";
 import { stripAnsiPreservingLayout } from "@/shared/ansi";
 import { PixelLoader } from "@/renderer/components/common";
@@ -9,7 +18,7 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { ChatItemAccordion } from "./ChatItemAccordion";
 import { CommandOutputViewport } from "./CommandOutputViewport";
-import { commandIntentDisplay } from "./commandSummary";
+import { commandIntentDisplay, type CommandIntentKind } from "./commandSummary";
 import { extractAcpResultText, readAcpStringField } from "./acpToolPayload";
 
 interface CommandExecutionProps {
@@ -31,7 +40,7 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
   const status = resolveCommandStatus(isRunning, payload?.exitCode, payload?.durationMs);
   const fullCommandLine = formatShellInvocation(cwd, command);
   const display = commandIntentDisplay(fullCommandLine);
-  const Icon = display.kind === "view" ? Eye : display.kind === "search" ? SearchCode : Terminal;
+  const Icon = iconForCommandIntent(display.kind);
 
   const rawOutput = item.streams.command_output ?? "";
   const plainOutput = useMemo(() => {
@@ -67,6 +76,26 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
     </ChatItemAccordion>
   );
 });
+
+export function iconForCommandIntent(kind: CommandIntentKind): LucideIcon {
+  switch (kind) {
+    case "view":
+      return Eye;
+    case "search":
+      return SearchCode;
+    case "git":
+      return GitBranch;
+    case "check":
+      return Check;
+    case "install":
+    case "package":
+      return Package;
+    case "list":
+      return FolderSearch;
+    case "command":
+      return Terminal;
+  }
+}
 
 type CommandStatus = { textClass: string; rightLabel: ReactNode };
 

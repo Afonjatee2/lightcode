@@ -1,7 +1,7 @@
 import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Surface } from "@heroui/react";
-import type { FileCheckpointChangedFile, ProjectLocation } from "@/shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { CompletedTurnRecord } from "@/renderer/state/slices/runtimeEventSlice";
@@ -48,6 +48,7 @@ interface MessageListProps {
 
 const CHAT_TRANSCRIPT_OVERSCAN = 8;
 const DEFAULT_ROW_ESTIMATE_PX = 96;
+const BACKWARD_SCROLL_ADJUSTMENT_SUPPRESSION_MS = 750;
 const SKIP_REVERT_CONFIRM_PREF_KEY = "lightcode-chat-checkpoint-revert-skip-confirm";
 
 /**
@@ -71,6 +72,8 @@ export const MessageList = memo(function MessageList({
   const hasItems = entries.length > 0;
   const parentActions = useChatPaneActions();
   const rowElementsRef = useRef(new Map<number, HTMLDivElement>());
+  const lastObservedScrollTopRef = useRef(0);
+  const suppressScrollAdjustmentUntilRef = useRef(0);
   const [measureEpoch, setMeasureEpoch] = useState(0);
   const [pendingRevertItemId, setPendingRevertItemId] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
@@ -93,14 +96,31 @@ export const MessageList = memo(function MessageList({
   });
 
   useLayoutEffect(() => {
-    virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item) => {
+    virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
       if (!scrollElement) return false;
+      if (instance.isScrolling && instance.scrollDirection === "backward") return false;
+      if (performance.now() <= suppressScrollAdjustmentUntilRef.current) return false;
       return item.start + item.size <= scrollElement.scrollTop;
     };
     return () => {
       virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
     };
   }, [scrollElement, virtualizer]);
+
+  useLayoutEffect(() => {
+    if (!scrollElement) return;
+    lastObservedScrollTopRef.current = scrollElement.scrollTop;
+    const handleScroll = () => {
+      const nextScrollTop = scrollElement.scrollTop;
+      if (nextScrollTop < lastObservedScrollTopRef.current) {
+        suppressScrollAdjustmentUntilRef.current =
+          performance.now() + BACKWARD_SCROLL_ADJUSTMENT_SUPPRESSION_MS;
+      }
+      lastObservedScrollTopRef.current = nextScrollTop;
+    };
+    scrollElement.addEventListener("scroll", handleScroll, { passive: true });
+    return () => scrollElement.removeEventListener("scroll", handleScroll);
+  }, [scrollElement]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
@@ -308,10 +328,12 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
       className="w-full"
     >
       <div className={`group/checkpoint relative w-full pb-1 ${showTurnGap ? "pt-3" : ""}`}>
-        <ChatItemRow threadId={threadId} entry={entry} isLastEntry={isLastEntry} />
-        {isCheckpointMessage && entry.kind === "item" ? (
-          <CheckpointRevertButton itemId={entry.id} onRequestRevert={onRequestRevert} />
-        ) : null}
+        <div className="relative">
+          <ChatItemRow threadId={threadId} entry={entry} isLastEntry={isLastEntry} />
+          {isCheckpointMessage && entry.kind === "item" ? (
+            <CheckpointRevertButton itemId={entry.id} onRequestRevert={onRequestRevert} />
+          ) : null}
+        </div>
         {showInlineTurn ? (
           <CompletedTurnIndicator threadId={threadId} record={completedTurn} />
         ) : null}
@@ -320,43 +342,17 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   );
 });
 
-function CompletedTurnIndicator({
-  threadId,
-  record,
-}: {
-  threadId: string;
-  record: CompletedTurnRecord;
-}) {
+function CompletedTurnIndicator({ record }: { threadId: string; record: CompletedTurnRecord }) {
   const elapsedSeconds = Math.max(0, Math.floor((record.endedAt - record.startedAt) / 1000));
-  const checkpoint = useAppStore((state) =>
-    record.anchorItemId
-      ? state.fileCheckpointTurnsByThread[threadId]?.[record.anchorItemId]
-      : undefined,
-  );
-  if (elapsedSeconds < 1 && !checkpoint) return null;
+  if (elapsedSeconds < 1) return null;
   return (
     <Surface variant="transparent" className={chatMessageSurfaceClass}>
       <div className="flex flex-col gap-0.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
         {elapsedSeconds >= 1 ? (
           <span className="text-muted">Worked for {formatElapsed(elapsedSeconds)}</span>
         ) : null}
-        {checkpoint ? <ChangedFilesSummary files={checkpoint.changedFiles} /> : null}
       </div>
     </Surface>
-  );
-}
-
-function ChangedFilesSummary({ files }: { files: readonly FileCheckpointChangedFile[] }) {
-  if (files.length === 0) {
-    return <span className="text-muted">No file changes</span>;
-  }
-  const preview = files.slice(0, 3).map((file) => file.path);
-  const suffix = files.length > preview.length ? ` +${files.length - preview.length} more` : "";
-  return (
-    <span className="text-muted">
-      Changed {files.length} {files.length === 1 ? "file" : "files"}: {preview.join(", ")}
-      {suffix}
-    </span>
   );
 }
 

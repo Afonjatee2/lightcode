@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { StatusTone } from "./statusTone";
 
 // --- Icon registry ---
@@ -11,15 +11,67 @@ export function registerProviderIcon(kind: string, icon: IconComponent) {
   ICON_REGISTRY.set(kind, icon);
 }
 
-export function ProviderIcon(props: { kind: string; tone?: StatusTone; className?: string }) {
-  const Icon = ICON_REGISTRY.get(props.kind);
-  if (!Icon) return null;
+function externalIconStyle(src: string): CSSProperties {
+  const cssUrl = `url(${JSON.stringify(src)})`;
+  return {
+    WebkitMaskImage: cssUrl,
+    maskImage: cssUrl,
+  };
+}
+
+function ExternalProviderIcon(props: { src: string; tone: StatusTone; className?: string }) {
   return (
-    <Icon
-      tone={props.tone ?? "inactive"}
-      {...(props.className ? { className: props.className } : {})}
-    />
+    <span
+      className={`lightcode-provider-icon lightcode-provider-icon--${props.tone}${props.className ? ` ${props.className}` : ""}`}
+    >
+      <span className="lightcode-provider-icon__mask" style={externalIconStyle(props.src)} />
+    </span>
   );
+}
+
+function fallbackInitial(label: string | undefined): string {
+  const raw = label?.replace(/^acp-generic:/, "").trim() ?? "";
+  return (raw.match(/[A-Za-z0-9]/)?.[0] ?? "?").toUpperCase();
+}
+
+function GenericProviderIcon(props: { label?: string; tone: StatusTone; className?: string }) {
+  return (
+    <span
+      className={`lightcode-provider-icon lightcode-provider-icon--${props.tone}${props.className ? ` ${props.className}` : ""}`}
+    >
+      <span className="lightcode-provider-icon__generic">{fallbackInitial(props.label)}</span>
+    </span>
+  );
+}
+
+export function ProviderIcon(props: {
+  kind: string;
+  tone?: StatusTone | undefined;
+  className?: string | undefined;
+  icon?: string | undefined;
+  fallbackLabel?: string | undefined;
+}) {
+  const Icon = ICON_REGISTRY.get(props.kind);
+  const tone = props.tone ?? "inactive";
+  if (!Icon) {
+    if (props.icon) {
+      return (
+        <ExternalProviderIcon
+          src={props.icon}
+          tone={tone}
+          {...(props.className ? { className: props.className } : {})}
+        />
+      );
+    }
+    return (
+      <GenericProviderIcon
+        label={props.fallbackLabel ?? props.kind}
+        tone={tone}
+        {...(props.className ? { className: props.className } : {})}
+      />
+    );
+  }
+  return <Icon tone={tone} {...(props.className ? { className: props.className } : {})} />;
 }
 
 // --- Provider label registry ---

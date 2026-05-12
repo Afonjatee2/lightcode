@@ -43,6 +43,15 @@ describe("createAcpGenericAdapter", () => {
     expect(adapter.label).toBe("my-acp");
   });
 
+  it("exposes the instance icon on detected status", async () => {
+    const adapter = createAcpGenericAdapter({
+      ...baseInstance,
+      icon: "https://example.com/icon.svg",
+    });
+    const status = await adapter.detectInstall();
+    expect(status.icon).toBe("https://example.com/icon.svg");
+  });
+
   it("merges user-declared capability overrides into the default capability set", () => {
     const adapter = createAcpGenericAdapter({
       ...baseInstance,

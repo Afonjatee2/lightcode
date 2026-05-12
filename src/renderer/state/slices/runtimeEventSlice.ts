@@ -431,6 +431,7 @@ function eventAffectsStructuralVersion(event: RuntimeEvent): boolean {
     case "item.started":
     case "item.updated":
     case "item.completed":
+    case "turn.completed":
     case "error":
       return true;
     default:
@@ -447,10 +448,13 @@ function applyRuntimeEventToRuntimeState(
     case "session.started":
     case "session.exited":
     case "turn.started":
-    case "turn.completed":
     case "warning":
       // No item state to mutate. Status flows through the existing thread-state channel.
       return {};
+
+    case "turn.completed":
+      if (event.state !== "interrupted" && event.state !== "cancelled") return {};
+      return pruneTrailingInterruptedReasoningItems(state, threadId);
 
     case "item.started": {
       const existingIds = state.runtimeItemIdsByThread[threadId] ?? [];
@@ -673,6 +677,41 @@ function coalesceRuntimeEvents(events: RuntimeEvent[]): RuntimeEvent[] {
 
   flushPendingDelta();
   return coalesced;
+}
+
+function pruneTrailingInterruptedReasoningItems(
+  state: RuntimeEventState,
+  threadId: string,
+): Partial<RuntimeEventState> {
+  const ids = state.runtimeItemIdsByThread[threadId];
+  const items = state.runtimeItemsByIdByThread[threadId];
+  if (!ids?.length || !items) return {};
+
+  const dropIds = new Set<string>();
+  for (let idx = ids.length - 1; idx >= 0; idx -= 1) {
+    const id = ids[idx]!;
+    const item = items[id];
+    if (!item) break;
+    if (item.type === "plan" || item.type === "error" || item.parentItemId) continue;
+    if (item.type !== "reasoning") break;
+    dropIds.add(id);
+  }
+  if (dropIds.size === 0) return {};
+
+  const remainingItems: Record<string, RuntimeChatItem> = {};
+  for (const [id, item] of Object.entries(items)) {
+    if (!dropIds.has(id)) remainingItems[id] = item;
+  }
+  return {
+    runtimeItemIdsByThread: {
+      ...state.runtimeItemIdsByThread,
+      [threadId]: ids.filter((id) => !dropIds.has(id)),
+    },
+    runtimeItemsByIdByThread: {
+      ...state.runtimeItemsByIdByThread,
+      [threadId]: remainingItems,
+    },
+  };
 }
 
 function isSubAgentToolCallItem(item: RuntimeChatItem): boolean {
