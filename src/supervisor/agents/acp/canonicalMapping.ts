@@ -24,8 +24,12 @@ import type {
   RuntimeEvent,
   ToolCallPayload,
 } from "@/shared/contracts";
-import { extractLeadingPath } from "@/shared/extractLeadingPath";
-import { readDiffSummary } from "../fileChangeSummary";
+import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
+import {
+  createContextUsageEvent,
+  readNonNegativeInteger,
+  usageFromTokenCounts,
+} from "../contextUsage";
 
 interface AcpToolCallItemState {
   itemId: string;
@@ -411,6 +415,19 @@ export function mapAcpSessionUpdate(
       break;
     }
 
+    case "usage_update": {
+      const usageUpdate = update as { used?: unknown; size?: unknown };
+      const event = createContextUsageEvent(
+        threadId,
+        usageFromTokenCounts({
+          usedTokens: readNonNegativeInteger(usageUpdate.used),
+          maxTokens: readNonNegativeInteger(usageUpdate.size),
+        }),
+      );
+      if (event) events.push(event);
+      break;
+    }
+
     default:
       // Other update kinds (`session_info_update`, `config_option_update`, etc.)
       // don't produce chat items in v1. They flow through the existing
@@ -510,8 +527,10 @@ function buildAcpToolCallUpdatePayload(
     ...(item.isSubAgent ? { isSubAgent: true } : {}),
   };
   if (item.itemType === "file_change") {
-    const path = extractFileChangePath(undefined, title, kind, locations);
+    const path = extractFileChangePath(toolCall.rawOutput, title, kind, locations);
     if (path) payload.path = path;
+    const diffSummary = readDiffSummary(toolCall.rawOutput);
+    if (diffSummary) payload.diffSummary = diffSummary;
   }
   return payload;
 }
@@ -686,10 +705,7 @@ function extractFileChangePath(
   locations: readonly { path: string }[],
 ): string | undefined {
   return (
-    readStringField(input, "path") ??
-    readToolLocationPath(kind, locations) ??
-    extractPatchPath(input) ??
-    extractLeadingPath(title)
+    readFileChangePath(input) ?? readToolLocationPath(kind, locations) ?? readFileChangePath(title)
   );
 }
 
@@ -700,15 +716,6 @@ function readToolLocationPath(
   if (locations.length === 0) return undefined;
   const lowerKind = (kind ?? "").toLowerCase();
   return lowerKind === "move" ? locations[locations.length - 1]?.path : locations[0]?.path;
-}
-
-/** `apply_patch`-style tool calls pass the patch as a single string arg; pull
- * the first `*** (Add|Update|Delete) File: <path>` header so the row can show
- * the affected path even though there is no structured `path` field. */
-function extractPatchPath(input: unknown): string | undefined {
-  if (typeof input !== "string") return undefined;
-  const m = /^\*\*\*\s+(?:Add|Update|Delete)\s+File:\s+(.+?)\s*$/m.exec(input);
-  return m?.[1]?.trim();
 }
 
 function classifyFileChangeKind(

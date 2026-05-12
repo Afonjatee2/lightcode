@@ -64,6 +64,17 @@ function hookDebugProjectLabel(loc: ProjectLocation): string {
   }
 }
 
+// Startup idle suppression is only for empty sync blips; visible runtime output
+// means a follow-up idle should close the optimistic working window.
+function shouldReleaseInitialStructuredIdleSuppression(event: RuntimeEvent): boolean {
+  if (event.type === "item.started") {
+    return event.itemType !== "user_message";
+  }
+  return (
+    event.type === "content.delta" || event.type === "request.opened" || event.type === "error"
+  );
+}
+
 export async function writeSubmittedPrompt(
   pty: Pick<IPty, "write">,
   chunks: readonly string[],
@@ -1512,21 +1523,6 @@ export class ThreadSessionManager {
         }
         this.outputPipeline.updateState(session, "error", "error", errorMessage);
       },
-      onServerRequest: (request) => {
-        if (
-          this.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-        this.options.emit({
-          type: "thread-server-request",
-          threadId: session.threadId,
-          requestId: request.requestId,
-          method: request.method,
-          params: request.params,
-        });
-      },
       onUpdate: (update) => {
         if (
           this.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
@@ -1603,6 +1599,12 @@ export class ThreadSessionManager {
           session.ignoreExit
         ) {
           return;
+        }
+        if (
+          session.suppressInitialStructuredIdle === true &&
+          shouldReleaseInitialStructuredIdleSuppression(event)
+        ) {
+          session.suppressInitialStructuredIdle = undefined;
         }
         this.enqueueRuntimeEvent(session.threadId, event);
       },

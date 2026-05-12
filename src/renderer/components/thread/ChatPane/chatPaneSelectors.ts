@@ -211,10 +211,10 @@ export function selectChatScrollAnchorForTimeline(
 }
 
 function isVisibleRuntimeItem(item: RuntimeChatItem): boolean {
-  // Plans are rendered exclusively in the todo dock — never inline in chat,
-  // even after they retire (e.g. all steps completed). Empty completed
-  // reasoning items are already dropped at the data layer.
-  if (item.type === "plan") return false;
+  // Plans and goals are rendered exclusively in composer docks — never inline
+  // in chat. Empty completed reasoning items are already dropped at the data
+  // layer.
+  if (item.type === "plan" || item.type === "goal") return false;
   // Error items have no renderer in the chat row switch (ChatItemRow returns
   // null for `error`); excluding them here keeps the virtualized list from
   // allocating an empty slot that shows up as a gap.

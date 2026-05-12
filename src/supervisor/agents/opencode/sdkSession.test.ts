@@ -41,7 +41,7 @@ describe("OpencodeSdkSession", () => {
   });
 
   it("starts the GUI event stream on activation", async () => {
-    const eventSubscribe = vi
+    const globalEvent = vi
       .fn<() => Promise<{ stream: AsyncGenerator<Event> }>>()
       .mockResolvedValue({
         stream: streamOf(serverConnectedEvent()),
@@ -50,7 +50,7 @@ describe("OpencodeSdkSession", () => {
 
     mocks.acquireOpenCodeServer.mockResolvedValue({
       client: {
-        event: { subscribe: eventSubscribe },
+        global: { event: globalEvent },
         command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
         session: {
           create: vi
@@ -72,18 +72,17 @@ describe("OpencodeSdkSession", () => {
     session.setListener({
       onClose: () => {},
       onError: () => {},
-      onServerRequest: () => {},
       onUpdate: () => {},
       onRuntimeEvent: () => {},
     });
 
     await session.activate();
-    expect(eventSubscribe).toHaveBeenCalledTimes(1);
+    expect(globalEvent).toHaveBeenCalledTimes(1);
 
     await session.openThread(config);
 
-    expect(eventSubscribe).toHaveBeenCalledTimes(1);
-    expect(eventSubscribe).toHaveBeenCalledWith(undefined, { signal: expect.any(AbortSignal) });
+    expect(globalEvent).toHaveBeenCalledTimes(1);
+    expect(globalEvent).toHaveBeenCalledWith({ signal: expect.any(AbortSignal) });
 
     await session.dispose();
     expect(dispose).toHaveBeenCalledTimes(1);
@@ -92,103 +91,118 @@ describe("OpencodeSdkSession", () => {
   it("unwraps global payload events and ignores sync duplicates", async () => {
     const updates: StructuredSessionUpdate[] = [];
     const runtimeEvents: RuntimeEvent[] = [];
-    const wrappedEvents: Event[] = [
-      serverConnectedEvent(),
+    const wrappedEvents = [
+      { payload: serverConnectedEvent() },
       {
-        id: "evt-other",
-        type: "session.status",
-        properties: { sessionID: "ses_other", status: { type: "busy" } },
+        payload: {
+          id: "evt-other",
+          type: "session.status",
+          properties: { sessionID: "ses_other", status: { type: "busy" } },
+        },
       },
       {
-        id: "evt-busy",
-        type: "session.status",
-        properties: { sessionID: "ses_test", status: { type: "busy" } },
+        payload: {
+          id: "evt-busy",
+          type: "session.status",
+          properties: { sessionID: "ses_test", status: { type: "busy" } },
+        },
       },
       {
-        type: "sync",
-        name: "message.updated.1",
-        id: "evt-sync",
-        seq: 0,
-        aggregateID: "sessionID",
-        data: {
-          sessionID: "ses_test",
-          info: {
-            id: "msg_sync",
-            parentID: "msg_user",
-            sessionID: "ses_test",
-            role: "assistant",
-            mode: "build",
-            agent: "build",
-            path: { cwd: "/repo", root: "/repo" },
-            cost: 0,
-            tokens: {
-              input: 0,
-              output: 0,
-              reasoning: 0,
-              cache: { read: 0, write: 0 },
+        payload: {
+          type: "sync",
+          syncEvent: {
+            type: "message.updated.1",
+            id: "evt-sync",
+            seq: 0,
+            aggregateID: "sessionID",
+            data: {
+              sessionID: "ses_test",
+              info: {
+                id: "msg_sync",
+                parentID: "msg_user",
+                sessionID: "ses_test",
+                role: "assistant",
+                mode: "build",
+                agent: "build",
+                path: { cwd: "/repo", root: "/repo" },
+                cost: 0,
+                tokens: {
+                  input: 0,
+                  output: 0,
+                  reasoning: 0,
+                  cache: { read: 0, write: 0 },
+                },
+                modelID: "big-pickle",
+                providerID: "opencode",
+                time: { created: 0 },
+              },
             },
-            modelID: "big-pickle",
-            providerID: "opencode",
-            time: { created: 0 },
           },
+          id: "evt-sync",
         },
-      } as unknown as Event,
+      },
       {
-        id: "evt-msg",
-        type: "message.updated",
-        properties: {
-          sessionID: "ses_test",
-          info: {
-            id: "msg_asst",
-            parentID: "msg_user",
+        payload: {
+          id: "evt-msg",
+          type: "message.updated",
+          properties: {
             sessionID: "ses_test",
-            role: "assistant",
-            mode: "build",
-            agent: "build",
-            path: { cwd: "/repo", root: "/repo" },
-            cost: 0,
-            tokens: {
-              input: 0,
-              output: 0,
-              reasoning: 0,
-              cache: { read: 0, write: 0 },
+            info: {
+              id: "msg_asst",
+              parentID: "msg_user",
+              sessionID: "ses_test",
+              role: "assistant",
+              mode: "build",
+              agent: "build",
+              path: { cwd: "/repo", root: "/repo" },
+              cost: 0,
+              tokens: {
+                input: 0,
+                output: 0,
+                reasoning: 0,
+                cache: { read: 0, write: 0 },
+              },
+              modelID: "big-pickle",
+              providerID: "opencode",
+              time: { created: 0 },
             },
-            modelID: "big-pickle",
-            providerID: "opencode",
-            time: { created: 0 },
           },
         },
       },
       {
-        id: "evt-part",
-        type: "message.part.updated",
-        properties: {
-          sessionID: "ses_test",
-          time: 0,
-          part: {
-            id: "prt_asst",
+        payload: {
+          id: "evt-part",
+          type: "message.part.updated",
+          properties: {
             sessionID: "ses_test",
-            messageID: "msg_asst",
-            type: "text",
-            text: "Hi",
+            time: 0,
+            part: {
+              id: "prt_asst",
+              sessionID: "ses_test",
+              messageID: "msg_asst",
+              type: "text",
+              text: "Hi",
+            },
           },
         },
       },
       {
-        id: "evt-idle",
-        type: "session.idle",
-        properties: { sessionID: "ses_test" },
+        payload: {
+          id: "evt-idle",
+          type: "session.idle",
+          properties: { sessionID: "ses_test" },
+        },
       },
     ];
-    const eventSubscribe = vi
-      .fn<() => Promise<{ stream: AsyncGenerator<Event> }>>()
+    const globalEvent = vi
+      .fn<() => Promise<{ stream: AsyncGenerator<unknown> }>>()
       .mockResolvedValue({
         stream: streamOf(...wrappedEvents),
       });
 
     mocks.acquireOpenCodeServer.mockResolvedValue({
       client: {
-        event: { subscribe: eventSubscribe },
+        global: { event: globalEvent },
         command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
         session: {
           create: vi
@@ -210,7 +224,6 @@ describe("OpencodeSdkSession", () => {
     session.setListener({
       onClose: () => {},
       onError: () => {},
-      onServerRequest: () => {},
       onUpdate: (update) => updates.push(update),
       onRuntimeEvent: (event) => runtimeEvents.push(event),
     });
@@ -245,7 +258,7 @@ describe("OpencodeSdkSession", () => {
     const updates: StructuredSessionUpdate[] = [];
     const commandList = vi
       .fn<
-        () => Promise<{
+        (input?: unknown) => Promise<{
           data: Array<{ name: string; description: string; hints: string[]; template: string }>;
         }>
       >()
@@ -283,7 +296,6 @@ describe("OpencodeSdkSession", () => {
     session.setListener({
       onClose: () => {},
       onError: () => {},
-      onServerRequest: () => {},
       onUpdate: (update) => updates.push(update),
       onRuntimeEvent: () => {},
     });
@@ -292,6 +304,7 @@ describe("OpencodeSdkSession", () => {
     await session.openThread(config);
 
     expect(commandList).toHaveBeenCalledTimes(1);
+    expect(commandList).toHaveBeenCalledWith({ directory: "/repo" });
     expect(updates).toContainEqual(
       expect.objectContaining({
         slashCommands: [

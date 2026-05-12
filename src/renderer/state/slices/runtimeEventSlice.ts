@@ -6,6 +6,7 @@ import type {
   RequestPayload,
   RuntimeContentStreamKind,
   RuntimeEvent,
+  ThreadContextUsage,
   ToolCallPayload,
 } from "@/shared/contracts";
 import type { AppStoreState, SliceCreator } from "./shared";
@@ -60,6 +61,8 @@ export interface RuntimeEventSlice {
   runtimeItemsByIdByThread: Record<string, Record<string, RuntimeChatItem>>;
   /** Open approval / user-input requests per thread. */
   runtimeRequestsByThread: Record<string, OpenRuntimeRequest[]>;
+  /** Latest provider-reported context usage per GUI thread. */
+  runtimeContextByThread: Record<string, ThreadContextUsage>;
   /** Thread ids with runtime item changes waiting for persistence. */
   runtimeDirtyThreadIds: readonly string[];
   /**
@@ -89,6 +92,12 @@ export interface RuntimeEventSlice {
   hydrateThreadRuntimeItems(threadId: string, items: RuntimeChatItem[]): void;
   /** Replace the persisted completed-turn list (used during DB hydration). */
   hydrateThreadCompletedTurns(threadId: string, turns: ReadonlyArray<CompletedTurnRecord>): void;
+  /**
+   * Seed the latest persisted context-window usage for a thread. Skipped if a
+   * fresher value already exists in the live store (the active provider stream
+   * is the source of truth once it's flowing).
+   */
+  hydrateThreadContextUsage(threadId: string, usage: ThreadContextUsage): void;
   hydrateThreadFileCheckpoints(
     threadId: string,
     checkpoints: readonly FileCheckpointRecord[],
@@ -120,6 +129,7 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
   runtimeItemIdsByThread: {},
   runtimeItemsByIdByThread: {},
   runtimeRequestsByThread: {},
+  runtimeContextByThread: {},
   runtimeDirtyThreadIds: [],
   runtimeStructuralVersionByThread: {},
   runtimeCompletedTurnsByThread: {},
@@ -148,6 +158,7 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         !(threadId in state.runtimeItemIdsByThread) &&
         !(threadId in state.runtimeItemsByIdByThread) &&
         !(threadId in state.runtimeRequestsByThread) &&
+        !(threadId in state.runtimeContextByThread) &&
         !(threadId in state.runtimeStructuralVersionByThread) &&
         !(threadId in state.runtimeCompletedTurnsByThread) &&
         !state.runtimeDirtyThreadIds.includes(threadId)
@@ -160,6 +171,8 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         state.runtimeItemsByIdByThread;
       const { [threadId]: _droppedReqs, ...runtimeRequestsByThread } =
         state.runtimeRequestsByThread;
+      const { [threadId]: _droppedContext, ...runtimeContextByThread } =
+        state.runtimeContextByThread;
       const { [threadId]: _droppedVersion, ...runtimeStructuralVersionByThread } =
         state.runtimeStructuralVersionByThread;
       const { [threadId]: _droppedTurns, ...runtimeCompletedTurnsByThread } =
@@ -171,6 +184,7 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         runtimeItemIdsByThread,
         runtimeItemsByIdByThread,
         runtimeRequestsByThread,
+        runtimeContextByThread,
         runtimeStructuralVersionByThread,
         runtimeCompletedTurnsByThread,
         runtimeDirtyThreadIds,
@@ -260,6 +274,17 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         runtimeCompletedTurnsByThread: {
           ...state.runtimeCompletedTurnsByThread,
           [threadId]: merged,
+        },
+      };
+    }),
+
+  hydrateThreadContextUsage: (threadId, usage) =>
+    set((state) => {
+      if (state.runtimeContextByThread[threadId]) return {};
+      return {
+        runtimeContextByThread: {
+          ...state.runtimeContextByThread,
+          [threadId]: usage,
         },
       };
     }),
@@ -375,6 +400,7 @@ type RuntimeEventState = Pick<
   | "runtimeItemIdsByThread"
   | "runtimeItemsByIdByThread"
   | "runtimeRequestsByThread"
+  | "runtimeContextByThread"
   | "runtimeDirtyThreadIds"
   | "runtimeStructuralVersionByThread"
 >;
@@ -388,6 +414,7 @@ function applyRuntimeEventsToState(
     runtimeItemIdsByThread: state.runtimeItemIdsByThread,
     runtimeItemsByIdByThread: state.runtimeItemsByIdByThread,
     runtimeRequestsByThread: state.runtimeRequestsByThread,
+    runtimeContextByThread: state.runtimeContextByThread,
     runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
     runtimeStructuralVersionByThread: state.runtimeStructuralVersionByThread,
   };
@@ -586,6 +613,18 @@ function applyRuntimeEventToRuntimeState(
       };
     }
 
+    case "context.updated": {
+      const prev = state.runtimeContextByThread[threadId];
+      const next = mergeContextUsage(prev, event.usage);
+      if (areContextUsagesEqual(prev, next)) return {};
+      return {
+        runtimeContextByThread: {
+          ...state.runtimeContextByThread,
+          [threadId]: next,
+        },
+      };
+    }
+
     case "request.opened": {
       const existing = state.runtimeRequestsByThread[threadId] ?? [];
       const filtered = existing.filter((r) => r.requestId !== event.requestId);
@@ -642,6 +681,32 @@ function applyRuntimeEventToRuntimeState(
     default:
       return {};
   }
+}
+
+function mergeContextUsage(
+  prev: ThreadContextUsage | undefined,
+  usage: ThreadContextUsage,
+): ThreadContextUsage {
+  return {
+    ...(prev ?? {}),
+    ...usage,
+    ...(usage.breakdown ? { breakdown: usage.breakdown } : {}),
+  };
+}
+
+function areContextUsagesEqual(
+  left: ThreadContextUsage | undefined,
+  right: ThreadContextUsage,
+): boolean {
+  if (!left) return false;
+  if (left.usedTokens !== right.usedTokens || left.maxTokens !== right.maxTokens) return false;
+  const leftBreakdown = left.breakdown ?? [];
+  const rightBreakdown = right.breakdown ?? [];
+  if (leftBreakdown.length !== rightBreakdown.length) return false;
+  return leftBreakdown.every((entry, index) => {
+    const other = rightBreakdown[index];
+    return other?.id === entry.id && other.label === entry.label && other.tokens === entry.tokens;
+  });
 }
 
 function coalesceRuntimeEvents(events: RuntimeEvent[]): RuntimeEvent[] {

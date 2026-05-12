@@ -2,6 +2,10 @@ import type { ProjectLocation } from "@/shared/contracts";
 
 /** Normalize model / markdown paths to a project-relative POSIX path for the file editor. */
 export function normalizeChatRelativePath(raw: string): string {
+  return normalizeChatPath(raw, { preserveAbsolute: false });
+}
+
+function normalizeChatPath(raw: string, options: { preserveAbsolute: boolean }): string {
   let s = raw.trim();
   if (!s) return s;
   if (s.startsWith("file://")) {
@@ -9,18 +13,21 @@ export function normalizeChatRelativePath(raw: string): string {
       const u = new URL(s);
       s = u.pathname;
       if (s.startsWith("/") && /^\/[A-Za-z]:/.test(s)) s = s.slice(1);
-      else s = s.replace(/^\//, "");
+      else if (!options.preserveAbsolute) s = s.replace(/^\//, "");
     } catch {
       /* keep */
     }
   }
   s = s.replace(/^\.\//, "").replace(/\\/g, "/");
-  return s.replace(/\/+/g, "/").replace(/^\/+/, "");
+  const collapsed = s.replace(/\/+/g, "/");
+  return options.preserveAbsolute ? collapsed : collapsed.replace(/^\/+/, "");
 }
 
 export function normalizeChatProjectPath(raw: string, projectLocation: ProjectLocation): string {
-  const normalized = normalizeChatRelativePath(raw);
-  const projectRoots = getProjectRoots(projectLocation).map(normalizeChatRelativePath);
+  const normalized = normalizeChatPath(raw, { preserveAbsolute: true });
+  const projectRoots = getProjectRoots(projectLocation).map((root) =>
+    normalizeChatPath(root, { preserveAbsolute: true }),
+  );
   const root = projectRoots.find((candidate) => pathStartsWithRoot(normalized, candidate));
   if (!root) return normalized;
   return normalized.slice(root.length).replace(/^\/+/, "");

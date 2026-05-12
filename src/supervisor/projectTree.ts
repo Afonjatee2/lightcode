@@ -13,12 +13,16 @@ import type {
   ProjectTreeEntry,
   ReadAbsoluteFilePayload,
   ReadAbsoluteFileResult,
+  ReadExternalFilePayload,
+  ReadExternalFileResult,
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
   SearchConfigPayload,
   SearchProjectTreePayload,
   SearchProjectTreeResult,
+  WriteExternalFilePayload,
+  WriteExternalFileResult,
   WriteProjectFilePayload,
   WriteProjectFileResult,
 } from "@/shared/contracts";
@@ -291,6 +295,121 @@ export class ProjectTreeService {
     }
 
     return { status: "ready", modifiedAtMs: raw.modifiedAtMs, content };
+  }
+
+  /**
+   * Read a file at an absolute path that is NOT required to live inside the
+   * project root. Used by the in-app editor when the user opens an
+   * out-of-project absolute path (e.g. /etc/hosts) from chat. WSL projects
+   * route through the WSL bridge; native projects use the OS file system.
+   */
+  async readExternalFile(payload: ReadExternalFilePayload): Promise<ReadExternalFileResult> {
+    if (!isAbsolute(payload.absolutePath) && !payload.absolutePath.startsWith("/")) {
+      throw new Error("Path must be absolute.");
+    }
+    let raw: RawFileRead;
+    try {
+      raw =
+        payload.projectLocation.kind === "wsl" && this.wslClient
+          ? await this.readAbsoluteFileBufferWsl(
+              payload.projectLocation,
+              payload.absolutePath,
+              this.wslClient,
+            )
+          : await this.readAbsoluteFileBufferNative(payload.absolutePath);
+    } catch (err: unknown) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+        return { path: payload.absolutePath, status: "missing", modifiedAtMs: 0 };
+      }
+      throw err;
+    }
+
+    if (raw.kind === "tooLarge") {
+      return { path: payload.absolutePath, status: "too_large", modifiedAtMs: raw.modifiedAtMs };
+    }
+
+    if (isBinaryBuffer(raw.buffer)) {
+      return { path: payload.absolutePath, status: "binary", modifiedAtMs: raw.modifiedAtMs };
+    }
+
+    const hasBom = raw.buffer.subarray(0, BOM.length).equals(BOM);
+    const contentBuffer = hasBom ? raw.buffer.subarray(BOM.length) : raw.buffer;
+
+    let content: string;
+    try {
+      content = new TextDecoder("utf-8", { fatal: true }).decode(contentBuffer);
+    } catch {
+      return { path: payload.absolutePath, status: "unsupported", modifiedAtMs: raw.modifiedAtMs };
+    }
+
+    return {
+      path: payload.absolutePath,
+      status: "ready",
+      modifiedAtMs: raw.modifiedAtMs,
+      content,
+      lineEnding: detectLineEnding(content),
+      hasBom,
+    };
+  }
+
+  /**
+   * Write a file at an absolute path that is NOT required to live inside the
+   * project root. Mirrors writeProjectFile's mtime conflict and BOM/EOL
+   * preservation, but does not enforce project-root containment.
+   */
+  async writeExternalFile(payload: WriteExternalFilePayload): Promise<WriteExternalFileResult> {
+    if (!isAbsolute(payload.absolutePath) && !payload.absolutePath.startsWith("/")) {
+      throw new Error("Path must be absolute.");
+    }
+    if (payload.projectLocation.kind === "wsl" && this.wslClient) {
+      return this.writeExternalFileWsl(payload.projectLocation, payload, this.wslClient);
+    }
+
+    const fileStat = await stat(payload.absolutePath);
+    if (!fileStat.isFile()) {
+      throw new Error("Only files can be saved from the editor.");
+    }
+    if (Math.abs(fileStat.mtimeMs - payload.baseModifiedAtMs) > 1) {
+      throw new Error("The file changed on disk. Reload it before saving.");
+    }
+    if (fileStat.size > MAX_EDITABLE_FILE_SIZE) {
+      throw new Error("This file is too large to save from the editor.");
+    }
+
+    const existingBuffer = await readFile(payload.absolutePath);
+    if (isBinaryBuffer(existingBuffer)) {
+      throw new Error("Binary files cannot be saved from the editor.");
+    }
+
+    const nextBuffer = buildWriteBuffer(existingBuffer, payload.content);
+    await writeFile(payload.absolutePath, nextBuffer);
+    const nextStat = await stat(payload.absolutePath);
+    return { modifiedAtMs: nextStat.mtimeMs };
+  }
+
+  private async writeExternalFileWsl(
+    location: Extract<ProjectLocation, { kind: "wsl" }>,
+    payload: WriteExternalFilePayload,
+    wslClient: WslBridgeClient,
+  ): Promise<WriteExternalFileResult> {
+    const existing = await wslClient.readFile(location, payload.absolutePath, {
+      maxBytes: MAX_EDITABLE_FILE_SIZE,
+    });
+    if (existing.tooLarge) {
+      throw new Error("This file is too large to save from the editor.");
+    }
+    if (Math.abs(existing.mtimeMs - payload.baseModifiedAtMs) > 1) {
+      throw new Error("The file changed on disk. Reload it before saving.");
+    }
+    const existingBuffer = Buffer.from(existing.contentBase64, "base64");
+    if (isBinaryBuffer(existingBuffer)) {
+      throw new Error("Binary files cannot be saved from the editor.");
+    }
+    const nextBuffer = buildWriteBuffer(existingBuffer, payload.content);
+    const result = await wslClient.writeFile(location, payload.absolutePath, nextBuffer, {
+      expectedMtimeMs: existing.mtimeMs,
+    });
+    return { modifiedAtMs: result.mtimeMs };
   }
 
   private resolveProjectNativeReadPath(location: ProjectLocation, path: string): string {

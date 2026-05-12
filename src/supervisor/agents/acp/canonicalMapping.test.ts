@@ -206,6 +206,47 @@ describe("mapAcpSessionUpdate", () => {
     expect(started.payload.changeKind).toBe("edit");
   });
 
+  it("extracts file_change metadata from file_path and changes arrays", () => {
+    const state = createAcpMapperState("t-fc-changes");
+    const diff = "@@ -1 +1 @@\n-before\n+after\n";
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-fc-changes",
+        title: "edit file",
+        kind: "edit",
+        status: "in_progress",
+        rawInput: {
+          changes: [
+            {
+              file_path: "src/foo.ts",
+              kind: { type: "update", move_path: null },
+              diff,
+            },
+          ],
+        },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    const started = events[0] as { itemType: string; payload: Record<string, unknown> };
+    expect(started.itemType).toBe("file_change");
+    expect(started.payload).toMatchObject({
+      path: "src/foo.ts",
+      changeKind: "edit",
+      diffSummary: { added: 1, removed: 1 },
+      args: {
+        changes: [
+          {
+            file_path: "src/foo.ts",
+            kind: { type: "update", move_path: null },
+            diff,
+          },
+        ],
+      },
+    });
+  });
+
   it("extracts file_change path from ACP locations when rawInput.path is missing", () => {
     const state = createAcpMapperState("t-fc-loc");
     const events = mapAcpSessionUpdate(
@@ -473,6 +514,56 @@ describe("mapAcpSessionUpdate", () => {
     expect(terminal.payload.result).toEqual({ ok: true });
   });
 
+  it("uses update changes arrays to heal file_change path and diff summary", () => {
+    const state = createAcpMapperState("t-fc-update-changes");
+    const diff = "@@ -1 +1 @@\n-before\n+after\n";
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-fc-update-changes",
+        title: "edit symbol",
+        kind: "edit",
+        status: "in_progress",
+        rawInput: { oldText: "before", newText: "after" },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    const completed = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-fc-update-changes",
+        rawOutput: {
+          changes: [
+            {
+              path: "src/foo.ts",
+              kind: { type: "update", move_path: null },
+              diff,
+            },
+          ],
+        },
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    const terminal = completed[0] as { type: string; payload: Record<string, unknown> };
+    expect(terminal.type).toBe("item.completed");
+    expect(terminal.payload).toMatchObject({
+      path: "src/foo.ts",
+      diffSummary: { added: 1, removed: 1 },
+      result: {
+        changes: [
+          {
+            path: "src/foo.ts",
+            kind: { type: "update", move_path: null },
+            diff,
+          },
+        ],
+      },
+    });
+  });
+
   it("ignores null update locations so reducer merges keep the original file path", () => {
     const state = createAcpMapperState("t-fc-null");
     mapAcpSessionUpdate(
@@ -609,5 +700,28 @@ describe("mapAcpSessionUpdate", () => {
       state,
     );
     expect(events).toEqual([]);
+  });
+
+  it("maps usage_update into context usage", () => {
+    const state = createAcpMapperState("t-usage");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "usage_update",
+        used: 71_000,
+        size: 200_000,
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    expect(events).toEqual([
+      {
+        type: "context.updated",
+        threadId: "t-usage",
+        usage: {
+          usedTokens: 71_000,
+          maxTokens: 200_000,
+        },
+      },
+    ]);
   });
 });

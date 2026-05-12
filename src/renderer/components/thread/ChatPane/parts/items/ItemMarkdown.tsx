@@ -1,8 +1,9 @@
 import { Link } from "@heroui/react";
 import { Suspense, lazy, useMemo } from "react";
+import type { ProjectLocation } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
-import { normalizeChatRelativePath } from "../../chatPathUtils";
+import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { InlineFolderPathChip } from "./InlineFolderPathChip";
 import { parseProjectPathRef } from "./parseProjectPathRef";
@@ -24,7 +25,11 @@ export function ItemMarkdown({ text }: ItemMarkdownProps) {
   const actions = useChatPaneActions();
   const rootNames = actions?.projectRootNames;
   return (
-    <Suspense fallback={<PlainText text={text} rootNames={rootNames} />}>
+    <Suspense
+      fallback={
+        <PlainText text={text} rootNames={rootNames} projectLocation={actions?.projectLocation} />
+      }
+    >
       <ItemMarkdownInner text={text} />
     </Suspense>
   );
@@ -33,15 +38,19 @@ export function ItemMarkdown({ text }: ItemMarkdownProps) {
 function PlainText({
   text,
   rootNames,
+  projectLocation,
 }: {
   text: string;
   rootNames: ReadonlySet<string> | undefined;
+  projectLocation: ProjectLocation | undefined;
 }) {
   const actions = useChatPaneActions();
   // Re-tokenizing on every render dominates the plain-text path during
   // streaming (regex scan over the full message body for each delta).
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- intentional escape hatch
   const nodes = useMemo(() => tokenizePlainText(text, rootNames), [text, rootNames]);
+  const toRelative = (path: string) =>
+    projectLocation ? normalizeChatProjectPath(path, projectLocation) : path;
   return (
     <div className="whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] leading-snug text-foreground">
       {nodes.map((node, i) => {
@@ -66,7 +75,7 @@ function PlainText({
           return (
             <InlineFilePathChip
               key={i}
-              path={normalizeChatRelativePath(node.path)}
+              path={toRelative(node.path)}
               line={node.line}
               endLine={node.endLine}
               onOpen={actions?.openProjectRelativePath}
@@ -76,7 +85,7 @@ function PlainText({
         return (
           <InlineFolderPathChip
             key={i}
-            path={normalizeChatRelativePath(node.path)}
+            path={toRelative(node.path)}
             onRevealInTree={actions?.revealProjectFolderInTree}
             onShowInExplorer={actions?.showProjectEntryInExplorer}
           />
@@ -93,7 +102,7 @@ type PlainTextNode =
   | { kind: "folder"; path: string };
 
 const PLAIN_TOKEN_RE =
-  /https?:\/\/[^\s<>"']+|(?<![A-Za-z0-9_:/@.\\-])([A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+)(?:-\d+)?)?/g;
+  /https?:\/\/[^\s<>"']+|(?<![A-Za-z0-9_:/@.\\-])(\/?[A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+)(?:-\d+)?)?/g;
 
 function tokenizePlainText(
   text: string,

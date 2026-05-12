@@ -70,11 +70,6 @@ export interface StructuredSessionUpdate {
 export interface StructuredSessionListener {
   onClose(): void;
   onError(errorMessage: string): void;
-  onServerRequest(request: {
-    requestId: ThreadServerRequestId;
-    method: string;
-    params: unknown;
-  }): void;
   onUpdate(update: StructuredSessionUpdate): void;
   /**
    * Emit a canonical chat-runtime event (per-message item lifecycle, content

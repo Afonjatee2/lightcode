@@ -16,6 +16,7 @@ export const canonicalItemTypeSchema = z.enum([
   "assistant_message",
   "reasoning",
   "plan",
+  "goal",
   "command_execution",
   "file_change",
   "tool_call",
@@ -86,6 +87,21 @@ export const planItemPayloadSchema = z.object({
   ),
 });
 export type PlanItemPayload = z.infer<typeof planItemPayloadSchema>;
+
+export const goalStatusSchema = z.enum(["active", "paused", "budget_limited", "complete"]);
+export type GoalStatus = z.infer<typeof goalStatusSchema>;
+
+export const goalItemPayloadSchema = z.object({
+  action: z.enum(["set", "updated", "cleared", "viewed"]).optional(),
+  objective: z.string().optional(),
+  status: goalStatusSchema.optional(),
+  tokenBudget: z.number().int().nonnegative().nullable().optional(),
+  tokensUsed: z.number().int().nonnegative().optional(),
+  timeUsedSeconds: z.number().nonnegative().optional(),
+  providerThreadId: z.string().optional(),
+  updatedAt: z.number().optional(),
+});
+export type GoalItemPayload = z.infer<typeof goalItemPayloadSchema>;
 
 export const commandExecutionPayloadSchema = z.object({
   command: z.string(),
@@ -177,6 +193,20 @@ export const errorItemPayloadSchema = z.object({
   message: z.string(),
 });
 export type ErrorItemPayload = z.infer<typeof errorItemPayloadSchema>;
+
+export const contextUsageBreakdownEntrySchema = z.object({
+  id: z.string().min(1),
+  label: z.string().min(1),
+  tokens: z.number().int().nonnegative(),
+});
+export type ContextUsageBreakdownEntry = z.infer<typeof contextUsageBreakdownEntrySchema>;
+
+export const threadContextUsageSchema = z.object({
+  usedTokens: z.number().int().nonnegative().optional(),
+  maxTokens: z.number().int().positive().optional(),
+  breakdown: z.array(contextUsageBreakdownEntrySchema).optional(),
+});
+export type ThreadContextUsage = z.infer<typeof threadContextUsageSchema>;
 
 // ── Request payloads ─────────────────────────────────────────────────
 
@@ -342,6 +372,11 @@ export const runtimeEventSchema = z.discriminatedUnion("type", [
     itemId: z.string(),
     stream: runtimeContentStreamKindSchema,
     delta: z.string(),
+  }),
+  z.object({
+    type: z.literal("context.updated"),
+    threadId: z.string(),
+    usage: threadContextUsageSchema,
   }),
   z.object({
     type: z.literal("request.opened"),

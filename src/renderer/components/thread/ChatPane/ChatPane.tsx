@@ -34,8 +34,9 @@ import {
   selectChatScrollAnchor,
   selectChatScrollAnchorForTimeline,
   selectVisibleThreadTimelineEntries,
+  type ChatTimelineEntry,
 } from "./chatPaneSelectors";
-import { normalizeChatRelativePath } from "./chatPathUtils";
+import { normalizeChatProjectPath } from "./chatPathUtils";
 import { formatElapsed } from "./formatElapsed";
 import { MessageList } from "./parts/MessageList";
 import { SubAgentOverlay } from "./parts/items/SubAgentOverlay";
@@ -138,12 +139,12 @@ export function ChatPane(props: ChatPaneProps) {
           project,
           worktreePath,
           branch,
-          normalizeChatRelativePath(path),
+          normalizeChatProjectPath(path, targetContext.projectLocation),
           lineNumber,
         );
       },
       revealProjectFolderInTree: (path) => {
-        const normalized = normalizeChatRelativePath(path);
+        const normalized = normalizeChatProjectPath(path, targetContext.projectLocation);
         const fileEditor = useFileEditorStore.getState();
         const currentRoot = fileEditor.rootContext;
         const isSameContext =
@@ -159,7 +160,7 @@ export function ChatPane(props: ChatPaneProps) {
         useProjectTreeStore.getState().expandMany(ancestors);
       },
       showProjectEntryInExplorer: (path) => {
-        const normalized = normalizeChatRelativePath(path);
+        const normalized = normalizeChatProjectPath(path, targetContext.projectLocation);
         void readBridge().revealProjectEntry({
           projectLocation: targetContext.projectLocation,
           path: normalized,
@@ -233,18 +234,26 @@ export function ChatPane(props: ChatPaneProps) {
   // turn. The pinned plan/budget item already advertises its own running
   // state, so suppress the tail when that's live to avoid double indicators.
   const turn = resolveTurnTiming(thread);
-  const showTailLoader = (isLive || turn?.endedAt != null) && !hiddenRuntimeItemIsLive;
-  const showEmptyHint = isEmpty && !isLive;
-  // The tail loader displays the most recent completed turn's frozen elapsed
-  // time when the thread is idle. Suppress that turn's inline indicator so we
-  // don't render the same "Worked for X" twice.
   const mostRecentCompletedTurnAnchor = useAppStore((s) => {
-    if (isLive || !showTailLoader) return null;
+    if (isLive || turn?.endedAt == null) return null;
     const records = s.runtimeCompletedTurnsByThread[threadId];
     return records && records.length > 0
       ? (records[records.length - 1]?.anchorItemId ?? null)
       : null;
   });
+  const completedTurnCanRenderInTail =
+    !isLive &&
+    turn?.endedAt != null &&
+    isCompletedTurnAnchorAtTimelineTail(mostRecentCompletedTurnAnchor, timelineEntries);
+  const showTailLoader = (isLive || completedTurnCanRenderInTail) && !hiddenRuntimeItemIsLive;
+  const showEmptyHint = isEmpty && !isLive;
+  // The tail loader displays the most recent completed turn's frozen elapsed
+  // time when the thread is idle and no newer timeline row exists. Once an
+  // optimistic next prompt is appended, keep the completed indicator inline at
+  // its anchor so the prompt does not briefly occupy the old footer position.
+  const suppressInlineTurnAnchorId = completedTurnCanRenderInTail
+    ? mostRecentCompletedTurnAnchor
+    : null;
   const checkpointGuard = useAppStore(
     useShallow((s) =>
       resolveCheckpointGuard({
@@ -298,7 +307,7 @@ export function ChatPane(props: ChatPaneProps) {
                     threadId={threadId}
                     entries={timelineEntries}
                     scrollElement={scrollEl}
-                    suppressInlineTurnAnchorId={mostRecentCompletedTurnAnchor}
+                    suppressInlineTurnAnchorId={suppressInlineTurnAnchorId}
                     canRevertCheckpoints={!isLive}
                     checkpointGuard={checkpointGuard}
                     projectLocation={targetContext?.projectLocation}
@@ -486,16 +495,23 @@ const ChatScrollControls = forwardRef<
   }, [scrollRef, threadId]);
 
   useEffect(() => {
+    const el = scrollRef.current;
     const content = contentRef.current;
-    if (!content) return;
+    if (!el && !content) return;
     const observer = new ResizeObserver(() => {
       // ResizeObserver already runs after layout and before paint, so syncing
-      // immediately here avoids a visible one-frame catch-up when rows collapse.
+      // immediately here avoids a visible one-frame catch-up when rows collapse
+      // or when the viewport shrinks because surrounding UI grew.
       syncLayoutNowAndAfterPaint();
     });
-    observer.observe(content);
+    if (el) {
+      observer.observe(el);
+    }
+    if (content) {
+      observer.observe(content);
+    }
     return () => observer.disconnect();
-  }, [contentRef, threadId]);
+  }, [contentRef, scrollRef, threadId]);
 
   useEffect(() => {
     if (pinRafRef.current !== null) {
@@ -636,6 +652,17 @@ function collectPathAncestors(path: string): string[] {
     ancestors.push(segments.slice(0, i + 1).join("/"));
   }
   return ancestors;
+}
+
+function isCompletedTurnAnchorAtTimelineTail(
+  anchorItemId: string | null,
+  entries: readonly ChatTimelineEntry[],
+): boolean {
+  if (anchorItemId === null || entries.length === 0) return true;
+  const lastEntry = entries[entries.length - 1]!;
+  return lastEntry.kind === "item"
+    ? lastEntry.id === anchorItemId
+    : lastEntry.itemIds.includes(anchorItemId);
 }
 
 type CheckpointGuard = {

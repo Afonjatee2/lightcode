@@ -30,6 +30,8 @@ import { buildCodexAppServerCommand } from "./argv";
 import {
   createCodexMapperState,
   mapCodexNotification,
+  mapCodexServerRequest,
+  translateCodexCanonicalResponse,
   type CodexMapperState,
 } from "./canonicalMapping";
 import { CodexStdioTransport } from "./stdioTransport";
@@ -96,6 +98,29 @@ const PLAN_MODE_DEVELOPER_INSTRUCTIONS =
 
 const DEFAULT_MODE_DEVELOPER_INSTRUCTIONS =
   "You are operating in default mode. Any prior plan-mode instructions no longer apply: you may edit files, run commands, and use mutating tools as appropriate to fulfill the user's request.";
+
+// Codex `/goal` is a Codex CLI feature (experimental, gated by --enable goals).
+// We mirror the TUI's sub-commands inline so the user can type them in the
+// composer; the actual state lives in the Codex app-server and emits
+// `thread/goal/{updated,cleared}` notifications that the canonical mapper
+// surfaces as the shared goal chat item.
+type CodexGoalCommand =
+  | { kind: "set"; objective: string }
+  | { kind: "clear" }
+  | { kind: "view" }
+  | { kind: "pause" }
+  | { kind: "resume" };
+
+function parseCodexGoalCommand(prompt: string): CodexGoalCommand | undefined {
+  const match = /^\/goal(?:\s+([\s\S]*))?$/u.exec(prompt.trim());
+  if (!match) return undefined;
+  const rawArgs = match[1]?.trim() ?? "";
+  if (rawArgs.length === 0) return { kind: "view" };
+  if (/^(clear|reset|off|none)$/iu.test(rawArgs)) return { kind: "clear" };
+  if (/^pause$/iu.test(rawArgs)) return { kind: "pause" };
+  if (/^resume$/iu.test(rawArgs)) return { kind: "resume" };
+  return { kind: "set", objective: rawArgs };
+}
 
 // `thread/start` accepts a SandboxMode string ("read-only" / "workspace-write" /
 // "danger-full-access"), but `turn/start` accepts a SandboxPolicy *object*
@@ -296,6 +321,16 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       timeout: NodeJS.Timeout;
     }
   >();
+  /**
+   * Inbound JSON-RPC requests the app-server is waiting on us to answer.
+   * The canonical request panel resolves with `{ optionId }`; we need the
+   * original method + params to translate that back into the Codex-native
+   * result shape in {@link resolveServerRequest}.
+   */
+  private readonly inboundRequests = new Map<
+    string,
+    { method: string; params: Record<string, unknown> | undefined }
+  >();
 
   private constructor(
     appServer: ChildProcess,
@@ -327,6 +362,35 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     }
     for (const event of events) {
       this.listener.onRuntimeEvent(event);
+    }
+  }
+
+  private async dispatchCodexGoalCommand(
+    threadId: string,
+    command: CodexGoalCommand,
+  ): Promise<void> {
+    switch (command.kind) {
+      case "set":
+        await this.request("thread/goal/set", {
+          threadId,
+          objective: command.objective,
+          status: "active",
+        });
+        return;
+      case "clear":
+        await this.request("thread/goal/clear", { threadId });
+        return;
+      case "pause":
+        await this.request("thread/goal/set", { threadId, status: "paused" });
+        return;
+      case "resume":
+        await this.request("thread/goal/set", { threadId, status: "active" });
+        return;
+      case "view":
+        // The active goal item is already in the chat via `thread/goal/updated`
+        // notifications. `/goal` alone is acknowledged with the user_message
+        // and a settled idle status — no RPC is required.
+        return;
     }
   }
 
@@ -424,7 +488,10 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       model: config.model,
       ...(config.approvalPolicy ? { approvalPolicy: config.approvalPolicy } : {}),
       ...(config.sandboxMode ? { sandbox: config.sandboxMode } : {}),
-      ...(config.effort ? { config: { model_reasoning_effort: config.effort } } : {}),
+      config: {
+        ...(config.effort ? { model_reasoning_effort: config.effort } : {}),
+        model_reasoning_summary: "auto",
+      },
     };
 
     const startParams = {
@@ -558,8 +625,9 @@ export class CodexStructuredSession implements StructuredSessionHandle {
 
     const turnId = `turn-${randomUUID()}`;
     const userItemId = options?.userMessageItemId ?? `user-${turnId}`;
+    const goalCommand = parseCodexGoalCommand(prompt);
 
-    this.emitRuntimeEvents([
+    const userEvents: RuntimeEvent[] = [
       {
         type: "item.started",
         threadId: this.threadId,
@@ -570,7 +638,32 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         },
       },
       { type: "item.completed", threadId: this.threadId, itemId: userItemId },
-    ]);
+    ];
+
+    if (goalCommand) {
+      this.emitRuntimeEvents([
+        { type: "turn.started", threadId: this.threadId, turnId },
+        ...userEvents,
+      ]);
+      try {
+        await this.dispatchCodexGoalCommand(threadId, goalCommand);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.emitRuntimeEvents([
+          { type: "error", threadId: this.threadId, message },
+          { type: "turn.completed", threadId: this.threadId, turnId, state: "completed" },
+        ]);
+        this.listener?.onUpdate({ status: "idle", attention: "none" });
+        return;
+      }
+      this.emitRuntimeEvents([
+        { type: "turn.completed", threadId: this.threadId, turnId, state: "completed" },
+      ]);
+      this.listener?.onUpdate({ status: "idle", attention: "none" });
+      return;
+    }
+
+    this.emitRuntimeEvents(userEvents);
 
     this.listener?.onUpdate({ status: "working", attention: "working" });
 
@@ -627,6 +720,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         input,
         model: config.model,
         ...(config.effort ? { effort: config.effort } : {}),
+        summary: "auto",
         ...(config.approvalPolicy ? { approvalPolicy: config.approvalPolicy } : {}),
         ...(sandboxPolicy ? { sandboxPolicy } : {}),
         collaborationMode,
@@ -668,10 +762,15 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   }
 
   async resolveServerRequest(requestId: ThreadServerRequestId, response: unknown): Promise<void> {
+    const inbound = this.inboundRequests.get(String(requestId));
+    this.inboundRequests.delete(String(requestId));
+    const result = inbound
+      ? translateCodexCanonicalResponse(inbound.method, inbound.params, response)
+      : response;
     this.transport.write({
       jsonrpc: "2.0",
       id: requestId,
-      result: response,
+      result,
     });
   }
 
@@ -718,11 +817,23 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         }
 
         if (message.kind === "request") {
-          this.listener?.onServerRequest({
-            requestId: message.id,
+          this.inboundRequests.set(String(message.id), {
             method: message.method,
             params: message.params,
           });
+          const canonical = mapCodexServerRequest(
+            this.threadId,
+            String(message.id),
+            message.method,
+            message.params,
+          );
+          if (canonical) {
+            this.emitRuntimeEvents([canonical]);
+          } else {
+            console.warn(
+              `[codex] no canonical mapping for app-server request method "${message.method}"; the agent will block until the request is answered.`,
+            );
+          }
           return;
         }
 

@@ -11,7 +11,7 @@
 import { spawn } from "node:child_process";
 import { createOpencodeClient } from "@opencode-ai/sdk/v2";
 
-const OPENCODE_BIN = "C:/Users/sdsle/.opencode/bin/opencode.exe";
+const OPENCODE_BIN = process.env.OPENCODE_BIN ?? "opencode";
 const PROMPT = process.argv[2] ?? "hi";
 const PROBE_TIMEOUT_MS = 60_000;
 
@@ -55,15 +55,18 @@ async function main() {
   const { proc, baseUrl } = await startServer();
   log("server.ready", { baseUrl });
 
-  const client = createOpencodeClient({ baseUrl, throwOnError: true });
+  const directory = process.cwd();
+  const client = createOpencodeClient({ baseUrl, directory, throwOnError: true });
 
   // Subscribe BEFORE creating the session so we don't miss the first events.
   const ctrl = new AbortController();
-  const sub = await client.event.subscribe(undefined, { signal: ctrl.signal });
+  const sub = await client.global.event({ signal: ctrl.signal });
   let eventCount = 0;
   const eventTask = (async () => {
     try {
-      for await (const ev of sub.stream) {
+      for await (const raw of sub.stream) {
+        const ev = raw?.payload?.type === "sync" ? undefined : (raw?.payload ?? raw);
+        if (!ev?.type) continue;
         eventCount += 1;
         // Strip large fields so the log stays readable but still proves
         // routing: keep type, properties.{partID, messageID, field, delta, part.type, info.role, info.id, info.time}.
@@ -89,17 +92,19 @@ async function main() {
           summary.infoTime = p.info.time;
         }
         log("event", summary);
+        if (ev.type === "session.idle") ctrl.abort();
       }
     } catch (err) {
       if (!ctrl.signal.aborted) log("event.error", { message: String(err) });
     }
   })();
 
-  const created = await client.session.create({ title: "probe" });
+  const created = await client.session.create({ directory, title: "probe" });
   const sessionID = created.data?.id;
   log("session.created", { sessionID });
 
   await client.session.promptAsync({
+    directory,
     sessionID,
     parts: [{ type: "text", text: PROMPT }],
   });

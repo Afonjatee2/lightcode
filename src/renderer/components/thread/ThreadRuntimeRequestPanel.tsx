@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, ButtonGroup, Dropdown, Label } from "@heroui/react";
-import { ChevronDown, HelpCircle, ShieldAlert } from "lucide-react";
+import { ChevronDown, HelpCircle, Plug, ShieldAlert } from "lucide-react";
 import {
   asPermissionRequestDetails,
   type CanonicalRequestType,
@@ -16,6 +16,7 @@ import { ThreadDockSection } from "./ThreadDockUI";
 interface ThreadRuntimeRequestPanelProps {
   threadId: string;
   request: OpenRuntimeRequest;
+  agentLabel?: string | undefined;
   onResolve: (input: {
     requestId: ThreadServerRequestId;
     method: string;
@@ -37,35 +38,23 @@ interface ThreadRuntimeRequestPanelProps {
  * matching the existing renderer<->supervisor contract.
  */
 export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps) {
-  const { threadId, request, onResolve, onPlanApproved } = props;
+  const { threadId, request, agentLabel, onResolve, onPlanApproved } = props;
   const [resolving, setResolving] = useState(false);
 
-  function decide(optionIds: readonly string[]) {
+  function submitRaw(response: unknown, outcome: RequestOutcome) {
     if (resolving) return;
-    const primaryOptionId = optionIds[0];
-    if (!primaryOptionId) return;
     setResolving(true);
-    if (
-      request.requestType !== "tool_user_input" &&
-      outcomeForSelection(request.requestType, primaryOptionId) === "accepted" &&
-      isPlanApprovalRequest(request)
-    ) {
-      onPlanApproved?.();
-    }
     void onResolve({
       requestId: request.requestId,
       method: "requestPermission",
-      response:
-        optionIds.length === 1
-          ? { optionId: primaryOptionId }
-          : { optionId: primaryOptionId, optionIds },
+      response,
     })
       .then(() => {
         useAppStore.getState().applyRuntimeEvent(threadId, {
           type: "request.resolved",
           threadId,
           requestId: request.requestId,
-          outcome: outcomeForSelection(request.requestType, primaryOptionId),
+          outcome,
         });
       })
       .catch((err) => {
@@ -74,23 +63,65 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
       });
   }
 
+  function decide(optionIds: readonly string[]) {
+    if (resolving) return;
+    const primaryOptionId = optionIds[0];
+    if (!primaryOptionId) return;
+    if (
+      request.requestType !== "tool_user_input" &&
+      outcomeForSelection(request.requestType, primaryOptionId) === "accepted" &&
+      isPlanApprovalRequest(request)
+    ) {
+      onPlanApproved?.();
+    }
+    submitRaw(
+      optionIds.length === 1
+        ? { optionId: primaryOptionId }
+        : { optionId: primaryOptionId, optionIds },
+      outcomeForSelection(request.requestType, primaryOptionId),
+    );
+  }
+
+  const mcpElicitation = asMcpElicitationDetails(request.payload.details);
+  const codexUserInput = !mcpElicitation
+    ? asCodexUserInputDetails(request.payload.details)
+    : undefined;
   const options = request.payload.options ?? DEFAULT_APPROVAL_OPTIONS;
   const isQuestion = request.requestType === "tool_user_input";
-  const Icon = isQuestion ? HelpCircle : ShieldAlert;
-  const permissionDetails = asPermissionRequestDetails(request.payload.details);
-  const detailText = !permissionDetails ? formatRawDetails(request.payload.details) : undefined;
+  const isCustomForm = !!(mcpElicitation || codexUserInput);
+  const Icon = mcpElicitation ? Plug : isQuestion ? HelpCircle : ShieldAlert;
+  const permissionDetails = !isCustomForm
+    ? asPermissionRequestDetails(request.payload.details)
+    : undefined;
+  const opencodePermission =
+    !permissionDetails && !isCustomForm
+      ? asOpenCodePermissionDetails(request.payload.details)
+      : undefined;
+  const detailText =
+    !permissionDetails && !opencodePermission && !isCustomForm
+      ? formatRawDetails(request.payload.details)
+      : undefined;
+  const agentLead = agentLabel ?? "The agent";
+  const contextLine = mcpElicitation
+    ? `MCP server "${mcpElicitation.serverName}" needs input.`
+    : isQuestion
+      ? `${agentLead} needs your input to continue.`
+      : `${agentLead} is waiting for approval before it can continue.`;
 
   return (
     <ThreadDockSection className="!text-xs" placement="composer" collapsed={false}>
       <div className="flex items-start gap-2 px-2 pt-1.5 pb-1 leading-snug">
         <Icon
-          className={`mt-0.5 size-3.5 shrink-0 ${isQuestion ? "text-foreground-muted" : "text-warning"}`}
+          className={`mt-0.5 size-3.5 shrink-0 ${mcpElicitation || isQuestion ? "text-foreground-muted" : "text-warning"}`}
         />
         <div className="min-w-0 flex-1">
           <div className="font-semibold text-foreground">{request.payload.summary}</div>
+          <div className="text-[11px] text-[color:var(--muted)]">{contextLine}</div>
           {permissionDetails ? (
             <PermissionDetailsLine details={permissionDetails} />
-          ) : detailText ? (
+          ) : opencodePermission ? (
+            <OpenCodePermissionDetailsLine details={opencodePermission} />
+          ) : !mcpElicitation && detailText ? (
             <pre className="mt-0.5 max-h-24 overflow-y-auto rounded-sm bg-foreground/5 p-1 font-mono text-[11px] whitespace-pre-wrap break-words">
               {detailText}
             </pre>
@@ -98,7 +129,19 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
         </div>
       </div>
 
-      {isQuestion ? (
+      {mcpElicitation ? (
+        <McpElicitationForm
+          params={mcpElicitation}
+          isDisabled={resolving}
+          onSubmit={(response, outcome) => submitRaw(response, outcome)}
+        />
+      ) : codexUserInput ? (
+        <CodexUserInputForm
+          questions={codexUserInput.questions}
+          isDisabled={resolving}
+          onSubmit={(response, outcome) => submitRaw(response, outcome)}
+        />
+      ) : isQuestion ? (
         <QuestionRows
           options={options}
           isDisabled={resolving}
@@ -138,6 +181,501 @@ const NEGATIVE_OPTION_PATTERN = /(deny|denied|decline|reject|abort|cancel)/i;
 function isNegativeOption(option: UserInputOption): boolean {
   return (
     NEGATIVE_OPTION_PATTERN.test(option.optionId) || NEGATIVE_OPTION_PATTERN.test(option.label)
+  );
+}
+
+type OpenCodePermissionDetails = {
+  permission: string;
+  patterns: string[];
+  metadata: Record<string, unknown> | undefined;
+};
+
+function asOpenCodePermissionDetails(value: unknown): OpenCodePermissionDetails | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.permission !== "string") return undefined;
+  const patterns = Array.isArray(obj.patterns)
+    ? obj.patterns.filter((p): p is string => typeof p === "string")
+    : [];
+  const metadata =
+    obj.metadata && typeof obj.metadata === "object"
+      ? (obj.metadata as Record<string, unknown>)
+      : undefined;
+  return { permission: obj.permission, patterns, metadata };
+}
+
+// ── MCP elicitation ─────────────────────────────────────────────────────
+
+type McpElicitationSchemaProperty =
+  | {
+      type: "string";
+      title?: string;
+      description?: string;
+      default?: string;
+      enum?: string[];
+      enumNames?: string[];
+      oneOf?: Array<{ const: string; title?: string }>;
+    }
+  | {
+      type: "integer" | "number";
+      title?: string;
+      description?: string;
+      default?: number;
+    }
+  | {
+      type: "boolean";
+      title?: string;
+      description?: string;
+      default?: boolean;
+    }
+  | {
+      type: "array";
+      title?: string;
+      description?: string;
+      default?: string[];
+      items?: {
+        enum?: string[];
+        enumNames?: string[];
+        oneOf?: Array<{ const: string; title?: string }>;
+      };
+    };
+
+type McpElicitationParams =
+  | {
+      mode: "form";
+      message: string;
+      serverName: string;
+      _meta?: unknown;
+      requestedSchema: {
+        type: "object";
+        properties: Record<string, McpElicitationSchemaProperty>;
+        required?: string[];
+      };
+    }
+  | {
+      mode: "url";
+      message: string;
+      serverName: string;
+      url: string;
+      elicitationId: string;
+      _meta?: unknown;
+    };
+
+function asMcpElicitationDetails(value: unknown): McpElicitationParams | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const wrapper = (value as { mcpElicitation?: unknown }).mcpElicitation;
+  const candidate = wrapper && typeof wrapper === "object" ? wrapper : value;
+  const obj = candidate as Record<string, unknown>;
+  const mode = obj.mode;
+  if (mode !== "form" && mode !== "url") return undefined;
+  if (typeof obj.message !== "string" || typeof obj.serverName !== "string") return undefined;
+  if (mode === "url") {
+    if (typeof obj.url !== "string" || typeof obj.elicitationId !== "string") return undefined;
+    return {
+      mode: "url",
+      message: obj.message,
+      serverName: obj.serverName,
+      url: obj.url,
+      elicitationId: obj.elicitationId,
+      ...(Object.hasOwn(obj, "_meta") ? { _meta: obj._meta } : {}),
+    };
+  }
+  const schema = obj.requestedSchema;
+  if (!schema || typeof schema !== "object") return undefined;
+  const schemaObj = schema as Record<string, unknown>;
+  if (
+    schemaObj.type !== "object" ||
+    !schemaObj.properties ||
+    typeof schemaObj.properties !== "object"
+  ) {
+    return undefined;
+  }
+  return {
+    mode: "form",
+    message: obj.message,
+    serverName: obj.serverName,
+    requestedSchema: schemaObj as McpElicitationParams extends { mode: "form"; requestedSchema: infer R }
+      ? R
+      : never,
+    ...(Object.hasOwn(obj, "_meta") ? { _meta: obj._meta } : {}),
+  };
+}
+
+type McpFormValue = boolean | number | string | string[];
+
+function getMcpEnumOptions(
+  property: McpElicitationSchemaProperty,
+): { id: string; label: string }[] {
+  if ("oneOf" in property && Array.isArray(property.oneOf)) {
+    return property.oneOf.map((o) => ({ id: o.const, label: o.title ?? o.const }));
+  }
+  if ("enum" in property && Array.isArray(property.enum)) {
+    const names = "enumNames" in property && Array.isArray(property.enumNames) ? property.enumNames : [];
+    return property.enum.map((v, i) => ({ id: v, label: names[i] ?? v }));
+  }
+  if (property.type === "array" && property.items) {
+    if (Array.isArray(property.items.oneOf)) {
+      return property.items.oneOf.map((o) => ({ id: o.const, label: o.title ?? o.const }));
+    }
+    if (Array.isArray(property.items.enum)) {
+      const names = Array.isArray(property.items.enumNames) ? property.items.enumNames : [];
+      return property.items.enum.map((v, i) => ({ id: v, label: names[i] ?? v }));
+    }
+  }
+  return [];
+}
+
+function getInitialMcpFormValues(
+  schema: { properties: Record<string, McpElicitationSchemaProperty> },
+): Record<string, McpFormValue> {
+  const initial: Record<string, McpFormValue> = {};
+  for (const [key, property] of Object.entries(schema.properties)) {
+    if (property.type === "boolean") initial[key] = property.default ?? false;
+    else if (property.type === "integer" || property.type === "number")
+      initial[key] = property.default ?? "";
+    else if (property.type === "array") initial[key] = property.default ?? [];
+    else initial[key] = property.default ?? "";
+  }
+  return initial;
+}
+
+function isEmptyRequiredValue(value: McpFormValue | undefined): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.length === 0;
+  if (Array.isArray(value)) return value.length === 0;
+  return false;
+}
+
+function McpElicitationForm(props: {
+  params: McpElicitationParams;
+  isDisabled: boolean;
+  onSubmit: (response: unknown, outcome: RequestOutcome) => void;
+}) {
+  const { params, isDisabled, onSubmit } = props;
+  const [formValues, setFormValues] = useState<Record<string, McpFormValue>>(() =>
+    params.mode === "form" ? getInitialMcpFormValues(params.requestedSchema) : {},
+  );
+  const requiredKeys = params.mode === "form" ? params.requestedSchema.required ?? [] : [];
+  const hasMissing =
+    params.mode === "form" && requiredKeys.some((key) => isEmptyRequiredValue(formValues[key]));
+
+  function submitAccept() {
+    onSubmit(
+      {
+        action: "accept",
+        ...(params.mode === "form" ? { content: formValues } : {}),
+        ...(Object.hasOwn(params, "_meta") ? { _meta: params._meta } : {}),
+      },
+      "answered",
+    );
+  }
+
+  return (
+    <div className="space-y-2 border-t border-[color:var(--border)] px-2 py-1.5">
+      {params.mode === "url" ? (
+        <a
+          className="text-xs font-medium text-[color:var(--accent)] underline-offset-4 hover:underline"
+          href={params.url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          Open required URL
+        </a>
+      ) : (
+        <div className="space-y-2">
+          {Object.entries(params.requestedSchema.properties).map(([key, property]) => {
+            const label = property.title ?? key;
+            const description = property.description ?? "";
+            const enumOpts = getMcpEnumOptions(property);
+            const isRequired = requiredKeys.includes(key);
+            return (
+              <div key={key} className="space-y-1">
+                <div>
+                  <p className="text-[11px] font-medium text-foreground">
+                    {label}
+                    {isRequired ? <span className="text-warning"> *</span> : null}
+                  </p>
+                  {description ? (
+                    <p className="text-[11px] text-[color:var(--muted)]">{description}</p>
+                  ) : null}
+                </div>
+                {property.type === "boolean" ? (
+                  <label className="flex items-center gap-2 text-[11px] text-foreground">
+                    <input
+                      type="checkbox"
+                      className="size-3.5"
+                      disabled={isDisabled}
+                      checked={Boolean(formValues[key])}
+                      onChange={(e) =>
+                        setFormValues((cur) => ({ ...cur, [key]: e.target.checked }))
+                      }
+                    />
+                    <span>{label}</span>
+                  </label>
+                ) : property.type === "integer" || property.type === "number" ? (
+                  <input
+                    type="number"
+                    disabled={isDisabled}
+                    value={formValues[key] === "" ? "" : String(formValues[key] ?? "")}
+                    onChange={(e) =>
+                      setFormValues((cur) => ({
+                        ...cur,
+                        [key]:
+                          e.target.value.trim().length === 0 ? "" : Number(e.target.value),
+                      }))
+                    }
+                    className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+                  />
+                ) : property.type === "array" ? (
+                  <div className="space-y-0.5">
+                    {enumOpts.map((option) => {
+                      const current = Array.isArray(formValues[key])
+                        ? (formValues[key] as string[])
+                        : [];
+                      const checked = current.includes(option.id);
+                      return (
+                        <label
+                          key={option.id}
+                          className="flex items-center gap-2 text-[11px] text-foreground"
+                        >
+                          <input
+                            type="checkbox"
+                            disabled={isDisabled}
+                            className="size-3.5"
+                            checked={checked}
+                            onChange={(e) =>
+                              setFormValues((cur) => {
+                                const next = Array.isArray(cur[key])
+                                  ? [...(cur[key] as string[])]
+                                  : [];
+                                return {
+                                  ...cur,
+                                  [key]: e.target.checked
+                                    ? [...next, option.id]
+                                    : next.filter((v) => v !== option.id),
+                                };
+                              })
+                            }
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : enumOpts.length > 0 ? (
+                  <select
+                    disabled={isDisabled}
+                    value={String(formValues[key] ?? "")}
+                    onChange={(e) =>
+                      setFormValues((cur) => ({ ...cur, [key]: e.target.value }))
+                    }
+                    className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+                  >
+                    <option value="">—</option>
+                    {enumOpts.map((option) => (
+                      <option key={option.id} value={option.id}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    disabled={isDisabled}
+                    value={String(formValues[key] ?? "")}
+                    onChange={(e) =>
+                      setFormValues((cur) => ({ ...cur, [key]: e.target.value }))
+                    }
+                    className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="flex flex-wrap items-center justify-end gap-1 pt-1">
+        <Button
+          isDisabled={isDisabled}
+          size="sm"
+          variant="ghost"
+          onPress={() => onSubmit({ action: "cancel" }, "cancelled")}
+        >
+          Cancel
+        </Button>
+        <Button
+          isDisabled={isDisabled}
+          size="sm"
+          variant="ghost"
+          onPress={() => onSubmit({ action: "decline" }, "declined")}
+        >
+          Decline
+        </Button>
+        <Button
+          isDisabled={isDisabled || hasMissing}
+          size="sm"
+          variant="secondary"
+          onPress={submitAccept}
+        >
+          {params.mode === "url" ? "Continue" : "Submit"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Codex item/tool/requestUserInput ────────────────────────────────────
+
+type CodexUserInputQuestion = {
+  id: string;
+  header: string;
+  question: string;
+  isSecret: boolean;
+  options: Array<{ label: string; description: string }> | null;
+};
+
+type CodexUserInputDetails = { questions: CodexUserInputQuestion[] };
+
+function asCodexUserInputDetails(value: unknown): CodexUserInputDetails | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const wrapper = (value as { codexUserInput?: unknown }).codexUserInput;
+  if (!wrapper || typeof wrapper !== "object") return undefined;
+  const raw = (wrapper as { questions?: unknown }).questions;
+  if (!Array.isArray(raw)) return undefined;
+  const questions: CodexUserInputQuestion[] = [];
+  for (const entry of raw) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Record<string, unknown>;
+    if (typeof e.id !== "string" || typeof e.header !== "string" || typeof e.question !== "string") {
+      continue;
+    }
+    const options =
+      Array.isArray(e.options) && e.options.length > 0
+        ? e.options.flatMap((opt) => {
+            if (!opt || typeof opt !== "object") return [];
+            const o = opt as Record<string, unknown>;
+            return typeof o.label === "string" && typeof o.description === "string"
+              ? [{ label: o.label, description: o.description }]
+              : [];
+          })
+        : null;
+    questions.push({
+      id: e.id,
+      header: e.header,
+      question: e.question,
+      isSecret: e.isSecret === true,
+      options,
+    });
+  }
+  return questions.length > 0 ? { questions } : undefined;
+}
+
+function CodexUserInputForm(props: {
+  questions: CodexUserInputQuestion[];
+  isDisabled: boolean;
+  onSubmit: (response: unknown, outcome: RequestOutcome) => void;
+}) {
+  const { questions, isDisabled, onSubmit } = props;
+  const [answers, setAnswers] = useState<Record<string, string>>(() =>
+    Object.fromEntries(questions.map((q) => [q.id, ""])),
+  );
+
+  function submit() {
+    onSubmit(
+      {
+        answers: Object.fromEntries(
+          Object.entries(answers).map(([id, value]) => [id, { answers: value ? [value] : [] }]),
+        ),
+      },
+      "answered",
+    );
+  }
+
+  return (
+    <div className="space-y-2 border-t border-[color:var(--border)] px-2 py-1.5">
+      <div className="space-y-2">
+        {questions.map((question) => (
+          <div key={question.id} className="space-y-1">
+            <div>
+              <p className="text-[11px] font-medium text-foreground">{question.header}</p>
+              <p className="text-[11px] text-[color:var(--muted)]">{question.question}</p>
+            </div>
+            {question.options ? (
+              <select
+                disabled={isDisabled}
+                value={answers[question.id] ?? ""}
+                onChange={(e) =>
+                  setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))
+                }
+                className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+              >
+                <option value="">—</option>
+                {question.options.map((option) => (
+                  <option key={option.label} value={option.label}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            ) : question.isSecret ? (
+              <input
+                type="password"
+                disabled={isDisabled}
+                value={answers[question.id] ?? ""}
+                onChange={(e) =>
+                  setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))
+                }
+                className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+              />
+            ) : (
+              <textarea
+                disabled={isDisabled}
+                rows={2}
+                value={answers[question.id] ?? ""}
+                onChange={(e) =>
+                  setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))
+                }
+                className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end pt-1">
+        <Button isDisabled={isDisabled} size="sm" variant="secondary" onPress={submit}>
+          Submit
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function OpenCodePermissionDetailsLine({ details }: { details: OpenCodePermissionDetails }) {
+  const metadataEntries = details.metadata
+    ? Object.entries(details.metadata).filter(([, v]) => v !== undefined && v !== null)
+    : [];
+  return (
+    <div className="mt-0.5 space-y-0.5 font-mono text-[11px]">
+      <div>
+        <span className="text-foreground/60">permission</span>
+        <span className="ml-1 text-foreground">{details.permission}</span>
+      </div>
+      {details.patterns.length > 0 ? (
+        <div className="break-words">
+          <span className="text-foreground/60">
+            {details.patterns.length === 1 ? "pattern" : "patterns"}
+          </span>
+          <span className="ml-1 text-foreground">{details.patterns.join(", ")}</span>
+        </div>
+      ) : null}
+      {metadataEntries.map(([key, value]) => (
+        <div key={key} className="break-words">
+          <span className="text-foreground/60">{key}</span>
+          <span className="ml-1 text-foreground">
+            {typeof value === "string" ? value : JSON.stringify(value)}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 

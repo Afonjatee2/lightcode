@@ -4,7 +4,6 @@ import type { AgentStatus, ProjectLocation, PromptSegment, Thread } from "@/shar
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
-import type { PendingThreadServerRequest } from "@/renderer/state/appStore";
 import { createArrayKeyedMap } from "@/renderer/state/derivations";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
@@ -12,7 +11,6 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const EMPTY_STRINGS: string[] = [];
 const EMPTY_THREADS: Thread[] = [];
-const EMPTY_REQUESTS: PendingThreadServerRequest[] = [];
 
 function selectCurrentProjectId(s: ReturnType<typeof useAppStore.getState>) {
   const v = s.view;
@@ -237,29 +235,3 @@ export function useHasDraft(projectId: string): boolean {
   return useAppStore((s) => projectId in s.draftContents);
 }
 
-/**
- * Per-thread server-request buckets cached by the array reference.
- * Building the bucket map is O(requests) once per unique array; subsequent
- * lookups are O(1). With useShallow on the returned array, threads whose
- * requests didn't change don't re-render even if the parent array rebuilds.
- */
-const getThreadRequests = createArrayKeyedMap<
-  PendingThreadServerRequest,
-  string,
-  PendingThreadServerRequest[]
->((all) => {
-  const map = new Map<string, PendingThreadServerRequest[]>();
-  for (const r of all) {
-    const list = map.get(r.threadId);
-    if (list) list.push(r);
-    else map.set(r.threadId, [r]);
-  }
-  return map;
-});
-
-/** Pending MCP server requests addressed to a given thread. */
-export function useThreadServerRequests(threadId: string): PendingThreadServerRequest[] {
-  return useAppStore(
-    useShallow((s) => getThreadRequests(s.pendingServerRequests, threadId) ?? EMPTY_REQUESTS),
-  );
-}

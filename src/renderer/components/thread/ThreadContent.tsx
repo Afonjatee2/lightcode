@@ -9,7 +9,6 @@ import type {
 } from "@/shared/contracts";
 import { useShallow } from "zustand/react/shallow";
 import { PixelLoader } from "../common";
-import type { PendingThreadServerRequest } from "@/renderer/state/appStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
@@ -21,6 +20,7 @@ import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposerSection } from "./ThreadComposerSection";
 import { ThreadTodoDock } from "./ThreadTodoDock";
 import { getThreadErrorDockStateForItem, selectThreadLatestErrorItem } from "./threadErrorState";
+import { getThreadGoalDockStateFromThreadItems } from "./threadGoalState";
 import { getThreadTodoDockStateFromThreadItems } from "./threadTodoState";
 
 type CommonContentProps = {
@@ -29,7 +29,6 @@ type CommonContentProps = {
   agentStatus: AgentStatus | undefined;
   projectLocation: ProjectLocation;
   paneCount: number;
-  pendingServerRequests: PendingThreadServerRequest[];
   terminalPaneRef: RefObject<TerminalPaneHandle | null>;
   onConfigChange: (config: ThreadConfig) => void;
   onResolveServerRequest: (input: {
@@ -44,7 +43,9 @@ const emptyTodoComposerProps = {
   todoDockCollapsed: false,
   todoDockPlacement: "composer" as const,
   todoDockState: null,
+  goalDockState: null,
   errorDockState: null,
+  onGoalDockDismiss: () => undefined,
   onTodoDockCollapsedChange: () => undefined,
   onTodoDockPlacementChange: () => undefined,
   onDismissError: () => undefined,
@@ -105,7 +106,9 @@ export function GuiThreadContent(
     })),
   );
   const todoDockState = getThreadTodoDockStateFromThreadItems(runtimeItemIds, runtimeItemsById);
+  const goalDockState = getThreadGoalDockStateFromThreadItems(runtimeItemIds, runtimeItemsById);
   const todoItem = todoDockState ? runtimeItemsById?.[todoDockState.sourceItemId] : undefined;
+  const goalItem = goalDockState ? runtimeItemsById?.[goalDockState.sourceItemId] : undefined;
 
   // If the plan is retired, but the agent sends an update (new object reference
   // in the store), un-retire it so the user sees the progress.
@@ -121,6 +124,19 @@ export function GuiThreadContent(
     lastTodoItemRef.current = todoItem;
   }, [todoItem, retiredSourceItemId, thread.id, retireTodoDock]);
 
+  const [dismissedGoalItemId, setDismissedGoalItemId] = useState<string | null>(null);
+  const lastGoalItemRef = useRef(goalItem);
+  useEffect(() => {
+    if (
+      dismissedGoalItemId &&
+      goalItem?.id === dismissedGoalItemId &&
+      goalItem !== lastGoalItemRef.current
+    ) {
+      setDismissedGoalItemId(null);
+    }
+    lastGoalItemRef.current = goalItem;
+  }, [dismissedGoalItemId, goalItem]);
+
   const errorItem = useAppStore((s) => selectThreadLatestErrorItem(s, props.threadId));
   const [dismissedErrorItemId, setDismissedErrorItemId] = useState<string | null>(null);
   const errorDockState =
@@ -128,13 +144,20 @@ export function GuiThreadContent(
       ? getThreadErrorDockStateForItem(errorItem)
       : null;
   const showTodoDock = todoDockState !== null && todoDockState.sourceItemId !== retiredSourceItemId;
+  const showGoalDock = goalDockState !== null && goalDockState.sourceItemId !== dismissedGoalItemId;
   const showTodoInRightRail = showTodoDock && todoDockPlacement === "right";
   const showThreadSideRail = runtimeDebugOpen || showTodoInRightRail;
   const hiddenRuntimeItemId = showTodoDock ? todoDockState?.sourceItemId : undefined;
   const hiddenRuntimeItemIsLive = showTodoDock && todoDockState.itemState !== "completed";
-  const todoDockLayoutToken = !showTodoDock
-    ? null
-    : `${todoDockState.sourceItemId}:${todoDockPlacement}:${todoDockCollapsed ? "collapsed" : "expanded"}`;
+  const dockLayoutToken =
+    [
+      showGoalDock ? `goal:${goalDockState.sourceItemId}` : null,
+      showTodoDock
+        ? `todo:${todoDockState.sourceItemId}:${todoDockPlacement}:${todoDockCollapsed ? "collapsed" : "expanded"}`
+        : null,
+    ]
+      .filter(Boolean)
+      .join("|") || null;
 
   return (
     <>
@@ -146,10 +169,10 @@ export function GuiThreadContent(
           <div className="min-h-0 min-w-0 flex-1">
             <ChatPane
               thread={thread}
-              hasSupplementaryContent={showTodoDock}
+              hasSupplementaryContent={showTodoDock || showGoalDock}
               hiddenRuntimeItemId={hiddenRuntimeItemId}
               hiddenRuntimeItemIsLive={hiddenRuntimeItemIsLive}
-              layoutChangeToken={todoDockLayoutToken}
+              layoutChangeToken={dockLayoutToken}
             />
           </div>
           {showThreadSideRail ? (
@@ -187,7 +210,11 @@ export function GuiThreadContent(
         todoDockCollapsed={todoDockCollapsed}
         todoDockPlacement={todoDockPlacement}
         todoDockState={showTodoDock ? todoDockState : null}
+        goalDockState={showGoalDock ? goalDockState : null}
         errorDockState={errorDockState}
+        onGoalDockDismiss={() =>
+          goalDockState && setDismissedGoalItemId(goalDockState.sourceItemId)
+        }
         onDismissError={() => errorItem && setDismissedErrorItemId(errorItem.id)}
         onTodoDockCollapsedChange={(collapsed) => setTodoDockCollapsed(thread.id, collapsed)}
         onTodoDockPlacementChange={(placement) => setTodoDockPlacement(thread.id, placement)}

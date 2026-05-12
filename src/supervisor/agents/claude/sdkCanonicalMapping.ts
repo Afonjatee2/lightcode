@@ -12,7 +12,13 @@ import type {
   TurnState,
   UserInputOption,
 } from "@/shared/contracts";
-import { readDiffSummary } from "../fileChangeSummary";
+import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
+import {
+  createContextUsageEvent,
+  readNonNegativeInteger,
+  usageFromTokenCounts,
+} from "../contextUsage";
+import { parseGoalSlashCommand, startGoalItemEvents } from "../goalRuntime";
 
 interface TextItemState {
   itemId: string;
@@ -41,6 +47,7 @@ export interface ClaudeMapperState {
   toolItemsById: Map<string, ToolItemState>;
   currentAssistantMessageId?: string;
   streamedAssistantMessageIds: Set<string>;
+  currentCompactionItemId?: string;
 }
 
 export function createClaudeMapperState(threadId: string): ClaudeMapperState {
@@ -95,10 +102,11 @@ export function startClaudeTurn(
   state.toolItemsByIndex.clear();
   state.toolItemsById.clear();
   delete state.currentAssistantMessageId;
+  delete state.currentCompactionItemId;
   state.streamedAssistantMessageIds.clear();
 
   const userItemId = userMessageItemId ?? newItemId("user");
-  return [
+  const events: RuntimeEvent[] = [
     { type: "turn.started", threadId: state.threadId, turnId },
     {
       type: "item.started",
@@ -109,6 +117,30 @@ export function startClaudeTurn(
     },
     { type: "item.completed", threadId: state.threadId, itemId: userItemId },
   ];
+  const goalPayload = parseGoalSlashCommand(prompt);
+  if (goalPayload) {
+    events.push(...startGoalItemEvents(state.threadId, `goal-${turnId}`, goalPayload));
+  }
+  if (isManualCompactPrompt(prompt)) {
+    const compactItemId = `compact-${turnId}`;
+    state.currentCompactionItemId = compactItemId;
+    events.push({
+      type: "item.started",
+      threadId: state.threadId,
+      itemId: compactItemId,
+      itemType: "tool_call",
+      payload: {
+        name: "ContextCompaction",
+        status: "running",
+        args: { trigger: "manual" },
+      },
+    });
+  }
+  return events;
+}
+
+function isManualCompactPrompt(prompt: string): boolean {
+  return /^\/compact(?:\s|$)/.test(prompt.trimStart());
 }
 
 function ensureTextItem(
@@ -198,6 +230,43 @@ function classifyToolItemType(toolName: string): CanonicalItemType {
     return "web_search";
   }
   return "tool_call";
+}
+
+function createToolItemState(input: {
+  itemId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+}): ToolItemState {
+  const fingerprint =
+    Object.keys(input.input).length > 0 ? inputFingerprint(input.input) : undefined;
+  return {
+    itemId: input.itemId,
+    itemType: classifyToolItemType(input.toolName),
+    toolName: input.toolName,
+    input: input.input,
+    partialInputJson: "",
+    ...(fingerprint ? { lastInputFingerprint: fingerprint } : {}),
+  };
+}
+
+function startToolItem(
+  state: ClaudeMapperState,
+  tool: ToolItemState,
+  index: number | undefined,
+  events: RuntimeEvent[],
+): void {
+  // Same tool_use id means the SDK is replaying a block we already opened.
+  // Keep the live ToolItemState intact so the later tool_result can complete it.
+  if (state.toolItemsById.has(tool.itemId)) return;
+  if (index !== undefined) state.toolItemsByIndex.set(index, tool);
+  state.toolItemsById.set(tool.itemId, tool);
+  events.push({
+    type: "item.started",
+    threadId: state.threadId,
+    itemId: tool.itemId,
+    itemType: tool.itemType,
+    payload: toolPayload(tool, "running"),
+  });
 }
 
 function classifyRequestType(toolName: string): CanonicalRequestType {
@@ -393,17 +462,15 @@ function toolPayload(
     };
   }
   if (tool.itemType === "file_change") {
-    const path =
-      typeof tool.input.file_path === "string"
-        ? tool.input.file_path
-        : typeof tool.input.path === "string"
-          ? tool.input.path
-          : "";
+    const path = readFileChangePath(tool.input) ?? "";
     const diffSummary = readDiffSummary(tool.input, result);
     return {
+      name: tool.toolName,
       path,
       changeKind: inferFileChangeKind(tool.toolName),
       ...(diffSummary ? { diffSummary } : {}),
+      args: tool.input,
+      ...(result !== undefined ? { result } : {}),
       ...errorFields,
     };
   }
@@ -496,9 +563,43 @@ function extractText(value: unknown): string {
   if (typeof value === "string") return value;
   if (Array.isArray(value)) return value.map(extractText).join("");
   if (!value || typeof value !== "object") return "";
-  const obj = value as { text?: unknown; content?: unknown };
+  const obj = value as { text?: unknown; thinking?: unknown; content?: unknown };
   if (typeof obj.text === "string") return obj.text;
+  if (typeof obj.thinking === "string") return obj.thinking;
   return extractText(obj.content);
+}
+
+function createClaudeContextUsageEvent(
+  threadId: string,
+  message: SDKMessage,
+): RuntimeEvent | undefined {
+  const obj = message as {
+    usage?: unknown;
+    total_tokens?: unknown;
+    input_tokens?: unknown;
+    output_tokens?: unknown;
+    cache_creation_input_tokens?: unknown;
+    cache_read_input_tokens?: unknown;
+  };
+  const usage =
+    obj.usage && typeof obj.usage === "object" ? (obj.usage as Record<string, unknown>) : undefined;
+  return createContextUsageEvent(
+    threadId,
+    usageFromTokenCounts({
+      usedTokens:
+        readNonNegativeInteger(usage?.total_tokens) ?? readNonNegativeInteger(obj.total_tokens),
+      inputTokens:
+        readNonNegativeInteger(usage?.input_tokens) ?? readNonNegativeInteger(obj.input_tokens),
+      outputTokens:
+        readNonNegativeInteger(usage?.output_tokens) ?? readNonNegativeInteger(obj.output_tokens),
+      cachedReadTokens:
+        readNonNegativeInteger(usage?.cache_read_input_tokens) ??
+        readNonNegativeInteger(obj.cache_read_input_tokens),
+      cachedWriteTokens:
+        readNonNegativeInteger(usage?.cache_creation_input_tokens) ??
+        readNonNegativeInteger(obj.cache_creation_input_tokens),
+    }),
+  );
 }
 
 /**
@@ -539,6 +640,9 @@ function applyTaskLifecycle(
     ...(typeof usage?.tool_uses === "number" ? { toolUses: usage.tool_uses } : {}),
     ...(typeof usage?.duration_ms === "number" ? { durationMs: usage.duration_ms } : {}),
   };
+  if (typeof usage?.tool_uses === "number") {
+    next.stepCount = Math.max(next.stepCount ?? 0, usage.tool_uses);
+  }
   if (Object.keys(next).length === 0) return undefined;
   tool.progress = next;
   return {
@@ -758,35 +862,12 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         block?.type === "mcp_tool_use"
       ) {
         const toolName = typeof block.name === "string" ? block.name : "Tool";
-        const itemType = classifyToolItemType(toolName);
         const input =
           block.input && typeof block.input === "object" && !Array.isArray(block.input)
             ? (block.input as Record<string, unknown>)
             : {};
         const itemId = typeof block.id === "string" ? block.id : newItemId("tool");
-        // Same tool_use id means the SDK is replaying a block we already
-        // opened — skip rather than overwrite the live ToolItemState.
-        if (state.toolItemsById.has(itemId)) return events;
-        const tool: ToolItemState = {
-          itemId,
-          itemType,
-          toolName,
-          input,
-          partialInputJson: "",
-          ...(() => {
-            const fingerprint = Object.keys(input).length > 0 ? inputFingerprint(input) : undefined;
-            return fingerprint ? { lastInputFingerprint: fingerprint } : {};
-          })(),
-        };
-        state.toolItemsByIndex.set(index, tool);
-        state.toolItemsById.set(itemId, tool);
-        events.push({
-          type: "item.started",
-          threadId: state.threadId,
-          itemId,
-          itemType,
-          payload: toolPayload(tool, "running"),
-        });
+        startToolItem(state, createToolItemState({ itemId, toolName, input }), index, events);
         return events;
       }
       return events;
@@ -864,26 +945,58 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
 
   if (message.type === "assistant") {
     const messageId = readClaudeAssistantMessageId(message.message);
-    if (messageId && state.streamedAssistantMessageIds.has(messageId)) return events;
+    const skipTextSnapshot = messageId ? state.streamedAssistantMessageIds.has(messageId) : false;
     const content = (message.message as { content?: unknown }).content;
     if (Array.isArray(content)) {
       for (let blockIndex = 0; blockIndex < content.length; blockIndex += 1) {
         const block = content[blockIndex];
         if (!block || typeof block !== "object") continue;
-        const obj = block as { type?: unknown; text?: unknown };
-        if (obj.type !== "text" || typeof obj.text !== "string" || obj.text.length === 0) continue;
-        const existing = state.assistantTextItems.get(blockIndex);
-        if (existing?.completed) continue;
-        const item = ensureTextItem(
-          state,
-          state.assistantTextItems,
-          blockIndex,
-          "assistant_message",
-          events,
-        );
-        if (!item) continue;
-        if (!item.emittedText) item.fallbackText = obj.text;
-        completeTextItem(state, item, "assistant_text", events);
+        const obj = block as Record<string, unknown>;
+        if (obj.type === "text" && typeof obj.text === "string" && obj.text.length > 0) {
+          if (skipTextSnapshot) continue;
+          const existing = state.assistantTextItems.get(blockIndex);
+          if (existing?.completed) continue;
+          const item = ensureTextItem(
+            state,
+            state.assistantTextItems,
+            blockIndex,
+            "assistant_message",
+            events,
+          );
+          if (!item) continue;
+          if (!item.emittedText) item.fallbackText = obj.text;
+          completeTextItem(state, item, "assistant_text", events);
+          continue;
+        }
+        if (obj.type === "thinking") {
+          const text = extractText(obj);
+          if (text.length === 0) continue;
+          const existing = state.reasoningItems.get(blockIndex);
+          if (existing?.completed) continue;
+          const item = ensureTextItem(state, state.reasoningItems, blockIndex, "reasoning", events);
+          if (!item) continue;
+          if (!item.emittedText) item.fallbackText = text;
+          completeTextItem(state, item, "reasoning_text", events);
+          continue;
+        }
+        if (
+          obj.type === "tool_use" ||
+          obj.type === "server_tool_use" ||
+          obj.type === "mcp_tool_use"
+        ) {
+          const toolName = typeof obj.name === "string" ? obj.name : "Tool";
+          const input =
+            obj.input && typeof obj.input === "object" && !Array.isArray(obj.input)
+              ? (obj.input as Record<string, unknown>)
+              : {};
+          const itemId = typeof obj.id === "string" ? obj.id : newItemId("tool");
+          startToolItem(
+            state,
+            createToolItemState({ itemId, toolName, input }),
+            blockIndex,
+            events,
+          );
+        }
       }
     }
     return events;
@@ -922,7 +1035,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         threadId: state.threadId,
         itemId: tool.itemId,
         payload:
-          tool.itemType === "tool_call"
+          tool.itemType === "tool_call" || tool.itemType === "file_change"
             ? toolPayload(tool, isError ? "error" : "success", obj)
             : toolPayload(tool, isError ? "error" : "success"),
       });
@@ -937,6 +1050,8 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
 
   if (message.type === "result") {
     const stateValue = mapResultState(message);
+    const usageEvent = createClaudeContextUsageEvent(state.threadId, message);
+    if (usageEvent) events.push(usageEvent);
     events.push(...closeClaudeOpenItems(state));
     if (stateValue === "failed") {
       const remaining = nonDiagnosticErrors(message);
@@ -971,20 +1086,24 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
   }
 
   if (message.type === "system" && message.subtype === "compact_boundary") {
-    const itemId = newItemId("compact");
+    const existingItemId = state.currentCompactionItemId;
+    const itemId = existingItemId ?? newItemId("compact");
+    delete state.currentCompactionItemId;
     const metadata = (message as { compact_metadata?: unknown }).compact_metadata;
     const payload = {
       name: "ContextCompaction",
       status: "success" as const,
       ...(metadata && typeof metadata === "object" ? { args: metadata } : {}),
     };
-    events.push({
-      type: "item.started",
-      threadId: state.threadId,
-      itemId,
-      itemType: "tool_call",
-      payload,
-    });
+    if (!existingItemId) {
+      events.push({
+        type: "item.started",
+        threadId: state.threadId,
+        itemId,
+        itemType: "tool_call",
+        payload,
+      });
+    }
     events.push({
       type: "item.completed",
       threadId: state.threadId,

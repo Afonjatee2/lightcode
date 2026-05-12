@@ -113,6 +113,24 @@ describe("ItemMarkdownInner", () => {
     );
   });
 
+  it("keeps out-of-project absolute markdown link hrefs absolute", () => {
+    const actions = makeActions();
+
+    render(
+      <AppProvider>
+        <ChatPaneActionsContext.Provider value={actions}>
+          <ItemMarkdownInner text={"Read [outside.txt](/tmp/outside.txt)"} />
+        </ChatPaneActionsContext.Provider>
+      </AppProvider>,
+    );
+
+    const chip = screen.getByRole("button", { name: /outside\.txt/ });
+    expect(chip).toHaveAttribute("title", "/tmp/outside.txt");
+
+    fireEvent.click(chip);
+    expect(actions.openProjectRelativePath).toHaveBeenCalledWith("/tmp/outside.txt", undefined);
+  });
+
   it("does not render incomplete absolute markdown hrefs as browser links", () => {
     const { container } = render(
       <AppProvider>

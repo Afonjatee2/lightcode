@@ -1,6 +1,64 @@
 import { describe, expect, it } from "vitest";
-import type { Event } from "@opencode-ai/sdk/v2";
+import type { AssistantMessage, Event, ToolPart, UserMessage } from "@opencode-ai/sdk/v2";
 import { closeOpenItems, createOpenCodeMapperState, mapOpenCodeEvent } from "./sdkCanonicalMapping";
+
+function assistantMessage(id: string, overrides: Partial<AssistantMessage> = {}): AssistantMessage {
+  return {
+    id,
+    sessionID: "ses_test",
+    role: "assistant",
+    parentID: "msg_user",
+    mode: "build",
+    agent: "build",
+    path: { cwd: "/", root: "/" },
+    cost: 0,
+    tokens: {
+      input: 0,
+      output: 0,
+      reasoning: 0,
+      cache: { read: 0, write: 0 },
+    },
+    modelID: "big-pickle",
+    providerID: "opencode",
+    time: { created: 0 },
+    ...overrides,
+  };
+}
+
+function userMessage(id: string, overrides: Partial<UserMessage> = {}): UserMessage {
+  return {
+    id,
+    sessionID: "ses_test",
+    role: "user",
+    agent: "build",
+    model: { providerID: "test", modelID: "test" },
+    time: { created: 0 },
+    ...overrides,
+  };
+}
+
+function messageUpdatedEvent(info: AssistantMessage | UserMessage): Event {
+  return {
+    id: "evt-" + Math.random().toString(36).slice(2),
+    type: "message.updated",
+    properties: {
+      sessionID: "ses_test",
+      info,
+    },
+  };
+}
+
+function toolPartUpdatedEvent(part: ToolPart): Event {
+  return {
+    id: "evt-" + Math.random().toString(36).slice(2),
+    type: "message.part.updated",
+    properties: {
+      sessionID: "ses_test",
+      time: 0,
+      part,
+    },
+  };
+}
 
 function deltaEvent(messageID: string, partID: string, delta: string): Event {
   return {
@@ -93,6 +151,38 @@ describe("sdkCanonicalMapping — text streaming", () => {
     expect(bItemId).toBeDefined();
     expect(aItemId).not.toBe(bItemId);
   });
+
+  it("maps message token buckets into context usage", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      messageUpdatedEvent(
+        assistantMessage("msg_asst", {
+          tokens: {
+            input: 60_000,
+            output: 8_000,
+            reasoning: 2_000,
+            cache: { read: 1_000, write: 500 },
+          },
+        }),
+      ),
+      state,
+    );
+
+    expect(events[0]).toEqual({
+      type: "context.updated",
+      threadId: "thread-1",
+      usage: {
+        usedTokens: 71_500,
+        breakdown: [
+          { id: "input", label: "Input", tokens: 60_000 },
+          { id: "output", label: "Output", tokens: 8_000 },
+          { id: "reasoning", label: "Reasoning", tokens: 2_000 },
+          { id: "cache-read", label: "Cache read", tokens: 1_000 },
+          { id: "cache-write", label: "Cache write", tokens: 500 },
+        ],
+      },
+    });
+  });
 });
 
 describe("sdkCanonicalMapping — permission/question events", () => {
@@ -110,7 +200,7 @@ describe("sdkCanonicalMapping — permission/question events", () => {
           metadata: {},
           always: [],
         },
-      } as Event,
+      },
       state,
     );
     expect(events).toHaveLength(1);
@@ -142,7 +232,7 @@ describe("sdkCanonicalMapping — permission/question events", () => {
             },
           ],
         },
-      } as Event,
+      },
       state,
     );
     expect(events).toHaveLength(1);
@@ -163,33 +253,25 @@ describe("sdkCanonicalMapping — todowrite → plan", () => {
     // so ThreadTodoDock picks it up instead of rendering a generic accordion.
     const state = createOpenCodeMapperState("thread-1");
     const events = mapOpenCodeEvent(
-      {
-        id: "evt-todo",
-        type: "message.part.updated",
-        properties: {
-          sessionID: "ses_test",
-          time: 0,
-          part: {
-            id: "prt_todo_1",
-            sessionID: "ses_test",
-            messageID: "msg_1",
-            type: "tool",
-            tool: "todowrite",
-            callID: "call_todo_1",
-            state: {
-              status: "running",
-              input: {
-                todos: [
-                  { content: "First task", status: "in_progress", priority: "high" },
-                  { content: "Second task", status: "pending", priority: "high" },
-                  { content: "Third task", status: "completed", priority: "medium" },
-                ],
-              },
-              time: { start: 0 },
-            },
+      toolPartUpdatedEvent({
+        id: "prt_todo_1",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "todowrite",
+        callID: "call_todo_1",
+        state: {
+          status: "running",
+          input: {
+            todos: [
+              { content: "First task", status: "in_progress", priority: "high" },
+              { content: "Second task", status: "pending", priority: "high" },
+              { content: "Third task", status: "completed", priority: "medium" },
+            ],
           },
+          time: { start: 0 },
         },
-      } as Event,
+      }),
       state,
     );
     const started = events.find((e) => e.type === "item.started");
@@ -207,32 +289,24 @@ describe("sdkCanonicalMapping — todowrite → plan", () => {
   it("treats unknown statuses as pending and falls back to 'Task' for empty content", () => {
     const state = createOpenCodeMapperState("thread-1");
     const events = mapOpenCodeEvent(
-      {
-        id: "evt-todo-2",
-        type: "message.part.updated",
-        properties: {
-          sessionID: "ses_test",
-          time: 0,
-          part: {
-            id: "prt_todo_2",
-            sessionID: "ses_test",
-            messageID: "msg_2",
-            type: "tool",
-            tool: "todowrite",
-            callID: "call_todo_2",
-            state: {
-              status: "running",
-              input: {
-                todos: [
-                  { content: "   ", status: "weird-unknown" },
-                  { content: "Real one", status: "in_progress" },
-                ],
-              },
-              time: { start: 0 },
-            },
+      toolPartUpdatedEvent({
+        id: "prt_todo_2",
+        sessionID: "ses_test",
+        messageID: "msg_2",
+        type: "tool",
+        tool: "todowrite",
+        callID: "call_todo_2",
+        state: {
+          status: "running",
+          input: {
+            todos: [
+              { content: "   ", status: "weird-unknown" },
+              { content: "Real one", status: "in_progress" },
+            ],
           },
+          time: { start: 0 },
         },
-      } as Event,
+      }),
       state,
     );
     const started = events.find((e) => e.type === "item.started");
@@ -250,52 +324,123 @@ describe("sdkCanonicalMapping — tool parts", () => {
   it("classifies bash tool as command_execution and emits item.started", () => {
     const state = createOpenCodeMapperState("thread-1");
     const events = mapOpenCodeEvent(
-      {
-        id: "evt-x",
-        type: "message.part.updated",
-        properties: {
-          sessionID: "ses_test",
-          time: 0,
-          part: {
-            id: "prt_tool_1",
-            sessionID: "ses_test",
-            messageID: "msg_1",
-            type: "tool",
-            tool: "bash",
-            callID: "call_1",
-            state: {
-              status: "running",
-              input: { command: "ls /" },
-              time: { start: 0 },
-            },
-          },
+      toolPartUpdatedEvent({
+        id: "prt_tool_1",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "bash",
+        callID: "call_1",
+        state: {
+          status: "running",
+          input: { command: "ls /" },
+          time: { start: 0 },
         },
-      } as Event,
+      }),
       state,
     );
     expect(events.find((e) => e.type === "item.started")).toMatchObject({
       itemType: "command_execution",
     });
   });
+
+  it("maps edit tools with file_path args as ACP-shaped file changes", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const args = {
+      file_path: "src/renderer/components/composer/MentionInput.tsx",
+      old_string: "before",
+      new_string: "after",
+    };
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_edit",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "edit",
+        callID: "call_edit",
+        state: {
+          status: "running",
+          input: args,
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "file_change",
+      payload: {
+        name: "edit",
+        path: "src/renderer/components/composer/MentionInput.tsx",
+        changeKind: "edit",
+        args,
+        status: "running",
+      },
+    });
+  });
+
+  it("uses completed edit changes arrays to heal path and diff summary", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const diff = "@@ -1 +1 @@\n-before\n+after\n";
+    mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_edit_changes",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "edit",
+        callID: "call_edit_changes",
+        state: {
+          status: "running",
+          input: { old_string: "before", new_string: "after" },
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_edit_changes",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "edit",
+        callID: "call_edit_changes",
+        state: {
+          status: "completed",
+          title: "Success. Updated the following files:\nM src/foo.ts",
+          input: { old_string: "before", new_string: "after" },
+          output: "Success. Updated the following files:\nM src/foo.ts",
+          metadata: {
+            changes: [
+              {
+                path: "src/foo.ts",
+                kind: { type: "update", move_path: null },
+                diff,
+              },
+            ],
+          },
+          time: { start: 0, end: 20 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.completed")).toMatchObject({
+      payload: {
+        name: "edit",
+        path: "src/foo.ts",
+        diffSummary: { added: 1, removed: 1 },
+        result: "Success. Updated the following files:\nM src/foo.ts",
+      },
+    });
+  });
 });
 
 function userMessageUpdatedEvent(messageID: string): Event {
-  return {
-    id: "evt-" + Math.random().toString(36).slice(2),
-    type: "message.updated",
-    properties: {
-      sessionID: "ses_test",
-      info: {
-        id: messageID,
-        sessionID: "ses_test",
-        role: "user",
-        agent: "build",
-        model: { providerID: "test", modelID: "test" },
-        time: { created: Date.now() },
-        path: { cwd: "/", root: "/" },
-      },
-    },
-  } as unknown as Event;
+  return messageUpdatedEvent(userMessage(messageID, { time: { created: Date.now() } }));
 }
 
 describe("sdkCanonicalMapping — user message dedup", () => {
@@ -365,26 +510,17 @@ function reasoningPartUpdatedEvent(
         time: end !== undefined ? { start: 0, end } : { start: 0 },
       },
     },
-  } as unknown as Event;
+  };
 }
 
 function assistantMessageUpdatedEvent(messageID: string, completed?: number): Event {
-  return {
-    id: "evt-" + Math.random().toString(36).slice(2),
-    type: "message.updated",
-    properties: {
-      sessionID: "ses_test",
-      info: {
-        id: messageID,
-        sessionID: "ses_test",
-        role: "assistant",
-        agent: "build",
-        model: { providerID: "test", modelID: "test" },
-        time: completed !== undefined ? { created: 0, completed } : { created: 0 },
-        path: { cwd: "/", root: "/" },
-      },
-    },
-  } as unknown as Event;
+  return messageUpdatedEvent(
+    assistantMessage(messageID, {
+      modelID: "test",
+      providerID: "test",
+      time: completed !== undefined ? { created: 0, completed } : { created: 0 },
+    }),
+  );
 }
 
 describe("sdkCanonicalMapping — reasoning delta routing", () => {

@@ -16,14 +16,34 @@
  *   - `item/fileChange/outputDelta`       → file_change_output delta
  *   - `item/plan/delta`                   → plan_text delta
  *
- * Approval requests (`item/.../requestApproval`) are JSON-RPC requests, not
- * notifications, and surface via `onServerRequest`. We do not handle them here.
+ * Approval requests (`item/.../requestApproval`) and form requests
+ * (`mcpServer/elicitation/request`, `item/tool/requestUserInput`) are JSON-RPC
+ * requests, not notifications. They are mapped to canonical
+ * `request.opened` events by {@link mapCodexServerRequest} below; the inverse
+ * is {@link translateCodexCanonicalResponse}.
  */
 
 import { randomUUID } from "node:crypto";
-import type { CanonicalItemType, RuntimeContentStreamKind, RuntimeEvent } from "@/shared/contracts";
+import type {
+  CanonicalItemType,
+  CanonicalRequestType,
+  RuntimeContentStreamKind,
+  RuntimeEvent,
+  UserInputOption,
+} from "@/shared/contracts";
 import { extractLeadingPath } from "@/shared/extractLeadingPath";
 import { readDiffSummary } from "../fileChangeSummary";
+import {
+  createContextUsageEvent,
+  readNonNegativeInteger,
+  usageFromTokenCounts,
+} from "../contextUsage";
+import {
+  goalPayloadFromProviderState,
+  startGoalItemEvents,
+  updateGoalItemEvents,
+  type ProviderGoalState,
+} from "../goalRuntime";
 
 export interface CodexMapperState {
   threadId: string;
@@ -41,6 +61,8 @@ export interface CodexMapperState {
   fileChangeOutputMap: Map<string, string>;
   /** Last path emitted for a file-change item, to avoid duplicate updates. */
   fileChangePathMap: Map<string, string>;
+  /** Current chat item that mirrors the provider's active goal state. */
+  goalItemId?: string;
 }
 
 export function createCodexMapperState(threadId: string): CodexMapperState {
@@ -69,6 +91,7 @@ export function canonicalTypeFor(raw: string | undefined | null): CanonicalItemT
   if (type.includes("agent message") || type.includes("assistant")) return "assistant_message";
   if (type.includes("reasoning") || type.includes("thought")) return "reasoning";
   if (type.includes("plan") || type.includes("todo")) return "plan";
+  if (type.includes("goal")) return "goal";
   if (type.includes("command")) return "command_execution";
   if (type.includes("file change") || type.includes("patch") || type.includes("edit"))
     return "file_change";
@@ -184,12 +207,148 @@ function isInterruptedTurn(params: Record<string, unknown> | undefined): boolean
   return (turn as Record<string, unknown>).status === "interrupted";
 }
 
+function createCodexContextUsageEvent(
+  threadId: string,
+  params: Record<string, unknown> | undefined,
+): RuntimeEvent | undefined {
+  const turn = params?.turn;
+  const fromTurn =
+    turn && typeof turn === "object" ? (turn as Record<string, unknown>).usage : undefined;
+  const usage = params?.usage ?? fromTurn;
+  if (!usage || typeof usage !== "object") return undefined;
+  return createCodexUsageEvent(threadId, usage as Record<string, unknown>);
+}
+
+function createCodexTokenUsageEvent(
+  threadId: string,
+  params: Record<string, unknown> | undefined,
+): RuntimeEvent | undefined {
+  const tokenUsage = readRecord(params?.tokenUsage) ?? readRecord(params?.token_usage);
+  if (tokenUsage) {
+    const usage =
+      readRecord(tokenUsage.last) ??
+      readRecord(tokenUsage.lastTokenUsage) ??
+      readRecord(tokenUsage.last_token_usage) ??
+      readRecord(tokenUsage.total) ??
+      readRecord(tokenUsage.totalTokenUsage) ??
+      readRecord(tokenUsage.total_token_usage);
+    if (!usage) return undefined;
+    return createCodexUsageEvent(threadId, usage, {
+      maxTokens:
+        readNonNegativeInteger(tokenUsage.modelContextWindow) ??
+        readNonNegativeInteger(tokenUsage.model_context_window),
+    });
+  }
+
+  const info = params?.info;
+  if (!info || typeof info !== "object") return undefined;
+  const obj = info as Record<string, unknown>;
+  const usage =
+    readRecord(obj.last_token_usage) ??
+    readRecord(obj.lastTokenUsage) ??
+    readRecord(obj.total_token_usage) ??
+    readRecord(obj.totalTokenUsage);
+  if (!usage) return undefined;
+
+  return createCodexUsageEvent(threadId, usage, {
+    maxTokens:
+      readNonNegativeInteger(obj.model_context_window) ??
+      readNonNegativeInteger(obj.modelContextWindow),
+  });
+}
+
+function createCodexUsageEvent(
+  threadId: string,
+  obj: Record<string, unknown>,
+  options: { maxTokens?: number | undefined } = {},
+): RuntimeEvent | undefined {
+  return createContextUsageEvent(
+    threadId,
+    usageFromTokenCounts({
+      usedTokens:
+        readNonNegativeInteger(obj.totalTokens) ??
+        readNonNegativeInteger(obj.total_tokens) ??
+        readNonNegativeInteger(obj.used),
+      maxTokens:
+        options.maxTokens ??
+        readNonNegativeInteger(obj.modelContextWindow) ??
+        readNonNegativeInteger(obj.model_context_window) ??
+        readNonNegativeInteger(obj.maxTokens) ??
+        readNonNegativeInteger(obj.max_tokens) ??
+        readNonNegativeInteger(obj.size),
+      inputTokens:
+        readNonNegativeInteger(obj.inputTokens) ?? readNonNegativeInteger(obj.input_tokens),
+      outputTokens:
+        readNonNegativeInteger(obj.outputTokens) ?? readNonNegativeInteger(obj.output_tokens),
+      thoughtTokens:
+        readNonNegativeInteger(obj.thoughtTokens) ??
+        readNonNegativeInteger(obj.reasoningTokens) ??
+        readNonNegativeInteger(obj.reasoningOutputTokens) ??
+        readNonNegativeInteger(obj.reasoning_output_tokens) ??
+        readNonNegativeInteger(obj.reasoning_tokens),
+      cachedReadTokens:
+        readNonNegativeInteger(obj.cachedInputTokens) ??
+        readNonNegativeInteger(obj.cachedReadTokens) ??
+        readNonNegativeInteger(obj.cacheReadTokens) ??
+        readNonNegativeInteger(obj.cached_input_tokens) ??
+        readNonNegativeInteger(obj.cache_read_tokens),
+      cachedWriteTokens:
+        readNonNegativeInteger(obj.cachedWriteTokens) ??
+        readNonNegativeInteger(obj.cacheWriteTokens) ??
+        readNonNegativeInteger(obj.cache_write_tokens),
+    }),
+  );
+}
+
+function readRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : undefined;
+}
+
+function readCodexGoal(params: Record<string, unknown> | undefined): ProviderGoalState | undefined {
+  const goal = params?.goal;
+  if (!goal || typeof goal !== "object") return undefined;
+  const record = goal as Record<string, unknown>;
+  const objective = typeof record.objective === "string" ? record.objective.trim() : "";
+  const status = readCodexGoalStatus(record.status);
+  return {
+    ...(typeof record.threadId === "string" ? { providerThreadId: record.threadId } : {}),
+    ...(objective.length > 0 ? { objective } : {}),
+    ...(status ? { status } : {}),
+    ...(typeof record.tokenBudget === "number" || record.tokenBudget === null
+      ? { tokenBudget: record.tokenBudget }
+      : {}),
+    ...(typeof record.tokensUsed === "number" ? { tokensUsed: record.tokensUsed } : {}),
+    ...(typeof record.timeUsedSeconds === "number"
+      ? { timeUsedSeconds: record.timeUsedSeconds }
+      : {}),
+    ...(typeof record.updatedAt === "number" ? { updatedAt: record.updatedAt } : {}),
+  };
+}
+
+function readCodexGoalStatus(status: unknown): ProviderGoalState["status"] | undefined {
+  switch (status) {
+    case "active":
+    case "paused":
+    case "complete":
+      return status;
+    case "budgetLimited":
+      return "budget_limited";
+    default:
+      return undefined;
+  }
+}
+
 export function mapCodexNotification(
   method: string,
   params: Record<string, unknown> | undefined,
   state: CodexMapperState,
 ): RuntimeEvent[] {
   const { threadId } = state;
+
+  if (method === "thread/tokenUsage/updated") {
+    const usageEvent = createCodexTokenUsageEvent(threadId, params);
+    return usageEvent ? [usageEvent] : [];
+  }
 
   if (method === "turn/started") {
     const turnId = readTurnId(params) ?? `t-${Date.now()}`;
@@ -199,6 +358,8 @@ export function mapCodexNotification(
 
   if (method === "turn/completed" || method === "turn/aborted") {
     const events: RuntimeEvent[] = [];
+    const usageEvent = createCodexContextUsageEvent(threadId, params);
+    if (usageEvent) events.push(usageEvent);
     if (state.openAssistantItemId) {
       events.push({
         type: "item.completed",
@@ -226,6 +387,37 @@ export function mapCodexNotification(
   if (method === "thread/error") {
     const message = String((params?.message as string | undefined) ?? "Codex thread error");
     return [{ type: "error", threadId, message }];
+  }
+
+  if (method === "thread/goal/updated") {
+    const goal = readCodexGoal(params);
+    if (!goal) return [];
+    if (!state.goalItemId) {
+      state.goalItemId = newItemId("goal");
+      const payload = goalPayloadFromProviderState(
+        goal,
+        goal.status === "active" ? "set" : "updated",
+      );
+      return startGoalItemEvents(threadId, state.goalItemId, payload);
+    }
+    const payload = goalPayloadFromProviderState(goal, "updated");
+    return updateGoalItemEvents(threadId, state.goalItemId, payload);
+  }
+
+  if (method === "thread/goal/cleared") {
+    const existingGoalItemId = state.goalItemId;
+    const goalItemId = existingGoalItemId ?? newItemId("goal");
+    const payload = goalPayloadFromProviderState(
+      {
+        ...(params && typeof params.threadId === "string"
+          ? { providerThreadId: params.threadId }
+          : {}),
+      },
+      "cleared",
+    );
+    delete state.goalItemId;
+    if (existingGoalItemId) return updateGoalItemEvents(threadId, goalItemId, payload);
+    return startGoalItemEvents(threadId, goalItemId, payload);
   }
 
   if (method === "item/started") {
@@ -489,6 +681,17 @@ export function buildStartedPayload(
     };
   }
   if (itemType === "plan") return { steps: [] };
+  if (itemType === "goal") {
+    return goalPayloadFromProviderState(
+      {
+        ...(typeof source.text === "string" ? { objective: source.text } : {}),
+        ...(readCodexGoalStatus(source.status)
+          ? { status: readCodexGoalStatus(source.status) }
+          : {}),
+      },
+      "updated",
+    );
+  }
   if (itemType === "reasoning") return {};
   return undefined;
 }
@@ -761,4 +964,217 @@ export function extractMessageText(item: CodexItemPayload): string {
     if (parts.length > 0) return parts.join("");
   }
   return "";
+}
+
+const CODEX_APPROVAL_METHODS = new Set([
+  "item/fileChange/requestApproval",
+  "applyPatchApproval",
+  "item/tool/requestApproval",
+  "item/commandExecution/requestApproval",
+  "item/permissions/requestApproval",
+]);
+
+const CODEX_FORM_METHODS = new Set([
+  "mcpServer/elicitation/request",
+  "item/tool/requestUserInput",
+]);
+
+function decisionLabel(decision: string): string {
+  switch (decision) {
+    case "accept":
+      return "Approve";
+    case "acceptForSession":
+      return "Approve for session";
+    case "decline":
+      return "Decline";
+    case "cancel":
+      return "Cancel";
+    default:
+      return decision;
+  }
+}
+
+function readStringField(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Map a Codex app-server JSON-RPC request to a canonical `request.opened`
+ * event. Returns `undefined` for methods that aren't representable as a
+ * canonical approval (e.g., MCP elicitation forms); callers should fall back
+ * to the legacy server-request bus for those.
+ *
+ * The translation from the renderer's `{ optionId }` response back into the
+ * Codex-native response shape is the inverse of this mapping and lives in
+ * {@link translateCodexCanonicalResponse}.
+ */
+export function mapCodexServerRequest(
+  threadId: string,
+  requestId: string,
+  method: string,
+  params: Record<string, unknown> | undefined,
+): RuntimeEvent | undefined {
+  if (method === "mcpServer/elicitation/request") {
+    const message = readStringField(params?.message);
+    const serverName = readStringField(params?.serverName);
+    const mode = readStringField(params?.mode);
+    if (!message || !serverName || (mode !== "form" && mode !== "url")) {
+      return undefined;
+    }
+    return {
+      type: "request.opened",
+      threadId,
+      requestId,
+      requestType: "tool_user_input" satisfies CanonicalRequestType,
+      payload: {
+        summary: message,
+        // The renderer detects MCP elicitation by the `mcpElicitation` marker on
+        // `details` and renders a form. The form response shape is the
+        // MCP-native `{ action, content, _meta? }`, which the supervisor
+        // passes through to the agent untranslated.
+        details: { mcpElicitation: params },
+      },
+    };
+  }
+
+  if (method === "item/tool/requestUserInput") {
+    const questions = Array.isArray(params?.questions) ? params.questions : [];
+    if (questions.length === 0) return undefined;
+    return {
+      type: "request.opened",
+      threadId,
+      requestId,
+      requestType: "tool_user_input" satisfies CanonicalRequestType,
+      payload: {
+        summary: "Input requested",
+        // Carry the original questions list — the renderer detects this by the
+        // `codexUserInput` marker and renders a multi-question form. The
+        // response shape is the Codex-native `{ answers: { [id]: { answers: [value] } } }`,
+        // which the supervisor passes through untranslated.
+        details: { codexUserInput: { questions } },
+      },
+    };
+  }
+
+  if (!CODEX_APPROVAL_METHODS.has(method)) return undefined;
+
+  const reason = readStringField(params?.reason);
+
+  if (method === "item/permissions/requestApproval") {
+    return {
+      type: "request.opened",
+      threadId,
+      requestId,
+      requestType: "command_execution_approval" satisfies CanonicalRequestType,
+      payload: {
+        summary: reason ?? "Permissions requested",
+        details: { permissions: params?.permissions },
+        options: [
+          { optionId: "turn", label: "Allow this turn" },
+          { optionId: "session", label: "Allow for session" },
+        ] satisfies UserInputOption[],
+      },
+    };
+  }
+
+  if (method === "item/commandExecution/requestApproval") {
+    const command = readStringField(params?.command) ?? "command";
+    const decisions = Array.isArray(params?.availableDecisions)
+      ? (params.availableDecisions as unknown[]).filter(
+          (d): d is string => typeof d === "string",
+        )
+      : ["accept", "acceptForSession", "decline", "cancel"];
+    return {
+      type: "request.opened",
+      threadId,
+      requestId,
+      requestType: "command_execution_approval" satisfies CanonicalRequestType,
+      payload: {
+        summary: command,
+        details: {
+          command,
+          cwd: readStringField(params?.cwd),
+          reason,
+        },
+        options: decisions.map((d) => ({
+          optionId: d,
+          label: decisionLabel(d),
+        })) satisfies UserInputOption[],
+      },
+    };
+  }
+
+  if (method === "item/fileChange/requestApproval" || method === "applyPatchApproval") {
+    const summary = reason ?? "File changes need approval";
+    return {
+      type: "request.opened",
+      threadId,
+      requestId,
+      requestType: "file_change_approval" satisfies CanonicalRequestType,
+      payload: {
+        summary,
+        details: {
+          command: readStringField(params?.command),
+          cwd: readStringField(params?.cwd),
+          grantRoot: readStringField(params?.grantRoot),
+        },
+        options: [
+          { optionId: "accept", label: "Approve" },
+          { optionId: "acceptForSession", label: "Approve for session" },
+          { optionId: "decline", label: "Decline" },
+          { optionId: "cancel", label: "Cancel" },
+        ] satisfies UserInputOption[],
+      },
+    };
+  }
+
+  // item/tool/requestApproval
+  const approvalToolName = readStringField(params?.name);
+  return {
+    type: "request.opened",
+    threadId,
+    requestId,
+    requestType: "command_execution_approval" satisfies CanonicalRequestType,
+    payload: {
+      summary: approvalToolName ?? "Tool requested",
+      details: { input: params?.input, reason },
+      options: [
+        { optionId: "accept", label: "Approve" },
+        { optionId: "acceptForSession", label: "Approve for session" },
+        { optionId: "decline", label: "Decline" },
+        { optionId: "cancel", label: "Cancel" },
+      ] satisfies UserInputOption[],
+    },
+  };
+}
+
+/**
+ * Inverse of {@link mapCodexServerRequest}: takes the renderer's canonical
+ * `{ optionId }` response and produces the Codex-native JSON-RPC result shape.
+ */
+export function translateCodexCanonicalResponse(
+  method: string,
+  params: Record<string, unknown> | undefined,
+  response: unknown,
+): unknown {
+  // Form-mode requests (MCP elicitation) carry their native response shape
+  // (`{ action, content, _meta? }`) straight through — there is no
+  // `{ optionId }` envelope to unwrap.
+  if (CODEX_FORM_METHODS.has(method)) return response;
+
+  const optionId =
+    response && typeof response === "object" && "optionId" in response
+      ? readStringField((response as { optionId: unknown }).optionId)
+      : undefined;
+  if (!optionId) return response;
+
+  if (method === "item/permissions/requestApproval") {
+    return {
+      permissions: params?.permissions ?? {},
+      scope: optionId === "session" ? "session" : "turn",
+    };
+  }
+
+  // All other Codex approval methods take `{ decision }`.
+  return { decision: optionId };
 }

@@ -44,6 +44,35 @@ describe("remarkAutolinkProjectPaths", () => {
     );
   });
 
+  it("detects absolute POSIX paths in plain text", () => {
+    const tree: MdNode = {
+      type: "root",
+      children: [
+        {
+          type: "paragraph",
+          children: [
+            {
+              type: "text",
+              value: "See /home/me/repo/src/foo.ts:42 for details.",
+            },
+          ],
+        },
+      ],
+    };
+
+    remarkAutolinkProjectPaths({
+      parsePathRef: (token): ProjectPathRef | null =>
+        token === "/home/me/repo/src/foo.ts:42"
+          ? { kind: "file", path: "/home/me/repo/src/foo.ts", line: 42 }
+          : null,
+    })(tree);
+
+    const linkNode = tree.children?.[0]?.children?.find((child) => child.type === "link");
+    expect(linkNode?.url).toBe(
+      `${AUTO_PATH_FILE_HREF_PREFIX}${encodeURIComponent("/home/me/repo/src/foo.ts:42")}`,
+    );
+  });
+
   it("preserves recognized file line ranges in chip links", () => {
     const tree: MdNode = {
       type: "root",

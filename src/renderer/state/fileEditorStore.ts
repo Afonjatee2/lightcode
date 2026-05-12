@@ -2,11 +2,42 @@ import { create } from "zustand";
 import type {
   ProjectFileReadStatus,
   ProjectLocation,
+  ReadExternalFileResult,
   ReadProjectFileResult,
 } from "@/shared/contracts";
 import { readBridge } from "../bridge";
 import { hasUnresolvedConflicts } from "@/renderer/utils/mergeConflicts";
 import { useGitStore } from "./gitStore";
+
+/**
+ * Paths in the file editor are either project-relative (e.g. `src/foo.ts`)
+ * or absolute when the user opens an out-of-project file from chat
+ * (e.g. `/etc/hosts`). Absolute paths skip the project-relative IPC and
+ * route through the external-file IPC instead.
+ */
+function isExternalPath(path: string): boolean {
+  return path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+function externalReadAsProjectResult(result: ReadExternalFileResult): ReadProjectFileResult {
+  if (result.status === "missing") {
+    throw new Error(`File not found: ${result.path}`);
+  }
+  const base = {
+    path: result.path,
+    modifiedAtMs: result.modifiedAtMs,
+  } as const;
+  if (result.status === "ready") {
+    return {
+      ...base,
+      status: "ready",
+      ...(result.content !== undefined ? { content: result.content } : {}),
+      ...(result.lineEnding !== undefined ? { lineEnding: result.lineEnding } : {}),
+      ...(result.hasBom !== undefined ? { hasBom: result.hasBom } : {}),
+    };
+  }
+  return { ...base, status: result.status };
+}
 
 export type FileEditorOverlayMode = "modal" | "fullscreen";
 
@@ -312,10 +343,17 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
     });
 
     try {
-      const result = await readBridge().readProjectFile({
-        projectLocation: rootContext.projectLocation,
-        path,
-      });
+      const result = isExternalPath(path)
+        ? externalReadAsProjectResult(
+            await readBridge().readExternalFile({
+              projectLocation: rootContext.projectLocation,
+              absolutePath: path,
+            }),
+          )
+        : await readBridge().readProjectFile({
+            projectLocation: rootContext.projectLocation,
+            path,
+          });
       set((state) => ({
         buffers: {
           ...state.buffers,
@@ -382,12 +420,19 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
     }
 
     const savedContent = buffer.content;
-    const result = await readBridge().writeProjectFile({
-      projectLocation: rootContext.projectLocation,
-      path,
-      content: savedContent,
-      baseModifiedAtMs: buffer.modifiedAtMs,
-    });
+    const result = isExternalPath(path)
+      ? await readBridge().writeExternalFile({
+          projectLocation: rootContext.projectLocation,
+          absolutePath: path,
+          content: savedContent,
+          baseModifiedAtMs: buffer.modifiedAtMs,
+        })
+      : await readBridge().writeProjectFile({
+          projectLocation: rootContext.projectLocation,
+          path,
+          content: savedContent,
+          baseModifiedAtMs: buffer.modifiedAtMs,
+        });
 
     recentlySavedAt.set(path, Date.now());
 
@@ -516,9 +561,18 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
 
     const results = await Promise.allSettled(
       paths.map((path) =>
-        readBridge()
-          .readProjectFile({ projectLocation: rootContext.projectLocation, path })
-          .then((result) => ({ path, result })),
+        (isExternalPath(path)
+          ? readBridge()
+              .readExternalFile({
+                projectLocation: rootContext.projectLocation,
+                absolutePath: path,
+              })
+              .then(externalReadAsProjectResult)
+          : readBridge().readProjectFile({
+              projectLocation: rootContext.projectLocation,
+              path,
+            })
+        ).then((result) => ({ path, result })),
       ),
     );
 

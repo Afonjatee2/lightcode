@@ -12,7 +12,7 @@ import type {
 } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 
-import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
+import { useAppStore } from "@/renderer/state/appStore";
 import { captureFileCheckpoint } from "@/renderer/state/fileCheckpointActions";
 import { TuxIcon } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -65,7 +65,6 @@ function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): 
     prev.pendingLaunchPrompt === next.pendingLaunchPrompt &&
     prev.pendingLaunchSegments === next.pendingLaunchSegments &&
     prev.isWsl === next.isWsl &&
-    prev.pendingServerRequests === next.pendingServerRequests &&
     prev.showCloseButton === next.showCloseButton &&
     prev.paneAlign === next.paneAlign &&
     prev.isDragging === next.isDragging &&
@@ -87,7 +86,6 @@ export type ThreadViewProps = {
   pendingLaunchPrompt?: string;
   pendingLaunchSegments?: PromptSegment[];
   isWsl?: boolean;
-  pendingServerRequests: PendingThreadServerRequest[];
   showCloseButton?: boolean;
   paneAlign?: "left" | "center" | "right";
   isDragging?: boolean;
@@ -140,7 +138,6 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     pendingLaunchPrompt,
     pendingLaunchSegments,
     isWsl,
-    pendingServerRequests,
     showCloseButton,
     paneAlign = "center",
     isDragging,
@@ -454,7 +451,6 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                 agentStatus={agentStatus}
                 projectLocation={projectLocation}
                 paneCount={paneCount}
-                pendingServerRequests={pendingServerRequests}
                 terminalPaneRef={terminalPaneRef}
                 onTerminalResize={setTerminalSize}
                 onConfigChange={onConfigChange}
@@ -468,7 +464,6 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                 agentStatus={agentStatus}
                 projectLocation={projectLocation}
                 paneCount={paneCount}
-                pendingServerRequests={pendingServerRequests}
                 terminalPaneRef={terminalPaneRef}
                 runtimeDebugOpen={runtimeDebugOpen}
                 onConfigChange={onConfigChange}

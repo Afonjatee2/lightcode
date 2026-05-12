@@ -30,6 +30,7 @@ import {
   resolveAvailableSlashCommands,
   resolveLocalSlashCommandAction,
 } from "./threadSlashCommands";
+import { handleComposerControlShortcut } from "./threadComposerShortcuts";
 
 export type DraftStartInput = {
   agentKind: AgentStatus["kind"];
@@ -297,6 +298,19 @@ export function ThreadDraftComposerArea(props: {
               submitSegments([...attachments.toSegments(), ...segments]);
             }}
             onInterceptKey={(e) => {
+              if (
+                handleComposerControlShortcut(e, {
+                  controls,
+                  onOpenModelPicker: () => {
+                    setControlOpenRequest((prev) => ({
+                      target: "model",
+                      nonce: (prev?.nonce ?? 0) + 1,
+                    }));
+                  },
+                })
+              ) {
+                return true;
+              }
               if (!showCommandPanel) {
                 return false;
               }

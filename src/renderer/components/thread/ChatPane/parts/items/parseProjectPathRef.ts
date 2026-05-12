@@ -43,7 +43,8 @@ export function parseProjectPathRef(s: string, options: ParseOptions = {}): Proj
 
   if (!hasSeparator && !hasExtension) return null;
 
-  if (options.rootNames && hasSeparator) {
+  const isAbsolutePosix = candidate.startsWith("/");
+  if (options.rootNames && hasSeparator && !isAbsolutePosix) {
     if (firstSegment === "" || !options.rootNames.has(firstSegment)) return null;
   }
 

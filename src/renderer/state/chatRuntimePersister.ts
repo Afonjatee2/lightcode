@@ -1,4 +1,4 @@
-import type { ToolCallPayload } from "@/shared/contracts";
+import type { ThreadContextUsage, ToolCallPayload } from "@/shared/contracts";
 import { isSubAgentTool } from "../components/thread/ChatPane/parts/items/toolDisplay";
 import { readBridge } from "../bridge";
 import { useAppStore } from "./appStore";
@@ -20,6 +20,7 @@ const FLUSH_DEBOUNCE_MS = 300;
 interface PendingFlush {
   items: RuntimeChatItem[];
   turns: ReadonlyArray<CompletedTurnRecord>;
+  contextUsage: ThreadContextUsage | null;
 }
 
 interface CompactedRuntimeItems {
@@ -72,6 +73,7 @@ export function installRuntimeItemsPersister(): () => void {
             endedAt: new Date(turn.endedAt).toISOString(),
             anchorItemId: turn.anchorItemId,
           })),
+          contextUsage: snapshot.contextUsage,
         })
         .catch((err: unknown) => {
           console.warn("[chat] failed to persist runtime snapshot for thread %s", threadId, err);
@@ -94,11 +96,13 @@ export function installRuntimeItemsPersister(): () => void {
         const ids = state.runtimeItemIdsByThread[threadId];
         const itemsById = state.runtimeItemsByIdByThread[threadId];
         const turns = state.runtimeCompletedTurnsByThread[threadId] ?? [];
+        const contextUsage = state.runtimeContextByThread[threadId] ?? null;
         scheduleFlush(threadId, {
           items: (ids ?? [])
             .map((itemId) => itemsById?.[itemId])
             .filter((item): item is RuntimeChatItem => !!item),
           turns,
+          contextUsage,
         });
       }
       useAppStore.getState().clearRuntimeDirtyThreadIds(dirtyThreadIds);
@@ -120,9 +124,10 @@ export function installRuntimeItemsPersister(): () => void {
  */
 export async function hydrateThreadRuntimeItems(threadId: string): Promise<void> {
   const bridge = readBridge();
-  const [itemsResult, turnsResult] = await Promise.allSettled([
+  const [itemsResult, turnsResult, contextResult] = await Promise.allSettled([
     Promise.resolve().then(() => bridge.dbGetThreadRuntimeItems(threadId)),
     Promise.resolve().then(() => bridge.dbGetThreadCompletedTurns(threadId)),
+    Promise.resolve().then(() => bridge.dbGetThreadContextUsage(threadId)),
   ]);
 
   if (itemsResult.status === "fulfilled" && itemsResult.value.length > 0) {
@@ -160,6 +165,16 @@ export async function hydrateThreadRuntimeItems(threadId: string): Promise<void>
       "[chat] failed to hydrate completed turns for thread %s",
       threadId,
       turnsResult.reason,
+    );
+  }
+
+  if (contextResult.status === "fulfilled" && contextResult.value) {
+    useAppStore.getState().hydrateThreadContextUsage(threadId, contextResult.value);
+  } else if (contextResult.status === "rejected") {
+    console.warn(
+      "[chat] failed to hydrate context usage for thread %s",
+      threadId,
+      contextResult.reason,
     );
   }
 }

@@ -296,6 +296,8 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         state.runtimeItemsByIdByThread;
       const { [threadId]: _droppedReqs, ...runtimeRequestsByThread } =
         state.runtimeRequestsByThread;
+      const { [threadId]: _droppedContext, ...runtimeContextByThread } =
+        state.runtimeContextByThread;
       const { [threadId]: _droppedVersion, ...runtimeStructuralVersionByThread } =
         state.runtimeStructuralVersionByThread;
       const { [threadId]: _droppedTurns, ...runtimeCompletedTurnsByThread } =
@@ -305,9 +307,6 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.filter((id) => id !== threadId);
       return {
         threads: nextThreads,
-        pendingServerRequests: state.pendingServerRequests.filter(
-          (request) => request.threadId !== threadId,
-        ),
         pendingThreadLaunches: Object.fromEntries(
           Object.entries(state.pendingThreadLaunches).filter(([id]) => id !== threadId),
         ),
@@ -317,6 +316,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         runtimeItemIdsByThread,
         runtimeItemsByIdByThread,
         runtimeRequestsByThread,
+        runtimeContextByThread,
         runtimeStructuralVersionByThread,
         runtimeCompletedTurnsByThread,
         runtimeDirtyThreadIds,
@@ -626,17 +626,12 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         };
       });
 
-      const pendingServerRequests = state.pendingServerRequests.filter(
-        (request) => request.threadId !== threadId,
-      );
       const turnsChanged =
         turnUpdate.runtimeCompletedTurnsByThread !== state.runtimeCompletedTurnsByThread;
       if (!changed) {
-        return turnsChanged ? { pendingServerRequests, ...turnUpdate } : { pendingServerRequests };
+        return turnsChanged ? turnUpdate : {};
       }
-      return turnsChanged
-        ? { threads, pendingServerRequests, ...turnUpdate }
-        : { threads, pendingServerRequests };
+      return turnsChanged ? { threads, ...turnUpdate } : { threads };
     }),
   touchThread: (threadId) =>
     set((state) => ({

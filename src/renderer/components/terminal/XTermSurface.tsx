@@ -4,7 +4,6 @@ import { ImageAddon } from "@xterm/addon-image";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
 import { TerminalLinkProvider } from "./TerminalLinkProvider";
-import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal } from "@xterm/xterm";
 import { Button } from "@heroui/react";
 import { ArrowDown } from "lucide-react";
@@ -368,14 +367,6 @@ export const XTermSurface = forwardRef<
     terminal.loadAddon(new ClipboardAddon());
 
     terminal.open(mount);
-
-    try {
-      const webgl = new WebglAddon();
-      webgl.onContextLoss(() => webgl.dispose());
-      terminal.loadAddon(webgl);
-    } catch {
-      // WebGL unavailable — falls back to canvas renderer.
-    }
 
     terminal.onWriteParsed(() => {
       onActivityRef.current?.();

@@ -47,6 +47,11 @@ import {
   mapAcpSessionUpdate,
   type AcpMapperState,
 } from "./canonicalMapping";
+import {
+  createContextUsageEvent,
+  readNonNegativeInteger,
+  usageFromTokenCounts,
+} from "../contextUsage";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import {
   createKnownSessionRef,
@@ -194,6 +199,22 @@ function guessMimeType(path: string): string {
     default:
       return "application/octet-stream";
   }
+}
+
+function createAcpPromptUsageEvent(threadId: string, usage: unknown): RuntimeEvent | undefined {
+  if (!usage || typeof usage !== "object") return undefined;
+  const obj = usage as Record<string, unknown>;
+  return createContextUsageEvent(
+    threadId,
+    usageFromTokenCounts({
+      usedTokens: readNonNegativeInteger(obj.totalTokens),
+      inputTokens: readNonNegativeInteger(obj.inputTokens),
+      outputTokens: readNonNegativeInteger(obj.outputTokens),
+      thoughtTokens: readNonNegativeInteger(obj.thoughtTokens),
+      cachedReadTokens: readNonNegativeInteger(obj.cachedReadTokens),
+      cachedWriteTokens: readNonNegativeInteger(obj.cachedWriteTokens),
+    }),
+  );
 }
 
 const INTERRUPT_ACK_TEXT_TAIL_LIMIT = 512;
@@ -1073,6 +1094,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         sessionId: this.sessionId,
         prompt: contentBlocks,
       });
+      const usageEvent = createAcpPromptUsageEvent(this.threadId, result.usage);
+      if (usageEvent) this.emitRuntimeEvents([usageEvent]);
 
       // Map stopReason to Lightcode status
       const normalizedStopReason = normalizeAcpStopReason(result.stopReason, {
@@ -1257,19 +1280,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         }
       });
 
-      // Emit as a server request so ThreadServerRequestPanel renders it
-      this.listener?.onServerRequest({
-        requestId,
-        method: "requestPermission",
-        params: {
-          toolCall: params.toolCall,
-          options: params.options,
-        },
-      });
-
-      // Mirror as a canonical request.opened so the chat UI can render an
-      // inline ApprovalCard. The terminal panel still handles the legacy
-      // server-request flow above.
+      // Emit a canonical request.opened — the composer-level runtime-request
+      // panel renders it and resolves through `bridge.resolveThreadServerRequest`
+      // → `resolveServerRequest()` here.
       const mapperState = this.ensureMapperState();
       this.emitRuntimeEvents([mapAcpPermissionRequest(params, mapperState, String(requestId))]);
 

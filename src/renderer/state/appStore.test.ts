@@ -9,7 +9,6 @@ describe("appStore runtime config sync", () => {
       ...state,
       projects: [],
       threads: [],
-      pendingServerRequests: [],
       view: { kind: "home" },
     }));
   });
@@ -641,48 +640,6 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.activeTurnStartedAt).toBe("2026-05-02T08:57:00.000Z");
   });
 
-  it("tracks and clears non-persisted thread server requests", () => {
-    const project = useAppStore.getState().addProject({
-      kind: "windows",
-      path: "C:\\repo",
-    });
-
-    const thread = useAppStore.getState().createThread({
-      projectId: project.id,
-      agentKind: "codex",
-      config: {
-        model: "gpt-5.4",
-      },
-      prompt: "hello",
-    });
-
-    useAppStore.getState().addThreadServerRequest({
-      threadId: thread.id,
-      requestId: "request-1",
-      method: "item/tool/requestUserInput",
-      params: {
-        questions: [],
-      },
-    });
-
-    expect(useAppStore.getState().pendingServerRequests).toHaveLength(1);
-
-    useAppStore.getState().removeThreadServerRequest(thread.id, "request-1");
-    expect(useAppStore.getState().pendingServerRequests).toHaveLength(0);
-
-    useAppStore.getState().addThreadServerRequest({
-      threadId: thread.id,
-      requestId: "request-2",
-      method: "item/tool/requestUserInput",
-      params: {
-        questions: [],
-      },
-    });
-
-    useAppStore.getState().markThreadExited(thread.id);
-    expect(useAppStore.getState().pendingServerRequests).toHaveLength(0);
-  });
-
   it("markThreadExited finalizes an active turn", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
@@ -815,7 +772,6 @@ describe("markThreadDone / unmarkThreadDone", () => {
       ...state,
       projects: [],
       threads: [],
-      pendingServerRequests: [],
       view: { kind: "home" },
     }));
   });
@@ -938,7 +894,6 @@ describe("grid layout actions", () => {
       ...state,
       projects: [],
       threads: [],
-      pendingServerRequests: [],
       view: { kind: "home" },
     }));
   });
@@ -1199,7 +1154,6 @@ describe("group view layout restore", () => {
       ...state,
       projects: [],
       threads: [],
-      pendingServerRequests: [],
       groupLayouts: {},
       view: { kind: "home" },
     }));

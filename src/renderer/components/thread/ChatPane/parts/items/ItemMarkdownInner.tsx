@@ -12,7 +12,7 @@ import { Streamdown, type Components as StreamdownComponents } from "streamdown"
 import remarkGfm from "remark-gfm";
 import { readBridge } from "@/renderer/bridge";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
-import { normalizeChatProjectPath, normalizeChatRelativePath } from "../../chatPathUtils";
+import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { CodeBlock } from "./CodeBlock";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { InlineFolderPathChip } from "./InlineFolderPathChip";
@@ -69,7 +69,7 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
   );
   const markdownText = normalizeIncompleteProjectLinkTail(normalizeShortCodeFenceClosers(text));
   return (
-    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-li:whitespace-pre-wrap prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
+    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
       <Streamdown remarkPlugins={remarkPlugins} components={MD_COMPONENTS} parseIncompleteMarkdown>
         {markdownText}
       </Streamdown>
@@ -221,7 +221,7 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
   if (actions) {
     const ref = parseHrefProjectPathRef(href, actions);
     if (ref?.kind === "folder") {
-      const folderPath = normalizeChatRelativePath(ref.path);
+      const folderPath = normalizeChatProjectPath(ref.path, actions.projectLocation);
       return (
         <button
           type="button"
@@ -238,7 +238,10 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
           type="button"
           className="inline cursor-pointer rounded border-0 bg-foreground/10 px-[0.35em] py-[0.1em] font-mono text-[0.875em] leading-none align-baseline text-accent underline-offset-2 [overflow-wrap:anywhere] hover:bg-foreground/15 hover:underline"
           onClick={() =>
-            actions.openProjectRelativePath(normalizeChatRelativePath(ref.path), ref.line)
+            actions.openProjectRelativePath(
+              normalizeChatProjectPath(ref.path, actions.projectLocation),
+              ref.line,
+            )
           }
         >
           {props.children}
@@ -285,7 +288,7 @@ function renderPathChip(
   ref: ProjectPathRef,
   actions: NonNullable<ReturnType<typeof useChatPaneActions>>,
 ) {
-  const normalized = normalizeChatRelativePath(ref.path);
+  const normalized = normalizeChatProjectPath(ref.path, actions.projectLocation);
   if (ref.kind === "file") {
     return (
       <InlineFilePathChip

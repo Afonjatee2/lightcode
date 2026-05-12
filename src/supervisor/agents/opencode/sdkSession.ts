@@ -38,7 +38,11 @@ import {
 } from "../base";
 import { mapOpenCodeSlashCommands } from "./detection";
 import { buildOpenCodePermissionRules } from "./permissionRules";
-import { acquireOpenCodeServer, type AcquiredOpenCodeServer } from "./sdkClient";
+import {
+  acquireOpenCodeServer,
+  resolveOpenCodeSessionDirectory,
+  type AcquiredOpenCodeServer,
+} from "./sdkClient";
 import {
   closeOpenItems,
   createOpenCodeMapperState,
@@ -49,6 +53,7 @@ import {
 interface PendingPermission {
   kind: "permission";
   requestID: string;
+  sessionID: string;
 }
 
 interface PendingQuestion {
@@ -149,12 +154,22 @@ function mapStatusUpdate(properties: { sessionID: string; status: { type: string
   }
 }
 
+function unwrapGlobalOpenCodeEvent(raw: unknown): Event | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const payload = (raw as { payload?: unknown }).payload;
+  const event = payload && typeof payload === "object" ? payload : raw;
+  const type = (event as { type?: unknown }).type;
+  if (typeof type !== "string" || type === "sync") return undefined;
+  return event as Event;
+}
+
 export class OpencodeSdkSession implements StructuredSessionHandle {
   launchOptions: AgentLaunchOptions;
 
   private readonly input: CreateStructuredSessionInput;
   private readonly threadId: string;
   private readonly isGui: boolean;
+  private readonly sdkDirectory: string;
   private listener: StructuredSessionListener | undefined;
   private acquired: AcquiredOpenCodeServer | undefined;
   private sessionId: string | undefined;
@@ -171,6 +186,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     this.input = input;
     this.threadId = input.threadId;
     this.isGui = input.presentationMode === "gui";
+    this.sdkDirectory = resolveOpenCodeSessionDirectory(input.projectLocation);
     this.currentConfig = input.config;
     this.launchOptions = { suppressResumeConfigOverrides: true };
   }
@@ -230,6 +246,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     if (sessionRef?.providerSessionId) {
       // Resume existing session.
       const existing = await acquired.client.session.get({
+        directory: this.sdkDirectory,
         sessionID: sessionRef.providerSessionId,
       });
       const id = existing.data?.id;
@@ -240,6 +257,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
 
     const created = await acquired.client.session.create({
+      directory: this.sdkDirectory,
       title: `lightcode/${this.threadId.slice(0, 8)}`,
       permission: buildOpenCodePermissionRules(config.approvalPolicy),
     });
@@ -279,6 +297,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     const variant = config.effort && config.effort.length > 0 ? config.effort : undefined;
 
     await acquired.client.session.promptAsync({
+      directory: this.sdkDirectory,
       sessionID,
       ...(model ? { model } : {}),
       ...(agent ? { agent } : {}),
@@ -290,7 +309,10 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
   async interruptTurn(): Promise<void> {
     if (!this.acquired || !this.sessionId) return;
     try {
-      await this.acquired.client.session.abort({ sessionID: this.sessionId });
+      await this.acquired.client.session.abort({
+        directory: this.sdkDirectory,
+        sessionID: this.sessionId,
+      });
     } catch {
       // Best-effort — server may already be torn down.
     }
@@ -305,9 +327,11 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     if (pending.kind === "permission") {
       const reply = parsePermissionReply(response);
       try {
-        await acquired.client.permission.reply({
-          requestID: pending.requestID,
-          reply,
+        await acquired.client.permission.respond({
+          directory: this.sdkDirectory,
+          sessionID: pending.sessionID,
+          permissionID: pending.requestID,
+          response: reply,
         });
       } catch {
         // Server-side may have already received another reply or aborted.
@@ -319,9 +343,13 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       const answers = parseQuestionAnswers(response, pending);
       try {
         if (answers === undefined) {
-          await acquired.client.question.reject({ requestID: pending.requestID });
+          await acquired.client.question.reject({
+            directory: this.sdkDirectory,
+            requestID: pending.requestID,
+          });
         } else {
           await acquired.client.question.reply({
+            directory: this.sdkDirectory,
             requestID: pending.requestID,
             answers,
           });
@@ -387,7 +415,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
   private async refreshSlashCommands(): Promise<void> {
     const acquired = this.requireAcquired();
     try {
-      const result = await acquired.client.command.list();
+      const result = await acquired.client.command.list({ directory: this.sdkDirectory });
       const commands = Array.isArray(result.data) ? mapOpenCodeSlashCommands(result.data) : [];
       this.updateSlashCommands(commands);
     } catch (error) {
@@ -405,12 +433,13 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
 
     void (async () => {
       try {
-        const sub = await acquired.client.event.subscribe(undefined, {
+        const sub = await acquired.client.global.event({
           signal: ctrl.signal,
         });
         for await (const ev of sub.stream) {
           if (this.disposed) break;
-          this.handleSseEvent(ev as Event);
+          const event = unwrapGlobalOpenCodeEvent(ev);
+          if (event) this.handleSseEvent(event);
         }
       } catch (err) {
         if (this.disposed) return;
@@ -424,7 +453,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
 
   private handleSseEvent(event: Event): void {
     const sessionID = (event.properties as { sessionID?: string } | undefined)?.sessionID;
-    if (sessionID && this.sessionId && sessionID !== this.sessionId) {
+    if (sessionID && (!this.sessionId || sessionID !== this.sessionId)) {
       return; // Event for another session on the same server.
     }
 
@@ -451,11 +480,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       this.pendingRequests.set(requestId, {
         kind: "permission",
         requestID: event.properties.id,
-      });
-      this.listener?.onServerRequest({
-        requestId,
-        method: "permission/request",
-        params: event.properties,
+        sessionID: event.properties.sessionID,
       });
     }
 
@@ -465,11 +490,6 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
         kind: "question",
         requestID: event.properties.id,
         optionValues: buildQuestionOptionValueMap(event.properties),
-      });
-      this.listener?.onServerRequest({
-        requestId,
-        method: "question/request",
-        params: event.properties,
       });
     }
 

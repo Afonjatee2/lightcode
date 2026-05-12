@@ -68,6 +68,7 @@ import {
   clearPendingSteerPayloadSchema,
   projectSchema,
   readAbsoluteFilePayloadSchema,
+  readExternalFilePayloadSchema,
   readProjectFilePayloadSchema,
   renameProjectEntryPayloadSchema,
   resizeTerminalPayloadSchema,
@@ -79,7 +80,9 @@ import {
   sendThreadInputPayloadSchema,
   startShellPayloadSchema,
   startThreadPayloadSchema,
+  threadContextUsageSchema,
   threadSchema,
+  writeExternalFilePayloadSchema,
   writeProjectFilePayloadSchema,
   writeTerminalPayloadSchema,
 } from "./contracts";
@@ -179,6 +182,8 @@ import type {
   Project,
   ReadAbsoluteFilePayload,
   ReadAbsoluteFileResult,
+  ReadExternalFilePayload,
+  ReadExternalFileResult,
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
@@ -198,10 +203,13 @@ import type {
   Thread,
   ThreadAttention,
   ThreadConfig,
+  ThreadContextUsage,
   ThreadRuntimeSnapshot,
   ThreadStatus,
   ThreadStatusSource,
   CloseThreadPayload,
+  WriteExternalFilePayload,
+  WriteExternalFileResult,
   WriteProjectFilePayload,
   WriteProjectFileResult,
   WriteTerminalPayload,
@@ -312,6 +320,10 @@ const dbReplaceRuntimeSnapshotPayloadSchema = z.object({
   threadId: z.string().min(1),
   items: z.array(persistedRuntimeItemSchema),
   turns: z.array(persistedCompletedTurnSchema),
+  contextUsage: threadContextUsageSchema.nullable().optional(),
+});
+const dbGetThreadContextUsagePayloadSchema = z.object({
+  threadId: z.string().min(1),
 });
 
 const openExternalPayloadSchema = z.string().min(1);
@@ -775,11 +787,21 @@ export const groupedIpcProcedures = {
       ReadAbsoluteFileResult,
       "supervisor"
     >("readAbsoluteFile", "supervisor", readAbsoluteFilePayloadSchema),
+    readExternalFile: definePayloadProcedure<
+      ReadExternalFilePayload,
+      ReadExternalFileResult,
+      "supervisor"
+    >("readExternalFile", "supervisor", readExternalFilePayloadSchema),
     writeProjectFile: definePayloadProcedure<
       WriteProjectFilePayload,
       WriteProjectFileResult,
       "supervisor"
     >("writeProjectFile", "supervisor", writeProjectFilePayloadSchema),
+    writeExternalFile: definePayloadProcedure<
+      WriteExternalFilePayload,
+      WriteExternalFileResult,
+      "supervisor"
+    >("writeExternalFile", "supervisor", writeExternalFilePayloadSchema),
     createProjectEntry: definePayloadProcedure<CreateProjectEntryPayload, void, "supervisor">(
       "createProjectEntry",
       "supervisor",
@@ -971,6 +993,14 @@ export const groupedIpcProcedures = {
       void,
       "main-local"
     >("dbReplaceThreadRuntimeSnapshot", "main-local", dbReplaceRuntimeSnapshotPayloadSchema),
+    dbGetThreadContextUsage: defineIpcProcedure<
+      [string],
+      z.infer<typeof dbGetThreadContextUsagePayloadSchema>,
+      ThreadContextUsage | null,
+      "main-local"
+    >("dbGetThreadContextUsage", "main-local", dbGetThreadContextUsagePayloadSchema, (threadId) =>
+      dbGetThreadContextUsagePayloadSchema.parse({ threadId }),
+    ),
   },
   updates: {
     checkForUpdate: defineNoArgProcedure<void, "main-local">("checkForUpdate", "main-local"),
@@ -1075,7 +1105,9 @@ export const ipcProcedureMap = {
   searchProjectTree: groupedIpcProcedures.projectTree.searchProjectTree,
   readProjectFile: groupedIpcProcedures.projectTree.readProjectFile,
   readAbsoluteFile: groupedIpcProcedures.projectTree.readAbsoluteFile,
+  readExternalFile: groupedIpcProcedures.projectTree.readExternalFile,
   writeProjectFile: groupedIpcProcedures.projectTree.writeProjectFile,
+  writeExternalFile: groupedIpcProcedures.projectTree.writeExternalFile,
   createProjectEntry: groupedIpcProcedures.projectTree.createProjectEntry,
   renameProjectEntry: groupedIpcProcedures.projectTree.renameProjectEntry,
   moveProjectEntry: groupedIpcProcedures.projectTree.moveProjectEntry,
@@ -1111,6 +1143,7 @@ export const ipcProcedureMap = {
   dbGetThreadCompletedTurns: groupedIpcProcedures.db.dbGetThreadCompletedTurns,
   dbReplaceThreadCompletedTurns: groupedIpcProcedures.db.dbReplaceThreadCompletedTurns,
   dbReplaceThreadRuntimeSnapshot: groupedIpcProcedures.db.dbReplaceThreadRuntimeSnapshot,
+  dbGetThreadContextUsage: groupedIpcProcedures.db.dbGetThreadContextUsage,
   checkForUpdate: groupedIpcProcedures.updates.checkForUpdate,
   startUpdateDownload: groupedIpcProcedures.updates.startUpdateDownload,
   installUpdate: groupedIpcProcedures.updates.installUpdate,
@@ -1156,6 +1189,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "dbGetThreadCompletedTurns",
   "dbReplaceThreadCompletedTurns",
   "dbReplaceThreadRuntimeSnapshot",
+  "dbGetThreadContextUsage",
   "checkForUpdate",
   "startUpdateDownload",
   "installUpdate",
@@ -1254,13 +1288,6 @@ export type SupervisorEvent =
        */
       type: "thread-runtime-events-multi";
       batches: ReadonlyArray<{ threadId: string; events: RuntimeEvent[] }>;
-    }
-  | {
-      type: "thread-server-request";
-      threadId: string;
-      requestId: string | number;
-      method: string;
-      params: unknown;
     }
   | {
       type: "thread-state";

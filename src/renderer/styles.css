@@ -208,13 +208,13 @@
 
 /* Truncate a single-line element at the START (ellipsis at the beginning)
    instead of the end. Used for path-like text in tool-call titles where the
-   tail (filename) is more informative than the head. The bidi flip works
-   because ASCII paths/URLs are LTR runs that the bidi algorithm preserves
-   even inside an RTL container; only the truncation side is affected. */
+   tail (filename) is more informative than the head. The bidi flip preserves
+   LTR path text inside an isolated RTL container; only the truncation side is
+   affected. */
 .lc-truncate-start {
   direction: rtl;
   text-align: left;
-  unicode-bidi: plaintext;
+  unicode-bidi: isolate;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -972,6 +972,94 @@ body {
   font-weight: 600;
 }
 
+.lightcode-context-indicator {
+  display: inline-flex;
+  height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--field-radius);
+  background: transparent;
+  padding: 0 0.35rem;
+  color: var(--muted);
+  transition: color 0.15s ease;
+}
+
+.lightcode-context-indicator:hover,
+.lightcode-context-indicator--open {
+  color: var(--foreground);
+}
+
+.lightcode-context-indicator__ring {
+  --lc-context-ring: color-mix(in oklab, var(--foreground) 65%, transparent);
+
+  width: 1.4rem;
+  height: 1.4rem;
+  flex-shrink: 0;
+}
+
+.lightcode-context-indicator__ring-track {
+  stroke: color-mix(in oklab, var(--muted) 40%, transparent);
+}
+
+.lightcode-context-indicator__ring-progress {
+  stroke: var(--lc-context-ring);
+  transition:
+    stroke 0.15s ease,
+    stroke-dasharray 0.2s ease;
+}
+
+.lightcode-context-indicator__ring-number {
+  fill: currentColor;
+  font-size: 0.375rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+}
+
+.lightcode-context-indicator[data-tone="unknown"] .lightcode-context-indicator__ring {
+  --lc-context-ring: color-mix(in oklab, var(--muted) 50%, transparent);
+}
+
+.lightcode-context-indicator[data-tone="warning"] .lightcode-context-indicator__ring {
+  --lc-context-ring: oklch(0.86 0.16 86);
+}
+
+.lightcode-context-indicator[data-tone="warning"] .lightcode-context-indicator__ring-number {
+  color: oklch(0.86 0.16 86);
+}
+
+.lightcode-context-indicator[data-tone="danger"] .lightcode-context-indicator__ring {
+  --lc-context-ring: oklch(0.62 0.22 28);
+}
+
+.lightcode-context-indicator[data-tone="danger"] .lightcode-context-indicator__ring-number {
+  color: oklch(0.62 0.22 28);
+}
+
+.lightcode-context-dock__bar {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--muted) 24%, transparent);
+}
+
+.lightcode-context-dock__bar-fill {
+  height: 100%;
+  width: var(--lc-context-progress);
+  border-radius: inherit;
+  background: var(--snow, white);
+}
+
+.lightcode-context-dock__bar-fill--warning {
+  background: var(--warning);
+}
+
+.lightcode-context-dock__bar-fill--danger {
+  background: var(--danger);
+}
+
 .lightcode-composer-toggle {
   --toggle-button-bg-selected: transparent;
   --toggle-button-bg-selected-hover: var(--toggle-button-bg-hover);
@@ -1127,6 +1215,33 @@ body {
 
 .lightcode-mention-chip:hover .lightcode-mention-chip__delete {
   display: inline-flex;
+}
+
+/* ── Slash Command Chip (composer + chat user message) ──────── */
+
+.lightcode-slash-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.1rem;
+  padding: 0.05em 0.4em;
+  border-radius: 0.3rem;
+  background: color-mix(in oklab, var(--accent) 18%, var(--surface));
+  color: var(--foreground);
+  font-size: 0.875em;
+  line-height: 1;
+  vertical-align: text-bottom;
+  user-select: none;
+  cursor: default;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.lightcode-slash-chip__slash {
+  color: color-mix(in oklab, var(--accent) 70%, var(--foreground));
+  font-weight: 600;
+}
+
+.lightcode-slash-chip__name {
+  font-weight: 500;
 }
 
 /* ── Inline File Path Chip (clickable, in chat markdown) ────── */
@@ -1651,7 +1766,7 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
 }
 .lc-chat-markdown li {
   margin: 0.1em 0;
-  white-space: pre-wrap;
+  white-space: normal;
 }
 .lc-chat-markdown p {
   white-space: pre-wrap;

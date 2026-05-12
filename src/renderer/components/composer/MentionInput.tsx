@@ -2,6 +2,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import type { FileEntry, ProjectLocation, PromptSegment } from "@/shared/contracts";
 import { fileNameFromPath } from "@/shared/promptContent";
 import { createChipElement, type FileMentionData } from "./FileMentionChip";
+import { createSlashCommandChipElement } from "./SlashCommandChip";
 import { MentionPopover } from "./MentionPopover";
 import { useDebouncedFileSearch } from "./useDebouncedFileSearch";
 import { serializeToSegments, flattenSegments } from "./serializeMentions";
@@ -102,8 +103,20 @@ function detectTriggerRange(triggerChar: string): Range | null {
 }
 
 function hasEditorContent(editor: HTMLDivElement): boolean {
-  if (editor.querySelector("[data-mention-path]")) return true;
+  if (editor.querySelector("[data-mention-path], [data-slash-command]")) return true;
   return (editor.textContent ?? "").trim().length > 0;
+}
+
+/**
+ * Purge leftover whitespace-only / empty text nodes when the editor has no
+ * meaningful content, so the `:empty` CSS selector matches and the placeholder
+ * reappears. Without this, an orphan space text node left over from removing a
+ * chip keeps the editor non-`:empty` and the placeholder stays hidden.
+ */
+function normalizeEmptyEditor(editor: HTMLDivElement): void {
+  if (hasEditorContent(editor)) return;
+  if (editor.childNodes.length === 0) return;
+  editor.innerHTML = "";
 }
 
 export const MentionInput = forwardRef<
@@ -202,7 +215,8 @@ export const MentionInput = forwardRef<
       }
     },
     insertSlashCommand(id: string) {
-      if (!editorRef.current) return;
+      const editor = editorRef.current;
+      if (!editor) return;
 
       const range = detectTriggerRange("/");
       if (!range) return;
@@ -214,11 +228,42 @@ export const MentionInput = forwardRef<
       sel.addRange(range);
       range.deleteContents();
 
-      const textNode = document.createTextNode(`/${id} `);
-      range.insertNode(textNode);
+      const chip = createSlashCommandChipElement(id);
+      range.insertNode(chip);
+
+      // Trailing space keeps the cursor visually separate from the chip and
+      // matches the legacy "/id " plain-text behavior.
+      const space = document.createTextNode(" ");
+      chip.after(space);
+
+      // Strip any browser-inserted empty siblings before the chip
+      // (empty text nodes, lone <br>, empty wrappers) that would render as
+      // a blank line above the badge.
+      let prev: Node | null = chip.previousSibling;
+      while (prev) {
+        const next: Node | null = prev.previousSibling;
+        if (prev.nodeType === Node.TEXT_NODE && (prev.textContent ?? "") === "") {
+          prev.parentNode?.removeChild(prev);
+        } else if (prev.nodeType === Node.ELEMENT_NODE) {
+          const el = prev as HTMLElement;
+          const isBr = el.tagName === "BR";
+          const isEmptyWrapper =
+            (el.tagName === "DIV" || el.tagName === "P") &&
+            el.childNodes.length === 0 &&
+            (el.textContent ?? "") === "";
+          if (isBr || isEmptyWrapper) {
+            el.remove();
+          } else {
+            break;
+          }
+        } else {
+          break;
+        }
+        prev = next;
+      }
 
       const newRange = document.createRange();
-      newRange.setStartAfter(textNode);
+      newRange.setStartAfter(space);
       newRange.collapse(true);
       sel.removeAllRanges();
       sel.addRange(newRange);
@@ -248,8 +293,10 @@ export const MentionInput = forwardRef<
   }
 
   function notifyTextChange() {
-    if (!editorRef.current) return;
-    onTextChange(hasEditorContent(editorRef.current));
+    const editor = editorRef.current;
+    if (!editor) return;
+    normalizeEmptyEditor(editor);
+    onTextChange(hasEditorContent(editor));
   }
 
   function insertMention(entry: FileEntry) {
@@ -307,7 +354,7 @@ export const MentionInput = forwardRef<
         setActiveIndex((prev) => (prev - 1 + results.length) % results.length);
         return;
       }
-      if (e.key === "Tab" || (e.key === "Enter" && !e.shiftKey)) {
+      if ((e.key === "Tab" && !e.shiftKey) || (e.key === "Enter" && !e.shiftKey)) {
         e.preventDefault();
         const selected = results[activeIndex];
         if (selected) insertMention(selected);
@@ -342,7 +389,7 @@ export const MentionInput = forwardRef<
 
         if (node.nodeType === Node.TEXT_NODE && offset === 0) {
           const prev = node.previousSibling as HTMLElement | null;
-          if (prev?.dataset?.mentionPath) {
+          if (prev?.dataset?.mentionPath || prev?.dataset?.slashCommand) {
             e.preventDefault();
             prev.remove();
             notifyTextChange();
@@ -352,7 +399,7 @@ export const MentionInput = forwardRef<
 
         if (node.nodeType === Node.ELEMENT_NODE && offset > 0) {
           const child = node.childNodes[offset - 1] as HTMLElement | undefined;
-          if (child?.dataset?.mentionPath) {
+          if (child?.dataset?.mentionPath || child?.dataset?.slashCommand) {
             e.preventDefault();
             child.remove();
             notifyTextChange();

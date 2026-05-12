@@ -45,10 +45,10 @@ describe("chatPaneSelectors", () => {
     ]);
   });
 
-  it("can hide a runtime item that is rendered in a pinned surface instead", () => {
+  it("keeps plan and goal runtime items out of the inline transcript", () => {
     const state = {
       runtimeItemIdsByThread: {
-        t1: ["assistant-1", "plan-1", "plan-2", "assistant-2"],
+        t1: ["assistant-1", "plan-1", "goal-1", "plan-2", "assistant-2"],
       },
       runtimeItemsByIdByThread: {
         t1: {
@@ -63,6 +63,13 @@ describe("chatPaneSelectors", () => {
             type: "plan",
             state: "updated",
             streams: { plan_text: "- [ ] Build dock" },
+          },
+          "goal-1": {
+            id: "goal-1",
+            type: "goal",
+            state: "completed",
+            payload: { action: "set", objective: "Ship goal dock", status: "active" },
+            streams: {},
           },
           "plan-2": {
             id: "plan-2",
@@ -80,10 +87,7 @@ describe("chatPaneSelectors", () => {
       },
     } as unknown as AppStoreState;
 
-    expect(selectVisibleThreadRuntimeItemIds(state, "t1", "plan-1")).toEqual([
-      "assistant-1",
-      "assistant-2",
-    ]);
+    expect(selectVisibleThreadRuntimeItemIds(state, "t1")).toEqual(["assistant-1", "assistant-2"]);
   });
 
   it("groups adjacent tool calls into one timeline entry", () => {

@@ -26,7 +26,7 @@ interface PluginOptions {
 const SKIP_PARENT_TYPES = new Set(["code", "inlineCode", "link", "linkReference", "html"]);
 
 const PATH_TOKEN_RE =
-  /(?<![A-Za-z0-9_:/@.\\-])([A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+)(?:-\d+)?)?/g;
+  /(?<![A-Za-z0-9_:/@.\\-])(\/?[A-Za-z0-9_@.][A-Za-z0-9_@.-]*(?:[\\/][A-Za-z0-9_@.-]+)+)(?::(\d+)(?:-\d+)?)?/g;
 
 /**
  * Markdown plugin that auto-links plain-text path tokens (e.g.

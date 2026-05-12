@@ -113,20 +113,11 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
       handleThreadStateNotification(event, oldThread, newThread);
     }
   }
-  if (event.type === "thread-server-request") {
-    useAppStore.getState().addThreadServerRequest({
-      threadId: event.threadId,
-      requestId: event.requestId,
-      method: event.method,
-      params: event.params,
-    });
-  }
   if (event.type === "thread-pending-steer") {
     useAppStore.getState().setPendingSteer(event.threadId, event.pending);
   }
   if (event.type === "thread-reset") {
     pendingRuntimeEvents.delete(event.threadId);
-    useAppStore.getState().clearThreadServerRequests(event.threadId);
     useAppStore.getState().clearThreadRuntimeEvents(event.threadId);
     useAppStore.getState().clearAllPendingSteer(event.threadId);
     clearRuntimeItemStoreSelectorCacheForThread(event.threadId);

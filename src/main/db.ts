@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { asc, eq } from "drizzle-orm";
-import type { ProjectLocation, Project, Thread } from "@/shared/contracts";
+import type { ProjectLocation, Project, Thread, ThreadContextUsage } from "@/shared/contracts";
 import * as schema from "./db.schema";
 
 let _db: ReturnType<typeof drizzle> | undefined;
@@ -82,11 +82,15 @@ export function initDatabase(dbPath: string) {
       anchor_item_id TEXT,
       PRIMARY KEY (thread_id, idx)
     );
+    CREATE TABLE IF NOT EXISTS thread_context_usage (
+      thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+      usage TEXT NOT NULL
+    );
   `);
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 14;
+  const SCHEMA_VERSION = 15;
 
   const storedVersion = Number(
     (
@@ -222,6 +226,15 @@ export function initDatabase(dbPath: string) {
       if (!cols.some((c) => c.name === "done_at")) {
         sqlite.exec("ALTER TABLE threads ADD COLUMN done_at TEXT");
       }
+    }
+
+    if (storedVersion < 15) {
+      sqlite.exec(`
+        CREATE TABLE IF NOT EXISTS thread_context_usage (
+          thread_id TEXT PRIMARY KEY REFERENCES threads(id) ON DELETE CASCADE,
+          usage TEXT NOT NULL
+        );
+      `);
     }
 
     sqlite
@@ -622,12 +635,43 @@ export function dbReplaceThreadRuntimeSnapshot(
   threadId: string,
   items: PersistedRuntimeItem[],
   turns: PersistedCompletedTurn[],
+  contextUsage: ThreadContextUsage | null | undefined,
 ): void {
   if (!_sqlite) throw new Error("Database not initialized");
   _sqlite.transaction(() => {
     replaceThreadRuntimeItemsInSqlite(_sqlite!, threadId, items);
     replaceThreadCompletedTurnsInSqlite(_sqlite!, threadId, turns);
+    if (contextUsage !== undefined) {
+      replaceThreadContextUsageInSqlite(_sqlite!, threadId, contextUsage);
+    }
   })();
+}
+
+export function dbGetThreadContextUsage(threadId: string): ThreadContextUsage | null {
+  if (!_sqlite) throw new Error("Database not initialized");
+  const row = _sqlite
+    .prepare("SELECT usage FROM thread_context_usage WHERE thread_id = ?")
+    .get(threadId) as { usage: string } | undefined;
+  if (!row) return null;
+  const parsed = safeParse(row.usage);
+  return parsed && typeof parsed === "object" ? (parsed as ThreadContextUsage) : null;
+}
+
+function replaceThreadContextUsageInSqlite(
+  sqlite: InstanceType<typeof Database>,
+  threadId: string,
+  usage: ThreadContextUsage | null,
+): void {
+  if (usage === null) {
+    sqlite.prepare("DELETE FROM thread_context_usage WHERE thread_id = ?").run(threadId);
+    return;
+  }
+  sqlite
+    .prepare(
+      `INSERT INTO thread_context_usage (thread_id, usage) VALUES (?, ?)
+       ON CONFLICT(thread_id) DO UPDATE SET usage = excluded.usage`,
+    )
+    .run(threadId, JSON.stringify(usage));
 }
 
 function replaceThreadCompletedTurnsInSqlite(

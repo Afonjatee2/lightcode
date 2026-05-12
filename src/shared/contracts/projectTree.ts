@@ -106,6 +106,40 @@ export const readAbsoluteFilePayloadSchema = z.object({
 });
 export type ReadAbsoluteFilePayload = z.infer<typeof readAbsoluteFilePayloadSchema>;
 
+/**
+ * Read or write a file at an absolute path that is NOT required to live
+ * inside the project root. Used by the in-app editor when the user opens
+ * an out-of-project absolute path from chat. The project location is still
+ * required so the supervisor knows which file system (native vs. WSL) to
+ * route the request through.
+ */
+export const readExternalFilePayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  absolutePath: z.string().min(1),
+});
+export type ReadExternalFilePayload = z.infer<typeof readExternalFilePayloadSchema>;
+
+export interface ReadExternalFileResult {
+  path: string;
+  status: ProjectFileReadStatus | "missing";
+  modifiedAtMs: number;
+  content?: string;
+  lineEnding?: "lf" | "crlf";
+  hasBom?: boolean;
+}
+
+export const writeExternalFilePayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  absolutePath: z.string().min(1),
+  content: z.string(),
+  baseModifiedAtMs: z.number().nonnegative(),
+});
+export type WriteExternalFilePayload = z.infer<typeof writeExternalFilePayloadSchema>;
+
+export interface WriteExternalFileResult {
+  modifiedAtMs: number;
+}
+
 export interface WriteProjectFileResult {
   modifiedAtMs: number;
 }

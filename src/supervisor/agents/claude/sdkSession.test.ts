@@ -76,7 +76,6 @@ describe("ClaudeSdkSession", () => {
     session.setListener({
       onRuntimeEvent: (event) => runtimeEvents.push(event),
       onUpdate: (update) => updates.push(update),
-      onServerRequest: () => {},
       onError: () => {},
       onClose: () => {},
     });
@@ -90,6 +89,14 @@ describe("ClaudeSdkSession", () => {
     await expect(startTurn).resolves.toBeUndefined();
 
     expect(mockSdk.query).toHaveBeenCalledTimes(1);
+    expect(mockSdk.query).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          includePartialMessages: true,
+          forwardSubagentText: true,
+        }),
+      }),
+    );
     expect(fake.setModel).toHaveBeenCalledWith("sonnet");
     expect(fake.setPermissionMode).toHaveBeenCalledWith("auto");
 
@@ -115,7 +122,6 @@ describe("ClaudeSdkSession", () => {
     session.setListener({
       onRuntimeEvent: () => {},
       onUpdate: (update) => updates.push(update),
-      onServerRequest: () => {},
       onError: () => {},
       onClose: () => {},
     });

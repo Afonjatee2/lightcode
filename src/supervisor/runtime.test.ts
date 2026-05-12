@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AgentStatus } from "@/shared/contracts";
+import type { AgentStatus, RuntimeEvent } from "@/shared/contracts";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import type { SessionRuntime } from "./runtime/sessionTypes";
 
@@ -1588,6 +1588,146 @@ describe("writeSubmittedPrompt", () => {
     });
   });
 
+  it("settles a Codex GUI /goal initial turn after the goal item is emitted", async () => {
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    let runtimeListener:
+      | {
+          onUpdate(update: Record<string, unknown>): void;
+          onRuntimeEvent(event: RuntimeEvent): void;
+        }
+      | undefined;
+    const startTurn = vi.fn<() => Promise<void>>(async () => {
+      runtimeListener?.onRuntimeEvent({
+        type: "item.started",
+        threadId: "thread-gui-goal",
+        itemId: "goal-turn-1",
+        itemType: "goal",
+        payload: {
+          action: "set",
+          objective: "ship GUI goal support",
+          status: "active",
+        },
+      });
+      runtimeListener?.onRuntimeEvent({
+        type: "item.completed",
+        threadId: "thread-gui-goal",
+        itemId: "goal-turn-1",
+      });
+      runtimeListener?.onUpdate({ status: "idle", attention: "none" });
+    });
+    const setListener = vi.fn<
+      (listener: {
+        onUpdate(update: Record<string, unknown>): void;
+        onRuntimeEvent(event: RuntimeEvent): void;
+      }) => void
+    >((listener) => {
+      runtimeListener = listener;
+      listener.onUpdate({
+        status: "idle",
+        attention: "none",
+        sessionRef: {
+          providerSessionId: "session-1",
+          discoveredAt: "2026-05-10T12:00:00.000Z",
+        },
+      });
+    });
+
+    const adapter = {
+      kind: "codex" as const,
+      label: "Codex",
+      capabilities: {
+        models: [{ id: "gpt-5.4", label: "5.4" }],
+        efforts: ["high"],
+        modelEfforts: {},
+        modes: ["agent"],
+        approvalPolicies: [{ id: "on-request", label: "On Request" }],
+        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "terminal" as const,
+        presentationMode: "terminal" as const,
+        presentationModes: ["terminal", "gui"] as const,
+      },
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "codex",
+        args: ["should-not-spawn"],
+      })),
+      buildResumeArgv: vi.fn<() => void>(),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+      createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+        launchOptions: { suppressResumeConfigOverrides: true, resumeThreadId: "session-1" },
+        activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        openThread: vi.fn<() => Promise<string>>().mockResolvedValue("session-1"),
+        startTurn,
+        setListener,
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      }),
+    };
+
+    (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+      "codex",
+      adapter,
+    );
+
+    await runtime.startThread({
+      threadId: "thread-gui-goal",
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      agentKind: "codex",
+      config: {
+        model: "gpt-5.4",
+      },
+      prompt: "/goal ship GUI goal support",
+      presentationMode: "gui",
+      initialSize: {
+        cols: 132,
+        rows: 42,
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const goalEvents = emitted.filter(
+      (event) =>
+        (event.type === "thread-runtime-event" || event.type === "thread-runtime-events") &&
+        event.threadId === "thread-gui-goal",
+    );
+    const runtimeEvents = goalEvents.flatMap((event) =>
+      event.type === "thread-runtime-events"
+        ? ((event.events as RuntimeEvent[] | undefined) ?? [])
+        : event.event
+          ? [event.event as RuntimeEvent]
+          : [],
+    );
+    expect(runtimeEvents).toContainEqual(
+      expect.objectContaining({
+        type: "item.started",
+        itemType: "goal",
+      }),
+    );
+    const threadStates = emitted.filter(
+      (event) => event.type === "thread-state" && event.threadId === "thread-gui-goal",
+    );
+    expect(threadStates[0]).toMatchObject({
+      status: "working",
+      attention: "working",
+    });
+    expect(threadStates.at(-1)).toMatchObject({
+      status: "idle",
+      attention: "none",
+      sessionRef: {
+        providerSessionId: "session-1",
+      },
+    });
+  });
+
   it("inserts Codex hook enable flags before the positional prompt", async () => {
     const runtime = new SupervisorRuntime(() => undefined);
     const pty = createMockPty();
@@ -2021,6 +2161,13 @@ describe("detectWslAgentStatuses", () => {
                 label: "Verbose logging",
                 description: "Already current format",
                 default: false,
+              },
+            ],
+            slashCommands: [
+              {
+                id: "goal",
+                label: "goal — Set a goal — keep working until the condition is met",
+                description: "Set a goal — keep working until the condition is met",
               },
             ],
           },

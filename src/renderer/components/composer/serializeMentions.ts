@@ -91,6 +91,11 @@ export function serializeToSegments(container: HTMLDivElement): PromptSegment[] 
       return;
     }
 
+    if (el.dataset.slashCommand) {
+      textBuffer += `/${el.dataset.slashCommand}`;
+      return;
+    }
+
     if (el.tagName === "BR") {
       textBuffer += "\n";
       return;

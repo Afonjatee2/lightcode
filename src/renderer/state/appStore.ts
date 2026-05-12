@@ -15,7 +15,7 @@ import { createViewSlice } from "./slices/viewSlice";
 
 export { makeThreadTitle } from "./slices/helpers";
 export type { AppStoreState } from "./slices/shared";
-export type { DraftContent, PendingThreadServerRequest, SavedGroupLayout } from "./slices/types";
+export type { DraftContent, SavedGroupLayout } from "./slices/types";
 
 export const useAppStore = create<AppStoreState>()(
   subscribeWithSelector(

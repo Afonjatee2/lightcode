@@ -15,6 +15,7 @@ import {
 } from "./detection";
 import { CodexStructuredSession } from "./acp";
 import type { OscNotification, OscTitle } from "@/shared/osc";
+import type { RuntimeEvent } from "@/shared/contracts";
 import { codexIntentFor } from "./plugin/intentMap";
 import { mapCodexModels, mapCodexSlashCommands } from "./probe";
 import { CodexStdioTransport } from "./stdioTransport";
@@ -195,9 +196,13 @@ describe("CodexStructuredSession", () => {
     session["currentThreadStatus"] = { type: "idle" };
     session["request"] = async (method: string, params: Record<string, unknown>) => {
       requests.push({ method, params });
-      return method === "turn/start"
-        ? { turn: { id: "turn-1", items: [], status: "inProgress" } }
-        : {};
+      if (method === "turn/start") {
+        return { turn: { id: "turn-1", items: [], status: "inProgress" } };
+      }
+      if (method === "thread/start") {
+        return { thread: { id: "provider-thread" } };
+      }
+      return {};
     };
 
     return session as unknown as CodexStructuredSession;
@@ -231,6 +236,94 @@ describe("CodexStructuredSession", () => {
       threadId: "provider-thread",
       turnId: "turn-1",
     });
+  });
+
+  it("requests Codex reasoning summaries for GUI turns", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+
+    await structuredSession.startTurn("hello", { model: "gpt-5.4", effort: "high" });
+
+    expect(requests[0]).toMatchObject({
+      method: "turn/start",
+      params: {
+        effort: "high",
+        summary: "auto",
+      },
+    });
+  });
+
+  it("dispatches /goal <objective> to thread/goal/set without starting a model turn", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+    const runtimeEvents: RuntimeEvent[] = [];
+    const updates: unknown[] = [];
+    (structuredSession as unknown as Record<string, unknown>)["listener"] = {
+      onRuntimeEvent: (event: RuntimeEvent) => runtimeEvents.push(event),
+      onUpdate: (update: unknown) => updates.push(update),
+    };
+
+    await structuredSession.startTurn("/goal ship unified GUI goal support", { model: "gpt-5.4" });
+
+    expect(requests).toEqual([
+      {
+        method: "thread/goal/set",
+        params: {
+          threadId: "provider-thread",
+          objective: "ship unified GUI goal support",
+          status: "active",
+        },
+      },
+    ]);
+    // The goal item itself is produced by the canonical mapper from the
+    // `thread/goal/updated` notification — startTurn should only emit the
+    // user-facing turn/user-message envelope around the RPC.
+    expect(runtimeEvents.map((event) => event.type)).toEqual([
+      "turn.started",
+      "item.started",
+      "item.completed",
+      "turn.completed",
+    ]);
+    expect(updates.at(-1)).toEqual({ status: "idle", attention: "none" });
+  });
+
+  it("maps /goal clear to thread/goal/clear", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+
+    await structuredSession.startTurn("/goal clear", { model: "gpt-5.4" });
+
+    expect(requests).toEqual([
+      { method: "thread/goal/clear", params: { threadId: "provider-thread" } },
+    ]);
+  });
+
+  it("maps /goal pause and /goal resume to thread/goal/set status changes", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+
+    await structuredSession.startTurn("/goal pause", { model: "gpt-5.4" });
+    await structuredSession.startTurn("/goal resume", { model: "gpt-5.4" });
+
+    expect(requests).toEqual([
+      {
+        method: "thread/goal/set",
+        params: { threadId: "provider-thread", status: "paused" },
+      },
+      {
+        method: "thread/goal/set",
+        params: { threadId: "provider-thread", status: "active" },
+      },
+    ]);
+  });
+
+  it("treats /goal with no args as a no-op acknowledgement", async () => {
+    const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
+    const structuredSession = makeStructuredSession(requests);
+
+    await structuredSession.startTurn("/goal", { model: "gpt-5.4" });
+
+    expect(requests).toEqual([]);
   });
 
   it("surfaces Codex app-server commands as slash commands during initialize", async () => {

@@ -100,12 +100,41 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
     window.show();
   });
 
+  const loadRenderer = () => {
+    if (options.isDev) {
+      void window.loadURL(options.devServerUrl as string);
+    } else {
+      void window.loadFile(options.rendererHtmlPath);
+    }
+  };
+
+  loadRenderer();
   if (options.isDev) {
-    void window.loadURL(options.devServerUrl as string);
     window.webContents.openDevTools({ mode: "detach" });
-  } else {
-    void window.loadFile(options.rendererHtmlPath);
   }
+
+  let lastReloadAt = 0;
+  let reloadCount = 0;
+  window.webContents.on("render-process-gone", (_event, details) => {
+    if (details.reason === "clean-exit" || window.isDestroyed()) {
+      return;
+    }
+    console.error(
+      `[lightcode] renderer gone: reason=${details.reason} exitCode=${details.exitCode}`,
+    );
+    const now = Date.now();
+    if (now - lastReloadAt < 5_000) {
+      reloadCount += 1;
+    } else {
+      reloadCount = 1;
+    }
+    lastReloadAt = now;
+    if (reloadCount > 3) {
+      console.error("[lightcode] renderer gone too many times in a row, not reloading");
+      return;
+    }
+    loadRenderer();
+  });
 
   let boundsTimer: ReturnType<typeof setTimeout> | null = null;
   const debouncedSave = () => {

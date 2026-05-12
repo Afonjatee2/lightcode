@@ -14,7 +14,6 @@ import {
   useInstalledAgents,
   useProjectAgentStatuses,
   useThreadPendingLaunch,
-  useThreadServerRequests,
 } from "@/renderer/hooks/uiSelectors";
 
 export function ThreadPane(props: {
@@ -36,7 +35,6 @@ export function ThreadPane(props: {
   const installedAgents = useInstalledAgents();
   const projectAgentStatuses = useProjectAgentStatuses(project?.location);
   const agentStatus = projectAgentStatuses.find((status) => status.kind === thread?.agentKind);
-  const pendingServerRequests = useThreadServerRequests(props.threadId);
   const { prompt: pendingLaunchPrompt, segments: pendingLaunchSegments } = useThreadPendingLaunch(
     props.threadId,
   );
@@ -45,7 +43,6 @@ export function ThreadPane(props: {
     updateThreadConfig,
     updateThreadRuntime,
     consumeThreadLaunch,
-    removeThreadServerRequest,
     touchThread,
   } = useAppStore.getState();
 
@@ -105,7 +102,6 @@ export function ThreadPane(props: {
           });
         }
       }}
-      pendingServerRequests={pendingServerRequests}
       projectLocation={projectLocation}
       onLaunchConsumed={() => consumeThreadLaunch(thread.id)}
       onLaunchFailed={(message) => {
@@ -130,7 +126,6 @@ export function ThreadPane(props: {
           method,
           response,
         });
-        removeThreadServerRequest(thread.id, requestId);
         touchThread(thread.id);
       }}
       {...(pendingLaunchPrompt !== undefined ? { pendingLaunchPrompt } : {})}

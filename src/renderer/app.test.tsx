@@ -309,7 +309,6 @@ describe("App", () => {
       ...state,
       projects: [],
       threads: [],
-      pendingServerRequests: [],
       pendingThreadLaunches: {},
       pendingLaunchSegments: {},
       view: { kind: "home" },

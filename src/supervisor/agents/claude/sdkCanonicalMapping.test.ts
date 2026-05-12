@@ -62,6 +62,35 @@ describe("sdkCanonicalMapping — prompt content", () => {
       { type: "item.completed", threadId: "thread-1", itemId: "user-optimistic" },
     ]);
   });
+
+  it("surfaces a Claude /goal command as a shared goal chat item", () => {
+    const state = createClaudeMapperState("thread-1");
+
+    const events = startClaudeTurn(
+      state,
+      "turn-goal",
+      "/goal ship unified GUI goal support",
+      undefined,
+      "user-goal",
+    );
+
+    expect(events).toContainEqual({
+      type: "item.started",
+      threadId: "thread-1",
+      itemId: "goal-turn-goal",
+      itemType: "goal",
+      payload: {
+        action: "set",
+        objective: "ship unified GUI goal support",
+        status: "active",
+      },
+    });
+    expect(events).toContainEqual({
+      type: "item.completed",
+      threadId: "thread-1",
+      itemId: "goal-turn-goal",
+    });
+  });
 });
 
 describe("sdkCanonicalMapping — text streaming", () => {
@@ -333,6 +362,81 @@ describe("sdkCanonicalMapping — tool use", () => {
     ]);
   });
 
+  it("maps Edit tool results as ACP-shaped file changes", () => {
+    const state = createClaudeMapperState("thread-1");
+    const args = {
+      file_path: "src/renderer/components/composer/MentionInput.tsx",
+      old_string: "const oldValue = true;",
+      new_string: "const oldValue = false;",
+    };
+
+    const started = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_edit",
+          name: "Edit",
+          input: args,
+        },
+      }),
+      state,
+    );
+
+    expect(started).toEqual([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: "toolu_edit",
+        itemType: "file_change",
+        payload: {
+          name: "Edit",
+          path: "src/renderer/components/composer/MentionInput.tsx",
+          changeKind: "edit",
+          args,
+        },
+      },
+    ]);
+
+    const result = { type: "tool_result", tool_use_id: "toolu_edit", content: "Edit applied." };
+    const completed = mapClaudeSdkMessage(
+      {
+        type: "user",
+        session_id: "claude-session",
+        parent_tool_use_id: null,
+        message: {
+          role: "user",
+          content: [result],
+        },
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(completed).toEqual([
+      {
+        type: "content.delta",
+        threadId: "thread-1",
+        itemId: "toolu_edit",
+        stream: "file_change_output",
+        delta: "Edit applied.",
+      },
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "toolu_edit",
+        payload: {
+          name: "Edit",
+          path: "src/renderer/components/composer/MentionInput.tsx",
+          changeKind: "edit",
+          args,
+          result,
+        },
+      },
+      { type: "item.completed", threadId: "thread-1", itemId: "toolu_edit" },
+    ]);
+  });
+
   it("surfaces auto-denied tool calls as completed error items", () => {
     const state = createClaudeMapperState("thread-1");
     mapClaudeSdkMessage(
@@ -425,6 +529,70 @@ describe("sdkCanonicalMapping — sub-agents", () => {
     );
     expect(events[0]).not.toHaveProperty("parentItemId");
   });
+
+  it("maps forwarded assistant tool_use blocks as subagent children", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_parent",
+          name: "Task",
+          input: { description: "Investigate", subagent_type: "Explore" },
+        },
+      }),
+      state,
+    );
+
+    const events = mapClaudeSdkMessage(
+      {
+        type: "assistant",
+        session_id: "claude-session",
+        uuid: "msg-subagent-tool",
+        parent_tool_use_id: "toolu_parent",
+        message: {
+          id: "msg-subagent-tool",
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              id: "toolu_read",
+              name: "Read",
+              input: { file_path: "src/App.tsx" },
+            },
+          ],
+        },
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(events).toMatchObject([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: "toolu_read",
+        itemType: "tool_call",
+        parentItemId: "toolu_parent",
+        payload: {
+          name: "Read",
+          args: { file_path: "src/App.tsx" },
+          status: "running",
+        },
+      },
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "toolu_parent",
+        payload: {
+          name: "Task",
+          status: "running",
+          progress: { stepCount: 1 },
+        },
+      },
+    ]);
+  });
 });
 
 describe("sdkCanonicalMapping — task progress", () => {
@@ -472,6 +640,7 @@ describe("sdkCanonicalMapping — task progress", () => {
             tokens: 4200,
             toolUses: 3,
             durationMs: 1500,
+            stepCount: 3,
           },
         },
       },
@@ -496,7 +665,87 @@ describe("sdkCanonicalMapping — task progress", () => {
   });
 });
 
+describe("sdkCanonicalMapping — context usage", () => {
+  it("maps result usage into context usage", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      {
+        type: "result",
+        subtype: "success",
+        session_id: "claude-session",
+        usage: {
+          input_tokens: 60_000,
+          output_tokens: 8_000,
+          cache_read_input_tokens: 1_000,
+          cache_creation_input_tokens: 500,
+          total_tokens: 69_500,
+        },
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(events[0]).toEqual({
+      type: "context.updated",
+      threadId: "thread-1",
+      usage: {
+        usedTokens: 69_500,
+        breakdown: [
+          { id: "input", label: "Input", tokens: 60_000 },
+          { id: "output", label: "Output", tokens: 8_000 },
+          { id: "cache-read", label: "Cache read", tokens: 1_000 },
+          { id: "cache-write", label: "Cache write", tokens: 500 },
+        ],
+      },
+    });
+  });
+});
+
 describe("sdkCanonicalMapping — compaction", () => {
+  it("starts a running ContextCompaction tool_call for a manual /compact turn", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = startClaudeTurn(state, "turn-compact", "/compact", undefined, "user-compact");
+
+    expect(events).toContainEqual({
+      type: "item.started",
+      threadId: "thread-1",
+      itemId: "compact-turn-compact",
+      itemType: "tool_call",
+      payload: {
+        name: "ContextCompaction",
+        status: "running",
+        args: { trigger: "manual" },
+      },
+    });
+  });
+
+  it("completes the running manual ContextCompaction tool_call when boundary arrives", () => {
+    const state = createClaudeMapperState("thread-1");
+    startClaudeTurn(state, "turn-compact", "/compact keep recent work", undefined, "user-compact");
+
+    const events = mapClaudeSdkMessage(
+      {
+        type: "system",
+        subtype: "compact_boundary",
+        compact_metadata: { trigger: "manual", pre_tokens: 290000, post_tokens: 9900 },
+        session_id: "claude-session",
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(events).toEqual([
+      {
+        type: "item.completed",
+        threadId: "thread-1",
+        itemId: "compact-turn-compact",
+        payload: {
+          name: "ContextCompaction",
+          status: "success",
+          args: { trigger: "manual", pre_tokens: 290000, post_tokens: 9900 },
+        },
+      },
+    ]);
+  });
+
   it("synthesizes a ContextCompaction tool_call carrying compact_metadata when boundary arrives", () => {
     const state = createClaudeMapperState("thread-1");
     const events = mapClaudeSdkMessage(

@@ -107,7 +107,6 @@ function renderThread(thread: Thread, agentStatus: AgentStatus) {
         thread={thread}
         agentStatus={agentStatus}
         projectLocation={{ kind: "posix", path: "/tmp/lightcode" }}
-        pendingServerRequests={[]}
         onConfigChange={() => {}}
         onResolveServerRequest={async () => {}}
         onSubmitInput={async () => {}}
@@ -398,6 +397,41 @@ describe("ThreadSlashCommands", () => {
     expect(onConfigChange).toHaveBeenCalledWith({ mode: "plan" });
     expect(onStart).not.toHaveBeenCalled();
     expect(editor.textContent).toBe("");
+  });
+
+  it("submits Codex GUI /goal as provider input instead of handling it locally", () => {
+    const baseCapabilities = makeAgentStatus().capabilities;
+    const onStart = vi.fn<(input: unknown) => void>();
+    const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
+    renderDraftComposer(
+      makeAgentStatus({
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          ...baseCapabilities,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          presentationModes: ["terminal", "gui"],
+        },
+      }),
+      onStart,
+      "gui",
+      onConfigChange,
+    );
+
+    const editor = screen.getByRole("textbox");
+    typeSlashQuery(editor, "/goal ship unified GUI goal support");
+
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    expect(onStart).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agentKind: "codex",
+        prompt: "/goal ship unified GUI goal support",
+        presentationMode: "gui",
+      }),
+    );
+    expect(onConfigChange).not.toHaveBeenCalled();
   });
 
   it("toggles Fast locally for Codex GUI draft commands", () => {

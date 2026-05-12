@@ -88,14 +88,6 @@ vi.mock("./TerminalLinkProvider", () => ({
   TerminalLinkProvider: class MockTerminalLinkProvider {},
 }));
 
-vi.mock("@xterm/addon-webgl", () => ({
-  WebglAddon: class MockWebglAddon {
-    onContextLoss = vi.fn<(handler: () => void) => { dispose: () => void }>(() => ({
-      dispose: vi.fn<() => void>(),
-    }));
-  },
-}));
-
 // ── bridge mock ──────────────────────────────────────────────────
 state.bridge.onSupervisorEvent.mockImplementation((listener: (e: SupervisorEvent) => void) => {
   state.eventListeners.push(listener);
@@ -184,17 +176,6 @@ describe("XTermSurface", () => {
   it("does not preserve TUI full-screen redraws as scrollback", () => {
     render(<XTermSurface terminalId="test-1" />);
     expect(state.terminalOptions?.scrollOnEraseInDisplay).toBe(false);
-  });
-
-  it("loads the WebGL addon on non-macOS platforms", () => {
-    render(<XTermSurface terminalId="test-1" />);
-    expect(terminal().loadAddon).toHaveBeenCalledTimes(6);
-  });
-
-  it("loads the WebGL addon on macOS too", () => {
-    state.isMac = true;
-    render(<XTermSurface terminalId="test-1" />);
-    expect(terminal().loadAddon).toHaveBeenCalledTimes(6);
   });
 
   it("subscribes to supervisor events", () => {

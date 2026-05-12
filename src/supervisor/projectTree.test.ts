@@ -108,6 +108,57 @@ describe("ProjectTreeService", () => {
     ).resolves.toMatchObject({ status: "ready", content: "relative\n" });
   });
 
+  it("readExternalFile reads files outside the project root", async () => {
+    const externalDir = mkdtempSync(join(tmpdir(), "lightcode-external-"));
+    const outsidePath = join(externalDir, "outside.txt");
+    writeFileSync(outsidePath, "outside\n", "utf8");
+
+    try {
+      await expect(
+        service.readExternalFile({
+          projectLocation: location,
+          absolutePath: outsidePath,
+        }),
+      ).resolves.toMatchObject({ status: "ready", content: "outside\n" });
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
+  });
+
+  it("readExternalFile returns 'missing' for nonexistent files", async () => {
+    await expect(
+      service.readExternalFile({
+        projectLocation: location,
+        absolutePath: join(tmpdir(), "lightcode-does-not-exist-xyz.txt"),
+      }),
+    ).resolves.toMatchObject({ status: "missing" });
+  });
+
+  it("writeExternalFile saves a file outside the project root", async () => {
+    const externalDir = mkdtempSync(join(tmpdir(), "lightcode-external-"));
+    const outsidePath = join(externalDir, "writable.txt");
+    writeFileSync(outsidePath, "before\n", "utf8");
+
+    try {
+      const read = await service.readExternalFile({
+        projectLocation: location,
+        absolutePath: outsidePath,
+      });
+      expect(read.status).toBe("ready");
+
+      const result = await service.writeExternalFile({
+        projectLocation: location,
+        absolutePath: outsidePath,
+        content: "after\n",
+        baseModifiedAtMs: read.modifiedAtMs,
+      });
+      expect(result.modifiedAtMs).toBeGreaterThanOrEqual(read.modifiedAtMs);
+      expect(readFileSync(outsidePath, "utf8")).toBe("after\n");
+    } finally {
+      rmSync(externalDir, { recursive: true, force: true });
+    }
+  });
+
   it("creates, renames, moves, and deletes entries", async () => {
     mkdirSync(join(tempDir, "src"), { recursive: true });
 

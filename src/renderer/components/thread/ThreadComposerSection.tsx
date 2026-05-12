@@ -17,7 +17,7 @@ import { flattenSegments } from "../composer/serializeMentions";
 import { getComposerControls } from "../providers";
 import { EffortIcon } from "../providers/EffortIcon";
 import { readBridge } from "@/renderer/bridge";
-import { useAppStore, type PendingThreadServerRequest } from "@/renderer/state/appStore";
+import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
@@ -25,18 +25,23 @@ import { ActiveSubAgentTile } from "./ChatPane/parts/items/ActiveSubAgentTile";
 import { selectActiveSubAgentParentItemIds } from "./ChatPane/chatPaneSelectors";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
+import { ThreadContextDock } from "./ThreadContextDock";
+import { ThreadContextIndicator } from "./ThreadContextIndicator";
 import { ThreadErrorDock } from "./ThreadErrorDock";
+import { ThreadGoalDock } from "./ThreadGoalDock";
 import { ThreadPendingSteerStrip } from "./ThreadPendingSteerStrip";
 import { ThreadRuntimeRequestPanel } from "./ThreadRuntimeRequestPanel";
-import { ThreadServerRequestPanel } from "./ThreadServerRequestPanel";
 import { ThreadTodoDock } from "./ThreadTodoDock";
+import { hasReportedContextUsage, resolveThreadContextUsageSummary } from "./threadContextUsage";
 import { capabilitiesForPresentation, filterHiddenModels } from "./threadComposerOptions";
 import {
   filterSlashCommands,
   resolveAvailableSlashCommands,
   resolveLocalSlashCommandAction,
 } from "./threadSlashCommands";
+import { handleComposerControlShortcut } from "./threadComposerShortcuts";
 import type { ThreadErrorDockState } from "./threadErrorState";
+import type { ThreadGoalDockState } from "./threadGoalState";
 import type { ThreadTodoDockState } from "./threadTodoState";
 import type { TerminalPaneHandle } from "./TerminalPane";
 
@@ -235,12 +240,13 @@ type ThreadComposerSectionProps = {
   agentStatus: AgentStatus | undefined;
   projectLocation: ProjectLocation;
   paneCount: number;
-  pendingServerRequests: PendingThreadServerRequest[];
   terminalPaneRef: RefObject<TerminalPaneHandle | null>;
   todoDockCollapsed: boolean;
   todoDockPlacement: "composer" | "right";
   todoDockState: ThreadTodoDockState | null;
+  goalDockState: ThreadGoalDockState | null;
   errorDockState: ThreadErrorDockState | null;
+  onGoalDockDismiss: () => void;
   onDismissError: () => void;
   onConfigChange: (config: ThreadConfig) => void;
   onResolveServerRequest: (input: {
@@ -265,10 +271,10 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     agentStatus,
     projectLocation,
     paneCount,
-    pendingServerRequests,
     todoDockCollapsed,
     todoDockPlacement,
     todoDockState,
+    goalDockState,
     errorDockState,
   } = props;
   const [prompt, setPrompt] = useState("");
@@ -283,6 +289,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     target: "model" | "effort";
     nonce: number;
   } | null>(null);
+  const [contextDockOpen, setContextDockOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const imageAttachments = attachments.attachments.filter((a) => a.isImage);
   const presentationMode =
@@ -309,7 +316,6 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     agentStatus?.capabilities.liveInputMode === "server" || !usesTerminalPresentation;
   const isTerminalInput = agentStatus?.capabilities.liveInputMode === "terminal";
   const needsFocusBeforeInput = agentStatus?.capabilities.requiresTerminalFocusBeforeInput === true;
-  const activeServerRequest = pendingServerRequests[0];
   const canQueueServerInput =
     isServerControlled &&
     !usesTerminalPresentation &&
@@ -335,6 +341,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     thread.status !== "launching";
   const showTodoInComposer =
     !usesTerminalPresentation && todoDockState !== null && todoDockPlacement === "composer";
+  const showGoalInComposer = !usesTerminalPresentation && goalDockState !== null;
   const showErrorInComposer = !usesTerminalPresentation && errorDockState !== null;
   const hasActiveSubAgent = useAppStore(
     (s) => !usesTerminalPresentation && selectActiveSubAgentParentItemIds(s, thread.id).length > 0,
@@ -369,6 +376,23 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const usesPendingSteerPath = !usesTerminalPresentation && thread.status === "working";
   const runtimeRequests = useAppStore((s) => s.runtimeRequestsByThread[thread.id]);
   const activeRuntimeRequest = !usesTerminalPresentation ? runtimeRequests?.[0] : undefined;
+  const reportedContextUsage = useAppStore((s) =>
+    !usesTerminalPresentation ? s.runtimeContextByThread[thread.id] : undefined,
+  );
+  const contextSummary = resolveThreadContextUsageSummary({
+    thread,
+    agentStatus,
+    reportedUsage: reportedContextUsage,
+  });
+  const showContextIndicator =
+    !usesTerminalPresentation && hasReportedContextUsage(reportedContextUsage);
+  const showContextInComposer = showContextIndicator && contextDockOpen;
+
+  useEffect(() => {
+    if (!showContextIndicator && contextDockOpen) {
+      setContextDockOpen(false);
+    }
+  }, [contextDockOpen, showContextIndicator]);
 
   function handleInterrupt() {
     if (isInterrupting) return;
@@ -449,6 +473,25 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
       setHasContent(false);
       return;
     }
+    const submittedInputSegments = segments;
+    const submittedAttachments = attachments.attachments;
+    const clearSubmittedComposer = () => {
+      mentionRef.current?.clear();
+      mentionRef.current?.focus();
+      setPrompt("");
+      setHasContent(false);
+      attachments.clearAll();
+    };
+    const restoreSubmittedComposer = () => {
+      mentionRef.current?.restoreFromSegments(submittedInputSegments);
+      mentionRef.current?.focus();
+      setPrompt(flat);
+      setHasContent(flat.length > 0);
+      if (submittedAttachments.length > 0) {
+        attachments.restore(submittedAttachments);
+      }
+    };
+    let clearedBeforeSendSettled = false;
     setIsSubmitting(true);
     if (!usesTerminalPresentation) {
       useAppStore.getState().requestChatScrollToBottom(thread.id);
@@ -473,17 +516,23 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
           })
         : props.onSubmitInput(flat, allSegments.length > 0 ? allSegments : undefined);
 
+    if (!usesTerminalPresentation) {
+      clearSubmittedComposer();
+      clearedBeforeSendSettled = true;
+    }
+
     void focusPromise
       .then(runSubmission)
       .then(() => {
-        mentionRef.current?.clear();
-        mentionRef.current?.focus();
-        setPrompt("");
-        setHasContent(false);
-        attachments.clearAll();
+        if (!clearedBeforeSendSettled) {
+          clearSubmittedComposer();
+        }
       })
       .catch(() => {
         // Leave the prompt intact so the user can retry.
+        if (clearedBeforeSendSettled) {
+          restoreSubmittedComposer();
+        }
       })
       .finally(() => {
         setIsSubmitting(false);
@@ -519,6 +568,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     setIsInterrupting(false);
     setSlashQuery(null);
     setSlashActiveIndex(0);
+    setContextDockOpen(false);
     setComposerCollapsed(collapseTerminalComposerSetting);
   }, [thread.id, collapseTerminalComposerSetting]);
 
@@ -553,15 +603,6 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
 
   return (
     <>
-      {activeServerRequest ? (
-        <ThreadServerRequestPanel
-          agentLabel={agentStatus?.label}
-          request={activeServerRequest}
-          onResolve={props.onResolveServerRequest}
-          onPlanApproved={() => props.onConfigChange({ ...thread.config, mode: "agent" })}
-        />
-      ) : null}
-
       {thread.status !== "launching" || !usesTerminalPresentation ? (
         <div>
           <div
@@ -583,17 +624,31 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   compact
                   fixedContent={
                     hasActiveSubAgent ||
+                    showContextInComposer ||
                     showErrorInComposer ||
+                    showGoalInComposer ||
                     showTodoInComposer ||
                     pendingSteer ||
                     activeRuntimeRequest ||
                     showCommandPanel ? (
                       <>
                         {hasActiveSubAgent ? <ActiveSubAgentTile threadId={thread.id} /> : null}
+                        {showContextInComposer ? (
+                          <ThreadContextDock
+                            summary={contextSummary}
+                            onClose={() => setContextDockOpen(false)}
+                          />
+                        ) : null}
                         {showErrorInComposer ? (
                           <ThreadErrorDock
                             state={errorDockState!}
                             onDismiss={props.onDismissError}
+                          />
+                        ) : null}
+                        {showGoalInComposer ? (
+                          <ThreadGoalDock
+                            state={goalDockState!}
+                            onDismiss={props.onGoalDockDismiss}
                           />
                         ) : null}
                         {showTodoInComposer ? (
@@ -615,6 +670,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         {activeRuntimeRequest ? (
                           <ThreadRuntimeRequestPanel
                             threadId={thread.id}
+                            agentLabel={agentStatus?.label}
                             request={activeRuntimeRequest}
                             onResolve={props.onResolveServerRequest}
                             onPlanApproved={() =>
@@ -665,6 +721,21 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         void attachments.addClipboardImage(file, thread.id);
                       }}
                       onInterceptKey={(e) => {
+                        if (
+                          !usesTerminalPresentation &&
+                          handleComposerControlShortcut(e, {
+                            controls: controlsWithOpenSignal,
+                            onOpenModelPicker: () => {
+                              setControlOpenRequest((prev) => ({
+                                target: "model",
+                                nonce: (prev?.nonce ?? 0) + 1,
+                              }));
+                            },
+                          })
+                        ) {
+                          return true;
+                        }
+
                         if (showCommandPanel) {
                           if (e.key === "ArrowDown") {
                             e.preventDefault();
@@ -734,6 +805,13 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   {...(() => {
                     const renderExtras = (level: number) => (
                       <>
+                        {showContextIndicator ? (
+                          <ThreadContextIndicator
+                            summary={contextSummary}
+                            isOpen={contextDockOpen}
+                            onToggle={() => setContextDockOpen((open) => !open)}
+                          />
+                        ) : null}
                         <Button
                           isIconOnly
                           aria-label="Attach files"

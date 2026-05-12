@@ -593,6 +593,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
             ? { sessionId: this.sessionId }
             : {}),
         includePartialMessages: true,
+        forwardSubagentText: true,
         canUseTool: this.canUseTool,
         env,
         ...(this.currentConfig.effort
@@ -655,11 +656,6 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           },
           { once: true },
         );
-        this.listener?.onServerRequest({
-          requestId,
-          method: "askUserQuestion",
-          params: { questions },
-        });
         this.emitRuntimeEvents([
           mapClaudeQuestionRequest({
             threadId: this.input.threadId,
@@ -687,11 +683,6 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         },
         { once: true },
       );
-      this.listener?.onServerRequest({
-        requestId,
-        method: "requestPermission",
-        params: { toolName, input: toolInput },
-      });
       this.emitRuntimeEvents([
         mapClaudePermissionRequest({
           threadId: this.input.threadId,

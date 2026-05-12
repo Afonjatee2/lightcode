@@ -34,7 +34,9 @@ export const UserMessage = memo(function UserMessage({
   const contentRef = useRef<HTMLDivElement>(null);
   const payload = getRuntimeItemPayload<MessageItemPayload>(item, "user_message");
   const content = payload?.content ?? [];
-  const text = buildUserPromptText(content);
+  const rawText = buildUserPromptText(content);
+  const { slashCommand, body } = extractLeadingSlashCommand(rawText);
+  const text = body;
   const attachments = buildUserPromptAttachments(content);
 
   const syncVisualOverflow = useEffectEvent(() => {
@@ -63,7 +65,8 @@ export const UserMessage = memo(function UserMessage({
     return () => observer.disconnect();
   }, []);
 
-  if (content.length === 0 || (text.length === 0 && attachments.length === 0)) return null;
+  if (content.length === 0 || (text.length === 0 && attachments.length === 0 && !slashCommand))
+    return null;
   const isCollapsible = hasVisualOverflow;
   const isCollapsed = isCollapsible && !isExpanded;
   const tooltipLabel = isExpanded ? "Show less" : "Show more";
@@ -90,7 +93,17 @@ export const UserMessage = memo(function UserMessage({
             />
           </div>
         ) : null}
-        {text.length > 0 ? <ItemMarkdown text={text} /> : null}
+        {slashCommand ? (
+          <div className="whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] leading-snug text-foreground">
+            <span className="lightcode-slash-chip mr-1.5">
+              <span className="lightcode-slash-chip__slash">/</span>
+              <span className="lightcode-slash-chip__name">{slashCommand}</span>
+            </span>
+            {text.length > 0 ? <span>{text}</span> : null}
+          </div>
+        ) : text.length > 0 ? (
+          <ItemMarkdown text={text} />
+        ) : null}
       </div>
       {isCollapsible ? (
         <>
@@ -121,6 +134,14 @@ export const UserMessage = memo(function UserMessage({
     </Surface>
   );
 });
+
+const LEADING_SLASH_COMMAND_RE = /^\/([A-Za-z][A-Za-z0-9_-]*)(\s+|$)/;
+
+function extractLeadingSlashCommand(text: string): { slashCommand: string | null; body: string } {
+  const match = text.match(LEADING_SLASH_COMMAND_RE);
+  if (!match) return { slashCommand: null, body: text };
+  return { slashCommand: match[1]!, body: text.slice(match[0].length) };
+}
 
 function buildUserPromptText(content: CanonicalContentBlock[]): string {
   return content

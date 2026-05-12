@@ -76,9 +76,6 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
 
       const nextThreads = state.threads.filter((thread) => thread.projectId !== projectId);
 
-      const nextPendingServerRequests = state.pendingServerRequests.filter(
-        (request) => !projectThreadIds.has(request.threadId),
-      );
       const nextPendingThreadLaunches = Object.fromEntries(
         Object.entries(state.pendingThreadLaunches).filter(
           ([threadId]) => !projectThreadIds.has(threadId),
@@ -108,7 +105,6 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
       return {
         projects: nextProjects,
         threads: nextThreads,
-        pendingServerRequests: nextPendingServerRequests,
         pendingThreadLaunches: nextPendingThreadLaunches,
         pendingLaunchSegments: nextPendingLaunchSegments,
         draftContents: nextDraftContents,

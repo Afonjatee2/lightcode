@@ -60,6 +60,204 @@ describe("mapCodexNotification — turn lifecycle", () => {
     const completed = events.find((e) => e.type === "turn.completed");
     expect(completed).toMatchObject({ type: "turn.completed", state: "interrupted" });
   });
+
+  it("maps turn usage into context usage when the app-server provides it", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification("turn/started", { turnId: "t-1", threadId: "x" }, state);
+    const events = mapCodexNotification(
+      "turn/completed",
+      {
+        threadId: "x",
+        turn: { id: "t-1", usage: { input_tokens: 10_000, output_tokens: 2_000, size: 200_000 } },
+      },
+      state,
+    );
+
+    expect(events[0]).toEqual({
+      type: "context.updated",
+      threadId: "t-codex",
+      usage: {
+        usedTokens: 12_000,
+        maxTokens: 200_000,
+        breakdown: [
+          { id: "input", label: "Input", tokens: 10_000 },
+          { id: "output", label: "Output", tokens: 2_000 },
+        ],
+      },
+    });
+  });
+
+  it("maps Codex token usage notifications into context usage", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "thread/tokenUsage/updated",
+      {
+        threadId: "x",
+        info: {
+          last_token_usage: {
+            input_tokens: 19_250,
+            cached_input_tokens: 2_432,
+            output_tokens: 85,
+            reasoning_output_tokens: 74,
+            total_tokens: 19_335,
+          },
+          model_context_window: 258_400,
+        },
+      },
+      state,
+    );
+
+    expect(events).toEqual([
+      {
+        type: "context.updated",
+        threadId: "t-codex",
+        usage: {
+          usedTokens: 19_335,
+          maxTokens: 258_400,
+          breakdown: [
+            { id: "input", label: "Input", tokens: 19_250 },
+            { id: "output", label: "Output", tokens: 85 },
+            { id: "reasoning", label: "Reasoning", tokens: 74 },
+            { id: "cache-read", label: "Cache read", tokens: 2_432 },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("maps current Codex tokenUsage notifications into context usage", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "thread/tokenUsage/updated",
+      {
+        threadId: "x",
+        turnId: "turn-1",
+        tokenUsage: {
+          total: {
+            inputTokens: 11_833,
+            cachedInputTokens: 3456,
+            outputTokens: 6,
+            reasoningOutputTokens: 0,
+            totalTokens: 11_839,
+          },
+          last: {
+            inputTokens: 120,
+            cachedInputTokens: 0,
+            outputTokens: 6,
+            reasoningOutputTokens: 4,
+            totalTokens: 130,
+          },
+          modelContextWindow: 258_400,
+        },
+      },
+      state,
+    );
+
+    expect(events).toEqual([
+      {
+        type: "context.updated",
+        threadId: "t-codex",
+        usage: {
+          usedTokens: 130,
+          maxTokens: 258_400,
+          breakdown: [
+            { id: "input", label: "Input", tokens: 120 },
+            { id: "output", label: "Output", tokens: 6 },
+            { id: "reasoning", label: "Reasoning", tokens: 4 },
+          ],
+        },
+      },
+    ]);
+  });
+});
+
+describe("mapCodexNotification — goals", () => {
+  it("maps Codex thread goal updates to a shared goal chat item", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "thread/goal/updated",
+      {
+        threadId: "provider-thread",
+        turnId: "turn-1",
+        goal: {
+          threadId: "provider-thread",
+          objective: "ship unified GUI goal support",
+          status: "active",
+          tokenBudget: 5000,
+          tokensUsed: 120,
+          timeUsedSeconds: 3,
+          createdAt: 1778570000,
+          updatedAt: 1778570003,
+        },
+      },
+      state,
+    );
+
+    expect(events).toEqual([
+      {
+        type: "item.started",
+        threadId: "t-codex",
+        itemId: expect.stringMatching(/^goal-/u),
+        itemType: "goal",
+        payload: {
+          action: "set",
+          objective: "ship unified GUI goal support",
+          status: "active",
+          tokenBudget: 5000,
+          tokensUsed: 120,
+          timeUsedSeconds: 3,
+          providerThreadId: "provider-thread",
+          updatedAt: 1778570003,
+        },
+      },
+      {
+        type: "item.completed",
+        threadId: "t-codex",
+        itemId: events[0]?.type === "item.started" ? events[0].itemId : "",
+      },
+    ]);
+  });
+
+  it("updates the existing Codex goal item when the goal is cleared", () => {
+    const state = createCodexMapperState("t-codex");
+    const started = mapCodexNotification(
+      "thread/goal/updated",
+      {
+        threadId: "provider-thread",
+        goal: {
+          threadId: "provider-thread",
+          objective: "ship unified GUI goal support",
+          status: "active",
+          tokenBudget: null,
+          tokensUsed: 0,
+          timeUsedSeconds: 0,
+          createdAt: 1778570000,
+          updatedAt: 1778570000,
+        },
+      },
+      state,
+    );
+    const goalItemId = started[0]?.type === "item.started" ? started[0].itemId : "";
+
+    const cleared = mapCodexNotification(
+      "thread/goal/cleared",
+      { threadId: "provider-thread" },
+      state,
+    );
+
+    expect(cleared).toEqual([
+      {
+        type: "item.updated",
+        threadId: "t-codex",
+        itemId: goalItemId,
+        payload: {
+          action: "cleared",
+          providerThreadId: "provider-thread",
+        },
+      },
+      { type: "item.completed", threadId: "t-codex", itemId: goalItemId },
+    ]);
+  });
 });
 
 describe("mapCodexNotification — item lifecycle (item/started, item/completed)", () => {

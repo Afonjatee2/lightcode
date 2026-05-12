@@ -67,5 +67,19 @@ describe("parseProjectPathRef", () => {
         path: "README.md",
       });
     });
+
+    it("accepts absolute POSIX paths without enforcing root-name check", () => {
+      // Absolute paths can't be validated against project-relative root names;
+      // downstream normalization converts them to project-relative if possible.
+      expect(parseProjectPathRef("/home/me/repo/src/foo.ts", { rootNames })).toEqual({
+        kind: "file",
+        path: "/home/me/repo/src/foo.ts",
+      });
+      expect(parseProjectPathRef("/home/me/repo/src/foo.ts:42", { rootNames })).toEqual({
+        kind: "file",
+        path: "/home/me/repo/src/foo.ts",
+        line: 42,
+      });
+    });
   });
 });

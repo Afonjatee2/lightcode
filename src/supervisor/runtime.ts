@@ -100,6 +100,8 @@ import type {
   PrData,
   ReadAbsoluteFilePayload,
   ReadAbsoluteFileResult,
+  ReadExternalFilePayload,
+  ReadExternalFileResult,
   ReadProjectFilePayload,
   ReadProjectFileResult,
   RenameProjectEntryPayload,
@@ -116,6 +118,8 @@ import type {
   StartThreadPayload,
   StartThreadResult,
   ThreadRuntimeSnapshot,
+  WriteExternalFilePayload,
+  WriteExternalFileResult,
   WriteProjectFilePayload,
   WriteProjectFileResult,
   WriteTerminalPayload,
@@ -962,8 +966,16 @@ export class SupervisorRuntime {
     return this.projectTreeService.readAbsoluteFile(payload);
   }
 
+  async readExternalFile(payload: ReadExternalFilePayload): Promise<ReadExternalFileResult> {
+    return this.projectTreeService.readExternalFile(payload);
+  }
+
   async writeProjectFile(payload: WriteProjectFilePayload): Promise<WriteProjectFileResult> {
     return this.projectTreeService.writeProjectFile(payload);
+  }
+
+  async writeExternalFile(payload: WriteExternalFilePayload): Promise<WriteExternalFileResult> {
+    return this.projectTreeService.writeExternalFile(payload);
   }
 
   async createProjectEntry(payload: CreateProjectEntryPayload): Promise<void> {

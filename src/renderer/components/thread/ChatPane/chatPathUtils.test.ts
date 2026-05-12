@@ -29,6 +29,24 @@ describe("normalizeChatProjectPath", () => {
     ).toBe("src/supervisor/agents/acp/session.ts:945");
   });
 
+  it("preserves out-of-project absolute POSIX paths for external-file editor routing", () => {
+    expect(
+      normalizeChatProjectPath("/etc/hosts", {
+        kind: "posix",
+        path: "/home/me/repo",
+      }),
+    ).toBe("/etc/hosts");
+  });
+
+  it("preserves out-of-project file URIs as absolute paths", () => {
+    expect(
+      normalizeChatProjectPath("file:///etc/hosts", {
+        kind: "posix",
+        path: "/home/me/repo",
+      }),
+    ).toBe("/etc/hosts");
+  });
+
   it("normalizes WSL Linux paths to project-relative paths", () => {
     expect(
       normalizeChatProjectPath("/home/me/repo/src/supervisor/agents/acp/session.ts:945", {

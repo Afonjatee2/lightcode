@@ -107,7 +107,6 @@ describe("ThreadView", () => {
         path: "C:\\repo",
       },
       pendingLaunchPrompt: "hi",
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onLaunchConsumed,
       onResolveServerRequest: async () => undefined,
@@ -186,7 +185,6 @@ describe("ThreadView", () => {
         path: "C:\\repo",
       },
       pendingLaunchPrompt: "hi",
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onLaunchConsumed,
       onLaunchFailed,
@@ -248,7 +246,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -302,7 +299,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -356,7 +352,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -416,7 +411,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -427,169 +421,6 @@ describe("ThreadView", () => {
       screen.getByPlaceholderText("Ask Codex anything about this workspace"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Send message")).toBeDisabled();
-  });
-
-  it("renders server request UI instead of the composer while Codex is waiting", () => {
-    renderThreadView({
-      thread: {
-        id: "thread-1",
-        projectId: "project-1",
-        title: "Codex thread",
-        agentKind: "codex",
-        config: {
-          model: "gpt-5.4",
-        },
-        status: "needs_reply",
-        attention: "needs_reply",
-        canResumeWithConfig: true,
-        archived: false,
-        done: false,
-        starred: false,
-        sessionRef: {
-          providerSessionId: "session-1",
-          discoveredAt: new Date().toISOString(),
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      agentStatus: {
-        kind: "codex",
-        label: "Codex",
-        installed: true,
-        authState: "authenticated",
-        capabilities: {
-          models: [{ id: "gpt-5.4", label: "5.4" }],
-          efforts: ["low"],
-          modelEfforts: {},
-          modes: ["agent"],
-          approvalPolicies: [{ id: "on-request", label: "On Request" }],
-          sandboxModes: [{ id: "read-only", label: "Read Only" }],
-          supportsResume: true,
-          supportsDirectInput: true,
-          liveInputMode: "server",
-          presentationMode: "terminal",
-          settingDefs: [],
-        },
-      },
-      projectLocation: {
-        kind: "windows",
-        path: "C:\\repo",
-      },
-      pendingServerRequests: [
-        {
-          threadId: "thread-1",
-          requestId: "request-1",
-          method: "item/tool/requestUserInput",
-          params: {
-            questions: [
-              {
-                id: "repo_name",
-                header: "Repository",
-                question: "Which repository should Codex inspect?",
-                isOther: false,
-                isSecret: false,
-                options: null,
-              },
-            ],
-          },
-          receivedAt: new Date().toISOString(),
-        },
-      ],
-      onConfigChange: () => undefined,
-      onResolveServerRequest: async () => undefined,
-      onSubmitInput: async () => undefined,
-    });
-
-    expect(screen.getByText("Input requested")).toBeInTheDocument();
-  });
-
-  it("resolves ACP permission requests with the selected option id", async () => {
-    const onResolveServerRequest = vi
-      .fn<
-        (input: { requestId: string | number; method: string; response: unknown }) => Promise<void>
-      >()
-      .mockResolvedValue(undefined);
-
-    renderThreadView({
-      thread: {
-        id: "thread-acp-request",
-        projectId: "project-1",
-        title: "Gemini thread",
-        agentKind: "gemini",
-        config: {
-          model: "gemini-3-flash-preview",
-        },
-        status: "needs_approval",
-        attention: "needs_approval",
-        canResumeWithConfig: true,
-        archived: false,
-        done: false,
-        starred: false,
-        sessionRef: {
-          providerSessionId: "session-1",
-          discoveredAt: new Date().toISOString(),
-        },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      },
-      agentStatus: {
-        kind: "gemini",
-        label: "Gemini",
-        installed: true,
-        authState: "authenticated",
-        capabilities: {
-          models: [{ id: "gemini-3-flash-preview", label: "Gemini 3 Flash" }],
-          efforts: [],
-          modelEfforts: {},
-          modes: ["agent"],
-          approvalPolicies: [{ id: "default", label: "Default" }],
-          sandboxModes: [],
-          supportsResume: true,
-          supportsDirectInput: true,
-          liveInputMode: "terminal",
-          presentationMode: "terminal",
-          presentationModes: ["terminal", "gui"],
-          settingDefs: [],
-        },
-      },
-      projectLocation: {
-        kind: "windows",
-        path: "C:\\repo",
-      },
-      pendingServerRequests: [
-        {
-          threadId: "thread-acp-request",
-          requestId: "acp-perm-1",
-          method: "requestPermission",
-          params: {
-            toolCall: {
-              toolCallId: "tool-1",
-              kind: "execute",
-              title: "echo hi",
-              rawInput: { command: "echo hi" },
-            },
-            options: [
-              { optionId: "allow_once", name: "Allow once", kind: "allow_once" },
-              { optionId: "reject_once", name: "Reject", kind: "reject_once" },
-            ],
-          },
-          receivedAt: new Date().toISOString(),
-        },
-      ],
-      onConfigChange: () => undefined,
-      onResolveServerRequest,
-      onSubmitInput: async () => undefined,
-    });
-
-    fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
-
-    await waitFor(() => {
-      expect(onResolveServerRequest).toHaveBeenCalledWith({
-        requestId: "acp-perm-1",
-        method: "requestPermission",
-        response: { optionId: "allow_once" },
-      });
-    });
   });
 
   it("keeps Claude live threads terminal-driven", () => {
@@ -638,7 +469,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -696,7 +526,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -771,7 +600,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -877,7 +705,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -886,6 +713,88 @@ describe("ThreadView", () => {
     expect(screen.getByLabelText("Thread todo dock")).toHaveAttribute("data-placement", "composer");
     expect(screen.getAllByText("Build ACP todo dock")).toHaveLength(1);
     expect(screen.queryByText("Old inline todo")).not.toBeInTheDocument();
+    expect(screen.queryByText("No messages yet")).not.toBeInTheDocument();
+  });
+
+  it("shows the active GUI goal in the composer dock instead of the chat transcript", () => {
+    useAppStore.setState({
+      runtimeItemIdsByThread: {
+        "thread-gui-goal": ["goal-1"],
+      },
+      runtimeItemsByIdByThread: {
+        "thread-gui-goal": {
+          "goal-1": {
+            id: "goal-1",
+            type: "goal",
+            state: "completed",
+            payload: {
+              action: "set",
+              objective: "Ship GUI goal dock",
+              status: "active",
+              tokensUsed: 120,
+              timeUsedSeconds: 5,
+              updatedAt: Date.now() / 1000,
+            },
+            streams: {},
+          },
+        },
+      },
+    });
+
+    renderThreadView({
+      thread: {
+        id: "thread-gui-goal",
+        projectId: "project-1",
+        title: "GUI Codex goal thread",
+        agentKind: "codex",
+        config: {
+          model: "gpt-5.4",
+        },
+        status: "idle",
+        attention: "none",
+        canResumeWithConfig: true,
+        archived: false,
+        done: false,
+        starred: false,
+        presentationMode: "gui",
+        sessionRef: {
+          providerSessionId: "session-gui-goal",
+          discoveredAt: new Date().toISOString(),
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "codex",
+        label: "Codex",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "read-only", label: "Read Only" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "gui",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      onConfigChange: () => undefined,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    expect(screen.getByLabelText("Thread goal dock")).toHaveAttribute("data-placement", "composer");
+    expect(screen.getAllByText("Ship GUI goal dock")).toHaveLength(1);
+    expect(screen.queryByText("Goal set")).not.toBeInTheDocument();
     expect(screen.queryByText("No messages yet")).not.toBeInTheDocument();
   });
 
@@ -958,7 +867,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -1056,7 +964,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -1116,7 +1023,6 @@ describe("ThreadView", () => {
             kind: "windows",
             path: "C:\\repo",
           }}
-          pendingServerRequests={[]}
           onConfigChange={() => undefined}
           onResolveServerRequest={async () => undefined}
           onSubmitInput={async () => undefined}
@@ -1176,7 +1082,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -1238,7 +1143,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput: async () => undefined,
@@ -1302,7 +1206,6 @@ describe("ThreadView", () => {
         kind: "windows",
         path: "C:\\repo",
       },
-      pendingServerRequests: [],
       onConfigChange: () => undefined,
       onResolveServerRequest: async () => undefined,
       onSubmitInput,

@@ -62,7 +62,6 @@ function makeConfigSyncSession(
   const listener = {
     onClose: vi.fn<() => void>(),
     onError: vi.fn<(message: string) => void>(),
-    onServerRequest: vi.fn<(request: unknown) => void>(),
     onUpdate: vi.fn<(update: unknown) => void>(),
     onRuntimeEvent: vi.fn<(event: unknown) => void>(),
   };

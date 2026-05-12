@@ -96,7 +96,6 @@ describe("ChatPane", () => {
       ...state,
       projects: [],
       threads: [],
-      pendingServerRequests: [],
       view: { kind: "home" },
       runtimeItemIdsByThread: {},
       runtimeItemsByIdByThread: {},
@@ -350,6 +349,66 @@ describe("ChatPane", () => {
     expect(metrics.getScrollTop()).toBe(80);
   });
 
+  it("re-pins when the scroll viewport shrinks while already at the bottom", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 300,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(200);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      metrics.setClientHeight(60);
+      MockResizeObserver.notify(scrollElement);
+    });
+
+    expect(metrics.getScrollTop()).toBe(300);
+  });
+
+  it("keeps the user's place when the scroll viewport shrinks after they scrolled up", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 300,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(200);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      fireEvent.wheel(scrollElement, { deltaY: -120 });
+      metrics.setScrollTop(120);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      metrics.setClientHeight(60);
+      MockResizeObserver.notify(scrollElement);
+    });
+
+    expect(metrics.getScrollTop()).toBe(120);
+  });
+
   it("keeps running command accordions closed until clicked", async () => {
     const thread = makeThread();
     seedCommandItem(thread.id, "cmd-1", "npm run test", "command output");
@@ -554,6 +613,37 @@ describe("ChatPane", () => {
 
     const label = screen.getByText("Worked for 1m 15s");
     expect(label.closest(".surface")).not.toBeNull();
+  });
+
+  it("keeps a completed turn anchored before an optimistic follow-up prompt", async () => {
+    const thread = {
+      ...makeThread(),
+      status: "idle" as const,
+      activeTurnStartedAt: undefined,
+      lastTurnStartedAt: "2026-05-01T12:00:00.000Z",
+      lastTurnEndedAt: "2026-05-01T12:01:15.000Z",
+    };
+    seedAssistantMessage(thread.id, "Inspect output");
+    useAppStore.getState().hydrateThreadCompletedTurns(thread.id, [
+      {
+        startedAt: new Date("2026-05-01T12:00:00.000Z").getTime(),
+        endedAt: new Date("2026-05-01T12:01:15.000Z").getTime(),
+        anchorItemId: ASSISTANT_ITEM_ID,
+      },
+    ]);
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(screen.getByText("Worked for 1m 15s")).toBeInTheDocument());
+
+    act(() => {
+      seedUserMessage(thread.id, "Follow-up prompt", "user-2");
+    });
+    await screen.findByText("Follow-up prompt");
+
+    expect(screen.getAllByText("Worked for 1m 15s")).toHaveLength(1);
+    const text = container.textContent ?? "";
+    expect(text.indexOf("Inspect output")).toBeLessThan(text.indexOf("Worked for 1m 15s"));
+    expect(text.indexOf("Worked for 1m 15s")).toBeLessThan(text.indexOf("Follow-up prompt"));
   });
 
   it("shows checkpoint buttons on later user messages and reverts to before that prompt", async () => {

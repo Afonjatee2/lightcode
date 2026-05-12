@@ -20,7 +20,12 @@ import type {
   ToolState,
 } from "@opencode-ai/sdk/v2";
 import type { CanonicalItemType, CanonicalRequestType, RuntimeEvent } from "@/shared/contracts";
-import { readDiffSummary } from "../fileChangeSummary";
+import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
+import {
+  createContextUsageEvent,
+  readNonNegativeInteger,
+  usageFromTokenCounts,
+} from "../contextUsage";
 
 export interface OpenCodeMapperState {
   threadId: string;
@@ -133,6 +138,28 @@ function toolStateStatus(state: ToolState): "running" | "success" | "error" {
   return "running";
 }
 
+function createOpenCodeContextUsageEvent(
+  threadId: string,
+  info: unknown,
+): RuntimeEvent | undefined {
+  if (!info || typeof info !== "object") return undefined;
+  const tokens = (info as { tokens?: unknown }).tokens;
+  if (!tokens || typeof tokens !== "object") return undefined;
+  const obj = tokens as Record<string, unknown>;
+  const cache =
+    obj.cache && typeof obj.cache === "object" ? (obj.cache as Record<string, unknown>) : {};
+  return createContextUsageEvent(
+    threadId,
+    usageFromTokenCounts({
+      inputTokens: readNonNegativeInteger(obj.input),
+      outputTokens: readNonNegativeInteger(obj.output),
+      thoughtTokens: readNonNegativeInteger(obj.reasoning),
+      cachedReadTokens: readNonNegativeInteger(cache.read),
+      cachedWriteTokens: readNonNegativeInteger(cache.write),
+    }),
+  );
+}
+
 /**
  * Build the canonical payload for a tool item based on its current state.
  *
@@ -191,12 +218,7 @@ function toolPayload(
     };
   }
   if (itemType === "file_change") {
-    const path =
-      typeof state.input?.path === "string"
-        ? state.input.path
-        : typeof state.input?.filePath === "string"
-          ? state.input.filePath
-          : "";
+    const path = readFileChangePath(state.input, result, title) ?? "";
     const diffSummary = readDiffSummary(
       state.input,
       result,
@@ -530,6 +552,8 @@ export function mapOpenCodeEvent(
     }
     case "message.updated": {
       const info = event.properties.info;
+      const usageEvent = createOpenCodeContextUsageEvent(state.threadId, info);
+      if (usageEvent) events.push(usageEvent);
       state.messageRoles.set(info.id, info.role);
       if (info.role === "user" && !state.userItems.has(info.id)) {
         const optimistic = state.pendingUserMessageItemIds.shift();

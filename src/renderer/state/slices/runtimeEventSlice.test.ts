@@ -84,6 +84,26 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     );
   });
 
+  it("stores context usage updates and marks the thread dirty for persistence", () => {
+    apply("t1", {
+      type: "context.updated",
+      threadId: "t1",
+      usage: {
+        usedTokens: 71_000,
+        maxTokens: 200_000,
+        breakdown: [{ id: "input", label: "Input", tokens: 71_000 }],
+      },
+    });
+
+    const state = store.getState();
+    expect(state.runtimeContextByThread["t1"]).toEqual({
+      usedTokens: 71_000,
+      maxTokens: 200_000,
+      breakdown: [{ id: "input", label: "Input", tokens: 71_000 }],
+    });
+    expect(state.runtimeDirtyThreadIds).toEqual(["t1"]);
+  });
+
   it("deduplicates overlapping streamed chunks", () => {
     apply("t1", {
       type: "item.started",

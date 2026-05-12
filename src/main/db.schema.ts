@@ -82,6 +82,19 @@ export const threadRuntimeItems = sqliteTable(
 );
 
 /**
+ * Latest provider-reported context-window usage per thread. One row per
+ * thread; rewritten alongside the runtime snapshot so the indicator can
+ * recover after app restart or session resume (providers only emit fresh
+ * `context.updated` values on the next assistant response).
+ */
+export const threadContextUsage = sqliteTable("thread_context_usage", {
+  threadId: text("thread_id")
+    .primaryKey()
+    .references(() => threads.id, { onDelete: "cascade" }),
+  usage: text("usage").notNull(),
+});
+
+/**
  * Frozen per-turn timing windows. One row per completed turn (first user
  * input → thread settles back to idle), in chronological order via `idx`.
  * `anchorItemId` points at the last canonical item present when the turn

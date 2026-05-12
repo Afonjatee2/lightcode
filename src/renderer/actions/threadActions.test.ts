@@ -20,7 +20,6 @@ describe("threadActions", () => {
       ...state,
       projects: [],
       threads: [],
-      pendingServerRequests: [],
       view: { kind: "home" },
     }));
   });

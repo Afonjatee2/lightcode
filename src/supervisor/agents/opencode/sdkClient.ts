@@ -5,7 +5,7 @@ import { buildOpenCodeServerCommand } from "./argv";
 import { spawnOpenCodeServer, type OpenCodeServerHandle } from "./sdkServer";
 
 /** Agent-side cwd that the SDK passes through to the server's session config. */
-function resolveSessionCwd(location: ProjectLocation): string {
+export function resolveOpenCodeSessionDirectory(location: ProjectLocation): string {
   switch (location.kind) {
     case "windows":
       return location.path;
@@ -69,7 +69,7 @@ async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSna
   const { createOpencodeClient } = await import("@opencode-ai/sdk/v2/client");
   const client = createOpencodeClient({
     baseUrl,
-    directory: resolveSessionCwd(projectLocation),
+    directory: resolveOpenCodeSessionDirectory(projectLocation),
     throwOnError: true,
   });
 

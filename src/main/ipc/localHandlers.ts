@@ -5,6 +5,7 @@ import {
   dbGetProjects,
   dbGetState,
   dbGetThreadCompletedTurns,
+  dbGetThreadContextUsage,
   dbGetThreadRuntimeItems,
   dbGetThreads,
   dbReplaceThreadCompletedTurns,
@@ -137,8 +138,9 @@ export function createLocalIpcHandlers(
     dbGetThreadCompletedTurns: ({ threadId }) => dbGetThreadCompletedTurns(threadId),
     dbReplaceThreadCompletedTurns: ({ threadId, turns }) =>
       dbReplaceThreadCompletedTurns(threadId, turns),
-    dbReplaceThreadRuntimeSnapshot: ({ threadId, items, turns }) =>
-      dbReplaceThreadRuntimeSnapshot(threadId, items, turns),
+    dbReplaceThreadRuntimeSnapshot: ({ threadId, items, turns, contextUsage }) =>
+      dbReplaceThreadRuntimeSnapshot(threadId, items, turns, contextUsage),
+    dbGetThreadContextUsage: ({ threadId }) => dbGetThreadContextUsage(threadId),
     checkForUpdate: () => options.autoUpdater.checkForUpdate(),
     startUpdateDownload: () => options.autoUpdater.startUpdateDownload(),
     installUpdate: () => options.autoUpdater.installUpdate(),
