@@ -37,7 +37,12 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
   const cwd = payload?.cwd?.trim() ?? readAcpStringField(payload, "cwd")?.trim() ?? undefined;
   const isRunning = item.state !== "completed";
   const [isExpanded, setIsExpanded] = useState(false);
-  const status = resolveCommandStatus(isRunning, payload?.exitCode, payload?.durationMs);
+  const status = resolveCommandStatus(
+    isRunning,
+    payload?.exitCode,
+    payload?.durationMs,
+    payload?.status === "error",
+  );
   const fullCommandLine = formatShellInvocation(cwd, command);
   const display = commandIntentDisplay(fullCommandLine);
   const Icon = iconForCommandIntent(display.kind);
@@ -67,6 +72,7 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
     <ChatItemAccordion
       icon={<Icon className="size-3" />}
       title={display.title}
+      {...(display.parts ? { titleParts: display.parts } : {})}
       rightLabel={status.rightLabel}
       rightLabelClassName={status.textClass}
       isExpanded={isExpanded}
@@ -103,6 +109,7 @@ function resolveCommandStatus(
   isRunning: boolean,
   exitCode: number | undefined,
   durationMs: number | undefined,
+  isPayloadError = false,
 ): CommandStatus {
   if (isRunning) {
     return {
@@ -111,7 +118,7 @@ function resolveCommandStatus(
     };
   }
   const dur = durationMs != null ? formatDuration(durationMs) : "";
-  if (exitCode === undefined || exitCode === 0) {
+  if (!isPayloadError && (exitCode === undefined || exitCode === 0)) {
     return { textClass: "!text-[color:var(--muted)]", rightLabel: dur };
   }
   return {

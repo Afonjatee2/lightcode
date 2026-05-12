@@ -93,6 +93,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
 
   if (items.length === 0) return null;
   const sections = summarizeToolCalls(items);
+  const sameFileEditSummary = summarizeSameFileEditGroup(items);
   const visibleItems =
     !showAll && hasOverflowRows ? items.slice(-TOOL_CALL_GROUP_MAX_VISIBLE_ROWS) : items;
 
@@ -109,21 +110,25 @@ export const ToolCallGroup = memo(function ToolCallGroup({
         <Disclosure.Heading>
           <Disclosure.Trigger className="flex w-full min-w-0 items-center gap-2 py-0 text-left">
             <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden whitespace-nowrap text-[color:var(--muted)]">
-              {sections.map((section, idx) => (
-                <Fragment key={section.category}>
-                  {idx > 0 ? (
-                    <span aria-hidden="true" className="select-none opacity-40">
-                      ·
+              {sameFileEditSummary ? (
+                <SameFileEditGroupTitle summary={sameFileEditSummary} />
+              ) : (
+                sections.map((section, idx) => (
+                  <Fragment key={section.category}>
+                    {idx > 0 ? (
+                      <span aria-hidden="true" className="select-none opacity-40">
+                        ·
+                      </span>
+                    ) : null}
+                    <span className="flex shrink-0 items-center gap-1">
+                      <section.Icon className="size-3" />
+                      <code className="font-mono tabular-nums !text-[color:var(--muted)]">
+                        {section.count} {section.label}
+                      </code>
                     </span>
-                  ) : null}
-                  <span className="flex shrink-0 items-center gap-1">
-                    <section.Icon className="size-3" />
-                    <code className="font-mono tabular-nums !text-[color:var(--muted)]">
-                      {section.count} {section.label}
-                    </code>
-                  </span>
-                </Fragment>
-              ))}
+                  </Fragment>
+                ))
+              )}
             </div>
             <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
           </Disclosure.Trigger>
@@ -163,6 +168,34 @@ export const ToolCallGroup = memo(function ToolCallGroup({
     </div>
   );
 });
+
+interface SameFileEditGroupSummary {
+  count: number;
+  path: string;
+  diffSummary?: NonNullable<FileChangePayload["diffSummary"]>;
+}
+
+function SameFileEditGroupTitle({ summary }: { summary: SameFileEditGroupSummary }) {
+  const diffLabel = formatDiffSummaryLabel(summary.diffSummary);
+  const label = `${summary.count} ${summary.count === 1 ? "edit" : "edits"}:`;
+  return (
+    <>
+      <span className="flex shrink-0 items-center gap-1">
+        <Pencil className="size-3" />
+        <code className="font-mono tabular-nums !text-[color:var(--muted)]">{label}</code>
+      </span>
+      <code className="flex min-w-0 flex-1 font-mono !text-[color:var(--muted)]">
+        <PathDisplay
+          className="flex-1"
+          path={summary.path}
+          basenameClassName="!text-[color:var(--foreground)]"
+          dirClassName="!text-[color:var(--muted)]"
+        />
+      </code>
+      {diffLabel ? <span className="shrink-0 tabular-nums font-medium">{diffLabel}</span> : null}
+    </>
+  );
+}
 
 function ToolCallInline({ item }: { item: RuntimeChatItem }) {
   const actions = useChatPaneActions();
@@ -332,7 +365,9 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
       ? item.streams.command_output
       : extractAcpResultText(payload);
   const isRunning = item.state !== "completed";
-  const isErrorExit = !isRunning && payload?.exitCode != null && payload.exitCode !== 0;
+  const isErrorExit =
+    !isRunning &&
+    (payload?.status === "error" || (payload?.exitCode != null && payload.exitCode !== 0));
   const rightLabel: ReactNode = isRunning ? (
     <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
   ) : isErrorExit ? (
@@ -341,6 +376,7 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
   return {
     Icon: display ? iconForCommandIntent(display.kind) : Terminal,
     title: display?.title ?? "Run command",
+    ...(display?.parts ? { titleParts: display.parts } : {}),
     rightLabel,
     rightLabelClassName: isErrorExit ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails: output.length > 0,
@@ -368,8 +404,11 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
       : [];
   const isRunning = item.state !== "completed";
   const diffSummary = payload.diffSummary ?? extractAcpDiffSummary(payload);
+  const isError = payload.status === "error";
   const rightLabel: ReactNode = isRunning ? (
     <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
+  ) : isError ? (
+    <ErrorIcon />
   ) : diffSummary ? (
     formatDiffSummaryLabel(diffSummary)
   ) : undefined;
@@ -390,7 +429,7 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
     title,
     ...(titleParts ? { titleParts } : {}),
     rightLabel,
-    rightLabelClassName: "text-[color:var(--muted)]",
+    rightLabelClassName: isError ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails:
       !!item.streams.file_change_output || createContent !== undefined || hasAuxFields(payload),
     sections,
@@ -475,6 +514,70 @@ function summarizeToolCalls(items: readonly RuntimeChatItem[]): GroupSection[] {
         Icon: meta.Icon,
       };
     });
+}
+
+function summarizeSameFileEditGroup(
+  items: readonly RuntimeChatItem[],
+): SameFileEditGroupSummary | null {
+  if (items.length <= 1) return null;
+
+  let sharedPath: string | undefined;
+  let added = 0;
+  let removed = 0;
+  let hasDiffSummary = false;
+  let missingDiffSummary = false;
+
+  for (const item of items) {
+    if (categorizeItem(item) !== "edited") return null;
+    const path = readEditGroupPath(item);
+    if (!path) return null;
+    if (sharedPath === undefined) {
+      sharedPath = path;
+    } else if (normalizeEditGroupPath(sharedPath) !== normalizeEditGroupPath(path)) {
+      return null;
+    }
+
+    const diffSummary = readFileChangeDiffSummary(item);
+    if (diffSummary) {
+      hasDiffSummary = true;
+      added += diffSummary.added;
+      removed += diffSummary.removed;
+    } else {
+      missingDiffSummary = true;
+    }
+  }
+
+  if (!sharedPath) return null;
+  return {
+    count: items.length,
+    path: sharedPath,
+    ...(hasDiffSummary && !missingDiffSummary ? { diffSummary: { added, removed } } : {}),
+  };
+}
+
+function readEditGroupPath(item: RuntimeChatItem): string | undefined {
+  if (item.type === "file_change") {
+    const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
+    return payload?.path && payload.path.length > 0 ? payload.path : undefined;
+  }
+  if (item.type !== "tool_call") return undefined;
+  const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+  if (!payload) return undefined;
+  const display = deriveToolDisplay(payload);
+  if (display.parts?.filePath && display.parts.path.length > 0) return display.parts.path;
+  return payload.locations?.find((location) => location.path.length > 0)?.path;
+}
+
+function readFileChangeDiffSummary(
+  item: RuntimeChatItem,
+): NonNullable<FileChangePayload["diffSummary"]> | undefined {
+  if (item.type !== "file_change") return undefined;
+  const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
+  return payload?.diffSummary ?? extractAcpDiffSummary(payload);
+}
+
+function normalizeEditGroupPath(path: string): string {
+  return path.trim().replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+/g, "/");
 }
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {

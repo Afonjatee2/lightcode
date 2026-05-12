@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -86,9 +86,29 @@ describe("ToolCallGroup", () => {
     );
 
     expect(screen.getByText("+4")).toHaveClass("text-success");
-    expect(screen.getByText("-2")).toHaveClass("text-danger");
+    expect(screen.getAllByText("-2")[0]).toHaveClass("text-danger");
     expect(screen.getByText("+5")).toHaveClass("text-success");
     expect(screen.queryByText("-0")).not.toBeInTheDocument();
+  });
+
+  it("summarizes same-file edit groups with the file path and total diff", () => {
+    const threadId = "thread-1";
+    const items = [
+      makeFileChangeItem("file-1", { added: 4, removed: 2 }),
+      makeFileChangeItem("file-2", { added: 5, removed: 3 }),
+    ];
+    seedThread(threadId, items);
+
+    renderToolCallGroup(
+      threadId,
+      items.map((item) => item.id),
+    );
+
+    const heading = screen.getByRole("button", { name: /2 edits:/i });
+    expect(within(heading).getByText("foo.ts")).toBeInTheDocument();
+    expect(within(heading).getByText("src")).toBeInTheDocument();
+    expect(within(heading).getByText("+9")).toHaveClass("text-success");
+    expect(within(heading).getByText("-5")).toHaveClass("text-danger");
   });
 
   it("renders file-change diffs directly instead of args/result sections", async () => {
@@ -160,7 +180,7 @@ describe("ToolCallGroup", () => {
       items.map((item) => item.id),
     );
 
-    expect(screen.getByText("View lines 1-24: src/supervisor/runtime.test.ts")).toBeInTheDocument();
+    expect(document.body).toHaveTextContent("View 1:24: src/supervisor/runtime.test.ts");
     expect(
       screen.getByText('Search files: "vitest.mjs" in node_modules/.pnpm'),
     ).toBeInTheDocument();

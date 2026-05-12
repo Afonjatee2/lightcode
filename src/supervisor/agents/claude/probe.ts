@@ -50,7 +50,9 @@ export function claudeCapabilitiesFromCliVersion(
   return { models, modelEfforts };
 }
 
-function mapSlashCommands(commands: SlashCommand[]): NonNullable<AgentCapability["slashCommands"]> {
+export function mapClaudeSlashCommands(
+  commands: readonly SlashCommand[],
+): NonNullable<AgentCapability["slashCommands"]> {
   return commands.map((c) => ({
     id: c.name,
     label: c.description?.trim() ? `${c.name} — ${c.description}` : c.name,
@@ -129,7 +131,7 @@ async function probeClaudeSdkPartialNative(
         },
       });
       const init = await q.initializationResult();
-      const slashCommands = mapSlashCommands(init.commands);
+      const slashCommands = mapClaudeSlashCommands(init.commands);
       try {
         q.close();
       } catch {

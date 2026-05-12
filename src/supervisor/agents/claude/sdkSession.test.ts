@@ -12,7 +12,7 @@ vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: mockSdk.query,
 }));
 
-function createFakeQuery() {
+function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
   let closed = false;
   let resolveNext: ((result: IteratorResult<SDKMessage>) => void) | undefined;
   const setModel = vi.fn<(model?: string) => Promise<void>>().mockResolvedValue(undefined);
@@ -44,7 +44,9 @@ function createFakeQuery() {
       .fn<(maxThinkingTokens: number | null) => Promise<void>>()
       .mockResolvedValue(undefined),
     applyFlagSettings: vi.fn<(settings: unknown) => Promise<void>>().mockResolvedValue(undefined),
-    initializationResult: vi.fn<() => Promise<unknown>>().mockResolvedValue({ commands: [] }),
+    initializationResult: vi.fn<() => Promise<unknown>>().mockResolvedValue({
+      commands: initCommands,
+    }),
     supportedCommands: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
     supportedModels: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
     close: vi.fn<() => void>(() => {
@@ -90,6 +92,48 @@ describe("ClaudeSdkSession", () => {
     expect(mockSdk.query).toHaveBeenCalledTimes(1);
     expect(fake.setModel).toHaveBeenCalledWith("sonnet");
     expect(fake.setPermissionMode).toHaveBeenCalledWith("auto");
+
+    await session.dispose();
+  });
+
+  it("surfaces live SDK slash commands on GUI sessions", async () => {
+    const fake = createFakeQuery([
+      {
+        name: "goal",
+        description: "Set a goal — keep working until the condition is met",
+        argumentHint: "",
+      },
+    ]);
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const updates: StructuredSessionUpdate[] = [];
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-goal",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: () => {},
+      onUpdate: (update) => updates.push(update),
+      onServerRequest: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread(config);
+    await Promise.resolve();
+
+    expect(updates).toContainEqual(
+      expect.objectContaining({
+        slashCommands: [
+          {
+            id: "goal",
+            label: "goal — Set a goal — keep working until the condition is met",
+            description: "Set a goal — keep working until the condition is met",
+          },
+        ],
+      }),
+    );
 
     await session.dispose();
   });

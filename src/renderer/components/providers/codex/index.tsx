@@ -56,6 +56,11 @@ registerGuiSlashCommands("codex", {
       label: "agent - Switch this chat to agent mode",
       description: "Switch this chat to agent mode",
     },
+    {
+      id: "goal",
+      label: "goal - Set or view an experimental goal",
+      description: "Set or view an experimental goal",
+    },
     ...(hasEffort
       ? [
           {

@@ -176,7 +176,12 @@ function ChildList({ threadId, childIds }: { threadId: string; childIds: readonl
   return (
     <div className="flex flex-col gap-1.5 px-3 py-3">
       {childIds.map((id) => (
-        <ChatItemRow key={id} threadId={threadId} entry={{ kind: "item", id }} />
+        <ChatItemRow
+          key={id}
+          threadId={threadId}
+          entry={{ kind: "item", id }}
+          checkpointRevertControl={null}
+        />
       ))}
     </div>
   );

@@ -74,6 +74,8 @@ export const reasoningItemPayloadSchema = z.object({
 });
 export type ReasoningItemPayload = z.infer<typeof reasoningItemPayloadSchema>;
 
+export const toolCallStatusSchema = z.enum(["running", "success", "error"]);
+
 export const planStepStatusSchema = z.enum(["pending", "in_progress", "completed"]);
 export const planItemPayloadSchema = z.object({
   steps: z.array(
@@ -90,6 +92,8 @@ export const commandExecutionPayloadSchema = z.object({
   cwd: z.string().optional(),
   exitCode: z.number().int().optional(),
   durationMs: z.number().int().optional(),
+  status: toolCallStatusSchema.optional(),
+  errorMessage: z.string().optional(),
 });
 export type CommandExecutionPayload = z.infer<typeof commandExecutionPayloadSchema>;
 
@@ -103,10 +107,10 @@ export const fileChangePayloadSchema = z.object({
       removed: z.number().int().nonnegative(),
     })
     .optional(),
+  status: toolCallStatusSchema.optional(),
+  errorMessage: z.string().optional(),
 });
 export type FileChangePayload = z.infer<typeof fileChangePayloadSchema>;
-
-export const toolCallStatusSchema = z.enum(["running", "success", "error"]);
 
 /**
  * Live progress signal a sub-agent (e.g. Claude `Task`) emits while running.

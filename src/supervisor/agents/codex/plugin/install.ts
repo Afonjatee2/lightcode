@@ -246,6 +246,7 @@ function seedWslCodexHome(distro: string, home: string, linuxCodexHome: string):
 
 const MIN_CODEX_SEMVER = [0, 122, 0] as const;
 const CODEX_HOOKS_FEATURE_RENAME_SEMVER = [0, 130, 0] as const;
+const CODEX_GOALS_FEATURE_SEMVER = [0, 130, 0] as const;
 
 export function parseCodexVersionLine(line: string): [number, number, number] | null {
   const m = /codex-cli\s+(\d+)\.(\d+)\.(\d+)/i.exec(line.trim());
@@ -285,6 +286,11 @@ export function probeCodexCliSemver(): [number, number, number] | null {
 export function isCodexSemverSupportedForHooks(v: [number, number, number] | null): boolean {
   if (!v) return false;
   return semverGte(v, MIN_CODEX_SEMVER);
+}
+
+export function isCodexSemverSupportedForGoals(v: [number, number, number] | null): boolean {
+  if (!v) return false;
+  return semverGte(v, CODEX_GOALS_FEATURE_SEMVER);
 }
 
 export function isCodexVersionSupportedForHooks(): boolean {

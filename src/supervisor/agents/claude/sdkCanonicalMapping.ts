@@ -371,12 +371,25 @@ function toolPayload(
   status: "running" | "success" | "error",
   result?: unknown,
 ): unknown {
+  const errorMessage =
+    status === "error" && result && typeof result === "object"
+      ? (result as { message?: unknown }).message
+      : undefined;
+  const errorFields =
+    status === "error"
+      ? {
+          status,
+          ...(typeof errorMessage === "string" && errorMessage.length > 0 ? { errorMessage } : {}),
+          ...(result !== undefined ? { result } : {}),
+        }
+      : {};
   if (tool.itemType === "command_execution") {
     return {
       command:
         typeof tool.input.command === "string"
           ? tool.input.command
           : summarizeToolRequest(tool.toolName, tool.input),
+      ...errorFields,
     };
   }
   if (tool.itemType === "file_change") {
@@ -391,6 +404,7 @@ function toolPayload(
       path,
       changeKind: inferFileChangeKind(tool.toolName),
       ...(diffSummary ? { diffSummary } : {}),
+      ...errorFields,
     };
   }
   if (tool.itemType === "web_search") {
@@ -533,6 +547,83 @@ function applyTaskLifecycle(
     itemId: tool.itemId,
     payload: toolPayload(tool, "running"),
   };
+}
+
+function mapPermissionDenied(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
+  const denied = message as {
+    tool_name?: unknown;
+    tool_use_id?: unknown;
+    message?: unknown;
+    decision_reason?: unknown;
+    decision_reason_type?: unknown;
+  };
+  const toolUseId = typeof denied.tool_use_id === "string" ? denied.tool_use_id : undefined;
+  if (!toolUseId) return [];
+
+  const existing = state.toolItemsById.get(toolUseId);
+  const toolName = typeof denied.tool_name === "string" ? denied.tool_name : "Tool";
+  const tool =
+    existing ??
+    ({
+      itemId: toolUseId,
+      itemType: classifyToolItemType(toolName),
+      toolName,
+      input: {},
+      partialInputJson: "",
+    } satisfies ToolItemState);
+
+  const events: RuntimeEvent[] = [];
+  if (!existing) {
+    state.toolItemsById.set(toolUseId, tool);
+    events.push({
+      type: "item.started",
+      threadId: state.threadId,
+      itemId: tool.itemId,
+      itemType: tool.itemType,
+      payload: toolPayload(tool, "running"),
+    });
+  }
+
+  const messageText =
+    typeof denied.message === "string" && denied.message.length > 0
+      ? denied.message
+      : "Tool use was denied.";
+  const result = {
+    message: messageText,
+    ...(typeof denied.decision_reason === "string"
+      ? { decisionReason: denied.decision_reason }
+      : {}),
+    ...(typeof denied.decision_reason_type === "string"
+      ? { decisionReasonType: denied.decision_reason_type }
+      : {}),
+  };
+  const stream =
+    tool.itemType === "command_execution"
+      ? "command_output"
+      : tool.itemType === "file_change"
+        ? "file_change_output"
+        : undefined;
+  if (stream) {
+    events.push({
+      type: "content.delta",
+      threadId: state.threadId,
+      itemId: tool.itemId,
+      stream,
+      delta: messageText,
+    });
+  }
+  events.push({
+    type: "item.updated",
+    threadId: state.threadId,
+    itemId: tool.itemId,
+    payload: toolPayload(tool, "error", result),
+  });
+  events.push({ type: "item.completed", threadId: state.threadId, itemId: tool.itemId });
+  state.toolItemsById.delete(toolUseId);
+  for (const [idx, value] of state.toolItemsByIndex) {
+    if (value.itemId === toolUseId) state.toolItemsByIndex.delete(idx);
+  }
+  return events;
 }
 
 function readParentToolUseId(message: SDKMessage): string | undefined {
@@ -873,6 +964,10 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
     const updated = applyTaskLifecycle(message, state);
     if (updated) events.push(updated);
     return events;
+  }
+
+  if (message.type === "system" && message.subtype === "permission_denied") {
+    return mapPermissionDenied(message, state);
   }
 
   if (message.type === "system" && message.subtype === "compact_boundary") {

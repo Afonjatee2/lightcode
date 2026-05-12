@@ -5,6 +5,14 @@ import { probeClaudeCapabilities } from "./probe";
 /** Default `--permission-mode` when `ThreadConfig.approvalPolicy` is omitted. */
 export const CLAUDE_DEFAULT_APPROVAL_POLICY = "auto" as const;
 
+const CLAUDE_BUILT_IN_SLASH_COMMANDS: AgentCapability["slashCommands"] = [
+  {
+    id: "goal",
+    label: "goal — Set a goal — keep working until the condition is met",
+    description: "Set a goal — keep working until the condition is met",
+  },
+];
+
 export const claudeCapabilities: AgentCapability = {
   models: [
     { id: "claude-opus-4-7", label: "Opus 4.7" },
@@ -44,6 +52,7 @@ export const claudeCapabilities: AgentCapability = {
   sandboxModes: [],
   supportsResume: true,
   supportsDirectInput: true,
+  slashCommands: CLAUDE_BUILT_IN_SLASH_COMMANDS,
   liveInputMode: "terminal",
   presentationMode: "terminal",
   presentationModes: ["terminal", "gui"],

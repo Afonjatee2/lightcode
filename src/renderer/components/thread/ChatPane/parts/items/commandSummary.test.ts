@@ -53,8 +53,13 @@ describe("humanIntentTitle", () => {
 
   it("describes sed -n ranges as viewed lines", () => {
     const full = `/bin/zsh -lc "sed -n '1,260p' src/supervisor/runtime.ts"`;
-    expect(humanIntentTitle(full)).toBe("View lines 1-260: src/supervisor/runtime.ts");
-    expect(commandIntentDisplay(full).kind).toBe("view");
+    const display = commandIntentDisplay(full);
+    expect(humanIntentTitle(full)).toBe("View 1:260: src/supervisor/runtime.ts");
+    expect(display.kind).toBe("view");
+    expect(display.parts).toEqual({
+      prefix: "View 1:260: ",
+      path: "src/supervisor/runtime.ts",
+    });
   });
 
   it("describes ripgrep commands as searches", () => {
@@ -67,8 +72,22 @@ describe("humanIntentTitle", () => {
 
   it("describes cat piped through sed as viewed lines", () => {
     const full = `cat node_modules/.modules.yaml 2>/dev/null | sed -n '1,180p'`;
-    expect(humanIntentTitle(full)).toBe("View lines 1-180: node_modules/.modules.yaml");
+    expect(humanIntentTitle(full)).toBe("View 1:180: node_modules/.modules.yaml");
     expect(commandIntentDisplay(full).kind).toBe("view");
+  });
+
+  it("describes numbered file output piped through sed as viewed lines", () => {
+    const full = `nl -ba src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts | sed -n '1,260p'`;
+    const display = commandIntentDisplay(full);
+
+    expect(display.title).toBe(
+      "View 1:260: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts",
+    );
+    expect(display.kind).toBe("view");
+    expect(display.parts).toEqual({
+      prefix: "View 1:260: ",
+      path: "src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts",
+    });
   });
 
   it("describes find commands as searches", () => {

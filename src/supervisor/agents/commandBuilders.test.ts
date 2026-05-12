@@ -140,7 +140,7 @@ describe("agent command builders", () => {
 
     const { cmd, cmdArgs } = parseWindowsSpec(spec);
     expect(cmd).toBe("codex");
-    expect(cmdArgs).toEqual(["app-server"]);
+    expect(cmdArgs).toEqual(["--enable", "goals", "app-server"]);
     expect(cmdArgs).not.toContain("--listen");
     expect(cmdArgs).not.toContain("--remote");
     expect(cmdArgs).not.toContain("--session-source");
@@ -154,7 +154,7 @@ describe("agent command builders", () => {
 
     const { cmdArgs } = parseWindowsSpec(spec);
     expect(cmdArgs[0]).toBe("resume");
-    expect(cmdArgs).not.toContain("--enable");
+    expect(cmdArgs.slice(1, 3)).toEqual(["--enable", "goals"]);
     expect(cmdArgs).not.toContain("--remote");
     expect(cmdArgs).not.toContain("-m");
     expect(cmdArgs[cmdArgs.length - 1]).toBe("019d19c4-8050-7270-b8fc-589eee8136c2");
@@ -177,6 +177,8 @@ describe("agent command builders", () => {
       "/usr/bin/env",
       "PATH=/home/demo/.nvm/versions/node/v24.10.0/bin:/home/demo/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
       "/home/demo/.local/bin/codex",
+      "--enable",
+      "goals",
       "app-server",
     ]);
   });
@@ -191,15 +193,17 @@ describe("agent command builders", () => {
     const resumeIndex = cmdArgs.indexOf("resume");
 
     expect(resumeIndex).toBeGreaterThan(-1);
-    expect(cmdArgs[resumeIndex + 1]).toBe("--no-alt-screen");
+    expect(cmdArgs[resumeIndex + 1]).toBe("--enable");
+    expect(cmdArgs[resumeIndex + 2]).toBe("goals");
+    expect(cmdArgs[resumeIndex + 3]).toBe("--no-alt-screen");
     // OSC 9 notifications (always-on) precede model / config flags.
-    expect(cmdArgs[resumeIndex + 2]).toBe("-c");
-    expect(cmdArgs[resumeIndex + 3]).toBe("tui.notifications=true");
     expect(cmdArgs[resumeIndex + 4]).toBe("-c");
-    expect(cmdArgs[resumeIndex + 5]).toBe('tui.notification_method="osc9"');
+    expect(cmdArgs[resumeIndex + 5]).toBe("tui.notifications=true");
     expect(cmdArgs[resumeIndex + 6]).toBe("-c");
-    expect(cmdArgs[resumeIndex + 7]).toBe("suppress_unstable_features_warning=true");
-    expect(cmdArgs[resumeIndex + 8]).toBe("-m");
+    expect(cmdArgs[resumeIndex + 7]).toBe('tui.notification_method="osc9"');
+    expect(cmdArgs[resumeIndex + 8]).toBe("-c");
+    expect(cmdArgs[resumeIndex + 9]).toBe("suppress_unstable_features_warning=true");
+    expect(cmdArgs[resumeIndex + 10]).toBe("-m");
     expect(cmdArgs).toContain("abc-123");
     expect(cmdArgs).not.toContain("");
   });

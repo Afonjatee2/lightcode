@@ -174,10 +174,10 @@ export function createCodexAdapter(): AgentAdapter {
           `  interactiveRollouts: ${rollouts.length}`,
         ].join("\n"),
       );
-      return buildCodexArgvFor(config, prompt, sessionRef, launchOptions);
+      return buildCodexArgvFor(location, config, prompt, sessionRef, launchOptions);
     },
-    buildResumeArgv(_location, config, prompt, sessionRef, launchOptions) {
-      return buildCodexArgvFor(config, prompt, sessionRef, launchOptions);
+    buildResumeArgv(location, config, prompt, sessionRef, launchOptions) {
+      return buildCodexArgvFor(location, config, prompt, sessionRef, launchOptions);
     },
     createInitialSessionRef() {
       return undefined;

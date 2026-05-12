@@ -332,6 +332,64 @@ describe("sdkCanonicalMapping — tool use", () => {
       { type: "item.completed", threadId: "thread-1", itemId: "toolu_bash" },
     ]);
   });
+
+  it("surfaces auto-denied tool calls as completed error items", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_bash",
+          name: "Bash",
+          input: { command: "rm -rf /" },
+        },
+      }),
+      state,
+    );
+
+    const events = mapClaudeSdkMessage(
+      {
+        type: "system",
+        subtype: "permission_denied",
+        tool_name: "Bash",
+        tool_use_id: "toolu_bash",
+        decision_reason_type: "classifier",
+        decision_reason: "Dangerous command",
+        message: "Command was denied.",
+        session_id: "claude-session",
+        uuid: "msg-1",
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(events).toEqual([
+      {
+        type: "content.delta",
+        threadId: "thread-1",
+        itemId: "toolu_bash",
+        stream: "command_output",
+        delta: "Command was denied.",
+      },
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "toolu_bash",
+        payload: {
+          command: "rm -rf /",
+          status: "error",
+          errorMessage: "Command was denied.",
+          result: {
+            message: "Command was denied.",
+            decisionReason: "Dangerous command",
+            decisionReasonType: "classifier",
+          },
+        },
+      },
+      { type: "item.completed", threadId: "thread-1", itemId: "toolu_bash" },
+    ]);
+  });
 });
 
 describe("sdkCanonicalMapping — sub-agents", () => {

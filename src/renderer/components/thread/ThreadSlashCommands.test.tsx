@@ -321,6 +321,7 @@ describe("ThreadSlashCommands", () => {
     expect(screen.getByText("/model")).toBeInTheDocument();
     expect(screen.getByText("/plan")).toBeInTheDocument();
     expect(screen.getByText("/agent")).toBeInTheDocument();
+    expect(screen.getByText("/goal")).toBeInTheDocument();
     expect(screen.queryByText("/status")).not.toBeInTheDocument();
   });
 
@@ -355,6 +356,7 @@ describe("ThreadSlashCommands", () => {
     expect(screen.getByText("/model")).toBeInTheDocument();
     expect(screen.getByText("/plan")).toBeInTheDocument();
     expect(screen.getByText("/agent")).toBeInTheDocument();
+    expect(screen.getByText("/goal")).toBeInTheDocument();
     expect(screen.queryByText("/status")).not.toBeInTheDocument();
   });
 

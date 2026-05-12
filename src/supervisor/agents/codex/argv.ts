@@ -1,22 +1,35 @@
 import { dirname as posixDirname } from "node:path/posix";
 import type { ProjectLocation, SessionRef, ThreadConfig } from "@/shared/contracts";
 import {
+  batchWslCommands,
   buildAgentCommand,
   getWslCommand,
+  quotePosixShellArg,
   type AgentArgvSpec,
   type AgentLaunchOptions,
   type CommandSpec,
 } from "../base";
+import {
+  isCodexSemverSupportedForGoals,
+  parseCodexVersionLine,
+  probeCodexCliSemver,
+} from "./plugin/install";
 
 const DEFAULT_WSL_EXEC_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
+const CODEX_GOALS_FEATURE_FLAG = "goals";
+const codexGoalsSupportCache = new Map<string, boolean>();
 
 function buildCodexArgs(
   config: ThreadConfig,
   prompt: string,
+  enableGoals: boolean,
   launchOptions?: AgentLaunchOptions,
 ): string[] {
   const args: string[] = [];
 
+  if (enableGoals) {
+    args.push("--enable", CODEX_GOALS_FEATURE_FLAG);
+  }
   args.push("--no-alt-screen");
 
   // OSC 9 TUI notifications — L2 status when hooks are unavailable (always-on).
@@ -56,15 +69,17 @@ function buildCodexArgs(
 }
 
 export function buildCodexArgvFor(
+  location: ProjectLocation,
   config: ThreadConfig,
   prompt: string,
   sessionRef?: SessionRef,
   launchOptions?: AgentLaunchOptions,
 ): AgentArgvSpec {
+  const enableGoals = isCodexGoalsSupported(location);
   // When the structured session owns thread lifecycle, the TUI resumes the
   // server-created thread. Config is controlled by the server, not the CLI.
   if (launchOptions?.suppressResumeConfigOverrides) {
-    const baseArgs = buildCodexArgs(config, "", launchOptions);
+    const baseArgs = buildCodexArgs(config, "", enableGoals, launchOptions);
     const args = launchOptions.resumeThreadId
       ? [
           "resume",
@@ -76,11 +91,11 @@ export function buildCodexArgvFor(
     return { binary: "codex", args };
   }
 
-  const codexArgs = buildCodexArgs(config, prompt, launchOptions);
+  const codexArgs = buildCodexArgs(config, prompt, enableGoals, launchOptions);
   const args = sessionRef
     ? [
         "resume",
-        ...buildCodexArgs(config, "", launchOptions),
+        ...buildCodexArgs(config, "", enableGoals, launchOptions),
         sessionRef.providerSessionId,
         ...(prompt.trim().length > 0 ? [prompt] : []),
       ]
@@ -94,7 +109,10 @@ export function buildCodexAppServerCommand(
   wslExecPath?: string,
   wslNodePath?: string,
 ): CommandSpec {
-  const args = ["app-server"];
+  const args = [
+    ...(isCodexGoalsSupported(location, wslExecPath) ? ["--enable", CODEX_GOALS_FEATURE_FLAG] : []),
+    "app-server",
+  ];
   if (location.kind === "wsl") {
     const pathSegments = [
       wslNodePath ? posixDirname(wslNodePath) : undefined,
@@ -117,4 +135,32 @@ export function buildCodexAppServerCommand(
     };
   }
   return buildAgentCommand(location, "codex", args, wslExecPath);
+}
+
+function isCodexGoalsSupported(location: ProjectLocation, executablePath?: string): boolean {
+  const key = `${location.kind}:${location.kind === "wsl" ? location.distro : (executablePath ?? "")}`;
+  const cached = codexGoalsSupportCache.get(key);
+  if (cached !== undefined) return cached;
+
+  const supported =
+    location.kind === "wsl"
+      ? isCodexGoalsSupportedInWsl(location.distro, executablePath)
+      : isCodexSemverKnownSupportedForGoals(probeCodexCliSemver());
+  codexGoalsSupportCache.set(key, supported);
+  return supported;
+}
+
+function isCodexGoalsSupportedInWsl(distro: string, executablePath?: string): boolean {
+  const command = `${quotePosixShellArg(executablePath ?? "codex")} --version`;
+  const [result] = batchWslCommands(distro, [command]);
+  const versionLine =
+    result?.stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.length > 0) ?? "";
+  return isCodexSemverKnownSupportedForGoals(parseCodexVersionLine(versionLine));
+}
+
+function isCodexSemverKnownSupportedForGoals(v: [number, number, number] | null): boolean {
+  return v === null ? true : isCodexSemverSupportedForGoals(v);
 }

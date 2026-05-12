@@ -1,4 +1,4 @@
-import { memo, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { memo, type ReactNode, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
 import { Surface, Tooltip } from "@heroui/react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import type { CanonicalContentBlock, MessageItemPayload } from "@/shared/contracts";
@@ -14,6 +14,7 @@ import { ItemMarkdown } from "./ItemMarkdown";
 
 interface UserMessageProps {
   item: RuntimeChatItem;
+  checkpointRevertControl: ReactNode | null;
 }
 
 const COLLAPSED_LINE_COUNT = 4;
@@ -22,7 +23,10 @@ const OVERFLOW_EPSILON_PX = 2;
 const collapsedMessageClass =
   "overflow-hidden [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] [mask-image:linear-gradient(to_bottom,black_65%,transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_65%,transparent)]";
 
-export const UserMessage = memo(function UserMessage({ item }: UserMessageProps) {
+export const UserMessage = memo(function UserMessage({
+  item,
+  checkpointRevertControl,
+}: UserMessageProps) {
   const actions = useChatPaneActions();
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasVisualOverflow, setHasVisualOverflow] = useState(false);
@@ -69,7 +73,7 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
       <div
         ref={contentRef}
         data-user-message-content="true"
-        className={`min-w-0 space-y-1.5 leading-snug ${
+        className={`min-w-0 space-y-1.5 leading-snug ${checkpointRevertControl ? "pr-7" : ""} ${
           isCollapsed ? collapsedMessageClass : isCollapsible ? "max-h-[50vh] overflow-y-auto" : ""
         }`}
       >
@@ -106,6 +110,7 @@ export const UserMessage = memo(function UserMessage({ item }: UserMessageProps)
           </Tooltip>
         </>
       ) : null}
+      {checkpointRevertControl}
       {lightboxIndex !== null ? (
         <ImageLightbox
           images={attachments.filter((a) => a.isImage)}

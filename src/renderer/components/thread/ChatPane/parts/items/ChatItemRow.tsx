@@ -3,7 +3,7 @@ import {
   type RuntimeChatItem,
 } from "@/renderer/state/slices/runtimeEventSlice";
 import type { ToolCallPayload } from "@/shared/contracts";
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { useAppStore } from "@/renderer/state/appStore";
 import {
   getChildItemIdsStoreSelector,
@@ -27,6 +27,7 @@ interface ChatItemRowProps {
   entry: ChatTimelineEntry;
   /** True when this is the tail of the visible timeline. Drives live-group expand state. */
   isLastEntry?: boolean;
+  checkpointRevertControl: ReactNode | null;
 }
 
 /**
@@ -41,20 +42,29 @@ export const ChatItemRow = memo(function ChatItemRow({
   threadId,
   entry,
   isLastEntry = false,
+  checkpointRevertControl,
 }: ChatItemRowProps) {
   "use no memo";
   if (entry.kind === "tool_call_group") {
     return <ToolCallGroup threadId={threadId} itemIds={entry.itemIds} isLive={isLastEntry} />;
   }
-  return <SingleChatItemRow threadId={threadId} itemId={entry.id} />;
+  return (
+    <SingleChatItemRow
+      threadId={threadId}
+      itemId={entry.id}
+      checkpointRevertControl={checkpointRevertControl}
+    />
+  );
 });
 
 const SingleChatItemRow = memo(function SingleChatItemRow({
   threadId,
   itemId,
+  checkpointRevertControl,
 }: {
   threadId: string;
   itemId: string;
+  checkpointRevertControl: ReactNode | null;
 }) {
   const item = useAppStore(getRuntimeItemStoreSelector(threadId, itemId));
   const childIds = useAppStore(getChildItemIdsStoreSelector(threadId, itemId));
@@ -73,13 +83,13 @@ const SingleChatItemRow = memo(function SingleChatItemRow({
       return <SubAgentToolCall threadId={threadId} item={item} />;
     }
   }
-  return renderItem(item);
+  return renderItem(item, checkpointRevertControl);
 });
 
-function renderItem(item: RuntimeChatItem) {
+function renderItem(item: RuntimeChatItem, checkpointRevertControl: ReactNode | null) {
   switch (item.type) {
     case "user_message":
-      return <UserMessage item={item} />;
+      return <UserMessage item={item} checkpointRevertControl={checkpointRevertControl} />;
     case "assistant_message":
       return <AssistantMessage item={item} />;
     case "reasoning":

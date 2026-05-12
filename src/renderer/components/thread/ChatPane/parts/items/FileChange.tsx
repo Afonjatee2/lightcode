@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
-import { FileEdit } from "lucide-react";
+import { CircleAlert, FileEdit } from "lucide-react";
 import type { FileChangePayload, ProjectLocation } from "@/shared/contracts";
 import { PathDisplay } from "@/renderer/components/common";
 import { readBridge } from "@/renderer/bridge";
@@ -281,5 +281,8 @@ export function formatDiffSummaryLabel(
 }
 
 function formatRightLabel(payload: FileChangePayload): ReactNode | undefined {
+  if (payload.status === "error") {
+    return <CircleAlert className="size-3 text-danger" aria-label="error" />;
+  }
   return formatDiffSummaryLabel(payload.diffSummary ?? extractAcpDiffSummary(payload));
 }

@@ -15,6 +15,7 @@ import type {
   SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
 import type {
+  AgentSlashCommand,
   ProjectLocation,
   PromptSegment,
   RuntimeEvent,
@@ -24,6 +25,7 @@ import type {
   ThreadServerRequestId,
   ThreadStatus,
 } from "@/shared/contracts";
+import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import {
   buildAgentCommand,
   createKnownSessionRef,
@@ -32,6 +34,7 @@ import {
   type StartTurnOptions,
   type StructuredSessionHandle,
   type StructuredSessionListener,
+  type StructuredSessionUpdate,
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { applyClaudeContextSuffix } from "./argv";
@@ -49,6 +52,7 @@ import {
   type ClaudeMapperState,
   type ClaudeQuestion,
 } from "./sdkCanonicalMapping";
+import { mapClaudeSlashCommands } from "./probe";
 
 const require = createRequire(import.meta.url);
 const claudeSdkRequire = createRequire(require.resolve("@anthropic-ai/claude-agent-sdk"));
@@ -307,6 +311,9 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
   private disposed = false;
   private sessionId: string | undefined;
   private currentConfig: ThreadConfig;
+  private currentStatus: ThreadStatus = "idle";
+  private currentAttention: ThreadAttention = "none";
+  private currentSlashCommands: AgentSlashCommand[] | undefined;
   private pendingRequests = new Map<ThreadServerRequestId, PendingRequest>();
   // openThread() fires `startQuery` as a fire-and-forget IIFE and returns
   // synchronously, but the runtime calls `setListener` only afterwards from
@@ -339,10 +346,65 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       this.bufferedRuntimeEvents = [];
       for (const ev of drain) listener.onRuntimeEvent(ev);
     }
+    if (this.currentSlashCommands !== undefined) {
+      listener.onUpdate({
+        status: this.currentStatus,
+        attention: this.currentAttention,
+        slashCommands: this.currentSlashCommands,
+        ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+      });
+    }
     if (this.pendingError !== undefined) {
       const message = this.pendingError;
       this.pendingError = undefined;
       listener.onError(message);
+    }
+  }
+
+  private emitUpdate(update: StructuredSessionUpdate): void {
+    this.currentStatus = update.status;
+    this.currentAttention = update.attention;
+    this.listener?.onUpdate({
+      ...update,
+      ...(this.currentSlashCommands !== undefined && update.slashCommands === undefined
+        ? { slashCommands: this.currentSlashCommands }
+        : {}),
+    });
+  }
+
+  private updateSlashCommands(commands: AgentSlashCommand[]): void {
+    if (areAgentSlashCommandsEqual(this.currentSlashCommands, commands)) {
+      return;
+    }
+    this.currentSlashCommands = commands;
+    this.listener?.onUpdate({
+      status: this.currentStatus,
+      attention: this.currentAttention,
+      slashCommands: commands,
+      ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+    });
+  }
+
+  private async refreshSlashCommands(runtime: Query): Promise<void> {
+    try {
+      const init = await runtime.initializationResult();
+      const commands = mapClaudeSlashCommands(init.commands);
+      if (commands.length > 0) {
+        this.updateSlashCommands(commands);
+        return;
+      }
+    } catch {
+      // Fall back to the narrower command-list control request below.
+    }
+
+    try {
+      const supported = await runtime.supportedCommands();
+      const commands = mapClaudeSlashCommands(supported);
+      if (commands.length > 0) {
+        this.updateSlashCommands(commands);
+      }
+    } catch {
+      // Install-time/default capabilities still provide the static fallback.
     }
   }
 
@@ -370,7 +432,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     this.emitRuntimeEvents(
       startClaudeTurn(this.mapperState, turnId, prompt, segments, options?.userMessageItemId),
     );
-    this.listener?.onUpdate({ status: "working", attention: "working" });
+    this.emitUpdate({ status: "working", attention: "working" });
 
     const query = await this.requireQuery();
     const model = applyClaudeContextSuffix(config.model, config.contextSize);
@@ -418,7 +480,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           outcome: "answered",
         },
       ]);
-      this.listener?.onUpdate({ status: "working", attention: "working" });
+      this.emitUpdate({ status: "working", attention: "working" });
       return;
     }
 
@@ -447,7 +509,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           outcome: "accepted",
         },
       ]);
-      this.listener?.onUpdate({ status: "working", attention: "working" });
+      this.emitUpdate({ status: "working", attention: "working" });
       return;
     }
 
@@ -466,7 +528,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         outcome: "declined",
       },
     ]);
-    this.listener?.onUpdate({ status: "working", attention: "working" });
+    this.emitUpdate({ status: "working", attention: "working" });
   }
 
   async dispose(): Promise<void> {
@@ -546,6 +608,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       };
 
       this.queryRuntime = query({ prompt: this.promptQueue, options });
+      void this.refreshSlashCommands(this.queryRuntime);
       return this.queryRuntime;
     })();
 
@@ -604,7 +667,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
             questions,
           }),
         ]);
-        this.listener?.onUpdate({ status: "needs_reply", attention: "needs_reply" });
+        this.emitUpdate({ status: "needs_reply", attention: "needs_reply" });
       });
     }
 
@@ -646,7 +709,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           ...(callbackOptions.suggestions ? { suggestions: callbackOptions.suggestions } : {}),
         }),
       ]);
-      this.listener?.onUpdate({ status: "needs_approval", attention: "needs_approval" });
+      this.emitUpdate({ status: "needs_approval", attention: "needs_approval" });
     });
   };
 
@@ -658,7 +721,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     if (sessionId && sessionId !== this.sessionId) {
       const previous = this.sessionId;
       this.sessionId = sessionId;
-      this.listener?.onUpdate({
+      this.emitUpdate({
         status: "working",
         attention: "working",
         sessionRef: createKnownSessionRef(sessionId),
@@ -668,7 +731,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 
     if (message.type === "system" && message.subtype === "session_state_changed") {
       const mapped = mapSessionState(message.state);
-      this.listener?.onUpdate(mapped);
+      this.emitUpdate(mapped);
     }
 
     const events = mapClaudeSdkMessage(message, this.mapperState);
@@ -683,7 +746,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       // (in-CLI) Esc interrupts where `interruptInFlight` is false.
       const failed = message.subtype !== "success" && !wasInterrupted && remaining.length > 0;
       const errorMessage = failed ? remaining[0] : undefined;
-      this.listener?.onUpdate({
+      this.emitUpdate({
         status: failed ? "error" : "idle",
         attention: failed ? "error" : "none",
         ...(errorMessage ? { errorMessage } : {}),

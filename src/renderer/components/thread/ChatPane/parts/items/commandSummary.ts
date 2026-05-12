@@ -18,19 +18,24 @@ export type CommandIntentKind =
 export interface CommandIntentDisplay {
   title: string;
   kind: CommandIntentKind;
+  parts?: { prefix: string; path: string; filePath?: boolean };
 }
 
 export function summarizeShellCommand(full: string): string {
+  return finalizeTitle(extractShellCommand(full));
+}
+
+function extractShellCommand(full: string): string {
   const s = full.trim().replace(/\r\n/g, "\n");
   if (!s) return "(command)";
 
   let work = s;
   for (let i = 0; i < 4; i++) {
     const fromPs = extractPowerShellQuotedCommand(work);
-    if (fromPs) return finalizeTitle(fromPs);
+    if (fromPs) return collapseWhitespace(fromPs.trim());
 
     const fromAnyQuote = extractDashCQuoted(work);
-    if (fromAnyQuote) return finalizeTitle(fromAnyQuote);
+    if (fromAnyQuote) return collapseWhitespace(fromAnyQuote.trim());
 
     const nextAmp = stripLeadingCdAnd(work);
     const nextSemi = stripLeadingCdSemicolon(work);
@@ -42,11 +47,11 @@ export function summarizeShellCommand(full: string): string {
   const tail = lastAmpersandSegment(work);
   if (tail && tail.length < work.length) {
     const nested = extractPowerShellQuotedCommand(tail) ?? extractDashCQuoted(tail) ?? null;
-    if (nested) return finalizeTitle(nested);
-    if (!looksLikeBareExecutable(tail)) return finalizeTitle(tail);
+    if (nested) return collapseWhitespace(nested.trim());
+    if (!looksLikeBareExecutable(tail)) return collapseWhitespace(tail.trim());
   }
 
-  return finalizeTitle(work);
+  return collapseWhitespace(work.trim());
 }
 
 function finalizeTitle(s: string): string {
@@ -120,8 +125,9 @@ export function humanIntentTitle(fullCommandLine: string): string {
 }
 
 export function commandIntentDisplay(fullCommandLine: string): CommandIntentDisplay {
-  const short = summarizeShellCommand(fullCommandLine);
-  return intentFromSummarizedCommand(short) ?? { title: `Run: ${short}`, kind: "command" };
+  const command = extractShellCommand(fullCommandLine);
+  const short = finalizeTitle(command);
+  return intentFromSummarizedCommand(command) ?? { title: `Run: ${short}`, kind: "command" };
 }
 
 function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
@@ -144,16 +150,20 @@ function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
 
   const sedView = parseSedView(trimmed);
   if (sedView) {
+    const prefix = `View ${formatLineRange(sedView.lines)}: `;
     return {
-      title: `View lines ${sedView.lines}: ${sedView.path}`,
+      title: `${prefix}${sedView.path}`,
+      parts: { prefix, path: sedView.path },
       kind: "view",
     };
   }
 
   const pipedFileView = parsePipedFileView(trimmed);
   if (pipedFileView) {
+    const prefix = `View ${formatLineRange(pipedFileView.lines)}: `;
     return {
-      title: `View lines ${pipedFileView.lines}: ${pipedFileView.path}`,
+      title: `${prefix}${pipedFileView.path}`,
+      parts: { prefix, path: pipedFileView.path },
       kind: "view",
     };
   }
@@ -266,28 +276,51 @@ function parseSedView(command: string): SedView | null {
   return { path, lines: end ? `${start}-${end}` : start };
 }
 
+function formatLineRange(lines: string): string {
+  return lines.replace("-", ":");
+}
+
 function parsePipedFileView(command: string): PipedFileView | null {
   const parts = splitShellPipeline(command);
   if (parts.length < 2) return null;
-  const first = parts[0]!;
-  const last = parts[parts.length - 1]!;
-  const firstWords = splitShellWords(first);
-  const lastWords = splitShellWords(last);
-  const firstExecutable = firstWords[0]?.split(/[/\\]/).pop()?.toLowerCase();
-  if (firstExecutable !== "cat" && firstExecutable !== "type") return null;
-  const lastExecutable = lastWords[0]?.split(/[/\\]/).pop()?.toLowerCase();
-  if (lastExecutable !== "sed" && lastExecutable !== "gsed") return null;
-
-  const path = firstWords.find((word, index) => {
-    if (index === 0) return false;
-    if (word.startsWith("-")) return false;
-    if (/^\d*>/.test(word)) return false;
-    return true;
-  });
+  const path = extractPipedReadableFilePath(splitShellWords(parts[0]!));
   if (!path) return null;
 
-  const sed = parseSedView(`${lastWords.join(" ")} ${path}`);
+  const sedPart = parts.find((part, index) => {
+    if (index === 0) return false;
+    const executable = splitShellWords(part)[0]?.split(/[/\\]/).pop()?.toLowerCase();
+    return executable === "sed" || executable === "gsed";
+  });
+  if (!sedPart) return null;
+
+  const sed = parseSedView(`${sedPart} ${path}`);
   return sed ? { path, lines: sed.lines } : null;
+}
+
+function extractPipedReadableFilePath(words: string[]): string | undefined {
+  const executable = words[0]?.split(/[/\\]/).pop()?.toLowerCase();
+  if (executable !== "cat" && executable !== "type" && executable !== "nl") return undefined;
+
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]!;
+    if (word === "--") return words[i + 1];
+    if (word.startsWith("-")) {
+      if (executable === "nl" && consumesNlOptionValue(word)) i++;
+      continue;
+    }
+    if (/^\d*>/.test(word)) continue;
+    return word;
+  }
+  return undefined;
+}
+
+function consumesNlOptionValue(option: string): boolean {
+  return (
+    /^-(b|d|f|h|i|l|n|s|v|w)$/.test(option) ||
+    /^--(body-numbering|section-delimiter|footer-numbering|header-numbering|line-increment|join-blank-lines|number-format|number-separator|starting-line-number|number-width)$/.test(
+      option,
+    )
+  );
 }
 
 function parseRipgrepSearch(command: string): RipgrepSearch | null {

@@ -307,10 +307,13 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
       ? state.runtimeItemsByIdByThread[threadId]?.[entry.id]?.type === "user_message"
       : false,
   );
-  const isCheckpointMessage = useAppStore((state) => {
-    if (!canRevertCheckpoints || entry.kind !== "item" || index === 0) return false;
-    const type = state.runtimeItemsByIdByThread[threadId]?.[entry.id]?.type;
-    return type === "user_message" || type === "assistant_message";
+  const checkpointRevertItemId = useAppStore((state) => {
+    if (!canRevertCheckpoints || entry.kind !== "item") return null;
+    const itemIds = state.runtimeItemIdsByThread[threadId];
+    const itemsById = state.runtimeItemsByIdByThread[threadId];
+    if (!itemIds || !itemsById) return null;
+    if (itemsById[entry.id]?.type !== "user_message") return null;
+    return findCheckpointBeforeUserMessage(itemIds, itemsById, entry.id);
   });
   const showTurnGap = isUserMessage && index > 0;
   const completedTurn = useAppStore((state) => selectCompletedTurnForEntry(state, threadId, entry));
@@ -329,10 +332,19 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
     >
       <div className={`group/checkpoint relative w-full pb-1 ${showTurnGap ? "pt-3" : ""}`}>
         <div className="relative">
-          <ChatItemRow threadId={threadId} entry={entry} isLastEntry={isLastEntry} />
-          {isCheckpointMessage && entry.kind === "item" ? (
-            <CheckpointRevertButton itemId={entry.id} onRequestRevert={onRequestRevert} />
-          ) : null}
+          <ChatItemRow
+            threadId={threadId}
+            entry={entry}
+            isLastEntry={isLastEntry}
+            checkpointRevertControl={
+              checkpointRevertItemId ? (
+                <CheckpointRevertButton
+                  itemId={checkpointRevertItemId}
+                  onRequestRevert={onRequestRevert}
+                />
+              ) : null
+            }
+          />
         </div>
         {showInlineTurn ? (
           <CompletedTurnIndicator threadId={threadId} record={completedTurn} />
@@ -399,4 +411,20 @@ function estimateRuntimeItemSize(item: ReturnType<typeof selectRuntimeItemById>)
     default:
       return DEFAULT_ROW_ESTIMATE_PX;
   }
+}
+
+function findCheckpointBeforeUserMessage(
+  itemIds: readonly string[],
+  itemsById: ReturnType<typeof useAppStore.getState>["runtimeItemsByIdByThread"][string],
+  userItemId: string,
+): string | null {
+  const userIndex = itemIds.indexOf(userItemId);
+  if (userIndex <= 0) return null;
+
+  for (let idx = userIndex - 1; idx >= 0; idx -= 1) {
+    const itemId = itemIds[idx]!;
+    if (itemsById[itemId]?.type === "assistant_message") return itemId;
+  }
+
+  return null;
 }

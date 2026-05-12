@@ -556,17 +556,19 @@ describe("ChatPane", () => {
     expect(label.closest(".surface")).not.toBeNull();
   });
 
-  it("shows checkpoint buttons only after the initial message and reverts with confirmation", async () => {
+  it("shows checkpoint buttons on later user messages and reverts to before that prompt", async () => {
     const thread = { ...makeThread(), status: "idle" as const };
     seedUserMessage(thread.id, "Initial prompt", "user-1");
     seedAssistantMessage(thread.id, "First answer", "assistant-1");
     seedUserMessage(thread.id, "Follow-up prompt", "user-2");
+    seedAssistantMessage(thread.id, "Second answer", "assistant-2");
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
     const buttons = screen.getAllByRole("button", { name: "Revert to this checkpoint" });
-    expect(buttons).toHaveLength(2);
+    expect(buttons).toHaveLength(1);
+    expect(screen.getByText("Follow-up prompt").closest(".surface")).toContainElement(buttons[0]!);
 
     fireEvent.click(buttons[0]!);
     expect(await screen.findByText("Revert to checkpoint?")).toBeInTheDocument();
@@ -577,6 +579,7 @@ describe("ChatPane", () => {
     await waitFor(() => expect(screen.queryByText("Follow-up prompt")).not.toBeInTheDocument());
     expect(screen.getByText("Initial prompt")).toBeInTheDocument();
     expect(screen.getByText("First answer")).toBeInTheDocument();
+    expect(screen.queryByText("Second answer")).not.toBeInTheDocument();
   });
 
   it("warns when checkpoint file restore would affect another chat on the main tree", async () => {
@@ -590,6 +593,7 @@ describe("ChatPane", () => {
     useAppStore.setState((state) => ({ ...state, threads: [thread, sibling] }));
     seedUserMessage(thread.id, "Initial prompt", "user-1");
     seedAssistantMessage(thread.id, "First answer", "assistant-1");
+    seedUserMessage(thread.id, "Follow-up prompt", "user-2");
 
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   codexHooksFeatureFlagForSemver,
   getCodexPluginPaths,
+  isCodexSemverSupportedForGoals,
   isCodexSemverSupportedForHooks,
   mergeCodexHooksDocument,
   parseCodexVersionLine,
@@ -71,6 +72,13 @@ describe("parseCodexVersionLine + isCodexSemverSupportedForHooks", () => {
     expect(codexHooksFeatureFlagForSemver([0, 131, 0])).toBe("hooks");
     expect(codexHooksFeatureFlagForSemver([1, 0, 0])).toBe("hooks");
     expect(codexHooksFeatureFlagForSemver(null)).toBe("codex_hooks");
+  });
+
+  it("gates the goals feature flag at 0.130.0", () => {
+    expect(isCodexSemverSupportedForGoals([0, 129, 99])).toBe(false);
+    expect(isCodexSemverSupportedForGoals([0, 130, 0])).toBe(true);
+    expect(isCodexSemverSupportedForGoals([1, 0, 0])).toBe(true);
+    expect(isCodexSemverSupportedForGoals(null)).toBe(false);
   });
 });
 

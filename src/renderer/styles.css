@@ -999,7 +999,6 @@ body {
   filter: drop-shadow(0 0 0.45rem color-mix(in oklab, currentColor 35%, transparent));
 }
 
-
 .lightcode-composer-utility {
   display: inline-flex;
   height: 2.25rem;
@@ -1652,6 +1651,11 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
 }
 .lc-chat-markdown li {
   margin: 0.1em 0;
+  white-space: pre-wrap;
+}
+.lc-chat-markdown p {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
 }
 .lc-chat-markdown li::marker {
   color: var(--lc-text-muted, currentColor);
