@@ -36,20 +36,26 @@ export function ThreadGoalDock({ state, onDismiss }: ThreadGoalDockProps) {
   const statusIconClass = isComplete
     ? "text-success"
     : isActive
-      ? "text-accent"
+      ? "text-white"
       : "text-foreground-muted";
 
   return (
     <ThreadDockSection ariaLabel="Thread goal dock" className="px-2 py-1">
       <div className="flex min-w-0 items-center gap-2 leading-5">
-        <StatusIcon className={`size-3.5 shrink-0 ${statusIconClass}`} />
+        {isActive ? (
+          <span className="lightcode-goal-active-icon shrink-0" aria-hidden="true">
+            <StatusIcon className={`size-3.5 ${statusIconClass}`} />
+          </span>
+        ) : (
+          <StatusIcon className={`size-3.5 shrink-0 ${statusIconClass}`} />
+        )}
         <span className="shrink-0 font-semibold text-foreground">Goal</span>
         {hasMeta || elapsedLabel ? (
           <span className="flex min-w-0 shrink items-center gap-1 text-[0.85em] text-[color:var(--muted)] [font-variant-numeric:tabular-nums]">
             {hasMeta ? <span className="truncate">{meta.join(" · ")}</span> : null}
             {hasMeta && elapsedLabel ? <span aria-hidden="true">·</span> : null}
             {elapsedLabel ? (
-              <span className="inline-block shrink-0" style={{ minWidth: "7ch" }}>
+              <span className="inline-block shrink-0 text-center" style={{ minWidth: "7ch" }}>
                 {elapsedLabel}
               </span>
             ) : null}

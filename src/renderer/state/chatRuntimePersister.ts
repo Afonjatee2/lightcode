@@ -1,4 +1,5 @@
 import type { ThreadContextUsage, ToolCallPayload } from "@/shared/contracts";
+import { captureRendererException } from "../diagnostics/sentry";
 import { isSubAgentTool } from "../components/thread/ChatPane/parts/items/toolDisplay";
 import { readBridge } from "../bridge";
 import { useAppStore } from "./appStore";
@@ -86,6 +87,7 @@ export function installRuntimeItemsPersister(): () => void {
         })
         .catch((err: unknown) => {
           console.warn("[chat] failed to persist runtime snapshot for thread %s", threadId, err);
+          captureRendererException(err, { featureArea: "runtime-persistence" });
         });
     }, FLUSH_DEBOUNCE_MS);
     pendingTimers.set(threadId, timer);
@@ -173,12 +175,19 @@ async function hydrateThreadRuntimeItemsFromDb(threadId: string): Promise<boolea
       })),
     );
     useAppStore.getState().hydrateThreadRuntimeItems(threadId, items);
+    // Any sub-agent tool_call that was mid-flight when the prior session
+    // ended will hydrate here as still "running" and show up in the active
+    // sub-agent dock forever. Reconcile in place so those rows render as
+    // terminated immediately instead of waiting for a live event that will
+    // never come.
+    useAppStore.getState().reconcileStaleSubAgents(threadId);
   } else if (itemsResult.status === "rejected") {
     console.warn(
       "[chat] failed to hydrate runtime items for thread %s",
       threadId,
       itemsResult.reason,
     );
+    captureRendererException(itemsResult.reason, { featureArea: "runtime-persistence" });
   }
 
   if (turnsResult.status === "fulfilled" && turnsResult.value.length > 0) {
@@ -195,6 +204,7 @@ async function hydrateThreadRuntimeItemsFromDb(threadId: string): Promise<boolea
       threadId,
       turnsResult.reason,
     );
+    captureRendererException(turnsResult.reason, { featureArea: "runtime-persistence" });
   }
 
   if (contextResult.status === "fulfilled" && contextResult.value) {
@@ -205,6 +215,7 @@ async function hydrateThreadRuntimeItemsFromDb(threadId: string): Promise<boolea
       threadId,
       contextResult.reason,
     );
+    captureRendererException(contextResult.reason, { featureArea: "runtime-persistence" });
   }
 
   return (

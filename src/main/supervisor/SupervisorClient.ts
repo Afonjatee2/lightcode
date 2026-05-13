@@ -1,6 +1,7 @@
 import { fork, type ChildProcess } from "node:child_process";
 import type { Readable } from "node:stream";
 import { randomUUID } from "node:crypto";
+import type { LightcodeDiagnosticTags } from "@/shared/diagnostics/sentryPrivacy";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import type {
   IpcProcedurePayload,
@@ -33,6 +34,8 @@ function pipeSupervisorStreamsToParent(child: ChildProcess): void {
 }
 
 export interface SupervisorClientOptions {
+  appVersion: string;
+  isDev: boolean;
   supervisorPath: string;
   /**
    * Directory containing the in-WSL helpers shipped with the app
@@ -42,6 +45,7 @@ export interface SupervisorClientOptions {
    */
   wslHelpersDir: string;
   assignPid?(pid: number): Promise<void>;
+  reportError?(error: unknown, tags?: LightcodeDiagnosticTags): void;
   onEvent(event: SupervisorEvent): void;
   onReset(): void;
 }
@@ -87,6 +91,8 @@ export class SupervisorClient {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
       env: {
         ...process.env,
+        LIGHTCODE_APP_VERSION: this.options.appVersion,
+        LIGHTCODE_IS_DEV: this.options.isDev ? "1" : "0",
         LIGHTCODE_DATA_DIR: baseDir,
         LIGHTCODE_WSL_HELPERS_DIR: this.options.wslHelpersDir,
         // Back-compat for one release; older supervisor builds still read
@@ -105,6 +111,7 @@ export class SupervisorClient {
           "[lightcode] failed to assign supervisor to Windows Job Object:",
           error instanceof Error ? error.message : String(error),
         );
+        this.options.reportError?.(error, { "lightcode.feature_area": "supervisor" });
       });
     }
 
@@ -133,7 +140,9 @@ export class SupervisorClient {
       this.child = null;
       this.reset(new Error("Supervisor exited"));
       if (!this.disposed && code !== 0 && this.baseDir) {
-        console.error(`[lightcode] supervisor exited with code ${code}, restarting…`);
+        const error = new Error(`Supervisor exited with code ${code ?? "unknown"}`);
+        console.error(`[lightcode] ${error.message}, restarting…`);
+        this.options.reportError?.(error, { "lightcode.feature_area": "supervisor" });
         setTimeout(() => {
           if (!this.child && this.baseDir) {
             this.start(this.baseDir);

@@ -1,6 +1,7 @@
 import { startTransition, useEffect, useState } from "react";
 import { isThreadTurnActive } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
+import { captureRendererException } from "@/renderer/diagnostics/sentry";
 import { useAppStore } from "@/renderer/state/appStore";
 import { hydrateThreadRuntimeItems } from "@/renderer/state/chatRuntimePersister";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -107,7 +108,9 @@ export function useAppHydration() {
           if (!selectedIds.has(snapshot.threadId) && storeThreadIds.has(snapshot.threadId)) {
             void readBridge()
               .closeThread({ threadId: snapshot.threadId })
-              .catch(() => undefined);
+              .catch((error: unknown) => {
+                captureRendererException(error, { featureArea: "hydration" });
+              });
           }
         }
 
@@ -116,6 +119,9 @@ export function useAppHydration() {
             selectedIds.size > 0 ? snapshots.filter((s) => selectedIds.has(s.threadId)) : [],
           );
         });
+      })
+      .catch((error: unknown) => {
+        captureRendererException(error, { featureArea: "hydration" });
       });
 
     return () => {
@@ -147,7 +153,9 @@ export function useAppHydration() {
           updateThreadRuntime(snapshot.threadId, snapshot);
         }
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        captureRendererException(error, { featureArea: "hydration" });
+      });
 
     return () => {
       cancelled = true;

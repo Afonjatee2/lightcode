@@ -1,11 +1,4 @@
-import {
-  useEffect,
-  useEffectEvent,
-  useId,
-  useLayoutEffect,
-  useRef,
-  type ReactNode,
-} from "react";
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, type ReactNode } from "react";
 import { Bot, X } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
@@ -236,4 +229,3 @@ function ChildList({
     </div>
   );
 }
-

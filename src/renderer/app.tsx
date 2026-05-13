@@ -19,6 +19,11 @@ import { useAppHydration } from "@/renderer/hooks/useAppHydration";
 import { AppProvider } from "./components/ui/provider";
 import { MainView } from "@/renderer/views/MainView/MainView";
 import { CommandPalette } from "@/renderer/commands/CommandPalette";
+import {
+  captureAppStarted,
+  flushProductAnalytics,
+  installProductAnalytics,
+} from "@/renderer/analytics/posthog";
 
 // ── Module-level IPC listeners ──────────────────────────────────
 // Subscribes to supervisor events as soon as the module loads,
@@ -112,6 +117,12 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
       const newThread = useAppStore.getState().threads.find((t) => t.id === event.threadId);
       handleThreadStateNotification(event, oldThread, newThread);
     }
+    // Once the agent process is gone, any sub-agent that hadn't completed is
+    // orphaned — its parent `item.completed` will never arrive. Reconcile so
+    // the active dock stops showing it as running.
+    if (event.status === "inactive" || event.status === "error") {
+      useAppStore.getState().reconcileStaleSubAgents(event.threadId);
+    }
   }
   if (event.type === "thread-pending-steer") {
     useAppStore.getState().setPendingSteer(event.threadId, event.pending);
@@ -178,6 +189,8 @@ const unsubUpdate = readBridge().onUpdateStatus((status) => {
 });
 
 const uninstallRuntimePersister = installRuntimeItemsPersister();
+let uninstallProductAnalytics: (() => void) | null = null;
+let productAnalyticsStarted = false;
 
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
@@ -189,6 +202,9 @@ if (import.meta.hot) {
       runtimeFlushHandle = null;
     }
     pendingRuntimeEvents.clear();
+    uninstallProductAnalytics?.();
+    uninstallProductAnalytics = null;
+    productAnalyticsStarted = false;
   });
 }
 
@@ -202,8 +218,16 @@ export function App() {
     }
 
     threadStateNotificationsArmed = true;
+    if (!uninstallProductAnalytics) {
+      uninstallProductAnalytics = installProductAnalytics();
+    }
+    if (!productAnalyticsStarted) {
+      productAnalyticsStarted = true;
+      captureAppStarted();
+    }
     return () => {
       threadStateNotificationsArmed = false;
+      void flushProductAnalytics();
     };
   }, [initialLoading]);
 

@@ -11,7 +11,7 @@ import type { ProjectLocation } from "@/shared/contracts";
 import { createLspRootUri, type LspSessionStatus } from "@/shared/lsp";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { getProjectFsPath } from "@/shared/wsl";
-import { buildAgentCommand } from "../agents/base";
+import { buildAgentCommand, primeProjectShellEnv } from "../agents/base";
 import type { LanguageServerConfig } from "./serverRegistry";
 
 /**
@@ -64,6 +64,12 @@ export class ServerInstance {
     this.onStatus("starting");
 
     const projectRoot = getProjectFsPath(this.projectLocation);
+    // Prime the user's interactive-shell env so node-based language servers
+    // (typescript-language-server, vscode-eslint, etc.) launch with the
+    // project-pinned node from fnm/asdf/mise rather than launchd's PATH.
+    if (this.projectLocation.kind === "posix") {
+      await primeProjectShellEnv(this.projectLocation.path);
+    }
     let spawned = false;
 
     for (const candidate of this.config.commands) {

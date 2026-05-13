@@ -10,6 +10,7 @@ import { Toast } from "@heroui/react";
 import { Copy } from "lucide-react";
 import { resolveThemeMode } from "@/shared/themeMode";
 import { readBridge } from "@/renderer/bridge";
+import { captureRendererException } from "@/renderer/diagnostics/sentry";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { getToastActionLabel, normalizeToastContent } from "./toastContent";
 
@@ -79,7 +80,8 @@ export function AppProvider(props: { children: ReactNode }) {
           styles.getPropertyValue("--window-overlay-background").trim() || "rgba(0, 0, 0, 0)",
         symbolColor: appearance === "dark" ? "#fafafa" : "#1f2937",
       })
-      .catch(() => {
+      .catch((error: unknown) => {
+        captureRendererException(error, { featureArea: "window-chrome" });
         // Keep renderer boot resilient if Electron rejects a color value.
       });
   }, [appearance]);

@@ -325,6 +325,67 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     });
   });
 
+  it("does not force-complete non-subagent nested tool calls during stale reconciliation", () => {
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "parent-tool",
+      itemType: "tool_call",
+      payload: {
+        name: "Parent",
+        status: "running",
+      },
+    });
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "nested-tool",
+      itemType: "tool_call",
+      parentItemId: "parent-tool",
+      payload: {
+        name: "Nested",
+        status: "running",
+      },
+    });
+
+    store.getState().reconcileStaleSubAgents("t1");
+
+    expect(store.getState().runtimeItemsByIdByThread["t1"]?.["nested-tool"]).toMatchObject({
+      id: "nested-tool",
+      state: "started",
+      payload: {
+        status: "running",
+      },
+    });
+  });
+
+  it("force-completes explicitly tagged stale subagent tool calls", () => {
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "subagent-tool",
+      itemType: "tool_call",
+      payload: {
+        name: "Task",
+        status: "running",
+        isSubAgent: true,
+      },
+    });
+
+    store.getState().reconcileStaleSubAgents("t1");
+
+    expect(store.getState().runtimeItemsByIdByThread["t1"]?.["subagent-tool"]).toMatchObject({
+      id: "subagent-tool",
+      state: "completed",
+      payload: {
+        status: "error",
+        result: {
+          error: "Interrupted: agent session ended before completion.",
+        },
+      },
+    });
+  });
+
   it("opens and resolves runtime requests", () => {
     apply("t1", {
       type: "request.opened",

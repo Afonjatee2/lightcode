@@ -6,6 +6,8 @@ import type {
   ReadProjectFileResult,
 } from "@/shared/contracts";
 import { readBridge } from "../bridge";
+import { captureProductEvent } from "../analytics/posthog";
+import { captureRendererException } from "../diagnostics/sentry";
 import { hasUnresolvedConflicts } from "@/renderer/utils/mergeConflicts";
 import { useGitStore } from "./gitStore";
 
@@ -142,7 +144,8 @@ async function maybeStageResolvedConflict(
       projectLocation: rootContext.projectLocation,
       filePath: path,
     });
-  } catch {
+  } catch (error) {
+    captureRendererException(error, { featureArea: "git" });
     // Best-effort: a status refresh elsewhere will reconcile.
   }
 }
@@ -305,7 +308,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
           ...(reveal ? { pendingReveal: reveal } : {}),
         };
       });
-      return {
+      const cachedResult = {
         path,
         status: existing.status,
         modifiedAtMs: existing.modifiedAtMs,
@@ -317,6 +320,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
             }
           : {}),
       };
+      return cachedResult;
     }
 
     set((state) => {
@@ -360,6 +364,10 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
           [path]: buildBuffer(result),
         },
       }));
+      captureProductEvent("file.opened", {
+        overlay_mode: mode ?? "unchanged",
+        source: isExternalPath(path) ? "external" : "project",
+      });
       return result;
     } catch (error) {
       set((state) => {

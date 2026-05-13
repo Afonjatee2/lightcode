@@ -1596,9 +1596,7 @@ export function getProjectShellEnv(cwd: string): Record<string, string> | undefi
  * probe fails or times out; callers must tolerate `getProjectShellEnv`
  * returning `undefined`.
  */
-export function primeProjectShellEnv(
-  cwd: string,
-): Promise<Record<string, string> | undefined> {
+export function primeProjectShellEnv(cwd: string): Promise<Record<string, string> | undefined> {
   if (process.platform === "win32") {
     return Promise.resolve(undefined);
   }
@@ -1607,10 +1605,7 @@ export function primeProjectShellEnv(
   if (existing) return existing;
 
   const promise = (async () => {
-    const probe = [
-      `printf '%s\\n' ${quotePosixShellArg(PRIMED_ENV_MARKER)}`,
-      `env`,
-    ].join("; ");
+    const probe = [`printf '%s\\n' ${quotePosixShellArg(PRIMED_ENV_MARKER)}`, `env`].join("; ");
     try {
       const { stdout } = await execFileAsync(
         process.env.SHELL || "/bin/bash",

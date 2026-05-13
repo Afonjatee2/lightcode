@@ -76,7 +76,7 @@ export function CommitSyncPanel(props: {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
-                  if (canCommitStaged) void handleCommit(!hasStagedChanges);
+                  if (canCommitStaged) void handleCommit(!hasStagedChanges, hasRemote);
                 }
               }}
             />
@@ -107,12 +107,18 @@ export function CommitSyncPanel(props: {
                 className="flex-1"
                 isDisabled={!canCommitStaged}
                 isPending={isCommitting}
-                onPress={() => void handleCommit(!hasStagedChanges)}
+                onPress={() => void handleCommit(!hasStagedChanges, hasRemote)}
               >
                 {({ isPending }) => (
                   <>
-                    {isPending ? <PixelLoader size="xs" /> : <Lock className="size-3.5" />}
-                    Commit
+                    {isPending ? (
+                      <PixelLoader size="xs" />
+                    ) : hasRemote ? (
+                      <ArrowUp className="size-3.5" />
+                    ) : (
+                      <Lock className="size-3.5" />
+                    )}
+                    {hasRemote ? "Commit + push" : "Commit"}
                   </>
                 )}
               </Button>
@@ -140,18 +146,18 @@ export function CommitSyncPanel(props: {
                     <Dropdown.Menu
                       aria-label="Commit options"
                       onAction={(key) => {
-                        if (key === "commit-and-push") void handleCommit(!hasStagedChanges, true);
+                        if (key === "commit-only") void handleCommit(!hasStagedChanges);
                         if (key === "pull-from-source") void handlePullFromSource();
                       }}
                     >
                       {hasRemote ? (
                         <Dropdown.Item
-                          id="commit-and-push"
-                          textValue="Commit + push"
+                          id="commit-only"
+                          textValue="Commit only"
                           isDisabled={!canCommitStaged}
                         >
-                          <ArrowUp className="size-3.5" />
-                          <Label>Commit + push</Label>
+                          <Lock className="size-3.5" />
+                          <Label>Commit only</Label>
                         </Dropdown.Item>
                       ) : null}
                       {showPullFromSource ? (

@@ -1,6 +1,16 @@
 import { defineConfig } from "tsdown";
 
 const isProd = process.env.NODE_ENV === "production";
+const sourcemap = isProd ? ("hidden" as const) : true;
+
+function readEnvValue(key: string): string {
+  return (process.env[key] ?? "").trim();
+}
+
+const buildDefines = {
+  __BUILD_SENTRY_DSN__: JSON.stringify(readEnvValue("SENTRY_DSN")),
+  __BUILD_SENTRY_ENVIRONMENT__: JSON.stringify(readEnvValue("SENTRY_ENVIRONMENT")),
+};
 
 const deps = {
   alwaysBundle: ["electron-updater", "simple-git", "zod"],
@@ -19,9 +29,10 @@ const shared = {
   platform: "node" as const,
   format: "cjs" as const,
   target: "node24" as const,
-  sourcemap: true,
+  sourcemap,
   dts: false,
   minify: isProd ? ({ compress: { dropConsole: true, dropDebugger: true } } as const) : false,
+  define: buildDefines,
   deps,
 };
 
@@ -48,9 +59,10 @@ export default defineConfig([
     platform: "node" as const,
     format: "esm" as const,
     target: "node24" as const,
-    sourcemap: true,
+    sourcemap,
     dts: false,
     minify: false,
+    define: buildDefines,
     deps,
   },
 ]);

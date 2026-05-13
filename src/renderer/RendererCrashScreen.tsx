@@ -1,6 +1,7 @@
 import { Component, useState, type ErrorInfo, type ReactNode } from "react";
 import { Copy, RefreshCw } from "lucide-react";
 import { Button } from "./components/common";
+import { captureRendererException } from "./diagnostics/sentry";
 
 export type RendererCrashKind = "bootstrap" | "react" | "uncaught" | "unhandled-rejection";
 
@@ -210,6 +211,7 @@ export class RendererErrorBoundary extends Component<
   }
 
   override componentDidCatch(error: unknown, errorInfo: ErrorInfo) {
+    captureRendererException(error, { featureArea: "react" });
     this.setState({
       report: createRendererCrashReport({
         kind: "react",

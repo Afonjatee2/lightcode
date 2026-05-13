@@ -1,6 +1,7 @@
 import { createRoot, type Root } from "react-dom/client";
 import "./styles.css";
 import { readBridge } from "./bridge";
+import { captureRendererException, initializeRendererSentry } from "./diagnostics/sentry";
 import { getAppName } from "@/shared/appName";
 import {
   createRendererCrashReport,
@@ -27,6 +28,7 @@ if (import.meta.env.DEV) {
 }
 
 document.title = getAppName(import.meta.env.DEV);
+initializeRendererSentry();
 
 document.documentElement.dataset.platform =
   typeof window !== "undefined" && "lightcode" in window ? readBridge().platform : "unknown";
@@ -50,10 +52,12 @@ function reportRootError(
 
   if (kind === "recoverable") {
     console.warn(prefix, error, componentStack ?? "");
+    captureRendererException(error, { featureArea: "react" });
     return;
   }
 
   console.error(prefix, error, componentStack ?? "");
+  captureRendererException(error, { featureArea: "react" });
 }
 
 function renderCrashScreen(report: RendererCrashReport): void {
@@ -74,7 +78,12 @@ function buildSource(event: ErrorEvent): string | undefined {
   return `${event.filename}${suffix}`;
 }
 
-function showCrash(kind: RendererCrashKind, error: unknown, source?: string): void {
+function showCrash(
+  kind: RendererCrashKind,
+  error: unknown,
+  source?: string,
+  options: { capture?: boolean } = {},
+): void {
   renderCrashScreen(
     createRendererCrashReport({
       kind,
@@ -82,15 +91,20 @@ function showCrash(kind: RendererCrashKind, error: unknown, source?: string): vo
       ...(source ? { source } : {}),
     }),
   );
+  if (options.capture ?? true) {
+    captureRendererException(error, { featureArea: "renderer" });
+  }
 }
 
 window.addEventListener("error", (event) => {
   if (!(event instanceof ErrorEvent)) return;
-  showCrash("uncaught", event.error ?? event.message, buildSource(event));
+  // Sentry's Electron renderer integration already captures global errors; this only swaps UI.
+  showCrash("uncaught", event.error ?? event.message, buildSource(event), { capture: false });
 });
 
 window.addEventListener("unhandledrejection", (event) => {
-  showCrash("unhandled-rejection", event.reason);
+  // Sentry's Electron renderer integration already captures global rejections; this only swaps UI.
+  showCrash("unhandled-rejection", event.reason, undefined, { capture: false });
 });
 
 reactRoot = createRoot(root, {

@@ -13,7 +13,6 @@ const TOAST_VARIANT_BY_CATEGORY: Record<NotificationCategory, "success" | "warni
   error: "danger",
 };
 
-
 const ACTIVE_STATUSES: ReadonlySet<ThreadStatus> = new Set([
   "working",
   "needs_approval",

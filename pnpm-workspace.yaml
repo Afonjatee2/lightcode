@@ -3,6 +3,7 @@ packages:
   - "website"
 
 allowBuilds:
+  "@sentry/cli": true
   better-sqlite3: true
   electron: true
   electron-winstaller: true
@@ -10,6 +11,7 @@ allowBuilds:
   node-pty: true
   sharp: true
 onlyBuiltDependencies:
+  - "@sentry/cli"
   - better-sqlite3
   - electron
   - electron-winstaller

@@ -2,6 +2,7 @@ import { toast } from "@heroui/react";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import type { AgentSlashCommand, Project, Thread } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
+import { captureThreadInputSubmitted } from "@/renderer/analytics/posthog";
 import { getCurrentProjectId } from "@/renderer/actions/currentProject";
 import {
   openFilesPanel,
@@ -236,6 +237,7 @@ function chatCommand(command: AgentSlashCommand, thread: Thread): AppCommand {
         prompt: `/${command.id}`,
         config: thread.config,
       });
+      captureThreadInputSubmitted(thread);
       useAppStore.getState().touchThread(thread.id);
     },
   };

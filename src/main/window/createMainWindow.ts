@@ -1,5 +1,5 @@
 import { dbGetState, dbSetState } from "../db";
-import { BrowserWindow, screen } from "electron";
+import { BrowserWindow, screen, type RenderProcessGoneDetails } from "electron";
 
 interface WindowBounds {
   x?: number;
@@ -51,8 +51,14 @@ export interface CreateMainWindowOptions {
   preloadPath: string;
   rendererHtmlPath: string;
   appVersion: string;
+  posthogEnableDev: boolean;
+  posthogEnabled: boolean;
+  posthogHost: string;
+  posthogKey: string;
+  sentryEnabled: boolean;
   windowChromeHeight: number;
   onClosed(): void;
+  onRendererProcessGone?: (details: RenderProcessGoneDetails) => void;
   devServerUrl?: string;
 }
 
@@ -89,6 +95,12 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
       additionalArguments: [
         `--lc-app-version=${encodeURIComponent(options.appVersion)}`,
         `--lc-is-dev=${options.isDev ? "1" : "0"}`,
+        `--lc-posthog-enable-dev=${options.posthogEnableDev ? "1" : "0"}`,
+        `--lc-posthog-enabled=${options.posthogEnabled ? "1" : "0"}`,
+        // PostHog project keys are browser/client keys, not secrets; the renderer must send them.
+        `--lc-posthog-host=${encodeURIComponent(options.posthogHost)}`,
+        `--lc-posthog-key=${encodeURIComponent(options.posthogKey)}`,
+        `--lc-sentry-enabled=${options.sentryEnabled ? "1" : "0"}`,
       ],
     },
   });
@@ -122,6 +134,7 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
     console.error(
       `[lightcode] renderer gone: reason=${details.reason} exitCode=${details.exitCode}`,
     );
+    options.onRendererProcessGone?.(details);
     const now = Date.now();
     if (now - lastReloadAt < 5_000) {
       reloadCount += 1;

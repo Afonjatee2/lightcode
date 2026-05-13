@@ -17,6 +17,8 @@ import { captureFileCheckpoint } from "@/renderer/state/fileCheckpointActions";
 import { TuxIcon } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
+import { captureThreadStarted } from "@/renderer/analytics/posthog";
+import { setRendererRuntimeDiagnosticContext } from "@/renderer/diagnostics/sentry";
 import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import type { TerminalPaneHandle } from "./TerminalPane";
 import { ContinueInProviderDialog } from "./ContinueInProviderDialog";
@@ -174,6 +176,17 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   const launchTerminalSize = usesTerminalPresentation ? terminalSize : DEFAULT_HIDDEN_TERMINAL_SIZE;
 
   useEffect(() => {
+    const presentation =
+      thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
+    setRendererRuntimeDiagnosticContext({
+      provider: thread.agentKind,
+      presentation,
+      runtimeKind: presentation === "terminal" ? "pty" : "structured",
+      featureArea: "thread",
+    });
+  }, [agentStatus?.capabilities.presentationMode, thread.agentKind, thread.presentationMode]);
+
+  useEffect(() => {
     setRuntimeDebugOpen(false);
   }, [thread.id]);
 
@@ -255,6 +268,16 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         ...(thread.presentationMode ? { presentationMode: thread.presentationMode } : {}),
         ...(optimisticUserMessageItemId ? { userMessageItemId: optimisticUserMessageItemId } : {}),
       });
+      captureThreadStarted(
+        {
+          agentKind: thread.agentKind,
+          config: thread.config,
+          ...(thread.presentationMode ? { presentationMode: thread.presentationMode } : {}),
+          ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
+          ...(thread.worktreePath ? { worktreePath: thread.worktreePath } : {}),
+        },
+        pendingLaunchSegments,
+      );
     })().catch((error) => {
       launchRequestRef.current = null;
       onLaunchFailed?.(formatLaunchError(error));
@@ -270,8 +293,9 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     thread.agentInstanceId,
     thread.config,
     thread.id,
-    thread.sessionRef,
     thread.presentationMode,
+    thread.sessionRef,
+    thread.worktreePath,
   ]);
 
   const alignClass =

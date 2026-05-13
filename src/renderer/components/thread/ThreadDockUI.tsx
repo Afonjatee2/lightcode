@@ -68,20 +68,30 @@ export function ThreadDockList({
   children,
   placement = "composer",
   collapsed = false,
+  gap = "none",
 }: {
   children: ReactNode;
   placement?: "composer" | "right";
   collapsed?: boolean;
+  gap?: "none" | "px" | "0.5" | "1";
 }) {
+  const spacingClass =
+    gap === "px"
+      ? "space-y-px"
+      : gap === "0.5"
+        ? "space-y-0.5"
+        : gap === "1"
+          ? "space-y-1"
+          : "space-y-0";
   return (
     <div className={placement === "right" && !collapsed ? "min-h-0 flex-1 px-1 pb-1" : "px-1 pb-1"}>
       <ul
         className={
           collapsed
-            ? "space-y-0"
+            ? spacingClass
             : placement === "composer"
-              ? "max-h-[min(12rem,32vh)] space-y-0 overflow-y-auto [scrollbar-gutter:stable]"
-              : "min-h-0 h-full space-y-0 overflow-y-auto [scrollbar-gutter:stable]"
+              ? `max-h-[min(12rem,32vh)] ${spacingClass} overflow-y-auto [scrollbar-gutter:stable]`
+              : `min-h-0 h-full ${spacingClass} overflow-y-auto [scrollbar-gutter:stable]`
         }
         role="list"
       >

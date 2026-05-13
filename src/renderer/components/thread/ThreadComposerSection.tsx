@@ -17,6 +17,7 @@ import { flattenSegments } from "../composer/serializeMentions";
 import { getComposerControls } from "../providers";
 import { EffortIcon } from "../providers/EffortIcon";
 import { readBridge } from "@/renderer/bridge";
+import { captureProductEvent, threadProductProperties } from "@/renderer/analytics/posthog";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -403,6 +404,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   function handleInterrupt() {
     if (isInterrupting) return;
     setIsInterrupting(true);
+    captureProductEvent("thread.interrupted", threadProductProperties(thread));
     void readBridge()
       .interruptThread({ threadId: thread.id })
       .catch((error: unknown) => {

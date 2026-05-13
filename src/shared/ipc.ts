@@ -1205,9 +1205,17 @@ export type LightcodeInvokeBridge = {
 export type LightcodeBridge = LightcodeInvokeBridge & {
   platform: NodeJS.Platform;
   appVersion: string;
+  arch: string;
+  chromeVersion: string;
   /** True in the `pnpm dev` build; false in packaged releases. */
   isDev: boolean;
   electronVersion: string;
+  nodeVersion: string;
+  posthogEnableDev: boolean;
+  posthogEnabled: boolean;
+  posthogHost: string;
+  posthogKey: string;
+  sentryEnabled: boolean;
   onSupervisorEvent(listener: (event: SupervisorEvent) => void): () => void;
   onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
 };

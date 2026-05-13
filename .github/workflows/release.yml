@@ -110,12 +110,50 @@ jobs:
         shell: pwsh
         run: Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
 
-      - name: Build and package
+      - name: Build app
+        run: pnpm run build
+        shell: bash
+        env:
+          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: ${{ vars.SENTRY_ENVIRONMENT || 'production' }}
+          POSTHOG_ENABLED: ${{ vars.POSTHOG_ENABLED || '1' }}
+          POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
+          POSTHOG_ENABLE_DEV: "0"
+
+      - name: Upload Sentry source maps
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # Local `pnpm run dist` cleans source maps before packaging. Release CI
+          # uploads them from the build output first, then removes them below.
+          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
+            echo "Sentry secrets are not configured; skipping source map upload."
+            exit 0
+          fi
+          pnpm run sentry:sourcemaps
+        shell: bash
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
+
+      - name: Remove packaged source maps
+        run: pnpm run clean:sourcemaps
+        shell: bash
+
+      - name: Package
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            pnpm run build && electron-builder --win --config electron-builder.yml --config build/signing.yml
+            pnpm run prepare:package-assets
+            electron-builder --win --config electron-builder.yml --config build/signing.yml
           else
-            pnpm run ${{ matrix.dist }}
+            if [ "${{ matrix.os }}" = "macos-latest" ]; then
+              pnpm run prepare:agent-plugins
+              electron-builder --mac
+            else
+              pnpm run prepare:package-assets
+              electron-builder --linux
+            fi
           fi
         shell: bash
         env:

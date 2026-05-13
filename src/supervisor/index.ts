@@ -1,6 +1,16 @@
 import type { SupervisorReply, SupervisorRequest } from "@/shared/ipc";
+import {
+  captureSupervisorException,
+  flushSupervisorSentry,
+  initializeSupervisorSentry,
+} from "./diagnostics/sentry";
 import { createSupervisorIpcHandlers } from "./ipcHandlers";
 import { SupervisorRuntime } from "./runtime";
+
+initializeSupervisorSentry({
+  appVersion: process.env.LIGHTCODE_APP_VERSION ?? process.env.npm_package_version ?? "dev",
+  isDev: process.env.LIGHTCODE_IS_DEV === "1" || Boolean(process.env.VITE_DEV_SERVER_URL),
+});
 
 const runtime = new SupervisorRuntime((event) => {
   process.send?.(event);
@@ -33,13 +43,14 @@ process.on("message", async (message: SupervisorRequest) => {
         data,
       }),
     )
-    .catch(
-      (error: unknown): SupervisorReply => ({
+    .catch((error: unknown): SupervisorReply => {
+      captureSupervisorException(error, { "lightcode.feature_area": "supervisor-ipc" });
+      return {
         replyTo: message.id,
         ok: false,
         error: error instanceof Error ? error.message : String(error),
-      }),
-    );
+      };
+    });
 
   process.send?.(reply);
 });
@@ -58,8 +69,12 @@ process.on("SIGTERM", () => {
 
 process.on("uncaughtException", (error) => {
   console.error("[supervisor] uncaught exception:", error);
+  captureSupervisorException(error, { "lightcode.feature_area": "supervisor" });
+  void flushSupervisorSentry();
 });
 
 process.on("unhandledRejection", (reason) => {
   console.error("[supervisor] unhandled rejection:", reason);
+  captureSupervisorException(reason, { "lightcode.feature_area": "supervisor" });
+  void flushSupervisorSentry();
 });

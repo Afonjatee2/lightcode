@@ -1,5 +1,6 @@
 import { autoUpdater } from "electron-updater";
 import type { UpdateStatus } from "@/shared/ipc";
+import type { LightcodeDiagnosticTags } from "@/shared/diagnostics/sentryPrivacy";
 
 export interface AutoUpdaterController {
   initialize(): void;
@@ -11,6 +12,7 @@ export interface AutoUpdaterController {
 export function createAutoUpdaterController(
   sendStatus: (status: UpdateStatus) => void,
   isDev: boolean,
+  reportError: (error: unknown, tags?: LightcodeDiagnosticTags) => void = () => {},
 ): AutoUpdaterController {
   let initialized = false;
 
@@ -51,11 +53,14 @@ export function createAutoUpdaterController(
       sendStatus({ type: "downloaded", version: info.version });
     });
     autoUpdater.on("error", (error) => {
+      reportError(error, { "lightcode.feature_area": "updates" });
       sendStatus({ type: "error", message: error.message });
     });
 
     setTimeout(() => {
-      void autoUpdater.checkForUpdates().catch(() => undefined);
+      void autoUpdater.checkForUpdates().catch((error: unknown) => {
+        reportError(error, { "lightcode.feature_area": "updates" });
+      });
     }, 3000);
   }
 
@@ -74,6 +79,7 @@ export function createAutoUpdaterController(
       if ((error as NodeJS.ErrnoException).code === "EPIPE") {
         return;
       }
+      reportError(error, { "lightcode.feature_area": "updates" });
       throw error;
     }
   }

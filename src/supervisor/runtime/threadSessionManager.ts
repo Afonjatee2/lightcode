@@ -43,6 +43,7 @@ import {
   primeProjectShellEnv,
   resolveLaunchSpec,
 } from "../agents/base";
+import { captureSupervisorException } from "../diagnostics/sentry";
 import type { WindowsShellPreference } from "../shellPreference";
 import { BufferedLogWriter } from "./bufferedLogWriter";
 import { hookDebugSpawn } from "./hookDebug";
@@ -766,6 +767,10 @@ export class ThreadSessionManager {
         return;
       }
       console.error("[supervisor] failed to interrupt structured turn:", error);
+      captureSupervisorException(error, {
+        "lightcode.feature_area": "supervisor-runtime",
+        "lightcode.provider": session.agentKind,
+      });
     });
   }
 
@@ -1266,9 +1271,20 @@ export class ThreadSessionManager {
       this.emitOptimisticWorkingState(payload.threadId, payload.config);
     }
 
+    // Prime the user's interactive-shell env (fnm / nvm / asdf / mise cd-hooks
+    // applied at the project root) before any agent process — structured or
+    // PTY — is spawned. Electron-from-Finder inherits launchd's skeleton PATH,
+    // so without this the spawned CLI picks up homebrew node instead of the
+    // project-pinned version. Memoized per cwd; the later prime before the PTY
+    // launch is a no-op after this.
+    if (payload.projectLocation.kind === "posix") {
+      await primeProjectShellEnv(payload.projectLocation.path);
+    }
+
     const structuredSession = await this.createStructuredSession(
       adapter,
       payload.threadId,
+      payload.agentKind,
       payload.projectLocation,
       payload.config,
       payload.sessionRef,
@@ -1359,6 +1375,10 @@ export class ThreadSessionManager {
         .startTurn(initialPrompt, payload.config, effectiveSegments)
         .catch((error) => {
           console.error("[supervisor] initial turn failed:", error);
+          captureSupervisorException(error, {
+            "lightcode.feature_area": "supervisor-runtime",
+            "lightcode.provider": payload.agentKind,
+          });
           const activeSession = this.sessions.get(payload.threadId);
           if (!activeSession) {
             return;
@@ -1456,6 +1476,7 @@ export class ThreadSessionManager {
   private async createStructuredSession(
     adapter: AgentAdapter,
     threadId: string,
+    agentKind: AgentKind,
     projectLocation: ProjectLocation,
     config: ThreadConfig,
     sessionRef?: SessionRef,
@@ -1474,6 +1495,10 @@ export class ThreadSessionManager {
       });
     } catch (error) {
       console.error("[supervisor] structured session creation failed:", error);
+      captureSupervisorException(error, {
+        "lightcode.feature_area": "supervisor-runtime",
+        "lightcode.provider": agentKind,
+      });
       return undefined;
     }
   }
@@ -1721,6 +1746,10 @@ export class ThreadSessionManager {
           `[supervisor] uncaught error in onData for thread ${session.threadId}:`,
           error,
         );
+        captureSupervisorException(error, {
+          "lightcode.feature_area": "supervisor-runtime",
+          "lightcode.provider": session.agentKind,
+        });
       }
     });
 
@@ -1811,15 +1840,28 @@ export class ThreadSessionManager {
       (session.presentationMode ?? session.adapter.capabilities.presentationMode) === "terminal";
     const useStructuredFlow = isServerControlled || !usesTerminalPresentation;
     session.ignoreExit = true;
+    // Subagent maps from the prior session would otherwise leak across resume:
+    // any unsubscribed buffers, lingering child→parent entries, and overlay
+    // subscriptions from the dead session are stale once the structured
+    // session is replaced. `closeThread` already does this on full teardown.
+    this.clearAllSubAgentStateForThread(session.threadId);
     await session.structuredSession?.dispose();
     if (session.structuredSession) {
       await sleep(150);
     }
     this.safePtyKill(session);
 
+    // Prime the user's interactive-shell env before respawning. See the same
+    // call in `startThreadInner` — must run before the structured-session
+    // spawn so the child inherits the project-pinned PATH, not launchd's.
+    if (session.projectLocation.kind === "posix") {
+      await primeProjectShellEnv(session.projectLocation.path);
+    }
+
     const structuredSession = await this.createStructuredSession(
       session.adapter,
       session.threadId,
+      session.agentKind,
       session.projectLocation,
       config,
       session.sessionRef,

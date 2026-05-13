@@ -106,7 +106,10 @@ export function RightPanel(props: {
           }
         }
       }}
-      onClose={closeAllPanels}
+      onClose={() => {
+        useDevTerminalStore.getState().closePanel();
+        closeAllPanels();
+      }}
     />
   );
 }

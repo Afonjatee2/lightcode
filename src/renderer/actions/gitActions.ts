@@ -1,5 +1,6 @@
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { readBridge } from "@/renderer/bridge";
+import { captureRendererException } from "@/renderer/diagnostics/sentry";
 import { useAppStore } from "@/renderer/state/appStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -7,15 +8,17 @@ import { resolveWorktreeBranch } from "@/renderer/utils/gitHelpers";
 import { closeThreads } from "@/renderer/utils/shellUtils";
 import { performWorktreeRemoval } from "./worktreeActions";
 
+function captureGitActionError(error: unknown): void {
+  captureRendererException(error, { featureArea: "git" });
+}
+
 export function gitSync(projectId: string, worktreePath?: string): void {
   const project = useAppStore.getState().projects.find((p) => p.id === projectId);
   if (!project) return;
   const location = worktreePath
     ? buildWorktreeLocation(project.location, worktreePath)
     : project.location;
-  void readBridge()
-    .gitSync({ projectLocation: location })
-    .catch(() => undefined);
+  void readBridge().gitSync({ projectLocation: location }).catch(captureGitActionError);
 }
 
 export function gitSyncRebase(projectId: string, worktreePath?: string): void {
@@ -24,9 +27,7 @@ export function gitSyncRebase(projectId: string, worktreePath?: string): void {
   const location = worktreePath
     ? buildWorktreeLocation(project.location, worktreePath)
     : project.location;
-  void readBridge()
-    .gitSyncRebase({ projectLocation: location })
-    .catch(() => undefined);
+  void readBridge().gitSyncRebase({ projectLocation: location }).catch(captureGitActionError);
 }
 
 export function gitPush(projectId: string, worktreePath: string): void {
@@ -42,7 +43,7 @@ export function gitPush(projectId: string, worktreePath: string): void {
       branch: worktreeBranch,
       setUpstream: true,
     })
-    .catch(() => undefined);
+    .catch(captureGitActionError);
 }
 
 export function gitPull(projectId: string, worktreePath: string): void {
@@ -51,7 +52,7 @@ export function gitPull(projectId: string, worktreePath: string): void {
   const worktreeLocation = buildWorktreeLocation(project.location, worktreePath);
   void readBridge()
     .gitPull({ projectLocation: worktreeLocation, remote: "origin" })
-    .catch(() => undefined);
+    .catch(captureGitActionError);
 }
 
 export function gitPullRebase(projectId: string, worktreePath: string): void {
@@ -60,7 +61,7 @@ export function gitPullRebase(projectId: string, worktreePath: string): void {
   const worktreeLocation = buildWorktreeLocation(project.location, worktreePath);
   void readBridge()
     .gitPullRebase({ projectLocation: worktreeLocation, remote: "origin" })
-    .catch(() => undefined);
+    .catch(captureGitActionError);
 }
 
 export function gitMergeToSource(projectId: string, worktreePath: string): void {
@@ -82,7 +83,8 @@ export function gitMergeToSource(projectId: string, worktreePath: string): void 
         worktreeBranch,
         sourceBranch,
       });
-    } catch {
+    } catch (error) {
+      captureGitActionError(error);
       // ignored — user can open git review for details
     }
   })();
@@ -116,7 +118,8 @@ export function gitMergeAndRemove(projectId: string, worktreePath: string): void
       }
       await closeThreads(siblings.map((sib) => sib.id));
       await performWorktreeRemoval(project, worktreePath, worktreeBranch);
-    } catch {
+    } catch (error) {
+      captureGitActionError(error);
       // ignored — user can open git review for details
     }
   })();
@@ -149,7 +152,8 @@ export function gitPullFromSource(projectId: string, worktreePath: string): void
           panelStore.setGitOverlayOpen(true);
         }
       }
-    } catch {
+    } catch (error) {
+      captureGitActionError(error);
       // ignored — user can open git review for details
     }
   })();

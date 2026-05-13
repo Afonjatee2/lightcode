@@ -79,7 +79,7 @@ function SubAgentResultDisclosure({ text }: { text: string }) {
   const [isOpen, setIsOpen] = useState(false);
   const actions = useChatPaneActions();
   return (
-    <div className="flex w-full flex-col items-stretch justify-center px-1 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
+    <div className="flex w-full flex-col items-stretch justify-center px-3 py-2 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
       <button
         type="button"
         onClick={() => {
@@ -96,7 +96,7 @@ function SubAgentResultDisclosure({ text }: { text: string }) {
         />
       </button>
       {isOpen ? (
-        <div className="mt-2 max-h-64 overflow-y-auto border-l border-dashed border-[color:var(--border)] pl-3 [scrollbar-gutter:stable]">
+        <div className="mt-2 max-h-64 overflow-y-auto border-l border-dashed border-[color:var(--border)] pl-3 italic [scrollbar-gutter:stable]">
           <ItemMarkdown text={text} />
         </div>
       ) : null}

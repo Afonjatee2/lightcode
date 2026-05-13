@@ -1176,7 +1176,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         itemId: tool.itemId,
         payload:
           tool.itemType === "tool_call" || tool.itemType === "file_change"
-            ? toolPayload(tool, isError ? "error" : "success", obj)
+            ? toolPayload(tool, isError ? "error" : "success", text)
             : toolPayload(tool, isError ? "error" : "success"),
       });
       events.push({ type: "item.completed", threadId: state.threadId, itemId: tool.itemId });

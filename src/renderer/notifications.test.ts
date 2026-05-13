@@ -160,18 +160,15 @@ describe("handleThreadStateNotification", () => {
       { status: "finished", attention: "none" },
     );
 
-    expect(toastMock.success).toHaveBeenCalledWith(
-      "Unknown project",
-      {
-        actionProps: {
-          children: "Open",
-          onPress: expect.any(Function),
-          variant: "secondary",
-        },
-        description: "Thread\nFinished · Waiting for your input",
+    expect(toastMock.success).toHaveBeenCalledWith("Unknown project", {
+      actionProps: {
+        children: "Open",
         onPress: expect.any(Function),
-        timeout: 6000,
+        variant: "secondary",
       },
-    );
+      description: "Thread\nFinished · Waiting for your input",
+      onPress: expect.any(Function),
+      timeout: 6000,
+    });
   });
 });

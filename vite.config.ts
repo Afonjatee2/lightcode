@@ -1,13 +1,34 @@
 import { resolve } from "node:path";
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 
 const compilerPreset = reactCompilerPreset();
+const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 
-export default defineConfig({
+function readEnvValue(env: Record<string, string>, key: string): string {
+  return (env[key] ?? process.env[key] ?? "").trim();
+}
+
+function buildPostHogEnvDefines(mode: string): Record<string, string> {
+  const env = loadEnv(mode, process.cwd(), "");
+  const posthogKey = readEnvValue(env, "POSTHOG_KEY");
+  const posthogHost = readEnvValue(env, "POSTHOG_HOST") || DEFAULT_POSTHOG_HOST;
+  const posthogEnabled = readEnvValue(env, "POSTHOG_ENABLED") || "1";
+  const posthogEnableDev = readEnvValue(env, "POSTHOG_ENABLE_DEV") || "0";
+
+  return {
+    "import.meta.env.VITE_POSTHOG_ENABLE_DEV": JSON.stringify(posthogEnableDev),
+    "import.meta.env.VITE_POSTHOG_ENABLED": JSON.stringify(posthogEnabled),
+    "import.meta.env.VITE_POSTHOG_HOST": JSON.stringify(posthogHost),
+    "import.meta.env.VITE_POSTHOG_KEY": JSON.stringify(posthogKey),
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   plugins: [react(), babel({ presets: [compilerPreset] })],
   base: "./",
+  define: buildPostHogEnvDefines(mode),
   resolve: {
     tsconfigPaths: true,
     alias: {
@@ -17,6 +38,7 @@ export default defineConfig({
   build: {
     outDir: "dist/renderer",
     emptyOutDir: true,
+    sourcemap: "hidden",
     // Filter modulePreload so the heaviest async chunks (shiki grammars,
     // @git-diff-view, xterm) are not parsed by V8 at startup. They load on
     // demand when the code path that needs them runs (first code block,
@@ -92,4 +114,4 @@ export default defineConfig({
     port: 3100,
     strictPort: true,
   },
-});
+}));

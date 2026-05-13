@@ -19,12 +19,19 @@ import { getAppName } from "@/shared/appName";
 import { IPC_EVENT_CHANNELS } from "@/shared/ipc";
 import { readSharedSettingsFile } from "./sharedSettingsFile";
 import { WindowsJobObjectManager } from "./windowsJobObject";
+import { captureMainException, initializeMainSentry } from "./diagnostics/sentry";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 
 if (isDev) {
   app.setPath("userData", join(app.getPath("userData"), "Dev"));
 }
+
+const sentryEnabled = initializeMainSentry({ appVersion: app.getVersion(), isDev });
+const posthogEnabled = process.env.POSTHOG_ENABLED !== "0";
+const posthogKey = posthogEnabled ? (process.env.POSTHOG_KEY ?? "").trim() : "";
+const posthogHost = (process.env.POSTHOG_HOST ?? "").trim();
+const posthogEnableDev = process.env.POSTHOG_ENABLE_DEV === "1";
 
 const hasSingleInstanceLock = isDev || app.requestSingleInstanceLock();
 const WINDOW_CHROME_HEIGHT = 32;
@@ -105,6 +112,7 @@ if (!hasSingleInstanceLock) {
           "[lightcode] Windows Job Object helper unavailable:",
           error instanceof Error ? error.message : String(error),
         );
+        captureMainException(error, { "lightcode.feature_area": "process-lifecycle" });
         if (windowsJobObjectManager === manager) {
           windowsJobObjectManager = null;
         }
@@ -119,10 +127,15 @@ if (!hasSingleInstanceLock) {
       : join(__dirname, "..", "..", "resources", "wsl-helpers");
 
     const supervisorClient = new SupervisorClient({
+      appVersion: app.getVersion(),
+      isDev,
       supervisorPath,
       wslHelpersDir,
       assignPid: async (pid) => {
         await windowsJobObjectManager?.assignPid(pid);
+      },
+      reportError: (error, tags) => {
+        captureMainException(error, tags);
       },
       onEvent: (event) => {
         handleSupervisorEventForSleep(event);
@@ -134,9 +147,13 @@ if (!hasSingleInstanceLock) {
       },
     });
 
-    const autoUpdaterController = createAutoUpdaterController((status) => {
-      mainWindow?.webContents.send(IPC_EVENT_CHANNELS.updateStatus, status);
-    }, isDev);
+    const autoUpdaterController = createAutoUpdaterController(
+      (status) => {
+        mainWindow?.webContents.send(IPC_EVENT_CHANNELS.updateStatus, status);
+      },
+      isDev,
+      captureMainException,
+    );
 
     registerIpcHandlers({
       localHandlers: createLocalIpcHandlers({
@@ -154,10 +171,21 @@ if (!hasSingleInstanceLock) {
       preloadPath: join(__dirname, "preload.cjs"),
       rendererHtmlPath: join(__dirname, "../renderer/index.html"),
       appVersion: app.getVersion(),
+      posthogEnableDev,
+      posthogEnabled,
+      posthogHost,
+      posthogKey,
+      sentryEnabled,
       windowChromeHeight: WINDOW_CHROME_HEIGHT,
       ...(process.env.VITE_DEV_SERVER_URL ? { devServerUrl: process.env.VITE_DEV_SERVER_URL } : {}),
       onClosed: () => {
         mainWindow = null;
+      },
+      onRendererProcessGone: (details) => {
+        captureMainException(new Error(`Renderer process gone: ${details.reason}`), {
+          "lightcode.feature_area": "renderer",
+          "lightcode.process": "renderer",
+        });
       },
     });
 
@@ -208,12 +236,23 @@ if (!hasSingleInstanceLock) {
           preloadPath: join(__dirname, "preload.cjs"),
           rendererHtmlPath: join(__dirname, "../renderer/index.html"),
           appVersion: app.getVersion(),
+          posthogEnableDev,
+          posthogEnabled,
+          posthogHost,
+          posthogKey,
+          sentryEnabled,
           windowChromeHeight: WINDOW_CHROME_HEIGHT,
           ...(process.env.VITE_DEV_SERVER_URL
             ? { devServerUrl: process.env.VITE_DEV_SERVER_URL }
             : {}),
           onClosed: () => {
             mainWindow = null;
+          },
+          onRendererProcessGone: (details) => {
+            captureMainException(new Error(`Renderer process gone: ${details.reason}`), {
+              "lightcode.feature_area": "renderer",
+              "lightcode.process": "renderer",
+            });
           },
         });
       }

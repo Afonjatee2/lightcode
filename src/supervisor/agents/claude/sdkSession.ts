@@ -29,6 +29,8 @@ import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import {
   buildAgentCommand,
   createKnownSessionRef,
+  getPrimedPosixEnv,
+  getProjectShellEnv,
   type AgentLaunchOptions,
   type CreateStructuredSessionInput,
   type StartTurnOptions,
@@ -36,6 +38,7 @@ import {
   type StructuredSessionListener,
   type StructuredSessionUpdate,
 } from "../base";
+import { captureSupervisorException } from "../../diagnostics/sentry";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { applyClaudeContextSuffix } from "./argv";
 import { CLAUDE_DEFAULT_APPROVAL_POLICY } from "./detection";
@@ -581,10 +584,24 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     this.queryReady = (async () => {
       const { query } = await import("@anthropic-ai/claude-agent-sdk");
       const permissionMode = permissionModeForConfig(this.currentConfig);
+      // POSIX: the SDK spawns the `claude` CLI internally, so its env is what
+      // determines PATH for the child. Prefer the project-scoped shell env
+      // captured by `primeProjectShellEnv` (fnm / asdf / mise / volta cd-hooks
+      // applied at the project root) over Electron's `process.env`, which on
+      // macOS-from-Finder is launchd's skeleton PATH and pins the CLI to
+      // homebrew node regardless of `.nvmrc`. Falls back to the homedir-scoped
+      // primed env, then to bare `process.env`.
+      const posixCwd = projectCwd(this.input.projectLocation);
+      const posixEnv =
+        this.input.projectLocation.kind === "posix"
+          ? (getProjectShellEnv(posixCwd) ??
+            getPrimedPosixEnv() ??
+            (process.env as Record<string, string>))
+          : undefined;
       const env =
         this.input.projectLocation.kind === "wsl"
           ? { CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode", BROWSER: "/bin/true" }
-          : { ...process.env, CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode" };
+          : { ...(posixEnv ?? process.env), CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode" };
       const claudeExecutablePath =
         this.input.projectLocation.kind === "wsl" ? undefined : bundledClaudeExecutablePath();
       const options: ClaudeQueryOptions = {
@@ -631,6 +648,10 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           }
         } catch (error) {
           if (!this.disposed) {
+            captureSupervisorException(error, {
+              "lightcode.feature_area": "provider-sdk",
+              "lightcode.provider": "claude",
+            });
             const message = error instanceof Error ? error.message : String(error);
             this.reportError(message);
             this.emitRuntimeEvents([{ type: "error", threadId: this.input.threadId, message }]);
@@ -639,6 +660,10 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       })
       .catch((error) => {
         if (this.disposed) return;
+        captureSupervisorException(error, {
+          "lightcode.feature_area": "provider-sdk",
+          "lightcode.provider": "claude",
+        });
         const message = error instanceof Error ? error.message : String(error);
         this.reportError(message);
         this.emitRuntimeEvents([{ type: "error", threadId: this.input.threadId, message }]);

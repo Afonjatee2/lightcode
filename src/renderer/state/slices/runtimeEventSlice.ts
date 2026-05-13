@@ -7,8 +7,11 @@ import type {
   RuntimeContentStreamKind,
   RuntimeEvent,
   ThreadContextUsage,
+  ToolCallPayload,
 } from "@/shared/contracts";
 import type { AppStoreState, SliceCreator } from "./shared";
+
+const STALE_SUB_AGENT_ERROR_MESSAGE = "Interrupted: agent session ended before completion.";
 
 /**
  * Frozen "Worked for X" record for a turn that has finished. Persisted so the
@@ -82,6 +85,14 @@ export interface RuntimeEventSlice {
   applyRuntimeEvents(threadId: string, events: RuntimeEvent[]): void;
   clearRuntimeDirtyThreadIds(threadIds: readonly string[]): void;
   clearThreadRuntimeEvents(threadId: string): void;
+  /**
+   * Force-terminate any still-running sub-agent tool_call items in a thread.
+   * Used when a thread has no live agent attached (after DB hydration, or when
+   * a structured session exits / is about to be replaced on resume) — without
+   * this, parents that never completed (denied permissions, crashes, abrupt
+   * exits) keep appearing in the active sub-agent dock forever.
+   */
+  reconcileStaleSubAgents(threadId: string): void;
   /**
    * Revert the visible chat transcript to a checkpoint item, preserving that
    * item and everything before it. Used by GUI chat checkpoints.
@@ -180,6 +191,33 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         runtimeContextByThread,
         runtimeStructuralVersionByThread,
         runtimeCompletedTurnsByThread,
+        runtimeDirtyThreadIds,
+      };
+    }),
+
+  reconcileStaleSubAgents: (threadId) =>
+    set((state) => {
+      const items = state.runtimeItemsByIdByThread[threadId];
+      if (!items) return {};
+      let nextItems: Record<string, RuntimeChatItem> | undefined;
+      for (const [id, item] of Object.entries(items)) {
+        if (!isStaleSubAgentItem(item)) continue;
+        nextItems ??= { ...items };
+        nextItems[id] = terminateSubAgentItem(item);
+      }
+      if (!nextItems) return {};
+      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.includes(threadId)
+        ? state.runtimeDirtyThreadIds
+        : [...state.runtimeDirtyThreadIds, threadId];
+      return {
+        runtimeItemsByIdByThread: {
+          ...state.runtimeItemsByIdByThread,
+          [threadId]: nextItems,
+        },
+        runtimeStructuralVersionByThread: {
+          ...state.runtimeStructuralVersionByThread,
+          [threadId]: (state.runtimeStructuralVersionByThread[threadId] ?? 0) + 1,
+        },
         runtimeDirtyThreadIds,
       };
     }),
@@ -352,7 +390,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         },
       };
     }),
-
 });
 
 type RuntimeEventState = Pick<
@@ -727,6 +764,30 @@ function mergeCompletedTurns(
 
 function completedTurnKey(turn: CompletedTurnRecord): string {
   return `${turn.startedAt}:${turn.endedAt}:${turn.anchorItemId ?? ""}`;
+}
+
+function isStaleSubAgentItem(item: RuntimeChatItem): boolean {
+  if (item.type !== "tool_call") return false;
+  const payload = item.payload as ToolCallPayload | undefined;
+  if (payload?.isSubAgent !== true) return false;
+  return item.state !== "completed" || payload?.status === "running";
+}
+
+function terminateSubAgentItem(item: RuntimeChatItem): RuntimeChatItem {
+  const payload: ToolCallPayload = (item.payload as ToolCallPayload | undefined) ?? {
+    name: "Task",
+    status: "error",
+  };
+  const nextPayload: ToolCallPayload = {
+    ...payload,
+    status: "error",
+    ...(payload.result === undefined ? { result: { error: STALE_SUB_AGENT_ERROR_MESSAGE } } : {}),
+  };
+  return {
+    ...item,
+    state: "completed",
+    payload: nextPayload,
+  };
 }
 
 /** Shallow-merge two payloads so item.updated layers on top of started. */

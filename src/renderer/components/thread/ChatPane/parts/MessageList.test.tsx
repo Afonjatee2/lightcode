@@ -97,10 +97,18 @@ describe("MessageList", () => {
       projectRootNames: new Set<string>(),
     };
 
+    const threadId = "thread-1";
+    useAppStore.getState().applyRuntimeEvent(threadId, {
+      type: "item.started",
+      threadId,
+      itemId: "item-4",
+      itemType: "assistant_message",
+    });
+
     render(
       <ChatPaneActionsContext.Provider value={actions}>
         <MessageList
-          threadId="thread-1"
+          threadId={threadId}
           entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
           scrollElement={scrollElement}
         />
@@ -307,7 +315,7 @@ describe("MessageList", () => {
     );
   });
 
-  it("hides the bottom overflow fade when the last timeline item is a user message", () => {
+  it("hides the bottom overflow fade when the last timeline item is not an assistant message", () => {
     const threadId = "thread-1";
     useAppStore.getState().applyRuntimeEvent(threadId, {
       type: "item.started",
@@ -320,6 +328,54 @@ describe("MessageList", () => {
       <MessageList
         threadId={threadId}
         entries={makeEntries(["assistant-1", "user-1"])}
+        scrollElement={document.createElement("div")}
+      />,
+    );
+
+    const virtualSizeBox = document.querySelector("[data-chat-virtual-size-box='true']");
+    expect(virtualSizeBox).toHaveAttribute("data-bottom-fade-visible", "false");
+    expect(
+      (virtualSizeBox as HTMLElement).style.getPropertyValue("--lc-chat-bottom-mask-end-alpha"),
+    ).toBe("1");
+  });
+
+  it("shows the bottom overflow fade only when the last timeline item is an assistant message", () => {
+    const threadId = "thread-1";
+    useAppStore.getState().applyRuntimeEvent(threadId, {
+      type: "item.started",
+      threadId,
+      itemId: "assistant-1",
+      itemType: "assistant_message",
+    });
+
+    render(
+      <MessageList
+        threadId={threadId}
+        entries={makeEntries(["user-1", "assistant-1"])}
+        scrollElement={document.createElement("div")}
+      />,
+    );
+
+    const virtualSizeBox = document.querySelector("[data-chat-virtual-size-box='true']");
+    expect(virtualSizeBox).toHaveAttribute("data-bottom-fade-visible", "true");
+    expect(
+      (virtualSizeBox as HTMLElement).style.getPropertyValue("--lc-chat-bottom-mask-end-alpha"),
+    ).toBe("0");
+  });
+
+  it("hides the bottom overflow fade when the last timeline item is reasoning", () => {
+    const threadId = "thread-1";
+    useAppStore.getState().applyRuntimeEvent(threadId, {
+      type: "item.started",
+      threadId,
+      itemId: "reasoning-1",
+      itemType: "reasoning",
+    });
+
+    render(
+      <MessageList
+        threadId={threadId}
+        entries={makeEntries(["assistant-1", "reasoning-1"])}
         scrollElement={document.createElement("div")}
       />,
     );

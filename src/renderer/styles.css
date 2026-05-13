@@ -14,10 +14,73 @@
   inherits: false;
 }
 
+@property --lc-goal-shine-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
 @keyframes lightcode-composer-border-spin {
   to {
     --composer-border-angle: 360deg;
   }
+}
+
+/* Goal dock active indicator — rotates a soft accent arc around the
+   target icon to suggest work in progress. The icon itself is already a
+   bullseye, so a thin ring traveling around it reads as "shining in
+   circle". A gentle outer drop-shadow pulse adds depth without competing
+   with the rotating shine. */
+@keyframes lightcode-goal-shine-spin {
+  to {
+    --lc-goal-shine-angle: 360deg;
+  }
+}
+
+@keyframes lightcode-goal-active-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 0.15rem color-mix(in oklab, var(--snow, white) 45%, transparent));
+  }
+  50% {
+    filter: drop-shadow(0 0 0.45rem color-mix(in oklab, var(--snow, white) 85%, transparent));
+  }
+}
+
+.lightcode-goal-active-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  animation: lightcode-goal-active-pulse 2.4s ease-in-out infinite;
+}
+
+.lightcode-goal-active-icon::before {
+  content: "";
+  position: absolute;
+  /* Orbit just outside the icon's bounding box so the full Target icon stays
+     visible and the light appears to circle around it. */
+  inset: -3px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from var(--lc-goal-shine-angle),
+    transparent 0deg,
+    var(--snow, white) 60deg,
+    var(--snow, white) 90deg,
+    transparent 140deg,
+    transparent 360deg
+  );
+  -webkit-mask: radial-gradient(
+    closest-side,
+    transparent calc(100% - 1.5px),
+    #000 calc(100% - 1.5px)
+  );
+  mask: radial-gradient(closest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
+  filter: drop-shadow(0 0 2px var(--snow, white))
+    drop-shadow(0 0 4px color-mix(in oklab, var(--snow, white) 60%, transparent));
+  animation: lightcode-goal-shine-spin 1.6s linear infinite;
+  pointer-events: none;
 }
 
 /* Shiki output (tool-call / file_change accordion bodies). The wrapper
@@ -1911,6 +1974,13 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
   }
   .agent-discovery-item[data-found="true"] .agent-discovery-item__icon {
     animation: none;
+  }
+  .lightcode-goal-active-icon {
+    animation: none;
+  }
+  .lightcode-goal-active-icon::before {
+    animation: none;
+    display: none;
   }
 }
 

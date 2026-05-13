@@ -2,6 +2,7 @@ import { toast } from "@heroui/react";
 import type { Project } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { readBridge } from "@/renderer/bridge";
+import { captureRendererException } from "@/renderer/diagnostics/sentry";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useGitStore } from "@/renderer/state/gitStore";
@@ -93,6 +94,7 @@ export async function openFileInEditor(
       lineNumber !== undefined ? { lineNumber } : undefined,
     );
   } catch (error) {
+    captureRendererException(error, { featureArea: "file-editor" });
     toast.danger(error instanceof Error ? error.message : String(error));
   }
 }
@@ -108,5 +110,7 @@ export function autoDetectSetupScript(project: Project) {
         });
       }
     })
-    .catch(() => undefined);
+    .catch((error: unknown) => {
+      captureRendererException(error, { featureArea: "project-setup" });
+    });
 }

@@ -3,6 +3,7 @@ import type { ExtractContextResult, Thread, ThreadConfig } from "@/shared/contra
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { readBridge } from "@/renderer/bridge";
+import { captureThreadInputSubmitted } from "@/renderer/analytics/posthog";
 import { toggleMarkThreadDone } from "@/renderer/actions/threadActions";
 import { useAppStore } from "@/renderer/state/appStore";
 import { captureFileCheckpoint } from "@/renderer/state/fileCheckpointActions";
@@ -167,6 +168,7 @@ export function ThreadPane(props: {
             ? { userMessageItemId: optimisticUserMessageItemId }
             : {}),
         });
+        captureThreadInputSubmitted(thread, segments);
         touchThread(thread.id);
       }}
       installedAgents={installedAgents}

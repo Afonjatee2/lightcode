@@ -8,6 +8,7 @@ directories:
 
 files:
   - dist/**/*
+  - "!dist/**/*.map"
   - package.json
   - node_modules/node-pty/**/*
   - node_modules/better-sqlite3/**/*
@@ -98,7 +99,6 @@ asarUnpack:
   # platform runtime package dynamically, so unpack both roots and the pnpm
   # store entries that back the platform package.
   - dist/main/claudeSdkProbeWorker.mjs
-  - dist/main/claudeSdkProbeWorker.mjs.map
   - node_modules/@anthropic-ai/claude-agent-sdk/**/*
   - node_modules/@anthropic-ai/claude-agent-sdk-*/**/*
   - node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-*/node_modules/@anthropic-ai/**/*

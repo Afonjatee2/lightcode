@@ -145,18 +145,18 @@ export const MessageList = memo(function MessageList({
     const virtualSizeBox = virtualSizeBoxRef.current;
     if (!virtualSizeBox) return;
 
-    const selectLastItemIsUserMessage = (state: AppStoreState) =>
-      isLastTimelineEntryUserMessage(state, threadId, entries);
-    const updateBottomMask = (lastItemIsUserMessage: boolean) => {
+    const selectLastItemIsAssistantMessage = (state: AppStoreState) =>
+      isLastTimelineEntryAssistantMessage(state, threadId, entries);
+    const updateBottomMask = (lastItemIsAssistantMessage: boolean) => {
       virtualSizeBox.style.setProperty(
         "--lc-chat-bottom-mask-end-alpha",
-        lastItemIsUserMessage ? "1" : "0",
+        lastItemIsAssistantMessage ? "0" : "1",
       );
-      virtualSizeBox.dataset.bottomFadeVisible = lastItemIsUserMessage ? "false" : "true";
+      virtualSizeBox.dataset.bottomFadeVisible = lastItemIsAssistantMessage ? "true" : "false";
     };
 
-    updateBottomMask(selectLastItemIsUserMessage(useAppStore.getState()));
-    return useAppStore.subscribe(selectLastItemIsUserMessage, updateBottomMask);
+    updateBottomMask(selectLastItemIsAssistantMessage(useAppStore.getState()));
+    return useAppStore.subscribe(selectLastItemIsAssistantMessage, updateBottomMask);
   }, [entries, threadId]);
 
   const virtualItems = virtualizer.getVirtualItems();
@@ -459,14 +459,14 @@ function computeLiveTailIndex(
   return -1;
 }
 
-function isLastTimelineEntryUserMessage(
+function isLastTimelineEntryAssistantMessage(
   state: AppStoreState,
   threadId: string,
   entries: readonly ChatTimelineEntry[],
 ): boolean {
   const lastEntry = entries[entries.length - 1];
   if (!lastEntry || lastEntry.kind !== "item") return false;
-  return state.runtimeItemsByIdByThread[threadId]?.[lastEntry.id]?.type === "user_message";
+  return state.runtimeItemsByIdByThread[threadId]?.[lastEntry.id]?.type === "assistant_message";
 }
 
 function estimateTimelineEntrySize(entry: ChatTimelineEntry | undefined, threadId: string): number {

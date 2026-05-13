@@ -499,7 +499,7 @@ describe("sdkCanonicalMapping — tool use", () => {
           path: "src/renderer/components/composer/MentionInput.tsx",
           changeKind: "edit",
           args,
-          result,
+          result: "Edit applied.",
         },
       },
       { type: "item.completed", threadId: "thread-1", itemId: "toolu_edit" },
