@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button, ButtonGroup, Dropdown, Label } from "@heroui/react";
+import { Button, ButtonGroup, Dropdown, Label, Tooltip } from "@heroui/react";
 import { ChevronDown, HelpCircle, Plug, ShieldAlert } from "lucide-react";
 import {
   asPermissionRequestDetails,
@@ -95,7 +95,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
       ? asOpenCodePermissionDetails(request.payload.details)
       : undefined;
   const detailText =
-    !permissionDetails && !opencodePermission && !isCustomForm
+    !permissionDetails && !opencodePermission && !isCustomForm && !isQuestion
       ? formatRawDetails(request.payload.details)
       : undefined;
   const agentLead = agentLabel ?? "The agent";
@@ -707,23 +707,14 @@ function QuestionRows(props: {
   if (!multiSelect) {
     return (
       <div role="listbox" aria-label="Options" className="flex flex-col px-1 pb-1">
-        {options.map((option) => (
-          <button
+        {options.map((option, index) => (
+          <QuestionOptionRow
             key={option.optionId}
-            type="button"
-            role="option"
-            aria-selected="false"
-            disabled={isDisabled}
+            index={index}
+            option={option}
+            isDisabled={isDisabled}
             onClick={() => onSubmit([option.optionId])}
-            className="flex w-full items-start gap-2 rounded px-2 py-1 text-left text-xs leading-tight transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/5 focus-visible:outline-none disabled:opacity-60 disabled:hover:bg-transparent"
-          >
-            <span className="min-w-0 flex-1 truncate text-foreground">{option.label}</span>
-            {option.description ? (
-              <span className="ms-auto truncate text-[color:var(--muted)]">
-                {option.description}
-              </span>
-            ) : null}
-          </button>
+          />
         ))}
       </div>
     );
@@ -749,24 +740,15 @@ function QuestionRows(props: {
       aria-multiselectable="true"
       className="flex flex-col px-1 pb-1"
     >
-      {options.map((option) => (
-        <button
+      {options.map((option, index) => (
+        <QuestionOptionRow
           key={option.optionId}
-          type="button"
-          role="option"
-          aria-selected={selected.has(option.optionId)}
-          disabled={isDisabled}
+          index={index}
+          option={option}
+          isDisabled={isDisabled}
+          checked={selected.has(option.optionId)}
           onClick={() => toggle(option.optionId)}
-          className="flex w-full items-start gap-2 rounded px-2 py-1 text-left text-xs leading-tight transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/5 focus-visible:outline-none disabled:opacity-60 disabled:hover:bg-transparent"
-        >
-          <span className="mt-0.5 flex size-3 shrink-0 items-center justify-center rounded border border-foreground/30 text-[9px] text-foreground">
-            {selected.has(option.optionId) ? "x" : ""}
-          </span>
-          <span className="min-w-0 flex-1 truncate text-foreground">{option.label}</span>
-          {option.description ? (
-            <span className="ms-auto truncate text-[color:var(--muted)]">{option.description}</span>
-          ) : null}
-        </button>
+        />
       ))}
       <div className="flex justify-end gap-1 px-1 pt-1">
         <Button
@@ -779,6 +761,64 @@ function QuestionRows(props: {
         </Button>
       </div>
     </div>
+  );
+}
+
+function QuestionOptionRow(props: {
+  index: number;
+  option: UserInputOption;
+  isDisabled: boolean;
+  onClick: () => void;
+  /** When defined, the row renders a checkbox marker (multi-select). */
+  checked?: boolean;
+}) {
+  const { index, option, isDisabled, onClick, checked } = props;
+  const isMultiSelect = checked !== undefined;
+  const tooltipBody = option.description ? (
+    <div className="max-w-[28rem] space-y-1 whitespace-normal break-words">
+      <div className="text-xs font-medium text-foreground">{option.label}</div>
+      <div className="text-[11px] text-[color:var(--muted)]">{option.description}</div>
+    </div>
+  ) : null;
+
+  const row = (
+    <button
+      type="button"
+      role="option"
+      aria-selected={isMultiSelect ? checked === true : false}
+      disabled={isDisabled}
+      onClick={onClick}
+      className="flex w-full items-start gap-2 rounded px-2 py-1 text-left transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/5 focus-visible:outline-none disabled:opacity-60 disabled:hover:bg-transparent"
+    >
+      {isMultiSelect ? (
+        <span className="mt-0.5 flex size-3 shrink-0 items-center justify-center rounded border border-foreground/30 text-[9px] text-foreground [font-variant-numeric:tabular-nums]">
+          {checked ? "x" : ""}
+        </span>
+      ) : (
+        <span className="mt-px w-4 shrink-0 text-[11px] font-medium text-[color:var(--muted)] [font-variant-numeric:tabular-nums]">
+          {`${index + 1}.`}
+        </span>
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-xs font-medium text-foreground">{option.label}</span>
+        {option.description ? (
+          <span
+            className="block overflow-hidden text-[11px] leading-snug text-[color:var(--muted)] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
+            title={option.description}
+          >
+            {option.description}
+          </span>
+        ) : null}
+      </span>
+    </button>
+  );
+
+  if (!tooltipBody) return row;
+  return (
+    <Tooltip delay={400}>
+      <Tooltip.Trigger>{row}</Tooltip.Trigger>
+      <Tooltip.Content placement="right">{tooltipBody}</Tooltip.Content>
+    </Tooltip>
   );
 }
 

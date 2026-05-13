@@ -68,9 +68,10 @@ describe("parseProjectPathRef", () => {
       });
     });
 
-    it("accepts absolute POSIX paths without enforcing root-name check", () => {
-      // Absolute paths can't be validated against project-relative root names;
-      // downstream normalization converts them to project-relative if possible.
+    it("accepts absolute POSIX file paths without enforcing root-name check", () => {
+      // File extensions and `:line` suffixes are strong enough signals to chip
+      // even outside the project; downstream normalization converts them to
+      // project-relative paths when possible.
       expect(parseProjectPathRef("/home/me/repo/src/foo.ts", { rootNames })).toEqual({
         kind: "file",
         path: "/home/me/repo/src/foo.ts",
@@ -79,6 +80,32 @@ describe("parseProjectPathRef", () => {
         kind: "file",
         path: "/home/me/repo/src/foo.ts",
         line: 42,
+      });
+    });
+
+    it("rejects absolute folder candidates whose first segment isn't a project root", () => {
+      // Slash commands like `/plan` and `/p` have first segment "plan"/"p",
+      // which won't be a real top-level project entry, so they must not chip.
+      expect(parseProjectPathRef("/plan", { rootNames })).toBeNull();
+      expect(parseProjectPathRef("/p", { rootNames })).toBeNull();
+      expect(parseProjectPathRef("/review", { rootNames })).toBeNull();
+      // Absolute folder paths outside the project are also rejected here;
+      // callers normalize to a project-relative path before re-parsing.
+      expect(parseProjectPathRef("/Users/me/repo/src/foo", { rootNames })).toBeNull();
+    });
+
+    it("accepts absolute folder candidates whose first segment is a project root", () => {
+      expect(parseProjectPathRef("/src/foo", { rootNames })).toEqual({
+        kind: "folder",
+        path: "/src/foo",
+      });
+    });
+
+    it("still recognizes explicit folder paths (trailing slash) regardless of root", () => {
+      // The trailing slash is itself a strong folder signal; keep it permissive.
+      expect(parseProjectPathRef("/plan/", { rootNames })).toEqual({
+        kind: "folder",
+        path: "/plan",
       });
     });
   });

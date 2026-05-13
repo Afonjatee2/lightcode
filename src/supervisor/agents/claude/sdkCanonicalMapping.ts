@@ -18,7 +18,12 @@ import type {
 } from "@/shared/contracts";
 import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
 import { createContextUsageEvent, readNonNegativeInteger } from "../contextUsage";
-import { parseGoalSlashCommand, startGoalItemEvents } from "../goalRuntime";
+import {
+  goalPayloadFromProviderState,
+  parseGoalSlashCommand,
+  startGoalItemEvents,
+  updateGoalItemEvents,
+} from "../goalRuntime";
 
 interface TextItemState {
   itemId: string;
@@ -48,6 +53,9 @@ export interface ClaudeMapperState {
   currentAssistantMessageId?: string;
   streamedAssistantMessageIds: Set<string>;
   currentCompactionItemId?: string;
+  activeGoalItemId?: string;
+  activeGoalObjective?: string;
+  activeGoalStartedAtMs?: number;
 }
 
 export function createClaudeMapperState(threadId: string): ClaudeMapperState {
@@ -119,7 +127,17 @@ export function startClaudeTurn(
   ];
   const goalPayload = parseGoalSlashCommand(prompt);
   if (goalPayload) {
-    events.push(...startGoalItemEvents(state.threadId, `goal-${turnId}`, goalPayload));
+    const goalItemId = `goal-${turnId}`;
+    events.push(...startGoalItemEvents(state.threadId, goalItemId, goalPayload));
+    if (goalPayload.action === "set" && goalPayload.objective) {
+      state.activeGoalItemId = goalItemId;
+      state.activeGoalObjective = goalPayload.objective;
+      state.activeGoalStartedAtMs = Date.now();
+    } else {
+      delete state.activeGoalItemId;
+      delete state.activeGoalObjective;
+      delete state.activeGoalStartedAtMs;
+    }
   }
   if (isManualCompactPrompt(prompt)) {
     const compactItemId = `compact-${turnId}`;
@@ -218,6 +236,8 @@ export function closeClaudeOpenItems(state: ClaudeMapperState): RuntimeEvent[] {
   state.toolItemsById.clear();
   return events;
 }
+
+const ASK_USER_QUESTION_TOOL_NAME = "AskUserQuestion";
 
 function classifyToolItemType(toolName: string): CanonicalItemType {
   const name = toolName.toLowerCase();
@@ -399,6 +419,68 @@ export function mapClaudeQuestionRequest(input: {
   };
 }
 
+/**
+ * Build the chat items rendered in place of the suppressed `AskUserQuestion`
+ * tool_call once the user has answered. Each question becomes a user-side
+ * message showing the chosen option labels, so the conversation has a visible
+ * trace of what the user picked.
+ */
+export function buildClaudeQuestionAnswerEvents(input: {
+  threadId: string;
+  itemId: string;
+  questions: ClaudeQuestion[];
+  answers: Record<string, unknown>;
+}): RuntimeEvent[] {
+  const lines = formatQuestionAnswerLines(input.questions, input.answers);
+  if (lines.length === 0) return [];
+  const text = lines.join("\n");
+  return [
+    {
+      type: "item.started",
+      threadId: input.threadId,
+      itemId: input.itemId,
+      itemType: "user_message",
+      payload: { content: [{ kind: "text", text }] },
+    },
+    { type: "item.completed", threadId: input.threadId, itemId: input.itemId },
+  ];
+}
+
+function formatQuestionAnswerLines(
+  questions: ClaudeQuestion[],
+  answers: Record<string, unknown>,
+): string[] {
+  const lines: string[] = [];
+  for (const question of questions) {
+    const raw = answers[question.question];
+    const chosen = extractChosenOptionIds(raw);
+    if (chosen.length === 0) continue;
+    const labels = chosen.map((id) => labelForOption(question, id));
+    lines.push(labels.join(", "));
+  }
+  return lines;
+}
+
+function extractChosenOptionIds(raw: unknown): string[] {
+  if (typeof raw === "string") return raw.length > 0 ? [raw] : [];
+  if (Array.isArray(raw)) {
+    return raw.filter((v): v is string => typeof v === "string" && v.length > 0);
+  }
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (Array.isArray(obj.optionIds)) {
+      return obj.optionIds.filter((v): v is string => typeof v === "string" && v.length > 0);
+    }
+    if (typeof obj.optionId === "string" && obj.optionId.length > 0) return [obj.optionId];
+  }
+  return [];
+}
+
+function labelForOption(question: ClaudeQuestion, optionId: string): string {
+  const match = question.options.find((opt) => opt.optionId === optionId);
+  return match?.label ?? optionId;
+}
+
 export interface ClaudeQuestion {
   question: string;
   header: string;
@@ -574,10 +656,8 @@ function extractText(value: unknown): string {
  * message into the parent Task tool_call's progress field. Lets a collapsed
  * sub-agent row show its current step without expanding to read the children.
  */
-function applyTaskLifecycle(
-  message: SDKMessage,
-  state: ClaudeMapperState,
-): RuntimeEvent | undefined {
+function applyTaskLifecycle(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
+  const events: RuntimeEvent[] = [];
   const obj = message as {
     tool_use_id?: unknown;
     description?: unknown;
@@ -585,15 +665,18 @@ function applyTaskLifecycle(
     summary?: unknown;
     usage?: unknown;
   };
-  const toolUseId = typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined;
-  if (!toolUseId) return undefined;
-  const tool = state.toolItemsById.get(toolUseId);
-  if (!tool) return undefined;
-
   const usage =
     obj.usage && typeof obj.usage === "object"
       ? (obj.usage as { total_tokens?: number; tool_uses?: number; duration_ms?: number })
       : undefined;
+  const contextUsage = contextUsageFromTaskUsage(state.threadId, usage);
+  if (contextUsage) events.push(contextUsage);
+
+  const toolUseId = typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined;
+  if (!toolUseId) return events;
+  const tool = state.toolItemsById.get(toolUseId);
+  if (!tool) return events;
+
   const next: ToolCallProgress = {
     ...tool.progress,
     ...(typeof obj.description === "string" && obj.description.length > 0
@@ -610,14 +693,24 @@ function applyTaskLifecycle(
   if (typeof usage?.tool_uses === "number") {
     next.stepCount = Math.max(next.stepCount ?? 0, usage.tool_uses);
   }
-  if (Object.keys(next).length === 0) return undefined;
+  if (Object.keys(next).length === 0) return events;
   tool.progress = next;
-  return {
+  events.push({
     type: "item.updated",
     threadId: state.threadId,
     itemId: tool.itemId,
     payload: toolPayload(tool, "running"),
-  };
+  });
+  return events;
+}
+
+function contextUsageFromTaskUsage(
+  threadId: string,
+  usage: { total_tokens?: number; tool_uses?: number; duration_ms?: number } | undefined,
+): RuntimeEvent | undefined {
+  const usedTokens = readNonNegativeInteger(usage?.total_tokens);
+  if (usedTokens === undefined || usedTokens <= 0) return undefined;
+  return createContextUsageEvent(threadId, { usedTokens });
 }
 
 function mapPermissionDenied(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
@@ -762,6 +855,48 @@ export function nonDiagnosticErrors(message: SDKMessage): string[] {
   );
 }
 
+function completeActiveGoalEvents(
+  state: ClaudeMapperState,
+  message: Extract<SDKMessage, { type: "result" }>,
+): RuntimeEvent[] {
+  const goalItemId = state.activeGoalItemId;
+  const objective = state.activeGoalObjective;
+  const startedAtMs = state.activeGoalStartedAtMs;
+  if (!goalItemId || !objective || startedAtMs === undefined) return [];
+
+  delete state.activeGoalItemId;
+  delete state.activeGoalObjective;
+  delete state.activeGoalStartedAtMs;
+
+  const nowMs = Date.now();
+  const usage = readClaudeResultUsage(message);
+  const payload = goalPayloadFromProviderState(
+    {
+      objective,
+      status: "complete",
+      ...(usage !== undefined ? { tokensUsed: usage } : {}),
+      timeUsedSeconds: Math.max(0, Math.round((nowMs - startedAtMs) / 1000)),
+      updatedAt: nowMs / 1000,
+    },
+    "updated",
+  );
+  return updateGoalItemEvents(state.threadId, goalItemId, payload);
+}
+
+function readClaudeResultUsage(
+  message: Extract<SDKMessage, { type: "result" }>,
+): number | undefined {
+  const usage = (message as { usage?: unknown }).usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const record = usage as Record<string, unknown>;
+  const total = readNonNegativeInteger(record.total_tokens);
+  if (total !== undefined) return total;
+  const input = readNonNegativeInteger(record.input_tokens) ?? 0;
+  const output = readNonNegativeInteger(record.output_tokens) ?? 0;
+  const sum = input + output;
+  return sum > 0 ? sum : undefined;
+}
+
 function mapResultState(message: Extract<SDKMessage, { type: "result" }>): TurnState {
   if (message.subtype === "success") return "completed";
   const filtered = nonDiagnosticErrors(message);
@@ -865,6 +1000,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         block?.type === "mcp_tool_use"
       ) {
         const toolName = typeof block.name === "string" ? block.name : "Tool";
+        if (toolName === ASK_USER_QUESTION_TOOL_NAME) return events;
         const input =
           block.input && typeof block.input === "object" && !Array.isArray(block.input)
             ? (block.input as Record<string, unknown>)
@@ -988,6 +1124,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
           obj.type === "mcp_tool_use"
         ) {
           const toolName = typeof obj.name === "string" ? obj.name : "Tool";
+          if (toolName === ASK_USER_QUESTION_TOOL_NAME) continue;
           const input =
             obj.input && typeof obj.input === "object" && !Array.isArray(obj.input)
               ? (obj.input as Record<string, unknown>)
@@ -1059,6 +1196,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
       const msg = remaining[0] ?? "Claude turn failed.";
       events.push({ type: "error", threadId: state.threadId, message: msg });
     }
+    events.push(...completeActiveGoalEvents(state, message));
     if (state.currentTurnId) {
       events.push({
         type: "turn.completed",
@@ -1077,8 +1215,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
       message.subtype === "task_progress" ||
       message.subtype === "task_notification")
   ) {
-    const updated = applyTaskLifecycle(message, state);
-    if (updated) events.push(updated);
+    events.push(...applyTaskLifecycle(message, state));
     return events;
   }
 

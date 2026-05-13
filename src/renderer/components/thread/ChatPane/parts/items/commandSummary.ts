@@ -168,12 +168,12 @@ function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
     };
   }
 
-  const rgSearch = parseRipgrepSearch(trimmed);
-  if (rgSearch) {
+  const grepLike = parseGrepLikeSearch(trimmed);
+  if (grepLike) {
     return {
-      title: rgSearch.scope
-        ? `Search: "${rgSearch.pattern}" in ${rgSearch.scope}`
-        : `Search: "${rgSearch.pattern}"`,
+      title: grepLike.scope
+        ? `Search: "${grepLike.pattern}" in ${grepLike.scope}`
+        : `Search: "${grepLike.pattern}"`,
       kind: "search",
     };
   }
@@ -229,10 +229,20 @@ interface SedView {
   lines: string;
 }
 
-interface RipgrepSearch {
+interface GrepLikeSearch {
   pattern: string;
   scope: string | undefined;
 }
+
+const GREP_LIKE_EXECUTABLES = new Set([
+  "rg",
+  "ripgrep",
+  "grep",
+  "egrep",
+  "fgrep",
+  "ggrep",
+  "rgrep",
+]);
 
 interface PipedFileView {
   path: string;
@@ -323,11 +333,11 @@ function consumesNlOptionValue(option: string): boolean {
   );
 }
 
-function parseRipgrepSearch(command: string): RipgrepSearch | null {
-  const words = splitShellWords(command);
+function parseGrepLikeSearch(command: string): GrepLikeSearch | null {
+  const words = splitShellWords(splitShellPipeline(command)[0] ?? command);
   if (words.length < 2) return null;
   const executable = words[0]!.split(/[/\\]/).pop()?.toLowerCase();
-  if (executable !== "rg" && executable !== "ripgrep") return null;
+  if (!executable || !GREP_LIKE_EXECUTABLES.has(executable)) return null;
 
   let pattern: string | undefined;
   const paths: string[] = [];
@@ -341,12 +351,16 @@ function parseRipgrepSearch(command: string): RipgrepSearch | null {
       }
       break;
     }
-    if (word === "-e" || word === "--regexp") {
-      pattern = words[++i];
+    if (word === "-e" || word === "--regexp" || word === "-f" || word === "--file") {
+      pattern = words[++i] ?? pattern;
       continue;
     }
     if (word.startsWith("--regexp=")) {
       pattern = word.slice("--regexp=".length);
+      continue;
+    }
+    if (word.startsWith("--file=")) {
+      pattern = word.slice("--file=".length);
       continue;
     }
     if (word === "-g" || word === "--glob" || word === "--type" || word === "-t") {

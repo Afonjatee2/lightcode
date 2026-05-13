@@ -70,6 +70,30 @@ describe("humanIntentTitle", () => {
     expect(commandIntentDisplay(full).kind).toBe("search");
   });
 
+  it("describes plain grep commands as searches", () => {
+    const full = `grep -n "toastId" src/renderer/notifications.ts`;
+    expect(humanIntentTitle(full)).toBe('Search: "toastId" in src/renderer/notifications.ts');
+    expect(commandIntentDisplay(full).kind).toBe("search");
+  });
+
+  it("describes recursive grep with multiple paths as a search", () => {
+    const full = `grep -rn "filteredCommands" src/renderer src/shared`;
+    expect(commandIntentDisplay(full)).toEqual({
+      title: 'Search: "filteredCommands" in src/renderer src/shared',
+      kind: "search",
+    });
+  });
+
+  it("describes egrep/fgrep as searches", () => {
+    expect(commandIntentDisplay(`egrep -i "foo|bar" src/x.ts`).kind).toBe("search");
+    expect(commandIntentDisplay(`fgrep "literal" src/x.ts`).kind).toBe("search");
+  });
+
+  it("handles grep -e PATTERN form", () => {
+    const full = `grep -rn -e "needle" src`;
+    expect(humanIntentTitle(full)).toBe('Search: "needle" in src');
+  });
+
   it("describes cat piped through sed as viewed lines", () => {
     const full = `cat node_modules/.modules.yaml 2>/dev/null | sed -n '1,180p'`;
     expect(humanIntentTitle(full)).toBe("View 1:180: node_modules/.modules.yaml");

@@ -1,6 +1,7 @@
 import { ArrowRight, FolderOpen, Plus, TerminalSquare } from "lucide-react";
 import { useShallow } from "zustand/shallow";
 import { useAppStore } from "@/renderer/state/appStore";
+import { openThread } from "@/renderer/actions/threadActions";
 import { ProviderIcon, getStatusTone } from "@/renderer/components/providers";
 import { RelativeTime } from "@/renderer/components/common/RelativeTime";
 
@@ -15,7 +16,6 @@ export function HomeView() {
     ),
   );
   const openDraft = useAppStore((state) => state.openDraft);
-  const openThread = useAppStore((state) => state.openThread);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

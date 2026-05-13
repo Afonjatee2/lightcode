@@ -15,8 +15,13 @@ vi.mock("../../bridge", () => ({
 }));
 
 vi.mock("./ThreadComposer", () => ({
-  ThreadComposer: (props: { inputContent?: ReactNode; onSubmit: () => void }) => (
+  ThreadComposer: (props: {
+    fixedContent?: ReactNode;
+    inputContent?: ReactNode;
+    onSubmit: () => void;
+  }) => (
     <div>
+      {props.fixedContent}
       {props.inputContent}
       <button type="button" onClick={props.onSubmit}>
         send
@@ -133,6 +138,75 @@ describe("ThreadComposerSection", () => {
 
     await act(async () => {
       resolveSubmit?.();
+      await Promise.resolve();
+    });
+  });
+
+  it("keeps queued runtime approval requests actionable after resolving the first one", async () => {
+    let resolveRequest: (() => void) | undefined;
+    const onResolveServerRequest = vi.fn<() => Promise<void>>(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRequest = resolve;
+        }),
+    );
+    useAppStore.setState({
+      runtimeRequestsByThread: {
+        [guiThread.id]: [
+          {
+            requestId: "r1",
+            threadId: guiThread.id,
+            requestType: "command_execution_approval",
+            payload: { summary: "Run first command" },
+            receivedAt: new Date().toISOString(),
+          },
+          {
+            requestId: "r2",
+            threadId: guiThread.id,
+            requestType: "command_execution_approval",
+            payload: { summary: "Run second command" },
+            receivedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    render(
+      <ThreadComposerSection
+        threadId={guiThread.id}
+        fallbackThread={guiThread}
+        agentStatus={codexGuiStatus}
+        projectLocation={{
+          kind: "windows",
+          path: "C:\\repo",
+        }}
+        paneCount={1}
+        terminalPaneRef={{ current: null }}
+        todoDockCollapsed={false}
+        todoDockPlacement="composer"
+        todoDockState={null}
+        goalDockState={null}
+        errorDockState={null}
+        onGoalDockDismiss={() => undefined}
+        onDismissError={() => undefined}
+        onConfigChange={() => undefined}
+        onResolveServerRequest={onResolveServerRequest}
+        onSubmitInput={async () => undefined}
+        onTodoDockCollapsedChange={() => undefined}
+        onTodoDockPlacementChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("Run first command")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Allow" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("Run second command")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Allow" })).toBeEnabled();
+
+    await act(async () => {
+      resolveRequest?.();
       await Promise.resolve();
     });
   });

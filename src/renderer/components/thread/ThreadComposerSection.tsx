@@ -36,6 +36,7 @@ import { hasReportedContextUsage, resolveThreadContextUsageSummary } from "./thr
 import { capabilitiesForPresentation, filterHiddenModels } from "./threadComposerOptions";
 import {
   filterSlashCommands,
+  handleSlashCommandPanelKeyDown,
   resolveAvailableSlashCommands,
   resolveLocalSlashCommandAction,
 } from "./threadSlashCommands";
@@ -681,6 +682,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         ) : null}
                         {activeRuntimeRequest ? (
                           <ThreadRuntimeRequestPanel
+                            key={activeRuntimeRequest.requestId}
                             threadId={thread.id}
                             agentLabel={agentStatus?.label}
                             request={activeRuntimeRequest}
@@ -748,34 +750,18 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                           return true;
                         }
 
-                        if (showCommandPanel) {
-                          if (e.key === "ArrowDown") {
-                            e.preventDefault();
-                            setSlashActiveIndex((prev) => (prev + 1) % filteredCommands.length);
-                            return true;
-                          }
-                          if (e.key === "ArrowUp") {
-                            e.preventDefault();
-                            setSlashActiveIndex(
-                              (prev) =>
-                                (prev - 1 + filteredCommands.length) % filteredCommands.length,
-                            );
-                            return true;
-                          }
-                          if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
-                            const selected = filteredCommands[slashActiveIndex];
-                            if (selected) {
-                              e.preventDefault();
-                              mentionRef.current?.insertSlashCommand(selected.id);
-                              setSlashQuery(null);
-                              return true;
-                            }
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setSlashQuery(null);
-                            return true;
-                          }
+                        if (
+                          showCommandPanel &&
+                          handleSlashCommandPanelKeyDown(e, {
+                            slashQuery,
+                            filteredCommands,
+                            slashActiveIndex,
+                            setSlashActiveIndex,
+                            setSlashQuery,
+                            mentionRef,
+                          })
+                        ) {
+                          return true;
                         }
 
                         if (showTerminalComposer) {

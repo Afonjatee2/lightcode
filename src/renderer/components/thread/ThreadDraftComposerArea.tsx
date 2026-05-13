@@ -27,6 +27,7 @@ import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import {
   filterSlashCommands,
+  handleSlashCommandPanelKeyDown,
   resolveAvailableSlashCommands,
   resolveLocalSlashCommandAction,
 } from "./threadSlashCommands";
@@ -314,33 +315,14 @@ export function ThreadDraftComposerArea(props: {
               if (!showCommandPanel) {
                 return false;
               }
-              if (e.key === "ArrowDown") {
-                e.preventDefault();
-                setSlashActiveIndex((prev) => (prev + 1) % filteredCommands.length);
-                return true;
-              }
-              if (e.key === "ArrowUp") {
-                e.preventDefault();
-                setSlashActiveIndex(
-                  (prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length,
-                );
-                return true;
-              }
-              if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
-                const selected = filteredCommands[slashActiveIndex];
-                if (selected) {
-                  e.preventDefault();
-                  mentionRef.current?.insertSlashCommand(selected.id);
-                  setSlashQuery(null);
-                  return true;
-                }
-              }
-              if (e.key === "Escape") {
-                e.preventDefault();
-                setSlashQuery(null);
-                return true;
-              }
-              return false;
+              return handleSlashCommandPanelKeyDown(e, {
+                slashQuery,
+                filteredCommands,
+                slashActiveIndex,
+                setSlashActiveIndex,
+                setSlashQuery,
+                mentionRef,
+              });
             }}
             onSlashCommandChange={setSlashQuery}
           />

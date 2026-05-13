@@ -1,4 +1,6 @@
+import type { KeyboardEvent, RefObject } from "react";
 import type { AgentSlashCommand, AgentStatus, ThreadPresentationMode } from "@/shared/contracts";
+import type { MentionInputHandle } from "@/renderer/components/composer/MentionInput";
 import {
   getGuiSlashCommands,
   type LocalSlashCommandAction,
@@ -62,4 +64,55 @@ export function filterSlashCommands(
       command.id.toLowerCase().startsWith(normalizedQuery) ||
       command.label.toLowerCase().includes(normalizedQuery),
   );
+}
+
+export interface SlashCommandPanelKeyDownContext {
+  slashQuery: string | null;
+  filteredCommands: readonly AgentSlashCommand[];
+  slashActiveIndex: number;
+  setSlashActiveIndex: (updater: (prev: number) => number) => void;
+  setSlashQuery: (value: string | null) => void;
+  mentionRef: RefObject<MentionInputHandle | null>;
+}
+
+export function handleSlashCommandPanelKeyDown(
+  e: KeyboardEvent,
+  ctx: SlashCommandPanelKeyDownContext,
+): boolean {
+  const { filteredCommands, mentionRef, setSlashActiveIndex, setSlashQuery } = ctx;
+  if (e.key === "ArrowDown") {
+    e.preventDefault();
+    setSlashActiveIndex((prev) => (prev + 1) % filteredCommands.length);
+    return true;
+  }
+  if (e.key === "ArrowUp") {
+    e.preventDefault();
+    setSlashActiveIndex((prev) => (prev - 1 + filteredCommands.length) % filteredCommands.length);
+    return true;
+  }
+  if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey) {
+    const selected = filteredCommands[ctx.slashActiveIndex];
+    if (selected) {
+      e.preventDefault();
+      mentionRef.current?.insertSlashCommand(selected.id);
+      setSlashQuery(null);
+      return true;
+    }
+  }
+  if (e.key === " " && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    const typed = (ctx.slashQuery ?? "").toLowerCase();
+    const exact = filteredCommands.find((cmd) => cmd.id.toLowerCase() === typed);
+    if (exact) {
+      e.preventDefault();
+      mentionRef.current?.insertSlashCommand(exact.id);
+      setSlashQuery(null);
+      return true;
+    }
+  }
+  if (e.key === "Escape") {
+    e.preventDefault();
+    setSlashQuery(null);
+    return true;
+  }
+  return false;
 }

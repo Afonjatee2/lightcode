@@ -35,7 +35,8 @@ describe("ThreadGoalDock", () => {
     expect(screen.getByLabelText("Thread goal dock")).toHaveAttribute("data-placement", "composer");
     expect(screen.getByText("Goal")).toBeInTheDocument();
     expect(screen.getByText("Ship goal dock")).toBeInTheDocument();
-    expect(screen.getByText("120/1000 tokens · 5s")).toBeInTheDocument();
+    expect(screen.getByText("120/1000 tokens")).toBeInTheDocument();
+    expect(screen.getByText("5s")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Close goal" }));
     expect(onDismiss).toHaveBeenCalledTimes(1);
@@ -64,7 +65,55 @@ describe("ThreadGoalDock", () => {
       </AppProvider>,
     );
 
-    expect(screen.getByText("Complete · 11k tokens · 10m 21s")).toBeInTheDocument();
+    expect(screen.getByText("Complete · 11k tokens")).toBeInTheDocument();
+    expect(screen.getByText("10m 21s")).toBeInTheDocument();
+  });
+
+  it("swaps the dock icon to the achieved indicator when the goal completes", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-12T10:00:10Z"));
+
+    const { container, rerender } = render(
+      <AppProvider>
+        <ThreadGoalDock
+          state={{
+            sourceItemId: "goal-1",
+            itemState: "completed",
+            objective: "Ship goal dock",
+            status: "active",
+            action: "set",
+          }}
+          onDismiss={() => undefined}
+        />
+      </AppProvider>,
+    );
+
+    const dock = screen.getByLabelText("Thread goal dock");
+    const activeIcon = dock.querySelector("svg.lucide-target");
+    expect(activeIcon).not.toBeNull();
+    expect(dock.querySelector("svg.lucide-circle-check-big")).toBeNull();
+
+    rerender(
+      <AppProvider>
+        <ThreadGoalDock
+          state={{
+            sourceItemId: "goal-1",
+            itemState: "completed",
+            objective: "Ship goal dock",
+            status: "complete",
+            action: "updated",
+            tokensUsed: 1200,
+            timeUsedSeconds: 90,
+          }}
+          onDismiss={() => undefined}
+        />
+      </AppProvider>,
+    );
+
+    const completeIcon = container.querySelector("svg.lucide-circle-check-big");
+    expect(completeIcon).not.toBeNull();
+    expect(completeIcon?.classList.contains("text-success")).toBe(true);
+    expect(container.querySelector("svg.lucide-target")).toBeNull();
   });
 
   it("advances active goal elapsed time locally between server updates", () => {

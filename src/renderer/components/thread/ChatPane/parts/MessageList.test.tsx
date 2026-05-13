@@ -1,5 +1,6 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "@/renderer/state/appStore";
 import { ChatPaneActionsContext, useChatPaneActions } from "../chatPaneActionsContext";
 import { MessageList } from "./MessageList";
 
@@ -14,6 +15,7 @@ type MockVirtualizer = {
   getTotalSize: () => number;
   measure: () => void;
   measureElement: (element: HTMLDivElement | null) => void;
+  scrollToIndex: (index: number, options?: { align?: "start" | "center" | "end" | "auto" }) => void;
   shouldAdjustScrollPositionOnItemSizeChange?: (
     item: { start: number; size: number },
     delta: number,
@@ -25,18 +27,22 @@ type MockVirtualizerOptions = {
   count: number;
   getScrollElement: () => Element | null;
   useFlushSync?: boolean;
+  useAnimationFrameWithResizeObserver?: boolean;
 };
 
 const {
   useVirtualizerMock,
   measureMock,
   measureElementMock,
+  scrollToIndexMock,
   getVirtualItemsMock,
   getTotalSizeMock,
 } = vi.hoisted(() => ({
   useVirtualizerMock: vi.fn<(options: MockVirtualizerOptions) => MockVirtualizer>(),
   measureMock: vi.fn<() => void>(),
   measureElementMock: vi.fn<(element: HTMLDivElement | null) => void>(),
+  scrollToIndexMock:
+    vi.fn<(index: number, options?: { align?: "start" | "center" | "end" | "auto" }) => void>(),
   getVirtualItemsMock: vi.fn<() => MockVirtualRow[]>(),
   getTotalSizeMock: vi.fn<() => number>(),
 }));
@@ -59,6 +65,13 @@ vi.mock("./items/ChatItemRow", () => ({
 describe("MessageList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAppStore.setState((state) => ({
+      ...state,
+      runtimeItemIdsByThread: {},
+      runtimeItemsByIdByThread: {},
+      runtimeItemChildrenByParentByThread: {},
+      runtimeCompletedTurnsByThread: {},
+    }));
     getVirtualItemsMock.mockReturnValue([
       { key: "row-2", index: 1, start: 96 },
       { key: "row-3", index: 2, start: 192 },
@@ -69,6 +82,7 @@ describe("MessageList", () => {
       getTotalSize: getTotalSizeMock,
       measure: measureMock,
       measureElement: measureElementMock,
+      scrollToIndex: scrollToIndexMock,
     });
   });
 
@@ -97,12 +111,21 @@ describe("MessageList", () => {
     const virtualizerOptions = useVirtualizerMock.mock.calls[0]![0];
     expect(virtualizerOptions.count).toBe(4);
     expect(virtualizerOptions.getScrollElement()).toBe(scrollElement);
-    expect(virtualizerOptions.useFlushSync).toBe(false);
+    expect(virtualizerOptions.useFlushSync).toBe(true);
+    expect(virtualizerOptions.useAnimationFrameWithResizeObserver).toBe(true);
     expect(screen.queryByText("item-1")).not.toBeInTheDocument();
     expect(screen.getByText("item-2")).toBeInTheDocument();
     expect(screen.getByText("item-3")).toBeInTheDocument();
     expect(screen.queryByText("item-4")).not.toBeInTheDocument();
     expect(document.querySelectorAll("[data-chat-virtual-row='true']")).toHaveLength(2);
+    const virtualSizeBox = document.querySelector("[data-chat-virtual-size-box='true']");
+    expect(virtualSizeBox).toHaveClass("overflow-hidden");
+    expect(virtualSizeBox).toHaveAttribute("data-bottom-fade-visible", "true");
+    expect(virtualSizeBox).toHaveStyle({
+      height: "384px",
+      maskImage:
+        "linear-gradient(to bottom, black calc(100% - 14px), rgb(0 0 0 / var(--lc-chat-bottom-mask-end-alpha, 0)))",
+    });
     expect(document.querySelector("[data-chat-virtual-block='true']")).toHaveStyle({
       transform: "translateY(96px)",
     });
@@ -176,6 +199,136 @@ describe("MessageList", () => {
         scrollDirection: null,
       }),
     ).toBe(false);
+  });
+
+  it("adjusts streaming row height changes when bottom-sticky", () => {
+    const scrollElement = document.createElement("div");
+    scrollElement.scrollTop = 160;
+    const actions = {
+      openProjectRelativePath: vi.fn<(path: string, lineNumber?: number) => void>(),
+      revealProjectFolderInTree: vi.fn<(path: string) => void>(),
+      showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
+      onContentHeightChange: vi.fn<() => void>(),
+      isStickToBottom: vi.fn<() => boolean>().mockReturnValue(true),
+      projectLocation: { kind: "windows" as const, path: "C:\\repo" },
+      projectRootNames: new Set<string>(),
+    };
+
+    render(
+      <ChatPaneActionsContext.Provider value={actions}>
+        <MessageList
+          threadId="thread-1"
+          entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
+          scrollElement={scrollElement}
+        />
+      </ChatPaneActionsContext.Provider>,
+    );
+
+    const virtualizer = useVirtualizerMock.mock.results[0]!.value;
+    const shouldAdjust = virtualizer.shouldAdjustScrollPositionOnItemSizeChange!;
+
+    expect(
+      shouldAdjust({ start: 96, size: 100 }, 24, {
+        isScrolling: false,
+        scrollDirection: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("registers TanStack scrollToIndex as the bottom scroll handler", () => {
+    const registerVirtualScrollToBottom = vi.fn<(handler: (() => void) | null) => void>();
+    const actions = {
+      openProjectRelativePath: vi.fn<(path: string, lineNumber?: number) => void>(),
+      revealProjectFolderInTree: vi.fn<(path: string) => void>(),
+      showProjectEntryInExplorer: vi.fn<(path: string) => void>(),
+      onContentHeightChange: vi.fn<() => void>(),
+      registerVirtualScrollToBottom,
+      projectLocation: { kind: "windows" as const, path: "C:\\repo" },
+      projectRootNames: new Set<string>(),
+    };
+
+    const { unmount } = render(
+      <ChatPaneActionsContext.Provider value={actions}>
+        <MessageList
+          threadId="thread-1"
+          entries={makeEntries(["item-1", "item-2", "item-3", "item-4"])}
+          scrollElement={document.createElement("div")}
+        />
+      </ChatPaneActionsContext.Provider>,
+    );
+
+    const handler = registerVirtualScrollToBottom.mock.calls.find(
+      (call): call is [() => void] => typeof call[0] === "function",
+    )?.[0];
+    expect(handler).toEqual(expect.any(Function));
+
+    handler?.();
+
+    expect(scrollToIndexMock).toHaveBeenCalledWith(3, { align: "end" });
+
+    unmount();
+
+    expect(registerVirtualScrollToBottom).toHaveBeenLastCalledWith(null);
+  });
+
+  it("remeasures the live row before paint when streamed text changes", () => {
+    const scrollElement = document.createElement("div");
+    const threadId = "thread-1";
+    useAppStore.getState().applyRuntimeEvent(threadId, {
+      type: "item.started",
+      threadId,
+      itemId: "assistant-1",
+      itemType: "assistant_message",
+    });
+
+    render(
+      <MessageList
+        threadId={threadId}
+        entries={makeEntries(["item-1", "item-2", "assistant-1"])}
+        scrollElement={scrollElement}
+      />,
+    );
+
+    measureElementMock.mockClear();
+
+    act(() => {
+      useAppStore.getState().applyRuntimeEvent(threadId, {
+        type: "content.delta",
+        threadId,
+        itemId: "assistant-1",
+        stream: "assistant_text",
+        delta: "new streamed line",
+      });
+    });
+
+    expect(measureElementMock).toHaveBeenCalledTimes(1);
+    expect(measureElementMock.mock.calls[0]?.[0]).toBe(
+      document.querySelector("[data-item-id='assistant-1']"),
+    );
+  });
+
+  it("hides the bottom overflow fade when the last timeline item is a user message", () => {
+    const threadId = "thread-1";
+    useAppStore.getState().applyRuntimeEvent(threadId, {
+      type: "item.started",
+      threadId,
+      itemId: "user-1",
+      itemType: "user_message",
+    });
+
+    render(
+      <MessageList
+        threadId={threadId}
+        entries={makeEntries(["assistant-1", "user-1"])}
+        scrollElement={document.createElement("div")}
+      />,
+    );
+
+    const virtualSizeBox = document.querySelector("[data-chat-virtual-size-box='true']");
+    expect(virtualSizeBox).toHaveAttribute("data-bottom-fade-visible", "false");
+    expect(
+      (virtualSizeBox as HTMLElement).style.getPropertyValue("--lc-chat-bottom-mask-end-alpha"),
+    ).toBe("1");
   });
 
   it("reports virtual total size changes to parent actions", () => {

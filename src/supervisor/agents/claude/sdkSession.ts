@@ -41,6 +41,7 @@ import { applyClaudeContextSuffix } from "./argv";
 import { CLAUDE_DEFAULT_APPROVAL_POLICY } from "./detection";
 import {
   ACCEPT_SUGGESTION_OPTION_PREFIX,
+  buildClaudeQuestionAnswerEvents,
   closeClaudeOpenItems,
   createClaudeMapperState,
   mapClaudePermissionRequest,
@@ -466,11 +467,12 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     this.pendingRequests.delete(requestId);
 
     if (pending.kind === "question") {
+      const answers = questionAnswers(response, pending);
       pending.resolve({
         behavior: "allow",
         updatedInput: {
           questions: pending.originalQuestions,
-          answers: questionAnswers(response, pending),
+          answers,
         },
       });
       this.emitRuntimeEvents([
@@ -480,6 +482,12 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           requestId: String(requestId),
           outcome: "answered",
         },
+        ...buildClaudeQuestionAnswerEvents({
+          threadId: this.input.threadId,
+          itemId: `question-answer-${randomUUID()}`,
+          questions: pending.questions,
+          answers,
+        }),
       ]);
       this.emitUpdate({ status: "working", attention: "working" });
       return;

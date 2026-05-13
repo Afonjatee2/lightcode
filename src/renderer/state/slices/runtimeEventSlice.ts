@@ -7,7 +7,6 @@ import type {
   RuntimeContentStreamKind,
   RuntimeEvent,
   ThreadContextUsage,
-  ToolCallPayload,
 } from "@/shared/contracts";
 import type { AppStoreState, SliceCreator } from "./shared";
 
@@ -105,12 +104,6 @@ export interface RuntimeEventSlice {
   ): void;
   upsertThreadFileCheckpoint(threadId: string, checkpoint: FileCheckpointRecord): void;
   upsertThreadFileCheckpointTurn(threadId: string, checkpoint: FileCheckpointTurn): void;
-  /**
-   * Drop all child items of a sub-agent parent from the thread. Called when
-   * the renderer closes the overlay (so re-opening reloads from the supervisor
-   * buffer cleanly) and is a no-op if no children are present.
-   */
-  evictSubAgentChildren(threadId: string, parentItemId: string): void;
 }
 
 /**
@@ -360,39 +353,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
       };
     }),
 
-  evictSubAgentChildren: (threadId, parentItemId) =>
-    set((state) => {
-      const ids = state.runtimeItemIdsByThread[threadId];
-      const items = state.runtimeItemsByIdByThread[threadId];
-      if (!ids?.length || !items) return {};
-      const remainingIds: string[] = [];
-      const remainingItems: Record<string, RuntimeChatItem> = {};
-      let evicted = 0;
-      for (const id of ids) {
-        const item = items[id];
-        if (item?.parentItemId === parentItemId) {
-          evicted += 1;
-          continue;
-        }
-        remainingIds.push(id);
-        if (item) remainingItems[id] = item;
-      }
-      if (evicted === 0) return {};
-      return {
-        runtimeItemIdsByThread: {
-          ...state.runtimeItemIdsByThread,
-          [threadId]: remainingIds,
-        },
-        runtimeItemsByIdByThread: {
-          ...state.runtimeItemsByIdByThread,
-          [threadId]: remainingItems,
-        },
-        runtimeStructuralVersionByThread: {
-          ...state.runtimeStructuralVersionByThread,
-          [threadId]: (state.runtimeStructuralVersionByThread[threadId] ?? 0) + 1,
-        },
-      };
-    }),
 });
 
 type RuntimeEventState = Pick<
@@ -552,40 +512,6 @@ function applyRuntimeEventToRuntimeState(
             [threadId]: remaining,
           },
         };
-      }
-      // A completing sub-agent parent (Claude `Task`/`Agent`) keeps only the
-      // final result on the parent payload — the child step trail is dropped
-      // both in-memory and on persistence (the persister mirrors this slice).
-      // The overlay renders `payload.result` for completed sub-agents, so the
-      // history is no longer needed.
-      if (isSubAgentToolCallItem(next)) {
-        const ids = state.runtimeItemIdsByThread[threadId];
-        if (ids) {
-          const childIds = new Set<string>();
-          for (const id of ids) {
-            if (items[id]?.parentItemId === event.itemId) childIds.add(id);
-          }
-          if (childIds.size > 0) {
-            const remainingItems: Record<string, RuntimeChatItem> = {};
-            for (const [id, value] of Object.entries(items)) {
-              if (id === event.itemId) {
-                remainingItems[id] = next;
-              } else if (!childIds.has(id)) {
-                remainingItems[id] = value;
-              }
-            }
-            return {
-              runtimeItemIdsByThread: {
-                ...state.runtimeItemIdsByThread,
-                [threadId]: ids.filter((id) => !childIds.has(id)),
-              },
-              runtimeItemsByIdByThread: {
-                ...state.runtimeItemsByIdByThread,
-                [threadId]: remainingItems,
-              },
-            };
-          }
-        }
       }
       return {
         runtimeItemsByIdByThread: {
@@ -777,21 +703,6 @@ function pruneTrailingInterruptedReasoningItems(
       [threadId]: remainingItems,
     },
   };
-}
-
-function isSubAgentToolCallItem(item: RuntimeChatItem): boolean {
-  if (item.type !== "tool_call") return false;
-  const payload = item.payload as ToolCallPayload | undefined;
-  if (!payload) return false;
-  if (payload.isSubAgent === true) return true;
-  const args = payload.args;
-  if (!args || typeof args !== "object" || Array.isArray(args)) return false;
-  const argRecord = args as Record<string, unknown>;
-  return (
-    typeof argRecord.subagent_type === "string" ||
-    typeof argRecord.agent_type === "string" ||
-    typeof argRecord.agentType === "string"
-  );
 }
 
 function mergeCompletedTurns(

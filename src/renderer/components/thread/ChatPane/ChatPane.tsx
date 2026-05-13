@@ -30,6 +30,7 @@ import {
   resolveWorktreeBranch,
 } from "@/renderer/utils/gitHelpers";
 import { ChatPaneActionsContext, type ChatPaneActions } from "./chatPaneActionsContext";
+import { isElementAtBottom } from "./chatScrollGeometry";
 import {
   selectChatScrollAnchor,
   selectChatScrollAnchorForTimeline,
@@ -49,7 +50,6 @@ interface ChatPaneProps {
   layoutChangeToken?: string | null;
 }
 
-const BOTTOM_EPSILON_PX = 4;
 const USER_SCROLL_INTENT_MS = 750;
 const EMPTY_COMPLETED_TURNS: NonNullable<
   ReturnType<typeof useAppStore.getState>["runtimeCompletedTurnsByThread"][string]
@@ -89,6 +89,10 @@ export function ChatPane(props: ChatPaneProps) {
     setScrollEl(el);
   }, []);
   const contentRef = useRef<HTMLDivElement>(null);
+  const [initialScrollSettledThreadId, setInitialScrollSettledThreadId] = useState<string | null>(
+    null,
+  );
+  const isInitialScrollSettled = initialScrollSettledThreadId === threadId;
 
   useEffect(() => {
     const el = scrollEl;
@@ -120,6 +124,7 @@ export function ChatPane(props: ChatPaneProps) {
   }, [scrollEl]);
 
   const scrollControlsRef = useRef<ChatScrollControlsHandle>(null);
+  const virtualScrollToBottomRef = useRef<(() => void) | null>(null);
   const timelineEntries = useAppStore(
     useShallow((s) => selectVisibleThreadTimelineEntries(s, threadId, hiddenRuntimeItemId)),
   );
@@ -167,6 +172,10 @@ export function ChatPane(props: ChatPaneProps) {
         });
       },
       onContentHeightChange: () => scrollControlsRef.current?.onContentHeightChange(),
+      isStickToBottom: () => scrollControlsRef.current?.isStickToBottom() ?? false,
+      registerVirtualScrollToBottom: (handler) => {
+        virtualScrollToBottomRef.current = handler;
+      },
       projectLocation: targetContext.projectLocation,
       projectRootNames,
     };
@@ -246,6 +255,10 @@ export function ChatPane(props: ChatPaneProps) {
     turn?.endedAt != null &&
     isCompletedTurnAnchorAtTimelineTail(mostRecentCompletedTurnAnchor, timelineEntries);
   const showTailLoader = (isLive || completedTurnCanRenderInTail) && !hiddenRuntimeItemIsLive;
+  // The agent is not actually working while it waits for a user answer, so the
+  // tail loader keeps rendering but its elapsed-time counter freezes for the
+  // duration of the wait and resumes once the thread flips back to working.
+  const isTurnPaused = status === "needs_reply";
   const showEmptyHint = isEmpty && !isLive;
   // The tail loader displays the most recent completed turn's frozen elapsed
   // time when the thread is idle and no newer timeline row exists. Once an
@@ -271,7 +284,7 @@ export function ChatPane(props: ChatPaneProps) {
         <div className="relative min-h-0 flex-1">
           <div
             ref={setScrollContainer}
-            className="min-h-0 h-full overflow-y-auto [scrollbar-gutter:stable]"
+            className="min-h-0 h-full overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable]"
             style={{
               WebkitMaskImage:
                 "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)",
@@ -293,7 +306,10 @@ export function ChatPane(props: ChatPaneProps) {
               }
             }}
           >
-            <div ref={contentRef} className="min-h-full pb-8">
+            <div
+              ref={contentRef}
+              className={`min-h-full pb-2 ${isInitialScrollSettled ? "" : "pointer-events-none opacity-0"}`}
+            >
               {isEmpty && !showTailLoader ? (
                 showEmptyHint ? (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-foreground-muted">
@@ -312,7 +328,9 @@ export function ChatPane(props: ChatPaneProps) {
                     checkpointGuard={checkpointGuard}
                     projectLocation={targetContext?.projectLocation}
                   />
-                  {showTailLoader && turn ? <ChatTailLoader turn={turn} /> : null}
+                  {showTailLoader && turn ? (
+                    <ChatTailLoader turn={turn} isPaused={isTurnPaused} />
+                  ) : null}
                 </>
               )}
             </div>
@@ -325,6 +343,9 @@ export function ChatPane(props: ChatPaneProps) {
             layoutChangeToken={layoutChangeToken}
             threadId={threadId}
             tailLoaderVisible={showTailLoader}
+            initialScrollSettled={isInitialScrollSettled}
+            virtualScrollToBottomRef={virtualScrollToBottomRef}
+            onInitialScrollSettled={() => setInitialScrollSettledThreadId(threadId)}
           />
           <SubAgentOverlay threadId={threadId} />
         </div>
@@ -335,6 +356,7 @@ export function ChatPane(props: ChatPaneProps) {
 
 type ChatScrollControlsHandle = {
   disableStickToBottom(): void;
+  isStickToBottom(): boolean;
   markUserScrollIntent(): void;
   onContentHeightChange(): void;
 };
@@ -348,6 +370,9 @@ const ChatScrollControls = forwardRef<
     layoutChangeToken: string | null | undefined;
     threadId: string;
     tailLoaderVisible: boolean;
+    initialScrollSettled: boolean;
+    virtualScrollToBottomRef: React.RefObject<(() => void) | null>;
+    onInitialScrollSettled: () => void;
   }
 >(function ChatScrollControls(props, ref) {
   const {
@@ -357,6 +382,9 @@ const ChatScrollControls = forwardRef<
     layoutChangeToken,
     threadId,
     tailLoaderVisible,
+    initialScrollSettled,
+    virtualScrollToBottomRef,
+    onInitialScrollSettled,
   } = props;
   const scrollAnchor = useAppStore((s) =>
     hiddenRuntimeItemId
@@ -370,6 +398,8 @@ const ChatScrollControls = forwardRef<
   const pinRafRef = useRef<number | null>(null);
   const layoutSyncRafRef = useRef<number | null>(null);
   const layoutSyncSecondRafRef = useRef<number | null>(null);
+  const initialSettleRafRef = useRef<number | null>(null);
+  const initialSettleSecondRafRef = useRef<number | null>(null);
   const userScrollIntentUntilRef = useRef(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
 
@@ -383,6 +413,7 @@ const ChatScrollControls = forwardRef<
 
   function disableStickToBottom() {
     if (!stickToBottomRef.current) return;
+    cancelScheduledInitialSettle();
     stickToBottomRef.current = false;
     const el = scrollRef.current;
     setShowScrollDown(!el || !isElementAtBottom(el));
@@ -399,7 +430,12 @@ const ChatScrollControls = forwardRef<
   function scrollToBottom() {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTop = el.scrollHeight;
+    const virtualScrollToBottom = virtualScrollToBottomRef.current;
+    if (virtualScrollToBottom) {
+      virtualScrollToBottom();
+    } else {
+      el.scrollTop = el.scrollHeight;
+    }
     lastScrollTopRef.current = el.scrollTop;
     stickToBottomRef.current = true;
     setShowScrollDown(false);
@@ -437,14 +473,40 @@ const ChatScrollControls = forwardRef<
     });
   });
 
+  function cancelScheduledInitialSettle() {
+    if (initialSettleRafRef.current !== null) {
+      cancelAnimationFrame(initialSettleRafRef.current);
+      initialSettleRafRef.current = null;
+    }
+    if (initialSettleSecondRafRef.current !== null) {
+      cancelAnimationFrame(initialSettleSecondRafRef.current);
+      initialSettleSecondRafRef.current = null;
+    }
+  }
+
+  const scheduleInitialScrollSettle = useEffectEvent(() => {
+    cancelScheduledInitialSettle();
+    initialSettleRafRef.current = requestAnimationFrame(() => {
+      initialSettleRafRef.current = null;
+      scrollToBottom();
+      initialSettleSecondRafRef.current = requestAnimationFrame(() => {
+        initialSettleSecondRafRef.current = null;
+        scrollToBottom();
+        onInitialScrollSettled();
+      });
+    });
+  });
+
   useImperativeHandle(ref, () => ({
     disableStickToBottom,
+    isStickToBottom: () => stickToBottomRef.current,
     markUserScrollIntent,
     onContentHeightChange: syncLayoutNowAndAfterPaint,
   }));
 
   useLayoutEffect(() => {
     scrollToBottom();
+    scheduleInitialScrollSettle();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- scroll reset is keyed to thread changes; the helper reads refs/state setters only.
   }, [threadId]);
 
@@ -460,7 +522,7 @@ const ChatScrollControls = forwardRef<
   // Scroll to bottom when the composer signals a fresh user submission.
   // Token increments per submit, so consecutive sends still re-trigger.
   const initialScrollTokenRef = useRef(scrollToBottomToken);
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (scrollToBottomToken === initialScrollTokenRef.current) return;
     initialScrollTokenRef.current = scrollToBottomToken;
     scrollToBottom();
@@ -481,6 +543,7 @@ const ChatScrollControls = forwardRef<
       // off in that one frame, then keeping the button stuck on because the
       // corrective syncLayoutNow takes the non-sticky branch.
       if (nextScrollTop < prevScrollTop && !isAtBottom && hasRecentUserScrollIntent()) {
+        cancelScheduledInitialSettle();
         stickToBottomRef.current = false;
       } else if (isAtBottom) {
         stickToBottomRef.current = true;
@@ -513,14 +576,23 @@ const ChatScrollControls = forwardRef<
     return () => observer.disconnect();
   }, [contentRef, scrollRef, threadId]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (pinRafRef.current !== null) {
       cancelAnimationFrame(pinRafRef.current);
+    }
+    if (stickToBottomRef.current) {
+      scrollToBottom();
+      if (!initialScrollSettled) {
+        scheduleInitialScrollSettle();
+      }
     }
     pinRafRef.current = requestAnimationFrame(() => {
       pinRafRef.current = null;
       if (!stickToBottomRef.current) return;
       scrollToBottom();
+      if (!initialScrollSettled) {
+        scheduleInitialScrollSettle();
+      }
     });
     return () => {
       if (pinRafRef.current !== null) {
@@ -529,9 +601,10 @@ const ChatScrollControls = forwardRef<
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- pinning is keyed to chat content changes; the helper reads refs/state setters only.
-  }, [scrollAnchor, tailLoaderVisible]);
+  }, [scrollAnchor, tailLoaderVisible, initialScrollSettled]);
 
   useEffect(() => cancelScheduledLayoutSync, []);
+  useEffect(() => cancelScheduledInitialSettle, []);
 
   return (
     <Button
@@ -584,12 +657,12 @@ function resolveTurnTiming(thread: Thread): TurnTiming | null {
   };
 }
 
-function ChatTailLoader({ turn }: { turn: TurnTiming }) {
+function ChatTailLoader({ turn, isPaused }: { turn: TurnTiming; isPaused: boolean }) {
   return (
     <div className="mx-auto w-full max-w-[920px]">
       <Surface variant="transparent" className={chatMessageSurfaceClass}>
         <div className="inline-flex items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
-          <WorkingFor turn={turn} />
+          <WorkingFor turn={turn} isPaused={isPaused} />
         </div>
       </Surface>
     </div>
@@ -598,13 +671,24 @@ function ChatTailLoader({ turn }: { turn: TurnTiming }) {
 
 /**
  * Self-ticking elapsed-time label. While `turn.endedAt` is null, ticks every
- * second as "Working for N"; once set, freezes as "Worked for N". Mutates
- * `textContent` directly via a ref instead of calling `setState` so the
- * per-second tick produces zero React commits — important while the rest of
- * the chat is potentially streaming.
+ * second as "Working for N"; once set, freezes as "Worked for N". When
+ * `isPaused` is true (e.g. the runtime is blocked on a user-input prompt) the
+ * counter freezes at its current value and the paused interval is excluded
+ * from the elapsed total once it resumes. Mutates `textContent` directly via
+ * a ref instead of calling `setState` so the per-second tick produces zero
+ * React commits — important while the rest of the chat is potentially
+ * streaming.
  */
-function WorkingFor({ turn }: { turn: TurnTiming }) {
+function WorkingFor({ turn, isPaused }: { turn: TurnTiming; isPaused: boolean }) {
   const textRef = useRef<HTMLSpanElement>(null);
+  const pauseStateRef = useRef<{ accumulatedPauseMs: number; pausedSinceMs: number | null }>({
+    accumulatedPauseMs: 0,
+    pausedSinceMs: null,
+  });
+
+  useEffect(() => {
+    pauseStateRef.current = { accumulatedPauseMs: 0, pausedSinceMs: null };
+  }, [turn.startedAt, turn.endedAt]);
 
   useEffect(() => {
     const update = () => {
@@ -615,21 +699,38 @@ function WorkingFor({ turn }: { turn: TurnTiming }) {
         node.textContent = elapsedSeconds < 1 ? "" : `Worked for ${formatElapsed(elapsedSeconds)}`;
         return;
       }
-      const elapsedSeconds = Math.floor((Date.now() - turn.startedAt) / 1000);
+      const pauseState = pauseStateRef.current;
+      const now = Date.now();
+      const currentPauseMs =
+        pauseState.pausedSinceMs !== null ? Math.max(0, now - pauseState.pausedSinceMs) : 0;
+      const elapsedMs = now - turn.startedAt - pauseState.accumulatedPauseMs - currentPauseMs;
+      const elapsedSeconds = Math.max(0, Math.floor(elapsedMs / 1000));
       node.textContent = elapsedSeconds < 1 ? "" : `Working for ${formatElapsed(elapsedSeconds)}`;
     };
+
+    if (isPaused) {
+      if (pauseStateRef.current.pausedSinceMs === null) {
+        pauseStateRef.current.pausedSinceMs = Date.now();
+      }
+      update();
+      return;
+    }
+
+    if (pauseStateRef.current.pausedSinceMs !== null) {
+      pauseStateRef.current.accumulatedPauseMs += Math.max(
+        0,
+        Date.now() - pauseStateRef.current.pausedSinceMs,
+      );
+      pauseStateRef.current.pausedSinceMs = null;
+    }
     update();
     if (turn.endedAt !== null) return;
     const id = setInterval(update, 1000);
     return () => clearInterval(id);
-  }, [turn.startedAt, turn.endedAt]);
+  }, [turn.startedAt, turn.endedAt, isPaused]);
 
   const className = turn.endedAt === null ? "lightcode-thinking-text" : "text-muted";
   return <span ref={textRef} className={className} aria-live="polite" />;
-}
-
-function isElementAtBottom(el: HTMLDivElement): boolean {
-  return el.scrollHeight - el.scrollTop - el.clientHeight <= BOTTOM_EPSILON_PX;
 }
 
 function isScrollNavigationKey(key: string): boolean {

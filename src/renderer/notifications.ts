@@ -13,6 +13,7 @@ const TOAST_VARIANT_BY_CATEGORY: Record<NotificationCategory, "success" | "warni
   error: "danger",
 };
 
+
 const ACTIVE_STATUSES: ReadonlySet<ThreadStatus> = new Set([
   "working",
   "needs_approval",
@@ -113,18 +114,19 @@ function showToastNotification(
   const variant = TOAST_VARIANT_BY_CATEGORY[category];
   const detail = getStatusDetail(category, status);
 
-  toast[variant](projectName, {
+  const open = () => {
+    openThread(threadId, { focusComposer: true });
+    toast.close(toastId);
+  };
+
+  const toastId = toast[variant](projectName, {
     actionProps: {
       children: "Open",
-      onPress: () => {
-        openThread(threadId, { focusComposer: true });
-      },
-      variant: "ghost",
+      onPress: open,
+      variant: "secondary",
     },
     description: `${threadTitle}\n${detail}`,
-    onPress: () => {
-      openThread(threadId, { focusComposer: true });
-    },
+    onPress: open,
     timeout: 6000,
   } as any);
   playSound();

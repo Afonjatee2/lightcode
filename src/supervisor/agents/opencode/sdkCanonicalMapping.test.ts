@@ -211,6 +211,39 @@ describe("sdkCanonicalMapping — permission/question events", () => {
     });
   });
 
+  it("keeps OpenCode tool-name permissions as approvals", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      {
+        id: "evt-x",
+        type: "permission.asked",
+        properties: {
+          id: "perm_1",
+          sessionID: "ses_test",
+          permission: "grep",
+          patterns: ["TERM_PROGRAM"],
+          metadata: { target: "TERM_PROGRAM" },
+          always: [],
+        },
+      },
+      state,
+    );
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "request.opened",
+      requestId: "opencode-perm-perm_1",
+      requestType: "command_execution_approval",
+      payload: {
+        summary: "TERM_PROGRAM",
+        details: {
+          permission: "grep",
+          patterns: ["TERM_PROGRAM"],
+          metadata: { target: "TERM_PROGRAM" },
+        },
+      },
+    });
+  });
+
   it("maps question.asked → request.opened with multiSelect aggregation", () => {
     const state = createOpenCodeMapperState("thread-1");
     const events = mapOpenCodeEvent(
@@ -341,6 +374,130 @@ describe("sdkCanonicalMapping — tool parts", () => {
     );
     expect(events.find((e) => e.type === "item.started")).toMatchObject({
       itemType: "command_execution",
+    });
+  });
+
+  it("maps lowercase read tools to categorized ACP-shaped tool calls", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_read",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "read",
+        callID: "call_read",
+        state: {
+          status: "running",
+          input: { filePath: "/repo/package.json" },
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "tool_call",
+      payload: {
+        name: "/repo/package.json",
+        title: "/repo/package.json",
+        kind: "read",
+        locations: [{ path: "/repo/package.json" }],
+        args: { filePath: "/repo/package.json" },
+        status: "running",
+      },
+    });
+  });
+
+  it("maps grep/glob-style tools to categorized search tool calls", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_grep",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "grep",
+        callID: "call_grep",
+        state: {
+          status: "running",
+          input: { pattern: "packageManager", path: "package.json" },
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "tool_call",
+      payload: {
+        kind: "search",
+        title: '"packageManager" in package.json',
+        locations: [{ path: "package.json" }],
+        args: { pattern: "packageManager", path: "package.json" },
+        status: "running",
+      },
+    });
+  });
+
+  it("maps OpenCode task tools to sub-agent tool calls", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_task",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "task",
+        callID: "call_task",
+        state: {
+          status: "running",
+          input: { description: "Audit mapper parity", prompt: "Check OpenCode mapping" },
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "tool_call",
+      payload: {
+        name: "Agent",
+        title: "Audit mapper parity",
+        isSubAgent: true,
+        args: { description: "Audit mapper parity", prompt: "Check OpenCode mapping" },
+        status: "running",
+      },
+    });
+  });
+
+  it("uses webfetch urls as canonical web-search targets", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_webfetch",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "webfetch",
+        callID: "call_webfetch",
+        state: {
+          status: "running",
+          input: { url: "https://opencode.ai/docs" },
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "web_search",
+      payload: {
+        query: "https://opencode.ai/docs",
+        kind: "fetch",
+        args: { url: "https://opencode.ai/docs" },
+        status: "running",
+      },
     });
   });
 

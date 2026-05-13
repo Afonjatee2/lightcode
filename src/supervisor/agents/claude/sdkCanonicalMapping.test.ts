@@ -1,6 +1,7 @@
 import type { SDKControlGetContextUsageResponse, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
+  buildClaudeQuestionAnswerEvents,
   createClaudeMapperState,
   mapClaudeContextUsageResponse,
   mapClaudePermissionRequest,
@@ -91,6 +92,73 @@ describe("sdkCanonicalMapping — prompt content", () => {
       threadId: "thread-1",
       itemId: "goal-turn-goal",
     });
+  });
+
+  it("marks an active /goal complete with tokens and elapsed time when the turn result arrives", () => {
+    const state = createClaudeMapperState("thread-1");
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-05-12T10:00:00Z"));
+      startClaudeTurn(
+        state,
+        "turn-goal",
+        "/goal ship unified GUI goal support",
+        undefined,
+        "user-goal",
+      );
+
+      vi.setSystemTime(new Date("2026-05-12T10:02:05Z"));
+      const resultEvents = mapClaudeSdkMessage(
+        {
+          type: "result",
+          subtype: "success",
+          session_id: "claude-session",
+          usage: {
+            input_tokens: 60_000,
+            output_tokens: 8_000,
+            cache_read_input_tokens: 1_000,
+            cache_creation_input_tokens: 500,
+            total_tokens: 69_500,
+          },
+        } as unknown as SDKMessage,
+        state,
+      );
+
+      const goalUpdate = resultEvents.find(
+        (event) => event.type === "item.updated" && event.itemId === "goal-turn-goal",
+      );
+      expect(goalUpdate).toMatchObject({
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "goal-turn-goal",
+        payload: {
+          action: "updated",
+          objective: "ship unified GUI goal support",
+          status: "complete",
+          tokensUsed: 69_500,
+          timeUsedSeconds: 125,
+        },
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not emit a goal completion update when no /goal was issued", () => {
+    const state = createClaudeMapperState("thread-1");
+    startClaudeTurn(state, "turn-plain", "do a thing", undefined, "user-plain");
+
+    const resultEvents = mapClaudeSdkMessage(
+      {
+        type: "result",
+        subtype: "success",
+        session_id: "claude-session",
+        usage: { input_tokens: 10, output_tokens: 5, total_tokens: 15 },
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    expect(resultEvents.some((event) => event.type === "item.updated")).toBe(false);
   });
 });
 
@@ -629,6 +697,11 @@ describe("sdkCanonicalMapping — task progress", () => {
 
     expect(events).toMatchObject([
       {
+        type: "context.updated",
+        threadId: "thread-1",
+        usage: { usedTokens: 4200 },
+      },
+      {
         type: "item.updated",
         threadId: "thread-1",
         itemId: "toolu_T1",
@@ -648,7 +721,7 @@ describe("sdkCanonicalMapping — task progress", () => {
     ]);
   });
 
-  it("ignores task_progress for unknown tool_use_id", () => {
+  it("still emits task_progress usage for unknown tool_use_id", () => {
     const state = createClaudeMapperState("thread-1");
     const events = mapClaudeSdkMessage(
       {
@@ -662,7 +735,36 @@ describe("sdkCanonicalMapping — task progress", () => {
       } as unknown as SDKMessage,
       state,
     );
-    expect(events).toEqual([]);
+    expect(events).toEqual([
+      {
+        type: "context.updated",
+        threadId: "thread-1",
+        usage: { usedTokens: 1 },
+      },
+    ]);
+  });
+
+  it("emits task_notification usage even without a parent tool row", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      {
+        type: "system",
+        subtype: "task_notification",
+        session_id: "claude-session",
+        task_id: "task-1",
+        status: "completed",
+        summary: "Done",
+        usage: { total_tokens: 98_765, tool_uses: 8, duration_ms: 12_000 },
+      } as unknown as SDKMessage,
+      state,
+    );
+    expect(events).toEqual([
+      {
+        type: "context.updated",
+        threadId: "thread-1",
+        usage: { usedTokens: 98_765 },
+      },
+    ]);
   });
 });
 
@@ -942,5 +1044,116 @@ describe("sdkCanonicalMapping — requests", () => {
         options: [{ optionId: "A", label: "A", description: "Alpha" }],
       },
     });
+  });
+
+  it("does not surface AskUserQuestion tool_use blocks as chat tool items", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      {
+        type: "assistant",
+        session_id: "claude-session",
+        parent_tool_use_id: null,
+        message: {
+          id: "msg_1",
+          type: "message",
+          role: "assistant",
+          model: "claude",
+          content: [
+            {
+              type: "tool_use",
+              id: "toolu_question_1",
+              name: "AskUserQuestion",
+              input: { questions: [{ question: "Pick one", options: [] }] },
+            },
+            {
+              type: "tool_use",
+              id: "toolu_other_1",
+              name: "Bash",
+              input: { command: "ls" },
+            },
+          ],
+          stop_reason: null,
+          stop_sequence: null,
+          usage: { input_tokens: 0, output_tokens: 0 },
+        },
+      } as unknown as SDKMessage,
+      state,
+    );
+    const startedItemIds = events
+      .filter((e) => e.type === "item.started")
+      .map((e) => (e as { itemId: string }).itemId);
+    expect(startedItemIds).toEqual(["toolu_other_1"]);
+  });
+
+  it("builds a user_message item from a single-answer AskUserQuestion response", () => {
+    const questions = parseClaudeQuestions({
+      questions: [
+        {
+          question: "How wide should the scope be?",
+          header: "Scope",
+          options: [
+            { label: "Replace nvm walk", description: "Tool-agnostic capture." },
+            { label: "Keep fallback", description: "Static fallback." },
+          ],
+        },
+      ],
+    });
+    const events = buildClaudeQuestionAnswerEvents({
+      threadId: "thread-1",
+      itemId: "question-answer-1",
+      questions,
+      answers: { "How wide should the scope be?": "Replace nvm walk" },
+    });
+    expect(events).toEqual([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: "question-answer-1",
+        itemType: "user_message",
+        payload: { content: [{ kind: "text", text: "Replace nvm walk" }] },
+      },
+      { type: "item.completed", threadId: "thread-1", itemId: "question-answer-1" },
+    ]);
+  });
+
+  it("joins multi-select answers into a single comma-separated user message", () => {
+    const questions = parseClaudeQuestions({
+      questions: [
+        {
+          question: "Pick categories",
+          header: "Cats",
+          multiSelect: true,
+          options: [{ label: "A" }, { label: "B" }, { label: "C" }],
+        },
+      ],
+    });
+    const events = buildClaudeQuestionAnswerEvents({
+      threadId: "thread-1",
+      itemId: "question-answer-2",
+      questions,
+      answers: { "Pick categories": ["A", "C"] },
+    });
+    expect(events[0]).toMatchObject({
+      itemType: "user_message",
+      payload: { content: [{ kind: "text", text: "A, C" }] },
+    });
+  });
+
+  it("returns no events when the answers map has no entries", () => {
+    const events = buildClaudeQuestionAnswerEvents({
+      threadId: "thread-1",
+      itemId: "question-answer-3",
+      questions: parseClaudeQuestions({
+        questions: [
+          {
+            question: "Q?",
+            header: "Q",
+            options: [{ label: "A" }],
+          },
+        ],
+      }),
+      answers: {},
+    });
+    expect(events).toEqual([]);
   });
 });

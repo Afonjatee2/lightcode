@@ -9,7 +9,9 @@ import {
   type RuntimeChatItem,
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
+import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { chatMessageSurfaceClass } from "./chatMessageSurface";
+import { InlineFilePathChip } from "./InlineFilePathChip";
 import { ItemMarkdown } from "./ItemMarkdown";
 
 interface UserMessageProps {
@@ -32,22 +34,27 @@ export const UserMessage = memo(function UserMessage({
   const [hasVisualOverflow, setHasVisualOverflow] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const hasVisualOverflowRef = useRef(false);
   const payload = getRuntimeItemPayload<MessageItemPayload>(item, "user_message");
   const content = payload?.content ?? [];
   const rawText = buildUserPromptText(content);
   const { slashCommand, body } = extractLeadingSlashCommand(rawText);
   const text = body;
+  const slashCommandPrefixLength = slashCommand ? rawText.length - body.length : 0;
+  const hasInlineFileMentions = content.some(
+    (block) => block.kind === "file" && block.source !== "attachment",
+  );
   const attachments = buildUserPromptAttachments(content);
 
   const syncVisualOverflow = useEffectEvent(() => {
     const element = contentRef.current;
     if (!element) return;
     const nextHasVisualOverflow = measureUserMessageOverflow(element);
-    setHasVisualOverflow((prev) => {
-      if (prev === nextHasVisualOverflow) return prev;
+    if (hasVisualOverflowRef.current !== nextHasVisualOverflow) {
+      hasVisualOverflowRef.current = nextHasVisualOverflow;
+      setHasVisualOverflow(nextHasVisualOverflow);
       actions?.onContentHeightChange();
-      return nextHasVisualOverflow;
-    });
+    }
     if (!nextHasVisualOverflow) setIsExpanded(false);
   });
 
@@ -94,12 +101,16 @@ export const UserMessage = memo(function UserMessage({
           </div>
         ) : null}
         {slashCommand ? (
-          <div className="whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] leading-snug text-foreground">
-            <span className="lightcode-slash-chip mr-1.5">
+          <div className="lightcode-user-message-inline-content whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] leading-snug text-foreground">
+            <span className="lightcode-slash-chip lightcode-slash-chip--user-message mr-1.5">
               <span className="lightcode-slash-chip__slash">/</span>
               <span className="lightcode-slash-chip__name">{slashCommand}</span>
             </span>
-            {text.length > 0 ? <span>{text}</span> : null}
+            {renderUserMessageInlineContent(content, slashCommandPrefixLength, actions)}
+          </div>
+        ) : hasInlineFileMentions ? (
+          <div className="lightcode-user-message-inline-content whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] leading-snug text-foreground">
+            {renderUserMessageInlineContent(content, 0, actions)}
           </div>
         ) : text.length > 0 ? (
           <ItemMarkdown text={text} />
@@ -151,6 +162,49 @@ function buildUserPromptText(content: CanonicalContentBlock[]): string {
       return "";
     })
     .join("");
+}
+
+function renderUserMessageInlineContent(
+  content: CanonicalContentBlock[],
+  skipLeadingTextLength: number,
+  actions: ReturnType<typeof useChatPaneActions>,
+): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  let remainingSkip = skipLeadingTextLength;
+
+  content.forEach((block, index) => {
+    if (block.kind === "text") {
+      if (remainingSkip >= block.text.length) {
+        remainingSkip -= block.text.length;
+        return;
+      }
+      const text = remainingSkip > 0 ? block.text.slice(remainingSkip) : block.text;
+      remainingSkip = 0;
+      if (text.length > 0) nodes.push(<span key={`text-${index}`}>{text}</span>);
+      return;
+    }
+
+    if (block.kind === "file") {
+      if (block.source === "attachment") return;
+      if (remainingSkip >= block.path.length) {
+        remainingSkip -= block.path.length;
+        return;
+      }
+      remainingSkip = 0;
+      const path = actions?.projectLocation
+        ? normalizeChatProjectPath(block.path, actions.projectLocation)
+        : block.path;
+      nodes.push(
+        <InlineFilePathChip
+          key={`file-${index}-${block.path}`}
+          path={path}
+          onOpen={actions?.openProjectRelativePath}
+        />,
+      );
+    }
+  });
+
+  return nodes;
 }
 
 function buildUserPromptAttachments(content: CanonicalContentBlock[]): Attachment[] {

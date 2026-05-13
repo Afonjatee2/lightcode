@@ -65,5 +65,13 @@ export function parseProjectPathRef(s: string, options: ParseOptions = {}): Proj
   if (hasExtension || isDotfile) {
     return { kind: "file", path: candidate };
   }
+  // Folder fallback (no extension, no trailing slash). For non-absolute paths
+  // the rootNames guard above already required the first segment to be a
+  // real project entry. For absolute paths, apply the same check here so
+  // slash commands like `/plan` (whose first segment isn't a project root)
+  // don't get chipped as folders.
+  if (isAbsolutePosix && options.rootNames && !options.rootNames.has(firstSegment)) {
+    return null;
+  }
   return { kind: "folder", path: candidate };
 }

@@ -2,6 +2,10 @@ import { startTransition } from "react";
 import { isDraftPaneId } from "@/shared/paneId";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
+import {
+  hasHydratedThreadRuntimeItems,
+  hydrateThreadRuntimeItems,
+} from "@/renderer/state/chatRuntimePersister";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useWorktreeDeleteStore } from "@/renderer/state/worktreeDeleteStore";
 import { readWorktreeDeletePref } from "@/renderer/views/MainView/parts/Sidebar/parts/DeleteWorktreeDialog";
@@ -11,7 +15,10 @@ import { closePanelsForUnloadedThread } from "./panelActions";
 import { getCurrentProjectId } from "./currentProject";
 import { performWorktreeRemoval } from "./worktreeActions";
 
+let openThreadRequestId = 0;
+
 export function openNewThread(projectId?: string): void {
+  openThreadRequestId += 1;
   const store = useAppStore.getState();
   const targetProjectId = projectId ?? getCurrentProjectId() ?? store.projects[0]?.id;
   startTransition(() => {
@@ -30,6 +37,7 @@ export function openNewThread(projectId?: string): void {
 }
 
 export function openNewThreadSideBySide(projectId: string): void {
+  openThreadRequestId += 1;
   startTransition(() => {
     useAppStore.getState().openDraftSideBySide(projectId);
   });
@@ -37,23 +45,61 @@ export function openNewThreadSideBySide(projectId: string): void {
 
 export function openThread(threadId: string, options?: { focusComposer?: boolean }): void {
   const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
+  const requestId = ++openThreadRequestId;
+  const threadIdsToHydrate = getGuiThreadIdsToHydrateBeforeOpen(threadId);
 
-  startTransition(() => {
-    useAppStore.getState().openThread(threadId);
-    if (options?.focusComposer) {
-      useAppStore.getState().requestComposerFocus(threadId);
-    }
-    // Late-rendering items (virtualizer measurement, hydration, streaming) can
-    // leave the chat slightly above the bottom on reopen. Re-arm stick-to-bottom
-    // so any post-mount growth keeps the view pinned.
-    if (thread?.presentationMode === "gui") {
-      useAppStore.getState().requestChatScrollToBottom(threadId);
-    }
-  });
+  const applyOpen = () => {
+    if (requestId !== openThreadRequestId) return;
 
-  if (thread?.status === "inactive") {
-    reopenStoredThread(threadId);
+    startTransition(() => {
+      useAppStore.getState().openThread(threadId);
+      if (options?.focusComposer) {
+        useAppStore.getState().requestComposerFocus(threadId);
+      }
+      // Late-rendering items (virtualizer measurement, hydration, streaming) can
+      // leave the chat slightly above the bottom on reopen. Re-arm stick-to-bottom
+      // so any post-mount growth keeps the view pinned.
+      if (thread?.presentationMode === "gui") {
+        useAppStore.getState().requestChatScrollToBottom(threadId);
+      }
+    });
+
+    if (thread?.status === "inactive") {
+      reopenStoredThread(threadId);
+    }
+  };
+
+  if (threadIdsToHydrate.length > 0) {
+    void Promise.all(threadIdsToHydrate.map((id) => hydrateThreadRuntimeItems(id))).then(
+      applyOpen,
+      applyOpen,
+    );
+    return;
   }
+
+  applyOpen();
+}
+
+function getGuiThreadIdsToHydrateBeforeOpen(threadId: string): string[] {
+  const state = useAppStore.getState();
+  const clickedThread = state.threads.find((thread) => thread.id === threadId);
+  if (!clickedThread) return [];
+
+  let candidates = [clickedThread];
+  if (clickedThread.groupId) {
+    const groupThreads = state.threads.filter(
+      (thread) => thread.groupId === clickedThread.groupId && !thread.done && !thread.archived,
+    );
+    if (groupThreads.length >= 2) {
+      candidates = groupThreads;
+    }
+  }
+
+  return candidates
+    .filter(
+      (thread) => thread.presentationMode === "gui" && !hasHydratedThreadRuntimeItems(thread.id),
+    )
+    .map((thread) => thread.id);
 }
 
 export function reopenStoredThread(threadId: string): void {
@@ -217,7 +263,7 @@ export function deleteThread(threadId: string, worktreePath?: string, projectId?
 }
 
 export function continueInProvider(threadId: string): void {
-  useAppStore.getState().openThread(threadId);
+  openThread(threadId);
 }
 
 export function reopenPaneThreadsIfInactive(): void {

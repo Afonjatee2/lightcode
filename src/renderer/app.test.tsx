@@ -14,6 +14,13 @@ const { bridge } = vi.hoisted(() => ({
       .fn<() => Promise<{ windows: unknown[]; wsl: unknown[]; fromCache: boolean }>>()
       .mockResolvedValue({ windows: [], wsl: [], fromCache: false }),
     getThreadSnapshots: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+    dbGetThreadRuntimeItems: vi
+      .fn<(threadId: string) => Promise<unknown[]>>()
+      .mockResolvedValue([]),
+    dbGetThreadCompletedTurns: vi
+      .fn<(threadId: string) => Promise<unknown[]>>()
+      .mockResolvedValue([]),
+    dbGetThreadContextUsage: vi.fn<(threadId: string) => Promise<null>>().mockResolvedValue(null),
     getGitStatus: vi
       .fn<
         () => Promise<{
@@ -374,6 +381,67 @@ describe("App", () => {
       expect(screen.getByTestId("thread-view-thread-1")).toHaveAttribute("data-pending-launch", "");
     });
     expect(bridge.startThread).not.toHaveBeenCalled();
+  });
+
+  it("hydrates the selected GUI thread transcript before initial render", async () => {
+    useAppStore.persist.hasHydrated = vi.fn<() => boolean>().mockReturnValue(true);
+    useAppStore.persist.onHydrate = vi.fn<() => () => void>(() => () => undefined);
+    useAppStore.persist.onFinishHydration = vi.fn<() => () => void>(() => () => undefined);
+    let resolveRuntimeItems: (items: unknown[]) => void = () => undefined;
+    bridge.dbGetThreadRuntimeItems.mockReturnValueOnce(
+      new Promise<unknown[]>((resolve) => {
+        resolveRuntimeItems = resolve;
+      }),
+    );
+
+    useAppStore.setState((state) => ({
+      ...state,
+      projects: [
+        {
+          id: "project-1",
+          name: "Repo",
+          location: {
+            kind: "windows",
+            path: "C:\\repo",
+          },
+          createdAt: "2026-03-22T00:00:00.000Z",
+        },
+      ],
+      threads: [
+        {
+          id: "thread-visible-gui",
+          projectId: "project-1",
+          title: "Visible GUI thread",
+          agentKind: "codex",
+          config: {
+            model: "gpt-5.4",
+          },
+          status: "idle",
+          attention: "none",
+          canResumeWithConfig: false,
+          archived: false,
+          done: false,
+          starred: false,
+          presentationMode: "gui",
+          createdAt: "2026-03-22T00:00:00.000Z",
+          updatedAt: "2026-03-22T00:00:00.000Z",
+        },
+      ],
+      view: { kind: "thread", panes: ["thread-visible-gui"] },
+    }));
+
+    render(<App />);
+
+    await waitFor(() => {
+      expect(bridge.dbGetThreadRuntimeItems).toHaveBeenCalledWith("thread-visible-gui");
+    });
+    expect(screen.queryByTestId("thread-view-thread-visible-gui")).not.toBeInTheDocument();
+
+    resolveRuntimeItems([]);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("thread-view-thread-visible-gui")).toBeInTheDocument();
+    });
   });
 
   it("queues launch for the selected thread after persisted state hydrates", async () => {

@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Thread } from "@/shared/contracts";
+import type { CanonicalContentBlock, Thread } from "@/shared/contracts";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { useAppStore } from "@/renderer/state/appStore";
 import { ChatPane } from "./ChatPane";
@@ -25,6 +25,7 @@ vi.mock("@/renderer/state/fileCheckpointActions", () => ({
 vi.mock("@tanstack/react-virtual", () => ({
   useVirtualizer: (options: {
     count: number;
+    getScrollElement?: () => Element | null;
     getItemKey?: (index: number) => string | number;
   }) => ({
     getVirtualItems: () =>
@@ -36,6 +37,12 @@ vi.mock("@tanstack/react-virtual", () => ({
     getTotalSize: () => options.count * 96,
     measure: vi.fn<() => void>(),
     measureElement: vi.fn<(element: HTMLDivElement | null) => void>(),
+    scrollToIndex: vi.fn<() => void>(() => {
+      const element = options.getScrollElement?.();
+      if (element instanceof HTMLElement) {
+        element.scrollTop = element.scrollHeight;
+      }
+    }),
   }),
 }));
 
@@ -140,6 +147,16 @@ describe("ChatPane", () => {
     await waitFor(() => expect(metrics.getScrollTop()).toBe(300));
   });
 
+  it("disables native browser scroll anchoring on the managed chat scroller", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    expect(getScrollElement(container).className).toContain("[overflow-anchor:none]");
+  });
+
   it("re-pins in the same resize frame when bottom-pinned content collapses", async () => {
     const thread = makeThread();
     seedPlanItem(thread.id, [{ step: "Inspect output", status: "in_progress" }]);
@@ -202,7 +219,7 @@ describe("ChatPane", () => {
       MockResizeObserver.notify(contentElement);
     });
 
-    await waitFor(() => expect(metrics.getScrollTop()).toBe(300));
+    expect(metrics.getScrollTop()).toBe(300);
   });
 
   it("does not pull the user back to the bottom after they scroll up", async () => {
@@ -373,7 +390,7 @@ describe("ChatPane", () => {
       MockResizeObserver.notify(scrollElement);
     });
 
-    expect(metrics.getScrollTop()).toBe(300);
+    await waitFor(() => expect(metrics.getScrollTop()).toBe(300));
   });
 
   it("keeps the user's place when the scroll viewport shrinks after they scrolled up", async () => {
@@ -476,6 +493,29 @@ describe("ChatPane", () => {
     });
 
     expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+  });
+
+  it("renders file mentions in user messages as inline chips", async () => {
+    const thread = makeThread();
+    seedUserMessageContent(thread.id, [
+      { kind: "text", text: "/goal sadasdas " },
+      {
+        kind: "file",
+        path: "src/supervisor/agents/acp/session.ts",
+        name: "session.ts",
+        source: "mention",
+      },
+    ]);
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    expect(screen.getByText("goal")).toBeInTheDocument();
+    expect(screen.getByText("sadasdas")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /session\.ts/u })).toBeInTheDocument();
+    expect(
+      screen.queryByText(/src\/supervisor\/agents\/acp\/session\.ts/u),
+    ).not.toBeInTheDocument();
   });
 
   it("updates user message collapse state when resize changes visual overflow", async () => {
@@ -826,12 +866,20 @@ function startCommandItem(threadId: string, itemId: string, command: string) {
 }
 
 function seedUserMessage(threadId: string, text: string, itemId = "user-1") {
+  seedUserMessageContent(threadId, [{ kind: "text", text }], itemId);
+}
+
+function seedUserMessageContent(
+  threadId: string,
+  content: CanonicalContentBlock[],
+  itemId = "user-1",
+) {
   useAppStore.getState().applyRuntimeEvent(threadId, {
     type: "item.started",
     threadId,
     itemId,
     itemType: "user_message",
-    payload: { content: [{ kind: "text", text }] },
+    payload: { content },
   });
 }
 

@@ -11,6 +11,7 @@ import { Surface } from "@heroui/react";
 import { Brain, ChevronDown } from "lucide-react";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
+import { isElementAtBottom } from "../../chatScrollGeometry";
 import { chatMessageSurfaceClass } from "./chatMessageSurface";
 import { ItemMarkdown } from "./ItemMarkdown";
 
@@ -134,8 +135,3 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
   );
 });
 
-const BOTTOM_EPSILON_PX = 4;
-
-function isElementAtBottom(element: HTMLElement): boolean {
-  return element.scrollHeight - element.scrollTop - element.clientHeight <= BOTTOM_EPSILON_PX;
-}

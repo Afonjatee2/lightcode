@@ -1,6 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
-import { join } from "node:path";
+import { homedir } from "node:os";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectLocation } from "@/shared/contracts";
 
@@ -24,6 +22,7 @@ import {
   clearExecutablePathCache,
   cliSubcommandAuthProbe,
   primeExecutablePathCache,
+  primeProjectShellEnv,
   resolveExecutablePathAsync,
 } from "./base";
 
@@ -113,66 +112,75 @@ describe.skipIf(process.platform === "win32")("POSIX login shell wrappers", () =
     });
   });
 
-  it("prepends the project's pinned nvm node bin to PATH on direct spawn", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "lightcode-nvm-spawn-"));
-    const project = join(tmp, "project");
-    const nvmDir = join(tmp, ".nvm");
-    const nodeBin = join(nvmDir, "versions", "node", "v24.13.1", "bin");
-    try {
-      mkdirSync(project, { recursive: true });
-      mkdirSync(nodeBin, { recursive: true });
-      writeFileSync(join(project, ".nvmrc"), "24\n");
+  it("uses the project-scoped shell env on direct spawn so cd-hooks (fnm/asdf/mise) win", async () => {
+    const project = "/Users/demo/project";
 
-      execFileAsyncMock.mockResolvedValue({
-        stdout: [
-          "claude\t/Users/demo/.local/bin/claude",
-          "__LIGHTCODE_ENV_BEGIN__",
-          "PATH=/opt/homebrew/bin:/usr/bin:/bin",
-          `NVM_DIR=${nvmDir}`,
-        ].join("\n"),
-        stderr: "",
-      });
+    // First call: homedir-scoped prime. PATH carries the user's *default* node.
+    execFileAsyncMock.mockResolvedValueOnce({
+      stdout: [
+        "claude\t/Users/demo/.local/bin/claude",
+        "__LIGHTCODE_ENV_BEGIN__",
+        "PATH=/Users/demo/.fnm/aliases/default/bin:/usr/bin:/bin",
+      ].join("\n"),
+      stderr: "",
+    });
+    await primeExecutablePathCache(["claude"]);
 
-      await primeExecutablePathCache(["claude"]);
+    // Second call: project-scoped prime. The shell stood in the project root,
+    // so the user's version manager swapped to the project-pinned node (24).
+    execFileAsyncMock.mockResolvedValueOnce({
+      stdout: [
+        "__LIGHTCODE_ENV_BEGIN__",
+        "PATH=/Users/demo/.local/share/fnm/node-versions/v24.13.1/installation/bin:/usr/bin:/bin",
+        "EDITOR=nvim",
+      ].join("\n"),
+      stderr: "",
+    });
+    await primeProjectShellEnv(project);
 
-      const spec = buildAgentCommand(
-        { kind: "posix", path: project },
-        "claude",
-        ["--version"],
-        "/Users/demo/.local/bin/claude",
-      );
+    const spec = buildAgentCommand(
+      { kind: "posix", path: project },
+      "claude",
+      ["--version"],
+      "/Users/demo/.local/bin/claude",
+    );
 
-      expect(spec.cwd).toBe(project);
-      expect(spec.env?.PATH).toBe(`${nodeBin}:/opt/homebrew/bin:/usr/bin:/bin`);
-      expect(spec.env?.NVM_DIR).toBe(nvmDir);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
+    expect(spec).toEqual({
+      command: "/Users/demo/.local/bin/claude",
+      args: ["--version"],
+      cwd: project,
+      env: {
+        PATH: "/Users/demo/.local/share/fnm/node-versions/v24.13.1/installation/bin:/usr/bin:/bin",
+        EDITOR: "nvim",
+      },
+    });
+
+    // The project-scoped probe must have been invoked with cwd=project.
+    const projectCall = execFileAsyncMock.mock.calls.find(
+      (call) => (call[2] as { cwd?: string })?.cwd === project,
+    );
+    expect(projectCall).toBeDefined();
   });
 
-  it("injects the project nvm bin even when wrapping in a login shell", async () => {
-    const tmp = mkdtempSync(join(tmpdir(), "lightcode-nvm-shell-"));
-    const project = join(tmp, "project");
-    const nvmDir = join(tmp, ".nvm");
-    const nodeBin = join(nvmDir, "versions", "node", "v24.13.1", "bin");
-    const originalNvmDir = process.env.NVM_DIR;
-    try {
-      mkdirSync(project, { recursive: true });
-      mkdirSync(nodeBin, { recursive: true });
-      writeFileSync(join(project, ".nvmrc"), "24\n");
-      process.env.NVM_DIR = nvmDir;
+  it("falls back to the homedir-scoped prime when the project has not been primed", async () => {
+    execFileAsyncMock.mockResolvedValueOnce({
+      stdout: [
+        "claude\t/Users/demo/.local/bin/claude",
+        "__LIGHTCODE_ENV_BEGIN__",
+        "PATH=/opt/homebrew/bin:/usr/bin:/bin",
+      ].join("\n"),
+      stderr: "",
+    });
+    await primeExecutablePathCache(["claude"]);
 
-      const spec = buildAgentCommand({ kind: "posix", path: project }, "claude", ["--version"]);
+    const spec = buildAgentCommand(
+      { kind: "posix", path: "/Users/demo/project" },
+      "claude",
+      ["--version"],
+      "/Users/demo/.local/bin/claude",
+    );
 
-      expect(spec.command).toBe("/bin/zsh");
-      expect(spec.args).toEqual(expectedShellArgs("exec 'claude' '--version'"));
-      expect(spec.cwd).toBe(project);
-      expect(spec.env?.PATH?.startsWith(`${nodeBin}:`)).toBe(true);
-    } finally {
-      if (originalNvmDir === undefined) delete process.env.NVM_DIR;
-      else process.env.NVM_DIR = originalNvmDir;
-      rmSync(tmp, { recursive: true, force: true });
-    }
+    expect(spec.env?.PATH).toBe("/opt/homebrew/bin:/usr/bin:/bin");
   });
 
   it("runs CLI auth probes via direct spawn", async () => {

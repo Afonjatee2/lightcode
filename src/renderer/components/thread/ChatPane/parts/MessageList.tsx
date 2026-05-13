@@ -71,9 +71,10 @@ export const MessageList = memo(function MessageList({
 }: MessageListProps) {
   const hasItems = entries.length > 0;
   const parentActions = useChatPaneActions();
+  const virtualSizeBoxRef = useRef<HTMLDivElement | null>(null);
   const rowElementsRef = useRef(new Map<number, HTMLDivElement>());
   const lastScrollTopRef = useRef(0);
-  const suppressSizeAdjustmentUntilRef = useRef(0);
+  const suppressUpwardSizeAdjustmentUntilRef = useRef(0);
   const [measureEpoch, setMeasureEpoch] = useState(0);
   const [pendingRevertItemId, setPendingRevertItemId] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
@@ -90,10 +91,18 @@ export const MessageList = memo(function MessageList({
     ),
     getItemKey: useCallback((index: number) => entries[index]?.id ?? index, [entries]),
     overscan: CHAT_TRANSCRIPT_OVERSCAN,
-    // React 19 batches updates naturally; flushSync inside scroll events triggers
-    // a "flushSync called from inside a lifecycle" warning. Disable it.
-    useFlushSync: false,
+    useFlushSync: true,
+    useAnimationFrameWithResizeObserver: true,
   });
+
+  useLayoutEffect(() => {
+    if (!parentActions?.registerVirtualScrollToBottom) return;
+    parentActions.registerVirtualScrollToBottom(() => {
+      if (entries.length === 0) return;
+      virtualizer.scrollToIndex(entries.length - 1, { align: "end" });
+    });
+    return () => parentActions.registerVirtualScrollToBottom?.(null);
+  }, [entries.length, parentActions, virtualizer]);
 
   useLayoutEffect(() => {
     if (!scrollElement) return;
@@ -104,7 +113,7 @@ export const MessageList = memo(function MessageList({
       const nextScrollTop = scrollElement.scrollTop;
       lastScrollTopRef.current = nextScrollTop;
       if (nextScrollTop < prevScrollTop) {
-        suppressSizeAdjustmentUntilRef.current =
+        suppressUpwardSizeAdjustmentUntilRef.current =
           performance.now() + UPWARD_SCROLL_MEASUREMENT_SUPPRESSION_MS;
       }
     };
@@ -121,14 +130,34 @@ export const MessageList = memo(function MessageList({
     // compensation so delayed row measurements do not pull the transcript.
     virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
       if (!scrollElement) return false;
+      const now = performance.now();
       if (instance.isScrolling && instance.scrollDirection === "backward") return false;
-      if (performance.now() <= suppressSizeAdjustmentUntilRef.current) return false;
+      if (now <= suppressUpwardSizeAdjustmentUntilRef.current) return false;
+      if (parentActions?.isStickToBottom?.()) return true;
       return item.start + item.size <= scrollElement.scrollTop;
     };
     return () => {
       virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
     };
-  }, [scrollElement, virtualizer]);
+  }, [parentActions, scrollElement, virtualizer]);
+
+  useLayoutEffect(() => {
+    const virtualSizeBox = virtualSizeBoxRef.current;
+    if (!virtualSizeBox) return;
+
+    const selectLastItemIsUserMessage = (state: AppStoreState) =>
+      isLastTimelineEntryUserMessage(state, threadId, entries);
+    const updateBottomMask = (lastItemIsUserMessage: boolean) => {
+      virtualSizeBox.style.setProperty(
+        "--lc-chat-bottom-mask-end-alpha",
+        lastItemIsUserMessage ? "1" : "0",
+      );
+      virtualSizeBox.dataset.bottomFadeVisible = lastItemIsUserMessage ? "false" : "true";
+    };
+
+    updateBottomMask(selectLastItemIsUserMessage(useAppStore.getState()));
+    return useAppStore.subscribe(selectLastItemIsUserMessage, updateBottomMask);
+  }, [entries, threadId]);
 
   const virtualItems = virtualizer.getVirtualItems();
   const totalSize = virtualizer.getTotalSize();
@@ -237,7 +266,20 @@ export const MessageList = memo(function MessageList({
   return (
     <ChatPaneActionsContext.Provider value={rowActions}>
       <div className="mx-auto w-full max-w-[920px] pb-1">
-        <div className="relative w-full" style={{ height: totalSize }}>
+        <div
+          ref={virtualSizeBoxRef}
+          data-chat-virtual-size-box="true"
+          data-bottom-fade-visible="true"
+          className="relative w-full overflow-hidden [--lc-chat-bottom-mask-end-alpha:0]"
+          style={{
+            height: totalSize,
+            WebkitMaskImage:
+              "linear-gradient(to bottom, black calc(100% - 14px), rgb(0 0 0 / var(--lc-chat-bottom-mask-end-alpha, 0)))",
+            maskImage:
+              "linear-gradient(to bottom, black calc(100% - 14px), rgb(0 0 0 / var(--lc-chat-bottom-mask-end-alpha, 0)))",
+            transition: "--lc-chat-bottom-mask-end-alpha 150ms ease-out",
+          }}
+        >
           <div
             data-chat-virtual-block="true"
             className="absolute left-0 top-0 w-full"
@@ -304,12 +346,37 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   canRevertCheckpoints,
   onRequestRevert,
 }: VirtualChatListRowProps) {
+  const rowElementRef = useRef<HTMLDivElement | null>(null);
   const ref = useCallback(
     (element: HTMLDivElement | null) => {
+      rowElementRef.current = element;
       measureElement(index, element);
     },
     [index, measureElement],
   );
+  const liveMeasureToken = useAppStore((state) => {
+    if (!isLastEntry || entry.kind !== "item") return null;
+    const item = state.runtimeItemsByIdByThread[threadId]?.[entry.id];
+    if (!item || item.state === "completed") return null;
+    switch (item.type) {
+      case "assistant_message":
+        return `${item.type}:${item.state}:${item.streams.assistant_text?.length ?? 0}`;
+      case "reasoning":
+        return `${item.type}:${item.state}:${item.streams.reasoning_text?.length ?? 0}`;
+      case "command_execution":
+        return `${item.type}:${item.state}:${item.streams.command_output?.length ?? 0}`;
+      case "file_change":
+        return `${item.type}:${item.state}:${item.streams.file_change_output?.length ?? 0}`;
+      default:
+        return `${item.type}:${item.state}`;
+    }
+  });
+  useLayoutEffect(() => {
+    if (liveMeasureToken === null) return;
+    const element = rowElementRef.current;
+    if (!element) return;
+    measureElement(index, element);
+  }, [index, liveMeasureToken, measureElement]);
   const isUserMessage = useAppStore((state) =>
     entry.kind === "item"
       ? state.runtimeItemsByIdByThread[threadId]?.[entry.id]?.type === "user_message"
@@ -390,6 +457,16 @@ function computeLiveTailIndex(
     return i;
   }
   return -1;
+}
+
+function isLastTimelineEntryUserMessage(
+  state: AppStoreState,
+  threadId: string,
+  entries: readonly ChatTimelineEntry[],
+): boolean {
+  const lastEntry = entries[entries.length - 1];
+  if (!lastEntry || lastEntry.kind !== "item") return false;
+  return state.runtimeItemsByIdByThread[threadId]?.[lastEntry.id]?.type === "user_message";
 }
 
 function estimateTimelineEntrySize(entry: ChatTimelineEntry | undefined, threadId: string): number {

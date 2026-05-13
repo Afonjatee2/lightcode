@@ -26,7 +26,6 @@ import type {
   ThreadStatus,
 } from "@/shared/contracts";
 import { primeAgentBinaryPath, resolveAgentBinaryPath } from "./binaryResolver";
-import { clearProjectNodeBinCache, resolveProjectNodeBin } from "./projectNodeResolver";
 
 export interface CommandSpec {
   command: string;
@@ -561,16 +560,18 @@ export function buildWindowsCommand(
  * Build a command spec for POSIX systems (macOS/Linux).
  *
  * Fast path: when given an absolute binary path, spawn directly and inject
- * the user's full shell env (captured once during `primeExecutablePathCache`).
- * This skips the interactive login shell init — on macOS with oh-my-zsh /
- * fnm / asdf / starship that's ~1.3-1.9s per spawn — while still giving the
- * child the same env it would inherit from the user's terminal: PATH plus
- * NVM_DIR, HOMEBREW_PREFIX, EDITOR, LANG, custom exports, etc. Bare names
- * still wrap in `$SHELL -l [-i] -c` so unprimed binaries are resolvable.
+ * the user's full shell env captured at the project root (via
+ * `primeProjectShellEnv`). Standing in the project root before dumping `env`
+ * lets the user's version manager — fnm, nvm, volta, asdf, mise, or any
+ * other — apply its chpwd / cd-hook so the project-pinned Node/Python/Ruby
+ * is the one on PATH. Falls back to the homedir-scoped `primedPosixEnv`
+ * (and ultimately the bare process env) when the project prime has not yet
+ * completed. Bare command names still wrap in `$SHELL -l [-i] -c` so
+ * unprimed binaries are resolvable.
  */
 function buildPosixCommand(cwd: string, command: string, args: string[]): CommandSpec {
+  const env = getProjectShellEnv(cwd) ?? primedPosixEnv;
   if (command.startsWith("/")) {
-    const env = withProjectNodeBin(cwd, primedPosixEnv);
     return {
       command,
       args,
@@ -581,29 +582,12 @@ function buildPosixCommand(cwd: string, command: string, args: string[]): Comman
 
   const shell = process.env.SHELL || "/bin/bash";
   const script = `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
-  const env = withProjectNodeBin(cwd, undefined);
   return {
     command: shell,
     args: getPosixLoginShellArgs(script),
     cwd,
-    ...(env ? { env } : {}),
+    ...(env ? { env: { ...env } } : {}),
   };
-}
-
-/**
- * Prepend the project's pinned Node bin (from .nvmrc / .node-version) to
- * `PATH`. Without this, agents launched in a project that pins Node 24
- * inherit the supervisor's home-shell Node when shelling out to npx/node.
- */
-function withProjectNodeBin(
-  cwd: string,
-  baseEnv: Record<string, string> | undefined,
-): Record<string, string> | undefined {
-  const projectBin = resolveProjectNodeBin(cwd, baseEnv?.NVM_DIR);
-  if (!projectBin) return baseEnv;
-  const basePath = baseEnv?.PATH ?? process.env.PATH ?? "";
-  const merged = basePath ? `${projectBin}:${basePath}` : projectBin;
-  return { ...(baseEnv ?? {}), PATH: merged };
 }
 
 /**
@@ -1525,8 +1509,27 @@ const EXEC_CACHE_TTL_MS = 60_000;
  * exports like OPENAI_API_KEY, etc.). Without it, Electron-from-Finder spawns
  * inherit only launchd's skeleton env and tools relying on user-set vars
  * silently break.
+ *
+ * Captured from `homedir()`, so it carries the user's *default* tool versions.
+ * Project-pinned versions (fnm `--use-on-cd`, asdf `.tool-versions`, mise
+ * shims, etc.) come from `projectShellEnvCache` instead — see
+ * `primeProjectShellEnv`.
  */
 let primedPosixEnv: Record<string, string> | undefined;
+
+/**
+ * Per-project shell env captured from the user's interactive login shell
+ * launched *inside* the project root. Standing in the project before
+ * dumping `env` lets version-manager cd-hooks (fnm `--use-on-cd`, asdf,
+ * mise, volta) apply the project-pinned tool versions to PATH. Read by
+ * `buildPosixCommand` when spawning agents in that project; falls back to
+ * `primedPosixEnv` (homedir-scoped) when a project has not been primed.
+ *
+ * Stores promises (not envs) so concurrent prime requests for the same
+ * project share a single shell invocation. The promise resolves to the
+ * parsed env or `undefined` if the probe failed.
+ */
+const projectShellEnvCache = new Map<string, Promise<Record<string, string> | undefined>>();
 
 /** Shell-internal / per-process vars that must not leak into spawned children. */
 const PRIMED_ENV_SKIP = new Set([
@@ -1541,11 +1544,20 @@ const PRIMED_ENV_SKIP = new Set([
   "PROMPT",
 ]);
 
+/**
+ * Synchronously resolved values of `projectShellEnvCache` promises, populated
+ * when each prime completes. `buildPosixCommand` is called from sync code
+ * paths (it composes `CommandSpec` ahead of the PTY spawn), so it needs a
+ * non-Promise view of the cache — callers `await primeProjectShellEnv` first.
+ */
+const projectShellEnvResolved = new Map<string, Record<string, string> | undefined>();
+
 export function clearExecutablePathCache(): void {
   execPathCache.clear();
   cachedWindowsSearchPath = null;
   primedPosixEnv = undefined;
-  clearProjectNodeBinCache();
+  projectShellEnvCache.clear();
+  projectShellEnvResolved.clear();
 }
 
 /** Sync read of the cached binary path. Returns undefined if absent or stale. */
@@ -1559,6 +1571,69 @@ export function getCachedExecutablePath(command: string): string | undefined {
 /** Env captured from the user's login shell during prime; undefined until then. */
 export function getPrimedPosixEnv(): Record<string, string> | undefined {
   return primedPosixEnv;
+}
+
+/**
+ * Read the project-scoped shell env captured by `primeProjectShellEnv`.
+ * Returns `undefined` if the prime has not completed (or failed) for this
+ * cwd — callers should fall back to `primedPosixEnv` or bare `process.env`.
+ * Synchronous to keep `buildPosixCommand` non-async; callers must await
+ * `primeProjectShellEnv(cwd)` ahead of any sync command-spec construction
+ * that relies on project-pinned tools.
+ */
+export function getProjectShellEnv(cwd: string): Record<string, string> | undefined {
+  return projectShellEnvResolved.get(cwd);
+}
+
+/**
+ * Capture the user's interactive shell env from inside the project root and
+ * cache it. Runs `$SHELL -l [-i] -c '<marker>; env'` with `cwd=projectRoot`
+ * so version-manager cd-hooks (fnm `--use-on-cd`, asdf, mise, volta) apply
+ * the project's pinned versions before `env` is dumped.
+ *
+ * Memoized per `cwd` and per shell binary — repeated calls return the same
+ * promise. No-op (resolves to `undefined`) on Windows and when the shell
+ * probe fails or times out; callers must tolerate `getProjectShellEnv`
+ * returning `undefined`.
+ */
+export function primeProjectShellEnv(
+  cwd: string,
+): Promise<Record<string, string> | undefined> {
+  if (process.platform === "win32") {
+    return Promise.resolve(undefined);
+  }
+  const key = `${process.env.SHELL || "/bin/bash"} ${cwd}`;
+  const existing = projectShellEnvCache.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    const probe = [
+      `printf '%s\\n' ${quotePosixShellArg(PRIMED_ENV_MARKER)}`,
+      `env`,
+    ].join("; ");
+    try {
+      const { stdout } = await execFileAsync(
+        process.env.SHELL || "/bin/bash",
+        getPosixLoginShellArgs(probe),
+        {
+          cwd,
+          windowsHide: true,
+          timeout: 15_000,
+        },
+      );
+      const lines = (stdout ?? "").split(/\r?\n/g);
+      const markerIdx = lines.indexOf(PRIMED_ENV_MARKER);
+      if (markerIdx < 0) return undefined;
+      const parsed = parsePrimedEnvDump(lines.slice(markerIdx + 1));
+      if (Object.keys(parsed).length === 0) return undefined;
+      projectShellEnvResolved.set(cwd, parsed);
+      return parsed;
+    } catch {
+      return undefined;
+    }
+  })();
+  projectShellEnvCache.set(key, promise);
+  return promise;
 }
 
 const PRIMED_ENV_MARKER = "__LIGHTCODE_ENV_BEGIN__";

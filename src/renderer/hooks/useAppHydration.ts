@@ -1,6 +1,8 @@
 import { startTransition, useEffect, useState } from "react";
+import { isThreadTurnActive } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
+import { hydrateThreadRuntimeItems } from "@/renderer/state/chatRuntimePersister";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 interface IdleCallbackHandle {
@@ -56,12 +58,25 @@ export function useAppHydration() {
       `[renderer] +${Date.now() - loadT0}ms: store hydrated, view=${JSON.stringify(restoredView)}, ${useAppStore.getState().projects.length} projects, ${useAppStore.getState().threads.length} threads`,
     );
 
-    startTransition(() => {
-      markThreadsInactiveOnLaunch();
-      purgeStaleArchivedThreads(30);
-      console.log(`[renderer] +${Date.now() - loadT0}ms: initialLoading = false`);
-      setInitialLoading(false);
-    });
+    void (async () => {
+      startTransition(() => {
+        markThreadsInactiveOnLaunch();
+        purgeStaleArchivedThreads(30);
+      });
+
+      const visibleGuiThreadIds = collectVisibleGuiThreadIds();
+      if (visibleGuiThreadIds.length > 0) {
+        await Promise.all(
+          visibleGuiThreadIds.map((threadId) => hydrateThreadRuntimeItems(threadId)),
+        );
+      }
+
+      if (!isActive) return;
+      startTransition(() => {
+        console.log(`[renderer] +${Date.now() - loadT0}ms: initialLoading = false`);
+        setInitialLoading(false);
+      });
+    })();
 
     const idleHandle = scheduleIdle(() => {
       if (!isActive) return;
@@ -140,4 +155,18 @@ export function useAppHydration() {
   }, [storeHydrated, initialLoading, updateThreadRuntime, view]);
 
   return { initialLoading, storeHydrated, loadT0 };
+}
+
+function collectVisibleGuiThreadIds(): string[] {
+  const state = useAppStore.getState();
+  if (state.view.kind !== "thread") return [];
+  const visibleThreadIds = new Set(state.view.panes);
+  return state.threads
+    .filter(
+      (thread) =>
+        visibleThreadIds.has(thread.id) &&
+        thread.presentationMode === "gui" &&
+        !isThreadTurnActive(thread.status),
+    )
+    .map((thread) => thread.id);
 }

@@ -18,7 +18,6 @@ vi.mock("@/renderer/bridge", () => ({
 
 describe("SubAgentOverlay", () => {
   beforeEach(() => {
-    localStorage.clear();
     mockBridge.subagentSubscribe.mockReset().mockResolvedValue({ history: [] });
     mockBridge.subagentUnsubscribe.mockReset().mockResolvedValue(undefined);
     useAppStore.setState({
@@ -61,9 +60,11 @@ describe("SubAgentOverlay", () => {
       throw new Error("missing subagent overlay header");
     }
 
-    expect(header).toHaveClass("h-7", "px-2", "gap-1.5");
+    expect(header).toHaveClass("px-2", "py-1", "gap-2");
+    expect(header).not.toHaveClass("bg-[var(--composer-surface)]");
+
     const closeButton = within(dialog).getByRole("button", { name: "Close subagent" });
-    expect(closeButton).toHaveClass("rounded", "p-0.5", "text-muted");
+    expect(closeButton).toHaveClass("rounded", "p-1", "text-muted/60");
 
     const icons = header.querySelectorAll("svg");
     expect(icons).toHaveLength(2);

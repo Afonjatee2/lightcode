@@ -285,7 +285,7 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     expect(state.runtimeItemsByIdByThread["t1"]?.["reason-1"]).toBeDefined();
   });
 
-  it("drops Copilot-style subagent children when the parent completes", () => {
+  it("preserves Copilot-style subagent children when the parent completes", () => {
     apply("t1", {
       type: "item.started",
       threadId: "t1",
@@ -318,8 +318,11 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
       payload: { status: "success" },
     });
     const state = store.getState();
-    expect(state.runtimeItemIdsByThread["t1"]).toEqual(["tool-parent"]);
-    expect(state.runtimeItemsByIdByThread["t1"]?.["child-1"]).toBeUndefined();
+    expect(state.runtimeItemIdsByThread["t1"]).toEqual(["tool-parent", "child-1"]);
+    expect(state.runtimeItemsByIdByThread["t1"]?.["child-1"]).toMatchObject({
+      id: "child-1",
+      parentItemId: "tool-parent",
+    });
   });
 
   it("opens and resolves runtime requests", () => {

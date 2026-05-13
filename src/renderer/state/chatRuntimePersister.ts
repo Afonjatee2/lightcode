@@ -6,6 +6,8 @@ import { canShareRuntimeToolGroup } from "./runtimeToolGrouping";
 import type { CompletedTurnRecord, RuntimeChatItem } from "./slices/runtimeEventSlice";
 
 const FLUSH_DEBOUNCE_MS = 300;
+const hydratedThreadRuntimeIds = new Set<string>();
+const pendingThreadRuntimeHydrations = new Map<string, Promise<boolean>>();
 
 /**
  * Persists per-thread canonical chat items to SQLite so the UI can hydrate
@@ -40,6 +42,13 @@ export function prepareRuntimeSnapshotForPersistence(
     items: compacted.items,
     turns: remapCompletedTurnAnchors(turns, compacted.anchorRemap),
   };
+}
+
+export function hasHydratedThreadRuntimeItems(threadId: string): boolean {
+  return (
+    hydratedThreadRuntimeIds.has(threadId) ||
+    Object.prototype.hasOwnProperty.call(useAppStore.getState().runtimeItemIdsByThread, threadId)
+  );
 }
 
 export function installRuntimeItemsPersister(): () => void {
@@ -123,6 +132,26 @@ export function installRuntimeItemsPersister(): () => void {
  * app restart.
  */
 export async function hydrateThreadRuntimeItems(threadId: string): Promise<void> {
+  if (hydratedThreadRuntimeIds.has(threadId)) return;
+  const pending = pendingThreadRuntimeHydrations.get(threadId);
+  if (pending) {
+    await pending;
+    return;
+  }
+
+  const hydration = hydrateThreadRuntimeItemsFromDb(threadId);
+  pendingThreadRuntimeHydrations.set(threadId, hydration);
+  try {
+    const completed = await hydration;
+    if (completed) {
+      hydratedThreadRuntimeIds.add(threadId);
+    }
+  } finally {
+    pendingThreadRuntimeHydrations.delete(threadId);
+  }
+}
+
+async function hydrateThreadRuntimeItemsFromDb(threadId: string): Promise<boolean> {
   const bridge = readBridge();
   const [itemsResult, turnsResult, contextResult] = await Promise.allSettled([
     Promise.resolve().then(() => bridge.dbGetThreadRuntimeItems(threadId)),
@@ -177,6 +206,12 @@ export async function hydrateThreadRuntimeItems(threadId: string): Promise<void>
       contextResult.reason,
     );
   }
+
+  return (
+    itemsResult.status !== "rejected" &&
+    turnsResult.status !== "rejected" &&
+    contextResult.status !== "rejected"
+  );
 }
 
 function remapCompletedTurnAnchors(
@@ -296,9 +331,10 @@ function summarizeToolCallNames(items: readonly RuntimeChatItem[]): string {
 }
 
 function isToolGroupItem(item: RuntimeChatItem): boolean {
-  // Sub-agent parents (e.g. Claude `Task`) carry the final result on their
-  // payload; if they got bundled into a tool-call summary the result would be
-  // lost and the overlay would have nothing to show after completion.
+  // Sub-agent children must stay as discrete rows so the overlay can replay
+  // them on reopen. Sub-agent parents carry the final result on their payload;
+  // bundling either into a tool-call summary would erase that history.
+  if (item.parentItemId) return false;
   if (item.type === "tool_call" && isSubAgentTool(item.payload as ToolCallPayload | undefined)) {
     return false;
   }

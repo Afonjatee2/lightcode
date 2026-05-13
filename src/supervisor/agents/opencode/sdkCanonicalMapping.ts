@@ -86,8 +86,12 @@ function suffixPrefixOverlap(emitted: string, full: string): number {
   return 0;
 }
 
+function normalizeToolName(toolName: string): string {
+  return toolName.trim().toLowerCase();
+}
+
 function classifyToolItemType(toolName: string): CanonicalItemType {
-  const n = toolName.toLowerCase();
+  const n = normalizeToolName(toolName);
   // OpenCode's todo tool is named `todowrite` (the legacy `todoread` may also
   // surface). Route both into the canonical `plan` item so the renderer picks
   // it up via `ThreadTodoDock` instead of a generic tool accordion.
@@ -102,6 +106,98 @@ function classifyToolItemType(toolName: string): CanonicalItemType {
     return "web_search";
   }
   return "tool_call";
+}
+
+function readStringField(
+  input: Record<string, unknown> | undefined,
+  ...keys: string[]
+): string | undefined {
+  if (!input) return undefined;
+  for (const key of keys) {
+    const value = input[key];
+    if (typeof value === "string" && value.trim().length > 0) return value.trim();
+  }
+  return undefined;
+}
+
+function readOpenCodePath(input: Record<string, unknown> | undefined): string | undefined {
+  return readStringField(
+    input,
+    "filePath",
+    "file_path",
+    "path",
+    "relativePath",
+    "relative_path",
+    "notebookPath",
+    "notebook_path",
+  );
+}
+
+function openCodeToolKind(
+  toolName: string,
+): "read" | "search" | "fetch" | "execute" | "other" | undefined {
+  switch (normalizeToolName(toolName)) {
+    case "read":
+      return "read";
+    case "glob":
+    case "grep":
+      return "search";
+    case "webfetch":
+      return "fetch";
+    case "bash":
+      return "execute";
+    case "question":
+    case "invalid":
+      return "other";
+    default:
+      return undefined;
+  }
+}
+
+function openCodeToolTitle(
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+  stateTitle: string | undefined,
+): string {
+  const title = stateTitle?.trim();
+  if (title) return title;
+
+  switch (normalizeToolName(toolName)) {
+    case "read":
+      return readOpenCodePath(input) ?? "Read";
+    case "glob":
+      return readStringField(input, "pattern", "glob") ?? "Glob";
+    case "grep": {
+      const pattern = readStringField(input, "pattern", "query", "needle");
+      const scope = readStringField(input, "path", "glob");
+      if (pattern && scope) return `"${pattern}" in ${scope}`;
+      return pattern ?? "Grep";
+    }
+    case "webfetch":
+      return readStringField(input, "url") ?? "Fetch";
+    case "skill":
+      return readStringField(input, "skill", "name") ?? "Skill";
+    case "task":
+      return readStringField(input, "description", "prompt") ?? "Agent";
+    default:
+      return toolName;
+  }
+}
+
+function openCodeToolLocations(
+  toolName: string,
+  input: Record<string, unknown> | undefined,
+): Array<{ path: string }> | undefined {
+  const n = normalizeToolName(toolName);
+  if (n === "read") {
+    const path = readOpenCodePath(input);
+    return path ? [{ path }] : undefined;
+  }
+  if (n === "grep") {
+    const path = readStringField(input, "path");
+    return path ? [{ path }] : undefined;
+  }
+  return undefined;
 }
 
 /**
@@ -173,28 +269,43 @@ function toolPayload(
   itemType: CanonicalItemType,
   toolName: string,
   state: ToolState,
+  partMetadata?: Record<string, unknown>,
 ): Record<string, unknown> {
   const status = toolStateStatus(state);
-  const title =
-    "title" in state && typeof state.title === "string" && state.title.length > 0
-      ? state.title
-      : toolName;
+  const input = state.input as Record<string, unknown> | undefined;
+  const title = openCodeToolTitle(
+    toolName,
+    input,
+    "title" in state && typeof state.title === "string" ? state.title : undefined,
+  );
   const result =
     state.status === "completed"
       ? state.output
       : state.status === "error"
         ? state.error
         : undefined;
+  const metadata =
+    "metadata" in state && state.metadata && typeof state.metadata === "object"
+      ? (state.metadata as Record<string, unknown>)
+      : partMetadata;
+  const errorMessage = state.status === "error" ? state.error : undefined;
+  const kind = openCodeToolKind(toolName);
+  const locations = openCodeToolLocations(toolName, input);
   const base: Record<string, unknown> = {
-    name: title,
-    args: state.input,
+    name: normalizeToolName(toolName) === "skill" ? "Skill" : title,
+    args: input,
     status,
+    ...(title !== toolName ? { title } : {}),
+    ...(kind ? { kind } : {}),
+    ...(locations ? { locations } : {}),
     ...(result !== undefined ? { result } : {}),
+    ...(errorMessage ? { errorMessage } : {}),
+    ...(metadata ? { metadata } : {}),
   };
 
   if (itemType === "command_execution") {
-    const command = typeof state.input?.command === "string" ? state.input.command : "";
-    const cwd = typeof state.input?.cwd === "string" ? state.input.cwd : undefined;
+    const command = readStringField(input, "command", "cmd") ?? "";
+    const cwd = readStringField(input, "cwd");
     const md =
       (state.status === "completed" || state.status === "error"
         ? (state.metadata as Record<string, unknown> | undefined)
@@ -215,15 +326,12 @@ function toolPayload(
       ...(cwd ? { cwd } : {}),
       ...(durationMs !== undefined ? { durationMs } : {}),
       ...(exitCode !== undefined ? { exitCode } : {}),
+      ...(errorMessage ? { errorMessage } : {}),
     };
   }
   if (itemType === "file_change") {
-    const path = readFileChangePath(state.input, result, title) ?? "";
-    const diffSummary = readDiffSummary(
-      state.input,
-      result,
-      "metadata" in state ? state.metadata : undefined,
-    );
+    const path = readFileChangePath(input, result, metadata, partMetadata, title) ?? "";
+    const diffSummary = readDiffSummary(input, result, metadata, partMetadata);
     return {
       ...base,
       // OpenCode's edit/write tools overwrite `state.title` on completion
@@ -243,11 +351,8 @@ function toolPayload(
   }
   if (itemType === "web_search") {
     const query =
-      typeof state.input?.query === "string"
-        ? state.input.query
-        : typeof state.input?.q === "string"
-          ? state.input.q
-          : "";
+      readStringField(input, "query", "q", "url") ??
+      (normalizeToolName(toolName) === "webfetch" ? title : "");
     return { ...base, query };
   }
   if (itemType === "plan") {
@@ -255,6 +360,9 @@ function toolPayload(
     // would fail schema validation, so the plan branch returns the canonical
     // shape directly. The dock reads `steps`, the runtime ignores the rest.
     return { steps: extractOpenCodePlanSteps(state.input as Record<string, unknown> | undefined) };
+  }
+  if (normalizeToolName(toolName) === "task") {
+    return { ...base, name: "Agent", isSubAgent: true };
   }
   return base;
 }
@@ -396,7 +504,7 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
     const existing = state.toolItems.get(part.id);
     const itemType = existing?.itemType ?? classifyToolItemType(part.tool);
     const itemId = existing?.itemId ?? newItemId("tool");
-    const payload = toolPayload(itemType, part.tool, part.state);
+    const payload = toolPayload(itemType, part.tool, part.state, part.metadata);
     if (!existing) {
       state.toolItems.set(part.id, { itemId, itemType });
       events.push({
@@ -439,7 +547,7 @@ function classifyPermissionRequestType(req: PermissionRequest): CanonicalRequest
     case "read":
       return "file_change_approval";
     default:
-      return "tool_user_input";
+      return "command_execution_approval";
   }
 }
 

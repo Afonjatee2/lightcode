@@ -40,6 +40,7 @@ import {
   defaultFormatPromptSegments,
   getWslCommand,
   injectWslEnv,
+  primeProjectShellEnv,
   resolveLaunchSpec,
 } from "../agents/base";
 import type { WindowsShellPreference } from "../shellPreference";
@@ -312,22 +313,31 @@ export class ThreadSessionManager {
         return;
       }
     }
-    this.appendPendingRuntimeEvent(threadId, event);
-    // When a sub-agent parent completes, drop its buffer + subscription state
-    // — the renderer evicts the children locally and reads the final result
-    // from the parent's payload. Detected by checking whether this completed
-    // itemId is a known sub-agent parent (has a buffer/subscription keyed to
-    // it). Children themselves return early via the gating branch above and
-    // never reach this point.
+    // When a sub-agent parent completes, drain any buffered child events
+    // BEFORE the parent's `item.completed` reaches the renderer. This way the
+    // renderer receives the full child step trail even when the overlay was
+    // never opened during the run, and persists it alongside the parent so
+    // the overlay can replay every turn on demand (live + later reopen).
+    // Children themselves return early via the gating branch above and never
+    // reach this point.
     if (event.type === "item.completed") {
       const itemId = (event as { itemId?: unknown }).itemId;
       if (typeof itemId === "string") {
         const key = subAgentKey(threadId, itemId);
+        const buffered = this.subAgentBuffers.get(key);
+        if (buffered && buffered.length > 0) {
+          for (const bufferedEvent of buffered) {
+            this.appendPendingRuntimeEvent(threadId, bufferedEvent);
+          }
+        }
+        this.appendPendingRuntimeEvent(threadId, event);
         if (this.subscribedSubAgents.has(key) || this.subAgentBuffers.has(key)) {
           this.clearSubAgentState(threadId, itemId);
         }
+        return;
       }
     }
+    this.appendPendingRuntimeEvent(threadId, event);
   }
 
   private appendPendingRuntimeEvent(threadId: string, event: RuntimeEvent): void {
@@ -392,8 +402,9 @@ export class ThreadSessionManager {
 
   /**
    * Renderer-facing: unsubscribe a sub-agent overlay. Subsequent child events
-   * are buffered again until the parent completes (which drops the buffer
-   * along with any state for that parent).
+   * are buffered again until the parent completes, at which point the buffer
+   * is flushed to the renderer so the overlay can replay every turn even if
+   * it was closed while the sub-agent ran.
    */
   subagentUnsubscribe(payload: { threadId: string; parentItemId: string }): void {
     this.subscribedSubAgents.delete(subAgentKey(payload.threadId, payload.parentItemId));
@@ -414,9 +425,9 @@ export class ThreadSessionManager {
 
   /**
    * Drop all sub-agent state for a parent: subscription, buffered events, and
-   * its child→parent index entries. Called when the parent `tool_call`
-   * completes — at that point the renderer evicts children and reads the
-   * final result from the parent payload.
+   * its child→parent index entries. Called after the parent `tool_call`
+   * completes — any buffered children are flushed to the renderer first by
+   * `enqueueRuntimeEvent`, so clearing here only sheds bookkeeping state.
    */
   private clearSubAgentState(threadId: string, parentItemId: string): void {
     const key = subAgentKey(threadId, parentItemId);
@@ -912,6 +923,13 @@ export class ThreadSessionManager {
       this.safeShellPtyKill(existing);
     }
 
+    // Capture project-scoped shell env (fnm / nvm / asdf / mise cd-hooks
+    // fire when the prime probe runs inside the project root) so the
+    // user's pinned Node/Python/Ruby are on PATH before the PTY spawns.
+    if (payload.projectLocation.kind === "posix") {
+      await primeProjectShellEnv(payload.projectLocation.path);
+    }
+
     const shellCommand = this.buildShellCommand(payload.projectLocation);
     this.options.emit({ type: "thread-reset", threadId: payload.shellId });
     const terminalEnv = resolveTerminalColorEnv(payload.projectLocation);
@@ -1394,6 +1412,9 @@ export class ThreadSessionManager {
         launchPrompt,
         payload.sessionRef,
       );
+    }
+    if (payload.projectLocation.kind === "posix") {
+      await primeProjectShellEnv(payload.projectLocation.path);
     }
     const command = resolveLaunchSpec(payload.projectLocation, argv);
 
@@ -1880,6 +1901,9 @@ export class ThreadSessionManager {
         session.sessionRef,
       );
     }
+    if (session.projectLocation.kind === "posix") {
+      await primeProjectShellEnv(session.projectLocation.path);
+    }
     const command = resolveLaunchSpec(session.projectLocation, argv);
 
     const keepStructuredSession = structuredSession && useStructuredFlow;
@@ -1943,6 +1967,9 @@ export class ThreadSessionManager {
           cliHookExtras.extraArgs,
           session.launchPrompt,
         );
+      }
+      if (session.projectLocation.kind === "posix") {
+        await primeProjectShellEnv(session.projectLocation.path);
       }
       const command = resolveLaunchSpec(session.projectLocation, argv);
 

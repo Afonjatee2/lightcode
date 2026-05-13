@@ -8,6 +8,8 @@ export type ChatPaneActions = {
   /** Reveal a file or folder in the OS file explorer (Finder/Explorer/Nautilus). */
   showProjectEntryInExplorer: (path: string) => void;
   onContentHeightChange: () => void;
+  isStickToBottom?: () => boolean;
+  registerVirtualScrollToBottom?: (handler: (() => void) | null) => void;
   projectLocation: ProjectLocation;
   /**
    * Top-level entry names for the chat's project, used to validate path-like

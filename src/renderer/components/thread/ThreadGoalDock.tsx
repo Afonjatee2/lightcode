@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
-import { Target, X } from "lucide-react";
+import { CircleCheckBig, Target, X } from "lucide-react";
 import type { ThreadGoalDockState } from "./threadGoalState";
 import { ThreadDockSection } from "./ThreadDockUI";
 import { formatElapsed } from "./ChatPane/formatElapsed";
@@ -14,6 +14,7 @@ export function ThreadGoalDock({ state, onDismiss }: ThreadGoalDockProps) {
   const [localAnchorSeconds, setLocalAnchorSeconds] = useState(() => Date.now() / 1000);
   const [nowSeconds, setNowSeconds] = useState(() => Date.now() / 1000);
   const isActive = state.status === "active";
+  const isComplete = state.status === "complete";
 
   useEffect(() => {
     const now = Date.now() / 1000;
@@ -28,18 +29,30 @@ export function ThreadGoalDock({ state, onDismiss }: ThreadGoalDockProps) {
   }, [isActive]);
 
   const elapsedSeconds = resolveGoalElapsedSeconds(state, nowSeconds, localAnchorSeconds);
-  const meta = goalMeta(state, elapsedSeconds);
+  const meta = goalMeta(state);
+  const elapsedLabel = elapsedSeconds > 0 ? formatElapsed(elapsedSeconds) : null;
+  const hasMeta = meta.length > 0;
+  const StatusIcon = isComplete ? CircleCheckBig : Target;
+  const statusIconClass = isComplete
+    ? "text-success"
+    : isActive
+      ? "text-accent"
+      : "text-foreground-muted";
 
   return (
     <ThreadDockSection ariaLabel="Thread goal dock" className="px-2 py-1">
       <div className="flex min-w-0 items-center gap-2 leading-5">
-        <Target
-          className={`size-3.5 shrink-0 ${isActive ? "text-accent" : "text-foreground-muted"}`}
-        />
+        <StatusIcon className={`size-3.5 shrink-0 ${statusIconClass}`} />
         <span className="shrink-0 font-semibold text-foreground">Goal</span>
-        {meta.length > 0 ? (
-          <span className="min-w-0 shrink text-[0.85em] text-[color:var(--muted)]">
-            {meta.join(" · ")}
+        {hasMeta || elapsedLabel ? (
+          <span className="flex min-w-0 shrink items-center gap-1 text-[0.85em] text-[color:var(--muted)] [font-variant-numeric:tabular-nums]">
+            {hasMeta ? <span className="truncate">{meta.join(" · ")}</span> : null}
+            {hasMeta && elapsedLabel ? <span aria-hidden="true">·</span> : null}
+            {elapsedLabel ? (
+              <span className="inline-block shrink-0" style={{ minWidth: "7ch" }}>
+                {elapsedLabel}
+              </span>
+            ) : null}
           </span>
         ) : null}
         <span className="h-3 w-px shrink-0 bg-[color:var(--border)]" />
@@ -100,7 +113,7 @@ function GoalObjectiveText({ objective }: { objective: string }) {
   );
 }
 
-function goalMeta(state: ThreadGoalDockState, elapsedSeconds: number): string[] {
+function goalMeta(state: ThreadGoalDockState): string[] {
   const details: string[] = [];
   if (state.status !== "active") details.push(goalStatusLabel(state.status));
   if (state.tokenBudget != null) {
@@ -110,7 +123,6 @@ function goalMeta(state: ThreadGoalDockState, elapsedSeconds: number): string[] 
   } else if (state.tokensUsed !== undefined && state.tokensUsed > 0) {
     details.push(`${formatTokenCount(state.tokensUsed)} tokens`);
   }
-  if (elapsedSeconds > 0) details.push(formatElapsed(elapsedSeconds));
   return details;
 }
 
