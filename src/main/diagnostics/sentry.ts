@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/electron/main";
 import { app } from "electron";
 import {
   sanitizeSentryEvent,
@@ -20,10 +19,32 @@ const DISABLED_INTEGRATIONS = new Set([
   "Screenshots",
 ]);
 
+type MainSentryModule = typeof import("@sentry/electron/main");
+
+let mainSentry: MainSentryModule | null | undefined;
+
 export type MainSentryOptions = {
   appVersion: string;
   isDev: boolean;
 };
+
+function loadMainSentry(): MainSentryModule | null {
+  if (mainSentry !== undefined) {
+    return mainSentry;
+  }
+
+  try {
+    mainSentry = require("@sentry/electron/main") as MainSentryModule;
+  } catch (error) {
+    mainSentry = null;
+    console.warn(
+      "[lightcode] Sentry main process integration unavailable:",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  return mainSentry;
+}
 
 function readSentryDsn(): string | null {
   const dsn = process.env.SENTRY_DSN || readBuildSentryDsn();
@@ -66,6 +87,11 @@ export function initializeMainSentry(options: MainSentryOptions): boolean {
     return false;
   }
 
+  const Sentry = loadMainSentry();
+  if (!Sentry) {
+    return false;
+  }
+
   Sentry.init({
     dsn,
     release: `lightcode@${options.appVersion}`,
@@ -102,6 +128,8 @@ export function initializeMainSentry(options: MainSentryOptions): boolean {
 }
 
 export function captureMainException(error: unknown, tags?: LightcodeDiagnosticTags): void {
+  const Sentry = loadMainSentry();
+  if (!Sentry) return;
   if (!Sentry.isEnabled()) return;
   Sentry.withScope((scope) => {
     if (tags) {

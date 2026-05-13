@@ -17,3 +17,26 @@ onlyBuiltDependencies:
   - electron-winstaller
   - esbuild
   - node-pty
+
+# @sentry/electron's main-process bundle eagerly requires @sentry/node, which
+# requires @opentelemetry/* via bare paths. Under pnpm's nested layout
+# electron-builder does not traverse those into the asar. Public-hoisting
+# pins them to top-level node_modules so the default packaging traversal
+# picks them up.
+publicHoistPattern:
+  - "@opentelemetry/*"
+  - "@sentry/*"
+  - "@sentry-internal/*"
+  - "@fastify/otel"
+  - "@prisma/instrumentation"
+  - "import-in-the-middle"
+  - "require-in-the-middle"
+  - "acorn"
+  - "acorn-import-attributes"
+  - "cjs-module-lexer"
+  - "module-details-from-path"
+
+# Force electron-builder to traverse symlinked transitive deps under pnpm's
+# nested layout. Without this, deep deps like @opentelemetry/* are not copied
+# into the asar even when listed in `files`.
+nodeLinker: hoisted

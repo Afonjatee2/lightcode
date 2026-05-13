@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/node";
 import {
   sanitizeSentryEvent,
   type LightcodeDiagnosticTags,
@@ -9,10 +8,32 @@ import {
   readBuildSentryEnvironment,
 } from "@/shared/diagnostics/sentryBuildConfig";
 
+type SupervisorSentryModule = typeof import("@sentry/node");
+
+let supervisorSentry: SupervisorSentryModule | null | undefined;
+
 export type SupervisorSentryOptions = {
   appVersion: string;
   isDev: boolean;
 };
+
+function loadSupervisorSentry(): SupervisorSentryModule | null {
+  if (supervisorSentry !== undefined) {
+    return supervisorSentry;
+  }
+
+  try {
+    supervisorSentry = require("@sentry/node") as SupervisorSentryModule;
+  } catch (error) {
+    supervisorSentry = null;
+    console.warn(
+      "[lightcode] Sentry supervisor integration unavailable:",
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+
+  return supervisorSentry;
+}
 
 function readSentryDsn(): string | null {
   const dsn = process.env.SENTRY_DSN || readBuildSentryDsn();
@@ -43,6 +64,11 @@ export function initializeSupervisorSentry(options: SupervisorSentryOptions): bo
     return false;
   }
 
+  const Sentry = loadSupervisorSentry();
+  if (!Sentry) {
+    return false;
+  }
+
   Sentry.init({
     dsn,
     release: `lightcode@${options.appVersion}`,
@@ -70,6 +96,8 @@ export function initializeSupervisorSentry(options: SupervisorSentryOptions): bo
 }
 
 export function captureSupervisorException(error: unknown, tags?: LightcodeDiagnosticTags): void {
+  const Sentry = loadSupervisorSentry();
+  if (!Sentry) return;
   if (!Sentry.isEnabled()) return;
   Sentry.withScope((scope) => {
     if (tags) {
@@ -80,6 +108,8 @@ export function captureSupervisorException(error: unknown, tags?: LightcodeDiagn
 }
 
 export async function flushSupervisorSentry(timeoutMs = 2000): Promise<void> {
+  const Sentry = loadSupervisorSentry();
+  if (!Sentry) return;
   if (!Sentry.isEnabled()) return;
   await Sentry.flush(timeoutMs);
 }

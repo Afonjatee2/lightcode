@@ -118,7 +118,7 @@ export function CommitSyncPanel(props: {
                     ) : (
                       <Lock className="size-3.5" />
                     )}
-                    {hasRemote ? "Commit + push" : "Commit"}
+                    {hasRemote ? "Commit & Push" : "Commit"}
                   </>
                 )}
               </Button>
@@ -153,11 +153,11 @@ export function CommitSyncPanel(props: {
                       {hasRemote ? (
                         <Dropdown.Item
                           id="commit-only"
-                          textValue="Commit only"
+                          textValue="Commit"
                           isDisabled={!canCommitStaged}
                         >
                           <Lock className="size-3.5" />
-                          <Label>Commit only</Label>
+                          <Label>Commit</Label>
                         </Dropdown.Item>
                       ) : null}
                       {showPullFromSource ? (

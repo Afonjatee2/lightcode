@@ -34,6 +34,21 @@ files:
   - node_modules/.pnpm/lodash.isequal@*/node_modules/**/*
   - node_modules/.pnpm/semver@*/node_modules/**/*
   - node_modules/.pnpm/tiny-typed-emitter@*/node_modules/**/*
+  # @sentry/electron pulls @sentry/node which eagerly requires @opentelemetry/*
+  # and friends at import time. Those packages live deep under .pnpm/ and are
+  # not traversed into the asar by electron-builder. `.npmrc` public-hoists
+  # them to top-level node_modules so the default node_modules pattern picks
+  # them up.
+  - node_modules/@opentelemetry/**/*
+  - node_modules/@sentry-internal/**/*
+  - node_modules/@fastify/otel/**/*
+  - node_modules/@prisma/instrumentation/**/*
+  - node_modules/import-in-the-middle/**/*
+  - node_modules/require-in-the-middle/**/*
+  - node_modules/acorn/**/*
+  - node_modules/acorn-import-attributes/**/*
+  - node_modules/cjs-module-lexer/**/*
+  - node_modules/module-details-from-path/**/*
   # Renderer-only packages — Vite already bundles them into dist/renderer/.
   # Excluding the source copies trims ~10k entries from the asar.
   - "!node_modules/monaco-editor/**/*"
