@@ -30,7 +30,6 @@ function buildCodexArgs(
   if (enableGoals) {
     args.push("--enable", CODEX_GOALS_FEATURE_FLAG);
   }
-  args.push("--no-alt-screen");
 
   // OSC 9 TUI notifications — L2 status when hooks are unavailable (always-on).
   // `tui.notifications = true` enables all notification event types; array = allowlist only.

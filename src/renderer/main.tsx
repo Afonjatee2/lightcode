@@ -1,8 +1,14 @@
-import { createRoot } from "react-dom/client";
-import { App } from "./app";
+import { createRoot, type Root } from "react-dom/client";
 import "./styles.css";
 import { readBridge } from "./bridge";
 import { getAppName } from "@/shared/appName";
+import {
+  createRendererCrashReport,
+  RendererCrashScreen,
+  RendererErrorBoundary,
+  type RendererCrashKind,
+  type RendererCrashReport,
+} from "./RendererCrashScreen";
 
 if (import.meta.env.DEV) {
   const warn = console.warn.bind(console);
@@ -22,13 +28,17 @@ if (import.meta.env.DEV) {
 
 document.title = getAppName(import.meta.env.DEV);
 
-document.documentElement.dataset.platform = readBridge().platform;
+document.documentElement.dataset.platform =
+  typeof window !== "undefined" && "lightcode" in window ? readBridge().platform : "unknown";
 
 const root = document.getElementById("root");
 
 if (!root) {
   throw new Error("Root element not found.");
 }
+
+let reactRoot: Root | null = null;
+let renderingCrashScreen = false;
 
 function reportRootError(
   kind: "caught" | "uncaught" | "recoverable",
@@ -46,14 +56,72 @@ function reportRootError(
   console.error(prefix, error, componentStack ?? "");
 }
 
-createRoot(root, {
+function renderCrashScreen(report: RendererCrashReport): void {
+  if (renderingCrashScreen) return;
+  renderingCrashScreen = true;
+  console.error(`[lightcode][renderer:${report.kind}]`, report);
+  try {
+    reactRoot?.render(<RendererCrashScreen report={report} />);
+  } finally {
+    renderingCrashScreen = false;
+  }
+}
+
+function buildSource(event: ErrorEvent): string | undefined {
+  if (!event.filename) return undefined;
+  const suffix =
+    event.lineno > 0 ? `:${event.lineno}${event.colno > 0 ? `:${event.colno}` : ""}` : "";
+  return `${event.filename}${suffix}`;
+}
+
+function showCrash(kind: RendererCrashKind, error: unknown, source?: string): void {
+  renderCrashScreen(
+    createRendererCrashReport({
+      kind,
+      error,
+      ...(source ? { source } : {}),
+    }),
+  );
+}
+
+window.addEventListener("error", (event) => {
+  if (!(event instanceof ErrorEvent)) return;
+  showCrash("uncaught", event.error ?? event.message, buildSource(event));
+});
+
+window.addEventListener("unhandledrejection", (event) => {
+  showCrash("unhandled-rejection", event.reason);
+});
+
+reactRoot = createRoot(root, {
   onCaughtError(error, errorInfo) {
     reportRootError("caught", error, errorInfo);
   },
   onUncaughtError(error, errorInfo) {
     reportRootError("uncaught", error, errorInfo);
+    renderCrashScreen(
+      createRendererCrashReport({
+        kind: "react",
+        error,
+        ...(errorInfo.componentStack?.trim()
+          ? { componentStack: errorInfo.componentStack.trim() }
+          : {}),
+      }),
+    );
   },
   onRecoverableError(error, errorInfo) {
     reportRootError("recoverable", error, errorInfo);
   },
-}).render(<App />);
+});
+
+void import("./app")
+  .then(({ App }) => {
+    reactRoot?.render(
+      <RendererErrorBoundary>
+        <App />
+      </RendererErrorBoundary>,
+    );
+  })
+  .catch((error: unknown) => {
+    showCrash("bootstrap", error);
+  });

@@ -45,6 +45,7 @@ import {
   createClaudeMapperState,
   mapClaudePermissionRequest,
   mapClaudeQuestionRequest,
+  mapClaudeContextUsageResponse,
   mapClaudeSdkMessage,
   nonDiagnosticErrors,
   parseClaudeQuestions,
@@ -728,6 +729,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     const events = mapClaudeSdkMessage(message, this.mapperState);
     this.emitRuntimeEvents(events);
     if (message.type === "result") {
+      void this.refreshContextUsage();
       const wasInterrupted = this.interruptInFlight || isInterruptedResult(message);
       this.interruptInFlight = false;
       const remaining = nonDiagnosticErrors(message);
@@ -743,6 +745,20 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         ...(errorMessage ? { errorMessage } : {}),
         ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
       });
+    }
+  }
+
+  private async refreshContextUsage(): Promise<void> {
+    try {
+      const runtime = this.queryRuntime;
+      if (!runtime) return;
+      const usage = await runtime.getContextUsage();
+      if (this.disposed) return;
+      const event = mapClaudeContextUsageResponse(this.input.threadId, usage);
+      if (event) this.emitRuntimeEvents([event]);
+    } catch {
+      // Older transports can reject this control call. In that case, keep the
+      // existing context state instead of emitting billing-token totals as usage.
     }
   }
 

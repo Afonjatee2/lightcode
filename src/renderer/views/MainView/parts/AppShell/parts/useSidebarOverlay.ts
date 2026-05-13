@@ -34,15 +34,17 @@ export function useSidebarOverlayEffects(opts: {
   sidebarWidth: number;
   shellRef: RefObject<HTMLDivElement | null>;
   mainRef: RefObject<HTMLElement | null>;
+  disabled?: boolean;
   onRequestClosePanels?: (() => void) | undefined;
 }) {
-  const { sidebarWidth, shellRef, mainRef, onRequestClosePanels } = opts;
+  const { sidebarWidth, shellRef, mainRef, disabled = false, onRequestClosePanels } = opts;
   const didAutoHideRef = useRef<"panels" | "sidebar" | null>(null);
   const onRequestClosePanelsRef = useRef(onRequestClosePanels);
   onRequestClosePanelsRef.current = onRequestClosePanels;
 
   // Shell width → isNarrow (drives the overlay flag).
   useEffect(() => {
+    if (disabled) return;
     const el = shellRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
@@ -55,10 +57,11 @@ export function useSidebarOverlayEffects(opts: {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [sidebarWidth, shellRef]);
+  }, [disabled, sidebarWidth, shellRef]);
 
   // Main width → auto-hide panels first, then sidebar, when content is squeezed.
   useEffect(() => {
+    if (disabled) return;
     const el = mainRef.current;
     if (!el) return;
     const ro = new ResizeObserver((entries) => {
@@ -82,7 +85,7 @@ export function useSidebarOverlayEffects(opts: {
     });
     ro.observe(el);
     return () => ro.disconnect();
-  }, [mainRef]);
+  }, [disabled, mainRef]);
 
   // shouldOverlay → overlayReady, with two rafs of delay (matches the
   // original behaviour: the overlay element mounts at translateX(-full),

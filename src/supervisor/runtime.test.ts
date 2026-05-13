@@ -7,6 +7,7 @@ import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import type { SessionRuntime } from "./runtime/sessionTypes";
 
 const taskkillSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
+const terminfoSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
 const ptySpawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
 const appendFileMock = vi.hoisted(() =>
   vi.fn<(path: string, data: string, encoding: string) => Promise<void>>(),
@@ -19,6 +20,10 @@ vi.mock("node:child_process", async (importActual) => {
     spawnSync: ((command, args, options) => {
       if (command === "taskkill") {
         return taskkillSpawnSyncMock(command, args, options);
+      }
+      const argv = Array.isArray(args) ? args.join(" ") : "";
+      if (command === "infocmp" || argv.includes("infocmp -x xterm-ghostty")) {
+        return terminfoSpawnSyncMock(command, args, options) ?? { status: 1 };
       }
       return actual.spawnSync(command, args, options);
     }) as typeof actual.spawnSync,
@@ -82,6 +87,10 @@ afterEach(() => {
   } else {
     process.env.LIGHTCODE_DATA_DIR = lightcodeDataDirBeforeTests;
   }
+  terminfoSpawnSyncMock.mockReset();
+  taskkillSpawnSyncMock.mockReset();
+  ptySpawnMock.mockReset();
+  appendFileMock.mockReset();
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -1144,8 +1153,83 @@ describe("writeSubmittedPrompt", () => {
       string[],
       { env: Record<string, string> },
     ];
+    expect(spawnOpts.env.TERM).toBe("xterm-256color");
+    expect(spawnOpts.env.COLORTERM).toBe("truecolor");
     expect(spawnOpts.env.TERM_PROGRAM).toBe("iTerm.app");
     expect(spawnOpts.env.TERM_PROGRAM_VERSION).toBe("3.6.6");
+  });
+
+  it("uses xterm-ghostty when the terminfo entry is available", () => {
+    terminfoSpawnSyncMock.mockReturnValue({ status: 0 });
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+    writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
+
+    const runtime = new SupervisorRuntime(() => undefined);
+    const pty = createMockPty();
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: { kind: "posix"; path: string };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          command: { command: string; args: string[] };
+        }) => unknown;
+      }
+    ).spawnThread({
+      threadId: "thread-ghostty-term",
+      agentKind: "codex",
+      adapter: {
+        kind: "codex",
+        label: "Codex",
+        capabilities: {
+          models: [{ id: "gpt-5.5", label: "GPT-5.5" }],
+          efforts: ["medium"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+        },
+        createInitialSessionRef: vi.fn<() => undefined>().mockReturnValue(undefined),
+        buildLaunchArgv: vi.fn<() => void>(),
+        buildResumeArgv: vi.fn<() => void>(),
+      },
+      projectLocation: {
+        kind: "posix",
+        path: "/repo",
+      },
+      config: {
+        model: "gpt-5.5",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      command: {
+        command: "codex",
+        args: [],
+      },
+    });
+
+    const [, , spawnOpts] = ptySpawnMock.mock.calls[0] as [
+      string,
+      string[],
+      { name: string; env: Record<string, string> },
+    ];
+    expect(spawnOpts.name).toBe("xterm-ghostty");
+    expect(spawnOpts.env.TERM).toBe("xterm-ghostty");
+    expect(spawnOpts.env.COLORTERM).toBe("truecolor");
   });
 
   it("does not spoof an iTerm terminal for Claude while hooks are active", () => {
@@ -1492,7 +1576,7 @@ describe("writeSubmittedPrompt", () => {
     });
 
     const adapter = {
-      kind: "codex" as const,
+      kind: "generic-gui" as const,
       label: "Codex",
       capabilities: {
         models: [{ id: "gpt-5.4", label: "5.4" }],
@@ -1509,7 +1593,7 @@ describe("writeSubmittedPrompt", () => {
       },
       detectInstall: vi.fn<() => void>(),
       buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
-        binary: "codex",
+        binary: "generic-gui",
         args: ["should-not-spawn"],
       })),
       buildResumeArgv: vi.fn<() => void>(),
@@ -1586,6 +1670,235 @@ describe("writeSubmittedPrompt", () => {
         providerSessionId: "session-1",
       },
     });
+  });
+
+  it("lets a quick stop close an optimistic GUI launch turn before provider output", async () => {
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    let runtimeListener: { onUpdate(update: Record<string, unknown>): void } | undefined;
+    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const interruptTurn = vi.fn<() => Promise<void>>(async () => {
+      runtimeListener?.onUpdate({ status: "idle", attention: "none" });
+    });
+    const setListener = vi.fn<
+      (listener: { onUpdate(update: Record<string, unknown>): void }) => void
+    >((listener) => {
+      runtimeListener = listener;
+      listener.onUpdate({
+        status: "idle",
+        attention: "none",
+        sessionRef: {
+          providerSessionId: "session-1",
+          discoveredAt: "2026-05-10T12:00:00.000Z",
+        },
+      });
+    });
+
+    const adapter = {
+      kind: "generic-gui" as const,
+      label: "Generic GUI Provider",
+      capabilities: {
+        models: [{ id: "gpt-5.4", label: "5.4" }],
+        efforts: ["high"],
+        modelEfforts: {},
+        modes: ["agent"],
+        approvalPolicies: [{ id: "on-request", label: "On Request" }],
+        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "terminal" as const,
+        presentationMode: "terminal" as const,
+        presentationModes: ["terminal", "gui"] as const,
+      },
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "generic-gui",
+        args: ["should-not-spawn"],
+      })),
+      buildResumeArgv: vi.fn<() => void>(),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+      createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>().mockResolvedValue({
+        launchOptions: { suppressResumeConfigOverrides: true, resumeThreadId: "session-1" },
+        activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        openThread: vi.fn<() => Promise<string>>().mockResolvedValue("session-1"),
+        startTurn,
+        interruptTurn,
+        setListener,
+        dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      }),
+    };
+
+    (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+      "generic-gui",
+      adapter,
+    );
+
+    await runtime.startThread({
+      threadId: "thread-gui-quick-stop",
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      agentKind: "generic-gui",
+      config: {
+        model: "gpt-5.4",
+      },
+      prompt: "hi",
+      presentationMode: "gui",
+      initialSize: {
+        cols: 132,
+        rows: 42,
+      },
+    });
+
+    emitted.length = 0;
+    await runtime.interruptThread({ threadId: "thread-gui-quick-stop" });
+
+    expect(interruptTurn).toHaveBeenCalledTimes(1);
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-gui-quick-stop",
+        status: "idle",
+        attention: "none",
+      }),
+    );
+  });
+
+  it("queues stop during GUI startup before the provider session exists", async () => {
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = new SupervisorRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    let resolveStructuredSession:
+      | ((session: {
+          launchOptions: Record<string, never>;
+          activate: () => Promise<void>;
+          openThread: () => Promise<string>;
+          startTurn: () => Promise<void>;
+          interruptTurn: () => Promise<void>;
+          setListener: (listener: { onUpdate(update: Record<string, unknown>): void }) => void;
+          dispose: () => Promise<void>;
+        }) => void)
+      | undefined;
+    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const interruptTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const setListener =
+      vi.fn<(listener: { onUpdate(update: Record<string, unknown>): void }) => void>();
+    const structuredSessionPromise = new Promise<{
+      launchOptions: Record<string, never>;
+      activate: () => Promise<void>;
+      openThread: () => Promise<string>;
+      startTurn: () => Promise<void>;
+      interruptTurn: () => Promise<void>;
+      setListener: (listener: { onUpdate(update: Record<string, unknown>): void }) => void;
+      dispose: () => Promise<void>;
+    }>((resolve) => {
+      resolveStructuredSession = resolve;
+    });
+
+    const adapter = {
+      kind: "generic-gui" as const,
+      label: "Generic GUI Provider",
+      capabilities: {
+        models: [{ id: "model-a", label: "Model A" }],
+        efforts: ["high"],
+        modelEfforts: {},
+        modes: ["agent"],
+        approvalPolicies: [{ id: "on-request", label: "On Request" }],
+        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "terminal" as const,
+        presentationMode: "terminal" as const,
+        presentationModes: ["terminal", "gui"] as const,
+      },
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "generic-gui",
+        args: ["should-not-spawn"],
+      })),
+      buildResumeArgv: vi.fn<() => void>(),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+      createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>(
+        () => structuredSessionPromise,
+      ),
+    };
+
+    (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+      "generic-gui",
+      adapter,
+    );
+
+    const startPromise = runtime.startThread({
+      threadId: "thread-gui-pre-session-stop",
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      agentKind: "generic-gui",
+      config: {
+        model: "model-a",
+      },
+      prompt: "hi",
+      presentationMode: "gui",
+      initialSize: {
+        cols: 132,
+        rows: 42,
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-gui-pre-session-stop",
+        status: "working",
+      }),
+    );
+
+    emitted.length = 0;
+    await runtime.interruptThread({ threadId: "thread-gui-pre-session-stop" });
+
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-gui-pre-session-stop",
+        status: "idle",
+        attention: "none",
+        forceCloseActiveTurn: true,
+      }),
+    );
+
+    resolveStructuredSession?.({
+      launchOptions: {},
+      activate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      openThread: vi.fn<() => Promise<string>>().mockResolvedValue("session-1"),
+      startTurn,
+      interruptTurn,
+      setListener,
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+    await startPromise;
+
+    expect(setListener).toHaveBeenCalledTimes(1);
+    expect(startTurn).not.toHaveBeenCalled();
+    expect(interruptTurn).not.toHaveBeenCalled();
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-gui-pre-session-stop",
+        status: "idle",
+        attention: "none",
+      }),
+    );
   });
 
   it("settles a Codex GUI /goal initial turn after the goal item is emitted", async () => {
@@ -1752,7 +2065,7 @@ describe("writeSubmittedPrompt", () => {
       detectInstall: vi.fn<() => void>(),
       buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
         binary: "codex",
-        args: ["--no-alt-screen", "hello"],
+        args: ["hello"],
       })),
       buildResumeArgv: vi.fn<() => void>(),
       createInitialSessionRef: vi
@@ -1829,7 +2142,7 @@ describe("writeSubmittedPrompt", () => {
       buildLaunchArgv: vi.fn<() => void>(),
       buildResumeArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
         binary: "codex",
-        args: ["resume", "--no-alt-screen", "session-123", "next prompt"],
+        args: ["resume", "session-123", "next prompt"],
       })),
       createInitialSessionRef: vi
         .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()

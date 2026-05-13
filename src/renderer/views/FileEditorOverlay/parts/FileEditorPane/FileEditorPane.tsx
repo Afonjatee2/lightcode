@@ -4,6 +4,7 @@ import { MarkdownPreview } from "../MarkdownPreview";
 import { Editor, type BeforeMount, type OnMount, type Monaco } from "@monaco-editor/react";
 import type { editor as MonacoEditor } from "monaco-editor";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
+import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import {
   useActiveBufferContent,
   useActiveBufferStatus,
@@ -24,6 +25,7 @@ export { getLanguageFromPath } from "./parts/langMap";
 
 export function FileEditorPane(props: {
   showTabs: boolean;
+  headerNeedsTrafficLightPad?: boolean;
   onOpenFullscreen?: () => void;
   onClose?: () => void;
 }) {
@@ -99,6 +101,7 @@ export function FileEditorPane(props: {
           showPreview={showPreview}
           setShowPreview={setShowPreview}
           activePath={activePath}
+          headerNeedsTrafficLightPad={props.headerNeedsTrafficLightPad ?? false}
           onSave={handleSave}
           handleCloseTab={handleCloseTab}
           {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
@@ -110,7 +113,9 @@ export function FileEditorPane(props: {
         <>
           {!props.showTabs ? (
             <div
-              className="flex shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3"
+              className={`flex shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3 ${
+                props.headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""
+              }`}
               style={{ height: "env(titlebar-area-height, 32px)" }}
             >
               <span className="min-w-0 truncate text-xs font-medium text-foreground">
@@ -157,6 +162,7 @@ function TabStripHeader(props: {
   showPreview: boolean;
   setShowPreview: React.Dispatch<React.SetStateAction<boolean>>;
   activePath: string | null;
+  headerNeedsTrafficLightPad: boolean;
   onSave: (path: string) => void;
   handleCloseTab: (path: string) => void;
   onOpenFullscreen?: () => void;
@@ -167,7 +173,9 @@ function TabStripHeader(props: {
 
   return (
     <div
-      className="flex shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1 pr-3"
+      className={`flex shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] pl-1 pr-3 ${
+        props.headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""
+      }`}
       style={{ height: "env(titlebar-area-height, 32px)" }}
     >
       <div

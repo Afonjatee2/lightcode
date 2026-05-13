@@ -75,7 +75,9 @@ export function ThreadContextDock({
   );
 }
 
-function resolveContextUsageTone(summary: ThreadContextUsageSummary): "default" | "warning" | "danger" {
+function resolveContextUsageTone(
+  summary: ThreadContextUsageSummary,
+): "default" | "warning" | "danger" {
   const percent = summary.percent;
   const used = summary.usedTokens;
   if (percent !== undefined && percent >= 90) return "danger";

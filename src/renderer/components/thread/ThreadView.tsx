@@ -277,6 +277,8 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   const alignClass =
     paneAlign === "right" ? "ml-auto" : paneAlign === "left" ? "mr-auto" : "mx-auto";
   const paddingClass = "px-2";
+  const contentShellClass = `${alignClass} relative flex min-h-0 w-full max-w-[1040px] flex-1 flex-col ${paddingClass} px-3 pb-2`;
+  const contentBodyClass = `${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col pt-2`;
 
   return (
     <>
@@ -409,9 +411,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
           </div>
         </div>
 
-        <div
-          className={`${alignClass} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-3 pb-2`}
-        >
+        <div className={contentShellClass}>
           {dropIndicator === "replace" && (
             <div
               aria-hidden="true"
@@ -443,7 +443,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
             />
           )}
 
-          <div className={`${alignClass} flex min-h-0 w-full max-w-[920px] flex-1 flex-col pt-2`}>
+          <div className={contentBodyClass}>
             {usesTerminalPresentation ? (
               <TerminalThreadContent
                 threadId={thread.id}

@@ -8,7 +8,11 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { Streamdown, type Components as StreamdownComponents } from "streamdown";
+import {
+  Streamdown,
+  defaultRehypePlugins,
+  type Components as StreamdownComponents,
+} from "streamdown";
 import remarkGfm from "remark-gfm";
 import { readBridge } from "@/renderer/bridge";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
@@ -28,6 +32,16 @@ import {
 } from "./remarkAutolinkProjectPaths";
 
 type RemarkPlugins = NonNullable<ComponentProps<typeof Streamdown>["remarkPlugins"]>;
+type RehypePlugins = NonNullable<ComponentProps<typeof Streamdown>["rehypePlugins"]>;
+
+// Streamdown bundles `rehype-harden`, which rewrites links whose href fails its
+// allowlist into `<span>…[blocked]</span>`. During streaming, partial hrefs
+// (e.g. `https://sent`) routinely trip it, producing a "[blocked]" flash on
+// otherwise valid URLs. We control the click path via `readBridge().openExternal`
+// and gate file/folder hrefs through `MdAnchor`, so harden is redundant here.
+const REHYPE_PLUGINS: RehypePlugins = Object.entries(defaultRehypePlugins)
+  .filter(([key]) => key !== "harden")
+  .map(([, plugin]) => plugin);
 
 interface ItemMarkdownInnerProps {
   text: string;
@@ -70,7 +84,12 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
   const markdownText = normalizeIncompleteProjectLinkTail(normalizeShortCodeFenceClosers(text));
   return (
     <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
-      <Streamdown remarkPlugins={remarkPlugins} components={MD_COMPONENTS} parseIncompleteMarkdown>
+      <Streamdown
+        remarkPlugins={remarkPlugins}
+        rehypePlugins={REHYPE_PLUGINS}
+        components={MD_COMPONENTS}
+        parseIncompleteMarkdown
+      >
         {markdownText}
       </Streamdown>
     </div>

@@ -718,6 +718,55 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.activeTurnStartedAt).toBe("2026-05-01T12:00:00.000Z");
   });
 
+  it("lets a forced GUI idle close an interrupted turn before assistant output", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "generic-gui",
+      config: { model: "m" },
+      prompt: "a",
+      presentationMode: "gui",
+    });
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "working",
+      attention: "working",
+      canResumeWithConfig: false,
+    });
+
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "user-1",
+      itemType: "user_message",
+    });
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.completed",
+      threadId: thread.id,
+      itemId: "user-1",
+    });
+
+    vi.setSystemTime(new Date("2026-05-01T12:00:01.000Z"));
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "idle",
+      attention: "none",
+      canResumeWithConfig: false,
+      forceCloseActiveTurn: true,
+    });
+
+    expect(useAppStore.getState().threads[0]).toMatchObject({
+      status: "idle",
+      attention: "none",
+      activeTurnStartedAt: undefined,
+      lastTurnStartedAt: "2026-05-01T12:00:00.000Z",
+      lastTurnEndedAt: "2026-05-01T12:00:01.000Z",
+    });
+  });
+
   it("anchors completed turns to assistant output when present", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-01T12:00:00.000Z"));

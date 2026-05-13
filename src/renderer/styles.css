@@ -453,6 +453,15 @@ body {
   z-index: 20;
 }
 
+.lightcode-git-diff-content {
+  contain: layout paint;
+}
+
+.lightcode-git-diff-body {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 260px;
+}
+
 .lightcode-window-header {
   background: var(--window-header-background);
 }

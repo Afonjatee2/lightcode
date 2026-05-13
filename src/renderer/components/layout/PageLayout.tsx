@@ -4,7 +4,19 @@ import { Button, Tooltip } from "@heroui/react";
 import { House } from "lucide-react";
 import { isMac, isWindows } from "@/renderer/bridge";
 import { macosTrafficLightGutterClass } from "@/renderer/components/layout/sidebarChrome";
-import { AppShell, useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
+import {
+  AppShell,
+  SidebarContext,
+  useSidebar,
+} from "@/renderer/views/MainView/parts/AppShell/AppShell";
+
+const alwaysExpandedSidebar = {
+  isCollapsed: false,
+  isOverlay: false,
+  closingOverlay: false,
+  collapse: () => {},
+  expand: () => {},
+};
 
 function SidebarHeaderWordmark(props: {
   title: string;
@@ -138,6 +150,7 @@ export function PageLayout(props: {
   content: ReactNode;
   rightPanel?: ReactNode;
   gitPanel?: ReactNode;
+  forceSidebarExpanded?: boolean;
   onRequestClosePanels?: () => void;
 }) {
   const {
@@ -149,6 +162,7 @@ export function PageLayout(props: {
     content,
     rightPanel,
     gitPanel,
+    forceSidebarExpanded,
     onRequestClosePanels,
   } = props;
 
@@ -163,7 +177,7 @@ export function PageLayout(props: {
   // the empty row (signalled by the empty fragment, since `null` would suppress it everywhere).
   const contentHeader = contentHeaderChildren ?? (isMac() ? null : <></>);
 
-  return (
+  const shell = (
     <AppShell
       sidebarHeader={sidebarHeader}
       contentHeader={contentHeader}
@@ -171,7 +185,14 @@ export function PageLayout(props: {
       content={content}
       rightPanel={rightPanel}
       gitPanel={gitPanel}
+      {...(forceSidebarExpanded === true ? { forceSidebarExpanded: true } : {})}
       {...(onRequestClosePanels != null ? { onRequestClosePanels } : {})}
     />
   );
+
+  if (forceSidebarExpanded === true) {
+    return <SidebarContext.Provider value={alwaysExpandedSidebar}>{shell}</SidebarContext.Provider>;
+  }
+
+  return shell;
 }

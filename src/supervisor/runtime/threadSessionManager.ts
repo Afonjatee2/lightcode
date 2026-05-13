@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
@@ -99,6 +100,46 @@ export async function writeSubmittedPrompt(
  */
 export const USER_INTERRUPT_RECOVERY_GRACE_MS = 1200;
 const RUNTIME_EVENT_BATCH_MS = 16;
+const GHOSTTY_TERM = "xterm-ghostty";
+const FALLBACK_TERM = "xterm-256color";
+const terminfoTermCache = new Map<string, string>();
+type TerminalColorEnv = {
+  TERM: string;
+  COLORTERM: string;
+};
+
+function terminalTermCacheKey(location: ProjectLocation): string {
+  if (location.kind === "wsl") return `wsl:${location.distro}`;
+  return `host:${process.platform}`;
+}
+
+function hasGhosttyTerminfo(location: ProjectLocation): boolean {
+  const options = { stdio: "ignore" as const, timeout: 250, windowsHide: true };
+  if (location.kind === "wsl") {
+    if (process.platform !== "win32") return false;
+    const result = spawnSync(
+      getWslCommand(),
+      ["-d", location.distro, "--", "sh", "-lc", `infocmp -x ${GHOSTTY_TERM} >/dev/null 2>&1`],
+      options,
+    );
+    return result?.status === 0;
+  }
+  if (process.platform === "win32") return false;
+  return spawnSync("infocmp", ["-x", GHOSTTY_TERM], options)?.status === 0;
+}
+
+function resolveTerminalColorEnv(location: ProjectLocation): TerminalColorEnv {
+  const key = terminalTermCacheKey(location);
+  const cached = terminfoTermCache.get(key);
+  if (cached) {
+    return { TERM: cached, COLORTERM: "truecolor" };
+  }
+  if (hasGhosttyTerminfo(location)) {
+    terminfoTermCache.set(key, GHOSTTY_TERM);
+    return { TERM: GHOSTTY_TERM, COLORTERM: "truecolor" };
+  }
+  return { TERM: FALLBACK_TERM, COLORTERM: "truecolor" };
+}
 
 /**
  * True iff the user keystroke payload represents an interrupt intent the
@@ -183,6 +224,7 @@ export class ThreadSessionManager {
   /** Reverse index: agent-native session id → SessionRuntime, for CLI hook routing fallback. */
   readonly sessionsBySessionId = new Map<string, SessionRuntime>();
   private readonly startLocks = new Map<string, Promise<void>>();
+  private readonly pendingStartInterrupts = new Set<string>();
   private readonly logWriter = new BufferedLogWriter();
   private readonly outputPipeline: ThreadOutputPipeline;
   private readonly pendingRuntimeEvents = new Map<string, RuntimeEvent[]>();
@@ -510,6 +552,9 @@ export class ThreadSessionManager {
       return await run;
     } finally {
       this.startLocks.delete(threadId);
+      if (!this.sessions.has(threadId)) {
+        this.pendingStartInterrupts.delete(threadId);
+      }
     }
   }
 
@@ -593,7 +638,22 @@ export class ThreadSessionManager {
   }
 
   async interruptThread(payload: { threadId: string }): Promise<void> {
-    const session = this.requireSession(payload.threadId);
+    const session = this.sessions.get(payload.threadId);
+    if (!session) {
+      if (this.startLocks.has(payload.threadId)) {
+        this.pendingStartInterrupts.add(payload.threadId);
+        this.options.emit({
+          type: "thread-state",
+          threadId: payload.threadId,
+          status: "idle",
+          attention: "none",
+          canResumeWithConfig: false,
+          forceCloseActiveTurn: true,
+        });
+        return;
+      }
+      throw new Error(`Unknown thread session: ${payload.threadId}`);
+    }
     await this.interruptStructuredTurn(session);
   }
 
@@ -854,20 +914,25 @@ export class ThreadSessionManager {
 
     const shellCommand = this.buildShellCommand(payload.projectLocation);
     this.options.emit({ type: "thread-reset", threadId: payload.shellId });
+    const terminalEnv = resolveTerminalColorEnv(payload.projectLocation);
 
     const shellEnv: Record<string, string> = {
       ...(process.env as Record<string, string>),
-      TERM: "xterm-256color",
+      ...terminalEnv,
     };
     if (payload.projectLocation.kind === "wsl") {
       const existingWslEnv = process.env.WSLENV ?? "";
-      if (!existingWslEnv.split(":").some((value) => value.replace(/\/.*/, "") === "TERM")) {
-        shellEnv.WSLENV = existingWslEnv ? `${existingWslEnv}:TERM` : "TERM";
+      const wslEnvNames = new Set(
+        existingWslEnv.split(":").map((value) => value.replace(/\/.*/, "")),
+      );
+      const missingNames = Object.keys(terminalEnv).filter((name) => !wslEnvNames.has(name));
+      if (missingNames.length > 0) {
+        shellEnv.WSLENV = [...(existingWslEnv ? [existingWslEnv] : []), ...missingNames].join(":");
       }
     }
 
     const pty = spawn(shellCommand.command, shellCommand.args, {
-      name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
+      name: process.platform === "win32" ? "xterm-color" : terminalEnv.TERM,
       cols: 120,
       rows: 30,
       ...(shellCommand.cwd ? { cwd: shellCommand.cwd } : {}),
@@ -1223,6 +1288,7 @@ export class ThreadSessionManager {
       const resolvedSessionRef =
         payload.sessionRef ??
         (openedStructuredThreadId ? createKnownSessionRef(openedStructuredThreadId) : undefined);
+      const startInterrupted = this.pendingStartInterrupts.delete(payload.threadId);
       const session = this.spawnThread({
         threadId: payload.threadId,
         adapter,
@@ -1234,11 +1300,17 @@ export class ThreadSessionManager {
         structuredSession,
         ...(resolvedSessionRef ? { sessionRef: resolvedSessionRef } : {}),
         presentationMode: requestedPresentation,
-        initialStatus: optimisticUserMessageItemId ? "working" : "idle",
-        initialAttention: optimisticUserMessageItemId ? "working" : "none",
-        suppressInitialStructuredIdle: optimisticUserMessageItemId !== undefined,
+        initialStatus: optimisticUserMessageItemId && !startInterrupted ? "working" : "idle",
+        initialAttention: optimisticUserMessageItemId && !startInterrupted ? "working" : "none",
+        suppressInitialStructuredIdle:
+          optimisticUserMessageItemId !== undefined && !startInterrupted,
       });
-      if (!payload.sessionRef && initialPrompt.length > 0 && structuredSession.startTurn) {
+      if (
+        !startInterrupted &&
+        !payload.sessionRef &&
+        initialPrompt.length > 0 &&
+        structuredSession.startTurn
+      ) {
         void structuredSession
           .startTurn(
             initialPrompt,
@@ -1411,7 +1483,7 @@ export class ThreadSessionManager {
     initialAttention?: import("@/shared/contracts").ThreadAttention;
     suppressInitialStructuredIdle?: boolean;
   }): SessionRuntime {
-    // `thread-reset` is only consumed by the terminal panel (xterm scrollback
+    // `thread-reset` is only consumed by the terminal panel (renderer scrollback
     // reset) and the renderer-side runtime-event/server-request slice clear.
     // GUI threads have no terminal scrollback, and clearing the slice would
     // wipe the optimistic user_message we may have already painted ahead of
@@ -1444,20 +1516,22 @@ export class ThreadSessionManager {
         cliHookEnvInjected,
       }),
     );
+    const terminalEnv = resolveTerminalColorEnv(input.projectLocation);
+    const terminalAgentEnv = { ...agentEnv, ...terminalEnv };
     const command = input.command
-      ? injectWslEnv(input.command, input.projectLocation, agentEnv)
+      ? injectWslEnv(input.command, input.projectLocation, terminalAgentEnv)
       : undefined;
     const pty = command
       ? spawn(command.command, command.args, {
-          name: process.platform === "win32" ? "xterm-color" : "xterm-256color",
+          name: process.platform === "win32" ? "xterm-color" : terminalEnv.TERM,
           cols: input.initialSize.cols,
           rows: input.initialSize.rows,
           cwd: command.cwd ?? process.cwd(),
           env: {
             ...process.env,
             ...(command.env ?? {}),
-            TERM: "xterm-256color",
             ...agentEnv,
+            ...terminalEnv,
           },
         })
       : undefined;
@@ -1558,7 +1632,8 @@ export class ThreadSessionManager {
         if (
           session.suppressInitialStructuredIdle === true &&
           update.status === "idle" &&
-          session.status === "working"
+          session.status === "working" &&
+          session.structuredTurnInterruptRequested !== true
         ) {
           if (update.sessionRef || configChanged || slashCommandsChanged) {
             this.outputPipeline.emitState(session);
@@ -1574,6 +1649,10 @@ export class ThreadSessionManager {
           update.status,
           update.attention,
           update.errorMessage,
+          {
+            forceCloseActiveTurn:
+              hadInterruptRequest && (update.status === "idle" || update.status === "needs_reply"),
+          },
         );
         if (update.status !== "working") {
           session.structuredTurnInterruptRequested = false;

@@ -48,6 +48,7 @@ interface MessageListProps {
 
 const CHAT_TRANSCRIPT_OVERSCAN = 8;
 const DEFAULT_ROW_ESTIMATE_PX = 96;
+const UPWARD_SCROLL_MEASUREMENT_SUPPRESSION_MS = 750;
 const SKIP_REVERT_CONFIRM_PREF_KEY = "lightcode-chat-checkpoint-revert-skip-confirm";
 
 /**
@@ -71,6 +72,8 @@ export const MessageList = memo(function MessageList({
   const hasItems = entries.length > 0;
   const parentActions = useChatPaneActions();
   const rowElementsRef = useRef(new Map<number, HTMLDivElement>());
+  const lastScrollTopRef = useRef(0);
+  const suppressSizeAdjustmentUntilRef = useRef(0);
   const [measureEpoch, setMeasureEpoch] = useState(0);
   const [pendingRevertItemId, setPendingRevertItemId] = useState<string | null>(null);
   const [dontAskAgain, setDontAskAgain] = useState(false);
@@ -93,14 +96,33 @@ export const MessageList = memo(function MessageList({
   });
 
   useLayoutEffect(() => {
+    if (!scrollElement) return;
+    lastScrollTopRef.current = scrollElement.scrollTop;
+
+    const handleScroll = () => {
+      const prevScrollTop = lastScrollTopRef.current;
+      const nextScrollTop = scrollElement.scrollTop;
+      lastScrollTopRef.current = nextScrollTop;
+      if (nextScrollTop < prevScrollTop) {
+        suppressSizeAdjustmentUntilRef.current =
+          performance.now() + UPWARD_SCROLL_MEASUREMENT_SUPPRESSION_MS;
+      }
+    };
+
+    scrollElement.addEventListener("scroll", handleScroll, { passive: true });
+    return () => scrollElement.removeEventListener("scroll", handleScroll);
+  }, [scrollElement]);
+
+  useLayoutEffect(() => {
     // Adjust scroll only when the resized row is fully above the viewport.
     // This is what keeps visible content anchored as overscan rows replace
     // their estimated heights with real measurements — critical for smooth
-    // upward scrolling, where rough estimates above the viewport otherwise
-    // shift visible rows downward and look like jumps. Do NOT suppress this
-    // during backward scrolling: the compensation IS the smooth scroll.
-    virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, _instance) => {
+    // idle reading. During and shortly after upward scrolling, suppress the
+    // compensation so delayed row measurements do not pull the transcript.
+    virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (item, _delta, instance) => {
       if (!scrollElement) return false;
+      if (instance.isScrolling && instance.scrollDirection === "backward") return false;
+      if (performance.now() <= suppressSizeAdjustmentUntilRef.current) return false;
       return item.start + item.size <= scrollElement.scrollTop;
     };
     return () => {

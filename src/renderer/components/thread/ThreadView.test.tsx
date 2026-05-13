@@ -45,6 +45,17 @@ function renderThreadView(props: Parameters<typeof ThreadView>[0]) {
   );
 }
 
+function hasAncestorWithClassFragment(element: HTMLElement | null, fragment: string): boolean {
+  let current = element;
+  while (current) {
+    if (typeof current.className === "string" && current.className.includes(fragment)) {
+      return true;
+    }
+    current = current.parentElement;
+  }
+  return false;
+}
+
 describe("ThreadView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1155,6 +1166,63 @@ describe("ThreadView", () => {
     expect(screen.getByLabelText("Send message")).toBeDisabled();
   });
 
+  it("keeps terminal presentation inside the thread max-width shell", () => {
+    renderThreadView({
+      thread: {
+        id: "thread-terminal-layout",
+        projectId: "project-1",
+        title: "Codex terminal thread",
+        agentKind: "codex",
+        config: {
+          model: "gpt-5.4",
+        },
+        status: "idle",
+        attention: "none",
+        canResumeWithConfig: true,
+        sessionRef: {
+          providerSessionId: "session-layout",
+          discoveredAt: new Date().toISOString(),
+        },
+        presentationMode: "terminal",
+        archived: false,
+        done: false,
+        starred: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "codex",
+        label: "Codex",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "read-only", label: "Read Only" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "terminal",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      onConfigChange: () => undefined,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    const terminalPane = screen.getByText("terminal pane");
+    expect(hasAncestorWithClassFragment(terminalPane.parentElement, "max-w-[920px]")).toBe(true);
+    expect(hasAncestorWithClassFragment(terminalPane.parentElement, "max-w-[1040px]")).toBe(true);
+  });
+
   it("allows queued follow-ups and stop while a GUI ACP thread is running", async () => {
     const onSubmitInput = vi
       .fn<(prompt: string, segments?: unknown) => Promise<void>>()
@@ -1228,5 +1296,60 @@ describe("ThreadView", () => {
     fireEvent.input(input);
 
     expect(screen.getByLabelText("Send message")).not.toBeDisabled();
+  });
+
+  it("allows stopping a GUI provider before a session ref is discovered", async () => {
+    renderThreadView({
+      thread: {
+        id: "thread-gui-starting",
+        projectId: "project-1",
+        title: "GUI thread",
+        agentKind: "generic-gui",
+        config: {
+          model: "model-a",
+        },
+        status: "working",
+        attention: "working",
+        canResumeWithConfig: false,
+        presentationMode: "gui",
+        archived: false,
+        done: false,
+        starred: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "generic-gui",
+        label: "Generic",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "model-a", label: "Model A" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "read-only", label: "Read Only" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "gui",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      onConfigChange: () => undefined,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    fireEvent.click(screen.getByLabelText("Stop response"));
+
+    await waitFor(() => {
+      expect(bridge.interruptThread).toHaveBeenCalledWith({ threadId: "thread-gui-starting" });
+    });
   });
 });

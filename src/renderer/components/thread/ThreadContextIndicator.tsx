@@ -67,16 +67,17 @@ export function ThreadContextIndicator({
           <span className="sr-only">{label}</span>
         </button>
       </Tooltip.Trigger>
-      <Tooltip.Content placement="top" className="max-w-72 text-xs">
-        <div className="flex min-w-52 flex-col gap-1">
-          <div className="text-foreground">{summary.headline}</div>
-          <div className="flex items-center justify-between gap-4 text-foreground-muted">
+      <Tooltip.Content placement="top" className="px-1 py-1.5 text-xs">
+        <div className="flex min-w-48 flex-col">
+          <div className="px-2 pb-1.5 pt-0.5 font-semibold text-foreground">{summary.headline}</div>
+          <div className="h-px w-full bg-[color:var(--border)]" />
+          <div className="flex items-center justify-between gap-6 px-2 pb-0.5 pt-1.5 text-foreground-muted">
             <span>Used</span>
-            <span>{summary.usedLabel}</span>
+            <span className="font-medium text-foreground">{summary.usedLabel}</span>
           </div>
-          <div className="flex items-center justify-between gap-4 text-foreground-muted">
+          <div className="flex items-center justify-between gap-6 px-2 pb-1 pt-0.5 text-foreground-muted">
             <span>Limit</span>
-            <span>{summary.maxLabel}</span>
+            <span className="font-medium text-foreground">{summary.maxLabel}</span>
           </div>
           <span className="sr-only">{label}</span>
         </div>

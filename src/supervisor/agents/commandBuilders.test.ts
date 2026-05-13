@@ -124,7 +124,6 @@ describe("agent command builders", () => {
       expect(spec.args[7]).toBe("-i");
       expect(spec.args[8]).toBe("-c");
       const script = spec.args[9]!;
-      expect(script).toContain("--no-alt-screen");
       expect(script).toContain("-m");
       expect(script).toContain("gpt-5.4");
       expect(script).toContain("-a");
@@ -195,15 +194,14 @@ describe("agent command builders", () => {
     expect(resumeIndex).toBeGreaterThan(-1);
     expect(cmdArgs[resumeIndex + 1]).toBe("--enable");
     expect(cmdArgs[resumeIndex + 2]).toBe("goals");
-    expect(cmdArgs[resumeIndex + 3]).toBe("--no-alt-screen");
     // OSC 9 notifications (always-on) precede model / config flags.
-    expect(cmdArgs[resumeIndex + 4]).toBe("-c");
-    expect(cmdArgs[resumeIndex + 5]).toBe("tui.notifications=true");
-    expect(cmdArgs[resumeIndex + 6]).toBe("-c");
-    expect(cmdArgs[resumeIndex + 7]).toBe('tui.notification_method="osc9"');
-    expect(cmdArgs[resumeIndex + 8]).toBe("-c");
-    expect(cmdArgs[resumeIndex + 9]).toBe("suppress_unstable_features_warning=true");
-    expect(cmdArgs[resumeIndex + 10]).toBe("-m");
+    expect(cmdArgs[resumeIndex + 3]).toBe("-c");
+    expect(cmdArgs[resumeIndex + 4]).toBe("tui.notifications=true");
+    expect(cmdArgs[resumeIndex + 5]).toBe("-c");
+    expect(cmdArgs[resumeIndex + 6]).toBe('tui.notification_method="osc9"');
+    expect(cmdArgs[resumeIndex + 7]).toBe("-c");
+    expect(cmdArgs[resumeIndex + 8]).toBe("suppress_unstable_features_warning=true");
+    expect(cmdArgs[resumeIndex + 9]).toBe("-m");
     expect(cmdArgs).toContain("abc-123");
     expect(cmdArgs).not.toContain("");
   });

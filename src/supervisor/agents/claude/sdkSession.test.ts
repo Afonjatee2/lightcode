@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PermissionMode, Query, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  PermissionMode,
+  Query,
+  SDKControlGetContextUsageResponse,
+  SDKMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import type { ProjectLocation, RuntimeEvent, ThreadConfig } from "@/shared/contracts";
 import type { StructuredSessionUpdate } from "../base";
 import { ClaudeSdkSession } from "./sdkSession";
@@ -19,6 +24,22 @@ function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
   const setPermissionMode = vi
     .fn<(mode: PermissionMode) => Promise<void>>()
     .mockResolvedValue(undefined);
+  const getContextUsage = vi
+    .fn<() => Promise<SDKControlGetContextUsageResponse>>()
+    .mockResolvedValue({
+      categories: [{ name: "Messages", tokens: 42_000, color: "#3366ff" }],
+      totalTokens: 42_000,
+      maxTokens: 1_000_000,
+      rawMaxTokens: 1_000_000,
+      percentage: 4.2,
+      gridRows: [],
+      model: "claude-opus-4-7[1m]",
+      memoryFiles: [],
+      mcpTools: [],
+      isAutoCompactEnabled: true,
+      agents: [],
+      apiUsage: null,
+    });
 
   const runtime = {
     async next(): Promise<IteratorResult<SDKMessage>> {
@@ -49,13 +70,28 @@ function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
     }),
     supportedCommands: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
     supportedModels: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+    getContextUsage,
     close: vi.fn<() => void>(() => {
       closed = true;
       resolveNext?.({ done: true, value: undefined });
     }),
   } as unknown as Query;
 
-  return { runtime, setModel, setPermissionMode };
+  return {
+    runtime,
+    setModel,
+    setPermissionMode,
+    getContextUsage,
+    emitMessage(message: SDKMessage): void {
+      const resolve = resolveNext;
+      resolveNext = undefined;
+      resolve?.({ done: false, value: message });
+    },
+  };
+}
+
+async function flushAsyncWork(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 describe("ClaudeSdkSession", () => {
@@ -140,6 +176,53 @@ describe("ClaudeSdkSession", () => {
         ],
       }),
     );
+
+    await session.dispose();
+  });
+
+  it("refreshes current SDK context usage after result messages", async () => {
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const runtimeEvents: RuntimeEvent[] = [];
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-context",
+      projectLocation,
+      config: { model: "claude-opus-4-7", contextSize: "1m" },
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: (event) => runtimeEvents.push(event),
+      onUpdate: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread({ model: "claude-opus-4-7", contextSize: "1m" });
+    await flushAsyncWork();
+
+    fake.emitMessage({
+      type: "result",
+      subtype: "success",
+      usage: { total_tokens: 4_000_000 },
+      session_id: "claude-session",
+    } as unknown as SDKMessage);
+    await flushAsyncWork();
+
+    expect(fake.getContextUsage).toHaveBeenCalledTimes(1);
+    expect(runtimeEvents).toContainEqual({
+      type: "context.updated",
+      threadId: "thread-claude-context",
+      usage: {
+        usedTokens: 42_000,
+        maxTokens: 1_000_000,
+        breakdown: [{ id: "messages-0", label: "Messages", tokens: 42_000 }],
+      },
+    });
+    expect(
+      runtimeEvents.some(
+        (event) => event.type === "context.updated" && event.usage.usedTokens === 4_000_000,
+      ),
+    ).toBe(false);
 
     await session.dispose();
   });

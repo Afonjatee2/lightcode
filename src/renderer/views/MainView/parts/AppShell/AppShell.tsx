@@ -10,6 +10,7 @@ import {
 import { useShallow } from "zustand/shallow";
 import { isMac, isWindows } from "@/renderer/bridge";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import {
   collapseSidebar,
   expandSidebar,
@@ -62,18 +63,21 @@ export function useSidebar(): SidebarContextValue {
  * state changes — purely a side effect, renders nothing. Non-Mac is a no-op
  * (the attribute is never set), so the matching CSS rule never matches.
  */
-function MacCollapsedTracker(props: { shellRef: RefObject<HTMLDivElement | null> }) {
+function MacCollapsedTracker(props: {
+  shellRef: RefObject<HTMLDivElement | null>;
+  forceSidebarExpanded: boolean;
+}) {
   const isCollapsed = useSidebarOverlayStore((s) => s.isCollapsed);
   useEffect(() => {
     if (!isMac()) return;
     const el = props.shellRef.current;
     if (!el) return;
-    if (isCollapsed) {
+    if (isCollapsed && !props.forceSidebarExpanded) {
       el.dataset.macCollapsed = "";
     } else {
       delete el.dataset.macCollapsed;
     }
-  }, [isCollapsed, props.shellRef]);
+  }, [isCollapsed, props.forceSidebarExpanded, props.shellRef]);
   return null;
 }
 
@@ -99,16 +103,20 @@ function easeOutCubic(t: number): number {
 function SidebarWidthDriver(props: {
   sidebarRef: RefObject<HTMLDivElement | null>;
   sidebarWidth: number;
+  forceSidebarExpanded: boolean;
 }) {
-  const { sidebarRef, sidebarWidth } = props;
+  const { sidebarRef, sidebarWidth, forceSidebarExpanded } = props;
   const isCollapsed = useSidebarOverlayStore((s) => s.isCollapsed);
   const skipTransition = useSidebarOverlayStore((s) => s.skipTransition);
   const isOverlay = useSidebarOverlayStore(selectIsOverlay);
+  const effectiveIsCollapsed = forceSidebarExpanded ? false : isCollapsed;
+  const effectiveIsOverlay = forceSidebarExpanded ? false : isOverlay;
 
   // In overlay mode the aside is `position: fixed` and slides via transform —
   // its width stays at the full sidebarWidth. In normal mode we either show
   // sidebarWidth (expanded) or SIDEBAR_COLLAPSED_WIDTH (collapsed).
-  const targetWidth = isCollapsed && !isOverlay ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
+  const targetWidth =
+    effectiveIsCollapsed && !effectiveIsOverlay ? SIDEBAR_COLLAPSED_WIDTH : sidebarWidth;
 
   const prevTargetRef = useRef<number | null>(null);
   const rafIdRef = useRef<number | null>(null);
@@ -164,9 +172,10 @@ function SidebarWidthDriver(props: {
   return null;
 }
 
-function ShellSidebarBackdrop() {
+function ShellSidebarBackdrop(props: { forceSidebarExpanded: boolean }) {
   const closingOverlay = useSidebarOverlayStore((s) => s.closingOverlay);
   const isOverlay = useSidebarOverlayStore(selectIsOverlay);
+  if (props.forceSidebarExpanded) return null;
   if (!isOverlay) return null;
   return (
     <div
@@ -179,8 +188,9 @@ function ShellSidebarBackdrop() {
   );
 }
 
-function ShellSidebarSpacer(props: { hasHeaders: boolean }) {
+function ShellSidebarSpacer(props: { hasHeaders: boolean; forceSidebarExpanded: boolean }) {
   const isOverlay = useSidebarOverlayStore(selectIsOverlay);
+  if (props.forceSidebarExpanded) return null;
   if (!isOverlay) return null;
   return (
     <div
@@ -196,22 +206,34 @@ function ShellSidebarAside(props: {
   sidebar: ReactNode;
   hasHeaders: boolean;
   isSidebarHandleHovered: boolean;
+  forceSidebarExpanded: boolean;
 }) {
-  const { sidebarRef, sidebarHeader, sidebar, hasHeaders, isSidebarHandleHovered } = props;
+  const {
+    sidebarRef,
+    sidebarHeader,
+    sidebar,
+    hasHeaders,
+    isSidebarHandleHovered,
+    forceSidebarExpanded,
+  } = props;
   const isCollapsed = useSidebarOverlayStore((s) => s.isCollapsed);
   const closingOverlay = useSidebarOverlayStore((s) => s.closingOverlay);
   const overlayReady = useSidebarOverlayStore((s) => s.overlayReady);
   const isOverlay = useSidebarOverlayStore(selectIsOverlay);
+  const effectiveIsCollapsed = forceSidebarExpanded ? false : isCollapsed;
+  const effectiveClosingOverlay = forceSidebarExpanded ? false : closingOverlay;
+  const effectiveIsOverlay = forceSidebarExpanded ? false : isOverlay;
 
   const sidebarDividerColorClass =
-    isSidebarHandleHovered && !isOverlay
+    isSidebarHandleHovered && !effectiveIsOverlay
       ? "border-[color:var(--accent)]"
       : "border-[color:var(--border)]";
   // Windows: stop the sidebar divider below the header so it doesn't run through the title row.
   // macOS keeps the full-height border because the header sits inside the hidden-inset titlebar.
   // HOWEVER, if the sidebar is too narrow (e.g. collapsed), the full-height border would run
   // directly through the macOS traffic light controls, so we push it below the header in that case.
-  const sidebarDividerBelowHeader = hasHeaders && !isOverlay && (!isMac() || isCollapsed);
+  const sidebarDividerBelowHeader =
+    hasHeaders && !effectiveIsOverlay && (!isMac() || effectiveIsCollapsed);
 
   // `width` and `min-width` are driven imperatively by `SidebarWidthDriver`
   // (raf-interpolated to match the drag path). React just owns the rest of
@@ -222,9 +244,9 @@ function ShellSidebarAside(props: {
     <aside
       ref={sidebarRef}
       className={`flex min-h-0 flex-col overflow-hidden transition-[border-color] duration-200 ${
-        isOverlay
+        effectiveIsOverlay
           ? `fixed inset-y-0 left-0 z-40 border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${
-              closingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"
+              effectiveClosingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"
             }`
           : `relative ${
               sidebarDividerBelowHeader ? "" : `border-r ${sidebarDividerColorClass}`
@@ -235,10 +257,12 @@ function ShellSidebarAside(props: {
         <div
           className={`lightcode-overlay-header flex shrink-0 items-center gap-3 ${
             isMac() ? "pl-3 pr-2 pt-0.5" : "px-2"
-          } ${isOverlay ? "bg-background" : "bg-[var(--content-background)]"}`}
+          } ${effectiveIsOverlay ? "bg-background" : "bg-[var(--content-background)]"}`}
           style={{
             height: "env(titlebar-area-height, 32px)",
-            ...(isCollapsed && !closingOverlay ? {} : { minWidth: SIDEBAR_MIN_WIDTH }),
+            ...(effectiveIsCollapsed && !effectiveClosingOverlay
+              ? {}
+              : { minWidth: SIDEBAR_MIN_WIDTH }),
           }}
         >
           {sidebarHeader}
@@ -258,6 +282,7 @@ function ShellSidebarAside(props: {
 function ShellSidebarResizeHandle(props: {
   hasHeaders: boolean;
   hasContentHeader: boolean;
+  forceSidebarExpanded: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onMouseDown: (event: React.MouseEvent<HTMLDivElement>) => void;
@@ -268,7 +293,9 @@ function ShellSidebarResizeHandle(props: {
       isOverlay: selectIsOverlay(s),
     })),
   );
-  if (isCollapsed || isOverlay) return null;
+  const effectiveIsCollapsed = props.forceSidebarExpanded ? false : isCollapsed;
+  const effectiveIsOverlay = props.forceSidebarExpanded ? false : isOverlay;
+  if (effectiveIsCollapsed || effectiveIsOverlay) return null;
   return (
     <div
       className={`lightcode-resize-handle ${!props.hasHeaders ? "-mt-5 h-[calc(100%+0.75rem)]" : ""}`}
@@ -299,9 +326,11 @@ export function AppShell(props: {
   contentHeader?: ReactNode;
   rightPanel?: ReactNode;
   gitPanel?: ReactNode;
+  forceSidebarExpanded?: boolean;
   onRequestClosePanels?: () => void;
 }) {
   const { sidebar, content, sidebarHeader, contentHeader, rightPanel, gitPanel } = props;
+  const forceSidebarExpanded = props.forceSidebarExpanded === true;
   const terminalPosition = useSharedSettings((s) => s.terminalPosition);
 
   const mainRef = useRef<HTMLElement>(null);
@@ -337,6 +366,7 @@ export function AppShell(props: {
     sidebarWidth,
     shellRef,
     mainRef,
+    disabled: forceSidebarExpanded,
     ...(props.onRequestClosePanels ? { onRequestClosePanels: props.onRequestClosePanels } : {}),
   });
 
@@ -351,12 +381,12 @@ export function AppShell(props: {
       className="lightcode-shell flex h-full min-h-0 overflow-hidden bg-background text-foreground"
       style={hasHeaders ? { paddingTop: 0 } : undefined}
     >
-      <MacCollapsedTracker shellRef={shellRef} />
+      <MacCollapsedTracker shellRef={shellRef} forceSidebarExpanded={forceSidebarExpanded} />
 
       {!hasHeaders && <div aria-hidden="true" className="lightcode-drag-region" />}
 
-      <ShellSidebarBackdrop />
-      <ShellSidebarSpacer hasHeaders={hasHeaders} />
+      <ShellSidebarBackdrop forceSidebarExpanded={forceSidebarExpanded} />
+      <ShellSidebarSpacer hasHeaders={hasHeaders} forceSidebarExpanded={forceSidebarExpanded} />
 
       <ShellSidebarAside
         sidebarRef={sidebarRef}
@@ -364,12 +394,18 @@ export function AppShell(props: {
         sidebar={sidebar}
         hasHeaders={hasHeaders}
         isSidebarHandleHovered={isSidebarHandleHovered}
+        forceSidebarExpanded={forceSidebarExpanded}
       />
-      <SidebarWidthDriver sidebarRef={sidebarRef} sidebarWidth={sidebarWidth} />
+      <SidebarWidthDriver
+        sidebarRef={sidebarRef}
+        sidebarWidth={sidebarWidth}
+        forceSidebarExpanded={forceSidebarExpanded}
+      />
 
       <ShellSidebarResizeHandle
         hasHeaders={hasHeaders}
         hasContentHeader={hasContentHeader}
+        forceSidebarExpanded={forceSidebarExpanded}
         onMouseEnter={() => setIsSidebarHandleHovered(true)}
         onMouseLeave={() => setIsSidebarHandleHovered(false)}
         onMouseDown={(event) => {
@@ -381,7 +417,7 @@ export function AppShell(props: {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden [isolation:isolate]">
         {contentHeader && (
           <div
-            className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-2"
+            className={`lightcode-overlay-header ${macosTrafficLightPadClass} flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-2`}
             style={{
               height: "env(titlebar-area-height, 32px)",
               paddingRight: isWindows()

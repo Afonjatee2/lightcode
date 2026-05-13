@@ -234,4 +234,3 @@ export function useThreadPendingLaunch(threadId: string): {
 export function useHasDraft(projectId: string): boolean {
   return useAppStore((s) => projectId in s.draftContents);
 }
-

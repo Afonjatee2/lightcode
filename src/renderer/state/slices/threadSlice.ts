@@ -62,6 +62,7 @@ export interface ThreadSlice {
       slashCommands?: Thread["slashCommands"];
       canResumeWithConfig: boolean;
       threadStatusSource?: ThreadStatusSource;
+      forceCloseActiveTurn?: boolean;
     },
   ) => void;
   archiveThread: (threadId: string) => void;
@@ -384,6 +385,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           input.status === "idle" &&
           thread.presentationMode === "gui" &&
           isThreadLiveStatus(thread.status) &&
+          input.forceCloseActiveTurn !== true &&
           resolveCompletedTurnAnchorItemId(state, thread.id) === null
         ) {
           effectiveStatus = thread.status;

@@ -324,6 +324,69 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
     expect((reasoning[0] as { itemType: string }).itemType).toBe("reasoning");
   });
 
+  it("extracts web_search query and args from Codex response action", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "ws-action",
+        item: {
+          id: "ws-action",
+          type: "web_search_call",
+          status: "in_progress",
+          action: {
+            type: "search",
+            query: "Electron crash reporting Sentry Electron SDK native crashes official",
+            queries: [
+              "Electron crash reporting Sentry Electron SDK native crashes official",
+              "Bugsnag Electron SDK crash reporting official docs pricing free",
+            ],
+          },
+        },
+      },
+      state,
+    );
+
+    expect((events[0] as { itemType: string }).itemType).toBe("web_search");
+    expect((events[0] as { payload: Record<string, unknown> }).payload).toMatchObject({
+      query: "Electron crash reporting Sentry Electron SDK native crashes official",
+      args: {
+        type: "search",
+        query: "Electron crash reporting Sentry Electron SDK native crashes official",
+        queries: [
+          "Electron crash reporting Sentry Electron SDK native crashes official",
+          "Bugsnag Electron SDK crash reporting official docs pricing free",
+        ],
+      },
+      status: "running",
+    });
+  });
+
+  it("uses Codex open_page action URL as the web_search query label", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "ws-open-page",
+        item: {
+          id: "ws-open-page",
+          type: "webSearch",
+          action: {
+            type: "open_page",
+            url: "https://github.com/getsentry/sentry-electron",
+          },
+        },
+      },
+      state,
+    );
+
+    expect((events[0] as { payload: Record<string, unknown> }).payload.query).toBe(
+      "https://github.com/getsentry/sentry-electron",
+    );
+  });
+
   it("captures tool_call args at start and result at completion (parity with ACP)", () => {
     const state = createCodexMapperState("t-codex");
     const started = mapCodexNotification(
@@ -558,12 +621,21 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
       {
         threadId: "x",
         itemId: "ws-1",
-        item: { id: "ws-1", status: "completed", results: [{ url: "a" }, { url: "b" }] },
+        item: {
+          id: "ws-1",
+          status: "completed",
+          action: { type: "open_page", url: "https://docs.sentry.io/" },
+          results: [{ url: "a" }, { url: "b" }],
+        },
       },
       state,
     );
     const payload = (completed.at(-1) as { payload: Record<string, unknown> }).payload;
-    expect(payload).toMatchObject({ status: "success", resultCount: 2 });
+    expect(payload).toMatchObject({
+      query: "https://docs.sentry.io/",
+      status: "success",
+      resultCount: 2,
+    });
   });
 
   it("emits item.completed with status / exitCode / durationMs for commandExecution", () => {

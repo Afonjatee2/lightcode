@@ -202,11 +202,9 @@ export function ThreadComposer(props: {
       return `menu:${control.value}:${control.iconOnly ? "icon" : "label"}:${control.hideLabelOnWrap ? "hide" : "show"}`;
     })
     .join("|");
-  const effectiveToolbarLayoutKey =
-    toolbarLayoutKey ??
-    `${derivedToolbarLayoutKey}::leading=${leadingControls ? "1" : "0"}::after=${
-      afterControls ? "1" : "0"
-    }`;
+  const effectiveToolbarLayoutKey = `${derivedToolbarLayoutKey}::leading=${
+    leadingControls ? "1" : "0"
+  }::after=${afterControls ? "1" : "0"}${toolbarLayoutKey ? `::extra=${toolbarLayoutKey}` : ""}`;
 
   const returnFocusToInput = () => {
     const el = editorHostRef.current?.querySelector<HTMLElement>(

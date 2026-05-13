@@ -261,17 +261,9 @@ export class ServerInstance {
     this.disposed = true;
     if (this.connection) {
       try {
-        this.connection
-          .sendRequest("shutdown")
-          .then(() => {
-            this.connection?.sendNotification("exit");
-            this.connection?.dispose();
-          })
-          .catch(() => {
-            this.connection?.dispose();
-          });
-      } catch {
         this.connection.dispose();
+      } catch {
+        // Ignore disposal errors while tearing down the backing process.
       }
       this.connection = null;
     }

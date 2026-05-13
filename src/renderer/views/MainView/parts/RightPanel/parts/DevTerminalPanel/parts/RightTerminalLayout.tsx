@@ -101,7 +101,7 @@ export function RightTerminalLayout(props: {
         </Tabs>
       </div>
 
-      <div className="relative min-h-0 flex-1 px-6 pt-2 pb-1">
+      <div className="relative min-h-0 flex-1 px-2">
         <TerminalSurfaces
           tabs={tabs}
           selectedTabId={selectedTabId}

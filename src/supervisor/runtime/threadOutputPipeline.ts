@@ -143,7 +143,11 @@ export class ThreadOutputPipeline {
     return session.outputTranscript.readTail(100_000);
   }
 
-  emitState(session: SessionRuntime, errorMessage?: string): void {
+  emitState(
+    session: SessionRuntime,
+    errorMessage?: string,
+    options: { forceCloseActiveTurn?: boolean } = {},
+  ): void {
     this.options.emit({
       type: "thread-state",
       threadId: session.threadId,
@@ -158,6 +162,7 @@ export class ThreadOutputPipeline {
         this.options.readDisableCliHookPlugin(),
       ),
       ...(errorMessage ? { errorMessage } : {}),
+      ...(options.forceCloseActiveTurn ? { forceCloseActiveTurn: true } : {}),
     });
   }
 
@@ -180,6 +185,7 @@ export class ThreadOutputPipeline {
     status: ThreadStatus,
     attention: ThreadAttention,
     errorMessage?: string,
+    options: { forceCloseActiveTurn?: boolean } = {},
   ): void {
     if (
       session.status === status &&
@@ -198,7 +204,7 @@ export class ThreadOutputPipeline {
     session.status = status;
     session.attention = attention;
     session.lastStatusChangeAt = Date.now();
-    this.emitState(session, errorMessage);
+    this.emitState(session, errorMessage, options);
   }
 
   /**

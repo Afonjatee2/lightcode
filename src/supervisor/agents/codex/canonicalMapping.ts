@@ -172,6 +172,8 @@ export interface CodexItemPayload {
   result?: unknown;
   /** Web search may carry a results array. */
   results?: unknown;
+  /** Responses-style web search action (`search`, `open_page`, `find_in_page`). */
+  action?: unknown;
 }
 
 function readItem(params: Record<string, unknown> | undefined): CodexItemPayload | undefined {
@@ -657,14 +659,12 @@ export function buildStartedPayload(
     };
   }
   if (itemType === "web_search") {
+    const query = extractCodexWebSearchQuery(source);
+    const args = pickCodexWebSearchInput(source);
     return {
-      query:
-        typeof source.query === "string"
-          ? source.query
-          : typeof source.text === "string"
-            ? source.text
-            : "",
+      query: query ?? "",
       ...(toolName(source) ? { name: toolName(source) } : {}),
+      ...(args !== undefined ? { args } : {}),
       status: "running" as const,
     };
   }
@@ -741,8 +741,10 @@ export function buildCompletedPayload(
   if (itemType === "web_search") {
     const result = pickToolOutput(source);
     const resultCount = countWebSearchResults(source);
+    const query = extractCodexWebSearchQuery(source);
     return {
       status: codexFinalStatus(source.status),
+      ...(query ? { query } : {}),
       ...(resultCount != null ? { resultCount } : {}),
       ...(result !== undefined ? { result } : {}),
     };
@@ -777,6 +779,11 @@ function pickToolInput(source: CodexItemPayload): unknown {
   if (source.args !== undefined) return source.args;
   if (source.input !== undefined) return source.input;
   return undefined;
+}
+
+function pickCodexWebSearchInput(source: CodexItemPayload): unknown {
+  if (source.action !== undefined) return source.action;
+  return pickToolInput(source);
 }
 
 function pickToolOutput(source: CodexItemPayload): unknown {
@@ -873,6 +880,27 @@ function toolName(source: CodexItemPayload): string | undefined {
   if (typeof source.name === "string" && source.name.length > 0) return source.name;
   if (typeof source.type === "string" && source.type.length > 0) return source.type;
   return undefined;
+}
+
+function extractCodexWebSearchQuery(source: CodexItemPayload): string | undefined {
+  const direct = readNonEmptyString(source.query) ?? readNonEmptyString(source.text);
+  if (direct) return direct;
+
+  const action = readRecord(source.action);
+  if (!action) return undefined;
+  const actionQuery = readNonEmptyString(action.query);
+  if (actionQuery) return actionQuery;
+
+  const url = readNonEmptyString(action.url);
+  const pattern = readNonEmptyString(action.pattern);
+  if (url && pattern) return `${pattern} in ${url}`;
+  if (url) return url;
+  if (pattern) return pattern;
+  return undefined;
+}
+
+function readNonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
 /**
@@ -974,10 +1002,7 @@ const CODEX_APPROVAL_METHODS = new Set([
   "item/permissions/requestApproval",
 ]);
 
-const CODEX_FORM_METHODS = new Set([
-  "mcpServer/elicitation/request",
-  "item/tool/requestUserInput",
-]);
+const CODEX_FORM_METHODS = new Set(["mcpServer/elicitation/request", "item/tool/requestUserInput"]);
 
 function decisionLabel(decision: string): string {
   switch (decision) {
@@ -1080,9 +1105,7 @@ export function mapCodexServerRequest(
   if (method === "item/commandExecution/requestApproval") {
     const command = readStringField(params?.command) ?? "command";
     const decisions = Array.isArray(params?.availableDecisions)
-      ? (params.availableDecisions as unknown[]).filter(
-          (d): d is string => typeof d === "string",
-        )
+      ? (params.availableDecisions as unknown[]).filter((d): d is string => typeof d === "string")
       : ["accept", "acceptForSession", "decline", "cancel"];
     return {
       type: "request.opened",

@@ -376,8 +376,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   });
   const isCliThread = usesTerminalPresentation;
   const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
-  const canInterruptStructuredTurn =
-    !usesTerminalPresentation && thread.sessionRef !== undefined && thread.status === "working";
+  const canInterruptStructuredTurn = !usesTerminalPresentation && thread.status === "working";
   const pendingSteer = useAppStore((s) => s.pendingSteerByThreadId[thread.id]);
   const usesPendingSteerPath = !usesTerminalPresentation && thread.status === "working";
   const runtimeRequests = useAppStore((s) => s.runtimeRequestsByThread[thread.id]);
@@ -628,6 +627,13 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                 <ThreadComposer
                   autoFocus={paneCount === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
                   compact
+                  toolbarLayoutKey={[
+                    isCliThread ? "cli" : "chat",
+                    showContextIndicator ? "ctx" : "no-ctx",
+                    branchName ?? "",
+                    thread.worktreePath ? "wt" : "br",
+                    thread.prNumber ? `pr=${thread.prNumber}` : "",
+                  ].join("|")}
                   fixedContent={
                     hasActiveSubAgent ||
                     showContextInComposer ||

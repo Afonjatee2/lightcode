@@ -84,6 +84,15 @@ vi.mock("@xterm/addon-search", () => ({
   SearchAddon: class MockSearchAddon {},
 }));
 
+vi.mock("@xterm/addon-webgl", () => ({
+  WebglAddon: class MockWebglAddon {
+    onContextLoss = vi.fn<(handler: () => void) => { dispose: () => void }>(() => ({
+      dispose: vi.fn<() => void>(),
+    }));
+    dispose = vi.fn<() => void>();
+  },
+}));
+
 vi.mock("./TerminalLinkProvider", () => ({
   TerminalLinkProvider: class MockTerminalLinkProvider {},
 }));
@@ -107,8 +116,8 @@ function emitEvent(event: SupervisorEvent) {
   }
 }
 
-/** Flush the write-batching setTimeout (8 ms coalescing window). */
-async function flushWriteTimer() {
+/** Flush microtasks plus a rAF window so scrollback hydration / activity callbacks settle. */
+async function flushFrame() {
   await act(async () => {
     await new Promise<void>((resolve) => {
       setTimeout(() => resolve(), 16);
@@ -173,11 +182,6 @@ describe("XTermSurface", () => {
     expect(state.terminalOptions?.scrollbar).toEqual({ width: 0.01 });
   });
 
-  it("does not preserve TUI full-screen redraws as scrollback", () => {
-    render(<XTermSurface terminalId="test-1" />);
-    expect(state.terminalOptions?.scrollOnEraseInDisplay).toBe(false);
-  });
-
   it("subscribes to supervisor events", () => {
     render(<XTermSurface terminalId="test-1" />);
     expect(state.bridge.onSupervisorEvent).toHaveBeenCalled();
@@ -188,10 +192,10 @@ describe("XTermSurface", () => {
     state.bridge.readTerminalScrollback.mockResolvedValueOnce("existing output");
 
     render(<XTermSurface terminalId="test-1" />);
-    await flushWriteTimer();
+    await flushFrame();
 
     expect(state.bridge.readTerminalScrollback).toHaveBeenCalledWith({ threadId: "test-1" });
-    expect(terminal().write).toHaveBeenCalledWith("\x1b[?2026hexisting output\x1b[?2026l");
+    expect(terminal().write).toHaveBeenCalledWith("existing output");
   });
 
   it("disposes terminal and unsubscribes on unmount", () => {
@@ -217,9 +221,9 @@ describe("XTermSurface", () => {
         outputLength: 11,
       });
     });
-    await flushWriteTimer();
+    await flushFrame();
 
-    expect(terminal().write).toHaveBeenCalledWith("\x1b[?2026hhello world\x1b[?2026l");
+    expect(terminal().write).toHaveBeenCalledWith("hello world");
   });
 
   it("ignores thread-output for a different terminal", async () => {
@@ -233,7 +237,7 @@ describe("XTermSurface", () => {
         outputLength: 4,
       });
     });
-    await flushWriteTimer();
+    await flushFrame();
 
     expect(terminal().write).not.toHaveBeenCalled();
   });
@@ -304,23 +308,37 @@ describe("XTermSurface", () => {
         outputLength: 11,
       });
     });
-    await flushWriteTimer();
+    await flushFrame();
 
-    expect(terminal().write).toHaveBeenCalledWith("\x1b[?2026hafter reset\x1b[?2026l");
+    expect(terminal().write).toHaveBeenCalledWith("after reset");
   });
 
   // ── Activity / bell / title callbacks ───────────────────────────
 
-  it("calls onActivity when onWriteParsed fires", () => {
+  it("calls onActivity when onWriteParsed fires", async () => {
     const onActivity = vi.fn<() => void>();
     render(<XTermSurface terminalId="test-1" onActivity={onActivity} />);
 
-    // onWriteParsed is called twice: once for activity tracking, once for scroll tracking.
-    expect(terminal().onWriteParsed).toHaveBeenCalledTimes(2);
-    // The activity handler is the first registration.
+    // Activity and scroll tracking are coalesced into a single rAF-gated handler.
+    expect(terminal().onWriteParsed).toHaveBeenCalledTimes(1);
     const handler = terminal().onWriteParsed.mock.calls[0]![0] as unknown as () => void;
 
     act(() => handler());
+    await flushFrame();
+    expect(onActivity).toHaveBeenCalledTimes(1);
+  });
+
+  it("coalesces rapid onWriteParsed events into one rAF flush", async () => {
+    const onActivity = vi.fn<() => void>();
+    render(<XTermSurface terminalId="test-1" onActivity={onActivity} />);
+
+    const handler = terminal().onWriteParsed.mock.calls[0]![0] as unknown as () => void;
+    act(() => {
+      handler();
+      handler();
+      handler();
+    });
+    await flushFrame();
     expect(onActivity).toHaveBeenCalledTimes(1);
   });
 

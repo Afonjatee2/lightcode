@@ -178,7 +178,7 @@ export function GitDiffContent(props: {
   const showLoader = (loading || !panelReady) && filtered.length > 0;
 
   return (
-    <div className="relative h-full min-h-0">
+    <div className="lightcode-git-diff-content relative h-full min-h-0">
       {showLoader && (
         <div className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--content-background)]">
           <PixelLoader size="lg" />

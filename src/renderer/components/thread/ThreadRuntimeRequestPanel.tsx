@@ -291,7 +291,10 @@ function asMcpElicitationDetails(value: unknown): McpElicitationParams | undefin
     mode: "form",
     message: obj.message,
     serverName: obj.serverName,
-    requestedSchema: schemaObj as McpElicitationParams extends { mode: "form"; requestedSchema: infer R }
+    requestedSchema: schemaObj as McpElicitationParams extends {
+      mode: "form";
+      requestedSchema: infer R;
+    }
       ? R
       : never,
     ...(Object.hasOwn(obj, "_meta") ? { _meta: obj._meta } : {}),
@@ -307,7 +310,8 @@ function getMcpEnumOptions(
     return property.oneOf.map((o) => ({ id: o.const, label: o.title ?? o.const }));
   }
   if ("enum" in property && Array.isArray(property.enum)) {
-    const names = "enumNames" in property && Array.isArray(property.enumNames) ? property.enumNames : [];
+    const names =
+      "enumNames" in property && Array.isArray(property.enumNames) ? property.enumNames : [];
     return property.enum.map((v, i) => ({ id: v, label: names[i] ?? v }));
   }
   if (property.type === "array" && property.items) {
@@ -322,9 +326,9 @@ function getMcpEnumOptions(
   return [];
 }
 
-function getInitialMcpFormValues(
-  schema: { properties: Record<string, McpElicitationSchemaProperty> },
-): Record<string, McpFormValue> {
+function getInitialMcpFormValues(schema: {
+  properties: Record<string, McpElicitationSchemaProperty>;
+}): Record<string, McpFormValue> {
   const initial: Record<string, McpFormValue> = {};
   for (const [key, property] of Object.entries(schema.properties)) {
     if (property.type === "boolean") initial[key] = property.default ?? false;
@@ -352,7 +356,7 @@ function McpElicitationForm(props: {
   const [formValues, setFormValues] = useState<Record<string, McpFormValue>>(() =>
     params.mode === "form" ? getInitialMcpFormValues(params.requestedSchema) : {},
   );
-  const requiredKeys = params.mode === "form" ? params.requestedSchema.required ?? [] : [];
+  const requiredKeys = params.mode === "form" ? (params.requestedSchema.required ?? []) : [];
   const hasMissing =
     params.mode === "form" && requiredKeys.some((key) => isEmptyRequiredValue(formValues[key]));
 
@@ -417,8 +421,7 @@ function McpElicitationForm(props: {
                     onChange={(e) =>
                       setFormValues((cur) => ({
                         ...cur,
-                        [key]:
-                          e.target.value.trim().length === 0 ? "" : Number(e.target.value),
+                        [key]: e.target.value.trim().length === 0 ? "" : Number(e.target.value),
                       }))
                     }
                     className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
@@ -463,9 +466,7 @@ function McpElicitationForm(props: {
                   <select
                     disabled={isDisabled}
                     value={String(formValues[key] ?? "")}
-                    onChange={(e) =>
-                      setFormValues((cur) => ({ ...cur, [key]: e.target.value }))
-                    }
+                    onChange={(e) => setFormValues((cur) => ({ ...cur, [key]: e.target.value }))}
                     className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
                   >
                     <option value="">—</option>
@@ -480,9 +481,7 @@ function McpElicitationForm(props: {
                     type="text"
                     disabled={isDisabled}
                     value={String(formValues[key] ?? "")}
-                    onChange={(e) =>
-                      setFormValues((cur) => ({ ...cur, [key]: e.target.value }))
-                    }
+                    onChange={(e) => setFormValues((cur) => ({ ...cur, [key]: e.target.value }))}
                     className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
                   />
                 )}
@@ -543,7 +542,11 @@ function asCodexUserInputDetails(value: unknown): CodexUserInputDetails | undefi
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
-    if (typeof e.id !== "string" || typeof e.header !== "string" || typeof e.question !== "string") {
+    if (
+      typeof e.id !== "string" ||
+      typeof e.header !== "string" ||
+      typeof e.question !== "string"
+    ) {
       continue;
     }
     const options =
@@ -601,9 +604,7 @@ function CodexUserInputForm(props: {
               <select
                 disabled={isDisabled}
                 value={answers[question.id] ?? ""}
-                onChange={(e) =>
-                  setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))
-                }
+                onChange={(e) => setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))}
                 className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
               >
                 <option value="">—</option>
@@ -618,9 +619,7 @@ function CodexUserInputForm(props: {
                 type="password"
                 disabled={isDisabled}
                 value={answers[question.id] ?? ""}
-                onChange={(e) =>
-                  setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))
-                }
+                onChange={(e) => setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))}
                 className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
               />
             ) : (
@@ -628,9 +627,7 @@ function CodexUserInputForm(props: {
                 disabled={isDisabled}
                 rows={2}
                 value={answers[question.id] ?? ""}
-                onChange={(e) =>
-                  setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))
-                }
+                onChange={(e) => setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))}
                 className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
               />
             )}

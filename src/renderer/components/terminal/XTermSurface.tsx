@@ -3,6 +3,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import { ImageAddon } from "@xterm/addon-image";
 import { SearchAddon } from "@xterm/addon-search";
 import { Unicode11Addon } from "@xterm/addon-unicode11";
+import { WebglAddon } from "@xterm/addon-webgl";
 import { TerminalLinkProvider } from "./TerminalLinkProvider";
 import { Terminal } from "@xterm/xterm";
 import { Button } from "@heroui/react";
@@ -154,46 +155,6 @@ export const XTermSurface = forwardRef<
     // the user releases — while still coalescing rapid mount-time transitions.
     const PTY_RESIZE_THROTTLE_MS = 25;
 
-    // ── Write batching ───────────────────────────────────────────
-    // Full-screen TUIs (e.g. Gemini CLI) send screen redraws as
-    // multiple PTY chunks (clear + rewrite).  The chunks arrive as
-    // separate IPC events (macrotasks).  If a rAF callback fires
-    // between two related IPC events, the first chunk is flushed
-    // alone and xterm renders a partial screen state → flicker.
-    //
-    // Fix: use a short setTimeout (8 ms ≈ half a frame) instead of
-    // requestAnimationFrame.  This gives a consistent coalescing
-    // window: all IPC events that arrive within the timeout are
-    // guaranteed to be batched into a single `terminal.write()`.
-    // 8 ms is imperceptible but long enough to span the gap between
-    // closely-spaced PTY read events.
-    //
-    // Each flush is wrapped in DEC synchronized output (mode 2026)
-    // so xterm buffers all rendering until the end marker.  This
-    // prevents the cursor from being visible at intermediate
-    // positions during TUI screen redraws.
-    const SYNC_START = "\x1b[?2026h";
-    const SYNC_END = "\x1b[?2026l";
-    let writeBuf = "";
-    let writeTimer = 0;
-    const flushWrites = () => {
-      writeTimer = 0;
-      if (writeBuf) {
-        try {
-          terminal.write(SYNC_START + writeBuf + SYNC_END);
-        } catch {
-          // Terminal may be disposed between timer set and fire.
-        }
-        writeBuf = "";
-      }
-    };
-    const queueWrite = (data: string) => {
-      writeBuf += data;
-      if (writeTimer === 0) {
-        writeTimer = window.setTimeout(flushWrites, 8) as unknown as number;
-      }
-    };
-
     const hydrateScrollback = () => {
       const token = ++scrollbackHydrationToken;
       hydratingScrollback = true;
@@ -206,7 +167,7 @@ export const XTermSurface = forwardRef<
           }
           if (scrollback.length > 0) {
             terminal.reset();
-            queueWrite(scrollback);
+            terminal.write(scrollback);
             bufferedOutputDuringHydration = "";
           }
         })
@@ -217,7 +178,7 @@ export const XTermSurface = forwardRef<
           }
           hydratingScrollback = false;
           if (bufferedOutputDuringHydration.length > 0) {
-            queueWrite(bufferedOutputDuringHydration);
+            terminal.write(bufferedOutputDuringHydration);
             bufferedOutputDuringHydration = "";
           }
         });
@@ -226,11 +187,6 @@ export const XTermSurface = forwardRef<
       scrollbackHydrationToken++;
       hydratingScrollback = false;
       bufferedOutputDuringHydration = "";
-      writeBuf = "";
-      if (writeTimer !== 0) {
-        clearTimeout(writeTimer);
-        writeTimer = 0;
-      }
       terminal.reset();
       onResetRef.current?.();
     };
@@ -243,15 +199,19 @@ export const XTermSurface = forwardRef<
       scrollback: 5_000,
       scrollSensitivity: useSharedSettings.getState().scrollSpeed,
       fastScrollSensitivity: 10,
-      // Codex/Gemini-style TUIs redraw by clearing the screen and repainting
-      // the visible conversation. Preserving erased lines turns each redraw
-      // and resize repaint into duplicated scrollback.
-      scrollOnEraseInDisplay: false,
       // Keep xterm's internal scrollbar gutter effectively zero; Lightcode
       // renders the visible scrollbar outside the terminal content area.
       scrollbar: { width: TERMINAL_INTERNAL_SCROLLBAR_WIDTH },
       fontSize: baseFontSizeRef.current,
       fontFamily: "'JetBrains Mono', 'Cascadia Code', monospace",
+      fontWeight: "normal",
+      fontWeightBold: "bold",
+      letterSpacing: 0,
+      lineHeight: 1,
+      minimumContrastRatio: 4.5,
+      rescaleOverlappingGlyphs: true,
+      macOptionIsMeta: true,
+      wordSeparator: " ()[]{}'\",;:",
       theme: getTerminalTheme(appearance),
       vtExtensions: {
         kittyKeyboard: true,
@@ -363,14 +323,28 @@ export const XTermSurface = forwardRef<
     terminal.loadAddon(unicode11);
     terminal.unicode.activeVersion = "11";
 
-    terminal.loadAddon(new ImageAddon());
     terminal.loadAddon(new ClipboardAddon());
 
     terminal.open(mount);
 
-    terminal.onWriteParsed(() => {
-      onActivityRef.current?.();
-    });
+    // ── WebGL renderer with DOM fallback ────────────────────────
+    // Match VSCode: prefer the GPU renderer, fall back to the DOM renderer
+    // on context loss or initialization failure. ImageAddon is gated on
+    // a healthy WebGL context (it relies on the GPU compositor).
+    let webglAddon: WebglAddon | null = null;
+    let webglContextLossDisposable: { dispose(): void } | null = null;
+    try {
+      webglAddon = new WebglAddon();
+      webglContextLossDisposable = webglAddon.onContextLoss(() => {
+        webglAddon?.dispose();
+        webglAddon = null;
+      });
+      terminal.loadAddon(webglAddon);
+      terminal.loadAddon(new ImageAddon());
+    } catch {
+      webglAddon?.dispose();
+      webglAddon = null;
+    }
 
     terminal.onBell(() => {
       onBellRef.current?.();
@@ -380,49 +354,56 @@ export const XTermSurface = forwardRef<
       onTitleChangeRef.current?.(title);
     });
 
-    // ── Scroll-to-bottom tracking ──────────────────────────────
+    // ── Coalesced onWriteParsed handler ─────────────────────────
+    // Both activity reporting and scroll-position tracking key off
+    // parsed-write events; coalesce into one rAF-gated callback so we
+    // do at most one setState per frame regardless of chunk frequency.
     const SCROLL_THRESHOLD = 15;
     let wasScrolledUp = false;
     let scrollCheckPending = false;
     const checkScrollPosition = () => {
+      const scrolledUp =
+        terminal.buffer.active.baseY - terminal.buffer.active.viewportY > SCROLL_THRESHOLD;
+      if (scrolledUp !== wasScrolledUp) {
+        wasScrolledUp = scrolledUp;
+        setShowScrollDown(scrolledUp);
+      }
+
+      const maxScroll = terminal.buffer.active.baseY;
+      if (maxScroll <= 0) {
+        setScrollbar((previous) =>
+          previous.isVisible
+            ? { isVisible: false, thumbTopPercent: 0, thumbHeightPercent: 100 }
+            : previous,
+        );
+        return;
+      }
+
+      const totalRows = terminal.buffer.active.baseY + terminal.rows;
+      const thumbHeightPercent = Math.max(8, Math.min(100, (terminal.rows / totalRows) * 100));
+      const thumbTopPercent = Math.min(
+        100 - thumbHeightPercent,
+        (terminal.buffer.active.viewportY / maxScroll) * (100 - thumbHeightPercent),
+      );
+      setScrollbar((previous) =>
+        previous.isVisible &&
+        Math.abs(previous.thumbTopPercent - thumbTopPercent) < 0.1 &&
+        Math.abs(previous.thumbHeightPercent - thumbHeightPercent) < 0.1
+          ? previous
+          : { isVisible: true, thumbTopPercent, thumbHeightPercent },
+      );
+    };
+    const scheduleParsedFlush = () => {
       if (scrollCheckPending) return;
       scrollCheckPending = true;
       requestAnimationFrame(() => {
         scrollCheckPending = false;
-        const scrolledUp =
-          terminal.buffer.active.baseY - terminal.buffer.active.viewportY > SCROLL_THRESHOLD;
-        if (scrolledUp !== wasScrolledUp) {
-          wasScrolledUp = scrolledUp;
-          setShowScrollDown(scrolledUp);
-        }
-
-        const maxScroll = terminal.buffer.active.baseY;
-        if (maxScroll <= 0) {
-          setScrollbar((previous) =>
-            previous.isVisible
-              ? { isVisible: false, thumbTopPercent: 0, thumbHeightPercent: 100 }
-              : previous,
-          );
-          return;
-        }
-
-        const totalRows = terminal.buffer.active.baseY + terminal.rows;
-        const thumbHeightPercent = Math.max(8, Math.min(100, (terminal.rows / totalRows) * 100));
-        const thumbTopPercent = Math.min(
-          100 - thumbHeightPercent,
-          (terminal.buffer.active.viewportY / maxScroll) * (100 - thumbHeightPercent),
-        );
-        setScrollbar((previous) =>
-          previous.isVisible &&
-          Math.abs(previous.thumbTopPercent - thumbTopPercent) < 0.1 &&
-          Math.abs(previous.thumbHeightPercent - thumbHeightPercent) < 0.1
-            ? previous
-            : { isVisible: true, thumbTopPercent, thumbHeightPercent },
-        );
+        onActivityRef.current?.();
+        checkScrollPosition();
       });
     };
-    terminal.onScroll(checkScrollPosition);
-    terminal.onWriteParsed(checkScrollPosition);
+    terminal.onWriteParsed(scheduleParsedFlush);
+    terminal.onScroll(scheduleParsedFlush);
 
     // ── Selection tracking ───────────────────────────────────────
     terminal.onSelectionChange(() => {
@@ -505,7 +486,7 @@ export const XTermSurface = forwardRef<
           bufferedOutputDuringHydration += event.data;
           return;
         }
-        queueWrite(event.data);
+        terminal.write(event.data);
         return;
       }
 
@@ -533,9 +514,8 @@ export const XTermSurface = forwardRef<
       if (ptyResizeTimer !== 0) {
         clearTimeout(ptyResizeTimer);
       }
-      if (writeTimer !== 0) {
-        clearTimeout(writeTimer);
-      }
+      webglContextLossDisposable?.dispose();
+      webglAddon?.dispose();
       linkDisposable.dispose();
       unsubscribe();
       resizeObserver.disconnect();

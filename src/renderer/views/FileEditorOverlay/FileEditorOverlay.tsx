@@ -32,6 +32,7 @@ export function FileEditorOverlay(props: { onClose: () => void }) {
   return (
     <PageLayout
       title="Editor"
+      forceSidebarExpanded
       contentHeaderChildren={
         <div className="lightcode-overlay-header__controls flex min-w-0 items-center">
           <span className="min-w-0 max-w-[min(200px,30vw)] truncate font-mono text-[13px] font-medium leading-none tracking-tight text-muted">

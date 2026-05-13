@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import type { PermissionUpdate, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type {
+  PermissionUpdate,
+  SDKControlGetContextUsageResponse,
+  SDKMessage,
+} from "@anthropic-ai/claude-agent-sdk";
 import type {
   CanonicalContentBlock,
   CanonicalItemType,
@@ -13,11 +17,7 @@ import type {
   UserInputOption,
 } from "@/shared/contracts";
 import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
-import {
-  createContextUsageEvent,
-  readNonNegativeInteger,
-  usageFromTokenCounts,
-} from "../contextUsage";
+import { createContextUsageEvent, readNonNegativeInteger } from "../contextUsage";
 import { parseGoalSlashCommand, startGoalItemEvents } from "../goalRuntime";
 
 interface TextItemState {
@@ -569,39 +569,6 @@ function extractText(value: unknown): string {
   return extractText(obj.content);
 }
 
-function createClaudeContextUsageEvent(
-  threadId: string,
-  message: SDKMessage,
-): RuntimeEvent | undefined {
-  const obj = message as {
-    usage?: unknown;
-    total_tokens?: unknown;
-    input_tokens?: unknown;
-    output_tokens?: unknown;
-    cache_creation_input_tokens?: unknown;
-    cache_read_input_tokens?: unknown;
-  };
-  const usage =
-    obj.usage && typeof obj.usage === "object" ? (obj.usage as Record<string, unknown>) : undefined;
-  return createContextUsageEvent(
-    threadId,
-    usageFromTokenCounts({
-      usedTokens:
-        readNonNegativeInteger(usage?.total_tokens) ?? readNonNegativeInteger(obj.total_tokens),
-      inputTokens:
-        readNonNegativeInteger(usage?.input_tokens) ?? readNonNegativeInteger(obj.input_tokens),
-      outputTokens:
-        readNonNegativeInteger(usage?.output_tokens) ?? readNonNegativeInteger(obj.output_tokens),
-      cachedReadTokens:
-        readNonNegativeInteger(usage?.cache_read_input_tokens) ??
-        readNonNegativeInteger(obj.cache_read_input_tokens),
-      cachedWriteTokens:
-        readNonNegativeInteger(usage?.cache_creation_input_tokens) ??
-        readNonNegativeInteger(obj.cache_creation_input_tokens),
-    }),
-  );
-}
-
 /**
  * Absorb a `task_started` / `task_progress` / `task_notification` system
  * message into the parent Task tool_call's progress field. Lets a collapsed
@@ -811,6 +778,42 @@ function mapResultState(message: Extract<SDKMessage, { type: "result" }>): TurnS
 export function mapClaudeSdkMessage(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
   const events = mapClaudeSdkMessageInner(message, state);
   return tagParent(events, readParentToolUseId(message), state);
+}
+
+export function mapClaudeContextUsageResponse(
+  threadId: string,
+  response: SDKControlGetContextUsageResponse,
+): RuntimeEvent | undefined {
+  const usedTokens = readNonNegativeInteger(response.totalTokens);
+  const maxTokens =
+    readPositiveInteger(response.maxTokens) ?? readPositiveInteger(response.rawMaxTokens);
+  const breakdown = response.categories
+    .map((category, index) => {
+      const tokens = readNonNegativeInteger(category.tokens);
+      if (tokens === undefined || tokens <= 0) return undefined;
+      const slug = category.name
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      return {
+        id: slug ? `${slug}-${index}` : `category-${index}`,
+        label: category.name,
+        tokens,
+      };
+    })
+    .filter((entry): entry is NonNullable<typeof entry> => entry !== undefined);
+
+  return createContextUsageEvent(threadId, {
+    ...(usedTokens !== undefined ? { usedTokens } : {}),
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+    ...(breakdown.length > 0 ? { breakdown } : {}),
+  });
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const parsed = readNonNegativeInteger(value);
+  return parsed !== undefined && parsed > 0 ? parsed : undefined;
 }
 
 function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState): RuntimeEvent[] {
@@ -1050,8 +1053,6 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
 
   if (message.type === "result") {
     const stateValue = mapResultState(message);
-    const usageEvent = createClaudeContextUsageEvent(state.threadId, message);
-    if (usageEvent) events.push(usageEvent);
     events.push(...closeClaudeOpenItems(state));
     if (stateValue === "failed") {
       const remaining = nonDiagnosticErrors(message);

@@ -1,7 +1,8 @@
-import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import type { SDKControlGetContextUsageResponse, SDKMessage } from "@anthropic-ai/claude-agent-sdk";
 import { describe, expect, it } from "vitest";
 import {
   createClaudeMapperState,
+  mapClaudeContextUsageResponse,
   mapClaudePermissionRequest,
   mapClaudeQuestionRequest,
   mapClaudeSdkMessage,
@@ -666,7 +667,41 @@ describe("sdkCanonicalMapping — task progress", () => {
 });
 
 describe("sdkCanonicalMapping — context usage", () => {
-  it("maps result usage into context usage", () => {
+  it("maps SDK current context usage into provider context usage", () => {
+    const event = mapClaudeContextUsageResponse("thread-1", {
+      categories: [
+        { name: "System prompt", tokens: 20_000, color: "#999999" },
+        { name: "Messages", tokens: 45_000, color: "#3366ff" },
+        { name: "Deferred tools", tokens: 0, color: "#666666", isDeferred: true },
+      ],
+      totalTokens: 65_000,
+      maxTokens: 1_000_000,
+      rawMaxTokens: 1_000_000,
+      percentage: 6.5,
+      gridRows: [],
+      model: "claude-opus-4-7[1m]",
+      memoryFiles: [],
+      mcpTools: [],
+      isAutoCompactEnabled: true,
+      agents: [],
+      apiUsage: null,
+    } satisfies SDKControlGetContextUsageResponse);
+
+    expect(event).toEqual({
+      type: "context.updated",
+      threadId: "thread-1",
+      usage: {
+        usedTokens: 65_000,
+        maxTokens: 1_000_000,
+        breakdown: [
+          { id: "system-prompt-0", label: "System prompt", tokens: 20_000 },
+          { id: "messages-1", label: "Messages", tokens: 45_000 },
+        ],
+      },
+    });
+  });
+
+  it("does not treat result billing usage as context-window usage", () => {
     const state = createClaudeMapperState("thread-1");
     const events = mapClaudeSdkMessage(
       {
@@ -684,19 +719,7 @@ describe("sdkCanonicalMapping — context usage", () => {
       state,
     );
 
-    expect(events[0]).toEqual({
-      type: "context.updated",
-      threadId: "thread-1",
-      usage: {
-        usedTokens: 69_500,
-        breakdown: [
-          { id: "input", label: "Input", tokens: 60_000 },
-          { id: "output", label: "Output", tokens: 8_000 },
-          { id: "cache-read", label: "Cache read", tokens: 1_000 },
-          { id: "cache-write", label: "Cache write", tokens: 500 },
-        ],
-      },
-    });
+    expect(events.some((event) => event.type === "context.updated")).toBe(false);
   });
 });
 

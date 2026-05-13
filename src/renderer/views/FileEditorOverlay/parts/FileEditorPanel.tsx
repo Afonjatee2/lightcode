@@ -54,7 +54,7 @@ export function FileEditorPanel() {
         visible ? "opacity-100" : "opacity-0"
       }`}
     >
-      <FileEditorPane showTabs onClose={requestClose} />
+      <FileEditorPane showTabs headerNeedsTrafficLightPad onClose={requestClose} />
     </div>
   );
 }

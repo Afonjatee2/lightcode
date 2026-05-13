@@ -1299,6 +1299,7 @@ export type SupervisorEvent =
       canResumeWithConfig: boolean;
       errorMessage?: string;
       slashCommands?: AgentSlashCommand[];
+      forceCloseActiveTurn?: boolean;
       /** Terminal: structured CLI hook (L1) vs terminal parsing (L2); server agents: `server`. */
       threadStatusSource?: ThreadStatusSource;
     }
