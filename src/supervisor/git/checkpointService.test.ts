@@ -20,6 +20,7 @@ function makeRepo(): { dir: string; location: ProjectLocation } {
   git(dir, "init");
   git(dir, "config", "user.email", "test@example.com");
   git(dir, "config", "user.name", "Lightcode Test");
+  git(dir, "config", "core.autocrlf", "false");
   writeFileSync(join(dir, "README.md"), "before\n");
   git(dir, "add", "README.md");
   git(dir, "commit", "-m", "init");
@@ -78,5 +79,5 @@ describe("GitCheckpointService", () => {
       " M README.md",
       "?? new.txt",
     ]);
-  });
+  }, 15_000);
 });

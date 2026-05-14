@@ -1227,8 +1227,10 @@ describe("writeSubmittedPrompt", () => {
       string[],
       { name: string; env: Record<string, string> },
     ];
-    expect(spawnOpts.name).toBe("xterm-ghostty");
-    expect(spawnOpts.env.TERM).toBe("xterm-ghostty");
+    const expectedTerm = process.platform === "win32" ? "xterm-256color" : "xterm-ghostty";
+    const expectedPtyName = process.platform === "win32" ? "xterm-color" : expectedTerm;
+    expect(spawnOpts.name).toBe(expectedPtyName);
+    expect(spawnOpts.env.TERM).toBe(expectedTerm);
     expect(spawnOpts.env.COLORTERM).toBe("truecolor");
   });
 

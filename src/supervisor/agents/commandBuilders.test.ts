@@ -11,6 +11,15 @@ vi.mock("./codex/session", async (importOriginal) => {
   };
 });
 
+vi.mock("./codex/plugin/install", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./codex/plugin/install")>();
+  return {
+    ...actual,
+    isCodexSemverSupportedForGoals: () => true,
+    probeCodexCliSemver: () => [999, 0, 0] as [number, number, number],
+  };
+});
+
 // Skip the slow $SHELL -l -c probe on non-Windows hosts. The tests using
 // `windowsProject` only exercise argv-shaping logic; resolving the binary
 // against the host PATH is irrelevant and adds 1-2s per cold call on macOS.
@@ -19,7 +28,7 @@ vi.mock("./binaryResolver", async (importActual) => {
   return {
     ...actual,
     resolveAgentBinaryPath: (location: { kind: string }, binary: string) =>
-      location.kind === "windows" && process.platform !== "win32"
+      location.kind === "windows"
         ? undefined
         : actual.resolveAgentBinaryPath(location as never, binary),
   };

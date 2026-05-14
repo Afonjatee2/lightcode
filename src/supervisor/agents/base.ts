@@ -1,6 +1,6 @@
-import { existsSync, watch as fsWatch } from "node:fs";
+import { existsSync, readFileSync, watch as fsWatch } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { execFile, spawn, spawnSync } from "node:child_process";
 import { promisify } from "node:util";
@@ -234,8 +234,8 @@ export interface AgentDetector {
 export interface AgentPromptFormatter {
   /**
    * Return true when the initial prompt must be typed into the TUI after idle
-   * rather than passed as a CLI argument (e.g. Codex plan mode needs `/plan`
-   * sent first). The runtime will set pendingTerminalPrompt accordingly.
+   * rather than passed as a CLI argument. The runtime will set
+   * pendingTerminalPrompt accordingly.
    */
   shouldDeferPromptToTerminal?(config: ThreadConfig): boolean;
   /**
@@ -556,6 +556,36 @@ export function buildWindowsCommand(
   return buildWindowsCmdCommand(cwd, command, args);
 }
 
+function resolveWindowsNodeCmdShim(commandPath: string):
+  | {
+      command: string;
+      argsPrefix: string[];
+    }
+  | undefined {
+  if (!/\.cmd$/i.test(commandPath)) return undefined;
+
+  let content: string;
+  try {
+    content = readFileSync(commandPath, "utf8");
+  } catch {
+    return undefined;
+  }
+
+  const match = /["']?%dp0%\\([^"']+?\.js)["']?\s+%\*/i.exec(content);
+  const relScript = match?.[1];
+  if (!relScript) return undefined;
+
+  const baseDir = dirname(commandPath);
+  const scriptPath = join(baseDir, ...relScript.split(/[\\/]+/));
+  if (!existsSync(scriptPath)) return undefined;
+
+  const localNode = join(baseDir, "node.exe");
+  return {
+    command: existsSync(localNode) ? localNode : "node",
+    argsPrefix: [scriptPath],
+  };
+}
+
 /**
  * Build a command spec for POSIX systems (macOS/Linux).
  *
@@ -635,7 +665,11 @@ export function buildAgentCommand(
   }
 
   if (location.kind === "windows") {
-    const spec = buildWindowsCommand(location.path, resolvedExecPath ?? command, args);
+    const commandPath = resolvedExecPath ?? command;
+    const shim = resolveWindowsNodeCmdShim(commandPath);
+    const spec = shim
+      ? buildWindowsCommand(location.path, shim.command, [...shim.argsPrefix, ...args])
+      : buildWindowsCommand(location.path, commandPath, args);
     if (env && Object.keys(env).length > 0) spec.env = env;
     return spec;
   }

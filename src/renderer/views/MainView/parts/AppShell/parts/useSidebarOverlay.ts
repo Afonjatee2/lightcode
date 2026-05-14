@@ -39,10 +39,14 @@ export function useSidebarOverlayEffects(opts: {
 }) {
   const { sidebarWidth, shellRef, mainRef, disabled = false, onRequestClosePanels } = opts;
   const didAutoHideRef = useRef<"panels" | "sidebar" | null>(null);
+  const didAutoCollapseOnNarrowRef = useRef(false);
   const onRequestClosePanelsRef = useRef(onRequestClosePanels);
   onRequestClosePanelsRef.current = onRequestClosePanels;
 
-  // Shell width → isNarrow (drives the overlay flag).
+  // Shell width → isNarrow. On the narrow transition we collapse the sidebar
+  // to the icon rail rather than overlaying it; overlay only triggers if the
+  // user manually re-expands the sidebar in narrow mode. Auto-collapsing is
+  // restored when the window grows back above the threshold.
   useEffect(() => {
     if (disabled) return;
     const el = shellRef.current;
@@ -53,7 +57,19 @@ export function useSidebarOverlayEffects(opts: {
       const width = readStableObservedWidth(entry);
       if (width === null) return;
       const next = width < CONTENT_MIN_WIDTH + sidebarWidth;
-      useSidebarOverlayStore.getState().setNarrow(next);
+      const store = useSidebarOverlayStore.getState();
+      if (next && !store.isNarrow) {
+        if (!store.isCollapsed) {
+          didAutoCollapseOnNarrowRef.current = true;
+          store.setCollapsed(true);
+        }
+      } else if (!next && store.isNarrow) {
+        if (didAutoCollapseOnNarrowRef.current) {
+          didAutoCollapseOnNarrowRef.current = false;
+          store.setCollapsed(false);
+        }
+      }
+      store.setNarrow(next);
     });
     ro.observe(el);
     return () => ro.disconnect();

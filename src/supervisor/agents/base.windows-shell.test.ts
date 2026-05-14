@@ -1,5 +1,9 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  buildAgentCommand,
   buildWindowsCommand,
   buildWindowsCmdCommand,
   quotePosixShellArg,
@@ -47,6 +51,7 @@ describe("quotePosixShellArg", () => {
 
 describe.skipIf(process.platform !== "win32")("buildWindowsCommand", () => {
   const originalPlatform = process.platform;
+  const tempDirs: string[] = [];
 
   beforeEach(() => {
     Object.defineProperty(process, "platform", { value: "win32", configurable: true });
@@ -55,6 +60,9 @@ describe.skipIf(process.platform !== "win32")("buildWindowsCommand", () => {
   afterEach(() => {
     Object.defineProperty(process, "platform", { value: originalPlatform, configurable: true });
     vi.restoreAllMocks();
+    for (const dir of tempDirs.splice(0)) {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("wraps spawns through pwsh.exe when PowerShell 7 is available", () => {
@@ -93,6 +101,39 @@ describe.skipIf(process.platform !== "win32")("buildWindowsCommand", () => {
     expect(spec.command).toBe("C:\\Windows\\System32\\cmd.exe");
     expect(spec.args.slice(0, 3)).toEqual(["/d", "/s", "/c"]);
     expect(spec.args.at(-1)).toBe(SPICY_PROMPT);
+  });
+
+  it("bypasses npm .cmd shims so multiline args stay in argv", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lightcode-cmd-shim-"));
+    tempDirs.push(dir);
+    const scriptPath = join(dir, "node_modules", "@openai", "codex", "bin", "codex.js");
+    mkdirSync(join(scriptPath, ".."), { recursive: true });
+    writeFileSync(scriptPath, "", "utf8");
+    const nodePath = join(dir, "node.exe");
+    writeFileSync(nodePath, "", "utf8");
+    const shimPath = join(dir, "codex.cmd");
+    writeFileSync(
+      shimPath,
+      [
+        "@ECHO off",
+        "SETLOCAL",
+        'endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%dp0%\\node.exe"  "%dp0%\\node_modules\\@openai\\codex\\bin\\codex.js" %*',
+      ].join("\r\n"),
+      "utf8",
+    );
+
+    const spec = buildAgentCommand(
+      { kind: "windows", path: "C:\\repo" },
+      "codex",
+      ["debug", "prompt-input", "hi\n1\n2"],
+      shimPath,
+    );
+    const script = decodePowerShellEncoded(spec.args.at(-1)!);
+
+    expect(script).toContain(quotePowerShellLiteral(nodePath));
+    expect(script).toContain(quotePowerShellLiteral(scriptPath));
+    expect(script).toContain(quotePowerShellLiteral("hi\n1\n2"));
+    expect(script).not.toContain(quotePowerShellLiteral(shimPath));
   });
 });
 
