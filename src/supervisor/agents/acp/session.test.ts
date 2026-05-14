@@ -657,3 +657,83 @@ describe("ACP turn config sync", () => {
     });
   });
 });
+
+describe("ACP permission request handling", () => {
+  function invokePermission(
+    session: TestableAcpSession,
+    options: Array<{ optionId: string; name: string; kind: string }>,
+  ): Promise<unknown> {
+    const handler = (
+      session as unknown as { handlePermissionRequest: Function }
+    ).handlePermissionRequest.bind(session);
+    return handler({
+      sessionId: "session-1",
+      toolCall: { toolCallId: "tc-1", title: "test", kind: "execute" },
+      options,
+    });
+  }
+
+  it("auto-approves when approvalPolicy is 'never' and an allow option exists", async () => {
+    const { listener, session } = makeConfigSyncSession({
+      availableModeIds: ["agent"],
+      currentConfig: {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "never",
+      },
+    });
+
+    const response = await invokePermission(session, [
+      { optionId: "deny", name: "Deny", kind: "reject_once" },
+      { optionId: "allow", name: "Allow", kind: "allow_once" },
+    ]);
+
+    expect(response).toEqual({ outcome: { outcome: "selected", optionId: "allow" } });
+    // The bypass path never emits a runtime-request event or a needs_approval
+    // status — those are only for prompts that reach the renderer.
+    expect(listener.onRuntimeEvent).not.toHaveBeenCalled();
+    expect(listener.onUpdate).not.toHaveBeenCalled();
+  });
+
+  it("prefers allow_always over allow_once when bypassing", async () => {
+    const { session } = makeConfigSyncSession({
+      availableModeIds: ["agent"],
+      currentConfig: {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "never",
+      },
+    });
+
+    const response = await invokePermission(session, [
+      { optionId: "once", name: "Allow once", kind: "allow_once" },
+      { optionId: "always", name: "Allow always", kind: "allow_always" },
+    ]);
+
+    expect(response).toEqual({ outcome: { outcome: "selected", optionId: "always" } });
+  });
+
+  it("falls back to UI prompt when approvalPolicy is not 'never'", async () => {
+    const { listener, session } = makeConfigSyncSession({
+      availableModeIds: ["agent"],
+      currentConfig: {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "default",
+      },
+    });
+
+    // Don't await — this should hang waiting for resolveServerRequest.
+    void invokePermission(session, [{ optionId: "allow", name: "Allow", kind: "allow_once" }]);
+    await Promise.resolve();
+
+    expect(listener.onUpdate).toHaveBeenCalledWith({
+      status: "needs_approval",
+      attention: "needs_approval",
+    });
+    expect(listener.onRuntimeEvent).toHaveBeenCalled();
+  });
+});

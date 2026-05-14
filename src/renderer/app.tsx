@@ -228,6 +228,12 @@ export function App() {
       productAnalyticsStarted = true;
       captureAppStarted();
     }
+    // Refresh the ACP registry once on app start so installed-version
+    // metadata (and any pending auto-updates) are in sync without waiting
+    // for the user to open the registry settings panel.
+    void readBridge()
+      .listAcpRegistry()
+      .catch(() => undefined);
     return () => {
       threadStateNotificationsArmed = false;
       void flushProductAnalytics();

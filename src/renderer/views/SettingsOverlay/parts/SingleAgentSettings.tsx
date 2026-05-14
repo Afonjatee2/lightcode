@@ -1,4 +1,4 @@
-import { startTransition, useState } from "react";
+import { startTransition, useEffect, useState } from "react";
 import {
   Button,
   Label,
@@ -10,7 +10,7 @@ import {
   type Selection,
   Virtualizer,
 } from "@heroui/react";
-import { AlertTriangle, LogIn, LogOut, Save } from "lucide-react";
+import { AlertTriangle, ArrowUpCircle, LogIn, LogOut, Save } from "lucide-react";
 import type {
   AgentEnvVarAuthMethod,
   AgentOwnedAuthMethod,
@@ -156,7 +156,10 @@ function envLabel(status: AgentStatus): string {
   return "";
 }
 
-function formatAgentMetadataSummary(status: AgentStatus): string | undefined {
+function formatAgentMetadataSummary(
+  status: AgentStatus,
+  options?: { includeAuthFallback?: boolean },
+): string | undefined {
   const metadata = status.providerMetadata;
   const identityParts: string[] = [];
   if (metadata?.authenticatedAs) identityParts.push(metadata.authenticatedAs);
@@ -172,13 +175,20 @@ function formatAgentMetadataSummary(status: AgentStatus): string | undefined {
     return `${providers.length} ${noun} · ${labels}`;
   }
 
+  if (options?.includeAuthFallback === false) return undefined;
   if (metadata?.authMethod) return `via ${metadata.authMethod}`;
   if (status.authState === "authenticated") return "Signed in";
   return undefined;
 }
 
-function AgentMetadataLine(props: { status: AgentStatus; showEnvironmentLabel: boolean }) {
-  const summary = formatAgentMetadataSummary(props.status);
+function AgentMetadataLine(props: {
+  status: AgentStatus;
+  showEnvironmentLabel: boolean;
+  includeAuthFallback: boolean;
+}) {
+  const summary = formatAgentMetadataSummary(props.status, {
+    includeAuthFallback: props.includeAuthFallback,
+  });
   if (!summary) return null;
   const prefix = props.showEnvironmentLabel ? `${envLabel(props.status)} · ` : "";
   return <p className="truncate text-xs text-muted">{`${prefix}${summary}`}</p>;
@@ -278,7 +288,10 @@ function AcpAgentAuthEnvRow(props: {
   const { status, agentAuthMethod, showEnvironmentLabel } = props;
   const isMissing = status.authState === "missing";
   const isAuthenticated = status.authState === "authenticated";
-  const envSuffix = showEnvironmentLabel ? ` ${envLabel(status)}` : "";
+  const env = envLabel(status);
+  const envSuffix = showEnvironmentLabel && env ? ` ${env}` : "";
+  const envScope = env ? ` for ${env}` : "";
+  const envSubject = env || "Agent";
   const canLogin = isMissing && agentAuthMethod !== undefined;
   const canLogout = isAuthenticated;
   const headerLabel = isMissing
@@ -286,24 +299,24 @@ function AcpAgentAuthEnvRow(props: {
     : isAuthenticated
       ? "Signed in"
       : "Authentication";
+  const headerPrefix = env ? `${env} · ` : "";
   const description = isMissing
     ? agentAuthMethod
-      ? `Complete ${agentAuthMethod.name} sign-in for ${envLabel(status)}.`
-      : `${envLabel(status)} needs authentication.`
+      ? `Complete ${agentAuthMethod.name} sign-in${envScope}.`
+      : `${envSubject} needs authentication.`
     : isAuthenticated
-      ? `${envLabel(status)} credentials are configured.`
+      ? `${envSubject} credentials are configured.`
       : "";
 
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-surface-secondary px-3 py-2 text-foreground">
+    <div className="flex items-start justify-between gap-4">
       <div className="flex min-w-0 items-start gap-2">
         <div className="min-w-0 flex-1">
           <p className={`text-sm font-medium ${isMissing ? "text-warning" : ""}`}>
-            {envLabel(status)} ·{" "}
             {isMissing ? (
-              <AlertTriangle className="inline size-4 -translate-y-px text-warning" />
+              <AlertTriangle className="mr-1.5 inline size-4 -translate-y-px text-warning" />
             ) : null}
-            {isMissing ? " " : ""}
+            {headerPrefix}
             {headerLabel}
           </p>
           {description ? <p className="text-xs text-muted">{description}</p> : null}
@@ -349,6 +362,8 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   const [authPending, setAuthPending] = useState(false);
   const [authPendingMessage, setAuthPendingMessage] = useState<string | undefined>();
   const [authPendingEnvKey, setAuthPendingEnvKey] = useState<string | undefined>();
+  const [latestRegistryVersion, setLatestRegistryVersion] = useState<string | undefined>();
+  const [updatePending, setUpdatePending] = useState(false);
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
   const projects = useAppStore((state) => state.projects);
@@ -360,7 +375,27 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   const agent = installedHere[0] ?? installedWsl[0];
   const isDisabled = useSharedSettings((s) => s.disabledAgents.includes(props.agentKind));
   const setAgentDisabled = useSharedSettings((s) => s.setAgentDisabled);
+  const installedRegistryRecord = useSharedSettings(
+    (s) => s.acpRegistryInstalledAgents[acpGenericInstanceId(props.agentKind) ?? ""],
+  );
   const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
+
+  const registryAgentId = acpGenericInstanceId(props.agentKind);
+  useEffect(() => {
+    if (!registryAgentId) return;
+    let cancelled = false;
+    readBridge()
+      .listAcpRegistry()
+      .then((result) => {
+        if (cancelled) return;
+        const match = result.agents.find((entry) => entry.id === registryAgentId);
+        setLatestRegistryVersion(match?.version);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [registryAgentId]);
 
   if (!agent) {
     return (
@@ -383,9 +418,6 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     for (const s of installedHere) versionRows.push({ label: envLabel(s), version: s.version });
     for (const s of installedWsl) versionRows.push({ label: envLabel(s), version: s.version });
   }
-  const metadataStatuses = installedStatuses.filter(
-    (status) => formatAgentMetadataSummary(status) !== undefined,
-  );
   const showEnvironmentMetadataLabels = installedStatuses.length > 1;
   const missingAuthStatuses = installedStatuses.filter((status) => status.authState === "missing");
   const envVarAuthMethod =
@@ -495,6 +527,13 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     loginCommand !== undefined ||
     missingAuthStatuses.length > 0 ||
     logoutStatuses.length > 0;
+  const includeAuthFallbackMetadata = !hasAuthSettings;
+  const metadataStatuses = installedStatuses.filter(
+    (status) =>
+      formatAgentMetadataSummary(status, {
+        includeAuthFallback: includeAuthFallbackMetadata,
+      }) !== undefined,
+  );
   const authMissing = missingAuthStatuses.length > 0;
   const missingAuthLabel = formatStatusList(missingAuthStatuses);
   const showAuthEnvironmentLabels = installedStatuses.length > 1;
@@ -536,6 +575,25 @@ export function SingleAgentSettings(props: { agentKind: string }) {
       .finally(() => setAuthPending(false));
   };
 
+  const installedVersion = installedRegistryRecord?.version ?? agent.version;
+  const updateAvailable =
+    acpInstanceId !== undefined &&
+    latestRegistryVersion !== undefined &&
+    installedVersion !== undefined &&
+    latestRegistryVersion !== installedVersion;
+  const performUpdate = () => {
+    if (!acpInstanceId || !updateAvailable) return;
+    setUpdatePending(true);
+    readBridge()
+      .updateAcpRegistryAgent({ agentId: acpInstanceId })
+      .then(() => readBridge().refreshAgentStatuses(wslDistros, { agentKinds: [props.agentKind] }))
+      .then(() => toast.success(`${agent.label} updated to v${latestRegistryVersion}.`))
+      .catch((error) =>
+        toast.danger(error instanceof Error ? error.message : `Unable to update ${agent.label}.`),
+      )
+      .finally(() => setUpdatePending(false));
+  };
+
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
       <div className="mx-auto max-w-[720px]">
@@ -548,6 +606,12 @@ export function SingleAgentSettings(props: { agentKind: string }) {
               className="size-5"
             />
             <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
+            {updateAvailable ? (
+              <Button size="sm" variant="ghost" isPending={updatePending} onPress={performUpdate}>
+                <ArrowUpCircle className="size-4" />
+                Update to v{latestRegistryVersion}
+              </Button>
+            ) : null}
           </div>
           {versionRows.length > 0 ? (
             <div className="mt-1 space-y-0.5">
@@ -568,6 +632,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                   key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}`}
                   status={status}
                   showEnvironmentLabel={showEnvironmentMetadataLabels}
+                  includeAuthFallback={includeAuthFallbackMetadata}
                 />
               ))}
             </div>
@@ -597,7 +662,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                             <Input
                               key={variable.name}
                               aria-label={variable.label ?? variable.name}
-                              className="max-w-[22rem]"
+                              className="w-full"
                               placeholder={variable.label ?? variable.name}
                               type={
                                 variable.secret === false || (!hasAuthValue && allEnvVarSaved)
@@ -650,16 +715,18 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                       </div>
                     </div>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-2">
+                  <div className="flex shrink-0 flex-row items-center gap-2">
                     <Button
                       size="sm"
                       variant="tertiary"
+                      isIconOnly
+                      aria-label="Save"
                       isDisabled={!canSaveEnvAuth}
                       isPending={authPending}
                       data-acp-auth-save=""
                       onPress={saveEnvAuth}
                     >
-                      Save
+                      <Save className="size-4" />
                     </Button>
                   </div>
                 </div>
@@ -682,246 +749,246 @@ export function SingleAgentSettings(props: { agentKind: string }) {
               })}
             </div>
           ) : hasAuthSettings ? (
-            <div
-              className={`flex items-start justify-between gap-4 rounded-xl border px-3 py-2 ${
-                authMissing
-                  ? "border-warning/35 bg-warning/10 text-warning"
-                  : "border-border bg-surface-secondary text-foreground"
-              }`}
-            >
-              <div className="flex min-w-0 items-start gap-2">
-                {authMissing ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : null}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">
-                    {authMissing ? "Login required" : "Authentication"}
-                  </p>
-                  <p className={`text-xs ${authMissing ? "text-warning/85" : "text-muted"}`}>
-                    {authMissing
-                      ? `${missingAuthLabel ? `${missingAuthLabel} needs authentication. ` : ""}${
-                          envVarAuthMethod
-                            ? agentAuth
-                              ? `Complete ${agentAuth.method.name} sign-in or save ${envVarAuthMethod.name} credentials, then detected agents will refresh.`
-                              : `Save ${envVarAuthMethod.name} credentials, then detected agents will refresh.`
-                            : agentAuth
-                              ? `Complete ${agentAuth.method.name} sign-in, then detected agents will refresh.`
-                              : loginCommand
-                                ? `Run ${loginCommand} to sign in.`
-                                : "Sign in with the agent CLI, then refresh detected agents."
-                        }`
-                      : envVarAuthMethod
-                        ? `Saved ${envVarAuthMethod.name} credentials are configured. Enter a new value to replace them.`
-                        : agentAuth
-                          ? `Sign in again with ${agentAuth.method.name}.`
-                          : loginCommand
-                            ? `Run ${loginCommand} again to refresh credentials.`
-                            : "Credentials are configured."}
-                  </p>
-                  {authPendingMessage ? (
-                    <p className={`mt-1 text-xs ${authMissing ? "text-warning/85" : "text-muted"}`}>
-                      {authPendingMessage}
+            <div className="space-y-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-medium ${authMissing ? "text-warning" : ""}`}>
+                      {authMissing ? (
+                        <AlertTriangle className="mr-1.5 inline size-4 -translate-y-px text-warning" />
+                      ) : null}
+                      {authMissing ? "Login required" : "Authentication"}
                     </p>
-                  ) : null}
-                  {envVarAuthMethod && acpInstanceId ? (
-                    <div className="mt-3 flex flex-col gap-2">
-                      {envVarAuthMethod.vars.map((variable) => {
-                        const hasAuthValue = Object.prototype.hasOwnProperty.call(
-                          authValues,
-                          variable.name,
-                        );
-                        return (
-                          <Input
-                            key={variable.name}
-                            aria-label={variable.label ?? variable.name}
-                            className="max-w-[22rem]"
-                            placeholder={variable.label ?? variable.name}
-                            type={
-                              variable.secret === false || (!hasAuthValue && !authMissing)
-                                ? "text"
-                                : "password"
-                            }
-                            value={
-                              hasAuthValue
-                                ? (authValues[variable.name] ?? "")
-                                : authMissing
-                                  ? ""
-                                  : SAVED_SECRET_MASK
-                            }
-                            onFocus={() => {
-                              if (!authMissing && !hasAuthValue) {
-                                setAuthValues((current) => ({ ...current, [variable.name]: "" }));
-                              }
-                            }}
-                            onBlur={(event) => {
-                              if (authMissing) return;
-                              if (
-                                event.relatedTarget instanceof HTMLElement &&
-                                event.relatedTarget.closest("[data-acp-auth-save]")
-                              ) {
-                                return;
-                              }
-                              setAuthValues((current) => {
-                                if (!Object.prototype.hasOwnProperty.call(current, variable.name)) {
-                                  return current;
-                                }
-                                const next = { ...current };
-                                delete next[variable.name];
-                                return next;
-                              });
-                            }}
-                            onChange={(event) =>
-                              setAuthValues((current) => ({
-                                ...current,
-                                [variable.name]: event.target.value,
-                              }))
-                            }
-                          />
-                        );
-                      })}
-                    </div>
-                  ) : null}
+                    <p className="text-xs text-muted">
+                      {authMissing
+                        ? `${missingAuthLabel ? `${missingAuthLabel} needs authentication. ` : ""}${
+                            envVarAuthMethod
+                              ? agentAuth
+                                ? `Complete ${agentAuth.method.name} sign-in or save ${envVarAuthMethod.name} credentials, then detected agents will refresh.`
+                                : `Save ${envVarAuthMethod.name} credentials, then detected agents will refresh.`
+                              : agentAuth
+                                ? `Complete ${agentAuth.method.name} sign-in, then detected agents will refresh.`
+                                : loginCommand
+                                  ? `Run ${loginCommand} to sign in.`
+                                  : "Sign in with the agent CLI, then refresh detected agents."
+                          }`
+                        : envVarAuthMethod
+                          ? `Saved ${envVarAuthMethod.name} credentials are configured. Enter a new value to replace them.`
+                          : agentAuth
+                            ? `Sign in again with ${agentAuth.method.name}.`
+                            : loginCommand
+                              ? `Run ${loginCommand} again to refresh credentials.`
+                              : "Credentials are configured."}
+                    </p>
+                    {authPendingMessage ? (
+                      <p className="mt-1 text-xs text-muted">{authPendingMessage}</p>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              {showEnvVarOnly && acpInstanceId ? (
-                <div className="flex shrink-0 flex-row items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="tertiary"
-                    isIconOnly
-                    aria-label="Save"
-                    isDisabled={!canSaveEnvAuth}
-                    isPending={authPending}
-                    data-acp-auth-save=""
-                    onPress={saveEnvAuth}
-                  >
-                    <Save className="size-4" />
-                  </Button>
-                  {/* Env-var credentials are shared across envs — a single
-                      "Logout" clears them for all environments. */}
-                  <Button
-                    size="sm"
-                    variant="tertiary"
-                    isIconOnly
-                    aria-label="Logout"
-                    isPending={authPending}
-                    onPress={clearEnvVarCredentials}
-                  >
-                    <LogOut className="size-4 text-danger" />
-                  </Button>
-                </div>
-              ) : agentAuth && acpInstanceId ? (
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  {(agentAuthEntries.length > 0 ? agentAuthEntries : [agentAuth]).map(
-                    (entry, index) => (
-                      <Button
-                        key={`${entry.status.kind}-${entry.status.envKind ?? "native"}-${entry.status.envDistro ?? index}`}
-                        size="sm"
-                        variant="tertiary"
-                        isPending={authPending}
-                        onPress={() => authenticateAgent(entry)}
-                      >
-                        <LogIn className="size-4" />
-                        {authMissing ? "Login" : "Re-login"}
-                        {showAuthEnvironmentLabels ? ` ${envLabel(entry.status)}` : ""}
-                      </Button>
-                    ),
-                  )}
-                  {envVarAuthMethod ? (
+                {showEnvVarOnly && acpInstanceId ? (
+                  <div className="flex shrink-0 flex-row items-center gap-2">
                     <Button
                       size="sm"
                       variant="tertiary"
+                      isIconOnly
+                      aria-label="Save"
                       isDisabled={!canSaveEnvAuth}
                       isPending={authPending}
                       data-acp-auth-save=""
                       onPress={saveEnvAuth}
                     >
-                      Save key
+                      <Save className="size-4" />
                     </Button>
-                  ) : null}
-                  {logoutStatuses.map((status, index) => (
+                    {/* Env-var credentials are shared across envs — a single
+                      "Logout" clears them for all environments. */}
                     <Button
-                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
                       size="sm"
                       variant="tertiary"
+                      isIconOnly
+                      aria-label="Logout"
                       isPending={authPending}
-                      onPress={() => logoutAgent(status)}
+                      onPress={clearEnvVarCredentials}
                     >
-                      <LogOut className="size-4" />
-                      Logout
-                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                      <LogOut className="size-4 text-danger" />
                     </Button>
-                  ))}
-                </div>
-              ) : envVarAuthMethod && acpInstanceId ? (
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="tertiary"
-                    isDisabled={!canSaveEnvAuth}
-                    isPending={authPending}
-                    data-acp-auth-save=""
-                    onPress={saveEnvAuth}
-                  >
-                    Save
-                  </Button>
-                  {logoutStatuses.map((status, index) => (
+                  </div>
+                ) : agentAuth && acpInstanceId ? (
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    {(agentAuthEntries.length > 0 ? agentAuthEntries : [agentAuth]).map(
+                      (entry, index) => (
+                        <Button
+                          key={`${entry.status.kind}-${entry.status.envKind ?? "native"}-${entry.status.envDistro ?? index}`}
+                          size="sm"
+                          variant="tertiary"
+                          isPending={authPending}
+                          onPress={() => authenticateAgent(entry)}
+                        >
+                          <LogIn className="size-4" />
+                          {authMissing ? "Login" : "Re-login"}
+                          {showAuthEnvironmentLabels ? ` ${envLabel(entry.status)}` : ""}
+                        </Button>
+                      ),
+                    )}
+                    {envVarAuthMethod ? (
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        isIconOnly
+                        aria-label="Save"
+                        isDisabled={!canSaveEnvAuth}
+                        isPending={authPending}
+                        data-acp-auth-save=""
+                        onPress={saveEnvAuth}
+                      >
+                        <Save className="size-4" />
+                      </Button>
+                    ) : null}
+                    {logoutStatuses.map((status, index) => (
+                      <Button
+                        key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                        size="sm"
+                        variant="tertiary"
+                        isPending={authPending}
+                        onPress={() => logoutAgent(status)}
+                      >
+                        <LogOut className="size-4" />
+                        Logout
+                        {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                      </Button>
+                    ))}
+                  </div>
+                ) : envVarAuthMethod && acpInstanceId ? (
+                  <div className="flex shrink-0 flex-col items-end gap-2">
                     <Button
-                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
                       size="sm"
                       variant="tertiary"
+                      isIconOnly
+                      aria-label="Save"
+                      isDisabled={!canSaveEnvAuth}
                       isPending={authPending}
-                      onPress={() => logoutAgent(status)}
+                      data-acp-auth-save=""
+                      onPress={saveEnvAuth}
                     >
-                      <LogOut className="size-4" />
-                      Logout
-                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                      <Save className="size-4" />
                     </Button>
-                  ))}
-                </div>
-              ) : loginStatus && loginCommand ? (
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="tertiary"
-                    onPress={() =>
-                      runAgentLoginCommand({
-                        label: loginStatus.label,
-                        command: loginCommand,
-                        ...(loginProject ? { project: loginProject } : {}),
-                      })
-                    }
-                  >
-                    <LogIn className="size-4" />
-                    {authMissing ? "Login" : "Re-login"}
-                  </Button>
-                  {logoutStatuses.map((status, index) => (
+                    {logoutStatuses.map((status, index) => (
+                      <Button
+                        key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                        size="sm"
+                        variant="tertiary"
+                        isPending={authPending}
+                        onPress={() => logoutAgent(status)}
+                      >
+                        <LogOut className="size-4" />
+                        Logout
+                        {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                      </Button>
+                    ))}
+                  </div>
+                ) : loginStatus && loginCommand ? (
+                  <div className="flex shrink-0 flex-col items-end gap-2">
                     <Button
-                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
                       size="sm"
                       variant="tertiary"
-                      isPending={authPending}
-                      onPress={() => logoutAgent(status)}
+                      onPress={() =>
+                        runAgentLoginCommand({
+                          label: loginStatus.label,
+                          command: loginCommand,
+                          ...(loginProject ? { project: loginProject } : {}),
+                        })
+                      }
                     >
-                      <LogOut className="size-4" />
-                      Logout
-                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                      <LogIn className="size-4" />
+                      {authMissing ? "Login" : "Re-login"}
                     </Button>
-                  ))}
-                </div>
-              ) : logoutStatuses.length > 0 && acpInstanceId ? (
-                <div className="flex shrink-0 flex-col items-end gap-2">
-                  {logoutStatuses.map((status, index) => (
-                    <Button
-                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
-                      size="sm"
-                      variant="tertiary"
-                      isPending={authPending}
-                      onPress={() => logoutAgent(status)}
-                    >
-                      <LogOut className="size-4" />
-                      Logout
-                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
-                    </Button>
-                  ))}
+                    {logoutStatuses.map((status, index) => (
+                      <Button
+                        key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                        size="sm"
+                        variant="tertiary"
+                        isPending={authPending}
+                        onPress={() => logoutAgent(status)}
+                      >
+                        <LogOut className="size-4" />
+                        Logout
+                        {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                      </Button>
+                    ))}
+                  </div>
+                ) : logoutStatuses.length > 0 && acpInstanceId ? (
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    {logoutStatuses.map((status, index) => (
+                      <Button
+                        key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                        size="sm"
+                        variant="tertiary"
+                        isPending={authPending}
+                        onPress={() => logoutAgent(status)}
+                      >
+                        <LogOut className="size-4" />
+                        Logout
+                        {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                      </Button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+              {envVarAuthMethod && acpInstanceId ? (
+                <div className="flex flex-col gap-2">
+                  {envVarAuthMethod.vars.map((variable) => {
+                    const hasAuthValue = Object.prototype.hasOwnProperty.call(
+                      authValues,
+                      variable.name,
+                    );
+                    return (
+                      <Input
+                        key={variable.name}
+                        aria-label={variable.label ?? variable.name}
+                        className="w-full"
+                        placeholder={variable.label ?? variable.name}
+                        type={
+                          variable.secret === false || (!hasAuthValue && !authMissing)
+                            ? "text"
+                            : "password"
+                        }
+                        value={
+                          hasAuthValue
+                            ? (authValues[variable.name] ?? "")
+                            : authMissing
+                              ? ""
+                              : SAVED_SECRET_MASK
+                        }
+                        onFocus={() => {
+                          if (!authMissing && !hasAuthValue) {
+                            setAuthValues((current) => ({ ...current, [variable.name]: "" }));
+                          }
+                        }}
+                        onBlur={(event) => {
+                          if (authMissing) return;
+                          if (
+                            event.relatedTarget instanceof HTMLElement &&
+                            event.relatedTarget.closest("[data-acp-auth-save]")
+                          ) {
+                            return;
+                          }
+                          setAuthValues((current) => {
+                            if (!Object.prototype.hasOwnProperty.call(current, variable.name)) {
+                              return current;
+                            }
+                            const next = { ...current };
+                            delete next[variable.name];
+                            return next;
+                          });
+                        }}
+                        onChange={(event) =>
+                          setAuthValues((current) => ({
+                            ...current,
+                            [variable.name]: event.target.value,
+                          }))
+                        }
+                      />
+                    );
+                  })}
                 </div>
               ) : null}
             </div>

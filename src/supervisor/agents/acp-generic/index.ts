@@ -43,7 +43,7 @@ export const ACP_GENERIC_KIND_PREFIX = "acp-generic:";
 type AcpAuthMethod = NonNullable<AcpProbeResult["authMethods"]>[number];
 type AcpEnvVarAuthMethod = Extract<AcpAuthMethod, { type: "env_var" }>;
 type AcpTerminalAuthMethod = Extract<AcpAuthMethod, { type: "terminal" }>;
-type AcpAgentAuthMethod = Extract<AcpAuthMethod, { type?: "agent" }>;
+type AcpAgentAuthMethod = Exclude<AcpAuthMethod, AcpEnvVarAuthMethod | AcpTerminalAuthMethod>;
 
 export function isAcpGenericKind(kind: string): boolean {
   return kind.startsWith(ACP_GENERIC_KIND_PREFIX);
@@ -93,8 +93,16 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
     capabilities,
     async detectInstall(ctx?: AgentEnvContext): Promise<AgentStatus> {
       const installed = isProbablyInstalled(cfg.binary);
-      const probeResult = installed
+      const rawProbe = installed
         ? await probeGenericCapabilities(ctx, cfg, instance, label)
+        : undefined;
+      const probeResult = rawProbe
+        ? {
+            ...rawProbe,
+            ...(rawProbe.authMethods
+              ? { authMethods: dedupeAuthMethods(rawProbe.authMethods) }
+              : {}),
+          }
         : undefined;
       const authState: AuthState = resolveGenericAuthState(cfg, instance, probeResult, ctx);
       const loginCommand = resolveGenericLoginCommand(cfg, probeResult);
@@ -199,7 +207,7 @@ function mergeAcpProbeCapabilities(
   probeResult: AcpProbeResult | undefined,
 ): AgentCapability {
   if (!probeResult) return capabilities;
-  return {
+  const merged: AgentCapability = {
     ...capabilities,
     ...(probeResult.models ? { models: probeResult.models } : {}),
     ...(probeResult.efforts ? { efforts: probeResult.efforts } : {}),
@@ -209,6 +217,14 @@ function mergeAcpProbeCapabilities(
     ...(probeResult.approvalPolicies ? { approvalPolicies: probeResult.approvalPolicies } : {}),
     ...(probeResult.slashCommands ? { slashCommands: probeResult.slashCommands } : {}),
   };
+  // Synthetic "never" policy for agents that don't advertise a bypass mode
+  // (e.g. glm-acp-agent). The session layer auto-approves requestPermission
+  // when this policy is selected, so users get the same effect even though
+  // the agent never offered yolo/autopilot at the protocol level.
+  if (merged.approvalPolicies.length === 0 && merged.modes.includes("agent")) {
+    merged.approvalPolicies = [{ id: "never", label: "Bypass approvals" }];
+  }
+  return merged;
 }
 
 function buildGenericCommand(
@@ -264,6 +280,15 @@ function isTerminalAuthMethod(method: AcpAuthMethod): method is AcpTerminalAuthM
 
 function isAgentAuthMethod(method: AcpAuthMethod): method is AcpAgentAuthMethod {
   return !isEnvVarAuthMethod(method) && !isTerminalAuthMethod(method);
+}
+
+// Some ACP agents (e.g. glm-acp-agent) advertise both an env_var method and a
+// typeless "agent" method for the same credential — the agent-owned one is a
+// stub whose authenticate() just acks. Drop those duplicates so the UI shows
+// only the real flow.
+function dedupeAuthMethods(methods: readonly AcpAuthMethod[]): AcpAuthMethod[] {
+  const envVarNames = new Set(methods.filter(isEnvVarAuthMethod).map((method) => method.name));
+  return methods.filter((method) => !(isAgentAuthMethod(method) && envVarNames.has(method.name)));
 }
 
 function resolveGenericAuthState(

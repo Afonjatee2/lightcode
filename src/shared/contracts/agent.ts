@@ -279,6 +279,11 @@ export const installAcpRegistryAgentPayloadSchema = z.object({
 });
 export type InstallAcpRegistryAgentPayload = z.infer<typeof installAcpRegistryAgentPayloadSchema>;
 
+export const updateAcpRegistryAgentPayloadSchema = z.object({
+  agentId: z.string().min(1),
+});
+export type UpdateAcpRegistryAgentPayload = z.infer<typeof updateAcpRegistryAgentPayloadSchema>;
+
 export const removeAcpRegistryAgentPayloadSchema = z.object({
   agentId: z.string().min(1),
 });

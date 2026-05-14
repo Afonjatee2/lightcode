@@ -4,11 +4,13 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { AcpRegistryListResult } from "@/shared/contracts";
 import {
+  autoUpdateAcpRegistryAgents,
   backfillAcpRegistryAgentIcons,
   installAcpRegistryAgent,
   readAcpRegistrySettings,
   resolveRegistryAgentFamilyKind,
   setAcpRegistryAgentAuth,
+  updateAcpRegistryAgent,
 } from "./acpRegistry";
 import { isEncryptedSecret } from "../secretStorage";
 
@@ -129,7 +131,6 @@ describe("ACP registry family mapping", () => {
       registry.agents[0]!.icon,
     );
     expect(settings.agentInstances["glm-acp-agent"]?.icon).toBe(registry.agents[0]!.icon);
-    expect(settings.agentInstances["glm-acp-agent"]?.version).toBe("1.1.3");
   });
 
   it("stores ACP registry auth env vars on the installed generic instance", () => {
@@ -184,5 +185,194 @@ describe("ACP registry family mapping", () => {
     ).toEqual({
       Z_AI_API_KEY: { value: "sk-test", sensitive: true },
     });
+  });
+
+  it("updates an installed ACP agent to a new registry version while preserving credentials", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "lightcode-acp-registry-"));
+    const settingsPath = join(dir, "settings.json");
+    const initialRegistry: AcpRegistryListResult = {
+      version: "1.0.0",
+      agents: [
+        {
+          id: "codex-acp",
+          name: "Codex ACP",
+          version: "1.0.0",
+          description: "Codex via ACP",
+          distribution: { npx: { package: "codex-acp@1.0.0" } },
+        },
+      ],
+    };
+    const updatedRegistry: AcpRegistryListResult = {
+      version: "1.0.0",
+      agents: [
+        {
+          id: "codex-acp",
+          name: "Codex ACP",
+          version: "1.1.0",
+          description: "Codex via ACP",
+          distribution: { npx: { package: "codex-acp@1.1.0" } },
+        },
+      ],
+    };
+
+    const fetchMock =
+      vi.fn<() => Promise<{ ok: boolean; json: () => Promise<AcpRegistryListResult> }>>();
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => initialRegistry });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => updatedRegistry });
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await installAcpRegistryAgent({ agentId: "codex-acp", baseDir: dir, settingsPath });
+      setAcpRegistryAgentAuth({
+        agentId: "codex-acp",
+        environment: { OPENAI_API_KEY: "sk-secret" },
+        settingsPath,
+      });
+
+      const installed = await updateAcpRegistryAgent({
+        agentId: "codex-acp",
+        baseDir: dir,
+        settingsPath,
+      });
+      expect(installed).toMatchObject([{ id: "codex-acp", version: "1.1.0" }]);
+
+      const settings = readAcpRegistrySettings(settingsPath);
+      expect(settings.agentInstances["codex-acp"]?.version).toBe("1.1.0");
+      expect(settings.agentInstances["codex-acp"]?.config).toMatchObject({
+        binary: "npx",
+        args: ["-y", "codex-acp@1.1.0"],
+      });
+      expect(settings.agentInstances["codex-acp"]?.environment).toEqual({
+        OPENAI_API_KEY: { value: "sk-secret", sensitive: true },
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("rejects updates for agents that are not installed", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "lightcode-acp-registry-"));
+    const settingsPath = join(dir, "settings.json");
+    await expect(
+      updateAcpRegistryAgent({ agentId: "codex-acp", baseDir: dir, settingsPath }),
+    ).rejects.toThrow(/not installed/i);
+  });
+
+  it("auto-updates installed agents whose registry version differs", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "lightcode-acp-registry-"));
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        acpRegistryInstalledAgents: {
+          "codex-acp": {
+            id: "codex-acp",
+            name: "Codex ACP",
+            version: "1.0.0",
+            installedAt: new Date(0).toISOString(),
+            adapterKind: "acp-generic:codex-acp",
+            installKind: "generic",
+          },
+        },
+        agentInstances: {
+          "codex-acp": {
+            id: "codex-acp",
+            driver: "acp-generic",
+            displayName: "Codex ACP",
+            version: "1.0.0",
+            enabled: true,
+            config: {
+              binary: "npx",
+              args: ["-y", "codex-acp@1.0.0"],
+              authMode: "none",
+            },
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const registry: AcpRegistryListResult = {
+      version: "1.0.0",
+      agents: [
+        {
+          id: "codex-acp",
+          name: "Codex ACP",
+          version: "1.2.0",
+          description: "Codex via ACP",
+          distribution: { npx: { package: "codex-acp@1.2.0" } },
+        },
+      ],
+    };
+
+    const result = await autoUpdateAcpRegistryAgents({
+      registry,
+      baseDir: dir,
+      settingsPath,
+    });
+    expect(result.updated).toEqual(["codex-acp"]);
+    expect(result.failed).toEqual([]);
+
+    const settings = readAcpRegistrySettings(settingsPath);
+    expect(settings.acpRegistryInstalledAgents["codex-acp"]?.version).toBe("1.2.0");
+    expect(settings.agentInstances["codex-acp"]?.version).toBe("1.2.0");
+    expect(settings.agentInstances["codex-acp"]?.config).toMatchObject({
+      args: ["-y", "codex-acp@1.2.0"],
+    });
+  });
+
+  it("auto-update skips installs that are already current", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "lightcode-acp-registry-"));
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        acpRegistryInstalledAgents: {
+          "codex-acp": {
+            id: "codex-acp",
+            name: "Codex ACP",
+            version: "1.0.0",
+            installedAt: new Date(0).toISOString(),
+            adapterKind: "acp-generic:codex-acp",
+            installKind: "generic",
+          },
+        },
+        agentInstances: {
+          "codex-acp": {
+            id: "codex-acp",
+            driver: "acp-generic",
+            displayName: "Codex ACP",
+            version: "1.0.0",
+            enabled: true,
+            config: {
+              binary: "npx",
+              args: ["-y", "codex-acp@1.0.0"],
+              authMode: "none",
+            },
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    const registry: AcpRegistryListResult = {
+      version: "1.0.0",
+      agents: [
+        {
+          id: "codex-acp",
+          name: "Codex ACP",
+          version: "1.0.0",
+          description: "Codex via ACP",
+          distribution: { npx: { package: "codex-acp@1.0.0" } },
+        },
+      ],
+    };
+
+    const result = await autoUpdateAcpRegistryAgents({
+      registry,
+      baseDir: dir,
+      settingsPath,
+    });
+    expect(result.updated).toEqual([]);
+    expect(result.failed).toEqual([]);
   });
 });

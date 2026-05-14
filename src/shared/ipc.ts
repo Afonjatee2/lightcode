@@ -6,6 +6,7 @@ import type { KeybindingsConfig } from "./keybindings";
 import {
   closeThreadPayloadSchema,
   installAcpRegistryAgentPayloadSchema,
+  updateAcpRegistryAgentPayloadSchema,
   authenticateAcpRegistryAgentPayloadSchema,
   logoutAcpRegistryAgentPayloadSchema,
   createFileCheckpointPayloadSchema,
@@ -225,6 +226,7 @@ import type {
   LogoutAcpRegistryAgentPayload,
   RemoveAcpRegistryAgentPayload,
   SetAcpRegistryAgentAuthPayload,
+  UpdateAcpRegistryAgentPayload,
 } from "./contracts";
 
 const emptyPayloadSchema = z.object({});
@@ -479,6 +481,11 @@ export const groupedIpcProcedures = {
       AcpRegistryMutationResult,
       "supervisor"
     >("installAcpRegistryAgent", "supervisor", installAcpRegistryAgentPayloadSchema),
+    updateAcpRegistryAgent: definePayloadProcedure<
+      UpdateAcpRegistryAgentPayload,
+      AcpRegistryMutationResult,
+      "supervisor"
+    >("updateAcpRegistryAgent", "supervisor", updateAcpRegistryAgentPayloadSchema),
     removeAcpRegistryAgent: definePayloadProcedure<
       RemoveAcpRegistryAgentPayload,
       AcpRegistryMutationResult,
@@ -1067,6 +1074,7 @@ export const ipcProcedureMap = {
   refreshAgentStatuses: groupedIpcProcedures.thread.refreshAgentStatuses,
   listAcpRegistry: groupedIpcProcedures.thread.listAcpRegistry,
   installAcpRegistryAgent: groupedIpcProcedures.thread.installAcpRegistryAgent,
+  updateAcpRegistryAgent: groupedIpcProcedures.thread.updateAcpRegistryAgent,
   removeAcpRegistryAgent: groupedIpcProcedures.thread.removeAcpRegistryAgent,
   setAcpRegistryAgentAuth: groupedIpcProcedures.thread.setAcpRegistryAgentAuth,
   authenticateAcpRegistryAgent: groupedIpcProcedures.thread.authenticateAcpRegistryAgent,

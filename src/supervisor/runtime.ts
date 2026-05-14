@@ -95,6 +95,7 @@ import type {
   InstallAcpRegistryAgentPayload,
   LogoutAcpRegistryAgentPayload,
   SetAcpRegistryAgentAuthPayload,
+  UpdateAcpRegistryAgentPayload,
   SetPendingSteerPayload,
   ClearPendingSteerPayload,
   ListProjectTreePayload,
@@ -131,9 +132,11 @@ import type { SupervisorEvent } from "@/shared/ipc";
 import type { LspMessagePayload, LspStartPayload, LspStopPayload } from "@/shared/lsp";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { joinProjectPosixPath } from "@/shared/wsl";
+import { ACP_GENERIC_KIND_PREFIX } from "./agents/acp-generic";
 import { buildAgentRegistry } from "./agents/registry";
 import {
   authenticateAcpRegistryAgent as authenticateAcpRegistryAgentFromRegistry,
+  autoUpdateAcpRegistryAgents,
   backfillAcpRegistryAgentIcons,
   fetchAcpRegistry,
   installAcpRegistryAgent as installAcpRegistryAgentFromRegistry,
@@ -141,6 +144,7 @@ import {
   readAcpRegistrySettings,
   removeAcpRegistryAgent as removeAcpRegistryAgentFromRegistry,
   setAcpRegistryAgentAuth as setAcpRegistryAgentAuthInRegistry,
+  updateAcpRegistryAgent as updateAcpRegistryAgentFromRegistry,
 } from "./agents/acpRegistry";
 import { prefetchNativeNodeRuntime } from "./runtime/prefetchNativeNode";
 import { readWslCommandOutputAsync, type AgentAdapter } from "./agents/base";
@@ -427,6 +431,14 @@ export class SupervisorRuntime {
     }
   }
 
+  private async refreshAffectedAgentStatus(agentKind: string): Promise<void> {
+    const wslDistros = await this.agentStatusService.listWslDistros();
+    await this.agentStatusService.refreshAgentStatuses({
+      wslDistros,
+      scope: { agentKinds: [agentKind] },
+    });
+  }
+
   async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     return this.agentStatusService.getAgentStatuses(payload);
   }
@@ -437,7 +449,14 @@ export class SupervisorRuntime {
 
   async listAcpRegistry(): Promise<AcpRegistryListResult> {
     const registry = await fetchAcpRegistry();
-    if (backfillAcpRegistryAgentIcons({ registry, settingsPath: this.settingsPath })) {
+    let changed = backfillAcpRegistryAgentIcons({ registry, settingsPath: this.settingsPath });
+    const autoUpdate = await autoUpdateAcpRegistryAgents({
+      registry,
+      baseDir: this.baseDir,
+      settingsPath: this.settingsPath,
+    });
+    if (autoUpdate.updated.length > 0) changed = true;
+    if (changed) {
       this.sharedSettingsCache.invalidate();
       this.refreshAgentRegistryAdapters();
     }
@@ -457,11 +476,26 @@ export class SupervisorRuntime {
     return { installed };
   }
 
+  async updateAcpRegistryAgent(
+    payload: UpdateAcpRegistryAgentPayload,
+  ): Promise<AcpRegistryMutationResult> {
+    const installed = await updateAcpRegistryAgentFromRegistry({
+      agentId: payload.agentId,
+      baseDir: this.baseDir,
+      settingsPath: this.settingsPath,
+    });
+    this.sharedSettingsCache.invalidate();
+    this.refreshAgentRegistryAdapters();
+    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
+    return { installed };
+  }
+
   async removeAcpRegistryAgent(
     payload: RemoveAcpRegistryAgentPayload,
   ): Promise<AcpRegistryMutationResult> {
     const installed = removeAcpRegistryAgentFromRegistry({
       agentId: payload.agentId,
+      baseDir: this.baseDir,
       settingsPath: this.settingsPath,
     });
     this.sharedSettingsCache.invalidate();
@@ -479,6 +513,7 @@ export class SupervisorRuntime {
     });
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
+    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
     return { installed };
   }
 
@@ -494,6 +529,7 @@ export class SupervisorRuntime {
     // adapters so the next status refresh sees the new ack state.
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
+    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
   }
 
   async logoutAcpRegistryAgent(payload: LogoutAcpRegistryAgentPayload): Promise<void> {
@@ -505,6 +541,7 @@ export class SupervisorRuntime {
     });
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
+    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {

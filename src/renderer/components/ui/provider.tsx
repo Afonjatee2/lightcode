@@ -6,7 +6,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Toast } from "@heroui/react";
+import { Toast, toast as heroToast } from "@heroui/react";
 import { Copy } from "lucide-react";
 import { resolveThemeMode } from "@/shared/themeMode";
 import { readBridge } from "@/renderer/bridge";
@@ -30,6 +30,42 @@ function getSystemPrefersDark(): boolean {
   }
 
   return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+interface ToastActionProps {
+  actionProps: Record<string, any> | undefined;
+  actionLabel: string | undefined;
+  isCopyAction: boolean;
+}
+
+function ToastAction({ actionProps, actionLabel, isCopyAction }: ToastActionProps) {
+  if (!actionProps) return null;
+  const { className, ...rest } = actionProps;
+
+  if (isCopyAction) {
+    return (
+      <Toast.ActionButton
+        {...rest}
+        {...(actionLabel ? { "aria-label": actionLabel, title: actionLabel } : {})}
+        isIconOnly
+        size="sm"
+        variant="ghost"
+        className={`absolute right-3 bottom-3 size-7 min-w-7 ${className ?? ""}`}
+      >
+        <Copy className="size-3.5" />
+      </Toast.ActionButton>
+    );
+  }
+
+  return (
+    <Toast.ActionButton
+      size="sm"
+      variant="ghost"
+      fullWidth
+      {...rest}
+      className={`w-full justify-center ${className ?? ""}`}
+    />
+  );
 }
 
 export function AppProvider(props: { children: ReactNode }) {
@@ -98,7 +134,19 @@ export function AppProvider(props: { children: ReactNode }) {
           const { title, description } = normalizeToastContent(variant, rawTitle, rawDescription);
           const onPress = isObject ? (content as any).onPress : undefined;
           const hasOnPress = typeof onPress === "function";
-          const actionProps = isObject ? (content as any).actionProps : undefined;
+          const rawActionProps = isObject ? (content as any).actionProps : undefined;
+          const actionProps = rawActionProps
+            ? {
+                ...rawActionProps,
+                onPress: (event: unknown) => {
+                  try {
+                    rawActionProps.onPress?.(event);
+                  } finally {
+                    heroToast.close(toastItem.key);
+                  }
+                },
+              }
+            : undefined;
           const isToastPressable = hasOnPress && !actionProps;
           const actionLabel = getToastActionLabel(actionProps);
           const isCopyAction = actionLabel?.toLowerCase().startsWith("copy") ?? false;
@@ -149,27 +197,11 @@ export function AppProvider(props: { children: ReactNode }) {
                       )}
                     </Toast.Content>
                   </div>
-                  {isCopyAction ? (
-                    <Toast.ActionButton
-                      {...actionProps}
-                      aria-label={actionLabel}
-                      isIconOnly
-                      size="sm"
-                      title={actionLabel}
-                      variant="ghost"
-                      className={`absolute right-3 bottom-3 size-7 min-w-7 ${actionProps.className ?? ""}`}
-                    >
-                      <Copy className="size-3.5" />
-                    </Toast.ActionButton>
-                  ) : actionProps ? (
-                    <Toast.ActionButton
-                      size="sm"
-                      variant="ghost"
-                      fullWidth
-                      {...actionProps}
-                      className={`w-full justify-center ${actionProps.className ?? ""}`}
-                    />
-                  ) : null}
+                  <ToastAction
+                    actionProps={actionProps}
+                    actionLabel={actionLabel}
+                    isCopyAction={isCopyAction}
+                  />
                 </div>
               )}
               <Toast.CloseButton className="absolute top-3 right-3" />

@@ -27,6 +27,27 @@ import {
   usageFromTokenCounts,
 } from "../contextUsage";
 
+/**
+ * Live progress state we track for an OpenCode subagent (child session). The
+ * `task` tool's part is in the parent session, the actual work runs in a
+ * child session with `parentID === mainSessionId`. The renderer reads
+ * `progress.stepCount` off the parent tool_call payload, so we count unique
+ * tool parts seen in the child session and re-emit `item.updated` on the
+ * parent.
+ */
+export interface OpenCodeSubAgentSessionState {
+  /** Parent task-tool Part.id in the main session. */
+  parentPartID: string;
+  /** Canonical item id of the parent task tool_call. */
+  itemId: string;
+  /** Unique child-session tool partIDs seen → `progress.stepCount`. */
+  toolPartIds: Set<string>;
+  /** Most recent child tool name (for `progress.lastToolName`). */
+  lastToolName?: string;
+  /** First text seen in child reasoning/assistant message (for description). */
+  description?: string;
+}
+
 export interface OpenCodeMapperState {
   threadId: string;
   /** Map AssistantMessage.id → canonical assistant item id. */
@@ -57,6 +78,32 @@ export interface OpenCodeMapperState {
    * id the renderer already painted instead of creating a duplicate.
    */
   pendingUserMessageItemIds: string[];
+  /**
+   * The id of the main (parent) session we're mapping. Set once by the
+   * runtime after `openThread` resolves. Used to recognise sub-sessions
+   * (`Session.parentID === mainSessionId`) so we can surface subagent
+   * progress on the parent `task` tool_call.
+   */
+  mainSessionId: string | null;
+  /**
+   * Latest computed payload for each task-tool Part.id. Subagent progress
+   * updates re-emit `item.updated` with the cached payload plus a fresh
+   * `progress` field, so the rest of the tool_call payload (args, status,
+   * isSubAgent…) survives.
+   */
+  taskToolPayloads: Map<string, Record<string, unknown>>;
+  /**
+   * FIFO queue of task-tool parts whose child session hasn't been linked
+   * yet. Drained when a matching `session.created` arrives.
+   */
+  taskToolsAwaitingChild: Array<{ partID: string; itemId: string }>;
+  /**
+   * FIFO queue of child session ids that arrived before their parent
+   * task-tool part. Drained the next time a task tool starts.
+   */
+  unclaimedChildSessions: string[];
+  /** Map child session id → live progress state. */
+  subAgentSessions: Map<string, OpenCodeSubAgentSessionState>;
 }
 
 export function createOpenCodeMapperState(threadId: string): OpenCodeMapperState {
@@ -70,7 +117,34 @@ export function createOpenCodeMapperState(threadId: string): OpenCodeMapperState
     emittedText: new Map(),
     messageRoles: new Map(),
     pendingUserMessageItemIds: [],
+    mainSessionId: null,
+    taskToolPayloads: new Map(),
+    taskToolsAwaitingChild: [],
+    unclaimedChildSessions: [],
+    subAgentSessions: new Map(),
   };
+}
+
+/**
+ * Record the main session id once `openThread` has resolved. The mapper uses
+ * this to recognise sub-sessions (`Session.parentID === mainSessionId`) when
+ * the `task` tool spawns a subagent.
+ */
+export function setOpenCodeMainSessionId(state: OpenCodeMapperState, sessionId: string): void {
+  state.mainSessionId = sessionId;
+}
+
+/**
+ * True when an event with the given `sessionID` belongs to a child session
+ * we are tracking for subagent progress. The session class uses this to
+ * bypass the per-session SSE filter so child events reach the mapper.
+ */
+export function isOpenCodeChildSession(
+  state: OpenCodeMapperState,
+  sessionID: string | undefined,
+): boolean {
+  if (!sessionID) return false;
+  return state.subAgentSessions.has(sessionID);
 }
 
 function newItemId(prefix: string): string {
@@ -473,6 +547,114 @@ function appendDelta(
   });
 }
 
+/**
+ * Try to link a queued `task` tool part to a queued child session. Pairs
+ * the heads of both queues in FIFO order so concurrent task tools (rare
+ * but possible) stay matched to the order they fired.
+ */
+function tryLinkTaskToolToChildSession(state: OpenCodeMapperState): void {
+  while (state.taskToolsAwaitingChild.length > 0 && state.unclaimedChildSessions.length > 0) {
+    const tool = state.taskToolsAwaitingChild.shift();
+    const childId = state.unclaimedChildSessions.shift();
+    if (!tool || !childId) continue;
+    state.subAgentSessions.set(childId, {
+      parentPartID: tool.partID,
+      itemId: tool.itemId,
+      toolPartIds: new Set(),
+    });
+  }
+}
+
+function emitSubAgentProgressUpdate(
+  state: OpenCodeMapperState,
+  child: OpenCodeSubAgentSessionState,
+  events: RuntimeEvent[],
+): void {
+  const cached = state.taskToolPayloads.get(child.parentPartID);
+  if (!cached) return;
+  const stepCount = child.toolPartIds.size;
+  const progress: Record<string, unknown> = { stepCount };
+  if (child.lastToolName) progress.lastToolName = child.lastToolName;
+  if (child.description) progress.description = child.description;
+  const payload: Record<string, unknown> = { ...cached, progress };
+  state.taskToolPayloads.set(child.parentPartID, payload);
+  events.push({
+    type: "item.updated",
+    threadId: state.threadId,
+    itemId: child.itemId,
+    payload,
+  });
+}
+
+/**
+ * Update progress state and emit an `item.updated` on the parent task tool
+ * when something noteworthy happens in a tracked child session.
+ */
+function applyChildSessionProgress(
+  event: EventSubscribeResponse,
+  state: OpenCodeMapperState,
+  child: OpenCodeSubAgentSessionState,
+  events: RuntimeEvent[],
+): void {
+  switch (event.type) {
+    case "message.part.updated": {
+      const part = event.properties.part;
+      if (part.type === "tool") {
+        child.toolPartIds.add(part.id);
+        const toolDisplay = normalizeToolName(part.tool) === "task" ? "Agent" : part.tool;
+        if (
+          part.state.status === "running" ||
+          part.state.status === "completed" ||
+          part.state.status === "error"
+        ) {
+          child.lastToolName = toolDisplay;
+        }
+        // Re-emit on every transition so `lastToolName` updates land even
+        // when the partID is the same (running → completed) and stepCount
+        // doesn't change.
+        emitSubAgentProgressUpdate(state, child, events);
+        return;
+      }
+      if (part.type === "text" && !child.description) {
+        // Stash the first text the subagent emits as a short description.
+        const trimmed = part.text.trim();
+        if (trimmed.length > 0) {
+          child.description = trimmed.slice(0, 160);
+          emitSubAgentProgressUpdate(state, child, events);
+        }
+      }
+      return;
+    }
+    case "session.idle":
+    case "session.compacted":
+    case "session.deleted": {
+      // Final progress flush; the parent task tool's own
+      // `message.part.updated` (status=completed) will close the item.
+      // Note: we intentionally leave the child entry in `subAgentSessions`
+      // so any straggling events (e.g. message.part.removed) still route
+      // here. It's cleaned up when the parent task tool completes.
+      emitSubAgentProgressUpdate(state, child, events);
+      return;
+    }
+    default:
+      return;
+  }
+}
+
+/**
+ * Tag `item.started` events with `parentItemId` so child-session items are
+ * routed to the sub-agent overlay buffer instead of the main chat timeline.
+ * Mirrors Claude's `tagParent` helper.
+ */
+function tagChildEventsWithParent(events: RuntimeEvent[], parentItemId: string): void {
+  for (let i = 0; i < events.length; i += 1) {
+    const ev = events[i]!;
+    if (ev.type !== "item.started") continue;
+    if ("parentItemId" in ev && typeof ev.parentItemId === "string") continue;
+    events[i] = { ...ev, parentItemId };
+  }
+}
+
 function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent[]): void {
   if (part.type === "text") {
     if (part.synthetic || part.ignored) return;
@@ -504,7 +686,17 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
     const existing = state.toolItems.get(part.id);
     const itemType = existing?.itemType ?? classifyToolItemType(part.tool);
     const itemId = existing?.itemId ?? newItemId("tool");
-    const payload = toolPayload(itemType, part.tool, part.state, part.metadata);
+    const isTask = normalizeToolName(part.tool) === "task";
+    const basePayload = toolPayload(itemType, part.tool, part.state, part.metadata);
+    // Preserve any progress we've already populated from the child session
+    // when re-emitting the tool payload from a parent-side update.
+    const cachedProgress = isTask
+      ? (state.taskToolPayloads.get(part.id)?.progress as Record<string, unknown> | undefined)
+      : undefined;
+    const payload: Record<string, unknown> = cachedProgress
+      ? { ...basePayload, progress: cachedProgress }
+      : basePayload;
+    if (isTask) state.taskToolPayloads.set(part.id, payload);
     if (!existing) {
       state.toolItems.set(part.id, { itemId, itemType });
       events.push({
@@ -514,6 +706,13 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
         itemType,
         payload,
       });
+      // Register the task tool so the first matching `session.created` can
+      // link its child session. If a child session was already announced
+      // before this part landed, claim it now.
+      if (isTask) {
+        state.taskToolsAwaitingChild.push({ partID: part.id, itemId });
+        tryLinkTaskToolToChildSession(state);
+      }
     } else {
       events.push({
         type: "item.updated",
@@ -529,6 +728,16 @@ function handlePart(state: OpenCodeMapperState, part: Part, events: RuntimeEvent
         itemId,
         payload,
       });
+      if (isTask) {
+        state.taskToolPayloads.delete(part.id);
+        // Drop the pending entry if it was never linked.
+        state.taskToolsAwaitingChild = state.taskToolsAwaitingChild.filter(
+          (entry) => entry.partID !== part.id,
+        );
+        for (const [childId, child] of state.subAgentSessions) {
+          if (child.parentPartID === part.id) state.subAgentSessions.delete(childId);
+        }
+      }
     }
     return;
   }
@@ -610,6 +819,61 @@ function questionRequestId(id: string): string {
  * by the session class).
  */
 export function mapOpenCodeEvent(
+  event: EventSubscribeResponse,
+  state: OpenCodeMapperState,
+): RuntimeEvent[] {
+  const events: RuntimeEvent[] = [];
+
+  // Detect subagent child-session creation. OpenCode runs `task` tools in a
+  // fresh session whose `parentID` points at our main session. Queue it for
+  // pairing with a running task-tool part — pair right away if one already
+  // awaits a child.
+  if (event.type === "session.created") {
+    const info = event.properties.info;
+    if (
+      state.mainSessionId &&
+      info.parentID === state.mainSessionId &&
+      !state.subAgentSessions.has(info.id)
+    ) {
+      state.unclaimedChildSessions.push(info.id);
+      tryLinkTaskToolToChildSession(state);
+    }
+    return events;
+  }
+
+  const sessionID = (event.properties as { sessionID?: string } | undefined)?.sessionID;
+  const child = sessionID ? state.subAgentSessions.get(sessionID) : undefined;
+
+  // For tracked child sessions, first update progress on the parent task tool
+  // (this is what powers the "Subagents X/Y" chip's step counter even when the
+  // overlay is closed).
+  if (child) {
+    applyChildSessionProgress(event, state, child, events);
+  }
+
+  const canonicalEvents = mapCanonicalEvent(event, state);
+
+  if (child) {
+    // Tag any new canonical items as belonging to this sub-agent so they get
+    // routed into the overlay buffer rather than the main chat timeline. The
+    // child-session message/part IDs are independent UUIDs from OpenCode, so
+    // they don't collide with parent items in the mapper's shared state maps.
+    tagChildEventsWithParent(canonicalEvents, child.itemId);
+    // Suppress context.updated events from child sessions — token accounting
+    // on the thread tracks the main session only; child sessions have their
+    // own budgets that don't roll up into the parent's display.
+    for (const ev of canonicalEvents) {
+      if (ev.type === "context.updated") continue;
+      events.push(ev);
+    }
+    return events;
+  }
+
+  events.push(...canonicalEvents);
+  return events;
+}
+
+function mapCanonicalEvent(
   event: EventSubscribeResponse,
   state: OpenCodeMapperState,
 ): RuntimeEvent[] {

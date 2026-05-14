@@ -164,6 +164,15 @@
   text-overflow: ellipsis;
 }
 
+/* Keep variant icons tinted, but render the title in the default
+   overlay-foreground color rather than inheriting the variant tint. */
+.toast--success .toast__title,
+.toast--warning .toast__title,
+.toast--danger .toast__title,
+.toast--accent .toast__title {
+  color: var(--overlay-foreground);
+}
+
 /* HeroUI component overrides */
 [data-react-aria-pressable] {
   cursor: default;
@@ -777,6 +786,15 @@ body {
 
 .lightcode-provider-icon--done {
   color: var(--muted);
+}
+
+.lightcode-provider-icon__done-check {
+  position: absolute;
+  top: 15%;
+  left: 15%;
+  width: 70%;
+  height: 70%;
+  pointer-events: none;
 }
 
 /* Streaming-reasoning brain icon: individual SVG paths flicker out of phase to

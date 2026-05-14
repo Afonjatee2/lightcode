@@ -46,7 +46,9 @@ import {
 import {
   closeOpenItems,
   createOpenCodeMapperState,
+  isOpenCodeChildSession,
   mapOpenCodeEvent,
+  setOpenCodeMainSessionId,
   type OpenCodeMapperState,
 } from "./sdkCanonicalMapping";
 
@@ -252,6 +254,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       const id = existing.data?.id;
       if (!id) throw new Error("opencode session.get returned no id");
       this.sessionId = id;
+      if (this.mapperState) setOpenCodeMainSessionId(this.mapperState, id);
       await this.refreshSlashCommands();
       return id;
     }
@@ -264,6 +267,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     const id = created.data?.id;
     if (!id) throw new Error("opencode session.create returned no id");
     this.sessionId = id;
+    if (this.mapperState) setOpenCodeMainSessionId(this.mapperState, id);
     await this.refreshSlashCommands();
     return id;
   }
@@ -454,7 +458,26 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
   private handleSseEvent(event: Event): void {
     const sessionID = (event.properties as { sessionID?: string } | undefined)?.sessionID;
     if (sessionID && (!this.sessionId || sessionID !== this.sessionId)) {
-      return; // Event for another session on the same server.
+      // Subagents run as child sessions with `parentID === this.sessionId`.
+      // We need to see `session.created` for them to start tracking, and we
+      // need to see their subsequent events so the mapper can count steps
+      // for the parent task tool. Everything else from unrelated sessions
+      // on the same server is still dropped.
+      const isChild = this.mapperState
+        ? isOpenCodeChildSession(this.mapperState, sessionID)
+        : false;
+      const isChildBirth =
+        event.type === "session.created" && event.properties.info.parentID === this.sessionId;
+      if (!isChild && !isChildBirth) {
+        return;
+      }
+      // For child-session events, route only through the mapper — skip the
+      // main-session status/permission/question side-effects below.
+      if (this.mapperState) {
+        const canonical = mapOpenCodeEvent(event, this.mapperState);
+        if (canonical.length > 0) this.emitRuntimeEvents(canonical);
+      }
+      return;
     }
 
     if (event.type === "session.status") {

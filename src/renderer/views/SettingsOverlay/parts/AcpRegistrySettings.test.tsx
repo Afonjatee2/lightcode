@@ -23,8 +23,10 @@ const settingsState = {
 const bridge = {
   platform: "darwin" as NodeJS.Platform,
   listAcpRegistry: vi.fn<() => Promise<AcpRegistryListResult>>(),
+  getAgentStatuses: vi.fn<() => Promise<AgentStatusesResponse>>(),
   refreshAgentStatuses: vi.fn<() => Promise<AgentStatusesResponse>>(),
   installAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
+  updateAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
   removeAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
   authenticateAcpRegistryAgent:
     vi.fn<
@@ -160,8 +162,10 @@ describe("AcpRegistrySettings", () => {
     appState.projects = [];
     settingsState.acpRegistryInstalledAgents = {};
     bridge.listAcpRegistry.mockReset().mockResolvedValue(registry);
+    bridge.getAgentStatuses.mockReset().mockResolvedValue(emptyStatusesResponse);
     bridge.refreshAgentStatuses.mockReset().mockResolvedValue(emptyStatusesResponse);
     bridge.installAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
+    bridge.updateAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
     bridge.removeAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
     bridge.authenticateAcpRegistryAgent.mockReset().mockResolvedValue(undefined);
     bridge.focusWindow.mockReset().mockResolvedValue(undefined);
@@ -226,7 +230,7 @@ describe("AcpRegistrySettings", () => {
     render(<AcpRegistrySettings />);
 
     await screen.findByRole("heading", { name: "Agent Registry" });
-    await waitFor(() => expect(bridge.refreshAgentStatuses).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(bridge.getAgentStatuses).toHaveBeenCalledTimes(1));
     bridge.refreshAgentStatuses.mockReturnValueOnce(
       new Promise<AgentStatusesResponse>((resolve) => {
         resolveRefresh = () => resolve(emptyStatusesResponse);
@@ -463,6 +467,57 @@ describe("AcpRegistrySettings", () => {
     });
     await waitFor(() => expect(bridge.focusWindow).toHaveBeenCalled());
     await waitFor(() => expect(bridge.refreshAgentStatuses).toHaveBeenCalled());
+  });
+
+  it("shows an Update button when the registry advertises a newer ACP version", async () => {
+    settingsState.acpRegistryInstalledAgents = {
+      "glm-acp-agent": {
+        id: "glm-acp-agent",
+        name: "GLM Agent",
+        version: "1.0.0",
+        installedAt: new Date(0).toISOString(),
+        adapterKind: "acp-generic:glm-acp-agent",
+        installKind: "generic",
+      },
+    };
+    statusesState.agentStatuses = [makeStatus("acp-generic:glm-acp-agent", { label: "GLM Agent" })];
+
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+    const updateButton = within(glmCard as HTMLElement).getByRole("button", {
+      name: /Update to v1\.1\.3/u,
+    });
+
+    fireEvent.click(updateButton);
+
+    await waitFor(() => {
+      expect(bridge.updateAcpRegistryAgent).toHaveBeenCalledWith({ agentId: "glm-acp-agent" });
+    });
+  });
+
+  it("hides the Update button when the installed ACP version is current", async () => {
+    settingsState.acpRegistryInstalledAgents = {
+      "glm-acp-agent": {
+        id: "glm-acp-agent",
+        name: "GLM Agent",
+        version: "1.1.3",
+        installedAt: new Date(0).toISOString(),
+        adapterKind: "acp-generic:glm-acp-agent",
+        installKind: "generic",
+      },
+    };
+
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+    expect(
+      within(glmCard as HTMLElement).queryByRole("button", { name: /Update to v/u }),
+    ).toBeNull();
   });
 
   it("runs ACP registry auth in the selected WSL environment", async () => {

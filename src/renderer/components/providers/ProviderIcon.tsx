@@ -19,19 +19,42 @@ function externalIconStyle(src: string): CSSProperties {
   };
 }
 
+function DoneCheckOverlay() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 24 24"
+      className="lightcode-provider-icon__done-check text-success"
+    >
+      <path
+        d="M5 13l4 4L19 7"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ExternalProviderIcon(props: { src: string; tone: StatusTone; className?: string }) {
   const style = externalIconStyle(props.src);
   return (
     <span
       className={`lightcode-provider-icon lightcode-provider-icon--external lightcode-provider-icon--${props.tone}${props.className ? ` ${props.className}` : ""}`}
     >
-      <span className="lightcode-provider-icon__mask" style={style} />
+      <span
+        className={`lightcode-provider-icon__mask${props.tone === "done" ? " opacity-40" : ""}`}
+        style={style}
+      />
       {props.tone === "working" ? (
         <span
           className="lightcode-provider-icon__mask lightcode-provider-icon__mask-scan"
           style={style}
         />
       ) : null}
+      {props.tone === "done" ? <DoneCheckOverlay /> : null}
     </span>
   );
 }
@@ -46,7 +69,12 @@ function GenericProviderIcon(props: { label?: string; tone: StatusTone; classNam
     <span
       className={`lightcode-provider-icon lightcode-provider-icon--${props.tone}${props.className ? ` ${props.className}` : ""}`}
     >
-      <span className="lightcode-provider-icon__generic">{fallbackInitial(props.label)}</span>
+      <span
+        className={`lightcode-provider-icon__generic${props.tone === "done" ? " opacity-40" : ""}`}
+      >
+        {fallbackInitial(props.label)}
+      </span>
+      {props.tone === "done" ? <DoneCheckOverlay /> : null}
     </span>
   );
 }

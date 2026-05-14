@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { AssistantMessage, Event, ToolPart, UserMessage } from "@opencode-ai/sdk/v2";
-import { closeOpenItems, createOpenCodeMapperState, mapOpenCodeEvent } from "./sdkCanonicalMapping";
+import type { AssistantMessage, Event, Session, ToolPart, UserMessage } from "@opencode-ai/sdk/v2";
+import {
+  closeOpenItems,
+  createOpenCodeMapperState,
+  mapOpenCodeEvent,
+  setOpenCodeMainSessionId,
+} from "./sdkCanonicalMapping";
 
 function assistantMessage(id: string, overrides: Partial<AssistantMessage> = {}): AssistantMessage {
   return {
@@ -468,6 +473,234 @@ describe("sdkCanonicalMapping — tool parts", () => {
         args: { description: "Audit mapper parity", prompt: "Check OpenCode mapping" },
         status: "running",
       },
+    });
+  });
+
+  it("counts child-session tool parts as subagent progress.stepCount", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    setOpenCodeMainSessionId(state, "ses_main");
+
+    // Parent task tool starts.
+    const started = mapOpenCodeEvent(
+      {
+        id: "evt-1",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_main",
+          time: 0,
+          part: {
+            id: "prt_task",
+            sessionID: "ses_main",
+            messageID: "msg_assistant",
+            type: "tool",
+            tool: "task",
+            callID: "call_task",
+            state: {
+              status: "running",
+              input: { description: "Explore code" },
+              time: { start: 0 },
+            },
+          } as ToolPart,
+        },
+      },
+      state,
+    );
+    const startEvent = started.find((e) => e.type === "item.started");
+    expect(startEvent).toBeDefined();
+    const taskItemId = (startEvent as { itemId: string }).itemId;
+
+    // Child session is created with parentID === main session.
+    const childSession: Session = {
+      id: "ses_child",
+      slug: "child",
+      projectID: "proj",
+      directory: "/",
+      parentID: "ses_main",
+      title: "subagent",
+      version: "1.0.0",
+      time: { created: 1, updated: 1 },
+    };
+    const sessionCreated = mapOpenCodeEvent(
+      {
+        id: "evt-2",
+        type: "session.created",
+        properties: { sessionID: "ses_child", info: childSession },
+      },
+      state,
+    );
+    expect(sessionCreated).toHaveLength(0);
+
+    // Two distinct tool parts in the child session → stepCount = 2.
+    const step1 = mapOpenCodeEvent(
+      {
+        id: "evt-3",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_child",
+          time: 0,
+          part: {
+            id: "prt_child_read",
+            sessionID: "ses_child",
+            messageID: "msg_child_1",
+            type: "tool",
+            tool: "read",
+            callID: "call_read",
+            state: { status: "running", input: { filePath: "a.ts" }, time: { start: 0 } },
+          } as ToolPart,
+        },
+      },
+      state,
+    );
+    expect(step1.find((e) => e.type === "item.updated" && e.itemId === taskItemId)).toMatchObject({
+      type: "item.updated",
+      itemId: taskItemId,
+      payload: {
+        isSubAgent: true,
+        progress: { stepCount: 1, lastToolName: "read" },
+      },
+    });
+    // The child tool itself is surfaced as a canonical item tagged with the
+    // parent task tool's id so the sub-agent overlay can list it.
+    expect(step1.find((e) => e.type === "item.started")).toMatchObject({
+      type: "item.started",
+      parentItemId: taskItemId,
+      itemType: "tool_call",
+    });
+
+    const step2 = mapOpenCodeEvent(
+      {
+        id: "evt-4",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_child",
+          time: 0,
+          part: {
+            id: "prt_child_grep",
+            sessionID: "ses_child",
+            messageID: "msg_child_1",
+            type: "tool",
+            tool: "grep",
+            callID: "call_grep",
+            state: {
+              status: "running",
+              input: { pattern: "foo" },
+              time: { start: 0 },
+            },
+          } as ToolPart,
+        },
+      },
+      state,
+    );
+    expect(step2[0]).toMatchObject({
+      type: "item.updated",
+      itemId: taskItemId,
+      payload: { progress: { stepCount: 2, lastToolName: "grep" } },
+    });
+
+    // Same partID transitioning running → completed should not bump count.
+    const same = mapOpenCodeEvent(
+      {
+        id: "evt-5",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_child",
+          time: 0,
+          part: {
+            id: "prt_child_grep",
+            sessionID: "ses_child",
+            messageID: "msg_child_1",
+            type: "tool",
+            tool: "grep",
+            callID: "call_grep",
+            state: {
+              status: "completed",
+              input: { pattern: "foo" },
+              output: "result",
+              title: "grep result",
+              metadata: {},
+              time: { start: 0, end: 1 },
+            },
+          } as ToolPart,
+        },
+      },
+      state,
+    );
+    expect(same[0]).toMatchObject({
+      type: "item.updated",
+      payload: { progress: { stepCount: 2 } },
+    });
+  });
+
+  it("links a child session that was announced before the parent task tool", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    setOpenCodeMainSessionId(state, "ses_main");
+
+    // Child session arrives first.
+    const child: Session = {
+      id: "ses_child",
+      slug: "child",
+      projectID: "proj",
+      directory: "/",
+      parentID: "ses_main",
+      title: "subagent",
+      version: "1.0.0",
+      time: { created: 1, updated: 1 },
+    };
+    mapOpenCodeEvent(
+      {
+        id: "evt-1",
+        type: "session.created",
+        properties: { sessionID: "ses_child", info: child },
+      },
+      state,
+    );
+
+    // Then the parent task tool starts.
+    mapOpenCodeEvent(
+      {
+        id: "evt-2",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_main",
+          time: 0,
+          part: {
+            id: "prt_task",
+            sessionID: "ses_main",
+            messageID: "msg_assistant",
+            type: "tool",
+            tool: "task",
+            callID: "call_task",
+            state: { status: "running", input: {}, time: { start: 0 } },
+          } as ToolPart,
+        },
+      },
+      state,
+    );
+
+    // A tool part in the child should now count toward parent progress.
+    const step = mapOpenCodeEvent(
+      {
+        id: "evt-3",
+        type: "message.part.updated",
+        properties: {
+          sessionID: "ses_child",
+          time: 0,
+          part: {
+            id: "prt_child_read",
+            sessionID: "ses_child",
+            messageID: "msg_child_1",
+            type: "tool",
+            tool: "read",
+            callID: "call_read",
+            state: { status: "running", input: { filePath: "a.ts" }, time: { start: 0 } },
+          } as ToolPart,
+        },
+      },
+      state,
+    );
+    expect(step[0]).toMatchObject({
+      type: "item.updated",
+      payload: { progress: { stepCount: 1 } },
     });
   });
 

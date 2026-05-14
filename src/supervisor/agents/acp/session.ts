@@ -1242,6 +1242,23 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private handlePermissionRequest(
     params: RequestPermissionRequest,
   ): Promise<RequestPermissionResponse> {
+    // Client-side bypass for agents that don't expose a yolo/autopilot mode.
+    // When the user selects "never" approval policy, auto-resolve without
+    // emitting to the UI. Agents that DO expose a bypass mode are switched
+    // into it before turn-start, so they won't call requestPermission in the
+    // first place — this branch only fires when the agent forwarded the
+    // prompt anyway.
+    if (this.currentConfig?.approvalPolicy === "never") {
+      const allow =
+        params.options.find((opt) => opt.kind === "allow_always") ??
+        params.options.find((opt) => opt.kind === "allow_once");
+      if (allow) {
+        return Promise.resolve({
+          outcome: { outcome: "selected", optionId: allow.optionId },
+        });
+      }
+    }
+
     return new Promise<RequestPermissionResponse>((resolve) => {
       const requestId = `acp-perm-${this.permissionRequestSeq++}`;
 

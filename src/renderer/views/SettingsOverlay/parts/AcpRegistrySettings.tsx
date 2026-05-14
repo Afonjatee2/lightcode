@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Button, Input, Tooltip, Card, Dropdown, Label, toast } from "@heroui/react";
 import {
   AlertTriangle,
+  ArrowUpCircle,
   CheckCircle2,
   ChevronDown,
   Download,
@@ -161,7 +162,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
         if (cancelled) return;
         setAgents(result.agents);
         void readBridge()
-          .refreshAgentStatuses(wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [])
+          .getAgentStatuses(wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [])
           .catch(() => undefined);
       })
       .catch((err: unknown) => {
@@ -267,6 +268,24 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
       .then((result) => {
         setMutatedInstalled(result.installed);
         refreshStatuses();
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setPendingAgentId(undefined));
+  };
+
+  const updateAgent = (agent: AcpRegistryAgent) => {
+    const agentId = agent.id;
+    setPendingAgentId(agentId);
+    setError(undefined);
+    readBridge()
+      .updateAcpRegistryAgent({ agentId })
+      .then(async (result) => {
+        const adapterKind = registryAdapterKind(agentId);
+        await refreshStatuses({ reset: false, scope: { agentKinds: [adapterKind] } });
+        setMutatedInstalled(result.installed);
+        toast.success(`${agent.name} updated to v${agent.version}.`);
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : String(err));
@@ -557,7 +576,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                 <div className="flex items-center gap-2">
                   <Card.Title className="truncate text-base font-semibold">{agent.name}</Card.Title>
                   <span className="text-sm font-medium tabular-nums text-muted">
-                    v{agent.version}
+                    v{installedRecord?.version ?? agent.version}
                   </span>
                   {renderTag("ACP")}
                   {APP_SUPPORTED_ACP_AGENT_IDS.has(agent.id) ? renderTag("Native support") : null}
@@ -569,20 +588,41 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
 
               <div className="flex shrink-0 flex-col items-end gap-2">
                 {canRemove ? (
-                  <Button
-                    size="sm"
-                    variant="tertiary"
-                    className="text-danger hover:bg-danger hover:text-white"
-                    isPending={isAgentPending}
-                    onPress={() => removeAgent(agent.id)}
-                  >
-                    {({ isPending }) => (
-                      <>
-                        {isPending ? <PixelLoader size="xs" /> : <Trash2 className="size-4" />}
-                        {isPending ? "Deleting" : "Delete"}
-                      </>
-                    )}
-                  </Button>
+                  <>
+                    {installedRecord && installedRecord.version !== agent.version ? (
+                      <Button
+                        size="sm"
+                        variant="tertiary"
+                        isPending={isAgentPending}
+                        onPress={() => updateAgent(agent)}
+                      >
+                        {({ isPending }) => (
+                          <>
+                            {isPending ? (
+                              <PixelLoader size="xs" />
+                            ) : (
+                              <ArrowUpCircle className="size-4" />
+                            )}
+                            {isPending ? "Updating" : `Update to v${agent.version}`}
+                          </>
+                        )}
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="tertiary"
+                      className="text-danger hover:bg-danger hover:text-white"
+                      isPending={isAgentPending}
+                      onPress={() => removeAgent(agent.id)}
+                    >
+                      {({ isPending }) => (
+                        <>
+                          {isPending ? <PixelLoader size="xs" /> : <Trash2 className="size-4" />}
+                          {isPending ? "Deleting" : "Delete"}
+                        </>
+                      )}
+                    </Button>
+                  </>
                 ) : localInstalled ? (
                   <div className="flex flex-col items-end gap-1">
                     {familyDetectedStatuses.map((status) => (

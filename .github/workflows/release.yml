@@ -208,3 +208,42 @@ jobs:
           files: release-assets/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Step 4: Bump master to next dev version ────────────────────────
+  post-release:
+    needs: [prepare, release]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Bump to next patch-dev version
+        run: |
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            const v = p.version.split('.').map(Number);
+            p.version = v[0] + '.' + v[1] + '.' + (v[2] + 1) + '-dev';
+            fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json
+          git commit -m "chore: bump to next dev version"
+          git push

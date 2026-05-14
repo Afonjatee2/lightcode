@@ -16,6 +16,7 @@ import {
   type AcpRegistryListResult,
   type AuthenticateAcpRegistryAgentPayload,
   type AgentInstanceConfig,
+  type AgentInstanceEnvVar,
   type AgentKind,
   type InstalledAcpRegistryAgent,
   type LogoutAcpRegistryAgentPayload,
@@ -68,10 +69,9 @@ export function backfillAcpRegistryAgentIcons(input: {
   const installedAgents = { ...settings.acpRegistryInstalledAgents };
   for (const [id, record] of Object.entries(installedAgents)) {
     const agent = agentsById.get(id);
-    if (!agent) continue;
-    const icon = agent.icon;
-    if ((!icon || record.icon === icon) && record.version === agent.version) continue;
-    installedAgents[id] = { ...record, version: agent.version, ...(icon ? { icon } : {}) };
+    if (!agent?.icon) continue;
+    if (record.icon === agent.icon) continue;
+    installedAgents[id] = { ...record, icon: agent.icon };
     changed = true;
   }
 
@@ -79,10 +79,9 @@ export function backfillAcpRegistryAgentIcons(input: {
   for (const [id, instance] of Object.entries(instances)) {
     if (instance.driver !== "acp-generic") continue;
     const agent = agentsById.get(id);
-    if (!agent) continue;
-    const icon = agent.icon;
-    if ((!icon || instance.icon === icon) && instance.version === agent.version) continue;
-    instances[id] = { ...instance, version: agent.version, ...(icon ? { icon } : {}) };
+    if (!agent?.icon) continue;
+    if (instance.icon === agent.icon) continue;
+    instances[id] = { ...instance, icon: agent.icon };
     changed = true;
   }
 
@@ -272,19 +271,50 @@ async function genericInstance(
   throw new Error(`${agent.name} does not include a supported distribution`);
 }
 
+/**
+ * Merge a freshly-built instance over any existing one: registry defaults win
+ * for non-sensitive env vars, while user-saved secrets and per-env login acks
+ * carry forward so update/reinstall doesn't silently clear credentials.
+ */
+function mergeRegistryInstance(
+  built: AgentInstanceConfig,
+  existing: AgentInstanceConfig | undefined,
+): AgentInstanceConfig {
+  if (!existing) return built;
+  const mergedEnv: Record<string, AgentInstanceEnvVar> = { ...(built.environment ?? {}) };
+  for (const [key, value] of Object.entries(existing.environment ?? {})) {
+    if (value.sensitive || !(key in mergedEnv)) {
+      mergedEnv[key] = value;
+    }
+  }
+  const hasEnv = Object.keys(mergedEnv).length > 0;
+  const next: AgentInstanceConfig = { ...built };
+  if (hasEnv) {
+    next.environment = mergedEnv;
+  } else {
+    delete next.environment;
+  }
+  if (existing.authAcknowledged) {
+    next.authAcknowledged = existing.authAcknowledged;
+  }
+  return next;
+}
+
 export async function installAcpRegistryAgent(input: {
   agentId: string;
   baseDir: string;
   settingsPath: string;
+  registry?: AcpRegistryListResult;
 }): Promise<InstalledAcpRegistryAgent[]> {
-  const registry = await fetchAcpRegistry();
+  const registry = input.registry ?? (await fetchAcpRegistry());
   const agent = registry.agents.find((entry) => entry.id === input.agentId);
   if (!agent) {
     throw new Error(`ACP registry agent not found: ${input.agentId}`);
   }
 
   const settings = readAcpRegistrySettings(input.settingsPath);
-  const instance = await genericInstance(agent, input.baseDir);
+  const built = await genericInstance(agent, input.baseDir);
+  const instance = mergeRegistryInstance(built, settings.agentInstances[agent.id]);
   settings.agentInstances = { ...settings.agentInstances, [agent.id]: instance };
   settings.acpRegistryInstalledAgents = {
     ...settings.acpRegistryInstalledAgents,
@@ -294,18 +324,109 @@ export async function installAcpRegistryAgent(input: {
   return Object.values(settings.acpRegistryInstalledAgents);
 }
 
+export async function updateAcpRegistryAgent(input: {
+  agentId: string;
+  baseDir: string;
+  settingsPath: string;
+  registry?: AcpRegistryListResult;
+}): Promise<InstalledAcpRegistryAgent[]> {
+  const settings = readAcpRegistrySettings(input.settingsPath);
+  if (!settings.agentInstances[input.agentId]) {
+    throw new Error(`ACP registry agent is not installed: ${input.agentId}`);
+  }
+  return installAcpRegistryAgent(input);
+}
+
+/**
+ * Refresh every installed ACP registry agent whose registry version differs
+ * from the locally-recorded version. Best-effort: individual update failures
+ * (e.g. binary download errors) are swallowed so listing the registry stays
+ * resilient — the user can retry manually from the settings UI.
+ */
+export async function autoUpdateAcpRegistryAgents(input: {
+  registry: AcpRegistryListResult;
+  baseDir: string;
+  settingsPath: string;
+}): Promise<{ updated: string[]; failed: { id: string; error: string }[] }> {
+  const settings = readAcpRegistrySettings(input.settingsPath);
+  const agentsById = new Map(input.registry.agents.map((agent) => [agent.id, agent]));
+  const updated: string[] = [];
+  const failed: { id: string; error: string }[] = [];
+  for (const [id, record] of Object.entries(settings.acpRegistryInstalledAgents)) {
+    const agent = agentsById.get(id);
+    if (!agent) continue;
+    if (record.version === agent.version) continue;
+    try {
+      await installAcpRegistryAgent({
+        agentId: id,
+        baseDir: input.baseDir,
+        settingsPath: input.settingsPath,
+        registry: input.registry,
+      });
+      updated.push(id);
+    } catch (error) {
+      failed.push({ id, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+  return { updated, failed };
+}
+
 export function removeAcpRegistryAgent(input: {
   agentId: string;
+  baseDir: string;
   settingsPath: string;
 }): InstalledAcpRegistryAgent[] {
   const settings = readAcpRegistrySettings(input.settingsPath);
+  const agentKind = `acp-generic:${input.agentId}`;
+
   const nextInstalled = { ...settings.acpRegistryInstalledAgents };
   delete nextInstalled[input.agentId];
   const nextInstances = { ...settings.agentInstances };
   delete nextInstances[input.agentId];
+
+  const nextProviderConfigs = { ...settings.providerConfigs };
+  delete nextProviderConfigs[agentKind];
+  const nextLastPresentation = { ...settings.lastPresentationModeByAgent };
+  delete nextLastPresentation[agentKind];
+  const nextAgentSettings = { ...settings.agentSettings };
+  delete nextAgentSettings[agentKind];
+  const nextHiddenModels = { ...settings.hiddenModels };
+  delete nextHiddenModels[agentKind];
+  const nextDisabledAgents = settings.disabledAgents.filter((k) => k !== agentKind);
+  const nextFavoriteModels = settings.favoriteModels.filter((m) => m.agentKind !== agentKind);
+  const nextRecentModels = settings.recentModels.filter((m) => m.agentKind !== agentKind);
+  const nextHookSupport = { ...settings.agentHookSupport };
+  for (const key of Object.keys(nextHookSupport)) {
+    if (key === agentKind || key.startsWith(`${agentKind}:`)) {
+      delete nextHookSupport[key];
+    }
+  }
+
+  if (settings.commitGenProvider === agentKind) settings.commitGenProvider = "auto";
+  if (settings.titleGenProvider === agentKind) settings.titleGenProvider = "auto";
+  if (settings.conflictResolverProvider === agentKind) settings.conflictResolverProvider = "auto";
+  if (settings.wslCommitGenProvider === agentKind) settings.wslCommitGenProvider = "auto";
+  if (settings.wslTitleGenProvider === agentKind) settings.wslTitleGenProvider = "auto";
+  if (settings.wslConflictResolverProvider === agentKind)
+    settings.wslConflictResolverProvider = "auto";
+
   settings.acpRegistryInstalledAgents = nextInstalled;
   settings.agentInstances = nextInstances;
+  settings.providerConfigs = nextProviderConfigs;
+  settings.lastPresentationModeByAgent = nextLastPresentation;
+  settings.agentSettings = nextAgentSettings;
+  settings.hiddenModels = nextHiddenModels;
+  settings.disabledAgents = nextDisabledAgents;
+  settings.favoriteModels = nextFavoriteModels;
+  settings.recentModels = nextRecentModels;
+  settings.agentHookSupport = nextHookSupport;
+
   writeAcpRegistrySettings(input.settingsPath, settings);
+
+  // Remove downloaded binaries from disk
+  const installDir = join(input.baseDir, ACP_REGISTRY_INSTALL_DIR, input.agentId);
+  rmSync(installDir, { recursive: true, force: true });
+
   return Object.values(settings.acpRegistryInstalledAgents);
 }
 
@@ -322,15 +443,23 @@ export function setAcpRegistryAgentAuth(input: {
 
   const environment = { ...(instance.environment ?? {}) };
   for (const [name, value] of Object.entries(input.environment)) {
-    environment[name] = { value, sensitive: true };
+    if (value) {
+      environment[name] = { value, sensitive: true };
+    } else {
+      delete environment[name];
+    }
+  }
+  const hasEnv = Object.keys(environment).length > 0;
+  const updatedInstance = { ...instance };
+  if (hasEnv) {
+    updatedInstance.environment = environment;
+  } else {
+    delete updatedInstance.environment;
   }
 
   settings.agentInstances = {
     ...settings.agentInstances,
-    [input.agentId]: {
-      ...instance,
-      environment,
-    },
+    [input.agentId]: updatedInstance,
   };
   writeAcpRegistrySettings(input.settingsPath, settings);
   return Object.values(settings.acpRegistryInstalledAgents);

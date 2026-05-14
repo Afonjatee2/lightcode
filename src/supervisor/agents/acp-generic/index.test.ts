@@ -73,6 +73,29 @@ describe("createAcpGenericAdapter", () => {
     expect(status.version).toBe("1.2.3");
   });
 
+  it("injects a synthetic 'never' approval policy when the probe declares none", async () => {
+    // Agents like glm-acp-agent don't advertise yolo/autopilot. We expose a
+    // synthetic "never" policy so users can still pick "Bypass approvals" —
+    // the ACP session layer auto-approves requestPermission for that policy.
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      models: [{ id: "glm-5.1", label: "GLM-5.1" }],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.capabilities.approvalPolicies).toEqual([
+      { id: "never", label: "Bypass approvals" },
+    ]);
+  });
+
+  it("does not override agent-advertised approval policies", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      approvalPolicies: [{ id: "auto_edit", label: "Auto edit" }],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.capabilities.approvalPolicies).toEqual([{ id: "auto_edit", label: "Auto edit" }]);
+  });
+
   it("merges ACP-probed capabilities into detected status", async () => {
     vi.mocked(probeAcpCapabilities).mockResolvedValue({
       models: [{ id: "glm-5.1", label: "GLM 5.1" }],
@@ -166,6 +189,34 @@ describe("createAcpGenericAdapter", () => {
     const status = await adapter.detectInstall();
     expect(status.authState).toBe("missing");
     expect(status.loginCommand).toBe("my-acp --stdio login");
+  });
+
+  it("drops agent-owned methods that duplicate an env-var method name", async () => {
+    // glm-acp-agent advertises both an agent-typed stub and the real env_var
+    // method under the same display name "Z.AI API key". The stub's
+    // authenticate() just acks, so surfacing it in the UI produces a Login
+    // button that does nothing — drop it at the adapter boundary.
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      authMethods: [
+        { id: "z-ai-api-key", name: "Z.AI API key" },
+        {
+          type: "env_var",
+          id: "z_ai_api_key",
+          name: "Z.AI API key",
+          vars: [{ name: "Z_AI_API_KEY" }],
+        },
+      ],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.authMethods).toEqual([
+      {
+        type: "env_var",
+        id: "z_ai_api_key",
+        name: "Z.AI API key",
+        vars: [{ name: "Z_AI_API_KEY" }],
+      },
+    ]);
   });
 
   it("reports advertised agent auth as missing even when a session probe succeeds", async () => {
