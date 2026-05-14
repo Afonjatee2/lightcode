@@ -91,6 +91,7 @@ export function ThreadHeaderStatusButton(props: {
   fallbackThread: Thread;
   fallbackAgentKind: string;
   agentLabel?: string | undefined;
+  agentIcon?: string | undefined;
 }) {
   const thread = useThread(props.threadId) ?? props.fallbackThread;
 
@@ -107,6 +108,8 @@ export function ThreadHeaderStatusButton(props: {
         >
           <ProviderIcon
             kind={thread.agentKind}
+            {...(props.agentIcon ? { icon: props.agentIcon } : {})}
+            fallbackLabel={props.agentLabel}
             tone={getStatusTone(thread)}
             className="size-3.5 shrink-0"
           />

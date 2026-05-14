@@ -6,11 +6,14 @@ import {
 } from "./diagnostics/sentry";
 import { createSupervisorIpcHandlers } from "./ipcHandlers";
 import { SupervisorRuntime } from "./runtime";
+import { configureSecretStorageKey } from "./secretStorage";
 
 initializeSupervisorSentry({
   appVersion: process.env.LIGHTCODE_APP_VERSION ?? process.env.npm_package_version ?? "dev",
   isDev: process.env.LIGHTCODE_IS_DEV === "1" || Boolean(process.env.VITE_DEV_SERVER_URL),
 });
+configureSecretStorageKey(process.env.LIGHTCODE_SECRET_STORAGE_KEY);
+delete process.env.LIGHTCODE_SECRET_STORAGE_KEY;
 
 const runtime = new SupervisorRuntime((event) => {
   process.send?.(event);

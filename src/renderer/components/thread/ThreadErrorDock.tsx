@@ -59,7 +59,10 @@ export function ThreadErrorDock(props: ThreadErrorDockProps) {
           </>
         }
       >
-        <span className="min-w-0 flex-1 truncate text-[color:var(--muted)]" title={state.message}>
+        <span
+          className="min-w-0 flex-1 truncate leading-5 text-[color:var(--muted)]"
+          title={state.message}
+        >
           {body}
         </span>
       </ThreadDockHeader>

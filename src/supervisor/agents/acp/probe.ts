@@ -8,12 +8,14 @@
  * Provider-agnostic — any agent that supports `--acp` can use this.
  */
 
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { Readable, Writable } from "node:stream";
 import {
   ClientSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
+  type Client,
+  type AuthMethod,
   type ModelInfo,
   type SessionNotification,
   type SessionMode,
@@ -24,6 +26,9 @@ import { terminateChildProcessTree } from "@/shared/processTree";
 // ── Types ────────────────────────────────────────────────────────
 
 export interface AcpProbeResult {
+  authMethods?: AuthMethod[];
+  authLogoutSupported?: boolean;
+  sessionEstablished?: boolean;
   models?: Array<{ id: string; label: string }>;
   efforts?: string[];
   defaultEffort?: string;
@@ -230,9 +235,9 @@ export async function probeAcpCapabilities(
   const timeoutMs = options?.timeoutMs ?? 15_000;
   const tag = options?.label ? `[acp-probe:${options.label}]` : "[acp-probe]";
   let child: ReturnType<typeof spawn> | undefined;
+  const probeResult: AcpProbeResult = {};
 
   try {
-    const probeResult: AcpProbeResult = {};
     let latestSlashCommands: AgentSlashCommand[] | undefined;
     let resolveInitialSlashCommands:
       | ((commands: AgentSlashCommand[] | undefined) => void)
@@ -290,37 +295,20 @@ export async function probeAcpCapabilities(
         const initResult = await connection.initialize({
           protocolVersion: PROTOCOL_VERSION,
           clientInfo: { name: "lightcode-probe", version: "0.1.0" },
-          clientCapabilities: {},
+          clientCapabilities: { auth: { terminal: true } },
         });
+        if (initResult.authMethods?.length) {
+          probeResult.authMethods = initResult.authMethods;
+        }
+        if (initResult.agentCapabilities?.auth?.logout !== undefined) {
+          probeResult.authLogoutSupported = true;
+        }
 
         // Non-spec compatibility fallback for agents that still expose
         // commands during initialize instead of session/update.
         const rawCommands = (initResult as { commands?: AcpAvailableCommandLike[] }).commands;
         if (Array.isArray(rawCommands) && rawCommands.length > 0) {
           latestSlashCommands = mapAcpSlashCommands(rawCommands);
-        }
-
-        // Authenticate if the agent advertises auth methods (e.g. Cursor's
-        // cursor_login). Best-effort: some agents (OpenCode) advertise
-        // informational methods that throw "Authentication not implemented"
-        // when called — swallow and let `newSession` surface real auth errors.
-        const authMethods = initResult.authMethods;
-        if (authMethods && authMethods.length > 0) {
-          const firstMethod = authMethods[0]!;
-          const methodId = "id" in firstMethod ? (firstMethod as { id: string }).id : undefined;
-          if (methodId) {
-            try {
-              console.log("%s authenticating with method: %s", tag, methodId);
-              await connection.authenticate({ methodId });
-            } catch (error) {
-              console.log(
-                "%s authenticate(%s) rejected, continuing: %s",
-                tag,
-                methodId,
-                error instanceof Error ? error.message : String(error),
-              );
-            }
-          }
         }
 
         return connection.newSession({ cwd: sessionCwd, mcpServers: [] });
@@ -340,6 +328,7 @@ export async function probeAcpCapabilities(
       probeResult.slashCommands = resolvedSlashCommands;
     }
 
+    probeResult.sessionEstablished = true;
     if (result.models?.availableModels?.length) {
       probeResult.models = mapAcpModels(result.models.availableModels);
     }
@@ -374,11 +363,163 @@ export async function probeAcpCapabilities(
     return probeResult;
   } catch (err) {
     console.log("%s failed: %s", tag, err instanceof Error ? err.message : err);
+    if (Object.keys(probeResult).length > 0) {
+      return probeResult;
+    }
     return undefined;
   } finally {
     if (child && !child.killed) {
       // Destroy stdin before killing to prevent the ACP SDK from writing
       // to a dead pipe (which causes noisy "ACP write error" logs).
+      try {
+        child.stdin?.destroy();
+      } catch {
+        /* ignore */
+      }
+      terminateChildProcessTree(child);
+    }
+  }
+}
+
+export async function authenticateAcpAgent(
+  command: string,
+  args: string[],
+  methodId: string,
+  options?: {
+    processCwd?: string;
+    env?: Record<string, string>;
+    label?: string;
+    timeoutMs?: number;
+  },
+): Promise<void> {
+  const tag = `[acp-auth:${options?.label ?? command}]`;
+  const timeoutMs = options?.timeoutMs ?? 10 * 60_000;
+  let child: ChildProcessWithoutNullStreams | undefined;
+
+  try {
+    child = spawn(command, args, {
+      ...(options?.processCwd ? { cwd: options.processCwd } : {}),
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, TERM: "xterm-256color", ...(options?.env ?? {}) },
+      shell: false,
+      windowsHide: true,
+    });
+
+    const spawnReady = new Promise<void>((resolve, reject) => {
+      child?.on("error", (err) => reject(new Error(`ACP agent failed to start: ${err.message}`)));
+      child?.on("spawn", resolve);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      console.log("%s stderr: %s", tag, String(chunk).trimEnd());
+    });
+
+    await Promise.race([
+      (async () => {
+        await spawnReady;
+        const toAgent = Writable.toWeb(child!.stdin) as WritableStream<Uint8Array>;
+        const fromAgent = Readable.toWeb(child!.stdout) as ReadableStream<Uint8Array>;
+        const connection = new ClientSideConnection(
+          (_agent): Client => ({
+            requestPermission() {
+              throw new Error("ACP auth did not request permission support.");
+            },
+            sessionUpdate() {
+              return Promise.resolve();
+            },
+          }),
+          ndJsonStream(toAgent, fromAgent),
+        );
+        const initResult = await connection.initialize({
+          protocolVersion: PROTOCOL_VERSION,
+          clientInfo: { name: "lightcode-auth", version: "0.1.0" },
+        });
+        if (!initResult.authMethods?.some((method) => method.id === methodId)) {
+          throw new Error(`ACP auth method not found: ${methodId}`);
+        }
+        console.log("%s authenticating with method: %s", tag, methodId);
+        await connection.authenticate({ methodId });
+      })(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("ACP auth timed out")), timeoutMs),
+      ),
+    ]);
+  } finally {
+    if (child && !child.killed) {
+      try {
+        child.stdin?.destroy();
+      } catch {
+        /* ignore */
+      }
+      terminateChildProcessTree(child);
+    }
+  }
+}
+
+export async function logoutAcpAgent(
+  command: string,
+  args: string[],
+  options?: {
+    processCwd?: string;
+    env?: Record<string, string>;
+    label?: string;
+    timeoutMs?: number;
+  },
+): Promise<void> {
+  const tag = `[acp-logout:${options?.label ?? command}]`;
+  const timeoutMs = options?.timeoutMs ?? 2 * 60_000;
+  let child: ChildProcessWithoutNullStreams | undefined;
+
+  try {
+    child = spawn(command, args, {
+      ...(options?.processCwd ? { cwd: options.processCwd } : {}),
+      stdio: ["pipe", "pipe", "pipe"],
+      env: { ...process.env, TERM: "xterm-256color", ...(options?.env ?? {}) },
+      shell: false,
+      windowsHide: true,
+    });
+
+    const spawnReady = new Promise<void>((resolve, reject) => {
+      child?.on("error", (err) => reject(new Error(`ACP agent failed to start: ${err.message}`)));
+      child?.on("spawn", resolve);
+    });
+
+    child.stderr.on("data", (chunk) => {
+      console.log("%s stderr: %s", tag, String(chunk).trimEnd());
+    });
+
+    await Promise.race([
+      (async () => {
+        await spawnReady;
+        const toAgent = Writable.toWeb(child!.stdin) as WritableStream<Uint8Array>;
+        const fromAgent = Readable.toWeb(child!.stdout) as ReadableStream<Uint8Array>;
+        const connection = new ClientSideConnection(
+          (_agent): Client => ({
+            requestPermission() {
+              throw new Error("ACP logout did not request permission support.");
+            },
+            sessionUpdate() {
+              return Promise.resolve();
+            },
+          }),
+          ndJsonStream(toAgent, fromAgent),
+        );
+        const initResult = await connection.initialize({
+          protocolVersion: PROTOCOL_VERSION,
+          clientInfo: { name: "lightcode-auth", version: "0.1.0" },
+        });
+        if (initResult.agentCapabilities?.auth?.logout === undefined) {
+          throw new Error("ACP logout is not supported by this agent.");
+        }
+        console.log("%s logging out", tag);
+        await connection.unstable_logout({});
+      })(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("ACP logout timed out")), timeoutMs),
+      ),
+    ]);
+  } finally {
+    if (child && !child.killed) {
       try {
         child.stdin?.destroy();
       } catch {

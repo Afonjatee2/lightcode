@@ -626,6 +626,7 @@ body {
 /* --- Unified provider icon styles --- */
 .lightcode-provider-icon {
   display: inline-flex;
+  position: relative;
   align-items: center;
   justify-content: center;
   color: color-mix(in oklab, var(--muted) 80%, var(--foreground));
@@ -654,6 +655,33 @@ body {
   -webkit-mask-size: contain;
 }
 
+.lightcode-provider-icon--external .lightcode-provider-icon__mask {
+  width: 88%;
+  height: 88%;
+}
+
+.lightcode-provider-icon__mask-scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255, 255, 255, 0.98) 52%,
+    transparent 64%,
+    transparent 100%
+  );
+  background-size: 220% 100%;
+  opacity: 0.95;
+  animation: lightcode-provider-icon-mask-scan 1.45s linear infinite;
+}
+
+.lightcode-provider-icon--external .lightcode-provider-icon__mask-scan {
+  inset: 6%;
+  width: auto;
+  height: auto;
+}
+
 .lightcode-provider-icon__generic {
   display: flex;
   width: 100%;
@@ -665,6 +693,15 @@ body {
   font-size: 0.62em;
   font-weight: 650;
   line-height: 1;
+}
+
+@keyframes lightcode-provider-icon-mask-scan {
+  from {
+    background-position: 170% 0;
+  }
+  to {
+    background-position: -70% 0;
+  }
 }
 
 .lightcode-provider-icon__shell {
@@ -2000,4 +2037,9 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
 
 .lightcode-compacting-icon {
   animation: lightcode-compacting-deck 1.5s ease-in-out infinite;
+}
+
+.lightcode-compacted-icon {
+  transform: scaleY(0.7);
+  transform-origin: center;
 }

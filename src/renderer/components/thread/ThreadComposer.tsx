@@ -147,6 +147,7 @@ export function ThreadComposer(props: {
   inputContent?: ReactNode;
   attachmentBar?: ReactNode;
   promptDisabled?: boolean;
+  hideSubmitButton?: boolean;
   submitLabel: string;
   submitDisabled: boolean;
   stopPending?: boolean;
@@ -168,6 +169,7 @@ export function ThreadComposer(props: {
     inputContent,
     attachmentBar,
     promptDisabled = false,
+    hideSubmitButton = false,
     submitLabel,
     submitDisabled,
     stopPending = false,
@@ -204,7 +206,9 @@ export function ThreadComposer(props: {
     .join("|");
   const effectiveToolbarLayoutKey = `${derivedToolbarLayoutKey}::leading=${
     leadingControls ? "1" : "0"
-  }::after=${afterControls ? "1" : "0"}${toolbarLayoutKey ? `::extra=${toolbarLayoutKey}` : ""}`;
+  }::after=${afterControls ? "1" : "0"}::submit=${hideSubmitButton ? "0" : "1"}${
+    toolbarLayoutKey ? `::extra=${toolbarLayoutKey}` : ""
+  }`;
 
   const returnFocusToInput = () => {
     const el = editorHostRef.current?.querySelector<HTMLElement>(
@@ -465,7 +469,7 @@ export function ThreadComposer(props: {
               </div>
               <div className="flex shrink-0 items-end gap-2">
                 {typeof afterControls === "function" ? afterControls(level) : afterControls}
-                <div className="size-8 shrink-0" />
+                {!hideSubmitButton && <div className="size-8 shrink-0" />}
               </div>
             </div>
           ))}
@@ -516,6 +520,8 @@ export function ThreadComposer(props: {
     );
 
   const renderSendButton = () => {
+    if (hideSubmitButton) return null;
+
     // When the agent is running and input is empty, show stop button
     if (onStop && submitDisabled) {
       return (

@@ -120,7 +120,7 @@ export function CreatePrModal(props: {
             </div>
           </Modal.Body>
           <Modal.Footer>
-            <Button slot="close" variant="ghost">
+            <Button slot="close" variant="ghost" className="text-muted">
               Cancel
             </Button>
             <ButtonGroup>

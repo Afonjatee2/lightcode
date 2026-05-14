@@ -677,6 +677,7 @@ export function ThreadDraftView(props: {
         .map((agent) => ({
           kind: agent.kind,
           label: agent.label,
+          ...(agent.icon ? { icon: agent.icon } : {}),
           capabilities: filterHiddenModels(
             capabilitiesForPresentation(agent.capabilities, presentationMode),
             allHiddenModels[agent.kind],

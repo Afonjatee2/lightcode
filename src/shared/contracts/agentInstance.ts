@@ -46,14 +46,32 @@ export const agentInstanceEnvVarSchema = z.object({
 });
 export type AgentInstanceEnvVar = z.infer<typeof agentInstanceEnvVarSchema>;
 
+/**
+ * Per-environment record of successful interactive login flows.
+ *
+ * ACP does not surface a positive "user is signed in" signal during the
+ * capabilities probe (some agents accept `newSession` without enforcing
+ * auth), so we trust the result of our own `authenticate()` call instead.
+ * Interactive auth state is per-env because browser/CLI sessions are not
+ * shared across Windows and individual WSL distros — env-var credentials
+ * remain shared (that path uses `environment` directly).
+ */
+export const agentInstanceAuthAcknowledgedSchema = z.object({
+  native: z.boolean().optional(),
+  wsl: z.record(z.string(), z.boolean()).optional(),
+});
+export type AgentInstanceAuthAcknowledged = z.infer<typeof agentInstanceAuthAcknowledgedSchema>;
+
 export const agentInstanceConfigSchema = z.object({
   id: agentInstanceIdSchema,
   driver: agentDriverKindSchema,
   displayName: z.string().min(1).max(120).optional(),
   icon: z.string().optional(),
+  version: z.string().optional(),
   accentColor: z.string().optional(),
   enabled: z.boolean().optional(),
   environment: z.record(z.string(), agentInstanceEnvVarSchema).optional(),
+  authAcknowledged: agentInstanceAuthAcknowledgedSchema.optional(),
   /** Driver-specific config; validated by the per-driver schema (see `acpGenericInstanceConfigSchema`). */
   config: z.unknown().optional(),
 });

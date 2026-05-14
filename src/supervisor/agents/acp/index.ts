@@ -1,2 +1,8 @@
 export { AcpStructuredSession, createAcpStructuredSession, shouldSpawnAcpSession } from "./session";
-export { humanizeModelId, probeAcpCapabilities, type AcpProbeResult } from "./probe";
+export {
+  authenticateAcpAgent,
+  humanizeModelId,
+  logoutAcpAgent,
+  probeAcpCapabilities,
+  type AcpProbeResult,
+} from "./probe";

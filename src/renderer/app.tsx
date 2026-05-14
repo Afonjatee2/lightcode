@@ -140,6 +140,9 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
   if (event.type === "agent-detected") {
     useAgentStatusesStore.getState().pushDiscoveredAgent(event.status);
   }
+  if (event.type === "agent-status-updated") {
+    useAgentStatusesStore.getState().mergeAgentStatus(event.status);
+  }
   if (event.type === "windows-agent-statuses") {
     console.log(`[renderer] event: windows-agent-statuses (${event.statuses.length} agents)`);
     const store = useAgentStatusesStore.getState();

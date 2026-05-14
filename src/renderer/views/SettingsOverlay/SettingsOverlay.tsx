@@ -22,7 +22,6 @@ const SECTION_VIEWS: Partial<Record<SettingsSection, () => ReactNode>> = {
   general: () => <GeneralSettings />,
   notifications: () => <NotificationSettings />,
   ai: () => <AISettings />,
-  acpRegistry: () => <AcpRegistrySettings />,
   search: () => <SearchSettings />,
   agents: () => <AgentSettingsEmpty />,
   archived: () => <ArchivedThreadsSettings />,
@@ -30,7 +29,15 @@ const SECTION_VIEWS: Partial<Record<SettingsSection, () => ReactNode>> = {
   dev: () => <DevSettings />,
 };
 
-function renderSection(activeSection: SettingsSection): ReactNode {
+function renderSection(
+  activeSection: SettingsSection,
+  onSectionChange: (section: SettingsSection) => void,
+): ReactNode {
+  if (activeSection === "acpRegistry") {
+    return (
+      <AcpRegistrySettings onOpenAgentSettings={(kind) => onSectionChange(`agents:${kind}`)} />
+    );
+  }
   if (activeSection.startsWith("agents:")) {
     return <SingleAgentSettings agentKind={activeSection.slice(7)} />;
   }
@@ -45,6 +52,11 @@ export function SettingsOverlay(props: { onClose: () => void }) {
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
   const wslProjectDistrosKey = useAppStore((state) => buildWslProjectDistrosKey(state.projects));
   const installedAgents = getSettingsInstalledAgents(agentStatuses, wslAgentStatuses);
+  const attentionAgentKinds = new Set(
+    [...agentStatuses, ...wslAgentStatuses]
+      .filter((status) => status.installed && status.authState === "missing")
+      .map((status) => status.kind),
+  );
   const isAgentsSectionActive = activeSection === "agents" || activeSection.startsWith("agents:");
   const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
 
@@ -80,13 +92,14 @@ export function SettingsOverlay(props: { onClose: () => void }) {
           onSectionChange={setActiveSection}
           onClose={onClose}
           installedAgents={installedAgents}
+          attentionAgentKinds={attentionAgentKinds}
           isRefreshingAgents={isRefreshingAgents}
           onRefreshAgents={refreshAgents}
         />
       }
       content={
         <div className="relative h-full min-h-0">
-          {renderSection(activeSection)}
+          {renderSection(activeSection, setActiveSection)}
           {isAgentsSectionActive && isRefreshingAgents ? (
             <div className="absolute inset-0 z-20 bg-background/90 backdrop-blur-sm">
               <AgentDiscoveryScreen />

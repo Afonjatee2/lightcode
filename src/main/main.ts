@@ -20,6 +20,7 @@ import { IPC_EVENT_CHANNELS } from "@/shared/ipc";
 import { readSharedSettingsFile } from "./sharedSettingsFile";
 import { WindowsJobObjectManager } from "./windowsJobObject";
 import { captureMainException, initializeMainSentry } from "./diagnostics/sentry";
+import { readOrCreateSafeStorageSecretKey } from "./secretStorageKey";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 
@@ -120,6 +121,7 @@ if (!hasSingleInstanceLock) {
     }
 
     initDatabase(lightcodePaths.dbPath);
+    const secretStorageKey = readOrCreateSafeStorageSecretKey(lightcodePaths.baseDir);
 
     const supervisorPath = join(__dirname, "supervisor.cjs");
     const wslHelpersDir = app.isPackaged
@@ -131,6 +133,7 @@ if (!hasSingleInstanceLock) {
       isDev,
       supervisorPath,
       wslHelpersDir,
+      secretStorageKey,
       assignPid: async (pid) => {
         await windowsJobObjectManager?.assignPid(pid);
       },

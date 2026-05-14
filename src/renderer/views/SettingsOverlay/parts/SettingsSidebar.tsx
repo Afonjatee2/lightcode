@@ -1,6 +1,7 @@
 import {
   Archive,
   ArrowLeft,
+  AlertTriangle,
   Bell,
   Bot,
   Boxes,
@@ -33,6 +34,7 @@ export function SettingsSidebar(props: {
   onSectionChange: (section: SettingsSection) => void;
   onClose: () => void;
   installedAgents: AgentStatus[];
+  attentionAgentKinds: ReadonlySet<AgentStatus["kind"]>;
   isRefreshingAgents: boolean;
   onRefreshAgents: () => void;
 }) {
@@ -41,6 +43,7 @@ export function SettingsSidebar(props: {
     onSectionChange,
     onClose,
     installedAgents,
+    attentionAgentKinds,
     isRefreshingAgents,
     onRefreshAgents,
   } = props;
@@ -118,23 +121,31 @@ export function SettingsSidebar(props: {
               />
             )}
             {isAgentsActive &&
-              installedAgents.map((agent) => (
-                <SidebarButton
-                  key={agent.kind}
-                  iconOnly
-                  icon={
-                    <ProviderIcon
-                      kind={agent.kind}
-                      icon={agent.icon}
-                      fallbackLabel={agent.label}
-                      className={`size-4 ${disabledAgents.includes(agent.kind) ? "opacity-35" : ""}`}
-                    />
-                  }
-                  label={agent.label}
-                  isActive={activeSection === `agents:${agent.kind}`}
-                  onPress={() => onSectionChange(`agents:${agent.kind}`)}
-                />
-              ))}
+              installedAgents.map((agent) => {
+                const needsAttention = attentionAgentKinds.has(agent.kind);
+                return (
+                  <SidebarButton
+                    key={agent.kind}
+                    iconOnly
+                    icon={
+                      <span className="relative flex size-4 items-center justify-center">
+                        <ProviderIcon
+                          kind={agent.kind}
+                          icon={agent.icon}
+                          fallbackLabel={agent.label}
+                          className={`size-4 ${disabledAgents.includes(agent.kind) ? "opacity-35" : ""}`}
+                        />
+                        {needsAttention ? (
+                          <AlertTriangle className="absolute -right-1 -top-1 size-2.5 text-warning" />
+                        ) : null}
+                      </span>
+                    }
+                    label={agent.label}
+                    isActive={activeSection === `agents:${agent.kind}`}
+                    onPress={() => onSectionChange(`agents:${agent.kind}`)}
+                  />
+                );
+              })}
             <SidebarButton
               iconOnly
               icon={<Archive className="size-4" />}
@@ -239,6 +250,7 @@ export function SettingsSidebar(props: {
                 />
                 {installedAgents.map((agent) => {
                   const agentDisabled = disabledAgents.includes(agent.kind);
+                  const needsAttention = attentionAgentKinds.has(agent.kind);
                   return (
                     <SidebarButton
                       key={agent.kind}
@@ -251,6 +263,11 @@ export function SettingsSidebar(props: {
                         />
                       }
                       label={agent.label}
+                      suffix={
+                        needsAttention ? (
+                          <AlertTriangle aria-hidden="true" className="size-3.5 text-warning" />
+                        ) : null
+                      }
                       className={agentDisabled ? "opacity-50" : ""}
                       isActive={activeSection === `agents:${agent.kind}`}
                       onPress={() => onSectionChange(`agents:${agent.kind}`)}

@@ -10,6 +10,7 @@ import {
   ChevronRight,
   CircleMinus,
   CirclePlus,
+  FileEdit,
   Lock,
   Minus,
   Plus,
@@ -22,6 +23,7 @@ import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { buildInWorker, diffFileFromBundle, extractDiffNames, getLang } from "./diffBuildClient";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
+import { openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { ConfirmDialog } from "@/renderer/components/common/ConfirmDialog";
 import { useGitReviewRowPadX } from "./GitReviewSidebar/gitReviewPadXContext";
 
@@ -57,8 +59,20 @@ export function StackedFileCard(props: {
   onRefresh: () => void;
   storeKey?: string;
   isWorktree?: boolean;
+  worktreePath?: string | undefined;
+  worktreeBranch?: string | undefined;
 }) {
-  const { file, project, theme, wrapLines, onRefresh, storeKey, isWorktree } = props;
+  const {
+    file,
+    project,
+    theme,
+    wrapLines,
+    onRefresh,
+    storeKey,
+    isWorktree,
+    worktreePath,
+    worktreeBranch,
+  } = props;
   const rowPadX = useGitReviewRowPadX();
   const [expanded, setExpanded] = useState(false);
   const [revertOpen, setRevertOpen] = useState(false);
@@ -167,6 +181,10 @@ export function StackedFileCard(props: {
     onRefresh();
   }
 
+  function handleOpenInEditor() {
+    void openFileInEditor(project, worktreePath, worktreeBranch, file.path);
+  }
+
   const isNewFile = file.deletions === 0 && file.status !== "M" && file.status !== "D";
 
   return (
@@ -207,6 +225,21 @@ export function StackedFileCard(props: {
             </span>
             {/* Action buttons — visible on hover */}
             <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+              <div
+                role="button"
+                tabIndex={0}
+                className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                title="Open in editor"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenInEditor();
+                }}
+                onKeyDown={(e) =>
+                  handleKeyActivate(e, handleOpenInEditor, { stopPropagation: true })
+                }
+              >
+                <FileEdit className="size-3" />
+              </div>
               <div
                 role="button"
                 tabIndex={0}

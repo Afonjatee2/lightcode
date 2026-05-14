@@ -57,15 +57,6 @@ export interface ProviderModelMenuProps {
   onOpenChange?: (open: boolean) => void;
 }
 
-function parseShortcutId(itemId: string): { agentKind: string; modelId: string } | undefined {
-  const colon = itemId.indexOf(":");
-  if (colon < 0) return undefined;
-  const rest = itemId.slice(colon + 1);
-  const sep = rest.indexOf(":");
-  if (sep < 0) return undefined;
-  return { agentKind: rest.slice(0, sep), modelId: rest.slice(sep + 1) };
-}
-
 function normalizeCurrentModelForProvider(
   provider: ProviderModelMenuProvider | undefined,
   modelId: string,
@@ -295,9 +286,9 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
   ]);
 
   function handleSelect(itemId: string) {
-    const parsed = parseShortcutId(itemId);
-    if (!parsed) return;
-    if (parsed.agentKind === currentAgentKind && parsed.modelId === effectiveCurrentModel) {
+    const selected = items.find((item) => item.id === itemId);
+    if (selected?.type !== "model") return;
+    if (selected.providerKind === currentAgentKind && selected.modelId === effectiveCurrentModel) {
       handleOpenChange(false);
       return;
     }
@@ -306,7 +297,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
     // context/fast resolution doesn't block the close animation.
     handleOpenChange(false);
     startTransition(() => {
-      onChange({ agentKind: parsed.agentKind, model: parsed.modelId });
+      onChange({ agentKind: selected.providerKind, model: selected.modelId });
     });
   }
 
@@ -318,7 +309,12 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
       variant="ghost"
       className="lightcode-composer-menu min-w-0 px-2.5"
     >
-      <ProviderIcon kind={currentAgentKind} tone="active" className="size-3.5 shrink-0" />
+      <ProviderIcon
+        kind={currentAgentKind}
+        {...(currentProvider?.icon ? { icon: currentProvider.icon } : {})}
+        tone="active"
+        className="size-3.5 shrink-0"
+      />
       <span
         className={
           hideLabelOnWrap
@@ -691,6 +687,7 @@ function WindowedProviderModelList(props: {
                 {item.showProviderIcon ? (
                   <ProviderIcon
                     kind={item.providerKind}
+                    {...(item.providerIcon ? { icon: item.providerIcon } : {})}
                     tone="inactive"
                     className="size-3 shrink-0"
                   />
@@ -782,7 +779,12 @@ function HeaderProvider(props: {
       role="presentation"
       className={`${className} flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80`}
     >
-      <ProviderIcon kind={item.providerKind} tone="active" className="size-3" />
+      <ProviderIcon
+        kind={item.providerKind}
+        {...(item.providerIcon ? { icon: item.providerIcon } : {})}
+        tone="active"
+        className="size-3"
+      />
       <span className="min-w-0 truncate">{item.label}</span>
       {subProviderLabel ? (
         <>

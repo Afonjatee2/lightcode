@@ -20,11 +20,18 @@ function externalIconStyle(src: string): CSSProperties {
 }
 
 function ExternalProviderIcon(props: { src: string; tone: StatusTone; className?: string }) {
+  const style = externalIconStyle(props.src);
   return (
     <span
-      className={`lightcode-provider-icon lightcode-provider-icon--${props.tone}${props.className ? ` ${props.className}` : ""}`}
+      className={`lightcode-provider-icon lightcode-provider-icon--external lightcode-provider-icon--${props.tone}${props.className ? ` ${props.className}` : ""}`}
     >
-      <span className="lightcode-provider-icon__mask" style={externalIconStyle(props.src)} />
+      <span className="lightcode-provider-icon__mask" style={style} />
+      {props.tone === "working" ? (
+        <span
+          className="lightcode-provider-icon__mask lightcode-provider-icon__mask-scan"
+          style={style}
+        />
+      ) : null}
     </span>
   );
 }

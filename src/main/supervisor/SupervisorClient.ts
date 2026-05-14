@@ -44,6 +44,7 @@ export interface SupervisorClientOptions {
    * into running distros.
    */
   wslHelpersDir: string;
+  secretStorageKey: string;
   assignPid?(pid: number): Promise<void>;
   reportError?(error: unknown, tags?: LightcodeDiagnosticTags): void;
   onEvent(event: SupervisorEvent): void;
@@ -94,6 +95,7 @@ export class SupervisorClient {
         LIGHTCODE_APP_VERSION: this.options.appVersion,
         LIGHTCODE_IS_DEV: this.options.isDev ? "1" : "0",
         LIGHTCODE_DATA_DIR: baseDir,
+        LIGHTCODE_SECRET_STORAGE_KEY: this.options.secretStorageKey,
         LIGHTCODE_WSL_HELPERS_DIR: this.options.wslHelpersDir,
         // Back-compat for one release; older supervisor builds still read
         // the legacy var. Safe to drop once min supported supervisor knows

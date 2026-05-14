@@ -8,6 +8,7 @@ import type {
   PromptSegment,
   Thread,
   ThreadConfig,
+  ThreadPresentationMode,
 } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { buildWorktreeLocation } from "@/shared/worktree";
@@ -165,6 +166,9 @@ export function AppContent() {
     sourceThread: Thread,
     targetAgentKind: string,
     targetConfig: ThreadConfig,
+    targetPresentationMode: ThreadPresentationMode,
+    prompt: string,
+    segments: PromptSegment[] | undefined,
     closeOriginal: boolean,
     extractedContext: ExtractContextResult | null,
   ) {
@@ -190,7 +194,8 @@ export function AppContent() {
       projectId: project.id,
       agentKind: targetAgentKind,
       config: targetConfig,
-      prompt: extractedContext ? "Continuing task from another provider..." : sourceThread.title,
+      prompt,
+      presentationMode: targetPresentationMode,
       ...(sourceThread.worktreePath ? { worktreePath: sourceThread.worktreePath } : {}),
       ...(sourceThread.worktreeBranch ? { worktreeBranch: sourceThread.worktreeBranch } : {}),
       ...(groupId ? { groupId } : {}),
@@ -203,16 +208,27 @@ export function AppContent() {
           threadId: thread.id,
           content: extractedContext.summary,
         });
-        const prompt = `This task was handed off from a ${extractedContext.sourceProvider} session. Read the attached context file and understand it. Wait for instructions.`;
-        const segments: PromptSegment[] = [
-          { kind: "text", content: prompt },
+        const handoffPrompt = `This task was handed off from a ${extractedContext.sourceProvider} session. Use the attached context file as prior conversation context.`;
+        const launchSegments: PromptSegment[] = [
+          { kind: "text", content: `${handoffPrompt}\n\n` },
           { kind: "attachment", path: filePath },
+          { kind: "text", content: "\n\n" },
+          ...(segments ?? [{ kind: "text" as const, content: prompt }]),
         ];
-        queueThreadLaunch(thread.id, prompt, segments);
+        queueThreadLaunch(thread.id, `${handoffPrompt}\n\n${prompt}`, launchSegments);
       } catch {
-        const prompt = `[Context from previous ${extractedContext.sourceProvider} session]\n\n${extractedContext.summary}\n\nUnderstand the context and wait for instructions.`;
-        queueThreadLaunch(thread.id, prompt);
+        const fallbackPrompt = `[Context from previous ${extractedContext.sourceProvider} session]\n\n${extractedContext.summary}\n\n${prompt}`;
+        const fallbackSegments: PromptSegment[] = [
+          {
+            kind: "text",
+            content: `[Context from previous ${extractedContext.sourceProvider} session]\n\n${extractedContext.summary}\n\n`,
+          },
+          ...(segments ?? [{ kind: "text" as const, content: prompt }]),
+        ];
+        queueThreadLaunch(thread.id, fallbackPrompt, fallbackSegments);
       }
+    } else {
+      queueThreadLaunch(thread.id, prompt, segments);
     }
 
     if (closeOriginal) {
@@ -234,10 +250,12 @@ export function AppContent() {
 
     const { agentStatuses, wslAgentStatuses } = useAgentStatusesStore.getState();
     const agents = getProjectAgentStatuses(project.location, agentStatuses, wslAgentStatuses);
-    generateTitleAsync(thread.id, project.location, agents, sourceThread.title);
+    generateTitleAsync(thread.id, project.location, agents, prompt);
 
     const targetLabel = agents.find((a) => a.kind === targetAgentKind)?.label ?? targetAgentKind;
-    toast.success(`Context transferred to ${targetLabel}`);
+    toast.success(
+      extractedContext ? `Context transferred to ${targetLabel}` : `Started ${targetLabel} thread`,
+    );
   }
 
   if (view.kind === "draft") {

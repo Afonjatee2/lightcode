@@ -5,19 +5,19 @@ describe("sharedSettingsStore", () => {
   beforeEach(() => {
     localStorage.clear();
     useSharedSettings.setState({
-      themeMode: "system",
+      themeMode: "dark",
       staleThreadUnloadMinutes: 20,
       providerConfigs: {},
     });
   });
 
-  it("defaults theme to system", () => {
-    expect(useSharedSettings.getState().themeMode).toBe("system");
+  it("defaults theme to dark", () => {
+    expect(useSharedSettings.getState().themeMode).toBe("dark");
   });
 
   it("switches theme mode", () => {
-    useSharedSettings.getState().setThemeMode("dark");
-    expect(useSharedSettings.getState().themeMode).toBe("dark");
+    useSharedSettings.getState().setThemeMode("light");
+    expect(useSharedSettings.getState().themeMode).toBe("light");
   });
 
   it("updates the stale thread unload timing", () => {

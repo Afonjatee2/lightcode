@@ -139,7 +139,7 @@ export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 export type SharedSettingsInput = Omit<SharedSettings, "agentHookSupport">;
 
 export const defaultSharedSettings: SharedSettings = {
-  themeMode: "system",
+  themeMode: "dark",
   terminalPosition: "bottom",
   commitGenProvider: "auto",
   commitGenModel: "",

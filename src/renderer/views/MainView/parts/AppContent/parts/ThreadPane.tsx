@@ -1,5 +1,11 @@
 import { startTransition, useRef } from "react";
-import type { ExtractContextResult, Thread, ThreadConfig } from "@/shared/contracts";
+import type {
+  ExtractContextResult,
+  PromptSegment,
+  Thread,
+  ThreadConfig,
+  ThreadPresentationMode,
+} from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { readBridge } from "@/renderer/bridge";
@@ -27,6 +33,9 @@ export function ThreadPane(props: {
     sourceThread: Thread,
     targetKind: string,
     targetConfig: ThreadConfig,
+    targetPresentationMode: ThreadPresentationMode,
+    prompt: string,
+    segments: PromptSegment[] | undefined,
     closeOriginal: boolean,
     extractedContext: ExtractContextResult | null,
   ) => void;
@@ -174,8 +183,17 @@ export function ThreadPane(props: {
       installedAgents={installedAgents}
       onContinueInProvider={
         props.onContinueInProvider
-          ? (targetKind, tConfig, closeOrig, ctx) => {
-              props.onContinueInProvider?.(thread, targetKind, tConfig, closeOrig, ctx);
+          ? (targetKind, tConfig, targetPresentationMode, prompt, segments, closeOrig, ctx) => {
+              props.onContinueInProvider?.(
+                thread,
+                targetKind,
+                tConfig,
+                targetPresentationMode,
+                prompt,
+                segments,
+                closeOrig,
+                ctx,
+              );
             }
           : undefined
       }

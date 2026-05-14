@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, watch, type FSWatcher } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/settings";
 import type {
   AgentKind,
@@ -90,8 +90,11 @@ import type {
   GitWatchProjectPayload,
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
+  AuthenticateAcpRegistryAgentPayload,
   InterruptThreadPayload,
   InstallAcpRegistryAgentPayload,
+  LogoutAcpRegistryAgentPayload,
+  SetAcpRegistryAgentAuthPayload,
   SetPendingSteerPayload,
   ClearPendingSteerPayload,
   ListProjectTreePayload,
@@ -130,11 +133,14 @@ import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { joinProjectPosixPath } from "@/shared/wsl";
 import { buildAgentRegistry } from "./agents/registry";
 import {
+  authenticateAcpRegistryAgent as authenticateAcpRegistryAgentFromRegistry,
   backfillAcpRegistryAgentIcons,
   fetchAcpRegistry,
   installAcpRegistryAgent as installAcpRegistryAgentFromRegistry,
+  logoutAcpRegistryAgent as logoutAcpRegistryAgentFromRegistry,
   readAcpRegistrySettings,
   removeAcpRegistryAgent as removeAcpRegistryAgentFromRegistry,
+  setAcpRegistryAgentAuth as setAcpRegistryAgentAuthInRegistry,
 } from "./agents/acpRegistry";
 import { prefetchNativeNodeRuntime } from "./runtime/prefetchNativeNode";
 import { readWslCommandOutputAsync, type AgentAdapter } from "./agents/base";
@@ -162,13 +168,18 @@ import { hookDebugEnvelope, isLightcodeHookDebug } from "./runtime/hookDebug";
 import { WslBridgeServer } from "./wsl/bridge";
 import { WslBridgeClient } from "./wsl/bridge/client";
 import { resolveWslHelpersDir } from "./wsl/wslDeploy";
+import { decryptSecret, transformSensitiveAgentSecrets } from "./secretStorage";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
 
 function readSupervisorSharedSettings(settingsPath: string) {
   if (!existsSync(settingsPath)) return { ...defaultSharedSettings };
   try {
-    return normalizeSharedSettings(JSON.parse(readFileSync(settingsPath, "utf8")));
+    return transformSensitiveAgentSecrets(
+      normalizeSharedSettings(JSON.parse(readFileSync(settingsPath, "utf8"))),
+      dirname(settingsPath),
+      decryptSecret,
+    );
   } catch {
     return { ...defaultSharedSettings };
   }
@@ -456,6 +467,44 @@ export class SupervisorRuntime {
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
     return { installed };
+  }
+
+  async setAcpRegistryAgentAuth(
+    payload: SetAcpRegistryAgentAuthPayload,
+  ): Promise<AcpRegistryMutationResult> {
+    const installed = setAcpRegistryAgentAuthInRegistry({
+      agentId: payload.agentId,
+      environment: payload.environment,
+      settingsPath: this.settingsPath,
+    });
+    this.sharedSettingsCache.invalidate();
+    this.refreshAgentRegistryAdapters();
+    return { installed };
+  }
+
+  async authenticateAcpRegistryAgent(payload: AuthenticateAcpRegistryAgentPayload): Promise<void> {
+    await authenticateAcpRegistryAgentFromRegistry({
+      agentId: payload.agentId,
+      methodId: payload.methodId,
+      ...(payload.envKind ? { envKind: payload.envKind } : {}),
+      ...(payload.wslDistro ? { wslDistro: payload.wslDistro } : {}),
+      settingsPath: this.settingsPath,
+    });
+    // Auth writes `authAcknowledged` into the instance — rebuild the cached
+    // adapters so the next status refresh sees the new ack state.
+    this.sharedSettingsCache.invalidate();
+    this.refreshAgentRegistryAdapters();
+  }
+
+  async logoutAcpRegistryAgent(payload: LogoutAcpRegistryAgentPayload): Promise<void> {
+    await logoutAcpRegistryAgentFromRegistry({
+      agentId: payload.agentId,
+      ...(payload.envKind ? { envKind: payload.envKind } : {}),
+      ...(payload.wslDistro ? { wslDistro: payload.wslDistro } : {}),
+      settingsPath: this.settingsPath,
+    });
+    this.sharedSettingsCache.invalidate();
+    this.refreshAgentRegistryAdapters();
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {

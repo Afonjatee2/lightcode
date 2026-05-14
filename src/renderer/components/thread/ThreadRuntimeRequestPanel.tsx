@@ -495,6 +495,7 @@ function McpElicitationForm(props: {
           isDisabled={isDisabled}
           size="sm"
           variant="ghost"
+          className="text-muted"
           onPress={() => onSubmit({ action: "cancel" }, "cancelled")}
         >
           Cancel

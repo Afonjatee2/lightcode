@@ -8,6 +8,7 @@ export interface ProviderModelHeaderProvider {
   type: "header-provider";
   id: string;
   providerKind: string;
+  providerIcon?: string;
   label: string;
 }
 
@@ -23,6 +24,7 @@ export interface ProviderModelRow {
   type: "model";
   id: string;
   providerKind: string;
+  providerIcon?: string;
   modelId: string;
   label: string;
   /** Tail hint shown to the right of the model label. */

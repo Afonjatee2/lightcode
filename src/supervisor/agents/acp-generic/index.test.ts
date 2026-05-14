@@ -1,11 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentInstanceConfig } from "@/shared/contracts";
+import { authenticateAcpAgent, logoutAcpAgent, probeAcpCapabilities } from "../acp";
 import {
   ACP_GENERIC_KIND_PREFIX,
+  authenticateAcpGenericInstance,
   createAcpGenericAdapter,
   extractAcpGenericInstanceId,
   isAcpGenericKind,
+  logoutAcpGenericInstance,
 } from ".";
+
+vi.mock("../acp", () => ({
+  authenticateAcpAgent: vi.fn<() => Promise<void>>(),
+  createAcpStructuredSession: vi.fn<() => undefined>(),
+  logoutAcpAgent: vi.fn<() => Promise<void>>(),
+  probeAcpCapabilities:
+    vi.fn<
+      (...args: Parameters<typeof probeAcpCapabilities>) => ReturnType<typeof probeAcpCapabilities>
+    >(),
+}));
 
 /**
  * The acp-generic adapter is the proof-point that any ACP-speaking binary
@@ -28,6 +41,12 @@ const baseInstance: AgentInstanceConfig = {
 };
 
 describe("createAcpGenericAdapter", () => {
+  beforeEach(() => {
+    vi.mocked(authenticateAcpAgent).mockReset().mockResolvedValue(undefined);
+    vi.mocked(logoutAcpAgent).mockReset().mockResolvedValue(undefined);
+    vi.mocked(probeAcpCapabilities).mockReset().mockResolvedValue(undefined);
+  });
+
   it("produces a chat-only adapter with a namespaced kind", () => {
     const adapter = createAcpGenericAdapter(baseInstance);
     expect(adapter.kind).toBe("acp-generic:my-acp");
@@ -47,9 +66,155 @@ describe("createAcpGenericAdapter", () => {
     const adapter = createAcpGenericAdapter({
       ...baseInstance,
       icon: "https://example.com/icon.svg",
+      version: "1.2.3",
     });
     const status = await adapter.detectInstall();
     expect(status.icon).toBe("https://example.com/icon.svg");
+    expect(status.version).toBe("1.2.3");
+  });
+
+  it("merges ACP-probed capabilities into detected status", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      models: [{ id: "glm-5.1", label: "GLM 5.1" }],
+      modes: ["agent", "plan"],
+      approvalPolicies: [{ id: "default", label: "Default" }],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.capabilities.models).toEqual([{ id: "glm-5.1", label: "GLM 5.1" }]);
+    expect(status.capabilities.modes).toEqual(["agent", "plan"]);
+    expect(status.capabilities.approvalPolicies).toEqual([{ id: "default", label: "Default" }]);
+  });
+
+  it("uses ACP env-var auth methods to report missing auth", async () => {
+    const key = "__LIGHTCODE_ACP_GENERIC_AUTH_METHOD_TEST__";
+    delete process.env[key];
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      authMethods: [
+        {
+          type: "env_var",
+          id: "zai",
+          name: "Z.AI API key",
+          vars: [{ name: key }],
+        },
+      ],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.authState).toBe("missing");
+    expect(status.authMethods).toEqual([
+      {
+        type: "env_var",
+        id: "zai",
+        name: "Z.AI API key",
+        vars: [{ name: key }],
+      },
+    ]);
+    expect(status.providerMetadata?.authMethod).toBe("Z.AI API key");
+  });
+
+  it("deduplicates repeated ACP auth method names in provider metadata", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      authMethods: [
+        {
+          type: "env_var",
+          id: "zai-native",
+          name: "Z.AI API key",
+          vars: [{ name: "Z_AI_API_KEY" }],
+        },
+        {
+          type: "env_var",
+          id: "zai-wsl",
+          name: "Z.AI API key",
+          vars: [{ name: "Z_AI_API_KEY" }],
+        },
+      ],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.providerMetadata?.authMethod).toBe("Z.AI API key");
+  });
+
+  it("does not report agent-owned login methods as provider metadata", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      authMethods: [
+        { id: "login", name: "Login" },
+        {
+          id: "factory-key",
+          name: "Factory API Key",
+          vars: [{ name: "FACTORY_API_KEY" }],
+        } as never,
+      ],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.providerMetadata?.authMethod).toBe("Factory API Key");
+  });
+
+  it("reports ACP terminal auth as missing until a session probe succeeds", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      authMethods: [
+        {
+          type: "terminal",
+          id: "cli-login",
+          name: "CLI login",
+          args: ["login"],
+        },
+      ],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.authState).toBe("missing");
+    expect(status.loginCommand).toBe("my-acp --stdio login");
+  });
+
+  it("reports advertised agent auth as missing even when a session probe succeeds", async () => {
+    // `sessionEstablished` is not a reliable proxy for "signed in" — some
+    // agents (e.g. Cline) accept newSession unauthenticated. Until we have a
+    // positive identity signal, fall through to "missing" so the UI prompts
+    // for login instead of falsely claiming Signed in.
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      sessionEstablished: true,
+      authMethods: [{ id: "browser-login", name: "Browser login" }],
+      authLogoutSupported: true,
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.authState).toBe("missing");
+    expect(status.authLogoutSupported).toBe(true);
+  });
+
+  it("treats per-env authAcknowledged native flag as authenticated on native only", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      sessionEstablished: true,
+      authMethods: [{ id: "browser-login", name: "Browser login" }],
+    });
+    const adapter = createAcpGenericAdapter({
+      ...baseInstance,
+      authAcknowledged: { native: true },
+    });
+    expect((await adapter.detectInstall()).authState).toBe("authenticated");
+    expect((await adapter.detectInstall({ envKind: "wsl", wslDistro: "Ubuntu" })).authState).toBe(
+      "missing",
+    );
+  });
+
+  it("treats per-env authAcknowledged wsl distro flag as authenticated only in that distro", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      sessionEstablished: true,
+      authMethods: [{ id: "browser-login", name: "Browser login" }],
+    });
+    const adapter = createAcpGenericAdapter({
+      ...baseInstance,
+      authAcknowledged: { wsl: { Ubuntu: true } },
+    });
+    expect((await adapter.detectInstall({ envKind: "wsl", wslDistro: "Ubuntu" })).authState).toBe(
+      "authenticated",
+    );
+    expect((await adapter.detectInstall({ envKind: "wsl", wslDistro: "Debian" })).authState).toBe(
+      "missing",
+    );
+    expect((await adapter.detectInstall()).authState).toBe("missing");
   });
 
   it("merges user-declared capability overrides into the default capability set", () => {
@@ -96,6 +261,30 @@ describe("createAcpGenericAdapter", () => {
     } finally {
       delete process.env[key];
     }
+  });
+
+  it("authenticates in the requested WSL environment", async () => {
+    await authenticateAcpGenericInstance(baseInstance, "browser-login", {
+      envKind: "wsl",
+      wslDistro: "Ubuntu",
+    });
+
+    const [command, args] = vi.mocked(authenticateAcpAgent).mock.calls[0]!;
+    expect(command).toMatch(/wsl(?:\.exe)?$/u);
+    expect(args).toContain("Ubuntu");
+    expect(args.at(-1)).toContain("BROWSER=");
+    expect(args.at(-1)).toContain("cmd.exe /c start");
+  });
+
+  it("logs out in the requested WSL environment", async () => {
+    await logoutAcpGenericInstance(baseInstance, {
+      envKind: "wsl",
+      wslDistro: "Ubuntu",
+    });
+
+    const [command, args] = vi.mocked(logoutAcpAgent).mock.calls[0]!;
+    expect(command).toMatch(/wsl(?:\.exe)?$/u);
+    expect(args).toContain("Ubuntu");
   });
 });
 

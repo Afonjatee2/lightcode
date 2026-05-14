@@ -1641,7 +1641,7 @@ export class ThreadSessionManager {
         ) {
           return;
         }
-        this.outputPipeline.updateState(session, "error", "error", errorMessage);
+        this.failStructuredSession(session, errorMessage);
       },
       onUpdate: (update) => {
         if (
@@ -1910,12 +1910,7 @@ export class ThreadSessionManager {
             if (this.sessions.get(restarted.threadId)?.instanceId !== restarted.instanceId) {
               return;
             }
-            this.outputPipeline.updateState(
-              restarted,
-              "error",
-              "error",
-              error instanceof Error ? error.message : String(error),
-            );
+            this.failStructuredSession(restarted, error);
           });
       }
       return;
@@ -2055,12 +2050,7 @@ export class ThreadSessionManager {
       if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
         return;
       }
-      this.outputPipeline.updateState(
-        session,
-        "error",
-        "error",
-        error instanceof Error ? error.message : String(error),
-      );
+      this.failStructuredSession(session, error);
     });
   }
 

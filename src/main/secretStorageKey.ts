@@ -1,0 +1,33 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { dirname, join } from "node:path";
+import { safeStorage } from "electron";
+
+const SAFE_STORAGE_KEY_FILE = "secret-key.safe";
+
+function keyFilePath(baseDir: string): string {
+  return join(baseDir, SAFE_STORAGE_KEY_FILE);
+}
+
+function isValidKey(value: string): boolean {
+  return Buffer.from(value, "base64").length === 32;
+}
+
+export function readOrCreateSafeStorageSecretKey(baseDir: string): string {
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error("Electron safeStorage encryption is not available.");
+  }
+
+  const path = keyFilePath(baseDir);
+  if (existsSync(path)) {
+    const encrypted = Buffer.from(readFileSync(path, "utf8"), "base64");
+    const key = safeStorage.decryptString(encrypted);
+    if (isValidKey(key)) return key;
+  }
+
+  const key = randomBytes(32).toString("base64");
+  const encrypted = safeStorage.encryptString(key).toString("base64");
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, encrypted, { encoding: "utf8", mode: 0o600 });
+  return key;
+}

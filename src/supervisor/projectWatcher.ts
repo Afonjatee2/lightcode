@@ -179,12 +179,12 @@ export class ProjectWatcher {
 
     try {
       entry.gitWatcher = watch(gitDir, { recursive: true }, (_eventType, filename) => {
-        if (filename) {
-          const name = filename.replace(/\\/g, "/");
-          if (isKnownGitNoisePath(name)) {
-            return;
-          }
-        }
+        // Windows fs.watch coalesces bursts into filename-less events, which
+        // we cannot filter — they cause a refresh→write→event→refresh loop.
+        // Real isolated changes always deliver a filename, so drop the rest.
+        if (!filename) return;
+        const name = filename.replace(/\\/g, "/");
+        if (isKnownGitNoisePath(name)) return;
         scheduleGitNotify();
       });
       entry.gitWatcher.on("error", () => {
@@ -197,10 +197,9 @@ export class ProjectWatcher {
 
     try {
       entry.workTreeWatcher = watch(repoPath, { recursive: true }, (_eventType, filename) => {
-        if (filename) {
-          const name = filename.replace(/\\/g, "/");
-          if (isIgnoredWorkTreeFile(name)) return;
-        }
+        if (!filename) return;
+        const name = filename.replace(/\\/g, "/");
+        if (isIgnoredWorkTreeFile(name)) return;
         scheduleTreeNotify();
       });
       entry.workTreeWatcher.on("error", () => {
@@ -403,9 +402,11 @@ export class ProjectWatcher {
           ignore,
         },
         (event) => {
+          // Empty path arrays carry no actionable info and historically slip
+          // through filters — drop them.
+          if (event.paths.length === 0) return;
           if (event.scope === "git") {
-            const onlyNoise =
-              event.paths.length > 0 && event.paths.every((p) => isKnownGitNoisePath(p));
+            const onlyNoise = event.paths.every((p) => isKnownGitNoisePath(p));
             if (onlyNoise) return;
             schedule.onGit();
             return;
@@ -417,7 +418,7 @@ export class ProjectWatcher {
             // by the dedicated git-scope subscription with noise filtering, so
             // drop them here to avoid a refresh→lock-write→refresh loop.
             const treePaths = event.paths.filter((p) => p !== ".git" && !p.startsWith(".git/"));
-            if (treePaths.length === 0 && event.paths.length > 0) return;
+            if (treePaths.length === 0) return;
             schedule.onTree();
             return;
           }

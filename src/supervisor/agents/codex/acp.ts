@@ -253,6 +253,31 @@ export function parseCodexSocketMessage(payload: unknown): CodexSocketMessage {
   return { kind: "unknown" };
 }
 
+/**
+ * Pull a human-readable message out of a Codex `thread/status/changed` payload
+ * when the new status is `systemError`. Codex's typed shape carries no message
+ * field, but observed wire payloads sometimes include `message`, `error`, or a
+ * nested `details` blob, so we probe the common spots before falling back to a
+ * generic string.
+ */
+function extractCodexStatusErrorMessage(status: unknown): string {
+  if (status && typeof status === "object") {
+    const record = status as Record<string, unknown>;
+    const direct = record.message ?? record.error ?? record.reason ?? record.detail;
+    if (typeof direct === "string" && direct.trim().length > 0) {
+      return direct;
+    }
+    const details = record.details;
+    if (details && typeof details === "object") {
+      const nested = (details as Record<string, unknown>).message;
+      if (typeof nested === "string" && nested.trim().length > 0) {
+        return nested;
+      }
+    }
+  }
+  return "Codex reported a system error. The session may be out of usage or otherwise unable to continue.";
+}
+
 function isRecoverableResumeError(message: string): boolean {
   const lower = message.toLowerCase();
   return (
@@ -882,8 +907,30 @@ export class CodexStructuredSession implements StructuredSessionHandle {
           if (!this.isCurrentThreadNotification(String(params.threadId))) {
             return;
           }
-          this.currentThreadStatus = params.status as CodexThreadStatus;
+          const nextStatus = params.status as CodexThreadStatus;
+          // A systemError status alone gives the renderer a red icon but no
+          // message. If Codex didn't already send a paired `thread/error`
+          // notification or a turn/start rejection (which set `errorSticky`),
+          // surface a fallback runtime error event so `ThreadErrorDock`
+          // renders something instead of leaving the user with an empty dock.
+          // Set `errorSticky` *after* `emitDerivedUpdate` so the derived
+          // `onUpdate` call still fires — `emitDerivedUpdate` short-circuits
+          // when `errorSticky` is already true.
+          const shouldFallbackEmit =
+            nextStatus.type === "systemError" &&
+            this.currentThreadStatus.type !== "systemError" &&
+            !this.errorSticky;
+          if (shouldFallbackEmit) {
+            const fallbackMessage = extractCodexStatusErrorMessage(params.status);
+            this.emitRuntimeEvents([
+              { type: "error", threadId: this.threadId, message: fallbackMessage },
+            ]);
+          }
+          this.currentThreadStatus = nextStatus;
           this.emitDerivedUpdate();
+          if (shouldFallbackEmit) {
+            this.errorSticky = true;
+          }
           return;
         }
 

@@ -125,7 +125,7 @@ export function RevertCheckpointDialog(props: {
             </div>
           </AlertDialog.Body>
           <AlertDialog.Footer>
-            <Button slot="close" variant="ghost">
+            <Button slot="close" variant="ghost" className="text-muted">
               Cancel
             </Button>
             <Button variant="tertiary" onPress={props.onConfirm}>

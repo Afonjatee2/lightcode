@@ -6,8 +6,11 @@ import type { AcpRegistryListResult } from "@/shared/contracts";
 import {
   backfillAcpRegistryAgentIcons,
   installAcpRegistryAgent,
+  readAcpRegistrySettings,
   resolveRegistryAgentFamilyKind,
+  setAcpRegistryAgentAuth,
 } from "./acpRegistry";
+import { isEncryptedSecret } from "../secretStorage";
 
 describe("ACP registry family mapping", () => {
   it("maps known registry agents to provider families for presentation only", () => {
@@ -62,6 +65,7 @@ describe("ACP registry family mapping", () => {
       };
       expect(settings.agentInstances["codex-acp"]).toMatchObject({
         driver: "acp-generic",
+        version: "1.0.0",
         config: { binary: "npx" },
       });
     } finally {
@@ -117,13 +121,68 @@ describe("ACP registry family mapping", () => {
 
     expect(backfillAcpRegistryAgentIcons({ registry, settingsPath })).toBe(true);
     const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as {
-      acpRegistryInstalledAgents: Record<string, { icon?: string }>;
-      agentInstances: Record<string, { icon?: string }>;
+      acpRegistryInstalledAgents: Record<string, { icon?: string; version?: string }>;
+      agentInstances: Record<string, { icon?: string; version?: string }>;
     };
 
     expect(settings.acpRegistryInstalledAgents["glm-acp-agent"]?.icon).toBe(
       registry.agents[0]!.icon,
     );
     expect(settings.agentInstances["glm-acp-agent"]?.icon).toBe(registry.agents[0]!.icon);
+    expect(settings.agentInstances["glm-acp-agent"]?.version).toBe("1.1.3");
+  });
+
+  it("stores ACP registry auth env vars on the installed generic instance", () => {
+    const dir = mkdtempSync(join(tmpdir(), "lightcode-acp-registry-"));
+    const settingsPath = join(dir, "settings.json");
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        acpRegistryInstalledAgents: {
+          "glm-acp-agent": {
+            id: "glm-acp-agent",
+            name: "GLM Agent",
+            version: "1.1.3",
+            installedAt: new Date(0).toISOString(),
+            adapterKind: "acp-generic:glm-acp-agent",
+            installKind: "generic",
+          },
+        },
+        agentInstances: {
+          "glm-acp-agent": {
+            id: "glm-acp-agent",
+            driver: "acp-generic",
+            displayName: "GLM Agent",
+            enabled: true,
+            config: {
+              binary: "npx",
+              args: ["-y", "glm-acp-agent@1.1.3"],
+              authMode: "none",
+            },
+          },
+        },
+      }),
+      "utf8",
+    );
+
+    setAcpRegistryAgentAuth({
+      agentId: "glm-acp-agent",
+      environment: { Z_AI_API_KEY: "sk-test" },
+      settingsPath,
+    });
+    const raw = readFileSync(settingsPath, "utf8");
+    expect(raw).not.toContain("sk-test");
+    const settings = JSON.parse(raw) as {
+      agentInstances: Record<string, { environment?: Record<string, unknown> }>;
+    };
+    const environment = settings.agentInstances["glm-acp-agent"]?.environment;
+    expect(environment).toBeDefined();
+    expect(isEncryptedSecret((environment!.Z_AI_API_KEY as { value: string }).value)).toBe(true);
+
+    expect(
+      readAcpRegistrySettings(settingsPath).agentInstances["glm-acp-agent"]?.environment,
+    ).toEqual({
+      Z_AI_API_KEY: { value: "sk-test", sensitive: true },
+    });
   });
 });

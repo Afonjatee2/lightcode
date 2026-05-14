@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PaneLayout } from "@/shared/paneLayout";
 import { useAppStore } from "./appStore";
 
 describe("appStore runtime config sync", () => {
@@ -1287,5 +1288,67 @@ describe("group view layout restore", () => {
         },
       ],
     });
+  });
+
+  it("restores the saved pane layout when clicking a thread inside a group from outside the group view", () => {
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const groupId = "group-1";
+    const ids = Array.from(
+      { length: 4 },
+      (_, index) =>
+        useAppStore.getState().createThread({
+          projectId: project.id,
+          agentKind: "codex",
+          config: { model: "m" },
+          prompt: `t${index}`,
+          groupId,
+          groupName: "Group 1",
+        }).id,
+    );
+
+    const savedLayout: PaneLayout = {
+      kind: "split",
+      axis: "horizontal",
+      children: [
+        {
+          kind: "split",
+          axis: "vertical",
+          children: [
+            { kind: "leaf", paneId: ids[0]! },
+            { kind: "leaf", paneId: ids[1]! },
+          ],
+        },
+        {
+          kind: "split",
+          axis: "vertical",
+          children: [
+            { kind: "leaf", paneId: ids[2]! },
+            { kind: "leaf", paneId: ids[3]! },
+          ],
+        },
+      ],
+    };
+
+    useAppStore.setState((state) => ({
+      ...state,
+      view: { kind: "home" as const },
+      groupLayouts: {
+        [groupId]: {
+          panes: [ids[0]!, ids[1]!, ids[2]!, ids[3]!],
+          paneLayout: savedLayout,
+        },
+      },
+    }));
+
+    useAppStore.getState().openThread(ids[2]!);
+
+    const view = useAppStore.getState().view;
+    expect(view.kind).toBe("thread");
+    expect(view.kind === "thread" && view.activeGroupId).toBe(groupId);
+    expect(view.kind === "thread" && view.panes).toEqual([ids[0], ids[1], ids[2], ids[3]]);
+    expect(view.kind === "thread" && view.paneLayout).toEqual(savedLayout);
   });
 });

@@ -13,8 +13,51 @@ import {
   History,
   Layout,
   Download,
+  Boxes,
 } from "lucide-react";
 import { motion } from "framer-motion";
+
+const ACP_REGISTRY_CDN = "https://cdn.agentclientprotocol.com/registry/v1/latest";
+
+interface AcpAgent {
+  id: string;
+  name: string;
+}
+
+// Mirrors the public ACP Registry at cdn.agentclientprotocol.com, excluding
+// providers already promoted in the hero "Supported Agents" strip.
+// Icons are served from the same CDN as `${id}.svg`.
+const ACP_REGISTRY_AGENTS: AcpAgent[] = [
+  { id: "agoragentic-acp", name: "Agoragentic" },
+  { id: "amp-acp", name: "Amp" },
+  { id: "auggie", name: "Auggie CLI" },
+  { id: "autohand", name: "Autohand Code" },
+  { id: "cline", name: "Cline" },
+  { id: "codebuddy-code", name: "Codebuddy Code" },
+  { id: "cortex-code", name: "Cortex Code" },
+  { id: "corust-agent", name: "Corust Agent" },
+  { id: "crow-cli", name: "crow-cli" },
+  { id: "deepagents", name: "DeepAgents" },
+  { id: "dimcode", name: "DimCode" },
+  { id: "dirac", name: "Dirac" },
+  { id: "factory-droid", name: "Factory Droid" },
+  { id: "fast-agent", name: "fast-agent" },
+  { id: "glm-acp-agent", name: "GLM Agent" },
+  { id: "goose", name: "goose" },
+  { id: "junie", name: "Junie" },
+  { id: "kilo", name: "Kilo" },
+  { id: "kimi", name: "Kimi CLI" },
+  { id: "minion-code", name: "Minion Code" },
+  { id: "mistral-vibe", name: "Mistral Vibe" },
+  { id: "nova", name: "Nova" },
+  { id: "pi-acp", name: "pi ACP" },
+  { id: "poolside", name: "Poolside" },
+  { id: "qoder", name: "Qoder CLI" },
+  { id: "qwen-code", name: "Qwen Code" },
+  { id: "sigit", name: "siGit Code" },
+  { id: "stakpak", name: "Stakpak" },
+  { id: "vtcode", name: "VT Code" },
+];
 
 type NavigatorWithUserAgentData = Navigator & {
   userAgentData?: {
@@ -57,6 +100,10 @@ async function getBrowserArchitecture(): Promise<string | undefined> {
 export default function Home() {
   const scrollToFeatures = () => {
     document.getElementById("features")?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  const scrollToAcpRegistry = () => {
+    document.getElementById("acp-registry")?.scrollIntoView({ behavior: "smooth" });
   };
 
   const [platform, setPlatform] = useState<{ label: string; slug: string }>({
@@ -227,11 +274,6 @@ export default function Home() {
                   path: "M23.922 16.992c-.861 1.495-5.859 5.023-11.922 5.023-6.063 0-11.061-3.528-11.922-5.023A.641.641 0 0 1 0 16.736v-2.869a.841.841 0 0 1 .053-.22c.372-.935 1.347-2.292 2.605-2.656.167-.429.414-1.055.644-1.517a10.195 10.195 0 0 1-.052-1.086c0-1.331.282-2.499 1.132-3.368.397-.406.89-.717 1.474-.952 1.399-1.136 3.392-2.093 6.122-2.093 2.731 0 4.767.957 6.166 2.093.584.235 1.077.546 1.474.952.85.869 1.132 2.037 1.132 3.368 0 .368-.014.733-.052 1.086.23.462.477 1.088.644 1.517 1.258.364 2.233 1.721 2.605 2.656a.832.832 0 0 1 .053.22v2.869a.641.641 0 0 1-.078.256ZM12.172 11h-.344a4.323 4.323 0 0 1-.355.508C10.703 12.455 9.555 13 7.965 13c-1.725 0-2.989-.359-3.782-1.259a2.005 2.005 0 0 1-.085-.104L4 11.741v6.585c1.435.779 4.514 2.179 8 2.179 3.486 0 6.565-1.4 8-2.179v-6.585l-.098-.104s-.033.045-.085.104c-.793.9-2.057 1.259-3.782 1.259-1.59 0-2.738-.545-3.508-1.492a4.323 4.323 0 0 1-.355-.508h-.016.016Zm.641-2.935c.136 1.057.403 1.913.878 2.497.442.544 1.134.938 2.344.938 1.573 0 2.292-.337 2.657-.751.384-.435.558-1.15.558-2.361 0-1.14-.243-1.847-.705-2.319-.477-.488-1.319-.862-2.824-1.025-1.487-.161-2.192.138-2.533.529-.269.307-.437.808-.438 1.578v.021c0 .265.021.562.063.893Zm-1.626 0c.042-.331.063-.628.063-.894v-.02c-.001-.77-.169-1.271-.438-1.578-.341-.391-1.046-.69-2.533-.529-1.505.163-2.347.537-2.824 1.025-.462.472-.705 1.179-.705 2.319 0 1.211.175 1.926.558 2.361.365.414 1.084.751 2.657.751 1.21 0 1.902-.394 2.344-.938.475-.584.742-1.44.878-2.497Z M14.5 14.25a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1Zm-5 0a1 1 0 0 1 1 1v2a1 1 0 0 1-2 0v-2a1 1 0 0 1 1-1Z",
                   viewBox: "0 0 24 24",
                 },
-                {
-                  name: "ACP Registry",
-                  path: "M12 2a2 2 0 0 1 2 2c0 .74-.4 1.39-1 1.73V7h1a7 7 0 0 1 7 7v8H3v-8a7 7 0 0 1 7-7h1V5.73c-.6-.34-1-1-1-1.73a2 2 0 0 1 2-2zM7.5 13a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm9 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM18 11a5 5 0 0 0-5-5h-2a5 5 0 0 0-5 5v1h12v-1z",
-                  viewBox: "0 0 24 24",
-                },
               ].map((agent) => (
                 <div
                   key={agent.name}
@@ -243,6 +285,14 @@ export default function Home() {
                   {agent.name}
                 </div>
               ))}
+              <button
+                type="button"
+                onClick={scrollToAcpRegistry}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm font-medium text-gray-300 transition hover:bg-white/10 hover:border-white/20 cursor-pointer"
+              >
+                <Boxes className="w-4 h-4 text-gray-300 opacity-80" />+ {ACP_REGISTRY_AGENTS.length}{" "}
+                via ACP Registry
+              </button>
             </div>
           </motion.div>
 
@@ -362,6 +412,66 @@ export default function Home() {
               description="Real terminal sessions backed by a live PTY. No abstractions, just raw terminal power."
             />
           </div>
+        </div>
+      </section>
+
+      {/* ACP Registry Section */}
+      <section
+        id="acp-registry"
+        className="relative z-10 py-24 px-4 bg-black border-t border-white/5"
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-3">
+              ACP Registry
+            </p>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">
+              Built for the entire <br />
+              <span className="text-gray-500">agent ecosystem.</span>
+            </h2>
+            <p className="text-gray-400 max-w-2xl mx-auto">
+              Lightcode installs and runs every agent published to the Agent Client Protocol
+              registry — one workspace, unified credentials, native UI.
+            </p>
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-wrap items-center justify-center gap-2"
+          >
+            {ACP_REGISTRY_AGENTS.map((agent) => (
+              <div
+                key={agent.id}
+                className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm font-medium text-gray-300 transition hover:bg-white/10 hover:border-white/20 cursor-default"
+              >
+                <img
+                  src={`${ACP_REGISTRY_CDN}/${agent.id}.svg`}
+                  alt=""
+                  width={16}
+                  height={16}
+                  loading="lazy"
+                  className="w-4 h-4 object-contain opacity-80 [filter:brightness(0)_invert(1)]"
+                />
+                {agent.name}
+              </div>
+            ))}
+          </motion.div>
+
+          <p className="text-center text-xs text-gray-600 mt-10">
+            List sourced from{" "}
+            <a
+              href="https://agentclientprotocol.com"
+              target="_blank"
+              rel="noreferrer"
+              className="underline underline-offset-4 hover:text-gray-400"
+            >
+              agentclientprotocol.com
+            </a>
+            .
+          </p>
         </div>
       </section>
 

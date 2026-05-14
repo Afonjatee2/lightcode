@@ -20,6 +20,8 @@ export function FileGroup(props: {
   onRefresh: () => void;
   storeKey: string;
   isWorktree: boolean;
+  worktreePath: string | undefined;
+  worktreeBranch: string | undefined;
   mode?: "overlay" | "panel";
   diffTheme?: "light" | "dark";
   wrapLines?: boolean;
@@ -35,6 +37,8 @@ export function FileGroup(props: {
     onRefresh,
     storeKey,
     isWorktree,
+    worktreePath,
+    worktreeBranch,
     mode,
     diffTheme,
     wrapLines,
@@ -159,6 +163,8 @@ export function FileGroup(props: {
                   onRefresh={onRefresh}
                   storeKey={storeKey}
                   isWorktree={isWorktree}
+                  worktreePath={worktreePath}
+                  worktreeBranch={worktreeBranch}
                 />
               ))
             : sorted.map((file) => (
@@ -171,6 +177,8 @@ export function FileGroup(props: {
                   onRefresh={onRefresh}
                   storeKey={storeKey}
                   isWorktree={isWorktree}
+                  worktreePath={worktreePath}
+                  worktreeBranch={worktreeBranch}
                 />
               ))}
         </div>

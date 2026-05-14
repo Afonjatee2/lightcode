@@ -6,6 +6,8 @@ import type { KeybindingsConfig } from "./keybindings";
 import {
   closeThreadPayloadSchema,
   installAcpRegistryAgentPayloadSchema,
+  authenticateAcpRegistryAgentPayloadSchema,
+  logoutAcpRegistryAgentPayloadSchema,
   createFileCheckpointPayloadSchema,
   createProjectEntryPayloadSchema,
   deleteProjectEntryPayloadSchema,
@@ -64,6 +66,7 @@ import {
   moveProjectEntryPayloadSchema,
   interruptThreadPayloadSchema,
   removeAcpRegistryAgentPayloadSchema,
+  setAcpRegistryAgentAuthPayloadSchema,
   setPendingSteerPayloadSchema,
   clearPendingSteerPayloadSchema,
   projectSchema,
@@ -180,6 +183,7 @@ import type {
   MoveProjectEntryPayload,
   PrData,
   Project,
+  RefreshAgentScope,
   ReadAbsoluteFilePayload,
   ReadAbsoluteFileResult,
   ReadExternalFilePayload,
@@ -216,8 +220,11 @@ import type {
   RuntimeEvent,
   AcpRegistryListResult,
   AcpRegistryMutationResult,
+  AuthenticateAcpRegistryAgentPayload,
   InstallAcpRegistryAgentPayload,
+  LogoutAcpRegistryAgentPayload,
   RemoveAcpRegistryAgentPayload,
+  SetAcpRegistryAgentAuthPayload,
 } from "./contracts";
 
 const emptyPayloadSchema = z.object({});
@@ -453,12 +460,15 @@ export const groupedIpcProcedures = {
       getAgentStatusesPayloadSchema.parse({ wslDistros: wslDistros ?? [] }),
     ),
     refreshAgentStatuses: defineIpcProcedure<
-      [string[]?],
+      [string[]?, RefreshAgentScope?],
       GetAgentStatusesPayload,
       AgentStatusesResponse,
       "supervisor"
-    >("refreshAgentStatuses", "supervisor", getAgentStatusesPayloadSchema, (wslDistros) =>
-      getAgentStatusesPayloadSchema.parse({ wslDistros: wslDistros ?? [] }),
+    >("refreshAgentStatuses", "supervisor", getAgentStatusesPayloadSchema, (wslDistros, scope) =>
+      getAgentStatusesPayloadSchema.parse({
+        wslDistros: wslDistros ?? [],
+        ...(scope ? { scope } : {}),
+      }),
     ),
     listAcpRegistry: defineNoArgProcedure<AcpRegistryListResult, "supervisor">(
       "listAcpRegistry",
@@ -474,6 +484,21 @@ export const groupedIpcProcedures = {
       AcpRegistryMutationResult,
       "supervisor"
     >("removeAcpRegistryAgent", "supervisor", removeAcpRegistryAgentPayloadSchema),
+    setAcpRegistryAgentAuth: definePayloadProcedure<
+      SetAcpRegistryAgentAuthPayload,
+      AcpRegistryMutationResult,
+      "supervisor"
+    >("setAcpRegistryAgentAuth", "supervisor", setAcpRegistryAgentAuthPayloadSchema),
+    authenticateAcpRegistryAgent: definePayloadProcedure<
+      AuthenticateAcpRegistryAgentPayload,
+      void,
+      "supervisor"
+    >("authenticateAcpRegistryAgent", "supervisor", authenticateAcpRegistryAgentPayloadSchema),
+    logoutAcpRegistryAgent: definePayloadProcedure<
+      LogoutAcpRegistryAgentPayload,
+      void,
+      "supervisor"
+    >("logoutAcpRegistryAgent", "supervisor", logoutAcpRegistryAgentPayloadSchema),
     getThreadSnapshots: defineNoArgProcedure<ThreadRuntimeSnapshot[], "supervisor">(
       "getThreadSnapshots",
       "supervisor",
@@ -1043,6 +1068,9 @@ export const ipcProcedureMap = {
   listAcpRegistry: groupedIpcProcedures.thread.listAcpRegistry,
   installAcpRegistryAgent: groupedIpcProcedures.thread.installAcpRegistryAgent,
   removeAcpRegistryAgent: groupedIpcProcedures.thread.removeAcpRegistryAgent,
+  setAcpRegistryAgentAuth: groupedIpcProcedures.thread.setAcpRegistryAgentAuth,
+  authenticateAcpRegistryAgent: groupedIpcProcedures.thread.authenticateAcpRegistryAgent,
+  logoutAcpRegistryAgent: groupedIpcProcedures.thread.logoutAcpRegistryAgent,
   getThreadSnapshots: groupedIpcProcedures.thread.getThreadSnapshots,
   startThread: groupedIpcProcedures.thread.startThread,
   sendThreadInput: groupedIpcProcedures.thread.sendThreadInput,
@@ -1340,6 +1368,14 @@ export type SupervisorEvent =
       // terminal `windows-agent-statuses` event. Used by the first-launch
       // discovery screen to reveal tiles incrementally instead of all at once.
       type: "agent-detected";
+      status: AgentStatus;
+    }
+  | {
+      // Emitted from a scoped refresh — carries a single freshly-probed status
+      // that the renderer merges into its store by (kind, envKind, envDistro)
+      // without overwriting the rest of the list. Used after install/login of
+      // a specific agent so we don't re-probe every adapter in every env.
+      type: "agent-status-updated";
       status: AgentStatus;
     }
   | { type: "git-changed"; projectId: string }

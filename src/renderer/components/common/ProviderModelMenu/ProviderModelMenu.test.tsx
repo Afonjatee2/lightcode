@@ -291,6 +291,29 @@ describe("ProviderModelMenu", () => {
     expect(screen.getByText("Model 3")).toBeInTheDocument();
   });
 
+  it("selects models for provider kinds containing colons", async () => {
+    const onChange = vi.fn<(next: { agentKind: string; model: string }) => void>();
+
+    render(
+      <ProviderModelMenu
+        providers={[makeNamedProvider("acp-generic:glm-acp-agent", "GLM Agent", 2)]}
+        currentAgentKind="acp-generic:glm-acp-agent"
+        currentModel="model-1"
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+    fireEvent.click(await screen.findByText("Model 2"));
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith({
+        agentKind: "acp-generic:glm-acp-agent",
+        model: "model-2",
+      });
+    });
+  });
+
   it("resets the window when a long list shrinks so rows do not render blank", async () => {
     const { rerender } = render(
       <ProviderModelMenu

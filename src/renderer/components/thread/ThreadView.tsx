@@ -8,6 +8,7 @@ import type {
   TerminalSize,
   Thread,
   ThreadConfig,
+  ThreadPresentationMode,
   ThreadServerRequestId,
 } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
@@ -116,6 +117,9 @@ export type ThreadViewProps = {
     | ((
         targetKind: string,
         targetConfig: ThreadConfig,
+        targetPresentationMode: ThreadPresentationMode,
+        prompt: string,
+        segments: PromptSegment[] | undefined,
         closeOriginal: boolean,
         extractedContext: import("../../../shared/contracts").ExtractContextResult | null,
       ) => void)
@@ -320,6 +324,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
               fallbackThread={thread}
               fallbackAgentKind={thread.agentKind}
               agentLabel={agentStatus?.label}
+              agentIcon={agentStatus?.icon}
             />
             <div
               ref={dragHandleRef}
@@ -511,9 +516,25 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
             return cfg ? { lastDraftConfig: cfg } : {};
           })()}
           onClose={() => setContinueDialogOpen(false)}
-          onContinue={(targetKind, targetConfig, closeOrig, ctx) => {
+          onContinue={(
+            targetKind,
+            targetConfig,
+            targetPresentationMode,
+            prompt,
+            segments,
+            closeOrig,
+            ctx,
+          ) => {
             setContinueDialogOpen(false);
-            onContinueInProvider(targetKind, targetConfig, closeOrig, ctx);
+            onContinueInProvider(
+              targetKind,
+              targetConfig,
+              targetPresentationMode,
+              prompt,
+              segments,
+              closeOrig,
+              ctx,
+            );
           }}
         />
       ) : null}

@@ -13,6 +13,7 @@
  */
 
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import type {
   AgentInstanceConfig,
   AcpGenericInstanceConfig,
@@ -22,7 +23,13 @@ import type {
   ProjectLocation,
 } from "@/shared/contracts";
 import { parseAcpGenericInstanceConfig } from "@/shared/contracts";
-import { createAcpStructuredSession } from "../acp";
+import {
+  authenticateAcpAgent,
+  createAcpStructuredSession,
+  logoutAcpAgent,
+  probeAcpCapabilities,
+  type AcpProbeResult,
+} from "../acp";
 import {
   buildAgentCommand,
   type AgentAdapter,
@@ -33,6 +40,10 @@ import {
 
 /** Prefix for generic-ACP `kind` values. Unique per registered instance. */
 export const ACP_GENERIC_KIND_PREFIX = "acp-generic:";
+type AcpAuthMethod = NonNullable<AcpProbeResult["authMethods"]>[number];
+type AcpEnvVarAuthMethod = Extract<AcpAuthMethod, { type: "env_var" }>;
+type AcpTerminalAuthMethod = Extract<AcpAuthMethod, { type: "terminal" }>;
+type AcpAgentAuthMethod = Extract<AcpAuthMethod, { type?: "agent" }>;
 
 export function isAcpGenericKind(kind: string): boolean {
   return kind.startsWith(ACP_GENERIC_KIND_PREFIX);
@@ -80,16 +91,26 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
     label,
     binary: cfg.binary,
     capabilities,
-    async detectInstall(_ctx?: AgentEnvContext): Promise<AgentStatus> {
+    async detectInstall(ctx?: AgentEnvContext): Promise<AgentStatus> {
       const installed = isProbablyInstalled(cfg.binary);
-      const authState: AuthState = resolveGenericAuthState(cfg);
+      const probeResult = installed
+        ? await probeGenericCapabilities(ctx, cfg, instance, label)
+        : undefined;
+      const authState: AuthState = resolveGenericAuthState(cfg, instance, probeResult, ctx);
+      const loginCommand = resolveGenericLoginCommand(cfg, probeResult);
+      const providerMetadata = resolveGenericProviderMetadata(probeResult);
       return {
         kind,
         label,
         installed,
         ...(instance.icon ? { icon: instance.icon } : {}),
+        ...(instance.version ? { version: instance.version } : {}),
         authState,
-        capabilities,
+        ...(loginCommand ? { loginCommand } : {}),
+        ...(providerMetadata ? { providerMetadata } : {}),
+        ...(probeResult?.authMethods ? { authMethods: probeResult.authMethods } : {}),
+        ...(probeResult?.authLogoutSupported ? { authLogoutSupported: true } : {}),
+        capabilities: mergeAcpProbeCapabilities(capabilities, probeResult),
       };
     },
     buildLaunchArgv() {
@@ -113,13 +134,91 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
   return adapter;
 }
 
+export async function authenticateAcpGenericInstance(
+  instance: AgentInstanceConfig,
+  methodId: string,
+  ctx?: AgentEnvContext,
+): Promise<void> {
+  const cfg = parseAcpGenericInstanceConfig(instance.config);
+  const location = detectProbeLocation(ctx);
+  const command = buildGenericCommand(location, cfg, instance, authBrowserEnv(location));
+  await authenticateAcpAgent(command.command, command.args, methodId, {
+    ...(command.cwd ? { processCwd: command.cwd } : {}),
+    ...(command.env ? { env: command.env } : {}),
+    label: instance.displayName ?? cfg.binary,
+  });
+}
+
+export async function logoutAcpGenericInstance(
+  instance: AgentInstanceConfig,
+  ctx?: AgentEnvContext,
+): Promise<void> {
+  const cfg = parseAcpGenericInstanceConfig(instance.config);
+  const location = detectProbeLocation(ctx);
+  const command = buildGenericCommand(location, cfg, instance);
+  await logoutAcpAgent(command.command, command.args, {
+    ...(command.cwd ? { processCwd: command.cwd } : {}),
+    ...(command.env ? { env: command.env } : {}),
+    label: instance.displayName ?? cfg.binary,
+  });
+}
+
+function detectProbeLocation(ctx: AgentEnvContext | undefined): ProjectLocation {
+  if (ctx?.envKind === "wsl" && ctx.wslDistro) {
+    return {
+      kind: "wsl",
+      distro: ctx.wslDistro,
+      linuxPath: "/",
+      uncPath: "\\\\wsl$",
+    };
+  }
+  if (process.platform === "win32") {
+    return { kind: "windows", path: homedir() };
+  }
+  return { kind: "posix", path: homedir() };
+}
+
+async function probeGenericCapabilities(
+  ctx: AgentEnvContext | undefined,
+  cfg: AcpGenericInstanceConfig,
+  instance: AgentInstanceConfig,
+  label: string,
+): Promise<AcpProbeResult | undefined> {
+  const location = detectProbeLocation(ctx);
+  const command = buildGenericCommand(location, cfg, instance);
+  const sessionCwd = location.kind === "wsl" ? location.linuxPath : location.path;
+  return probeAcpCapabilities(command.command, command.args, sessionCwd, {
+    ...(command.cwd ? { processCwd: command.cwd } : {}),
+    ...(command.env ? { env: command.env } : {}),
+    label,
+  });
+}
+
+function mergeAcpProbeCapabilities(
+  capabilities: AgentCapability,
+  probeResult: AcpProbeResult | undefined,
+): AgentCapability {
+  if (!probeResult) return capabilities;
+  return {
+    ...capabilities,
+    ...(probeResult.models ? { models: probeResult.models } : {}),
+    ...(probeResult.efforts ? { efforts: probeResult.efforts } : {}),
+    ...(probeResult.defaultEffort ? { defaultEffort: probeResult.defaultEffort } : {}),
+    ...(probeResult.modelEfforts ? { modelEfforts: probeResult.modelEfforts } : {}),
+    ...(probeResult.modes ? { modes: probeResult.modes } : {}),
+    ...(probeResult.approvalPolicies ? { approvalPolicies: probeResult.approvalPolicies } : {}),
+    ...(probeResult.slashCommands ? { slashCommands: probeResult.slashCommands } : {}),
+  };
+}
+
 function buildGenericCommand(
   location: ProjectLocation,
   cfg: AcpGenericInstanceConfig,
   instance: AgentInstanceConfig,
+  extraEnv?: Record<string, string>,
 ): CommandSpec {
   const args = cfg.args ?? [];
-  const env: Record<string, string> = {};
+  const env: Record<string, string> = { ...(extraEnv ?? {}) };
   if (instance.environment) {
     for (const [name, value] of Object.entries(instance.environment)) {
       env[name] = value.value;
@@ -139,6 +238,11 @@ function buildGenericCommand(
   return buildAgentCommand(location, cfg.binary, args, undefined, env);
 }
 
+function authBrowserEnv(location: ProjectLocation): Record<string, string> | undefined {
+  if (location.kind !== "wsl") return undefined;
+  return { BROWSER: 'cmd.exe /c start ""' };
+}
+
 function isProbablyInstalled(binary: string): boolean {
   // Absolute path → check existence. Otherwise we can't easily probe without
   // platform-specific code; report as installed (true) and let the user catch
@@ -150,10 +254,85 @@ function isProbablyInstalled(binary: string): boolean {
   return true;
 }
 
-function resolveGenericAuthState(cfg: AcpGenericInstanceConfig): AuthState {
+function isEnvVarAuthMethod(method: AcpAuthMethod): method is AcpEnvVarAuthMethod {
+  return ("type" in method && method.type === "env_var") || "vars" in method;
+}
+
+function isTerminalAuthMethod(method: AcpAuthMethod): method is AcpTerminalAuthMethod {
+  return "type" in method && method.type === "terminal";
+}
+
+function isAgentAuthMethod(method: AcpAuthMethod): method is AcpAgentAuthMethod {
+  return !isEnvVarAuthMethod(method) && !isTerminalAuthMethod(method);
+}
+
+function resolveGenericAuthState(
+  cfg: AcpGenericInstanceConfig,
+  instance: AgentInstanceConfig,
+  probeResult: AcpProbeResult | undefined,
+  ctx: AgentEnvContext | undefined,
+): AuthState {
   if (cfg.authMode === "envVar" && cfg.authEnvVar) {
-    const value = process.env[cfg.authEnvVar];
+    const value = instance.environment?.[cfg.authEnvVar]?.value ?? process.env[cfg.authEnvVar];
     return value && value.length > 0 ? "authenticated" : "missing";
   }
+  for (const method of probeResult?.authMethods ?? []) {
+    if (!isEnvVarAuthMethod(method)) continue;
+    const requiredVars = method.vars.filter((variable) => variable.optional !== true);
+    if (
+      requiredVars.some(
+        (variable) => !(instance.environment?.[variable.name]?.value ?? process.env[variable.name]),
+      )
+    ) {
+      return "missing";
+    }
+    if (requiredVars.length > 0) {
+      return "authenticated";
+    }
+  }
+  // Interactive (browser/CLI) login state is per-env — a Windows browser
+  // session does not carry over into a WSL distro, and vice versa. Trust
+  // the persisted ack from our own `authenticate()` call rather than
+  // inferring auth from `sessionEstablished` (some agents, e.g. Cline,
+  // accept `newSession` without enforcing auth).
+  if (isInteractiveAuthAcknowledged(instance, ctx)) {
+    return "authenticated";
+  }
+  if (
+    probeResult?.authMethods?.some(
+      (method) => isTerminalAuthMethod(method) || isAgentAuthMethod(method),
+    )
+  ) {
+    return "missing";
+  }
   return "unknown";
+}
+
+function isInteractiveAuthAcknowledged(
+  instance: AgentInstanceConfig,
+  ctx: AgentEnvContext | undefined,
+): boolean {
+  const ack = instance.authAcknowledged;
+  if (!ack) return false;
+  if (ctx?.envKind === "wsl" && ctx.wslDistro) {
+    return ack.wsl?.[ctx.wslDistro] === true;
+  }
+  return ack.native === true;
+}
+
+function resolveGenericLoginCommand(
+  cfg: AcpGenericInstanceConfig,
+  probeResult: AcpProbeResult | undefined,
+): string | undefined {
+  const terminalMethod = probeResult?.authMethods?.find(isTerminalAuthMethod);
+  if (!terminalMethod) return undefined;
+  return [cfg.binary, ...(cfg.args ?? []), ...(terminalMethod.args ?? [])].join(" ");
+}
+
+function resolveGenericProviderMetadata(
+  probeResult: AcpProbeResult | undefined,
+): AgentStatus["providerMetadata"] | undefined {
+  const methods = probeResult?.authMethods?.filter(isEnvVarAuthMethod);
+  if (!methods?.length) return undefined;
+  return { authMethod: [...new Set(methods.map((method) => method.name))].join(", ") };
 }

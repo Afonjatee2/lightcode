@@ -8,6 +8,7 @@ import type {
 import {
   buildPaneLayoutFromLegacy,
   collectPaneIds,
+  insertPaneInLayout,
   removePaneFromLayout,
   replacePaneIdInLayout,
   type PaneLayout,
@@ -145,6 +146,79 @@ export function saveGroupLayout(state: {
       panes: [...state.view.panes],
       ...(state.view.paneLayout ? { paneLayout: state.view.paneLayout } : {}),
     },
+  };
+}
+
+/**
+ * Build the thread view that restores a group's saved panes + paneLayout.
+ * - Drops saved pane ids that no longer exist in the group's active threads.
+ * - Appends any active group threads missing from the saved list.
+ * - Reconciles paneLayout the same way (drops invalid leaves, appends missing).
+ * Used by both openGroupView (sidebar group icon) and openThread (clicking a
+ * thread that belongs to a group) so layout restore is symmetric.
+ */
+export function restoreGroupView(
+  groupId: string,
+  groupThreads: Thread[],
+  saved: SavedGroupLayout | undefined,
+): Extract<AppView, { kind: "thread" }> | null {
+  if (groupThreads.length === 0) return null;
+
+  if (saved) {
+    const validIds = new Set(groupThreads.map((t) => t.id));
+    const restoredPanes = saved.panes.filter((id) => validIds.has(id));
+    for (const t of groupThreads) {
+      if (!restoredPanes.includes(t.id)) restoredPanes.push(t.id);
+    }
+    if (restoredPanes.length > 0) {
+      let paneLayout = saved.paneLayout;
+      if (paneLayout) {
+        const savedPaneIds = collectPaneIds(paneLayout);
+        for (const paneId of savedPaneIds) {
+          if (validIds.has(paneId)) continue;
+          const nextLayout = removePaneFromLayout(paneLayout, paneId);
+          if (!nextLayout) {
+            paneLayout = undefined;
+            break;
+          }
+          paneLayout = nextLayout;
+        }
+
+        if (paneLayout) {
+          const layoutPaneIds = new Set(collectPaneIds(paneLayout));
+          for (const paneId of restoredPanes) {
+            if (layoutPaneIds.has(paneId)) continue;
+            paneLayout = insertPaneInLayout(
+              paneLayout,
+              paneLayout.kind === "split" && paneLayout.axis === "vertical"
+                ? { path: [], axis: "vertical", index: paneLayout.children.length }
+                : { path: [], axis: "vertical", index: 1 },
+              paneId,
+            );
+            layoutPaneIds.add(paneId);
+          }
+
+          return {
+            kind: "thread",
+            panes: collectPaneIds(paneLayout) as [string, ...string[]],
+            paneLayout,
+            activeGroupId: groupId,
+          };
+        }
+      }
+
+      return {
+        kind: "thread",
+        panes: restoredPanes as [string, ...string[]],
+        activeGroupId: groupId,
+      };
+    }
+  }
+
+  return {
+    kind: "thread",
+    panes: groupThreads.map((t) => t.id) as [string, ...string[]],
+    activeGroupId: groupId,
   };
 }
 

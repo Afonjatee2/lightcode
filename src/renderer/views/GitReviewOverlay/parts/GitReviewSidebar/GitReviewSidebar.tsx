@@ -263,6 +263,8 @@ export function GitReviewSidebar(props: {
                 onRefresh={onRefresh}
                 storeKey={storeKey}
                 isWorktree={isWorktreeStatus}
+                worktreePath={worktreePath}
+                worktreeBranch={worktreeBranch}
                 mode={mode}
                 diffTheme={diffTheme}
                 wrapLines={wrapLines}
@@ -280,6 +282,8 @@ export function GitReviewSidebar(props: {
                 onRefresh={onRefresh}
                 storeKey={storeKey}
                 isWorktree={isWorktreeStatus}
+                worktreePath={worktreePath}
+                worktreeBranch={worktreeBranch}
                 mode={mode}
                 diffTheme={diffTheme}
                 wrapLines={wrapLines}

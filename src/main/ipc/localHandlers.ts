@@ -97,12 +97,13 @@ export function createLocalIpcHandlers(
     getSharedSettings: () => readSharedSettingsFile(options.requireLightcodePaths().settingsPath),
     setSharedSettings: (settings) => {
       const settingsPath = options.requireLightcodePaths().settingsPath;
-      // Preserve supervisor-only fields (e.g. `agentHookSupport`) so the
-      // renderer's persist cycle doesn't clobber the CLI hook plugin cache that
-      // the supervisor writes out-of-band.
+      // Preserve supervisor-managed fields so the renderer's persist cycle
+      // doesn't clobber writes made out-of-band by the supervisor.
       const onDisk = readSharedSettingsFile(settingsPath);
       writeSharedSettingsFile(settingsPath, {
         ...settings,
+        acpRegistryInstalledAgents: onDisk.acpRegistryInstalledAgents,
+        agentInstances: onDisk.agentInstances,
         agentHookSupport: onDisk.agentHookSupport,
       });
       options.updatePowerSaveBlocker();

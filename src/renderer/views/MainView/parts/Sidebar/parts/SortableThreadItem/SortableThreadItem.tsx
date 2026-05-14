@@ -75,6 +75,7 @@ export function SortableThreadItem(props: {
   const isCurrentThread = useIsCurrentThread(thread.id);
   const currentThreadCount = useCurrentThreadIdsCount();
   const installedAgents = useInstalledAgents();
+  const threadAgent = installedAgents.find((agent) => agent.kind === thread.agentKind);
   const worktreeGitItems = useWorktreeGitItems(
     thread.projectId,
     thread.worktreePath ?? "",
@@ -287,7 +288,13 @@ export function SortableThreadItem(props: {
           size="xs"
           statusTone={statusTone}
           icon={
-            <ProviderIcon kind={thread.agentKind} tone={statusTone} className="size-3.5 shrink-0" />
+            <ProviderIcon
+              kind={thread.agentKind}
+              {...(threadAgent?.icon ? { icon: threadAgent.icon } : {})}
+              fallbackLabel={threadAgent?.label}
+              tone={statusTone}
+              className="size-3.5 shrink-0"
+            />
           }
           label={
             editingThreadId === thread.id ? (

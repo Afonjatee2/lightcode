@@ -27,7 +27,7 @@ export const ContextCompaction = memo(function ContextCompaction({ item }: Conte
   return (
     <div className="flex w-full flex-col items-stretch justify-center px-3 py-2 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
       <span className="inline-flex min-w-0 items-center gap-1.5 self-start leading-none italic opacity-80">
-        <Layers className="size-3 shrink-0" />
+        <Layers className="size-3 shrink-0 lightcode-compacted-icon" />
         {summary ?? "Context compacted"}
       </span>
     </div>

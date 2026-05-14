@@ -10,6 +10,8 @@ import {
   type AgentStatus,
   type AgentStatusesResponse,
   type GetAgentStatusesPayload,
+  type RefreshAgentScope,
+  type RefreshAgentScopeEnv,
 } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { normalizeSharedSettings } from "@/shared/settings";
@@ -94,6 +96,32 @@ function filterWslStatusesForDistros(
   return statuses.filter(
     (status) => status.envDistro !== undefined && distroSet.has(status.envDistro),
   );
+}
+
+function statusEnvKey(status: AgentStatus): string {
+  return `${status.kind}|${status.envKind ?? ""}|${status.envDistro ?? ""}`;
+}
+
+function mergeScopedStatuses(
+  existingWindows: readonly AgentStatus[],
+  existingWsl: readonly AgentStatus[],
+  probed: readonly AgentStatus[],
+): { windows: AgentStatus[]; wsl: AgentStatus[] } {
+  const byKey = new Map<string, AgentStatus>();
+  for (const status of existingWindows) byKey.set(statusEnvKey(status), status);
+  for (const status of existingWsl) byKey.set(statusEnvKey(status), status);
+  for (const status of probed) byKey.set(statusEnvKey(status), status);
+
+  const windows: AgentStatus[] = [];
+  const wsl: AgentStatus[] = [];
+  for (const status of byKey.values()) {
+    if (status.envKind === "wsl") {
+      wsl.push(status);
+    } else {
+      windows.push(status);
+    }
+  }
+  return { windows, wsl };
 }
 
 export async function detectWslAgentStatuses(
@@ -187,6 +215,9 @@ export class AgentStatusService {
 
   async refreshAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
     const wslDistros = [...new Set(payload.wslDistros)];
+    if (payload.scope) {
+      return this.runScopedDetection(wslDistros, payload.scope);
+    }
     this.startupDetectionLaunched = true;
     const previousDetection = this.pendingDetection;
     const fresh = await this.runDetectionTask(async () => {
@@ -196,6 +227,115 @@ export class AgentStatusService {
       return this.runDetection(wslDistros);
     });
     return { ...fresh, fromCache: false };
+  }
+
+  /**
+   * Probes only the (adapter × env) combinations named in `scope`, then merges
+   * the freshly-probed statuses into the on-disk cache. Avoids re-running the
+   * full N-adapter × M-env detection sweep after an install or login.
+   *
+   * Per-status updates are streamed via `agent-status-updated` events so the
+   * renderer can upsert into its store without overwriting unrelated entries.
+   * The returned response contains the merged full lists so awaiters that
+   * inspect the response (e.g. install flows checking `authState`) keep
+   * working.
+   */
+  private async runScopedDetection(
+    wslDistros: readonly string[],
+    scope: RefreshAgentScope,
+  ): Promise<AgentStatusesResponse> {
+    // Without a baseline cache we have no merge target — fall back to a full
+    // detection so the renderer ends up with a complete list. Callers
+    // typically hit this path well after startup, so this is rare.
+    if (!existsSync(this.options.statusCachePath)) {
+      this.startupDetectionLaunched = true;
+      const fresh = await this.runDetectionTask(() => this.runDetection(wslDistros));
+      return { ...fresh, fromCache: false };
+    }
+
+    const allAdapters = [...this.options.adapters.values()];
+    const adapterByKind = new Map(allAdapters.map((adapter) => [adapter.kind, adapter]));
+    const targetAdapters = scope.agentKinds
+      .map((kind) => adapterByKind.get(kind))
+      .filter((adapter): adapter is AgentAdapter => adapter !== undefined);
+
+    const targetEnvs = this.resolveScopedEnvs(scope.envs, wslDistros);
+    const disabled = this.readDisabledAgents();
+    const existing = this.readCachedStatuses(wslDistros);
+
+    const probed = await Promise.all(
+      targetAdapters.flatMap((adapter) =>
+        targetEnvs.map((env) => this.probeScopedStatus(adapter, env, disabled)),
+      ),
+    );
+
+    for (const status of probed) {
+      this.options.emit({ type: "agent-status-updated", status });
+    }
+
+    const merged = mergeScopedStatuses(existing.windows, existing.wsl, probed);
+    this.writeDiskCache(merged.windows, merged.wsl);
+    return { ...merged, fromCache: false };
+  }
+
+  private resolveScopedEnvs(
+    envs: RefreshAgentScope["envs"],
+    wslDistros: readonly string[],
+  ): RefreshAgentScopeEnv[] {
+    if (envs && envs.length > 0) {
+      return envs;
+    }
+    const nativeEnv: RefreshAgentScopeEnv = { kind: "native" };
+    return [
+      nativeEnv,
+      ...wslDistros.map<RefreshAgentScopeEnv>((distro) => ({ kind: "wsl", distro })),
+    ];
+  }
+
+  private async probeScopedStatus(
+    adapter: AgentAdapter,
+    env: RefreshAgentScopeEnv,
+    disabled: ReadonlySet<string>,
+  ): Promise<AgentStatus> {
+    const isWsl = env.kind === "wsl";
+    const nativeEnvKind: "windows" | "posix" = process.platform === "win32" ? "windows" : "posix";
+    const envKind: "windows" | "posix" | "wsl" = isWsl ? "wsl" : nativeEnvKind;
+    const envDistro = isWsl ? env.distro : undefined;
+
+    if (disabled.has(adapter.kind)) {
+      return {
+        kind: adapter.kind,
+        label: adapter.label,
+        installed: true,
+        authState: "unknown",
+        capabilities: adapter.capabilities,
+        envKind,
+        ...(envDistro ? { envDistro } : {}),
+      };
+    }
+    const ctx: AgentEnvContext | undefined = isWsl
+      ? { envKind: "wsl", wslDistro: env.distro }
+      : undefined;
+    try {
+      const detected = ctx ? await adapter.detectInstall(ctx) : await adapter.detectInstall();
+      return {
+        ...detected,
+        envKind,
+        ...(envDistro ? { envDistro } : {}),
+      };
+    } catch (error) {
+      const where = isWsl ? `wsl:${env.distro}` : "native";
+      console.error(`[supervisor] scoped detectInstall(${adapter.kind}, ${where}) failed`, error);
+      return {
+        kind: adapter.kind,
+        label: adapter.label,
+        installed: false,
+        authState: "unknown",
+        capabilities: adapter.capabilities,
+        envKind,
+        ...(envDistro ? { envDistro } : {}),
+      };
+    }
   }
 
   /**

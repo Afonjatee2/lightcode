@@ -54,21 +54,29 @@ function makeStatus(): AgentStatus {
   };
 }
 
-function makeService(detectInstall: AgentAdapter["detectInstall"]): {
-  service: AgentStatusService;
-  statusCachePath: string;
-} {
-  const dir = makeTempDir();
-  const statusCachePath = join(dir, "agent-statuses.json");
-  const adapter = {
-    kind: "codex",
-    label: "Codex",
+function makeAdapter(
+  kind: string,
+  label: string,
+  detectInstall: AgentAdapter["detectInstall"],
+): AgentAdapter {
+  return {
+    kind,
+    label,
     capabilities,
     detectInstall,
     buildLaunchArgv: vi.fn<AgentAdapter["buildLaunchArgv"]>(),
     buildResumeArgv: vi.fn<AgentAdapter["buildResumeArgv"]>(),
     createInitialSessionRef: vi.fn<AgentAdapter["createInitialSessionRef"]>(() => undefined),
   } as unknown as AgentAdapter;
+}
+
+function makeService(detectInstall: AgentAdapter["detectInstall"]): {
+  service: AgentStatusService;
+  statusCachePath: string;
+} {
+  const dir = makeTempDir();
+  const statusCachePath = join(dir, "agent-statuses.json");
+  const adapter = makeAdapter("codex", "Codex", detectInstall);
 
   return {
     service: new AgentStatusService({
@@ -79,6 +87,23 @@ function makeService(detectInstall: AgentAdapter["detectInstall"]): {
     }),
     statusCachePath,
   };
+}
+
+function makeMultiAdapterService(adapters: AgentAdapter[]): {
+  service: AgentStatusService;
+  statusCachePath: string;
+  emit: ReturnType<typeof vi.fn<(event: SupervisorEvent) => void>>;
+} {
+  const dir = makeTempDir();
+  const statusCachePath = join(dir, "agent-statuses.json");
+  const emit = vi.fn<(event: SupervisorEvent) => void>();
+  const service = new AgentStatusService({
+    adapters: new Map(adapters.map((a) => [a.kind, a])),
+    settingsPath: join(dir, "settings.json"),
+    statusCachePath,
+    emit,
+  });
+  return { service, statusCachePath, emit };
 }
 
 describe("AgentStatusService", () => {
@@ -124,5 +149,50 @@ describe("AgentStatusService", () => {
     await new Promise((resolve) => setTimeout(resolve, 10));
 
     expect(detectInstall).toHaveBeenCalledTimes(1);
+  });
+
+  it("scoped refresh probes only the requested adapter and merges into the cache", async () => {
+    const codexStatus: AgentStatus = { ...makeStatus(), kind: "codex", label: "Codex" };
+    const claudeStatus: AgentStatus = { ...makeStatus(), kind: "claude", label: "Claude" };
+    const codexDetect = vi.fn<AgentAdapter["detectInstall"]>().mockResolvedValue(codexStatus);
+    const claudeDetect = vi.fn<AgentAdapter["detectInstall"]>().mockResolvedValue(claudeStatus);
+    const codexAdapter = makeAdapter("codex", "Codex", codexDetect);
+    const claudeAdapter = makeAdapter("claude", "Claude", claudeDetect);
+    const { service, emit } = makeMultiAdapterService([codexAdapter, claudeAdapter]);
+
+    // Seed the cache with a baseline full detection.
+    await service.refreshAgentStatuses({ wslDistros: [] });
+    expect(codexDetect).toHaveBeenCalledTimes(1);
+    expect(claudeDetect).toHaveBeenCalledTimes(1);
+    emit.mockClear();
+
+    // Updated codex status — only codex should be re-probed.
+    codexDetect.mockResolvedValueOnce({
+      ...codexStatus,
+      authState: "missing",
+      loginCommand: "codex login",
+    });
+
+    const response = await service.refreshAgentStatuses({
+      wslDistros: [],
+      scope: { agentKinds: ["codex"] },
+    });
+
+    expect(codexDetect).toHaveBeenCalledTimes(2);
+    expect(claudeDetect).toHaveBeenCalledTimes(1);
+
+    const all = [...response.windows, ...response.wsl];
+    const merged = all.find((s) => s.kind === "codex");
+    expect(merged?.authState).toBe("missing");
+    expect(merged?.loginCommand).toBe("codex login");
+    expect(all.some((s) => s.kind === "claude")).toBe(true);
+
+    // Scoped path streams a per-status update event, not the terminal lists.
+    const updates = emit.mock.calls.filter(([e]) => e.type === "agent-status-updated");
+    expect(updates).toHaveLength(1);
+    const terminal = emit.mock.calls.filter(
+      ([e]) => e.type === "windows-agent-statuses" || e.type === "wsl-agent-statuses",
+    );
+    expect(terminal).toHaveLength(0);
   });
 });

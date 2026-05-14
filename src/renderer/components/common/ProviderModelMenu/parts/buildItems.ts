@@ -5,6 +5,7 @@ import type { ProviderModelItem } from "./types";
 export interface ProviderModelMenuProvider {
   kind: string;
   label: string;
+  icon?: string;
   capabilities: AgentCapability;
 }
 
@@ -248,6 +249,9 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         providerKind: m.ref.agentKind,
         modelId: m.ref.modelId,
         label: m.label,
+        ...(visibleProvidersByKind.get(m.ref.agentKind)?.provider.icon
+          ? { providerIcon: visibleProvidersByKind.get(m.ref.agentKind)!.provider.icon }
+          : {}),
         ...(m.subProviderLabel ? { subProviderLabel: m.subProviderLabel } : {}),
         ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
         showProviderIcon: true,
@@ -294,6 +298,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         type: "header-provider",
         id: `provider:${provider.kind}`,
         providerKind: provider.kind,
+        ...(provider.icon ? { providerIcon: provider.icon } : {}),
         label: provider.label,
       });
     }
@@ -307,6 +312,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           providerKind: provider.kind,
           modelId: m.id,
           label: m.label,
+          ...(provider.icon ? { providerIcon: provider.icon } : {}),
           ...(m.subLabel ? { subProviderLabel: m.subLabel } : {}),
           ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
           showProviderIcon: true,
@@ -338,6 +344,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         providerKind: provider.kind,
         modelId: m.id,
         label: m.label,
+        ...(provider.icon ? { providerIcon: provider.icon } : {}),
         ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
         isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
       });
@@ -362,6 +369,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           providerKind: provider.kind,
           modelId: m.id,
           label: m.label,
+          ...(provider.icon ? { providerIcon: provider.icon } : {}),
           ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
           isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
         });

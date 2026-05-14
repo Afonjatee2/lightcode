@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AcpRegistryListResult, AgentStatus, Project } from "@/shared/contracts";
+import type {
+  AcpRegistryListResult,
+  AgentStatusesResponse,
+  AgentStatus,
+  Project,
+} from "@/shared/contracts";
 
 const statusesState = {
   agentStatuses: [] as AgentStatus[],
@@ -18,9 +23,19 @@ const settingsState = {
 const bridge = {
   platform: "darwin" as NodeJS.Platform,
   listAcpRegistry: vi.fn<() => Promise<AcpRegistryListResult>>(),
-  refreshAgentStatuses: vi.fn<() => Promise<void>>(),
+  refreshAgentStatuses: vi.fn<() => Promise<AgentStatusesResponse>>(),
   installAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
   removeAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
+  authenticateAcpRegistryAgent:
+    vi.fn<
+      (payload: {
+        agentId: string;
+        methodId: string;
+        envKind?: AgentStatus["envKind"];
+        wslDistro?: string;
+      }) => Promise<void>
+    >(),
+  focusWindow: vi.fn<() => Promise<void>>(),
   openExternal: vi.fn<(url: string) => Promise<void>>(),
 };
 
@@ -135,6 +150,8 @@ const registry: AcpRegistryListResult = {
   ],
 };
 
+const emptyStatusesResponse: AgentStatusesResponse = { windows: [], wsl: [], fromCache: false };
+
 describe("AcpRegistrySettings", () => {
   beforeEach(() => {
     bridge.platform = "darwin";
@@ -143,9 +160,11 @@ describe("AcpRegistrySettings", () => {
     appState.projects = [];
     settingsState.acpRegistryInstalledAgents = {};
     bridge.listAcpRegistry.mockReset().mockResolvedValue(registry);
-    bridge.refreshAgentStatuses.mockReset().mockResolvedValue(undefined);
+    bridge.refreshAgentStatuses.mockReset().mockResolvedValue(emptyStatusesResponse);
     bridge.installAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
     bridge.removeAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
+    bridge.authenticateAcpRegistryAgent.mockReset().mockResolvedValue(undefined);
+    bridge.focusWindow.mockReset().mockResolvedValue(undefined);
     bridge.openExternal.mockReset().mockResolvedValue(undefined);
     runAgentLoginCommandMock.mockReset();
     runAgentTerminalCommandMock.mockReset();
@@ -199,6 +218,62 @@ describe("AcpRegistrySettings", () => {
           tabPurpose: "install",
         }),
       );
+    });
+  });
+
+  it("keeps ACP registry install pending until agent refresh completes", async () => {
+    let resolveRefresh: (() => void) | undefined;
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    await waitFor(() => expect(bridge.refreshAgentStatuses).toHaveBeenCalledTimes(1));
+    bridge.refreshAgentStatuses.mockReturnValueOnce(
+      new Promise<AgentStatusesResponse>((resolve) => {
+        resolveRefresh = () => resolve(emptyStatusesResponse);
+      }),
+    );
+
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+    fireEvent.click(within(glmCard as HTMLElement).getByRole("button", { name: "Install" }));
+
+    await screen.findByRole("button", { name: "Installing" });
+    expect(screen.getByRole("button", { name: "Installing" })).toBeInTheDocument();
+
+    resolveRefresh?.();
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Installing" })).toBeNull();
+    });
+  });
+
+  it("keeps registry-installed agents deletable after status rescan", async () => {
+    settingsState.acpRegistryInstalledAgents = {
+      "glm-acp-agent": {
+        id: "glm-acp-agent",
+        name: "GLM Agent",
+        version: "1.1.3",
+        installedAt: new Date(0).toISOString(),
+        adapterKind: "acp-generic:glm-acp-agent",
+        installKind: "generic",
+      },
+    };
+    statusesState.agentStatuses = [
+      makeStatus("acp-generic:glm-acp-agent", {
+        label: "GLM Agent",
+        envKind: "windows",
+      }),
+    ];
+
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+
+    fireEvent.click(within(glmCard as HTMLElement).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => {
+      expect(bridge.removeAcpRegistryAgent).toHaveBeenCalledWith({ agentId: "glm-acp-agent" });
     });
   });
 
@@ -274,6 +349,49 @@ describe("AcpRegistrySettings", () => {
     ).toBeNull();
   });
 
+  it("shows WSL detection for app-supported ACP registry agents", async () => {
+    statusesState.agentStatuses = [
+      makeStatus("cursor", {
+        label: "Cursor",
+        envKind: "windows",
+      }),
+    ];
+    statusesState.wslAgentStatuses = [
+      makeStatus("cursor", {
+        label: "Cursor WSL",
+        envKind: "wsl",
+        envDistro: "Ubuntu",
+      }),
+    ];
+
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const cursorCard = screen.getByText("Cursor through ACP").closest(".rounded-lg");
+    expect(cursorCard).toBeTruthy();
+    expect(within(cursorCard as HTMLElement).getByText("(Windows)")).toBeInTheDocument();
+    expect(within(cursorCard as HTMLElement).getByText("(WSL (Ubuntu))")).toBeInTheDocument();
+  });
+
+  it("does not label generic ACP registry agent statuses as detected", async () => {
+    statusesState.agentStatuses = [
+      makeStatus("acp-generic:glm-acp-agent", {
+        label: "GLM Agent",
+        envKind: "windows",
+      }),
+    ];
+
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+    expect(within(glmCard as HTMLElement).queryByText("Detected")).toBeNull();
+    expect(
+      within(glmCard as HTMLElement).getByRole("button", { name: "Install" }),
+    ).toBeInTheDocument();
+  });
+
   it("opens missing-auth WSL login commands in the matching WSL project", async () => {
     bridge.platform = "win32";
     const wslProject = makeProject({
@@ -309,6 +427,88 @@ describe("AcpRegistrySettings", () => {
       label: "Codex WSL",
       command: "codex login",
       project: wslProject,
+    });
+  });
+
+  it("runs ACP agent-owned auth from registry cards", async () => {
+    settingsState.acpRegistryInstalledAgents = {
+      "glm-acp-agent": {
+        id: "glm-acp-agent",
+        name: "GLM Agent",
+        version: "1.1.3",
+        installedAt: new Date(0).toISOString(),
+        adapterKind: "acp-generic:glm-acp-agent",
+        installKind: "generic",
+      },
+    };
+    statusesState.agentStatuses = [
+      makeStatus("acp-generic:glm-acp-agent", {
+        label: "GLM Agent",
+        authState: "missing",
+        authMethods: [{ id: "sso", name: "SSO" }],
+      }),
+    ];
+
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+
+    fireEvent.click(within(glmCard as HTMLElement).getByRole("button", { name: "Login" }));
+
+    expect(bridge.authenticateAcpRegistryAgent).toHaveBeenCalledWith({
+      agentId: "glm-acp-agent",
+      methodId: "sso",
+    });
+    await waitFor(() => expect(bridge.focusWindow).toHaveBeenCalled());
+    await waitFor(() => expect(bridge.refreshAgentStatuses).toHaveBeenCalled());
+  });
+
+  it("runs ACP registry auth in the selected WSL environment", async () => {
+    settingsState.acpRegistryInstalledAgents = {
+      "glm-acp-agent": {
+        id: "glm-acp-agent",
+        name: "GLM Agent",
+        version: "1.1.3",
+        installedAt: new Date(0).toISOString(),
+        adapterKind: "acp-generic:glm-acp-agent",
+        installKind: "generic",
+      },
+    };
+    statusesState.agentStatuses = [
+      makeStatus("acp-generic:glm-acp-agent", {
+        label: "GLM Agent",
+        authState: "missing",
+        authMethods: [{ id: "sso", name: "SSO" }],
+        envKind: "windows",
+      }),
+    ];
+    statusesState.wslAgentStatuses = [
+      makeStatus("acp-generic:glm-acp-agent", {
+        label: "GLM Agent",
+        authState: "missing",
+        authMethods: [{ id: "sso", name: "SSO" }],
+        envKind: "wsl",
+        envDistro: "Ubuntu",
+      }),
+    ];
+
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+
+    fireEvent.click(
+      within(glmCard as HTMLElement).getByRole("button", { name: "Login WSL (Ubuntu)" }),
+    );
+
+    expect(bridge.authenticateAcpRegistryAgent).toHaveBeenCalledWith({
+      agentId: "glm-acp-agent",
+      methodId: "sso",
+      envKind: "wsl",
+      wslDistro: "Ubuntu",
     });
   });
 });

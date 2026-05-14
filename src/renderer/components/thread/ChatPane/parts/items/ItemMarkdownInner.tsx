@@ -1,4 +1,5 @@
 import { Link, Table } from "@heroui/react";
+import { ExternalLink } from "lucide-react";
 import {
   Children,
   cloneElement,
@@ -83,7 +84,7 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
   );
   const markdownText = normalizeIncompleteProjectLinkTail(normalizeShortCodeFenceClosers(text));
   return (
-    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-accent prose-a:underline prose-a:underline-offset-2">
+    <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-foreground prose-a:no-underline prose-a:text-[length:inherit] hover:prose-a:underline hover:prose-a:decoration-1 prose-a:underline-offset-2">
       <Streamdown
         remarkPlugins={remarkPlugins}
         rehypePlugins={REHYPE_PLUGINS}
@@ -227,13 +228,17 @@ function MdAnchor(props: { href: string; children?: ReactNode }) {
       <Link
         href={href}
         rel="noreferrer noopener"
-        className="[display:inline] [width:auto] [overflow-wrap:anywhere] [word-break:break-word]"
+        className="text-[length:inherit] text-foreground no-underline hover:underline hover:decoration-1 underline-offset-2 [display:inline] [width:auto] [overflow-wrap:anywhere] [word-break:break-word]"
         onClick={(event) => {
           event.preventDefault();
           void readBridge().openExternal(href);
         }}
       >
         {props.children}
+        <ExternalLink
+          className="ml-[0.2em] inline-block size-[0.85em] align-[-0.1em]"
+          aria-hidden
+        />
       </Link>
     );
   }

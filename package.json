@@ -3,9 +3,9 @@
   "version": "0.1.7",
   "private": true,
   "description": "The universal desktop orchestrator for AI agents. Run terminal-native and structured chat agents side-by-side.",
+  "homepage": "https://www.lightcodeapp.com/",
   "license": "Apache-2.0",
   "author": "SDSLeon",
-  "homepage": "https://www.lightcodeapp.com/",
   "repository": {
     "type": "git",
     "url": "https://github.com/SDSLeon/lightcode"
@@ -16,6 +16,9 @@
     "postinstall": "electron-rebuild --only better-sqlite3 && node scripts/ensure-native-deps.mjs",
     "setup:native": "electron-rebuild --only better-sqlite3 && node scripts/ensure-native-deps.mjs",
     "dev": "concurrently -k -n renderer,electron,app -c cyan,magenta,yellow \"pnpm run dev:renderer\" \"pnpm run dev:electron\" \"pnpm run dev:app\"",
+    "website:dev": "pnpm --dir website dev",
+    "website:build": "pnpm --dir website build",
+    "website:start": "pnpm --dir website start",
     "dev:renderer": "node scripts/free-port.mjs 3100 && vite",
     "dev:electron": "tsdown --watch",
     "dev:app": "pnpm run setup:native && pnpm run prepare:package-assets && wait-on tcp:3100 dist/main/main.cjs && node scripts/dev-launch.mjs",
@@ -117,6 +120,7 @@
     "electronmon": "^2.0.4",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
+    "lint-staged": "^17.0.4",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
     "oxlint-tsgolint": "^0.22.1",
@@ -130,6 +134,13 @@
   "optionalDependencies": {
     "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.2.139",
     "@anthropic-ai/claude-agent-sdk-win32-x64": "0.2.139"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx,mjs,cjs}": [
+      "oxlint --type-aware --fix --deny-warnings",
+      "oxfmt --write"
+    ],
+    "*.{json,jsonc,css,md,html,yml,toml}": "oxfmt --write"
   },
   "engines": {
     "node": ">=24.10.0"

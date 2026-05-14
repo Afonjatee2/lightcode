@@ -14,9 +14,11 @@ import {
   acpRegistryListResultSchema,
   type AcpRegistryAgent,
   type AcpRegistryListResult,
+  type AuthenticateAcpRegistryAgentPayload,
   type AgentInstanceConfig,
   type AgentKind,
   type InstalledAcpRegistryAgent,
+  type LogoutAcpRegistryAgentPayload,
 } from "@/shared/contracts";
 import {
   defaultSharedSettings,
@@ -24,6 +26,9 @@ import {
   type SharedSettings,
 } from "@/shared/settings";
 import { downloadToFile } from "../runtime/download";
+import { decryptSecret, encryptSecret, transformSensitiveAgentSecrets } from "../secretStorage";
+import { authenticateAcpGenericInstance, logoutAcpGenericInstance } from "./acp-generic";
+import type { AgentEnvContext } from "./base";
 
 const execFileAsync = promisify(execFile);
 
@@ -62,18 +67,22 @@ export function backfillAcpRegistryAgentIcons(input: {
 
   const installedAgents = { ...settings.acpRegistryInstalledAgents };
   for (const [id, record] of Object.entries(installedAgents)) {
-    const icon = agentsById.get(id)?.icon;
-    if (!icon || record.icon === icon) continue;
-    installedAgents[id] = { ...record, icon };
+    const agent = agentsById.get(id);
+    if (!agent) continue;
+    const icon = agent.icon;
+    if ((!icon || record.icon === icon) && record.version === agent.version) continue;
+    installedAgents[id] = { ...record, version: agent.version, ...(icon ? { icon } : {}) };
     changed = true;
   }
 
   const instances = { ...settings.agentInstances };
   for (const [id, instance] of Object.entries(instances)) {
     if (instance.driver !== "acp-generic") continue;
-    const icon = agentsById.get(id)?.icon;
-    if (!icon || instance.icon === icon) continue;
-    instances[id] = { ...instance, icon };
+    const agent = agentsById.get(id);
+    if (!agent) continue;
+    const icon = agent.icon;
+    if ((!icon || instance.icon === icon) && instance.version === agent.version) continue;
+    instances[id] = { ...instance, version: agent.version, ...(icon ? { icon } : {}) };
     changed = true;
   }
 
@@ -88,7 +97,11 @@ export function backfillAcpRegistryAgentIcons(input: {
 
 export function readAcpRegistrySettings(settingsPath: string): SharedSettings {
   try {
-    return normalizeSharedSettings(JSON.parse(readFileSync(settingsPath, "utf8")));
+    return transformSensitiveAgentSecrets(
+      normalizeSharedSettings(JSON.parse(readFileSync(settingsPath, "utf8"))),
+      dirname(settingsPath),
+      decryptSecret,
+    );
   } catch {
     return { ...defaultSharedSettings };
   }
@@ -96,7 +109,8 @@ export function readAcpRegistrySettings(settingsPath: string): SharedSettings {
 
 function writeAcpRegistrySettings(settingsPath: string, settings: SharedSettings): void {
   mkdirSync(dirname(settingsPath), { recursive: true });
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+  const encrypted = transformSensitiveAgentSecrets(settings, dirname(settingsPath), encryptSecret);
+  writeFileSync(settingsPath, JSON.stringify(encrypted, null, 2), "utf8");
 }
 
 function registryInstallRecord(
@@ -129,6 +143,7 @@ function packageInstance(agent: AcpRegistryAgent, command: "npx" | "uvx"): Agent
     id: agent.id,
     driver: "acp-generic",
     displayName: agent.name,
+    version: agent.version,
     ...(agent.icon ? { icon: agent.icon } : {}),
     enabled: true,
     ...(env ? { environment: env } : {}),
@@ -234,6 +249,7 @@ async function binaryInstance(
     id: agent.id,
     driver: "acp-generic",
     displayName: agent.name,
+    version: agent.version,
     ...(agent.icon ? { icon: agent.icon } : {}),
     enabled: true,
     ...(env ? { environment: env } : {}),
@@ -291,4 +307,130 @@ export function removeAcpRegistryAgent(input: {
   settings.agentInstances = nextInstances;
   writeAcpRegistrySettings(input.settingsPath, settings);
   return Object.values(settings.acpRegistryInstalledAgents);
+}
+
+export function setAcpRegistryAgentAuth(input: {
+  agentId: string;
+  environment: Record<string, string>;
+  settingsPath: string;
+}): InstalledAcpRegistryAgent[] {
+  const settings = readAcpRegistrySettings(input.settingsPath);
+  const instance = settings.agentInstances[input.agentId];
+  if (!instance || instance.driver !== "acp-generic") {
+    throw new Error(`ACP registry agent is not installed: ${input.agentId}`);
+  }
+
+  const environment = { ...(instance.environment ?? {}) };
+  for (const [name, value] of Object.entries(input.environment)) {
+    environment[name] = { value, sensitive: true };
+  }
+
+  settings.agentInstances = {
+    ...settings.agentInstances,
+    [input.agentId]: {
+      ...instance,
+      environment,
+    },
+  };
+  writeAcpRegistrySettings(input.settingsPath, settings);
+  return Object.values(settings.acpRegistryInstalledAgents);
+}
+
+export async function authenticateAcpRegistryAgent(input: {
+  agentId: string;
+  methodId: string;
+  envKind?: AuthenticateAcpRegistryAgentPayload["envKind"];
+  wslDistro?: string;
+  settingsPath: string;
+}): Promise<void> {
+  const settings = readAcpRegistrySettings(input.settingsPath);
+  const instance = settings.agentInstances[input.agentId];
+  if (!instance || instance.driver !== "acp-generic") {
+    throw new Error(`ACP registry agent is not installed: ${input.agentId}`);
+  }
+  const envContext: AgentEnvContext | undefined = input.envKind
+    ? {
+        envKind: input.envKind,
+        ...(input.wslDistro ? { wslDistro: input.wslDistro } : {}),
+      }
+    : undefined;
+  await authenticateAcpGenericInstance(instance, input.methodId, envContext);
+  persistAuthAcknowledged(input.settingsPath, input.agentId, envContext, true);
+}
+
+export async function logoutAcpRegistryAgent(input: {
+  agentId: string;
+  envKind?: LogoutAcpRegistryAgentPayload["envKind"];
+  wslDistro?: string;
+  settingsPath: string;
+}): Promise<void> {
+  const settings = readAcpRegistrySettings(input.settingsPath);
+  const instance = settings.agentInstances[input.agentId];
+  if (!instance || instance.driver !== "acp-generic") {
+    throw new Error(`ACP registry agent is not installed: ${input.agentId}`);
+  }
+  const envContext: AgentEnvContext | undefined = input.envKind
+    ? {
+        envKind: input.envKind,
+        ...(input.wslDistro ? { wslDistro: input.wslDistro } : {}),
+      }
+    : undefined;
+  // Best-effort ACP-side logout — some agents (e.g. Cline) do not implement
+  // the ACP logout capability. The local ack is the source of truth for our
+  // UI, so swallow "not supported" but propagate other failures.
+  try {
+    await logoutAcpGenericInstance(instance, envContext);
+  } catch (error) {
+    if (!isUnsupportedAcpLogoutError(error)) throw error;
+  }
+  persistAuthAcknowledged(input.settingsPath, input.agentId, envContext, false);
+}
+
+function isUnsupportedAcpLogoutError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /logout is not supported/i.test(message);
+}
+
+/**
+ * Record/clear an interactive-login acknowledgement for one (agent, env) pair.
+ * Env-var auth shares credentials across envs and is not tracked here; this
+ * path only models browser/CLI login flows that are bound to a single env.
+ */
+function persistAuthAcknowledged(
+  settingsPath: string,
+  agentId: string,
+  envContext: AgentEnvContext | undefined,
+  acknowledged: boolean,
+): void {
+  const settings = readAcpRegistrySettings(settingsPath);
+  const instance = settings.agentInstances[agentId];
+  if (!instance) return;
+  const current = instance.authAcknowledged ?? {};
+  const nextWsl: Record<string, boolean> = { ...(current.wsl ?? {}) };
+  let nextNative = current.native === true;
+  if (envContext?.envKind === "wsl" && envContext.wslDistro) {
+    if (acknowledged) {
+      nextWsl[envContext.wslDistro] = true;
+    } else {
+      delete nextWsl[envContext.wslDistro];
+    }
+  } else {
+    nextNative = acknowledged;
+  }
+  const hasWsl = Object.keys(nextWsl).length > 0;
+  const next: { native?: boolean; wsl?: Record<string, boolean> } = {};
+  if (nextNative) next.native = true;
+  if (hasWsl) next.wsl = nextWsl;
+  const hasAny = nextNative || hasWsl;
+  settings.agentInstances = {
+    ...settings.agentInstances,
+    [agentId]: {
+      ...instance,
+      ...(hasAny ? { authAcknowledged: next } : {}),
+    },
+  };
+  if (!hasAny) {
+    delete settings.agentInstances[agentId]!.authAcknowledged;
+  }
+  writeAcpRegistrySettings(settingsPath, settings);
 }

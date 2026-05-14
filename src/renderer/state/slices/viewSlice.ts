@@ -15,6 +15,7 @@ import {
   currentPaneLayout,
   removePaneFromView,
   replacePaneInView,
+  restoreGroupView,
   rowLayoutAfterInsert,
   rowLayoutAfterRemove,
   saveGroupLayout,
@@ -174,26 +175,13 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
           (t) => t.groupId === groupId && !t.done && !t.archived,
         );
         if (groupThreads.length >= 2) {
-          const saved = gl[groupId];
-          let paneIds: [string, ...string[]];
-          if (saved) {
-            const validIds = new Set(groupThreads.map((t) => t.id));
-            const restored = saved.panes.filter((id) => validIds.has(id));
-            for (const t of groupThreads) {
-              if (!restored.includes(t.id)) restored.push(t.id);
-            }
-            paneIds = (restored.length > 0 ? restored : groupThreads.map((t) => t.id)) as [
-              string,
-              ...string[],
-            ];
-          } else {
-            paneIds = groupThreads.map((t) => t.id) as [string, ...string[]];
+          const nextView = restoreGroupView(groupId, groupThreads, gl[groupId]);
+          if (nextView) {
+            const cleared = clearFinishedAndDone(state.threads, nextView.panes);
+            return cleared
+              ? { groupLayouts: gl, view: nextView, threads: cleared }
+              : { groupLayouts: gl, view: nextView };
           }
-          const nextView: AppView = { kind: "thread", panes: paneIds, activeGroupId: groupId };
-          const cleared = clearFinishedAndDone(state.threads, paneIds);
-          return cleared
-            ? { groupLayouts: gl, view: nextView, threads: cleared }
-            : { groupLayouts: gl, view: nextView };
         }
       }
 
@@ -260,77 +248,16 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
   openGroupView: (groupId) =>
     set((state) => {
       const gl = saveGroupLayout(state);
-
       const groupThreads = state.threads.filter(
         (t) => t.groupId === groupId && !t.done && !t.archived,
       );
-      if (groupThreads.length === 0) return {};
-
-      const saved = gl[groupId] ?? state.groupLayouts[groupId];
-      if (saved) {
-        const validIds = new Set(groupThreads.map((t) => t.id));
-        const restoredPanes = saved.panes.filter((id) => validIds.has(id));
-        for (const t of groupThreads) {
-          if (!restoredPanes.includes(t.id)) restoredPanes.push(t.id);
-        }
-        if (restoredPanes.length > 0) {
-          let paneLayout = saved.paneLayout;
-          if (paneLayout) {
-            const savedPaneIds = collectPaneIds(paneLayout);
-            for (const paneId of savedPaneIds) {
-              if (validIds.has(paneId)) continue;
-              const nextLayout = removePaneFromLayout(paneLayout, paneId);
-              if (!nextLayout) {
-                paneLayout = undefined;
-                break;
-              }
-              paneLayout = nextLayout;
-            }
-
-            if (paneLayout) {
-              const layoutPaneIds = new Set(collectPaneIds(paneLayout));
-              for (const paneId of restoredPanes) {
-                if (layoutPaneIds.has(paneId)) continue;
-                paneLayout = insertPaneInLayout(
-                  paneLayout,
-                  paneLayout.kind === "split" && paneLayout.axis === "vertical"
-                    ? {
-                        path: [],
-                        axis: "vertical",
-                        index: paneLayout.children.length,
-                      }
-                    : { path: [], axis: "vertical", index: 1 },
-                  paneId,
-                );
-                layoutPaneIds.add(paneId);
-              }
-
-              const paneIds = collectPaneIds(paneLayout);
-              const nextView: AppView = {
-                kind: "thread",
-                panes: paneIds,
-                paneLayout,
-                activeGroupId: groupId,
-              };
-              const cleared = clearFinishedAndDone(state.threads, paneIds);
-              return cleared
-                ? { groupLayouts: gl, view: nextView, threads: cleared }
-                : { groupLayouts: gl, view: nextView };
-            }
-          }
-
-          const paneIds = restoredPanes as [string, ...string[]];
-          const nextView: AppView = { kind: "thread", panes: paneIds, activeGroupId: groupId };
-          const cleared = clearFinishedAndDone(state.threads, paneIds);
-          return cleared
-            ? { groupLayouts: gl, view: nextView, threads: cleared }
-            : { groupLayouts: gl, view: nextView };
-        }
-      }
-
-      const paneIds = groupThreads.map((t) => t.id) as [string, ...string[]];
-      const nextView: AppView = { kind: "thread", panes: paneIds, activeGroupId: groupId };
-      const cleared = clearFinishedAndDone(state.threads, paneIds);
+      const nextView = restoreGroupView(
+        groupId,
+        groupThreads,
+        gl[groupId] ?? state.groupLayouts[groupId],
+      );
+      if (!nextView) return {};
+      const cleared = clearFinishedAndDone(state.threads, nextView.panes);
       return cleared
         ? { groupLayouts: gl, view: nextView, threads: cleared }
         : { groupLayouts: gl, view: nextView };

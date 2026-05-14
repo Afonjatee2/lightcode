@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Input, Tooltip, Card, Dropdown, Label } from "@heroui/react";
+import { Button, Input, Tooltip, Card, Dropdown, Label, toast } from "@heroui/react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -14,9 +14,13 @@ import {
 } from "lucide-react";
 import type {
   AcpRegistryAgent,
+  AgentOwnedAuthMethod,
   AgentStatus,
+  AgentStatusesResponse,
   InstalledAcpRegistryAgent,
   Project,
+  RefreshAgentScope,
+  RefreshAgentScopeEnv,
 } from "@/shared/contracts";
 import { isWindows, readBridge } from "@/renderer/bridge";
 import {
@@ -62,10 +66,48 @@ function registryAdapterKind(agentId: string): string {
   return `acp-generic:${agentId}`;
 }
 
+function scopeEnvForStatus(status: AgentStatus): RefreshAgentScopeEnv {
+  return status.envKind === "wsl" && status.envDistro
+    ? { kind: "wsl", distro: status.envDistro }
+    : { kind: "native" };
+}
+
+type StatusAuthMethod = NonNullable<AgentStatus["authMethods"]>[number];
+
+function isEnvVarAuthMethod(method: StatusAuthMethod | undefined): boolean {
+  return (
+    method !== undefined &&
+    (method.type === "env_var" || ("vars" in method && Array.isArray(method.vars)))
+  );
+}
+
+function findAgentAuthMethod(status: AgentStatus | undefined): AgentOwnedAuthMethod | undefined {
+  return status?.authMethods?.find(
+    (candidate): candidate is AgentOwnedAuthMethod =>
+      !isEnvVarAuthMethod(candidate) && candidate.type !== "terminal",
+  );
+}
+
+function agentAuthTarget(status: AgentStatus) {
+  return {
+    ...(status.envKind ? { envKind: status.envKind } : {}),
+    ...(status.envDistro ? { wslDistro: status.envDistro } : {}),
+  };
+}
+
 interface InstallTarget {
   id: string;
   label: string;
   project?: Project;
+}
+
+function findStatusInResponse(
+  response: AgentStatusesResponse | undefined,
+  ...kinds: Array<string | undefined>
+): AgentStatus | undefined {
+  if (!response) return undefined;
+  const kindSet = new Set(kinds.filter((kind): kind is string => typeof kind === "string"));
+  return [...response.windows, ...response.wsl].find((status) => kindSet.has(status.kind));
 }
 
 function AgentIcon(props: {
@@ -83,12 +125,13 @@ function AgentIcon(props: {
   );
 }
 
-export function AcpRegistrySettings() {
+export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string) => void }) {
   const [agents, setAgents] = useState<AcpRegistryAgent[]>([]);
   const [query, setQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | undefined>();
   const [pendingAgentId, setPendingAgentId] = useState<string | undefined>();
+  const [pendingAuthAgentId, setPendingAuthAgentId] = useState<string | undefined>();
   const [mutatedInstalled, setMutatedInstalled] = useState<InstalledAcpRegistryAgent[]>();
 
   const settingsInstalled = useSharedSettings((s) => s.acpRegistryInstalledAgents);
@@ -99,12 +142,12 @@ export function AcpRegistrySettings() {
   const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
   const isWindowsPlatform = isWindows();
 
-  const refreshStatuses = (options?: { reset?: boolean }) => {
+  const refreshStatuses = (options?: { reset?: boolean; scope?: RefreshAgentScope }) => {
     if (options?.reset !== false) {
       useAgentStatusesStore.getState().resetDiscoveredAgents();
     }
-    void readBridge()
-      .refreshAgentStatuses(wslDistros)
+    return readBridge()
+      .refreshAgentStatuses(wslDistros, options?.scope)
       .catch(() => undefined);
   };
 
@@ -172,9 +215,7 @@ export function AcpRegistrySettings() {
     if (normalizedQuery && !registrySearchText(agent).includes(normalizedQuery)) continue;
     const registryInstalled = installedById.has(agent.id);
     const familyKind = REGISTRY_AGENT_FAMILY_KIND[agent.id];
-    const localInstalled =
-      hasDetectedInstalledKind(registryAdapterKind(agent.id)) ||
-      (familyKind ? hasDetectedInstalledKind(familyKind) : false);
+    const localInstalled = familyKind ? hasDetectedInstalledKind(familyKind) : false;
     if (KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS.has(agent.id) && !registryInstalled) {
       continue;
     }
@@ -185,14 +226,32 @@ export function AcpRegistrySettings() {
     }
   }
 
-  const installAgent = (agentId: string) => {
+  const installAgent = (agent: AcpRegistryAgent) => {
+    const agentId = agent.id;
     setPendingAgentId(agentId);
     setError(undefined);
     readBridge()
       .installAcpRegistryAgent({ agentId })
-      .then((result) => {
+      .then(async (result) => {
+        const adapterKind = registryAdapterKind(agentId);
+        const response = await refreshStatuses({
+          reset: false,
+          scope: { agentKinds: [adapterKind] },
+        });
         setMutatedInstalled(result.installed);
-        refreshStatuses();
+        const status = findStatusInResponse(
+          response,
+          adapterKind,
+          REGISTRY_AGENT_FAMILY_KIND[agentId],
+        );
+        if (status?.authState === "missing") {
+          toast.warning(`${agent.name} needs authentication.`, {
+            actionProps: {
+              children: "Open settings",
+              onPress: () => props.onOpenAgentSettings?.(adapterKind),
+            },
+          });
+        }
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : String(err));
@@ -215,6 +274,27 @@ export function AcpRegistrySettings() {
       .finally(() => setPendingAgentId(undefined));
   };
 
+  const authenticateAgent = (agentId: string, methodId: string, status: AgentStatus) => {
+    setPendingAuthAgentId(agentId);
+    setError(undefined);
+    readBridge()
+      .authenticateAcpRegistryAgent({ agentId, methodId, ...agentAuthTarget(status) })
+      .then(() => readBridge().focusWindow())
+      .then(() =>
+        refreshStatuses({
+          reset: false,
+          scope: {
+            agentKinds: [registryAdapterKind(agentId)],
+            envs: [scopeEnvForStatus(status)],
+          },
+        }),
+      )
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : String(err));
+      })
+      .finally(() => setPendingAuthAgentId(undefined));
+  };
+
   const renderTag = (label: string) => (
     <span className="rounded border border-border px-1.5 py-0.5 text-[11px] font-medium text-muted">
       {label}
@@ -225,10 +305,12 @@ export function AcpRegistrySettings() {
     return (detectedInstalledByKind.get(kind)?.length ?? 0) > 0;
   }
 
+  function findDetectedStatuses(...kinds: Array<string | undefined>): AgentStatus[] {
+    return kinds.flatMap((kind) => (kind ? (detectedInstalledByKind.get(kind) ?? []) : []));
+  }
+
   function findDetectedStatus(...kinds: Array<string | undefined>): AgentStatus | undefined {
-    const statuses = kinds.flatMap((kind) =>
-      kind ? (detectedInstalledByKind.get(kind) ?? []) : [],
-    );
+    const statuses = findDetectedStatuses(...kinds);
     return (
       statuses.find((status) => status.authState === "missing" && status.loginCommand) ??
       statuses.find((status) => status.authState === "missing") ??
@@ -437,14 +519,24 @@ export function AcpRegistrySettings() {
     const installedRecord = installedById.get(agent.id);
     const adapterKind = registryAdapterKind(agent.id);
     const familyKind = REGISTRY_AGENT_FAMILY_KIND[agent.id];
+    const detectedStatuses = findDetectedStatuses(adapterKind, familyKind);
+    const familyDetectedStatuses = findDetectedStatuses(familyKind);
     const localStatus = findDetectedStatus(adapterKind, familyKind);
-    const localInstalled = localStatus !== undefined;
+    const localInstalled = familyDetectedStatuses.length > 0;
     const rowInstalledKind = installedRecord?.adapterKind ?? familyKind;
     const isAgentPending = pendingAgentId === agent.id;
     const canRemove = installedRecord !== undefined;
     const isAvailable = installedRecord !== undefined || localInstalled;
     const needsLogin = localStatus?.authState === "missing";
     const loginCommand = localStatus?.loginCommand;
+    const agentAuthMethod = findAgentAuthMethod(localStatus);
+    const agentAuthStatuses = needsLogin
+      ? detectedStatuses.filter((status) => status.authState === "missing")
+      : detectedStatuses;
+    const agentAuthEntries = agentAuthStatuses.flatMap((status) => {
+      const method = findAgentAuthMethod(status);
+      return method ? [{ status, method }] : [];
+    });
     const loginProject = projectForStatus(localStatus);
 
     return (
@@ -470,7 +562,7 @@ export function AcpRegistrySettings() {
                   {renderTag("ACP")}
                   {APP_SUPPORTED_ACP_AGENT_IDS.has(agent.id) ? renderTag("Native support") : null}
                 </div>
-                <Card.Description className="line-clamp-2 text-sm text-foreground/85">
+                <Card.Description className="line-clamp-2 text-xs text-foreground/85">
                   {agent.description}
                 </Card.Description>
               </Card.Header>
@@ -487,22 +579,29 @@ export function AcpRegistrySettings() {
                     {({ isPending }) => (
                       <>
                         {isPending ? <PixelLoader size="xs" /> : <Trash2 className="size-4" />}
-                        {isPending ? "Removing" : "Remove"}
+                        {isPending ? "Deleting" : "Delete"}
                       </>
                     )}
                   </Button>
                 ) : localInstalled ? (
-                  <span className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted">
-                    <CheckCircle2 className="size-3.5 text-white" />
-                    Detected{" "}
-                    <span className="text-muted/70">({detectionScopeLabel(localStatus)})</span>
-                  </span>
+                  <div className="flex flex-col items-end gap-1">
+                    {familyDetectedStatuses.map((status) => (
+                      <span
+                        key={`${status.kind}-${status.envKind ?? "local"}-${status.envDistro ?? "default"}`}
+                        className="inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs text-muted"
+                      >
+                        <CheckCircle2 className="size-3.5 text-white" />
+                        Detected{" "}
+                        <span className="text-muted/70">({detectionScopeLabel(status)})</span>
+                      </span>
+                    ))}
+                  </div>
                 ) : (
                   <Button
                     size="sm"
                     variant="tertiary"
                     isPending={isAgentPending}
-                    onPress={() => installAgent(agent.id)}
+                    onPress={() => installAgent(agent)}
                   >
                     {({ isPending }) => (
                       <>
@@ -518,7 +617,32 @@ export function AcpRegistrySettings() {
                       <AlertTriangle className="size-3.5" />
                       Sign in required
                     </span>
-                    {loginCommand ? (
+                    {agentAuthMethod ? (
+                      <div className="flex flex-col items-end gap-2">
+                        {(agentAuthEntries.length > 0
+                          ? agentAuthEntries
+                          : localStatus
+                            ? [{ status: localStatus, method: agentAuthMethod }]
+                            : []
+                        ).map((entry) => (
+                          <Button
+                            key={`${entry.status.kind}-${entry.status.envKind ?? "local"}-${entry.status.envDistro ?? "default"}-auth`}
+                            size="sm"
+                            variant="tertiary"
+                            isPending={pendingAuthAgentId === agent.id}
+                            onPress={() =>
+                              authenticateAgent(agent.id, entry.method.id, entry.status)
+                            }
+                          >
+                            <LogIn className="size-3.5" />
+                            Login
+                            {agentAuthEntries.length > 1
+                              ? ` ${detectionScopeLabel(entry.status)}`
+                              : ""}
+                          </Button>
+                        ))}
+                      </div>
+                    ) : loginCommand ? (
                       <Button
                         size="sm"
                         variant="tertiary"

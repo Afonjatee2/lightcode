@@ -37,6 +37,13 @@ interface AgentStatusesStore {
   beginFirstLaunchDiscovery: () => void;
   resetDiscoveredAgents: () => void;
   pushDiscoveredAgent: (status: AgentStatus) => void;
+  /**
+   * Upserts a single status into the store, matched by (kind, envKind,
+   * envDistro). Used by scoped refreshes after install/login so we don't
+   * overwrite the rest of the list. WSL statuses land in `wslAgentStatuses`;
+   * everything else lands in `agentStatuses`.
+   */
+  mergeAgentStatus: (status: AgentStatus) => void;
 }
 
 function capabilitiesEqual(
@@ -65,6 +72,7 @@ function statusesEqual(a: AgentStatus[], b: AgentStatus[]): boolean {
       x.version === b[i]!.version &&
       x.authState === b[i]!.authState &&
       x.loginCommand === b[i]!.loginCommand &&
+      JSON.stringify(x.authMethods ?? []) === JSON.stringify(b[i]!.authMethods ?? []) &&
       areAgentProviderMetadataEqual(x.providerMetadata, b[i]!.providerMetadata) &&
       capabilitiesEqual(x.capabilities, b[i]!.capabilities),
   );
@@ -130,6 +138,27 @@ export const useAgentStatusesStore = create<AgentStatusesStore>()((set) => ({
         return prev;
       }
       return { discoveredAgents: [...prev.discoveredAgents, status] };
+    }),
+  mergeAgentStatus: (status) =>
+    set((prev) => {
+      const matches = (entry: AgentStatus) =>
+        entry.kind === status.kind &&
+        entry.envKind === status.envKind &&
+        entry.envDistro === status.envDistro;
+      if (status.envKind === "wsl") {
+        const idx = prev.wslAgentStatuses.findIndex(matches);
+        const next =
+          idx === -1
+            ? [...prev.wslAgentStatuses, status]
+            : prev.wslAgentStatuses.map((entry, i) => (i === idx ? status : entry));
+        return { wslAgentStatuses: next, wslLoaded: true };
+      }
+      const idx = prev.agentStatuses.findIndex(matches);
+      const next =
+        idx === -1
+          ? [...prev.agentStatuses, status]
+          : prev.agentStatuses.map((entry, i) => (i === idx ? status : entry));
+      return { agentStatuses: next, windowsLoaded: true };
     }),
 }));
 

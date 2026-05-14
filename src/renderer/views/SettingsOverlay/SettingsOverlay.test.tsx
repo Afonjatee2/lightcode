@@ -53,12 +53,18 @@ vi.mock("@/renderer/components/layout/PageLayout", () => ({
 
 vi.mock("@/renderer/components/common", () => ({
   PixelLoader: () => <span />,
-  SidebarButton: (props: { label: string; onPress?: () => void; suffix?: ReactNode }) => (
+  SidebarButton: (props: {
+    icon?: ReactNode;
+    label: string;
+    onPress?: () => void;
+    suffix?: ReactNode;
+  }) => (
     <>
       <button type="button" onClick={props.onPress}>
+        {props.icon}
         {props.label}
+        {props.suffix}
       </button>
-      {props.suffix}
     </>
   ),
 }));
@@ -203,6 +209,23 @@ describe("SettingsOverlay", () => {
     fireEvent.click(screen.getByRole("button", { name: "Agent Registry" }));
 
     expect(screen.getByText("Agent Registry Settings")).toBeInTheDocument();
+  });
+
+  it("marks agents that need attention in the sidebar", () => {
+    statusesState.agentStatuses = [
+      makeStatus("acp-generic:factory-droid", {
+        label: "Factory Droid",
+        authState: "missing",
+        envKind: "windows",
+      }),
+    ];
+
+    render(<SettingsOverlay onClose={() => undefined} />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Agents" }));
+
+    const factoryButton = screen.getByRole("button", { name: "Factory Droid" });
+    expect(factoryButton.querySelector(".text-warning")).not.toBeNull();
   });
 
   it("refreshes agent probing from the agents sidebar and shows the discovery overlay", async () => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Lock, Minus, Plus, Undo2 } from "lucide-react";
+import { FileEdit, Lock, Minus, Plus, Undo2 } from "lucide-react";
 import type { Project } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
@@ -12,6 +12,7 @@ import {
   PathDisplay,
 } from "@/renderer/components/common";
 import { handleKeyActivate } from "@/renderer/utils/a11y";
+import { openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { useGitReviewRowPadX } from "../gitReviewPadXContext";
 
 export function FileRow(props: {
@@ -22,8 +23,20 @@ export function FileRow(props: {
   onRefresh: () => void;
   storeKey: string;
   isWorktree: boolean;
+  worktreePath: string | undefined;
+  worktreeBranch: string | undefined;
 }) {
-  const { path, project, isSelected, onSelect, onRefresh, storeKey, isWorktree } = props;
+  const {
+    path,
+    project,
+    isSelected,
+    onSelect,
+    onRefresh,
+    storeKey,
+    isWorktree,
+    worktreePath,
+    worktreeBranch,
+  } = props;
   const rowPadX = useGitReviewRowPadX();
   const file = useGitFile(storeKey, path, isWorktree);
   const [revertOpen, setRevertOpen] = useState(false);
@@ -53,6 +66,10 @@ export function FileRow(props: {
     });
     setRevertOpen(false);
     onRefresh();
+  }
+
+  function handleOpenInEditor() {
+    void openFileInEditor(project, worktreePath, worktreeBranch, path);
   }
 
   return (
@@ -85,6 +102,19 @@ export function FileRow(props: {
             {file.deletions > 0 && <span className="ml-0.5 text-danger">-{file.deletions}</span>}
           </span>
           <span className="absolute inset-0 flex items-center justify-end gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+            <div
+              role="button"
+              tabIndex={0}
+              className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+              title="Open in editor"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenInEditor();
+              }}
+              onKeyDown={(e) => handleKeyActivate(e, handleOpenInEditor, { stopPropagation: true })}
+            >
+              <FileEdit className="size-3" />
+            </div>
             <div
               role="button"
               tabIndex={0}

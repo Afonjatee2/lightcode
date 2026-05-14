@@ -271,9 +271,21 @@ export function useGitRefresh(storeHydrated: boolean) {
       }
     }
 
+    const watcherDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    const WATCHER_DEBOUNCE_MS = 250;
+
     function scheduleWatcherRefresh(project: { id: string; location: ProjectLocation }) {
       if (!isActive) return;
-      void refreshProject(project, "watcher", "status");
+      const existing = watcherDebounceTimers.get(project.id);
+      if (existing) clearTimeout(existing);
+      watcherDebounceTimers.set(
+        project.id,
+        setTimeout(() => {
+          watcherDebounceTimers.delete(project.id);
+          if (!isActive) return;
+          void refreshProject(project, "watcher", "status");
+        }, WATCHER_DEBOUNCE_MS),
+      );
     }
 
     function getPriorityProjectIds(): Set<string> {
@@ -393,6 +405,8 @@ export function useGitRefresh(storeHydrated: boolean) {
       isActive = false;
       clearTimeout(initialFetchTimer);
       clearInterval(fetchIntervalId);
+      for (const timer of watcherDebounceTimers.values()) clearTimeout(timer);
+      watcherDebounceTimers.clear();
       unsubWatcher();
       for (const project of activeProjects) {
         readBridge()

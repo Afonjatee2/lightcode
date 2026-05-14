@@ -1,4 +1,4 @@
-import { startTransition } from "react";
+import { startTransition, useState } from "react";
 import {
   Button,
   Label,
@@ -6,24 +6,34 @@ import {
   ListLayout,
   Popover,
   Switch,
+  toast,
   type Selection,
   Virtualizer,
 } from "@heroui/react";
-import { AlertTriangle, LogIn } from "lucide-react";
-import type { AgentSettingDef, AgentStatus, Project } from "@/shared/contracts";
+import { AlertTriangle, LogIn, LogOut, Save } from "lucide-react";
+import type {
+  AgentEnvVarAuthMethod,
+  AgentOwnedAuthMethod,
+  AgentSettingDef,
+  AgentStatus,
+  Project,
+  RefreshAgentScopeEnv,
+} from "@/shared/contracts";
 import { runAgentLoginCommand } from "@/renderer/actions/agentLoginActions";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
-import { Select } from "@/renderer/components/common";
+import { Input, Select } from "@/renderer/components/common";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import {
   LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD,
   MENU_DROPDOWN_ROW_HEIGHT,
   VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS,
 } from "@/renderer/components/common/dropdownVirtualization";
+
+const SAVED_SECRET_MASK = "***********";
 
 function AgentSettingRow(props: { agentKind: string; def: AgentSettingDef }) {
   const { agentKind, def } = props;
@@ -146,7 +156,7 @@ function envLabel(status: AgentStatus): string {
   return "";
 }
 
-export function formatAgentMetadataSummary(status: AgentStatus): string | undefined {
+function formatAgentMetadataSummary(status: AgentStatus): string | undefined {
   const metadata = status.providerMetadata;
   const identityParts: string[] = [];
   if (metadata?.authenticatedAs) identityParts.push(metadata.authenticatedAs);
@@ -174,6 +184,13 @@ function AgentMetadataLine(props: { status: AgentStatus; showEnvironmentLabel: b
   return <p className="truncate text-xs text-muted">{`${prefix}${summary}`}</p>;
 }
 
+function formatStatusList(statuses: readonly AgentStatus[]): string {
+  return statuses
+    .map((status) => envLabel(status))
+    .filter((label) => label.length > 0)
+    .join(", ");
+}
+
 function findProjectForAgentStatus(
   status: AgentStatus | undefined,
   projects: readonly Project[],
@@ -190,7 +207,148 @@ function findProjectForAgentStatus(
   return undefined;
 }
 
+function acpGenericInstanceId(kind: string): string | undefined {
+  return kind.startsWith("acp-generic:") ? kind.slice("acp-generic:".length) : undefined;
+}
+
+type StatusAuthMethod = NonNullable<AgentStatus["authMethods"]>[number];
+
+function isEnvVarAuthMethod(method: StatusAuthMethod | undefined): method is AgentEnvVarAuthMethod {
+  return (
+    method !== undefined &&
+    (method.type === "env_var" || ("vars" in method && Array.isArray(method.vars)))
+  );
+}
+
+function isAgentAuthMethod(method: StatusAuthMethod | undefined): method is AgentOwnedAuthMethod {
+  return method !== undefined && !isEnvVarAuthMethod(method) && method.type !== "terminal";
+}
+
+function findEnvVarAuthMethod(statuses: readonly AgentStatus[]): AgentEnvVarAuthMethod | undefined {
+  for (const status of statuses) {
+    const method = status.authMethods?.find(isEnvVarAuthMethod);
+    if (method) return method;
+  }
+  return undefined;
+}
+
+function findAgentAuthMethod(
+  statuses: readonly AgentStatus[],
+): { status: AgentStatus; method: AgentOwnedAuthMethod } | undefined {
+  for (const status of statuses) {
+    const method = status.authMethods?.find(isAgentAuthMethod);
+    if (method) return { status, method };
+  }
+  return undefined;
+}
+
+function agentAuthTarget(status: AgentStatus) {
+  return {
+    ...(status.envKind ? { envKind: status.envKind } : {}),
+    ...(status.envDistro ? { wslDistro: status.envDistro } : {}),
+  };
+}
+
+function scopeEnvForStatus(status: AgentStatus): RefreshAgentScopeEnv {
+  return status.envKind === "wsl" && status.envDistro
+    ? { kind: "wsl", distro: status.envDistro }
+    : { kind: "native" };
+}
+
+function findTerminalLoginStatus(statuses: readonly AgentStatus[]): AgentStatus | undefined {
+  return statuses.find(
+    (status) =>
+      status.loginCommand && status.authMethods?.some((candidate) => candidate.type === "terminal"),
+  );
+}
+
+function statusEnvKey(status: AgentStatus): string {
+  return status.envKind === "wsl" && status.envDistro ? `wsl:${status.envDistro}` : "native";
+}
+
+function AcpAgentAuthEnvRow(props: {
+  status: AgentStatus;
+  agentAuthMethod: AgentOwnedAuthMethod | undefined;
+  authPending: boolean;
+  pendingMessage: string | undefined;
+  showEnvironmentLabel: boolean;
+  onLogin: () => void;
+  onLogout: () => void;
+}) {
+  const { status, agentAuthMethod, showEnvironmentLabel } = props;
+  const isMissing = status.authState === "missing";
+  const isAuthenticated = status.authState === "authenticated";
+  const envSuffix = showEnvironmentLabel ? ` ${envLabel(status)}` : "";
+  const canLogin = isMissing && agentAuthMethod !== undefined;
+  const canLogout = isAuthenticated;
+  const headerLabel = isMissing
+    ? "Login required"
+    : isAuthenticated
+      ? "Signed in"
+      : "Authentication";
+  const description = isMissing
+    ? agentAuthMethod
+      ? `Complete ${agentAuthMethod.name} sign-in for ${envLabel(status)}.`
+      : `${envLabel(status)} needs authentication.`
+    : isAuthenticated
+      ? `${envLabel(status)} credentials are configured.`
+      : "";
+
+  return (
+    <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-surface-secondary px-3 py-2 text-foreground">
+      <div className="flex min-w-0 items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <p className={`text-sm font-medium ${isMissing ? "text-warning" : ""}`}>
+            {envLabel(status)} ·{" "}
+            {isMissing ? (
+              <AlertTriangle className="inline size-4 -translate-y-px text-warning" />
+            ) : null}
+            {isMissing ? " " : ""}
+            {headerLabel}
+          </p>
+          {description ? <p className="text-xs text-muted">{description}</p> : null}
+          {props.pendingMessage ? (
+            <p className="mt-1 text-xs text-muted">{props.pendingMessage}</p>
+          ) : null}
+        </div>
+      </div>
+      {canLogin || canLogout ? (
+        <div className="flex shrink-0 flex-row items-center gap-2">
+          {canLogin ? (
+            <Button
+              size="sm"
+              variant="tertiary"
+              isIconOnly
+              aria-label={`Login${envSuffix}`}
+              isPending={props.authPending}
+              onPress={props.onLogin}
+            >
+              <LogIn className="size-4" />
+            </Button>
+          ) : null}
+          {canLogout ? (
+            <Button
+              size="sm"
+              variant="tertiary"
+              isIconOnly
+              aria-label={`Logout${envSuffix}`}
+              isPending={props.authPending}
+              onPress={props.onLogout}
+            >
+              <LogOut className="size-4 text-danger" />
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function SingleAgentSettings(props: { agentKind: string }) {
+  const [authValues, setAuthValues] = useState<Record<string, string>>({});
+  const [authPending, setAuthPending] = useState(false);
+  const [authPendingMessage, setAuthPendingMessage] = useState<string | undefined>();
+  const [authPendingEnvKey, setAuthPendingEnvKey] = useState<string | undefined>();
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
   const projects = useAppStore((state) => state.projects);
@@ -230,9 +388,153 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   );
   const showEnvironmentMetadataLabels = installedStatuses.length > 1;
   const missingAuthStatuses = installedStatuses.filter((status) => status.authState === "missing");
-  const loginStatus = missingAuthStatuses.find((status) => status.loginCommand);
+  const envVarAuthMethod =
+    findEnvVarAuthMethod(installedStatuses) ?? findEnvVarAuthMethod(missingAuthStatuses);
+  const agentAuthStatuses =
+    missingAuthStatuses.length > 0 ? missingAuthStatuses : installedStatuses;
+  const agentAuthEntries = agentAuthStatuses.flatMap((status) => {
+    const method = status.authMethods?.find(isAgentAuthMethod);
+    return method ? [{ status, method }] : [];
+  });
+  const agentAuth = findAgentAuthMethod(agentAuthStatuses);
+  const terminalLoginStatus =
+    findTerminalLoginStatus(installedStatuses) ??
+    missingAuthStatuses.find((status) => status.loginCommand);
+  const loginStatus =
+    terminalLoginStatus ?? missingAuthStatuses.find((status) => status.loginCommand);
   const loginCommand = loginStatus?.loginCommand;
   const loginProject = findProjectForAgentStatus(loginStatus, projects);
+  const acpInstanceId = acpGenericInstanceId(agent.kind);
+  const logoutStatuses = installedStatuses.filter(
+    (status) =>
+      status.authState === "authenticated" &&
+      (status.authLogoutSupported === true || acpInstanceId !== undefined),
+  );
+  const requiredAuthVars = envVarAuthMethod?.vars.filter((variable) => variable.optional !== true);
+  const canSaveEnvAuth =
+    acpInstanceId !== undefined &&
+    requiredAuthVars?.every((variable) => authValues[variable.name]?.trim()) === true;
+  const saveEnvAuth = () => {
+    if (!envVarAuthMethod || !acpInstanceId || !canSaveEnvAuth) return;
+    const environment = Object.fromEntries(
+      envVarAuthMethod.vars.flatMap((variable) => {
+        const value = authValues[variable.name]?.trim();
+        return value ? [[variable.name, value]] : [];
+      }),
+    );
+    setAuthPending(true);
+    readBridge()
+      .setAcpRegistryAgentAuth({ agentId: acpInstanceId, environment })
+      .then(() => readBridge().refreshAgentStatuses(wslDistros, { agentKinds: [props.agentKind] }))
+      .then(() => {
+        setAuthValues({});
+        toast.success(`${agent.label} credentials saved.`);
+      })
+      .catch((error) =>
+        toast.danger(
+          error instanceof Error ? error.message : `Unable to save ${agent.label} credentials.`,
+        ),
+      )
+      .finally(() => setAuthPending(false));
+  };
+  const authenticateAgent = (auth = agentAuth) => {
+    if (!auth || !acpInstanceId) return;
+    setAuthPending(true);
+    setAuthPendingEnvKey(statusEnvKey(auth.status));
+    setAuthPendingMessage(
+      `Waiting for ${envLabel(auth.status) ? `${envLabel(auth.status)} ` : ""}${auth.method.name} authentication. Detected agents will refresh when it finishes.`,
+    );
+    readBridge()
+      .authenticateAcpRegistryAgent({
+        agentId: acpInstanceId,
+        methodId: auth.method.id,
+        ...agentAuthTarget(auth.status),
+      })
+      .then(() => readBridge().focusWindow())
+      .then(() =>
+        readBridge().refreshAgentStatuses(wslDistros, {
+          agentKinds: [props.agentKind],
+          envs: [scopeEnvForStatus(auth.status)],
+        }),
+      )
+      .then(() => toast.success(`${agent.label} authenticated.`))
+      .catch((error) =>
+        toast.danger(
+          error instanceof Error ? error.message : `Unable to authenticate ${agent.label}.`,
+        ),
+      )
+      .finally(() => {
+        setAuthPending(false);
+        setAuthPendingMessage(undefined);
+        setAuthPendingEnvKey(undefined);
+      });
+  };
+  const logoutAgent = (status: AgentStatus) => {
+    if (!acpInstanceId) return;
+    setAuthPending(true);
+    readBridge()
+      .logoutAcpRegistryAgent({
+        agentId: acpInstanceId,
+        ...agentAuthTarget(status),
+      })
+      .then(() =>
+        readBridge().refreshAgentStatuses(wslDistros, {
+          agentKinds: [props.agentKind],
+          envs: [scopeEnvForStatus(status)],
+        }),
+      )
+      .then(() => toast.success(`${agent.label} logged out.`))
+      .catch((error) =>
+        toast.danger(error instanceof Error ? error.message : `Unable to log out ${agent.label}.`),
+      )
+      .finally(() => setAuthPending(false));
+  };
+  const hasAuthSettings =
+    envVarAuthMethod !== undefined ||
+    agentAuth !== undefined ||
+    loginCommand !== undefined ||
+    missingAuthStatuses.length > 0 ||
+    logoutStatuses.length > 0;
+  const authMissing = missingAuthStatuses.length > 0;
+  const missingAuthLabel = formatStatusList(missingAuthStatuses);
+  const showAuthEnvironmentLabels = installedStatuses.length > 1;
+  const showEnvVarOnly = envVarAuthMethod !== undefined && !authMissing;
+  // Interactive auth (browser/CLI sign-in) is per-env — Windows and each WSL
+  // distro hold their own sessions. We split the auth panel into one row per
+  // env so each shows its own state independently. Env-var credentials stay
+  // shared (single block above the per-env rows).
+  const hasInteractiveAuth = installedStatuses.some((status) =>
+    status.authMethods?.some((method) => isAgentAuthMethod(method) || method.type === "terminal"),
+  );
+  // When env-var credentials already satisfy every env, the user is signed in
+  // via the shared key — per-env Logout rows are misleading because there is
+  // no per-env session to revoke. Show just the env-var block in that case.
+  const envVarFullySatisfied =
+    envVarAuthMethod !== undefined &&
+    installedStatuses.length > 0 &&
+    installedStatuses.every((status) => status.authState === "authenticated");
+  const usePerEnvAuthRows =
+    acpInstanceId !== undefined && hasInteractiveAuth && !envVarFullySatisfied;
+  const clearEnvVarCredentials = () => {
+    if (!envVarAuthMethod || !acpInstanceId) return;
+    const environment = Object.fromEntries(
+      envVarAuthMethod.vars.map((variable) => [variable.name, ""]),
+    );
+    setAuthPending(true);
+    readBridge()
+      .setAcpRegistryAgentAuth({ agentId: acpInstanceId, environment })
+      .then(() => readBridge().refreshAgentStatuses(wslDistros, { agentKinds: [props.agentKind] }))
+      .then(() => {
+        setAuthValues({});
+        toast.success(`${agent.label} credentials removed.`);
+      })
+      .catch((error) =>
+        toast.danger(
+          error instanceof Error ? error.message : `Unable to remove ${agent.label} credentials.`,
+        ),
+      )
+      .finally(() => setAuthPending(false));
+  };
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
@@ -273,34 +575,354 @@ export function SingleAgentSettings(props: { agentKind: string }) {
         </div>
 
         <div className="space-y-4">
-          {missingAuthStatuses.length > 0 ? (
-            <div className="flex items-center justify-between gap-4 rounded-md border border-warning/35 bg-warning/10 px-3 py-2 text-warning">
+          {hasAuthSettings && usePerEnvAuthRows ? (
+            <div className="space-y-2">
+              {envVarAuthMethod && acpInstanceId ? (
+                <div className="flex items-start justify-between gap-4 rounded-xl border border-border bg-surface-secondary px-3 py-2 text-foreground">
+                  <div className="flex min-w-0 items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">{envVarAuthMethod.name}</p>
+                      <p className="text-xs text-muted">
+                        Saved credentials are shared across all environments.
+                      </p>
+                      <div className="mt-3 flex flex-col gap-2">
+                        {envVarAuthMethod.vars.map((variable) => {
+                          const hasAuthValue = Object.prototype.hasOwnProperty.call(
+                            authValues,
+                            variable.name,
+                          );
+                          const allEnvVarSaved =
+                            missingAuthStatuses.length === 0 && installedStatuses.length > 0;
+                          return (
+                            <Input
+                              key={variable.name}
+                              aria-label={variable.label ?? variable.name}
+                              className="max-w-[22rem]"
+                              placeholder={variable.label ?? variable.name}
+                              type={
+                                variable.secret === false || (!hasAuthValue && allEnvVarSaved)
+                                  ? "text"
+                                  : "password"
+                              }
+                              value={
+                                hasAuthValue
+                                  ? (authValues[variable.name] ?? "")
+                                  : allEnvVarSaved
+                                    ? SAVED_SECRET_MASK
+                                    : ""
+                              }
+                              onFocus={() => {
+                                if (allEnvVarSaved && !hasAuthValue) {
+                                  setAuthValues((current) => ({
+                                    ...current,
+                                    [variable.name]: "",
+                                  }));
+                                }
+                              }}
+                              onBlur={(event) => {
+                                if (!allEnvVarSaved) return;
+                                if (
+                                  event.relatedTarget instanceof HTMLElement &&
+                                  event.relatedTarget.closest("[data-acp-auth-save]")
+                                ) {
+                                  return;
+                                }
+                                setAuthValues((current) => {
+                                  if (
+                                    !Object.prototype.hasOwnProperty.call(current, variable.name)
+                                  ) {
+                                    return current;
+                                  }
+                                  const next = { ...current };
+                                  delete next[variable.name];
+                                  return next;
+                                });
+                              }}
+                              onChange={(event) =>
+                                setAuthValues((current) => ({
+                                  ...current,
+                                  [variable.name]: event.target.value,
+                                }))
+                              }
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="tertiary"
+                      isDisabled={!canSaveEnvAuth}
+                      isPending={authPending}
+                      data-acp-auth-save=""
+                      onPress={saveEnvAuth}
+                    >
+                      Save
+                    </Button>
+                  </div>
+                </div>
+              ) : null}
+              {installedStatuses.map((status) => {
+                const envKey = statusEnvKey(status);
+                const method = status.authMethods?.find(isAgentAuthMethod);
+                return (
+                  <AcpAgentAuthEnvRow
+                    key={`${status.kind}-${envKey}-auth-row`}
+                    status={status}
+                    agentAuthMethod={method}
+                    authPending={authPending}
+                    pendingMessage={authPendingEnvKey === envKey ? authPendingMessage : undefined}
+                    showEnvironmentLabel={showAuthEnvironmentLabels}
+                    onLogin={() => method && authenticateAgent({ status, method })}
+                    onLogout={() => logoutAgent(status)}
+                  />
+                );
+              })}
+            </div>
+          ) : hasAuthSettings ? (
+            <div
+              className={`flex items-start justify-between gap-4 rounded-xl border px-3 py-2 ${
+                authMissing
+                  ? "border-warning/35 bg-warning/10 text-warning"
+                  : "border-border bg-surface-secondary text-foreground"
+              }`}
+            >
               <div className="flex min-w-0 items-start gap-2">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">Login required</p>
-                  <p className="text-xs text-warning/85">
-                    {loginCommand
-                      ? `Run ${loginCommand} to sign in.`
-                      : "Sign in with the agent CLI, then refresh detected agents."}
+                {authMissing ? <AlertTriangle className="mt-0.5 size-4 shrink-0" /> : null}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">
+                    {authMissing ? "Login required" : "Authentication"}
                   </p>
+                  <p className={`text-xs ${authMissing ? "text-warning/85" : "text-muted"}`}>
+                    {authMissing
+                      ? `${missingAuthLabel ? `${missingAuthLabel} needs authentication. ` : ""}${
+                          envVarAuthMethod
+                            ? agentAuth
+                              ? `Complete ${agentAuth.method.name} sign-in or save ${envVarAuthMethod.name} credentials, then detected agents will refresh.`
+                              : `Save ${envVarAuthMethod.name} credentials, then detected agents will refresh.`
+                            : agentAuth
+                              ? `Complete ${agentAuth.method.name} sign-in, then detected agents will refresh.`
+                              : loginCommand
+                                ? `Run ${loginCommand} to sign in.`
+                                : "Sign in with the agent CLI, then refresh detected agents."
+                        }`
+                      : envVarAuthMethod
+                        ? `Saved ${envVarAuthMethod.name} credentials are configured. Enter a new value to replace them.`
+                        : agentAuth
+                          ? `Sign in again with ${agentAuth.method.name}.`
+                          : loginCommand
+                            ? `Run ${loginCommand} again to refresh credentials.`
+                            : "Credentials are configured."}
+                  </p>
+                  {authPendingMessage ? (
+                    <p className={`mt-1 text-xs ${authMissing ? "text-warning/85" : "text-muted"}`}>
+                      {authPendingMessage}
+                    </p>
+                  ) : null}
+                  {envVarAuthMethod && acpInstanceId ? (
+                    <div className="mt-3 flex flex-col gap-2">
+                      {envVarAuthMethod.vars.map((variable) => {
+                        const hasAuthValue = Object.prototype.hasOwnProperty.call(
+                          authValues,
+                          variable.name,
+                        );
+                        return (
+                          <Input
+                            key={variable.name}
+                            aria-label={variable.label ?? variable.name}
+                            className="max-w-[22rem]"
+                            placeholder={variable.label ?? variable.name}
+                            type={
+                              variable.secret === false || (!hasAuthValue && !authMissing)
+                                ? "text"
+                                : "password"
+                            }
+                            value={
+                              hasAuthValue
+                                ? (authValues[variable.name] ?? "")
+                                : authMissing
+                                  ? ""
+                                  : SAVED_SECRET_MASK
+                            }
+                            onFocus={() => {
+                              if (!authMissing && !hasAuthValue) {
+                                setAuthValues((current) => ({ ...current, [variable.name]: "" }));
+                              }
+                            }}
+                            onBlur={(event) => {
+                              if (authMissing) return;
+                              if (
+                                event.relatedTarget instanceof HTMLElement &&
+                                event.relatedTarget.closest("[data-acp-auth-save]")
+                              ) {
+                                return;
+                              }
+                              setAuthValues((current) => {
+                                if (!Object.prototype.hasOwnProperty.call(current, variable.name)) {
+                                  return current;
+                                }
+                                const next = { ...current };
+                                delete next[variable.name];
+                                return next;
+                              });
+                            }}
+                            onChange={(event) =>
+                              setAuthValues((current) => ({
+                                ...current,
+                                [variable.name]: event.target.value,
+                              }))
+                            }
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               </div>
-              {loginStatus && loginCommand ? (
-                <Button
-                  size="sm"
-                  variant="tertiary"
-                  onPress={() =>
-                    runAgentLoginCommand({
-                      label: loginStatus.label,
-                      command: loginCommand,
-                      ...(loginProject ? { project: loginProject } : {}),
-                    })
-                  }
-                >
-                  <LogIn className="size-4" />
-                  Login
-                </Button>
+              {showEnvVarOnly && acpInstanceId ? (
+                <div className="flex shrink-0 flex-row items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    isIconOnly
+                    aria-label="Save"
+                    isDisabled={!canSaveEnvAuth}
+                    isPending={authPending}
+                    data-acp-auth-save=""
+                    onPress={saveEnvAuth}
+                  >
+                    <Save className="size-4" />
+                  </Button>
+                  {/* Env-var credentials are shared across envs — a single
+                      "Logout" clears them for all environments. */}
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    isIconOnly
+                    aria-label="Logout"
+                    isPending={authPending}
+                    onPress={clearEnvVarCredentials}
+                  >
+                    <LogOut className="size-4 text-danger" />
+                  </Button>
+                </div>
+              ) : agentAuth && acpInstanceId ? (
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {(agentAuthEntries.length > 0 ? agentAuthEntries : [agentAuth]).map(
+                    (entry, index) => (
+                      <Button
+                        key={`${entry.status.kind}-${entry.status.envKind ?? "native"}-${entry.status.envDistro ?? index}`}
+                        size="sm"
+                        variant="tertiary"
+                        isPending={authPending}
+                        onPress={() => authenticateAgent(entry)}
+                      >
+                        <LogIn className="size-4" />
+                        {authMissing ? "Login" : "Re-login"}
+                        {showAuthEnvironmentLabels ? ` ${envLabel(entry.status)}` : ""}
+                      </Button>
+                    ),
+                  )}
+                  {envVarAuthMethod ? (
+                    <Button
+                      size="sm"
+                      variant="tertiary"
+                      isDisabled={!canSaveEnvAuth}
+                      isPending={authPending}
+                      data-acp-auth-save=""
+                      onPress={saveEnvAuth}
+                    >
+                      Save key
+                    </Button>
+                  ) : null}
+                  {logoutStatuses.map((status, index) => (
+                    <Button
+                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                      size="sm"
+                      variant="tertiary"
+                      isPending={authPending}
+                      onPress={() => logoutAgent(status)}
+                    >
+                      <LogOut className="size-4" />
+                      Logout
+                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                    </Button>
+                  ))}
+                </div>
+              ) : envVarAuthMethod && acpInstanceId ? (
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    isDisabled={!canSaveEnvAuth}
+                    isPending={authPending}
+                    data-acp-auth-save=""
+                    onPress={saveEnvAuth}
+                  >
+                    Save
+                  </Button>
+                  {logoutStatuses.map((status, index) => (
+                    <Button
+                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                      size="sm"
+                      variant="tertiary"
+                      isPending={authPending}
+                      onPress={() => logoutAgent(status)}
+                    >
+                      <LogOut className="size-4" />
+                      Logout
+                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                    </Button>
+                  ))}
+                </div>
+              ) : loginStatus && loginCommand ? (
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="tertiary"
+                    onPress={() =>
+                      runAgentLoginCommand({
+                        label: loginStatus.label,
+                        command: loginCommand,
+                        ...(loginProject ? { project: loginProject } : {}),
+                      })
+                    }
+                  >
+                    <LogIn className="size-4" />
+                    {authMissing ? "Login" : "Re-login"}
+                  </Button>
+                  {logoutStatuses.map((status, index) => (
+                    <Button
+                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                      size="sm"
+                      variant="tertiary"
+                      isPending={authPending}
+                      onPress={() => logoutAgent(status)}
+                    >
+                      <LogOut className="size-4" />
+                      Logout
+                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                    </Button>
+                  ))}
+                </div>
+              ) : logoutStatuses.length > 0 && acpInstanceId ? (
+                <div className="flex shrink-0 flex-col items-end gap-2">
+                  {logoutStatuses.map((status, index) => (
+                    <Button
+                      key={`${status.kind}-${status.envKind ?? "native"}-${status.envDistro ?? index}-logout`}
+                      size="sm"
+                      variant="tertiary"
+                      isPending={authPending}
+                      onPress={() => logoutAgent(status)}
+                    >
+                      <LogOut className="size-4" />
+                      Logout
+                      {showAuthEnvironmentLabels ? ` ${envLabel(status)}` : ""}
+                    </Button>
+                  ))}
+                </div>
               ) : null}
             </div>
           ) : null}
@@ -320,7 +942,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                 });
                 if (selected) {
                   void readBridge()
-                    .refreshAgentStatuses(wslDistros)
+                    .refreshAgentStatuses(wslDistros, { agentKinds: [agent.kind] })
                     .catch(() => undefined);
                 }
               }}

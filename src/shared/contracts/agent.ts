@@ -53,6 +53,46 @@ export const agentProviderMetadataSchema = z.object({
 });
 export type AgentProviderMetadata = z.infer<typeof agentProviderMetadataSchema>;
 
+export const agentAuthEnvVarSchema = z.object({
+  name: z.string().min(1),
+  label: z.string().nullable().optional(),
+  optional: z.boolean().optional(),
+  secret: z.boolean().optional(),
+});
+export type AgentAuthEnvVar = z.infer<typeof agentAuthEnvVarSchema>;
+
+const agentAuthMethodBaseSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  description: z.string().nullable().optional(),
+});
+
+export const agentEnvVarAuthMethodSchema = agentAuthMethodBaseSchema.extend({
+  type: z.literal("env_var"),
+  link: z.string().nullable().optional(),
+  vars: z.array(agentAuthEnvVarSchema),
+});
+export type AgentEnvVarAuthMethod = z.infer<typeof agentEnvVarAuthMethodSchema>;
+
+export const agentTerminalAuthMethodSchema = agentAuthMethodBaseSchema.extend({
+  type: z.literal("terminal"),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string(), z.string()).optional(),
+});
+export type AgentTerminalAuthMethod = z.infer<typeof agentTerminalAuthMethodSchema>;
+
+export const agentOwnedAuthMethodSchema = agentAuthMethodBaseSchema.extend({
+  type: z.literal("agent").optional(),
+});
+export type AgentOwnedAuthMethod = z.infer<typeof agentOwnedAuthMethodSchema>;
+
+export const agentAuthMethodSchema = z.union([
+  agentEnvVarAuthMethodSchema,
+  agentTerminalAuthMethodSchema,
+  agentOwnedAuthMethodSchema,
+]);
+export type AgentAuthMethod = z.infer<typeof agentAuthMethodSchema>;
+
 export const agentSettingDefSchema = z.discriminatedUnion("type", [
   agentToggleSettingDefSchema,
   agentSelectSettingDefSchema,
@@ -148,14 +188,29 @@ export const agentStatusSchema = z.object({
   authState: authStateSchema,
   loginCommand: z.string().min(1).optional(),
   providerMetadata: agentProviderMetadataSchema.optional(),
+  authMethods: z.array(agentAuthMethodSchema).optional(),
+  authLogoutSupported: z.boolean().optional(),
   capabilities: agentCapabilitySchema,
   envKind: z.enum(["windows", "wsl", "posix"]).optional(),
   envDistro: z.string().optional(),
 });
 export type AgentStatus = z.infer<typeof agentStatusSchema>;
 
+export const refreshAgentScopeEnvSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("native") }),
+  z.object({ kind: z.literal("wsl"), distro: z.string().min(1) }),
+]);
+export type RefreshAgentScopeEnv = z.infer<typeof refreshAgentScopeEnvSchema>;
+
+export const refreshAgentScopeSchema = z.object({
+  agentKinds: z.array(z.string().min(1)).min(1),
+  envs: z.array(refreshAgentScopeEnvSchema).optional(),
+});
+export type RefreshAgentScope = z.infer<typeof refreshAgentScopeSchema>;
+
 export const getAgentStatusesPayloadSchema = z.object({
   wslDistros: z.array(z.string().min(1)).default([]),
+  scope: refreshAgentScopeSchema.optional(),
 });
 export type GetAgentStatusesPayload = z.infer<typeof getAgentStatusesPayloadSchema>;
 
@@ -228,6 +283,29 @@ export const removeAcpRegistryAgentPayloadSchema = z.object({
   agentId: z.string().min(1),
 });
 export type RemoveAcpRegistryAgentPayload = z.infer<typeof removeAcpRegistryAgentPayloadSchema>;
+
+export const setAcpRegistryAgentAuthPayloadSchema = z.object({
+  agentId: z.string().min(1),
+  environment: z.record(z.string().min(1), z.string()),
+});
+export type SetAcpRegistryAgentAuthPayload = z.infer<typeof setAcpRegistryAgentAuthPayloadSchema>;
+
+export const authenticateAcpRegistryAgentPayloadSchema = z.object({
+  agentId: z.string().min(1),
+  methodId: z.string().min(1),
+  envKind: z.enum(["windows", "wsl", "posix"]).optional(),
+  wslDistro: z.string().min(1).optional(),
+});
+export type AuthenticateAcpRegistryAgentPayload = z.infer<
+  typeof authenticateAcpRegistryAgentPayloadSchema
+>;
+
+export const logoutAcpRegistryAgentPayloadSchema = z.object({
+  agentId: z.string().min(1),
+  envKind: z.enum(["windows", "wsl", "posix"]).optional(),
+  wslDistro: z.string().min(1).optional(),
+});
+export type LogoutAcpRegistryAgentPayload = z.infer<typeof logoutAcpRegistryAgentPayloadSchema>;
 
 export const acpRegistryMutationResultSchema = z.object({
   installed: z.array(installedAcpRegistryAgentSchema),

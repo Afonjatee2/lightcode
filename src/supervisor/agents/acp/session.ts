@@ -955,34 +955,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       initResult.agentInfo?.name ?? "unknown",
     );
 
-    // Handle authentication if required.
-    //
-    // ACP's authMethods list is *advertisements*, not necessarily callable
-    // RPCs. Some agents (notably OpenCode, whose `opencode-login` method's
-    // description literally reads "Run `opencode auth login` in the
-    // terminal") use it to tell the user how to authenticate out-of-band,
-    // and reject the `authenticate` RPC with "Authentication not
-    // implemented". Treat the call as best-effort: if the agent is already
-    // authenticated (the common case), `session/new` below succeeds and the
-    // failure here was harmless; if the agent really isn't authenticated,
-    // `session/new` will return a clear auth error of its own.
-    const authMethods = initResult.authMethods;
-    if (authMethods && authMethods.length > 0) {
-      const firstMethod = authMethods[0]!;
-      const methodId = "id" in firstMethod ? (firstMethod as { id: string }).id : undefined;
-      if (methodId) {
-        try {
-          console.log("[acp] authenticating with method:", methodId);
-          await this.connection.authenticate({ methodId });
-          console.log("[acp] authenticated");
-        } catch (error) {
-          console.log(
-            "[acp] authenticate(%s) rejected, continuing: %s",
-            methodId,
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      }
+    if (initResult.authMethods?.length) {
+      console.log("[acp] agent advertised auth methods:", initResult.authMethods.length);
     }
   }
 
