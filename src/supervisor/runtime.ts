@@ -132,7 +132,7 @@ import type { SupervisorEvent } from "@/shared/ipc";
 import type { LspMessagePayload, LspStartPayload, LspStopPayload } from "@/shared/lsp";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { joinProjectPosixPath } from "@/shared/wsl";
-import { ACP_GENERIC_KIND_PREFIX } from "./agents/acp-generic";
+import { acpGenericKind } from "./agents/acp-generic";
 import { buildAgentRegistry } from "./agents/registry";
 import {
   authenticateAcpRegistryAgent as authenticateAcpRegistryAgentFromRegistry,
@@ -432,11 +432,15 @@ export class SupervisorRuntime {
   }
 
   private async refreshAffectedAgentStatus(agentKind: string): Promise<void> {
-    const wslDistros = await this.agentStatusService.listWslDistros();
-    await this.agentStatusService.refreshAgentStatuses({
-      wslDistros,
-      scope: { agentKinds: [agentKind] },
-    });
+    try {
+      const wslDistros = await this.agentStatusService.listWslDistros();
+      await this.agentStatusService.refreshAgentStatuses({
+        wslDistros,
+        scope: { agentKinds: [agentKind] },
+      });
+    } catch (error) {
+      console.warn(`[supervisor] refreshAffectedAgentStatus failed for ${agentKind}`, error);
+    }
   }
 
   async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
@@ -486,7 +490,7 @@ export class SupervisorRuntime {
     });
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
-    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
+    void this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
     return { installed };
   }
 
@@ -513,7 +517,7 @@ export class SupervisorRuntime {
     });
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
-    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
+    void this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
     return { installed };
   }
 
@@ -529,7 +533,7 @@ export class SupervisorRuntime {
     // adapters so the next status refresh sees the new ack state.
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
-    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
+    void this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
   }
 
   async logoutAcpRegistryAgent(payload: LogoutAcpRegistryAgentPayload): Promise<void> {
@@ -541,7 +545,7 @@ export class SupervisorRuntime {
     });
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
-    this.refreshAffectedAgentStatus(`${ACP_GENERIC_KIND_PREFIX}${payload.agentId}`);
+    void this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {

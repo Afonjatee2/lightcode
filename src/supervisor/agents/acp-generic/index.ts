@@ -45,6 +45,10 @@ type AcpEnvVarAuthMethod = Extract<AcpAuthMethod, { type: "env_var" }>;
 type AcpTerminalAuthMethod = Extract<AcpAuthMethod, { type: "terminal" }>;
 type AcpAgentAuthMethod = Exclude<AcpAuthMethod, AcpEnvVarAuthMethod | AcpTerminalAuthMethod>;
 
+export function acpGenericKind(instanceId: string): string {
+  return `${ACP_GENERIC_KIND_PREFIX}${instanceId}`;
+}
+
 export function isAcpGenericKind(kind: string): boolean {
   return kind.startsWith(ACP_GENERIC_KIND_PREFIX);
 }
@@ -73,7 +77,7 @@ const GENERIC_ACP_DEFAULT_CAPABILITIES: AgentCapability = {
 
 export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAdapter {
   const cfg = parseAcpGenericInstanceConfig(instance.config);
-  const kind = `${ACP_GENERIC_KIND_PREFIX}${instance.id}`;
+  const kind = acpGenericKind(instance.id);
   const label = instance.displayName ?? cfg.binary;
 
   const capabilities: AgentCapability = {

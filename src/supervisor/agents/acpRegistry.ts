@@ -28,7 +28,11 @@ import {
 } from "@/shared/settings";
 import { downloadToFile } from "../runtime/download";
 import { decryptSecret, encryptSecret, transformSensitiveAgentSecrets } from "../secretStorage";
-import { authenticateAcpGenericInstance, logoutAcpGenericInstance } from "./acp-generic";
+import {
+  acpGenericKind,
+  authenticateAcpGenericInstance,
+  logoutAcpGenericInstance,
+} from "./acp-generic";
 import type { AgentEnvContext } from "./base";
 
 const execFileAsync = promisify(execFile);
@@ -318,7 +322,7 @@ export async function installAcpRegistryAgent(input: {
   settings.agentInstances = { ...settings.agentInstances, [agent.id]: instance };
   settings.acpRegistryInstalledAgents = {
     ...settings.acpRegistryInstalledAgents,
-    [agent.id]: registryInstallRecord(agent, `acp-generic:${agent.id}`, "generic"),
+    [agent.id]: registryInstallRecord(agent, acpGenericKind(agent.id), "generic"),
   };
   writeAcpRegistrySettings(input.settingsPath, settings);
   return Object.values(settings.acpRegistryInstalledAgents);
@@ -377,7 +381,7 @@ export function removeAcpRegistryAgent(input: {
   settingsPath: string;
 }): InstalledAcpRegistryAgent[] {
   const settings = readAcpRegistrySettings(input.settingsPath);
-  const agentKind = `acp-generic:${input.agentId}`;
+  const agentKind = acpGenericKind(input.agentId);
 
   const nextInstalled = { ...settings.acpRegistryInstalledAgents };
   delete nextInstalled[input.agentId];
@@ -423,7 +427,6 @@ export function removeAcpRegistryAgent(input: {
 
   writeAcpRegistrySettings(input.settingsPath, settings);
 
-  // Remove downloaded binaries from disk
   const installDir = join(input.baseDir, ACP_REGISTRY_INSTALL_DIR, input.agentId);
   rmSync(installDir, { recursive: true, force: true });
 
