@@ -134,8 +134,7 @@ export async function generatePrSummary(
         buildPrompt: () => {
           let prompt = PROMPT + branchHeader + logSection;
           if (files.length > 0) {
-            prompt +=
-              "\n\n" + buildDiffPromptContext({ diff: "", files, sourceLabel });
+            prompt += "\n\n" + buildDiffPromptContext({ diff: "", files, sourceLabel });
           }
           return prompt;
         },

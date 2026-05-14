@@ -495,5 +495,4 @@ describe("generateCommitMessage", () => {
     await expect(pending).rejects.toThrow("spawn ENOENT");
     expect(spawnMock).toHaveBeenCalledTimes(1);
   });
-
 });

@@ -67,6 +67,7 @@ vi.mock("./agents/binaryResolver", async (importActual) => {
 import { detectWslAgentStatuses, SupervisorRuntime, writeSubmittedPrompt } from "./runtime";
 
 const tempDirs: string[] = [];
+const runtimesToDispose: SupervisorRuntime[] = [];
 const lightcodeDataDirBeforeTests = process.env.LIGHTCODE_DATA_DIR;
 
 function makeTempDir(): string {
@@ -75,7 +76,26 @@ function makeTempDir(): string {
   return dir;
 }
 
+function makeRuntime(emit: ConstructorParameters<typeof SupervisorRuntime>[0]): SupervisorRuntime {
+  const runtime = new SupervisorRuntime(emit);
+  runtimesToDispose.push(runtime);
+  return runtime;
+}
+
 afterEach(() => {
+  // Dispose any runtimes the test created so their owned services (LSP
+  // manager, project watcher, session manager, hook coordinator) stop
+  // scheduling async work. Without this, lingering operations can log to
+  // console after the test file completes — vitest's worker IPC then
+  // rejects the queued `onUserConsoleLog` forward as it tears down,
+  // surfacing as an unhandled rejection that fails the CI run.
+  for (const runtime of runtimesToDispose.splice(0)) {
+    try {
+      runtime.dispose();
+    } catch {
+      // best-effort cleanup
+    }
+  }
   // Restoring an env var to `undefined` coerces it to the literal string
   // "undefined" (Node stringifies anything assigned to `process.env.X`).
   // That bug used to cause the supervisor to resolve its baseDir as the
@@ -251,7 +271,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("routes server-controlled thread input through structured turn start", async () => {
     const emitted: unknown[] = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event);
     });
     const session = createRuntimeSession();
@@ -284,7 +304,7 @@ describe("writeSubmittedPrompt", () => {
   it("returns immediately while server-controlled turn start continues in the background", async () => {
     let resolveStartTurn: (() => void) | undefined;
     const emitted: unknown[] = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event);
     });
     const session = createRuntimeSession({
@@ -333,7 +353,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("marks the thread as error when server-controlled turn start fails asynchronously", async () => {
     const emitted: unknown[] = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event);
     });
     const session = createRuntimeSession({
@@ -373,7 +393,7 @@ describe("writeSubmittedPrompt", () => {
   });
 
   it("stages GUI submit-while-working as a single pending steer with replace-latest, interrupts once, and drains the latest on idle", async () => {
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const interruptTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
 
@@ -496,7 +516,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("does not emit runtime status updates for raw terminal writes", async () => {
     const emitted: unknown[] = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event);
     });
     const session = createRuntimeSession({
@@ -534,7 +554,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("promotes routed CLI hook session ids into resumable thread session refs", () => {
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     const session = createRuntimeSession({
@@ -599,7 +619,7 @@ describe("writeSubmittedPrompt", () => {
   it("starts terminal session ref discovery immediately after spawn without hooks", async () => {
     vi.useFakeTimers();
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     const pty = createMockPty();
@@ -684,7 +704,7 @@ describe("writeSubmittedPrompt", () => {
   });
 
   it("keeps terminal scrollback in a capped transcript buffer", () => {
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const session = createRuntimeSession({ prevChunk: "" });
 
     (runtime as unknown as { sessions: Map<string, typeof session> }).sessions.set(
@@ -713,7 +733,7 @@ describe("writeSubmittedPrompt", () => {
     process.env.VITE_DEV_SERVER_URL = "http://localhost:5173";
     const tempDir = makeTempDir();
     process.env.LIGHTCODE_DATA_DIR = tempDir;
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const session = createRuntimeSession({ prevChunk: "" });
 
     (runtime as unknown as { sessions: Map<string, typeof session> }).sessions.set(
@@ -743,7 +763,7 @@ describe("writeSubmittedPrompt", () => {
   it("keeps a working thread active when the last corroborated terminal hint is still working", async () => {
     vi.useFakeTimers();
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     const session = createRuntimeSession({
@@ -793,7 +813,7 @@ describe("writeSubmittedPrompt", () => {
   it("promotes Codex question screens to needs_reply before silence can mark them idle", async () => {
     vi.useFakeTimers();
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     const session = createRuntimeSession({
@@ -852,7 +872,7 @@ describe("writeSubmittedPrompt", () => {
   it("still falls back to idle after silence when no strong terminal hint remains", async () => {
     vi.useFakeTimers();
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     const session = createRuntimeSession({
@@ -895,7 +915,7 @@ describe("writeSubmittedPrompt", () => {
   it("does not fall back to idle when the adapter disables the silence watchdog", async () => {
     vi.useFakeTimers();
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     const session = createRuntimeSession({
@@ -938,7 +958,7 @@ describe("writeSubmittedPrompt", () => {
   });
 
   it("uses taskkill instead of pty.kill when closing a Windows shell session", async () => {
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const shell = {
       instanceId: "shell-instance-1",
       shellId: "shell-1",
@@ -995,7 +1015,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("starts the queued launch prompt when isReadyForInitialPrompt fires", async () => {
     const emitted: unknown[] = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event);
     });
     const pty = createMockPty();
@@ -1091,7 +1111,7 @@ describe("writeSubmittedPrompt", () => {
     process.env.LIGHTCODE_DATA_DIR = dataDir;
     writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
 
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -1165,7 +1185,7 @@ describe("writeSubmittedPrompt", () => {
     process.env.LIGHTCODE_DATA_DIR = dataDir;
     writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
 
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -1239,7 +1259,7 @@ describe("writeSubmittedPrompt", () => {
     process.env.LIGHTCODE_DATA_DIR = dataDir;
     writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
 
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -1318,7 +1338,7 @@ describe("writeSubmittedPrompt", () => {
       "utf8",
     );
 
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -1393,7 +1413,7 @@ describe("writeSubmittedPrompt", () => {
     process.env.LIGHTCODE_DATA_DIR = dataDir;
     writeFileSync(resolveLightcodePaths(dataDir).settingsPath, JSON.stringify({}), "utf8");
 
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
     ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -1469,7 +1489,7 @@ describe("writeSubmittedPrompt", () => {
   it.skipIf(process.platform !== "win32")(
     "does not eagerly start a queued Codex turn during thread startup",
     async () => {
-      const runtime = new SupervisorRuntime(() => undefined);
+      const runtime = makeRuntime(() => undefined);
       const pty = createMockPty();
       const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
       const activate = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
@@ -1560,7 +1580,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("starts Codex GUI presentation on the structured session without a PTY and stays visually working", async () => {
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
@@ -1676,7 +1696,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("lets a quick stop close an optimistic GUI launch turn before provider output", async () => {
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     let runtimeListener: { onUpdate(update: Record<string, unknown>): void } | undefined;
@@ -1773,7 +1793,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("queues stop during GUI startup before the provider session exists", async () => {
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     let resolveStructuredSession:
@@ -1905,7 +1925,7 @@ describe("writeSubmittedPrompt", () => {
 
   it("settles a Codex GUI /goal initial turn after the goal item is emitted", async () => {
     const emitted: Array<Record<string, unknown>> = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
     });
     let runtimeListener:
@@ -2044,7 +2064,7 @@ describe("writeSubmittedPrompt", () => {
   });
 
   it("inserts Codex hook enable flags before the positional prompt", async () => {
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
 
     ptySpawnMock.mockReturnValueOnce(pty);
@@ -2120,7 +2140,7 @@ describe("writeSubmittedPrompt", () => {
   });
 
   it("inserts Codex hook enable flags before the resume session id", async () => {
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
 
     ptySpawnMock.mockReturnValueOnce(pty);
@@ -2201,7 +2221,7 @@ describe("writeSubmittedPrompt", () => {
   });
 
   it("skips TUI parsing hooks for server-backed GUI presentation", () => {
-    const runtime = new SupervisorRuntime(() => undefined);
+    const runtime = makeRuntime(() => undefined);
     const pty = createMockPty();
     const detectAutoResponse = vi.fn<(text: string) => unknown>(() => null);
     const isReadyForInitialPrompt = vi.fn<(text: string) => boolean>(() => false);
@@ -2288,7 +2308,7 @@ describe("writeSubmittedPrompt", () => {
   )(
     "passes a text + attachment prompt with special chars through to the launch arg unchanged on $name",
     async ({ projectLocation }) => {
-      const runtime = new SupervisorRuntime(() => undefined);
+      const runtime = makeRuntime(() => undefined);
       const pty = createMockPty();
       ptySpawnMock.mockReturnValueOnce(pty);
 
@@ -2422,7 +2442,7 @@ describe("detectWslAgentStatuses", () => {
     );
 
     const emitted: unknown[] = [];
-    const runtime = new SupervisorRuntime((event) => {
+    const runtime = makeRuntime((event) => {
       emitted.push(event);
     });
 
@@ -2526,7 +2546,7 @@ describe("detectWslAgentStatuses", () => {
       }),
     );
 
-    const runtime = new SupervisorRuntime(() => {});
+    const runtime = makeRuntime(() => {});
     const cached = (
       runtime as unknown as {
         readCachedStatuses: (wslDistros: readonly string[]) => {

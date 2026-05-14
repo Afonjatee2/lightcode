@@ -213,12 +213,7 @@ describe("generatePrSummary", () => {
       ].join("\n"),
     );
 
-    const pending = generatePrSummary(
-      windowsProject,
-      createAdapter(),
-      "feature/SIT-123-x",
-      "main",
-    );
+    const pending = generatePrSummary(windowsProject, createAdapter(), "feature/SIT-123-x", "main");
     await flushPromises();
 
     first.emit("error", Object.assign(new Error("spawn ENAMETOOLONG"), { code: "ENAMETOOLONG" }));

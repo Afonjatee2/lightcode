@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd .. && pnpm install --frozen-lockfile --filter lightcode-website...",
+  "buildCommand": "cd .. && pnpm --filter lightcode-website build",
+  "outputDirectory": ".next"
+}

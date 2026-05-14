@@ -5,6 +5,7 @@
   "description": "The universal desktop orchestrator for AI agents. Run terminal-native and structured chat agents side-by-side.",
   "license": "Apache-2.0",
   "author": "SDSLeon",
+  "homepage": "https://www.lightcodeapp.com/",
   "repository": {
     "type": "git",
     "url": "https://github.com/SDSLeon/lightcode"

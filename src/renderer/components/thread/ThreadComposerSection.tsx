@@ -809,67 +809,64 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         ? () => undefined
                         : undefined
                   }
-                  {...(() => {
-                    const renderExtras = (level: number) => (
-                      <>
-                        {showContextIndicator ? (
-                          <ThreadContextIndicator
-                            summary={contextSummary}
-                            isOpen={contextDockOpen}
-                            onToggle={() => setContextDockOpen((open) => !open)}
-                          />
-                        ) : null}
-                        <Button
-                          isIconOnly
-                          aria-label="Attach files"
-                          className="lightcode-composer-menu min-w-9 px-2"
-                          size="sm"
-                          variant="ghost"
-                          onPress={() => {
-                            void readBridge()
-                              .pickFiles()
-                              .then((paths) => {
-                                if (paths) attachments.addFiles(paths);
-                              });
-                          }}
-                        >
-                          <Paperclip className="size-4" />
-                        </Button>
-                        {branchName ? (
-                          thread.worktreePath ? (
-                            <Tooltip delay={0}>
-                              <Tooltip.Trigger tabIndex={-1} role="none">
-                                <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
-                                  <GitFork className="size-3.5 text-muted" />
-                                  {level < 3 && <span className="truncate">{branchName}</span>}
-                                  {level < 3 && thread.prNumber ? (
-                                    <span className="shrink-0 text-muted/60">
-                                      PR #{thread.prNumber}
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </Tooltip.Trigger>
-                              <Tooltip.Content placement="top">{branchName}</Tooltip.Content>
-                            </Tooltip>
-                          ) : (
-                            <BranchSelector
-                              projectId={thread.projectId}
-                              currentBranch={branchName}
-                              value={branchName}
-                              onSelect={handleBranchSelect}
-                              onSwitchBranch={handleSwitchBranch}
-                              hideWorktreeToggle
-                              forceHideLabel={level >= 3}
-                              iconOnly={level >= 3}
-                            />
-                          )
-                        ) : null}
-                      </>
-                    );
-                    return isCliThread
-                      ? { leadingControls: renderExtras }
-                      : { afterControls: renderExtras };
-                  })()}
+                  leadingControls={
+                    <>
+                      {showContextIndicator ? (
+                        <ThreadContextIndicator
+                          summary={contextSummary}
+                          isOpen={contextDockOpen}
+                          onToggle={() => setContextDockOpen((open) => !open)}
+                        />
+                      ) : null}
+                      <Button
+                        isIconOnly
+                        aria-label="Attach files"
+                        className="lightcode-composer-menu min-w-9 px-2"
+                        size="sm"
+                        variant="ghost"
+                        onPress={() => {
+                          void readBridge()
+                            .pickFiles()
+                            .then((paths) => {
+                              if (paths) attachments.addFiles(paths);
+                            });
+                        }}
+                      >
+                        <Paperclip className="size-4" />
+                      </Button>
+                    </>
+                  }
+                  afterControls={(level: number) =>
+                    branchName ? (
+                      thread.worktreePath ? (
+                        <Tooltip delay={0}>
+                          <Tooltip.Trigger tabIndex={-1} role="none">
+                            <div className="lightcode-composer-static min-w-0 max-w-48 px-2.5">
+                              <GitFork className="size-3.5 text-muted" />
+                              {level < 3 && <span className="truncate">{branchName}</span>}
+                              {level < 3 && thread.prNumber ? (
+                                <span className="shrink-0 text-muted/60">
+                                  PR #{thread.prNumber}
+                                </span>
+                              ) : null}
+                            </div>
+                          </Tooltip.Trigger>
+                          <Tooltip.Content placement="top">{branchName}</Tooltip.Content>
+                        </Tooltip>
+                      ) : (
+                        <BranchSelector
+                          projectId={thread.projectId}
+                          currentBranch={branchName}
+                          value={branchName}
+                          onSelect={handleBranchSelect}
+                          onSwitchBranch={handleSwitchBranch}
+                          hideWorktreeToggle
+                          forceHideLabel={level >= 3}
+                          iconOnly={level >= 3}
+                        />
+                      )
+                    ) : null
+                  }
                   onPromptChange={setPrompt}
                   onSubmit={() => {
                     const segments = mentionRef.current?.serializeSegments();

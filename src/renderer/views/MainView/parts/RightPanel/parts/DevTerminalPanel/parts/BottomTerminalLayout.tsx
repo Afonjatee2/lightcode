@@ -132,7 +132,7 @@ export function BottomTerminalLayout(props: {
         </div>
       </div>
 
-      <div className="relative min-h-0 min-w-0 flex-1 px-2">
+      <div className="relative min-h-0 min-w-0 flex-1 px-2 pt-2">
         <TerminalSurfaces
           tabs={tabs}
           selectedTabId={selectedTabId}

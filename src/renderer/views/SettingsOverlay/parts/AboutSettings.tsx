@@ -7,6 +7,7 @@ import { formatBytes } from "@/shared/formatBytes";
 import appIconUrl from "../../../../../build/icon.png";
 
 const GITHUB_REPO = "https://github.com/nicepkg/lightcode";
+const WEBSITE_URL = "https://www.lightcodeapp.com/";
 
 function AboutLink(props: { href: string; children: React.ReactNode }) {
   return (
@@ -124,6 +125,8 @@ export function AboutSettings() {
         </div>
 
         <div className="mt-8 space-y-3 border-t border-white/6 pt-6">
+          <AboutLink href={WEBSITE_URL}>Website</AboutLink>
+          <br />
           <AboutLink href={GITHUB_REPO}>GitHub Repository</AboutLink>
           <br />
           <AboutLink href={`${GITHUB_REPO}/releases`}>Changelog</AboutLink>

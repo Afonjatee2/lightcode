@@ -17,7 +17,11 @@ const buildAgentCommandMock = vi.hoisted(() =>
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 vi.mock("./agents/base", () => ({ buildAgentCommand: buildAgentCommandMock }));
 
-import { isArgvLikelyTooLong, isArgvTooLongError, runOneShotPromptWithFallback } from "./oneShotPromptRunner";
+import {
+  isArgvLikelyTooLong,
+  isArgvTooLongError,
+  runOneShotPromptWithFallback,
+} from "./oneShotPromptRunner";
 
 type MockChildProcess = EventEmitter & {
   stdout: EventEmitter;
