@@ -568,10 +568,11 @@ function applyRuntimeEventToRuntimeState(
         state: prev.state === "completed" ? "completed" : "updated",
         streams: { ...prev.streams, [event.stream]: mergeStreamChunk(prevStream, event.delta) },
       };
+      items[event.itemId] = next;
       return {
         runtimeItemsByIdByThread: {
           ...state.runtimeItemsByIdByThread,
-          [threadId]: { ...items, [event.itemId]: next },
+          [threadId]: items,
         },
       };
     }

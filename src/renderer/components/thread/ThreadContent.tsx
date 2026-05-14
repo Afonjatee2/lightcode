@@ -7,7 +7,6 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
 } from "@/shared/contracts";
-import { useShallow } from "zustand/react/shallow";
 import { PixelLoader } from "../common";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -20,8 +19,8 @@ import { TerminalPane, type TerminalPaneHandle } from "./TerminalPane";
 import { ThreadComposerSection } from "./ThreadComposerSection";
 import { ThreadTodoDock } from "./ThreadTodoDock";
 import { getThreadErrorDockStateForItem, selectThreadLatestErrorItem } from "./threadErrorState";
-import { getThreadGoalDockStateFromThreadItems } from "./threadGoalState";
-import { getThreadTodoDockStateFromThreadItems } from "./threadTodoState";
+import { selectThreadGoalDockItem, selectThreadGoalDockState } from "./threadGoalState";
+import { selectThreadTodoDockItem, selectThreadTodoDockState } from "./threadTodoState";
 
 type CommonContentProps = {
   threadId: string;
@@ -99,16 +98,10 @@ export function GuiThreadContent(
   const setTodoDockPlacement = useThreadTodoDockStore((s) => s.setPlacement);
   const setTodoDockCollapsed = useThreadTodoDockStore((s) => s.setCollapsed);
   const retireTodoDock = useThreadTodoDockStore((s) => s.retire);
-  const { runtimeItemIds, runtimeItemsById } = useAppStore(
-    useShallow((s) => ({
-      runtimeItemIds: s.runtimeItemIdsByThread[props.threadId],
-      runtimeItemsById: s.runtimeItemsByIdByThread[props.threadId],
-    })),
-  );
-  const todoDockState = getThreadTodoDockStateFromThreadItems(runtimeItemIds, runtimeItemsById);
-  const goalDockState = getThreadGoalDockStateFromThreadItems(runtimeItemIds, runtimeItemsById);
-  const todoItem = todoDockState ? runtimeItemsById?.[todoDockState.sourceItemId] : undefined;
-  const goalItem = goalDockState ? runtimeItemsById?.[goalDockState.sourceItemId] : undefined;
+  const todoDockState = useAppStore((s) => selectThreadTodoDockState(s, props.threadId));
+  const goalDockState = useAppStore((s) => selectThreadGoalDockState(s, props.threadId));
+  const todoItem = useAppStore((s) => selectThreadTodoDockItem(s, props.threadId));
+  const goalItem = useAppStore((s) => selectThreadGoalDockItem(s, props.threadId));
 
   // If the plan is retired, but the agent sends an update (new object reference
   // in the store), un-retire it so the user sees the progress.

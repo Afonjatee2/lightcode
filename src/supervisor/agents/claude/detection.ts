@@ -40,7 +40,7 @@ export const claudeCapabilities: AgentCapability = {
     sonnet: ["200k", "1m"],
   },
   defaultContextSize: "200k",
-  fastModels: ["claude-opus-4-6"],
+  fastModels: ["claude-opus-4-7", "claude-opus-4-6"],
   modes: ["agent", "plan"],
   approvalPolicies: [
     { id: "default", label: "Default" },

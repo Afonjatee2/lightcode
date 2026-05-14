@@ -87,7 +87,7 @@ export function ThreadPane(props: {
       droppableRef={paneElementRef}
       onClose={props.onClose}
       onMarkDone={() => {
-        toggleMarkThreadDone(props.threadId, { keepSidePanels: false });
+        toggleMarkThreadDone(props.threadId);
       }}
       onConfigChange={(config) => {
         updateThreadConfig(thread.id, config);

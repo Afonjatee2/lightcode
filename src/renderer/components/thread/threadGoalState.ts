@@ -22,13 +22,41 @@ interface ThreadGoalCandidate {
   payload: GoalItemPayload;
 }
 
+const goalDockStateCache = new Map<
+  string,
+  {
+    itemIds: readonly string[] | undefined;
+    latestGoalItem: RuntimeChatItem | undefined;
+    result: ThreadGoalDockState | null;
+  }
+>();
+
 export function selectThreadGoalDockState(
   state: AppStoreState,
   threadId: string,
 ): ThreadGoalDockState | null {
-  return getThreadGoalDockStateFromThreadItems(
-    state.runtimeItemIdsByThread[threadId],
-    state.runtimeItemsByIdByThread[threadId],
+  const itemIds = state.runtimeItemIdsByThread[threadId];
+  const itemsById = state.runtimeItemsByIdByThread[threadId];
+  const latestGoalItem = selectLatestThreadGoalItem(itemIds, itemsById);
+  const cached = goalDockStateCache.get(threadId);
+  if (cached && cached.itemIds === itemIds && cached.latestGoalItem === latestGoalItem) {
+    return cached.result;
+  }
+  const result = getThreadGoalDockStateFromThreadItems(itemIds, itemsById);
+  if (goalDockStateCache.size > 200) goalDockStateCache.clear();
+  goalDockStateCache.set(threadId, { itemIds, latestGoalItem, result });
+  return result;
+}
+
+export function selectThreadGoalDockItem(
+  state: AppStoreState,
+  threadId: string,
+): RuntimeChatItem | null {
+  return (
+    selectLatestThreadGoalCandidate(
+      state.runtimeItemIdsByThread[threadId],
+      state.runtimeItemsByIdByThread[threadId],
+    )?.item ?? null
   );
 }
 
@@ -71,6 +99,18 @@ function selectLatestThreadGoalCandidate(
     return { item, payload };
   }
   return null;
+}
+
+function selectLatestThreadGoalItem(
+  itemIds: readonly string[] | undefined,
+  itemsById: AppStoreState["runtimeItemsByIdByThread"][string] | undefined,
+): RuntimeChatItem | undefined {
+  if (!itemIds?.length) return undefined;
+  for (let index = itemIds.length - 1; index >= 0; index -= 1) {
+    const item = itemsById?.[itemIds[index]!];
+    if (item?.type === "goal") return item;
+  }
+  return undefined;
 }
 
 function normalizeObjective(objective: string | undefined): string {

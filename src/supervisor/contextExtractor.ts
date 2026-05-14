@@ -1,5 +1,6 @@
 import type { ExtractContextResult, ProjectLocation, SessionRef } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
+import { runOneShotPromptWithFallback } from "./oneShotPromptRunner";
 import { buildOneShotSpec, spawnAgent } from "./oneShotSpawn";
 
 const EXTRACTION_PROMPT = [
@@ -110,25 +111,28 @@ export async function extractContextFromScrollback(
     throw new Error(`No default one-shot model configured for ${adapter.label}`);
   }
 
-  // Truncate scrollback to fit within model limits
-  const truncatedScrollback =
-    scrollbackText.length > 100_000
-      ? scrollbackText.slice(-100_000) + "\n\n[earlier output truncated]"
-      : scrollbackText;
+  const buildPromptForCap = (maxChars: number): string => {
+    const trimmed =
+      scrollbackText.length > maxChars
+        ? scrollbackText.slice(-maxChars) + "\n\n[earlier output truncated]"
+        : scrollbackText;
+    return `${EXTRACTION_PROMPT}\n\n--- Terminal Output ---\n${trimmed}\n--- End Terminal Output ---`;
+  };
 
-  const fullPrompt = `${EXTRACTION_PROMPT}\n\n--- Terminal Output ---\n${truncatedScrollback}\n--- End Terminal Output ---`;
-
-  const cmd = adapter.buildOneShotCommand(effectiveModel, effort, fullPrompt);
-  if (!cmd) {
-    throw new Error(`${adapter.label} one-shot command returned undefined`);
-  }
-
-  const spawnSpec = buildOneShotSpec(location, cmd.command, cmd.args);
-  console.log(
-    `[context-extract-scrollback] spawning: ${spawnSpec.command} ${spawnSpec.args.join(" ")}`,
-  );
-
-  const raw = await spawnAgent(spawnSpec, cmd.stdin ?? fullPrompt, EXTRACTION_TIMEOUT_MS, signal);
+  const raw = await runOneShotPromptWithFallback({
+    location,
+    adapter,
+    model: effectiveModel,
+    effort,
+    timeoutMs: EXTRACTION_TIMEOUT_MS,
+    ...(signal ? { signal } : {}),
+    logTag: "context-extract-scrollback",
+    attempts: [
+      { level: "100k", buildPrompt: () => buildPromptForCap(100_000) },
+      { level: "30k", buildPrompt: () => buildPromptForCap(30_000) },
+      { level: "10k", buildPrompt: () => buildPromptForCap(10_000) },
+    ],
+  });
   const summary = cleanExtraction(raw);
   if (!summary) {
     throw new Error("Context extraction from scrollback returned empty result");

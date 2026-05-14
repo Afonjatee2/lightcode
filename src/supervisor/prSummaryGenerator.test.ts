@@ -198,4 +198,50 @@ describe("generatePrSummary", () => {
 
     await expect(pending).rejects.toThrow("PR summary generation returned empty title");
   });
+
+  it("falls back to a files-only prompt when the first spawn fails with ENAMETOOLONG", async () => {
+    const first = createMockChildProcess();
+    const second = createMockChildProcess();
+    spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+    getDiffRangeMock.mockResolvedValue(
+      [
+        "diff --git a/src/big.ts b/src/big.ts",
+        "@@ -1,1 +1,5 @@",
+        "-old",
+        "+new line 1",
+        "+new line 2",
+      ].join("\n"),
+    );
+
+    const pending = generatePrSummary(
+      windowsProject,
+      createAdapter(),
+      "feature/SIT-123-x",
+      "main",
+    );
+    await flushPromises();
+
+    first.emit("error", Object.assign(new Error("spawn ENAMETOOLONG"), { code: "ENAMETOOLONG" }));
+    await flushPromises();
+
+    second.stdout.emit(
+      "data",
+      Buffer.from("TITLE: SIT-123: Trim PR summary\nDESCRIPTION:\n- Smaller prompt"),
+    );
+    second.emit("close", 0);
+
+    await expect(pending).resolves.toEqual({
+      title: "SIT-123: Trim PR summary",
+      description: "- Smaller prompt",
+    });
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+
+    const fullStdin = first.stdin.end.mock.calls[0]?.[0];
+    expect(fullStdin).toContain("diff --git");
+
+    const slimStdin = second.stdin.end.mock.calls[0]?.[0];
+    expect(slimStdin).toContain("Changed files (1):");
+    expect(slimStdin).toContain("[No textual diff available for these files]");
+    expect(slimStdin).not.toContain("diff --git");
+  });
 });

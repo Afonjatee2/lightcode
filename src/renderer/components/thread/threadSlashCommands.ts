@@ -59,11 +59,7 @@ export function filterSlashCommands(
   }
 
   const normalizedQuery = query.toLowerCase();
-  return commands.filter(
-    (command) =>
-      command.id.toLowerCase().startsWith(normalizedQuery) ||
-      command.label.toLowerCase().includes(normalizedQuery),
-  );
+  return commands.filter((command) => command.id.toLowerCase().startsWith(normalizedQuery));
 }
 
 export interface SlashCommandPanelKeyDownContext {

@@ -54,16 +54,16 @@ export function hasHydratedThreadRuntimeItems(threadId: string): boolean {
 
 export function installRuntimeItemsPersister(): () => void {
   const pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  const pending = new Map<string, PendingFlush>();
+  const pendingThreadIds = new Set<string>();
 
-  const scheduleFlush = (threadId: string, payload: PendingFlush) => {
-    pending.set(threadId, payload);
+  const scheduleFlush = (threadId: string) => {
+    pendingThreadIds.add(threadId);
     const existing = pendingTimers.get(threadId);
     if (existing) clearTimeout(existing);
     const timer = setTimeout(() => {
       pendingTimers.delete(threadId);
-      const snapshot = pending.get(threadId);
-      pending.delete(threadId);
+      if (!pendingThreadIds.delete(threadId)) return;
+      const snapshot = collectPendingFlush(threadId);
       if (!snapshot) return;
       const persisted = prepareRuntimeSnapshotForPersistence(snapshot.items, snapshot.turns);
       const bridge = readBridge();
@@ -102,19 +102,8 @@ export function installRuntimeItemsPersister(): () => void {
     (state) => state.runtimeDirtyThreadIds,
     (dirtyThreadIds) => {
       if (dirtyThreadIds.length === 0) return;
-      const state = useAppStore.getState();
       for (const threadId of dirtyThreadIds) {
-        const ids = state.runtimeItemIdsByThread[threadId];
-        const itemsById = state.runtimeItemsByIdByThread[threadId];
-        const turns = state.runtimeCompletedTurnsByThread[threadId] ?? [];
-        const contextUsage = state.runtimeContextByThread[threadId] ?? null;
-        scheduleFlush(threadId, {
-          items: (ids ?? [])
-            .map((itemId) => itemsById?.[itemId])
-            .filter((item): item is RuntimeChatItem => !!item),
-          turns,
-          contextUsage,
-        });
+        scheduleFlush(threadId);
       }
       useAppStore.getState().clearRuntimeDirtyThreadIds(dirtyThreadIds);
     },
@@ -124,7 +113,22 @@ export function installRuntimeItemsPersister(): () => void {
     unsubscribe();
     for (const timer of pendingTimers.values()) clearTimeout(timer);
     pendingTimers.clear();
-    pending.clear();
+    pendingThreadIds.clear();
+  };
+}
+
+function collectPendingFlush(threadId: string): PendingFlush | null {
+  const state = useAppStore.getState();
+  const ids = state.runtimeItemIdsByThread[threadId];
+  const itemsById = state.runtimeItemsByIdByThread[threadId];
+  const turns = state.runtimeCompletedTurnsByThread[threadId] ?? [];
+  const contextUsage = state.runtimeContextByThread[threadId] ?? null;
+  return {
+    items: (ids ?? [])
+      .map((itemId) => itemsById?.[itemId])
+      .filter((item): item is RuntimeChatItem => !!item),
+    turns,
+    contextUsage,
   };
 }
 

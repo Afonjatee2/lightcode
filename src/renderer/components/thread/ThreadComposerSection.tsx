@@ -379,6 +379,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const isCliThread = usesTerminalPresentation;
   const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
   const canInterruptStructuredTurn = !usesTerminalPresentation && thread.status === "working";
+  const isStructuredLaunching = !usesTerminalPresentation && thread.status === "launching";
   const pendingSteer = useAppStore((s) => s.pendingSteerByThreadId[thread.id]);
   const usesPendingSteerPath = !usesTerminalPresentation && thread.status === "working";
   const runtimeRequests = useAppStore((s) => s.runtimeRequestsByThread[thread.id]);
@@ -798,10 +799,16 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   placeholder="Send a message..."
                   prompt={prompt}
                   promptDisabled={!(showServerComposer || showTerminalComposer)}
-                  stopPending={isInterrupting}
+                  stopPending={isInterrupting || isStructuredLaunching}
                   submitDisabled={!(hasContent || attachments.attachments.length > 0) || !canSubmit}
                   submitLabel="Send message"
-                  onStop={canInterruptStructuredTurn ? handleInterrupt : undefined}
+                  onStop={
+                    canInterruptStructuredTurn
+                      ? handleInterrupt
+                      : isStructuredLaunching
+                        ? () => undefined
+                        : undefined
+                  }
                   {...(() => {
                     const renderExtras = (level: number) => (
                       <>

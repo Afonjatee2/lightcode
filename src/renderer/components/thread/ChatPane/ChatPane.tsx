@@ -196,8 +196,6 @@ export function ChatPane(props: ChatPaneProps) {
   const completedTurns = useAppStore(
     (s) => s.runtimeCompletedTurnsByThread[threadId] ?? EMPTY_COMPLETED_TURNS,
   );
-  const runtimeItemIds = useAppStore((s) => s.runtimeItemIdsByThread[threadId] ?? EMPTY_ITEM_IDS);
-  const runtimeItemsById = useAppStore((s) => s.runtimeItemsByIdByThread[threadId]);
   const fileCheckpointTurns = useAppStore(
     (s) => s.fileCheckpointTurnsByThread[threadId] ?? EMPTY_FILE_CHECKPOINT_TURNS,
   );
@@ -210,6 +208,9 @@ export function ChatPane(props: ChatPaneProps) {
       if (!checkpointItemId) continue;
       if (fileCheckpointTurns[checkpointItemId]) continue;
       if (finalizingFileCheckpointIdsRef.current.has(checkpointItemId)) continue;
+      const state = useAppStore.getState();
+      const runtimeItemIds = state.runtimeItemIdsByThread[threadId] ?? EMPTY_ITEM_IDS;
+      const runtimeItemsById = state.runtimeItemsByIdByThread[threadId];
       const baseCheckpointItemId = findBaseCheckpointItemId(
         runtimeItemIds,
         runtimeItemsById,
@@ -226,14 +227,7 @@ export function ChatPane(props: ChatPaneProps) {
         finalizingFileCheckpointIdsRef.current.delete(checkpointItemId);
       });
     }
-  }, [
-    completedTurns,
-    fileCheckpointTurns,
-    runtimeItemIds,
-    runtimeItemsById,
-    targetContext,
-    threadId,
-  ]);
+  }, [completedTurns, fileCheckpointTurns, targetContext, threadId]);
 
   const isEmpty = timelineEntries.length === 0 && !hasSupplementaryContent;
   const isLive = isThreadTurnActive(status);

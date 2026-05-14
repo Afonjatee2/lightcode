@@ -375,7 +375,7 @@ describe("ThreadView", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("keeps the GUI ACP composer visible but send-disabled while reconnecting", () => {
+  it("keeps the GUI ACP composer input editable while a launching stop button stands in", () => {
     renderThreadView({
       thread: {
         id: "thread-gui-launching",
@@ -428,10 +428,14 @@ describe("ThreadView", () => {
     });
 
     expect(screen.queryByText("terminal pane")).not.toBeInTheDocument();
-    expect(
-      screen.getByPlaceholderText("Ask Codex anything about this workspace"),
-    ).toBeInTheDocument();
-    expect(screen.getByLabelText("Send message")).toBeDisabled();
+    const input = screen.getByPlaceholderText("Ask Codex anything about this workspace");
+    expect(input).toBeInTheDocument();
+    // Composer input must remain editable while the session is launching.
+    expect(input.getAttribute("aria-disabled")).not.toBe("true");
+    // The stop button stands in for the send button during launch.
+    expect(screen.queryByLabelText("Send message")).not.toBeInTheDocument();
+    const stopButton = screen.getByLabelText("Stop response");
+    expect(stopButton.querySelector('[aria-label="Loading"]')).toBeInTheDocument();
   });
 
   it("keeps Claude live threads terminal-driven", () => {

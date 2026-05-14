@@ -28,14 +28,30 @@ interface ThreadPlanCandidate {
   dockState: ThreadTodoDockState;
 }
 
+const todoDockStateCache = new Map<
+  string,
+  {
+    itemIds: readonly string[] | undefined;
+    latestPlanItem: RuntimeChatItem | undefined;
+    result: ThreadTodoDockState | null;
+  }
+>();
+
 export function selectThreadTodoDockState(
   state: AppStoreState,
   threadId: string,
 ): ThreadTodoDockState | null {
-  return getThreadTodoDockStateFromThreadItems(
-    state.runtimeItemIdsByThread[threadId],
-    state.runtimeItemsByIdByThread[threadId],
-  );
+  const itemIds = state.runtimeItemIdsByThread[threadId];
+  const itemsById = state.runtimeItemsByIdByThread[threadId];
+  const latestPlanItem = selectLatestThreadPlanItem(itemIds, itemsById);
+  const cached = todoDockStateCache.get(threadId);
+  if (cached && cached.itemIds === itemIds && cached.latestPlanItem === latestPlanItem) {
+    return cached.result;
+  }
+  const result = getThreadTodoDockStateFromThreadItems(itemIds, itemsById);
+  if (todoDockStateCache.size > 200) todoDockStateCache.clear();
+  todoDockStateCache.set(threadId, { itemIds, latestPlanItem, result });
+  return result;
 }
 
 export function selectThreadTodoDockItem(
@@ -74,6 +90,18 @@ function selectLatestThreadTodoDockCandidate(
     return allCompleted ? null : { item: item.item, dockState };
   }
   return null;
+}
+
+function selectLatestThreadPlanItem(
+  itemIds: readonly string[] | undefined,
+  itemsById: AppStoreState["runtimeItemsByIdByThread"][string] | undefined,
+): RuntimeChatItem | undefined {
+  if (!itemIds?.length) return undefined;
+  for (let index = itemIds.length - 1; index >= 0; index -= 1) {
+    const item = itemsById?.[itemIds[index]!];
+    if (item?.type === "plan") return item;
+  }
+  return undefined;
 }
 
 export function getThreadTodoDockStateForItem(item: RuntimeChatItem): ThreadTodoDockState | null {

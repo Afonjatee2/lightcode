@@ -18,8 +18,9 @@ if (import.meta.env.DEV) {
     if (
       typeof head === "string" &&
       (head.startsWith("<Focusable>") || head.startsWith("<Pressable>")) &&
-      head.includes("interactive ARIA role") &&
-      (head.includes('Got "none"') || head.includes('Got "presentation"'))
+      ((head.includes("interactive ARIA role") &&
+        (head.includes('Got "none"') || head.includes('Got "presentation"'))) ||
+        (head.startsWith("<Pressable>") && head.includes("child must be focusable")))
     ) {
       return;
     }

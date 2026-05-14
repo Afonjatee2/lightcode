@@ -178,19 +178,14 @@ export function unloadThread(threadId: string): void {
   void unloadStoredThread(threadId, { closeThreadPane: true }).catch(() => undefined);
 }
 
-export function toggleMarkThreadDone(
-  threadId: string,
-  options?: { keepSidePanels?: boolean },
-): void {
+export function toggleMarkThreadDone(threadId: string): void {
   const store = useAppStore.getState();
   const thread = store.threads.find((t) => t.id === threadId);
   if (!thread) return;
   if (thread.done) {
     store.unmarkThreadDone(threadId);
   } else {
-    void unloadStoredThread(threadId, { keepSidePanels: options?.keepSidePanels ?? true }).catch(
-      () => undefined,
-    );
+    void unloadStoredThread(threadId, { keepSidePanels: true }).catch(() => undefined);
     store.markThreadDone(threadId);
   }
 }

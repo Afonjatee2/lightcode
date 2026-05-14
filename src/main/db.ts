@@ -716,48 +716,159 @@ export function dbDeleteProject(projectId: string): void {
  */
 export function dbSyncAll(projectsData: Project[], threadsData: Thread[], viewJson: string): void {
   if (!_sqlite) throw new Error("Database not initialized");
-  const db = getDb();
 
   _sqlite.transaction(() => {
-    // Sync projects
     const existingProjectIds = new Set(
-      db
-        .select({ id: schema.projects.id })
-        .from(schema.projects)
-        .all()
-        .map((r) => r.id),
+      (_sqlite!.prepare("SELECT id FROM projects").all() as Array<{ id: string }>).map((r) => r.id),
     );
     const incomingProjectIds = new Set(projectsData.map((p) => p.id));
+    const deleteProject = _sqlite!.prepare("DELETE FROM projects WHERE id = ?");
+    const upsertProject = prepareProjectSyncStatement(_sqlite!);
 
     for (const pid of existingProjectIds) {
       if (!incomingProjectIds.has(pid)) {
-        db.delete(schema.projects).where(eq(schema.projects.id, pid)).run();
+        deleteProject.run(pid);
       }
     }
     for (let i = 0; i < projectsData.length; i++) {
-      dbUpsertProject(projectsData[i]!, i);
+      runProjectSync(upsertProject, projectsData[i]!, i);
     }
 
-    // Sync threads
     const existingThreadIds = new Set(
-      db
-        .select({ id: schema.threads.id })
-        .from(schema.threads)
-        .all()
-        .map((r) => r.id),
+      (_sqlite!.prepare("SELECT id FROM threads").all() as Array<{ id: string }>).map((r) => r.id),
     );
     const incomingThreadIds = new Set(threadsData.map((t) => t.id));
+    const deleteThread = _sqlite!.prepare("DELETE FROM threads WHERE id = ?");
+    const upsertThread = prepareThreadSyncStatement(_sqlite!);
 
     for (const tid of existingThreadIds) {
       if (!incomingThreadIds.has(tid)) {
-        db.delete(schema.threads).where(eq(schema.threads.id, tid)).run();
+        deleteThread.run(tid);
       }
     }
     for (let i = 0; i < threadsData.length; i++) {
-      dbUpsertThread(threadsData[i]!, i);
+      runThreadSync(upsertThread, threadsData[i]!, i);
     }
 
-    // Sync view
-    dbSetState("view", viewJson);
+    _sqlite!
+      .prepare(
+        "INSERT INTO app_state (key, value) VALUES ('view', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+      )
+      .run(viewJson);
   })();
+}
+
+type SqliteStatement = ReturnType<InstanceType<typeof Database>["prepare"]>;
+
+function prepareProjectSyncStatement(sqlite: InstanceType<typeof Database>): SqliteStatement {
+  return sqlite.prepare(`
+    INSERT INTO projects (
+      id, name, location_kind, location_path, location_distro, location_linux_path,
+      location_unc_path, last_draft_config, scripts, search_settings, disabled,
+      sort_order, created_at
+    ) VALUES (
+      @id, @name, @locationKind, @locationPath, @locationDistro, @locationLinuxPath,
+      @locationUncPath, @lastDraftConfig, @scripts, @searchSettings, @disabled,
+      @sortOrder, @createdAt
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      name = excluded.name,
+      location_kind = excluded.location_kind,
+      location_path = excluded.location_path,
+      location_distro = excluded.location_distro,
+      location_linux_path = excluded.location_linux_path,
+      location_unc_path = excluded.location_unc_path,
+      last_draft_config = excluded.last_draft_config,
+      scripts = excluded.scripts,
+      search_settings = excluded.search_settings,
+      disabled = excluded.disabled,
+      sort_order = excluded.sort_order
+  `);
+}
+
+function runProjectSync(stmt: SqliteStatement, project: Project, sortOrder: number): void {
+  stmt.run({
+    id: project.id,
+    name: project.name,
+    ...locationToRow(project.location),
+    lastDraftConfig: project.lastDraftConfig ? JSON.stringify(project.lastDraftConfig) : null,
+    scripts: project.scripts ? JSON.stringify(project.scripts) : null,
+    searchSettings: project.searchSettings ? JSON.stringify(project.searchSettings) : null,
+    disabled: project.disabled ? 1 : 0,
+    sortOrder,
+    createdAt: project.createdAt,
+  });
+}
+
+function prepareThreadSyncStatement(sqlite: InstanceType<typeof Database>): SqliteStatement {
+  return sqlite.prepare(`
+    INSERT INTO threads (
+      id, project_id, title, agent_kind, agent_instance_id, config, status,
+      attention, can_resume_with_config, session_ref, terminal_prompt, worktree_path,
+      worktree_branch, pr_number, group_id, group_name, archived, done, done_at,
+      starred, presentation_mode, sort_order, created_at, updated_at,
+      active_turn_started_at, last_turn_started_at, last_turn_ended_at
+    ) VALUES (
+      @id, @projectId, @title, @agentKind, @agentInstanceId, @config, @status,
+      @attention, @canResumeWithConfig, @sessionRef, NULL, @worktreePath,
+      @worktreeBranch, @prNumber, @groupId, @groupName, @archived, @done, @doneAt,
+      @starred, @presentationMode, @sortOrder, @createdAt, @updatedAt,
+      @activeTurnStartedAt, @lastTurnStartedAt, @lastTurnEndedAt
+    )
+    ON CONFLICT(id) DO UPDATE SET
+      title = excluded.title,
+      agent_instance_id = excluded.agent_instance_id,
+      config = excluded.config,
+      status = excluded.status,
+      attention = excluded.attention,
+      can_resume_with_config = excluded.can_resume_with_config,
+      session_ref = excluded.session_ref,
+      terminal_prompt = excluded.terminal_prompt,
+      worktree_path = excluded.worktree_path,
+      worktree_branch = excluded.worktree_branch,
+      pr_number = excluded.pr_number,
+      group_id = excluded.group_id,
+      group_name = excluded.group_name,
+      archived = excluded.archived,
+      done = excluded.done,
+      done_at = excluded.done_at,
+      starred = excluded.starred,
+      presentation_mode = excluded.presentation_mode,
+      sort_order = excluded.sort_order,
+      updated_at = excluded.updated_at,
+      active_turn_started_at = excluded.active_turn_started_at,
+      last_turn_started_at = excluded.last_turn_started_at,
+      last_turn_ended_at = excluded.last_turn_ended_at
+  `);
+}
+
+function runThreadSync(stmt: SqliteStatement, thread: Thread, sortOrder: number): void {
+  stmt.run({
+    id: thread.id,
+    projectId: thread.projectId,
+    title: thread.title,
+    agentKind: thread.agentKind,
+    agentInstanceId: thread.agentInstanceId ?? null,
+    config: JSON.stringify(thread.config),
+    status: thread.status,
+    attention: thread.attention,
+    canResumeWithConfig: thread.canResumeWithConfig ? 1 : 0,
+    sessionRef: thread.sessionRef ? JSON.stringify(thread.sessionRef) : null,
+    worktreePath: thread.worktreePath ?? null,
+    worktreeBranch: thread.worktreeBranch ?? null,
+    prNumber: thread.prNumber ?? null,
+    groupId: thread.groupId ?? null,
+    groupName: thread.groupName ?? null,
+    archived: thread.archived ? 1 : 0,
+    done: thread.done ? 1 : 0,
+    doneAt: thread.doneAt ?? null,
+    starred: thread.starred ? 1 : 0,
+    presentationMode: thread.presentationMode ?? "terminal",
+    sortOrder,
+    createdAt: thread.createdAt,
+    updatedAt: thread.updatedAt,
+    activeTurnStartedAt: thread.activeTurnStartedAt ?? null,
+    lastTurnStartedAt: thread.lastTurnStartedAt ?? null,
+    lastTurnEndedAt: thread.lastTurnEndedAt ?? null,
+  });
 }

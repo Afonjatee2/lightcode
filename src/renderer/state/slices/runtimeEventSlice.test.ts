@@ -84,6 +84,30 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     );
   });
 
+  it("updates the streamed item without cloning the whole thread item map", () => {
+    apply("t1", {
+      type: "item.started",
+      threadId: "t1",
+      itemId: "i1",
+      itemType: "assistant_message",
+    });
+    const beforeItems = store.getState().runtimeItemsByIdByThread["t1"];
+    const beforeItem = beforeItems?.["i1"];
+
+    apply("t1", {
+      type: "content.delta",
+      threadId: "t1",
+      itemId: "i1",
+      stream: "assistant_text",
+      delta: "Hello",
+    });
+
+    const afterItems = store.getState().runtimeItemsByIdByThread["t1"];
+    expect(afterItems).toBe(beforeItems);
+    expect(afterItems?.["i1"]).not.toBe(beforeItem);
+    expect(afterItems?.["i1"]?.streams.assistant_text).toBe("Hello");
+  });
+
   it("stores context usage updates and marks the thread dirty for persistence", () => {
     apply("t1", {
       type: "context.updated",

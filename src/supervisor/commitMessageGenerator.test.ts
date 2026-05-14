@@ -435,4 +435,65 @@ describe("generateCommitMessage", () => {
 
     await expect(pending).rejects.toThrow("Agent timed out");
   });
+
+  it("retries with a files-only prompt when the first spawn fails with ENAMETOOLONG", async () => {
+    const first = createMockChildProcess();
+    const second = createMockChildProcess();
+    spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+    const pending = generateCommitMessage(windowsProject, createAdapter());
+    await flushPromises();
+
+    const argvErr = Object.assign(new Error("spawn ENAMETOOLONG"), { code: "ENAMETOOLONG" });
+    first.emit("error", argvErr);
+    await flushPromises();
+
+    second.stdout.emit("data", Buffer.from("fix(commit-gen): shrink argv"));
+    second.emit("close", 0);
+
+    await expect(pending).resolves.toBe("fix(commit-gen): shrink argv");
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+
+    const fullStdin = first.stdin.end.mock.calls[0]?.[0];
+    expect(fullStdin).toContain("diff --git");
+
+    const slimStdin = second.stdin.end.mock.calls[0]?.[0];
+    expect(slimStdin).toEqual(expect.any(String));
+    expect(slimStdin).toContain("Changed files (1):");
+    expect(slimStdin).toContain("[No textual diff available for these files]");
+    expect(slimStdin).not.toContain("diff --git");
+  });
+
+  it("retries on Linux E2BIG too", async () => {
+    const first = createMockChildProcess();
+    const second = createMockChildProcess();
+    spawnMock.mockReturnValueOnce(first).mockReturnValueOnce(second);
+
+    const pending = generateCommitMessage(windowsProject, createAdapter());
+    await flushPromises();
+
+    first.emit("error", Object.assign(new Error("spawn E2BIG"), { code: "E2BIG" }));
+    await flushPromises();
+
+    second.stdout.emit("data", Buffer.from("fix: handle linux argv cap"));
+    second.emit("close", 0);
+
+    await expect(pending).resolves.toBe("fix: handle linux argv cap");
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("propagates non-argv spawn errors without retrying", async () => {
+    const child = createMockChildProcess();
+    spawnMock.mockReturnValueOnce(child);
+
+    const pending = generateCommitMessage(windowsProject, createAdapter());
+    await flushPromises();
+
+    const otherErr = Object.assign(new Error("spawn ENOENT"), { code: "ENOENT" });
+    child.emit("error", otherErr);
+
+    await expect(pending).rejects.toThrow("spawn ENOENT");
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+
 });

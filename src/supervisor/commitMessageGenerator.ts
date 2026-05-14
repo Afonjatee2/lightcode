@@ -2,7 +2,7 @@ import type { GitFileChange, ProjectLocation } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 import { buildDiffPromptContext } from "./diffPromptContext";
 import { GitService } from "./git";
-import { buildOneShotSpec, spawnAgent } from "./oneShotSpawn";
+import { runOneShotPromptWithFallback } from "./oneShotPromptRunner";
 
 const PROMPT =
   "Generate a git commit message for the following diff using the Conventional Commits format.\n" +
@@ -113,16 +113,24 @@ export async function generateCommitMessage(
     throw new Error("No changes to describe");
   }
 
-  const prompt =
-    PROMPT + buildDiffPromptContext({ diff, files, sourceLabel: `Change source: ${source}` });
-  const cmd = adapter.buildOneShotCommand(effectiveModel, effort, prompt);
-  if (!cmd) {
-    throw new Error(`${adapter.label} does not support one-shot generation`);
-  }
-
-  const spawnSpec = buildOneShotSpec(location, cmd.command, cmd.args);
-  console.log(`[commit-gen] spawning: ${spawnSpec.command} ${spawnSpec.args.join(" ")}`);
-
-  const raw = await spawnAgent(spawnSpec, cmd.stdin ?? prompt, COMMIT_MESSAGE_TIMEOUT_MS);
+  const sourceLabel = `Change source: ${source}`;
+  const raw = await runOneShotPromptWithFallback({
+    location,
+    adapter,
+    model: effectiveModel,
+    effort,
+    timeoutMs: COMMIT_MESSAGE_TIMEOUT_MS,
+    logTag: "commit-gen",
+    attempts: [
+      {
+        level: "full",
+        buildPrompt: () => PROMPT + buildDiffPromptContext({ diff, files, sourceLabel }),
+      },
+      {
+        level: "files-only",
+        buildPrompt: () => PROMPT + buildDiffPromptContext({ diff: "", files, sourceLabel }),
+      },
+    ],
+  });
   return cleanCommitMessage(raw);
 }

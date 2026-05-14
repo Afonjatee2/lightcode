@@ -149,9 +149,13 @@ export function selectVisibleThreadTimelineEntries(
     if (groupIds.length === 1) {
       entries.push({ kind: "item", id: itemId });
     } else {
+      // Keep the id stable as new items are appended to the group so the
+      // virtualizer reuses the same row DOM and existing tool rows do not
+      // remount and replay their `animate-tool-call-enter` animation. Only
+      // the newly appended item should animate in.
       entries.push({
         kind: "tool_call_group",
-        id: `tool-call-group:${groupIds[0]}:${groupIds[groupIds.length - 1]}:${groupIds.length}`,
+        id: `tool-call-group:${groupIds[0]}`,
         itemIds: groupIds,
       });
     }

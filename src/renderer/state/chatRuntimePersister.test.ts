@@ -1,6 +1,23 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CompletedTurnRecord, RuntimeChatItem } from "./slices/runtimeEventSlice";
-import { prepareRuntimeSnapshotForPersistence } from "./chatRuntimePersister";
+import { useAppStore } from "./appStore";
+import {
+  installRuntimeItemsPersister,
+  prepareRuntimeSnapshotForPersistence,
+} from "./chatRuntimePersister";
+
+const bridge = vi.hoisted(() => ({
+  dbGetProjects: vi.fn<() => Promise<[]>>(),
+  dbGetThreads: vi.fn<() => Promise<[]>>(),
+  dbGetState: vi.fn<(key: string) => Promise<string | null>>(),
+  dbSetState: vi.fn<(key: string, value: string) => Promise<void>>(),
+  dbSyncAll: vi.fn<(projects: unknown[], threads: unknown[], viewJson: string) => Promise<void>>(),
+  dbReplaceThreadRuntimeSnapshot: vi.fn<(payload: unknown) => Promise<void>>(),
+}));
+
+vi.mock("../bridge", () => ({
+  readBridge: () => bridge,
+}));
 
 function makeItem(
   input: Partial<RuntimeChatItem> & Pick<RuntimeChatItem, "id" | "type">,
@@ -18,6 +35,30 @@ function makeItem(
 function makeTurn(anchorItemId: string | null): CompletedTurnRecord {
   return { startedAt: 1, endedAt: 2, anchorItemId };
 }
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  bridge.dbGetProjects.mockReset().mockResolvedValue([]);
+  bridge.dbGetThreads.mockReset().mockResolvedValue([]);
+  bridge.dbGetState.mockReset().mockResolvedValue(null);
+  bridge.dbSetState.mockReset().mockResolvedValue(undefined);
+  bridge.dbSyncAll.mockReset().mockResolvedValue(undefined);
+  bridge.dbReplaceThreadRuntimeSnapshot.mockReset().mockResolvedValue(undefined);
+  useAppStore.setState({
+    runtimeItemIdsByThread: {},
+    runtimeItemsByIdByThread: {},
+    runtimeRequestsByThread: {},
+    runtimeContextByThread: {},
+    runtimeDirtyThreadIds: [],
+    runtimeStructuralVersionByThread: {},
+    runtimeCompletedTurnsByThread: {},
+  });
+  window.lightcode = {} as typeof window.lightcode;
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("prepareRuntimeSnapshotForPersistence", () => {
   it("remaps completed-turn anchors to the persisted summary id for compacted runs", () => {
@@ -118,5 +159,57 @@ describe("prepareRuntimeSnapshotForPersistence", () => {
 
     expect(snapshot.items.map((item) => item.id)).toEqual(["assistant-1", "assistant-2"]);
     expect(snapshot.turns[0]?.anchorItemId).toBe("assistant-1");
+  });
+});
+
+describe("installRuntimeItemsPersister", () => {
+  it("collects the thread snapshot only when the debounce fires", async () => {
+    const unsubscribe = installRuntimeItemsPersister();
+    const first = makeItem({
+      id: "assistant-1",
+      type: "assistant_message",
+      state: "updated",
+      streams: { assistant_text: "first" },
+    });
+    const latest = {
+      ...first,
+      streams: { assistant_text: "latest" },
+    };
+
+    try {
+      useAppStore.setState({
+        runtimeItemIdsByThread: { t1: [first.id] },
+        runtimeItemsByIdByThread: { t1: { [first.id]: first } },
+        runtimeDirtyThreadIds: ["t1"],
+      });
+
+      await vi.advanceTimersByTimeAsync(150);
+      expect(bridge.dbReplaceThreadRuntimeSnapshot).not.toHaveBeenCalled();
+
+      useAppStore.setState({
+        runtimeItemsByIdByThread: { t1: { [latest.id]: latest } },
+        runtimeDirtyThreadIds: ["t1"],
+      });
+
+      await vi.advanceTimersByTimeAsync(299);
+      expect(bridge.dbReplaceThreadRuntimeSnapshot).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(1);
+
+      expect(bridge.dbReplaceThreadRuntimeSnapshot).toHaveBeenCalledTimes(1);
+      expect(bridge.dbReplaceThreadRuntimeSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          threadId: "t1",
+          items: [
+            expect.objectContaining({
+              id: latest.id,
+              streams: latest.streams,
+            }),
+          ],
+        }),
+      );
+    } finally {
+      unsubscribe();
+    }
   });
 });

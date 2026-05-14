@@ -2,7 +2,7 @@ import type { ProjectLocation } from "@/shared/contracts";
 import type { AgentAdapter } from "./agents/base";
 import { buildDiffPromptContext, getFilesFromDiff } from "./diffPromptContext";
 import { GitService } from "./git";
-import { buildOneShotSpec, spawnAgent } from "./oneShotSpawn";
+import { runOneShotPromptWithFallback } from "./oneShotPromptRunner";
 
 const PROMPT =
   "Generate a pull request title and description for the following changes.\n" +
@@ -99,29 +99,49 @@ export async function generatePrSummary(
     // fallback: empty diff
   }
 
-  let prompt = PROMPT;
-  prompt += `Branch: ${branch} → ${baseBranch}\n\n`;
-  prompt += "Git log:\n" + truncate(log, MAX_LOG_CHARS);
-  if (diff.trim()) {
-    prompt +=
-      "\n\n" +
-      buildDiffPromptContext({
-        diff,
-        files: getFilesFromDiff(diff),
-        sourceLabel: `Branch diff: ${baseBranch}...${branch}`,
-        maxTotalDiffChars: MAX_DIFF_CONTEXT_CHARS,
-      });
-  }
+  const branchHeader = `Branch: ${branch} → ${baseBranch}\n\n`;
+  const logSection = "Git log:\n" + truncate(log, MAX_LOG_CHARS);
+  const sourceLabel = `Branch diff: ${baseBranch}...${branch}`;
+  const files = diff.trim() ? getFilesFromDiff(diff) : [];
 
-  const cmd = adapter.buildOneShotCommand(effectiveModel, effort, prompt);
-  if (!cmd) {
-    throw new Error(`${adapter.label} does not support one-shot generation`);
-  }
-
-  const spawnSpec = buildOneShotSpec(location, cmd.command, cmd.args);
-  console.log(`[pr-summary-gen] spawning: ${spawnSpec.command} ${spawnSpec.args.join(" ")}`);
-
-  const raw = await spawnAgent(spawnSpec, cmd.stdin ?? prompt, PR_SUMMARY_TIMEOUT_MS);
+  const raw = await runOneShotPromptWithFallback({
+    location,
+    adapter,
+    model: effectiveModel,
+    effort,
+    timeoutMs: PR_SUMMARY_TIMEOUT_MS,
+    logTag: "pr-summary-gen",
+    attempts: [
+      {
+        level: "full",
+        buildPrompt: () => {
+          let prompt = PROMPT + branchHeader + logSection;
+          if (diff.trim()) {
+            prompt +=
+              "\n\n" +
+              buildDiffPromptContext({
+                diff,
+                files,
+                sourceLabel,
+                maxTotalDiffChars: MAX_DIFF_CONTEXT_CHARS,
+              });
+          }
+          return prompt;
+        },
+      },
+      {
+        level: "files-only",
+        buildPrompt: () => {
+          let prompt = PROMPT + branchHeader + logSection;
+          if (files.length > 0) {
+            prompt +=
+              "\n\n" + buildDiffPromptContext({ diff: "", files, sourceLabel });
+          }
+          return prompt;
+        },
+      },
+    ],
+  });
   const result = cleanPrSummary(raw);
   if (!result.title) {
     throw new Error("PR summary generation returned empty title");

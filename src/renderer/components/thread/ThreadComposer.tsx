@@ -525,6 +525,7 @@ export function ThreadComposer(props: {
               isIconOnly
               aria-label="Stop response"
               className="lightcode-composer-send"
+              isDisabled={stopPending}
               isPending={stopPending}
               onPress={onStop}
               size="sm"

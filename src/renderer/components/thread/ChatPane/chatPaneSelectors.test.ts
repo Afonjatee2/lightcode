@@ -138,7 +138,7 @@ describe("chatPaneSelectors", () => {
       { kind: "item", id: "assistant-1" },
       {
         kind: "tool_call_group",
-        id: "tool-call-group:tool-1:command-1:2",
+        id: "tool-call-group:tool-1",
         itemIds: ["tool-1", "command-1"],
       },
       { kind: "item", id: "assistant-2" },
@@ -236,12 +236,12 @@ describe("chatPaneSelectors", () => {
       { kind: "item", id: "assistant-1" },
       {
         kind: "tool_call_group",
-        id: "tool-call-group:edit-1:edit-2:2",
+        id: "tool-call-group:edit-1",
         itemIds: ["edit-1", "edit-2"],
       },
       {
         kind: "tool_call_group",
-        id: "tool-call-group:command-1:command-2:2",
+        id: "tool-call-group:command-1",
         itemIds: ["command-1", "command-2"],
       },
       { kind: "item", id: "assistant-2" },
@@ -307,7 +307,7 @@ describe("chatPaneSelectors", () => {
     expect(selectVisibleThreadTimelineEntries(state, "t1")).toEqual([
       {
         kind: "tool_call_group",
-        id: "tool-call-group:tool-edit-1:tool-edit-2:2",
+        id: "tool-call-group:tool-edit-1",
         itemIds: ["tool-edit-1", "tool-edit-2"],
       },
       { kind: "item", id: "tool-read-1" },
