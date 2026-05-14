@@ -347,6 +347,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   onRequestRevert,
 }: VirtualChatListRowProps) {
   const rowElementRef = useRef<HTMLDivElement | null>(null);
+  const liveMeasureRafRef = useRef<number | null>(null);
   const ref = useCallback(
     (element: HTMLDivElement | null) => {
       rowElementRef.current = element;
@@ -354,29 +355,48 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
     },
     [index, measureElement],
   );
-  const liveMeasureToken = useAppStore((state) => {
-    if (!isLastEntry || entry.kind !== "item") return null;
-    const item = state.runtimeItemsByIdByThread[threadId]?.[entry.id];
-    if (!item || item.state === "completed") return null;
-    switch (item.type) {
-      case "assistant_message":
-        return `${item.type}:${item.state}:${item.streams.assistant_text?.length ?? 0}`;
-      case "reasoning":
-        return `${item.type}:${item.state}:${item.streams.reasoning_text?.length ?? 0}`;
-      case "command_execution":
-        return `${item.type}:${item.state}:${item.streams.command_output?.length ?? 0}`;
-      case "file_change":
-        return `${item.type}:${item.state}:${item.streams.file_change_output?.length ?? 0}`;
-      default:
-        return `${item.type}:${item.state}`;
-    }
-  });
+  const scheduleLiveMeasure = useCallback(() => {
+    if (liveMeasureRafRef.current !== null) return;
+    liveMeasureRafRef.current = requestAnimationFrame(() => {
+      liveMeasureRafRef.current = null;
+      const element = rowElementRef.current;
+      if (!element) return;
+      measureElement(index, element);
+    });
+  }, [index, measureElement]);
   useLayoutEffect(() => {
-    if (liveMeasureToken === null) return;
-    const element = rowElementRef.current;
-    if (!element) return;
-    measureElement(index, element);
-  }, [index, liveMeasureToken, measureElement]);
+    if (!isLastEntry || entry.kind !== "item") return;
+    return useAppStore.subscribe(
+      (state) => {
+        const item = state.runtimeItemsByIdByThread[threadId]?.[entry.id];
+        if (!item || item.state === "completed") return null;
+        switch (item.type) {
+          case "assistant_message":
+            return `${item.type}:${item.state}:${item.streams.assistant_text?.length ?? 0}`;
+          case "reasoning":
+            return `${item.type}:${item.state}:${item.streams.reasoning_text?.length ?? 0}`;
+          case "command_execution":
+            return `${item.type}:${item.state}:${item.streams.command_output?.length ?? 0}`;
+          case "file_change":
+            return `${item.type}:${item.state}:${item.streams.file_change_output?.length ?? 0}`;
+          default:
+            return `${item.type}:${item.state}`;
+        }
+      },
+      (token) => {
+        if (token !== null) scheduleLiveMeasure();
+      },
+    );
+  }, [entry.id, entry.kind, isLastEntry, scheduleLiveMeasure, threadId]);
+  useLayoutEffect(
+    () => () => {
+      if (liveMeasureRafRef.current !== null) {
+        cancelAnimationFrame(liveMeasureRafRef.current);
+        liveMeasureRafRef.current = null;
+      }
+    },
+    [],
+  );
   const isUserMessage = useAppStore((state) =>
     entry.kind === "item"
       ? state.runtimeItemsByIdByThread[threadId]?.[entry.id]?.type === "user_message"

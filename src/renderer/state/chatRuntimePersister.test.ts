@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CompletedTurnRecord, RuntimeChatItem } from "./slices/runtimeEventSlice";
+import {
+  markThreadRuntimeForPersistence,
+  type CompletedTurnRecord,
+  type RuntimeChatItem,
+} from "./slices/runtimeEventSlice";
 import { useAppStore } from "./appStore";
 import {
   installRuntimeItemsPersister,
@@ -49,7 +53,6 @@ beforeEach(() => {
     runtimeItemsByIdByThread: {},
     runtimeRequestsByThread: {},
     runtimeContextByThread: {},
-    runtimeDirtyThreadIds: [],
     runtimeStructuralVersionByThread: {},
     runtimeCompletedTurnsByThread: {},
   });
@@ -180,16 +183,16 @@ describe("installRuntimeItemsPersister", () => {
       useAppStore.setState({
         runtimeItemIdsByThread: { t1: [first.id] },
         runtimeItemsByIdByThread: { t1: { [first.id]: first } },
-        runtimeDirtyThreadIds: ["t1"],
       });
+      markThreadRuntimeForPersistence("t1");
 
       await vi.advanceTimersByTimeAsync(150);
       expect(bridge.dbReplaceThreadRuntimeSnapshot).not.toHaveBeenCalled();
 
       useAppStore.setState({
         runtimeItemsByIdByThread: { t1: { [latest.id]: latest } },
-        runtimeDirtyThreadIds: ["t1"],
       });
+      markThreadRuntimeForPersistence("t1");
 
       await vi.advanceTimersByTimeAsync(299);
       expect(bridge.dbReplaceThreadRuntimeSnapshot).not.toHaveBeenCalled();

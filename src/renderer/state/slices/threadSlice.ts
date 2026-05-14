@@ -20,7 +20,7 @@ import {
   type ReorderPlacement,
 } from "../reorder";
 import { makeThreadTitle, removePaneFromView, replacePaneInView, stripPlanMode } from "./helpers";
-import type { CompletedTurnRecord } from "./runtimeEventSlice";
+import { markThreadRuntimeForPersistence, type CompletedTurnRecord } from "./runtimeEventSlice";
 import type { AppStoreState, SliceCreator } from "./shared";
 
 export interface ThreadSlice {
@@ -100,7 +100,6 @@ function parseTurnIso(iso: string | undefined): number | null {
  */
 interface TurnCloseUpdate {
   runtimeCompletedTurnsByThread: AppStoreState["runtimeCompletedTurnsByThread"];
-  runtimeDirtyThreadIds: AppStoreState["runtimeDirtyThreadIds"];
 }
 
 function appendCompletedTurnIfClosed(
@@ -113,7 +112,6 @@ function appendCompletedTurnIfClosed(
   const willBeLive = nextTurnTiming.activeTurnStartedAt !== undefined;
   const unchanged: TurnCloseUpdate = {
     runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
-    runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
   };
   if (!wasLive || willBeLive) return unchanged;
 
@@ -131,14 +129,12 @@ function appendCompletedTurnIfClosed(
 
   const record: CompletedTurnRecord = { startedAt, endedAt, anchorItemId };
   const existing = state.runtimeCompletedTurnsByThread[threadId] ?? [];
+  markThreadRuntimeForPersistence(threadId);
   return {
     runtimeCompletedTurnsByThread: {
       ...state.runtimeCompletedTurnsByThread,
       [threadId]: [...existing, record],
     },
-    runtimeDirtyThreadIds: state.runtimeDirtyThreadIds.includes(threadId)
-      ? state.runtimeDirtyThreadIds
-      : [...state.runtimeDirtyThreadIds, threadId],
   };
 }
 
@@ -305,7 +301,6 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         state.runtimeCompletedTurnsByThread;
       const { [threadId]: _droppedRuntimeConfig, ...lastRuntimeConfigByThreadId } =
         state.lastRuntimeConfigByThreadId;
-      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.filter((id) => id !== threadId);
       return {
         threads: nextThreads,
         pendingThreadLaunches: Object.fromEntries(
@@ -320,7 +315,6 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
         runtimeContextByThread,
         runtimeStructuralVersionByThread,
         runtimeCompletedTurnsByThread,
-        runtimeDirtyThreadIds,
         lastRuntimeConfigByThreadId,
         view: nextView,
       };
@@ -352,7 +346,6 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       let changed = false;
       let turnUpdate: TurnCloseUpdate = {
         runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
-        runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
       };
       const isVisible = state.view.kind === "thread" && state.view.panes.includes(threadId);
       const nowIso = new Date().toISOString();
@@ -587,7 +580,6 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       let changed = false;
       let turnUpdate: TurnCloseUpdate = {
         runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
-        runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
       };
       const nowIso = new Date().toISOString();
 
@@ -647,7 +639,6 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
       let changed = false;
       let turnUpdate: TurnCloseUpdate = {
         runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread,
-        runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
       };
       const nowIso = new Date().toISOString();
 

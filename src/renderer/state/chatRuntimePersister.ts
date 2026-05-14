@@ -4,7 +4,11 @@ import { isSubAgentTool } from "../components/thread/ChatPane/parts/items/toolDi
 import { readBridge } from "../bridge";
 import { useAppStore } from "./appStore";
 import { canShareRuntimeToolGroup } from "./runtimeToolGrouping";
-import type { CompletedTurnRecord, RuntimeChatItem } from "./slices/runtimeEventSlice";
+import {
+  subscribeRuntimePersistenceDirtyThreads,
+  type CompletedTurnRecord,
+  type RuntimeChatItem,
+} from "./slices/runtimeEventSlice";
 
 const FLUSH_DEBOUNCE_MS = 300;
 const hydratedThreadRuntimeIds = new Set<string>();
@@ -93,21 +97,11 @@ export function installRuntimeItemsPersister(): () => void {
     pendingTimers.set(threadId, timer);
   };
 
-  // Gate the subscriber on `runtimeDirtyThreadIds` reference change so the
-  // persister body skips the ~99% of store mutations that aren't runtime
-  // events (theme toggles, thread metadata edits, drafts, view changes, …).
-  // The slice keeps `runtimeDirtyThreadIds` reference-stable until a runtime
-  // event fires (or a turn closes), so reference equality is the right gate.
-  const unsubscribe = useAppStore.subscribe(
-    (state) => state.runtimeDirtyThreadIds,
-    (dirtyThreadIds) => {
-      if (dirtyThreadIds.length === 0) return;
-      for (const threadId of dirtyThreadIds) {
-        scheduleFlush(threadId);
-      }
-      useAppStore.getState().clearRuntimeDirtyThreadIds(dirtyThreadIds);
-    },
-  );
+  const unsubscribe = subscribeRuntimePersistenceDirtyThreads((dirtyThreadIds) => {
+    for (const threadId of dirtyThreadIds) {
+      scheduleFlush(threadId);
+    }
+  });
 
   return () => {
     unsubscribe();

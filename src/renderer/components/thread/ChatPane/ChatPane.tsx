@@ -380,11 +380,6 @@ const ChatScrollControls = forwardRef<
     virtualScrollToBottomRef,
     onInitialScrollSettled,
   } = props;
-  const scrollAnchor = useAppStore((s) =>
-    hiddenRuntimeItemId
-      ? selectChatScrollAnchorForTimeline(s, threadId, hiddenRuntimeItemId)
-      : selectChatScrollAnchor(s, threadId),
-  );
   const scrollToBottomToken = useAppStore((s) => s.chatScrollToBottomTokens[threadId] ?? 0);
   const initialLayoutChangeTokenRef = useRef(layoutChangeToken);
   const lastScrollTopRef = useRef(0);
@@ -421,11 +416,11 @@ const ChatScrollControls = forwardRef<
     return performance.now() <= userScrollIntentUntilRef.current;
   }
 
-  function scrollToBottom() {
+  function scrollToBottom(options: { reconcileVirtualizer?: boolean } = {}) {
     const el = scrollRef.current;
     if (!el) return;
     const virtualScrollToBottom = virtualScrollToBottomRef.current;
-    if (virtualScrollToBottom) {
+    if (options.reconcileVirtualizer && virtualScrollToBottom) {
       virtualScrollToBottom();
     } else {
       el.scrollTop = el.scrollHeight;
@@ -482,10 +477,10 @@ const ChatScrollControls = forwardRef<
     cancelScheduledInitialSettle();
     initialSettleRafRef.current = requestAnimationFrame(() => {
       initialSettleRafRef.current = null;
-      scrollToBottom();
+      scrollToBottom({ reconcileVirtualizer: true });
       initialSettleSecondRafRef.current = requestAnimationFrame(() => {
         initialSettleSecondRafRef.current = null;
-        scrollToBottom();
+        scrollToBottom({ reconcileVirtualizer: true });
         onInitialScrollSettled();
       });
     });
@@ -499,7 +494,7 @@ const ChatScrollControls = forwardRef<
   }));
 
   useLayoutEffect(() => {
-    scrollToBottom();
+    scrollToBottom({ reconcileVirtualizer: true });
     scheduleInitialScrollSettle();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- scroll reset is keyed to thread changes; the helper reads refs/state setters only.
   }, [threadId]);
@@ -519,7 +514,7 @@ const ChatScrollControls = forwardRef<
   useLayoutEffect(() => {
     if (scrollToBottomToken === initialScrollTokenRef.current) return;
     initialScrollTokenRef.current = scrollToBottomToken;
-    scrollToBottom();
+    scrollToBottom({ reconcileVirtualizer: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- helper reads refs/state setters only.
   }, [scrollToBottomToken]);
 
@@ -570,7 +565,7 @@ const ChatScrollControls = forwardRef<
     return () => observer.disconnect();
   }, [contentRef, scrollRef, threadId]);
 
-  useLayoutEffect(() => {
+  const syncPinnedContentChange = useEffectEvent(() => {
     if (pinRafRef.current !== null) {
       cancelAnimationFrame(pinRafRef.current);
     }
@@ -594,11 +589,30 @@ const ChatScrollControls = forwardRef<
         pinRafRef.current = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinning is keyed to chat content changes; the helper reads refs/state setters only.
-  }, [scrollAnchor, tailLoaderVisible, initialScrollSettled]);
+  });
+
+  useLayoutEffect(() => {
+    return useAppStore.subscribe(
+      (s) =>
+        hiddenRuntimeItemId
+          ? selectChatScrollAnchorForTimeline(s, threadId, hiddenRuntimeItemId)
+          : selectChatScrollAnchor(s, threadId),
+      () => syncPinnedContentChange(),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- subscription identity is keyed to the rendered thread; the effect event reads latest layout refs.
+  }, [hiddenRuntimeItemId, threadId]);
+
+  useLayoutEffect(() => {
+    syncPinnedContentChange();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- pinning is keyed to loader visibility changes; the effect event reads latest layout refs.
+  }, [tailLoaderVisible, initialScrollSettled]);
 
   useEffect(() => cancelScheduledLayoutSync, []);
   useEffect(() => cancelScheduledInitialSettle, []);
+
+  function handleScrollButtonPress() {
+    scrollToBottom({ reconcileVirtualizer: true });
+  }
 
   return (
     <Button
@@ -606,7 +620,7 @@ const ChatScrollControls = forwardRef<
       variant="tertiary"
       size="sm"
       aria-label="Scroll to bottom"
-      onPress={scrollToBottom}
+      onPress={handleScrollButtonPress}
       className={`absolute bottom-4 right-4 z-10 transition-opacity duration-200 ease-out ${
         showScrollDown ? "opacity-80 hover:opacity-100" : "pointer-events-none opacity-0"
       }`}

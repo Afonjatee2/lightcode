@@ -13,6 +13,23 @@ import type { AppStoreState, SliceCreator } from "./shared";
 
 const STALE_SUB_AGENT_ERROR_MESSAGE = "Interrupted: agent session ended before completion.";
 
+type RuntimePersistenceDirtyListener = (threadIds: readonly string[]) => void;
+
+const runtimePersistenceDirtyListeners = new Set<RuntimePersistenceDirtyListener>();
+
+export function subscribeRuntimePersistenceDirtyThreads(
+  listener: RuntimePersistenceDirtyListener,
+): () => void {
+  runtimePersistenceDirtyListeners.add(listener);
+  return () => runtimePersistenceDirtyListeners.delete(listener);
+}
+
+export function markThreadRuntimeForPersistence(threadId: string): void {
+  for (const listener of runtimePersistenceDirtyListeners) {
+    listener([threadId]);
+  }
+}
+
 /**
  * Frozen "Worked for X" record for a turn that has finished. Persisted so the
  * chat can keep prior turn timings visible across reloads. The most recent
@@ -65,8 +82,6 @@ export interface RuntimeEventSlice {
   runtimeRequestsByThread: Record<string, OpenRuntimeRequest[]>;
   /** Latest provider-reported context usage per GUI thread. */
   runtimeContextByThread: Record<string, ThreadContextUsage>;
-  /** Thread ids with runtime item changes waiting for persistence. */
-  runtimeDirtyThreadIds: readonly string[];
   /**
    * Per-thread monotonic counter that bumps only on grouping-affecting changes
    * (item add/remove/payload mutation). Excludes `content.delta` so that
@@ -83,7 +98,6 @@ export interface RuntimeEventSlice {
   fileCheckpointTurnsByThread: Record<string, Record<string, FileCheckpointTurn>>;
   applyRuntimeEvent(threadId: string, event: RuntimeEvent): void;
   applyRuntimeEvents(threadId: string, events: RuntimeEvent[]): void;
-  clearRuntimeDirtyThreadIds(threadIds: readonly string[]): void;
   clearThreadRuntimeEvents(threadId: string): void;
   /**
    * Force-terminate any still-running sub-agent tool_call items in a thread.
@@ -134,7 +148,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
   runtimeItemsByIdByThread: {},
   runtimeRequestsByThread: {},
   runtimeContextByThread: {},
-  runtimeDirtyThreadIds: [],
   runtimeStructuralVersionByThread: {},
   runtimeCompletedTurnsByThread: {},
   fileCheckpointsByThread: {},
@@ -146,16 +159,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
   applyRuntimeEvents: (threadId, events) =>
     set((state) => applyRuntimeEventsToState(state, threadId, events)),
 
-  clearRuntimeDirtyThreadIds: (threadIds) =>
-    set((state) => {
-      if (threadIds.length === 0 || state.runtimeDirtyThreadIds.length === 0) return {};
-      const dropped = new Set(threadIds);
-      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.filter((id) => !dropped.has(id));
-      return runtimeDirtyThreadIds.length === state.runtimeDirtyThreadIds.length
-        ? {}
-        : { runtimeDirtyThreadIds };
-    }),
-
   clearThreadRuntimeEvents: (threadId) =>
     set((state) => {
       if (
@@ -164,11 +167,11 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         !(threadId in state.runtimeRequestsByThread) &&
         !(threadId in state.runtimeContextByThread) &&
         !(threadId in state.runtimeStructuralVersionByThread) &&
-        !(threadId in state.runtimeCompletedTurnsByThread) &&
-        !state.runtimeDirtyThreadIds.includes(threadId)
+        !(threadId in state.runtimeCompletedTurnsByThread)
       ) {
         return {};
       }
+      markThreadRuntimeForPersistence(threadId);
       const { [threadId]: _droppedItemIds, ...runtimeItemIdsByThread } =
         state.runtimeItemIdsByThread;
       const { [threadId]: _droppedItems, ...runtimeItemsByIdByThread } =
@@ -181,9 +184,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         state.runtimeStructuralVersionByThread;
       const { [threadId]: _droppedTurns, ...runtimeCompletedTurnsByThread } =
         state.runtimeCompletedTurnsByThread;
-      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.includes(threadId)
-        ? state.runtimeDirtyThreadIds
-        : [...state.runtimeDirtyThreadIds, threadId];
       return {
         runtimeItemIdsByThread,
         runtimeItemsByIdByThread,
@@ -191,7 +191,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         runtimeContextByThread,
         runtimeStructuralVersionByThread,
         runtimeCompletedTurnsByThread,
-        runtimeDirtyThreadIds,
       };
     }),
 
@@ -206,9 +205,7 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
         nextItems[id] = terminateSubAgentItem(item);
       }
       if (!nextItems) return {};
-      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.includes(threadId)
-        ? state.runtimeDirtyThreadIds
-        : [...state.runtimeDirtyThreadIds, threadId];
+      markThreadRuntimeForPersistence(threadId);
       return {
         runtimeItemsByIdByThread: {
           ...state.runtimeItemsByIdByThread,
@@ -218,7 +215,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
           ...state.runtimeStructuralVersionByThread,
           [threadId]: (state.runtimeStructuralVersionByThread[threadId] ?? 0) + 1,
         },
-        runtimeDirtyThreadIds,
       };
     }),
 
@@ -243,9 +239,7 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
       const keptCompletedTurns = completedTurns.filter(
         (turn) => turn.anchorItemId === null || keptIdSet.has(turn.anchorItemId),
       );
-      const runtimeDirtyThreadIds = state.runtimeDirtyThreadIds.includes(threadId)
-        ? state.runtimeDirtyThreadIds
-        : [...state.runtimeDirtyThreadIds, threadId];
+      markThreadRuntimeForPersistence(threadId);
 
       return {
         runtimeItemIdsByThread: {
@@ -268,7 +262,6 @@ export const createRuntimeEventSlice: SliceCreator<RuntimeEventSlice> = (set) =>
           ...state.runtimeCompletedTurnsByThread,
           [threadId]: keptCompletedTurns,
         },
-        runtimeDirtyThreadIds,
       };
     }),
 
@@ -398,7 +391,6 @@ type RuntimeEventState = Pick<
   | "runtimeItemsByIdByThread"
   | "runtimeRequestsByThread"
   | "runtimeContextByThread"
-  | "runtimeDirtyThreadIds"
   | "runtimeStructuralVersionByThread"
 >;
 
@@ -412,7 +404,6 @@ function applyRuntimeEventsToState(
     runtimeItemsByIdByThread: state.runtimeItemsByIdByThread,
     runtimeRequestsByThread: state.runtimeRequestsByThread,
     runtimeContextByThread: state.runtimeContextByThread,
-    runtimeDirtyThreadIds: state.runtimeDirtyThreadIds,
     runtimeStructuralVersionByThread: state.runtimeStructuralVersionByThread,
   };
   let changed = false;
@@ -436,11 +427,9 @@ function applyRuntimeEventsToState(
       },
     };
   }
+  markThreadRuntimeForPersistence(threadId);
   return {
     ...nextState,
-    runtimeDirtyThreadIds: nextState.runtimeDirtyThreadIds.includes(threadId)
-      ? nextState.runtimeDirtyThreadIds
-      : [...nextState.runtimeDirtyThreadIds, threadId],
   };
 }
 

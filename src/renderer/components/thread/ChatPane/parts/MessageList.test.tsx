@@ -279,7 +279,8 @@ describe("MessageList", () => {
     expect(registerVirtualScrollToBottom).toHaveBeenLastCalledWith(null);
   });
 
-  it("remeasures the live row before paint when streamed text changes", () => {
+  it("coalesces live row remeasurement to one animation frame while text streams", async () => {
+    vi.useFakeTimers();
     const scrollElement = document.createElement("div");
     const threadId = "thread-1";
     useAppStore.getState().applyRuntimeEvent(threadId, {
@@ -289,30 +290,47 @@ describe("MessageList", () => {
       itemType: "assistant_message",
     });
 
-    render(
-      <MessageList
-        threadId={threadId}
-        entries={makeEntries(["item-1", "item-2", "assistant-1"])}
-        scrollElement={scrollElement}
-      />,
-    );
+    try {
+      render(
+        <MessageList
+          threadId={threadId}
+          entries={makeEntries(["item-1", "item-2", "assistant-1"])}
+          scrollElement={scrollElement}
+        />,
+      );
 
-    measureElementMock.mockClear();
+      measureElementMock.mockClear();
 
-    act(() => {
-      useAppStore.getState().applyRuntimeEvent(threadId, {
-        type: "content.delta",
-        threadId,
-        itemId: "assistant-1",
-        stream: "assistant_text",
-        delta: "new streamed line",
+      act(() => {
+        useAppStore.getState().applyRuntimeEvent(threadId, {
+          type: "content.delta",
+          threadId,
+          itemId: "assistant-1",
+          stream: "assistant_text",
+          delta: "new streamed line",
+        });
+        useAppStore.getState().applyRuntimeEvent(threadId, {
+          type: "content.delta",
+          threadId,
+          itemId: "assistant-1",
+          stream: "assistant_text",
+          delta: " more text",
+        });
       });
-    });
 
-    expect(measureElementMock).toHaveBeenCalledTimes(1);
-    expect(measureElementMock.mock.calls[0]?.[0]).toBe(
-      document.querySelector("[data-item-id='assistant-1']"),
-    );
+      expect(measureElementMock).not.toHaveBeenCalled();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(16);
+      });
+
+      expect(measureElementMock).toHaveBeenCalledTimes(1);
+      expect(measureElementMock.mock.calls[0]?.[0]).toBe(
+        document.querySelector("[data-item-id='assistant-1']"),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("hides the bottom overflow fade when the last timeline item is not an assistant message", () => {
