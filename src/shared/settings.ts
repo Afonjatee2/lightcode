@@ -113,6 +113,13 @@ export const sharedSettingsSchema = z.object({
     needsAttention: z.boolean(),
     error: z.boolean(),
   }),
+  /**
+   * When false, suppress notifications for terminal-presentation threads whose
+   * status is derived from the OSC/heuristic fallback (L2) rather than the CLI
+   * hook plugin (L1). L2 status is less precise, so users can opt out of its
+   * noisier transitions.
+   */
+  notifyL2Cli: z.boolean(),
   /** User-starred (provider, model) entries surfaced at the top of the model picker. */
   favoriteModels: z.array(z.object({ agentKind: z.string().min(1), modelId: z.string().min(1) })),
   /**
@@ -185,6 +192,7 @@ export const defaultSharedSettings: SharedSettings = {
   notificationSound: true,
   notificationFilter: "unfocused",
   notificationStatuses: { done: true, needsAttention: true, error: true },
+  notifyL2Cli: true,
   favoriteModels: [],
   recentModels: [],
   disableCliHookPlugin: false,

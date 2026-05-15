@@ -202,6 +202,8 @@ export function handleThreadStateNotification(
 
   if (!settings.notificationStatuses[category]) return;
 
+  if (!settings.notifyL2Cli && oldThread.threadStatusSource === "terminal_parse") return;
+
   const projectName = getProjectName(oldThread.projectId);
   const threadId = oldThread.id;
   const threadTitle = oldThread.title;

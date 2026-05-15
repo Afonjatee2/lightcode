@@ -4,11 +4,14 @@ export function buildGeminiArgs(
   config: ThreadConfig,
   prompt: string,
   resumeSessionId?: string,
+  assignedSessionId?: string,
 ): string[] {
   const args: string[] = [];
 
   if (resumeSessionId) {
     args.push("--resume", resumeSessionId);
+  } else if (assignedSessionId) {
+    args.push("--session-id", assignedSessionId);
   }
   if (config.model) {
     args.push("--model", config.model);

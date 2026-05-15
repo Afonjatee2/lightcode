@@ -20,12 +20,11 @@ export function buildOpenCodeArgs(
   if (config.model) {
     args.push("--model", config.model);
   }
-  // OpenCode's `--variant` flag matches its SDK `variant` field — used to
-  // pick provider-specific reasoning effort (high, max, minimal, …) for
-  // models that publish a `variants` map in `opencode models --verbose`.
-  if (config.effort && config.effort.length > 0) {
-    args.push("--variant", config.effort);
-  }
+  // NOTE: `config.effort` (variant) is intentionally NOT forwarded here.
+  // The opencode CLI (verified against 1.14.30) does not accept `--variant`;
+  // passing it makes yargs abort with the help screen instead of starting the
+  // TUI. The SDK `session.promptAsync({ variant })` path still applies it for
+  // GUI threads; TUI launches fall back to the model default at session start.
   // Plan mode in the TUI is just the built-in `plan` agent (`opencode agent
   // list`). The default command accepts `--agent <name>` to pick it at
   // launch; the SDK runtime uses the same value via `prompt_async`.

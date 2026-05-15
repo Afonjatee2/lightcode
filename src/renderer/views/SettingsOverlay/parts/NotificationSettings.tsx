@@ -18,6 +18,8 @@ export function NotificationSettings() {
   const setNotificationFilter = useSharedSettings((s) => s.setNotificationFilter);
   const notificationStatuses = useSharedSettings((s) => s.notificationStatuses);
   const setNotificationStatuses = useSharedSettings((s) => s.setNotificationStatuses);
+  const notifyL2Cli = useSharedSettings((s) => s.notifyL2Cli);
+  const setNotifyL2Cli = useSharedSettings((s) => s.setNotifyL2Cli);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
@@ -146,6 +148,28 @@ export function NotificationSettings() {
                   </Switch>
                 </div>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-4 pt-2">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">Notify for L2 CLI threads</p>
+                <p className="text-xs text-muted">
+                  When off, suppress notifications from terminal threads whose status comes from the
+                  OSC fallback (no CLI hook plugin).
+                </p>
+              </div>
+              <Switch
+                isSelected={notifyL2Cli}
+                onChange={(selected) => {
+                  startTransition(() => {
+                    setNotifyL2Cli(selected);
+                  });
+                }}
+              >
+                <Switch.Control>
+                  <Switch.Thumb />
+                </Switch.Control>
+              </Switch>
             </div>
           </div>
         </div>

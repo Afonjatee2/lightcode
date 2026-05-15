@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
+
 import type { AgentCapability, PromptSegment } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import { createAcpStructuredSession } from "../acp";
 import {
   buildAgentCommand,
   createKnownSessionRef,
-  createRecursiveDirWatcher,
   detectAgentInstall,
   type AgentAdapter,
   type CreateStructuredSessionInput,
@@ -20,11 +21,7 @@ import {
   isGeminiPluginInstalled,
   readBundledGeminiPluginVersion,
 } from "./plugin/install";
-import {
-  detectGeminiInvalidSessionRef,
-  queryLatestSessionId,
-  resolveGeminiWatchPath,
-} from "./session";
+import { detectGeminiInvalidSessionRef } from "./session";
 import { detectGeminiTerminalStatus } from "./terminal";
 
 export { detectGeminiInvalidSessionRef } from "./session";
@@ -38,8 +35,6 @@ function geminiHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
 }
 
 export function createGeminiAdapter(): AgentAdapter {
-  /** Latest session ID seen before the TUI spawned — used to detect the new one. */
-  let preSpawnLatestId: string | undefined;
   let capabilities: AgentCapability = defaultGeminiCapabilities;
 
   return {
@@ -90,13 +85,18 @@ export function createGeminiAdapter(): AgentAdapter {
       return status;
     },
 
-    buildLaunchArgv(location, config, prompt) {
-      // Snapshot the latest session ID before TUI spawn so we can detect the new one
-      void queryLatestSessionId(location).then((id) => {
-        preSpawnLatestId = id;
-      });
-      const args = buildGeminiArgs(config, prompt);
-      return { binary: "gemini", args };
+    buildLaunchArgv(_location, config, prompt) {
+      // Pre-assign the session UUID via --session-id so we know it before
+      // spawn. Avoids racing post-spawn discovery against one-shot `gemini -p`
+      // calls (title gen, commit-msg, PR summary) that also create entries in
+      // --list-sessions and would otherwise be picked as "the new session".
+      const assignedId = randomUUID();
+      const args = buildGeminiArgs(config, prompt, undefined, assignedId);
+      return {
+        binary: "gemini",
+        args,
+        sessionRef: createKnownSessionRef(assignedId),
+      };
     },
 
     buildResumeArgv(_location, config, prompt, sessionRef) {
@@ -140,21 +140,6 @@ export function createGeminiAdapter(): AgentAdapter {
     detectInvalidSessionRef: detectGeminiInvalidSessionRef,
 
     defaultOneShotModel: "gemini-2.5-flash",
-
-    async discoverSessionRef(location) {
-      try {
-        const latestId = await queryLatestSessionId(location);
-        if (!latestId || latestId === preSpawnLatestId) return undefined;
-        return createKnownSessionRef(latestId);
-      } catch {
-        return undefined;
-      }
-    },
-    watchSessionRef(location, onChanged) {
-      const watchPath = resolveGeminiWatchPath(location);
-      if (!watchPath) return undefined;
-      return createRecursiveDirWatcher(watchPath, onChanged, `gemini:${location.kind}`);
-    },
 
     buildOneShotCommand(model, _effort, prompt) {
       if (!prompt) return undefined;

@@ -50,16 +50,14 @@ describe("buildOpenCodeArgs", () => {
     expect(buildOpenCodeArgs({ model: "" }, "   ")).toEqual([]);
   });
 
-  it("forwards effort via --variant", () => {
+  it("does not forward effort/variant — opencode CLI does not accept --variant", () => {
     expect(buildOpenCodeArgs({ model: "opencode/claude-sonnet-4-6", effort: "high" }, "")).toEqual([
       "--model",
       "opencode/claude-sonnet-4-6",
-      "--variant",
-      "high",
     ]);
   });
 
-  it("omits --variant when effort is empty string", () => {
+  it("does not forward an empty effort either", () => {
     expect(buildOpenCodeArgs({ model: "opencode/big-pickle", effort: "" }, "")).toEqual([
       "--model",
       "opencode/big-pickle",

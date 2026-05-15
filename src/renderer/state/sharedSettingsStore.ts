@@ -59,6 +59,7 @@ interface SharedSettingsState extends SharedSettings {
     needsAttention?: boolean;
     error?: boolean;
   }) => void;
+  setNotifyL2Cli: (value: boolean) => void;
   toggleFavoriteModel: (agentKind: string, modelId: string) => void;
   pushRecentModel: (agentKind: string, modelId: string) => void;
 }
@@ -298,6 +299,11 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ notificationStatuses: next });
     persistSettings(selectSharedSettings(get()));
   },
+  setNotifyL2Cli: (notifyL2Cli) => {
+    if (get().notifyL2Cli === notifyL2Cli) return;
+    set({ notifyL2Cli });
+    persistSettings(selectSharedSettings(get()));
+  },
   toggleFavoriteModel: (agentKind, modelId) => {
     const current = get().favoriteModels;
     const idx = current.findIndex((m) => m.agentKind === agentKind && m.modelId === modelId);
@@ -372,6 +378,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     notificationSound: state.notificationSound,
     notificationFilter: state.notificationFilter,
     notificationStatuses: state.notificationStatuses,
+    notifyL2Cli: state.notifyL2Cli,
     favoriteModels: state.favoriteModels,
     recentModels: state.recentModels,
   };

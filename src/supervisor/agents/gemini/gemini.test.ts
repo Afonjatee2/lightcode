@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
+import type { ProjectLocation, ThreadConfig } from "@/shared/contracts";
 import { createGeminiAdapter } from ".";
+import { buildGeminiArgs } from "./argv";
 import { geminiIntentFor } from "./plugin/intentMap";
 import { detectGeminiInvalidSessionRef } from "./session";
 import { detectGeminiTerminalStatus } from "./terminal";
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 describe("detectGeminiTerminalStatus", () => {
   it("detects idle from ◇ Ready title bar indicator", () => {
@@ -178,6 +182,68 @@ describe("detectGeminiTerminalStatus", () => {
     const result = detectGeminiTerminalStatus(text);
     expect(result?.status).toBe("needs_reply");
     expect(result?.attention).toBe("needs_reply");
+  });
+});
+
+describe("buildGeminiArgs", () => {
+  const config: ThreadConfig = { model: "gemini-2.5-pro" };
+
+  it("emits --session-id when an assignedSessionId is provided", () => {
+    const args = buildGeminiArgs(config, "hello", undefined, "abc-uuid");
+    const sessionIdx = args.indexOf("--session-id");
+    expect(sessionIdx).toBeGreaterThanOrEqual(0);
+    expect(args[sessionIdx + 1]).toBe("abc-uuid");
+    expect(args).not.toContain("--resume");
+  });
+
+  it("prefers --resume over --session-id when both are provided", () => {
+    const args = buildGeminiArgs(config, "hello", "resume-uuid", "assigned-uuid");
+    expect(args).toContain("--resume");
+    expect(args).toContain("resume-uuid");
+    expect(args).not.toContain("--session-id");
+    expect(args).not.toContain("assigned-uuid");
+  });
+
+  it("omits both flags when neither is provided", () => {
+    const args = buildGeminiArgs(config, "hello");
+    expect(args).not.toContain("--resume");
+    expect(args).not.toContain("--session-id");
+  });
+});
+
+describe("createGeminiAdapter buildLaunchArgv", () => {
+  const project: ProjectLocation = {
+    kind: "windows",
+    path: "C:\\demo",
+  };
+  const config: ThreadConfig = { model: "gemini-2.5-pro" };
+
+  it("assigns a stable session UUID at launch and returns it as sessionRef", () => {
+    const adapter = createGeminiAdapter();
+    const argv = adapter.buildLaunchArgv(project, config, "hi");
+
+    if (argv === undefined) throw new Error("expected argv");
+    expect(argv.binary).toBe("gemini");
+
+    const sessionIdx = argv.args.indexOf("--session-id");
+    expect(sessionIdx).toBeGreaterThanOrEqual(0);
+    const uuid = argv.args[sessionIdx + 1]!;
+    expect(uuid).toMatch(UUID_RE);
+
+    expect(argv.sessionRef?.providerSessionId).toBe(uuid);
+  });
+
+  it("uses --resume (not --session-id) on resume", () => {
+    const adapter = createGeminiAdapter();
+    const argv = adapter.buildResumeArgv(project, config, "hi", {
+      providerSessionId: "11111111-1111-4111-8111-111111111111",
+      discoveredAt: "2026-05-15T00:00:00.000Z",
+    });
+
+    if (argv === undefined) throw new Error("expected argv");
+    expect(argv.args).toContain("--resume");
+    expect(argv.args).toContain("11111111-1111-4111-8111-111111111111");
+    expect(argv.args).not.toContain("--session-id");
   });
 });
 
