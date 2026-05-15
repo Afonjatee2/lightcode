@@ -108,7 +108,15 @@ jobs:
       - name: Install NuGet provider (Windows signing)
         if: matrix.os == 'windows-latest'
         shell: pwsh
-        run: Install-PackageProvider -Name NuGet -Force -Scope CurrentUser
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        run: |
+          if (-not $env:AZURE_TENANT_ID) {
+            Write-Host "AZURE_TENANT_ID not set; skipping NuGet provider installation."
+            exit 0
+          }
+          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser
 
       - name: Build app
         run: pnpm run build
@@ -145,14 +153,19 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             pnpm run prepare:package-assets
-            electron-builder --win --config electron-builder.yml --config build/signing.yml
+            if [ -n "$AZURE_TENANT_ID" ]; then
+              pnpm exec electron-builder --win --config electron-builder.yml --config build/signing.yml
+            else
+              echo "Azure signing secrets not configured; building unsigned Windows installer."
+              pnpm exec electron-builder --win
+            fi
           else
             if [ "${{ matrix.os }}" = "macos-latest" ]; then
               pnpm run prepare:agent-plugins
-              electron-builder --mac
+              pnpm exec electron-builder --mac
             else
               pnpm run prepare:package-assets
-              electron-builder --linux
+              pnpm exec electron-builder --linux
             fi
           fi
         shell: bash
