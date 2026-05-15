@@ -109,19 +109,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install NuGet provider (Windows signing)
-        if: matrix.os == 'windows-latest'
-        shell: pwsh
-        env:
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        run: |
-          if (-not $env:AZURE_TENANT_ID) {
-            Write-Host "AZURE_TENANT_ID not set; skipping NuGet provider installation."
-            exit 0
-          }
-          [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-          Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force -Scope CurrentUser
-
       - name: Build app
         run: pnpm run build
         shell: bash
@@ -157,12 +144,7 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             pnpm run prepare:package-assets
-            if [ -n "$AZURE_TENANT_ID" ]; then
-              pnpm exec electron-builder --win --config electron-builder.yml --config build/signing.yml
-            else
-              echo "Azure signing secrets not configured; building unsigned Windows installer."
-              pnpm exec electron-builder --win
-            fi
+            pnpm exec electron-builder --win
           else
             if [ "${{ matrix.os }}" = "macos-latest" ]; then
               pnpm run prepare:agent-plugins
@@ -175,14 +157,6 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Azure Trusted Signing (Windows only)
-          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-          AZURE_SIGNING_PUBLISHER_NAME: ${{ secrets.AZURE_SIGNING_PUBLISHER_NAME }}
-          AZURE_SIGNING_ENDPOINT: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
-          AZURE_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_SIGNING_ACCOUNT_NAME }}
-          AZURE_SIGNING_CERT_PROFILE: ${{ secrets.AZURE_SIGNING_CERT_PROFILE }}
 
       - name: Upload built artifacts
         uses: actions/upload-artifact@v7
