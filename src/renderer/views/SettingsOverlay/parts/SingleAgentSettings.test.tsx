@@ -12,6 +12,7 @@ const sharedSettingsState = {
   disabledAgents: [] as string[],
   hiddenModels: {} as Record<string, string[]>,
   agentSettings: {} as Record<string, Record<string, unknown>>,
+  acpRegistryInstalledAgents: {} as Record<string, unknown>,
   setAgentDisabled: vi.fn<(kind: string, disabled: boolean) => void>(),
   setHiddenModels: vi.fn<(kind: string, hidden: string[]) => void>(),
   setAgentSetting: vi.fn<(kind: string, key: string, value: unknown) => void>(),
@@ -126,6 +127,10 @@ const logoutAcpRegistryAgentMock = vi.hoisted(() =>
 );
 const focusWindowMock = vi.hoisted(() => vi.fn<() => Promise<void>>());
 
+const listAcpRegistryMock = vi.hoisted(() =>
+  vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+);
+
 vi.mock("@/renderer/bridge", () => ({
   readBridge: () => ({
     refreshAgentStatuses: refreshAgentStatusesMock,
@@ -133,6 +138,7 @@ vi.mock("@/renderer/bridge", () => ({
     authenticateAcpRegistryAgent: authenticateAcpRegistryAgentMock,
     logoutAcpRegistryAgent: logoutAcpRegistryAgentMock,
     focusWindow: focusWindowMock,
+    listAcpRegistry: listAcpRegistryMock,
   }),
 }));
 

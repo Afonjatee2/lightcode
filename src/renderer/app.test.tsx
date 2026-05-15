@@ -124,6 +124,7 @@ const { bridge } = vi.hoisted(() => ({
     startUpdateDownload: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     installUpdate: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     onUpdateStatus: vi.fn<() => () => void>(() => () => undefined),
+    listAcpRegistry: vi.fn<() => Promise<unknown>>().mockResolvedValue([]),
   },
 }));
 
