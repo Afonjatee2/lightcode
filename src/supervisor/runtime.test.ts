@@ -64,6 +64,11 @@ vi.mock("./agents/binaryResolver", async (importActual) => {
   };
 });
 
+// Suppress supervisor [supervisor] console output during tests so vitest's
+// onUserConsoleLog RPC does not remain pending at worker teardown.
+vi.spyOn(console, "warn").mockImplementation(() => {});
+vi.spyOn(console, "log").mockImplementation(() => {});
+
 import { detectWslAgentStatuses, SupervisorRuntime, writeSubmittedPrompt } from "./runtime";
 
 const tempDirs: string[] = [];
