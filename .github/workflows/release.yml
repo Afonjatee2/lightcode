@@ -165,6 +165,7 @@ jobs:
           path: |
             release/Lightcode-*.exe
             release/Lightcode-*.dmg
+            release/Lightcode-*.zip
             release/Lightcode-*.AppImage
             release/Lightcode-*.deb
             release/latest*.yml

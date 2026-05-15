@@ -135,6 +135,8 @@ nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
+  # Skip the combined multi-arch installer; emit only per-arch builds.
+  buildUniversalInstaller: false
   artifactName: ${productName}-Setup-${version}-${arch}.${ext}
 
 linux:
@@ -153,6 +155,12 @@ linux:
 mac:
   target:
     - target: dmg
+      arch:
+        - x64
+        - arm64
+    # electron-updater requires a zipped app bundle for in-place macOS updates;
+    # the DMG is install-only. Without zip, clients fail with "ZIP file not provided".
+    - target: zip
       arch:
         - x64
         - arm64
