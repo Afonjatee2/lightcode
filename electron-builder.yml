@@ -147,6 +147,7 @@ linux:
         - x64
   icon: build/icon.png
   category: Development
+  maintainer: SDSLeon <SDSLeon999@gmail.com>
   artifactName: ${productName}-${version}-${arch}.${ext}
 
 mac:
