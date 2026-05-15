@@ -76,14 +76,16 @@ function UpdateButtons(props: { iconOnly?: boolean }) {
     }
 
     return (
-      <div className="flex w-full items-center gap-2 rounded-3xl px-2 py-1.5 text-sm text-muted">
+      <div className="flex w-full items-center gap-2 rounded-3xl px-2 py-1.5 text-muted">
         <Download className="size-4 shrink-0 animate-pulse text-accent" />
         <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="truncate">
-            Downloading{versionLabel} — {Math.round(downloadPercent)}%
-            {speedLine ? ` · ${speedLine}` : ""}
-          </span>
-          {byteLine ? <span className="truncate text-xs opacity-80">{byteLine}</span> : null}
+          <span className="truncate text-xs">Downloading{versionLabel}</span>
+          <div className="flex min-w-0 items-center justify-between gap-2 text-xs opacity-80">
+            <span className="truncate">{byteLine ?? ""}</span>
+            <span className="shrink-0 whitespace-nowrap">
+              {Math.round(downloadPercent)}%{speedLine ? ` · ${speedLine}` : ""}
+            </span>
+          </div>
           <div className="h-1 w-full rounded-full bg-white/10">
             <div
               className="h-1 rounded-full bg-accent transition-[width] duration-300"
