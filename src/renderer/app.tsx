@@ -172,7 +172,6 @@ const unsubUpdate = readBridge().onUpdateStatus((status) => {
       break;
     case "update-not-available":
       store.setNotAvailable();
-      toast.success("You're on the latest version.");
       break;
     case "downloading":
       store.setDownloading(status.percent, {
