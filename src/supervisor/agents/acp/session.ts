@@ -601,6 +601,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private currentAttention: ThreadAttention = "none";
   private spawnReady: Promise<void> = Promise.resolve();
   private currentTurnId: string | undefined;
+  private stableSessionRef: SessionRef | undefined;
   /**
    * True while a `connection.prompt()` call is in flight (between issue and
    * resolution). Used together with `pendingPromptInterrupt` to close the
@@ -635,6 +636,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    * and let normal mapping resume once the load completes.
    */
   private isReplayingHistory = false;
+  private replayHistoryUntil = 0;
 
   private constructor(
     child: ChildProcess,
@@ -677,11 +679,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   }
 
   private emitCurrentState(listener: StructuredSessionListener): void {
+    const sessionRef = this.currentSessionRef();
     listener.onUpdate({
       status: this.currentStatus,
       attention: this.currentAttention,
       ...(this.currentConfig ? { config: this.currentConfig } : {}),
-      ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+      ...(sessionRef ? { sessionRef } : {}),
       ...(this.currentSlashCommands !== undefined
         ? { slashCommands: this.currentSlashCommands }
         : {}),
@@ -693,13 +696,27 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       return;
     }
     this.currentSlashCommands = commands;
+    const sessionRef = this.currentSessionRef();
     this.emitListenerUpdate({
       status: this.currentStatus,
       attention: this.currentAttention,
       ...(this.currentConfig ? { config: this.currentConfig } : {}),
-      ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+      ...(sessionRef ? { sessionRef } : {}),
       slashCommands: commands,
     });
+  }
+
+  private currentSessionRef(): SessionRef | undefined {
+    if (!this.sessionId) return undefined;
+    if (this.stableSessionRef?.providerSessionId !== this.sessionId) {
+      this.stableSessionRef = createKnownSessionRef(this.sessionId);
+    }
+    return this.stableSessionRef;
+  }
+
+  private adoptSessionRef(sessionRef: SessionRef): void {
+    this.sessionId = sessionRef.providerSessionId;
+    this.stableSessionRef = sessionRef;
   }
 
   private rememberSessionOptions(availableModeIds: string[], configOptions: unknown): void {
@@ -976,17 +993,19 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (sessionRef) {
       console.log("[acp] loading session:", sessionRef.providerSessionId);
       this.isReplayingHistory = true;
+      this.replayHistoryUntil = Infinity;
       try {
         const result = await this.connection.loadSession({
           sessionId: sessionRef.providerSessionId,
           cwd: this.cwd,
           mcpServers: [],
         });
-        this.sessionId = sessionRef.providerSessionId;
+        this.adoptSessionRef(sessionRef);
         availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
         configOptions = result.configOptions ?? [];
       } finally {
         this.isReplayingHistory = false;
+        this.replayHistoryUntil = Date.now() + 500;
       }
     } else {
       console.log("[acp] creating new session in", this.cwd);
@@ -995,6 +1014,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         mcpServers: [],
       });
       this.sessionId = result.sessionId;
+      this.stableSessionRef = createKnownSessionRef(result.sessionId);
       availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
       configOptions = result.configOptions ?? [];
       console.log("[acp] session created:", this.sessionId, "modes:", availableModeIds);
@@ -1003,7 +1023,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.rememberSessionOptions(availableModeIds, configOptions);
     await this.applyTurnConfig(config);
 
-    this.launchOptions = { ...this.launchOptions, resumeThreadId: this.sessionId };
+    if (this.sessionId) {
+      this.launchOptions = { ...this.launchOptions, resumeThreadId: this.sessionId };
+    }
     return this.sessionId!;
   }
 
@@ -1306,7 +1328,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     // `session/update` notifications. Lightcode already has those messages
     // in its own DB, so we skip canonical mapping for the replay window to
     // avoid duplicating every message in the chat pane.
-    if (!this.isReplayingHistory) {
+    if (!this.isReplayingHistory && Date.now() >= (this.replayHistoryUntil || 0)) {
       const events = mapAcpSessionUpdate(params, this.ensureMapperState());
       if (events.length > 0) this.emitRuntimeEvents(events);
     } else {
@@ -1358,6 +1380,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           const nextConfig = applyAcpModeUpdateToConfig(this.currentConfig, update.currentModeId);
           if (!isThreadConfigEqual(this.currentConfig, nextConfig)) {
             this.currentConfig = nextConfig;
+            const sessionRef = this.currentSessionRef();
             // Mode-change confirmations are metadata, not turn boundaries —
             // preserve the live status so the renderer's working-time clock
             // doesn't reset when the agent echoes back a setSessionMode call.
@@ -1365,7 +1388,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
               status: this.currentStatus,
               attention: this.currentAttention,
               config: nextConfig,
-              ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+              ...(sessionRef ? { sessionRef } : {}),
             });
           }
         }
@@ -1381,11 +1404,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           ) {
             const nextConfig = { ...this.currentConfig, effort: thoughtLevelConfig.currentValue };
             this.currentConfig = nextConfig;
+            const sessionRef = this.currentSessionRef();
             this.emitListenerUpdate({
               status: this.currentStatus,
               attention: this.currentAttention,
               config: nextConfig,
-              ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
+              ...(sessionRef ? { sessionRef } : {}),
             });
           }
         }

@@ -497,6 +497,43 @@ describe("appStore runtime config sync", () => {
     expect(useAppStore.getState().threads[0]?.status).toBe("idle");
   });
 
+  it("preserves the stored session ref when runtime re-emits the same provider id", () => {
+    const project = useAppStore.getState().addProject({
+      kind: "windows",
+      path: "C:\\repo",
+    });
+    const thread = useAppStore.getState().createThread({
+      projectId: project.id,
+      agentKind: "gemini",
+      config: { model: "gemini-test" },
+      prompt: "a",
+    });
+
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "idle",
+      attention: "none",
+      canResumeWithConfig: true,
+      sessionRef: {
+        providerSessionId: "gemini-session-1",
+        discoveredAt: "2026-05-01T12:00:00.000Z",
+      },
+    });
+    useAppStore.getState().updateThreadRuntime(thread.id, {
+      status: "idle",
+      attention: "none",
+      canResumeWithConfig: true,
+      sessionRef: {
+        providerSessionId: "gemini-session-1",
+        discoveredAt: "2026-05-01T12:05:00.000Z",
+      },
+    });
+
+    expect(useAppStore.getState().threads[0]?.sessionRef).toEqual({
+      providerSessionId: "gemini-session-1",
+      discoveredAt: "2026-05-01T12:00:00.000Z",
+    });
+  });
+
   it("openThread on finished thread transitions to idle", () => {
     const project = useAppStore.getState().addProject({
       kind: "windows",

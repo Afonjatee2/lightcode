@@ -387,8 +387,9 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
 
         const sessionRefChanged =
           input.sessionRef !== undefined &&
-          (thread.sessionRef?.providerSessionId !== input.sessionRef.providerSessionId ||
-            thread.sessionRef?.discoveredAt !== input.sessionRef.discoveredAt);
+          thread.sessionRef?.providerSessionId !== input.sessionRef.providerSessionId;
+        const nextSessionRef =
+          input.sessionRef && sessionRefChanged ? input.sessionRef : thread.sessionRef;
 
         const statusSourceMatch =
           input.threadStatusSource === undefined ||
@@ -439,7 +440,7 @@ export const createThreadSlice: SliceCreator<ThreadSlice> = (set) => ({
           ...(input.threadStatusSource !== undefined
             ? { threadStatusSource: input.threadStatusSource }
             : {}),
-          ...(input.sessionRef ? { sessionRef: input.sessionRef } : {}),
+          ...(nextSessionRef ? { sessionRef: nextSessionRef } : {}),
           ...(input.slashCommands !== undefined ? { slashCommands: input.slashCommands } : {}),
           ...(input.status === "working" && thread.status !== "working"
             ? { updatedAt: nowIso }

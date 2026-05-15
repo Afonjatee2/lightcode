@@ -477,6 +477,21 @@ describe("ACP turn config sync", () => {
     expect(listener.onUpdate).not.toHaveBeenCalled();
   });
 
+  it("continues suppressing late Gemini loadSession history replay after the RPC resolves", () => {
+    const { listener, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["replayHistoryUntil"] = Date.now() + 500;
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "restored assistant message" },
+      },
+    });
+
+    expect(listener.onRuntimeEvent).not.toHaveBeenCalled();
+    expect(listener.onUpdate).not.toHaveBeenCalled();
+  });
+
   it("surfaces available ACP slash commands from session updates", () => {
     const { listener, session } = makeConfigSyncSession();
 
