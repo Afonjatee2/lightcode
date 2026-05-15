@@ -8,6 +8,14 @@ export function buildGeminiArgs(
 ): string[] {
   const args: string[] = [];
 
+  // Gemini emits "Skipping project agents due to untrusted folder..." on
+  // stdout when the workspace is not pre-trusted. In --acp mode that string
+  // collides with JSON-RPC frames and breaks the stream parser. --skip-trust
+  // suppresses the prompt for this session (replaces the older
+  // GEMINI_CLI_TRUST_WORKSPACE=true env var, which only worked through env
+  // inheritance and was easy to lose across spawn wrappers).
+  args.push("--skip-trust");
+
   if (resumeSessionId) {
     args.push("--resume", resumeSessionId);
   } else if (assignedSessionId) {

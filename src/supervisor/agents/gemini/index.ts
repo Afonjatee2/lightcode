@@ -44,13 +44,12 @@ export function createGeminiAdapter(): AgentAdapter {
     get capabilities() {
       return capabilities;
     },
-    // GEMINI_CLI_TRUST_WORKSPACE=true bypasses Gemini's folder-trust check.
-    // Without it, the AgentRegistry emits "Skipping project agents due to
-    // untrusted folder..." onto stdout, which can collide with JSON-RPC
-    // frames in --acp mode and break the ACP stream parser.
+    // Workspace trust is now suppressed via --skip-trust on every gemini
+    // invocation (see buildGeminiArgs and the --acp launch below). WSL still
+    // needs BROWSER=/bin/true so the OAuth flow does not try to xdg-open a
+    // browser inside the distro and hang the PTY.
     spawnEnv: {
-      native: { GEMINI_CLI_TRUST_WORKSPACE: "true" },
-      wsl: { BROWSER: "/bin/true", GEMINI_CLI_TRUST_WORKSPACE: "true" },
+      wsl: { BROWSER: "/bin/true" },
     },
     pluginId: "lightcode-status@gemini",
     pluginVersion: GEMINI_PLUGIN_VERSION,
@@ -108,9 +107,8 @@ export function createGeminiAdapter(): AgentAdapter {
       const command = buildAgentCommand(
         input.projectLocation,
         "gemini",
-        ["--acp"],
+        ["--acp", "--skip-trust"],
         resolveAgentBinaryPath(input.projectLocation, "gemini"),
-        { GEMINI_CLI_TRUST_WORKSPACE: "true" },
       );
       return createAcpStructuredSession(command, input);
     },

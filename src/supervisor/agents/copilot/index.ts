@@ -13,7 +13,7 @@ import {
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
-import { buildCopilotArgs, formatCopilotInteractivePrompt } from "./argv";
+import { buildCopilotArgs } from "./argv";
 import { buildCopilotCommand, copilotDefaultCapabilities, copilotDetectionSpec } from "./detection";
 import {
   installCopilotPlugin,
@@ -118,8 +118,10 @@ export function createCopilotAdapter(): AgentAdapter {
     createInitialSessionRef() {
       return undefined;
     },
-    buildDirectInput(prompt, _segments, config) {
-      return [formatCopilotInteractivePrompt(prompt, config), "@wait:40", "\r"];
+    buildDirectInput(prompt) {
+      // Mode is set at launch via --plan / --mode. The TUI persists the
+      // selection across turns, so subsequent prompts pass through as-is.
+      return [prompt, "@wait:40", "\r"];
     },
     formatPromptSegments(segments: PromptSegment[]) {
       const attachments = segments.filter((segment) => segment.kind === "attachment");

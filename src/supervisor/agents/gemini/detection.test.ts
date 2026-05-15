@@ -51,6 +51,7 @@ describe("geminiDetectionSpec", () => {
 
     expect(buildAgentCommandMock).toHaveBeenCalledWith(location, "/Users/demo/.local/bin/gemini", [
       "--acp",
+      "--skip-trust",
     ]);
     expect(probeAcpCapabilitiesMock).toHaveBeenCalledWith(
       "/bin/zsh",

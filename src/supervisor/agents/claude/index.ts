@@ -108,14 +108,35 @@ export function createClaudeAdapter(): AgentAdapter {
     defaultOneShotModel: "haiku",
     buildOneShotCommand(model, effort, prompt) {
       if (!prompt) return undefined;
-      const args = ["-p", prompt, "--model", model];
+      // --no-session-persistence keeps title/commit/PR-summary calls out of
+      // the `/resume` picker. --fallback-model auto-degrades to Haiku if the
+      // primary is overloaded so async title generation does not silently
+      // fail when the API throttles.
+      const args = [
+        "-p",
+        prompt,
+        "--model",
+        model,
+        "--fallback-model",
+        "haiku",
+        "--no-session-persistence",
+      ];
       if (effort) {
         args.push("--effort", effort);
       }
       return { command: "claude", args, stdin: "" };
     },
     buildContextExtractionCommand(sessionRef, _location, model) {
-      const args = ["-p", "--resume", sessionRef.providerSessionId, "--model", model ?? "haiku"];
+      // The resumed session is read-only here; --no-session-persistence
+      // prevents the extraction turn from being written back to disk.
+      const args = [
+        "-p",
+        "--resume",
+        sessionRef.providerSessionId,
+        "--model",
+        model ?? "haiku",
+        "--no-session-persistence",
+      ];
       return { command: "claude", args };
     },
   };

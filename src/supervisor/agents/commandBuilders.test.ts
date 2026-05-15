@@ -273,7 +273,17 @@ describe("agent command builders", () => {
       createClaudeAdapter().buildOneShotCommand?.("haiku", "low", "Summarize this diff"),
     ).toEqual({
       command: "claude",
-      args: ["-p", "Summarize this diff", "--model", "haiku", "--effort", "low"],
+      args: [
+        "-p",
+        "Summarize this diff",
+        "--model",
+        "haiku",
+        "--fallback-model",
+        "haiku",
+        "--no-session-persistence",
+        "--effort",
+        "low",
+      ],
       stdin: "",
     });
 
@@ -362,7 +372,7 @@ describe("agent command builders", () => {
   );
 
   it.skipIf(process.platform !== "win32")(
-    "prefixes the initial Copilot interactive prompt with /plan in plan mode",
+    "passes --plan and an unmodified initial prompt when launching in plan mode",
     () => {
       const spec = launch(
         createCopilotAdapter(),
@@ -373,9 +383,10 @@ describe("agent command builders", () => {
       const { cmd, cmdArgs } = parseWindowsSpec(spec);
 
       expect(cmd).toBe("copilot");
+      expect(cmdArgs).toContain("--plan");
       expect(cmdArgs).toContain("-i");
-      expect(cmdArgs).toContain("/plan hi");
-      expect(cmdArgs).not.toContain("hi");
+      expect(cmdArgs).toContain("hi");
+      expect(cmdArgs).not.toContain("/plan hi");
     },
   );
 

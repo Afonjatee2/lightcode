@@ -136,11 +136,11 @@ export const geminiDetectionSpec: DetectionSpec = {
     // Bypass Gemini's folder-trust check during the probe so the AgentRegistry
     // doesn't emit "Skipping project agents..." onto stdout, which can collide
     // with JSON-RPC frames and break the ACP parser.
-    const trustEnv = { GEMINI_CLI_TRUST_WORKSPACE: "true" };
+    const probeArgs = ["--acp", "--skip-trust"];
     const probeCmd =
       ctx.location.kind === "wsl"
-        ? buildAgentCommand(ctx.location, "gemini", ["--acp"], ctx.executablePath, trustEnv)
-        : buildAgentCommand(ctx.location, ctx.executablePath, ["--acp"]);
+        ? buildAgentCommand(ctx.location, "gemini", probeArgs, ctx.executablePath)
+        : buildAgentCommand(ctx.location, ctx.executablePath, probeArgs);
     const probeCwd = ctx.location.kind === "wsl" ? "/tmp" : homedir();
     const probeResult = await probeAcpCapabilities(probeCmd.command, probeCmd.args, probeCwd, {
       timeoutMs: 15_000,
@@ -148,7 +148,6 @@ export const geminiDetectionSpec: DetectionSpec = {
         ctx.location.kind === "wsl"
           ? `gemini:wsl:${ctx.location.distro}`
           : `gemini:${ctx.location.kind}`,
-      ...(ctx.location.kind === "wsl" ? {} : { env: trustEnv }),
     });
     if (!probeResult) return undefined;
     const modelTokens = new Map<string, number>();

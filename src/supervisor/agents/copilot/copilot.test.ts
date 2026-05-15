@@ -398,7 +398,7 @@ describe("createCopilotAdapter", () => {
     },
   );
 
-  it("prefixes plan-mode interactive prompts with /plan", () => {
+  it("passes plan-mode prompts through unchanged (mode is set via --plan at launch)", () => {
     const adapter = createCopilotAdapter();
 
     expect(
@@ -406,10 +406,10 @@ describe("createCopilotAdapter", () => {
         model: "gpt-5.4",
         mode: "plan",
       }),
-    ).toEqual(["/plan fix bug", "@wait:40", "\r"]);
+    ).toEqual(["fix bug", "@wait:40", "\r"]);
   });
 
-  it("does not double-prefix existing slash commands in plan mode", () => {
+  it("preserves user-typed slash commands verbatim", () => {
     const adapter = createCopilotAdapter();
 
     expect(
