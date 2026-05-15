@@ -5,7 +5,7 @@ import type {
   SDKControlGetContextUsageResponse,
   SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { ProjectLocation, RuntimeEvent, ThreadConfig } from "@/shared/contracts";
+import type { ProjectLocation, RuntimeEvent, SessionRef, ThreadConfig } from "@/shared/contracts";
 import type { StructuredSessionUpdate } from "../base";
 import { ClaudeSdkSession } from "./sdkSession";
 
@@ -94,9 +94,27 @@ async function flushAsyncWork(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
 
+function sdkSystemMessage(
+  subtype: "hook_started" | "hook_progress" | "hook_response" | "session_state_changed",
+  sessionId: string,
+  extra: Record<string, unknown> = {},
+): SDKMessage {
+  return {
+    type: "system",
+    subtype,
+    uuid: `uuid-${subtype}`,
+    session_id: sessionId,
+    ...extra,
+  } as unknown as SDKMessage;
+}
+
 describe("ClaudeSdkSession", () => {
   const projectLocation: ProjectLocation = { kind: "windows", path: "C:\\repo" };
   const config: ThreadConfig = { model: "sonnet" };
+  const sessionRef: SessionRef = {
+    providerSessionId: "11111111-1111-4111-8111-111111111111",
+    discoveredAt: "2026-05-14T00:00:00.000Z",
+  };
 
   it("waits for SDK query creation before sending the first GUI turn", async () => {
     const fake = createFakeQuery();
@@ -135,6 +153,108 @@ describe("ClaudeSdkSession", () => {
     );
     expect(fake.setModel).toHaveBeenCalledWith("sonnet");
     expect(fake.setPermissionMode).toHaveBeenCalledWith("auto");
+
+    await session.dispose();
+  });
+
+  it("resumes with the persisted session id without adopting transient hook ids", async () => {
+    mockSdk.query.mockClear();
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const updates: StructuredSessionUpdate[] = [];
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-resume",
+      projectLocation,
+      config,
+      sessionRef,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: () => {},
+      onUpdate: (update) => updates.push(update),
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await expect(session.openThread(config, sessionRef)).resolves.toBe(
+      sessionRef.providerSessionId,
+    );
+
+    const queryInput = mockSdk.query.mock.calls[0]?.[0] as { options?: Record<string, unknown> };
+    expect(queryInput.options).toMatchObject({ resume: sessionRef.providerSessionId });
+    expect(queryInput.options).not.toHaveProperty("sessionId");
+
+    fake.emitMessage(sdkSystemMessage("hook_started", "22222222-2222-4222-8222-222222222222"));
+    await flushAsyncWork();
+
+    expect(updates).not.toContainEqual(
+      expect.objectContaining({
+        status: "working",
+        sessionRef: expect.objectContaining({
+          providerSessionId: "22222222-2222-4222-8222-222222222222",
+        }),
+      }),
+    );
+
+    fake.emitMessage(
+      sdkSystemMessage("session_state_changed", "22222222-2222-4222-8222-222222222222", {
+        state: "idle",
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(updates.some((update) => update.status === "idle")).toBe(true);
+    });
+    expect(
+      updates.some(
+        (update) => update.sessionRef?.providerSessionId === "22222222-2222-4222-8222-222222222222",
+      ),
+    ).toBe(false);
+
+    await session.dispose();
+  });
+
+  it("lets the SDK allocate new session ids without marking idle threads working", async () => {
+    mockSdk.query.mockClear();
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const updates: StructuredSessionUpdate[] = [];
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-new",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: () => {},
+      onUpdate: (update) => updates.push(update),
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await expect(session.openThread(config)).resolves.toBe("");
+
+    const queryInput = mockSdk.query.mock.calls[0]?.[0] as { options?: Record<string, unknown> };
+    expect(queryInput.options).not.toHaveProperty("resume");
+    expect(queryInput.options).not.toHaveProperty("sessionId");
+
+    fake.emitMessage(
+      sdkSystemMessage("session_state_changed", "33333333-3333-4333-8333-333333333333", {
+        state: "idle",
+      }),
+    );
+
+    await vi.waitFor(() => {
+      expect(updates).toContainEqual(
+        expect.objectContaining({
+          status: "idle",
+          attention: "none",
+          sessionRef: expect.objectContaining({
+            providerSessionId: "33333333-3333-4333-8333-333333333333",
+          }),
+        }),
+      );
+    });
+    expect(updates.some((update) => update.status === "working")).toBe(false);
 
     await session.dispose();
   });

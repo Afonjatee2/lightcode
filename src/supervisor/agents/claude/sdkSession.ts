@@ -315,6 +315,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
   private streamStarted = false;
   private disposed = false;
   private sessionId: string | undefined;
+  private openedResumeSessionId: string | undefined;
   private currentConfig: ThreadConfig;
   private currentStatus: ThreadStatus = "idle";
   private currentAttention: ThreadAttention = "none";
@@ -419,10 +420,11 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 
   async openThread(config: ThreadConfig, sessionRef?: SessionRef): Promise<string> {
     this.currentConfig = config;
-    this.sessionId = sessionRef?.providerSessionId ?? randomUUID();
+    this.sessionId = sessionRef?.providerSessionId;
+    this.openedResumeSessionId = sessionRef?.providerSessionId;
     this.startQuery(sessionRef?.providerSessionId);
     await this.requireQuery();
-    return this.sessionId;
+    return this.sessionId ?? "";
   }
 
   async startTurn(
@@ -613,11 +615,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         ...(permissionMode === "bypassPermissions"
           ? { allowDangerouslySkipPermissions: true }
           : {}),
-        ...(resumeSessionId
-          ? { resume: resumeSessionId }
-          : this.sessionId
-            ? { sessionId: this.sessionId }
-            : {}),
+        ...(resumeSessionId ? { resume: resumeSessionId } : {}),
         includePartialMessages: true,
         forwardSubagentText: true,
         canUseTool: this.canUseTool,
@@ -743,15 +741,13 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       "session_id" in message && typeof message.session_id === "string"
         ? message.session_id
         : undefined;
-    if (sessionId && sessionId !== this.sessionId) {
-      const previous = this.sessionId;
+    if (sessionId && sessionId !== this.sessionId && this.shouldAdoptSessionId(message)) {
       this.sessionId = sessionId;
       this.emitUpdate({
-        status: "working",
-        attention: "working",
+        status: this.currentStatus,
+        attention: this.currentAttention,
         sessionRef: createKnownSessionRef(sessionId),
       });
-      void previous;
     }
 
     if (message.type === "system" && message.subtype === "session_state_changed") {
@@ -779,6 +775,20 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         ...(this.sessionId ? { sessionRef: createKnownSessionRef(this.sessionId) } : {}),
       });
     }
+  }
+
+  private shouldAdoptSessionId(message: SDKMessage): boolean {
+    if (this.openedResumeSessionId) {
+      return false;
+    }
+    if (message.type !== "system") {
+      return true;
+    }
+    return (
+      message.subtype !== "hook_started" &&
+      message.subtype !== "hook_progress" &&
+      message.subtype !== "hook_response"
+    );
   }
 
   private async refreshContextUsage(): Promise<void> {

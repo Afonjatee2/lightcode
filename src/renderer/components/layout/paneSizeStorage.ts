@@ -48,13 +48,16 @@ export function writeStoredSizes(key: string, sizes: number[]) {
 }
 
 /**
- * Rewrite split-size localStorage keys when a pane id changes (e.g., a draft
- * pane is replaced by the real thread id once the first message is sent).
- * Without this, the storage key — derived from the pane id list — no longer
- * matches and the user's custom proportions silently fall back to equal sizes.
+ * Rewrite split-size localStorage keys by remapping pane ids. The storage key
+ * encodes the full pane id list (in tree order), so any change to that list —
+ * a rename (draft → real thread id) or a swap (drag-to-replace pane reorder) —
+ * shifts the key. Without rewriting the stored entry, `readStoredSizes` falls
+ * back to equal sizes and the user's custom proportions are silently lost.
+ *
+ * Sizes are stored as a positional array; this only rewrites the *key*, so
+ * size-per-slot is preserved while the contents of those slots change.
  */
-export function migratePaneSizeStorage(oldPaneId: string, newPaneId: string): void {
-  if (oldPaneId === newPaneId) return;
+function remapPaneIdsInStorage(mapper: (paneId: string) => string): void {
   if (typeof localStorage === "undefined") return;
 
   const matchingKeys: string[] = [];
@@ -70,8 +73,8 @@ export function migratePaneSizeStorage(oldPaneId: string, newPaneId: string): vo
     if (axisSeparator === -1) continue;
     const idsPart = key.slice(axisSeparator + 1);
     const ids = idsPart.split(PANE_ID_SEPARATOR);
-    if (!ids.includes(oldPaneId)) continue;
-    const nextIds = ids.map((id) => (id === oldPaneId ? newPaneId : id));
+    const nextIds = ids.map(mapper);
+    if (nextIds.every((id, i) => id === ids[i])) continue;
     const nextKey = `${key.slice(0, axisSeparator + 1)}${nextIds.join(PANE_ID_SEPARATOR)}`;
     if (nextKey === key) continue;
     const value = localStorage.getItem(key);
@@ -83,4 +86,23 @@ export function migratePaneSizeStorage(oldPaneId: string, newPaneId: string): vo
       // ignore quota / privacy errors
     }
   }
+}
+
+export function migratePaneSizeStorage(oldPaneId: string, newPaneId: string): void {
+  if (oldPaneId === newPaneId) return;
+  remapPaneIdsInStorage((id) => (id === oldPaneId ? newPaneId : id));
+}
+
+/**
+ * Swap two pane ids in all split-size localStorage keys at once. Used when the
+ * user drags one pane onto another to swap positions: each slot keeps its size,
+ * only the pane id occupying that slot changes.
+ */
+export function swapPaneIdsInStorage(firstPaneId: string, secondPaneId: string): void {
+  if (firstPaneId === secondPaneId) return;
+  remapPaneIdsInStorage((id) => {
+    if (id === firstPaneId) return secondPaneId;
+    if (id === secondPaneId) return firstPaneId;
+    return id;
+  });
 }

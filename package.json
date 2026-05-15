@@ -50,7 +50,7 @@
   },
   "dependencies": {
     "@agentclientprotocol/sdk": "^0.21.0",
-    "@anthropic-ai/claude-agent-sdk": "^0.2.139",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.142",
     "@chenglou/pretext": "^0.0.6",
     "@dnd-kit/abstract": "^0.4.0",
     "@dnd-kit/collision": "^0.4.0",
@@ -132,8 +132,8 @@
     "wait-on": "^9.0.4"
   },
   "optionalDependencies": {
-    "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.2.139",
-    "@anthropic-ai/claude-agent-sdk-win32-x64": "0.2.139"
+    "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.3.142",
+    "@anthropic-ai/claude-agent-sdk-win32-x64": "0.3.142"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs}": [

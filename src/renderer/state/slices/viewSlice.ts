@@ -9,6 +9,7 @@ import {
   swapPaneIdsInLayout,
   type PaneLayoutInsertTarget,
 } from "@/shared/paneLayout";
+import { swapPaneIdsInStorage } from "@/renderer/components/layout/paneSizeStorage";
 import { reorderIds, type ReorderPlacement } from "../reorder";
 import {
   clearFinishedAndDone,
@@ -441,6 +442,10 @@ export const createViewSlice: SliceCreator<ViewSlice> = (set) => ({
       ) {
         return {};
       }
+      // Rewrite stored split sizes so each slot keeps its width after the swap.
+      // The storage key is derived from the pane id list, so the layout swap
+      // alone would shift the key and lose the user's custom proportions.
+      swapPaneIdsInStorage(firstPaneId, secondPaneId);
       const layout = swapPaneIdsInLayout(currentPaneLayout(state.view), firstPaneId, secondPaneId);
       return {
         view: {
