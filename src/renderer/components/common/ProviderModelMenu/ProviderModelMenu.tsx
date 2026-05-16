@@ -700,7 +700,7 @@ function WindowedProviderModelList(props: {
                 aria-label={item.isFavorite ? "Remove from favorites" : "Add to favorites"}
                 className={`ml-1 flex size-5 shrink-0 items-center justify-center rounded transition ${
                   item.isFavorite
-                    ? "text-[oklch(0.78_0.13_75)]"
+                    ? "text-foreground"
                     : "text-muted/40 opacity-0 group-hover:opacity-100 hover:text-foreground"
                 }`}
                 onPointerDown={(event) => event.stopPropagation()}
