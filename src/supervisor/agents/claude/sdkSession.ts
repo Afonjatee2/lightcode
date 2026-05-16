@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
-import { createRequire } from "node:module";
 import type {
   CanUseTool,
   Options as ClaudeQueryOptions,
@@ -31,6 +30,7 @@ import {
   createKnownSessionRef,
   getPrimedPosixEnv,
   getProjectShellEnv,
+  resolveExecutablePathAsync,
   type AgentLaunchOptions,
   type CreateStructuredSessionInput,
   type StartTurnOptions,
@@ -58,9 +58,6 @@ import {
   type ClaudeQuestion,
 } from "./sdkCanonicalMapping";
 import { mapClaudeSlashCommands } from "./probe";
-
-const require = createRequire(import.meta.url);
-const claudeSdkRequire = createRequire(require.resolve("@anthropic-ai/claude-agent-sdk"));
 
 type PendingPermission = {
   kind: "permission";
@@ -160,32 +157,6 @@ function spawnClaudeInWsl(location: ProjectLocation, options: SpawnOptions): Spa
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   }) as unknown as SpawnedProcess;
-}
-
-function unpackedAsarPath(p: string): string {
-  return p.replace(/([\\/])app\.asar([\\/])/, "$1app.asar.unpacked$2");
-}
-
-function bundledClaudeExecutablePaths(): string[] {
-  const binary = process.platform === "win32" ? "claude.exe" : "claude";
-  if (process.platform === "linux") {
-    return [
-      `@anthropic-ai/claude-agent-sdk-linux-${process.arch}-musl/${binary}`,
-      `@anthropic-ai/claude-agent-sdk-linux-${process.arch}/${binary}`,
-    ];
-  }
-  return [`@anthropic-ai/claude-agent-sdk-${process.platform}-${process.arch}/${binary}`];
-}
-
-function bundledClaudeExecutablePath(): string | undefined {
-  for (const candidate of bundledClaudeExecutablePaths()) {
-    try {
-      return unpackedAsarPath(claudeSdkRequire.resolve(candidate));
-    } catch {
-      // Try the next platform package candidate.
-    }
-  }
-  return undefined;
 }
 
 function isImageSegment(
@@ -604,8 +575,38 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         this.input.projectLocation.kind === "wsl"
           ? { CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode", BROWSER: "/bin/true" }
           : { ...(posixEnv ?? process.env), CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode" };
-      const claudeExecutablePath =
-        this.input.projectLocation.kind === "wsl" ? undefined : bundledClaudeExecutablePath();
+      // Posix builds ship without the SDK's bundled `claude` SEA binary
+      // (electron-builder strips `@anthropic-ai/claude-agent-sdk-*` from the
+      // asar). The SDK falls back to that binary when `pathToClaudeCodeExecutable`
+      // is missing, so unresolved on posix is a hard error — surface it
+      // explicitly instead of letting the SDK throw its "Native CLI binary
+      // for darwin-arm64 not found" message.
+      let claudeExecutablePath: string | undefined;
+      switch (this.input.projectLocation.kind) {
+        case "posix": {
+          claudeExecutablePath =
+            resolveAgentBinaryPath(this.input.projectLocation, "claude") ??
+            (await resolveExecutablePathAsync("claude"));
+          if (!claudeExecutablePath) {
+            throw new Error(
+              "Claude Code CLI not found on PATH. Install Claude Code (`npm i -g @anthropic-ai/claude-code` or via Homebrew) and restart Lightcode.",
+            );
+          }
+          break;
+        }
+        case "windows": {
+          claudeExecutablePath = resolveAgentBinaryPath(this.input.projectLocation, "claude");
+          break;
+        }
+        case "wsl":
+          // WSL spawns through wsl.exe (see spawnClaudeInWsl); the SDK path
+          // is resolved inside the distro.
+          break;
+        default: {
+          const _exhaustive: never = this.input.projectLocation;
+          void _exhaustive;
+        }
+      }
       const options: ClaudeQueryOptions = {
         cwd: projectCwd(this.input.projectLocation),
         model: applyClaudeContextSuffix(this.currentConfig.model, this.currentConfig.contextSize),

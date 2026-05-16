@@ -246,13 +246,6 @@ importers:
       wait-on:
         specifier: ^9.0.4
         version: 9.0.5
-    optionalDependencies:
-      '@anthropic-ai/claude-agent-sdk-darwin-arm64':
-        specifier: 0.3.142
-        version: 0.3.142
-      '@anthropic-ai/claude-agent-sdk-win32-x64':
-        specifier: 0.3.142
-        version: 0.3.142
 
   website:
     dependencies:

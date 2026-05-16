@@ -1,5 +1,6 @@
 import { compactAgentProviderMetadata, type AgentCapability } from "@/shared/contracts";
 import { readAgentCommandOutput, type DetectionSpec, type StatusProbeResult } from "../base";
+import { getAgentProbeCwd } from "../probeCwd";
 import { probeClaudeCapabilities } from "./probe";
 
 /** Default `--permission-mode` when `ThreadConfig.approvalPolicy` is omitted. */
@@ -145,7 +146,14 @@ export function parseClaudeAuthStatusJson(output: string): StatusProbeResult | u
 
 async function probeClaudeStatus(ctx: Parameters<NonNullable<DetectionSpec["statusProbe"]>>[0]) {
   if (!ctx.executablePath) return undefined;
-  const result = await readAgentCommandOutput(ctx.location, ctx.executablePath, ["auth", "status"]);
+  const result = await readAgentCommandOutput(
+    ctx.location,
+    ctx.executablePath,
+    ["auth", "status"],
+    {
+      posixCwd: getAgentProbeCwd(ctx.location),
+    },
+  );
   const parsed = parseClaudeAuthStatusJson(result.stdout || result.stderr);
   if (parsed) return parsed;
   return result.ok ? { authState: "authenticated" as const } : { authState: "unknown" as const };

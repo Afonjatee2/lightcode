@@ -37,6 +37,7 @@ import {
   type CommandSpec,
   type CreateStructuredSessionInput,
 } from "../base";
+import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
 
 /** Prefix for generic-ACP `kind` values. Unique per registered instance. */
 export const ACP_GENERIC_KIND_PREFIX = "acp-generic:";
@@ -154,8 +155,9 @@ export async function authenticateAcpGenericInstance(
   const cfg = parseAcpGenericInstanceConfig(instance.config);
   const location = detectProbeLocation(ctx);
   const command = buildGenericCommand(location, cfg, instance, authBrowserEnv(location));
+  const processCwd = resolveProbeSpawnCwd(location, command.cwd);
   await authenticateAcpAgent(command.command, command.args, methodId, {
-    ...(command.cwd ? { processCwd: command.cwd } : {}),
+    ...(processCwd ? { processCwd } : {}),
     ...(command.env ? { env: command.env } : {}),
     label: instance.displayName ?? cfg.binary,
   });
@@ -168,8 +170,9 @@ export async function logoutAcpGenericInstance(
   const cfg = parseAcpGenericInstanceConfig(instance.config);
   const location = detectProbeLocation(ctx);
   const command = buildGenericCommand(location, cfg, instance);
+  const processCwd = resolveProbeSpawnCwd(location, command.cwd);
   await logoutAcpAgent(command.command, command.args, {
-    ...(command.cwd ? { processCwd: command.cwd } : {}),
+    ...(processCwd ? { processCwd } : {}),
     ...(command.env ? { env: command.env } : {}),
     label: instance.displayName ?? cfg.binary,
   });
@@ -198,9 +201,17 @@ async function probeGenericCapabilities(
 ): Promise<AcpProbeResult | undefined> {
   const location = detectProbeLocation(ctx);
   const command = buildGenericCommand(location, cfg, instance);
-  const sessionCwd = location.kind === "wsl" ? location.linuxPath : location.path;
+  // On posix, route into the contained probe dir (TCC-safe); on WSL the linux
+  // path is required by the agent; on Windows, keep the project's native path.
+  const sessionCwd =
+    location.kind === "wsl"
+      ? location.linuxPath
+      : location.kind === "windows"
+        ? location.path
+        : getAgentProbeCwd(location);
+  const processCwd = resolveProbeSpawnCwd(location, command.cwd);
   return probeAcpCapabilities(command.command, command.args, sessionCwd, {
-    ...(command.cwd ? { processCwd: command.cwd } : {}),
+    ...(processCwd ? { processCwd } : {}),
     ...(command.env ? { env: command.env } : {}),
     label,
   });

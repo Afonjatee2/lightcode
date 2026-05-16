@@ -10,6 +10,7 @@ import {
 } from "@/shared/contracts";
 import { configFileAuthProbe, readAgentCommandOutput, type DetectionSpec } from "../base";
 import { buildContextSizeCapabilities } from "../contextWindowLabel";
+import { getAgentProbeCwd } from "../probeCwd";
 
 // Canonical ordering for the union effort list. Anything OpenCode reports
 // outside this set gets appended after these in discovery order so we never
@@ -152,6 +153,7 @@ async function probeOpenCodeModels(
     // Verbose mode prints a JSON object per model — slower than the bare
     // `models` listing but still bounded by OpenCode's local cache.
     timeoutMs: 15_000,
+    posixCwd: getAgentProbeCwd(location),
   });
   if (!result.ok || !result.stdout) return undefined;
   const parsed = parseOpenCodeVerboseModels(result.stdout);
@@ -267,10 +269,12 @@ export function parseOpenCodeProvidersList(output: string): AgentConnectedProvid
 
 async function probeOpenCodeStatus(ctx: Parameters<NonNullable<DetectionSpec["statusProbe"]>>[0]) {
   if (!ctx.executablePath) return undefined;
-  const result = await readAgentCommandOutput(ctx.location, ctx.executablePath, [
-    "providers",
-    "list",
-  ]);
+  const result = await readAgentCommandOutput(
+    ctx.location,
+    ctx.executablePath,
+    ["providers", "list"],
+    { posixCwd: getAgentProbeCwd(ctx.location) },
+  );
   const text = `${result.stdout}\n${result.stderr}`.trim();
   const connectedProviders = parseOpenCodeProvidersList(text);
   const credentialsCountMatch = /(\d+)\s+credentials\b/i.exec(text);

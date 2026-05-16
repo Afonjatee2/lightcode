@@ -31,11 +31,13 @@
     "prepare:package-assets": "pnpm run prepare:wsl-helpers && pnpm run prepare:agent-plugins",
     "sentry:sourcemaps": "node scripts/sentry-sourcemaps.mjs",
     "clean:sourcemaps": "node scripts/clean-sourcemaps.mjs",
-    "dist": "pnpm run build && pnpm run clean:sourcemaps && pnpm run prepare:package-assets && electron-builder",
-    "dist:win": "pnpm run build && pnpm run clean:sourcemaps && pnpm run prepare:package-assets && electron-builder --win nsis:x64",
-    "dist:win:all": "pnpm run build && pnpm run clean:sourcemaps && pnpm run prepare:package-assets && electron-builder --win",
-    "dist:linux": "pnpm run build && pnpm run clean:sourcemaps && pnpm run prepare:package-assets && electron-builder --linux",
-    "dist:mac": "pnpm run build && pnpm run clean:sourcemaps && pnpm run prepare:agent-plugins && electron-builder --mac",
+    "dist": "node scripts/build-desktop-artifact.mjs",
+    "dist:win": "node scripts/build-desktop-artifact.mjs --platform win --target nsis --arch x64",
+    "dist:win:all": "node scripts/build-desktop-artifact.mjs --platform win",
+    "dist:linux": "node scripts/build-desktop-artifact.mjs --platform linux",
+    "dist:mac": "node scripts/build-desktop-artifact.mjs --platform mac",
+    "dist:mac:arm": "node scripts/build-desktop-artifact.mjs --platform mac --target dmg --arch arm64",
+    "dist:legacy": "pnpm run build && pnpm run clean:sourcemaps && pnpm run prepare:package-assets && electron-builder",
     "typecheck": "pnpm exec tsgo --noEmit -p tsconfig.json",
     "typecheck:compat": "tsc --noEmit -p tsconfig.json",
     "lint": "oxlint --type-aware --deny-warnings .",
@@ -131,10 +133,6 @@
     "vitest": "^4.1.5",
     "wait-on": "^9.0.4"
   },
-  "optionalDependencies": {
-    "@anthropic-ai/claude-agent-sdk-darwin-arm64": "0.3.142",
-    "@anthropic-ai/claude-agent-sdk-win32-x64": "0.3.142"
-  },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs}": [
       "oxlint --type-aware --fix --deny-warnings",
@@ -145,7 +143,7 @@
   "engines": {
     "node": ">=24.10.0"
   },
-  "packageManager": "pnpm@11.1.0+sha512.0c44e842e5686b2c061a81adda8b2258bd8818e9704b2cf2c63d56b931a7b2e910092e085027003b96ca3911ab56a07f6df5abaed2be9925034cdd686a535b14",
+  "packageManager": "pnpm@11.1.2+sha512.415a1cc25974731e75455c1468371be74c5aa5fb7621b50d4056d222451609f11412f23fd602e6169f1e060466641f798597e1be961a10688836a67b16569499",
   "electronmon": {
     "patterns": [
       "!src/**",

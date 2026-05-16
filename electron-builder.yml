@@ -14,11 +14,6 @@ files:
   - node_modules/better-sqlite3/**/*
   - node_modules/electron-updater/**/*
   - node_modules/.pnpm/electron-updater@*/node_modules/**/*
-  # Claude SDK loads a platform-specific runtime package dynamically (e.g.
-  # `@anthropic-ai/claude-agent-sdk-win32-x64`). Under pnpm those live in the
-  # `.pnpm/` store and are not pulled in by the plain root package path alone.
-  - node_modules/@anthropic-ai/claude-agent-sdk-*/**/*
-  - node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-*/node_modules/@anthropic-ai/**/*
   - node_modules/.pnpm/builder-util-runtime@*/node_modules/**/*
   - node_modules/.pnpm/debug@*/node_modules/**/*
   - node_modules/.pnpm/ms@*/node_modules/**/*
@@ -90,6 +85,11 @@ files:
   - "!node_modules/.pnpm/@chenglou*/**/*"
   - "!node_modules/.pnpm/tailwindcss@*/**/*"
   - "!node_modules/.pnpm/@tailwindcss*/**/*"
+  # Claude Agent SDK ships the `claude` CLI as a 200+MB precompiled SEA binary
+  # per platform, declared as optionalDependencies on the SDK. We require users
+  # to install Claude Code separately and use `claude` from PATH instead.
+  - "!node_modules/@anthropic-ai/claude-agent-sdk-*/**/*"
+  - "!node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-*/**/*"
 
 extraResources:
   - from: resources/wsl-helpers
@@ -110,13 +110,9 @@ asarUnpack:
   - node_modules/better-sqlite3/**/*
   # Claude SDK slash-command probe runs inside WSL via in-distro `node`, which
   # cannot read inside an asar archive. The worker resolves
-  # `@anthropic-ai/claude-agent-sdk` from its own location, and the SDK loads a
-  # platform runtime package dynamically, so unpack both roots and the pnpm
-  # store entries that back the platform package.
+  # `@anthropic-ai/claude-agent-sdk` from its own location.
   - dist/main/claudeSdkProbeWorker.mjs
   - node_modules/@anthropic-ai/claude-agent-sdk/**/*
-  - node_modules/@anthropic-ai/claude-agent-sdk-*/**/*
-  - node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-*/node_modules/@anthropic-ai/**/*
 
 publish:
   provider: github

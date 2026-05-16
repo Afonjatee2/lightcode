@@ -5,6 +5,7 @@ import {
   type DetectionSpec,
   type StatusProbeResult,
 } from "../base";
+import { getAgentProbeCwd } from "../probeCwd";
 import { probeCodexAccount, probeCodexCapabilities, type CodexProbeResult } from "./probe";
 import { codexAuthPath } from "./sessionFiles";
 
@@ -302,10 +303,12 @@ async function probeCodexStatus(ctx: Parameters<NonNullable<DetectionSpec["statu
     }
   }
 
-  const result = await readAgentCommandOutput(ctx.location, ctx.executablePath, [
-    "login",
-    "status",
-  ]);
+  const result = await readAgentCommandOutput(
+    ctx.location,
+    ctx.executablePath,
+    ["login", "status"],
+    { posixCwd: getAgentProbeCwd(ctx.location) },
+  );
   const parsed = parseCodexLoginStatusOutput(`${result.stdout}\n${result.stderr}`);
   if (parsed) return parsed;
   return result.ok ? { authState: "authenticated" as const } : { authState: "unknown" as const };

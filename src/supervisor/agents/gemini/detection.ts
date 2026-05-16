@@ -12,6 +12,7 @@ import {
   type DetectionSpec,
 } from "../base";
 import { buildContextSizeCapabilities } from "../contextWindowLabel";
+import { getAgentProbeCwd } from "../probeCwd";
 
 // Gemini's ACP probe reports the selectable model ids/names, but not token
 // limits. Keep this as an exact documented allowlist so new ids do not inherit
@@ -141,7 +142,7 @@ export const geminiDetectionSpec: DetectionSpec = {
       ctx.location.kind === "wsl"
         ? buildAgentCommand(ctx.location, "gemini", probeArgs, ctx.executablePath)
         : buildAgentCommand(ctx.location, ctx.executablePath, probeArgs);
-    const probeCwd = ctx.location.kind === "wsl" ? "/tmp" : homedir();
+    const probeCwd = ctx.location.kind === "wsl" ? "/tmp" : getAgentProbeCwd(ctx.location);
     const probeResult = await probeAcpCapabilities(probeCmd.command, probeCmd.args, probeCwd, {
       timeoutMs: 15_000,
       label:

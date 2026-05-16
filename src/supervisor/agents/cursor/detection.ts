@@ -18,7 +18,7 @@ import {
   type DetectionSpec,
 } from "../base";
 import { probeAcpCapabilities } from "../acp";
-import { getProjectPosixPath } from "@/shared/wsl";
+import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
 
 export const cursorDefaultCapabilities: AgentCapability = {
   models: [],
@@ -44,10 +44,18 @@ const MODEL_LINE_RE = /^([^\s-]+(?:-[^\s-]+)*)\s+-\s+(.+)$/;
 export function buildCursorProbeSpec(
   executablePath: string,
   args: string[],
-  cwd = process.cwd(),
+  cwd?: string,
 ): CommandSpec {
-  const location: ProjectLocation =
-    process.platform === "win32" ? { kind: "windows", path: cwd } : { kind: "posix", path: cwd };
+  // When no cwd is supplied, posix callers spawn from the contained probe dir
+  // (see probeCwd.ts) rather than process.cwd() — cursor-agent indexes its cwd
+  // at probe time and would otherwise trip macOS TCC prompts. Windows callers
+  // still default to process.cwd() since TCC is macOS-only.
+  const isWindows = process.platform === "win32";
+  const resolvedCwd =
+    cwd ?? (isWindows ? process.cwd() : getAgentProbeCwd({ kind: "posix", path: process.cwd() }));
+  const location: ProjectLocation = isWindows
+    ? { kind: "windows", path: resolvedCwd }
+    : { kind: "posix", path: resolvedCwd };
   return buildAgentCommand(location, executablePath, args);
 }
 
@@ -392,19 +400,16 @@ async function probeCursorAcpModelPickerCapabilities(
 ): Promise<Partial<AgentCapability> | undefined> {
   if (!ctx.executablePath) return undefined;
   const spec = buildAgentCommand(ctx.location, "cursor-agent", ["acp"], ctx.executablePath);
-  const result = await probeAcpCapabilities(
-    spec.command,
-    spec.args,
-    getProjectPosixPath(ctx.location),
-    {
-      ...(spec.cwd ? { processCwd: spec.cwd } : {}),
-      timeoutMs: 15_000,
-      label:
-        ctx.location.kind === "wsl"
-          ? `cursor-acp:wsl:${ctx.location.distro}`
-          : `cursor-acp:${ctx.location.kind}`,
-    },
-  );
+  const probeCwd = getAgentProbeCwd(ctx.location);
+  const processCwd = resolveProbeSpawnCwd(ctx.location, spec.cwd);
+  const result = await probeAcpCapabilities(spec.command, spec.args, probeCwd, {
+    ...(processCwd ? { processCwd } : {}),
+    timeoutMs: 15_000,
+    label:
+      ctx.location.kind === "wsl"
+        ? `cursor-acp:wsl:${ctx.location.distro}`
+        : `cursor-acp:${ctx.location.kind}`,
+  });
   if (!result?.models?.length) return undefined;
   return buildCursorAcpModelPickerCapabilities(result.models);
 }
@@ -604,9 +609,10 @@ export function parseCursorAboutOutput(output: string): AgentProviderMetadata | 
 
 async function probeCursorStatus(ctx: Parameters<NonNullable<DetectionSpec["statusProbe"]>>[0]) {
   if (!ctx.executablePath) return undefined;
+  const probeCwd = getAgentProbeCwd(ctx.location);
   const [whoamiResult, aboutResult] = await Promise.all([
-    readAgentCommandOutput(ctx.location, ctx.executablePath, ["whoami"]),
-    readAgentCommandOutput(ctx.location, ctx.executablePath, ["about"]),
+    readAgentCommandOutput(ctx.location, ctx.executablePath, ["whoami"], { posixCwd: probeCwd }),
+    readAgentCommandOutput(ctx.location, ctx.executablePath, ["about"], { posixCwd: probeCwd }),
   ]);
 
   const whoami = parseCursorWhoamiOutput(`${whoamiResult.stdout}\n${whoamiResult.stderr}`);
