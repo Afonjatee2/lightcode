@@ -169,6 +169,19 @@ export function mapAcpSessionUpdate(
 
   switch (update.sessionUpdate) {
     case "agent_message_chunk": {
+      const content = (update as { content?: ContentBlock }).content;
+      // Gemini echoes `[MODE_UPDATE] <mode>` as an agent text chunk whenever the
+      // session is launched (or switched) into a specific approval mode. The
+      // user already chose the mode in the launcher; surfacing the echo as
+      // chat noise on every turn is just clutter. Drop it before we open an
+      // assistant item so the chat stays clean.
+      if (
+        !state.openAssistantItemId &&
+        content?.type === "text" &&
+        /^\[MODE_UPDATE\]/.test(content.text)
+      ) {
+        break;
+      }
       // Open an assistant item on first chunk; emit deltas thereafter.
       if (!state.openAssistantItemId) {
         // Close any prior reasoning/user items — assistant is starting fresh.
@@ -181,7 +194,6 @@ export function mapAcpSessionUpdate(
           itemType: "assistant_message",
         });
       }
-      const content = (update as { content?: ContentBlock }).content;
       if (content) {
         if (content.type === "text") {
           events.push({

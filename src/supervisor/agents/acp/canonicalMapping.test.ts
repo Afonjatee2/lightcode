@@ -41,6 +41,25 @@ describe("mapAcpSessionUpdate", () => {
     expect((second[0] as { delta: string }).delta).toBe(" world");
   });
 
+  it("drops [MODE_UPDATE] agent text echoes — mode is chosen in the launcher, not chat", () => {
+    // Gemini's ACP server emits `[MODE_UPDATE] <mode>` as a fresh
+    // agent_message_chunk every time a session starts (or switches) into a
+    // specific approval mode. The user already picked that mode in the
+    // launcher UI; replaying it as a chat message on every turn is pure
+    // noise, so the mapper must drop the chunk before opening an assistant
+    // item.
+    const state = createAcpMapperState("t-mode");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "agent_message_chunk",
+        content: { type: "text", text: "[MODE_UPDATE] yolo" },
+      }),
+      state,
+    );
+    expect(events).toEqual([]);
+    expect(state.openAssistantItemId).toBeUndefined();
+  });
+
   it("drops user_message_chunk echoes — supervisor/renderer own the user_message item", () => {
     // Some ACP servers (Copilot) echo the user's prompt back as
     // `user_message_chunk` updates after we send `session/prompt`. The
