@@ -11,6 +11,7 @@ import {
   buildCursorProbeSpec,
   createCursorAdapter,
   detectCursorTerminalStatus,
+  rewriteCursorLoadSessionError,
   sortCursorModels,
 } from "./index";
 import { buildCursorArgs } from "./argv";
@@ -39,6 +40,17 @@ describe("createCursorAdapter capabilities", () => {
     expect(adapter.capabilities.approvalPolicies.some((p) => p.id === "never")).toBe(true);
     expect(adapter.capabilities.presentationModes).toEqual(["terminal", "gui"]);
     expect(adapter.createStructuredSession).toBeTypeOf("function");
+  });
+});
+
+describe("rewriteCursorLoadSessionError", () => {
+  it("returns the Cursor-specific 'resume not supported' copy", () => {
+    const raw = new Error("Invalid params");
+    const out = rewriteCursorLoadSessionError(raw, "ses-1");
+    expect(out.message).toBe(
+      "Cursor's ACP integration doesn't currently support resuming chat sessions. Start a new thread to continue.",
+    );
+    expect((out as { cause?: unknown }).cause).toBe(raw);
   });
 });
 

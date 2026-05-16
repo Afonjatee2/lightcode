@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
+import { RequestError } from "@agentclientprotocol/sdk";
 import type { CreateStructuredSessionInput } from "../base";
 import type { ThreadConfig } from "@/shared/contracts";
 import {
   AcpStructuredSession,
   resolveAcpResourcePath,
+  rewriteLoadSessionError,
   shouldSpawnAcpSession,
   toAcpResourceUri,
 } from "./session";
@@ -140,6 +142,36 @@ describe("shouldSpawnAcpSession — shared resume/presentation gate for all ACP 
     expect(shouldSpawnAcpSession(makeInput({ presentationMode: "gui" }))).toBe(true);
     expect(shouldSpawnAcpSession(makeInput({ presentationMode: "terminal" }))).toBe(true);
     expect(shouldSpawnAcpSession(makeInput())).toBe(true);
+  });
+});
+
+describe("rewriteLoadSessionError — user-facing copy for session/load failures", () => {
+  it("rewrites a 'Session not found' invalidParams into resume-specific guidance", () => {
+    const raw = RequestError.invalidParams({ message: 'Session "abc-123" not found' });
+    const out = rewriteLoadSessionError(raw, "abc-123");
+    expect(out.message).toBe(
+      "This conversation can't be resumed — the agent no longer recognizes this session. Start a new thread to continue.",
+    );
+    expect((out as { cause?: unknown }).cause).toBe(raw);
+  });
+
+  it("includes the agent's error message verbatim for non-not-found failures", () => {
+    const raw = RequestError.invalidParams({ message: "cwd does not match" });
+    const out = rewriteLoadSessionError(raw, "ses-9");
+    expect(out.message).toContain("cwd does not match");
+    expect(out.message).toContain("Start a new thread");
+  });
+
+  it("falls back to the Error message when the error isn't a RequestError", () => {
+    const out = rewriteLoadSessionError(new Error("stream closed"), "ses-9");
+    expect(out.message).toContain("stream closed");
+    expect(out.message).toContain("Start a new thread");
+  });
+
+  it("detects 'session ... not found' phrasing inside plain Error messages", () => {
+    const out = rewriteLoadSessionError(new Error('session "ses-9" not found'), "ses-9");
+    expect(out.message).toContain("can't be resumed");
+    expect(out.message).not.toContain("ses-9");
   });
 });
 

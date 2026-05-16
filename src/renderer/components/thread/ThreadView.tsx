@@ -28,12 +28,20 @@ import { ThreadHeaderStatusButton } from "./ThreadHeaderStatus";
 
 const DEFAULT_HIDDEN_TERMINAL_SIZE: TerminalSize = { cols: 120, rows: 30 };
 
+/**
+ * Strip Electron's `Error invoking remote method '<channel>': Error: ` prefix
+ * from IPC rejections so users see the supervisor's actual message verbatim.
+ */
+function stripIpcInvokeFraming(message: string): string {
+  return message.replace(/^Error invoking remote method '[^']+':\s*(?:Error:\s*)?/, "");
+}
+
 function formatLaunchError(error: unknown): string {
   if (error instanceof Error && error.message.trim().length > 0) {
-    return error.message;
+    return stripIpcInvokeFraming(error.message);
   }
   if (typeof error === "string" && error.trim().length > 0) {
-    return error;
+    return stripIpcInvokeFraming(error);
   }
   if (
     error &&
@@ -42,7 +50,7 @@ function formatLaunchError(error: unknown): string {
     typeof error.message === "string" &&
     error.message.trim().length > 0
   ) {
-    return error.message;
+    return stripIpcInvokeFraming(error.message);
   }
   return "Thread failed to start.";
 }

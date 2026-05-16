@@ -48,6 +48,18 @@ function cursorHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
   return hint.status === "needs_approval";
 }
 
+/**
+ * Cursor's ACP server advertises `loadSession: true` but immediately rejects
+ * every sessionId it issues via `session/new` with `-32602 Session not found`.
+ * Acknowledged Cursor bug (forum thread #155516) with no client workaround, so
+ * we replace the raw transport error with copy that names the limitation.
+ */
+export function rewriteCursorLoadSessionError(error: unknown, _sessionId: string): Error {
+  const message =
+    "Cursor's ACP integration doesn't currently support resuming chat sessions. Start a new thread to continue.";
+  return Object.assign(new Error(message), { cause: error });
+}
+
 export function createCursorAdapter(): AgentAdapter {
   let capabilities: AgentCapability = cursorDefaultCapabilities;
 
@@ -105,7 +117,10 @@ export function createCursorAdapter(): AgentAdapter {
         ["acp"],
         resolveAgentBinaryPath(input.projectLocation, "cursor-agent"),
       );
-      return createAcpStructuredSession(command, input);
+      return createAcpStructuredSession(command, {
+        ...input,
+        loadSessionErrorRewriter: rewriteCursorLoadSessionError,
+      });
     },
     buildDirectInput(prompt, _segments, _config, projectLocation) {
       // Cursor's TUI debounces fast incoming bytes as a paste burst. With

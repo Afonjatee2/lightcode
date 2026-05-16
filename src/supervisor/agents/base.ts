@@ -122,6 +122,14 @@ export interface CreateStructuredSessionInput {
    * return `undefined` for terminal-mode threads to skip the spawn.
    */
   presentationMode?: ThreadPresentationMode;
+  /**
+   * Optional adapter-supplied rewriter for `session/load` failures. The ACP
+   * session calls this when the agent rejects a resume so the adapter can
+   * surface provider-specific copy (e.g. Cursor's ACP doesn't yet support
+   * resuming sessions). Falls back to a generic "can't resume" message when
+   * omitted.
+   */
+  loadSessionErrorRewriter?: (error: unknown, sessionId: string) => Error;
 }
 
 /**

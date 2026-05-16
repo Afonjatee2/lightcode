@@ -20,6 +20,7 @@ import {
   ClientSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
+  RequestError,
   type Client,
   type ContentBlock,
   type RequestPermissionRequest,
@@ -215,6 +216,39 @@ function createAcpPromptUsageEvent(threadId: string, usage: unknown): RuntimeEve
       cachedWriteTokens: readNonNegativeInteger(obj.cachedWriteTokens),
     }),
   );
+}
+
+/**
+ * Replace the raw JSON-RPC error from `session/load` with a message the
+ * renderer can show verbatim. Provider-agnostic on purpose: the same code
+ * path triggers whenever any ACP agent rejects a `session/load` call (lost,
+ * rotated, or never-persisted sessionId).
+ */
+export function rewriteLoadSessionError(error: unknown, _sessionId: string): Error {
+  const detail = extractLoadSessionDetail(error);
+  const message = detail.notFound
+    ? "This conversation can't be resumed — the agent no longer recognizes this session. Start a new thread to continue."
+    : `This conversation can't be resumed: ${detail.message ?? (error instanceof Error ? error.message : String(error))}. Start a new thread to continue.`;
+  return Object.assign(new Error(message), { cause: error });
+}
+
+function extractLoadSessionDetail(error: unknown): { message?: string; notFound: boolean } {
+  let message: string | undefined;
+  let notFound = false;
+  if (error instanceof RequestError) {
+    message = error.message;
+    const data = error.data as { message?: unknown } | undefined;
+    if (data && typeof data.message === "string") {
+      message = data.message;
+      if (/not\s+found/i.test(data.message)) notFound = true;
+    }
+  } else if (error instanceof Error) {
+    message = error.message;
+    if (/session.*not\s+found/i.test(error.message)) notFound = true;
+  }
+  return notFound
+    ? { ...(message ? { message } : {}), notFound: true }
+    : { ...(message ? { message } : {}), notFound: false };
 }
 
 const INTERRUPT_ACK_TEXT_TAIL_LIMIT = 512;
@@ -582,8 +616,20 @@ function applyAcpModeUpdateToConfig(currentConfig: ThreadConfig, modeId: string)
 
 // ── Session ──────────────────────────────────────────────────────
 
+export interface AcpStructuredSessionOptions {
+  /**
+   * Hook the adapter passes in when it wants to control the message a failed
+   * `session/load` produces. Receives the raw transport error and the
+   * sessionId that was being loaded; must return the Error to throw.
+   */
+  loadSessionErrorRewriter?: (error: unknown, sessionId: string) => Error;
+}
+
 export class AcpStructuredSession implements StructuredSessionHandle {
   launchOptions: AgentLaunchOptions;
+
+  private loadSessionErrorRewriter: (error: unknown, sessionId: string) => Error =
+    rewriteLoadSessionError;
 
   private readonly child: ChildProcess;
   private readonly connection: ClientSideConnection;
@@ -644,6 +690,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     projectLocation: ProjectLocation,
     cwd: string,
     threadId: string,
+    options?: AcpStructuredSessionOptions,
   ) {
     this.child = child;
     this.connection = connection;
@@ -651,6 +698,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.cwd = cwd;
     this.threadId = threadId;
     this.launchOptions = { suppressResumeConfigOverrides: true };
+    if (options?.loadSessionErrorRewriter) {
+      this.loadSessionErrorRewriter = options.loadSessionErrorRewriter;
+    }
   }
 
   /** Initialize the canonical mapper once we have a stable thread id. */
@@ -831,6 +881,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     command: CommandSpec,
     projectLocation: ProjectLocation,
     threadId: string,
+    options?: AcpStructuredSessionOptions,
   ): AcpStructuredSession {
     const sessionCwd = resolveSessionCwd(projectLocation);
     const spawnCwd = command.cwd ?? resolveSpawnCwd(projectLocation);
@@ -897,7 +948,14 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       stream,
     );
 
-    session = new AcpStructuredSession(child, connection, projectLocation, sessionCwd, threadId);
+    session = new AcpStructuredSession(
+      child,
+      connection,
+      projectLocation,
+      sessionCwd,
+      threadId,
+      options,
+    );
     session.spawnReady = spawnReady;
     session.stderrChunks.push(...stderrChunks);
 
@@ -1003,6 +1061,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         this.adoptSessionRef(sessionRef);
         availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
         configOptions = result.configOptions ?? [];
+      } catch (error) {
+        throw this.loadSessionErrorRewriter(error, sessionRef.providerSessionId);
       } finally {
         this.isReplayingHistory = false;
         this.replayHistoryUntil = Date.now() + 500;
@@ -1483,5 +1543,9 @@ export function createAcpStructuredSession(
   if (!shouldSpawnAcpSession(input)) {
     return undefined;
   }
-  return AcpStructuredSession.create(acpCommand, input.projectLocation, input.threadId);
+  return AcpStructuredSession.create(acpCommand, input.projectLocation, input.threadId, {
+    ...(input.loadSessionErrorRewriter
+      ? { loadSessionErrorRewriter: input.loadSessionErrorRewriter }
+      : {}),
+  });
 }

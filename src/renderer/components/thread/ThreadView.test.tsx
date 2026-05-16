@@ -211,6 +211,65 @@ describe("ThreadView", () => {
     });
   });
 
+  it("strips Electron IPC framing from launch errors before surfacing them", async () => {
+    bridge.startThread.mockRejectedValueOnce(
+      new Error(
+        "Error invoking remote method 'lightcode:start-thread': Error: This conversation can't be resumed.",
+      ),
+    );
+    const onLaunchFailed = vi.fn<(message: string) => void>();
+
+    renderThreadView({
+      thread: {
+        id: "thread-launch-ipc-error",
+        projectId: "project-1",
+        title: "Cursor resume",
+        agentKind: "cursor",
+        config: { model: "auto" },
+        status: "launching",
+        attention: "none",
+        canResumeWithConfig: false,
+        archived: false,
+        done: false,
+        starred: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "cursor",
+        label: "Cursor",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "auto", label: "Auto" }],
+          efforts: [],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+          settingDefs: [],
+        },
+      },
+      projectLocation: { kind: "posix", path: "/tmp" },
+      pendingLaunchPrompt: "hi",
+      onConfigChange: () => undefined,
+      onLaunchConsumed: () => undefined,
+      onLaunchFailed,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    fireEvent.click(screen.getByText("report terminal size"));
+
+    await waitFor(() => {
+      expect(onLaunchFailed).toHaveBeenCalledWith("This conversation can't be resumed.");
+    });
+  });
+
   it("renders a server-mode composer for Codex live threads", () => {
     renderThreadView({
       thread: {
