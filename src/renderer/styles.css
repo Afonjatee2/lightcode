@@ -2073,3 +2073,9 @@ html[data-platform="darwin"] .lightcode-sidebar-project-nudge {
   transform: scaleY(0.7);
   transform-origin: center;
 }
+
+/* Take chat scrollers out of dnd-kit's AutoScroller ancestor scan while a
+   drag is active. */
+html[data-lightcode-drag-active="true"] [data-lightcode-chat-scroller="true"] {
+  overflow: hidden !important;
+}

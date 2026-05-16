@@ -245,6 +245,7 @@ export function ChatPane(props: ChatPaneProps) {
         <div className="relative min-h-0 flex-1">
           <div
             ref={setScrollContainer}
+            data-lightcode-chat-scroller="true"
             className="min-h-0 h-full overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable]"
             style={scrollFadeStyle}
             onWheelCapture={(event) => {

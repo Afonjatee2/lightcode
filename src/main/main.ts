@@ -1,11 +1,12 @@
 import { watch } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { app, BrowserWindow, powerSaveBlocker } from "electron";
+import { app, BrowserWindow } from "electron";
 import { closeDatabase, dbGetThreads, initDatabase } from "./db";
 import { cleanupOrphanedAttachments, prepareLightcodeDataRoot } from "./lightcodeData";
 import { createLocalIpcHandlers } from "./ipc/localHandlers";
 import { registerIpcHandlers } from "./ipc/registerHandlers";
+import { createSleepInhibitor } from "./sleepInhibitor";
 import {
   installLocalFileProtocolHandler,
   registerLocalFileProtocolScheme,
@@ -44,7 +45,7 @@ let lightcodePaths: LightcodePaths | null = null;
 let windowsJobObjectManager: WindowsJobObjectManager | null = null;
 
 const workingThreads = new Set<string>();
-let powerSaveBlockerId: number | null = null;
+const sleepInhibitor = createSleepInhibitor();
 
 function requireLightcodePaths(): LightcodePaths {
   if (!lightcodePaths) {
@@ -55,17 +56,9 @@ function requireLightcodePaths(): LightcodePaths {
 
 function updatePowerSaveBlocker(): void {
   const enabled = lightcodePaths
-    ? (readSharedSettingsFile(lightcodePaths.settingsPath).preventSleepWhileWorking ?? true)
+    ? readSharedSettingsFile(lightcodePaths.settingsPath).preventSleepWhileWorking
     : true;
-  const shouldBlock = enabled && workingThreads.size > 0;
-  if (shouldBlock && powerSaveBlockerId === null) {
-    powerSaveBlockerId = powerSaveBlocker.start("prevent-app-suspension");
-  } else if (!shouldBlock && powerSaveBlockerId !== null) {
-    if (powerSaveBlocker.isStarted(powerSaveBlockerId)) {
-      powerSaveBlocker.stop(powerSaveBlockerId);
-    }
-    powerSaveBlockerId = null;
-  }
+  sleepInhibitor.setActive(enabled && workingThreads.size > 0);
 }
 
 function handleSupervisorEventForSleep(event: SupervisorEvent): void {
@@ -270,6 +263,7 @@ if (!hasSingleInstanceLock) {
       supervisorClient.dispose();
       windowsJobObjectManager?.dispose();
       windowsJobObjectManager = null;
+      sleepInhibitor.dispose();
     });
   });
 }

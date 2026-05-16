@@ -51,16 +51,9 @@ const DEFAULT_ROW_ESTIMATE_PX = 96;
 const UPWARD_SCROLL_MEASUREMENT_SUPPRESSION_MS = 750;
 const SKIP_REVERT_CONFIRM_PREF_KEY = "lightcode-chat-checkpoint-revert-skip-confirm";
 
-/**
- * Virtualized chat transcript for the thread. Scroll lives on the parent pane,
- * while TanStack Virtual keeps the DOM limited to visible rows plus overscan.
- *
- * Explicit `memo` escape hatch: `ChatPane` re-renders for scroll pinning and
- * approval-card churn, but the transcript rows should stay isolated unless the
- * ordered `itemIds` actually change. React Compiler is the default strategy in
- * this repo; this is one of the cases where a manual boundary is still useful.
- */
-export const MessageList = memo(function MessageList({
+// Intentionally not wrapped in `React.memo`: pane swaps preserve this fiber
+// while moving the DOM, so the virtualizer must re-render to re-measure.
+export function MessageList({
   threadId,
   entries,
   scrollElement,
@@ -323,7 +316,7 @@ export const MessageList = memo(function MessageList({
       />
     </ChatPaneActionsContext.Provider>
   );
-});
+}
 
 type VirtualChatListRowProps = {
   threadId: string;

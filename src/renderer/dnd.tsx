@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import { PointerActivationConstraints } from "@dnd-kit/dom";
-import { DragDropProvider, KeyboardSensor, PointerSensor } from "@dnd-kit/react";
+import type { Plugins } from "@dnd-kit/abstract";
+import { Feedback, PointerActivationConstraints } from "@dnd-kit/dom";
+import { DragDropProvider, DragOverlay, KeyboardSensor, PointerSensor } from "@dnd-kit/react";
 import { isSortable } from "@dnd-kit/react/sortable";
 import type { PaneLayout, PaneLayoutAxis, PaneLayoutInsertTarget } from "@/shared/paneLayout";
 import { findPanePath } from "@/shared/paneLayout";
 import { useFileEditorStore } from "./state/fileEditorStore";
+import { useThread } from "./state/useThread";
 
 export type DragSourceData =
   | { type: "project"; projectId: string }
@@ -181,6 +183,12 @@ function isMainPanelDropSource(source: DragSourceData | undefined): source is Ma
     source?.type === "project" ||
     source?.type === "worktree-group"
   );
+}
+
+type PaneDragSource = Extract<DragSourceData, { type: "pane" }>;
+
+function isPaneDragSource(source: DragSourceData | undefined): source is PaneDragSource {
+  return source?.type === "pane";
 }
 
 function isPointerInMainPanelDropZone(pointerX: number, pointerY: number): boolean {
@@ -372,14 +380,28 @@ export function AppDndProvider(props: {
     [],
   );
 
+  // Pane drags use a separate overlay (below), so disable the default tween:
+  // moving the real pane element would reparent its chat scroller and reset
+  // `scrollTop`. Sidebar sortables keep default feedback.
+  const plugins = useMemo(
+    () => (defaults: Plugins) =>
+      defaults.map((plugin) =>
+        plugin === Feedback ? Feedback.configure({ dropAnimation: null }) : plugin,
+      ),
+    [],
+  );
+
   return (
     <DragDropProvider
       sensors={sensors}
+      plugins={plugins}
       onDragStart={(event) => {
         const data = event.operation.source?.data as DragSourceData | undefined;
         if (data) setDragSource(data);
         sidebarSortTargetRef.current = null;
         mainPanelDropActiveRef.current = false;
+        // Lets CSS opt chat scrollers out of dnd-kit's AutoScroller ancestor scan.
+        document.documentElement.dataset.lightcodeDragActive = "true";
       }}
       onDragMove={(event) => {
         const data = event.operation.source?.data as DragSourceData | undefined;
@@ -525,9 +547,24 @@ export function AppDndProvider(props: {
         paneIndicatorRef.current = null;
         mainPanelDropActiveRef.current = false;
         sidebarSortTargetRef.current = null;
+        delete document.documentElement.dataset.lightcodeDragActive;
       }}
     >
       {props.children}
+      <DragOverlay
+        disabled={(source) => !isPaneDragSource(source?.data as DragSourceData | undefined)}
+      >
+        {(source) => <PaneDragPreview paneId={(source.data as PaneDragSource).paneId} />}
+      </DragOverlay>
     </DragDropProvider>
+  );
+}
+
+function PaneDragPreview({ paneId }: { paneId: string }) {
+  const thread = useThread(paneId);
+  return (
+    <div className="pointer-events-none flex h-12 min-w-[180px] max-w-[280px] items-center gap-2 rounded-lg border border-[color:var(--border)] bg-[color:var(--surface)] px-3 text-xs shadow-lg">
+      <span className="truncate font-medium text-foreground">{thread?.title ?? "Pane"}</span>
+    </div>
   );
 }

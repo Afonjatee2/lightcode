@@ -367,24 +367,29 @@ export function SplitPaneContainer(props: {
           height: innerHeight,
         }}
       >
-        {computed.panes.map((pane) => (
-          <div
-            key={pane.paneId}
-            ref={(element) => {
-              if (element) paneElementRefs.current.set(pane.paneId, element);
-              else paneElementRefs.current.delete(pane.paneId);
-            }}
-            className="absolute overflow-hidden"
-            style={{
-              left: pane.rect.left,
-              top: pane.rect.top,
-              width: pane.rect.width,
-              height: pane.rect.height,
-            }}
-          >
-            {props.renderPane(pane.paneId, pane.rect)}
-          </div>
-        ))}
+        {/* Sort by id so React keeps the same DOM slot per pane across layout
+            swaps; reparenting an absolutely-positioned pane resets `scrollTop`
+            on the nested chat scroller. */}
+        {[...computed.panes]
+          .sort((a, b) => a.paneId.localeCompare(b.paneId))
+          .map((pane) => (
+            <div
+              key={pane.paneId}
+              ref={(element) => {
+                if (element) paneElementRefs.current.set(pane.paneId, element);
+                else paneElementRefs.current.delete(pane.paneId);
+              }}
+              className="absolute overflow-hidden"
+              style={{
+                left: pane.rect.left,
+                top: pane.rect.top,
+                width: pane.rect.width,
+                height: pane.rect.height,
+              }}
+            >
+              {props.renderPane(pane.paneId, pane.rect)}
+            </div>
+          ))}
         {computed.dividers.map((divider) => (
           <Divider
             key={divider.zoneId}

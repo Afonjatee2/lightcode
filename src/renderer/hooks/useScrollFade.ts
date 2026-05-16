@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, MutableRefObject, RefObject } from "react";
 
 const FADE_MASK_GRADIENT =
@@ -50,10 +50,12 @@ export function useScrollFade<T extends HTMLElement = HTMLDivElement>(
   const scrollRef = useRef<T | null>(null);
   const [scrollEl, setScrollEl] = useState<T | null>(null);
 
-  const setScrollContainer = (el: T | null) => {
+  // Stable identity: an inline closure would cycle the ref null→element on
+  // every parent re-render, dropping the virtualizer's scroll element.
+  const setScrollContainer = useCallback((el: T | null) => {
     scrollRef.current = el;
     setScrollEl(el);
-  };
+  }, []);
 
   useEffect(() => {
     const el = scrollEl;
