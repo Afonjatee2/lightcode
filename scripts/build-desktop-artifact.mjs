@@ -23,7 +23,7 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -75,12 +75,23 @@ function parseArgs(argv) {
 
 function run(command, commandArgs, options = {}) {
   const printable = [command, ...commandArgs].join(" ");
+  const shellCommands = new Set(["pnpm", "npm", "npx"]);
+  const commandLower = command.toLowerCase();
+  const usesShellOnWindows =
+    process.platform === "win32" &&
+    (shellCommands.has(basename(command)) ||
+      commandLower.endsWith(".cmd") ||
+      commandLower.endsWith(".bat"));
   console.log(`\n[stage] $ ${printable}${options.cwd ? `  (cwd=${options.cwd})` : ""}`);
   const result = spawnSync(command, commandArgs, {
     stdio: "inherit",
     env: process.env,
+    shell: usesShellOnWindows,
     ...options,
   });
+  if (result.error) {
+    throw new Error(`Command failed to start (${result.error.message}): ${printable}`);
+  }
   if (result.status !== 0) {
     throw new Error(`Command failed (${result.status ?? "signal"}): ${printable}`);
   }
