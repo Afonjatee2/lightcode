@@ -1,6 +1,5 @@
 import {
   forwardRef,
-  useCallback,
   useEffect,
   useEffectEvent,
   useImperativeHandle,
@@ -15,6 +14,7 @@ import { useShallow } from "zustand/react/shallow";
 import { isThreadTurnActive, type Thread } from "@/shared/contracts";
 import { chatMessageSurfaceClass } from "./parts/items/chatMessageSurface";
 import { readBridge } from "@/renderer/bridge";
+import { useScrollFade } from "@/renderer/hooks/useScrollFade";
 import { useAppStore } from "@/renderer/state/appStore";
 import { hydrateThreadRuntimeItems } from "@/renderer/state/chatRuntimePersister";
 import {
@@ -76,52 +76,19 @@ export function ChatPane(props: ChatPaneProps) {
     layoutChangeToken,
   } = props;
   const { id: threadId, projectId, status, worktreePath, worktreeBranch } = thread;
-  const scrollRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   // `scrollEl` mirrors `scrollRef.current` as React state so the virtualizer
   // in `MessageList` sees the element transition from `null` to mounted across
   // a real React render. Without this, after a drag-drop pane move the
   // virtualizer's internal observer-driven rerender can be lost and the chat
   // renders empty (with a scrollbar from `getTotalSize`) until the next state
   // change forces a recompute.
-  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
-  const setScrollContainer = useCallback((el: HTMLDivElement | null) => {
-    scrollRef.current = el;
-    setScrollEl(el);
-  }, []);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const { setScrollContainer, scrollRef, scrollEl, scrollFadeStyle } =
+    useScrollFade<HTMLDivElement>({ contentRef });
   const [initialScrollSettledThreadId, setInitialScrollSettledThreadId] = useState<string | null>(
     null,
   );
   const isInitialScrollSettled = initialScrollSettledThreadId === threadId;
-
-  useEffect(() => {
-    const el = scrollEl;
-    if (!el) return;
-
-    const updateFades = () => {
-      const { scrollTop, scrollHeight, clientHeight } = el;
-      const topFade = Math.min(32, scrollTop);
-      const bottomFade = Math.min(32, Math.max(0, scrollHeight - scrollTop - clientHeight));
-
-      el.style.setProperty("--top-fade-size", `${topFade}px`);
-      el.style.setProperty("--bottom-fade-size", `${bottomFade}px`);
-    };
-
-    updateFades();
-    el.addEventListener("scroll", updateFades, { passive: true });
-
-    // Re-check when the container or its content resizes.
-    const observer = new ResizeObserver(updateFades);
-    observer.observe(el);
-    if (contentRef.current) {
-      observer.observe(contentRef.current);
-    }
-
-    return () => {
-      el.removeEventListener("scroll", updateFades);
-      observer.disconnect();
-    };
-  }, [scrollEl]);
 
   const scrollControlsRef = useRef<ChatScrollControlsHandle>(null);
   const virtualScrollToBottomRef = useRef<(() => void) | null>(null);
@@ -279,12 +246,7 @@ export function ChatPane(props: ChatPaneProps) {
           <div
             ref={setScrollContainer}
             className="min-h-0 h-full overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable]"
-            style={{
-              WebkitMaskImage:
-                "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)",
-              maskImage:
-                "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)",
-            }}
+            style={scrollFadeStyle}
             onWheelCapture={(event) => {
               if (event.deltaY < 0) {
                 scrollControlsRef.current?.markUserScrollIntent();

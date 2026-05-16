@@ -31,6 +31,7 @@ import {
   useCurrentThreadIds,
   useCurrentWorktreePath,
 } from "@/renderer/hooks/uiSelectors";
+import { useScrollFade } from "@/renderer/hooks/useScrollFade";
 import { useAppStore } from "@/renderer/state/appStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
@@ -126,9 +127,16 @@ function CollapsedThreadRail() {
       ),
     ),
   );
+  const { setScrollContainer, scrollFadeStyle } = useScrollFade<HTMLDivElement>({
+    maxFadePx: 10,
+  });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto">
+    <div
+      ref={setScrollContainer}
+      className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto"
+      style={scrollFadeStyle}
+    >
       {activeThreads.map((thread) => (
         <SidebarButton
           key={thread.id}
@@ -164,6 +172,9 @@ export function Sidebar() {
   const openHome = useAppStore((s) => s.openHome);
   const appView = useAppStore((s) => s.view);
   const appNameForHome = getAppName(readBridge().channel, import.meta.env.DEV);
+  const { setScrollContainer, scrollFadeStyle } = useScrollFade<HTMLDivElement>({
+    maxFadePx: 10,
+  });
 
   useEffect(() => {
     if (currentProjectId) {
@@ -221,7 +232,7 @@ export function Sidebar() {
         className={`${sidebarColumnLayoutClass} ${isCollapsed ? "invisible" : ""}`}
         style={{ minWidth: SIDEBAR_MIN_WIDTH }}
       >
-        <div className={sidebarBodyScrollClass()}>
+        <div ref={setScrollContainer} className={sidebarBodyScrollClass()} style={scrollFadeStyle}>
           {projectIds.length === 0 ? (
             <div className="pt-4">
               <p className="text-center text-sm text-muted">Add a project to start</p>

@@ -1,0 +1,90 @@
+import { useEffect, useRef, useState } from "react";
+import type { CSSProperties, MutableRefObject, RefObject } from "react";
+
+const FADE_MASK_GRADIENT =
+  "linear-gradient(to bottom, transparent, black var(--top-fade-size, 0px), black calc(100% - var(--bottom-fade-size, 0px)), transparent)";
+
+const FADE_MASK_STYLE: CSSProperties = {
+  WebkitMaskImage: FADE_MASK_GRADIENT,
+  maskImage: FADE_MASK_GRADIENT,
+};
+
+const DEFAULT_MAX_FADE_PX = 32;
+
+interface ScrollFadeOptions {
+  /**
+   * Inner content element to also observe for size changes; lets the bottom
+   * fade settle immediately when content height changes (virtualizer growth,
+   * dynamic row collapse, etc.). Optional.
+   */
+  contentRef?: RefObject<HTMLElement | null>;
+  /** Max fade height in px (applied to both top and bottom). Defaults to 32. */
+  maxFadePx?: number;
+}
+
+interface ScrollFadeHandles<T extends HTMLElement> {
+  /** Callback ref — pass to the scroll container's `ref`. */
+  setScrollContainer: (el: T | null) => void;
+  /** Direct access to the latest scroll element (e.g. for virtualizers). */
+  scrollRef: MutableRefObject<T | null>;
+  /**
+   * Same value as `scrollRef.current`, but tracked as React state so consumers
+   * can pass it down as a prop and trigger renders when it changes (e.g. to
+   * (re)mount a virtualizer once the container is in the DOM).
+   */
+  scrollEl: T | null;
+  /** Apply to the same scroll container's `style` to render the fade mask. */
+  scrollFadeStyle: CSSProperties;
+}
+
+/**
+ * Top + bottom fade mask on a scrollable container. Mirrors the ACP chat
+ * scroll behaviour: writes `--top-fade-size` / `--bottom-fade-size` onto the
+ * scroll element on scroll/resize (clamped to `maxFadePx`), and the consumer
+ * applies `scrollFadeStyle` to render a CSS mask gradient from those vars.
+ */
+export function useScrollFade<T extends HTMLElement = HTMLDivElement>(
+  options?: ScrollFadeOptions,
+): ScrollFadeHandles<T> {
+  const { contentRef, maxFadePx = DEFAULT_MAX_FADE_PX } = options ?? {};
+  const scrollRef = useRef<T | null>(null);
+  const [scrollEl, setScrollEl] = useState<T | null>(null);
+
+  const setScrollContainer = (el: T | null) => {
+    scrollRef.current = el;
+    setScrollEl(el);
+  };
+
+  useEffect(() => {
+    const el = scrollEl;
+    if (!el) return;
+
+    const update = () => {
+      const { scrollTop, scrollHeight, clientHeight } = el;
+      const topFade = Math.min(maxFadePx, scrollTop);
+      const bottomFade = Math.min(maxFadePx, Math.max(0, scrollHeight - scrollTop - clientHeight));
+      el.style.setProperty("--top-fade-size", `${topFade}px`);
+      el.style.setProperty("--bottom-fade-size", `${bottomFade}px`);
+    };
+
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    const contentEl = contentRef?.current;
+    if (contentEl) observer.observe(contentEl);
+
+    return () => {
+      el.removeEventListener("scroll", update);
+      observer.disconnect();
+    };
+  }, [scrollEl, contentRef, maxFadePx]);
+
+  return {
+    setScrollContainer,
+    scrollRef,
+    scrollEl,
+    scrollFadeStyle: FADE_MASK_STYLE,
+  };
+}

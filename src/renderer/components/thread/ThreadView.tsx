@@ -325,7 +325,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
         {/* Header bar — provider icon outside pane drag handle; status tooltip uses HeroUI tooltip (anchored bottom start). */}
         <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div
-            className={`lightcode-content-over-drag-region @container ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
+            className={`${dragHandleRef ? "lightcode-content-over-drag-region" : "lightcode-content-over-drag-region--drag"} @container ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
           >
             <ThreadHeaderStatusButton
               threadId={thread.id}
@@ -380,7 +380,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                       <button
                         type="button"
                         aria-label="Continue in another provider"
-                        className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                        className="lightcode-overlay-header__controls shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
                         onClick={(e) => {
                           e.stopPropagation();
                           setContinueDialogOpen(true);
@@ -401,7 +401,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                           runtimeDebugOpen ? "Hide runtime debug panel" : "Show runtime debug panel"
                         }
                         aria-pressed={runtimeDebugOpen}
-                        className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${runtimeDebugOpen ? "text-foreground" : "text-muted/60 hover:text-foreground"}`}
+                        className={`lightcode-overlay-header__controls shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${runtimeDebugOpen ? "text-foreground" : "text-muted/60 hover:text-foreground"}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setRuntimeDebugOpen((o) => !o);
@@ -421,7 +421,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                   <button
                     type="button"
                     aria-label={thread.done ? "Unmark done" : "Mark done"}
-                    className={`shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
+                    className={`lightcode-overlay-header__controls shrink-0 rounded p-1 transition-colors hover:bg-white/[0.06] ${thread.done ? "text-[oklch(0.78_0.1_180)]" : "text-muted/60 hover:text-foreground"}`}
                     onClick={(e) => {
                       e.stopPropagation();
                       onMarkDone();
@@ -434,7 +434,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                   <button
                     type="button"
                     aria-label="Close pane"
-                    className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                    className="lightcode-overlay-header__controls shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
                     onClick={(e) => {
                       e.stopPropagation();
                       onClose?.();

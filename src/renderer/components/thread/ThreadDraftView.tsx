@@ -968,7 +968,7 @@ export function ThreadDraftView(props: {
         <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
           <div
             ref={props.dragHandleRef}
-            className={`lightcode-content-over-drag-region ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1 ${props.dragHandleRef ? "cursor-grab active:cursor-grabbing" : ""}`}
+            className={`${props.dragHandleRef ? "lightcode-content-over-drag-region cursor-grab active:cursor-grabbing" : "lightcode-content-over-drag-region--drag"} ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
           >
             <TerminalSquare className="size-3.5 shrink-0 text-muted/60" />
             <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-muted">
@@ -980,7 +980,7 @@ export function ThreadDraftView(props: {
                 <button
                   type="button"
                   aria-label="Close pane"
-                  className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
+                  className="lightcode-overlay-header__controls shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
                   onClick={(e) => {
                     e.stopPropagation();
                     props.onClose?.();

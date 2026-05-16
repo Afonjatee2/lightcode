@@ -531,6 +531,18 @@ body {
   z-index: 20;
 }
 
+/* Counterpart to .lightcode-content-over-drag-region: used on pane headers
+   when the pane can't be reordered (single-pane layouts), so the header
+   acts as the window drag region instead of a dnd handle. Interactive
+   children opt out via .lightcode-overlay-header__controls. */
+.lightcode-content-over-drag-region--drag {
+  position: relative;
+  -webkit-app-region: drag;
+  app-region: drag;
+  user-select: none;
+  z-index: 20;
+}
+
 .lightcode-git-diff-content {
   contain: layout paint;
 }

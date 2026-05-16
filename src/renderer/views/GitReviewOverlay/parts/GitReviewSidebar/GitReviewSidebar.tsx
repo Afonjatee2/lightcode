@@ -16,6 +16,7 @@ import {
 } from "@/renderer/state/gitSelectors";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { SidebarButton } from "@/renderer/components/common";
+import { useScrollFade } from "@/renderer/hooks/useScrollFade";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
 import { getCommitGenCandidates } from "@/renderer/components/providers";
 import {
@@ -78,6 +79,9 @@ export function GitReviewSidebar(props: {
   const isWorktreeStatus = Boolean(statusKey);
   const { isCollapsed, collapse, expand } = useSidebar();
   const diffTheme = useDiffTheme();
+  const { setScrollContainer, scrollFadeStyle } = useScrollFade<HTMLDivElement>({
+    maxFadePx: 10,
+  });
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
   const isWsl = project.location.kind === "wsl";
@@ -234,7 +238,11 @@ export function GitReviewSidebar(props: {
         <div
           className={`${gitReviewColumnClass(mode)} transition-opacity duration-150 ${isCollapsed ? "invisible opacity-0" : "opacity-100 delay-100"}`}
         >
-          <div className={gitReviewSidebarListScrollClass()}>
+          <div
+            ref={setScrollContainer}
+            className={gitReviewSidebarListScrollClass()}
+            style={scrollFadeStyle}
+          >
             {mergeConflicting && mergeConflictFiles.length > 0 && (
               <ConflictGroup
                 files={mergeConflictFiles}

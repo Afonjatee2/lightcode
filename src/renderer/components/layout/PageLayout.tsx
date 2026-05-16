@@ -87,10 +87,13 @@ function SidebarHeaderRow(props: {
 
   return (
     <>
-      {/* Ghost container to measure uncollapsed width */}
+      {/* Ghost container to measure uncollapsed width. `invisible` (not
+          `opacity-0`) so the no-drag children inside don't contribute to
+          Electron's draggable-region map and steal drag from the visible
+          spacer in the actual header row. */}
       <div
         ref={fullContentRef}
-        className={`pointer-events-none absolute left-0 top-0 flex w-max items-center gap-1.5 opacity-0${
+        className={`pointer-events-none invisible absolute left-0 top-0 flex w-max items-center gap-1.5${
           isWindows() ? " pl-1" : ""
         }`}
         aria-hidden="true"

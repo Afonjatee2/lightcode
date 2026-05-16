@@ -8,11 +8,11 @@ import {
   Search,
   X,
 } from "lucide-react";
-import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { ProjectTreeEntry } from "@/shared/contracts";
 import { ContextMenu, PixelLoader } from "@/renderer/components/common";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
+import { useScrollFade } from "@/renderer/hooks/useScrollFade";
 import type { FileEditorRootContext } from "@/renderer/state/fileEditorStore";
 import { useIsTabActive, useIsPathOpenInTab } from "@/renderer/state/fileEditorSelectors";
 import {
@@ -38,7 +38,9 @@ export function ProjectTreeView(props: {
   const tree = useProjectTree(props);
   const rootIsDropTarget = useIsDropTarget("");
   const rootLoading = useIsPathLoading("");
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { setScrollContainer, scrollRef, scrollFadeStyle } = useScrollFade<HTMLDivElement>({
+    maxFadePx: 10,
+  });
   const directoryEntries = useProjectTreeStore((s) => s.directoryEntries);
   const expandedPaths = useProjectTreeStore((s) => s.expandedPaths);
   const loadingPaths = useProjectTreeStore((s) => s.loadingPaths);
@@ -149,10 +151,11 @@ export function ProjectTreeView(props: {
         </div>
 
         <div
-          ref={scrollRef}
+          ref={setScrollContainer}
           className={`min-h-0 flex-1 overflow-auto px-0 py-2 ${
             rootIsDropTarget ? "ring-1 ring-inset ring-accent/40" : ""
           }`}
+          style={scrollFadeStyle}
         >
           {tree.searchQuery.trim() ? (
             tree.searchLoading ? (

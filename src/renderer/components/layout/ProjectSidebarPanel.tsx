@@ -43,13 +43,15 @@ export function ProjectSidebarPanel(props: {
     };
   };
 
+  const dragCtl = "lightcode-overlay-header__controls";
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]">
-      <div className="flex h-8 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
+      <div className="lightcode-overlay-header flex h-8 shrink-0 items-center gap-1.5 border-b border-[color:var(--border)] px-3">
         {projectName ? (
           <div className="min-w-0">
             <Tooltip delay={300}>
-              <Tooltip.Trigger>
+              <Tooltip.Trigger className={dragCtl}>
                 <div className="max-w-[100px] truncate text-xs font-medium text-foreground">
                   {projectName}
                 </div>
@@ -62,7 +64,7 @@ export function ProjectSidebarPanel(props: {
         {activeTab === "git" && onExpandGitToOverlay ? (
           <button
             type="button"
-            className="rounded p-0.5 text-muted hover:text-foreground"
+            className={`${dragCtl} rounded p-0.5 text-muted hover:text-foreground`}
             title="Open as page"
             onClick={onExpandGitToOverlay}
           >
@@ -71,7 +73,7 @@ export function ProjectSidebarPanel(props: {
         ) : activeTab === "files" && onExpandFilesToOverlay ? (
           <button
             type="button"
-            className="rounded p-0.5 text-muted hover:text-foreground"
+            className={`${dragCtl} rounded p-0.5 text-muted hover:text-foreground`}
             title="Open as page"
             onClick={onExpandFilesToOverlay}
           >
@@ -81,7 +83,7 @@ export function ProjectSidebarPanel(props: {
         <div className="mx-0.5 h-3 w-px bg-border" />
         <button
           type="button"
-          className={`rounded p-0.5 transition-colors ${
+          className={`${dragCtl} rounded p-0.5 transition-colors ${
             activeTab === "files" ? "text-accent" : "text-muted hover:text-foreground"
           }`}
           title="Files"
@@ -94,7 +96,7 @@ export function ProjectSidebarPanel(props: {
         </button>
         <button
           type="button"
-          className={`rounded p-0.5 transition-colors ${
+          className={`${dragCtl} rounded p-0.5 transition-colors ${
             activeTab === "git" ? "text-accent" : "text-muted hover:text-foreground"
           }`}
           title="Git"
@@ -107,7 +109,7 @@ export function ProjectSidebarPanel(props: {
         </button>
         <button
           type="button"
-          className="rounded p-0.5 text-muted hover:text-foreground"
+          className={`${dragCtl} rounded p-0.5 text-muted hover:text-foreground`}
           title="Hide panel"
           onClick={onClose}
         >

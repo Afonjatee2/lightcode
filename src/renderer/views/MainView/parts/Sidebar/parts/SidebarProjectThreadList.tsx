@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { Project, Thread } from "@/shared/contracts";
 import {
@@ -7,6 +6,7 @@ import {
   useIsCurrentProjectDraft,
   useProjectThreads,
 } from "@/renderer/hooks/uiSelectors";
+import { useScrollFade } from "@/renderer/hooks/useScrollFade";
 import { useDragSource } from "@/renderer/dnd";
 import { openNewThread, openNewThreadSideBySide } from "@/renderer/actions/threadActions";
 import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
@@ -221,7 +221,9 @@ function buildRows(input: {
 
 export function SidebarProjectThreadList(props: { project: Project; sortMode: ThreadSortMode }) {
   const { project, sortMode } = props;
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const { setScrollContainer, scrollRef, scrollFadeStyle } = useScrollFade<HTMLDivElement>({
+    maxFadePx: 10,
+  });
   const projectThreads = useProjectThreads(project.id);
   const collapsedWorktrees = useSidebarUiStore((s) => s.collapsedWorktrees);
   const editingThreadId = useSidebarUiStore((s) => s.editingThreadId);
@@ -260,7 +262,7 @@ export function SidebarProjectThreadList(props: { project: Project; sortMode: Th
         onOpenAsPanel={() => openNewThreadSideBySide(project.id)}
       />
 
-      <div ref={scrollRef} className="max-h-80 overflow-y-auto">
+      <div ref={setScrollContainer} className="max-h-80 overflow-y-auto" style={scrollFadeStyle}>
         <div className="relative w-full" style={{ height: totalSize }}>
           <div
             className="absolute top-0 left-0 w-full"

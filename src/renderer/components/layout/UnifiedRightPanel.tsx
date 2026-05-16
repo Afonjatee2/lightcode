@@ -55,15 +55,23 @@ export function UnifiedRightPanel(props: {
     };
   };
 
+  const dragCtl = "lightcode-overlay-header__controls";
+
   return (
     <div className="flex h-full min-h-0 flex-col bg-[var(--content-background)]">
-      <div className={panelHeaderRowClass}>
-        {projectName && <PanelHeaderProjectName name={projectName} maxWidthClass="max-w-[100px]" />}
+      <div className={`lightcode-overlay-header ${panelHeaderRowClass}`}>
+        {projectName && (
+          <PanelHeaderProjectName
+            name={projectName}
+            maxWidthClass="max-w-[100px]"
+            triggerClassName={dragCtl}
+          />
+        )}
         <div className="flex-1" />
         {activeTab === "git" && onExpandGitToOverlay && (
           <button
             type="button"
-            className={panelHeaderIconButtonClass}
+            className={`${dragCtl} ${panelHeaderIconButtonClass}`}
             title="Open as page"
             onClick={onExpandGitToOverlay}
           >
@@ -73,7 +81,7 @@ export function UnifiedRightPanel(props: {
         {activeTab === "files" && onExpandFilesToOverlay && (
           <button
             type="button"
-            className={panelHeaderIconButtonClass}
+            className={`${dragCtl} ${panelHeaderIconButtonClass}`}
             title="Open as page"
             onClick={onExpandFilesToOverlay}
           >
@@ -83,7 +91,7 @@ export function UnifiedRightPanel(props: {
         <div className="mx-0.5 h-3 w-px bg-border" />
         <button
           type="button"
-          className={panelHeaderTabIconButtonClass(activeTab === "terminal")}
+          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "terminal")}`}
           title="Terminal"
           onClick={() => {
             onTabChange("terminal");
@@ -94,7 +102,7 @@ export function UnifiedRightPanel(props: {
         </button>
         <button
           type="button"
-          className={panelHeaderTabIconButtonClass(activeTab === "files")}
+          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "files")}`}
           title="Files"
           onClick={() => {
             onTabChange("files");
@@ -105,7 +113,7 @@ export function UnifiedRightPanel(props: {
         </button>
         <button
           type="button"
-          className={panelHeaderTabIconButtonClass(activeTab === "git")}
+          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "git")}`}
           title="Git"
           onClick={() => {
             onTabChange("git");
@@ -116,7 +124,7 @@ export function UnifiedRightPanel(props: {
         </button>
         <button
           type="button"
-          className={panelHeaderIconButtonClass}
+          className={`${dragCtl} ${panelHeaderIconButtonClass}`}
           title="Hide panel"
           onClick={onClose}
         >
