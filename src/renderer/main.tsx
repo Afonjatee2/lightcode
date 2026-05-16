@@ -28,7 +28,7 @@ if (import.meta.env.DEV) {
   };
 }
 
-document.title = getAppName(import.meta.env.DEV);
+document.title = getAppName(readBridge().channel, import.meta.env.DEV);
 initializeRendererSentry();
 
 document.documentElement.dataset.platform =

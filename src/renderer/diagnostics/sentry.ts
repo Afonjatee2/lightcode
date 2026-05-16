@@ -20,6 +20,7 @@ function buildBaseTags(): LightcodeDiagnosticTags {
   const bridge = readBridge();
   return {
     "lightcode.app_version": bridge.appVersion,
+    "lightcode.channel": bridge.channel,
     "lightcode.electron": bridge.electronVersion,
     "lightcode.platform": bridge.platform,
     "lightcode.process": "renderer",
@@ -55,6 +56,7 @@ export function initializeRendererSentry(): boolean {
 
   Sentry.setContext("lightcode", {
     appVersion: bridge.appVersion,
+    channel: bridge.channel,
     isDev: bridge.isDev,
     process: "renderer",
   });

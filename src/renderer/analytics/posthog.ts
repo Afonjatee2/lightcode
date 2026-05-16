@@ -121,6 +121,7 @@ function buildBaseProperties(): ProductAnalyticsProperties {
     $process_person_profile: false,
     app_version: bridge.appVersion,
     arch: bridge.arch,
+    channel: bridge.channel,
     chrome: bridge.chromeVersion,
     electron: bridge.electronVersion,
     is_dev: bridge.isDev,

@@ -3,6 +3,7 @@ import { Download, ExternalLink, RefreshCw } from "lucide-react";
 import { readBridge } from "@/renderer/bridge";
 import { PixelLoader } from "@/renderer/components/common";
 import { useUpdateStore } from "@/renderer/state/updateStore";
+import { productNameFor } from "@/shared/channel";
 import { formatBytes } from "@/shared/formatBytes";
 import appIconUrl from "../../../../../build/icon.png";
 
@@ -86,6 +87,7 @@ function UpdateButton() {
 
 export function AboutSettings() {
   const bridge = readBridge();
+  const productName = productNameFor(bridge.channel);
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
@@ -93,9 +95,9 @@ export function AboutSettings() {
         <h1 className="mb-6 text-lg font-semibold text-foreground">About</h1>
 
         <div className="mb-8 flex items-center gap-4">
-          <img src={appIconUrl} alt="Lightcode" className="size-12 shrink-0 rounded-lg" />
+          <img src={appIconUrl} alt={productName} className="size-12 shrink-0 rounded-lg" />
           <div>
-            <p className="text-lg font-semibold text-foreground">Lightcode</p>
+            <p className="text-lg font-semibold text-foreground">{productName}</p>
             <p className="text-xs text-muted">
               AI agent orchestrator — manage coding agents via Terminal and Native ACP.
             </p>
@@ -111,6 +113,11 @@ export function AboutSettings() {
             <div className="shrink-0">
               <UpdateButton />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-medium text-foreground">Channel</p>
+            <p className="text-sm text-muted capitalize">{bridge.channel}</p>
           </div>
 
           <div className="flex items-center justify-between gap-4">

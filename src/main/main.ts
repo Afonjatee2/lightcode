@@ -14,8 +14,9 @@ import { SupervisorClient } from "./supervisor/SupervisorClient";
 import { createAutoUpdaterController } from "./updates/autoUpdater";
 import { createMainWindow } from "./window/createMainWindow";
 import type { SupervisorEvent } from "@/shared/ipc";
-import type { LightcodePaths } from "@/shared/lightcodePaths";
+import { type LightcodePaths, resolveLightcodeBaseDir } from "@/shared/lightcodePaths";
 import { getAppName } from "@/shared/appName";
+import { resolveLightcodeChannel } from "@/shared/channel";
 import { IPC_EVENT_CHANNELS } from "@/shared/ipc";
 import { readSharedSettingsFile } from "./sharedSettingsFile";
 import { WindowsJobObjectManager } from "./windowsJobObject";
@@ -23,12 +24,13 @@ import { captureMainException, initializeMainSentry } from "./diagnostics/sentry
 import { readOrCreateSafeStorageSecretKey } from "./secretStorageKey";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
+const channel = resolveLightcodeChannel();
 
 if (isDev) {
   app.setPath("userData", join(app.getPath("userData"), "Dev"));
 }
 
-const sentryEnabled = initializeMainSentry({ appVersion: app.getVersion(), isDev });
+const sentryEnabled = initializeMainSentry({ appVersion: app.getVersion(), isDev, channel });
 const posthogEnabled = process.env.POSTHOG_ENABLED !== "0";
 const posthogKey = posthogEnabled ? (process.env.POSTHOG_KEY ?? "").trim() : "";
 const posthogHost = (process.env.POSTHOG_HOST ?? "").trim();
@@ -102,7 +104,7 @@ if (!hasSingleInstanceLock) {
     installLocalFileProtocolHandler();
 
     lightcodePaths = prepareLightcodeDataRoot(
-      isDev ? join(homedir(), ".lightcode-dev") : undefined,
+      isDev ? join(homedir(), ".lightcode-dev") : resolveLightcodeBaseDir(channel),
     );
     let jobObjectReady: Promise<void> = Promise.resolve();
     if (process.platform === "win32") {
@@ -154,6 +156,7 @@ if (!hasSingleInstanceLock) {
       (status) => {
         mainWindow?.webContents.send(IPC_EVENT_CHANNELS.updateStatus, status);
       },
+      channel,
       isDev,
       captureMainException,
     );
@@ -169,8 +172,9 @@ if (!hasSingleInstanceLock) {
     });
 
     mainWindow = createMainWindow({
-      title: getAppName(isDev),
+      title: getAppName(channel, isDev),
       isDev,
+      channel,
       preloadPath: join(__dirname, "preload.cjs"),
       rendererHtmlPath: join(__dirname, "../renderer/index.html"),
       appVersion: app.getVersion(),
@@ -234,8 +238,9 @@ if (!hasSingleInstanceLock) {
     app.on("activate", () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         mainWindow = createMainWindow({
-          title: getAppName(isDev),
+          title: getAppName(channel, isDev),
           isDev,
+          channel,
           preloadPath: join(__dirname, "preload.cjs"),
           rendererHtmlPath: join(__dirname, "../renderer/index.html"),
           appVersion: app.getVersion(),

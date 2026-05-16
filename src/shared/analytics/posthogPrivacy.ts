@@ -38,6 +38,7 @@ const ALLOWED_PROPERTY_KEYS = new Set([
   "attachment_segment_count",
   "attention",
   "auto_generated_message",
+  "channel",
   "chrome",
   "collapsed",
   "duration_bucket",

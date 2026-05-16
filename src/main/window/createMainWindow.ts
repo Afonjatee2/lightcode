@@ -1,5 +1,6 @@
 import { dbGetState, dbSetState } from "../db";
 import { BrowserWindow, screen, type RenderProcessGoneDetails } from "electron";
+import type { LightcodeChannel } from "@/shared/channel";
 
 interface WindowBounds {
   x?: number;
@@ -48,6 +49,7 @@ function saveWindowBounds(window: BrowserWindow): void {
 export interface CreateMainWindowOptions {
   title: string;
   isDev: boolean;
+  channel: LightcodeChannel;
   preloadPath: string;
   rendererHtmlPath: string;
   appVersion: string;
@@ -95,6 +97,7 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
       additionalArguments: [
         `--lc-app-version=${encodeURIComponent(options.appVersion)}`,
         `--lc-is-dev=${options.isDev ? "1" : "0"}`,
+        `--lc-channel=${options.channel}`,
         `--lc-posthog-enable-dev=${options.posthogEnableDev ? "1" : "0"}`,
         `--lc-posthog-enabled=${options.posthogEnabled ? "1" : "0"}`,
         // PostHog project keys are browser/client keys, not secrets; the renderer must send them.

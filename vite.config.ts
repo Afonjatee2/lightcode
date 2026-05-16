@@ -25,10 +25,18 @@ function buildPostHogEnvDefines(mode: string): Record<string, string> {
   };
 }
 
+// Inline ternary instead of importing src/shared/channel.normalizeChannel —
+// keeps config loading uniform with tsdown.config.ts. Parity is pinned by
+// src/shared/channel.config-parity.test.ts.
+const lightcodeChannel = process.env.LIGHTCODE_CHANNEL === "nightly" ? "nightly" : "stable";
+
 export default defineConfig(({ mode }) => ({
   plugins: [react(), babel({ presets: [compilerPreset] })],
   base: "./",
-  define: buildPostHogEnvDefines(mode),
+  define: {
+    ...buildPostHogEnvDefines(mode),
+    __LIGHTCODE_CHANNEL__: JSON.stringify(lightcodeChannel),
+  },
   resolve: {
     tsconfigPaths: true,
     alias: {

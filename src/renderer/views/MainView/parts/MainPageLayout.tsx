@@ -1,6 +1,7 @@
 import { lazy, Suspense, type ReactNode, useEffect, useRef } from "react";
 import { useDroppable } from "@dnd-kit/react";
 import { getAppName } from "@/shared/appName";
+import { readBridge } from "@/renderer/bridge";
 import { PageLayout } from "@/renderer/components/layout/PageLayout";
 import { Sidebar } from "@/renderer/views/MainView/parts/Sidebar/Sidebar";
 import { AppContent } from "@/renderer/views/MainView/parts/AppContent/AppContent";
@@ -24,7 +25,7 @@ export function MainPageLayout(props: { wslAvailable: boolean; onTitleClick: () 
 
   return (
     <PageLayout
-      title={getAppName(import.meta.env.DEV)}
+      title={getAppName(readBridge().channel, import.meta.env.DEV)}
       onTitleClick={onTitleClick}
       onRequestClosePanels={closeAllPanels}
       sidebarHeaderChildren={<SidebarHeaderControls wslAvailable={wslAvailable} />}

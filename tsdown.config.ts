@@ -7,9 +7,16 @@ function readEnvValue(key: string): string {
   return (process.env[key] ?? "").trim();
 }
 
+// Channel is read inline here (vs imported from src/shared/channel) because
+// tsdown's config loader doesn't follow TS-extension resolution. Equivalence
+// with src/shared/channel.normalizeChannel + scripts/electron-builder.shared.cjs
+// is pinned by src/shared/channel.config-parity.test.ts.
+const channel = process.env.LIGHTCODE_CHANNEL === "nightly" ? "nightly" : "stable";
+
 const buildDefines = {
   __BUILD_SENTRY_DSN__: JSON.stringify(readEnvValue("SENTRY_DSN")),
   __BUILD_SENTRY_ENVIRONMENT__: JSON.stringify(readEnvValue("SENTRY_ENVIRONMENT")),
+  __LIGHTCODE_CHANNEL__: JSON.stringify(channel),
 };
 
 const deps = {

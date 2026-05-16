@@ -1,5 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { type LightcodeChannel, resolveLightcodeChannel, userDataDirNameFor } from "./channel";
 
 export interface LightcodePaths {
   baseDir: string;
@@ -15,8 +16,11 @@ export interface LightcodePaths {
   agentPluginsDir: string;
 }
 
-export function resolveLightcodeBaseDir(homeDir: string = homedir()): string {
-  return join(homeDir, ".lightcode");
+export function resolveLightcodeBaseDir(
+  channel: LightcodeChannel = resolveLightcodeChannel(),
+  homeDir: string = homedir(),
+): string {
+  return join(homeDir, userDataDirNameFor(channel));
 }
 
 export function resolveLightcodePaths(baseDir: string = resolveLightcodeBaseDir()): LightcodePaths {

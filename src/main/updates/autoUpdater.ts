@@ -1,4 +1,5 @@
 import { autoUpdater } from "electron-updater";
+import type { LightcodeChannel } from "@/shared/channel";
 import type { UpdateStatus } from "@/shared/ipc";
 import type { LightcodeDiagnosticTags } from "@/shared/diagnostics/sentryPrivacy";
 
@@ -11,6 +12,7 @@ export interface AutoUpdaterController {
 
 export function createAutoUpdaterController(
   sendStatus: (status: UpdateStatus) => void,
+  channel: LightcodeChannel,
   isDev: boolean,
   reportError: (error: unknown, tags?: LightcodeDiagnosticTags) => void = () => {},
 ): AutoUpdaterController {
@@ -25,6 +27,13 @@ export function createAutoUpdaterController(
     autoUpdater.autoDownload = true;
     autoUpdater.autoInstallOnAppQuit = false;
     autoUpdater.forceDevUpdateConfig = Boolean(process.env.UPDATE_SERVER_URL);
+
+    if (channel === "nightly") {
+      autoUpdater.channel = "nightly";
+      autoUpdater.allowPrerelease = true;
+    } else {
+      autoUpdater.allowPrerelease = false;
+    }
 
     const localUpdateUrl = process.env.UPDATE_SERVER_URL;
     if (localUpdateUrl) {

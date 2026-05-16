@@ -1,6 +1,7 @@
 export const LIGHTCODE_DIAGNOSTIC_TAG_KEYS = [
   "lightcode.app_version",
   "lightcode.arch",
+  "lightcode.channel",
   "lightcode.chrome",
   "lightcode.electron",
   "lightcode.feature_area",
@@ -53,6 +54,7 @@ const ALLOWED_CONTEXT_KEYS = new Set([
   "chrome",
   "device",
   "gpu",
+  "lightcode",
   "node",
   "os",
   "runtime",

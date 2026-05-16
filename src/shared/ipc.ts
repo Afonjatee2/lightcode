@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { LightcodeChannel } from "./channel";
 import type { LspMessagePayload, LspSessionStatus, LspStartPayload, LspStopPayload } from "./lsp";
 import type { OscShellEvent } from "./osc";
 import type { SharedSettings, SharedSettingsInput } from "./settings";
@@ -1245,6 +1246,8 @@ export type LightcodeBridge = LightcodeInvokeBridge & {
   chromeVersion: string;
   /** True in the `pnpm dev` build; false in packaged releases. */
   isDev: boolean;
+  /** Release channel the running binary was built for (stable | nightly). */
+  channel: LightcodeChannel;
   electronVersion: string;
   nodeVersion: string;
   posthogEnableDev: boolean;

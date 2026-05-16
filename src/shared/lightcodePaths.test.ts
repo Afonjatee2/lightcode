@@ -5,7 +5,11 @@ import { resolveLightcodeBaseDir, resolveLightcodePaths } from "./lightcodePaths
 
 describe("lightcodePaths", () => {
   it("derives the default base dir under the user home", () => {
-    expect(resolveLightcodeBaseDir()).toBe(join(homedir(), ".lightcode"));
+    expect(resolveLightcodeBaseDir("stable")).toBe(join(homedir(), ".lightcode"));
+  });
+
+  it("returns the nightly base dir when the channel is nightly", () => {
+    expect(resolveLightcodeBaseDir("nightly")).toBe(join(homedir(), ".lightcode-nightly"));
   });
 
   it("derives all persisted paths from the provided base dir", () => {

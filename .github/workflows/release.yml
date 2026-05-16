@@ -1,12 +1,13 @@
-name: Release
+name: Release (stable)
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Release version (e.g. 0.2.0, 1.0.0)"
-        required: true
+        description: "Release version (e.g. 1.0.1). If empty, master's package.json is used."
+        required: false
         type: string
+        default: ""
       dry_run:
         description: "Dry run — skip tag push and build (for testing)"
         required: false
@@ -17,11 +18,12 @@ permissions:
   contents: write
 
 jobs:
-  # ── Step 1: Bump version, commit, tag, push ──────────────────────
+  # ── Step 1: Resolve version, commit if needed, tag, push ─────────
   prepare:
     runs-on: ubuntu-latest
     outputs:
-      tag: v${{ inputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+      version: ${{ steps.resolve.outputs.version }}
 
     steps:
       - name: Checkout
@@ -38,24 +40,42 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
 
-      - name: Validate version format
+      - name: Resolve version
+        id: resolve
         run: |
-          if ! echo "${{ inputs.version }}" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$'; then
-            echo "::error::Invalid version format. Use semver like 0.2.0 or 1.0.0-beta.1"
+          INPUT_VERSION="${{ inputs.version }}"
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if [ -z "$INPUT_VERSION" ]; then
+            VERSION="$PKG_VERSION"
+            echo "Using master's package.json version: $VERSION"
+          else
+            VERSION="$INPUT_VERSION"
+            echo "Using workflow input version: $VERSION"
+          fi
+          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Stable version must be plain semver (X.Y.Z), got '$VERSION'."
             exit 1
           fi
-          if git rev-parse "v${{ inputs.version }}" >/dev/null 2>&1; then
-            echo "::error::Tag v${{ inputs.version }} already exists"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::error::Tag v$VERSION already exists"
             exit 1
           fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Bump version in package.json
+      - name: Bump package.json if needed
         run: |
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            pkg.version = '${{ inputs.version }}';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            const next = '${{ steps.resolve.outputs.version }}';
+            if (pkg.version !== next) {
+              pkg.version = next;
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+              console.log('Updated package.json to ' + next);
+            } else {
+              console.log('package.json already at ' + next + '; no bump needed.');
+            }
           "
 
       - name: Commit and tag
@@ -64,123 +84,34 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json
           if git diff --cached --quiet; then
-            echo "package.json already at v${{ inputs.version }}; skipping bump commit."
+            echo "No package.json changes; tagging HEAD as-is."
           else
-            git commit -m "release: v${{ inputs.version }}"
+            git commit -m "release: ${{ steps.resolve.outputs.tag }}"
           fi
-          git tag "v${{ inputs.version }}"
+          git tag "${{ steps.resolve.outputs.tag }}"
 
       - name: Push commit and tag
         if: ${{ !inputs.dry_run }}
         run: |
           git push origin HEAD
-          git push origin "v${{ inputs.version }}"
+          git push origin "${{ steps.resolve.outputs.tag }}"
 
   # ── Step 2: Build installers for each platform ───────────────────
   build:
     needs: prepare
     if: ${{ !inputs.dry_run }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            artifact: dist-windows
-          - os: ubuntu-latest
-            artifact: dist-linux
-          - os: macos-latest
-            artifact: dist-mac
-
-    runs-on: ${{ matrix.os }}
-
-    steps:
-      - name: Checkout tag
-        uses: actions/checkout@v6
-        with:
-          ref: ${{ needs.prepare.outputs.tag }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: "24"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build app
-        run: pnpm run build
-        shell: bash
-        env:
-          SENTRY_DSN: ${{ vars.SENTRY_DSN }}
-          SENTRY_ENVIRONMENT: ${{ vars.SENTRY_ENVIRONMENT || 'production' }}
-          POSTHOG_ENABLED: ${{ vars.POSTHOG_ENABLED || '1' }}
-          POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
-          POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.i.posthog.com' }}
-          POSTHOG_ENABLE_DEV: "0"
-
-      - name: Upload Sentry source maps
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          # Local `pnpm run dist` cleans source maps before packaging. Release CI
-          # uploads them from the build output first, then removes them below.
-          if [ -z "$SENTRY_AUTH_TOKEN" ] || [ -z "$SENTRY_ORG" ] || [ -z "$SENTRY_PROJECT" ]; then
-            echo "Sentry secrets are not configured; skipping source map upload."
-            exit 0
-          fi
-          pnpm run sentry:sourcemaps
-        shell: bash
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
-          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT }}
-
-      - name: Remove packaged source maps
-        run: pnpm run clean:sourcemaps
-        shell: bash
-
-      - name: Package
-        run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            pnpm run prepare:package-assets
-            pnpm exec electron-builder --win
-          else
-            if [ "${{ matrix.os }}" = "macos-latest" ]; then
-              pnpm run prepare:agent-plugins
-              pnpm exec electron-builder --mac
-            else
-              pnpm run prepare:package-assets
-              pnpm exec electron-builder --linux
-            fi
-          fi
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # macOS Developer ID signing (base64-encoded .p12 + password).
-          # No-op on Windows/Linux runners.
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-          # macOS notarization via Apple ID + app-specific password.
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Upload built artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: ${{ matrix.artifact }}
-          path: |
-            release/Lightcode-*.exe
-            release/Lightcode-*.dmg
-            release/Lightcode-*.zip
-            release/Lightcode-*.AppImage
-            release/Lightcode-*.deb
-            release/latest*.yml
-            release/*.blockmap
-          if-no-files-found: error
-          retention-days: 7
+    uses: ./.github/workflows/_build.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+      channel: stable
+      sentry_environment: production
+    secrets:
+      MAC_CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+      MAC_CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
 
   # ── Step 3: Create GitHub Release with auto-generated notes ──────
   release:
@@ -210,7 +141,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # ── Step 4: Bump master to next dev version ────────────────────────
+  # ── Step 4: Bump master to next plain patch version ──────────────
   post-release:
     needs: [prepare, release]
     if: ${{ !inputs.dry_run }}
@@ -232,13 +163,13 @@ jobs:
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
 
-      - name: Bump to next patch-dev version
+      - name: Bump to next plain patch version
         run: |
           node -e "
             const fs = require('fs');
             const p = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            const v = p.version.split('.').map(Number);
-            p.version = v[0] + '.' + v[1] + '.' + (v[2] + 1) + '-dev';
+            const v = p.version.split('-')[0].split('.').map(Number);
+            p.version = v[0] + '.' + v[1] + '.' + (v[2] + 1);
             fs.writeFileSync('package.json', JSON.stringify(p, null, 2) + '\n');
           "
 
@@ -247,5 +178,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add package.json
-          git commit -m "chore: bump to next dev version"
-          git push
+          if git diff --cached --quiet; then
+            echo "No bump needed."
+          else
+            git commit -m "chore: bump to next patch version"
+            git push
+          fi

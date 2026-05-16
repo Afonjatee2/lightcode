@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import { type LightcodeChannel, normalizeChannel } from "@/shared/channel";
 import {
   createInvokeBridge,
   IPC_EVENT_CHANNELS,
@@ -30,6 +31,16 @@ function resolveIsDev(): boolean {
     }
   }
   return false;
+}
+
+function resolveChannel(): LightcodeChannel {
+  const prefix = "--lc-channel=";
+  for (const arg of process.argv) {
+    if (arg.startsWith(prefix)) {
+      return normalizeChannel(arg.slice(prefix.length));
+    }
+  }
+  return "stable";
 }
 
 function resolveSentryEnabled(): boolean {
@@ -66,6 +77,7 @@ const bridge: LightcodeBridge = {
   arch: process.arch,
   chromeVersion: process.versions.chrome ?? "unknown",
   isDev: resolveIsDev(),
+  channel: resolveChannel(),
   electronVersion: process.versions.electron ?? "unknown",
   nodeVersion: process.versions.node,
   posthogEnableDev: resolveArgBoolean("--lc-posthog-enable-dev="),

@@ -21,11 +21,15 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+const requireFromHere = createRequire(import.meta.url);
+const channelTable = requireFromHere("./electron-builder.shared.cjs");
 
 // Runtime externals — packages tsdown does NOT inline into dist/main/*.cjs.
 // Regenerate with `node scripts/scan-runtime-externals.mjs`.
@@ -301,12 +305,23 @@ async function main() {
 }
 
 function buildElectronBuilderConfig() {
-  // Reproduce the project's electron-builder.yml, but with a drastically
+  // Reproduce the project's electron-builder.config.cjs, but with a drastically
   // simplified `files:` block — the stage's node_modules contains only the
   // runtime externals we listed, so we can include all of node_modules
   // without dragging renderer-only transitive peers along.
-  return `appId: com.lightcode.app
-productName: Lightcode
+  //
+  // Channel-keyed values come from scripts/electron-builder.shared.cjs, the
+  // same source the project-root config uses.
+  const channel = channelTable.normalizeChannel(process.env.LIGHTCODE_CHANNEL);
+  const appId = channelTable.appIdFor(channel);
+  const productName = channelTable.productNameFor(channel);
+  const updaterChannel = channelTable.updaterChannelFor(channel);
+  const prefix = channelTable.artifactPrefixFor(channel);
+  const iconSuffix = channel === "nightly" ? "-nightly" : "";
+  const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
+
+  return `appId: ${appId}
+productName: ${productName}
 copyright: Copyright (C) 2026 Lightcode
 
 directories:
@@ -345,7 +360,7 @@ asarUnpack:
 publish:
   provider: github
   owner: SDSLeon
-  repo: lightcode
+  repo: lightcode${publishChannelLine}
 
 win:
   target:
@@ -353,14 +368,14 @@ win:
       arch:
         - x64
         - arm64
-  icon: build/icon.ico
+  icon: build/icon${iconSuffix}.ico
 
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   buildUniversalInstaller: false
-  artifactName: \${productName}-Setup-\${version}-\${arch}.\${ext}
+  artifactName: ${prefix}-Setup-\${version}-\${arch}.\${ext}
 
 linux:
   target:
@@ -370,10 +385,10 @@ linux:
     - target: deb
       arch:
         - x64
-  icon: build/icon.png
+  icon: build/icon${iconSuffix}.png
   category: Development
   maintainer: SDSLeon <SDSLeon999@gmail.com>
-  artifactName: \${productName}-\${version}-\${arch}.\${ext}
+  artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:
   target:
@@ -385,9 +400,9 @@ mac:
       arch:
         - x64
         - arm64
-  icon: build/icon.icns
+  icon: build/icon${iconSuffix}.icns
   category: public.app-category.developer-tools
-  artifactName: \${productName}-\${version}-\${arch}.\${ext}
+  artifactName: ${prefix}-\${version}-\${arch}.\${ext}
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist

@@ -163,7 +163,7 @@ export function Sidebar() {
   const { isCollapsed, collapse, expand } = useSidebar();
   const openHome = useAppStore((s) => s.openHome);
   const appView = useAppStore((s) => s.view);
-  const appNameForHome = getAppName(import.meta.env.DEV);
+  const appNameForHome = getAppName(readBridge().channel, import.meta.env.DEV);
 
   useEffect(() => {
     if (currentProjectId) {

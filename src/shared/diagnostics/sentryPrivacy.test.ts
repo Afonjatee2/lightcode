@@ -72,6 +72,30 @@ describe("sentryPrivacy", () => {
     });
   });
 
+  it("preserves the lightcode context (channel, appVersion, packaged) while still dropping disallowed contexts", () => {
+    const event = sanitizeSentryEvent({
+      contexts: {
+        lightcode: {
+          appVersion: "0.9.5",
+          channel: "nightly",
+          packaged: true,
+          process: "main",
+        },
+        runtime: { name: "node", version: "24.10.0" },
+        session: { id: "should-be-dropped" },
+      },
+    } satisfies SentryEventLike);
+
+    expect(event.contexts?.lightcode).toEqual({
+      appVersion: "0.9.5",
+      channel: "nightly",
+      packaged: true,
+      process: "main",
+    });
+    expect(event.contexts?.runtime).toEqual({ name: "node", version: "24.10.0" });
+    expect(event.contexts?.session).toBeUndefined();
+  });
+
   it("builds coarse runtime tags without thread or project identifiers", () => {
     expect(
       buildRuntimeDiagnosticTags({

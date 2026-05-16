@@ -1,4 +1,5 @@
 import { app } from "electron";
+import type { LightcodeChannel } from "@/shared/channel";
 import {
   sanitizeSentryEvent,
   type LightcodeDiagnosticTags,
@@ -26,6 +27,7 @@ let mainSentry: MainSentryModule | null | undefined;
 export type MainSentryOptions = {
   appVersion: string;
   isDev: boolean;
+  channel: LightcodeChannel;
 };
 
 function loadMainSentry(): MainSentryModule | null {
@@ -69,6 +71,7 @@ function buildBaseTags(options: MainSentryOptions): LightcodeDiagnosticTags {
   return {
     "lightcode.app_version": options.appVersion,
     "lightcode.arch": process.arch,
+    "lightcode.channel": options.channel,
     "lightcode.chrome": process.versions.chrome ?? "unknown",
     "lightcode.electron": process.versions.electron ?? "unknown",
     "lightcode.node": process.versions.node,
@@ -120,6 +123,7 @@ export function initializeMainSentry(options: MainSentryOptions): boolean {
 
   Sentry.setContext("lightcode", {
     appVersion: options.appVersion,
+    channel: options.channel,
     packaged: app.isPackaged,
     process: "main",
   });
