@@ -73,17 +73,30 @@ describe("createAcpGenericAdapter", () => {
     expect(status.version).toBe("1.2.3");
   });
 
-  it("injects a synthetic 'never' approval policy when the probe declares none", async () => {
-    // Agents like glm-acp-agent don't advertise yolo/autopilot. We expose a
-    // synthetic "never" policy so users can still pick "Bypass approvals" —
-    // the ACP session layer auto-approves requestPermission for that policy.
+  it("injects synthetic supervised and auto-approve policies when the probe declares none", async () => {
+    // Some agents don't advertise yolo/autopilot. We expose a synthetic
+    // "never" policy so users can still pick "Auto Approve", while "default"
+    // keeps the supervised prompting path available.
     vi.mocked(probeAcpCapabilities).mockResolvedValue({
-      models: [{ id: "glm-5.1", label: "GLM-5.1" }],
+      models: [{ id: "model-a", label: "Model A" }],
     });
     const adapter = createAcpGenericAdapter(baseInstance);
     const status = await adapter.detectInstall();
     expect(status.capabilities.approvalPolicies).toEqual([
-      { id: "never", label: "Bypass approvals" },
+      { id: "default", label: "Supervised" },
+      { id: "never", label: "Auto Approve" },
+    ]);
+  });
+
+  it("normalizes probe-produced default-only approval policy to supervised and auto-approve", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      approvalPolicies: [{ id: "default", label: "Ask for permission" }],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.capabilities.approvalPolicies).toEqual([
+      { id: "default", label: "Supervised" },
+      { id: "never", label: "Auto Approve" },
     ]);
   });
 
@@ -98,15 +111,67 @@ describe("createAcpGenericAdapter", () => {
 
   it("merges ACP-probed capabilities into detected status", async () => {
     vi.mocked(probeAcpCapabilities).mockResolvedValue({
-      models: [{ id: "glm-5.1", label: "GLM 5.1" }],
+      models: [{ id: "model-a", label: "Model A" }],
       modes: ["agent", "plan"],
       approvalPolicies: [{ id: "default", label: "Default" }],
     });
     const adapter = createAcpGenericAdapter(baseInstance);
     const status = await adapter.detectInstall();
-    expect(status.capabilities.models).toEqual([{ id: "glm-5.1", label: "GLM 5.1" }]);
+    expect(status.capabilities.models).toEqual([{ id: "model-a", label: "Model A" }]);
     expect(status.capabilities.modes).toEqual(["agent", "plan"]);
-    expect(status.capabilities.approvalPolicies).toEqual([{ id: "default", label: "Default" }]);
+    expect(status.capabilities.approvalPolicies).toEqual([
+      { id: "default", label: "Supervised" },
+      { id: "never", label: "Auto Approve" },
+    ]);
+  });
+
+  it("normalizes Factory Droid model rates at the provider boundary", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      models: [
+        {
+          id: "glm-5.1",
+          label: "Droid Core (GLM-5.1)",
+          description: "0.55x Factory token rate",
+        },
+        {
+          id: "auto",
+          label: "Auto",
+          description: "Let Droid choose the best model",
+        },
+      ],
+    });
+    const adapter = createAcpGenericAdapter({
+      ...baseInstance,
+      id: "factory-droid",
+      displayName: "Factory Droid",
+    });
+    const status = await adapter.detectInstall();
+    expect(status.capabilities.models).toEqual([
+      {
+        id: "glm-5.1",
+        label: "Droid Core (GLM-5.1)",
+        description: "0.55x",
+        tooltipDescription: "0.55x Factory token rate",
+      },
+      { id: "auto", label: "Auto", description: "Let Droid choose the best model" },
+    ]);
+  });
+
+  it("does not parse token-rate prose for other ACP-generic instances", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      models: [
+        {
+          id: "glm-5.1",
+          label: "GLM-5.1",
+          description: "0.55x Factory token rate",
+        },
+      ],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.capabilities.models).toEqual([
+      { id: "glm-5.1", label: "GLM-5.1", description: "0.55x Factory token rate" },
+    ]);
   });
 
   it("uses ACP env-var auth methods to report missing auth", async () => {
@@ -116,8 +181,8 @@ describe("createAcpGenericAdapter", () => {
       authMethods: [
         {
           type: "env_var",
-          id: "zai",
-          name: "Z.AI API key",
+          id: "example-key",
+          name: "Example API key",
           vars: [{ name: key }],
         },
       ],
@@ -128,12 +193,12 @@ describe("createAcpGenericAdapter", () => {
     expect(status.authMethods).toEqual([
       {
         type: "env_var",
-        id: "zai",
-        name: "Z.AI API key",
+        id: "example-key",
+        name: "Example API key",
         vars: [{ name: key }],
       },
     ]);
-    expect(status.providerMetadata?.authMethod).toBe("Z.AI API key");
+    expect(status.providerMetadata?.authMethod).toBe("Example API key");
   });
 
   it("deduplicates repeated ACP auth method names in provider metadata", async () => {
@@ -141,21 +206,21 @@ describe("createAcpGenericAdapter", () => {
       authMethods: [
         {
           type: "env_var",
-          id: "zai-native",
-          name: "Z.AI API key",
-          vars: [{ name: "Z_AI_API_KEY" }],
+          id: "example-native",
+          name: "Example API key",
+          vars: [{ name: "EXAMPLE_API_KEY" }],
         },
         {
           type: "env_var",
-          id: "zai-wsl",
-          name: "Z.AI API key",
-          vars: [{ name: "Z_AI_API_KEY" }],
+          id: "example-wsl",
+          name: "Example API key",
+          vars: [{ name: "EXAMPLE_API_KEY" }],
         },
       ],
     });
     const adapter = createAcpGenericAdapter(baseInstance);
     const status = await adapter.detectInstall();
-    expect(status.providerMetadata?.authMethod).toBe("Z.AI API key");
+    expect(status.providerMetadata?.authMethod).toBe("Example API key");
   });
 
   it("does not report agent-owned login methods as provider metadata", async () => {
@@ -192,18 +257,17 @@ describe("createAcpGenericAdapter", () => {
   });
 
   it("drops agent-owned methods that duplicate an env-var method name", async () => {
-    // glm-acp-agent advertises both an agent-typed stub and the real env_var
-    // method under the same display name "Z.AI API key". The stub's
-    // authenticate() just acks, so surfacing it in the UI produces a Login
-    // button that does nothing — drop it at the adapter boundary.
+    // Some agents advertise both an agent-typed stub and the real env_var
+    // method under the same display name. The stub's authenticate() just acks,
+    // so surfacing it in the UI produces a Login button that does nothing.
     vi.mocked(probeAcpCapabilities).mockResolvedValue({
       authMethods: [
-        { id: "z-ai-api-key", name: "Z.AI API key" },
+        { id: "example-api-key", name: "Example API key" },
         {
           type: "env_var",
-          id: "z_ai_api_key",
-          name: "Z.AI API key",
-          vars: [{ name: "Z_AI_API_KEY" }],
+          id: "example_api_key",
+          name: "Example API key",
+          vars: [{ name: "EXAMPLE_API_KEY" }],
         },
       ],
     });
@@ -212,9 +276,9 @@ describe("createAcpGenericAdapter", () => {
     expect(status.authMethods).toEqual([
       {
         type: "env_var",
-        id: "z_ai_api_key",
-        name: "Z.AI API key",
-        vars: [{ name: "Z_AI_API_KEY" }],
+        id: "example_api_key",
+        name: "Example API key",
+        vars: [{ name: "EXAMPLE_API_KEY" }],
       },
     ]);
   });

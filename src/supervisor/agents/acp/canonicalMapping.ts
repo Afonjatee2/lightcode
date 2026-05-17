@@ -13,6 +13,7 @@
 import { randomUUID } from "node:crypto";
 import type {
   ContentBlock,
+  CreateElicitationRequest,
   RequestPermissionRequest,
   SessionNotification,
   SessionUpdate,
@@ -21,6 +22,7 @@ import type {
   CanonicalContentBlock,
   CanonicalItemType,
   CanonicalRequestType,
+  PermissionRequestDetails,
   RuntimeEvent,
   ToolCallPayload,
 } from "@/shared/contracts";
@@ -800,7 +802,17 @@ export function mapAcpPermissionRequest(
     rawInput?: unknown;
   };
   const requestType = classifyApprovalRequestType(toolCall.kind, toolCall.title);
-  const summary = toolCall.title ?? toolCall.kind ?? "Approval requested";
+  const command = readStringField(toolCall.rawInput, "command");
+  const title = normalizeToolText(toolCall.title);
+  const kind = normalizeToolText(toolCall.kind);
+  const summary =
+    requestType === "command_execution_approval" && command
+      ? stripCommandFromApprovalTitle(title, command)
+      : (title ?? kind ?? "Approval requested");
+  const details =
+    requestType === "command_execution_approval" && command
+      ? buildCommandPermissionDetails(toolCall.rawInput, kind)
+      : toolCall.rawInput;
   const options = req.options.map((opt) => ({
     optionId: opt.optionId,
     label: opt.name,
@@ -813,8 +825,59 @@ export function mapAcpPermissionRequest(
     requestType,
     payload: {
       summary,
-      details: toolCall.rawInput,
+      details,
       options,
+    },
+  };
+}
+
+function buildCommandPermissionDetails(
+  rawInput: unknown,
+  kind: string | undefined,
+): PermissionRequestDetails {
+  const command = readStringField(rawInput, "command") ?? "";
+  const cwd = readStringField(rawInput, "cwd");
+  return {
+    toolName: kind ?? "execute",
+    displayName: "command",
+    input: {
+      command,
+      ...(cwd ? { cwd } : {}),
+    },
+  };
+}
+
+function stripCommandFromApprovalTitle(title: string | undefined, command: string): string {
+  if (!title) return "Run command";
+  const colon = title.indexOf(":");
+  if (colon < 0) return title;
+  const prefix = title.slice(0, colon).trim();
+  const suffix = title.slice(colon + 1).trim();
+  return suffix === command && prefix.length > 0 ? prefix : title;
+}
+
+/**
+ * Map an ACP `unstable_createElicitation` call to a canonical user-input
+ * request. The renderer owns the form/URL presentation; the ACP session owns
+ * converting the resolved response back to the SDK response shape.
+ */
+export function mapAcpElicitationRequest(
+  req: CreateElicitationRequest,
+  state: AcpMapperState,
+  requestId: string,
+): RuntimeEvent {
+  return {
+    type: "request.opened",
+    threadId: state.threadId,
+    requestId,
+    requestType: "tool_user_input",
+    payload: {
+      summary: req.message,
+      details: {
+        acpElicitation: {
+          ...req,
+        },
+      },
     },
   };
 }

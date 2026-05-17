@@ -266,12 +266,41 @@ function questionAnswers(response: unknown, pending: PendingQuestion): Record<st
   if (response && typeof response === "object") {
     const obj = response as Record<string, unknown>;
     if (obj.answers && typeof obj.answers === "object") {
-      return obj.answers as Record<string, unknown>;
+      return normalizeQuestionAnswers(obj.answers as Record<string, unknown>, pending);
     }
   }
   const option = responseOptionId(response);
   const first = pending.questions[0];
   return first && option ? { [first.question]: option } : {};
+}
+
+function normalizeQuestionAnswers(
+  answers: Record<string, unknown>,
+  pending: PendingQuestion,
+): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const question of pending.questions) {
+    const raw = answers[question.question] ?? answers[question.header];
+    const value = normalizeQuestionAnswerValue(raw);
+    if (value !== undefined) normalized[question.question] = value;
+  }
+  return Object.keys(normalized).length > 0 ? normalized : answers;
+}
+
+function normalizeQuestionAnswerValue(raw: unknown): unknown {
+  if (typeof raw === "string") return raw;
+  if (Array.isArray(raw)) return raw.filter((value): value is string => typeof value === "string");
+  if (!raw || typeof raw !== "object") return undefined;
+  const obj = raw as Record<string, unknown>;
+  if (Array.isArray(obj.answers)) {
+    const values = obj.answers.filter((value): value is string => typeof value === "string");
+    return values.length === 1 ? values[0] : values;
+  }
+  if (Array.isArray(obj.optionIds)) {
+    return obj.optionIds.filter((value): value is string => typeof value === "string");
+  }
+  if (typeof obj.optionId === "string") return obj.optionId;
+  return undefined;
 }
 
 export class ClaudeSdkSession implements StructuredSessionHandle {
@@ -391,7 +420,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 
   async openThread(config: ThreadConfig, sessionRef?: SessionRef): Promise<string> {
     this.currentConfig = config;
-    this.sessionId = sessionRef?.providerSessionId;
+    this.sessionId = sessionRef?.providerSessionId ?? randomUUID();
     this.openedResumeSessionId = sessionRef?.providerSessionId;
     this.startQuery(sessionRef?.providerSessionId);
     await this.requireQuery();
@@ -617,6 +646,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           ? { allowDangerouslySkipPermissions: true }
           : {}),
         ...(resumeSessionId ? { resume: resumeSessionId } : {}),
+        ...(!resumeSessionId && this.sessionId ? { sessionId: this.sessionId } : {}),
         includePartialMessages: true,
         forwardSubagentText: true,
         canUseTool: this.canUseTool,

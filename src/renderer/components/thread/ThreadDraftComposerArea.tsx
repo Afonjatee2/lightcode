@@ -24,6 +24,7 @@ import {
 } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
+import { ThreadAuthRequiredDock } from "./ThreadAuthRequiredDock";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import {
   filterSlashCommands,
@@ -99,6 +100,7 @@ export function ThreadDraftComposerArea(props: {
   );
   const filteredCommands = filterSlashCommands(availableCommands, slashQuery);
   const showCommandPanel = filteredCommands.length > 0;
+  const authRequired = props.selectedAgent.authState === "missing";
   const controls: ComposerControl[] = controlOpenRequest
     ? props.controls.map((control) => {
         if (controlOpenRequest.target === "model" && control.kind === "provider-model") {
@@ -122,6 +124,7 @@ export function ThreadDraftComposerArea(props: {
       : "no-fast-control",
     props.gitBranch ?? "",
     props.worktreeMode ? "worktree" : "branch",
+    authRequired ? "auth-required" : "auth-ready",
     branchSelection?.branch ?? "",
     branchSelection?.baseBranch ?? "",
     branchSelection?.isWorktree ? "selection-worktree" : "selection-branch",
@@ -168,6 +171,9 @@ export function ThreadDraftComposerArea(props: {
       setPrompt("");
       setHasContent(false);
       resetDraftRefs();
+      return;
+    }
+    if (authRequired) {
       return;
     }
 
@@ -258,16 +264,23 @@ export function ThreadDraftComposerArea(props: {
         controls={controls}
         toolbarLayoutKey={toolbarLayoutKey}
         fixedContent={
-          showCommandPanel ? (
-            <ThreadCommandPanel
-              commands={filteredCommands}
-              activeIndex={slashActiveIndex}
-              onActiveIndexChange={setSlashActiveIndex}
-              onSelect={(cmd) => {
-                mentionRef.current?.insertSlashCommand(cmd.id);
-                setSlashQuery(null);
-              }}
-            />
+          authRequired || showCommandPanel ? (
+            <>
+              {authRequired ? (
+                <ThreadAuthRequiredDock agentStatus={props.selectedAgent} project={props.project} />
+              ) : null}
+              {showCommandPanel ? (
+                <ThreadCommandPanel
+                  commands={filteredCommands}
+                  activeIndex={slashActiveIndex}
+                  onActiveIndexChange={setSlashActiveIndex}
+                  onSelect={(cmd) => {
+                    mentionRef.current?.insertSlashCommand(cmd.id);
+                    setSlashQuery(null);
+                  }}
+                />
+              ) : null}
+            </>
           ) : null
         }
         attachmentBar={
@@ -329,7 +342,7 @@ export function ThreadDraftComposerArea(props: {
         }
         placeholder="Send a message..."
         prompt={prompt}
-        submitDisabled={!(hasContent || attachments.attachments.length > 0)}
+        submitDisabled={authRequired || !(hasContent || attachments.attachments.length > 0)}
         submitLabel="Launch thread"
         onPromptChange={setPrompt}
         onSubmit={() => {

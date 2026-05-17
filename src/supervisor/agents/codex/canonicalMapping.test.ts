@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { createCodexMapperState, mapCodexNotification } from "./canonicalMapping";
+import {
+  createCodexMapperState,
+  mapCodexNotification,
+  mapCodexServerRequest,
+  translateCodexCanonicalResponse,
+} from "./canonicalMapping";
 
 describe("mapCodexNotification — turn lifecycle", () => {
   it("emits turn.started with the supplied turnId", () => {
@@ -836,5 +841,66 @@ describe("mapCodexNotification — streaming deltas", () => {
   it("returns [] for unknown methods", () => {
     const state = createCodexMapperState("t-codex");
     expect(mapCodexNotification("totally/unknown", {}, state)).toEqual([]);
+  });
+});
+
+describe("mapCodexServerRequest — user input", () => {
+  it("carries multi-question requestUserInput payloads as structured form details", () => {
+    const event = mapCodexServerRequest("thread-1", "req-1", "item/tool/requestUserInput", {
+      questions: [
+        {
+          id: "scope",
+          header: "Scope",
+          question: "Which scope?",
+          options: [{ label: "Scope A", description: "Minimal" }],
+        },
+        {
+          id: "validation",
+          header: "Validation",
+          question: "Which validation?",
+          options: [{ label: "After each phase", description: "Incremental" }],
+        },
+      ],
+    });
+
+    expect(event).toMatchObject({
+      type: "request.opened",
+      threadId: "thread-1",
+      requestId: "req-1",
+      requestType: "tool_user_input",
+      payload: {
+        details: {
+          codexUserInput: {
+            questions: [
+              {
+                id: "scope",
+                header: "Scope",
+                question: "Which scope?",
+              },
+              {
+                id: "validation",
+                header: "Validation",
+                question: "Which validation?",
+              },
+            ],
+          },
+        },
+      },
+    });
+    if (event?.type !== "request.opened") throw new Error("unexpected event");
+    expect(event.payload.options).toBeUndefined();
+  });
+
+  it("passes requestUserInput responses through in Codex-native shape", () => {
+    const response = {
+      answers: {
+        scope: { answers: ["Scope A"] },
+        validation: { answers: ["After each phase"] },
+      },
+    };
+
+    expect(
+      translateCodexCanonicalResponse("item/tool/requestUserInput", { questions: [] }, response),
+    ).toBe(response);
   });
 });

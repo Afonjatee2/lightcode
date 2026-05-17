@@ -776,21 +776,23 @@ function permissionRequestPayload(req: PermissionRequest): {
 
 function questionRequestPayload(req: QuestionRequest): {
   summary: string;
-  options: { optionId: string; label: string; description?: string }[];
-  multiSelect: boolean;
+  details?: unknown;
+  options?: { optionId: string; label: string; description?: string }[];
+  multiSelect?: boolean;
 } {
   const questions = req.questions ?? [];
   const summary =
-    questions
-      .map((q) => q.header ?? q.question ?? "")
-      .filter((s) => s.length > 0)
-      .join("\n") || "Input requested";
-  const options: { optionId: string; label: string; description?: string }[] = [];
-  let multiSelect = false;
+    questions.length > 1
+      ? (questions[0]?.question ?? questions[0]?.header ?? "Input requested")
+      : questions
+          .map((q) => q.header ?? q.question ?? "")
+          .filter((s) => s.length > 0)
+          .join("\n") || "Input requested";
+  const formQuestions = [];
   for (let qi = 0; qi < questions.length; qi += 1) {
     const q = questions[qi]!;
-    if (q.multiple) multiSelect = true;
     const opts = q.options ?? [];
+    const options = [];
     for (let oi = 0; oi < opts.length; oi += 1) {
       const opt = opts[oi]!;
       const id = `q${qi}.${oi}`;
@@ -800,8 +802,25 @@ function questionRequestPayload(req: QuestionRequest): {
         ...(opt.description ? { description: opt.description } : {}),
       });
     }
+    formQuestions.push({
+      id: `q${qi}`,
+      question: q.question,
+      header: q.header,
+      options,
+      ...(q.multiple ? { multiSelect: true } : {}),
+    });
   }
-  return { summary, options, multiSelect };
+  if (formQuestions.length > 1) {
+    return { summary, details: { userInputForm: { questions: formQuestions } } };
+  }
+  const first = formQuestions[0];
+  return first
+    ? {
+        summary,
+        options: first.options,
+        ...(first.multiSelect ? { multiSelect: true } : {}),
+      }
+    : { summary };
 }
 
 function permissionRequestId(id: string): string {
@@ -1011,13 +1030,12 @@ function mapCanonicalEvent(
     }
     case "question.asked": {
       const req = event.properties;
-      const { summary, options, multiSelect } = questionRequestPayload(req);
       events.push({
         type: "request.opened",
         threadId: state.threadId,
         requestId: questionRequestId(req.id),
         requestType: "tool_user_input",
-        payload: { summary, options, multiSelect },
+        payload: questionRequestPayload(req),
       });
       return events;
     }

@@ -3,7 +3,7 @@ import { Readable, Writable } from "node:stream";
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import { probeAcpCapabilities } from "../acp";
+import { probeAcpCapabilities, type AcpProbeResult } from "../acp";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,
@@ -217,6 +217,23 @@ async function probeCopilotModelEfforts(
   }
 }
 
+function readCopilotUsageRate(metadata: Record<string, unknown> | undefined): string | undefined {
+  const usage = metadata?.copilotUsage;
+  return typeof usage === "string" && /^\d+(?:\.\d+)?x$/iu.test(usage.trim())
+    ? usage.trim()
+    : undefined;
+}
+
+function withCopilotModelRates(
+  models: NonNullable<AgentCapability["models"]>,
+  metadataByModelId: AcpProbeResult["modelMetadata"],
+): NonNullable<AgentCapability["models"]> {
+  return models.map((model) => {
+    const usageRate = readCopilotUsageRate(metadataByModelId?.[model.id]);
+    return usageRate ? { ...model, description: usageRate } : model;
+  });
+}
+
 async function probeCapabilities(
   location: ProjectLocation,
   executablePath?: string,
@@ -245,7 +262,9 @@ async function probeCapabilities(
 
   return {
     ...copilotDefaultCapabilities,
-    ...(probe?.models?.length ? { models: probe.models } : {}),
+    ...(probe?.models?.length
+      ? { models: withCopilotModelRates(probe.models, probe.modelMetadata) }
+      : {}),
     ...(probe?.efforts?.length ? { efforts: probe.efforts } : {}),
     ...((modelEffortProbe.defaultEffort ?? probe?.defaultEffort)
       ? { defaultEffort: modelEffortProbe.defaultEffort ?? probe?.defaultEffort }

@@ -144,6 +144,81 @@ describe("ProviderModelMenu", () => {
     expect(await screen.findByText("Model 500")).toBeInTheDocument();
   });
 
+  it("renders normalized model rate descriptions as muted row hints", async () => {
+    const provider = makeProvider(1);
+    provider.capabilities.models = [
+      {
+        id: "opus",
+        label: "Opus",
+        description: "2x",
+      },
+    ];
+
+    render(
+      <ProviderModelMenu
+        providers={[provider]}
+        currentAgentKind="codex"
+        currentModel="opus"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    expect(await screen.findByRole("option", { name: /Opus/u })).toHaveTextContent("· 2x");
+  });
+
+  it("ignores provider prose model descriptions", async () => {
+    const provider = makeProvider(1);
+    provider.capabilities.models = [
+      {
+        id: "opus",
+        label: "Opus",
+        description: "2x Factory token rate",
+      },
+    ];
+
+    render(
+      <ProviderModelMenu
+        providers={[provider]}
+        currentAgentKind="codex"
+        currentModel="opus"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    expect(await screen.findByRole("option", { name: /Opus/u })).toHaveTextContent("Opus");
+    expect(screen.getByRole("option", { name: /Opus/u })).not.toHaveTextContent("Factory");
+  });
+
+  it("keeps raw model descriptions available without rendering them in the row", async () => {
+    const provider = makeProvider(1);
+    provider.capabilities.models = [
+      {
+        id: "opus",
+        label: "Opus",
+        description: "2x",
+        tooltipDescription: "2x Factory token rate",
+      },
+    ];
+
+    render(
+      <ProviderModelMenu
+        providers={[provider]}
+        currentAgentKind="codex"
+        currentModel="opus"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+    const row = await screen.findByRole("option", { name: /Opus/u });
+    expect(row).toHaveTextContent("· 2x");
+    expect(screen.queryByText("2x Factory token rate")).not.toBeInTheDocument();
+  });
+
   it("keeps the current provider header rendered while scrolling deep into a long section", async () => {
     render(
       <ProviderModelMenu

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Button, ButtonGroup, Dropdown, Label, Tooltip } from "@heroui/react";
-import { ChevronDown, HelpCircle, Plug, ShieldAlert } from "lucide-react";
+import { Check, ChevronDown, HelpCircle, Plug, ShieldAlert } from "lucide-react";
 import {
   asPermissionRequestDetails,
   type CanonicalRequestType,
@@ -79,14 +79,14 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
     );
   }
 
-  const mcpElicitation = asMcpElicitationDetails(request.payload.details);
-  const codexUserInput = !mcpElicitation
-    ? asCodexUserInputDetails(request.payload.details)
+  const structuredElicitation = asStructuredElicitationDetails(request.payload.details);
+  const userInputForm = !structuredElicitation
+    ? asUserInputFormDetails(request.payload.details)
     : undefined;
   const options = request.payload.options ?? DEFAULT_APPROVAL_OPTIONS;
   const isQuestion = request.requestType === "tool_user_input";
-  const isCustomForm = !!(mcpElicitation || codexUserInput);
-  const Icon = mcpElicitation ? Plug : isQuestion ? HelpCircle : ShieldAlert;
+  const isCustomForm = !!(structuredElicitation || userInputForm);
+  const Icon = structuredElicitation ? Plug : isQuestion ? HelpCircle : ShieldAlert;
   const permissionDetails = !isCustomForm
     ? asPermissionRequestDetails(request.payload.details)
     : undefined;
@@ -99,42 +99,56 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
       ? formatRawDetails(request.payload.details)
       : undefined;
   const agentLead = agentLabel ?? "The agent";
-  const contextLine = mcpElicitation
-    ? `MCP server "${mcpElicitation.serverName}" needs input.`
+  const contextLine = structuredElicitation
+    ? `${structuredElicitation.sourceText} needs input.`
     : isQuestion
       ? `${agentLead} needs your input to continue.`
-      : `${agentLead} is waiting for approval before it can continue.`;
+      : undefined;
+  const approvalActions =
+    !isCustomForm && !isQuestion ? (
+      <ApprovalActions
+        options={options}
+        requestType={request.requestType}
+        isDisabled={resolving}
+        onSelect={(optionId) => decide([optionId])}
+      />
+    ) : null;
 
   return (
     <ThreadDockSection className="!text-xs" placement="composer" collapsed={false}>
-      <div className="flex items-start gap-2 px-2 pt-1.5 pb-1 leading-snug">
+      <div className="flex flex-wrap items-start gap-x-2 gap-y-1 px-2 py-1.5 leading-snug">
         <Icon
-          className={`mt-0.5 size-3.5 shrink-0 ${mcpElicitation || isQuestion ? "text-foreground-muted" : "text-warning"}`}
+          className={`mt-0.5 size-3.5 shrink-0 ${structuredElicitation || isQuestion ? "text-foreground-muted" : "text-warning"}`}
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-96">
           <div className="font-semibold text-foreground">{request.payload.summary}</div>
-          <div className="text-[11px] text-[color:var(--muted)]">{contextLine}</div>
+          {contextLine ? (
+            <div className="text-[11px] text-[color:var(--muted)]">{contextLine}</div>
+          ) : null}
           {permissionDetails ? (
             <PermissionDetailsLine details={permissionDetails} />
           ) : opencodePermission ? (
             <OpenCodePermissionDetailsLine details={opencodePermission} />
-          ) : !mcpElicitation && detailText ? (
+          ) : !structuredElicitation && detailText ? (
             <pre className="mt-0.5 max-h-24 overflow-y-auto rounded-sm bg-foreground/5 p-1 font-mono text-[11px] whitespace-pre-wrap break-words">
               {detailText}
             </pre>
           ) : null}
         </div>
+        {approvalActions ? (
+          <div className="ml-auto shrink-0 self-end">{approvalActions}</div>
+        ) : null}
       </div>
 
-      {mcpElicitation ? (
-        <McpElicitationForm
-          params={mcpElicitation}
+      {structuredElicitation ? (
+        <StructuredElicitationForm
+          params={structuredElicitation}
           isDisabled={resolving}
           onSubmit={(response, outcome) => submitRaw(response, outcome)}
         />
-      ) : codexUserInput ? (
-        <CodexUserInputForm
-          questions={codexUserInput.questions}
+      ) : userInputForm ? (
+        <UserInputForm
+          details={userInputForm}
           isDisabled={resolving}
           onSubmit={(response, outcome) => submitRaw(response, outcome)}
         />
@@ -145,14 +159,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
           onSubmit={decide}
           multiSelect={request.payload.multiSelect === true}
         />
-      ) : (
-        <ApprovalActions
-          options={options}
-          requestType={request.requestType}
-          isDisabled={resolving}
-          onSelect={(optionId) => decide([optionId])}
-        />
-      )}
+      ) : null}
     </ThreadDockSection>
   );
 }
@@ -201,9 +208,9 @@ function asOpenCodePermissionDetails(value: unknown): OpenCodePermissionDetails 
   return { permission: obj.permission, patterns, metadata };
 }
 
-// ── MCP elicitation ─────────────────────────────────────────────────────
+// ── Structured elicitation ──────────────────────────────────────────────
 
-type McpElicitationSchemaProperty =
+type StructuredElicitationSchemaProperty =
   | {
       type: "string";
       title?: string;
@@ -237,41 +244,58 @@ type McpElicitationSchemaProperty =
       };
     };
 
-type McpElicitationParams =
+type StructuredElicitationParams =
   | {
       mode: "form";
       message: string;
-      serverName: string;
+      sourceText: string;
       _meta?: unknown;
       requestedSchema: {
         type: "object";
-        properties: Record<string, McpElicitationSchemaProperty>;
+        properties: Record<string, StructuredElicitationSchemaProperty>;
         required?: string[];
       };
     }
   | {
       mode: "url";
       message: string;
-      serverName: string;
+      sourceText: string;
       url: string;
       elicitationId: string;
       _meta?: unknown;
     };
 
-function asMcpElicitationDetails(value: unknown): McpElicitationParams | undefined {
+function asStructuredElicitationDetails(value: unknown): StructuredElicitationParams | undefined {
   if (!value || typeof value !== "object") return undefined;
-  const wrapper = (value as { mcpElicitation?: unknown }).mcpElicitation;
-  const candidate = wrapper && typeof wrapper === "object" ? wrapper : value;
+  const obj = value as Record<string, unknown>;
+  const mcp = obj.mcpElicitation;
+  if (mcp && typeof mcp === "object") {
+    return parseStructuredElicitationCandidate(mcp, getMcpElicitationSourceText);
+  }
+  const acp = obj.acpElicitation;
+  if (acp && typeof acp === "object") {
+    return parseStructuredElicitationCandidate(acp, getAcpElicitationSourceText);
+  }
+  return parseStructuredElicitationCandidate(value, getMcpElicitationSourceText);
+}
+
+function parseStructuredElicitationCandidate(
+  candidate: unknown,
+  getSourceText: (obj: Record<string, unknown>) => string | undefined,
+): StructuredElicitationParams | undefined {
+  if (!candidate || typeof candidate !== "object") return undefined;
   const obj = candidate as Record<string, unknown>;
   const mode = obj.mode;
   if (mode !== "form" && mode !== "url") return undefined;
-  if (typeof obj.message !== "string" || typeof obj.serverName !== "string") return undefined;
+  if (typeof obj.message !== "string") return undefined;
+  const sourceText = getSourceText(obj);
+  if (!sourceText) return undefined;
   if (mode === "url") {
     if (typeof obj.url !== "string" || typeof obj.elicitationId !== "string") return undefined;
     return {
       mode: "url",
       message: obj.message,
-      serverName: obj.serverName,
+      sourceText,
       url: obj.url,
       elicitationId: obj.elicitationId,
       ...(Object.hasOwn(obj, "_meta") ? { _meta: obj._meta } : {}),
@@ -281,30 +305,47 @@ function asMcpElicitationDetails(value: unknown): McpElicitationParams | undefin
   if (!schema || typeof schema !== "object") return undefined;
   const schemaObj = schema as Record<string, unknown>;
   if (
-    schemaObj.type !== "object" ||
-    !schemaObj.properties ||
-    typeof schemaObj.properties !== "object"
+    (schemaObj.type !== undefined && schemaObj.type !== "object") ||
+    (schemaObj.properties !== undefined && typeof schemaObj.properties !== "object")
   ) {
     return undefined;
   }
+  const rawRequired = schemaObj.required;
+  const required = Array.isArray(rawRequired)
+    ? rawRequired.filter((key): key is string => typeof key === "string")
+    : [];
   return {
     mode: "form",
     message: obj.message,
-    serverName: obj.serverName,
-    requestedSchema: schemaObj as McpElicitationParams extends {
-      mode: "form";
-      requestedSchema: infer R;
-    }
-      ? R
-      : never,
+    sourceText,
+    requestedSchema: {
+      type: "object",
+      properties: (schemaObj.properties ?? {}) as Record<
+        string,
+        StructuredElicitationSchemaProperty
+      >,
+      ...(required.length > 0 ? { required } : {}),
+    },
     ...(Object.hasOwn(obj, "_meta") ? { _meta: obj._meta } : {}),
   };
 }
 
-type McpFormValue = boolean | number | string | string[];
+function getMcpElicitationSourceText(obj: Record<string, unknown>): string | undefined {
+  return typeof obj.serverName === "string" && obj.serverName.length > 0
+    ? `MCP server "${obj.serverName}"`
+    : undefined;
+}
 
-function getMcpEnumOptions(
-  property: McpElicitationSchemaProperty,
+function getAcpElicitationSourceText(obj: Record<string, unknown>): string {
+  const agentName =
+    typeof obj.agentName === "string" && obj.agentName.length > 0 ? obj.agentName : undefined;
+  return agentName ? `ACP agent "${agentName}"` : "ACP agent";
+}
+
+type StructuredFormValue = boolean | number | string | string[];
+
+function getStructuredElicitationEnumOptions(
+  property: StructuredElicitationSchemaProperty,
 ): { id: string; label: string }[] {
   if ("oneOf" in property && Array.isArray(property.oneOf)) {
     return property.oneOf.map((o) => ({ id: o.const, label: o.title ?? o.const }));
@@ -326,10 +367,10 @@ function getMcpEnumOptions(
   return [];
 }
 
-function getInitialMcpFormValues(schema: {
-  properties: Record<string, McpElicitationSchemaProperty>;
-}): Record<string, McpFormValue> {
-  const initial: Record<string, McpFormValue> = {};
+function getInitialStructuredFormValues(schema: {
+  properties: Record<string, StructuredElicitationSchemaProperty>;
+}): Record<string, StructuredFormValue> {
+  const initial: Record<string, StructuredFormValue> = {};
   for (const [key, property] of Object.entries(schema.properties)) {
     if (property.type === "boolean") initial[key] = property.default ?? false;
     else if (property.type === "integer" || property.type === "number")
@@ -340,21 +381,21 @@ function getInitialMcpFormValues(schema: {
   return initial;
 }
 
-function isEmptyRequiredValue(value: McpFormValue | undefined): boolean {
+function isEmptyRequiredValue(value: StructuredFormValue | undefined): boolean {
   if (value === undefined || value === null) return true;
   if (typeof value === "string") return value.length === 0;
   if (Array.isArray(value)) return value.length === 0;
   return false;
 }
 
-function McpElicitationForm(props: {
-  params: McpElicitationParams;
+function StructuredElicitationForm(props: {
+  params: StructuredElicitationParams;
   isDisabled: boolean;
   onSubmit: (response: unknown, outcome: RequestOutcome) => void;
 }) {
   const { params, isDisabled, onSubmit } = props;
-  const [formValues, setFormValues] = useState<Record<string, McpFormValue>>(() =>
-    params.mode === "form" ? getInitialMcpFormValues(params.requestedSchema) : {},
+  const [formValues, setFormValues] = useState<Record<string, StructuredFormValue>>(() =>
+    params.mode === "form" ? getInitialStructuredFormValues(params.requestedSchema) : {},
   );
   const requiredKeys = params.mode === "form" ? (params.requestedSchema.required ?? []) : [];
   const hasMissing =
@@ -387,7 +428,7 @@ function McpElicitationForm(props: {
           {Object.entries(params.requestedSchema.properties).map(([key, property]) => {
             const label = property.title ?? key;
             const description = property.description ?? "";
-            const enumOpts = getMcpEnumOptions(property);
+            const enumOpts = getStructuredElicitationEnumOptions(property);
             const isRequired = requiredKeys.includes(key);
             return (
               <div key={key} className="space-y-1">
@@ -521,71 +562,169 @@ function McpElicitationForm(props: {
   );
 }
 
-// ── Codex item/tool/requestUserInput ────────────────────────────────────
+// ── Structured user input forms ─────────────────────────────────────────
 
-type CodexUserInputQuestion = {
+type UserInputFormOption = {
+  optionId: string;
+  label: string;
+  description?: string;
+};
+
+type UserInputFormQuestion = {
   id: string;
   header: string;
   question: string;
   isSecret: boolean;
-  options: Array<{ label: string; description: string }> | null;
+  multiSelect: boolean;
+  options: UserInputFormOption[] | null;
 };
 
-type CodexUserInputDetails = { questions: CodexUserInputQuestion[] };
+type UserInputFormDetails = {
+  questions: UserInputFormQuestion[];
+  responseShape: "answers-map" | "codex-request-user-input";
+};
 
-function asCodexUserInputDetails(value: unknown): CodexUserInputDetails | undefined {
+function asUserInputFormDetails(value: unknown): UserInputFormDetails | undefined {
   if (!value || typeof value !== "object") return undefined;
-  const wrapper = (value as { codexUserInput?: unknown }).codexUserInput;
-  if (!wrapper || typeof wrapper !== "object") return undefined;
-  const raw = (wrapper as { questions?: unknown }).questions;
-  if (!Array.isArray(raw)) return undefined;
-  const questions: CodexUserInputQuestion[] = [];
+  const obj = value as Record<string, unknown>;
+  const generic = obj.userInputForm;
+  if (generic && typeof generic === "object") {
+    const questions = readUserInputFormQuestions(
+      (generic as { questions?: unknown }).questions,
+      "generic",
+    );
+    if (questions.length > 0) return { questions, responseShape: "answers-map" };
+  }
+
+  const codex = obj.codexUserInput;
+  if (codex && typeof codex === "object") {
+    const questions = readUserInputFormQuestions(
+      (codex as { questions?: unknown }).questions,
+      "codex",
+    );
+    if (questions.length > 0) return { questions, responseShape: "codex-request-user-input" };
+  }
+
+  return undefined;
+}
+
+function readUserInputFormQuestions(
+  raw: unknown,
+  source: "generic" | "codex",
+): UserInputFormQuestion[] {
+  if (!Array.isArray(raw)) return [];
+  const questions: UserInputFormQuestion[] = [];
   for (const entry of raw) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
-    if (
-      typeof e.id !== "string" ||
-      typeof e.header !== "string" ||
-      typeof e.question !== "string"
-    ) {
-      continue;
-    }
+    if (typeof e.question !== "string" || e.question.length === 0) continue;
+    const id = typeof e.id === "string" && e.id.length > 0 ? e.id : e.question;
+    const header =
+      typeof e.header === "string" && e.header.length > 0
+        ? e.header
+        : source === "codex"
+          ? e.question
+          : id;
     const options =
       Array.isArray(e.options) && e.options.length > 0
         ? e.options.flatMap((opt) => {
             if (!opt || typeof opt !== "object") return [];
             const o = opt as Record<string, unknown>;
-            return typeof o.label === "string" && typeof o.description === "string"
-              ? [{ label: o.label, description: o.description }]
-              : [];
+            if (typeof o.label !== "string" || o.label.length === 0) return [];
+            const optionId =
+              typeof o.optionId === "string" && o.optionId.length > 0 ? o.optionId : o.label;
+            return [
+              {
+                optionId,
+                label: o.label,
+                ...(typeof o.description === "string" && o.description.length > 0
+                  ? { description: o.description }
+                  : {}),
+              },
+            ];
           })
         : null;
     questions.push({
-      id: e.id,
-      header: e.header,
+      id,
+      header,
       question: e.question,
       isSecret: e.isSecret === true,
+      multiSelect: e.multiSelect === true,
       options,
     });
   }
-  return questions.length > 0 ? { questions } : undefined;
+  return questions;
 }
 
-function CodexUserInputForm(props: {
-  questions: CodexUserInputQuestion[];
+type UserInputFormAnswer = string | string[];
+
+function initialUserInputFormAnswers(
+  questions: readonly UserInputFormQuestion[],
+): Record<string, UserInputFormAnswer> {
+  return Object.fromEntries(questions.map((q) => [q.id, q.multiSelect ? [] : ""]));
+}
+
+function singleUserInputValue(value: UserInputFormAnswer | undefined): string {
+  return typeof value === "string" ? value : "";
+}
+
+function userInputValueList(value: UserInputFormAnswer | undefined): string[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function UserInputForm(props: {
+  details: UserInputFormDetails;
   isDisabled: boolean;
   onSubmit: (response: unknown, outcome: RequestOutcome) => void;
 }) {
-  const { questions, isDisabled, onSubmit } = props;
-  const [answers, setAnswers] = useState<Record<string, string>>(() =>
-    Object.fromEntries(questions.map((q) => [q.id, ""])),
+  const { details, isDisabled, onSubmit } = props;
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, UserInputFormAnswer>>(() =>
+    initialUserInputFormAnswers(details.questions),
   );
+  const activeQuestion = details.questions[activeIndex] ?? details.questions[0];
+  if (!activeQuestion) return null;
+
+  function setAnswer(questionId: string, value: UserInputFormAnswer) {
+    setAnswers((cur) => (cur[questionId] === value ? cur : { ...cur, [questionId]: value }));
+  }
+
+  function answerSingleChoice(questionId: string, optionId: string) {
+    setAnswer(questionId, optionId);
+    setActiveIndex((index) => Math.min(index + 1, details.questions.length - 1));
+  }
+
+  function toggleAnswer(questionId: string, optionId: string) {
+    setAnswers((cur) => {
+      const selected = userInputValueList(cur[questionId]);
+      const next = selected.includes(optionId)
+        ? selected.filter((id) => id !== optionId)
+        : [...selected, optionId];
+      return { ...cur, [questionId]: next };
+    });
+  }
 
   function submit() {
+    if (details.responseShape === "codex-request-user-input") {
+      onSubmit(
+        {
+          answers: Object.fromEntries(
+            details.questions.map((question) => {
+              const value = answers[question.id];
+              const values = Array.isArray(value) ? value : value ? [value] : [];
+              return [question.id, { answers: values }];
+            }),
+          ),
+        },
+        "answered",
+      );
+      return;
+    }
+
     onSubmit(
       {
         answers: Object.fromEntries(
-          Object.entries(answers).map(([id, value]) => [id, { answers: value ? [value] : [] }]),
+          details.questions.map((question) => [question.id, answers[question.id]]),
         ),
       },
       "answered",
@@ -594,46 +733,68 @@ function CodexUserInputForm(props: {
 
   return (
     <div className="space-y-2 border-t border-[color:var(--border)] px-2 py-1.5">
-      <div className="space-y-2">
-        {questions.map((question) => (
-          <div key={question.id} className="space-y-1">
-            <div>
-              <p className="text-[11px] font-medium text-foreground">{question.header}</p>
-              <p className="text-[11px] text-[color:var(--muted)]">{question.question}</p>
-            </div>
-            {question.options ? (
-              <select
-                disabled={isDisabled}
-                value={answers[question.id] ?? ""}
-                onChange={(e) => setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))}
-                className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
-              >
-                <option value="">—</option>
-                {question.options.map((option) => (
-                  <option key={option.label} value={option.label}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            ) : question.isSecret ? (
-              <input
-                type="password"
-                disabled={isDisabled}
-                value={answers[question.id] ?? ""}
-                onChange={(e) => setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))}
-                className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+      <QuestionSwitcher
+        questions={details.questions}
+        answers={answers}
+        activeIndex={activeIndex}
+        isDisabled={isDisabled}
+        onSelect={setActiveIndex}
+      />
+      <div className="space-y-1">
+        <div>
+          <p className="text-[11px] font-medium text-foreground">{activeQuestion.header}</p>
+          <p className="text-[11px] text-[color:var(--muted)]">{activeQuestion.question}</p>
+        </div>
+        {activeQuestion.options ? (
+          <div
+            role="listbox"
+            aria-label={activeQuestion.header}
+            {...(activeQuestion.multiSelect ? { "aria-multiselectable": true } : {})}
+            className="flex flex-col"
+          >
+            {activeQuestion.options.map((option, index) => (
+              <QuestionOptionRow
+                key={option.optionId}
+                index={index}
+                option={option}
+                isDisabled={isDisabled}
+                {...(activeQuestion.multiSelect
+                  ? {
+                      checked: userInputValueList(answers[activeQuestion.id]).includes(
+                        option.optionId,
+                      ),
+                    }
+                  : {
+                      selected:
+                        singleUserInputValue(answers[activeQuestion.id]) === option.optionId,
+                    })}
+                onClick={() => {
+                  if (activeQuestion.multiSelect) {
+                    toggleAnswer(activeQuestion.id, option.optionId);
+                    return;
+                  }
+                  answerSingleChoice(activeQuestion.id, option.optionId);
+                }}
               />
-            ) : (
-              <textarea
-                disabled={isDisabled}
-                rows={2}
-                value={answers[question.id] ?? ""}
-                onChange={(e) => setAnswers((cur) => ({ ...cur, [question.id]: e.target.value }))}
-                className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
-              />
-            )}
+            ))}
           </div>
-        ))}
+        ) : activeQuestion.isSecret ? (
+          <input
+            type="password"
+            disabled={isDisabled}
+            value={singleUserInputValue(answers[activeQuestion.id])}
+            onChange={(e) => setAnswer(activeQuestion.id, e.target.value)}
+            className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+          />
+        ) : (
+          <textarea
+            disabled={isDisabled}
+            rows={2}
+            value={singleUserInputValue(answers[activeQuestion.id])}
+            onChange={(e) => setAnswer(activeQuestion.id, e.target.value)}
+            className="w-full rounded border border-[color:var(--border)] bg-[var(--composer-surface)] px-2 py-1 text-[11px] text-foreground outline-none"
+          />
+        )}
       </div>
       <div className="flex justify-end pt-1">
         <Button isDisabled={isDisabled} size="sm" variant="secondary" onPress={submit}>
@@ -642,6 +803,50 @@ function CodexUserInputForm(props: {
       </div>
     </div>
   );
+}
+
+function QuestionSwitcher(props: {
+  questions: readonly UserInputFormQuestion[];
+  answers: Record<string, UserInputFormAnswer>;
+  activeIndex: number;
+  isDisabled: boolean;
+  onSelect: (index: number) => void;
+}) {
+  const { questions, answers, activeIndex, isDisabled, onSelect } = props;
+  if (questions.length <= 1) return null;
+  return (
+    <div role="tablist" aria-label="Questions" className="flex gap-1 overflow-x-auto pb-0.5">
+      {questions.map((question, index) => {
+        const isActive = index === activeIndex;
+        const hasAnswer = hasUserInputAnswer(answers[question.id]);
+        return (
+          <button
+            key={question.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            disabled={isDisabled}
+            onClick={() => onSelect(index)}
+            className={`flex min-w-0 shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] transition-colors disabled:opacity-60 ${
+              isActive
+                ? "bg-foreground/10 text-foreground"
+                : "text-[color:var(--muted)] hover:bg-foreground/5 hover:text-foreground"
+            }`}
+          >
+            <span className="flex size-3.5 shrink-0 items-center justify-center rounded-sm border border-foreground/20 text-[9px] [font-variant-numeric:tabular-nums]">
+              {hasAnswer ? <Check className="size-2.5" /> : index + 1}
+            </span>
+            <span className="max-w-32 truncate">{question.header}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function hasUserInputAnswer(value: UserInputFormAnswer | undefined): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  return typeof value === "string" && value.length > 0;
 }
 
 function OpenCodePermissionDetailsLine({ details }: { details: OpenCodePermissionDetails }) {
@@ -770,10 +975,12 @@ function QuestionOptionRow(props: {
   option: UserInputOption;
   isDisabled: boolean;
   onClick: () => void;
+  /** Single-select forms can mark the saved choice without changing row shape. */
+  selected?: boolean;
   /** When defined, the row renders a checkbox marker (multi-select). */
   checked?: boolean;
 }) {
-  const { index, option, isDisabled, onClick, checked } = props;
+  const { index, option, isDisabled, onClick, selected, checked } = props;
   const isMultiSelect = checked !== undefined;
   const tooltipBody = option.description ? (
     <div className="max-w-[28rem] space-y-1 whitespace-normal break-words">
@@ -786,10 +993,12 @@ function QuestionOptionRow(props: {
     <button
       type="button"
       role="option"
-      aria-selected={isMultiSelect ? checked === true : false}
+      aria-selected={isMultiSelect ? checked === true : selected === true}
       disabled={isDisabled}
       onClick={onClick}
-      className="flex w-full items-start gap-2 rounded px-2 py-1 text-left transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/5 focus-visible:outline-none disabled:opacity-60 disabled:hover:bg-transparent"
+      className={`flex w-full items-start gap-2 rounded px-2 py-1 text-left transition-colors hover:bg-foreground/5 focus-visible:bg-foreground/5 focus-visible:outline-none disabled:opacity-60 disabled:hover:bg-transparent ${
+        selected ? "bg-foreground/5" : ""
+      }`}
     >
       {isMultiSelect ? (
         <span className="mt-0.5 flex size-3 shrink-0 items-center justify-center rounded border border-foreground/30 text-[9px] text-foreground [font-variant-numeric:tabular-nums]">
@@ -836,7 +1045,7 @@ function ApprovalActions(props: {
   const positiveAlternates = positives.slice(1);
 
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-[color:var(--border)] px-2 py-1.5">
+    <div className="flex flex-wrap items-center justify-end gap-2">
       <div className="flex flex-wrap items-center gap-1">
         {negatives.map((option) => (
           <Button

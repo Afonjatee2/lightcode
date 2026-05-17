@@ -142,6 +142,43 @@ describe("ThreadComposerSection", () => {
     });
   });
 
+  it("shows an auth row and blocks active-thread input when the agent needs login", () => {
+    const onSubmitInput = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    render(
+      <ThreadComposerSection
+        threadId={guiThread.id}
+        fallbackThread={guiThread}
+        agentStatus={{ ...codexGuiStatus, authState: "missing", loginCommand: "codex login" }}
+        projectLocation={{
+          kind: "windows",
+          path: "C:\\repo",
+        }}
+        paneCount={1}
+        terminalPaneRef={{ current: null }}
+        todoDockCollapsed={false}
+        todoDockPlacement="composer"
+        todoDockState={null}
+        goalDockState={null}
+        errorDockState={null}
+        onGoalDockDismiss={() => undefined}
+        onDismissError={() => undefined}
+        onConfigChange={() => undefined}
+        onResolveServerRequest={async () => undefined}
+        onSubmitInput={onSubmitInput}
+        onTodoDockCollapsedChange={() => undefined}
+        onTodoDockPlacementChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("Sign in required")).toBeInTheDocument();
+    const input = screen.getByRole("textbox");
+    input.appendChild(document.createTextNode("should not send"));
+    fireEvent.input(input);
+    fireEvent.click(screen.getByText("send"));
+
+    expect(onSubmitInput).not.toHaveBeenCalled();
+  });
+
   it("keeps queued runtime approval requests actionable after resolving the first one", async () => {
     let resolveRequest: (() => void) | undefined;
     const onResolveServerRequest = vi.fn<() => Promise<void>>(
@@ -208,6 +245,277 @@ describe("ThreadComposerSection", () => {
     await act(async () => {
       resolveRequest?.();
       await Promise.resolve();
+    });
+  });
+
+  it("renders multi-question user input forms with answer options instead of approval fallback buttons", async () => {
+    const onResolveServerRequest = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    useAppStore.setState({
+      runtimeRequestsByThread: {
+        [guiThread.id]: [
+          {
+            requestId: "claude-question-1",
+            threadId: guiThread.id,
+            requestType: "tool_user_input",
+            payload: {
+              summary: "Which split scope should I execute?",
+              details: {
+                userInputForm: {
+                  questions: [
+                    {
+                      question: "Which split scope should I execute?",
+                      header: "Scope",
+                      options: [
+                        {
+                          optionId: "Scope A: minimal",
+                          label: "Scope A: minimal",
+                          description: "Add the runtime package only.",
+                        },
+                        {
+                          optionId: "Scope B: app-only",
+                          label: "Scope B: app-only",
+                          description: "Move desktop app source only.",
+                        },
+                      ],
+                    },
+                    {
+                      question: "Should I run validation after each phase?",
+                      header: "Validation cadence",
+                      options: [
+                        {
+                          optionId: "After each phase",
+                          label: "After each phase",
+                          description: "Land in incremental chunks.",
+                        },
+                      ],
+                    },
+                  ],
+                },
+              },
+            },
+            receivedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    render(
+      <ThreadComposerSection
+        threadId={guiThread.id}
+        fallbackThread={guiThread}
+        agentStatus={codexGuiStatus}
+        projectLocation={{
+          kind: "windows",
+          path: "C:\\repo",
+        }}
+        paneCount={1}
+        terminalPaneRef={{ current: null }}
+        todoDockCollapsed={false}
+        todoDockPlacement="composer"
+        todoDockState={null}
+        goalDockState={null}
+        errorDockState={null}
+        onGoalDockDismiss={() => undefined}
+        onDismissError={() => undefined}
+        onConfigChange={() => undefined}
+        onResolveServerRequest={onResolveServerRequest}
+        onSubmitInput={async () => undefined}
+        onTodoDockCollapsedChange={() => undefined}
+        onTodoDockPlacementChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("Scope A: minimal")).toBeInTheDocument();
+    expect(screen.queryByText("After each phase")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Allow" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Scope A: minimal"));
+    expect(screen.getByText("After each phase")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("After each phase"));
+    fireEvent.click(screen.getByRole("tab", { name: /Scope/ }));
+    fireEvent.click(screen.getByText("Scope B: app-only"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(onResolveServerRequest).toHaveBeenCalledWith({
+        requestId: "claude-question-1",
+        method: "requestPermission",
+        response: {
+          answers: {
+            "Which split scope should I execute?": "Scope B: app-only",
+            "Should I run validation after each phase?": "After each phase",
+          },
+        },
+      });
+    });
+  });
+
+  it("submits Codex multi-question user input in Codex-native response shape", async () => {
+    const onResolveServerRequest = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    useAppStore.setState({
+      runtimeRequestsByThread: {
+        [guiThread.id]: [
+          {
+            requestId: "codex-question-1",
+            threadId: guiThread.id,
+            requestType: "tool_user_input",
+            payload: {
+              summary: "Input requested",
+              details: {
+                codexUserInput: {
+                  questions: [
+                    {
+                      id: "scope",
+                      header: "Scope",
+                      question: "Which scope?",
+                      options: [{ label: "Scope A", description: "Minimal" }],
+                    },
+                    {
+                      id: "validation",
+                      header: "Validation",
+                      question: "Which validation?",
+                      options: [{ label: "After each phase", description: "Incremental" }],
+                    },
+                  ],
+                },
+              },
+            },
+            receivedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    render(
+      <ThreadComposerSection
+        threadId={guiThread.id}
+        fallbackThread={guiThread}
+        agentStatus={codexGuiStatus}
+        projectLocation={{
+          kind: "windows",
+          path: "C:\\repo",
+        }}
+        paneCount={1}
+        terminalPaneRef={{ current: null }}
+        todoDockCollapsed={false}
+        todoDockPlacement="composer"
+        todoDockState={null}
+        goalDockState={null}
+        errorDockState={null}
+        onGoalDockDismiss={() => undefined}
+        onDismissError={() => undefined}
+        onConfigChange={() => undefined}
+        onResolveServerRequest={onResolveServerRequest}
+        onSubmitInput={async () => undefined}
+        onTodoDockCollapsedChange={() => undefined}
+        onTodoDockPlacementChange={() => undefined}
+      />,
+    );
+
+    fireEvent.click(screen.getByText("Scope A"));
+    fireEvent.click(screen.getByText("After each phase"));
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(onResolveServerRequest).toHaveBeenCalledWith({
+        requestId: "codex-question-1",
+        method: "requestPermission",
+        response: {
+          answers: {
+            scope: { answers: ["Scope A"] },
+            validation: { answers: ["After each phase"] },
+          },
+        },
+      });
+    });
+  });
+
+  it("submits ACP elicitation forms in ACP response shape", async () => {
+    const onResolveServerRequest = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    useAppStore.setState({
+      runtimeRequestsByThread: {
+        [guiThread.id]: [
+          {
+            requestId: "acp-elicit-1",
+            threadId: guiThread.id,
+            requestType: "tool_user_input",
+            payload: {
+              summary: "Choose deployment scope",
+              details: {
+                acpElicitation: {
+                  mode: "form",
+                  message: "Choose deployment scope",
+                  requestedSchema: {
+                    type: "object",
+                    required: ["scope"],
+                    properties: {
+                      scope: {
+                        type: "string",
+                        title: "Scope",
+                        enum: ["Scope A", "Scope B"],
+                      },
+                      confirm: {
+                        type: "boolean",
+                        title: "Confirm",
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            receivedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    render(
+      <ThreadComposerSection
+        threadId={guiThread.id}
+        fallbackThread={guiThread}
+        agentStatus={codexGuiStatus}
+        projectLocation={{
+          kind: "windows",
+          path: "C:\\repo",
+        }}
+        paneCount={1}
+        terminalPaneRef={{ current: null }}
+        todoDockCollapsed={false}
+        todoDockPlacement="composer"
+        todoDockState={null}
+        goalDockState={null}
+        errorDockState={null}
+        onGoalDockDismiss={() => undefined}
+        onDismissError={() => undefined}
+        onConfigChange={() => undefined}
+        onResolveServerRequest={onResolveServerRequest}
+        onSubmitInput={async () => undefined}
+        onTodoDockCollapsedChange={() => undefined}
+        onTodoDockPlacementChange={() => undefined}
+      />,
+    );
+
+    expect(screen.getByText("ACP agent needs input.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Allow" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Deny" })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByRole("combobox"), { target: { value: "Scope B" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Confirm" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+
+    await waitFor(() => {
+      expect(onResolveServerRequest).toHaveBeenCalledWith({
+        requestId: "acp-elicit-1",
+        method: "requestPermission",
+        response: {
+          action: "accept",
+          content: {
+            scope: "Scope B",
+            confirm: true,
+          },
+        },
+      });
     });
   });
 });

@@ -15,13 +15,10 @@ import {
 } from "lucide-react";
 import type {
   AcpRegistryAgent,
-  AgentOwnedAuthMethod,
   AgentStatus,
   AgentStatusesResponse,
-  InstalledAcpRegistryAgent,
   Project,
   RefreshAgentScope,
-  RefreshAgentScopeEnv,
 } from "@/shared/contracts";
 import { isWindows, readBridge } from "@/renderer/bridge";
 import {
@@ -32,6 +29,12 @@ import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import {
+  agentAuthTarget,
+  findAgentAuthMethodForStatus,
+  registryAdapterKind,
+  scopeEnvForStatus,
+} from "@/renderer/utils/acpRegistryAuth";
 import { PixelLoader } from "@/renderer/components/common";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import {
@@ -61,39 +64,6 @@ function distributionLabel(agent: AcpRegistryAgent): string {
   if (agent.distribution.uvx) return `uvx ${agent.distribution.uvx.package}`;
   if (agent.distribution.binary) return "Binary";
   return "Custom";
-}
-
-function registryAdapterKind(agentId: string): string {
-  return `acp-generic:${agentId}`;
-}
-
-function scopeEnvForStatus(status: AgentStatus): RefreshAgentScopeEnv {
-  return status.envKind === "wsl" && status.envDistro
-    ? { kind: "wsl", distro: status.envDistro }
-    : { kind: "native" };
-}
-
-type StatusAuthMethod = NonNullable<AgentStatus["authMethods"]>[number];
-
-function isEnvVarAuthMethod(method: StatusAuthMethod | undefined): boolean {
-  return (
-    method !== undefined &&
-    (method.type === "env_var" || ("vars" in method && Array.isArray(method.vars)))
-  );
-}
-
-function findAgentAuthMethod(status: AgentStatus | undefined): AgentOwnedAuthMethod | undefined {
-  return status?.authMethods?.find(
-    (candidate): candidate is AgentOwnedAuthMethod =>
-      !isEnvVarAuthMethod(candidate) && candidate.type !== "terminal",
-  );
-}
-
-function agentAuthTarget(status: AgentStatus) {
-  return {
-    ...(status.envKind ? { envKind: status.envKind } : {}),
-    ...(status.envDistro ? { wslDistro: status.envDistro } : {}),
-  };
 }
 
 interface InstallTarget {
@@ -133,9 +103,9 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
   const [error, setError] = useState<string | undefined>();
   const [pendingAgentId, setPendingAgentId] = useState<string | undefined>();
   const [pendingAuthAgentId, setPendingAuthAgentId] = useState<string | undefined>();
-  const [mutatedInstalled, setMutatedInstalled] = useState<InstalledAcpRegistryAgent[]>();
 
   const settingsInstalled = useSharedSettings((s) => s.acpRegistryInstalledAgents);
+  const syncInstalledAgents = useSharedSettings((s) => s.syncAcpRegistryInstalledAgents);
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
   const projects = useAppStore((state) => state.projects);
@@ -177,8 +147,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     };
   }, [wslProjectDistrosKey]);
 
-  const installedRecords = mutatedInstalled ?? Object.values(settingsInstalled);
-  const installedById = new Map(installedRecords.map((record) => [record.id, record]));
+  const installedById = new Map(Object.entries(settingsInstalled));
   const detectedInstalledByKind = new Map<string, AgentStatus[]>();
   for (const status of [...agentStatuses, ...wslAgentStatuses]) {
     if (!status.installed) continue;
@@ -239,7 +208,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
           reset: false,
           scope: { agentKinds: [adapterKind] },
         });
-        setMutatedInstalled(result.installed);
+        syncInstalledAgents(result.installed);
         const status = findStatusInResponse(
           response,
           adapterKind,
@@ -266,7 +235,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     readBridge()
       .removeAcpRegistryAgent({ agentId })
       .then((result) => {
-        setMutatedInstalled(result.installed);
+        syncInstalledAgents(result.installed);
         refreshStatuses();
       })
       .catch((err: unknown) => {
@@ -284,7 +253,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
       .then(async (result) => {
         const adapterKind = registryAdapterKind(agentId);
         await refreshStatuses({ reset: false, scope: { agentKinds: [adapterKind] } });
-        setMutatedInstalled(result.installed);
+        syncInstalledAgents(result.installed);
         toast.success(`${agent.name} updated to v${agent.version}.`);
       })
       .catch((err: unknown) => {
@@ -548,12 +517,12 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     const isAvailable = installedRecord !== undefined || localInstalled;
     const needsLogin = localStatus?.authState === "missing";
     const loginCommand = localStatus?.loginCommand;
-    const agentAuthMethod = findAgentAuthMethod(localStatus);
+    const agentAuthMethod = findAgentAuthMethodForStatus(localStatus);
     const agentAuthStatuses = needsLogin
       ? detectedStatuses.filter((status) => status.authState === "missing")
       : detectedStatuses;
     const agentAuthEntries = agentAuthStatuses.flatMap((status) => {
-      const method = findAgentAuthMethod(status);
+      const method = findAgentAuthMethodForStatus(status);
       return method ? [{ status, method }] : [];
     });
     const loginProject = projectForStatus(localStatus);

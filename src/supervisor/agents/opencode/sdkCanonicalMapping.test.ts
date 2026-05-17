@@ -282,6 +282,63 @@ describe("sdkCanonicalMapping — permission/question events", () => {
     expect(ev.payload.options).toHaveLength(2);
     expect(ev.payload.options?.[0]?.label).toBe("React");
   });
+
+  it("maps multi-question question.asked to a structured user input form", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      {
+        id: "evt-x",
+        type: "question.asked",
+        properties: {
+          id: "q_2",
+          sessionID: "ses_test",
+          questions: [
+            {
+              question: "Which scope?",
+              header: "Scope",
+              options: [
+                { label: "Scope A", description: "Minimal" },
+                { label: "Scope B", description: "App only" },
+              ],
+            },
+            {
+              question: "Which validation?",
+              header: "Validation",
+              options: [{ label: "After each phase", description: "Incremental" }],
+            },
+          ],
+        },
+      },
+      state,
+    );
+    expect(events).toHaveLength(1);
+    const ev = events[0];
+    if (ev?.type !== "request.opened") throw new Error("unexpected event");
+    expect(ev.requestId).toBe("opencode-q-q_2");
+    expect(ev.requestType).toBe("tool_user_input");
+    expect(ev.payload.options).toBeUndefined();
+    expect(ev.payload.details).toEqual({
+      userInputForm: {
+        questions: [
+          {
+            id: "q0",
+            question: "Which scope?",
+            header: "Scope",
+            options: [
+              { optionId: "q0.0", label: "Scope A", description: "Minimal" },
+              { optionId: "q0.1", label: "Scope B", description: "App only" },
+            ],
+          },
+          {
+            id: "q1",
+            question: "Which validation?",
+            header: "Validation",
+            options: [{ optionId: "q1.0", label: "After each phase", description: "Incremental" }],
+          },
+        ],
+      },
+    });
+  });
 });
 
 describe("sdkCanonicalMapping — todowrite → plan", () => {

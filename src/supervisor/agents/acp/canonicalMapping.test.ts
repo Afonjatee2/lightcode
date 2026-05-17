@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { SessionNotification } from "@agentclientprotocol/sdk";
-import { closeOpenTurnItems, createAcpMapperState, mapAcpSessionUpdate } from "./canonicalMapping";
+import {
+  closeOpenTurnItems,
+  createAcpMapperState,
+  mapAcpPermissionRequest,
+  mapAcpSessionUpdate,
+} from "./canonicalMapping";
 
 /**
  * Smoke tests for the generic ACP → canonical RuntimeEvent mapper.
@@ -742,5 +747,53 @@ describe("mapAcpSessionUpdate", () => {
         },
       },
     ]);
+  });
+});
+
+describe("mapAcpPermissionRequest", () => {
+  it("unwraps command approval input instead of surfacing raw JSON details", () => {
+    const state = createAcpMapperState("t-perm-command");
+
+    const event = mapAcpPermissionRequest(
+      {
+        sessionId: "s1",
+        toolCall: {
+          title: "Run command: cd /repo && pnpm run typecheck 2>&1",
+          kind: "execute",
+          rawInput: {
+            command: "cd /repo && pnpm run typecheck 2>&1",
+            cwd: "/repo",
+          },
+        },
+        options: [
+          { optionId: "allow", name: "Allow", kind: "allow_once" },
+          { optionId: "reject", name: "Skip", kind: "reject_once" },
+        ],
+      } as Parameters<typeof mapAcpPermissionRequest>[0],
+      state,
+      "acp-perm-0",
+    );
+
+    expect(event).toEqual({
+      type: "request.opened",
+      threadId: "t-perm-command",
+      requestId: "acp-perm-0",
+      requestType: "command_execution_approval",
+      payload: {
+        summary: "Run command",
+        details: {
+          toolName: "execute",
+          displayName: "command",
+          input: {
+            command: "cd /repo && pnpm run typecheck 2>&1",
+            cwd: "/repo",
+          },
+        },
+        options: [
+          { optionId: "allow", label: "Allow", description: undefined },
+          { optionId: "reject", label: "Skip", description: undefined },
+        ],
+      },
+    });
   });
 });

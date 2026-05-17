@@ -59,6 +59,8 @@ interface ModelEntry {
   subId?: string;
   subLabel?: string;
   contextDescription?: string;
+  modelDescription?: string;
+  tooltipDescription?: string;
   searchText: string;
 }
 
@@ -82,6 +84,38 @@ function pickContextDescription(modelId: string, capability: AgentCapability): s
     if (!labels.includes(label)) labels.push(label);
   }
   return labels.length > 0 ? labels.join(" / ") : undefined;
+}
+
+function formatModelDescription(description: string | undefined): string | undefined {
+  const trimmed = description?.trim();
+  if (!trimmed) return undefined;
+  const rawRate = /^(\d+(?:\.\d+)?)x$/iu.exec(trimmed);
+  return rawRate ? `${rawRate[1]}x` : undefined;
+}
+
+function joinHints(...hints: Array<string | undefined>): string | undefined {
+  const parts = hints.filter((hint): hint is string => Boolean(hint));
+  return parts.length > 0 ? parts.join(" · ") : undefined;
+}
+
+function modelHintProps(model: {
+  modelDescription?: string;
+  contextDescription?: string;
+}): { contextDescription: string } | {} {
+  const contextDescription = joinHints(model.modelDescription, model.contextDescription);
+  return contextDescription ? { contextDescription } : {};
+}
+
+function formatTooltipDescription(input: {
+  description?: string;
+  modelDescription?: string;
+  tooltipDescription?: string;
+}): string | undefined {
+  const explicit = input.tooltipDescription?.trim();
+  if (explicit) return explicit;
+  const description = input.description?.trim();
+  if (!description || description === input.modelDescription) return undefined;
+  return description;
 }
 
 interface ProviderModelCache {
@@ -111,11 +145,19 @@ interface ResolvedModelRef {
   providerLabel: string;
   subProviderLabel?: string;
   contextDescription?: string;
+  modelDescription?: string;
+  tooltipDescription?: string;
   searchText: string;
   providerSearchText: string;
 }
 
-function makeModelEntry(id: string, label: string, capability: AgentCapability): ModelEntry {
+function makeModelEntry(
+  id: string,
+  label: string,
+  capability: AgentCapability,
+  description?: string,
+  tooltipDescription?: string,
+): ModelEntry {
   const sub = deriveSubProvider(id, capability);
   const searchParts = [id, label];
   const entry: ModelEntry = { id, label, searchText: "" };
@@ -127,6 +169,20 @@ function makeModelEntry(id: string, label: string, capability: AgentCapability):
   const contextDescription = pickContextDescription(id, capability);
   if (contextDescription) {
     entry.contextDescription = contextDescription;
+    searchParts.push(contextDescription);
+  }
+  const modelDescription = formatModelDescription(description);
+  if (modelDescription) {
+    entry.modelDescription = modelDescription;
+    searchParts.push(modelDescription);
+  }
+  const tooltip = formatTooltipDescription({
+    ...(description ? { description } : {}),
+    ...(modelDescription ? { modelDescription } : {}),
+    ...(tooltipDescription ? { tooltipDescription } : {}),
+  });
+  if (tooltip) {
+    entry.tooltipDescription = tooltip;
   }
   entry.searchText = searchParts.join("\n").toLowerCase();
   return entry;
@@ -139,7 +195,13 @@ function getProviderModelCache(capability: AgentCapability): ProviderModelCache 
   const models: ModelEntry[] = [];
   const modelById = new Map<string, ModelEntry>();
   for (const model of capability.models) {
-    const entry = makeModelEntry(model.id, model.label, capability);
+    const entry = makeModelEntry(
+      model.id,
+      model.label,
+      capability,
+      model.description,
+      model.tooltipDescription,
+    );
     models.push(entry);
     modelById.set(entry.id, entry);
   }
@@ -174,6 +236,8 @@ function resolveModelRef(
   };
   if (model.subLabel) resolved.subProviderLabel = model.subLabel;
   if (model.contextDescription) resolved.contextDescription = model.contextDescription;
+  if (model.modelDescription) resolved.modelDescription = model.modelDescription;
+  if (model.tooltipDescription) resolved.tooltipDescription = model.tooltipDescription;
   return resolved;
 }
 
@@ -243,17 +307,17 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
     if (items.length === 0) return;
     out.push({ type: "header-plain", id: `header:${sectionId}`, label: headerLabel });
     for (const m of items) {
+      const providerIcon = visibleProvidersByKind.get(m.ref.agentKind)?.provider.icon;
       out.push({
         type: "model",
         id: `${sectionId}:${m.ref.agentKind}:${m.ref.modelId}`,
         providerKind: m.ref.agentKind,
         modelId: m.ref.modelId,
         label: m.label,
-        ...(visibleProvidersByKind.get(m.ref.agentKind)?.provider.icon
-          ? { providerIcon: visibleProvidersByKind.get(m.ref.agentKind)!.provider.icon }
-          : {}),
+        ...(providerIcon ? { providerIcon } : {}),
         ...(m.subProviderLabel ? { subProviderLabel: m.subProviderLabel } : {}),
-        ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
+        ...modelHintProps(m),
+        ...(m.tooltipDescription ? { tooltipDescription: m.tooltipDescription } : {}),
         showProviderIcon: true,
         isFavorite: favoriteStateSet.has(refKey(m.ref)),
       });
@@ -314,7 +378,8 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           label: m.label,
           ...(provider.icon ? { providerIcon: provider.icon } : {}),
           ...(m.subLabel ? { subProviderLabel: m.subLabel } : {}),
-          ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
+          ...modelHintProps(m),
+          ...(m.tooltipDescription ? { tooltipDescription: m.tooltipDescription } : {}),
           showProviderIcon: true,
           isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
         });
@@ -345,7 +410,8 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         modelId: m.id,
         label: m.label,
         ...(provider.icon ? { providerIcon: provider.icon } : {}),
-        ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
+        ...modelHintProps(m),
+        ...(m.tooltipDescription ? { tooltipDescription: m.tooltipDescription } : {}),
         isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
       });
     }
@@ -370,7 +436,8 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           modelId: m.id,
           label: m.label,
           ...(provider.icon ? { providerIcon: provider.icon } : {}),
-          ...(m.contextDescription ? { contextDescription: m.contextDescription } : {}),
+          ...modelHintProps(m),
+          ...(m.tooltipDescription ? { tooltipDescription: m.tooltipDescription } : {}),
           isFavorite: favoriteStateSet.has(`${provider.kind}:${m.id}`),
         });
       }

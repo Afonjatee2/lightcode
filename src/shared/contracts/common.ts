@@ -97,5 +97,7 @@ export type SessionRef = z.infer<typeof sessionRefSchema>;
 export const labeledOptionSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  tooltipDescription: z.string().min(1).optional(),
 });
 export type LabeledOption = z.infer<typeof labeledOptionSchema>;

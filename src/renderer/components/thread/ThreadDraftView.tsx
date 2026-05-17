@@ -114,6 +114,14 @@ function formatEffortLabel(id: string): string {
 
 function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
   const policies = agent.capabilities.approvalPolicies;
+  if (
+    agent.kind.startsWith("acp-generic:") &&
+    policies.some((policy) => policy.id === "default") &&
+    policies.some((policy) => policy.id === "never")
+  ) {
+    return "default";
+  }
+
   const configuredBypass = agent.capabilities.bypassApprovalPolicy;
   if (configuredBypass && policies.some((policy) => policy.id === configuredBypass)) {
     return configuredBypass;

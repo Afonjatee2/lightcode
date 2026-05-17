@@ -4,6 +4,7 @@ import type {
   AcpRegistryListResult,
   AgentStatusesResponse,
   AgentStatus,
+  InstalledAcpRegistryAgent,
   Project,
 } from "@/shared/contracts";
 
@@ -17,7 +18,8 @@ const appState = {
 };
 
 const settingsState = {
-  acpRegistryInstalledAgents: {} as Record<string, unknown>,
+  acpRegistryInstalledAgents: {} as Record<string, InstalledAcpRegistryAgent>,
+  syncAcpRegistryInstalledAgents: vi.fn<(installed: InstalledAcpRegistryAgent[]) => void>(),
 };
 
 const bridge = {
@@ -25,9 +27,12 @@ const bridge = {
   listAcpRegistry: vi.fn<() => Promise<AcpRegistryListResult>>(),
   getAgentStatuses: vi.fn<() => Promise<AgentStatusesResponse>>(),
   refreshAgentStatuses: vi.fn<() => Promise<AgentStatusesResponse>>(),
-  installAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
-  updateAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
-  removeAcpRegistryAgent: vi.fn<(payload: { agentId: string }) => Promise<{ installed: [] }>>(),
+  installAcpRegistryAgent:
+    vi.fn<(payload: { agentId: string }) => Promise<{ installed: InstalledAcpRegistryAgent[] }>>(),
+  updateAcpRegistryAgent:
+    vi.fn<(payload: { agentId: string }) => Promise<{ installed: InstalledAcpRegistryAgent[] }>>(),
+  removeAcpRegistryAgent:
+    vi.fn<(payload: { agentId: string }) => Promise<{ installed: InstalledAcpRegistryAgent[] }>>(),
   authenticateAcpRegistryAgent:
     vi.fn<
       (payload: {
@@ -154,6 +159,22 @@ const registry: AcpRegistryListResult = {
 
 const emptyStatusesResponse: AgentStatusesResponse = { windows: [], wsl: [], fromCache: false };
 
+function installedRecord(input: {
+  id: string;
+  name: string;
+  version: string;
+  adapterKind: string;
+}): InstalledAcpRegistryAgent {
+  return {
+    id: input.id,
+    name: input.name,
+    version: input.version,
+    installedAt: new Date(0).toISOString(),
+    adapterKind: input.adapterKind,
+    installKind: "generic",
+  };
+}
+
 describe("AcpRegistrySettings", () => {
   beforeEach(() => {
     bridge.platform = "darwin";
@@ -173,6 +194,11 @@ describe("AcpRegistrySettings", () => {
     runAgentLoginCommandMock.mockReset();
     runAgentTerminalCommandMock.mockReset();
     resetDiscoveredAgentsMock.mockReset();
+    settingsState.syncAcpRegistryInstalledAgents.mockReset().mockImplementation((installed) => {
+      settingsState.acpRegistryInstalledAgents = Object.fromEntries(
+        installed.map((record) => [record.id, record]),
+      );
+    });
   });
 
   it("shows detected native providers without offering a native install", async () => {
@@ -250,16 +276,47 @@ describe("AcpRegistrySettings", () => {
     });
   });
 
-  it("keeps registry-installed agents deletable after status rescan", async () => {
-    settingsState.acpRegistryInstalledAgents = {
-      "glm-acp-agent": {
+  it("keeps ACP registry installs visible after leaving and returning to the registry", async () => {
+    const installed = [
+      installedRecord({
         id: "glm-acp-agent",
         name: "GLM Agent",
         version: "1.1.3",
-        installedAt: new Date(0).toISOString(),
         adapterKind: "acp-generic:glm-acp-agent",
-        installKind: "generic",
-      },
+      }),
+    ];
+    bridge.installAcpRegistryAgent.mockResolvedValueOnce({ installed });
+    const view = render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(glmCard).toBeTruthy();
+
+    fireEvent.click(within(glmCard as HTMLElement).getByRole("button", { name: "Install" }));
+
+    await waitFor(() => {
+      expect(settingsState.syncAcpRegistryInstalledAgents).toHaveBeenCalledWith(installed);
+    });
+
+    view.unmount();
+    render(<AcpRegistrySettings />);
+
+    await screen.findByRole("heading", { name: "Agent Registry" });
+    const remountedCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
+    expect(remountedCard).toBeTruthy();
+    expect(
+      within(remountedCard as HTMLElement).getByRole("button", { name: "Delete" }),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps registry-installed agents deletable after status rescan", async () => {
+    settingsState.acpRegistryInstalledAgents = {
+      "glm-acp-agent": installedRecord({
+        id: "glm-acp-agent",
+        name: "GLM Agent",
+        version: "1.1.3",
+        adapterKind: "acp-generic:glm-acp-agent",
+      }),
     };
     statusesState.agentStatuses = [
       makeStatus("acp-generic:glm-acp-agent", {

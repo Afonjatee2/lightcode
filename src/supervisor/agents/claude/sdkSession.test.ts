@@ -213,7 +213,7 @@ describe("ClaudeSdkSession", () => {
     await session.dispose();
   });
 
-  it("lets the SDK allocate new session ids without marking idle threads working", async () => {
+  it("starts new SDK sessions with an explicit session id without marking idle threads working", async () => {
     mockSdk.query.mockClear();
     const fake = createFakeQuery();
     mockSdk.query.mockReturnValue(fake.runtime);
@@ -231,14 +231,17 @@ describe("ClaudeSdkSession", () => {
       onClose: () => {},
     });
 
-    await expect(session.openThread(config)).resolves.toBe("");
+    const openedSessionId = await session.openThread(config);
+    expect(openedSessionId).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
 
     const queryInput = mockSdk.query.mock.calls[0]?.[0] as { options?: Record<string, unknown> };
     expect(queryInput.options).not.toHaveProperty("resume");
-    expect(queryInput.options).not.toHaveProperty("sessionId");
+    expect(queryInput.options).toHaveProperty("sessionId", openedSessionId);
 
     fake.emitMessage(
-      sdkSystemMessage("session_state_changed", "33333333-3333-4333-8333-333333333333", {
+      sdkSystemMessage("session_state_changed", openedSessionId, {
         state: "idle",
       }),
     );
@@ -248,9 +251,6 @@ describe("ClaudeSdkSession", () => {
         expect.objectContaining({
           status: "idle",
           attention: "none",
-          sessionRef: expect.objectContaining({
-            providerSessionId: "33333333-3333-4333-8333-333333333333",
-          }),
         }),
       );
     });

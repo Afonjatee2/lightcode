@@ -9,24 +9,45 @@
  * changes required.
  */
 
-import { spawn, type ChildProcess } from "node:child_process";
+import { spawn as spawnChild, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { basename, join, posix, win32 } from "node:path";
 import { homedir } from "node:os";
 import { Readable, Writable } from "node:stream";
 import { pathToFileURL } from "node:url";
+import { spawn as spawnPty, type IDisposable, type IPty } from "node-pty";
 import {
   ClientSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
   RequestError,
   type Client,
+  type CompleteElicitationNotification,
   type ContentBlock,
+  type CreateElicitationRequest,
+  type CreateElicitationResponse,
+  type CreateTerminalRequest,
+  type CreateTerminalResponse,
+  type ElicitationContentValue,
+  type ElicitationPropertySchema,
+  type KillTerminalRequest,
+  type PromptCapabilities,
+  type ReadTextFileRequest,
+  type ReadTextFileResponse,
+  type ReleaseTerminalRequest,
   type RequestPermissionRequest,
   type RequestPermissionResponse,
   type SessionNotification,
+  type SessionCapabilities,
   type SessionUpdate,
+  type TerminalExitStatus,
+  type TerminalOutputRequest,
+  type TerminalOutputResponse,
+  type WaitForTerminalExitRequest,
+  type WaitForTerminalExitResponse,
+  type WriteTextFileRequest,
+  type WriteTextFileResponse,
 } from "@agentclientprotocol/sdk";
 import type {
   AgentSlashCommand,
@@ -44,6 +65,7 @@ import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
   closeOpenTurnItems,
   createAcpMapperState,
+  mapAcpElicitationRequest,
   mapAcpPermissionRequest,
   mapAcpSessionUpdate,
   type AcpMapperState,
@@ -116,6 +138,42 @@ export function resolveAcpResourcePath(location: ProjectLocation, rawPath: strin
   }
 }
 
+function isProjectRelativePath(location: ProjectLocation, absolutePath: string): boolean {
+  switch (location.kind) {
+    case "windows": {
+      const relative = win32.relative(location.path, absolutePath);
+      return relative === "" || (!relative.startsWith("..") && !win32.isAbsolute(relative));
+    }
+    case "wsl": {
+      const relative = posix.relative(location.linuxPath, absolutePath);
+      return relative === "" || (!relative.startsWith("..") && !posix.isAbsolute(relative));
+    }
+    case "posix": {
+      const relative = posix.relative(location.path, absolutePath);
+      return relative === "" || (!relative.startsWith("..") && !posix.isAbsolute(relative));
+    }
+  }
+}
+
+function resolveAcpProjectPath(location: ProjectLocation, rawPath: string): string {
+  const absolutePath = resolveAcpResourcePath(location, rawPath);
+  if (!isProjectRelativePath(location, absolutePath)) {
+    throw RequestError.invalidParams({ message: `Path is outside the project: ${rawPath}` });
+  }
+  return absolutePath;
+}
+
+function resolveAcpHostFsPath(location: ProjectLocation, rawPath: string): string {
+  const absolutePath = resolveAcpProjectPath(location, rawPath);
+  if (location.kind !== "wsl" || isWindowsAbsolutePath(absolutePath)) {
+    return absolutePath;
+  }
+  const relative = posix.relative(location.linuxPath, absolutePath);
+  return relative === ""
+    ? location.uncPath
+    : win32.join(location.uncPath, ...relative.split("/").filter(Boolean));
+}
+
 export function toAcpResourceUri(location: ProjectLocation, rawPath: string): string {
   const absolutePath = resolveAcpResourcePath(location, rawPath);
   if (isWindowsAbsolutePath(absolutePath)) {
@@ -137,6 +195,7 @@ async function segmentsToContentBlocks(
   prompt: string,
   location: ProjectLocation,
   segments?: PromptSegment[],
+  promptCapabilities?: PromptCapabilities,
 ): Promise<ContentBlock[]> {
   const blocks: ContentBlock[] = [];
 
@@ -144,7 +203,7 @@ async function segmentsToContentBlocks(
     if (seg.kind === "attachment") {
       const resourcePath = resolveAcpResourcePath(location, seg.path);
       const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(seg.path);
-      if (isImage) {
+      if (isImage && promptCapabilities?.image === true) {
         try {
           const data = await readFile(resourcePath);
           const mimeType = seg.mimeType ?? guessMimeType(seg.path);
@@ -200,6 +259,64 @@ function guessMimeType(path: string): string {
     default:
       return "application/octet-stream";
   }
+}
+
+type AcpTerminalRecord = {
+  pty: IPty;
+  output: string;
+  outputByteLimit: number | undefined;
+  truncated: boolean;
+  exitStatus: TerminalExitStatus | undefined;
+  waiters: Array<(status: TerminalExitStatus) => void>;
+  subscriptions: IDisposable[];
+};
+
+// Cap concurrent host PTYs per ACP session. Legitimate use rarely exceeds a
+// handful; the cap is a defensive bound against a misbehaving agent that
+// creates terminals without releasing them and leaks file descriptors.
+const MAX_ACP_TERMINALS_PER_SESSION = 32;
+
+function truncateTerminalOutput(
+  output: string,
+  limit: number | undefined,
+): { output: string; truncated: boolean } {
+  if (limit === undefined || limit < 0 || Buffer.byteLength(output, "utf8") <= limit) {
+    return { output, truncated: false };
+  }
+  let low = 0;
+  let high = output.length;
+  while (low < high) {
+    const mid = Math.floor((low + high) / 2);
+    if (Buffer.byteLength(output.slice(mid), "utf8") <= limit) {
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+  return { output: output.slice(low), truncated: true };
+}
+
+function appendTerminalOutput(record: AcpTerminalRecord, chunk: string): void {
+  const next = truncateTerminalOutput(record.output + chunk, record.outputByteLimit);
+  record.output = next.output;
+  record.truncated = record.truncated || next.truncated;
+}
+
+function sliceTextFileContent(
+  content: string,
+  line: number | null | undefined,
+  limit: number | null | undefined,
+): string {
+  if (line == null && limit == null) return content;
+  const startLine = Math.max(1, Math.trunc(line ?? 1));
+  const maxLines =
+    limit === undefined || limit === null ? undefined : Math.max(0, Math.trunc(limit));
+  const lines = content.split(/\r?\n/u);
+  const selected = lines.slice(
+    startLine - 1,
+    maxLines === undefined ? undefined : startLine - 1 + maxLines,
+  );
+  return selected.join("\n");
 }
 
 function createAcpPromptUsageEvent(threadId: string, usage: unknown): RuntimeEvent | undefined {
@@ -293,6 +410,11 @@ function resolveAcpMode(config: ThreadConfig, availableModeIds: string[]): strin
     if (available.has("plan")) return available.get("plan");
     if (available.has("architect")) return available.get("architect");
     return undefined;
+  }
+
+  const approvalPolicy = config.approvalPolicy?.toLowerCase();
+  if (approvalPolicy && available.has(approvalPolicy)) {
+    return available.get(approvalPolicy);
   }
 
   if (config.mode === "autopilot" || config.approvalPolicy === "autopilot") {
@@ -607,6 +729,10 @@ function applyAcpModeUpdateToConfig(currentConfig: ThreadConfig, modeId: string)
     return { ...currentConfig, mode: "agent", approvalPolicy: "never" };
   }
 
+  if (normalized !== "agent" && normalized !== "default" && normalized !== "code") {
+    return { ...currentConfig, mode: "agent", approvalPolicy: normalizeAcpModeId(modeId) };
+  }
+
   return {
     ...currentConfig,
     mode: "agent",
@@ -665,6 +791,10 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private modeConfigId: string | undefined;
   private modelConfigValue: string | undefined;
   private thoughtLevelConfigId: string | undefined;
+  private agentPromptCapabilities: PromptCapabilities | undefined;
+  private agentSessionCapabilities: SessionCapabilities | undefined;
+  private readonly acpTerminals = new Map<string, AcpTerminalRecord>();
+  private acpTerminalSeq = 0;
 
   private mapperState: AcpMapperState | undefined;
   /**
@@ -886,7 +1016,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     const sessionCwd = resolveSessionCwd(projectLocation);
     const spawnCwd = command.cwd ?? resolveSpawnCwd(projectLocation);
 
-    const child = spawn(command.command, command.args, {
+    const child = spawnChild(command.command, command.args, {
       ...(spawnCwd ? { cwd: spawnCwd } : {}),
       stdio: ["pipe", "pipe", "pipe"],
       env: { ...process.env, TERM: "xterm-256color", ...(command.env ?? {}) },
@@ -926,22 +1056,38 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         requestPermission(params: RequestPermissionRequest) {
           return session.handlePermissionRequest(params);
         },
+        unstable_createElicitation(params: CreateElicitationRequest) {
+          return session.handleElicitationRequest(params);
+        },
+        unstable_completeElicitation(params: CompleteElicitationNotification) {
+          session.handleElicitationComplete(params);
+          return Promise.resolve();
+        },
         sessionUpdate(params: SessionNotification) {
           session.handleSessionUpdate(params);
           return Promise.resolve();
         },
         async readTextFile(params) {
-          try {
-            const { readFile: readFileAsync } = await import("node:fs/promises");
-            const content = await readFileAsync(params.path, "utf8");
-            return { content };
-          } catch {
-            throw new Error(`File not found: ${params.path}`);
-          }
+          return session.handleReadTextFile(params);
         },
         async writeTextFile(params) {
-          const { writeFile: fsWriteFile } = await import("node:fs/promises");
-          await fsWriteFile(params.path, params.content, "utf8");
+          return session.handleWriteTextFile(params);
+        },
+        async createTerminal(params: CreateTerminalRequest) {
+          return session.handleCreateTerminal(params);
+        },
+        async terminalOutput(params: TerminalOutputRequest) {
+          return session.handleTerminalOutput(params);
+        },
+        async releaseTerminal(params: ReleaseTerminalRequest) {
+          session.handleReleaseTerminal(params);
+          return {};
+        },
+        waitForTerminalExit(params: WaitForTerminalExitRequest) {
+          return session.handleWaitForTerminalExit(params);
+        },
+        async killTerminal(params: KillTerminalRequest) {
+          session.handleKillTerminal(params);
           return {};
         },
       }),
@@ -1021,9 +1167,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       clientInfo: { name: "lightcode", version: "0.1.0" },
       clientCapabilities: {
         fs: { readTextFile: true, writeTextFile: true },
+        elicitation: { form: {}, url: {} },
         terminal: true,
       },
     });
+    this.agentPromptCapabilities = initResult.agentCapabilities?.promptCapabilities;
+    this.agentSessionCapabilities = initResult.agentCapabilities?.sessionCapabilities;
     console.log(
       "[acp] initialized — protocol v%d, agent: %s",
       initResult.protocolVersion,
@@ -1049,23 +1198,39 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.currentSlashCommands = undefined;
 
     if (sessionRef) {
-      console.log("[acp] loading session:", sessionRef.providerSessionId);
-      this.isReplayingHistory = true;
-      this.replayHistoryUntil = Infinity;
-      try {
-        const result = await this.connection.loadSession({
-          sessionId: sessionRef.providerSessionId,
-          cwd: this.cwd,
-          mcpServers: [],
-        });
-        this.adoptSessionRef(sessionRef);
-        availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
-        configOptions = result.configOptions ?? [];
-      } catch (error) {
-        throw this.loadSessionErrorRewriter(error, sessionRef.providerSessionId);
-      } finally {
-        this.isReplayingHistory = false;
-        this.replayHistoryUntil = Date.now() + 500;
+      if (this.agentSessionCapabilities?.resume !== undefined) {
+        console.log("[acp] resuming session:", sessionRef.providerSessionId);
+        try {
+          const result = await this.connection.resumeSession({
+            sessionId: sessionRef.providerSessionId,
+            cwd: this.cwd,
+            mcpServers: [],
+          });
+          this.adoptSessionRef(sessionRef);
+          availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
+          configOptions = result.configOptions ?? [];
+        } catch (error) {
+          throw this.loadSessionErrorRewriter(error, sessionRef.providerSessionId);
+        }
+      } else {
+        console.log("[acp] loading session:", sessionRef.providerSessionId);
+        this.isReplayingHistory = true;
+        this.replayHistoryUntil = Infinity;
+        try {
+          const result = await this.connection.loadSession({
+            sessionId: sessionRef.providerSessionId,
+            cwd: this.cwd,
+            mcpServers: [],
+          });
+          this.adoptSessionRef(sessionRef);
+          availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
+          configOptions = result.configOptions ?? [];
+        } catch (error) {
+          throw this.loadSessionErrorRewriter(error, sessionRef.providerSessionId);
+        } finally {
+          this.isReplayingHistory = false;
+          this.replayHistoryUntil = Date.now() + 500;
+        }
       }
     } else {
       console.log("[acp] creating new session in", this.cwd);
@@ -1134,7 +1299,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     // Signal working state immediately
     this.emitListenerUpdate({ status: "working", attention: "working" });
 
-    const contentBlocks = await segmentsToContentBlocks(prompt, this.projectLocation, segments);
+    const contentBlocks = await segmentsToContentBlocks(
+      prompt,
+      this.projectLocation,
+      segments,
+      this.agentPromptCapabilities,
+    );
 
     try {
       this.promptInFlight = true;
@@ -1210,7 +1380,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (resolver) {
       this.pendingPermissionResolvers.delete(requestId);
       resolver(response);
+      return;
     }
+    this.resolvePendingElicitationRequest(requestId, response);
   }
 
   async interruptTurn(): Promise<void> {
@@ -1218,7 +1390,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       return;
     }
 
-    this.cancelPendingPermissionRequests();
+    this.cancelPendingServerRequests();
     this.currentTurnInterruptRequested = true;
     // Race guard: if interrupt fires before `connection.prompt()` has been
     // entered (e.g. the supervisor stages a steer in the same microtask as
@@ -1237,7 +1409,16 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (this.isDisposed) return;
     this.isDisposed = true;
 
-    this.cancelPendingPermissionRequests();
+    this.cancelPendingServerRequests();
+    this.releaseAllAcpTerminals();
+
+    if (this.sessionId && this.agentSessionCapabilities?.close !== undefined) {
+      try {
+        await this.connection.closeSession({ sessionId: this.sessionId });
+      } catch (error) {
+        console.warn("[acp] session/close failed during dispose:", error);
+      }
+    }
 
     // Don't send cancel — the ACP process may not be generating,
     // and the connection may already be closing. Just kill the process.
@@ -1287,24 +1468,174 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
   // ── Internal handlers ────────────────────────────────────────
 
+  private assertRequestSession(sessionId: string): void {
+    if (!this.sessionId || sessionId !== this.sessionId) {
+      throw RequestError.invalidParams({ message: `Unknown ACP session: ${sessionId}` });
+    }
+  }
+
+  private async handleReadTextFile(params: ReadTextFileRequest): Promise<ReadTextFileResponse> {
+    this.assertRequestSession(params.sessionId);
+    const path = resolveAcpHostFsPath(this.projectLocation, params.path);
+    const fullContent = await readFile(path, "utf8");
+    const content = sliceTextFileContent(fullContent, params.line, params.limit);
+    return { content };
+  }
+
+  private async handleWriteTextFile(params: WriteTextFileRequest): Promise<WriteTextFileResponse> {
+    this.assertRequestSession(params.sessionId);
+    const path = resolveAcpHostFsPath(this.projectLocation, params.path);
+    await writeFile(path, params.content, "utf8");
+    return {};
+  }
+
+  private handleCreateTerminal(params: CreateTerminalRequest): CreateTerminalResponse {
+    this.assertRequestSession(params.sessionId);
+    if (this.acpTerminals.size >= MAX_ACP_TERMINALS_PER_SESSION) {
+      throw RequestError.invalidParams({
+        message: `ACP terminal limit reached (${MAX_ACP_TERMINALS_PER_SESSION}); release existing terminals before creating more.`,
+      });
+    }
+    const terminalId = `acp-terminal-${this.acpTerminalSeq++}`;
+    const cwd = params.cwd
+      ? resolveAcpHostFsPath(this.projectLocation, params.cwd)
+      : resolveAcpHostFsPath(this.projectLocation, this.cwd);
+    const env = { ...process.env };
+    for (const entry of params.env ?? []) {
+      env[entry.name] = entry.value;
+    }
+    const outputByteLimit =
+      typeof params.outputByteLimit === "number" ? params.outputByteLimit : undefined;
+    const pty = spawnPty(params.command, params.args ?? [], {
+      cwd,
+      env,
+      cols: 80,
+      rows: 24,
+    });
+    const record: AcpTerminalRecord = {
+      pty,
+      output: "",
+      outputByteLimit,
+      truncated: false,
+      exitStatus: undefined,
+      waiters: [],
+      subscriptions: [],
+    };
+    this.acpTerminals.set(terminalId, record);
+    record.subscriptions.push(pty.onData((data) => appendTerminalOutput(record, data)));
+    record.subscriptions.push(
+      pty.onExit((event) => {
+        record.exitStatus = {
+          exitCode: event.exitCode,
+          ...(event.signal ? { signal: String(event.signal) } : {}),
+        };
+        const waiters = record.waiters.splice(0);
+        for (const resolve of waiters) {
+          resolve(record.exitStatus);
+        }
+      }),
+    );
+    return { terminalId };
+  }
+
+  private handleTerminalOutput(params: TerminalOutputRequest): TerminalOutputResponse {
+    this.assertRequestSession(params.sessionId);
+    const record = this.getAcpTerminal(params.terminalId);
+    return {
+      output: record.output,
+      truncated: record.truncated,
+      ...(record.exitStatus ? { exitStatus: record.exitStatus } : {}),
+    };
+  }
+
+  private handleReleaseTerminal(params: ReleaseTerminalRequest): void {
+    this.assertRequestSession(params.sessionId);
+    const record = this.getAcpTerminal(params.terminalId);
+    this.disposeAcpTerminal(params.terminalId, record);
+  }
+
+  private async handleWaitForTerminalExit(
+    params: WaitForTerminalExitRequest,
+  ): Promise<WaitForTerminalExitResponse> {
+    this.assertRequestSession(params.sessionId);
+    const record = this.getAcpTerminal(params.terminalId);
+    if (record.exitStatus) return record.exitStatus;
+    return new Promise((resolve) => {
+      record.waiters.push(resolve);
+    });
+  }
+
+  private handleKillTerminal(params: KillTerminalRequest): void {
+    this.assertRequestSession(params.sessionId);
+    const record = this.getAcpTerminal(params.terminalId);
+    if (!record.exitStatus) {
+      record.pty.kill();
+    }
+  }
+
+  private getAcpTerminal(terminalId: string): AcpTerminalRecord {
+    const record = this.acpTerminals.get(terminalId);
+    if (!record) {
+      throw RequestError.invalidParams({ message: `Unknown ACP terminal: ${terminalId}` });
+    }
+    return record;
+  }
+
+  private releaseAllAcpTerminals(): void {
+    for (const [terminalId, record] of [...this.acpTerminals]) {
+      this.disposeAcpTerminal(terminalId, record);
+    }
+  }
+
+  private disposeAcpTerminal(terminalId: string, record: AcpTerminalRecord): void {
+    this.acpTerminals.delete(terminalId);
+    for (const subscription of record.subscriptions.splice(0)) {
+      subscription.dispose();
+    }
+    if (!record.exitStatus) {
+      record.pty.kill();
+    }
+    const status = record.exitStatus ?? { signal: "SIGTERM" };
+    const waiters = record.waiters.splice(0);
+    for (const resolve of waiters) {
+      resolve(status);
+    }
+  }
+
   private readonly pendingPermissionResolvers = new Map<
     ThreadServerRequestId,
     (response: unknown) => void
   >();
+  private readonly pendingElicitationResolvers = new Map<
+    ThreadServerRequestId,
+    { resolve: (response: unknown) => void; elicitationId?: string }
+  >();
+  private readonly pendingElicitationRequestIdsByElicitationId = new Map<
+    string,
+    ThreadServerRequestId
+  >();
 
   private permissionRequestSeq = 0;
+  private elicitationRequestSeq = 0;
 
-  private cancelPendingPermissionRequests(): void {
-    const requestIds = [...this.pendingPermissionResolvers.keys()];
-    for (const requestId of requestIds) {
-      const resolver = this.pendingPermissionResolvers.get(requestId);
-      if (!resolver) continue;
-      this.pendingPermissionResolvers.delete(requestId);
+  private cancelPendingServerRequests(): void {
+    const cancelledIds: ThreadServerRequestId[] = [];
+    for (const [requestId, resolver] of this.pendingPermissionResolvers) {
+      cancelledIds.push(requestId);
       resolver({ outcome: { outcome: "cancelled" } });
     }
-    if (requestIds.length > 0) {
+    this.pendingPermissionResolvers.clear();
+    for (const [requestId, entry] of this.pendingElicitationResolvers) {
+      cancelledIds.push(requestId);
+      if (entry.elicitationId !== undefined) {
+        this.pendingElicitationRequestIdsByElicitationId.delete(entry.elicitationId);
+      }
+      entry.resolve({ action: "cancel" });
+    }
+    this.pendingElicitationResolvers.clear();
+    if (cancelledIds.length > 0) {
       this.emitRuntimeEvents(
-        requestIds.map((requestId) => ({
+        cancelledIds.map((requestId) => ({
           type: "request.resolved",
           threadId: this.threadId,
           requestId: String(requestId),
@@ -1312,6 +1643,20 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         })),
       );
     }
+  }
+
+  private resolvePendingElicitationRequest(
+    requestId: ThreadServerRequestId,
+    response: unknown,
+  ): boolean {
+    const entry = this.pendingElicitationResolvers.get(requestId);
+    if (!entry) return false;
+    this.pendingElicitationResolvers.delete(requestId);
+    if (entry.elicitationId !== undefined) {
+      this.pendingElicitationRequestIdsByElicitationId.delete(entry.elicitationId);
+    }
+    entry.resolve(response);
+    return true;
   }
 
   /**
@@ -1362,6 +1707,45 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       // Also signal that the thread needs approval
       this.emitListenerUpdate({ status: "needs_approval", attention: "needs_approval" });
     });
+  }
+
+  private handleElicitationRequest(
+    params: CreateElicitationRequest,
+  ): Promise<CreateElicitationResponse> {
+    return new Promise<CreateElicitationResponse>((resolve) => {
+      const requestId = `acp-elicit-${this.elicitationRequestSeq++}`;
+      const urlElicitationId = params.mode === "url" ? params.elicitationId : undefined;
+
+      this.pendingElicitationResolvers.set(requestId, {
+        resolve: (response: unknown) => {
+          resolve(normalizeAcpElicitationResponse(response, params));
+        },
+        ...(urlElicitationId !== undefined ? { elicitationId: urlElicitationId } : {}),
+      });
+
+      if (urlElicitationId !== undefined) {
+        this.pendingElicitationRequestIdsByElicitationId.set(urlElicitationId, requestId);
+      }
+
+      const mapperState = this.ensureMapperState();
+      this.emitRuntimeEvents([mapAcpElicitationRequest(params, mapperState, String(requestId))]);
+      this.emitListenerUpdate({ status: "needs_reply", attention: "needs_reply" });
+    });
+  }
+
+  private handleElicitationComplete(params: CompleteElicitationNotification): void {
+    const requestId = this.pendingElicitationRequestIdsByElicitationId.get(params.elicitationId);
+    if (!requestId) return;
+    if (this.resolvePendingElicitationRequest(requestId, { action: "accept" })) {
+      this.emitRuntimeEvents([
+        {
+          type: "request.resolved",
+          threadId: this.threadId,
+          requestId: String(requestId),
+          outcome: "answered",
+        },
+      ]);
+    }
   }
 
   /**
@@ -1498,6 +1882,72 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         return { status: "idle", attention: "none" };
     }
   }
+}
+
+function normalizeAcpElicitationResponse(
+  response: unknown,
+  request: CreateElicitationRequest,
+): CreateElicitationResponse {
+  if (!response || typeof response !== "object") return { action: "cancel" };
+  const obj = response as Record<string, unknown>;
+  const action = obj.action;
+  const meta = readAcpResponseMeta(obj);
+  if (action === "decline") return { action: "decline", ...meta };
+  if (action !== "accept") return { action: "cancel", ...meta };
+
+  const content =
+    request.mode === "form"
+      ? normalizeAcpElicitationContent(obj.content, request.requestedSchema.properties ?? {})
+      : undefined;
+  return {
+    action: "accept",
+    ...(content !== undefined ? { content } : {}),
+    ...meta,
+  };
+}
+
+function readAcpResponseMeta(
+  response: Record<string, unknown>,
+): { _meta: Record<string, unknown> | null } | {} {
+  if (!Object.hasOwn(response, "_meta")) return {};
+  const meta = response._meta;
+  if (meta === null) return { _meta: null };
+  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return {};
+  return { _meta: meta as Record<string, unknown> };
+}
+
+function normalizeAcpElicitationContent(
+  content: unknown,
+  properties: Record<string, ElicitationPropertySchema>,
+): Record<string, ElicitationContentValue> | undefined {
+  if (!content || typeof content !== "object" || Array.isArray(content)) return undefined;
+  const source = content as Record<string, unknown>;
+  const normalized: Record<string, ElicitationContentValue> = {};
+  for (const [key, schema] of Object.entries(properties)) {
+    if (!Object.hasOwn(source, key)) continue;
+    const value = source[key];
+    if (!schema || typeof schema !== "object" || !("type" in schema)) continue;
+    switch (schema.type) {
+      case "string":
+        if (typeof value === "string") normalized[key] = value;
+        break;
+      case "integer":
+      case "number":
+        if (typeof value === "number" && Number.isFinite(value)) normalized[key] = value;
+        break;
+      case "boolean":
+        if (typeof value === "boolean") normalized[key] = value;
+        break;
+      case "array":
+        if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
+          normalized[key] = value;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return normalized;
 }
 
 // ── Factory ──────────────────────────────────────────────────────

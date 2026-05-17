@@ -166,6 +166,30 @@ const cursorStatus: AgentStatus = {
   },
 };
 
+const acpGenericStatus: AgentStatus = {
+  kind: "acp-generic:example-agent",
+  label: "Example Agent",
+  installed: true,
+  authState: "authenticated",
+  capabilities: {
+    models: [{ id: "model-a", label: "Model A" }],
+    efforts: [],
+    modelEfforts: {},
+    modes: ["agent"],
+    approvalPolicies: [
+      { id: "default", label: "Supervised" },
+      { id: "never", label: "Auto Approve" },
+    ],
+    sandboxModes: [],
+    supportsResume: false,
+    supportsDirectInput: true,
+    liveInputMode: "server",
+    presentationMode: "gui",
+    presentationModes: ["gui"],
+    settingDefs: [],
+  },
+};
+
 const singleContextThinkingCursorStatus: AgentStatus = {
   ...cursorStatus,
   capabilities: {
@@ -254,6 +278,29 @@ describe("ThreadDraftView", () => {
     expect(screen.queryByText("No supported agents detected")).not.toBeInTheDocument();
   });
 
+  it("keeps auth-missing agents selectable but blocks launching from the draft composer", () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+    render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[{ ...codexStatus, authState: "missing", loginCommand: "codex login" }]}
+        onStart={onStart}
+      />,
+    );
+
+    const props = composerSpy.mock.lastCall?.[0] as {
+      fixedContent?: unknown;
+      submitDisabled?: boolean;
+    };
+    expect(props.fixedContent).toBeTruthy();
+    expect(props.submitDisabled).toBe(true);
+
+    fireEvent.click(screen.getByText("set-prompt"));
+    fireEvent.click(screen.getByText("submit"));
+
+    expect(onStart).not.toHaveBeenCalled();
+  });
+
   it("submits codex defaults on first launch", async () => {
     const onStart = vi.fn<(input: unknown) => void>();
 
@@ -292,6 +339,43 @@ describe("ThreadDraftView", () => {
         mode: "agent",
         approvalPolicy: "never",
         sandboxMode: "danger-full-access",
+      },
+      presentationMode: "gui",
+      prompt: "hello world",
+    });
+  });
+
+  it("defaults synthetic generic ACP permissions to supervised", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(
+      <ThreadDraftView project={project} agentStatuses={[acpGenericStatus]} onStart={onStart} />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          label?: string;
+          isSelected?: boolean;
+        }>;
+      };
+      const permission = props.controls.find((control) => control.label === "Supervised");
+      expect(permission).toMatchObject({
+        kind: "toggle",
+        isSelected: false,
+      });
+    });
+
+    fireEvent.click(screen.getByText("set-prompt"));
+    fireEvent.click(screen.getByText("submit"));
+
+    expect(onStart).toHaveBeenCalledWith({
+      agentKind: "acp-generic:example-agent",
+      config: {
+        model: "model-a",
+        mode: "agent",
+        approvalPolicy: "default",
       },
       presentationMode: "gui",
       prompt: "hello world",

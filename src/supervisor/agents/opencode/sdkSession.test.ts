@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "@opencode-ai/sdk/v2";
 import type { ProjectLocation, RuntimeEvent, ThreadConfig } from "@/shared/contracts";
 import type { StructuredSessionUpdate } from "../base";
-import { OpencodeSdkSession } from "./sdkSession";
+import { OpencodeSdkSession, parseOpenCodeQuestionAnswers } from "./sdkSession";
 
 const mocks = vi.hoisted(() => ({
   acquireOpenCodeServer: vi.fn<(input: unknown) => Promise<unknown>>(),
@@ -317,5 +317,48 @@ describe("OpencodeSdkSession", () => {
         ],
       }),
     );
+  });
+});
+
+describe("parseOpenCodeQuestionAnswers", () => {
+  it("translates structured form answers back to OpenCode answer rows", () => {
+    expect(
+      parseOpenCodeQuestionAnswers(
+        {
+          answers: {
+            q0: "q0.1",
+            q1: "q1.0",
+          },
+        },
+        {
+          answerKeys: ["q0", "q1"],
+          optionValues: {
+            "q0.0": "Scope A",
+            "q0.1": "Scope B",
+            "q1.0": "After each phase",
+          },
+        },
+      ),
+    ).toEqual([["Scope B"], ["After each phase"]]);
+  });
+
+  it("keeps multi-select rows grouped by question", () => {
+    expect(
+      parseOpenCodeQuestionAnswers(
+        {
+          answers: {
+            q0: ["q0.0", "q0.1"],
+            q1: "custom answer",
+          },
+        },
+        {
+          answerKeys: ["q0", "q1"],
+          optionValues: {
+            "q0.0": "React",
+            "q0.1": "Vue",
+          },
+        },
+      ),
+    ).toEqual([["React", "Vue"], ["custom answer"]]);
   });
 });

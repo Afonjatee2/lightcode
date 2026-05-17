@@ -31,6 +31,8 @@ export interface ProviderModelRow {
   subProviderLabel?: string;
   /** Context-window hint (e.g. "200K", "272K / 1M"). Rendered muted next to the label. */
   contextDescription?: string;
+  /** Full provider-provided model description. Rendered in a delayed tooltip. */
+  tooltipDescription?: string;
   /** When true, show the provider icon in the row right rail. */
   showProviderIcon?: boolean;
   /** When true, the row's persisted favorite state is true (drives the star icon). */

@@ -7,7 +7,7 @@
 // by glob is a moving target. Instead we copy the build artifacts into a clean
 // staging directory, write a fresh package.json that lists ONLY the runtime
 // externals reported by `scripts/scan-runtime-externals.mjs`, run a flat
-// `npm install`, and run electron-builder there.
+// `pnpm install` (node-linker=hoisted), and run electron-builder there.
 
 import { spawnSync } from "node:child_process";
 import {
@@ -106,10 +106,10 @@ function detectHostPlatform() {
 
 const PLATFORM_FLAG = { mac: "--mac", linux: "--linux", win: "--win" };
 
-// npm doesn't auto-install peer deps in every situation, and a missing peer
-// of a runtime external surfaces as `ERR_MODULE_NOT_FOUND` deep inside SDK
-// code at app launch. Walk each external's installed package.json and pull
-// in any non-optional peer that the root itself declares as a dep.
+// A missing peer of a runtime external surfaces as `ERR_MODULE_NOT_FOUND` deep
+// inside SDK code at app launch. Walk each external's installed package.json
+// and pull in any non-optional peer that the root itself declares as a dep —
+// this stays explicit regardless of the installer's auto-peer behavior.
 function expandPeerDeps(externals, rootPkg) {
   const expanded = new Set();
   const rootHasDep = (name) =>
@@ -187,7 +187,7 @@ function copyDir(from, to) {
 // electron-builder.yml keeps them out of the shipped app; this prune shrinks
 // the stage tmpdir and speeds up electron-builder's file walk.
 //
-// Safe to delete after `npm install` returned: the platform packs are pure
+// Safe to delete after `pnpm install` returned: the platform packs are pure
 // binary blobs with no postinstall hooks, and the SDK only `require`s them
 // lazily at runtime (when `pathToClaudeCodeExecutable` is unset) — which we
 // always set on posix and route through wsl.exe on WSL.
@@ -272,15 +272,23 @@ async function main() {
     writeFileSync(join(stageRoot, "electron-builder.yml"), buildElectronBuilderConfig());
 
     // 6. Install prod + stage devdeps with a flat layout.
-    //    We DON'T use --omit=optional because electron-builder's dmg-builder
+    //    node-linker=hoisted makes pnpm produce an npm-style flat node_modules,
+    //    which electron-builder's file walker (and our asar globs) expect.
+    //    dangerously-allow-all-builds bypasses pnpm 10+'s build-script gating
+    //    (electron's postinstall must run to download the binary; better-sqlite3
+    //    and node-pty compile native bindings). The stage's deps are pinned to
+    //    versions the root project already trusts, so this is no riskier than
+    //    `pnpm install` on the root.
+    //    We DON'T disable optionals because electron-builder's dmg-builder
     //    requires the `dmg-license` optionalDependency unconditionally at
     //    import time. Instead we install optionals normally, then surgically
     //    delete the only optional we actually want gone: the Claude SDK's
     //    platform-specific `claude` SEA binary (~200 MB).
-    //    --no-package-lock keeps the stage stateless across runs.
+    //    The stage tmpdir is fresh each run, so any generated pnpm-lock.yaml
+    //    is ephemeral and gets discarded with the stage.
     run(
-      "npm",
-      ["install", "--no-package-lock", "--no-fund", "--no-audit", "--ignore-scripts=false"],
+      "pnpm",
+      ["install", "--config.node-linker=hoisted", "--config.dangerously-allow-all-builds=true"],
       { cwd: stageRoot },
     );
 

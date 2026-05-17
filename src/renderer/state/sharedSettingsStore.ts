@@ -8,6 +8,7 @@ import {
 } from "@/shared/settings";
 import type {
   GitReviewMode,
+  InstalledAcpRegistryAgent,
   NewThreadMode,
   NotificationFilter,
   ProviderDraftConfig,
@@ -54,6 +55,7 @@ interface SharedSettingsState extends SharedSettings {
   setNotificationsEnabled: (value: boolean) => void;
   setNotificationSound: (value: boolean) => void;
   setNotificationFilter: (value: NotificationFilter) => void;
+  syncAcpRegistryInstalledAgents: (installed: InstalledAcpRegistryAgent[]) => void;
   setNotificationStatuses: (value: {
     done?: boolean;
     needsAttention?: boolean;
@@ -100,6 +102,14 @@ function persistSettings(settings: SharedSettingsInput): void {
   if (hasBridge() && initialLoadDone) {
     void readBridge().setSharedSettings(settings);
   }
+}
+
+function cacheSettingsSnapshot(settings: SharedSettingsInput): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
 }
 
 function providerDraftConfigEqual(
@@ -285,6 +295,33 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     if (get().notificationFilter === notificationFilter) return;
     set({ notificationFilter });
     persistSettings(selectSharedSettings(get()));
+  },
+  syncAcpRegistryInstalledAgents: (installed) => {
+    const current = get().acpRegistryInstalledAgents;
+    const currentKeys = Object.keys(current);
+    if (
+      currentKeys.length === installed.length &&
+      installed.every((record) => {
+        const existing = current[record.id];
+        return (
+          existing !== undefined &&
+          existing.name === record.name &&
+          existing.version === record.version &&
+          existing.icon === record.icon &&
+          existing.installedAt === record.installedAt &&
+          existing.adapterKind === record.adapterKind &&
+          existing.installKind === record.installKind
+        );
+      })
+    ) {
+      return;
+    }
+    set({
+      acpRegistryInstalledAgents: Object.fromEntries(
+        installed.map((record) => [record.id, record]),
+      ),
+    });
+    cacheSettingsSnapshot(selectSharedSettings(get()));
   },
   setNotificationStatuses: (partial) => {
     const current = get().notificationStatuses;

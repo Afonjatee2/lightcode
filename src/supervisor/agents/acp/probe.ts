@@ -29,7 +29,8 @@ export interface AcpProbeResult {
   authMethods?: AuthMethod[];
   authLogoutSupported?: boolean;
   sessionEstablished?: boolean;
-  models?: Array<{ id: string; label: string }>;
+  models?: Array<{ id: string; label: string; description?: string; tooltipDescription?: string }>;
+  modelMetadata?: Record<string, Record<string, unknown>>;
   efforts?: string[];
   defaultEffort?: string;
   modelEfforts?: Record<string, string[]>;
@@ -39,6 +40,7 @@ export interface AcpProbeResult {
 }
 
 type AcpConfigOptionLike = {
+  id?: string;
   category?: string | null;
   type?: string;
   currentValue?: string;
@@ -61,6 +63,9 @@ type AcpAvailableCommandLike = {
     hint?: string | null;
   } | null;
 };
+
+const MODEL_THOUGHT_LEVEL_PROBE_TIMEOUT_MS = 300;
+const MAX_MODEL_THOUGHT_LEVEL_PROBES = 40;
 
 // ── Mode mapping ─────────────────────────────────────────────────
 
@@ -100,9 +105,11 @@ export function mapAcpModes(availableModes: SessionMode[]): {
   const approvalPolicies: Array<{ id: string; label: string }> = [];
 
   for (const acpMode of availableModes) {
-    const mapped = MODE_MAP[normalizeAcpModeId(acpMode.id)];
+    const normalizedModeId = normalizeAcpModeId(acpMode.id);
+    const mapped = MODE_MAP[normalizedModeId];
     if (!mapped) {
-      console.log("[acp-probe] unknown mode ID, skipping:", acpMode.id);
+      modes.add("agent");
+      approvalPolicies.push({ id: normalizedModeId, label: acpMode.name });
       continue;
     }
     modes.add(mapped.mode);
@@ -134,11 +141,29 @@ export function humanizeModelId(id: string): string {
  * If the agent returns `name` equal to `modelId`, we generate a
  * friendlier label from the ID.
  */
-export function mapAcpModels(availableModels: ModelInfo[]): Array<{ id: string; label: string }> {
-  return availableModels.map((m) => ({
-    id: m.modelId,
-    label: m.name === m.modelId ? humanizeModelId(m.modelId) : m.name,
-  }));
+export function mapAcpModels(
+  availableModels: ModelInfo[],
+): Array<{ id: string; label: string; description?: string }> {
+  return availableModels.map((m) => {
+    const description = m.description?.trim();
+    return {
+      id: m.modelId,
+      label: m.name === m.modelId ? humanizeModelId(m.modelId) : m.name,
+      ...(description ? { description } : {}),
+    };
+  });
+}
+
+function mapAcpModelMetadata(
+  availableModels: ModelInfo[],
+): Record<string, Record<string, unknown>> {
+  const metadata: Record<string, Record<string, unknown>> = {};
+  for (const model of availableModels) {
+    if (typeof model._meta === "object" && model._meta !== null) {
+      metadata[model.modelId] = model._meta;
+    }
+  }
+  return metadata;
 }
 
 export function mapAcpSlashCommands(commands: AcpAvailableCommandLike[]): AgentSlashCommand[] {
@@ -178,21 +203,28 @@ function flattenSelectOptions(options: unknown): AcpConfigSelectOptionLike[] {
   });
 }
 
-export function mapAcpThoughtLevels(configOptions: unknown): {
-  efforts: string[];
-  defaultEffort?: string;
-} {
+function findSelectConfigOption(
+  configOptions: unknown,
+  category: string,
+): AcpConfigOptionLike | undefined {
   if (!Array.isArray(configOptions)) {
-    return { efforts: [] };
+    return undefined;
   }
 
-  const option = configOptions.find((candidate) => {
+  return configOptions.find((candidate) => {
     if (typeof candidate !== "object" || candidate === null) {
       return false;
     }
     const configOption = candidate as AcpConfigOptionLike;
-    return configOption.category === "thought_level" && configOption.type === "select";
+    return configOption.category === category && configOption.type === "select";
   }) as AcpConfigOptionLike | undefined;
+}
+
+export function mapAcpThoughtLevels(configOptions: unknown): {
+  efforts: string[];
+  defaultEffort?: string;
+} {
+  const option = findSelectConfigOption(configOptions, "thought_level");
 
   if (!option) {
     return { efforts: [] };
@@ -211,6 +243,52 @@ export function mapAcpThoughtLevels(configOptions: unknown): {
     efforts,
     ...(defaultEffort ? { defaultEffort } : {}),
   };
+}
+
+function sameStringList(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((value, index) => value === right[index]);
+}
+
+function rememberModelThoughtLevels(
+  modelId: string,
+  configOptions: unknown,
+  fallbackEfforts: string[],
+  modelEfforts: Record<string, string[]>,
+): void {
+  const thoughtLevels = mapAcpThoughtLevels(configOptions);
+  if (
+    thoughtLevels.efforts.length === 0 ||
+    sameStringList(thoughtLevels.efforts, fallbackEfforts)
+  ) {
+    return;
+  }
+  modelEfforts[modelId] = thoughtLevels.efforts;
+}
+
+function readConfigOptions(value: unknown): unknown[] | undefined {
+  if (typeof value !== "object" || value === null) {
+    return undefined;
+  }
+  const configOptions = (value as { configOptions?: unknown }).configOptions;
+  return Array.isArray(configOptions) ? configOptions : undefined;
+}
+
+function nextConfigOptionsUpdate(
+  waiters: Array<(configOptions: unknown[] | undefined) => void>,
+  timeoutMs: number,
+): Promise<unknown[] | undefined> {
+  return new Promise((resolve) => {
+    const waiter = (configOptions: unknown[] | undefined) => {
+      clearTimeout(timer);
+      resolve(configOptions);
+    };
+    const timer = setTimeout(() => {
+      const index = waiters.indexOf(waiter);
+      if (index >= 0) waiters.splice(index, 1);
+      resolve(undefined);
+    }, timeoutMs);
+    waiters.push(waiter);
+  });
 }
 
 // ── Probe ────────────────────────────────────────────────────────
@@ -238,6 +316,7 @@ export async function probeAcpCapabilities(
   const probeResult: AcpProbeResult = {};
 
   try {
+    const configOptionsWaiters: Array<(configOptions: unknown[] | undefined) => void> = [];
     let latestSlashCommands: AgentSlashCommand[] | undefined;
     let resolveInitialSlashCommands:
       | ((commands: AgentSlashCommand[] | undefined) => void)
@@ -283,6 +362,13 @@ export async function probeAcpCapabilities(
         sessionUpdate: (params: SessionNotification) => {
           if (params.update.sessionUpdate === "available_commands_update") {
             rememberSlashCommands(mapAcpSlashCommands(params.update.availableCommands));
+          }
+          if (
+            params.update.sessionUpdate === "config_option_update" &&
+            Array.isArray(params.update.configOptions)
+          ) {
+            const waiters = configOptionsWaiters.splice(0);
+            for (const waiter of waiters) waiter(params.update.configOptions);
           }
           return Promise.resolve();
         },
@@ -331,6 +417,10 @@ export async function probeAcpCapabilities(
     probeResult.sessionEstablished = true;
     if (result.models?.availableModels?.length) {
       probeResult.models = mapAcpModels(result.models.availableModels);
+      const modelMetadata = mapAcpModelMetadata(result.models.availableModels);
+      if (Object.keys(modelMetadata).length > 0) {
+        probeResult.modelMetadata = modelMetadata;
+      }
     }
     if (result.configOptions?.length) {
       const thoughtLevels = mapAcpThoughtLevels(result.configOptions);
@@ -339,6 +429,52 @@ export async function probeAcpCapabilities(
       }
       if (thoughtLevels.defaultEffort) {
         probeResult.defaultEffort = thoughtLevels.defaultEffort;
+      }
+      if (probeResult.models?.length && probeResult.efforts?.length && result.sessionId) {
+        const modelConfig = findSelectConfigOption(result.configOptions, "model");
+        const currentModel =
+          typeof modelConfig?.currentValue === "string" ? modelConfig.currentValue : undefined;
+        if (modelConfig?.id) {
+          const modelEfforts: Record<string, string[]> = {};
+          if (currentModel) {
+            rememberModelThoughtLevels(
+              currentModel,
+              result.configOptions,
+              probeResult.efforts,
+              modelEfforts,
+            );
+          }
+          const modelIds = probeResult.models
+            .map((model) => model.id)
+            .filter((modelId) => modelId !== currentModel)
+            .slice(0, MAX_MODEL_THOUGHT_LEVEL_PROBES);
+          for (const modelId of modelIds) {
+            const configOptionsUpdate = nextConfigOptionsUpdate(
+              configOptionsWaiters,
+              MODEL_THOUGHT_LEVEL_PROBE_TIMEOUT_MS,
+            );
+            let returnedConfigOptions: unknown[] | undefined;
+            try {
+              const setResult = await connection.setSessionConfigOption({
+                sessionId: result.sessionId,
+                configId: modelConfig.id,
+                value: modelId,
+              });
+              returnedConfigOptions = readConfigOptions(setResult);
+            } catch {
+              await configOptionsUpdate;
+              continue;
+            }
+            const configOptions = returnedConfigOptions ?? (await configOptionsUpdate);
+            if (!configOptions) {
+              break;
+            }
+            rememberModelThoughtLevels(modelId, configOptions, probeResult.efforts, modelEfforts);
+          }
+          if (Object.keys(modelEfforts).length > 0) {
+            probeResult.modelEfforts = modelEfforts;
+          }
+        }
       }
     }
     if (result.modes?.availableModes?.length) {
@@ -353,6 +489,7 @@ export async function probeAcpCapabilities(
         `  models: ${probeResult.models?.length ?? 0}`,
         `  efforts: ${probeResult.efforts?.join(", ") ?? "(none)"}`,
         `  defaultEffort: ${probeResult.defaultEffort ?? "(none)"}`,
+        `  modelEfforts: ${probeResult.modelEfforts ? Object.keys(probeResult.modelEfforts).length : 0}`,
         `  modes: ${probeResult.modes?.join(", ") ?? "(none)"}`,
         `  approvalPolicies: ${probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(none)"}`,
         `  slashCommands: ${probeResult.slashCommands?.length ?? 0}`,

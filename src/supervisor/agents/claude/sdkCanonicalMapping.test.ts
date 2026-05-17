@@ -1046,6 +1046,76 @@ describe("sdkCanonicalMapping — requests", () => {
     });
   });
 
+  it("preserves AskUserQuestion option ids when Claude provides them", () => {
+    const questions = parseClaudeQuestions({
+      questions: [
+        {
+          question: "Which scope?",
+          header: "Scope",
+          options: [
+            {
+              optionId: "scope-a",
+              label: "Scope A",
+              description: "Minimal split.",
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(questions[0]?.options).toEqual([
+      { optionId: "scope-a", label: "Scope A", description: "Minimal split." },
+    ]);
+  });
+
+  it("maps multi-question AskUserQuestion input to a structured form instead of fallback approvals", () => {
+    const questions = parseClaudeQuestions({
+      questions: [
+        {
+          question: "Which split scope should I execute?",
+          header: "Scope",
+          options: [
+            {
+              optionId: "Scope A: minimal",
+              label: "Scope A: minimal",
+              description: "Add the runtime package only.",
+            },
+          ],
+        },
+        {
+          question: "Should I run validation after each phase?",
+          header: "Validation cadence",
+          options: [
+            {
+              optionId: "After each phase",
+              label: "After each phase",
+            },
+          ],
+        },
+      ],
+    });
+    const event = mapClaudeQuestionRequest({
+      threadId: "thread-1",
+      requestId: "q-2",
+      questions,
+    });
+
+    expect(event).toMatchObject({
+      type: "request.opened",
+      requestType: "tool_user_input",
+      payload: {
+        summary: "Which split scope should I execute?",
+        details: {
+          userInputForm: {
+            questions,
+          },
+        },
+      },
+    });
+    if (event.type !== "request.opened") throw new Error("unexpected event");
+    expect(event.payload.options).toBeUndefined();
+  });
+
   it("does not surface AskUserQuestion tool_use blocks as chat tool items", () => {
     const state = createClaudeMapperState("thread-1");
     const events = mapClaudeSdkMessage(
@@ -1136,6 +1206,29 @@ describe("sdkCanonicalMapping — requests", () => {
     expect(events[0]).toMatchObject({
       itemType: "user_message",
       payload: { content: [{ kind: "text", text: "A, C" }] },
+    });
+  });
+
+  it("builds a user_message item from structured form answer arrays", () => {
+    const questions = parseClaudeQuestions({
+      questions: [
+        {
+          question: "Which scope?",
+          header: "Scope",
+          options: [{ optionId: "scope-a", label: "Scope A" }],
+        },
+      ],
+    });
+    const events = buildClaudeQuestionAnswerEvents({
+      threadId: "thread-1",
+      itemId: "question-answer-4",
+      questions,
+      answers: { "Which scope?": { answers: ["scope-a"] } },
+    });
+
+    expect(events[0]).toMatchObject({
+      itemType: "user_message",
+      payload: { content: [{ kind: "text", text: "Scope A" }] },
     });
   });
 

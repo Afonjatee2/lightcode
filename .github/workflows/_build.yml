@@ -108,14 +108,14 @@ jobs:
         run: |
           if [ "${{ matrix.os }}" = "windows-latest" ]; then
             pnpm run prepare:package-assets
-            pnpm exec electron-builder --win
+            pnpm exec electron-builder --config electron-builder.config.cjs --win
           else
             if [ "${{ matrix.os }}" = "macos-latest" ]; then
               pnpm run prepare:agent-plugins
-              pnpm exec electron-builder --mac
+              pnpm exec electron-builder --config electron-builder.config.cjs --mac
             else
               pnpm run prepare:package-assets
-              pnpm exec electron-builder --linux
+              pnpm exec electron-builder --config electron-builder.config.cjs --linux
             fi
           fi
         shell: bash

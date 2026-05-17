@@ -123,7 +123,7 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
         ...(providerMetadata ? { providerMetadata } : {}),
         ...(probeResult?.authMethods ? { authMethods: probeResult.authMethods } : {}),
         ...(probeResult?.authLogoutSupported ? { authLogoutSupported: true } : {}),
-        capabilities: mergeAcpProbeCapabilities(capabilities, probeResult),
+        capabilities: mergeAcpProbeCapabilities(capabilities, probeResult, instance),
       };
     },
     buildLaunchArgv() {
@@ -220,11 +220,14 @@ async function probeGenericCapabilities(
 function mergeAcpProbeCapabilities(
   capabilities: AgentCapability,
   probeResult: AcpProbeResult | undefined,
+  instance: AgentInstanceConfig,
 ): AgentCapability {
   if (!probeResult) return capabilities;
   const merged: AgentCapability = {
     ...capabilities,
-    ...(probeResult.models ? { models: probeResult.models } : {}),
+    ...(probeResult.models
+      ? { models: normalizeProviderModels(instance, probeResult.models) }
+      : {}),
     ...(probeResult.efforts ? { efforts: probeResult.efforts } : {}),
     ...(probeResult.defaultEffort ? { defaultEffort: probeResult.defaultEffort } : {}),
     ...(probeResult.modelEfforts ? { modelEfforts: probeResult.modelEfforts } : {}),
@@ -232,14 +235,47 @@ function mergeAcpProbeCapabilities(
     ...(probeResult.approvalPolicies ? { approvalPolicies: probeResult.approvalPolicies } : {}),
     ...(probeResult.slashCommands ? { slashCommands: probeResult.slashCommands } : {}),
   };
-  // Synthetic "never" policy for agents that don't advertise a bypass mode
-  // (e.g. glm-acp-agent). The session layer auto-approves requestPermission
-  // when this policy is selected, so users get the same effect even though
-  // the agent never offered yolo/autopilot at the protocol level.
-  if (merged.approvalPolicies.length === 0 && merged.modes.includes("agent")) {
-    merged.approvalPolicies = [{ id: "never", label: "Bypass approvals" }];
+  const hasBypassApprovalPolicy = merged.approvalPolicies.some((policy) => policy.id === "never");
+  const hasOnlyDefaultApprovalPolicy =
+    merged.approvalPolicies.length === 1 && merged.approvalPolicies[0]?.id === "default";
+
+  // Synthetic supervised/auto-approve policies when the ACP probe leaves us
+  // without a real bypass mode. A protocol default mode can arrive here as a
+  // single provider-named "default" policy; normalize it to Lightcode's
+  // two-state UI instead of showing a one-item dropdown.
+  if (
+    !hasBypassApprovalPolicy &&
+    (merged.approvalPolicies.length === 0 || hasOnlyDefaultApprovalPolicy) &&
+    merged.modes.includes("agent")
+  ) {
+    merged.approvalPolicies = [
+      { id: "default", label: "Supervised" },
+      { id: "never", label: "Auto Approve" },
+    ];
   }
   return merged;
+}
+
+function normalizeProviderModels(
+  instance: AgentInstanceConfig,
+  models: NonNullable<AcpProbeResult["models"]>,
+): NonNullable<AcpProbeResult["models"]> {
+  if (instance.id !== "factory-droid") {
+    return models;
+  }
+
+  return models.map((model) => {
+    const rawDescription = model.description;
+    const rate = readFactoryDroidTokenRate(rawDescription);
+    return rate && rawDescription
+      ? { ...model, description: rate, tooltipDescription: rawDescription }
+      : model;
+  });
+}
+
+function readFactoryDroidTokenRate(description: string | undefined): string | undefined {
+  const match = /^(\d+(?:\.\d+)?)x\b.*\bFactory token rate\b/iu.exec(description?.trim() ?? "");
+  return match ? `${match[1]}x` : undefined;
 }
 
 function buildGenericCommand(
@@ -297,7 +333,7 @@ function isAgentAuthMethod(method: AcpAuthMethod): method is AcpAgentAuthMethod 
   return !isEnvVarAuthMethod(method) && !isTerminalAuthMethod(method);
 }
 
-// Some ACP agents (e.g. glm-acp-agent) advertise both an env_var method and a
+// Some ACP agents advertise both an env_var method and a
 // typeless "agent" method for the same credential — the agent-owned one is a
 // stub whose authenticate() just acks. Drop those duplicates so the UI shows
 // only the real flow.

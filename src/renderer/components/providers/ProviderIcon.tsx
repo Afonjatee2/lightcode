@@ -182,7 +182,12 @@ export function registerComposerControls(kind: string, registration: ComposerCon
 }
 
 export function getComposerControls(kind: string): ComposerControlsFactory | undefined {
-  const registration = COMPOSER_CONTROLS_REGISTRY.get(kind);
+  const separatorIndex = kind.indexOf(":");
+  const registration =
+    COMPOSER_CONTROLS_REGISTRY.get(kind) ??
+    (separatorIndex > 0
+      ? COMPOSER_CONTROLS_REGISTRY.get(kind.slice(0, separatorIndex))
+      : undefined);
   if (!registration) return undefined;
   if (typeof registration === "function") return registration;
   return (input) => {

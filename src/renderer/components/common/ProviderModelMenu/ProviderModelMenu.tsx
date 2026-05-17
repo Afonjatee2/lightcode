@@ -27,6 +27,7 @@ const MODEL_MENU_ROW_HEIGHT = 28;
 const MODEL_MENU_PROVIDER_HEADER_BOTTOM_GAP = 4;
 const MODEL_MENU_MAX_HEIGHT = 288;
 const MODEL_MENU_OVERSCAN_ROWS = 16;
+const MODEL_DESCRIPTION_TOOLTIP_DELAY_MS = 1000;
 
 interface WindowedItemsMeta {
   structureKey: string;
@@ -667,8 +668,8 @@ function WindowedProviderModelList(props: {
               // the label string itself (e.g. "GPT-5.5 · 272K · Medium").
               // Render the head as the model name and the tail as muted hint.
               const { name, hint } = splitModelLabel(item.label);
-              const mutedHint = hint ?? item.contextDescription;
-              return (
+              const mutedHint = [hint, item.contextDescription].filter(Boolean).join(" · ");
+              const content = (
                 <span className="flex min-w-0 flex-1 items-center gap-1.5">
                   <span className="min-w-0 truncate">{name}</span>
                   {mutedHint ? (
@@ -677,6 +678,19 @@ function WindowedProviderModelList(props: {
                     </span>
                   ) : null}
                 </span>
+              );
+              return item.tooltipDescription ? (
+                <Tooltip delay={MODEL_DESCRIPTION_TOOLTIP_DELAY_MS}>
+                  {content}
+                  <Tooltip.Content
+                    placement="right"
+                    className="max-w-72 whitespace-normal break-words text-xs"
+                  >
+                    {item.tooltipDescription}
+                  </Tooltip.Content>
+                </Tooltip>
+              ) : (
+                content
               );
             })()}
             {item.showProviderIcon || item.subProviderLabel ? (

@@ -18,6 +18,7 @@ import type {
 } from "@/shared/contracts";
 import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
 import { createContextUsageEvent, readNonNegativeInteger } from "../contextUsage";
+import { chosenOptionIds } from "../questionAnswers";
 import {
   goalPayloadFromProviderState,
   parseGoalSlashCommand,
@@ -405,6 +406,7 @@ export function mapClaudeQuestionRequest(input: {
   questions: ClaudeQuestion[];
 }): RuntimeEvent {
   const firstQuestion = input.questions[0];
+  const isSingleQuestion = input.questions.length === 1;
   return {
     type: "request.opened",
     threadId: input.threadId,
@@ -412,9 +414,14 @@ export function mapClaudeQuestionRequest(input: {
     requestType: "tool_user_input",
     payload: {
       summary: firstQuestion?.question ?? "Claude needs more information",
-      details: { questions: input.questions },
-      options: input.questions.length === 1 ? firstQuestion?.options : undefined,
-      multiSelect: input.questions.length === 1 ? firstQuestion?.multiSelect : undefined,
+      details: {
+        questions: input.questions,
+        ...(!isSingleQuestion ? { userInputForm: { questions: input.questions } } : {}),
+      },
+      ...(isSingleQuestion && firstQuestion?.options ? { options: firstQuestion.options } : {}),
+      ...(isSingleQuestion && firstQuestion?.multiSelect !== undefined
+        ? { multiSelect: firstQuestion.multiSelect }
+        : {}),
     },
   };
 }
@@ -453,27 +460,12 @@ function formatQuestionAnswerLines(
   const lines: string[] = [];
   for (const question of questions) {
     const raw = answers[question.question];
-    const chosen = extractChosenOptionIds(raw);
+    const chosen = chosenOptionIds(raw);
     if (chosen.length === 0) continue;
     const labels = chosen.map((id) => labelForOption(question, id));
     lines.push(labels.join(", "));
   }
   return lines;
-}
-
-function extractChosenOptionIds(raw: unknown): string[] {
-  if (typeof raw === "string") return raw.length > 0 ? [raw] : [];
-  if (Array.isArray(raw)) {
-    return raw.filter((v): v is string => typeof v === "string" && v.length > 0);
-  }
-  if (raw && typeof raw === "object") {
-    const obj = raw as Record<string, unknown>;
-    if (Array.isArray(obj.optionIds)) {
-      return obj.optionIds.filter((v): v is string => typeof v === "string" && v.length > 0);
-    }
-    if (typeof obj.optionId === "string" && obj.optionId.length > 0) return [obj.optionId];
-  }
-  return [];
 }
 
 function labelForOption(question: ClaudeQuestion, optionId: string): string {
@@ -503,10 +495,18 @@ export function parseClaudeQuestions(input: Record<string, unknown>): ClaudeQues
       ? q.options.flatMap((opt, optIndex) => {
           if (!opt || typeof opt !== "object") return [];
           const o = opt as Record<string, unknown>;
-          const label = typeof o.label === "string" ? o.label : `Option ${optIndex + 1}`;
+          const fallback = `Option ${optIndex + 1}`;
+          const optionId =
+            typeof o.optionId === "string" && o.optionId.length > 0
+              ? o.optionId
+              : typeof o.label === "string" && o.label.length > 0
+                ? o.label
+                : fallback;
+          const label =
+            typeof o.label === "string" && o.label.length > 0 ? o.label : optionId || fallback;
           return [
             {
-              optionId: label,
+              optionId,
               label,
               ...(typeof o.description === "string" ? { description: o.description } : {}),
             },

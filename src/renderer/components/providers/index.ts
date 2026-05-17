@@ -17,3 +17,4 @@ export * from "./codex";
 export * from "./gemini";
 export * from "./cursor";
 export * from "./opencode";
+export * from "./acpGeneric";

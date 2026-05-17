@@ -36,6 +36,7 @@ import {
   type StructuredSessionHandle,
   type StructuredSessionListener,
 } from "../base";
+import { chosenOptionIds } from "../questionAnswers";
 import { mapOpenCodeSlashCommands } from "./detection";
 import { buildOpenCodePermissionRules } from "./permissionRules";
 import {
@@ -61,10 +62,16 @@ interface PendingPermission {
 interface PendingQuestion {
   kind: "question";
   requestID: string;
-  optionValues: Record<string, string>;
+  answerKeys: OpenCodeQuestionAnswerContext["answerKeys"];
+  optionValues: OpenCodeQuestionAnswerContext["optionValues"];
 }
 
 type PendingRequest = PendingPermission | PendingQuestion;
+
+export interface OpenCodeQuestionAnswerContext {
+  answerKeys: string[];
+  optionValues: Record<string, string>;
+}
 
 function resolveAbsolutePath(location: ProjectLocation, segmentPath: string): string {
   if (location.kind === "wsl") {
@@ -344,7 +351,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
 
     if (pending.kind === "question") {
-      const answers = parseQuestionAnswers(response, pending);
+      const answers = parseOpenCodeQuestionAnswers(response, pending);
       try {
         if (answers === undefined) {
           await acquired.client.question.reject({
@@ -509,10 +516,12 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
 
     if (event.type === "question.asked") {
       const requestId = `opencode-q-${event.properties.id}` as ThreadServerRequestId;
+      const questionMetadata = buildQuestionMetadata(event.properties);
       this.pendingRequests.set(requestId, {
         kind: "question",
         requestID: event.properties.id,
-        optionValues: buildQuestionOptionValueMap(event.properties),
+        answerKeys: questionMetadata.answerKeys,
+        optionValues: questionMetadata.optionValues,
       });
     }
 
@@ -569,12 +578,17 @@ function parsePermissionReply(response: unknown): "once" | "always" | "reject" {
   return "once";
 }
 
-function buildQuestionOptionValueMap(properties: { questions?: unknown }): Record<string, string> {
-  const values: Record<string, string> = {};
+function buildQuestionMetadata(properties: { questions?: unknown }): {
+  answerKeys: string[];
+  optionValues: Record<string, string>;
+} {
+  const answerKeys: string[] = [];
+  const optionValues: Record<string, string> = {};
   const questions = Array.isArray(properties.questions) ? properties.questions : [];
   for (let qi = 0; qi < questions.length; qi += 1) {
     const question = questions[qi];
     if (!question || typeof question !== "object") continue;
+    answerKeys.push(`q${qi}`);
     const options = (question as { options?: unknown }).options;
     if (!Array.isArray(options)) continue;
     for (let oi = 0; oi < options.length; oi += 1) {
@@ -582,16 +596,16 @@ function buildQuestionOptionValueMap(properties: { questions?: unknown }): Recor
       if (!option || typeof option !== "object") continue;
       const label = (option as { label?: unknown }).label;
       if (typeof label === "string") {
-        values[`q${qi}.${oi}`] = label;
+        optionValues[`q${qi}.${oi}`] = label;
       }
     }
   }
-  return values;
+  return { answerKeys, optionValues };
 }
 
-function parseQuestionAnswers(
+export function parseOpenCodeQuestionAnswers(
   response: unknown,
-  pending: PendingQuestion,
+  pending: OpenCodeQuestionAnswerContext,
 ): Array<Array<string>> | undefined {
   if (response === undefined || response === null) return undefined;
   if (Array.isArray(response)) {
@@ -601,6 +615,9 @@ function parseQuestionAnswers(
     const obj = response as { answers?: unknown; optionId?: unknown; optionIds?: unknown };
     if (Array.isArray(obj.answers)) {
       return obj.answers.map((row) => (Array.isArray(row) ? row.map(String) : [String(row)]));
+    }
+    if (obj.answers && typeof obj.answers === "object") {
+      return answerRowsForAnswerMap(obj.answers as Record<string, unknown>, pending);
     }
     if (Array.isArray(obj.optionIds)) {
       return answerRowsForOptionIds(
@@ -613,6 +630,18 @@ function parseQuestionAnswers(
     }
   }
   return undefined;
+}
+
+function answerRowsForAnswerMap(
+  answers: Record<string, unknown>,
+  pending: OpenCodeQuestionAnswerContext,
+): Array<Array<string>> {
+  const rows: Array<Array<string>> = [];
+  for (let qi = 0; qi < pending.answerKeys.length; qi += 1) {
+    const raw = answers[pending.answerKeys[qi]!];
+    rows[qi] = chosenOptionIds(raw).map((value) => pending.optionValues[value] ?? value);
+  }
+  return rows;
 }
 
 function answerRowsForOptionIds(

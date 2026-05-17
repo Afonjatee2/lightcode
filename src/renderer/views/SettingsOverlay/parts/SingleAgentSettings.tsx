@@ -17,7 +17,6 @@ import type {
   AgentSettingDef,
   AgentStatus,
   Project,
-  RefreshAgentScopeEnv,
 } from "@/shared/contracts";
 import { runAgentLoginCommand } from "@/renderer/actions/agentLoginActions";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -25,6 +24,13 @@ import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
+import {
+  acpGenericInstanceId,
+  agentAuthTarget,
+  isAgentAuthMethod,
+  isEnvVarAuthMethod,
+  scopeEnvForStatus,
+} from "@/renderer/utils/acpRegistryAuth";
 import { Input, Select } from "@/renderer/components/common";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import {
@@ -217,23 +223,6 @@ function findProjectForAgentStatus(
   return undefined;
 }
 
-function acpGenericInstanceId(kind: string): string | undefined {
-  return kind.startsWith("acp-generic:") ? kind.slice("acp-generic:".length) : undefined;
-}
-
-type StatusAuthMethod = NonNullable<AgentStatus["authMethods"]>[number];
-
-function isEnvVarAuthMethod(method: StatusAuthMethod | undefined): method is AgentEnvVarAuthMethod {
-  return (
-    method !== undefined &&
-    (method.type === "env_var" || ("vars" in method && Array.isArray(method.vars)))
-  );
-}
-
-function isAgentAuthMethod(method: StatusAuthMethod | undefined): method is AgentOwnedAuthMethod {
-  return method !== undefined && !isEnvVarAuthMethod(method) && method.type !== "terminal";
-}
-
 function findEnvVarAuthMethod(statuses: readonly AgentStatus[]): AgentEnvVarAuthMethod | undefined {
   for (const status of statuses) {
     const method = status.authMethods?.find(isEnvVarAuthMethod);
@@ -250,19 +239,6 @@ function findAgentAuthMethod(
     if (method) return { status, method };
   }
   return undefined;
-}
-
-function agentAuthTarget(status: AgentStatus) {
-  return {
-    ...(status.envKind ? { envKind: status.envKind } : {}),
-    ...(status.envDistro ? { wslDistro: status.envDistro } : {}),
-  };
-}
-
-function scopeEnvForStatus(status: AgentStatus): RefreshAgentScopeEnv {
-  return status.envKind === "wsl" && status.envDistro
-    ? { kind: "wsl", distro: status.envDistro }
-    : { kind: "native" };
 }
 
 function findTerminalLoginStatus(statuses: readonly AgentStatus[]): AgentStatus | undefined {
@@ -378,6 +354,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   const installedRegistryRecord = useSharedSettings(
     (s) => s.acpRegistryInstalledAgents[acpGenericInstanceId(props.agentKind) ?? ""],
   );
+  const syncInstalledAgents = useSharedSettings((s) => s.syncAcpRegistryInstalledAgents);
   const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
 
   const registryAgentId = acpGenericInstanceId(props.agentKind);
@@ -586,6 +563,9 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     setUpdatePending(true);
     readBridge()
       .updateAcpRegistryAgent({ agentId: acpInstanceId })
+      .then((result) => {
+        syncInstalledAgents(result.installed);
+      })
       .then(() => readBridge().refreshAgentStatuses(wslDistros, { agentKinds: [props.agentKind] }))
       .then(() => toast.success(`${agent.label} updated to v${latestRegistryVersion}.`))
       .catch((error) =>

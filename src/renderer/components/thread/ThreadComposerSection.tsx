@@ -32,6 +32,7 @@ import { ThreadErrorDock } from "./ThreadErrorDock";
 import { ThreadGoalDock } from "./ThreadGoalDock";
 import { ThreadPendingSteerStrip } from "./ThreadPendingSteerStrip";
 import { ThreadRuntimeRequestPanel } from "./ThreadRuntimeRequestPanel";
+import { ThreadAuthRequiredDock } from "./ThreadAuthRequiredDock";
 import { ThreadTodoDock } from "./ThreadTodoDock";
 import { hasReportedContextUsage, resolveThreadContextUsageSummary } from "./threadContextUsage";
 import { capabilitiesForPresentation, filterHiddenModels } from "./threadComposerOptions";
@@ -321,6 +322,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   );
   const filteredCommands = filterSlashCommands(availableCommands, slashQuery);
   const showCommandPanel = filteredCommands.length > 0;
+  const authRequired = agentStatus?.authState === "missing";
   const isServerControlled =
     agentStatus?.capabilities.liveInputMode === "server" || !usesTerminalPresentation;
   const isTerminalInput = agentStatus?.capabilities.liveInputMode === "terminal";
@@ -378,7 +380,8 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     return control;
   });
   const isCliThread = usesTerminalPresentation;
-  const canSubmit = (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting;
+  const canSubmit =
+    (canSubmitServerInput || canSubmitTerminalInput) && !isSubmitting && !authRequired;
   const canInterruptStructuredTurn = !usesTerminalPresentation && thread.status === "working";
   const isStructuredLaunching = !usesTerminalPresentation && thread.status === "launching";
   const pendingSteer = useAppStore((s) => s.pendingSteerByThreadId[thread.id]);
@@ -398,6 +401,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     hasReportedContextUsage(reportedContextUsage) &&
     contextSummary.maxTokens !== undefined;
   const showContextInComposer = showContextIndicator && contextDockOpen;
+  const project = useAppStore((s) =>
+    s.projects.find((candidate) => candidate.id === thread.projectId),
+  );
 
   useEffect(() => {
     if (!showContextIndicator && contextDockOpen) {
@@ -640,6 +646,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                     branchName ?? "",
                     thread.worktreePath ? "wt" : "br",
                     thread.prNumber ? `pr=${thread.prNumber}` : "",
+                    authRequired ? "auth-required" : "auth-ready",
                   ].join("|")}
                   fixedContent={
                     hasActiveSubAgent ||
@@ -647,6 +654,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                     showErrorInComposer ||
                     showGoalInComposer ||
                     showTodoInComposer ||
+                    authRequired ||
                     pendingSteer ||
                     activeRuntimeRequest ||
                     showCommandPanel ? (
@@ -678,6 +686,12 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                             onCollapsedChange={props.onTodoDockCollapsedChange}
                             onPlacementChange={props.onTodoDockPlacementChange}
                             onRetire={() => props.onTodoDockRetire?.()}
+                          />
+                        ) : null}
+                        {authRequired && agentStatus ? (
+                          <ThreadAuthRequiredDock
+                            agentStatus={agentStatus}
+                            {...(project ? { project } : {})}
                           />
                         ) : null}
                         {pendingSteer ? (

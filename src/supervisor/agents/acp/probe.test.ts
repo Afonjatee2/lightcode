@@ -36,6 +36,45 @@ describe("mapAcpModels", () => {
     ]);
   });
 
+  it("preserves model descriptions for secondary menu hints", () => {
+    const result = mapAcpModels([
+      {
+        modelId: "claude-opus-4-7",
+        name: "Claude Opus 4.7",
+        description: "2x Factory token rate",
+      },
+    ]);
+
+    expect(result).toEqual([
+      {
+        id: "claude-opus-4-7",
+        label: "Claude Opus 4.7",
+        description: "2x Factory token rate",
+      },
+    ]);
+  });
+
+  it("does not interpret provider-specific model metadata", () => {
+    const result = mapAcpModels([
+      {
+        modelId: "claude-opus-4.6",
+        name: "Claude Opus 4.6",
+        description: "Claude Opus 4.6",
+        _meta: {
+          copilotUsage: "3x",
+        },
+      },
+    ]);
+
+    expect(result).toEqual([
+      {
+        id: "claude-opus-4.6",
+        label: "Claude Opus 4.6",
+        description: "Claude Opus 4.6",
+      },
+    ]);
+  });
+
   it("humanizes label when name equals modelId", () => {
     const result = mapAcpModels([
       { modelId: "gemini-2.5-pro", name: "gemini-2.5-pro" },
@@ -81,14 +120,17 @@ describe("mapAcpModes", () => {
     ]);
   });
 
-  it("skips unknown mode IDs gracefully", () => {
+  it("maps unknown mode IDs as agent approval policies", () => {
     const result = mapAcpModes([
       { id: "default", name: "Default" },
       { id: "some_future_mode", name: "Future Mode" },
       { id: "plan", name: "Plan" },
     ]);
     expect(result.modes).toEqual(["agent", "plan"]);
-    expect(result.approvalPolicies).toEqual([{ id: "default", label: "Default" }]);
+    expect(result.approvalPolicies).toEqual([
+      { id: "default", label: "Default" },
+      { id: "some_future_mode", label: "Future Mode" },
+    ]);
   });
 
   it("returns empty arrays for empty input", () => {
@@ -120,6 +162,40 @@ describe("mapAcpModes", () => {
     ]);
     expect(result.modes).toEqual(["agent", "plan"]);
     expect(result.approvalPolicies).toEqual([{ id: "autopilot", label: "Autopilot" }]);
+  });
+
+  it("maps GLM ACP permission modes from the agent", () => {
+    const result = mapAcpModes([
+      { id: "default", name: "Ask for permission" },
+      { id: "accept_edits", name: "Auto-approve edits" },
+      { id: "bypass_permissions", name: "Bypass all permissions" },
+    ]);
+
+    expect(result.modes).toEqual(["agent"]);
+    expect(result.approvalPolicies).toEqual([
+      { id: "default", label: "Ask for permission" },
+      { id: "accept_edits", label: "Auto-approve edits" },
+      { id: "bypass_permissions", label: "Bypass all permissions" },
+    ]);
+  });
+
+  it("maps Droid-style autonomy levels to approval policies", () => {
+    const result = mapAcpModes([
+      { id: "normal", name: "Auto (Off)" },
+      { id: "spec", name: "Spec" },
+      { id: "auto-low", name: "Auto (Low)" },
+      { id: "auto-medium", name: "Auto (Medium)" },
+      { id: "auto-high", name: "Auto (High)" },
+    ]);
+
+    expect(result.modes).toEqual(["agent"]);
+    expect(result.approvalPolicies).toEqual([
+      { id: "normal", label: "Auto (Off)" },
+      { id: "spec", label: "Spec" },
+      { id: "auto-low", label: "Auto (Low)" },
+      { id: "auto-medium", label: "Auto (Medium)" },
+      { id: "auto-high", label: "Auto (High)" },
+    ]);
   });
 });
 

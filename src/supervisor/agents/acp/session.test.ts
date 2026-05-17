@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { RequestError } from "@agentclientprotocol/sdk";
 import type { CreateStructuredSessionInput } from "../base";
 import type { ThreadConfig } from "@/shared/contracts";
@@ -22,6 +25,10 @@ function makeInput(
 }
 
 type TestableAcpSession = {
+  openThread(
+    config: ThreadConfig,
+    sessionRef?: import("@/shared/contracts").SessionRef,
+  ): Promise<string>;
   applyTurnConfig(config: ThreadConfig): Promise<void>;
   startTurn(
     prompt: string,
@@ -30,9 +37,19 @@ type TestableAcpSession = {
     options?: { userMessageItemId?: string },
   ): Promise<void>;
   interruptTurn(): Promise<void>;
+  dispose(): Promise<void>;
+  resolveServerRequest(requestId: string, response: unknown): Promise<void>;
   handleSessionUpdate(params: { update: unknown }): void;
   setListener(listener: unknown): void;
 };
+
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { force: true, recursive: true });
+  }
+});
 
 function makeConfigSyncSession(
   overrides: {
@@ -60,6 +77,38 @@ function makeConfigSyncSession(
       .fn<(args: { sessionId: string; prompt: unknown[] }) => Promise<{ stopReason: string }>>()
       .mockResolvedValue({ stopReason: "end_turn" }),
     cancel: vi.fn<(args: { sessionId: string }) => Promise<void>>().mockResolvedValue(undefined),
+    closeSession: vi
+      .fn<(args: { sessionId: string }) => Promise<void>>()
+      .mockResolvedValue(undefined),
+    loadSession: vi
+      .fn<
+        (args: { sessionId: string; cwd: string; mcpServers: unknown[] }) => Promise<{
+          modes?: { availableModes: Array<{ id: string }> };
+          configOptions?: unknown[];
+        }>
+      >()
+      .mockResolvedValue({ modes: { availableModes: [] }, configOptions: [] }),
+    resumeSession: vi
+      .fn<
+        (args: { sessionId: string; cwd: string; mcpServers: unknown[] }) => Promise<{
+          modes?: { availableModes: Array<{ id: string }> };
+          configOptions?: unknown[];
+        }>
+      >()
+      .mockResolvedValue({ modes: { availableModes: [] }, configOptions: [] }),
+    newSession: vi
+      .fn<
+        (args: { cwd: string; mcpServers: unknown[] }) => Promise<{
+          sessionId: string;
+          modes?: { availableModes: Array<{ id: string }> };
+          configOptions?: unknown[];
+        }>
+      >()
+      .mockResolvedValue({
+        sessionId: "session-1",
+        modes: { availableModes: [] },
+        configOptions: [],
+      }),
   };
   const listener = {
     onClose: vi.fn<() => void>(),
@@ -68,6 +117,7 @@ function makeConfigSyncSession(
     onRuntimeEvent: vi.fn<(event: unknown) => void>(),
   };
   const session = Object.create(AcpStructuredSession.prototype) as Record<string, unknown>;
+  session["child"] = { killed: true };
   session["connection"] = connection;
   session["sessionId"] = "session-1";
   session["threadId"] = "thread-1";
@@ -102,6 +152,18 @@ function makeConfigSyncSession(
   session["recentInterruptAckTextTail"] = "";
   session["mapperState"] = undefined;
   session["pendingPermissionResolvers"] = new Map();
+  session["pendingElicitationResolvers"] = new Map();
+  session["pendingElicitationRequestIdsByElicitationId"] = new Map();
+  session["permissionRequestSeq"] = 0;
+  session["elicitationRequestSeq"] = 0;
+  session["acpTerminals"] = new Map();
+  session["acpTerminalSeq"] = 0;
+  session["agentPromptCapabilities"] = undefined;
+  session["agentSessionCapabilities"] = undefined;
+  session["cwd"] = "C:\\repo";
+  session["stableSessionRef"] = undefined;
+  session["launchOptions"] = {};
+  session["loadSessionErrorRewriter"] = rewriteLoadSessionError;
   return { connection, listener, session: session as unknown as TestableAcpSession };
 }
 
@@ -231,6 +293,222 @@ describe("ACP resource path helpers", () => {
   });
 });
 
+describe("ACP client protocol helpers", () => {
+  function makePosixProject() {
+    const root = mkdtempSync(join(tmpdir(), "lightcode-acp-"));
+    tempDirs.push(root);
+    return root;
+  }
+
+  it("serves fs/read_text_file with ACP line and limit semantics inside the project", async () => {
+    const projectRoot = makePosixProject();
+    writeFileSync(join(projectRoot, "notes.txt"), "one\ntwo\nthree\nfour", "utf8");
+    const { session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["projectLocation"] = {
+      kind: "posix",
+      path: projectRoot,
+    };
+
+    const read = (session as unknown as { handleReadTextFile: Function }).handleReadTextFile.bind(
+      session,
+    );
+
+    await expect(
+      read({ sessionId: "session-1", path: join(projectRoot, "notes.txt"), line: 2, limit: 2 }),
+    ).resolves.toEqual({ content: "two\nthree" });
+  });
+
+  it("rejects ACP fs requests outside the project root", async () => {
+    const projectRoot = makePosixProject();
+    const outside = join(makePosixProject(), "secret.txt");
+    writeFileSync(outside, "secret", "utf8");
+    const { session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["projectLocation"] = {
+      kind: "posix",
+      path: projectRoot,
+    };
+
+    const read = (session as unknown as { handleReadTextFile: Function }).handleReadTextFile.bind(
+      session,
+    );
+
+    await expect(read({ sessionId: "session-1", path: outside })).rejects.toThrow("Invalid params");
+  });
+
+  it("serves fs/write_text_file only inside the project root", async () => {
+    const projectRoot = makePosixProject();
+    const { session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["projectLocation"] = {
+      kind: "posix",
+      path: projectRoot,
+    };
+
+    const write = (
+      session as unknown as { handleWriteTextFile: Function }
+    ).handleWriteTextFile.bind(session);
+
+    await write({ sessionId: "session-1", path: join(projectRoot, "out.txt"), content: "ok" });
+    expect(readFileSync(join(projectRoot, "out.txt"), "utf8")).toBe("ok");
+  });
+
+  it("uses resource links for image attachments unless the ACP agent advertises image prompts", async () => {
+    const projectRoot = makePosixProject();
+    const imagePath = join(projectRoot, "diagram.png");
+    writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const { connection, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["projectLocation"] = {
+      kind: "posix",
+      path: projectRoot,
+    };
+
+    await session.startTurn(
+      "inspect",
+      {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "default",
+      },
+      [{ kind: "attachment", path: "diagram.png", mimeType: "image/png" }],
+    );
+
+    expect(connection.prompt).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      prompt: [
+        {
+          type: "resource_link",
+          uri: `file://${imagePath}`,
+          name: "diagram.png",
+          mimeType: "image/png",
+        },
+        { type: "text", text: "inspect" },
+      ],
+    });
+  });
+
+  it("sends image content when the ACP agent advertises image prompt support", async () => {
+    const projectRoot = makePosixProject();
+    writeFileSync(join(projectRoot, "diagram.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    const { connection, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["projectLocation"] = {
+      kind: "posix",
+      path: projectRoot,
+    };
+    (session as unknown as Record<string, unknown>)["agentPromptCapabilities"] = { image: true };
+
+    await session.startTurn(
+      "inspect",
+      {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "default",
+      },
+      [{ kind: "attachment", path: "diagram.png", mimeType: "image/png" }],
+    );
+
+    expect(connection.prompt).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      prompt: [
+        {
+          type: "image",
+          data: Buffer.from([0x89, 0x50, 0x4e, 0x47]).toString("base64"),
+          mimeType: "image/png",
+        },
+        { type: "text", text: "inspect" },
+      ],
+    });
+  });
+
+  it("implements ACP terminal create/output/wait/release over a real PTY", async () => {
+    const projectRoot = makePosixProject();
+    const { session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["projectLocation"] = {
+      kind: "posix",
+      path: projectRoot,
+    };
+
+    const create = (
+      session as unknown as { handleCreateTerminal: Function }
+    ).handleCreateTerminal.bind(session);
+    const wait = (
+      session as unknown as { handleWaitForTerminalExit: Function }
+    ).handleWaitForTerminalExit.bind(session);
+    const output = (
+      session as unknown as { handleTerminalOutput: Function }
+    ).handleTerminalOutput.bind(session);
+    const release = (
+      session as unknown as { handleReleaseTerminal: Function }
+    ).handleReleaseTerminal.bind(session);
+
+    const created = create({
+      sessionId: "session-1",
+      command: process.execPath,
+      args: ["-e", "process.stdout.write('hello from acp')"],
+      cwd: projectRoot,
+      outputByteLimit: 100,
+    });
+
+    await expect(
+      wait({ sessionId: "session-1", terminalId: created.terminalId }),
+    ).resolves.toMatchObject({ exitCode: 0 });
+    expect(output({ sessionId: "session-1", terminalId: created.terminalId })).toMatchObject({
+      output: expect.stringContaining("hello from acp"),
+      truncated: false,
+      exitStatus: { exitCode: 0 },
+    });
+    release({ sessionId: "session-1", terminalId: created.terminalId });
+  });
+
+  it("calls session/close on dispose when the ACP agent advertises close support", async () => {
+    const { connection, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["agentSessionCapabilities"] = { close: {} };
+
+    await session.dispose();
+
+    expect(connection.closeSession).toHaveBeenCalledWith({ sessionId: "session-1" });
+  });
+
+  it("uses session/resume for known sessions when the ACP agent advertises resume support", async () => {
+    const { connection, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["agentSessionCapabilities"] = { resume: {} };
+    const sessionRef = {
+      providerSessionId: "session-resume",
+      discoveredAt: new Date().toISOString(),
+    };
+
+    await expect(session.openThread({ model: "model-a" }, sessionRef)).resolves.toBe(
+      "session-resume",
+    );
+
+    expect(connection.resumeSession).toHaveBeenCalledWith({
+      sessionId: "session-resume",
+      cwd: "C:\\repo",
+      mcpServers: [],
+    });
+    expect(connection.loadSession).not.toHaveBeenCalled();
+  });
+
+  it("falls back to session/load for known sessions when resume is not advertised", async () => {
+    const { connection, session } = makeConfigSyncSession();
+    const sessionRef = {
+      providerSessionId: "session-load",
+      discoveredAt: new Date().toISOString(),
+    };
+
+    await expect(session.openThread({ model: "model-a" }, sessionRef)).resolves.toBe(
+      "session-load",
+    );
+
+    expect(connection.loadSession).toHaveBeenCalledWith({
+      sessionId: "session-load",
+      cwd: "C:\\repo",
+      mcpServers: [],
+    });
+    expect(connection.resumeSession).not.toHaveBeenCalled();
+  });
+});
+
 describe("ACP turn config sync", () => {
   it("applies model, mode, and effort changes before a new turn", async () => {
     const { connection, session } = makeConfigSyncSession();
@@ -273,6 +551,29 @@ describe("ACP turn config sync", () => {
       sessionId: "session-1",
       modeId: "autopilot",
     });
+  });
+
+  it("applies arbitrary ACP mode ids from approval policies", async () => {
+    const { connection, session } = makeConfigSyncSession({
+      availableModeIds: ["normal", "auto-low", "auto-high"],
+    });
+    Object.assign(session as unknown as Record<string, unknown>, {
+      modeConfigId: "autonomy-level",
+    });
+
+    await session.applyTurnConfig({
+      model: "model-a",
+      effort: "low",
+      mode: "agent",
+      approvalPolicy: "auto-high",
+    });
+
+    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      configId: "autonomy-level",
+      value: "auto-high",
+    });
+    expect(connection.setSessionMode).not.toHaveBeenCalled();
   });
 
   it("uses ACP session config options for Cursor-style model aliases", async () => {
@@ -426,6 +727,33 @@ describe("ACP turn config sync", () => {
         config: expect.objectContaining({
           mode: "agent",
           approvalPolicy: "never",
+        }),
+      }),
+    );
+  });
+
+  it("maps arbitrary ACP mode updates back to approval config", () => {
+    const { listener, session } = makeConfigSyncSession({
+      currentConfig: {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "normal",
+      },
+    });
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "current_mode_update",
+        currentModeId: "auto-high",
+      },
+    });
+
+    expect(listener.onUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          mode: "agent",
+          approvalPolicy: "auto-high",
         }),
       }),
     );
@@ -782,5 +1110,101 @@ describe("ACP permission request handling", () => {
       attention: "needs_approval",
     });
     expect(listener.onRuntimeEvent).toHaveBeenCalled();
+  });
+});
+
+describe("ACP elicitation request handling", () => {
+  function invokeElicitation(session: TestableAcpSession, params: unknown): Promise<unknown> {
+    const handler = (
+      session as unknown as { handleElicitationRequest: Function }
+    ).handleElicitationRequest.bind(session);
+    return handler(params);
+  }
+
+  it("emits form elicitation as user input and resolves with ACP accept content", async () => {
+    const { listener, session } = makeConfigSyncSession();
+
+    const responsePromise = invokeElicitation(session, {
+      mode: "form",
+      sessionId: "session-1",
+      message: "Choose deployment scope",
+      requestedSchema: {
+        type: "object",
+        properties: {
+          scope: { type: "string" },
+          count: { type: "integer" },
+          confirm: { type: "boolean" },
+          tags: { type: "array" },
+        },
+      },
+    });
+    await Promise.resolve();
+
+    expect(listener.onUpdate).toHaveBeenCalledWith({
+      status: "needs_reply",
+      attention: "needs_reply",
+    });
+    expect(listener.onRuntimeEvent).toHaveBeenCalledWith({
+      type: "request.opened",
+      threadId: "thread-1",
+      requestId: "acp-elicit-0",
+      requestType: "tool_user_input",
+      payload: {
+        summary: "Choose deployment scope",
+        details: {
+          acpElicitation: expect.objectContaining({
+            mode: "form",
+            message: "Choose deployment scope",
+          }),
+        },
+      },
+    });
+
+    await session.resolveServerRequest("acp-elicit-0", {
+      action: "accept",
+      content: {
+        scope: "Scope A",
+        count: 2,
+        confirm: true,
+        tags: ["fast"],
+        ignored: "not in schema",
+      },
+    });
+
+    await expect(responsePromise).resolves.toEqual({
+      action: "accept",
+      content: {
+        scope: "Scope A",
+        count: 2,
+        confirm: true,
+        tags: ["fast"],
+      },
+    });
+  });
+
+  it("resolves URL elicitation when ACP sends completion notification", async () => {
+    const { listener, session } = makeConfigSyncSession();
+
+    const responsePromise = invokeElicitation(session, {
+      mode: "url",
+      sessionId: "session-1",
+      message: "Authenticate",
+      elicitationId: "elicit-1",
+      url: "https://example.com/auth",
+    });
+    await Promise.resolve();
+
+    const complete = (
+      session as unknown as { handleElicitationComplete: Function }
+    ).handleElicitationComplete.bind(session);
+    complete({ elicitationId: "elicit-1" });
+
+    await expect(responsePromise).resolves.toEqual({ action: "accept" });
+    expect(listener.onRuntimeEvent).toHaveBeenLastCalledWith({
+      type: "request.resolved",
+      threadId: "thread-1",
+      requestId: "acp-elicit-0",
+      outcome: "answered",
+    });
   });
 });
