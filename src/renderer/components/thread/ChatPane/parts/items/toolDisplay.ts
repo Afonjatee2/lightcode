@@ -5,6 +5,7 @@ import {
   FilePlus,
   FolderSearch,
   Globe,
+  ImageIcon,
   Pencil,
   Plug,
   SearchCode,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
 import { extractLeadingPath } from "@/shared/extractLeadingPath";
+import { extractAcpPatchTargetPath } from "./acpToolPayload";
 
 export interface ToolDisplay {
   title: string;
@@ -37,7 +39,7 @@ type AcpLocation = NonNullable<ToolCallPayload["locations"]>[number];
  *
  * Three input shapes are normalized:
  *   1. Claude SDK raw names (`Read`, `Grep`, `Glob`, `Task`, …) — the title is
- *      composed from the args (`Read: src/foo.ts`, `Grep: "pattern"`).
+ *      composed from the args (`View: src/foo.ts`, `Grep: "pattern"`).
  *   2. MCP tools (`mcp__<server>__<tool>` or `<server>-mcp-server-<tool>`) —
  *      shown as `<server>: <tool>` with the Plug icon.
  *   3. ACP-style human-readable titles (`Viewing src/foo.ts`, `Searching for…`)
@@ -93,7 +95,7 @@ function mapClaudeRawTool(
   switch (name) {
     case "Read":
     case "NotebookRead":
-      return withPath("Read", args, ["file_path", "notebook_path"], Eye, { filePath: true });
+      return withReadPath(args, ["file_path", "notebook_path"], Eye);
     case "Grep":
       return formatGrepDisplay(args);
     case "Glob":
@@ -132,7 +134,11 @@ function mapClaudeRawTool(
     case "TaskStop":
       return { title: titleWithValue("Stop task", args, "id"), Icon: Trash2 };
     default:
-      return null;
+      return name.toLowerCase().includes("image")
+        ? withPath("Image", args, ["path", "file_path", "image_path", "source"], ImageIcon, {
+            filePath: true,
+          })
+        : null;
   }
 }
 
@@ -149,6 +155,58 @@ function withPath(
   const parts: NonNullable<ToolDisplay["parts"]> = { prefix, path };
   if (options?.filePath) parts.filePath = true;
   return { title: `${prefix}${path}`, Icon, parts };
+}
+
+function withReadPath(
+  args: Record<string, unknown> | undefined,
+  keys: string[],
+  Icon: LucideIcon,
+): ToolDisplay {
+  return withTarget(readVerb(args), readStr(args, ...keys), Icon, { filePath: true });
+}
+
+function readVerb(args: Record<string, unknown> | undefined): string {
+  const range = readLineRange(args);
+  return range ? `View ${range}` : "View";
+}
+
+function readLineRange(args: Record<string, unknown> | undefined): string | undefined {
+  const rawStart = readInt(
+    args,
+    "offset",
+    "line",
+    "lineNumber",
+    "start",
+    "startLine",
+    "start_line",
+    "lineStart",
+    "line_start",
+  );
+  const explicitEnd = readInt(args, "end", "endLine", "end_line", "lineEnd", "line_end");
+  const limit = readInt(args, "limit");
+  const start =
+    rawStart !== undefined ? Math.max(1, rawStart) : limit !== undefined ? 1 : undefined;
+  if (start === undefined) return undefined;
+  const end =
+    explicitEnd !== undefined
+      ? Math.max(start, explicitEnd)
+      : limit !== undefined && limit > 0
+        ? start + limit - 1
+        : undefined;
+  return end !== undefined && end !== start ? `${start}:${end}` : `${start}`;
+}
+
+function readInt(args: Record<string, unknown> | undefined, ...keys: string[]): number | undefined {
+  if (!args) return undefined;
+  for (const key of keys) {
+    const value = args[key];
+    if (typeof value === "number" && Number.isInteger(value) && Number.isFinite(value))
+      return value;
+    if (typeof value === "string" && /^\d+$/.test(value.trim())) {
+      return Number.parseInt(value.trim(), 10);
+    }
+  }
+  return undefined;
 }
 
 function readArgsObject(payload: ToolCallPayload): Record<string, unknown> | undefined {
@@ -215,11 +273,14 @@ function mapAcpTool(
   const locations = payload.locations ?? [];
   const locationPath = pickAcpLocationPath(kind, locations);
   const titlePath = extractLeadingPath(title);
-  const path = locationPath ?? titlePath;
+  const argsPath = readPathArg(args);
+  const patchPath =
+    kind === "edit" || kind === "delete" ? extractAcpPatchTargetPath(payload) : undefined;
+  const path = locationPath ?? argsPath ?? patchPath ?? titlePath;
 
   switch (kind) {
     case "read":
-      return formatAcpPathDisplay("Read", path, title, Eye);
+      return formatReadPathDisplay(path, title, args, Eye);
     case "edit":
       return formatAcpPathDisplay("Edit", path, title, Pencil);
     case "delete":
@@ -243,6 +304,19 @@ function mapAcpTool(
     default:
       return null;
   }
+}
+
+function formatReadPathDisplay(
+  path: string | undefined,
+  title: string,
+  args: Record<string, unknown> | undefined,
+  Icon: LucideIcon,
+): ToolDisplay {
+  const verb = readVerb(args);
+  if (path) return withTarget(verb, path, Icon, { filePath: true });
+  if (title.length === 0) return { title: verb, Icon };
+  const readableTitle = title.replace(/^read(?:ing| file)?[:\s]+/i, "").trim() || title;
+  return { title: `${verb}: ${readableTitle}`, Icon };
 }
 
 interface McpInfo {
@@ -351,6 +425,19 @@ function readScope(args: Record<string, unknown> | undefined): string | undefine
     if (first) return first;
   }
   return undefined;
+}
+
+function readPathArg(args: Record<string, unknown> | undefined): string | undefined {
+  return readStr(
+    args,
+    "file_path",
+    "filePath",
+    "path",
+    "relative_path",
+    "relativePath",
+    "notebook_path",
+    "notebookPath",
+  );
 }
 
 function withTarget(

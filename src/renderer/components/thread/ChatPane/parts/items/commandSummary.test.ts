@@ -31,9 +31,41 @@ describe("summarizeShellCommand", () => {
 });
 
 describe("humanIntentTitle", () => {
-  it("describes Get-Content as read file", () => {
+  it("describes Get-Content as a file view", () => {
     const full = String.raw`cd C:\proj && pwsh -Command 'Get-Content src/shared/contracts/agentInstance.ts'`;
-    expect(humanIntentTitle(full)).toBe("Read file: agentInstance.ts");
+    expect(humanIntentTitle(full)).toBe("View: agentInstance.ts");
+    expect(commandIntentDisplay(full).parts).toEqual({
+      prefix: "View: ",
+      path: "src/shared/contracts/agentInstance.ts",
+      filePath: true,
+    });
+  });
+
+  it("describes PowerShell Get-Content -Path ranges", () => {
+    const full = String.raw`cd C:\Users\sdsle\work\lightcode && "C:\\Program Files\\WindowsApps\\Microsoft.PowerShell_7.6.1.0_x64__8wekyb3d8bbwe\\pwsh.exe" -Command 'Get-Content -Path src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx | Select-Object -Skip 550 -First 110'`;
+    const display = commandIntentDisplay(full);
+
+    expect(display.title).toBe(
+      "View 551:660: src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx",
+    );
+    expect(display.kind).toBe("view");
+    expect(display.parts).toEqual({
+      prefix: "View 551:660: ",
+      path: "src/renderer/components/thread/ChatPane/parts/items/ToolCallGroup.tsx",
+      filePath: true,
+    });
+  });
+
+  it("preserves Windows paths in PowerShell Get-Content -LiteralPath", () => {
+    const full = String.raw`pwsh -Command 'Get-Content -LiteralPath C:\Users\sdsle\work\lightcode\src\foo.ts'`;
+    const display = commandIntentDisplay(full);
+
+    expect(display.title).toBe("View: foo.ts");
+    expect(display.parts).toEqual({
+      prefix: "View: ",
+      path: String.raw`C:\Users\sdsle\work\lightcode\src\foo.ts`,
+      filePath: true,
+    });
   });
 
   it("uses Check: for lint/typecheck scripts", () => {

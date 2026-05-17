@@ -91,6 +91,26 @@ describe("deriveCodexStructuredState", () => {
     });
   });
 
+  it("preserves numeric server request ids", () => {
+    expect(
+      parseCodexSocketMessage({
+        jsonrpc: "2.0",
+        id: 0,
+        method: "item/commandExecution/requestApproval",
+        params: {
+          command: "pnpm test",
+        },
+      }),
+    ).toEqual({
+      kind: "request",
+      id: 0,
+      method: "item/commandExecution/requestApproval",
+      params: {
+        command: "pnpm test",
+      },
+    });
+  });
+
   it("treats id-only messages as JSON-RPC responses", () => {
     expect(
       parseCodexSocketMessage({
@@ -366,6 +386,84 @@ describe("CodexStructuredSession", () => {
         ],
       }),
     );
+  });
+
+  it("responds to numeric Codex app-server request ids with the original numeric id", async () => {
+    const structuredSession = Object.create(CodexStructuredSession.prototype) as Record<
+      string,
+      unknown
+    >;
+    const writes: unknown[] = [];
+    structuredSession["inboundRequests"] = new Map([
+      [
+        "0",
+        {
+          id: 0,
+          method: "item/commandExecution/requestApproval",
+          params: { command: "pnpm test" },
+        },
+      ],
+    ]);
+    structuredSession["transport"] = {
+      write: (message: unknown) => writes.push(message),
+    };
+
+    await (structuredSession as unknown as CodexStructuredSession).resolveServerRequest("0", {
+      optionId: "accept",
+    });
+
+    expect(writes).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: 0,
+        result: { decision: "accept" },
+      },
+    ]);
+  });
+
+  it("answers unsupported app-server requests instead of leaving Codex blocked", () => {
+    const structuredSession = Object.create(CodexStructuredSession.prototype) as Record<
+      string,
+      unknown
+    >;
+    const writes: unknown[] = [];
+    let listener:
+      | {
+          onMessage: (message: unknown) => void;
+        }
+      | undefined;
+    structuredSession["threadId"] = "local-thread";
+    structuredSession["isDisposed"] = false;
+    structuredSession["pendingRequests"] = new Map();
+    structuredSession["inboundRequests"] = new Map();
+    structuredSession["rejectPendingRequests"] = () => {};
+    structuredSession["transport"] = {
+      setListener: (next: typeof listener) => {
+        listener = next;
+      },
+      write: (message: unknown) => writes.push(message),
+    };
+
+    (structuredSession["attachTransportHandlers"] as () => void).call(structuredSession);
+    listener?.onMessage({
+      jsonrpc: "2.0",
+      id: "refresh-1",
+      method: "account/chatgptAuthTokens/refresh",
+      params: { reason: "unauthorized" },
+    });
+
+    expect(writes).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: "refresh-1",
+        error: {
+          code: -32601,
+          message:
+            'Unsupported Codex app-server request method "account/chatgptAuthTokens/refresh".',
+        },
+      },
+    ]);
+    expect((structuredSession["inboundRequests"] as Map<string, unknown>).size).toBe(0);
   });
 });
 

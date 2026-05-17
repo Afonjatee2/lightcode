@@ -52,7 +52,7 @@ type CodexSocketMessage =
     }
   | {
       kind: "request";
-      id: ThreadServerRequestId;
+      id: string | number;
       method: string;
       params?: Record<string, unknown>;
     }
@@ -354,7 +354,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
    */
   private readonly inboundRequests = new Map<
     string,
-    { method: string; params: Record<string, unknown> | undefined }
+    { id: string | number; method: string; params: Record<string, unknown> | undefined }
   >();
 
   private constructor(
@@ -794,7 +794,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       : response;
     this.transport.write({
       jsonrpc: "2.0",
-      id: requestId,
+      id: inbound?.id ?? requestId,
       result,
     });
   }
@@ -842,10 +842,6 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         }
 
         if (message.kind === "request") {
-          this.inboundRequests.set(String(message.id), {
-            method: message.method,
-            params: message.params,
-          });
           const canonical = mapCodexServerRequest(
             this.threadId,
             String(message.id),
@@ -853,11 +849,24 @@ export class CodexStructuredSession implements StructuredSessionHandle {
             message.params,
           );
           if (canonical) {
+            this.inboundRequests.set(String(message.id), {
+              id: message.id,
+              method: message.method,
+              params: message.params,
+            });
             this.emitRuntimeEvents([canonical]);
           } else {
             console.warn(
-              `[codex] no canonical mapping for app-server request method "${message.method}"; the agent will block until the request is answered.`,
+              `[codex] no canonical mapping for app-server request method "${message.method}"; replying method not found.`,
             );
+            this.transport.write({
+              jsonrpc: "2.0",
+              id: message.id,
+              error: {
+                code: -32601,
+                message: `Unsupported Codex app-server request method "${message.method}".`,
+              },
+            });
           }
           return;
         }

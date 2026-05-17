@@ -18,6 +18,9 @@ function readDiffSummaryInner(source: unknown): DiffSummary | undefined {
     readDiffSummaryRecord(record.diffSummary) ??
     readDiffSummaryRecord(record.diff_summary) ??
     readStructuredChangesDiffSummary(record.changes) ??
+    readPatchTextDiffSummary(record.patchText) ??
+    readPatchTextDiffSummary(record.patch_text) ??
+    readPatchTextDiffSummary(record.patch) ??
     readDiffSummaryRecord(record)
   );
 }
@@ -48,6 +51,9 @@ function readFileChangePathInner(source: unknown): string | undefined {
     return (
       readPathField(record) ??
       readFirstStructuredChangePath(record.changes) ??
+      readPatchTextPath(record.patchText) ??
+      readPatchTextPath(record.patch_text) ??
+      readPatchTextPath(record.patch) ??
       readFileChangePathInner(record.args) ??
       readFileChangePathInner(record.input) ??
       readFileChangePathInner(record.rawInput) ??
@@ -80,6 +86,15 @@ function readFileChangePathInner(source: unknown): string | undefined {
     if (path) return path.trim();
   }
   return undefined;
+}
+
+function readPatchTextPath(source: unknown): string | undefined {
+  if (typeof source !== "string") return undefined;
+  const paths = [...source.matchAll(/^\*\*\*\s+(?:Add|Update|Delete)\s+File:\s+(.+?)\s*$/gm)]
+    .map((match) => match[1]?.trim())
+    .filter((path): path is string => !!path);
+  const uniquePaths = new Set(paths);
+  return uniquePaths.size === 1 ? paths[0] : undefined;
 }
 
 function readPathField(record: Record<string, unknown>): string | undefined {
@@ -137,6 +152,24 @@ function readStructuredChangesDiffSummary(changes: unknown): DiffSummary | undef
       if (line.startsWith("+++") || line.startsWith("---")) continue;
       if (line.startsWith("+")) added++;
       else if (line.startsWith("-")) removed++;
+    }
+  }
+  return sawDiff ? { added, removed } : undefined;
+}
+
+function readPatchTextDiffSummary(source: unknown): DiffSummary | undefined {
+  if (typeof source !== "string") return undefined;
+  let added = 0;
+  let removed = 0;
+  let sawDiff = false;
+  for (const line of source.split(/\r?\n/)) {
+    if (line.startsWith("+++") || line.startsWith("---")) continue;
+    if (line.startsWith("+")) {
+      added += 1;
+      sawDiff = true;
+    } else if (line.startsWith("-")) {
+      removed += 1;
+      sawDiff = true;
     }
   }
   return sawDiff ? { added, removed } : undefined;

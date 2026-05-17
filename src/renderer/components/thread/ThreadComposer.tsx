@@ -151,6 +151,7 @@ export function ThreadComposer(props: {
   submitLabel: string;
   submitDisabled: boolean;
   stopPending?: boolean;
+  preserveDisabledControlStyle?: boolean;
   onPromptChange: (value: string) => void;
   onSubmit: () => void;
   onStop?: (() => void) | undefined;
@@ -173,6 +174,7 @@ export function ThreadComposer(props: {
     submitLabel,
     submitDisabled,
     stopPending = false,
+    preserveDisabledControlStyle = false,
     onPromptChange,
     onSubmit,
     onStop,
@@ -270,6 +272,16 @@ export function ThreadComposer(props: {
   const toolbarClassName = compact
     ? "lightcode-composer-toolbar lightcode-composer-toolbar--compact relative flex items-end justify-between gap-3"
     : "lightcode-composer-toolbar relative flex items-end justify-between gap-3";
+  const shellClassName = [
+    "lightcode-composer-shell",
+    variant === "draft" && "lightcode-composer-shell--draft",
+    variant !== "draft" &&
+      preserveDisabledControlStyle &&
+      "lightcode-composer-shell--preserve-disabled-controls",
+    "overflow-hidden",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const renderControlItem = (
     control: ComposerControl,
@@ -561,13 +573,7 @@ export function ThreadComposer(props: {
 
   return (
     <div>
-      <div
-        className={
-          variant === "draft"
-            ? "lightcode-composer-shell lightcode-composer-shell--draft overflow-hidden"
-            : "lightcode-composer-shell overflow-hidden"
-        }
-      >
+      <div className={shellClassName}>
         {fixedContent}
         {attachmentBar}
         <div ref={editorHostRef}>{renderEditor()}</div>

@@ -27,6 +27,7 @@ import { randomUUID } from "node:crypto";
 import type {
   CanonicalItemType,
   CanonicalRequestType,
+  PermissionRequestDetails,
   RuntimeContentStreamKind,
   RuntimeEvent,
   UserInputOption,
@@ -63,6 +64,8 @@ export interface CodexMapperState {
   fileChangePathMap: Map<string, string>;
   /** Current chat item that mirrors the provider's active goal state. */
   goalItemId?: string;
+  /** Current plan item sourced from `turn/plan/updated` notifications. */
+  turnPlanItemId?: string;
 }
 
 export function createCodexMapperState(threadId: string): CodexMapperState {
@@ -96,7 +99,10 @@ export function canonicalTypeFor(raw: string | undefined | null): CanonicalItemT
   if (type.includes("file change") || type.includes("patch") || type.includes("edit"))
     return "file_change";
   if (type.includes("web search")) return "web_search";
-  if (type.includes("mcp") || type.includes("tool") || type.includes("dynamic")) return "tool_call";
+  if (type.includes("mcp")) return "mcp_tool_call";
+  if (type.includes("image")) return "image_view";
+  if (type.includes("dynamic")) return "dynamic_tool_call";
+  if (type.includes("tool")) return "tool_call";
   if (type.includes("error")) return "error";
   return "tool_call";
 }
@@ -203,10 +209,74 @@ function readItemId(
   return undefined;
 }
 
-function isInterruptedTurn(params: Record<string, unknown> | undefined): boolean {
+function readTurnState(
+  method: string,
+  params: Record<string, unknown> | undefined,
+): "completed" | "failed" | "interrupted" | "cancelled" {
+  if (method === "turn/aborted") return "interrupted";
   const turn = params?.turn;
-  if (!turn || typeof turn !== "object" || !("status" in turn)) return false;
-  return (turn as Record<string, unknown>).status === "interrupted";
+  const status = turn && typeof turn === "object" ? (turn as Record<string, unknown>).status : null;
+  switch (status) {
+    case "failed":
+      return "failed";
+    case "interrupted":
+      return "interrupted";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "completed";
+  }
+}
+
+function readCodexErrorMessage(params: Record<string, unknown> | undefined): string | undefined {
+  const direct =
+    readStringField(params?.message) ?? readStringField(params?.errorMessage) ?? undefined;
+  if (direct) return direct;
+  const error = params?.error;
+  if (error && typeof error === "object") {
+    const message = readStringField((error as Record<string, unknown>).message);
+    if (message) return message;
+  }
+  const turn = params?.turn;
+  if (turn && typeof turn === "object") {
+    const turnError = (turn as Record<string, unknown>).error;
+    if (turnError && typeof turnError === "object") {
+      const message = readStringField((turnError as Record<string, unknown>).message);
+      if (message) return message;
+    }
+  }
+  return undefined;
+}
+
+function readCodexPlanSteps(
+  params: Record<string, unknown> | undefined,
+): Array<{ step: string; status: "pending" | "in_progress" | "completed" }> {
+  const rawPlan = params?.plan;
+  if (!Array.isArray(rawPlan)) return [];
+  return rawPlan.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const record = entry as Record<string, unknown>;
+    const step = readStringField(record.step)?.trim();
+    if (!step) return [];
+    return [
+      {
+        step,
+        status: codexPlanStepStatus(record.status),
+      },
+    ];
+  });
+}
+
+function codexPlanStepStatus(raw: unknown): "pending" | "in_progress" | "completed" {
+  switch (raw) {
+    case "completed":
+      return "completed";
+    case "inProgress":
+    case "in_progress":
+      return "in_progress";
+    default:
+      return "pending";
+  }
 }
 
 function createCodexContextUsageEvent(
@@ -370,12 +440,25 @@ export function mapCodexNotification(
       });
       delete state.openAssistantItemId;
     }
+    if (state.turnPlanItemId) {
+      events.push({
+        type: "item.completed",
+        threadId,
+        itemId: state.turnPlanItemId,
+      });
+      delete state.turnPlanItemId;
+    }
     const turnId = state.currentTurnId ?? readTurnId(params) ?? `t-${Date.now()}`;
+    const turnState = readTurnState(method, params);
+    const errorMessage = turnState === "failed" ? readCodexErrorMessage(params) : undefined;
+    if (errorMessage) {
+      events.push({ type: "error", threadId, message: errorMessage });
+    }
     events.push({
       type: "turn.completed",
       threadId,
       turnId,
-      state: method === "turn/aborted" || isInterruptedTurn(params) ? "interrupted" : "completed",
+      state: turnState,
     });
     delete state.currentTurnId;
     state.itemIdMap.clear();
@@ -386,9 +469,44 @@ export function mapCodexNotification(
     return events;
   }
 
-  if (method === "thread/error") {
-    const message = String((params?.message as string | undefined) ?? "Codex thread error");
+  if (method === "thread/error" || method === "error") {
+    const message = readCodexErrorMessage(params) ?? "Codex thread error";
     return [{ type: "error", threadId, message }];
+  }
+
+  if (method === "serverRequest/resolved") {
+    const requestId =
+      typeof params?.requestId === "string" || typeof params?.requestId === "number"
+        ? String(params.requestId)
+        : undefined;
+    return requestId
+      ? [{ type: "request.resolved", threadId, requestId, outcome: "answered" }]
+      : [];
+  }
+
+  if (method === "turn/plan/updated") {
+    const steps = readCodexPlanSteps(params);
+    if (steps.length === 0) return [];
+    if (!state.turnPlanItemId) {
+      state.turnPlanItemId = newItemId("plan");
+      return [
+        {
+          type: "item.started",
+          threadId,
+          itemId: state.turnPlanItemId,
+          itemType: "plan",
+          payload: { steps },
+        },
+      ];
+    }
+    return [
+      {
+        type: "item.updated",
+        threadId,
+        itemId: state.turnPlanItemId,
+        payload: { steps },
+      },
+    ];
   }
 
   if (method === "thread/goal/updated") {
@@ -607,6 +725,24 @@ export function mapCodexNotification(
     ];
   }
 
+  if (method === "item/mcpToolCall/progress") {
+    const codexItemId = readItemId(params);
+    const internalId = codexItemId ? state.itemIdMap.get(codexItemId) : undefined;
+    const message = readStringField(params?.message);
+    if (!internalId || !message) return [];
+    return [
+      {
+        type: "item.updated",
+        threadId,
+        itemId: internalId,
+        payload: {
+          status: "running",
+          progress: { summary: message },
+        },
+      },
+    ];
+  }
+
   return [];
 }
 
@@ -672,7 +808,7 @@ export function buildStartedPayload(
     const text = extractMessageText(source);
     return { content: text.length > 0 ? [{ kind: "text", text }] : [] };
   }
-  if (itemType === "tool_call") {
+  if (isToolLikeItemType(itemType)) {
     const args = pickToolInput(source);
     return {
       name: toolName(source) ?? "tool",
@@ -709,7 +845,7 @@ export function buildCompletedPayload(
       ...(typeof source.durationMs === "number" ? { durationMs: source.durationMs } : {}),
     };
   }
-  if (itemType === "tool_call") {
+  if (isToolLikeItemType(itemType)) {
     const result = pickToolOutput(source);
     return {
       status: codexFinalStatus(source.status),
@@ -750,6 +886,15 @@ export function buildCompletedPayload(
     };
   }
   return undefined;
+}
+
+function isToolLikeItemType(itemType: CanonicalItemType): boolean {
+  return (
+    itemType === "tool_call" ||
+    itemType === "mcp_tool_call" ||
+    itemType === "image_view" ||
+    itemType === "dynamic_tool_call"
+  );
 }
 
 function readCommandAggregatedOutput(
@@ -995,8 +1140,10 @@ export function extractMessageText(item: CodexItemPayload): string {
 }
 
 const CODEX_APPROVAL_METHODS = new Set([
+  "item/fileRead/requestApproval",
   "item/fileChange/requestApproval",
   "applyPatchApproval",
+  "execCommandApproval",
   "item/tool/requestApproval",
   "item/commandExecution/requestApproval",
   "item/permissions/requestApproval",
@@ -1007,20 +1154,52 @@ const CODEX_FORM_METHODS = new Set(["mcpServer/elicitation/request", "item/tool/
 function decisionLabel(decision: string): string {
   switch (decision) {
     case "accept":
-      return "Approve";
+      return "Allow";
     case "acceptForSession":
-      return "Approve for session";
+      return "Allow always";
     case "decline":
-      return "Decline";
     case "cancel":
-      return "Cancel";
+      return "Deny";
     default:
       return decision;
   }
 }
 
+function codexDecisionOptions(decisions: readonly string[]): UserInputOption[] {
+  const hasDecline = decisions.includes("decline");
+  return decisions
+    .filter((decision) => decision !== "cancel" || !hasDecline)
+    .map((decision) => ({
+      optionId: decision,
+      label: decisionLabel(decision),
+    }));
+}
+
+function readAvailableDecisions(
+  params: Record<string, unknown> | undefined,
+  fallback: readonly string[],
+): string[] {
+  return Array.isArray(params?.availableDecisions)
+    ? (params.availableDecisions as unknown[]).filter((d): d is string => typeof d === "string")
+    : [...fallback];
+}
+
 function readStringField(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function codexPermissionDetails(input: {
+  toolName: string;
+  displayName?: string;
+  toolInput?: unknown;
+  reason?: string;
+}): PermissionRequestDetails {
+  return {
+    toolName: input.toolName,
+    ...(input.displayName ? { displayName: input.displayName } : {}),
+    ...(input.toolInput !== undefined ? { input: input.toolInput } : {}),
+    ...(input.reason ? { decisionReason: input.reason } : {}),
+  };
 }
 
 /**
@@ -1093,7 +1272,12 @@ export function mapCodexServerRequest(
       requestType: "command_execution_approval" satisfies CanonicalRequestType,
       payload: {
         summary: reason ?? "Permissions requested",
-        details: { permissions: params?.permissions },
+        details: codexPermissionDetails({
+          toolName: "permissions",
+          displayName: "Permissions",
+          toolInput: { permissions: params?.permissions },
+          ...(reason ? { reason } : {}),
+        }),
         options: [
           { optionId: "turn", label: "Allow this turn" },
           { optionId: "session", label: "Allow for session" },
@@ -1104,31 +1288,88 @@ export function mapCodexServerRequest(
 
   if (method === "item/commandExecution/requestApproval") {
     const command = readStringField(params?.command) ?? "command";
-    const decisions = Array.isArray(params?.availableDecisions)
-      ? (params.availableDecisions as unknown[]).filter((d): d is string => typeof d === "string")
-      : ["accept", "acceptForSession", "decline", "cancel"];
+    const decisions = readAvailableDecisions(params, [
+      "accept",
+      "acceptForSession",
+      "decline",
+      "cancel",
+    ]);
     return {
       type: "request.opened",
       threadId,
       requestId,
       requestType: "command_execution_approval" satisfies CanonicalRequestType,
       payload: {
-        summary: command,
-        details: {
-          command,
-          cwd: readStringField(params?.cwd),
-          reason,
-        },
-        options: decisions.map((d) => ({
-          optionId: d,
-          label: decisionLabel(d),
-        })) satisfies UserInputOption[],
+        summary: reason ?? "Run command",
+        details: codexPermissionDetails({
+          toolName: "command_execution",
+          displayName: "Run",
+          toolInput: {
+            command,
+            ...(readStringField(params?.cwd) ? { cwd: readStringField(params?.cwd) } : {}),
+          },
+          ...(reason ? { reason } : {}),
+        }),
+        options: codexDecisionOptions(decisions),
+      },
+    };
+  }
+
+  if (method === "execCommandApproval") {
+    const command = Array.isArray(params?.command)
+      ? (params.command as unknown[]).filter((part): part is string => typeof part === "string")
+      : [];
+    return {
+      type: "request.opened",
+      threadId,
+      requestId,
+      requestType: "command_execution_approval" satisfies CanonicalRequestType,
+      payload: {
+        summary: reason ?? "Run command",
+        details: codexPermissionDetails({
+          toolName: "command_execution",
+          displayName: "Run",
+          toolInput: {
+            command: command.length > 0 ? command.join(" ") : "command",
+            ...(readStringField(params?.cwd) ? { cwd: readStringField(params?.cwd) } : {}),
+          },
+          ...(reason ? { reason } : {}),
+        }),
+        options: codexDecisionOptions(["accept", "acceptForSession", "decline", "cancel"]),
+      },
+    };
+  }
+
+  if (method === "item/fileRead/requestApproval") {
+    return {
+      type: "request.opened",
+      threadId,
+      requestId,
+      requestType: "file_read_approval" satisfies CanonicalRequestType,
+      payload: {
+        summary: reason ?? "Read file",
+        details: codexPermissionDetails({
+          toolName: "file_read",
+          displayName: "Read file",
+          toolInput: {
+            ...(readStringField(params?.path) ? { path: readStringField(params?.path) } : {}),
+            ...(readStringField(params?.cwd) ? { cwd: readStringField(params?.cwd) } : {}),
+          },
+          ...(reason ? { reason } : {}),
+        }),
+        options: codexDecisionOptions(["accept", "decline", "cancel"]),
       },
     };
   }
 
   if (method === "item/fileChange/requestApproval" || method === "applyPatchApproval") {
     const summary = reason ?? "File changes need approval";
+    const decisions = readAvailableDecisions(params, [
+      "accept",
+      "acceptForSession",
+      "decline",
+      "cancel",
+    ]);
     return {
       type: "request.opened",
       threadId,
@@ -1136,17 +1377,22 @@ export function mapCodexServerRequest(
       requestType: "file_change_approval" satisfies CanonicalRequestType,
       payload: {
         summary,
-        details: {
-          command: readStringField(params?.command),
-          cwd: readStringField(params?.cwd),
-          grantRoot: readStringField(params?.grantRoot),
-        },
-        options: [
-          { optionId: "accept", label: "Approve" },
-          { optionId: "acceptForSession", label: "Approve for session" },
-          { optionId: "decline", label: "Decline" },
-          { optionId: "cancel", label: "Cancel" },
-        ] satisfies UserInputOption[],
+        details: codexPermissionDetails({
+          toolName: "file_change",
+          displayName: "Edit files",
+          toolInput: {
+            ...(readStringField(params?.command)
+              ? { command: readStringField(params?.command) }
+              : {}),
+            ...(readStringField(params?.cwd) ? { cwd: readStringField(params?.cwd) } : {}),
+            ...(readStringField(params?.grantRoot)
+              ? { grantRoot: readStringField(params?.grantRoot) }
+              : {}),
+            ...(params?.fileChanges !== undefined ? { fileChanges: params.fileChanges } : {}),
+          },
+          ...(reason ? { reason } : {}),
+        }),
+        options: codexDecisionOptions(decisions),
       },
     };
   }
@@ -1159,14 +1405,14 @@ export function mapCodexServerRequest(
     requestId,
     requestType: "command_execution_approval" satisfies CanonicalRequestType,
     payload: {
-      summary: approvalToolName ?? "Tool requested",
-      details: { input: params?.input, reason },
-      options: [
-        { optionId: "accept", label: "Approve" },
-        { optionId: "acceptForSession", label: "Approve for session" },
-        { optionId: "decline", label: "Decline" },
-        { optionId: "cancel", label: "Cancel" },
-      ] satisfies UserInputOption[],
+      summary: approvalToolName ? `${approvalToolName} needs approval` : "Tool requested",
+      details: codexPermissionDetails({
+        toolName: approvalToolName ?? "tool",
+        ...(approvalToolName ? { displayName: approvalToolName } : {}),
+        toolInput: params?.input,
+        ...(reason ? { reason } : {}),
+      }),
+      options: codexDecisionOptions(["accept", "acceptForSession", "decline", "cancel"]),
     },
   };
 }

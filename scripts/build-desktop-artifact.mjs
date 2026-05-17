@@ -48,6 +48,7 @@ const RUNTIME_DEPS = [
 
 // devDependencies the stage needs to run electron-builder + rebuild natives.
 const STAGE_DEV_DEPS = ["electron", "electron-builder", "@electron/rebuild"];
+const { PACKAGED_DIST_DIRS, PACKAGED_DIST_FILES } = channelTable;
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -181,6 +182,14 @@ function copyDir(from, to) {
   cpSync(from, to, { recursive: true });
 }
 
+function copyPackagedDist(stageRoot) {
+  const stageDistRoot = join(stageRoot, "dist");
+  mkdirSync(stageDistRoot, { recursive: true });
+  for (const dir of PACKAGED_DIST_DIRS) {
+    copyDir(resolve(repoRoot, "dist", dir), join(stageDistRoot, dir));
+  }
+}
+
 // The Claude Agent SDK lists `@anthropic-ai/claude-agent-sdk-<plat>-<arch>` as
 // optionalDependencies — each platform pack contains a ~200 MB precompiled
 // SEA binary of the `claude` CLI. The asar exclusion in the staged
@@ -259,7 +268,7 @@ async function main() {
 
   try {
     // 3. Copy build artifacts.
-    copyDir(resolve(repoRoot, "dist"), join(stageRoot, "dist"));
+    copyPackagedDist(stageRoot);
     copyDir(resolve(repoRoot, "build"), join(stageRoot, "build"));
     copyDir(resolve(repoRoot, "resources"), join(stageRoot, "resources"));
 
@@ -338,6 +347,9 @@ function buildElectronBuilderConfig() {
   const prefix = channelTable.artifactPrefixFor(channel);
   const iconSuffix = channel === "nightly" ? "-nightly" : "";
   const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
+  const packagedDistFilesYaml = PACKAGED_DIST_FILES.map((glob) =>
+    glob.startsWith("!") ? `  - "${glob}"` : `  - ${glob}`,
+  ).join("\n");
 
   return `appId: ${appId}
 productName: ${productName}
@@ -348,8 +360,7 @@ directories:
   buildResources: build
 
 files:
-  - dist/**/*
-  - "!dist/**/*.map"
+${packagedDistFilesYaml}
   - package.json
   - node_modules/**/*
   # The SDK's optionalDependencies include a 200+MB precompiled \`claude\` SEA

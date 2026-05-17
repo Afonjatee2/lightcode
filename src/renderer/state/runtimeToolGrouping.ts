@@ -27,11 +27,20 @@ function getRuntimeToolEditTarget(item: RuntimeChatItem): string | null | undefi
     const payload = item.payload as Partial<FileChangePayload> | undefined;
     return normalizeEditPath(payload?.path) ?? null;
   }
-  if (item.type !== "tool_call") return undefined;
+  if (!isToolPayloadItem(item)) return undefined;
 
   const payload = item.payload as Partial<ToolCallPayload> | undefined;
   if (!payload || !isEditToolPayload(payload)) return undefined;
   return readEditToolPath(payload) ?? null;
+}
+
+function isToolPayloadItem(item: RuntimeChatItem): boolean {
+  return (
+    item.type === "tool_call" ||
+    item.type === "mcp_tool_call" ||
+    item.type === "image_view" ||
+    item.type === "dynamic_tool_call"
+  );
 }
 
 function isEditToolPayload(payload: Partial<ToolCallPayload>): boolean {

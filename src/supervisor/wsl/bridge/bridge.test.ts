@@ -1,5 +1,13 @@
-import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from "node:fs";
+import { execFileSync, spawn, type ChildProcess } from "node:child_process";
+import {
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
@@ -188,4 +196,42 @@ describeOnPosix("bridge.mjs fs endpoints", () => {
     expect(link?.type).toBe("symlink");
     expect(link?.isDirectoryLink).toBe(true);
   });
+
+  it("creates git checkpoint snapshots inside the bridge process", async () => {
+    git(projectRoot, "init");
+    git(projectRoot, "config", "user.email", "test@example.com");
+    git(projectRoot, "config", "user.name", "Lightcode Test");
+    git(projectRoot, "add", "README.md");
+    git(projectRoot, "commit", "-m", "init");
+    writeFileSync(join(projectRoot, "README.md"), "after");
+    writeFileSync(join(projectRoot, "new.txt"), "new");
+
+    const metadata = {
+      threadId: "thread-1",
+      checkpointItemId: "user-1",
+      capturedAt: "2026-05-16T00:00:00.000Z",
+      ref: "refs/lightcode/checkpoints/dGhyZWFkLTE/dXNlci0x",
+    };
+    const { status, body } = await post(`${bridge.baseUrl}/v1/git/checkpoint-snapshot`, {
+      projectRoot,
+      ref: metadata.ref,
+      metadata,
+    });
+
+    expect(status).toBe(200);
+    const envelope = body as { ok: boolean; data: { commit: string } };
+    expect(envelope.ok).toBe(true);
+    const commit = envelope.data.commit;
+    expect(git(projectRoot, "rev-parse", "--verify", metadata.ref).trim()).toBe(commit);
+    git(projectRoot, "read-tree", "--reset", "-u", metadata.ref);
+    expect(readFileSync(join(projectRoot, "README.md"), "utf8")).toBe("after");
+    expect(readFileSync(join(projectRoot, "new.txt"), "utf8")).toBe("new");
+    expect(
+      readdirSync(join(projectRoot, ".git")).some((name) => name.startsWith("index.lightcode-")),
+    ).toBe(false);
+  });
 });
+
+function git(cwd: string, ...args: string[]): string {
+  return execFileSync("git", args, { cwd, encoding: "utf8" });
+}

@@ -33,31 +33,29 @@ export function DeleteWorktreeDialog(props: {
 
   return (
     <AlertDialog.Backdrop isOpen={props.isOpen} onOpenChange={(open) => !open && props.onClose()}>
-      <AlertDialog.Container>
-        <AlertDialog.Dialog>
-          <AlertDialog.Header>
-            <AlertDialog.Icon status="danger" />
+      <AlertDialog.Container size="sm">
+        <AlertDialog.Dialog className="sm:max-w-[420px] !p-4">
+          <AlertDialog.Header className="gap-1">
             <AlertDialog.Heading>Delete thread?</AlertDialog.Heading>
+            <p className="text-sm leading-5 text-muted">
+              This thread uses worktree{" "}
+              <strong className="font-medium text-foreground">{props.worktreeBranch}</strong>. Also
+              remove the worktree directory?
+            </p>
           </AlertDialog.Header>
           <AlertDialog.Body>
-            <p>
-              This thread uses worktree <strong>{props.worktreeBranch}</strong>. Also remove the
-              worktree directory?
-            </p>
-            <div className="mt-3">
-              <Checkbox isSelected={dontAskAgain} onChange={setDontAskAgain}>
-                <Checkbox.Control>
-                  <Checkbox.Indicator />
-                </Checkbox.Control>
-                Don&apos;t ask again
-              </Checkbox>
-            </div>
+            <Checkbox isSelected={dontAskAgain} onChange={setDontAskAgain}>
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              Don&apos;t ask again
+            </Checkbox>
           </AlertDialog.Body>
           <AlertDialog.Footer>
-            <Button slot="close" variant="tertiary">
+            <Button slot="close" variant="ghost" className="text-muted">
               Cancel
             </Button>
-            <Button variant="secondary" onPress={handleThreadOnly}>
+            <Button variant="tertiary" className="text-warning" onPress={handleThreadOnly}>
               Thread Only
             </Button>
             <Button variant="danger" onPress={handleThreadAndWorktree}>

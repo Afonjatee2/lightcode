@@ -20,6 +20,9 @@ export const canonicalItemTypeSchema = z.enum([
   "command_execution",
   "file_change",
   "tool_call",
+  "mcp_tool_call",
+  "image_view",
+  "dynamic_tool_call",
   "web_search",
   "error",
 ]);
@@ -27,6 +30,7 @@ export type CanonicalItemType = z.infer<typeof canonicalItemTypeSchema>;
 
 export const canonicalRequestTypeSchema = z.enum([
   "command_execution_approval",
+  "file_read_approval",
   "file_change_approval",
   "apply_patch_approval",
   "tool_user_input",

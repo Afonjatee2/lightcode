@@ -100,7 +100,7 @@ export async function extractContextFromScrollback(
   effort?: string,
   signal?: AbortSignal,
 ): Promise<ExtractContextResult> {
-  if (!adapter.buildOneShotCommand) {
+  if (!adapter.runOneShot && !adapter.buildOneShotCommand) {
     throw new Error(
       `${adapter.label} does not support one-shot commands for scrollback extraction`,
     );

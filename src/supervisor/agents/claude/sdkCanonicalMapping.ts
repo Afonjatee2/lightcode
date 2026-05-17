@@ -25,6 +25,17 @@ import {
   startGoalItemEvents,
   updateGoalItemEvents,
 } from "../goalRuntime";
+import {
+  closePlanAggregator,
+  createPlanAggregator,
+  registerPlanTaskId,
+  removePlanTask,
+  replaceAllPlanTasks,
+  resolvePlanTaskKey,
+  upsertPlanTask,
+  type PlanAggregatorState,
+  type PlanStepStatus,
+} from "../planAggregator";
 
 interface TextItemState {
   itemId: string;
@@ -34,6 +45,8 @@ interface TextItemState {
   messageId?: string;
 }
 
+type PlanAggregatorRole = "TodoWrite" | "TaskCreate" | "TaskUpdate" | "TaskStop";
+
 interface ToolItemState {
   itemId: string;
   itemType: CanonicalItemType;
@@ -42,6 +55,13 @@ interface ToolItemState {
   partialInputJson: string;
   lastInputFingerprint?: string;
   progress?: ToolCallProgress;
+  /**
+   * Tool calls handled by the plan aggregator are tracked in `toolItemsById`
+   * for tool_result correlation, but their `item.started`/`item.updated`/
+   * `item.completed` events are suppressed — the aggregator emits the
+   * canonical `plan` item events instead.
+   */
+  planAggregatorRole?: PlanAggregatorRole;
 }
 
 export interface ClaudeMapperState {
@@ -57,6 +77,7 @@ export interface ClaudeMapperState {
   activeGoalItemId?: string;
   activeGoalObjective?: string;
   activeGoalStartedAtMs?: number;
+  planAggregator?: PlanAggregatorState;
 }
 
 export function createClaudeMapperState(threadId: string): ClaudeMapperState {
@@ -215,7 +236,10 @@ function completeTextItem(
   events.push({ type: "item.completed", threadId: state.threadId, itemId: item.itemId });
 }
 
-export function closeClaudeOpenItems(state: ClaudeMapperState): RuntimeEvent[] {
+export function closeClaudeOpenItems(
+  state: ClaudeMapperState,
+  options?: { closePlan?: boolean },
+): RuntimeEvent[] {
   const events: RuntimeEvent[] = [];
   for (const item of state.assistantTextItems.values()) {
     completeTextItem(state, item, "assistant_text", events);
@@ -224,6 +248,9 @@ export function closeClaudeOpenItems(state: ClaudeMapperState): RuntimeEvent[] {
     completeTextItem(state, item, "reasoning_text", events);
   }
   for (const tool of state.toolItemsByIndex.values()) {
+    // Plan-aggregated tools never emitted item.started; their lifecycle is
+    // owned by the aggregator's plan item, which persists across turns.
+    if (tool.planAggregatorRole) continue;
     events.push({
       type: "item.completed",
       threadId: state.threadId,
@@ -235,6 +262,9 @@ export function closeClaudeOpenItems(state: ClaudeMapperState): RuntimeEvent[] {
   state.reasoningItems.clear();
   state.toolItemsByIndex.clear();
   state.toolItemsById.clear();
+  if (options?.closePlan && state.planAggregator) {
+    events.push(...closePlanAggregator(state.planAggregator));
+  }
   return events;
 }
 
@@ -243,14 +273,46 @@ const ASK_USER_QUESTION_TOOL_NAME = "AskUserQuestion";
 function classifyToolItemType(toolName: string): CanonicalItemType {
   const name = toolName.toLowerCase();
   if (name === "todowrite" || name.includes("todo")) return "plan";
-  if (/(^|[_-])(bash|shell|command)($|[_-])/.test(name)) return "command_execution";
-  if (/(^|[_-])(edit|write|patch|multiedit|notebookedit)($|[_-])/.test(name)) {
+  if (
+    name === "task" ||
+    name === "agent" ||
+    name.includes("subagent") ||
+    name.includes("sub-agent")
+  ) {
+    return "tool_call";
+  }
+  if (
+    name === "exitplanmode" ||
+    name === "exit_plan_mode" ||
+    name === "enterplanmode" ||
+    name === "enter_plan_mode"
+  ) {
+    return "tool_call";
+  }
+  if (
+    name.includes("bash") ||
+    name.includes("shell") ||
+    name.includes("command") ||
+    name.includes("terminal")
+  ) {
+    return "command_execution";
+  }
+  if (
+    name === "edit" ||
+    name === "write" ||
+    name === "multiedit" ||
+    name === "notebookedit" ||
+    name.includes("patch") ||
+    name.includes("replace")
+  ) {
     return "file_change";
   }
-  if (name.includes("websearch") || name.includes("webfetch") || name.includes("search")) {
+  if (name === "websearch" || name === "webfetch") {
     return "web_search";
   }
-  return "tool_call";
+  if (name.includes("mcp")) return "mcp_tool_call";
+  if (name.includes("image")) return "image_view";
+  return "dynamic_tool_call";
 }
 
 function createToolItemState(input: {
@@ -260,6 +322,7 @@ function createToolItemState(input: {
 }): ToolItemState {
   const fingerprint =
     Object.keys(input.input).length > 0 ? inputFingerprint(input.input) : undefined;
+  const planAggregatorRole = classifyPlanAggregatorRole(input.toolName);
   return {
     itemId: input.itemId,
     itemType: classifyToolItemType(input.toolName),
@@ -267,7 +330,153 @@ function createToolItemState(input: {
     input: input.input,
     partialInputJson: "",
     ...(fingerprint ? { lastInputFingerprint: fingerprint } : {}),
+    ...(planAggregatorRole ? { planAggregatorRole } : {}),
   };
+}
+
+function classifyPlanAggregatorRole(toolName: string): PlanAggregatorRole | undefined {
+  switch (toolName) {
+    case "TodoWrite":
+      return "TodoWrite";
+    case "TaskCreate":
+      return "TaskCreate";
+    case "TaskUpdate":
+      return "TaskUpdate";
+    case "TaskStop":
+      return "TaskStop";
+    default:
+      return undefined;
+  }
+}
+
+function ensurePlanAggregator(state: ClaudeMapperState): PlanAggregatorState {
+  if (!state.planAggregator) {
+    state.planAggregator = createPlanAggregator(state.threadId, `plan-${state.threadId}`);
+  }
+  return state.planAggregator;
+}
+
+function readPlanStepStatus(value: unknown): PlanStepStatus | undefined {
+  if (value === "pending" || value === "in_progress" || value === "completed") return value;
+  return undefined;
+}
+
+/**
+ * Translate the input of a Task / TodoWrite tool_use into aggregator events.
+ * Called both at start time (when `block.input` is populated up front) and
+ * after `input_json_delta` finishes streaming a partial payload. Idempotent —
+ * the aggregator's no-op detection swallows repeat calls.
+ */
+function applyPlanAggregatorInput(state: ClaudeMapperState, tool: ToolItemState): RuntimeEvent[] {
+  const aggregator = ensurePlanAggregator(state);
+  switch (tool.planAggregatorRole) {
+    case "TodoWrite":
+      return replaceAllPlanTasks(aggregator, extractTodoWriteTasks(tool.input));
+    case "TaskCreate": {
+      const description = readTaskCreateDescription(tool.input);
+      if (!description) return [];
+      return upsertPlanTask(aggregator, tool.itemId, {
+        description,
+        status: "pending",
+      });
+    }
+    case "TaskUpdate": {
+      const taskId =
+        readStringField(tool.input, "taskId") ?? readStringField(tool.input, "task_id");
+      if (!taskId) return [];
+      const status = readPlanStepStatus(tool.input.status);
+      const isDeleted = tool.input.status === "deleted";
+      const description =
+        readStringField(tool.input, "subject") ?? readStringField(tool.input, "description");
+      const key = resolvePlanTaskKey(aggregator, taskId) ?? `task:${taskId}`;
+      if (isDeleted) return removePlanTask(aggregator, key);
+      const fields: { description?: string; status?: PlanStepStatus } = {};
+      if (description) fields.description = description;
+      if (status) fields.status = status;
+      if (!fields.description && !fields.status) return [];
+      return upsertPlanTask(aggregator, key, fields);
+    }
+    case "TaskStop": {
+      const taskId =
+        readStringField(tool.input, "taskId") ?? readStringField(tool.input, "task_id");
+      if (!taskId) return [];
+      const key = resolvePlanTaskKey(aggregator, taskId);
+      if (!key) return [];
+      return upsertPlanTask(aggregator, key, { status: "completed" });
+    }
+    default:
+      return [];
+  }
+}
+
+/**
+ * When a TaskCreate tool_result arrives, parse the runtime-assigned task_id
+ * out of the response (formats vary across hosts — Anthropic's "Task #N
+ * created successfully" string and a JSON `{task_id|taskId|id}` are both
+ * accepted) and register it against the aggregator so later TaskUpdate calls
+ * referencing that id land on the same entry.
+ */
+function bindTaskCreateResult(
+  state: ClaudeMapperState,
+  tool: ToolItemState,
+  resultText: string,
+): void {
+  const taskId = parseTaskIdFromResult(resultText);
+  if (!taskId) return;
+  const aggregator = ensurePlanAggregator(state);
+  registerPlanTaskId(aggregator, taskId, tool.itemId);
+}
+
+function parseTaskIdFromResult(resultText: string): string | undefined {
+  const text = resultText.trim();
+  if (text.length === 0) return undefined;
+  const phrase = /Task #?([\w-]+)\s+created/i.exec(text);
+  if (phrase?.[1]) return phrase[1];
+  if (text.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(text);
+      if (parsed && typeof parsed === "object") {
+        const obj = parsed as Record<string, unknown>;
+        const candidate =
+          (typeof obj.task_id === "string" && obj.task_id) ||
+          (typeof obj.taskId === "string" && obj.taskId) ||
+          (typeof obj.id === "string" && obj.id) ||
+          (typeof obj.id === "number" && String(obj.id));
+        if (candidate) return candidate;
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return undefined;
+}
+
+function extractTodoWriteTasks(
+  input: Record<string, unknown>,
+): Array<{ key: string; description: string; status: PlanStepStatus }> {
+  const todos = input.todos;
+  if (!Array.isArray(todos)) return [];
+  const tasks: Array<{ key: string; description: string; status: PlanStepStatus }> = [];
+  todos.forEach((todo, index) => {
+    if (!todo || typeof todo !== "object") return;
+    const obj = todo as Record<string, unknown>;
+    const description =
+      typeof obj.content === "string" && obj.content.trim().length > 0
+        ? obj.content.trim()
+        : "Task";
+    const status = readPlanStepStatus(obj.status) ?? "pending";
+    tasks.push({ key: `todo:${index}`, description, status });
+  });
+  return tasks;
+}
+
+function readTaskCreateDescription(input: Record<string, unknown>): string | undefined {
+  return readStringField(input, "subject") ?? readStringField(input, "description");
+}
+
+function readStringField(input: Record<string, unknown>, field: string): string | undefined {
+  const value = input[field];
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : undefined;
 }
 
 function startToolItem(
@@ -281,6 +490,16 @@ function startToolItem(
   if (state.toolItemsById.has(tool.itemId)) return;
   if (index !== undefined) state.toolItemsByIndex.set(index, tool);
   state.toolItemsById.set(tool.itemId, tool);
+  if (tool.planAggregatorRole) {
+    // Suppress the underlying tool row — the aggregator's plan item is the
+    // visible surface for TodoWrite / Task* calls. Forward any input that's
+    // already populated at start time; streamed inputs flow through the
+    // `input_json_delta` path below.
+    if (Object.keys(tool.input).length > 0) {
+      events.push(...applyPlanAggregatorInput(state, tool));
+    }
+    return;
+  }
   events.push({
     type: "item.started",
     threadId: state.threadId,
@@ -291,13 +510,39 @@ function startToolItem(
 }
 
 function classifyRequestType(toolName: string): CanonicalRequestType {
+  if (isReadOnlyToolName(toolName)) return "file_read_approval";
   const itemType = classifyToolItemType(toolName);
   if (itemType === "command_execution") return "command_execution_approval";
   if (itemType === "file_change") return "file_change_approval";
   return "tool_user_input";
 }
 
+function isReadOnlyToolName(toolName: string): boolean {
+  const name = toolName.toLowerCase();
+  return (
+    name === "read" ||
+    name === "notebookread" ||
+    name === "ls" ||
+    name === "list" ||
+    name === "glob" ||
+    name === "grep" ||
+    name.includes("search") ||
+    name.includes("view") ||
+    name === "listmcpresources" ||
+    name === "readmcpresource"
+  );
+}
+
+function isExitPlanModeToolName(toolName: string): boolean {
+  return toolName === "ExitPlanMode" || toolName === "exit_plan_mode";
+}
+
 export const ACCEPT_SUGGESTION_OPTION_PREFIX = "accept-suggestion-";
+const EXIT_PLAN_MODE_OPTIONS: UserInputOption[] = [
+  { optionId: "deny", label: "No, keep planning" },
+  { optionId: "default", label: "Yes, and manually approve edits" },
+  { optionId: "auto", label: "Yes, and switch to Auto" },
+];
 
 export function mapClaudePermissionRequest(input: {
   threadId: string;
@@ -312,7 +557,10 @@ export function mapClaudePermissionRequest(input: {
   toolUseID?: string;
   suggestions?: readonly PermissionUpdate[];
 }): RuntimeEvent {
-  const summary = input.title ?? summarizeToolRequest(input.toolName, input.toolInput);
+  const isExitPlanMode = isExitPlanModeToolName(input.toolName);
+  const summary = isExitPlanMode
+    ? "Proposed plan"
+    : (input.title ?? summarizeToolRequest(input.toolName, input.toolInput));
   const suggestions = (input.suggestions ?? []) as PermissionSuggestion[];
   const details: PermissionRequestDetails = {
     toolName: input.toolName,
@@ -332,7 +580,7 @@ export function mapClaudePermissionRequest(input: {
     payload: {
       summary,
       details,
-      options: buildPermissionOptions(suggestions),
+      options: isExitPlanMode ? EXIT_PLAN_MODE_OPTIONS : buildPermissionOptions(suggestions),
     },
   };
 }
@@ -639,6 +887,28 @@ function tryParseJsonRecord(value: string): Record<string, unknown> | undefined 
   } catch {
     return undefined;
   }
+}
+
+// Matches a completed top-level `"key":"value"` string pair in a partial JSON
+// buffer. Used to surface `file_path` / `path` / `command` to the UI before the
+// full tool input has finished streaming. Skipped for plan/sub-agent tools
+// whose inputs nest these keys inside arrays/objects.
+const COMPLETED_STRING_FIELD_RE = /"((?:\\.|[^"\\])+)"\s*:\s*"((?:\\.|[^"\\])*)"/g;
+
+function extractCompletedStringFields(partial: string): Record<string, string> {
+  const out: Record<string, string> = {};
+  COMPLETED_STRING_FIELD_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = COMPLETED_STRING_FIELD_RE.exec(partial)) !== null) {
+    try {
+      const key = JSON.parse(`"${match[1]}"`);
+      const value = JSON.parse(`"${match[2]}"`);
+      if (typeof key === "string" && typeof value === "string") out[key] = value;
+    } catch {
+      // skip malformed escape sequences
+    }
+  }
+  return out;
 }
 
 function extractText(value: unknown): string {
@@ -1057,11 +1327,26 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         if (!tool || !partial) return events;
         tool.partialInputJson += partial;
         const parsed = tryParseJsonRecord(tool.partialInputJson);
-        if (!parsed) return events;
-        const fingerprint = inputFingerprint(parsed);
+        // Plan/sub-agent inputs nest path-like keys inside arrays, so partial
+        // top-level extraction would catch the wrong values. Wait for full parse.
+        const allowPartial =
+          tool.itemType !== "plan" && tool.itemType !== "tool_call" && !tool.planAggregatorRole;
+        const partialFields =
+          !parsed && allowPartial ? extractCompletedStringFields(tool.partialInputJson) : undefined;
+        const nextInput = parsed
+          ? parsed
+          : partialFields && Object.keys(partialFields).length > 0
+            ? { ...tool.input, ...partialFields }
+            : undefined;
+        if (!nextInput) return events;
+        const fingerprint = inputFingerprint(nextInput);
         if (!fingerprint || fingerprint === tool.lastInputFingerprint) return events;
-        tool.input = parsed;
+        tool.input = nextInput;
         tool.lastInputFingerprint = fingerprint;
+        if (tool.planAggregatorRole) {
+          events.push(...applyPlanAggregatorInput(state, tool));
+          return events;
+        }
         events.push({
           type: "item.updated",
           threadId: state.threadId,
@@ -1153,8 +1438,20 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
       if (!toolUseId) continue;
       const tool = state.toolItemsById.get(toolUseId);
       if (!tool) continue;
-      const isError = obj.is_error === true;
       const text = extractText(obj.content);
+      if (tool.planAggregatorRole) {
+        if (tool.planAggregatorRole === "TaskCreate" && text.length > 0) {
+          bindTaskCreateResult(state, tool, text);
+        }
+        // Aggregated tools don't emit per-call lifecycle events. Drop the
+        // tracking entry so the index map stays small.
+        state.toolItemsById.delete(toolUseId);
+        for (const [idx, value] of state.toolItemsByIndex) {
+          if (value.itemId === toolUseId) state.toolItemsByIndex.delete(idx);
+        }
+        continue;
+      }
+      const isError = obj.is_error === true;
       const stream =
         tool.itemType === "command_execution"
           ? "command_output"
@@ -1175,7 +1472,7 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
         threadId: state.threadId,
         itemId: tool.itemId,
         payload:
-          tool.itemType === "tool_call" || tool.itemType === "file_change"
+          hasToolCallPayload(tool.itemType) || tool.itemType === "file_change"
             ? toolPayload(tool, isError ? "error" : "success", text)
             : toolPayload(tool, isError ? "error" : "success"),
       });
@@ -1270,4 +1567,13 @@ function mapClaudeSdkMessageInner(message: SDKMessage, state: ClaudeMapperState)
   }
 
   return events;
+}
+
+function hasToolCallPayload(itemType: CanonicalItemType): boolean {
+  return (
+    itemType === "tool_call" ||
+    itemType === "mcp_tool_call" ||
+    itemType === "image_view" ||
+    itemType === "dynamic_tool_call"
+  );
 }

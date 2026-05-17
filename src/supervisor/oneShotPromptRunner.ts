@@ -69,33 +69,78 @@ export interface RunOneShotPromptOptions {
 /**
  * Run a one-shot LLM call with progressive prompt fallback.
  *
- * Adapters that embed the prompt in argv (Claude/OpenCode/Gemini/Copilot via `-p`)
- * blow past OS argv caps for large diffs / scrollbacks, surfacing as `spawn
- * ENAMETOOLONG` (or `E2BIG` on Linux). This helper retries with the next smaller
- * prompt on detected argv overflow, and also skips proactively when the built
- * `CommandSpec` is already over the platform budget — so we don't waste a
- * doomed spawn before falling back.
+ * Two execution paths:
+ *
+ *   1. If the adapter exposes `runOneShot`, the prompt is passed straight to
+ *      the provider's structured runtime (SDK / ACP / shared server). This is
+ *      the preferred path: no per-call cold start, no OS argv length cap,
+ *      cleaner error surface. The fallback chain is still honoured — if the
+ *      "full" prompt fails we still drop to "files-only" / "scrollback-N" —
+ *      but argv-overflow detection is skipped (there's no argv).
+ *
+ *   2. Otherwise the adapter must provide `buildOneShotCommand`, and we shell
+ *      out via `spawnAgent`. Adapters that embed the prompt in argv
+ *      (Claude/OpenCode CLI/Gemini/Copilot via `-p`) blow past OS argv caps
+ *      for large diffs / scrollbacks, surfacing as `spawn ENAMETOOLONG`
+ *      (or `E2BIG` on Linux). This path retries with the next smaller prompt
+ *      on detected argv overflow, and also skips proactively when the built
+ *      `CommandSpec` is already over the platform budget — so we don't waste
+ *      a doomed spawn before falling back.
  */
 export async function runOneShotPromptWithFallback(
   options: RunOneShotPromptOptions,
 ): Promise<string> {
-  if (!options.adapter.buildOneShotCommand) {
-    throw new Error(`${options.adapter.label} does not support one-shot generation`);
-  }
   if (options.attempts.length === 0) {
     throw new Error("runOneShotPromptWithFallback: no attempts provided");
   }
+  if (!options.adapter.runOneShot && !options.adapter.buildOneShotCommand) {
+    throw new Error(`${options.adapter.label} does not support one-shot generation`);
+  }
+
+  const useSdkPath = typeof options.adapter.runOneShot === "function";
 
   let lastError: unknown;
   for (let i = 0; i < options.attempts.length; i++) {
     const attempt = options.attempts[i]!;
     const prompt = attempt.buildPrompt();
+    const hasNextAttempt = i < options.attempts.length - 1;
+
+    if (useSdkPath) {
+      console.log(
+        `[${options.logTag}] sdk one-shot ${attempt.level} (prompt ${prompt.length} chars)`,
+      );
+      const signal = wrapTimeoutSignal(options.signal, options.timeoutMs);
+      try {
+        return await options.adapter.runOneShot!({
+          location: options.location,
+          model: options.model,
+          effort: options.effort,
+          prompt,
+          signal,
+        });
+      } catch (err) {
+        lastError = err;
+        // SDK path has no argv overflow class of errors; only fall through to
+        // the next attempt if there's one available and the failure isn't an
+        // explicit abort.
+        if (hasNextAttempt && !isAbortError(err)) {
+          console.warn(
+            `[${options.logTag}] sdk one-shot ${attempt.level} for ${options.adapter.label} failed (${formatError(err)}); retrying with ${options.attempts[i + 1]!.level}`,
+          );
+          continue;
+        }
+        throw err;
+      }
+    }
+
+    if (!options.adapter.buildOneShotCommand) {
+      throw new Error(`${options.adapter.label} does not support one-shot generation`);
+    }
     const cmd = options.adapter.buildOneShotCommand(options.model, options.effort, prompt);
     if (!cmd) {
       throw new Error(`${options.adapter.label} does not support one-shot generation`);
     }
     const spawnSpec = buildOneShotSpec(options.location, cmd.command, cmd.args);
-    const hasNextAttempt = i < options.attempts.length - 1;
 
     if (hasNextAttempt && isArgvLikelyTooLong(spawnSpec)) {
       console.warn(
@@ -123,6 +168,48 @@ export async function runOneShotPromptWithFallback(
   }
 
   throw lastError ?? new Error(`[${options.logTag}] all fallback attempts exhausted`);
+}
+
+function isAbortError(err: unknown): boolean {
+  if (err instanceof Error) {
+    if (err.name === "AbortError") return true;
+    if (/\baborted\b/i.test(err.message)) return true;
+  }
+  return false;
+}
+
+function formatError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+/**
+ * Combine the caller's optional `AbortSignal` with a per-call timeout. SDK
+ * runOneShot honours a single `AbortSignal`, so this folds both deadlines
+ * into one. Returns `undefined` only when there is neither a parent signal
+ * nor a positive timeout, matching the surface `runOneShot` expects.
+ */
+function wrapTimeoutSignal(
+  parent: AbortSignal | undefined,
+  timeoutMs: number,
+): AbortSignal | undefined {
+  if (!parent && (!Number.isFinite(timeoutMs) || timeoutMs <= 0)) return undefined;
+  const controller = new AbortController();
+  if (parent) {
+    if (parent.aborted) {
+      controller.abort();
+    } else {
+      parent.addEventListener("abort", () => controller.abort(), { once: true });
+    }
+  }
+  if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    if (typeof timer.unref === "function") timer.unref();
+    // Stop the timer if the parent (or caller) finishes first. Listening on
+    // `controller.signal` covers both abort sources.
+    controller.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+  }
+  return controller.signal;
 }
 
 function argvCharCount(spec: CommandSpec): number {

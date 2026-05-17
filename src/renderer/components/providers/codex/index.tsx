@@ -87,17 +87,17 @@ registerGuiSlashCommands("codex", {
 
 const CODEX_PERMISSION_PRESETS = [
   {
-    id: "supervised",
-    label: "Supervised",
-    hint: "Ask first",
-    approvalPolicies: ["on-request"],
-    sandboxModes: ["read-only", "workspace-write"],
+    id: "default-permissions",
+    label: "Default permissions",
+    hint: "Use config",
+    approvalPolicies: [],
+    sandboxModes: [],
   },
   {
-    id: "auto-accept-edits",
-    label: "Auto-accept edits",
-    hint: "Edits allowed",
-    approvalPolicies: ["on-failure", "on-request"],
+    id: "auto-review",
+    label: "Auto-review",
+    hint: "Review failures",
+    approvalPolicies: ["on-failure"],
     sandboxModes: ["workspace-write"],
   },
   {
@@ -116,9 +116,25 @@ function resolveCodexPermissionPreset(
   approvalIds: Set<string>,
   sandboxIds: Set<string>,
 ): { approvalPolicy: string; sandboxMode: string } | undefined {
+  if (preset.approvalPolicies.length === 0 && preset.sandboxModes.length === 0) {
+    return { approvalPolicy: "", sandboxMode: "" };
+  }
+
   const approvalPolicy = preset.approvalPolicies.find((id) => approvalIds.has(id));
   const sandboxMode = preset.sandboxModes.find((id) => sandboxIds.has(id));
   return approvalPolicy && sandboxMode ? { approvalPolicy, sandboxMode } : undefined;
+}
+
+function isCodexPermissionPresetSelected(
+  preset: CodexPermissionPreset & { approvalPolicy: string; sandboxMode: string },
+  config: { approvalPolicy?: string | undefined; sandboxMode?: string | undefined },
+): boolean {
+  if (!preset.approvalPolicy && !preset.sandboxMode) {
+    return !config.approvalPolicy && !config.sandboxMode;
+  }
+  return (
+    preset.approvalPolicy === config.approvalPolicy && preset.sandboxMode === config.sandboxMode
+  );
 }
 
 registerComposerControls("codex", {
@@ -141,11 +157,8 @@ registerComposerControls("codex", {
     });
     if (permissionPresets.length > 0) {
       const currentPermissionPreset =
-        permissionPresets.find(
-          (preset) =>
-            preset.approvalPolicy === config.approvalPolicy &&
-            preset.sandboxMode === config.sandboxMode,
-        ) ?? permissionPresets[0]!;
+        permissionPresets.find((preset) => isCodexPermissionPresetSelected(preset, config)) ??
+        permissionPresets[0]!;
       controls.push({
         iconKind: "permission",
         options: permissionPresets.map((preset) => ({
@@ -184,10 +197,7 @@ registerComposerControls("codex", {
           if (selected) {
             onConfigChange({ approvalPolicy: "never", sandboxMode: "danger-full-access" });
           } else {
-            onConfigChange({
-              approvalPolicy: capabilities.approvalPolicies[0]?.id,
-              sandboxMode: capabilities.sandboxModes[0]?.id,
-            });
+            onConfigChange({ approvalPolicy: "", sandboxMode: "" });
           }
         },
       }),

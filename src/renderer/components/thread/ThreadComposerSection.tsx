@@ -22,6 +22,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
+import { openFileInEditor } from "@/renderer/utils/gitHelpers";
 import { ActiveSubAgentTile } from "./ChatPane/parts/items/ActiveSubAgentTile";
 import { selectActiveSubAgentParentItemIds } from "./ChatPane/chatPaneSelectors";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
@@ -707,8 +708,26 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                             agentLabel={agentStatus?.label}
                             request={activeRuntimeRequest}
                             onResolve={props.onResolveServerRequest}
-                            onPlanApproved={() =>
-                              props.onConfigChange({ ...thread.config, mode: "agent" })
+                            onPlanApproved={(optionId) =>
+                              props.onConfigChange({
+                                ...thread.config,
+                                mode: "agent",
+                                ...(optionId === "default" || optionId === "auto"
+                                  ? { approvalPolicy: optionId }
+                                  : {}),
+                              })
+                            }
+                            onOpenPlanFile={
+                              project
+                                ? (path) =>
+                                    void openFileInEditor(
+                                      project,
+                                      thread.worktreePath,
+                                      branchName,
+                                      path,
+                                      { markdownPreview: true },
+                                    )
+                                : undefined
                             }
                           />
                         ) : null}
@@ -816,6 +835,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                   placeholder="Send a message..."
                   prompt={prompt}
                   promptDisabled={!(showServerComposer || showTerminalComposer)}
+                  preserveDisabledControlStyle={isStructuredLaunching}
                   stopPending={isInterrupting || isStructuredLaunching}
                   submitDisabled={!(hasContent || attachments.attachments.length > 0) || !canSubmit}
                   submitLabel="Send message"

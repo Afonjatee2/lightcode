@@ -101,6 +101,9 @@ function renderItem(item: RuntimeChatItem, checkpointRevertControl: ReactNode | 
     case "file_change":
       return <FileChange item={item} />;
     case "tool_call":
+    case "mcp_tool_call":
+    case "image_view":
+    case "dynamic_tool_call":
       return <ToolCall item={item} />;
     case "web_search":
       return <WebSearchItem item={item} />;

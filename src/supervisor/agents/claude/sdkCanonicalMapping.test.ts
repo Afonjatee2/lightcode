@@ -343,7 +343,7 @@ describe("sdkCanonicalMapping — text streaming", () => {
 });
 
 describe("sdkCanonicalMapping — tool use", () => {
-  it("classifies TodoWrite as a plan item and updates steps from streamed input JSON", () => {
+  it("routes legacy TodoWrite bulk replacements through the plan aggregator", () => {
     const state = createClaudeMapperState("thread-1");
 
     const started = mapClaudeSdkMessage(
@@ -367,21 +367,351 @@ describe("sdkCanonicalMapping — tool use", () => {
       state,
     );
 
-    expect(started[0]).toMatchObject({
-      type: "item.started",
-      itemType: "plan",
-      itemId: "toolu_todo",
-    });
-    expect(updated[0]).toMatchObject({
-      type: "item.updated",
-      itemId: "toolu_todo",
-      payload: {
-        steps: [
-          { step: "First task", status: "in_progress" },
-          { step: "Done", status: "completed" },
-        ],
+    // Empty input at start = aggregator has nothing to publish yet — the
+    // underlying tool_use row is suppressed and no event is emitted.
+    expect(started).toEqual([]);
+    expect(updated).toEqual([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: "plan-thread-1",
+        itemType: "plan",
+        payload: {
+          steps: [
+            { step: "First task", status: "in_progress" },
+            { step: "Done", status: "completed" },
+          ],
+        },
       },
+    ]);
+  });
+
+  it("surfaces file_path from partial input JSON before the full payload finishes streaming", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "toolu_read", name: "Read", input: {} },
+      }),
+      state,
+    );
+
+    const firstChunk = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: '{"file_path":"src/foo.ts","of' },
+      }),
+      state,
+    );
+
+    expect(firstChunk).toEqual([
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "toolu_read",
+        payload: expect.objectContaining({
+          name: "Read",
+          args: expect.objectContaining({ file_path: "src/foo.ts" }),
+          status: "running",
+        }),
+      },
+    ]);
+
+    const finalChunk = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: { type: "input_json_delta", partial_json: 'fset":0}' },
+      }),
+      state,
+    );
+
+    expect(finalChunk[0]).toMatchObject({
+      type: "item.updated",
+      payload: expect.objectContaining({
+        args: { file_path: "src/foo.ts", offset: 0 },
+      }),
     });
+  });
+
+  it("does not extract nested keys from partial input JSON for plan tools", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: { type: "tool_use", id: "toolu_todo_partial", name: "TodoWrite", input: {} },
+      }),
+      state,
+    );
+
+    const partial = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_delta",
+        index: 0,
+        delta: {
+          type: "input_json_delta",
+          partial_json: '{"todos":[{"content":"Working on it","status":"in_progress"',
+        },
+      }),
+      state,
+    );
+
+    expect(partial).toEqual([]);
+  });
+
+  it("routes Claude TaskCreate calls through the plan aggregator as a stable plan item", () => {
+    const state = createClaudeMapperState("thread-1");
+
+    const first = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_create_1",
+          name: "TaskCreate",
+          input: { subject: "Investigate bug", description: "details" },
+        },
+      }),
+      state,
+    );
+    expect(first).toEqual([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: "plan-thread-1",
+        itemType: "plan",
+        payload: { steps: [{ step: "Investigate bug", status: "pending" }] },
+      },
+    ]);
+
+    const second = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 1,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_create_2",
+          name: "TaskCreate",
+          input: { subject: "Write fix" },
+        },
+      }),
+      state,
+    );
+    expect(second).toEqual([
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "plan-thread-1",
+        payload: {
+          steps: [
+            { step: "Investigate bug", status: "pending" },
+            { step: "Write fix", status: "pending" },
+          ],
+        },
+      },
+    ]);
+  });
+
+  it("uses the TaskCreate tool_result to map runtime task_ids to aggregator keys", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_create_1",
+          name: "TaskCreate",
+          input: { subject: "Investigate bug" },
+        },
+      }),
+      state,
+    );
+
+    // The host returns "Task #N created successfully" — bind that to the
+    // aggregator without producing a chat row.
+    const resultEvents = mapClaudeSdkMessage(
+      {
+        type: "user",
+        session_id: "claude-session",
+        parent_tool_use_id: null,
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_create_1",
+              content: "Task #42 created successfully: Investigate bug",
+            },
+          ],
+        },
+      } as unknown as SDKMessage,
+      state,
+    );
+    expect(resultEvents).toEqual([]);
+
+    // A subsequent TaskUpdate referencing task_id 42 must update the same
+    // aggregator entry, not create a new "Task 42" row.
+    const updateEvents = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 1,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_update_1",
+          name: "TaskUpdate",
+          input: { taskId: "42", status: "completed" },
+        },
+      }),
+      state,
+    );
+    expect(updateEvents).toEqual([
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "plan-thread-1",
+        payload: { steps: [{ step: "Investigate bug", status: "completed" }] },
+      },
+    ]);
+  });
+
+  it("treats TaskUpdate with an unknown taskId as a new aggregator entry", () => {
+    const state = createClaudeMapperState("thread-1");
+    const events = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_update_orphan",
+          name: "TaskUpdate",
+          input: { taskId: "99", subject: "Orphan task", status: "in_progress" },
+        },
+      }),
+      state,
+    );
+    expect(events).toEqual([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: "plan-thread-1",
+        itemType: "plan",
+        payload: { steps: [{ step: "Orphan task", status: "in_progress" }] },
+      },
+    ]);
+  });
+
+  it("removes a task when TaskUpdate sets status=deleted", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_create_1",
+          name: "TaskCreate",
+          input: { subject: "Keep" },
+        },
+      }),
+      state,
+    );
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 1,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_create_2",
+          name: "TaskCreate",
+          input: { subject: "Remove" },
+        },
+      }),
+      state,
+    );
+    // Bind task_id 7 to the second create
+    mapClaudeSdkMessage(
+      {
+        type: "user",
+        session_id: "claude-session",
+        parent_tool_use_id: null,
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_create_2",
+              content: "Task #7 created successfully",
+            },
+          ],
+        },
+      } as unknown as SDKMessage,
+      state,
+    );
+
+    const removed = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 2,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_delete",
+          name: "TaskUpdate",
+          input: { taskId: "7", status: "deleted" },
+        },
+      }),
+      state,
+    );
+    expect(removed).toEqual([
+      {
+        type: "item.updated",
+        threadId: "thread-1",
+        itemId: "plan-thread-1",
+        payload: { steps: [{ step: "Keep", status: "pending" }] },
+      },
+    ]);
+  });
+
+  it("never registers Task* tools as standalone chat rows", () => {
+    const state = createClaudeMapperState("thread-1");
+    mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: "toolu_create_1",
+          name: "TaskCreate",
+          input: { subject: "Investigate" },
+        },
+      }),
+      state,
+    );
+    // Drain the (suppressed) tool_result — no item.completed for the TaskCreate
+    // tool_use; only the aggregator's plan item is visible.
+    const resultEvents = mapClaudeSdkMessage(
+      {
+        type: "user",
+        session_id: "claude-session",
+        parent_tool_use_id: null,
+        message: {
+          role: "user",
+          content: [
+            {
+              type: "tool_result",
+              tool_use_id: "toolu_create_1",
+              content: "Task #1 created successfully",
+            },
+          ],
+        },
+      } as unknown as SDKMessage,
+      state,
+    );
+    expect(resultEvents).toEqual([]);
   });
 
   it("streams command tool results to command_output and completes the item", () => {
@@ -504,6 +834,64 @@ describe("sdkCanonicalMapping — tool use", () => {
       },
       { type: "item.completed", threadId: "thread-1", itemId: "toolu_edit" },
     ]);
+  });
+
+  // TodoWrite, TaskCreate, TaskUpdate, and TaskStop are routed through the
+  // plan aggregator (see dedicated tests above) — their underlying tool_use
+  // rows never produce a standalone chat item, so they're excluded from this
+  // classification grid.
+  it.each([
+    ["Agent", { prompt: "check this" }, "tool_call"],
+    ["Task", { description: "check this" }, "tool_call"],
+    ["ExitPlanMode", { plan: "# Plan" }, "tool_call"],
+    ["Bash", { command: "pnpm test" }, "command_execution"],
+    ["TaskOutput", { task_id: "task-1" }, "dynamic_tool_call"],
+    ["Read", { file_path: "src/App.tsx" }, "dynamic_tool_call"],
+    ["NotebookRead", { notebook_path: "analysis.ipynb" }, "dynamic_tool_call"],
+    ["LS", { path: "src" }, "dynamic_tool_call"],
+    ["Grep", { pattern: "needle" }, "dynamic_tool_call"],
+    ["Glob", { pattern: "*.ts" }, "dynamic_tool_call"],
+    ["ListMcpResources", { server: "github" }, "mcp_tool_call"],
+    ["ReadMcpResource", { server: "github", uri: "repo://x" }, "mcp_tool_call"],
+    ["mcp__github__search", { query: "deploy" }, "mcp_tool_call"],
+    ["ToolSearch", { query: "deploy" }, "dynamic_tool_call"],
+    ["WebSearch", { query: "docs" }, "web_search"],
+    ["WebFetch", { url: "https://example.com" }, "web_search"],
+    ["TaskGet", { task_id: "task-1" }, "dynamic_tool_call"],
+    ["TaskList", {}, "dynamic_tool_call"],
+    ["EnterWorktree", { path: "feature" }, "dynamic_tool_call"],
+    ["ExitWorktree", {}, "dynamic_tool_call"],
+    ["ViewImage", { path: "screen.png" }, "image_view"],
+    ["BashOutput", { bash_id: "bash-1" }, "command_execution"],
+    ["KillBash", { shell_id: "bash-1" }, "command_execution"],
+    ["KillShell", { shell_id: "shell-1" }, "command_execution"],
+    ["Edit", { file_path: "src/App.tsx", old_string: "a", new_string: "b" }, "file_change"],
+    ["Write", { file_path: "src/new.ts", content: "" }, "file_change"],
+    ["Patch", { file_path: "src/App.tsx" }, "file_change"],
+    ["MultiEdit", { file_path: "src/App.tsx", edits: [] }, "file_change"],
+    ["NotebookEdit", { notebook_path: "analysis.ipynb", new_source: "" }, "file_change"],
+  ] as const)("classifies Claude %s tool_use blocks as %s", (name, input, itemType) => {
+    const state = createClaudeMapperState("thread-1");
+
+    const events = mapClaudeSdkMessage(
+      streamEvent({
+        type: "content_block_start",
+        index: 0,
+        content_block: {
+          type: "tool_use",
+          id: `toolu_${name}`,
+          name,
+          input,
+        },
+      }),
+      state,
+    );
+
+    expect(events[0]).toMatchObject({
+      type: "item.started",
+      itemType,
+      itemId: `toolu_${name}`,
+    });
   });
 
   it("surfaces auto-denied tool calls as completed error items", () => {
@@ -642,7 +1030,7 @@ describe("sdkCanonicalMapping — sub-agents", () => {
         type: "item.started",
         threadId: "thread-1",
         itemId: "toolu_read",
-        itemType: "tool_call",
+        itemType: "dynamic_tool_call",
         parentItemId: "toolu_parent",
         payload: {
           name: "Read",
@@ -935,6 +1323,100 @@ describe("sdkCanonicalMapping — requests", () => {
       requestId: "perm-1",
       requestType: "command_execution_approval",
       payload: { summary: "Bash: pnpm test" },
+    });
+  });
+
+  it.each([
+    ["Read", { file_path: "src/App.tsx" }, "file_read_approval", "Read: src/App.tsx"],
+    [
+      "NotebookRead",
+      { notebook_path: "analysis.ipynb" },
+      "file_read_approval",
+      'NotebookRead: {"notebook_path":"analysis.ipynb"}',
+    ],
+    ["LS", { path: "src" }, "file_read_approval", "LS: src"],
+    ["Grep", { pattern: "needle" }, "file_read_approval", 'Grep: {"pattern":"needle"}'],
+    ["Glob", { pattern: "*.ts" }, "file_read_approval", 'Glob: {"pattern":"*.ts"}'],
+    [
+      "ListMcpResources",
+      { server: "github" },
+      "file_read_approval",
+      'ListMcpResources: {"server":"github"}',
+    ],
+    [
+      "ReadMcpResource",
+      { uri: "repo://x" },
+      "file_read_approval",
+      'ReadMcpResource: {"uri":"repo://x"}',
+    ],
+    ["Bash", { command: "pnpm test" }, "command_execution_approval", "Bash: pnpm test"],
+    [
+      "KillShell",
+      { shell_id: "shell-1" },
+      "command_execution_approval",
+      'KillShell: {"shell_id":"shell-1"}',
+    ],
+    [
+      "Write",
+      { file_path: "src/new.ts", content: "" },
+      "file_change_approval",
+      "Write: src/new.ts",
+    ],
+    ["Patch", { file_path: "src/App.tsx" }, "file_change_approval", "Patch: src/App.tsx"],
+    ["ToolSearch", { query: "deploy" }, "file_read_approval", 'ToolSearch: {"query":"deploy"}'],
+    [
+      "mcp__github__search",
+      { query: "deploy" },
+      "file_read_approval",
+      'mcp__github__search: {"query":"deploy"}',
+    ],
+    ["ViewImage", { path: "screen.png" }, "file_read_approval", "ViewImage: screen.png"],
+  ] as const)("maps Claude %s permissions to %s", (toolName, toolInput, requestType, summary) => {
+    expect(
+      mapClaudePermissionRequest({
+        threadId: "thread-1",
+        requestId: `perm-${toolName}`,
+        toolName,
+        toolInput,
+      }),
+    ).toMatchObject({
+      type: "request.opened",
+      requestId: `perm-${toolName}`,
+      requestType,
+      payload: { summary },
+    });
+  });
+
+  it("maps ExitPlanMode to plan-specific approval options", () => {
+    const event = mapClaudePermissionRequest({
+      threadId: "thread-1",
+      requestId: "perm-plan",
+      toolName: "ExitPlanMode",
+      toolInput: {
+        plan: "# Plan",
+        planFilePath: "C:\\Users\\sdsle\\.claude\\plans\\plan.md",
+      },
+      title: 'ExitPlanMode: {"plan":"# Plan"}',
+    });
+
+    expect(event).toMatchObject({
+      type: "request.opened",
+      requestId: "perm-plan",
+      payload: {
+        summary: "Proposed plan",
+        details: {
+          toolName: "ExitPlanMode",
+          input: {
+            plan: "# Plan",
+            planFilePath: "C:\\Users\\sdsle\\.claude\\plans\\plan.md",
+          },
+        },
+        options: [
+          { optionId: "deny", label: "No, keep planning" },
+          { optionId: "default", label: "Yes, and manually approve edits" },
+          { optionId: "auto", label: "Yes, and switch to Auto" },
+        ],
+      },
     });
   });
 

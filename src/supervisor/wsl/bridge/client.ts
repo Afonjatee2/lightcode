@@ -139,6 +139,17 @@ export class WslBridgeClient {
     });
   }
 
+  async createGitCheckpointSnapshot(
+    location: WslLocation,
+    input: { ref: string; metadata: unknown },
+  ): Promise<{ commit: string }> {
+    return this.call<{ commit: string }>(location, "/v1/git/checkpoint-snapshot", {
+      projectRoot: location.linuxPath,
+      ref: input.ref,
+      metadata: input.metadata,
+    });
+  }
+
   /** Rename/move a path. Both sides must live inside `location`. */
   async rename(location: WslLocation, fromAbsolute: string, toAbsolute: string): Promise<void> {
     await this.call(location, "/v1/fs/rename", {

@@ -18,7 +18,12 @@
       "Bash(git checkout *)",
       "Bash(npx tsc *)",
       "Bash(pnpm run *)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\sdsle\\\\work\\\\lightcode\\\\src\\\\renderer\\\\components\" -Directory)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\sdsle\\\\work\\\\lightcode\" -Recurse -Directory -Depth 2)",
+      "Bash(grep -v \"^\\\\.$\\\\|^\\\\.\\\\.\")",
+      "Bash(grep -i \"tsx$\")",
+      "Bash(git log *)"
     ]
   }
 }

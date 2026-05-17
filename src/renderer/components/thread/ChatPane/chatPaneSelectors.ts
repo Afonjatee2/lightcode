@@ -175,6 +175,9 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
   }
   return (
     item.type === "tool_call" ||
+    item.type === "mcp_tool_call" ||
+    item.type === "image_view" ||
+    item.type === "dynamic_tool_call" ||
     item.type === "command_execution" ||
     item.type === "file_change" ||
     item.type === "web_search"

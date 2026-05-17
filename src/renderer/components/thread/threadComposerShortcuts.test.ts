@@ -96,10 +96,10 @@ describe("handleComposerControlShortcut", () => {
       controls: [
         {
           iconKind: "permission",
-          value: "supervised",
+          value: "default-permissions",
           options: [
-            { id: "supervised", label: "Supervised" },
-            { id: "auto-accept-edits", label: "Auto-accept edits" },
+            { id: "default-permissions", label: "Default permissions" },
+            { id: "auto-review", label: "Auto-review" },
             { id: "full-access", label: "Full access" },
           ],
           onChange,
@@ -109,7 +109,7 @@ describe("handleComposerControlShortcut", () => {
     });
 
     expect(event.preventDefault).toHaveBeenCalledOnce();
-    expect(onChange).toHaveBeenCalledWith("auto-accept-edits");
+    expect(onChange).toHaveBeenCalledWith("auto-review");
   });
 
   it("toggles permission toggles with Ctrl+P", () => {

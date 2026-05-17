@@ -145,6 +145,25 @@ describe("ToolCallGroup", () => {
     expect(screen.queryByText("result")).not.toBeInTheDocument();
   });
 
+  it("renders apply_patch tool-call edits with diff counts and rich diff body", async () => {
+    const threadId = "thread-1";
+    const item = makeApplyPatchToolItem("tool-apply-patch");
+    seedThread(threadId, [item]);
+
+    renderToolCallGroup(threadId, [item.id]);
+
+    expect(screen.getByText("+1")).toHaveClass("text-success");
+    expect(screen.getByText("-1")).toHaveClass("text-danger");
+    fireEvent.click(screen.getByText("toolDisplay.ts"));
+
+    await waitFor(() => {
+      expect(document.body).toHaveTextContent(/before/);
+      expect(document.body).toHaveTextContent(/after/);
+    });
+    expect(screen.queryByText("args")).not.toBeInTheDocument();
+    expect(screen.queryByText("result")).not.toBeInTheDocument();
+  });
+
   it("renders changes-array creates as highlighted file content", async () => {
     const threadId = "thread-1";
     const item = makeChangesArrayFileChangeItem("file-changes-array-create", "create");
@@ -205,6 +224,37 @@ describe("ToolCallGroup", () => {
 
     expect(screen.getByText("2 commands")).toBeInTheDocument();
     expect(screen.getByText("1 edit")).toBeInTheDocument();
+  });
+
+  it("renders semantic tool-like item buckets as tool rows", () => {
+    const threadId = "thread-1";
+    const items = [
+      makeSemanticToolItem("mcp-1", "mcp_tool_call", {
+        name: "mcp__github__search",
+        status: "success",
+        args: { query: "deploy" },
+      }),
+      makeSemanticToolItem("image-1", "image_view", {
+        name: "ViewImage",
+        status: "success",
+        args: { path: "screen.png" },
+      }),
+      makeSemanticToolItem("dynamic-1", "dynamic_tool_call", {
+        name: "ToolSearch",
+        status: "success",
+        args: { query: "deploy" },
+      }),
+    ];
+    seedThread(threadId, items);
+
+    renderToolCallGroup(
+      threadId,
+      items.map((item) => item.id),
+    );
+
+    expect(screen.getByText("github: search")).toBeInTheDocument();
+    expect(screen.getAllByText("screen.png").length).toBeGreaterThan(0);
+    expect(screen.getByText("Tool search: deploy")).toBeInTheDocument();
   });
 
   it("categorizes sub-agent tools as commands", () => {
@@ -273,6 +323,20 @@ function makeToolItem(id: string, name: string): RuntimeChatItem {
   };
 }
 
+function makeSemanticToolItem(
+  id: string,
+  type: "mcp_tool_call" | "image_view" | "dynamic_tool_call",
+  payload: RuntimeChatItem["payload"],
+): RuntimeChatItem {
+  return {
+    id,
+    type,
+    state: "completed",
+    payload,
+    streams: {},
+  };
+}
+
 function makeAgentItem(id: string): RuntimeChatItem {
   return {
     id,
@@ -282,6 +346,33 @@ function makeAgentItem(id: string): RuntimeChatItem {
       name: "Agent",
       status: "success",
       args: { description: "Review code", subagent_type: "general-purpose" },
+    },
+    streams: {},
+  };
+}
+
+function makeApplyPatchToolItem(id: string): RuntimeChatItem {
+  return {
+    id,
+    type: "tool_call",
+    state: "completed",
+    payload: {
+      name: "apply_patch",
+      title: "apply_patch",
+      kind: "edit",
+      status: "success",
+      args: {
+        patchText: [
+          "*** Begin Patch",
+          "*** Update File: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts",
+          "@@",
+          "-before",
+          "+after",
+          "*** End Patch",
+        ].join("\n"),
+      },
+      result:
+        "Success. Updated the following files:\nM src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts",
     },
     streams: {},
   };

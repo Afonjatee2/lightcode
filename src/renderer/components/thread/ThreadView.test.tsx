@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ThreadConfig } from "@/shared/contracts";
+import type { ThreadConfig, ThreadServerRequestId } from "@/shared/contracts";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -446,7 +446,7 @@ describe("ThreadView", () => {
         },
         status: "launching",
         attention: "none",
-        canResumeWithConfig: true,
+        canResumeWithConfig: false,
         presentationMode: "gui",
         sessionRef: {
           providerSessionId: "session-gui-launching",
@@ -491,6 +491,12 @@ describe("ThreadView", () => {
     expect(input).toBeInTheDocument();
     // Composer input must remain editable while the session is launching.
     expect(input.getAttribute("aria-disabled")).not.toBe("true");
+    expect(
+      hasAncestorWithClassFragment(
+        screen.getAllByLabelText("Select model")[0]!,
+        "lightcode-composer-shell--preserve-disabled-controls",
+      ),
+    ).toBe(true);
     // The stop button stands in for the send button during launch.
     expect(screen.queryByLabelText("Send message")).not.toBeInTheDocument();
     const stopButton = screen.getByLabelText("Stop response");
@@ -611,6 +617,132 @@ describe("ThreadView", () => {
     ).toBeInTheDocument();
   });
 
+  it("renders ExitPlanMode as an approval and leaves plan mode when accepted", async () => {
+    const now = new Date().toISOString();
+    const rawSummary = 'ExitPlanMode: {"plan":"# Plan"}';
+    const onConfigChange = vi.fn<(config: ThreadConfig) => void>();
+    const onResolveServerRequest = vi
+      .fn<
+        (input: {
+          requestId: ThreadServerRequestId;
+          method: string;
+          response: unknown;
+        }) => Promise<void>
+      >()
+      .mockResolvedValue(undefined);
+
+    useAppStore.setState({
+      projects: [
+        {
+          id: "project-1",
+          name: "Repo",
+          location: { kind: "windows", path: "C:\\repo" },
+          createdAt: now,
+        },
+      ],
+      runtimeRequestsByThread: {
+        "thread-claude-plan": [
+          {
+            requestId: "perm-plan",
+            threadId: "thread-claude-plan",
+            requestType: "tool_user_input",
+            receivedAt: now,
+            payload: {
+              summary: "Proposed plan",
+              details: {
+                toolName: "ExitPlanMode",
+                input: {
+                  planFilePath: "C:\\Users\\sdsle\\.claude\\plans\\plan.md",
+                },
+              },
+              options: [
+                { optionId: "deny", label: "No, keep planning" },
+                { optionId: "default", label: "Yes, and manually approve edits" },
+                { optionId: "auto", label: "Yes, and switch to Auto" },
+              ],
+            },
+          },
+        ],
+      },
+    });
+
+    renderThreadView({
+      thread: {
+        id: "thread-claude-plan",
+        projectId: "project-1",
+        title: "Claude plan thread",
+        agentKind: "claude",
+        config: {
+          model: "opus",
+          mode: "plan",
+        },
+        status: "needs_reply",
+        attention: "needs_reply",
+        canResumeWithConfig: true,
+        archived: false,
+        done: false,
+        starred: false,
+        presentationMode: "gui",
+        sessionRef: {
+          providerSessionId: "session-claude-plan",
+          discoveredAt: now,
+        },
+        createdAt: now,
+        updatedAt: now,
+      },
+      agentStatus: {
+        kind: "claude",
+        label: "Claude Code",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "opus", label: "Opus" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent", "plan"],
+          approvalPolicies: [
+            { id: "auto", label: "Auto" },
+            { id: "bypassPermissions", label: "Bypass Permissions" },
+          ],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "gui",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      onConfigChange,
+      onResolveServerRequest,
+      onSubmitInput: async () => undefined,
+    });
+
+    expect(screen.getByText("Proposed plan")).toBeInTheDocument();
+    expect(screen.queryByText(rawSummary)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open plan" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "No, keep planning" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Yes, and switch to Auto" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Yes, and manually approve edits" }));
+
+    await waitFor(() => {
+      expect(onConfigChange).toHaveBeenCalledWith({
+        model: "opus",
+        mode: "agent",
+        approvalPolicy: "default",
+      });
+      expect(onResolveServerRequest).toHaveBeenCalledWith({
+        requestId: "perm-plan",
+        method: "requestPermission",
+        response: { optionId: "default" },
+      });
+    });
+  });
+
   it("uses the ACP composer controls for per-thread GUI presentation", () => {
     useSharedSettings.setState({ collapseTerminalComposer: true });
     const onConfigChange = vi.fn<(config: ThreadConfig) => void>();
@@ -624,8 +756,6 @@ describe("ThreadView", () => {
         config: {
           model: "gpt-5.4",
           effort: "medium",
-          approvalPolicy: "never",
-          sandboxMode: "danger-full-access",
         },
         status: "idle",
         attention: "none",
@@ -688,7 +818,7 @@ describe("ThreadView", () => {
     expect(screen.queryByText("Normal")).not.toBeInTheDocument();
     expect(screen.getAllByLabelText("Fast").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Work").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Full access").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Default permissions").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("Collapse composer")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Show composer")).not.toBeInTheDocument();
 

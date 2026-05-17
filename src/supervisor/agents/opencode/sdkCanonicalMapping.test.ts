@@ -213,6 +213,19 @@ describe("sdkCanonicalMapping — permission/question events", () => {
       type: "request.opened",
       requestId: "opencode-perm-perm_1",
       requestType: "command_execution_approval",
+      payload: {
+        summary: "Permission required",
+        details: {
+          toolName: "bash",
+          displayName: "target",
+          decisionReason: "OpenCode wants to run a command.",
+          input: { command: "rm -rf /tmp" },
+        },
+        options: [
+          { optionId: "reject", label: "Deny" },
+          { optionId: "once", label: "Allow" },
+        ],
+      },
     });
   });
 
@@ -239,12 +252,17 @@ describe("sdkCanonicalMapping — permission/question events", () => {
       requestId: "opencode-perm-perm_1",
       requestType: "command_execution_approval",
       payload: {
-        summary: "TERM_PROGRAM",
+        summary: "Permission required",
         details: {
-          permission: "grep",
-          patterns: ["TERM_PROGRAM"],
-          metadata: { target: "TERM_PROGRAM" },
+          toolName: "grep",
+          displayName: "target",
+          decisionReason: "OpenCode wants to use grep.",
+          input: { command: "TERM_PROGRAM" },
         },
+        options: [
+          { optionId: "reject", label: "Deny" },
+          { optionId: "once", label: "Allow" },
+        ],
       },
     });
   });
@@ -466,6 +484,38 @@ describe("sdkCanonicalMapping — tool parts", () => {
         kind: "read",
         locations: [{ path: "/repo/package.json" }],
         args: { filePath: "/repo/package.json" },
+        status: "running",
+      },
+    });
+  });
+
+  it("maps view tools to categorized read tool calls", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_view",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "view",
+        callID: "call_view",
+        state: {
+          status: "running",
+          input: { path: "src/foo.ts" },
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "tool_call",
+      payload: {
+        name: "src/foo.ts",
+        title: "src/foo.ts",
+        kind: "read",
+        locations: [{ path: "src/foo.ts" }],
+        args: { path: "src/foo.ts" },
         status: "running",
       },
     });
@@ -821,6 +871,123 @@ describe("sdkCanonicalMapping — tool parts", () => {
         name: "edit",
         path: "src/renderer/components/composer/MentionInput.tsx",
         changeKind: "edit",
+        args,
+        status: "running",
+      },
+    });
+  });
+
+  it("maps running apply_patch edits with patchText paths and diff summaries", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const args = {
+      patchText: [
+        "*** Begin Patch",
+        "*** Update File: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts",
+        "@@",
+        "-before",
+        "+after",
+        "*** End Patch",
+      ].join("\n"),
+    };
+
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_apply_patch",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "apply_patch",
+        callID: "call_apply_patch",
+        state: {
+          status: "running",
+          input: args,
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "file_change",
+      payload: {
+        name: "apply_patch",
+        path: "src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts",
+        changeKind: "edit",
+        diffSummary: { added: 1, removed: 1 },
+        args,
+        status: "running",
+      },
+    });
+  });
+
+  it("maps running apply_patch creates with patchText paths", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const args = {
+      patchText: [
+        "*** Begin Patch",
+        "*** Add File: src/new-file.ts",
+        "+export const value = 1;",
+        "*** End Patch",
+      ].join("\n"),
+    };
+
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_apply_patch_create",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "apply_patch",
+        callID: "call_apply_patch_create",
+        state: {
+          status: "running",
+          input: args,
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "file_change",
+      payload: {
+        name: "apply_patch",
+        path: "src/new-file.ts",
+        changeKind: "create",
+        diffSummary: { added: 1, removed: 0 },
+        args,
+        status: "running",
+      },
+    });
+  });
+
+  it("maps create tools with path args as running file changes", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const args = { path: "src/new-file.ts", content: "export const value = 1;\n" };
+
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_create",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "create",
+        callID: "call_create",
+        state: {
+          status: "running",
+          input: args,
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "file_change",
+      payload: {
+        name: "create",
+        path: "src/new-file.ts",
+        changeKind: "create",
         args,
         status: "running",
       },

@@ -318,6 +318,284 @@ describe("OpencodeSdkSession", () => {
       }),
     );
   });
+
+  it("omits a session permission override in supervised mode", async () => {
+    const create = vi
+      .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+      .mockResolvedValue({ data: { id: "ses_test" } });
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: { create },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation,
+      config: { ...config, approvalPolicy: "default" },
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread({ ...config, approvalPolicy: "default" });
+
+    expect(create).toHaveBeenCalledWith({
+      directory: "/repo",
+      title: "lightcode/thread-o",
+    });
+  });
+
+  it("passes an allow-all session permission override in full access mode", async () => {
+    const create = vi
+      .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+      .mockResolvedValue({ data: { id: "ses_test" } });
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: { create },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation,
+      config: { ...config, approvalPolicy: "yolo" },
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread({ ...config, approvalPolicy: "yolo" });
+
+    expect(create).toHaveBeenCalledWith({
+      directory: "/repo",
+      title: "lightcode/thread-o",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    });
+  });
+
+  it("updates the same session to full access before a later turn", async () => {
+    const update = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+    const promptAsync = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_test" } }),
+          update,
+          promptAsync,
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation,
+      config: { ...config, approvalPolicy: "default" },
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread({ ...config, approvalPolicy: "default" });
+    await session.startTurn("ship it", { ...config, approvalPolicy: "yolo" });
+
+    expect(update).toHaveBeenCalledWith({
+      directory: "/repo",
+      sessionID: "ses_test",
+      permission: [{ permission: "*", pattern: "*", action: "allow" }],
+    });
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionID: "ses_test",
+        parts: [{ type: "text", text: "ship it" }],
+      }),
+    );
+  });
+
+  it("resolves Windows relative file mentions against the project root", async () => {
+    const promptAsync = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+    const windowsProject: ProjectLocation = {
+      kind: "windows",
+      path: "C:\\Users\\demo\\repo",
+    };
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_test" } }),
+          promptAsync,
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation: windowsProject,
+      config,
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread(config);
+    await session.startTurn("inspect file", config, [
+      { kind: "text", content: "inspect " },
+      { kind: "file", path: "tmp_osc9_scan.py" },
+    ]);
+
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directory: "C:\\Users\\demo\\repo",
+        sessionID: "ses_test",
+        parts: [
+          { type: "text", text: "inspect " },
+          {
+            type: "file",
+            mime: "application/octet-stream",
+            filename: "tmp_osc9_scan.py",
+            url: expect.stringContaining("C"),
+          },
+        ],
+      }),
+    );
+    const input = promptAsync.mock.calls[0]?.[0] as { parts?: Array<{ url?: string }> };
+    expect(input.parts?.[1]?.url).toContain("repo");
+    expect(input.parts?.[1]?.url).toContain("tmp_osc9_scan.py");
+  });
+
+  it("resolves WSL relative file mentions to Linux file URLs", async () => {
+    const promptAsync = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+    const wslProject: ProjectLocation = {
+      kind: "wsl",
+      distro: "Ubuntu",
+      uncPath: "\\\\wsl$\\Ubuntu\\home\\demo\\repo",
+      linuxPath: "/home/demo/repo",
+    };
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_test" } }),
+          promptAsync,
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation: wslProject,
+      config,
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread(config);
+    await session.startTurn("inspect file", config, [{ kind: "file", path: "src/main.ts" }]);
+
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        directory: "/home/demo/repo",
+        sessionID: "ses_test",
+        parts: [
+          {
+            type: "file",
+            mime: "application/octet-stream",
+            filename: "main.ts",
+            url: "file:///home/demo/repo/src/main.ts",
+          },
+        ],
+      }),
+    );
+  });
+
+  it("restores supervised permissions on the same session before a later turn", async () => {
+    const update = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+    const promptAsync = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+    const agentPermission = [{ permission: "bash", pattern: "*", action: "ask" as const }];
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        app: {
+          agents: vi
+            .fn<
+              () => Promise<{ data: Array<{ name: string; permission: typeof agentPermission }> }>
+            >()
+            .mockResolvedValue({ data: [{ name: "build", permission: agentPermission }] }),
+        },
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_test" } }),
+          update,
+          promptAsync,
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation,
+      config: { ...config, approvalPolicy: "yolo" },
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread({ ...config, approvalPolicy: "yolo" });
+    await session.startTurn("be careful", { ...config, approvalPolicy: "default" });
+
+    expect(update).toHaveBeenCalledWith({
+      directory: "/repo",
+      sessionID: "ses_test",
+      permission: agentPermission,
+    });
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionID: "ses_test",
+        parts: [{ type: "text", text: "be careful" }],
+      }),
+    );
+  });
 });
 
 describe("parseOpenCodeQuestionAnswers", () => {

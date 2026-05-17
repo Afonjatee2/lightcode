@@ -325,7 +325,7 @@ describe("ThreadDraftView", () => {
       expect(providerModel?.currentModel).toBe("gpt-5.4");
       const effortContext = props.controls.find((c) => c.kind === "effort-context");
       expect(effortContext?.effortValue).toBe("high");
-      expect(props.controls.some((control) => control.value === "full-access")).toBe(true);
+      expect(props.controls.some((control) => control.value === "default-permissions")).toBe(true);
     });
 
     fireEvent.click(screen.getByText("set-prompt"));
@@ -337,8 +337,6 @@ describe("ThreadDraftView", () => {
         model: "gpt-5.4",
         effort: "high",
         mode: "agent",
-        approvalPolicy: "never",
-        sandboxMode: "danger-full-access",
       },
       presentationMode: "gui",
       prompt: "hello world",

@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   extractAcpAddedFileText,
   extractAcpDiffResultPart,
+  extractAcpDiffSummary,
+  extractAcpPatchTargetPath,
   extractAcpResultPart,
 } from "./acpToolPayload";
 
@@ -91,5 +93,35 @@ describe("acpToolPayload", () => {
         "",
       ].join("\n"),
     );
+  });
+
+  it("synthesizes diffs and summaries from apply_patch patchText args", () => {
+    const payload = {
+      args: {
+        patchText: [
+          "*** Begin Patch",
+          "*** Update File: src/foo.ts",
+          "@@",
+          "-old",
+          "+new",
+          "*** End Patch",
+        ].join("\n"),
+      },
+    };
+
+    expect(extractAcpPatchTargetPath(payload)).toBe("src/foo.ts");
+    expect(extractAcpDiffSummary(payload)).toEqual({ added: 1, removed: 1 });
+    expect(extractAcpDiffResultPart(payload)).toEqual({
+      text: [
+        "diff --git a/src/foo.ts b/src/foo.ts",
+        "--- a/src/foo.ts",
+        "+++ b/src/foo.ts",
+        "@@ -1 +1 @@",
+        "-old",
+        "+new",
+        "",
+      ].join("\n"),
+      language: "diff",
+    });
   });
 });

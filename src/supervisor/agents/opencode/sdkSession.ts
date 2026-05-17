@@ -15,7 +15,8 @@
  */
 
 import { pathToFileURL } from "node:url";
-import type { Event } from "@opencode-ai/sdk/v2";
+import { posix, win32 } from "node:path";
+import type { Event, PermissionRule } from "@opencode-ai/sdk/v2";
 import type {
   AgentSlashCommand,
   ProjectLocation,
@@ -35,9 +36,12 @@ import {
   type StartTurnOptions,
   type StructuredSessionHandle,
   type StructuredSessionListener,
+  type ThreadHistory,
+  type ThreadHistoryEntry,
 } from "../base";
 import { chosenOptionIds } from "../questionAnswers";
 import { mapOpenCodeSlashCommands } from "./detection";
+import { classifyOpenCodeError } from "./opencodeErrors";
 import { buildOpenCodePermissionRules } from "./permissionRules";
 import {
   acquireOpenCodeServer,
@@ -73,6 +77,10 @@ export interface OpenCodeQuestionAnswerContext {
   optionValues: Record<string, string>;
 }
 
+function encodePosixFileUrl(path: string): string {
+  return `file://${path.split("/").map(encodeURIComponent).join("/")}`;
+}
+
 function resolveAbsolutePath(location: ProjectLocation, segmentPath: string): string {
   if (location.kind === "wsl") {
     // Segments arrive as host (Windows) UNC paths or already-Linux paths.
@@ -83,9 +91,20 @@ function resolveAbsolutePath(location: ProjectLocation, segmentPath: string): st
       const m = unc.match(/^\/\/wsl(?:\$|\.localhost)\/[^/]+(\/.*)$/i);
       if (m && m[1]) return m[1];
     }
-    return segmentPath;
+    return posix.isAbsolute(segmentPath)
+      ? segmentPath
+      : posix.join(location.linuxPath, segmentPath);
   }
+  if (location.kind === "windows") {
+    return win32.isAbsolute(segmentPath) ? segmentPath : win32.join(location.path, segmentPath);
+  }
+  if (!posix.isAbsolute(segmentPath)) return posix.join(location.path, segmentPath);
   return segmentPath;
+}
+
+function fileUrlForPath(location: ProjectLocation, path: string): string {
+  if (location.kind === "windows") return pathToFileURL(path).href;
+  return encodePosixFileUrl(path);
 }
 
 function inferMimeFromPath(path: string): string {
@@ -117,7 +136,7 @@ function segmentsToParts(
         continue;
       }
       const absolute = resolveAbsolutePath(location, seg.path);
-      const url = pathToFileURL(absolute).href;
+      const url = fileUrlForPath(location, absolute);
       const mime =
         seg.kind === "attachment" && seg.mimeType ? seg.mimeType : inferMimeFromPath(absolute);
       const filename = absolute.split(/[\\/]/).pop();
@@ -186,6 +205,8 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
   private mapperState: OpenCodeMapperState | undefined;
   private bufferedRuntimeEvents: RuntimeEvent[] = [];
   private currentConfig: ThreadConfig | undefined;
+  private appliedPermissionSyncKey: string | undefined;
+  private sessionHasPermissionOverride = false;
   private activated = false;
   private disposed = false;
   private pendingRequests = new Map<ThreadServerRequestId, PendingRequest>();
@@ -238,9 +259,18 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
     this.activated = true;
 
-    this.acquired = await acquireOpenCodeServer({
-      projectLocation: this.input.projectLocation,
-    });
+    try {
+      this.acquired = await acquireOpenCodeServer({
+        projectLocation: this.input.projectLocation,
+      });
+    } catch (cause) {
+      // Surface server-startup failures (sandbox blocks, ENOENT, port races,
+      // macOS quarantine) as classified user-facing strings rather than the
+      // raw thrown shape. The runtime relays these through `onError`.
+      throw new Error(classifyOpenCodeError({ cause, operation: "start opencode serve" }), {
+        cause,
+      });
+    }
 
     if (this.isGui) {
       this.mapperState = createOpenCodeMapperState(this.threadId);
@@ -254,26 +284,42 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
 
     if (sessionRef?.providerSessionId) {
       // Resume existing session.
-      const existing = await acquired.client.session.get({
-        directory: this.sdkDirectory,
-        sessionID: sessionRef.providerSessionId,
-      });
-      const id = existing.data?.id;
+      let existing: Awaited<ReturnType<typeof acquired.client.session.get>>;
+      try {
+        existing = await acquired.client.session.get({
+          directory: this.sdkDirectory,
+          sessionID: sessionRef.providerSessionId,
+        });
+      } catch (cause) {
+        throw new Error(classifyOpenCodeError({ cause, operation: "session.get" }), { cause });
+      }
+      const existingData = existing.data;
+      const id = existingData?.id;
       if (!id) throw new Error("opencode session.get returned no id");
       this.sessionId = id;
+      this.sessionHasPermissionOverride = existingData.permission !== undefined;
+      this.appliedPermissionSyncKey = undefined;
       if (this.mapperState) setOpenCodeMainSessionId(this.mapperState, id);
       await this.refreshSlashCommands();
       return id;
     }
 
-    const created = await acquired.client.session.create({
-      directory: this.sdkDirectory,
-      title: `lightcode/${this.threadId.slice(0, 8)}`,
-      permission: buildOpenCodePermissionRules(config.approvalPolicy),
-    });
+    const permission = buildOpenCodePermissionRules(config.approvalPolicy);
+    let created: Awaited<ReturnType<typeof acquired.client.session.create>>;
+    try {
+      created = await acquired.client.session.create({
+        directory: this.sdkDirectory,
+        title: `lightcode/${this.threadId.slice(0, 8)}`,
+        ...(permission ? { permission } : {}),
+      });
+    } catch (cause) {
+      throw new Error(classifyOpenCodeError({ cause, operation: "session.create" }), { cause });
+    }
     const id = created.data?.id;
     if (!id) throw new Error("opencode session.create returned no id");
     this.sessionId = id;
+    this.sessionHasPermissionOverride = permission !== undefined;
+    this.appliedPermissionSyncKey = this.permissionSyncKey(config);
     if (this.mapperState) setOpenCodeMainSessionId(this.mapperState, id);
     await this.refreshSlashCommands();
     return id;
@@ -307,14 +353,21 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     // as "model default", so only forward truthy values.
     const variant = config.effort && config.effort.length > 0 ? config.effort : undefined;
 
-    await acquired.client.session.promptAsync({
-      directory: this.sdkDirectory,
-      sessionID,
-      ...(model ? { model } : {}),
-      ...(agent ? { agent } : {}),
-      ...(variant ? { variant } : {}),
-      ...(parts.length > 0 ? { parts } : {}),
-    });
+    try {
+      await this.syncSessionPermissions(config);
+      await acquired.client.session.promptAsync({
+        directory: this.sdkDirectory,
+        sessionID,
+        ...(model ? { model } : {}),
+        ...(agent ? { agent } : {}),
+        ...(variant ? { variant } : {}),
+        ...(parts.length > 0 ? { parts } : {}),
+      });
+    } catch (cause) {
+      throw new Error(classifyOpenCodeError({ cause, operation: "session.promptAsync" }), {
+        cause,
+      });
+    }
   }
 
   async interruptTurn(): Promise<void> {
@@ -371,6 +424,94 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
   }
 
+  /**
+   * Dump the OpenCode server's view of this thread's messages. Mirrors
+   * t3code's `readThread`: `session.messages` returns every message in the
+   * session (both roles), each with its parts (text / tool / reasoning) and
+   * `info` metadata (token counts, role, time fields). Consumers can replay
+   * the result through the canonical mapper, or use it for a "regenerate
+   * from turn X" UI.
+   */
+  async readThread(): Promise<ThreadHistory> {
+    const acquired = this.requireAcquired();
+    const sessionID = this.requireSessionId();
+    let result: Awaited<ReturnType<typeof acquired.client.session.messages>>;
+    try {
+      result = await acquired.client.session.messages({
+        directory: this.sdkDirectory,
+        sessionID,
+      });
+    } catch (cause) {
+      throw new Error(classifyOpenCodeError({ cause, operation: "session.messages" }), { cause });
+    }
+    const messages = toThreadHistoryEntries(result.data ?? []);
+    return { providerSessionId: sessionID, messages };
+  }
+
+  /**
+   * Truncate the OpenCode session back to the assistant message that came
+   * `numTurns` *assistant turns* before the current head. Counting only
+   * assistant messages matches what the UI thinks of as a "turn" — each
+   * regenerate / rollback action wipes the last N assistant replies and the
+   * user prompts that followed.
+   *
+   * Returns the post-revert history. The current sessionId stays the same;
+   * OpenCode reverts in-place rather than forking.
+   */
+  async rollbackThread(numTurns: number): Promise<ThreadHistory> {
+    if (!Number.isInteger(numTurns) || numTurns < 1) {
+      throw new Error(`rollbackThread: numTurns must be a positive integer (got ${numTurns}).`);
+    }
+    const acquired = this.requireAcquired();
+    const sessionID = this.requireSessionId();
+
+    let messagesResult: Awaited<ReturnType<typeof acquired.client.session.messages>>;
+    try {
+      messagesResult = await acquired.client.session.messages({
+        directory: this.sdkDirectory,
+        sessionID,
+      });
+    } catch (cause) {
+      throw new Error(classifyOpenCodeError({ cause, operation: "session.messages" }), { cause });
+    }
+    const entries = messagesResult.data ?? [];
+    const assistantMessages = entries.filter(
+      (entry: { info?: { role?: unknown } }) => entry.info?.role === "assistant",
+    );
+    // -1 because the *current* head also counts; reverting N turns means we
+    // want the assistant message N+1 from the end to become the new head.
+    const targetIndex = assistantMessages.length - numTurns - 1;
+    const target = targetIndex >= 0 ? assistantMessages[targetIndex] : undefined;
+    const targetMessageId =
+      target && typeof target.info?.id === "string" ? target.info.id : undefined;
+
+    try {
+      await acquired.client.session.revert({
+        directory: this.sdkDirectory,
+        sessionID,
+        ...(targetMessageId ? { messageID: targetMessageId } : {}),
+      });
+    } catch (cause) {
+      throw new Error(classifyOpenCodeError({ cause, operation: "session.revert" }), { cause });
+    }
+
+    // Mapper state retains items from the pre-revert turns; flush them so any
+    // future emit from the new tail doesn't collide with stale ids the
+    // renderer no longer cares about. The mapper's text-dedup table is the
+    // most likely culprit if we skip this — `emittedText` would refuse to
+    // emit identical content the server now re-sends.
+    if (this.mapperState) {
+      const closing = closeOpenItems(this.mapperState);
+      if (this.listener?.onRuntimeEvent) {
+        for (const ev of closing) this.listener.onRuntimeEvent(ev);
+      } else {
+        this.bufferedRuntimeEvents.push(...closing);
+      }
+    }
+
+    return this.readThread();
+  }
+
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
@@ -408,6 +549,67 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       throw new Error("OpencodeSdkSession.openThread has not completed.");
     }
     return this.sessionId;
+  }
+
+  private permissionSyncKey(config: ThreadConfig): string {
+    const permission = buildOpenCodePermissionRules(config.approvalPolicy);
+    if (permission) return "full-access";
+    return `supervised:${config.mode === "plan" ? "plan" : "build"}`;
+  }
+
+  private async syncSessionPermissions(config: ThreadConfig): Promise<void> {
+    const syncKey = this.permissionSyncKey(config);
+    if (this.appliedPermissionSyncKey === syncKey) return;
+
+    const acquired = this.requireAcquired();
+    const sessionID = this.requireSessionId();
+    const fullAccessPermission = buildOpenCodePermissionRules(config.approvalPolicy);
+
+    if (fullAccessPermission) {
+      await this.updateSessionPermission(sessionID, fullAccessPermission);
+      this.sessionHasPermissionOverride = true;
+      this.appliedPermissionSyncKey = syncKey;
+      return;
+    }
+
+    if (!this.sessionHasPermissionOverride) {
+      // Fresh supervised sessions have no session-level permission override;
+      // OpenCode already resolves permissions from its loaded config stack.
+      this.appliedPermissionSyncKey = syncKey;
+      return;
+    }
+
+    let rules: PermissionRule[];
+    try {
+      const result = await acquired.client.app.agents({ directory: this.sdkDirectory });
+      const agents = Array.isArray(result.data) ? result.data : [];
+      const agentName = config.mode === "plan" ? "plan" : "build";
+      const agent = agents.find((candidate) => candidate.name === agentName);
+      if (!agent) throw new Error(`OpenCode agent '${agentName}' was not found.`);
+      rules = agent.permission;
+    } catch (cause) {
+      throw new Error(classifyOpenCodeError({ cause, operation: "app.agents" }), { cause });
+    }
+
+    await this.updateSessionPermission(sessionID, rules);
+    this.sessionHasPermissionOverride = true;
+    this.appliedPermissionSyncKey = syncKey;
+  }
+
+  private async updateSessionPermission(
+    sessionID: string,
+    permission: PermissionRule[],
+  ): Promise<void> {
+    const acquired = this.requireAcquired();
+    try {
+      await acquired.client.session.update({
+        directory: this.sdkDirectory,
+        sessionID,
+        permission,
+      });
+    } catch (cause) {
+      throw new Error(classifyOpenCodeError({ cause, operation: "session.update" }), { cause });
+    }
   }
 
   private updateSlashCommands(commands: AgentSlashCommand[]): void {
@@ -657,4 +859,33 @@ function answerRowsForOptionIds(
     rows[questionIndex]!.push(value);
   }
   return rows;
+}
+
+/**
+ * Normalise `session.messages` SDK output into the shared
+ * `ThreadHistoryEntry[]` shape. We keep `parts` and `info` as opaque payloads
+ * — the canonical mapper reads them through the same field names as live
+ * events, so a future replay layer can feed these straight back through
+ * `mapOpenCodeEvent` if it wants per-message canonical reconstruction.
+ */
+function toThreadHistoryEntries(raw: ReadonlyArray<unknown>): ThreadHistoryEntry[] {
+  const entries: ThreadHistoryEntry[] = [];
+  for (const candidate of raw) {
+    if (!candidate || typeof candidate !== "object") continue;
+    const obj = candidate as { info?: unknown; parts?: unknown };
+    const info =
+      obj.info && typeof obj.info === "object" ? (obj.info as Record<string, unknown>) : undefined;
+    const messageId = info && typeof info.id === "string" ? info.id : undefined;
+    const role =
+      info?.role === "assistant" ? "assistant" : info?.role === "user" ? "user" : undefined;
+    if (!messageId || !role) continue;
+    const parts = Array.isArray(obj.parts) ? obj.parts : [];
+    entries.push({
+      messageId,
+      role,
+      parts,
+      info,
+    });
+  }
+  return entries;
 }

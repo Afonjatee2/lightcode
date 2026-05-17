@@ -69,23 +69,52 @@ export async function generateTitle(
     throw new Error(`No default one-shot model configured for ${adapter.label}`);
   }
 
-  if (!adapter.buildOneShotCommand) {
+  if (!adapter.runOneShot && !adapter.buildOneShotCommand) {
     throw new Error(`${adapter.label} does not support one-shot generation`);
   }
 
   const finalPrompt = PROMPT + truncatePrompt(prompt);
-  const cmd = adapter.buildOneShotCommand(effectiveModel, effort, finalPrompt);
-  if (!cmd) {
-    throw new Error(`${adapter.label} does not support one-shot generation`);
-  }
 
-  const spawnSpec = buildOneShotSpec(location, cmd.command, cmd.args);
-  console.log(`[title-gen] spawning: ${spawnSpec.command} ${spawnSpec.args.join(" ")}`);
+  // Prefer the SDK / structured-runtime path: no cold-start cost, no argv
+  // length limit. Fall back to spawning the CLI when the adapter only
+  // exposes `buildOneShotCommand`.
+  const raw = adapter.runOneShot
+    ? await adapter.runOneShot({
+        location,
+        model: effectiveModel,
+        effort,
+        prompt: finalPrompt,
+        signal: timeoutSignal(TITLE_GEN_TIMEOUT_MS),
+      })
+    : await runViaCli(location, adapter, effectiveModel, effort, finalPrompt);
 
-  const raw = await spawnAgent(spawnSpec, cmd.stdin ?? finalPrompt, TITLE_GEN_TIMEOUT_MS);
   const title = cleanTitle(raw);
   if (!title) {
     throw new Error("Title generation returned empty result");
   }
   return title;
+}
+
+async function runViaCli(
+  location: ProjectLocation,
+  adapter: AgentAdapter,
+  model: string,
+  effort: string | undefined,
+  prompt: string,
+): Promise<string> {
+  const cmd = adapter.buildOneShotCommand!(model, effort, prompt);
+  if (!cmd) {
+    throw new Error(`${adapter.label} does not support one-shot generation`);
+  }
+  const spawnSpec = buildOneShotSpec(location, cmd.command, cmd.args);
+  return spawnAgent(spawnSpec, cmd.stdin ?? prompt, TITLE_GEN_TIMEOUT_MS);
+}
+
+function timeoutSignal(timeoutMs: number): AbortSignal | undefined {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return undefined;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  if (typeof timer.unref === "function") timer.unref();
+  controller.signal.addEventListener("abort", () => clearTimeout(timer), { once: true });
+  return controller.signal;
 }

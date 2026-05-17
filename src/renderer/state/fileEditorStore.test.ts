@@ -23,8 +23,10 @@ describe("fileEditorStore path remapping", () => {
       tabs: [],
       activePath: null,
       previewTab: null,
+      markdownPreviewPath: null,
       buffers: {},
       refreshToken: 0,
+      pendingReveal: null,
     });
   });
 
@@ -131,8 +133,10 @@ describe("fileEditorStore preview tabs", () => {
       tabs: [],
       activePath: null,
       previewTab: null,
+      markdownPreviewPath: null,
       buffers: {},
       refreshToken: 0,
+      pendingReveal: null,
     });
   });
 
@@ -239,6 +243,7 @@ describe("fileEditorStore preview tabs", () => {
       tabs: ["src/a.ts"],
       activePath: "src/a.ts",
       previewTab: "src/a.ts",
+      markdownPreviewPath: "src/a.ts",
       buffers: { "src/a.ts": makeBuffer("src/a.ts") },
       refreshToken: 0,
     });
@@ -246,6 +251,7 @@ describe("fileEditorStore preview tabs", () => {
     useFileEditorStore.getState().renamePath("src", "app");
 
     expect(useFileEditorStore.getState().previewTab).toBe("app/a.ts");
+    expect(useFileEditorStore.getState().markdownPreviewPath).toBe("app/a.ts");
   });
 
   it("removePath clears previewTab when the preview file is deleted", () => {
@@ -253,6 +259,7 @@ describe("fileEditorStore preview tabs", () => {
       tabs: ["src/a.ts", "other.ts"],
       activePath: "src/a.ts",
       previewTab: "src/a.ts",
+      markdownPreviewPath: "src/a.ts",
       overlayMode: "modal",
       buffers: { "src/a.ts": makeBuffer("src/a.ts"), "other.ts": makeBuffer("other.ts") },
       refreshToken: 0,
@@ -261,6 +268,7 @@ describe("fileEditorStore preview tabs", () => {
     useFileEditorStore.getState().removePath("src");
 
     expect(useFileEditorStore.getState().previewTab).toBeNull();
+    expect(useFileEditorStore.getState().markdownPreviewPath).toBeNull();
     expect(useFileEditorStore.getState().tabs).toEqual(["other.ts"]);
   });
 });

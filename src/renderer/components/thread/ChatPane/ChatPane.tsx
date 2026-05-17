@@ -198,6 +198,9 @@ export function ChatPane(props: ChatPaneProps) {
 
   const isEmpty = timelineEntries.length === 0 && !hasSupplementaryContent;
   const isLive = isThreadTurnActive(status);
+  const hasOpenRuntimeRequest = useAppStore(
+    (s) => (s.runtimeRequestsByThread[threadId]?.length ?? 0) > 0,
+  );
   // Anchor on thread.status alone — gating on item state caused the loader to
   // disappear in the gap between an item flipping to `completed` and the next
   // `item.started` arriving, even though the runtime was still working the
@@ -219,7 +222,8 @@ export function ChatPane(props: ChatPaneProps) {
   // The agent is not actually working while it waits for a user answer, so the
   // tail loader keeps rendering but its elapsed-time counter freezes for the
   // duration of the wait and resumes once the thread flips back to working.
-  const isTurnPaused = status === "needs_reply";
+  const isTurnPaused =
+    status === "needs_reply" || status === "needs_approval" || hasOpenRuntimeRequest;
   const showEmptyHint = isEmpty && !isLive;
   // The tail loader displays the most recent completed turn's frozen elapsed
   // time when the thread is idle and no newer timeline row exists. Once an
@@ -497,7 +501,10 @@ const ChatScrollControls = forwardRef<
       if (nextScrollTop < prevScrollTop && !isAtBottom && hasRecentUserScrollIntent()) {
         cancelScheduledInitialSettle();
         stickToBottomRef.current = false;
-      } else if (isAtBottom) {
+      } else if (isAtBottom && (nextScrollTop >= prevScrollTop || !hasRecentUserScrollIntent())) {
+        // Don't re-enable sticky when the user is actively scrolling upward but
+        // is still within `BOTTOM_EPSILON_PX` of the bottom — otherwise a tiny
+        // wheel-up gets snapped back by the next streaming delta.
         stickToBottomRef.current = true;
       }
       setShowScrollDown(!stickToBottomRef.current && !isAtBottom);
@@ -700,7 +707,11 @@ function WorkingFor({ turn, isPaused }: { turn: TurnTiming; isPaused: boolean })
     return () => clearInterval(id);
   }, [turn.startedAt, turn.endedAt, isPaused]);
 
-  const className = turn.endedAt === null ? "lightcode-thinking-text" : "text-muted";
+  const className = isPaused
+    ? "text-warning"
+    : turn.endedAt === null
+      ? "lightcode-thinking-text"
+      : "text-muted";
   return <span ref={textRef} className={className} aria-live="polite" />;
 }
 

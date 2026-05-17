@@ -1260,6 +1260,13 @@ body {
   background: color-mix(in oklab, var(--surface) 88%, transparent);
 }
 
+.lightcode-composer-shell--preserve-disabled-controls
+  .lightcode-composer-menu:is(:disabled, [aria-disabled="true"], [data-disabled="true"]),
+.lightcode-composer-shell--preserve-disabled-controls
+  .lightcode-composer-toggle:is(:disabled, [aria-disabled="true"], [data-disabled="true"]) {
+  opacity: 1;
+}
+
 .lightcode-inline-control {
   height: 2.25rem;
   min-width: 0;

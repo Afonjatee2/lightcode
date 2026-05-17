@@ -133,19 +133,30 @@ export function commandIntentDisplay(fullCommandLine: string): CommandIntentDisp
 function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
   const trimmed = t.trim();
 
-  const gc = /^Get-Content\s+(.+)$/i.exec(trimmed);
-  if (gc) {
-    let p = gc[1]!.trim().replace(/^['"]|['"]$/g, "");
-    p = (p.split(/\s+/)[0] ?? p).replace(/^['"]|['"]$/g, "");
-    const base = p.split(/[/\\]/).pop() ?? p;
-    return { title: `Read file: ${base}`, kind: "view" };
+  const powerShellFileView = parsePowerShellGetContentView(trimmed);
+  if (powerShellFileView) {
+    const prefix = powerShellFileView.lines
+      ? `View ${formatLineRange(powerShellFileView.lines)}: `
+      : "View: ";
+    const label = powerShellFileView.lines
+      ? powerShellFileView.path
+      : basenameFromPath(powerShellFileView.path);
+    return {
+      title: `${prefix}${label}`,
+      parts: { prefix, path: powerShellFileView.path, filePath: true },
+      kind: "view",
+    };
   }
 
   const typeCmd = /^type\s+(.+)$/i.exec(trimmed);
   if (typeCmd) {
     const p = typeCmd[1]!.trim().replace(/^['"]|['"]$/g, "");
-    const base = p.split(/[/\\]/).pop() ?? p;
-    return { title: `Read file: ${base}`, kind: "view" };
+    const prefix = "View: ";
+    return {
+      title: `${prefix}${basenameFromPath(p)}`,
+      parts: { prefix, path: p, filePath: true },
+      kind: "view",
+    };
   }
 
   const sedView = parseSedView(trimmed);
@@ -249,6 +260,11 @@ interface PipedFileView {
   lines: string;
 }
 
+interface PowerShellFileView {
+  path: string;
+  lines?: string;
+}
+
 interface FindSearch {
   scope: string;
   pattern: string | undefined;
@@ -305,6 +321,87 @@ function parsePipedFileView(command: string): PipedFileView | null {
 
   const sed = parseSedView(`${sedPart} ${path}`);
   return sed ? { path, lines: sed.lines } : null;
+}
+
+function parsePowerShellGetContentView(command: string): PowerShellFileView | null {
+  const parts = splitPowerShellPipeline(command);
+  const path = extractPowerShellGetContentPath(splitPowerShellWords(parts[0] ?? command));
+  if (!path) return null;
+
+  const lines = parts
+    .slice(1)
+    .map((part) => parseSelectObjectLineWindow(splitPowerShellWords(part)))
+    .find((lineWindow): lineWindow is string => !!lineWindow);
+  return { path, ...(lines ? { lines } : {}) };
+}
+
+function extractPowerShellGetContentPath(words: string[]): string | undefined {
+  const executable = words[0]?.split(/[/\\]/).pop()?.toLowerCase();
+  if (executable !== "get-content" && executable !== "gc") return undefined;
+
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]!;
+    const lower = word.toLowerCase();
+    if (lower === "-path" || lower === "-literalpath") return words[i + 1];
+    if (lower.startsWith("-path:")) return word.slice("-Path:".length);
+    if (lower.startsWith("-literalpath:")) return word.slice("-LiteralPath:".length);
+    if (word.startsWith("-")) {
+      if (getContentOptionConsumesValue(lower)) i++;
+      continue;
+    }
+    return word;
+  }
+  return undefined;
+}
+
+function getContentOptionConsumesValue(option: string): boolean {
+  return (
+    option === "-encoding" ||
+    option === "-filter" ||
+    option === "-include" ||
+    option === "-exclude" ||
+    option === "-readcount" ||
+    option === "-totalcount" ||
+    option === "-tail" ||
+    option === "-delimiter" ||
+    option === "-stream" ||
+    option === "-credential"
+  );
+}
+
+function parseSelectObjectLineWindow(words: string[]): string | undefined {
+  const executable = words[0]?.split(/[/\\]/).pop()?.toLowerCase();
+  if (executable !== "select-object" && executable !== "select") return undefined;
+
+  let skip = 0;
+  let first: number | undefined;
+  for (let i = 1; i < words.length; i++) {
+    const word = words[i]!;
+    const lower = word.toLowerCase();
+    if (lower === "-skip") {
+      skip = readNonNegativeInteger(words[++i]) ?? skip;
+      continue;
+    }
+    if (lower.startsWith("-skip:")) {
+      skip = readNonNegativeInteger(word.slice("-Skip:".length)) ?? skip;
+      continue;
+    }
+    if (lower === "-first") {
+      first = readNonNegativeInteger(words[++i]) ?? first;
+      continue;
+    }
+    if (lower.startsWith("-first:")) {
+      first = readNonNegativeInteger(word.slice("-First:".length)) ?? first;
+    }
+  }
+  if (first === undefined) return undefined;
+  const start = skip + 1;
+  return `${start}-${start + first - 1}`;
+}
+
+function readNonNegativeInteger(value: string | undefined): number | undefined {
+  if (!value || !/^\d+$/.test(value)) return undefined;
+  return Number(value);
 }
 
 function extractPipedReadableFilePath(words: string[]): string | undefined {
@@ -494,6 +591,46 @@ function splitShellPipeline(command: string): string[] {
   return parts;
 }
 
+function splitPowerShellPipeline(command: string): string[] {
+  const parts: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+
+  for (const ch of command) {
+    if (escaped) {
+      current += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "`") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      current += ch;
+      if (ch === quote) quote = null;
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      current += ch;
+      quote = ch;
+      continue;
+    }
+    if (ch === "|") {
+      const part = current.trim();
+      if (part.length > 0) parts.push(part);
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+
+  const tail = current.trim();
+  if (tail.length > 0) parts.push(tail);
+  return parts;
+}
+
 function splitShellWords(input: string): string[] {
   const words: string[] = [];
   let current = "";
@@ -534,4 +671,56 @@ function splitShellWords(input: string): string[] {
 
   if (current.length > 0) words.push(current);
   return words;
+}
+
+function splitPowerShellWords(input: string): string[] {
+  const words: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaped = false;
+
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i]!;
+    if (escaped) {
+      current += ch;
+      escaped = false;
+      continue;
+    }
+    if (ch === "`") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (quote === "'" && ch === "'" && input[i + 1] === "'") {
+        current += "'";
+        i++;
+        continue;
+      }
+      if (ch === quote) {
+        quote = null;
+      } else {
+        current += ch;
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"') {
+      quote = ch;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (current.length > 0) {
+        words.push(current);
+        current = "";
+      }
+      continue;
+    }
+    current += ch;
+  }
+
+  if (current.length > 0) words.push(current);
+  return words;
+}
+
+function basenameFromPath(path: string): string {
+  return path.split(/[/\\]/).pop() ?? path;
 }

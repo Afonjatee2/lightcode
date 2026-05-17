@@ -212,7 +212,10 @@ function formatRuntimeItemForHandoff(item: RuntimeChatItem): string | null {
       const status = typeof payload?.status === "string" ? ` (${payload.status})` : "";
       return objective ? `Goal${status}:\n${objective}` : null;
     }
-    case "tool_call": {
+    case "tool_call":
+    case "mcp_tool_call":
+    case "image_view":
+    case "dynamic_tool_call": {
       const name = typeof payload?.title === "string" ? payload.title : payload?.name;
       const status = typeof payload?.status === "string" ? payload.status : item.state;
       return typeof name === "string" ? `Tool ${status}: ${name}` : null;

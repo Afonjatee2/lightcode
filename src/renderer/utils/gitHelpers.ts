@@ -75,7 +75,7 @@ export async function openFileInEditor(
   worktreePath: string | undefined,
   worktreeBranch: string | undefined,
   path: string,
-  lineNumber?: number,
+  options?: number | { lineNumber?: number; markdownPreview?: boolean },
 ): Promise<void> {
   const fileEditor = useFileEditorStore.getState();
   const targetContext = buildFileEditorContext(project, worktreePath, worktreeBranch);
@@ -91,7 +91,7 @@ export async function openFileInEditor(
       path,
       "modal",
       false,
-      lineNumber !== undefined ? { lineNumber } : undefined,
+      typeof options === "number" ? { lineNumber: options } : options,
     );
   } catch (error) {
     captureRendererException(error, { featureArea: "file-editor" });

@@ -323,12 +323,14 @@ function getInlineRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | n
 }
 
 function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | null {
-  const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+  const payload = getToolLikePayload(item);
   if (!payload?.name) return null;
-  const hasDetails = payload.args !== undefined || payload.result !== undefined;
   const display = deriveToolDisplay(payload);
+  const diffPart = isEditLikeToolPayload(payload) ? extractAcpDiffResultPart(payload) : undefined;
+  const diffText = diffPart?.text || undefined;
+  const hasDetails = payload.args !== undefined || payload.result !== undefined || !!diffText;
   const sections: ToolCallSection[] =
-    isExpanded && hasDetails
+    isExpanded && hasDetails && !diffText
       ? [
           { label: "args", part: extractAcpArgsPart(payload) },
           { label: "result", part: extractAcpResultPart(payload) },
@@ -336,10 +338,13 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
       : [];
   const isRunning = item.state !== "completed";
   const isError = payload.status === "error";
+  const diffSummary = diffText ? extractAcpDiffSummary(payload) : undefined;
   const rightLabel: ReactNode = isRunning ? (
     <PixelLoader size="xxs" className="text-[color:var(--muted)]" />
   ) : isError ? (
     <ErrorIcon />
+  ) : diffSummary ? (
+    formatDiffSummaryLabel(diffSummary)
   ) : undefined;
   return {
     Icon: display.Icon,
@@ -349,7 +354,20 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
     rightLabelClassName: isError ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails,
     sections,
+    bodyText: isExpanded ? diffText : undefined,
+    bodyKind: diffText ? "diff" : "text",
+    bodyFilePath: display.parts?.filePath ? display.parts.path : undefined,
   };
+}
+
+function isEditLikeToolPayload(payload: ToolCallPayload): boolean {
+  switch (payload.kind) {
+    case "edit":
+    case "delete":
+    case "move":
+      return true;
+  }
+  return categorizeToolName(payload.name) === "edited";
 }
 
 function ErrorIcon() {
@@ -364,6 +382,7 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
     item.streams.command_output && item.streams.command_output.length > 0
       ? item.streams.command_output
       : extractAcpResultText(payload);
+  const outputPath = display?.kind === "view" ? display.parts?.path : undefined;
   const isRunning = item.state !== "completed";
   const isErrorExit =
     !isRunning &&
@@ -382,6 +401,7 @@ function getCommandRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow | 
     hasDetails: output.length > 0,
     sections: [],
     bodyText: isExpanded ? output : undefined,
+    bodyLanguage: outputPath ? detectLanguageFromPath(outputPath) : undefined,
   };
 }
 
@@ -537,7 +557,7 @@ function summarizeSameFileEditGroup(
       return null;
     }
 
-    const diffSummary = readFileChangeDiffSummary(item);
+    const diffSummary = readEditDiffSummary(item);
     if (diffSummary) {
       hasDiffSummary = true;
       added += diffSummary.added;
@@ -560,20 +580,24 @@ function readEditGroupPath(item: RuntimeChatItem): string | undefined {
     const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
     return payload?.path && payload.path.length > 0 ? payload.path : undefined;
   }
-  if (item.type !== "tool_call") return undefined;
-  const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+  if (!isToolLikeItem(item)) return undefined;
+  const payload = getToolLikePayload(item);
   if (!payload) return undefined;
   const display = deriveToolDisplay(payload);
   if (display.parts?.filePath && display.parts.path.length > 0) return display.parts.path;
   return payload.locations?.find((location) => location.path.length > 0)?.path;
 }
 
-function readFileChangeDiffSummary(
+function readEditDiffSummary(
   item: RuntimeChatItem,
 ): NonNullable<FileChangePayload["diffSummary"]> | undefined {
-  if (item.type !== "file_change") return undefined;
-  const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
-  return payload?.diffSummary ?? extractAcpDiffSummary(payload);
+  if (item.type === "file_change") {
+    const payload = getRuntimeItemPayload<FileChangePayload>(item, "file_change");
+    return payload?.diffSummary ?? extractAcpDiffSummary(payload);
+  }
+  if (!isToolLikeItem(item)) return undefined;
+  const payload = getToolLikePayload(item);
+  return payload && isEditLikeToolPayload(payload) ? extractAcpDiffSummary(payload) : undefined;
 }
 
 function normalizeEditGroupPath(path: string): string {
@@ -584,7 +608,7 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
   if (isContextCompactionToolCall(item)) return false;
   if (isPlanProposalToolCall(item)) return false;
   return (
-    item.type === "tool_call" ||
+    isToolLikeItem(item) ||
     item.type === "command_execution" ||
     item.type === "file_change" ||
     item.type === "web_search"
@@ -595,7 +619,7 @@ function categorizeItem(item: RuntimeChatItem): GroupCategory {
   if (item.type === "command_execution") return categorizeCommandExecution(item);
   if (item.type === "file_change") return "edited";
   if (item.type === "web_search") return "searched";
-  const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+  const payload = getToolLikePayload(item);
   if (!payload) return "other";
   if (isSubAgentTool(payload)) return "executed";
 
@@ -619,6 +643,19 @@ function categorizeItem(item: RuntimeChatItem): GroupCategory {
   const byName = categorizeToolName(payload.name ?? "");
   if (byName !== "other") return byName;
   return categorizeVerbPrefix(payload.name ?? "");
+}
+
+function isToolLikeItem(item: RuntimeChatItem): boolean {
+  return (
+    item.type === "tool_call" ||
+    item.type === "mcp_tool_call" ||
+    item.type === "image_view" ||
+    item.type === "dynamic_tool_call"
+  );
+}
+
+function getToolLikePayload(item: RuntimeChatItem): ToolCallPayload | undefined {
+  return isToolLikeItem(item) ? (item.payload as ToolCallPayload | undefined) : undefined;
 }
 
 function categorizeCommandExecution(item: RuntimeChatItem): GroupCategory {

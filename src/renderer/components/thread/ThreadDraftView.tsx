@@ -146,6 +146,10 @@ function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
 
 function resolveApprovalPolicyValue(agent: AgentStatus, preferred?: string): string {
   const policies = agent.capabilities.approvalPolicies;
+  if (agent.kind === "codex" && !preferred) {
+    return "";
+  }
+
   return preferred && policies.some((p) => p.id === preferred)
     ? preferred
     : (findDefaultApprovalPolicy(agent) ?? policies[0]?.id ?? "");
@@ -165,6 +169,10 @@ function findDefaultSandboxMode(agent: AgentStatus): string | undefined {
 
 function resolveSandboxModeValue(agent: AgentStatus, preferred?: string): string {
   const modes = agent.capabilities.sandboxModes;
+  if (agent.kind === "codex" && !preferred) {
+    return "";
+  }
+
   return preferred && modes.some((m) => m.id === preferred)
     ? preferred
     : (findDefaultSandboxMode(agent) ?? modes[0]?.id ?? "");

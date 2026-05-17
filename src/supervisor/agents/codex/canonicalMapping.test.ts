@@ -66,6 +66,24 @@ describe("mapCodexNotification — turn lifecycle", () => {
     expect(completed).toMatchObject({ type: "turn.completed", state: "interrupted" });
   });
 
+  it("preserves failed turn status and surfaces the Codex error message", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification("turn/started", { turnId: "t-1", threadId: "x" }, state);
+    const events = mapCodexNotification(
+      "turn/completed",
+      {
+        threadId: "x",
+        turn: { id: "t-1", status: "failed", error: { message: "Rate limit exceeded" } },
+      },
+      state,
+    );
+
+    expect(events).toEqual([
+      { type: "error", threadId: "t-codex", message: "Rate limit exceeded" },
+      { type: "turn.completed", threadId: "t-codex", turnId: "t-1", state: "failed" },
+    ]);
+  });
+
   it("maps turn usage into context usage when the app-server provides it", () => {
     const state = createCodexMapperState("t-codex");
     mapCodexNotification("turn/started", { turnId: "t-1", threadId: "x" }, state);
@@ -265,6 +283,74 @@ describe("mapCodexNotification — goals", () => {
   });
 });
 
+describe("mapCodexNotification — plan updates", () => {
+  it("maps structured turn plan updates to a stable plan item", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification("turn/started", { turnId: "turn-1", threadId: "x" }, state);
+
+    const started = mapCodexNotification(
+      "turn/plan/updated",
+      {
+        threadId: "x",
+        turnId: "turn-1",
+        plan: [
+          { step: "Inspect Codex protocol", status: "completed" },
+          { step: "Patch gaps", status: "inProgress" },
+        ],
+      },
+      state,
+    );
+
+    expect(started).toEqual([
+      {
+        type: "item.started",
+        threadId: "t-codex",
+        itemId: expect.stringMatching(/^plan-/u),
+        itemType: "plan",
+        payload: {
+          steps: [
+            { step: "Inspect Codex protocol", status: "completed" },
+            { step: "Patch gaps", status: "in_progress" },
+          ],
+        },
+      },
+    ]);
+
+    const planItemId = started[0]?.type === "item.started" ? started[0].itemId : "";
+    const updated = mapCodexNotification(
+      "turn/plan/updated",
+      {
+        threadId: "x",
+        turnId: "turn-1",
+        plan: [
+          { step: "Inspect Codex protocol", status: "completed" },
+          { step: "Patch gaps", status: "completed" },
+        ],
+      },
+      state,
+    );
+
+    expect(updated).toEqual([
+      {
+        type: "item.updated",
+        threadId: "t-codex",
+        itemId: planItemId,
+        payload: {
+          steps: [
+            { step: "Inspect Codex protocol", status: "completed" },
+            { step: "Patch gaps", status: "completed" },
+          ],
+        },
+      },
+    ]);
+
+    expect(mapCodexNotification("turn/completed", { threadId: "x" }, state)).toEqual([
+      { type: "item.completed", threadId: "t-codex", itemId: planItemId },
+      { type: "turn.completed", threadId: "t-codex", turnId: "turn-1", state: "completed" },
+    ]);
+  });
+});
+
 describe("mapCodexNotification — item lifecycle (item/started, item/completed)", () => {
   it("ignores Codex user_message item/started (user bubble comes from CodexStructuredSession.startTurn)", () => {
     const state = createCodexMapperState("t-codex");
@@ -392,7 +478,7 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
     );
   });
 
-  it("captures tool_call args at start and result at completion (parity with ACP)", () => {
+  it("captures MCP tool args at start and result at completion (parity with ACP)", () => {
     const state = createCodexMapperState("t-codex");
     const started = mapCodexNotification(
       "item/started",
@@ -408,6 +494,7 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
       },
       state,
     );
+    expect((started[0] as { itemType: string }).itemType).toBe("mcp_tool_call");
     const startedPayload = (started[0] as { payload: Record<string, unknown> }).payload;
     expect(startedPayload).toMatchObject({
       name: "github-search",
@@ -426,6 +513,31 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
     );
     const completedPayload = (completed.at(-1) as { payload: Record<string, unknown> }).payload;
     expect(completedPayload).toMatchObject({ status: "success", result: { hits: 3 } });
+  });
+
+  it("preserves Codex dynamic and image tool item types", () => {
+    const state = createCodexMapperState("t-codex");
+    const dynamic = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "dynamic-1",
+        item: { id: "dynamic-1", type: "dynamicToolCall", title: "custom-tool" },
+      },
+      state,
+    );
+    const image = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "image-1",
+        item: { id: "image-1", type: "imageView", title: "preview" },
+      },
+      state,
+    );
+
+    expect((dynamic[0] as { itemType: string }).itemType).toBe("dynamic_tool_call");
+    expect((image[0] as { itemType: string }).itemType).toBe("image_view");
   });
 
   it("classifies file_change kind from item.changeKind / kind / type", () => {
@@ -828,6 +940,54 @@ describe("mapCodexNotification — streaming deltas", () => {
     expect(summary[0]).toMatchObject({ type: "content.delta", stream: "reasoning_text" });
   });
 
+  it("maps MCP tool progress into the existing tool payload", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "mcp-1",
+        item: { id: "mcp-1", type: "mcpToolCall", title: "github-search" },
+      },
+      state,
+    );
+
+    const events = mapCodexNotification(
+      "item/mcpToolCall/progress",
+      { threadId: "x", itemId: "mcp-1", message: "Searching repositories" },
+      state,
+    );
+
+    expect(events).toEqual([
+      {
+        type: "item.updated",
+        threadId: "t-codex",
+        itemId: expect.stringMatching(/^mcp_tool_call-/u),
+        payload: {
+          status: "running",
+          progress: { summary: "Searching repositories" },
+        },
+      },
+    ]);
+  });
+
+  it("maps Codex error and serverRequest/resolved notifications", () => {
+    const state = createCodexMapperState("t-codex");
+
+    expect(
+      mapCodexNotification(
+        "error",
+        { threadId: "x", turnId: "turn-1", error: { message: "Tool failed" }, willRetry: false },
+        state,
+      ),
+    ).toEqual([{ type: "error", threadId: "t-codex", message: "Tool failed" }]);
+    expect(
+      mapCodexNotification("serverRequest/resolved", { threadId: "x", requestId: 42 }, state),
+    ).toEqual([
+      { type: "request.resolved", threadId: "t-codex", requestId: "42", outcome: "answered" },
+    ]);
+  });
+
   it("auto-opens an item when delta arrives before item/started", () => {
     const state = createCodexMapperState("t-codex");
     const events = mapCodexNotification(
@@ -841,6 +1001,118 @@ describe("mapCodexNotification — streaming deltas", () => {
   it("returns [] for unknown methods", () => {
     const state = createCodexMapperState("t-codex");
     expect(mapCodexNotification("totally/unknown", {}, state)).toEqual([]);
+  });
+
+  it("maps legacy execCommandApproval requests", () => {
+    const event = mapCodexServerRequest("thread-1", "exec-1", "execCommandApproval", {
+      command: ["pnpm", "test"],
+      cwd: "C:\\repo",
+      reason: "Command needs approval",
+    });
+
+    expect(event).toMatchObject({
+      type: "request.opened",
+      threadId: "thread-1",
+      requestId: "exec-1",
+      requestType: "command_execution_approval",
+      payload: {
+        summary: "Command needs approval",
+        details: {
+          toolName: "command_execution",
+          displayName: "Run",
+          input: { command: "pnpm test", cwd: "C:\\repo" },
+          decisionReason: "Command needs approval",
+        },
+      },
+    });
+  });
+
+  it("maps file-read approval requests", () => {
+    const event = mapCodexServerRequest("thread-1", "read-1", "item/fileRead/requestApproval", {
+      path: "src/index.ts",
+      reason: "Read outside workspace",
+    });
+
+    expect(event).toMatchObject({
+      type: "request.opened",
+      threadId: "thread-1",
+      requestId: "read-1",
+      requestType: "file_read_approval",
+      payload: {
+        summary: "Read outside workspace",
+        details: {
+          toolName: "file_read",
+          displayName: "Read file",
+          input: { path: "src/index.ts" },
+          decisionReason: "Read outside workspace",
+        },
+      },
+    });
+  });
+});
+
+describe("mapCodexServerRequest — approvals", () => {
+  it("maps command execution approvals to structured permission details", () => {
+    const event = mapCodexServerRequest("thread-1", "0", "item/commandExecution/requestApproval", {
+      command: "pnpm test",
+      cwd: "C:\\repo",
+      reason: "Command needs approval",
+      availableDecisions: ["accept", "acceptForSession", "decline", "cancel"],
+    });
+
+    expect(event).toEqual({
+      type: "request.opened",
+      threadId: "thread-1",
+      requestId: "0",
+      requestType: "command_execution_approval",
+      payload: {
+        summary: "Command needs approval",
+        details: {
+          toolName: "command_execution",
+          displayName: "Run",
+          input: {
+            command: "pnpm test",
+            cwd: "C:\\repo",
+          },
+          decisionReason: "Command needs approval",
+        },
+        options: [
+          { optionId: "accept", label: "Allow" },
+          { optionId: "acceptForSession", label: "Allow always" },
+          { optionId: "decline", label: "Deny" },
+        ],
+      },
+    });
+  });
+
+  it("offers and translates session approval for file edits", () => {
+    const event = mapCodexServerRequest("thread-1", "edit-1", "item/fileChange/requestApproval", {
+      reason: "File changes need approval",
+      command: "edit src/foo.ts",
+    });
+
+    expect(event).toMatchObject({
+      type: "request.opened",
+      threadId: "thread-1",
+      requestId: "edit-1",
+      requestType: "file_change_approval",
+      payload: {
+        summary: "File changes need approval",
+        options: [
+          { optionId: "accept", label: "Allow" },
+          { optionId: "acceptForSession", label: "Allow always" },
+          { optionId: "decline", label: "Deny" },
+        ],
+      },
+    });
+
+    expect(
+      translateCodexCanonicalResponse(
+        "item/fileChange/requestApproval",
+        {},
+        { optionId: "acceptForSession" },
+      ),
+    ).toEqual({ decision: "acceptForSession" });
   });
 });
 

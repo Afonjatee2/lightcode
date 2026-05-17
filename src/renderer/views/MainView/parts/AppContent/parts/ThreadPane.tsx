@@ -162,7 +162,7 @@ export function ThreadPane(props: {
             threadId: thread.id,
             itemId: optimisticUserMessageItemId,
           });
-          await captureFileCheckpoint({
+          void captureFileCheckpoint({
             threadId: thread.id,
             checkpointItemId: optimisticUserMessageItemId,
             projectLocation,

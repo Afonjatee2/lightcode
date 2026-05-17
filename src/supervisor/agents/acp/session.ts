@@ -197,19 +197,24 @@ async function segmentsToContentBlocks(
   segments?: PromptSegment[],
   promptCapabilities?: PromptCapabilities,
 ): Promise<ContentBlock[]> {
+  void promptCapabilities;
   const blocks: ContentBlock[] = [];
 
   for (const seg of segments ?? []) {
     if (seg.kind === "attachment") {
       const resourcePath = resolveAcpResourcePath(location, seg.path);
       const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(seg.path);
-      if (isImage && promptCapabilities?.image === true) {
+      if (isImage) {
         try {
           const data = await readFile(resourcePath);
           const mimeType = seg.mimeType ?? guessMimeType(seg.path);
           blocks.push({ type: "image", data: data.toString("base64"), mimeType });
         } catch {
-          // Fall back to resource link if image can't be read
+          // Fall back to resource link if the image bytes can't be read
+          // (permission / size / missing). Capability-gating is intentionally
+          // skipped — matches t3code's Cursor adapter which sends image
+          // blocks unconditionally; ACP agents that don't accept images
+          // should reject the prompt rather than silently dropping content.
           blocks.push({
             type: "resource_link",
             uri: toAcpResourceUri(location, seg.path),

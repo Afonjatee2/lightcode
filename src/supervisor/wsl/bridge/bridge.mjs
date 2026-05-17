@@ -28,6 +28,8 @@
  */
 
 import { createServer } from "node:http";
+import { execFileSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import {
   mkdirSync,
   opendirSync,
@@ -46,7 +48,7 @@ import { isAbsolute, normalize, resolve as resolvePath } from "node:path/posix";
 import { createRequire } from "node:module";
 
 // Bumped on every behavioural change. Windows side reads this via regex.
-const BRIDGE_VERSION = "2.4.0";
+const BRIDGE_VERSION = "2.5.0";
 
 /**
  * Lazily loads `@parcel/watcher` (staged next to this script as
@@ -86,6 +88,9 @@ const VALID_INTENTS = new Set([
   "session.turn_finished",
   "session.turn_errored",
 ]);
+const EMPTY_GIT_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+const LIGHTCODE_CHECKPOINT_REF_RE =
+  /^refs\/lightcode\/checkpoints\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+$/;
 
 if (!SECRET) {
   emit({ type: "error", message: "LIGHTCODE_HOOK_SECRET missing in bridge env" });
@@ -487,6 +492,73 @@ function writeNewFileHandler(req, body) {
   return { status: 200, data: { mtimeMs: st.mtimeMs, size: st.size } };
 }
 
+function git(args, cwd, env) {
+  return execFileSync("git", args, {
+    cwd,
+    env: { ...process.env, GIT_OPTIONAL_LOCKS: "0", ...(env ?? {}) },
+    encoding: "utf8",
+    maxBuffer: 50 * 1024 * 1024,
+  });
+}
+
+function gitMaybe(args, cwd, env) {
+  try {
+    return git(args, cwd, env).trim();
+  } catch {
+    return "";
+  }
+}
+
+function gitCheckpointSnapshotHandler(req, body) {
+  const projectRoot = resolveSafePath(body.projectRoot, body.projectRoot);
+  if (!projectRoot) return { status: 400, code: "ESCAPE", message: "projectRoot is invalid" };
+  if (typeof body.ref !== "string" || !LIGHTCODE_CHECKPOINT_REF_RE.test(body.ref)) {
+    return { status: 400, code: "EINVAL", message: "invalid checkpoint ref" };
+  }
+  if (!body.metadata || typeof body.metadata !== "object" || Array.isArray(body.metadata)) {
+    return { status: 400, code: "EINVAL", message: "metadata object required" };
+  }
+
+  try {
+    git(["rev-parse", "--is-inside-work-tree"], projectRoot);
+    const indexPath = git(
+      ["rev-parse", "--path-format=absolute", "--git-path", "index"],
+      projectRoot,
+    ).trim();
+    const tempIndex = `${indexPath}.lightcode-${randomUUID()}`;
+    try {
+      const env = { GIT_INDEX_FILE: tempIndex };
+      const baseTree =
+        gitMaybe(["rev-parse", "--verify", "HEAD^{tree}"], projectRoot) || EMPTY_GIT_TREE;
+      git(["read-tree", baseTree], projectRoot, env);
+      git(["add", "-A", "--", "."], projectRoot, env);
+      const tree = git(["write-tree"], projectRoot, env).trim();
+      const head = gitMaybe(["rev-parse", "--verify", "HEAD"], projectRoot);
+      const commitArgs = [
+        "commit-tree",
+        tree,
+        ...(head ? ["-p", head] : []),
+        "-m",
+        "Lightcode checkpoint",
+        "-m",
+        JSON.stringify(body.metadata),
+      ];
+      const commit = git(commitArgs, projectRoot, env).trim();
+      git(["update-ref", body.ref, commit], projectRoot);
+      return { status: 200, data: { commit } };
+    } finally {
+      try {
+        rmSync(tempIndex, { force: true });
+      } catch {
+        // best effort
+      }
+    }
+  } catch (err) {
+    const message = String(err?.stderr || err?.message || err);
+    return { status: 500, code: "EGIT", message };
+  }
+}
+
 const FS_ROUTES = new Map([
   ["/v1/fs/readdir", readdirHandler],
   ["/v1/fs/stat", statHandler],
@@ -498,6 +570,8 @@ const FS_ROUTES = new Map([
   ["/v1/fs/rm", rmHandler],
   ["/v1/fs/rename", renameHandler],
 ]);
+
+const GIT_ROUTES = new Map([["/v1/git/checkpoint-snapshot", gitCheckpointSnapshotHandler]]);
 
 /**
  * Active watch subscriptions keyed by client-supplied `subscriptionId`.
@@ -744,6 +818,11 @@ const server = createServer(async (req, res) => {
   const fsHandler = FS_ROUTES.get(pathOnly);
   if (fsHandler) {
     await handleFs(req, res, fsHandler);
+    return;
+  }
+  const gitHandler = GIT_ROUTES.get(pathOnly);
+  if (gitHandler) {
+    await handleFs(req, res, gitHandler);
     return;
   }
   const watchHandler = WATCH_ROUTES.get(pathOnly);

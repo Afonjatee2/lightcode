@@ -26,10 +26,13 @@ import type {
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import {
-  buildAgentCommand,
   createKnownSessionRef,
+  getWslCommand,
   getPrimedPosixEnv,
   getProjectShellEnv,
+  getWslProjectShellEnv,
+  primeWslProjectShellEnv,
+  quotePosixShellArg,
   resolveExecutablePathAsync,
   type AgentLaunchOptions,
   type CreateStructuredSessionInput,
@@ -40,6 +43,7 @@ import {
 } from "../base";
 import { captureSupervisorException } from "../../diagnostics/sentry";
 import { resolveAgentBinaryPath } from "../binaryResolver";
+import { chosenOptionIds } from "../questionAnswers";
 import { applyClaudeContextSuffix } from "./argv";
 import { CLAUDE_DEFAULT_APPROVAL_POLICY } from "./detection";
 import {
@@ -128,30 +132,76 @@ function permissionModeForConfig(config: ThreadConfig): PermissionMode {
   ) as PermissionMode;
 }
 
+function basePermissionModeForConfig(config: ThreadConfig): PermissionMode {
+  return (config.approvalPolicy ?? CLAUDE_DEFAULT_APPROVAL_POLICY) as PermissionMode;
+}
+
+// SDK-provided env is layered on top of the WSL login-shell env we primed,
+// so these Windows-host vars must be dropped — otherwise they overwrite the
+// Linux PATH (and friends) inside the distro.
+const WINDOWS_HOST_ENV_KEYS = new Set([
+  "path",
+  "pathext",
+  "systemroot",
+  "windir",
+  "comspec",
+  "appdata",
+  "localappdata",
+  "userprofile",
+  "homedrive",
+  "homepath",
+  "programdata",
+  "programfiles",
+  "programfiles(x86)",
+  "commonprogramfiles",
+  "commonprogramfiles(x86)",
+]);
+const POSIX_ENV_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
 function filteredEnv(env: Record<string, string | undefined>): Record<string, string> {
   const out: Record<string, string> = {};
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) continue;
-    // WSL login shells should keep their own PATH; exporting Windows PATH breaks tool lookup.
-    if (/^(path|pathext|systemroot|windir)$/i.test(key)) continue;
+    if (WINDOWS_HOST_ENV_KEYS.has(key.toLowerCase())) continue;
     out[key] = value;
   }
   return out;
+}
+
+function buildDirectWslEnvCommandArgs(
+  command: string,
+  args: string[],
+  env: Record<string, string>,
+): string[] {
+  const exports = Object.entries(env)
+    .filter(([key]) => POSIX_ENV_NAME_RE.test(key))
+    .map(([key, value]) => `export ${key}=${quotePosixShellArg(value)}`)
+    .join("; ");
+  const exec = `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
+  return ["/bin/sh", "-c", exports ? `${exports}; ${exec}` : exec];
 }
 
 function spawnClaudeInWsl(location: ProjectLocation, options: SpawnOptions): SpawnedProcess {
   if (location.kind !== "wsl") {
     throw new Error("spawnClaudeInWsl called for a non-WSL project.");
   }
-  const spec = buildAgentCommand(
-    location,
-    "claude",
-    options.args,
-    resolveAgentBinaryPath(location, "claude"),
-    filteredEnv(options.env),
-  );
-  return spawn(spec.command, spec.args, {
-    cwd: spec.cwd,
+  const command = options.command || resolveAgentBinaryPath(location, "claude") || "claude";
+  const cwd = options.cwd ?? location.linuxPath;
+  const capturedEnv =
+    getWslProjectShellEnv(location.distro, cwd) ??
+    getWslProjectShellEnv(location.distro, location.linuxPath);
+  const env = capturedEnv
+    ? { ...capturedEnv, ...filteredEnv(options.env) }
+    : filteredEnv(options.env);
+  const args = [
+    "-d",
+    location.distro,
+    "--cd",
+    cwd,
+    "--",
+    ...buildDirectWslEnvCommandArgs(command, options.args, env),
+  ];
+  return spawn(getWslCommand(), args, {
     env: process.env,
     signal: options.signal,
     stdio: ["pipe", "pipe", "pipe"],
@@ -159,13 +209,18 @@ function spawnClaudeInWsl(location: ProjectLocation, options: SpawnOptions): Spa
   }) as unknown as SpawnedProcess;
 }
 
-function isImageSegment(
-  segment: PromptSegment,
-): segment is Extract<PromptSegment, { kind: "attachment" }> {
+function isImageAttachment(segment: PromptSegment): boolean {
   return (
     segment.kind === "attachment" &&
     (segment.mimeType?.startsWith("image/") === true ||
       /\.(png|jpe?g|gif|webp)$/i.test(segment.path))
+  );
+}
+
+function isPdfAttachment(segment: PromptSegment): boolean {
+  return (
+    segment.kind === "attachment" &&
+    (segment.mimeType === "application/pdf" || /\.pdf$/i.test(segment.path))
   );
 }
 
@@ -184,16 +239,19 @@ async function buildSdkUserMessage(
 
   const content: Array<Record<string, unknown>> = [];
   const textParts: string[] = [];
+  const flushText = () => {
+    if (textParts.length > 0) {
+      content.push({ type: "text", text: textParts.join("") });
+      textParts.length = 0;
+    }
+  };
   for (const segment of segments) {
     if (segment.kind === "text") {
       textParts.push(segment.content);
       continue;
     }
-    if (isImageSegment(segment)) {
-      if (textParts.length > 0) {
-        content.push({ type: "text", text: textParts.join("") });
-        textParts.length = 0;
-      }
+    if (segment.kind === "attachment" && isImageAttachment(segment)) {
+      flushText();
       const bytes = await readFile(segment.path);
       const mimeType = segment.mimeType ?? inferImageMime(segment.path);
       content.push({
@@ -206,9 +264,22 @@ async function buildSdkUserMessage(
       });
       continue;
     }
+    if (segment.kind === "attachment" && isPdfAttachment(segment)) {
+      flushText();
+      const bytes = await readFile(segment.path);
+      content.push({
+        type: "document",
+        source: {
+          type: "base64",
+          media_type: "application/pdf",
+          data: bytes.toString("base64"),
+        },
+      });
+      continue;
+    }
     textParts.push(`@${segment.path}`);
   }
-  if (textParts.length > 0) content.push({ type: "text", text: textParts.join("") });
+  flushText();
   if (content.length === 0 && prompt.length > 0) content.push({ type: "text", text: prompt });
 
   return {
@@ -266,41 +337,42 @@ function questionAnswers(response: unknown, pending: PendingQuestion): Record<st
   if (response && typeof response === "object") {
     const obj = response as Record<string, unknown>;
     if (obj.answers && typeof obj.answers === "object") {
-      return normalizeQuestionAnswers(obj.answers as Record<string, unknown>, pending);
+      return normalizeQuestionAnswersForSdk(obj.answers as Record<string, unknown>, pending);
     }
   }
   const option = responseOptionId(response);
   const first = pending.questions[0];
-  return first && option ? { [first.question]: option } : {};
+  return first && option ? { [first.question]: labelForOption(first, option) } : {};
 }
 
-function normalizeQuestionAnswers(
+function isQuestionCancelResponse(response: unknown): boolean {
+  if (!response || typeof response !== "object") return false;
+  const action = (response as Record<string, unknown>).action;
+  return action === "cancel" || action === "decline";
+}
+
+function normalizeQuestionAnswersForSdk(
   answers: Record<string, unknown>,
   pending: PendingQuestion,
 ): Record<string, unknown> {
   const normalized: Record<string, unknown> = {};
   for (const question of pending.questions) {
     const raw = answers[question.question] ?? answers[question.header];
-    const value = normalizeQuestionAnswerValue(raw);
+    const value = normalizeQuestionAnswerValue(question, raw);
     if (value !== undefined) normalized[question.question] = value;
   }
-  return Object.keys(normalized).length > 0 ? normalized : answers;
+  return normalized;
 }
 
-function normalizeQuestionAnswerValue(raw: unknown): unknown {
-  if (typeof raw === "string") return raw;
-  if (Array.isArray(raw)) return raw.filter((value): value is string => typeof value === "string");
-  if (!raw || typeof raw !== "object") return undefined;
-  const obj = raw as Record<string, unknown>;
-  if (Array.isArray(obj.answers)) {
-    const values = obj.answers.filter((value): value is string => typeof value === "string");
-    return values.length === 1 ? values[0] : values;
-  }
-  if (Array.isArray(obj.optionIds)) {
-    return obj.optionIds.filter((value): value is string => typeof value === "string");
-  }
-  if (typeof obj.optionId === "string") return obj.optionId;
-  return undefined;
+function normalizeQuestionAnswerValue(question: ClaudeQuestion, raw: unknown): string | undefined {
+  const chosen = chosenOptionIds(raw);
+  if (chosen.length === 0) return undefined;
+  return chosen.map((id) => labelForOption(question, id)).join(", ");
+}
+
+function labelForOption(question: ClaudeQuestion, optionId: string): string {
+  const match = question.options.find((opt) => opt.optionId === optionId);
+  return match?.label ?? optionId;
 }
 
 export class ClaudeSdkSession implements StructuredSessionHandle {
@@ -317,6 +389,8 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
   private sessionId: string | undefined;
   private openedResumeSessionId: string | undefined;
   private currentConfig: ThreadConfig;
+  private appliedModel: string | undefined;
+  private appliedPermissionMode: PermissionMode | undefined;
   private currentStatus: ThreadStatus = "idle";
   private currentAttention: ThreadAttention = "none";
   private currentSlashCommands: AgentSlashCommand[] | undefined;
@@ -443,18 +517,26 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 
     const query = await this.requireQuery();
     const model = applyClaudeContextSuffix(config.model, config.contextSize);
-    try {
-      await query.setModel(model);
-    } catch {
-      // Older SDK transports can reject live model updates; the launch model still applies.
+    if (model !== this.appliedModel) {
+      try {
+        await query.setModel(model);
+        this.appliedModel = model;
+      } catch {
+        // Older SDK transports can reject live model updates; the launch model still applies.
+      }
     }
-    try {
-      await query.setPermissionMode(permissionModeForConfig(config));
-    } catch {
-      // Same best-effort rule as model updates.
+    const permissionMode = permissionModeForConfig(config);
+    if (permissionMode !== this.appliedPermissionMode || config.mode === "plan") {
+      try {
+        await query.setPermissionMode(permissionMode);
+        this.appliedPermissionMode = permissionMode;
+      } catch {
+        // Same best-effort rule as model updates.
+      }
     }
 
-    this.promptQueue.push(await buildSdkUserMessage(prompt, segments));
+    const message = await buildSdkUserMessage(prompt, segments);
+    this.promptQueue.push(message);
   }
 
   async interruptTurn(): Promise<void> {
@@ -472,6 +554,19 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     this.pendingRequests.delete(requestId);
 
     if (pending.kind === "question") {
+      if (isQuestionCancelResponse(response)) {
+        pending.resolve({ behavior: "deny", message: "User cancelled tool execution." });
+        this.emitRuntimeEvents([
+          {
+            type: "request.resolved",
+            threadId: this.input.threadId,
+            requestId: String(requestId),
+            outcome: "cancelled",
+          },
+        ]);
+        this.emitUpdate({ status: "working", attention: "working" });
+        return;
+      }
       const answers = questionAnswers(response, pending);
       pending.resolve({
         behavior: "allow",
@@ -564,7 +659,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       ]);
     }
     this.pendingRequests.clear();
-    this.emitRuntimeEvents(closeClaudeOpenItems(this.mapperState));
+    this.emitRuntimeEvents(closeClaudeOpenItems(this.mapperState, { closePlan: true }));
     this.promptQueue.close();
     try {
       this.queryRuntime?.close();
@@ -584,8 +679,22 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     this.streamStarted = true;
 
     this.queryReady = (async () => {
+      const wslPrime =
+        this.input.projectLocation.kind === "wsl"
+          ? primeWslProjectShellEnv(
+              this.input.projectLocation.distro,
+              this.input.projectLocation.linuxPath,
+            )
+          : undefined;
       const { query } = await import("@anthropic-ai/claude-agent-sdk");
-      const permissionMode = permissionModeForConfig(this.currentConfig);
+      if (wslPrime) {
+        await wslPrime;
+      }
+      const permissionMode = basePermissionModeForConfig(this.currentConfig);
+      const model = applyClaudeContextSuffix(
+        this.currentConfig.model,
+        this.currentConfig.contextSize,
+      );
       // POSIX: the SDK spawns the `claude` CLI internally, so its env is what
       // determines PATH for the child. Prefer the project-scoped shell env
       // captured by `primeProjectShellEnv` (fnm / asdf / mise / volta cd-hooks
@@ -646,7 +755,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       }
       const options: ClaudeQueryOptions = {
         cwd: projectCwd(this.input.projectLocation),
-        model: applyClaudeContextSuffix(this.currentConfig.model, this.currentConfig.contextSize),
+        model,
         systemPrompt: { type: "preset", preset: "claude_code" },
         settingSources: ["user", "project", "local"],
         permissionMode,
@@ -672,6 +781,8 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       };
 
       this.queryRuntime = query({ prompt: this.promptQueue, options });
+      this.appliedModel = model;
+      this.appliedPermissionMode = permissionMode;
       void this.refreshSlashCommands(this.queryRuntime);
       return this.queryRuntime;
     })();

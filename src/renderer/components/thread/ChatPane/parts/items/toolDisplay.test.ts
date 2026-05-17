@@ -22,10 +22,10 @@ describe("deriveToolDisplay", () => {
     );
 
     expect(display.title).toBe(
-      "Read: src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx",
+      "View: src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx",
     );
     expect(display.parts).toEqual({
-      prefix: "Read: ",
+      prefix: "View: ",
       path: "src/renderer/components/thread/ChatPane/parts/items/UserMessage.tsx",
       filePath: true,
     });
@@ -38,6 +38,34 @@ describe("deriveToolDisplay", () => {
         name: "src/renderer/notifications.ts: function showToast => function showToast",
         title: "src/renderer/notifications.ts: function showToast => function showToast",
         kind: "edit",
+      }),
+    );
+
+    expect(display.title).toBe("Edit: src/renderer/notifications.ts");
+    expect(display.parts).toEqual({
+      prefix: "Edit: ",
+      path: "src/renderer/notifications.ts",
+      filePath: true,
+    });
+    expect(display.Icon).toBe(Pencil);
+  });
+
+  it("labels ACP edit tools from apply_patch patchText args", () => {
+    const display = deriveToolDisplay(
+      makePayload({
+        name: "apply_patch",
+        title: "apply_patch",
+        kind: "edit",
+        args: {
+          patchText: [
+            "*** Begin Patch",
+            "*** Update File: src/renderer/notifications.ts",
+            "@@",
+            "-before",
+            "+after",
+            "*** End Patch",
+          ].join("\n"),
+        },
       }),
     );
 
@@ -68,7 +96,7 @@ describe("deriveToolDisplay", () => {
     expect(display.Icon).toBe(SearchCode);
   });
 
-  it("keeps Claude raw tool displays intact", () => {
+  it("normalizes Claude raw read tools to view file displays", () => {
     const display = deriveToolDisplay(
       makePayload({
         name: "Read",
@@ -76,8 +104,28 @@ describe("deriveToolDisplay", () => {
       }),
     );
 
-    expect(display.title).toBe("Read: src/foo.ts");
-    expect(display.parts).toEqual({ prefix: "Read: ", path: "src/foo.ts", filePath: true });
+    expect(display.title).toBe("View: src/foo.ts");
+    expect(display.parts).toEqual({ prefix: "View: ", path: "src/foo.ts", filePath: true });
+    expect(display.Icon).toBe(Eye);
+  });
+
+  it("includes line ranges for read tools that provide offsets", () => {
+    const display = deriveToolDisplay(
+      makePayload({
+        name: "src/foo.ts",
+        title: "src/foo.ts",
+        kind: "read",
+        locations: [{ path: "src/foo.ts" }],
+        args: { filePath: "src/foo.ts", offset: 1051, limit: 80 },
+      }),
+    );
+
+    expect(display.title).toBe("View 1051:1130: src/foo.ts");
+    expect(display.parts).toEqual({
+      prefix: "View 1051:1130: ",
+      path: "src/foo.ts",
+      filePath: true,
+    });
     expect(display.Icon).toBe(Eye);
   });
 

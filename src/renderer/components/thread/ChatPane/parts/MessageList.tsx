@@ -501,6 +501,9 @@ function estimateRuntimeItemSize(item: ReturnType<typeof selectRuntimeItemById>)
       return 128;
     case "command_execution":
     case "tool_call":
+    case "mcp_tool_call":
+    case "image_view":
+    case "dynamic_tool_call":
     case "file_change":
     case "web_search":
       return item.state === "completed" ? 56 : 132;

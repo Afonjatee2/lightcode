@@ -156,4 +156,35 @@ describe("WslBridgeClient", () => {
       ignore: [".git"],
     });
   });
+
+  it("createGitCheckpointSnapshot forwards ref and metadata", async () => {
+    fake.server.on("request", (req, res) => {
+      let raw = "";
+      req.on("data", (chunk) => (raw += chunk.toString("utf8")));
+      req.on("end", () => {
+        fake.lastRequest = {
+          url: req.url,
+          body: raw ? JSON.parse(raw) : undefined,
+          auth: req.headers["authorization"] as string | undefined,
+        };
+        res.statusCode = 200;
+        res.setHeader("content-type", "application/json");
+        res.end(JSON.stringify({ ok: true, data: { commit: "abc123" } }));
+      });
+    });
+
+    const client = new WslBridgeClient(mockServer);
+    const result = await client.createGitCheckpointSnapshot(makeLocation(), {
+      ref: "refs/lightcode/checkpoints/thread/item",
+      metadata: { threadId: "thread", checkpointItemId: "item" },
+    });
+
+    expect(result.commit).toBe("abc123");
+    expect(fake.lastRequest.url).toBe("/v1/git/checkpoint-snapshot");
+    expect(fake.lastRequest.body).toEqual({
+      projectRoot: "/home/user/proj",
+      ref: "refs/lightcode/checkpoints/thread/item",
+      metadata: { threadId: "thread", checkpointItemId: "item" },
+    });
+  });
 });

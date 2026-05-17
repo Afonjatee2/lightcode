@@ -262,6 +262,98 @@ describe("ChatPane", () => {
     await waitFor(() => expect(metrics.getScrollTop()).toBe(80));
   });
 
+  it("does not snap back to the bottom after a tiny upward scroll within the bottom epsilon", async () => {
+    // Regression: a wheel-up of only 1–3 px disables sticky in the wheel
+    // handler, but the resulting scroll event arrives with `isAtBottom` still
+    // true (within `BOTTOM_EPSILON_PX = 4`). The `else if (isAtBottom)` branch
+    // used to unconditionally re-enable sticky here, so the next streaming
+    // delta would slam scrollTop back to scrollHeight.
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const contentElement = getContentElement(scrollElement);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 200,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(100);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      fireEvent.wheel(scrollElement, { deltaY: -2 });
+      metrics.setScrollTop(98);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      appendAssistantText(thread.id, " — Open logs");
+    });
+
+    await screen.findByText(/Open logs/);
+
+    act(() => {
+      metrics.setScrollHeight(300);
+      MockResizeObserver.notify(contentElement);
+    });
+
+    await waitFor(() => expect(metrics.getScrollTop()).toBe(98));
+  });
+
+  it("re-pins to the bottom when the user scrolls back down to it", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const contentElement = getContentElement(scrollElement);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 200,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(100);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      fireEvent.wheel(scrollElement, { deltaY: -120 });
+      metrics.setScrollTop(20);
+      fireEvent.scroll(scrollElement);
+    });
+
+    // User scrolls back down to the bottom — direction is downward and lands
+    // at-bottom, so sticky must re-engage.
+    act(() => {
+      metrics.setScrollTop(100);
+      fireEvent.scroll(scrollElement);
+    });
+
+    act(() => {
+      appendAssistantText(thread.id, " — Open logs");
+    });
+
+    await screen.findByText(/Open logs/);
+
+    act(() => {
+      metrics.setScrollHeight(300);
+      MockResizeObserver.notify(contentElement);
+    });
+
+    await waitFor(() => expect(metrics.getScrollTop()).toBe(300));
+  });
+
   it("does not release sticky mode for layout-driven upward scroll during tail collapse", async () => {
     const thread = makeThread();
     seedAssistantMessage(thread.id, "Inspect output");
@@ -618,6 +710,33 @@ describe("ChatPane", () => {
     renderChatPane({
       ...makeThread(),
       activeTurnStartedAt: "2026-05-01T12:00:00.000Z",
+    });
+
+    expect(screen.getByText("Working for 1m 10s")).toBeInTheDocument();
+  });
+
+  it("pauses the live turn timer while a runtime request is open", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-05-01T12:01:10.000Z"));
+
+    useAppStore.getState().applyRuntimeEvent("thread-gui", {
+      type: "request.opened",
+      threadId: "thread-gui",
+      requestId: "approval-1",
+      requestType: "command_execution_approval",
+      payload: { summary: "Permission required" },
+    });
+
+    renderChatPane({
+      ...makeThread(),
+      activeTurnStartedAt: "2026-05-01T12:00:00.000Z",
+    });
+
+    const label = screen.getByText("Working for 1m 10s");
+    expect(label).toHaveClass("text-warning");
+
+    act(() => {
+      vi.advanceTimersByTime(10_000);
     });
 
     expect(screen.getByText("Working for 1m 10s")).toBeInTheDocument();

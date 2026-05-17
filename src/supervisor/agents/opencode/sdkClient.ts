@@ -44,6 +44,14 @@ interface PoolEntry {
   key: string;
   ready: Promise<ServerSnapshot>;
   refCount: number;
+  /**
+   * When set, the entry is currently waiting out an idle-grace window. A new
+   * `acquire` cancels the timer and reuses the entry; if it fires, the server
+   * is torn down. Mirrors t3code's `scheduleIdleClose`.
+   */
+  idleCloseTimer?: NodeJS.Timeout | undefined;
+  /** Caller-requested idle TTL on the current grace timer (informational). */
+  pendingIdleTtlMs?: number | undefined;
 }
 
 // Per-project pool. The OpenCode HTTP server can host any number of sessions
@@ -87,9 +95,20 @@ async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSna
  * acquirer releases it. TUI flow calls `dispose()` immediately after
  * `session.create`; GUI flow keeps its acquisition for the thread's lifetime.
  */
-export async function acquireOpenCodeServer(input: {
+export interface AcquireOpenCodeServerInput {
   projectLocation: ProjectLocation;
-}): Promise<AcquiredOpenCodeServer> {
+  /**
+   * If set, the server stays alive for this many milliseconds after the last
+   * release before being torn down. A re-acquire within the window reuses the
+   * same server and cancels the pending teardown. Callers that want
+   * immediate teardown (the TUI and GUI thread flows) leave this unset.
+   */
+  idleCloseDelayMs?: number;
+}
+
+export async function acquireOpenCodeServer(
+  input: AcquireOpenCodeServerInput,
+): Promise<AcquiredOpenCodeServer> {
   const key = poolKey(input.projectLocation);
   let entry = pool.get(key);
 
@@ -117,6 +136,13 @@ export async function acquireOpenCodeServer(input: {
   const acquiringEntry = entry;
   acquiringEntry.refCount += 1;
 
+  // Cancel any pending idle-teardown: this acquire reuses the same server.
+  if (acquiringEntry.idleCloseTimer) {
+    clearTimeout(acquiringEntry.idleCloseTimer);
+    acquiringEntry.idleCloseTimer = undefined;
+    acquiringEntry.pendingIdleTtlMs = undefined;
+  }
+
   let snapshot: ServerSnapshot;
   try {
     snapshot = await acquiringEntry.ready;
@@ -126,6 +152,7 @@ export async function acquireOpenCodeServer(input: {
   }
 
   let released = false;
+  const idleCloseDelayMs = input.idleCloseDelayMs;
   return {
     client: snapshot.client,
     baseUrl: snapshot.baseUrl,
@@ -135,8 +162,29 @@ export async function acquireOpenCodeServer(input: {
       released = true;
       acquiringEntry.refCount -= 1;
       if (acquiringEntry.refCount > 0) return;
-      if (pool.get(key) === acquiringEntry) pool.delete(key);
-      await snapshot.handle.dispose();
+
+      // No idle window requested → tear down immediately, matching prior
+      // behaviour for the TUI/GUI flows.
+      if (idleCloseDelayMs === undefined || idleCloseDelayMs <= 0) {
+        if (pool.get(key) === acquiringEntry) pool.delete(key);
+        await snapshot.handle.dispose();
+        return;
+      }
+
+      // Hold the entry open for `idleCloseDelayMs`. The next `acquire`
+      // cancels the timer above; if no acquire comes, the timer tears the
+      // server down and evicts the entry.
+      acquiringEntry.pendingIdleTtlMs = idleCloseDelayMs;
+      acquiringEntry.idleCloseTimer = setTimeout(() => {
+        if (acquiringEntry.refCount > 0) return;
+        if (pool.get(key) !== acquiringEntry) return;
+        pool.delete(key);
+        void snapshot.handle.dispose();
+      }, idleCloseDelayMs);
+      // Don't keep the process alive just to honour an idle-close timer.
+      if (typeof acquiringEntry.idleCloseTimer.unref === "function") {
+        acquiringEntry.idleCloseTimer.unref();
+      }
     },
   };
 }

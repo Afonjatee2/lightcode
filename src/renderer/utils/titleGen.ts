@@ -17,12 +17,6 @@ export function generateTitleAsync(
 
   const model = isWsl ? settings.wslTitleGenModel : settings.titleGenModel;
   const effort = isWsl ? settings.wslTitleGenEffort : settings.titleGenEffort;
-  console.log(
-    `[title-gen] provider=${provider} model=${model || "(auto)"} effort=${effort || "(auto)"} env=${isWsl ? "wsl" : "windows"} candidates=${agentStatuses
-      .filter((a) => a.installed)
-      .map((a) => `${a.kind}(${a.authState})`)
-      .join(",")}`,
-  );
 
   void generateTitleWithFallback({
     projectLocation,
@@ -32,9 +26,6 @@ export function generateTitleAsync(
     effort,
     prompt,
     invoke: (payload) => {
-      console.log(
-        `[title-gen] invoke: agent=${payload.agentKind} model=${payload.model ?? "(default)"} effort=${payload.effort ?? "(default)"}`,
-      );
       return readBridge().generateTitle(payload);
     },
   })

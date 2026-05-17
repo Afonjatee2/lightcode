@@ -8,6 +8,7 @@ import type {
   ProjectLocation,
 } from "@/shared/contracts";
 import { readWslCommandOutputAsync } from "../agents/base";
+import type { WslBridgeClient } from "../wsl/bridge/client";
 import { execGit } from "./exec";
 
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
@@ -16,6 +17,12 @@ const REF_ROOT = "refs/lightcode/checkpoints";
 type CheckpointMetadata = FileCheckpointRecord | FileCheckpointTurn;
 
 export class GitCheckpointService {
+  private wslClient: WslBridgeClient | undefined;
+
+  setWslClient(client: WslBridgeClient): void {
+    this.wslClient = client;
+  }
+
   async create(input: {
     threadId: string;
     checkpointItemId: string;
@@ -125,8 +132,25 @@ export class GitCheckpointService {
     metadata: Omit<FileCheckpointRecord, "ref" | "commit"> &
       Partial<Pick<FileCheckpointTurn, "baseCheckpointItemId" | "baseRef" | "changedFiles">>,
   ): Promise<FileCheckpointRecord> {
-    await execGit(projectLocation, ["rev-parse", "--is-inside-work-tree"]);
     const ref = checkpointRef(metadata.threadId, metadata.checkpointItemId);
+    if (projectLocation.kind === "wsl") {
+      if (!this.wslClient) {
+        throw new Error("WSL bridge unavailable for checkpoint snapshot");
+      }
+      const { commit } = await this.wslClient.createGitCheckpointSnapshot(projectLocation, {
+        ref,
+        metadata: { ...metadata, ref },
+      });
+      return {
+        threadId: metadata.threadId,
+        checkpointItemId: metadata.checkpointItemId,
+        ref,
+        commit,
+        capturedAt: metadata.capturedAt,
+      };
+    }
+
+    await execGit(projectLocation, ["rev-parse", "--is-inside-work-tree"]);
     const tempIndex = await createTempIndexPath(projectLocation);
     try {
       const env = { GIT_INDEX_FILE: tempIndex };

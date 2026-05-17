@@ -1,11 +1,20 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  CanUseTool,
   PermissionMode,
   Query,
   SDKControlGetContextUsageResponse,
   SDKMessage,
+  SpawnOptions,
+  SpawnedProcess,
 } from "@anthropic-ai/claude-agent-sdk";
-import type { ProjectLocation, RuntimeEvent, SessionRef, ThreadConfig } from "@/shared/contracts";
+import type {
+  ProjectLocation,
+  RuntimeEvent,
+  SessionRef,
+  ThreadConfig,
+  ThreadServerRequestId,
+} from "@/shared/contracts";
 import type { StructuredSessionUpdate } from "../base";
 import { ClaudeSdkSession } from "./sdkSession";
 
@@ -13,8 +22,46 @@ const mockSdk = vi.hoisted(() => ({
   query: vi.fn<(input: unknown) => Query>(),
 }));
 
+const mockChildProcess = vi.hoisted(() => ({
+  spawn:
+    vi.fn<(command: string, args: string[], options: Record<string, unknown>) => SpawnedProcess>(),
+}));
+
+const mockBinaryResolver = vi.hoisted(() => ({
+  resolveAgentBinaryPath:
+    vi.fn<(location: ProjectLocation, binary: string) => string | undefined>(),
+}));
+
+const mockBase = vi.hoisted(() => ({
+  getWslProjectShellEnv:
+    vi.fn<(distro: string, cwd: string) => Record<string, string> | undefined>(),
+  primeWslProjectShellEnv:
+    vi.fn<(distro: string, cwd: string) => Promise<Record<string, string> | undefined>>(),
+}));
+
 vi.mock("@anthropic-ai/claude-agent-sdk", () => ({
   query: mockSdk.query,
+}));
+
+vi.mock("../base", async () => {
+  const actual = await vi.importActual<typeof import("../base")>("../base");
+  return {
+    ...actual,
+    getWslProjectShellEnv: mockBase.getWslProjectShellEnv,
+    primeWslProjectShellEnv: mockBase.primeWslProjectShellEnv,
+  };
+});
+
+vi.mock("node:child_process", async () => {
+  const actual = await vi.importActual<typeof import("node:child_process")>("node:child_process");
+  return {
+    ...actual,
+    spawn: mockChildProcess.spawn,
+  };
+});
+
+vi.mock("../binaryResolver", () => ({
+  resolveAgentBinaryPath: mockBinaryResolver.resolveAgentBinaryPath,
 }));
 
 function createFakeQuery(initCommands: Array<Record<string, string>> = []) {
@@ -110,11 +157,28 @@ function sdkSystemMessage(
 
 describe("ClaudeSdkSession", () => {
   const projectLocation: ProjectLocation = { kind: "windows", path: "C:\\repo" };
+  const wslProjectLocation: ProjectLocation = {
+    kind: "wsl",
+    distro: "Ubuntu",
+    linuxPath: "/home/demo/project",
+    uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\project",
+  };
   const config: ThreadConfig = { model: "sonnet" };
   const sessionRef: SessionRef = {
     providerSessionId: "11111111-1111-4111-8111-111111111111",
     discoveredAt: "2026-05-14T00:00:00.000Z",
   };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockChildProcess.spawn.mockReturnValue({} as SpawnedProcess);
+    mockBase.getWslProjectShellEnv.mockReturnValue(undefined);
+    mockBase.primeWslProjectShellEnv.mockResolvedValue(undefined);
+    mockBinaryResolver.resolveAgentBinaryPath.mockImplementation(
+      (location: ProjectLocation, binary: string) =>
+        location.kind === "wsl" && binary === "claude" ? "/home/demo/.local/bin/claude" : undefined,
+    );
+  });
 
   it("waits for SDK query creation before sending the first GUI turn", async () => {
     const fake = createFakeQuery();
@@ -151,8 +215,142 @@ describe("ClaudeSdkSession", () => {
         }),
       }),
     );
-    expect(fake.setModel).toHaveBeenCalledWith("sonnet");
-    expect(fake.setPermissionMode).toHaveBeenCalledWith("auto");
+    expect(fake.setModel).not.toHaveBeenCalled();
+    expect(fake.setPermissionMode).not.toHaveBeenCalled();
+
+    await session.dispose();
+  });
+
+  it("switches the SDK permission mode for plan turns instead of changing the base policy", async () => {
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const planConfig: ThreadConfig = { model: "sonnet", mode: "plan" };
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-plan",
+      projectLocation,
+      config: planConfig,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: () => {},
+      onUpdate: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread(planConfig);
+    const queryInput = mockSdk.query.mock.calls[0]?.[0] as { options?: Record<string, unknown> };
+    expect(queryInput.options).toMatchObject({ permissionMode: "auto" });
+
+    await session.startTurn("plan this", planConfig);
+    expect(fake.setPermissionMode).toHaveBeenCalledWith("plan");
+
+    await session.dispose();
+  });
+
+  it("restores the configured SDK permission mode after plan turns", async () => {
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const planConfig: ThreadConfig = {
+      model: "sonnet",
+      mode: "plan",
+      approvalPolicy: "acceptEdits",
+    };
+    const workConfig: ThreadConfig = {
+      model: "sonnet",
+      mode: "agent",
+      approvalPolicy: "acceptEdits",
+    };
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-plan-deny",
+      projectLocation,
+      config: planConfig,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: () => {},
+      onUpdate: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread(planConfig);
+    await session.startTurn("plan this", planConfig);
+    await session.startTurn("build this", workConfig);
+
+    expect(fake.setPermissionMode).toHaveBeenNthCalledWith(1, "plan");
+    expect(fake.setPermissionMode).toHaveBeenNthCalledWith(2, "acceptEdits");
+
+    await session.dispose();
+  });
+
+  it("returns AskUserQuestion answers keyed by question text with SDK labels", async () => {
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    const runtimeEvents: RuntimeEvent[] = [];
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-question",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: (event) => runtimeEvents.push(event),
+      onUpdate: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread(config);
+    const queryInput = mockSdk.query.mock.calls[0]?.[0] as {
+      options?: { canUseTool?: CanUseTool };
+    };
+    const canUseTool = queryInput.options?.canUseTool;
+    if (!canUseTool) throw new Error("missing canUseTool");
+
+    const questions = [
+      {
+        question: "Which features should be enabled?",
+        header: "Features",
+        multiSelect: true,
+        options: [
+          { optionId: "fast", label: "Fast mode", description: "Use the fast path." },
+          { optionId: "safe", label: "Safe mode", description: "Run extra checks." },
+        ],
+      },
+    ];
+    const permissionPromise = canUseTool(
+      "AskUserQuestion",
+      { questions },
+      {
+        signal: new AbortController().signal,
+        toolUseID: "toolu_question",
+      },
+    );
+
+    const opened = runtimeEvents.find((event) => event.type === "request.opened");
+    expect(opened).toMatchObject({
+      type: "request.opened",
+      requestType: "tool_user_input",
+      payload: { summary: "Which features should be enabled?" },
+    });
+    if (!opened || opened.type !== "request.opened") throw new Error("missing question request");
+
+    await session.resolveServerRequest(opened.requestId as ThreadServerRequestId, {
+      answers: {
+        Features: ["fast", "safe"],
+      },
+    });
+
+    await expect(permissionPromise).resolves.toMatchObject({
+      behavior: "allow",
+      updatedInput: {
+        questions,
+        answers: {
+          "Which features should be enabled?": "Fast mode, Safe mode",
+        },
+      },
+    });
 
     await session.dispose();
   });
@@ -255,6 +453,96 @@ describe("ClaudeSdkSession", () => {
       );
     });
     expect(updates.some((update) => update.status === "working")).toBe(false);
+
+    await session.dispose();
+  });
+
+  it("spawns WSL GUI sessions directly via wsl.exe without a login shell", async () => {
+    const fake = createFakeQuery();
+    mockSdk.query.mockReturnValue(fake.runtime);
+    mockBase.getWslProjectShellEnv.mockImplementation((_distro, cwd) =>
+      cwd === "/home/demo/project"
+        ? {
+            PATH: "/home/demo/.nvm/versions/node/v24/bin:/usr/bin:/bin",
+            NVM_DIR: "/home/demo/.nvm",
+            LS_COLORS: "rs=0:di=01;34:ln=01",
+          }
+        : undefined,
+    );
+    const signal = new AbortController().signal;
+    const session = await ClaudeSdkSession.create({
+      threadId: "thread-claude-wsl",
+      projectLocation: wslProjectLocation,
+      config,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onRuntimeEvent: () => {},
+      onUpdate: () => {},
+      onError: () => {},
+      onClose: () => {},
+    });
+
+    await session.openThread(config);
+    expect(mockBase.primeWslProjectShellEnv).toHaveBeenCalledWith("Ubuntu", "/home/demo/project");
+
+    const queryInput = mockSdk.query.mock.calls[0]?.[0] as {
+      options?: {
+        spawnClaudeCodeProcess?: (spawnOptions: SpawnOptions) => SpawnedProcess;
+      };
+    };
+    const spawnClaudeCodeProcess = queryInput.options?.spawnClaudeCodeProcess;
+    expect(spawnClaudeCodeProcess).toEqual(expect.any(Function));
+
+    spawnClaudeCodeProcess?.({
+      command: "/home/demo/.local/bin/claude",
+      args: ["chat", "--json"],
+      cwd: "/home/demo/project/subdir",
+      env: {
+        BROWSER: "/bin/true",
+        CLAUDE_AGENT_SDK_CLIENT_APP: "lightcode",
+        LOCALAPPDATA: "C:\\Users\\demo\\AppData\\Local",
+        PATH: "C:\\Windows\\System32",
+        FOO: "bar",
+      },
+      signal,
+    });
+
+    expect(mockChildProcess.spawn).toHaveBeenCalledTimes(1);
+    const [command, args, options] = mockChildProcess.spawn.mock.calls[0] as [
+      string,
+      string[],
+      Record<string, unknown>,
+    ];
+    expect(command.toLowerCase()).toMatch(/wsl\.exe$/);
+    const wslPreambleEnd = args.indexOf("--");
+    expect(args.slice(0, wslPreambleEnd)).toEqual([
+      "-d",
+      "Ubuntu",
+      "--cd",
+      "/home/demo/project/subdir",
+    ]);
+    const shellArgs = args.slice(wslPreambleEnd + 1);
+    expect(shellArgs.slice(0, 2)).toEqual(["/bin/sh", "-c"]);
+    expect(args).not.toContain("-l");
+    expect(args).not.toContain("-i");
+    expect(shellArgs[2]).toBe(
+      [
+        "export PATH='/home/demo/.nvm/versions/node/v24/bin:/usr/bin:/bin'",
+        "export NVM_DIR='/home/demo/.nvm'",
+        "export LS_COLORS='rs=0:di=01;34:ln=01'",
+        "export BROWSER='/bin/true'",
+        "export CLAUDE_AGENT_SDK_CLIENT_APP='lightcode'",
+        "export FOO='bar'",
+        "exec '/home/demo/.local/bin/claude' 'chat' '--json'",
+      ].join("; "),
+    );
+    expect(options).toMatchObject({
+      env: process.env,
+      signal,
+      stdio: ["pipe", "pipe", "pipe"],
+      windowsHide: true,
+    });
 
     await session.dispose();
   });

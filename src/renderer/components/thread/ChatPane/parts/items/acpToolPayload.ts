@@ -109,6 +109,14 @@ export function extractAcpAddedFileText(payload: unknown, filePath: string): str
   return extractStructuredAddedFileText(payload, filePath);
 }
 
+export function extractAcpPatchTargetPath(payload: unknown): string | undefined {
+  const patchText = readApplyPatchText(payload);
+  if (!patchText) return undefined;
+  const paths = parseApplyPatchSections(patchText).map((section) => section.path);
+  const uniquePaths = new Set(paths);
+  return uniquePaths.size === 1 ? paths[0] : undefined;
+}
+
 export function extractAcpDiffSummary(payload: unknown): DiffSummary | undefined {
   const changesSummary = summarizeStructuredFileChanges(payload);
   if (changesSummary) return changesSummary;
@@ -139,6 +147,8 @@ function synthesizeEditDiff(payload: unknown): string | undefined {
   const p = payload as Record<string, unknown>;
   const changesDiff = synthesizeStructuredFileChangesDiff(payload);
   if (changesDiff) return changesDiff;
+  const applyPatchDiff = synthesizeApplyPatchDiff(payload);
+  if (applyPatchDiff) return applyPatchDiff;
 
   const args = p.args;
   if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
@@ -250,6 +260,112 @@ function synthesizeStructuredFileChangesDiff(payload: unknown): string | undefin
     );
   }
   return parts.length > 0 ? `${parts.join("\n")}\n` : undefined;
+}
+
+interface ApplyPatchSection {
+  operation: "Add" | "Update" | "Delete";
+  path: string;
+  lines: string[];
+}
+
+function synthesizeApplyPatchDiff(payload: unknown): string | undefined {
+  const patchText = readApplyPatchText(payload);
+  if (!patchText) return undefined;
+  const sections = parseApplyPatchSections(patchText);
+  const parts = sections.flatMap((section) => sectionToUnifiedDiff(section));
+  return parts.length > 0 ? `${parts.join("\n")}\n` : undefined;
+}
+
+function readApplyPatchText(payload: unknown): string | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const args = (payload as Record<string, unknown>).args;
+  if (typeof args === "string") return args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return undefined;
+  const record = args as Record<string, unknown>;
+  const value = record.patchText ?? record.patch_text ?? record.patch;
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function parseApplyPatchSections(patchText: string): ApplyPatchSection[] {
+  const lines = patchText.split(/\r?\n/);
+  const sections: ApplyPatchSection[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const match = /^\*\*\* (Add|Update|Delete) File: (.+)$/.exec(lines[i] ?? "");
+    if (!match) continue;
+    const operation = match[1] as ApplyPatchSection["operation"];
+    const path = match[2]?.trim();
+    if (!path) continue;
+    const sectionLines: string[] = [];
+    for (i += 1; i < lines.length; i += 1) {
+      const line = lines[i] ?? "";
+      if (/^\*\*\* (?:Add|Update|Delete) File: /.test(line) || line === "*** End Patch") {
+        i -= 1;
+        break;
+      }
+      if (!line.startsWith("*** ")) sectionLines.push(line);
+    }
+    sections.push({ operation, path, lines: sectionLines });
+  }
+  return sections;
+}
+
+function sectionToUnifiedDiff(section: ApplyPatchSection): string[] {
+  const hunks = splitApplyPatchHunks(section.lines).flatMap((hunk) =>
+    normalizeApplyPatchHunk(hunk),
+  );
+  if (hunks.length === 0) return [];
+  return [
+    `diff --git a/${section.path} b/${section.path}`,
+    section.operation === "Add" ? "--- /dev/null" : `--- a/${section.path}`,
+    section.operation === "Delete" ? "+++ /dev/null" : `+++ b/${section.path}`,
+    ...hunks,
+  ];
+}
+
+function splitApplyPatchHunks(lines: string[]): string[][] {
+  const hunks: string[][] = [];
+  let current: string[] = [];
+  for (const line of lines) {
+    if (line.startsWith("@@")) {
+      if (current.length > 0) hunks.push(current);
+      current = [line];
+    } else {
+      current.push(line);
+    }
+  }
+  if (current.length > 0) hunks.push(current);
+  return hunks;
+}
+
+function normalizeApplyPatchHunk(hunk: string[]): string[] {
+  const header = hunk[0]?.startsWith("@@") ? hunk[0] : undefined;
+  const body = (header ? hunk.slice(1) : hunk).filter(isPatchBodyLine);
+  if (body.length === 0) return [];
+  const normalizedHeader =
+    header && /^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/.test(header)
+      ? header
+      : synthesizeHunkHeader(body);
+  return [normalizedHeader, ...body];
+}
+
+function isPatchBodyLine(line: string): boolean {
+  return (
+    line.startsWith("+") || line.startsWith("-") || line.startsWith(" ") || line.startsWith("\\")
+  );
+}
+
+function synthesizeHunkHeader(lines: readonly string[]): string {
+  let oldCount = 0;
+  let newCount = 0;
+  for (const line of lines) {
+    if (line.startsWith("\\")) continue;
+    if (line.startsWith("-") || line.startsWith(" ")) oldCount += 1;
+    if (line.startsWith("+") || line.startsWith(" ")) newCount += 1;
+  }
+  return `@@ -${formatRange(oldCount, oldCount === 0 ? 0 : 1)} +${formatRange(
+    newCount,
+    newCount === 0 ? 0 : 1,
+  )} @@`;
 }
 
 function extractStructuredAddedFileText(payload: unknown, filePath: string): string | undefined {

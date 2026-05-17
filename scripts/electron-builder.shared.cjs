@@ -4,6 +4,16 @@
 
 const CHANNELS = ["stable", "nightly"];
 
+// Subdirectories under `dist/` that ship in the installer. A broad `dist/**/*`
+// glob would sweep up stale `dist/win-unpacked` trees from prior packaging
+// runs and recursively bloat the next installer.
+const PACKAGED_DIST_DIRS = ["main", "renderer"];
+
+const PACKAGED_DIST_FILES = PACKAGED_DIST_DIRS.flatMap((dir) => [
+  `dist/${dir}/**/*`,
+  `!dist/${dir}/**/*.map`,
+]);
+
 function normalizeChannel(value) {
   return value === "nightly" ? "nightly" : "stable";
 }
@@ -30,6 +40,8 @@ function artifactPrefixFor(channel) {
 
 module.exports = {
   CHANNELS,
+  PACKAGED_DIST_DIRS,
+  PACKAGED_DIST_FILES,
   normalizeChannel,
   productNameFor,
   appIdFor,

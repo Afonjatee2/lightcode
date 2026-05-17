@@ -875,19 +875,18 @@ export class ThreadSessionManager {
         ? (turn.userMessageItemId ??
           this.emitOptimisticUserMessage(session.threadId, turn.prompt, turn.segments))
         : undefined;
-    void session.structuredSession
-      .startTurn(
-        turn.prompt,
-        turn.config,
-        turn.segments,
-        optimisticItemId ? { userMessageItemId: optimisticItemId } : undefined,
-      )
-      .catch((error) => {
-        if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-          return;
-        }
-        this.failStructuredSession(session, error);
-      });
+    const startTurn = session.structuredSession.startTurn(
+      turn.prompt,
+      turn.config,
+      turn.segments,
+      optimisticItemId ? { userMessageItemId: optimisticItemId } : undefined,
+    );
+    void startTurn.catch((error) => {
+      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
+        return;
+      }
+      this.failStructuredSession(session, error);
+    });
   }
 
   async closeThread(payload: CloseThreadPayload): Promise<void> {

@@ -6,6 +6,7 @@ import {
   shortenHomePath,
   type AgentAdapter,
   type CreateStructuredSessionInput,
+  type RunOneShotInput,
   type TerminalStatusHint,
 } from "../base";
 import { warnIfPluginManifestMissing } from "../plugin/installerBase";
@@ -18,6 +19,7 @@ import {
   readBundledOpenCodePluginVersion,
   uninstallOpenCodePlugin,
 } from "./plugin/install";
+import { runOpenCodeOneShot } from "./sdkOneShot";
 import { detectOpenCodeTerminalStatus, opencodeOscHint, opencodeOscTitleHint } from "./terminal";
 
 const OPENCODE_PLUGIN_VERSION = readBundledOpenCodePluginVersion();
@@ -192,7 +194,20 @@ export function createOpenCodeAdapter(): AgentAdapter {
     workingSilenceTimeoutMs: null,
 
     // ── One-shot (commit / title gen) ────────────────────────────────────
+    //
+    // Two paths:
+    //   - `runOneShot` (preferred): goes through `opencode serve` over SDK,
+    //     reusing the per-project server pool with a 30s idle TTL. Mirrors
+    //     t3code's text-generation flow and avoids one CLI cold-start per
+    //     generated commit/title/PR.
+    //   - `buildOneShotCommand` (fallback): legacy `opencode run --format
+    //     json` path. Kept so orchestrators that haven't migrated to the
+    //     SDK-first runner still work, and so we have a CLI fallback for
+    //     environments where `opencode serve` fails to start.
     defaultOneShotModel: OPENCODE_DEFAULT_ONE_SHOT_MODEL,
+    async runOneShot(input: RunOneShotInput): Promise<string> {
+      return runOpenCodeOneShot(input);
+    },
     buildOneShotCommand(model, _effort, prompt) {
       if (!prompt) return undefined;
       return {

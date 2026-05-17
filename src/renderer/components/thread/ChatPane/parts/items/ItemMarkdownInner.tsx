@@ -21,7 +21,7 @@ import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { CodeBlock } from "./CodeBlock";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { InlineFolderPathChip } from "./InlineFolderPathChip";
-import { normalizeShortCodeFenceClosers } from "./ItemMarkdown";
+import { normalizeGfmTableSeparators, normalizeShortCodeFenceClosers } from "./ItemMarkdown";
 import { normalizeHighlightLanguage } from "./languageDetect";
 import { parseProjectPathRef, type ProjectPathRef } from "./parseProjectPathRef";
 import {
@@ -82,7 +82,9 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
     ],
     [actions, rootNames],
   );
-  const markdownText = normalizeIncompleteProjectLinkTail(normalizeShortCodeFenceClosers(text));
+  const markdownText = normalizeIncompleteProjectLinkTail(
+    normalizeGfmTableSeparators(normalizeShortCodeFenceClosers(text)),
+  );
   return (
     <div className="lc-chat-markdown prose max-w-none text-[length:var(--lc-chat-font-size)] leading-snug text-foreground prose-headings:text-[length:var(--lc-chat-font-size)] prose-p:text-[length:var(--lc-chat-font-size)] prose-p:whitespace-pre-wrap prose-li:text-[length:var(--lc-chat-font-size)] prose-pre:my-2 prose-pre:rounded prose-pre:border-0 prose-pre:bg-foreground/10 prose-pre:px-[0.5em] prose-pre:py-[0.25em] prose-pre:font-mono prose-pre:text-[0.875em] prose-pre:leading-snug prose-pre:whitespace-pre-wrap prose-pre:break-words prose-pre:overflow-x-hidden prose-code:before:content-none prose-code:after:content-none prose-a:text-foreground prose-a:no-underline prose-a:text-[length:inherit] hover:prose-a:underline hover:prose-a:decoration-1 prose-a:underline-offset-2">
       <Streamdown
@@ -337,6 +339,19 @@ function MdTable({ children }: { children?: ReactNode }) {
   if (headerCells.length === 0 && bodyRows.length === 0) {
     return null;
   }
+  // React Aria's Table is strict: every Row must have exactly one Cell per
+  // Column. Malformed markdown (mismatched separator dash count, ragged rows,
+  // partial streaming chunks) routinely produces rows whose lengths drift from
+  // the header. Normalize everything to the widest row so the table renders
+  // instead of falling over.
+  const columnCount = Math.max(headerCells.length, ...bodyRows.map((r) => r.length), 1);
+  const paddedHeader: ReactNode[] = Array.from(
+    { length: columnCount },
+    (_, i) => headerCells[i] ?? "",
+  );
+  const paddedRows: ReactNode[][] = bodyRows.map((row) =>
+    Array.from({ length: columnCount }, (_, i) => row[i] ?? ""),
+  );
   return (
     <div className="not-prose my-2 min-w-0 max-w-full overflow-hidden">
       <Table className="min-w-0 max-w-full">
@@ -346,20 +361,14 @@ function MdTable({ children }: { children?: ReactNode }) {
             className="text-[length:var(--lc-chat-font-size-command)]"
           >
             <Table.Header>
-              {headerCells.length > 0
-                ? headerCells.map((cell, i) => (
-                    <Table.Column key={`col-${i}`} id={`col-${i}`} isRowHeader={i === 0}>
-                      {cell}
-                    </Table.Column>
-                  ))
-                : (bodyRows[0] ?? []).map((_, i) => (
-                    <Table.Column key={`col-${i}`} id={`col-${i}`} isRowHeader={i === 0}>
-                      {""}
-                    </Table.Column>
-                  ))}
+              {paddedHeader.map((cell, i) => (
+                <Table.Column key={`col-${i}`} id={`col-${i}`} isRowHeader={i === 0}>
+                  {cell}
+                </Table.Column>
+              ))}
             </Table.Header>
             <Table.Body>
-              {bodyRows.map((row, ri) => (
+              {paddedRows.map((row, ri) => (
                 <Table.Row key={`row-${ri}`} id={`row-${ri}`}>
                   {row.map((cell, ci) => (
                     <Table.Cell key={`cell-${ri}-${ci}`}>{cell}</Table.Cell>
@@ -374,7 +383,7 @@ function MdTable({ children }: { children?: ReactNode }) {
   );
 }
 
-function extractTableParts(children: ReactNode): {
+export function extractTableParts(children: ReactNode): {
   headerCells: ReactNode[];
   bodyRows: ReactNode[][];
 } {

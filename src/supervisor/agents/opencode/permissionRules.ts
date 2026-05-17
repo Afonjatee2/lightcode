@@ -1,26 +1,16 @@
 import type { PermissionRule } from "@opencode-ai/sdk/v2";
 
 /**
- * Map our `approvalPolicy` config to OpenCode's `PermissionRuleset`.
+ * Build the Lightcode-owned permission override for OpenCode sessions.
  *
- * Mirrors the upstream OpenCode permission mapping. Question prompts are
- * auto-allowed in both modes — they're informational, not gating.
+ * Supervised mode intentionally returns undefined so OpenCode resolves
+ * permissions from its normal global + project config stack.
  */
-export function buildOpenCodePermissionRules(approvalPolicy: string | undefined): PermissionRule[] {
+export function buildOpenCodePermissionRules(
+  approvalPolicy: string | undefined,
+): PermissionRule[] | undefined {
   const isFullAccess = approvalPolicy === "yolo" || approvalPolicy === "never";
-  if (isFullAccess) {
-    return [{ permission: "*", pattern: "*", action: "allow" }];
-  }
+  if (!isFullAccess) return undefined;
 
-  return [
-    { permission: "*", pattern: "*", action: "ask" },
-    { permission: "bash", pattern: "*", action: "ask" },
-    { permission: "edit", pattern: "*", action: "ask" },
-    { permission: "webfetch", pattern: "*", action: "ask" },
-    { permission: "websearch", pattern: "*", action: "ask" },
-    { permission: "codesearch", pattern: "*", action: "ask" },
-    { permission: "external_directory", pattern: "*", action: "ask" },
-    { permission: "doom_loop", pattern: "*", action: "ask" },
-    { permission: "question", pattern: "*", action: "allow" },
-  ];
+  return [{ permission: "*", pattern: "*", action: "allow" }];
 }

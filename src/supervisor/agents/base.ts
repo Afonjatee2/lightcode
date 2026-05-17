@@ -91,6 +91,31 @@ export interface StartTurnOptions {
   userMessageItemId?: string;
 }
 
+/**
+ * Single message entry in a structured-session thread history. The provider
+ * decides what `parts` actually contains — adapters that wire `readThread`
+ * are expected to keep the provider-native payload here so the renderer or a
+ * follow-up replay layer can re-derive canonical events from it later.
+ */
+export interface ThreadHistoryEntry {
+  /** Provider-native message id (e.g. OpenCode `msg_xxx`). */
+  messageId: string;
+  /** Author of the message. */
+  role: "user" | "assistant";
+  /** Provider-native parts payload (text, tool, reasoning, etc.). */
+  parts: ReadonlyArray<unknown>;
+  /** Provider-native message metadata (token counts, time, error, …). */
+  info: unknown;
+}
+
+/** Result of a `readThread` / `rollbackThread` call. */
+export interface ThreadHistory {
+  /** Provider-native session id this history was read from. */
+  providerSessionId: string;
+  /** Messages in chronological order. */
+  messages: ReadonlyArray<ThreadHistoryEntry>;
+}
+
 export interface StructuredSessionHandle {
   launchOptions: AgentLaunchOptions;
   activate?(): Promise<void>;
@@ -105,6 +130,21 @@ export interface StructuredSessionHandle {
   ): Promise<void>;
   interruptTurn?(): Promise<void>;
   resolveServerRequest?(requestId: ThreadServerRequestId, response: unknown): Promise<void>;
+  /**
+   * Read the provider-native thread history. Optional — adapters that don't
+   * persist server-side messages (TUI-only providers) leave this unimplemented
+   * and consumers fall back to the renderer's in-memory chat state.
+   */
+  readThread?(): Promise<ThreadHistory>;
+  /**
+   * Roll back `numTurns` *assistant turns* on the provider-native session and
+   * return the resulting history. Implementations are expected to truncate
+   * back to the assistant message before the rolled-back ones — providers
+   * like OpenCode that persist messages in SQLite tend to use a "revert to
+   * message id" primitive under the hood. Optional, same gating as
+   * {@link readThread}.
+   */
+  rollbackThread?(numTurns: number): Promise<ThreadHistory>;
   setListener(listener: StructuredSessionListener): void;
   dispose(): Promise<void>;
 }
@@ -333,6 +373,16 @@ export interface AgentSessionTracker {
   watchSessionRef?(location: ProjectLocation, onChanged: () => void): (() => void) | undefined;
 }
 
+/** Input to {@link AgentOneShotRunner.runOneShot}. */
+export interface RunOneShotInput {
+  location: ProjectLocation;
+  model: string;
+  effort?: string | undefined;
+  prompt: string;
+  /** Caller's abort signal (e.g. timeout). Implementations must honour it. */
+  signal?: AbortSignal | undefined;
+}
+
 export interface AgentOneShotRunner {
   /** Default model for lightweight one-shot tasks like commit message generation. */
   defaultOneShotModel?: string;
@@ -345,6 +395,20 @@ export interface AgentOneShotRunner {
     effort?: string,
     prompt?: string,
   ): { command: string; args: string[]; stdin?: string } | undefined;
+  /**
+   * Run a one-shot prompt directly through the provider's structured runtime
+   * (SDK, ACP, …) instead of spawning a fresh CLI process per request. When
+   * defined, one-shot orchestrators prefer this path over
+   * {@link buildOneShotCommand}: it avoids the cold-start cost of a separate
+   * process and removes the OS argv-length budget that the CLI path has to
+   * work around.
+   *
+   * Implementations are responsible for keeping any server-side resources
+   * warm across consecutive calls (idle TTLs, shared pools) — adapters that
+   * spin up a server per call should keep using {@link buildOneShotCommand}
+   * instead, since that's no different from what the CLI fallback does.
+   */
+  runOneShot?(input: RunOneShotInput): Promise<string>;
   /**
    * Build a command that extracts a context summary from an active session.
    * Used by "Continue in Other Provider" to hand off conversation context.
@@ -1594,6 +1658,12 @@ const PRIMED_ENV_SKIP = new Set([
  * non-Promise view of the cache — callers `await primeProjectShellEnv` first.
  */
 const projectShellEnvResolved = new Map<string, Record<string, string> | undefined>();
+const wslProjectShellEnvCache = new Map<string, Promise<Record<string, string> | undefined>>();
+const wslProjectShellEnvResolved = new Map<string, Record<string, string> | undefined>();
+
+function wslProjectShellEnvKey(distro: string, cwd: string): string {
+  return `${distro}\u0000${cwd}`;
+}
 
 export function clearExecutablePathCache(): void {
   execPathCache.clear();
@@ -1601,6 +1671,8 @@ export function clearExecutablePathCache(): void {
   primedPosixEnv = undefined;
   projectShellEnvCache.clear();
   projectShellEnvResolved.clear();
+  wslProjectShellEnvCache.clear();
+  wslProjectShellEnvResolved.clear();
 }
 
 /** Sync read of the cached binary path. Returns undefined if absent or stale. */
@@ -1629,6 +1701,17 @@ export function getProjectShellEnv(cwd: string): Record<string, string> | undefi
 }
 
 /**
+ * Read the WSL project env captured by `primeWslProjectShellEnv`.
+ * Returns `undefined` until the prime completes (or when it fails).
+ */
+export function getWslProjectShellEnv(
+  distro: string,
+  cwd: string,
+): Record<string, string> | undefined {
+  return wslProjectShellEnvResolved.get(wslProjectShellEnvKey(distro, cwd));
+}
+
+/**
  * Capture the user's interactive shell env from inside the project root and
  * cache it. Runs `$SHELL -l [-i] -c '<marker>; env'` with `cwd=projectRoot`
  * so version-manager cd-hooks (fnm `--use-on-cd`, asdf, mise, volta) apply
@@ -1648,30 +1731,82 @@ export function primeProjectShellEnv(cwd: string): Promise<Record<string, string
   if (existing) return existing;
 
   const promise = (async () => {
-    const probe = [`printf '%s\\n' ${quotePosixShellArg(PRIMED_ENV_MARKER)}`, `env`].join("; ");
-    try {
-      const { stdout } = await execFileAsync(
-        process.env.SHELL || "/bin/bash",
-        getPosixLoginShellArgs(probe),
-        {
-          cwd,
-          windowsHide: true,
-          timeout: 15_000,
-        },
-      );
-      const lines = (stdout ?? "").split(/\r?\n/g);
-      const markerIdx = lines.indexOf(PRIMED_ENV_MARKER);
-      if (markerIdx < 0) return undefined;
-      const parsed = parsePrimedEnvDump(lines.slice(markerIdx + 1));
-      if (Object.keys(parsed).length === 0) return undefined;
-      projectShellEnvResolved.set(cwd, parsed);
-      return parsed;
-    } catch {
-      return undefined;
-    }
+    const parsed = await runPrimedEnvProbe(
+      process.env.SHELL || "/bin/bash",
+      getPosixLoginShellArgs(buildPrimedEnvProbe()),
+      { cwd },
+    );
+    if (parsed) projectShellEnvResolved.set(cwd, parsed);
+    return parsed;
   })();
   projectShellEnvCache.set(key, promise);
   return promise;
+}
+
+/**
+ * Capture the user's WSL login-shell env from inside the project root and
+ * cache it. This mirrors the POSIX project-env prime but runs through
+ * `wsl.exe` so structured runtimes can spawn directly over stdio while still
+ * inheriting the user's login-shell PATH / nvm / fnm / mise exports.
+ */
+export function primeWslProjectShellEnv(
+  distro: string,
+  cwd: string,
+): Promise<Record<string, string> | undefined> {
+  const key = wslProjectShellEnvKey(distro, cwd);
+  const existing = wslProjectShellEnvCache.get(key);
+  if (existing) return existing;
+
+  const promise = (async () => {
+    let shellPath: string;
+    try {
+      shellPath = await resolveWslShellPathAsync(distro);
+    } catch {
+      return undefined;
+    }
+    const parsed = await runPrimedEnvProbe(getWslCommand(), [
+      "-d",
+      distro,
+      "--cd",
+      cwd,
+      "--",
+      shellPath,
+      "-l",
+      "-i",
+      "-c",
+      buildPrimedEnvProbe(),
+    ]);
+    if (parsed) wslProjectShellEnvResolved.set(key, parsed);
+    return parsed;
+  })();
+  wslProjectShellEnvCache.set(key, promise);
+  return promise;
+}
+
+function buildPrimedEnvProbe(): string {
+  return [`printf '%s\\n' ${quotePosixShellArg(PRIMED_ENV_MARKER)}`, `env`].join("; ");
+}
+
+async function runPrimedEnvProbe(
+  command: string,
+  args: string[],
+  options: { cwd?: string } = {},
+): Promise<Record<string, string> | undefined> {
+  try {
+    const { stdout } = await execFileAsync(command, args, {
+      ...(options.cwd !== undefined ? { cwd: options.cwd } : {}),
+      windowsHide: true,
+      timeout: 15_000,
+    });
+    const lines = (stdout ?? "").split(/\r?\n/g);
+    const markerIdx = lines.indexOf(PRIMED_ENV_MARKER);
+    if (markerIdx < 0) return undefined;
+    const parsed = parsePrimedEnvDump(lines.slice(markerIdx + 1));
+    if (Object.keys(parsed).length === 0) return undefined;
+    return parsed;
+  } catch {
+    return undefined;
+  }
 }
 
 const PRIMED_ENV_MARKER = "__LIGHTCODE_ENV_BEGIN__";

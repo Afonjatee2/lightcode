@@ -351,6 +351,64 @@ describe("ThreadComposerSection", () => {
     });
   });
 
+  it("keeps long permission details in a scrollable region so actions remain available", () => {
+    const onResolveServerRequest = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const longCommand = Array.from({ length: 60 }, (_, index) => `patch line ${index + 1}`).join(
+      "\n",
+    );
+    useAppStore.setState({
+      runtimeRequestsByThread: {
+        [guiThread.id]: [
+          {
+            requestId: "approval-long",
+            threadId: guiThread.id,
+            requestType: "command_execution_approval",
+            payload: {
+              summary: "Permission required",
+              details: {
+                toolName: "Edit",
+                input: { command: longCommand },
+              },
+            },
+            receivedAt: new Date().toISOString(),
+          },
+        ],
+      },
+    });
+
+    render(
+      <ThreadComposerSection
+        threadId={guiThread.id}
+        fallbackThread={guiThread}
+        agentStatus={codexGuiStatus}
+        projectLocation={{
+          kind: "windows",
+          path: "C:\\repo",
+        }}
+        paneCount={1}
+        terminalPaneRef={{ current: null }}
+        todoDockCollapsed={false}
+        todoDockPlacement="composer"
+        todoDockState={null}
+        goalDockState={null}
+        errorDockState={null}
+        onGoalDockDismiss={() => undefined}
+        onDismissError={() => undefined}
+        onConfigChange={() => undefined}
+        onResolveServerRequest={onResolveServerRequest}
+        onSubmitInput={async () => undefined}
+        onTodoDockCollapsedChange={() => undefined}
+        onTodoDockPlacementChange={() => undefined}
+      />,
+    );
+
+    const details = screen.getByRole("region", { name: "Request details" });
+    expect(details).toHaveClass("overflow-y-auto");
+    expect(details).toHaveClass("max-h-[min(12rem,35vh)]");
+    expect(screen.getByRole("button", { name: "Allow" })).toHaveClass("button--tertiary");
+    expect(screen.getByRole("button", { name: "Deny" })).toHaveClass("button--ghost");
+  });
+
   it("submits Codex multi-question user input in Codex-native response shape", async () => {
     const onResolveServerRequest = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     useAppStore.setState({

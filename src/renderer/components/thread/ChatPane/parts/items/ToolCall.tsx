@@ -2,10 +2,7 @@ import { memo, useMemo, useState, type ReactNode } from "react";
 import { CircleAlert } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
 import { PixelLoader } from "@/renderer/components/common";
-import {
-  getRuntimeItemPayload,
-  type RuntimeChatItem,
-} from "@/renderer/state/slices/runtimeEventSlice";
+import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { ChatItemAccordion } from "./ChatItemAccordion";
 import { ContextCompaction, isContextCompactionToolCall } from "./ContextCompaction";
 import { PlanProposal, isPlanProposalToolCall } from "./PlanProposal";
@@ -18,7 +15,7 @@ interface ToolCallProps {
 }
 
 export const ToolCall = memo(function ToolCall({ item }: ToolCallProps) {
-  const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+  const payload = item.payload as ToolCallPayload | undefined;
   const [isExpanded, setIsExpanded] = useState(false);
   const sections = useMemo<ToolCallSection[]>(() => {
     if (!isExpanded || !payload) return [];

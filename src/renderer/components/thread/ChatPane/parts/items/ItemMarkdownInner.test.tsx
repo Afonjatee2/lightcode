@@ -131,6 +131,26 @@ describe("ItemMarkdownInner", () => {
     expect(actions.openProjectRelativePath).toHaveBeenCalledWith("/tmp/outside.txt", undefined);
   });
 
+  it("does not leave a malformed table as raw piped text", () => {
+    // 4-cell header but only 3 separator segments. Without normalization
+    // remark-gfm rejects the table and renders the source as a raw paragraph
+    // of pipes — the failure users report as a corrupted table. After
+    // normalization the block should be recognized as a table, so no `<p>`
+    // contains the raw pipes.
+    const malformed = ["| a | b | c | d |", "|---|---|---|", "| 1 | 2 | 3 | 4 |", ""].join("\n");
+
+    const { container } = render(
+      <AppProvider>
+        <ItemMarkdownInner text={malformed} />
+      </AppProvider>,
+    );
+
+    const rawParagraph = Array.from(container.querySelectorAll("p")).find((p) =>
+      (p.textContent ?? "").includes("| a | b |"),
+    );
+    expect(rawParagraph).toBeUndefined();
+  });
+
   it("does not render incomplete absolute markdown hrefs as browser links", () => {
     const { container } = render(
       <AppProvider>

@@ -4,6 +4,7 @@
 // against src/shared/channel.ts by src/shared/channel.config-parity.test.ts.
 
 const {
+  PACKAGED_DIST_FILES,
   normalizeChannel,
   appIdFor,
   productNameFor,
@@ -25,8 +26,7 @@ module.exports = {
     buildResources: "build",
   },
   files: [
-    "dist/**/*",
-    "!dist/**/*.map",
+    ...PACKAGED_DIST_FILES,
     "package.json",
     "node_modules/node-pty/**/*",
     "node_modules/better-sqlite3/**/*",

@@ -26,6 +26,10 @@ export type { ProviderModelMenuProvider };
 const MODEL_MENU_ROW_HEIGHT = 28;
 const MODEL_MENU_PROVIDER_HEADER_BOTTOM_GAP = 4;
 const MODEL_MENU_MAX_HEIGHT = 288;
+const MODEL_MENU_LISTBOX_PADDING_TOP = 6;
+const MODEL_MENU_LISTBOX_PADDING_BOTTOM = 6;
+const MODEL_MENU_LISTBOX_VERTICAL_PADDING =
+  MODEL_MENU_LISTBOX_PADDING_TOP + MODEL_MENU_LISTBOX_PADDING_BOTTOM;
 const MODEL_MENU_OVERSCAN_ROWS = 16;
 const MODEL_DESCRIPTION_TOOLTIP_DELAY_MS = 1000;
 
@@ -440,7 +444,10 @@ function WindowedProviderModelList(props: {
   }, [activeIndex, initialActiveRowId, meta]);
 
   const totalHeight = meta.totalHeight;
-  const viewportHeight = Math.min(totalHeight, MODEL_MENU_MAX_HEIGHT);
+  const viewportHeight = Math.min(
+    totalHeight + MODEL_MENU_LISTBOX_VERTICAL_PADDING,
+    MODEL_MENU_MAX_HEIGHT,
+  );
   const visibleRowCount = Math.max(1, Math.ceil(viewportHeight / MODEL_MENU_ROW_HEIGHT));
   const clampedVisibleRow = Math.min(visibleRow, Math.max(0, items.length - 1));
   const startIndex = Math.max(0, clampedVisibleRow - MODEL_MENU_OVERSCAN_ROWS);
@@ -546,7 +553,7 @@ function WindowedProviderModelList(props: {
       aria-activedescendant={
         activeIndex >= 0 ? `${domIdPrefix}-${items[activeIndex]?.id}` : undefined
       }
-      className="lightcode-model-menu-listbox no-scrollbar max-h-72 overflow-y-auto pb-1 outline-none"
+      className="lightcode-model-menu-listbox no-scrollbar max-h-72 overflow-y-auto pt-1.5 pb-1.5 outline-none"
       style={{ height: viewportHeight }}
       tabIndex={0}
       onScroll={(event) => {
@@ -759,7 +766,8 @@ function StickyWindowedHeader(props: {
   return (
     <div
       data-sticky-windowed-header=""
-      className="sticky top-0 z-20 h-0 overflow-visible"
+      className="sticky z-20 h-0 overflow-visible"
+      style={{ top: MODEL_MENU_LISTBOX_PADDING_TOP }}
       aria-hidden="true"
     >
       {content}

@@ -1,6 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RequestError } from "@agentclientprotocol/sdk";
 import type { CreateStructuredSessionInput } from "../base";
@@ -294,6 +295,8 @@ describe("ACP resource path helpers", () => {
 });
 
 describe("ACP client protocol helpers", () => {
+  const HOST_KIND: "windows" | "posix" = process.platform === "win32" ? "windows" : "posix";
+
   function makePosixProject() {
     const root = mkdtempSync(join(tmpdir(), "lightcode-acp-"));
     tempDirs.push(root);
@@ -305,7 +308,7 @@ describe("ACP client protocol helpers", () => {
     writeFileSync(join(projectRoot, "notes.txt"), "one\ntwo\nthree\nfour", "utf8");
     const { session } = makeConfigSyncSession();
     (session as unknown as Record<string, unknown>)["projectLocation"] = {
-      kind: "posix",
+      kind: HOST_KIND,
       path: projectRoot,
     };
 
@@ -324,7 +327,7 @@ describe("ACP client protocol helpers", () => {
     writeFileSync(outside, "secret", "utf8");
     const { session } = makeConfigSyncSession();
     (session as unknown as Record<string, unknown>)["projectLocation"] = {
-      kind: "posix",
+      kind: HOST_KIND,
       path: projectRoot,
     };
 
@@ -339,7 +342,7 @@ describe("ACP client protocol helpers", () => {
     const projectRoot = makePosixProject();
     const { session } = makeConfigSyncSession();
     (session as unknown as Record<string, unknown>)["projectLocation"] = {
-      kind: "posix",
+      kind: HOST_KIND,
       path: projectRoot,
     };
 
@@ -351,50 +354,14 @@ describe("ACP client protocol helpers", () => {
     expect(readFileSync(join(projectRoot, "out.txt"), "utf8")).toBe("ok");
   });
 
-  it("uses resource links for image attachments unless the ACP agent advertises image prompts", async () => {
-    const projectRoot = makePosixProject();
-    const imagePath = join(projectRoot, "diagram.png");
-    writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
-    const { connection, session } = makeConfigSyncSession();
-    (session as unknown as Record<string, unknown>)["projectLocation"] = {
-      kind: "posix",
-      path: projectRoot,
-    };
-
-    await session.startTurn(
-      "inspect",
-      {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "default",
-      },
-      [{ kind: "attachment", path: "diagram.png", mimeType: "image/png" }],
-    );
-
-    expect(connection.prompt).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      prompt: [
-        {
-          type: "resource_link",
-          uri: `file://${imagePath}`,
-          name: "diagram.png",
-          mimeType: "image/png",
-        },
-        { type: "text", text: "inspect" },
-      ],
-    });
-  });
-
-  it("sends image content when the ACP agent advertises image prompt support", async () => {
+  it("sends image content blocks for image attachments regardless of advertised prompt capabilities", async () => {
     const projectRoot = makePosixProject();
     writeFileSync(join(projectRoot, "diagram.png"), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
     const { connection, session } = makeConfigSyncSession();
     (session as unknown as Record<string, unknown>)["projectLocation"] = {
-      kind: "posix",
+      kind: HOST_KIND,
       path: projectRoot,
     };
-    (session as unknown as Record<string, unknown>)["agentPromptCapabilities"] = { image: true };
 
     await session.startTurn(
       "inspect",
@@ -420,11 +387,45 @@ describe("ACP client protocol helpers", () => {
     });
   });
 
+  it("falls back to a resource link when an image attachment can't be read", async () => {
+    const projectRoot = makePosixProject();
+    const imagePath = join(projectRoot, "missing.png");
+    const { connection, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["projectLocation"] = {
+      kind: HOST_KIND,
+      path: projectRoot,
+    };
+
+    await session.startTurn(
+      "inspect",
+      {
+        model: "model-a",
+        effort: "low",
+        mode: "agent",
+        approvalPolicy: "default",
+      },
+      [{ kind: "attachment", path: "missing.png", mimeType: "image/png" }],
+    );
+
+    expect(connection.prompt).toHaveBeenCalledWith({
+      sessionId: "session-1",
+      prompt: [
+        {
+          type: "resource_link",
+          uri: pathToFileURL(imagePath).href,
+          name: "missing.png",
+          mimeType: "image/png",
+        },
+        { type: "text", text: "inspect" },
+      ],
+    });
+  });
+
   it("implements ACP terminal create/output/wait/release over a real PTY", async () => {
     const projectRoot = makePosixProject();
     const { session } = makeConfigSyncSession();
     (session as unknown as Record<string, unknown>)["projectLocation"] = {
-      kind: "posix",
+      kind: HOST_KIND,
       path: projectRoot,
     };
 
@@ -446,7 +447,7 @@ describe("ACP client protocol helpers", () => {
       command: process.execPath,
       args: ["-e", "process.stdout.write('hello from acp')"],
       cwd: projectRoot,
-      outputByteLimit: 100,
+      outputByteLimit: 65536,
     });
 
     await expect(

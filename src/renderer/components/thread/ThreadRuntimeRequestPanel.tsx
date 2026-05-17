@@ -1,6 +1,14 @@
-import { useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { Button, ButtonGroup, Dropdown, Label, Tooltip } from "@heroui/react";
-import { Check, ChevronDown, HelpCircle, Plug, ShieldAlert } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  FileText,
+  HelpCircle,
+  ListChecks,
+  Plug,
+  ShieldAlert,
+} from "lucide-react";
 import {
   asPermissionRequestDetails,
   type CanonicalRequestType,
@@ -11,6 +19,7 @@ import {
 } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { OpenRuntimeRequest } from "@/renderer/state/slices/runtimeEventSlice";
+import { PathDisplay } from "@/renderer/components/common/PathDisplay";
 import { ThreadDockSection } from "./ThreadDockUI";
 
 interface ThreadRuntimeRequestPanelProps {
@@ -22,7 +31,8 @@ interface ThreadRuntimeRequestPanelProps {
     method: string;
     response: unknown;
   }) => Promise<void>;
-  onPlanApproved?: () => void;
+  onPlanApproved?: (optionId: string) => void;
+  onOpenPlanFile?: ((path: string) => void) | undefined;
 }
 
 /**
@@ -38,8 +48,9 @@ interface ThreadRuntimeRequestPanelProps {
  * matching the existing renderer<->supervisor contract.
  */
 export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps) {
-  const { threadId, request, agentLabel, onResolve, onPlanApproved } = props;
+  const { threadId, request, agentLabel, onResolve, onPlanApproved, onOpenPlanFile } = props;
   const [resolving, setResolving] = useState(false);
+  const formId = useId();
 
   function submitRaw(response: unknown, outcome: RequestOutcome) {
     if (resolving) return;
@@ -64,32 +75,41 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
     if (resolving) return;
     const primaryOptionId = optionIds[0];
     if (!primaryOptionId) return;
-    if (
-      request.requestType !== "tool_user_input" &&
-      outcomeForSelection(request.requestType, primaryOptionId) === "accepted" &&
-      isPlanApprovalRequest(request)
-    ) {
-      onPlanApproved?.();
+    const isPlanApproval = isPlanApprovalRequest(request);
+    const outcome = outcomeForSelection(request.requestType, primaryOptionId, isPlanApproval);
+    if (outcome === "accepted" && isPlanApproval) {
+      onPlanApproved?.(primaryOptionId);
     }
     submitRaw(
       optionIds.length === 1
         ? { optionId: primaryOptionId }
         : { optionId: primaryOptionId, optionIds },
-      outcomeForSelection(request.requestType, primaryOptionId),
+      outcome,
     );
   }
 
+  const isPlanApproval = isPlanApprovalRequest(request);
   const structuredElicitation = asStructuredElicitationDetails(request.payload.details);
   const userInputForm = !structuredElicitation
     ? asUserInputFormDetails(request.payload.details)
     : undefined;
   const options = request.payload.options ?? DEFAULT_APPROVAL_OPTIONS;
-  const isQuestion = request.requestType === "tool_user_input";
+  const isQuestion = request.requestType === "tool_user_input" && !isPlanApproval;
   const isCustomForm = !!(structuredElicitation || userInputForm);
-  const Icon = structuredElicitation ? Plug : isQuestion ? HelpCircle : ShieldAlert;
+  const Icon = isPlanApproval
+    ? ListChecks
+    : structuredElicitation
+      ? Plug
+      : isQuestion
+        ? HelpCircle
+        : ShieldAlert;
   const permissionDetails = !isCustomForm
     ? asPermissionRequestDetails(request.payload.details)
     : undefined;
+  const planFilePath =
+    isPlanApproval && permissionDetails
+      ? readInputString(permissionDetails.input, "planFilePath", "plan_filename")
+      : undefined;
   const opencodePermission =
     !permissionDetails && !isCustomForm
       ? asOpenCodePermissionDetails(request.payload.details)
@@ -104,39 +124,77 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
     : isQuestion
       ? `${agentLead} needs your input to continue.`
       : undefined;
+  const summary = request.payload.summary;
+  const planFileAction =
+    planFilePath && onOpenPlanFile ? (
+      <Button size="sm" variant="tertiary" onPress={() => onOpenPlanFile(planFilePath)}>
+        <FileText className="size-3.5" />
+        Open plan
+      </Button>
+    ) : null;
   const approvalActions =
     !isCustomForm && !isQuestion ? (
       <ApprovalActions
         options={options}
         requestType={request.requestType}
         isDisabled={resolving}
+        leadingAction={planFileAction}
+        showAllOptions
         onSelect={(optionId) => decide([optionId])}
       />
+    ) : null;
+  const userInputFormActions = userInputForm ? (
+    <div className="flex items-center gap-1">
+      <Button
+        isDisabled={resolving}
+        size="sm"
+        variant="ghost"
+        onPress={() => submitRaw({ action: "cancel" }, "cancelled")}
+      >
+        Cancel
+      </Button>
+      <Button form={formId} isDisabled={resolving} size="sm" type="submit" variant="secondary">
+        Submit
+      </Button>
+    </div>
+  ) : null;
+  const requestDetails =
+    permissionDetails && !isPlanApproval ? (
+      <PermissionDetailsLine details={permissionDetails} />
+    ) : opencodePermission ? (
+      <OpenCodePermissionDetailsLine details={opencodePermission} />
+    ) : !structuredElicitation && detailText ? (
+      <pre className="rounded-sm bg-foreground/5 p-1 font-mono text-[11px] whitespace-pre-wrap break-words">
+        {detailText}
+      </pre>
     ) : null;
 
   return (
     <ThreadDockSection className="!text-xs" placement="composer" collapsed={false}>
       <div className="flex flex-wrap items-start gap-x-2 gap-y-1 px-2 py-1.5 leading-snug">
         <Icon
-          className={`mt-0.5 size-3.5 shrink-0 ${structuredElicitation || isQuestion ? "text-foreground-muted" : "text-warning"}`}
+          className={`mt-0.5 size-3.5 shrink-0 ${structuredElicitation || isQuestion || isPlanApproval ? "text-foreground-muted" : "text-warning"}`}
         />
         <div className="min-w-0 flex-1 basis-96">
-          <div className="font-semibold text-foreground">{request.payload.summary}</div>
+          <div className="font-semibold text-foreground">{summary}</div>
           {contextLine ? (
             <div className="text-[11px] text-[color:var(--muted)]">{contextLine}</div>
           ) : null}
-          {permissionDetails ? (
-            <PermissionDetailsLine details={permissionDetails} />
-          ) : opencodePermission ? (
-            <OpenCodePermissionDetailsLine details={opencodePermission} />
-          ) : !structuredElicitation && detailText ? (
-            <pre className="mt-0.5 max-h-24 overflow-y-auto rounded-sm bg-foreground/5 p-1 font-mono text-[11px] whitespace-pre-wrap break-words">
-              {detailText}
-            </pre>
+          {requestDetails || planFilePath ? (
+            <div
+              role="region"
+              aria-label="Request details"
+              className="mt-0.5 max-h-[min(12rem,35vh)] overflow-y-auto pr-1 [scrollbar-gutter:stable]"
+            >
+              {requestDetails}
+              {planFilePath ? <PlanFileLine path={planFilePath} /> : null}
+            </div>
           ) : null}
         </div>
         {approvalActions ? (
           <div className="ml-auto shrink-0 self-end">{approvalActions}</div>
+        ) : userInputFormActions ? (
+          <div className="ml-auto shrink-0 self-start">{userInputFormActions}</div>
         ) : null}
       </div>
 
@@ -148,6 +206,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
         />
       ) : userInputForm ? (
         <UserInputForm
+          formId={formId}
           details={userInputForm}
           isDisabled={resolving}
           onSubmit={(response, outcome) => submitRaw(response, outcome)}
@@ -170,8 +229,12 @@ function isPlanApprovalRequest(request: OpenRuntimeRequest): boolean {
   return details.toolName === "ExitPlanMode" || details.toolName === "exit_plan_mode";
 }
 
-function outcomeForSelection(requestType: CanonicalRequestType, optionId: string): RequestOutcome {
-  if (requestType === "tool_user_input") return "answered";
+function outcomeForSelection(
+  requestType: CanonicalRequestType,
+  optionId: string,
+  forceApproval = false,
+): RequestOutcome {
+  if (requestType === "tool_user_input" && !forceApproval) return "answered";
   return NEGATIVE_OPTION_PATTERN.test(optionId) ? "declined" : "accepted";
 }
 
@@ -673,11 +736,12 @@ function userInputValueList(value: UserInputFormAnswer | undefined): string[] {
 }
 
 function UserInputForm(props: {
+  formId: string;
   details: UserInputFormDetails;
   isDisabled: boolean;
   onSubmit: (response: unknown, outcome: RequestOutcome) => void;
 }) {
-  const { details, isDisabled, onSubmit } = props;
+  const { formId, details, isDisabled, onSubmit } = props;
   const [activeIndex, setActiveIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, UserInputFormAnswer>>(() =>
     initialUserInputFormAnswers(details.questions),
@@ -732,7 +796,14 @@ function UserInputForm(props: {
   }
 
   return (
-    <div className="space-y-2 border-t border-[color:var(--border)] px-2 py-1.5">
+    <form
+      id={formId}
+      className="space-y-2 border-t border-[color:var(--border)] px-2 py-1.5"
+      onSubmit={(event) => {
+        event.preventDefault();
+        submit();
+      }}
+    >
       <QuestionSwitcher
         questions={details.questions}
         answers={answers}
@@ -796,12 +867,7 @@ function UserInputForm(props: {
           />
         )}
       </div>
-      <div className="flex justify-end pt-1">
-        <Button isDisabled={isDisabled} size="sm" variant="secondary" onPress={submit}>
-          Submit
-        </Button>
-      </div>
-    </div>
+    </form>
   );
 }
 
@@ -860,7 +926,7 @@ function OpenCodePermissionDetailsLine({ details }: { details: OpenCodePermissio
         <span className="ml-1 text-foreground">{details.permission}</span>
       </div>
       {details.patterns.length > 0 ? (
-        <div className="break-words">
+        <div className="whitespace-pre-wrap break-words">
           <span className="text-foreground/60">
             {details.patterns.length === 1 ? "target" : "targets"}
           </span>
@@ -868,7 +934,7 @@ function OpenCodePermissionDetailsLine({ details }: { details: OpenCodePermissio
         </div>
       ) : null}
       {metadataEntries.map(([key, value]) => (
-        <div key={key} className="break-words">
+        <div key={key} className="whitespace-pre-wrap break-words">
           <span className="text-foreground/60">{key}</span>
           <span className="ml-1 text-foreground">
             {typeof value === "string" ? value : JSON.stringify(value)}
@@ -884,7 +950,7 @@ function PermissionDetailsLine({ details }: { details: PermissionRequestDetails 
   const label = details.displayName ?? details.toolName;
   return (
     <div className="mt-0.5 space-y-0.5">
-      <div className="font-mono text-[11px] text-foreground/80">
+      <div className="font-mono text-[11px] whitespace-pre-wrap break-words text-foreground/80">
         <span className="text-foreground/60">{label}</span>
         {subject ? <span className="ml-1 text-foreground">{subject}</span> : null}
       </div>
@@ -894,10 +960,24 @@ function PermissionDetailsLine({ details }: { details: PermissionRequestDetails 
         </div>
       ) : null}
       {details.blockedPath ? (
-        <div className="font-mono text-[11px] text-foreground/60">
+        <div className="font-mono text-[11px] whitespace-pre-wrap break-words text-foreground/60">
           blocked: <span className="text-foreground/80">{details.blockedPath}</span>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function PlanFileLine(props: { path: string }) {
+  const { path } = props;
+  return (
+    <div className="mt-1 flex min-w-0 items-center gap-2">
+      <PathDisplay
+        path={path}
+        className="min-w-0 flex-1 font-mono text-[11px]"
+        basenameClassName="text-foreground/80"
+        dirClassName="text-muted/60"
+      />
     </div>
   );
 }
@@ -1012,10 +1092,7 @@ function QuestionOptionRow(props: {
       <span className="min-w-0 flex-1">
         <span className="block truncate text-xs font-medium text-foreground">{option.label}</span>
         {option.description ? (
-          <span
-            className="block overflow-hidden text-[11px] leading-snug text-[color:var(--muted)] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]"
-            title={option.description}
-          >
+          <span className="block overflow-hidden text-[11px] leading-snug text-[color:var(--muted)] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
             {option.description}
           </span>
         ) : null}
@@ -1026,8 +1103,12 @@ function QuestionOptionRow(props: {
   if (!tooltipBody) return row;
   return (
     <Tooltip delay={400}>
-      <Tooltip.Trigger>{row}</Tooltip.Trigger>
-      <Tooltip.Content placement="right">{tooltipBody}</Tooltip.Content>
+      <Tooltip.Trigger className="flex w-full min-h-0 flex-col" tabIndex={-1} role="none">
+        {row}
+      </Tooltip.Trigger>
+      <Tooltip.Content placement="right" showArrow className="max-w-[28rem] break-words text-xs">
+        {tooltipBody}
+      </Tooltip.Content>
     </Tooltip>
   );
 }
@@ -1036,69 +1117,68 @@ function ApprovalActions(props: {
   options: readonly UserInputOption[];
   requestType: CanonicalRequestType;
   isDisabled: boolean;
+  leadingAction?: ReactNode;
+  showAllOptions?: boolean;
   onSelect: (optionId: string) => void;
 }) {
-  const { options, isDisabled, onSelect } = props;
+  const { options, isDisabled, leadingAction, showAllOptions, onSelect } = props;
   const negatives = options.filter(isNegativeOption);
   const positives = options.filter((o) => !isNegativeOption(o));
   const primary = positives[0];
   const positiveAlternates = positives.slice(1);
 
+  if (!primary && negatives.length === 0) return null;
+
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2">
-      <div className="flex flex-wrap items-center gap-1">
-        {negatives.map((option) => (
-          <Button
-            key={option.optionId}
-            isDisabled={isDisabled}
-            size="sm"
-            variant="ghost"
-            onPress={() => onSelect(option.optionId)}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </div>
-      <div className="flex items-center gap-1">
-        {primary ? (
-          positiveAlternates.length > 0 ? (
-            <ButtonGroup size="sm" variant="tertiary">
-              <Button isDisabled={isDisabled} onPress={() => onSelect(primary.optionId)}>
-                {primary.label}
-              </Button>
-              <Dropdown>
-                <Button isIconOnly aria-label="More approval options" isDisabled={isDisabled}>
-                  <ButtonGroup.Separator />
-                  <ChevronDown className="size-3.5" />
-                </Button>
-                <Dropdown.Popover placement="top end">
-                  <Dropdown.Menu onAction={(key) => onSelect(String(key))}>
-                    {positiveAlternates.map((option) => (
-                      <Dropdown.Item
-                        key={option.optionId}
-                        id={option.optionId}
-                        textValue={option.label}
-                      >
-                        <Label>{option.label}</Label>
-                      </Dropdown.Item>
-                    ))}
-                  </Dropdown.Menu>
-                </Dropdown.Popover>
-              </Dropdown>
-            </ButtonGroup>
-          ) : (
+    <ButtonGroup size="sm" variant="tertiary">
+      {leadingAction}
+      {negatives.map((option, index) => (
+        <Button
+          key={option.optionId}
+          isDisabled={isDisabled}
+          variant="ghost"
+          onPress={() => onSelect(option.optionId)}
+        >
+          {leadingAction || index > 0 ? <ButtonGroup.Separator /> : null}
+          {option.label}
+        </Button>
+      ))}
+      {primary ? (
+        <Button isDisabled={isDisabled} onPress={() => onSelect(primary.optionId)}>
+          {leadingAction || negatives.length > 0 ? <ButtonGroup.Separator /> : null}
+          {primary.label}
+        </Button>
+      ) : null}
+      {showAllOptions
+        ? positiveAlternates.map((option) => (
             <Button
+              key={option.optionId}
               isDisabled={isDisabled}
-              size="sm"
-              variant="tertiary"
-              onPress={() => onSelect(primary.optionId)}
+              onPress={() => onSelect(option.optionId)}
             >
-              {primary.label}
+              <ButtonGroup.Separator />
+              {option.label}
             </Button>
-          )
-        ) : null}
-      </div>
-    </div>
+          ))
+        : null}
+      {primary && positiveAlternates.length > 0 && !showAllOptions ? (
+        <Dropdown>
+          <Button isIconOnly aria-label="More approval options" isDisabled={isDisabled}>
+            <ButtonGroup.Separator />
+            <ChevronDown className="size-3.5" />
+          </Button>
+          <Dropdown.Popover placement="top end">
+            <Dropdown.Menu onAction={(key) => onSelect(String(key))}>
+              {positiveAlternates.map((option) => (
+                <Dropdown.Item key={option.optionId} id={option.optionId} textValue={option.label}>
+                  <Label>{option.label}</Label>
+                </Dropdown.Item>
+              ))}
+            </Dropdown.Menu>
+          </Dropdown.Popover>
+        </Dropdown>
+      ) : null}
+    </ButtonGroup>
   );
 }
 
@@ -1109,6 +1189,16 @@ function formatInputSubject(input: unknown): string | undefined {
   if (typeof obj.file_path === "string") return obj.file_path;
   if (typeof obj.path === "string") return obj.path;
   if (typeof obj.url === "string") return obj.url;
+  return undefined;
+}
+
+function readInputString(input: unknown, ...keys: string[]): string | undefined {
+  if (!input || typeof input !== "object") return undefined;
+  const obj = input as Record<string, unknown>;
+  for (const key of keys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.length > 0) return value;
+  }
   return undefined;
 }
 

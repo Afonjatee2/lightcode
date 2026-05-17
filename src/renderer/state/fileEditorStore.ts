@@ -76,6 +76,7 @@ interface FileEditorStoreState {
   tabs: string[];
   activePath: string | null;
   previewTab: string | null;
+  markdownPreviewPath: string | null;
   buffers: Record<string, FileEditorBuffer>;
   refreshToken: number;
   pendingReveal: FileEditorPendingReveal | null;
@@ -85,7 +86,7 @@ interface FileEditorStoreState {
     path: string,
     mode?: FileEditorOverlayMode | null,
     preview?: boolean,
-    options?: { lineNumber?: number },
+    options?: { lineNumber?: number; markdownPreview?: boolean },
   ) => Promise<ReadProjectFileResult>;
   consumeReveal: (token: number) => void;
   pinTab: (path: string) => void;
@@ -249,6 +250,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
   tabs: [],
   activePath: null,
   previewTab: null,
+  markdownPreviewPath: null,
   buffers: {},
   refreshToken: 0,
   pendingReveal: null,
@@ -267,6 +269,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         tabs: [],
         activePath: null,
         previewTab: null,
+        markdownPreviewPath: null,
         buffers: {},
         pendingReveal: null,
         refreshToken: state.refreshToken + 1,
@@ -279,6 +282,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       tabs: [],
       activePath: null,
       previewTab: null,
+      markdownPreviewPath: null,
       buffers: {},
       pendingReveal: null,
       refreshToken: state.refreshToken + 1,
@@ -289,6 +293,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
     ),
   async openFile(path, mode = "modal", preview = false, options) {
     const lineNumber = options?.lineNumber;
+    const markdownPreviewPath = options?.markdownPreview ? path : null;
     const reveal: FileEditorPendingReveal | null =
       lineNumber !== undefined && Number.isFinite(lineNumber) && lineNumber > 0
         ? { path, lineNumber, token: ++revealTokenCounter }
@@ -305,6 +310,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         return {
           ...changes,
           activePath: path,
+          markdownPreviewPath,
           ...(reveal ? { pendingReveal: reveal } : {}),
         };
       });
@@ -328,6 +334,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
       return {
         ...changes,
         activePath: path,
+        markdownPreviewPath,
         ...(reveal ? { pendingReveal: reveal } : {}),
         buffers: {
           ...changes.buffers,
@@ -380,6 +387,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
               ? (state.tabs.find((tabPath) => tabPath !== path) ?? null)
               : state.activePath,
           previewTab: state.previewTab === path ? null : state.previewTab,
+          markdownPreviewPath:
+            state.markdownPreviewPath === path ? null : state.markdownPreviewPath,
         };
       });
       throw error;
@@ -476,6 +485,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         buffers,
         activePath: nextActivePath,
         previewTab: state.previewTab === path ? null : state.previewTab,
+        markdownPreviewPath: state.markdownPreviewPath === path ? null : state.markdownPreviewPath,
         overlayMode:
           tabs.length === 0 && state.overlayMode !== "fullscreen" ? null : state.overlayMode,
       };
@@ -522,6 +532,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         tabs: state.tabs.map((tabPath) => remapPath(tabPath)!),
         activePath: remapPath(state.activePath),
         previewTab: remapPath(state.previewTab),
+        markdownPreviewPath: remapPath(state.markdownPreviewPath),
         refreshToken: state.refreshToken + 1,
       };
     }),
@@ -536,6 +547,8 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
         ),
       );
       const previewRemoved = state.previewTab === path || state.previewTab?.startsWith(`${path}/`);
+      const markdownPreviewRemoved =
+        state.markdownPreviewPath === path || state.markdownPreviewPath?.startsWith(`${path}/`);
       return {
         tabs,
         buffers,
@@ -544,6 +557,7 @@ export const useFileEditorStore = create<FileEditorStoreState>((set, get) => ({
             ? (tabs[tabs.length - 1] ?? null)
             : state.activePath,
         previewTab: previewRemoved ? null : state.previewTab,
+        markdownPreviewPath: markdownPreviewRemoved ? null : state.markdownPreviewPath,
         overlayMode:
           tabs.length === 0 && state.overlayMode !== "fullscreen" ? null : state.overlayMode,
         refreshToken: state.refreshToken + 1,

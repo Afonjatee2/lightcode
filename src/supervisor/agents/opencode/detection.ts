@@ -11,6 +11,15 @@ import {
 import { configFileAuthProbe, readAgentCommandOutput, type DetectionSpec } from "../base";
 import { buildContextSizeCapabilities } from "../contextWindowLabel";
 import { getAgentProbeCwd } from "../probeCwd";
+import { probeOpenCodeInventoryViaSdk, type OpenCodeSdkInventory } from "./sdkProbe";
+
+/**
+ * Minimum OpenCode CLI version we can talk to over the SDK. 1.14.19 is the
+ * first build that ships the v2 client surface we depend on (provider.list,
+ * app.agents, session.promptAsync with `agent`/`variant`). Older binaries
+ * silently miss fields and we crash deserialising responses.
+ */
+export const OPENCODE_MIN_VERSION = "1.14.19";
 
 // Canonical ordering for the union effort list. Anything OpenCode reports
 // outside this set gets appended after these in discovery order so we never
@@ -71,6 +80,32 @@ interface OpenCodeProbedModel {
   id: string;
   variants: string[];
   contextLimit?: number;
+}
+
+/**
+ * Compare two `x.y.z` semver strings. Returns -1 / 0 / 1 like a normal sort
+ * comparator. Pre-release suffixes (`-alpha.1`) are ignored — they only affect
+ * tie-breakers between the same `x.y.z`, which we don't care about for a
+ * minimum-version gate. Non-numeric segments compare as zero so a malformed
+ * "1.14.x" stays less than "1.14.19" without throwing.
+ */
+export function compareOpencodeSemver(left: string, right: string): number {
+  const parse = (input: string): number[] => {
+    const core = input.split(/[-+]/, 1)[0] ?? input;
+    return core.split(".").map((segment) => {
+      const numeric = Number.parseInt(segment, 10);
+      return Number.isFinite(numeric) ? numeric : 0;
+    });
+  };
+  const a = parse(left);
+  const b = parse(right);
+  const max = Math.max(a.length, b.length);
+  for (let i = 0; i < max; i += 1) {
+    const ai = a[i] ?? 0;
+    const bi = b[i] ?? 0;
+    if (ai !== bi) return ai < bi ? -1 : 1;
+  }
+  return 0;
 }
 
 interface OpenCodeCommandLike {
@@ -317,55 +352,159 @@ export const opencodeDetectionSpec: DetectionSpec = {
   ],
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;
+
+    // Block old binaries before either probe path: parseOpenCodeVerboseModels
+    // happens to handle pre-1.14 output but the SDK call would silently
+    // misbehave, and the GUI session can't recover. Surface the issue early.
+    if (ctx.version && compareOpencodeSemver(ctx.version, OPENCODE_MIN_VERSION) < 0) {
+      console.warn(
+        `[opencode] detected version ${ctx.version} is below the supported minimum ${OPENCODE_MIN_VERSION}. ` +
+          `Models and chat will be disabled until OpenCode is upgraded (run \`opencode upgrade\` or reinstall).`,
+      );
+      return undefined;
+    }
+
+    // Prefer SDK-driven inventory (richer model/agent data straight from
+    // `opencode serve`). If the server fails to come up — corporate firewall,
+    // sandboxed binary, missing libc — fall back to the CLI `models --verbose`
+    // parser so the user still sees a usable model list.
+    const sdkInventory = await probeOpenCodeInventoryViaSdk(ctx.location, ctx.executablePath).catch(
+      (cause) => {
+        console.warn(
+          `[opencode] SDK capabilities probe failed, falling back to CLI parser: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`,
+        );
+        return undefined;
+      },
+    );
+
+    if (sdkInventory) {
+      return buildCapabilityPartialFromSdkInventory(sdkInventory);
+    }
+
     const probed = await probeOpenCodeModels(ctx.location, ctx.executablePath);
     if (!probed) return undefined;
-    const modelIds = probed.map((m) => m.id);
-    const subProviderIds = [...new Set(modelIds.map(openCodeModelSubProvider).filter(isString))];
-
-    // Per-model variant lists feed the composer effort picker via
-    // `getAvailableEfforts(capabilities, model)` — empty arrays mean "no
-    // effort selector for this model", which is the right default for free
-    // models like `opencode/big-pickle` whose `variants: {}` we already saw.
-    const modelEfforts: Record<string, string[]> = {};
-    const seenEfforts = new Set<string>();
-    for (const m of probed) {
-      modelEfforts[m.id] = m.variants;
-      for (const v of m.variants) seenEfforts.add(v);
-    }
-    const ordered: string[] = [];
-    for (const e of CANONICAL_EFFORT_ORDER) {
-      if (seenEfforts.has(e)) {
-        ordered.push(e);
-        seenEfforts.delete(e);
-      }
-    }
-    // Append any non-canonical variant names OpenCode reported, preserving
-    // discovery order — keeps us forward-compatible with new variants.
-    for (const e of seenEfforts) ordered.push(e);
-
-    // Map each model to its registry-reported context limit so the renderer's
-    // context-usage dock can show "X / Y tokens" before any message has flowed
-    // through `context.updated`. OpenCode's `models --verbose` emits a Model
-    // object whose `limit.context` is the upstream context window in tokens.
-    const modelTokens = new Map<string, number>();
-    for (const m of probed) {
-      if (m.contextLimit !== undefined) modelTokens.set(m.id, m.contextLimit);
-    }
-
-    return {
-      models: modelIds.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
-      subProviders: subProviderIds.map((id) => ({
-        id,
-        label: humanizeOpenCodeSubProviderId(id),
-      })),
-      efforts: ordered,
-      modelEfforts,
-      ...(ordered.includes(OPENCODE_PREFERRED_DEFAULT_EFFORT)
-        ? { defaultEffort: OPENCODE_PREFERRED_DEFAULT_EFFORT }
-        : ordered.length > 0
-          ? { defaultEffort: ordered[0] }
-          : {}),
-      ...buildContextSizeCapabilities(modelTokens),
-    };
+    return buildCapabilityPartialFromProbedModels(probed);
   },
 };
+
+function orderEffortsCanonically(seen: Set<string>): string[] {
+  const ordered: string[] = [];
+  for (const effort of CANONICAL_EFFORT_ORDER) {
+    if (seen.has(effort)) {
+      ordered.push(effort);
+      seen.delete(effort);
+    }
+  }
+  // Append any non-canonical variant names OpenCode reported, preserving
+  // discovery order — keeps us forward-compatible with new variants.
+  for (const effort of seen) ordered.push(effort);
+  return ordered;
+}
+
+function defaultEffortFor(ordered: readonly string[]): { defaultEffort?: string } {
+  if (ordered.includes(OPENCODE_PREFERRED_DEFAULT_EFFORT)) {
+    return { defaultEffort: OPENCODE_PREFERRED_DEFAULT_EFFORT };
+  }
+  return ordered.length > 0 ? { defaultEffort: ordered[0]! } : {};
+}
+
+/**
+ * Build the `capabilitiesProbe` return value from the CLI-parsed model list.
+ * Used as the fallback when the SDK probe is unavailable.
+ */
+export function buildCapabilityPartialFromProbedModels(
+  probed: readonly OpenCodeProbedModel[],
+): Partial<AgentCapability> {
+  const modelIds = probed.map((m) => m.id);
+  const subProviderIds = [...new Set(modelIds.map(openCodeModelSubProvider).filter(isString))];
+
+  // Per-model variant lists feed the composer effort picker via
+  // `getAvailableEfforts(capabilities, model)` — empty arrays mean "no
+  // effort selector for this model", which is the right default for free
+  // models like `opencode/big-pickle` whose `variants: {}` we already saw.
+  const modelEfforts: Record<string, string[]> = {};
+  const seenEfforts = new Set<string>();
+  for (const m of probed) {
+    modelEfforts[m.id] = m.variants;
+    for (const v of m.variants) seenEfforts.add(v);
+  }
+  const ordered = orderEffortsCanonically(seenEfforts);
+
+  // Map each model to its registry-reported context limit so the renderer's
+  // context-usage dock can show "X / Y tokens" before any message has flowed
+  // through `context.updated`.
+  const modelTokens = new Map<string, number>();
+  for (const m of probed) {
+    if (m.contextLimit !== undefined) modelTokens.set(m.id, m.contextLimit);
+  }
+
+  return {
+    models: modelIds.map((id) => ({ id, label: humanizeOpenCodeModelId(id) })),
+    subProviders: subProviderIds.map((id) => ({
+      id,
+      label: humanizeOpenCodeSubProviderId(id),
+    })),
+    efforts: ordered,
+    modelEfforts,
+    ...defaultEffortFor(ordered),
+    ...buildContextSizeCapabilities(modelTokens),
+  };
+}
+
+/**
+ * Build the `capabilitiesProbe` return value from a successful SDK inventory.
+ *
+ * The SDK gives us richer data than the CLI parser:
+ *   - per-provider model names (so we don't need slug-titleization heuristics)
+ *   - `connected` provider ids (we filter out providers with no upstream auth)
+ *   - per-model `variants` keyed by id (same shape as the CLI parser)
+ *   - per-model `limit.context` token counts
+ *   - the list of user-defined agents (custom `~/.config/opencode/agent/*`)
+ *
+ * Returned shape exactly matches `buildCapabilityPartialFromProbedModels` so
+ * the renderer treats the two paths interchangeably.
+ */
+export function buildCapabilityPartialFromSdkInventory(
+  inventory: OpenCodeSdkInventory,
+): Partial<AgentCapability> {
+  const connected = new Set(inventory.connected);
+  const models: Array<{ id: string; label: string }> = [];
+  const subProviderIds = new Set<string>();
+  const modelEfforts: Record<string, string[]> = {};
+  const seenEfforts = new Set<string>();
+  const modelTokens = new Map<string, number>();
+
+  for (const provider of inventory.providers) {
+    // OpenCode reports both authenticated and pseudo "available" providers in
+    // `all`. The renderer's picker should only show models the user can
+    // actually call right now, so filter to the `connected` set — same gate
+    // t3code applies to its model list.
+    if (!connected.has(provider.id)) continue;
+    subProviderIds.add(provider.id);
+    for (const model of provider.models) {
+      const slug = `${provider.id}/${model.id}`;
+      const label =
+        model.name.trim().length > 0 ? model.name.trim() : humanizeOpenCodeModelId(slug);
+      models.push({ id: slug, label });
+      modelEfforts[slug] = [...model.variants];
+      for (const variant of model.variants) seenEfforts.add(variant);
+      if (model.contextLimit !== undefined) modelTokens.set(slug, model.contextLimit);
+    }
+  }
+
+  const ordered = orderEffortsCanonically(seenEfforts);
+
+  return {
+    models: models.toSorted((left, right) => left.label.localeCompare(right.label)),
+    subProviders: [...subProviderIds].map((id) => ({
+      id,
+      label: humanizeOpenCodeSubProviderId(id),
+    })),
+    efforts: ordered,
+    modelEfforts,
+    ...defaultEffortFor(ordered),
+    ...buildContextSizeCapabilities(modelTokens),
+  };
+}

@@ -261,7 +261,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
 
     void (async () => {
       if (optimisticUserMessageItemId) {
-        await captureFileCheckpoint({
+        void captureFileCheckpoint({
           threadId: thread.id,
           checkpointItemId: optimisticUserMessageItemId,
           projectLocation,

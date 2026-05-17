@@ -74,7 +74,7 @@ export async function generatePrSummary(
     throw new Error(`No default one-shot model configured for ${adapter.label}`);
   }
 
-  if (!adapter.buildOneShotCommand) {
+  if (!adapter.runOneShot && !adapter.buildOneShotCommand) {
     throw new Error(`${adapter.label} does not support one-shot generation`);
   }
 

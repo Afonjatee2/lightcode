@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import type { CommandSpec } from "../base";
+import { classifyOpenCodeError } from "./opencodeErrors";
 
 const URL_LINE_PREFIX = "opencode server listening";
 const URL_REGEX = /on\s+(https?:\/\/[^\s]+)/;
@@ -27,9 +28,6 @@ export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHan
     env: {
       ...process.env,
       ...commandSpec.env,
-      // Neutralise any user `~/.config/opencode/config.json`
-      // so server behaviour is hermetic and not influenced by global config.
-      OPENCODE_CONFIG_CONTENT: "{}",
     },
     stdio: ["pipe", "pipe", "pipe"],
     shell: false,
@@ -51,13 +49,24 @@ export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHan
 
   // Spawn-error and early-exit guards (mirrors Codex acp.ts:327-336).
   child.once("error", (err) => {
-    pending?.reject(new Error(`opencode serve failed to spawn: ${err.message}`));
+    pending?.reject(
+      new Error(classifyOpenCodeError({ cause: err, operation: "spawn opencode serve" })),
+    );
   });
   child.once("exit", (code, signal) => {
     if (!baseUrl) {
+      const detail = formatOutput();
+      const exitMessage = `opencode serve exited before ready (code=${code} signal=${signal}).${detail}`;
+      // Run the captured stdout/stderr through the classifier too — a binary
+      // that bails out on macOS quarantine, ENOENT, or a missing libc usually
+      // prints something useful before exit, and we want the user-facing
+      // message to reflect that instead of a bare exit code.
       pending?.reject(
         new Error(
-          `opencode serve exited before ready (code=${code} signal=${signal}).${formatOutput()}`,
+          classifyOpenCodeError({
+            cause: new Error(`${exitMessage}\n${detail}`),
+            operation: "opencode serve",
+          }),
         ),
       );
     }
@@ -66,7 +75,12 @@ export function spawnOpenCodeServer(commandSpec: CommandSpec): OpenCodeServerHan
   const readyTimeout = setTimeout(() => {
     if (!baseUrl) {
       pending?.reject(
-        new Error(`opencode serve did not emit ready URL within ${READY_TIMEOUT_MS}ms.`),
+        new Error(
+          classifyOpenCodeError({
+            cause: new Error(`opencode serve did not emit ready URL within ${READY_TIMEOUT_MS}ms`),
+            operation: "opencode serve",
+          }),
+        ),
       );
     }
   }, READY_TIMEOUT_MS);

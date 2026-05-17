@@ -35,6 +35,7 @@ export function FileEditorPane(props: {
   );
   const isDirty = useIsActiveBufferDirty();
   const bufferStatus = useActiveBufferStatus();
+  const markdownPreviewPath = useFileEditorStore((state) => state.markdownPreviewPath);
   const [monacoInstance, setMonacoInstance] = useState<Monaco | null>(null);
   const theme = useResolvedTheme();
 
@@ -45,8 +46,8 @@ export function FileEditorPane(props: {
   const { notifyDidSave } = useLspSync({ monaco: monacoInstance, activePath, bufferStatus });
 
   useEffect(() => {
-    setShowPreview(false);
-  }, [activePath]);
+    setShowPreview(!!activePath && isMarkdown && markdownPreviewPath === activePath);
+  }, [activePath, isMarkdown, markdownPreviewPath]);
 
   async function handleSave(path: string) {
     try {

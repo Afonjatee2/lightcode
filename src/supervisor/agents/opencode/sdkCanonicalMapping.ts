@@ -19,7 +19,13 @@ import type {
   QuestionRequest,
   ToolState,
 } from "@opencode-ai/sdk/v2";
-import type { CanonicalItemType, CanonicalRequestType, RuntimeEvent } from "@/shared/contracts";
+import type {
+  CanonicalItemType,
+  CanonicalRequestType,
+  PermissionRequestDetails,
+  RuntimeEvent,
+  UserInputOption,
+} from "@/shared/contracts";
 import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
 import {
   createContextUsageEvent,
@@ -173,7 +179,7 @@ function classifyToolItemType(toolName: string): CanonicalItemType {
   if (/(^|[_-])bash($|[_-])|(^|[_-])shell($|[_-])|(^|[_-])command($|[_-])/.test(n)) {
     return "command_execution";
   }
-  if (/(^|[_-])(edit|write|patch|multiedit)($|[_-])/.test(n)) {
+  if (/(^|[_-])(create|edit|write|patch|multiedit)($|[_-])/.test(n)) {
     return "file_change";
   }
   if (/(^|[_-])(webfetch|websearch|search)($|[_-])/.test(n)) {
@@ -207,11 +213,66 @@ function readOpenCodePath(input: Record<string, unknown> | undefined): string | 
   );
 }
 
+function inferFileChangeKind(
+  toolName: string,
+  ...sources: unknown[]
+): "create" | "edit" | "delete" {
+  const n = normalizeToolName(toolName);
+  if (/create|write/.test(n)) return "create";
+  if (/delete|rm/.test(n)) return "delete";
+  for (const source of sources) {
+    const kind = inferFileChangeKindFromSource(source);
+    if (kind) return kind;
+  }
+  return "edit";
+}
+
+function inferFileChangeKindFromSource(source: unknown): "create" | "delete" | undefined {
+  if (!source || typeof source !== "object") return undefined;
+  const record = source as Record<string, unknown>;
+  const direct = readStringField(record, "changeKind", "change_kind", "type")?.toLowerCase();
+  if (direct === "create" || direct === "add") return "create";
+  if (direct === "delete" || direct === "remove") return "delete";
+  const patchText = readStringField(record, "patchText", "patch_text", "patch");
+  const patchKind = inferPatchTextKind(patchText);
+  if (patchKind) return patchKind;
+  const changesKind = inferChangesKind(record.changes);
+  if (changesKind) return changesKind;
+  return inferFileChangeKindFromSource(record.args) ?? inferFileChangeKindFromSource(record.input);
+}
+
+function inferPatchTextKind(patchText: string | undefined): "create" | "delete" | undefined {
+  if (!patchText) return undefined;
+  const operations = [...patchText.matchAll(/^\*\*\*\s+(Add|Update|Delete)\s+File:/gm)].map(
+    (match) => match[1],
+  );
+  if (operations.length === 0) return undefined;
+  if (operations.every((operation) => operation === "Add")) return "create";
+  if (operations.every((operation) => operation === "Delete")) return "delete";
+  return undefined;
+}
+
+function inferChangesKind(changes: unknown): "create" | "delete" | undefined {
+  if (!Array.isArray(changes) || changes.length === 0) return undefined;
+  const kinds = changes.flatMap((change) => {
+    if (!change || typeof change !== "object") return [];
+    const kind = (change as Record<string, unknown>).kind;
+    if (!kind || typeof kind !== "object") return [];
+    const type = readStringField(kind as Record<string, unknown>, "type")?.toLowerCase();
+    return type ? [type] : [];
+  });
+  if (kinds.length === 0) return undefined;
+  if (kinds.every((kind) => kind === "add" || kind === "create")) return "create";
+  if (kinds.every((kind) => kind === "delete" || kind === "remove")) return "delete";
+  return undefined;
+}
+
 function openCodeToolKind(
   toolName: string,
 ): "read" | "search" | "fetch" | "execute" | "other" | undefined {
   switch (normalizeToolName(toolName)) {
     case "read":
+    case "view":
       return "read";
     case "glob":
     case "grep":
@@ -238,6 +299,7 @@ function openCodeToolTitle(
 
   switch (normalizeToolName(toolName)) {
     case "read":
+    case "view":
       return readOpenCodePath(input) ?? "Read";
     case "glob":
       return readStringField(input, "pattern", "glob") ?? "Glob";
@@ -263,7 +325,7 @@ function openCodeToolLocations(
   input: Record<string, unknown> | undefined,
 ): Array<{ path: string }> | undefined {
   const n = normalizeToolName(toolName);
-  if (n === "read") {
+  if (n === "read" || n === "view") {
     const path = readOpenCodePath(input);
     return path ? [{ path }] : undefined;
   }
@@ -415,11 +477,7 @@ function toolPayload(
       // instead of the polluted title.
       name: toolName,
       path,
-      changeKind: /create|write/.test(toolName)
-        ? "create"
-        : /delete|rm/.test(toolName)
-          ? "delete"
-          : "edit",
+      changeKind: inferFileChangeKind(toolName, input, result, metadata, partMetadata),
       ...(diffSummary ? { diffSummary } : {}),
     };
   }
@@ -762,16 +820,60 @@ function classifyPermissionRequestType(req: PermissionRequest): CanonicalRequest
 
 function permissionRequestPayload(req: PermissionRequest): {
   summary: string;
-  details: unknown;
+  details: PermissionRequestDetails;
+  options: UserInputOption[];
 } {
-  const summary =
-    req.patterns && req.patterns.length > 0
-      ? req.patterns.join("\n")
-      : `${req.permission} approval requested`;
+  const target = readPermissionTarget(req);
+  const targetKind = classifyPermissionTargetKind(req.permission);
+  const options: UserInputOption[] = [
+    { optionId: "reject", label: "Deny" },
+    { optionId: "once", label: "Allow" },
+  ];
+  if (Array.isArray(req.always) && req.always.length > 0) {
+    options.push({ optionId: "always", label: "Allow always" });
+  }
   return {
-    summary,
-    details: { permission: req.permission, metadata: req.metadata, patterns: req.patterns },
+    summary: "Permission required",
+    details: {
+      toolName: req.permission,
+      displayName: "target",
+      decisionReason: permissionDescription(req.permission),
+      input: targetKind === "path" ? { path: target } : { command: target },
+    },
+    options,
   };
+}
+
+function readPermissionTarget(req: PermissionRequest): string {
+  const metadata = req.metadata && typeof req.metadata === "object" ? req.metadata : undefined;
+  const metadataTarget = metadata
+    ? (readStringMetadata(metadata, "description") ?? readStringMetadata(metadata, "target"))
+    : undefined;
+  return metadataTarget ?? req.patterns?.find((pattern) => pattern.length > 0) ?? req.permission;
+}
+
+function readStringMetadata(metadata: object, key: string): string | undefined {
+  const value = (metadata as Record<string, unknown>)[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function classifyPermissionTargetKind(permission: string): "command" | "path" {
+  return permission === "read" || permission === "edit" ? "path" : "command";
+}
+
+function permissionDescription(permission: string): string {
+  switch (permission) {
+    case "bash":
+      return "OpenCode wants to run a command.";
+    case "read":
+      return "OpenCode wants to read a file.";
+    case "edit":
+      return "OpenCode wants to edit files.";
+    case "task":
+      return "OpenCode wants to start a subagent.";
+    default:
+      return `OpenCode wants to use ${permission}.`;
+  }
 }
 
 function questionRequestPayload(req: QuestionRequest): {
@@ -1008,13 +1110,13 @@ function mapCanonicalEvent(
     case "permission.asked": {
       const req = event.properties;
       const requestType = classifyPermissionRequestType(req);
-      const { summary, details } = permissionRequestPayload(req);
+      const { summary, details, options } = permissionRequestPayload(req);
       events.push({
         type: "request.opened",
         threadId: state.threadId,
         requestId: permissionRequestId(req.id),
         requestType,
-        payload: { summary, details },
+        payload: { summary, details, options },
       });
       return events;
     }

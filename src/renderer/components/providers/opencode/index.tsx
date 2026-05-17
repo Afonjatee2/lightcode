@@ -58,12 +58,12 @@ registerComposerControls("opencode", {
     return controls;
   },
   // Full Access (yolo) is only honored on the GUI surface, where the SDK
-  // runtime maps it to `[{ permission: "*", action: "allow" }]` via
-  // `buildOpenCodePermissionRules` on `session.create`. The default TUI
-  // command (`opencode [project]`) has no equivalent launch flag — the
-  // `--dangerously-skip-permissions` flag exists only on `opencode run`.
-  // Hide the toggle on terminal threads so it can't be set silently to no
-  // effect.
+  // runtime maps it to an allow-all permission override on `session.create`.
+  // Supervised GUI threads omit the override so OpenCode uses its global +
+  // project config permissions. The default TUI command (`opencode [project]`)
+  // has no equivalent launch flag — the `--dangerously-skip-permissions` flag
+  // exists only on `opencode run`. Hide the toggle on terminal threads so it
+  // can't be set silently to no effect.
   gui: ({ config, isDisabled, onConfigChange }) => [
     fullAccessToggle({
       isFullAccess: config.approvalPolicy === "yolo",

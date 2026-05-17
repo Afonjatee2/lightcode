@@ -93,7 +93,7 @@ describe("chatPaneSelectors", () => {
   it("groups adjacent tool calls into one timeline entry", () => {
     const state = {
       runtimeItemIdsByThread: {
-        t1: ["assistant-1", "tool-1", "command-1", "assistant-2", "tool-3"],
+        t1: ["assistant-1", "tool-1", "mcp-1", "image-1", "command-1", "assistant-2", "tool-3"],
       },
       runtimeItemsByIdByThread: {
         t1: {
@@ -108,6 +108,20 @@ describe("chatPaneSelectors", () => {
             type: "tool_call",
             state: "completed",
             payload: { name: "Viewing src/a.ts", status: "success" },
+            streams: {},
+          },
+          "mcp-1": {
+            id: "mcp-1",
+            type: "mcp_tool_call",
+            state: "completed",
+            payload: { name: "mcp__github__search", status: "success" },
+            streams: {},
+          },
+          "image-1": {
+            id: "image-1",
+            type: "image_view",
+            state: "completed",
+            payload: { name: "ViewImage", status: "success", args: { path: "screen.png" } },
             streams: {},
           },
           "command-1": {
@@ -139,7 +153,7 @@ describe("chatPaneSelectors", () => {
       {
         kind: "tool_call_group",
         id: "tool-call-group:tool-1",
-        itemIds: ["tool-1", "command-1"],
+        itemIds: ["tool-1", "mcp-1", "image-1", "command-1"],
       },
       { kind: "item", id: "assistant-2" },
       { kind: "item", id: "tool-3" },
