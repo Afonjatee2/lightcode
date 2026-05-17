@@ -628,8 +628,16 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           break;
         }
         case "wsl":
-          // WSL spawns through wsl.exe (see spawnClaudeInWsl); the SDK path
-          // is resolved inside the distro.
+          // WSL spawns through wsl.exe (see spawnClaudeInWsl), but the SDK
+          // still resolves `pathToClaudeCodeExecutable` eagerly — if unset,
+          // it tries to load its bundled win32-x64 SEA binary and throws
+          // "Native CLI binary for win32-x64 not found" even though our
+          // custom `spawnClaudeCodeProcess` will override the actual spawn.
+          // Pass the in-distro path as a placeholder; fall back to `claude`
+          // so the SDK's truthy check passes when detection hasn't primed
+          // the binary cache yet.
+          claudeExecutablePath =
+            resolveAgentBinaryPath(this.input.projectLocation, "claude") ?? "claude";
           break;
         default: {
           const _exhaustive: never = this.input.projectLocation;
