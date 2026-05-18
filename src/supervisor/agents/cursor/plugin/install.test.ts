@@ -146,6 +146,21 @@ describe("installCursorPlugin", () => {
     expect(sessionStart[0]).toEqual({ type: "command", command: "/usr/local/bin/audit.sh" });
     expect(sessionStart[1]?.command).toMatch(/lightcode-hook\.(?:sh|cmd|ps1)['"]? sessionStart$/);
   });
+
+  it("regenerates a zero-filled hooks.json", () => {
+    const baseDir = makeTempDir("install-zero-filled");
+    const globalCursorDirOverride = makeTempDir("cursor-home-zero-filled");
+    const hooksPath = join(globalCursorDirOverride, "hooks.json");
+    writeFileSync(hooksPath, Buffer.alloc(64));
+
+    const result = installCursorPlugin({ envKind: "posix", baseDir }, { globalCursorDirOverride });
+
+    expect(result.ok).toBe(true);
+    const doc = JSON.parse(readFileSync(hooksPath, "utf8")) as {
+      hooks: Record<string, Array<Record<string, unknown>>>;
+    };
+    expect(doc.hooks.sessionStart?.[0]?.command).toMatch(/lightcode-hook\.(?:sh|cmd|ps1)/);
+  });
 });
 
 // `isCursorPluginInstalled` always inspects the system `~/.cursor/hooks.json`,

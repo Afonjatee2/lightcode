@@ -319,6 +319,101 @@ describe("OpencodeSdkSession", () => {
     );
   });
 
+  it("records single-question option replies as question answer events", async () => {
+    const runtimeEvents: RuntimeEvent[] = [];
+    const questionReply = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    let releaseQuestionEvent!: () => void;
+    const waitForSession = new Promise<void>((resolve) => {
+      releaseQuestionEvent = resolve;
+    });
+    const globalEvent = vi
+      .fn<() => Promise<{ stream: AsyncGenerator<Event> }>>()
+      .mockResolvedValue({
+        stream: (async function* () {
+          yield serverConnectedEvent();
+          await waitForSession;
+          yield {
+            id: "evt-question",
+            type: "question.asked",
+            properties: {
+              id: "req1",
+              sessionID: "ses_test",
+              questions: [
+                {
+                  header: "Scope",
+                  question: "Which scope should I use?",
+                  options: [{ label: "Scope A" }, { label: "Scope B" }],
+                },
+              ],
+            },
+          } as Event;
+        })(),
+      });
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        global: { event: globalEvent },
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        question: {
+          reply: questionReply,
+          reject: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        },
+        session: {
+          create: vi
+            .fn<() => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_test" } }),
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+    });
+    session.setListener({
+      onClose: () => {},
+      onError: () => {},
+      onUpdate: () => {},
+      onRuntimeEvent: (event) => runtimeEvents.push(event),
+    });
+
+    await session.activate();
+    await session.openThread(config);
+    releaseQuestionEvent();
+
+    await vi.waitFor(() => {
+      expect(runtimeEvents.some((event) => event.type === "request.opened")).toBe(true);
+    });
+
+    await session.resolveServerRequest("opencode-q-req1", { optionId: "q0.1" });
+
+    expect(questionReply).toHaveBeenCalledWith({
+      directory: "/repo",
+      requestID: "req1",
+      answers: [["Scope B"]],
+    });
+    expect(
+      runtimeEvents.find(
+        (event) => event.type === "item.started" && event.itemType === "question_answer",
+      ),
+    ).toMatchObject({
+      payload: {
+        questions: [
+          {
+            header: "Scope",
+            question: "Which scope should I use?",
+            selected: [{ label: "Scope B" }],
+          },
+        ],
+      },
+    });
+  });
+
   it("omits a session permission override in supervised mode", async () => {
     const create = vi
       .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
@@ -476,7 +571,7 @@ describe("OpencodeSdkSession", () => {
           { type: "text", text: "inspect " },
           {
             type: "file",
-            mime: "application/octet-stream",
+            mime: "text/plain",
             filename: "tmp_osc9_scan.py",
             url: expect.stringContaining("C"),
           },
@@ -532,10 +627,103 @@ describe("OpencodeSdkSession", () => {
         parts: [
           {
             type: "file",
-            mime: "application/octet-stream",
+            mime: "text/plain",
             filename: "main.ts",
             url: "file:///home/demo/repo/src/main.ts",
           },
+        ],
+      }),
+    );
+  });
+
+  it("sends migrated handoff context attachments as Markdown", async () => {
+    const promptAsync = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_test" } }),
+          promptAsync,
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation,
+      config,
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread(config);
+    await session.startTurn("Finish refactoring", config, [
+      { kind: "text", content: "Use the attached context file.\n\n" },
+      { kind: "attachment", path: "/tmp/handoff-context.md" },
+      { kind: "text", content: "\n\nFinish refactoring" },
+    ]);
+
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parts: expect.arrayContaining([
+          {
+            type: "file",
+            mime: "text/markdown",
+            filename: "handoff-context.md",
+            url: "file:///tmp/handoff-context.md",
+          },
+        ]),
+      }),
+    );
+  });
+
+  it("does not send unknown files as octet-stream parts", async () => {
+    const promptAsync = vi
+      .fn<(input: unknown) => Promise<{ data: unknown }>>()
+      .mockResolvedValue({ data: {} });
+
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<(input: unknown) => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_test" } }),
+          promptAsync,
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-opencode",
+      projectLocation,
+      config,
+      presentationMode: "terminal",
+    });
+
+    await session.activate();
+    await session.openThread(config);
+    await session.startTurn("inspect file", config, [
+      { kind: "text", content: "inspect " },
+      { kind: "attachment", path: "artifact.unknown" },
+    ]);
+
+    expect(promptAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parts: [
+          { type: "text", text: "inspect " },
+          { type: "text", text: "@/repo/artifact.unknown" },
         ],
       }),
     );

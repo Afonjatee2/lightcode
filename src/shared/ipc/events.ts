@@ -1,0 +1,93 @@
+import type { OscShellEvent } from "../osc";
+import type { LspSessionStatus } from "../lsp";
+import type {
+  AgentSlashCommand,
+  AgentStatus,
+  PendingSteerState,
+  RuntimeEvent,
+  ThreadAttention,
+  ThreadConfig,
+  ThreadStatus,
+  ThreadStatusSource,
+} from "../contracts";
+import type { IpcProcedurePayload, SupervisorProcedureName } from "./procedureMap";
+
+export type SupervisorRequest = {
+  [Name in SupervisorProcedureName]: {
+    id: string;
+    type: Name;
+    payload: IpcProcedurePayload<Name>;
+  };
+}[SupervisorProcedureName];
+
+export type SupervisorReply =
+  | { replyTo: string; ok: true; data: unknown }
+  | { replyTo: string; ok: false; error: string };
+
+export type SupervisorEvent =
+  | { type: "thread-reset"; threadId: string }
+  | { type: "thread-output"; threadId: string; data: string; outputLength: number }
+  | { type: "thread-runtime-event"; threadId: string; event: RuntimeEvent }
+  | { type: "thread-runtime-events"; threadId: string; events: RuntimeEvent[] }
+  | {
+      type: "thread-runtime-events-multi";
+      batches: ReadonlyArray<{ threadId: string; events: RuntimeEvent[] }>;
+    }
+  | {
+      type: "thread-state";
+      threadId: string;
+      status: ThreadStatus;
+      attention: ThreadAttention;
+      config?: ThreadConfig;
+      sessionRef?: { providerSessionId: string; discoveredAt: string };
+      canResumeWithConfig: boolean;
+      errorMessage?: string;
+      slashCommands?: AgentSlashCommand[];
+      forceCloseActiveTurn?: boolean;
+      threadStatusSource?: ThreadStatusSource;
+    }
+  | {
+      type: "thread-pending-steer";
+      threadId: string;
+      pending: PendingSteerState | null;
+    }
+  | { type: "thread-exited"; threadId: string; exitCode: number | null }
+  | {
+      type: "thread-osc-notification";
+      threadId: string;
+      title: string;
+      body: string;
+    }
+  | {
+      type: "thread-osc-shell";
+      threadId: string;
+      event: OscShellEvent;
+    }
+  | { type: "windows-agent-statuses"; statuses: AgentStatus[] }
+  | { type: "wsl-agent-statuses"; statuses: AgentStatus[] }
+  | { type: "agent-detected"; status: AgentStatus }
+  | { type: "agent-status-updated"; status: AgentStatus }
+  | { type: "git-changed"; projectId: string }
+  | { type: "project-tree-changed"; projectId: string }
+  | { type: "lsp-message"; sessionId: string; message: unknown }
+  | {
+      type: "lsp-status";
+      sessionId: string;
+      status: LspSessionStatus;
+      languageId: string;
+      error?: string;
+    };
+
+export type UpdateStatus =
+  | { type: "checking" }
+  | { type: "update-available"; version: string }
+  | { type: "update-not-available" }
+  | {
+      type: "downloading";
+      percent: number;
+      bytesPerSecond: number;
+      transferred: number;
+      total: number;
+    }
+  | { type: "downloaded"; version: string }
+  | { type: "error"; message: string };

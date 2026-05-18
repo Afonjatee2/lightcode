@@ -27,6 +27,10 @@ import { readOrCreateSafeStorageSecretKey } from "./secretStorageKey";
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const channel = resolveLightcodeChannel();
 
+if (process.env.LIGHTCODE_CDP_PORT) {
+  app.commandLine.appendSwitch("remote-debugging-port", process.env.LIGHTCODE_CDP_PORT);
+}
+
 if (isDev) {
   app.setPath("userData", join(app.getPath("userData"), "Dev"));
 }
@@ -96,8 +100,10 @@ if (!hasSingleInstanceLock) {
   app.whenReady().then(async () => {
     installLocalFileProtocolHandler();
 
+    const baseDirOverride = process.env.LIGHTCODE_BASE_DIR;
     lightcodePaths = prepareLightcodeDataRoot(
-      isDev ? join(homedir(), ".lightcode-dev") : resolveLightcodeBaseDir(channel),
+      baseDirOverride ??
+        (isDev ? join(homedir(), ".lightcode-dev") : resolveLightcodeBaseDir(channel)),
     );
     let jobObjectReady: Promise<void> = Promise.resolve();
     if (process.platform === "win32") {

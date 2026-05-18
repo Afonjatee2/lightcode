@@ -540,8 +540,17 @@ export function dbGetThreadRuntimeItems(threadId: string): PersistedRuntimeItem[
 export function dbReplaceThreadRuntimeItems(threadId: string, items: PersistedRuntimeItem[]): void {
   if (!_sqlite) throw new Error("Database not initialized");
   _sqlite.transaction(() => {
+    if (!threadExistsInSqlite(_sqlite!, threadId)) return;
     replaceThreadRuntimeItemsInSqlite(_sqlite!, threadId, items);
   })();
+}
+
+function threadExistsInSqlite(sqlite: InstanceType<typeof Database>, threadId: string): boolean {
+  return (
+    (sqlite.prepare("SELECT 1 FROM threads WHERE id = ?").get(threadId) as
+      | { "1": number }
+      | undefined) !== undefined
+  );
 }
 
 function replaceThreadRuntimeItemsInSqlite(
@@ -627,6 +636,7 @@ export function dbReplaceThreadCompletedTurns(
 ): void {
   if (!_sqlite) throw new Error("Database not initialized");
   _sqlite.transaction(() => {
+    if (!threadExistsInSqlite(_sqlite!, threadId)) return;
     replaceThreadCompletedTurnsInSqlite(_sqlite!, threadId, turns);
   })();
 }
@@ -639,6 +649,7 @@ export function dbReplaceThreadRuntimeSnapshot(
 ): void {
   if (!_sqlite) throw new Error("Database not initialized");
   _sqlite.transaction(() => {
+    if (!threadExistsInSqlite(_sqlite!, threadId)) return;
     replaceThreadRuntimeItemsInSqlite(_sqlite!, threadId, items);
     replaceThreadCompletedTurnsInSqlite(_sqlite!, threadId, turns);
     if (contextUsage !== undefined) {

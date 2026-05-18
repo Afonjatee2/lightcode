@@ -1,0 +1,189 @@
+import {
+  authenticateAcpRegistryAgentPayloadSchema,
+  clearPendingSteerPayloadSchema,
+  closeThreadPayloadSchema,
+  extractContextPayloadSchema,
+  getAgentStatusesPayloadSchema,
+  installAcpRegistryAgentPayloadSchema,
+  interruptThreadPayloadSchema,
+  logoutAcpRegistryAgentPayloadSchema,
+  removeAcpRegistryAgentPayloadSchema,
+  resizeTerminalPayloadSchema,
+  resolveThreadServerRequestPayloadSchema,
+  sendThreadInputPayloadSchema,
+  setAcpRegistryAgentAuthPayloadSchema,
+  setPendingSteerPayloadSchema,
+  startShellPayloadSchema,
+  startThreadPayloadSchema,
+  updateAcpRegistryAgentPayloadSchema,
+  writeTerminalPayloadSchema,
+} from "../../contracts";
+import type {
+  AcpRegistryListResult,
+  AcpRegistryMutationResult,
+  AgentStatusesResponse,
+  AuthenticateAcpRegistryAgentPayload,
+  ClearPendingSteerPayload,
+  CloseThreadPayload,
+  ExtractContextPayload,
+  ExtractContextResult,
+  GetAgentStatusesPayload,
+  InstallAcpRegistryAgentPayload,
+  InterruptThreadPayload,
+  LogoutAcpRegistryAgentPayload,
+  RefreshAgentScope,
+  RemoveAcpRegistryAgentPayload,
+  ResizeTerminalPayload,
+  ResolveThreadServerRequestPayload,
+  SendThreadInputPayload,
+  SetAcpRegistryAgentAuthPayload,
+  SetPendingSteerPayload,
+  StartShellPayload,
+  StartThreadPayload,
+  StartThreadResult,
+  ThreadRuntimeSnapshot,
+  UpdateAcpRegistryAgentPayload,
+  WriteTerminalPayload,
+} from "../../contracts";
+import { defineIpcProcedure, defineNoArgProcedure, definePayloadProcedure } from "../core";
+import {
+  readThreadPayloadSchema,
+  subAgentSubscribePayloadSchema,
+  type SubAgentSubscribePayload,
+  type SubAgentSubscribeResult,
+} from "../schemas";
+
+export const threadProcedures = {
+  getAgentStatuses: defineIpcProcedure<
+    [string[]?],
+    GetAgentStatusesPayload,
+    AgentStatusesResponse,
+    "supervisor"
+  >("getAgentStatuses", "supervisor", getAgentStatusesPayloadSchema, (wslDistros) =>
+    getAgentStatusesPayloadSchema.parse({ wslDistros: wslDistros ?? [] }),
+  ),
+  refreshAgentStatuses: defineIpcProcedure<
+    [string[]?, RefreshAgentScope?],
+    GetAgentStatusesPayload,
+    AgentStatusesResponse,
+    "supervisor"
+  >("refreshAgentStatuses", "supervisor", getAgentStatusesPayloadSchema, (wslDistros, scope) =>
+    getAgentStatusesPayloadSchema.parse({
+      wslDistros: wslDistros ?? [],
+      ...(scope ? { scope } : {}),
+    }),
+  ),
+  listAcpRegistry: defineNoArgProcedure<AcpRegistryListResult, "supervisor">(
+    "listAcpRegistry",
+    "supervisor",
+  ),
+  installAcpRegistryAgent: definePayloadProcedure<
+    InstallAcpRegistryAgentPayload,
+    AcpRegistryMutationResult,
+    "supervisor"
+  >("installAcpRegistryAgent", "supervisor", installAcpRegistryAgentPayloadSchema),
+  updateAcpRegistryAgent: definePayloadProcedure<
+    UpdateAcpRegistryAgentPayload,
+    AcpRegistryMutationResult,
+    "supervisor"
+  >("updateAcpRegistryAgent", "supervisor", updateAcpRegistryAgentPayloadSchema),
+  removeAcpRegistryAgent: definePayloadProcedure<
+    RemoveAcpRegistryAgentPayload,
+    AcpRegistryMutationResult,
+    "supervisor"
+  >("removeAcpRegistryAgent", "supervisor", removeAcpRegistryAgentPayloadSchema),
+  setAcpRegistryAgentAuth: definePayloadProcedure<
+    SetAcpRegistryAgentAuthPayload,
+    AcpRegistryMutationResult,
+    "supervisor"
+  >("setAcpRegistryAgentAuth", "supervisor", setAcpRegistryAgentAuthPayloadSchema),
+  authenticateAcpRegistryAgent: definePayloadProcedure<
+    AuthenticateAcpRegistryAgentPayload,
+    void,
+    "supervisor"
+  >("authenticateAcpRegistryAgent", "supervisor", authenticateAcpRegistryAgentPayloadSchema),
+  logoutAcpRegistryAgent: definePayloadProcedure<LogoutAcpRegistryAgentPayload, void, "supervisor">(
+    "logoutAcpRegistryAgent",
+    "supervisor",
+    logoutAcpRegistryAgentPayloadSchema,
+  ),
+  getThreadSnapshots: defineNoArgProcedure<ThreadRuntimeSnapshot[], "supervisor">(
+    "getThreadSnapshots",
+    "supervisor",
+  ),
+  startThread: definePayloadProcedure<StartThreadPayload, StartThreadResult, "supervisor">(
+    "startThread",
+    "supervisor",
+    startThreadPayloadSchema,
+  ),
+  sendThreadInput: definePayloadProcedure<SendThreadInputPayload, void, "supervisor">(
+    "sendThreadInput",
+    "supervisor",
+    sendThreadInputPayloadSchema,
+  ),
+  interruptThread: definePayloadProcedure<InterruptThreadPayload, void, "supervisor">(
+    "interruptThread",
+    "supervisor",
+    interruptThreadPayloadSchema,
+  ),
+  setPendingSteer: definePayloadProcedure<SetPendingSteerPayload, void, "supervisor">(
+    "setPendingSteer",
+    "supervisor",
+    setPendingSteerPayloadSchema,
+  ),
+  clearPendingSteer: definePayloadProcedure<ClearPendingSteerPayload, void, "supervisor">(
+    "clearPendingSteer",
+    "supervisor",
+    clearPendingSteerPayloadSchema,
+  ),
+  writeTerminal: definePayloadProcedure<WriteTerminalPayload, void, "supervisor">(
+    "writeTerminal",
+    "supervisor",
+    writeTerminalPayloadSchema,
+  ),
+  resizeTerminal: definePayloadProcedure<ResizeTerminalPayload, void, "supervisor">(
+    "resizeTerminal",
+    "supervisor",
+    resizeTerminalPayloadSchema,
+  ),
+  resolveThreadServerRequest: definePayloadProcedure<
+    ResolveThreadServerRequestPayload,
+    void,
+    "supervisor"
+  >("resolveThreadServerRequest", "supervisor", resolveThreadServerRequestPayloadSchema),
+  closeThread: definePayloadProcedure<CloseThreadPayload, void, "supervisor">(
+    "closeThread",
+    "supervisor",
+    closeThreadPayloadSchema,
+  ),
+  startShell: definePayloadProcedure<StartShellPayload, void, "supervisor">(
+    "startShell",
+    "supervisor",
+    startShellPayloadSchema,
+  ),
+  extractContext: definePayloadProcedure<ExtractContextPayload, ExtractContextResult, "supervisor">(
+    "extractContext",
+    "supervisor",
+    extractContextPayloadSchema,
+  ),
+  cancelExtractContext: definePayloadProcedure<{ threadId: string }, void, "supervisor">(
+    "cancelExtractContext",
+    "supervisor",
+    readThreadPayloadSchema,
+  ),
+  readTerminalScrollback: definePayloadProcedure<{ threadId: string }, string, "supervisor">(
+    "readTerminalScrollback",
+    "supervisor",
+    readThreadPayloadSchema,
+  ),
+  subagentSubscribe: definePayloadProcedure<
+    SubAgentSubscribePayload,
+    SubAgentSubscribeResult,
+    "supervisor"
+  >("subagentSubscribe", "supervisor", subAgentSubscribePayloadSchema),
+  subagentUnsubscribe: definePayloadProcedure<SubAgentSubscribePayload, void, "supervisor">(
+    "subagentUnsubscribe",
+    "supervisor",
+    subAgentSubscribePayloadSchema,
+  ),
+} as const;

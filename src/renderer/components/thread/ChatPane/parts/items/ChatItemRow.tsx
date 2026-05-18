@@ -14,6 +14,7 @@ import { AssistantMessage } from "./AssistantMessage";
 import { CommandExecution } from "./CommandExecution";
 import { FileChange } from "./FileChange";
 import { PlanItem } from "./PlanItem";
+import { QuestionAnswer } from "./QuestionAnswer";
 import { Reasoning } from "./Reasoning";
 import { SubAgentToolCall } from "./SubAgentToolCall";
 import { ToolCall } from "./ToolCall";
@@ -90,6 +91,8 @@ function renderItem(item: RuntimeChatItem, checkpointRevertControl: ReactNode | 
   switch (item.type) {
     case "user_message":
       return <UserMessage item={item} checkpointRevertControl={checkpointRevertControl} />;
+    case "question_answer":
+      return <QuestionAnswer item={item} checkpointRevertControl={checkpointRevertControl} />;
     case "assistant_message":
       return <AssistantMessage item={item} />;
     case "reasoning":

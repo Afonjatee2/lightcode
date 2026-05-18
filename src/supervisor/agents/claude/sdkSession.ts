@@ -333,16 +333,16 @@ function permissionDecision(response: unknown): PermissionDecision {
   return { kind: "accept" };
 }
 
-function questionAnswers(response: unknown, pending: PendingQuestion): Record<string, unknown> {
+function rawQuestionAnswers(response: unknown, pending: PendingQuestion): Record<string, unknown> {
   if (response && typeof response === "object") {
     const obj = response as Record<string, unknown>;
     if (obj.answers && typeof obj.answers === "object") {
-      return normalizeQuestionAnswersForSdk(obj.answers as Record<string, unknown>, pending);
+      return obj.answers as Record<string, unknown>;
     }
   }
   const option = responseOptionId(response);
   const first = pending.questions[0];
-  return first && option ? { [first.question]: labelForOption(first, option) } : {};
+  return first && option ? { [first.question]: option } : {};
 }
 
 function isQuestionCancelResponse(response: unknown): boolean {
@@ -567,7 +567,8 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
         this.emitUpdate({ status: "working", attention: "working" });
         return;
       }
-      const answers = questionAnswers(response, pending);
+      const rawAnswers = rawQuestionAnswers(response, pending);
+      const answers = normalizeQuestionAnswersForSdk(rawAnswers, pending);
       pending.resolve({
         behavior: "allow",
         updatedInput: {
@@ -586,7 +587,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           threadId: this.input.threadId,
           itemId: `question-answer-${randomUUID()}`,
           questions: pending.questions,
-          answers,
+          answers: rawAnswers,
         }),
       ]);
       this.emitUpdate({ status: "working", attention: "working" });

@@ -1637,7 +1637,7 @@ describe("sdkCanonicalMapping — requests", () => {
     expect(startedItemIds).toEqual(["toolu_other_1"]);
   });
 
-  it("builds a user_message item from a single-answer AskUserQuestion response", () => {
+  it("builds a question_answer item from a single-answer AskUserQuestion response", () => {
     const questions = parseClaudeQuestions({
       questions: [
         {
@@ -1661,14 +1661,22 @@ describe("sdkCanonicalMapping — requests", () => {
         type: "item.started",
         threadId: "thread-1",
         itemId: "question-answer-1",
-        itemType: "user_message",
-        payload: { content: [{ kind: "text", text: "Replace nvm walk" }] },
+        itemType: "question_answer",
+        payload: {
+          questions: [
+            {
+              header: "Scope",
+              question: "How wide should the scope be?",
+              selected: [{ label: "Replace nvm walk", description: "Tool-agnostic capture." }],
+            },
+          ],
+        },
       },
       { type: "item.completed", threadId: "thread-1", itemId: "question-answer-1" },
     ]);
   });
 
-  it("joins multi-select answers into a single comma-separated user message", () => {
+  it("captures every selection from a multi-select answer", () => {
     const questions = parseClaudeQuestions({
       questions: [
         {
@@ -1686,12 +1694,20 @@ describe("sdkCanonicalMapping — requests", () => {
       answers: { "Pick categories": ["A", "C"] },
     });
     expect(events[0]).toMatchObject({
-      itemType: "user_message",
-      payload: { content: [{ kind: "text", text: "A, C" }] },
+      itemType: "question_answer",
+      payload: {
+        questions: [
+          {
+            header: "Cats",
+            question: "Pick categories",
+            selected: [{ label: "A" }, { label: "C" }],
+          },
+        ],
+      },
     });
   });
 
-  it("builds a user_message item from structured form answer arrays", () => {
+  it("resolves option ids to their labels when answers carry structured form arrays", () => {
     const questions = parseClaudeQuestions({
       questions: [
         {
@@ -1709,8 +1725,48 @@ describe("sdkCanonicalMapping — requests", () => {
     });
 
     expect(events[0]).toMatchObject({
-      itemType: "user_message",
-      payload: { content: [{ kind: "text", text: "Scope A" }] },
+      itemType: "question_answer",
+      payload: {
+        questions: [
+          {
+            header: "Scope",
+            question: "Which scope?",
+            selected: [{ label: "Scope A" }],
+          },
+        ],
+      },
+    });
+  });
+
+  it("treats unmatched answer strings as a freeform custom answer", () => {
+    const questions = parseClaudeQuestions({
+      questions: [
+        {
+          question: "Which scope?",
+          header: "Scope",
+          options: [{ optionId: "scope-a", label: "Scope A" }],
+        },
+      ],
+    });
+    const events = buildClaudeQuestionAnswerEvents({
+      threadId: "thread-1",
+      itemId: "question-answer-5",
+      questions,
+      answers: { "Which scope?": "Just rip out the old auth middleware" },
+    });
+
+    expect(events[0]).toMatchObject({
+      itemType: "question_answer",
+      payload: {
+        questions: [
+          {
+            header: "Scope",
+            question: "Which scope?",
+            selected: [],
+            customAnswer: "Just rip out the old auth middleware",
+          },
+        ],
+      },
     });
   });
 

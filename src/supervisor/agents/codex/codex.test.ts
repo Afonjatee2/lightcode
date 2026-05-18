@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createCodexAdapter,
   deriveCodexStructuredState,
@@ -17,7 +17,7 @@ import { CodexStructuredSession } from "./acp";
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import type { RuntimeEvent } from "@/shared/contracts";
 import { codexIntentFor } from "./plugin/intentMap";
-import { mapCodexModels, mapCodexSlashCommands } from "./probe";
+import { mapCodexModels, mapCodexRequirements, mapCodexSlashCommands } from "./probe";
 import { CodexStdioTransport } from "./stdioTransport";
 
 describe("deriveCodexStructuredState", () => {
@@ -204,9 +204,13 @@ describe("CodexStdioTransport", () => {
 });
 
 describe("CodexStructuredSession", () => {
-  function makeStructuredSession(
-    requests: Array<{ method: string; params: Record<string, unknown> }>,
-  ): CodexStructuredSession {
+  type CodexRequestRecord = {
+    method: string;
+    params: Record<string, unknown>;
+    timeoutMs?: number;
+  };
+
+  function makeStructuredSession(requests: CodexRequestRecord[]): CodexStructuredSession {
     const session = Object.create(CodexStructuredSession.prototype) as Record<string, unknown>;
 
     session["threadId"] = "local-thread";
@@ -214,8 +218,16 @@ describe("CodexStructuredSession", () => {
     session["bufferedRuntimeEvents"] = [];
     session["isDisposed"] = false;
     session["currentThreadStatus"] = { type: "idle" };
-    session["request"] = async (method: string, params: Record<string, unknown>) => {
-      requests.push({ method, params });
+    session["request"] = async (
+      method: string,
+      params: Record<string, unknown>,
+      timeoutMs?: number,
+    ) => {
+      requests.push({
+        method,
+        params,
+        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+      });
       if (method === "turn/start") {
         return { turn: { id: "turn-1", items: [], status: "inProgress" } };
       }
@@ -227,6 +239,55 @@ describe("CodexStructuredSession", () => {
 
     return session as unknown as CodexStructuredSession;
   }
+
+  it("uses a 30s default app-server request timeout", async () => {
+    const structuredSession = Object.create(CodexStructuredSession.prototype) as Record<
+      string,
+      unknown
+    >;
+    const writes: unknown[] = [];
+    structuredSession["requestSequence"] = 0;
+    structuredSession["pendingRequests"] = new Map();
+    structuredSession["transport"] = {
+      write: (message: unknown) => writes.push(message),
+    };
+
+    vi.useFakeTimers();
+    try {
+      const pending = (
+        structuredSession["request"] as (
+          method: string,
+          params: Record<string, unknown>,
+        ) => Promise<unknown>
+      ).call(structuredSession, "thread/read", { threadId: "provider-thread" });
+      let rejectedMessage: string | undefined;
+      pending.catch((error: unknown) => {
+        rejectedMessage = error instanceof Error ? error.message : String(error);
+      });
+
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect((structuredSession["pendingRequests"] as Map<string, unknown>).size).toBe(1);
+      expect(rejectedMessage).toBeUndefined();
+
+      await vi.advanceTimersByTimeAsync(1);
+      await Promise.resolve();
+      expect(rejectedMessage).toBe(
+        "Timed out waiting for Codex app-server response to thread/read.",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect(writes).toEqual([
+      {
+        jsonrpc: "2.0",
+        id: "lightcode-0",
+        method: "thread/read",
+        params: { threadId: "provider-thread" },
+      },
+    ]);
+    expect((structuredSession["pendingRequests"] as Map<string, unknown>).size).toBe(0);
+  });
 
   it("interrupts the active Codex app-server turn", async () => {
     const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
@@ -314,7 +375,10 @@ describe("CodexStructuredSession", () => {
     await structuredSession.startTurn("/goal clear", { model: "gpt-5.4" });
 
     expect(requests).toEqual([
-      { method: "thread/goal/clear", params: { threadId: "provider-thread" } },
+      {
+        method: "thread/goal/clear",
+        params: { threadId: "provider-thread" },
+      },
     ]);
   });
 
@@ -488,6 +552,14 @@ describe("mapCodexSlashCommands", () => {
         argumentHint: "<scope>",
       },
     ]);
+  });
+});
+
+describe("mapCodexRequirements", () => {
+  it("includes on-failure in unrestricted approval policies", () => {
+    expect(mapCodexRequirements(null).approvalPolicies?.map((policy) => policy.id)).toContain(
+      "on-failure",
+    );
   });
 });
 

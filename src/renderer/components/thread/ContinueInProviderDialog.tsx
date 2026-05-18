@@ -393,6 +393,7 @@ export function ContinueInProviderDialog(props: {
           providers: providerModelProviders,
           currentAgentKind: selectedKind,
           currentModel: targetConfig.model,
+          presentationMode: targetPresentationMode,
           hideLabelOnWrap: true,
           tier: 5,
           onChange: (next) => handleProviderChange(next.agentKind, { model: next.model }),

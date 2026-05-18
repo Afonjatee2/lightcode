@@ -1,9 +1,8 @@
 import { readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
-import { spawn, type IPty } from "node-pty";
+import { spawn } from "node-pty";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/settings";
 import {
@@ -56,140 +55,21 @@ import type {
 import { ThreadOutputPipeline, resolveThreadStatusSource } from "./threadOutputPipeline";
 import { rewriteSegmentsForWsl } from "./threadAttachments";
 
-function hookDebugProjectLabel(loc: ProjectLocation): string {
-  switch (loc.kind) {
-    case "wsl":
-      return `wsl:${loc.distro}`;
-    case "windows":
-      return `windows:${loc.path}`;
-    case "posix":
-      return `posix:${loc.path}`;
-  }
-}
+import {
+  isInterruptibleBusyStatus,
+  isUserInterruptKeystroke,
+  USER_INTERRUPT_RECOVERY_GRACE_MS,
+} from "./threadSession/userInterrupt";
+import { writeSubmittedPrompt } from "./threadSession/promptWrite";
+import { getClaudeL2TerminalEnv, resolveTerminalColorEnv } from "./threadSession/terminalEnv";
+import {
+  hookDebugProjectLabel,
+  requireSessionPty,
+  shouldReleaseInitialStructuredIdleSuppression,
+} from "./threadSession/helpers";
+import { RuntimeEventRouter } from "./threadSession/runtimeEventRouter";
 
-// Startup idle suppression is only for empty sync blips; visible runtime output
-// means a follow-up idle should close the optimistic working window.
-function shouldReleaseInitialStructuredIdleSuppression(event: RuntimeEvent): boolean {
-  if (event.type === "item.started") {
-    return event.itemType !== "user_message";
-  }
-  return (
-    event.type === "content.delta" || event.type === "request.opened" || event.type === "error"
-  );
-}
-
-export async function writeSubmittedPrompt(
-  pty: Pick<IPty, "write">,
-  chunks: readonly string[],
-  _projectLocation: ProjectLocation,
-): Promise<void> {
-  for (const chunk of chunks) {
-    const waitMatch = chunk.match(/^@wait:(\d+)$/);
-    if (waitMatch) {
-      await sleep(Number(waitMatch[1]));
-      continue;
-    }
-    pty.write(chunk);
-    await sleep(8);
-  }
-}
-
-/**
- * Grace window before the local fallback commits to `idle` after detecting a
- * user-interrupt keystroke. Long enough for a legitimate
- * `PostToolUseFailure { is_interrupt: true }` hook to land and take over,
- * short enough that the UI doesn't feel stuck.
- */
-export const USER_INTERRUPT_RECOVERY_GRACE_MS = 1200;
-const RUNTIME_EVENT_BATCH_MS = 16;
-const GHOSTTY_TERM = "xterm-ghostty";
-const FALLBACK_TERM = "xterm-256color";
-const terminfoTermCache = new Map<string, string>();
-type TerminalColorEnv = {
-  TERM: string;
-  COLORTERM: string;
-};
-
-function terminalTermCacheKey(location: ProjectLocation): string {
-  if (location.kind === "wsl") return `wsl:${location.distro}`;
-  return `host:${process.platform}`;
-}
-
-function hasGhosttyTerminfo(location: ProjectLocation): boolean {
-  const options = { stdio: "ignore" as const, timeout: 250, windowsHide: true };
-  if (location.kind === "wsl") {
-    if (process.platform !== "win32") return false;
-    const result = spawnSync(
-      getWslCommand(),
-      ["-d", location.distro, "--", "sh", "-lc", `infocmp -x ${GHOSTTY_TERM} >/dev/null 2>&1`],
-      options,
-    );
-    return result?.status === 0;
-  }
-  if (process.platform === "win32") return false;
-  return spawnSync("infocmp", ["-x", GHOSTTY_TERM], options)?.status === 0;
-}
-
-function resolveTerminalColorEnv(location: ProjectLocation): TerminalColorEnv {
-  const key = terminalTermCacheKey(location);
-  const cached = terminfoTermCache.get(key);
-  if (cached) {
-    return { TERM: cached, COLORTERM: "truecolor" };
-  }
-  if (hasGhosttyTerminfo(location)) {
-    terminfoTermCache.set(key, GHOSTTY_TERM);
-    return { TERM: GHOSTTY_TERM, COLORTERM: "truecolor" };
-  }
-  return { TERM: FALLBACK_TERM, COLORTERM: "truecolor" };
-}
-
-/**
- * True iff the user keystroke payload represents an interrupt intent the
- * user expects to unblock the agent. Matches:
- *   - `\x03`   (Ctrl+C)     — always an interrupt
- *   - exactly `\x1b` (Esc)  — standalone Esc press
- * Does NOT match CSI sequences like `\x1b[A` (arrows) or `\x1bO...` (fn keys),
- * or alt+<char> (`\x1b<letter>`), so menu navigation inside the permission
- * dialog does not trigger the fallback.
- */
-export function isUserInterruptKeystroke(data: string): boolean {
-  if (data.includes("\x03")) return true;
-  if (data === "\x1b") return true;
-  return false;
-}
-
-/**
- * True iff the current thread status is "busy" from the user's point of view —
- * i.e. pressing Esc / Ctrl+C in this state is expected to unblock the UI.
- */
-function isInterruptibleBusyStatus(status: SessionRuntime["status"]): boolean {
-  return status === "working" || status === "needs_approval" || status === "needs_reply";
-}
-
-function requireSessionPty(session: SessionRuntime): IPty {
-  if (!session.pty) {
-    throw new Error(`Thread ${session.threadId} does not have a terminal PTY.`);
-  }
-  return session.pty;
-}
-
-function getClaudeL2TerminalEnv(input: {
-  agentKind: AgentKind;
-  projectLocation: ProjectLocation;
-  disableCliHookPlugin: boolean;
-  cliHookEnvInjected: boolean;
-}): Record<string, string> {
-  if (input.agentKind !== "claude") {
-    return {};
-  }
-  if (!input.disableCliHookPlugin && input.cliHookEnvInjected) {
-    return {};
-  }
-  return {
-    TERM_PROGRAM: "iTerm.app",
-    TERM_PROGRAM_VERSION: "3.6.6",
-  };
-}
+export { isUserInterruptKeystroke, USER_INTERRUPT_RECOVERY_GRACE_MS, writeSubmittedPrompt };
 
 export interface ThreadSessionManagerOptions {
   emit(event: SupervisorEvent): void;
@@ -212,12 +92,10 @@ export interface ThreadSessionManagerOptions {
   }): Promise<{ env: Record<string, string>; extraArgs: string[] } | undefined>;
 }
 
-function subAgentKey(threadId: string, parentItemId: string): string {
-  return `${threadId}\0${parentItemId}`;
-}
-
-function childKey(threadId: string, itemId: string): string {
-  return `${threadId}\0${itemId}`;
+function shouldPrimeNativeProjectShellEnv(
+  location: ProjectLocation,
+): location is Extract<ProjectLocation, { kind: "windows" | "posix" }> {
+  return location.kind === "posix" || (process.platform === "win32" && location.kind === "windows");
 }
 
 export class ThreadSessionManager {
@@ -229,24 +107,10 @@ export class ThreadSessionManager {
   private readonly pendingStartInterrupts = new Set<string>();
   private readonly logWriter = new BufferedLogWriter();
   private readonly outputPipeline: ThreadOutputPipeline;
-  private readonly pendingRuntimeEvents = new Map<string, RuntimeEvent[]>();
-  private runtimeEventBatchTimer: ReturnType<typeof setTimeout> | undefined;
-  /**
-   * `${threadId}\0${itemId}` → `parentItemId`. Built from `item.started`
-   * events with `parentItemId` set (sub-agent children). Used to look up the
-   * parent for any later event on the same `itemId` so we can route it through
-   * the gating layer.
-   */
-  private readonly subAgentChildToParent = new Map<string, string>();
-  /** Renderer-subscribed sub-agents (`${threadId}\0${parentItemId}`). */
-  private readonly subscribedSubAgents = new Set<string>();
-  /**
-   * Buffered child events per sub-agent parent (`${threadId}\0${parentItemId}`).
-   * Drained on subscribe; cleared on parent completion.
-   */
-  private readonly subAgentBuffers = new Map<string, RuntimeEvent[]>();
+  private readonly runtimeEventRouter: RuntimeEventRouter;
 
   constructor(private readonly options: ThreadSessionManagerOptions) {
+    this.runtimeEventRouter = new RuntimeEventRouter(options.emit);
     this.outputPipeline = new ThreadOutputPipeline({
       emit: options.emit,
       isDev: options.isDev,
@@ -296,94 +160,7 @@ export class ThreadSessionManager {
   }
 
   private enqueueRuntimeEvent(threadId: string, event: RuntimeEvent): void {
-    // Sub-agent gating: child events stream live only when the renderer has
-    // the overlay open (subscribed). Otherwise they're buffered per-parent
-    // and drained when the renderer subscribes. The parent's own events
-    // (item.started/updated/completed for the `Task`/`Agent` row) always flow
-    // so the closed pill keeps showing live status.
-    const parentItemId = this.resolveSubAgentParent(threadId, event);
-    if (parentItemId) {
-      const subKey = subAgentKey(threadId, parentItemId);
-      if (!this.subscribedSubAgents.has(subKey)) {
-        const buffer = this.subAgentBuffers.get(subKey);
-        if (buffer) {
-          buffer.push(event);
-        } else {
-          this.subAgentBuffers.set(subKey, [event]);
-        }
-        return;
-      }
-    }
-    // When a sub-agent parent completes, drain any buffered child events
-    // BEFORE the parent's `item.completed` reaches the renderer. This way the
-    // renderer receives the full child step trail even when the overlay was
-    // never opened during the run, and persists it alongside the parent so
-    // the overlay can replay every turn on demand (live + later reopen).
-    // Children themselves return early via the gating branch above and never
-    // reach this point.
-    if (event.type === "item.completed") {
-      const itemId = (event as { itemId?: unknown }).itemId;
-      if (typeof itemId === "string") {
-        const key = subAgentKey(threadId, itemId);
-        const buffered = this.subAgentBuffers.get(key);
-        if (buffered && buffered.length > 0) {
-          for (const bufferedEvent of buffered) {
-            this.appendPendingRuntimeEvent(threadId, bufferedEvent);
-          }
-        }
-        this.appendPendingRuntimeEvent(threadId, event);
-        if (this.subscribedSubAgents.has(key) || this.subAgentBuffers.has(key)) {
-          this.clearSubAgentState(threadId, itemId);
-        }
-        return;
-      }
-    }
-    this.appendPendingRuntimeEvent(threadId, event);
-  }
-
-  private appendPendingRuntimeEvent(threadId: string, event: RuntimeEvent): void {
-    const pending = this.pendingRuntimeEvents.get(threadId);
-    if (pending) {
-      pending.push(event);
-    } else {
-      this.pendingRuntimeEvents.set(threadId, [event]);
-    }
-    this.runtimeEventBatchTimer ??= setTimeout(() => {
-      this.flushRuntimeEvents();
-    }, RUNTIME_EVENT_BATCH_MS);
-  }
-
-  /**
-   * For a runtime event that targets a known sub-agent CHILD item, return the
-   * parent item id; otherwise undefined. Maintains the child→parent lookup
-   * map opportunistically as events flow through:
-   *  - `item.started` with `parentItemId` registers the child
-   *  - `item.completed` for a registered child evicts it from the map
-   *  - any other event on a registered child is matched against the map
-   *
-   * Events on the sub-agent PARENT itself (the `Task`/`Agent` tool_call row)
-   * are never gated — they keep flowing so the closed pill stays live.
-   */
-  private resolveSubAgentParent(threadId: string, event: RuntimeEvent): string | undefined {
-    if (event.type === "item.started") {
-      if (!("parentItemId" in event) || typeof event.parentItemId !== "string") return undefined;
-      this.subAgentChildToParent.set(childKey(threadId, event.itemId), event.parentItemId);
-      return event.parentItemId;
-    }
-    if (
-      event.type !== "item.updated" &&
-      event.type !== "item.completed" &&
-      event.type !== "content.delta"
-    ) {
-      return undefined;
-    }
-    const itemId = (event as { itemId?: unknown }).itemId;
-    if (typeof itemId !== "string") return undefined;
-    const ckey = childKey(threadId, itemId);
-    const parentItemId = this.subAgentChildToParent.get(ckey);
-    if (!parentItemId) return undefined;
-    if (event.type === "item.completed") this.subAgentChildToParent.delete(ckey);
-    return parentItemId;
+    this.runtimeEventRouter.append(threadId, event);
   }
 
   /**
@@ -394,11 +171,7 @@ export class ThreadSessionManager {
   subagentSubscribe(payload: { threadId: string; parentItemId: string }): {
     history: RuntimeEvent[];
   } {
-    const key = subAgentKey(payload.threadId, payload.parentItemId);
-    this.subscribedSubAgents.add(key);
-    const buffered = this.subAgentBuffers.get(key) ?? [];
-    this.subAgentBuffers.delete(key);
-    return { history: buffered };
+    return { history: this.runtimeEventRouter.subscribe(payload.threadId, payload.parentItemId) };
   }
 
   /**
@@ -408,72 +181,15 @@ export class ThreadSessionManager {
    * it was closed while the sub-agent ran.
    */
   subagentUnsubscribe(payload: { threadId: string; parentItemId: string }): void {
-    this.subscribedSubAgents.delete(subAgentKey(payload.threadId, payload.parentItemId));
+    this.runtimeEventRouter.unsubscribe(payload.threadId, payload.parentItemId);
   }
 
   private clearAllSubAgentStateForThread(threadId: string): void {
-    const subPrefix = `${threadId}\0`;
-    for (const key of this.subscribedSubAgents) {
-      if (key.startsWith(subPrefix)) this.subscribedSubAgents.delete(key);
-    }
-    for (const key of this.subAgentBuffers.keys()) {
-      if (key.startsWith(subPrefix)) this.subAgentBuffers.delete(key);
-    }
-    for (const key of this.subAgentChildToParent.keys()) {
-      if (key.startsWith(subPrefix)) this.subAgentChildToParent.delete(key);
-    }
-  }
-
-  /**
-   * Drop all sub-agent state for a parent: subscription, buffered events, and
-   * its child→parent index entries. Called after the parent `tool_call`
-   * completes — any buffered children are flushed to the renderer first by
-   * `enqueueRuntimeEvent`, so clearing here only sheds bookkeeping state.
-   */
-  private clearSubAgentState(threadId: string, parentItemId: string): void {
-    const key = subAgentKey(threadId, parentItemId);
-    this.subscribedSubAgents.delete(key);
-    this.subAgentBuffers.delete(key);
-    const childPrefix = `${threadId}\0`;
-    for (const ckey of this.subAgentChildToParent.keys()) {
-      if (!ckey.startsWith(childPrefix)) continue;
-      if (this.subAgentChildToParent.get(ckey) === parentItemId) {
-        this.subAgentChildToParent.delete(ckey);
-      }
-    }
+    this.runtimeEventRouter.clearAllForThread(threadId);
   }
 
   private flushRuntimeEvents(): void {
-    if (this.runtimeEventBatchTimer) {
-      clearTimeout(this.runtimeEventBatchTimer);
-      this.runtimeEventBatchTimer = undefined;
-    }
-    if (this.pendingRuntimeEvents.size === 0) return;
-
-    // Single-thread path: keep the existing per-thread IPC shape so single
-    // active stream cases stay on the cheaper non-array envelope.
-    if (this.pendingRuntimeEvents.size === 1) {
-      for (const [threadId, events] of this.pendingRuntimeEvents) {
-        if (events.length === 1) {
-          this.options.emit({ type: "thread-runtime-event", threadId, event: events[0]! });
-        } else if (events.length > 1) {
-          this.options.emit({ type: "thread-runtime-events", threadId, events: [...events] });
-        }
-      }
-      this.pendingRuntimeEvents.clear();
-      return;
-    }
-
-    // Multi-thread path: collapse into a single IPC envelope so 6-8 concurrent
-    // streams produce one round-trip per 16ms tick instead of 6-8.
-    const batches: { threadId: string; events: RuntimeEvent[] }[] = [];
-    for (const [threadId, events] of this.pendingRuntimeEvents) {
-      if (events.length > 0) batches.push({ threadId, events: [...events] });
-    }
-    if (batches.length > 0) {
-      this.options.emit({ type: "thread-runtime-events-multi", batches });
-    }
-    this.pendingRuntimeEvents.clear();
+    this.runtimeEventRouter.flush();
   }
 
   /**
@@ -930,7 +646,7 @@ export class ThreadSessionManager {
     // Capture project-scoped shell env (fnm / nvm / asdf / mise cd-hooks
     // fire when the prime probe runs inside the project root) so the
     // user's pinned Node/Python/Ruby are on PATH before the PTY spawns.
-    if (payload.projectLocation.kind === "posix") {
+    if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
       await primeProjectShellEnv(payload.projectLocation.path);
     }
 
@@ -1276,7 +992,7 @@ export class ThreadSessionManager {
     // so without this the spawned CLI picks up homebrew node instead of the
     // project-pinned version. Memoized per cwd; the later prime before the PTY
     // launch is a no-op after this.
-    if (payload.projectLocation.kind === "posix") {
+    if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
       await primeProjectShellEnv(payload.projectLocation.path);
     }
 
@@ -1295,6 +1011,9 @@ export class ThreadSessionManager {
         await structuredSession.activate();
       } catch (error) {
         await structuredSession.dispose();
+        if (this.pendingStartInterrupts.delete(payload.threadId)) {
+          return { threadId: payload.threadId };
+        }
         throw error;
       }
     }
@@ -1308,6 +1027,9 @@ export class ThreadSessionManager {
         );
       } catch (error) {
         await structuredSession.dispose();
+        if (this.pendingStartInterrupts.delete(payload.threadId)) {
+          return { threadId: payload.threadId };
+        }
         throw error;
       }
     }
@@ -1432,7 +1154,7 @@ export class ThreadSessionManager {
         payload.sessionRef,
       );
     }
-    if (payload.projectLocation.kind === "posix") {
+    if (shouldPrimeNativeProjectShellEnv(payload.projectLocation)) {
       await primeProjectShellEnv(payload.projectLocation.path);
     }
     const command = resolveLaunchSpec(payload.projectLocation, argv);
@@ -1853,7 +1575,7 @@ export class ThreadSessionManager {
     // Prime the user's interactive-shell env before respawning. See the same
     // call in `startThreadInner` — must run before the structured-session
     // spawn so the child inherits the project-pinned PATH, not launchd's.
-    if (session.projectLocation.kind === "posix") {
+    if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
       await primeProjectShellEnv(session.projectLocation.path);
     }
 
@@ -1937,7 +1659,7 @@ export class ThreadSessionManager {
         session.sessionRef,
       );
     }
-    if (session.projectLocation.kind === "posix") {
+    if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
       await primeProjectShellEnv(session.projectLocation.path);
     }
     const command = resolveLaunchSpec(session.projectLocation, argv);
@@ -2004,7 +1726,7 @@ export class ThreadSessionManager {
           session.launchPrompt,
         );
       }
-      if (session.projectLocation.kind === "posix") {
+      if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
         await primeProjectShellEnv(session.projectLocation.path);
       }
       const command = resolveLaunchSpec(session.projectLocation, argv);

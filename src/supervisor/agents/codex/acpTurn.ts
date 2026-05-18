@@ -1,0 +1,83 @@
+import type { PromptSegment, ThreadConfig } from "@/shared/contracts";
+
+// Codex's `turn/start` requires a non-empty `developer_instructions` string
+// inside `collaborationMode.settings`. We send these on every turn so that
+// switching between Plan and Default mode mid-session takes effect.
+const PLAN_MODE_DEVELOPER_INSTRUCTIONS =
+  "You are operating in plan mode. Produce a clear, step-by-step plan for the user's request. Do not edit files, run shell commands, or call mutating tools — gather context with read-only tools as needed, then present the plan and wait for the user to approve before executing any changes.";
+
+const DEFAULT_MODE_DEVELOPER_INSTRUCTIONS =
+  "You are operating in default mode. Any prior plan-mode instructions no longer apply: you may edit files, run commands, and use mutating tools as appropriate to fulfill the user's request.";
+
+// Codex `/goal` is a Codex CLI feature (experimental, gated by --enable goals).
+// We mirror the TUI's sub-commands inline so the user can type them in the
+// composer; the actual state lives in the Codex app-server.
+export type CodexGoalCommand =
+  | { kind: "set"; objective: string }
+  | { kind: "clear" }
+  | { kind: "view" }
+  | { kind: "pause" }
+  | { kind: "resume" };
+
+export function parseCodexGoalCommand(prompt: string): CodexGoalCommand | undefined {
+  const match = /^\/goal(?:\s+([\s\S]*))?$/u.exec(prompt.trim());
+  if (!match) return undefined;
+  const rawArgs = match[1]?.trim() ?? "";
+  if (rawArgs.length === 0) return { kind: "view" };
+  if (/^(clear|reset|off|none)$/iu.test(rawArgs)) return { kind: "clear" };
+  if (/^pause$/iu.test(rawArgs)) return { kind: "pause" };
+  if (/^resume$/iu.test(rawArgs)) return { kind: "resume" };
+  return { kind: "set", objective: rawArgs };
+}
+
+export function buildCodexTurnInput(
+  prompt: string,
+  segments: PromptSegment[] | undefined,
+): Record<string, unknown>[] {
+  const input: Record<string, unknown>[] = [];
+
+  for (const seg of segments ?? []) {
+    if (seg.kind === "attachment") {
+      if (isImagePath(seg.path)) {
+        input.push({ type: "localImage", path: seg.path });
+      } else {
+        input.push({
+          type: "mention",
+          path: seg.path,
+          name: fileName(seg.path),
+        });
+      }
+    } else if (seg.kind === "file") {
+      input.push({
+        type: "mention",
+        path: seg.path,
+        name: fileName(seg.path),
+      });
+    }
+  }
+
+  input.push({ type: "text", text: prompt, text_elements: [] });
+  return input;
+}
+
+export function buildCodexCollaborationMode(config: ThreadConfig): Record<string, unknown> {
+  return {
+    mode: config.mode === "plan" ? "plan" : "default",
+    settings: {
+      model: config.model,
+      reasoning_effort: config.effort ?? "medium",
+      developer_instructions:
+        config.mode === "plan"
+          ? PLAN_MODE_DEVELOPER_INSTRUCTIONS
+          : DEFAULT_MODE_DEVELOPER_INSTRUCTIONS,
+    },
+  };
+}
+
+function isImagePath(path: string): boolean {
+  return /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(path);
+}
+
+function fileName(path: string): string {
+  return path.split(/[\\/]/).pop() ?? path;
+}

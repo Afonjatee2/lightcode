@@ -109,6 +109,7 @@ export function createGeminiAdapter(): AgentAdapter {
         "gemini",
         ["--acp", "--skip-trust"],
         resolveAgentBinaryPath(input.projectLocation, "gemini"),
+        input.projectLocation.kind === "windows" ? { GEMINI_PTY_INFO: "child_process" } : undefined,
       );
       return createAcpStructuredSession(command, input);
     },

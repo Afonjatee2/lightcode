@@ -1928,6 +1928,118 @@ describe("writeSubmittedPrompt", () => {
     );
   });
 
+  it("settles a queued GUI startup stop when ACP closes during activate", async () => {
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = makeRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    let resolveStructuredSession:
+      | ((session: {
+          launchOptions: Record<string, never>;
+          activate: () => Promise<void>;
+          openThread: () => Promise<string>;
+          startTurn: () => Promise<void>;
+          interruptTurn: () => Promise<void>;
+          setListener: (listener: { onUpdate(update: Record<string, unknown>): void }) => void;
+          dispose: () => Promise<void>;
+        }) => void)
+      | undefined;
+    const activate = vi
+      .fn<() => Promise<void>>()
+      .mockRejectedValue(new Error("ACP connection closed"));
+    const openThread = vi.fn<() => Promise<string>>().mockResolvedValue("session-1");
+    const startTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const interruptTurn = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const setListener =
+      vi.fn<(listener: { onUpdate(update: Record<string, unknown>): void }) => void>();
+    const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const structuredSessionPromise = new Promise<{
+      launchOptions: Record<string, never>;
+      activate: () => Promise<void>;
+      openThread: () => Promise<string>;
+      startTurn: () => Promise<void>;
+      interruptTurn: () => Promise<void>;
+      setListener: (listener: { onUpdate(update: Record<string, unknown>): void }) => void;
+      dispose: () => Promise<void>;
+    }>((resolve) => {
+      resolveStructuredSession = resolve;
+    });
+
+    const adapter = {
+      kind: "generic-gui" as const,
+      label: "Generic GUI Provider",
+      capabilities: {
+        models: [{ id: "model-a", label: "Model A" }],
+        efforts: ["high"],
+        modelEfforts: {},
+        modes: ["agent"],
+        approvalPolicies: [{ id: "on-request", label: "On Request" }],
+        sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+        supportsResume: true,
+        supportsDirectInput: true,
+        liveInputMode: "terminal" as const,
+        presentationMode: "terminal" as const,
+        presentationModes: ["terminal", "gui"] as const,
+      },
+      detectInstall: vi.fn<() => void>(),
+      buildLaunchArgv: vi.fn<() => { binary: string; args: string[] }>(() => ({
+        binary: "generic-gui",
+        args: ["should-not-spawn"],
+      })),
+      buildResumeArgv: vi.fn<() => void>(),
+      createInitialSessionRef: vi
+        .fn<() => { providerSessionId: string; discoveredAt: string } | undefined>()
+        .mockReturnValue(undefined),
+      createStructuredSession: vi.fn<() => Promise<Record<string, unknown>>>(
+        () => structuredSessionPromise,
+      ),
+    };
+
+    (runtime as unknown as { adapters: Map<string, typeof adapter> }).adapters.set(
+      "generic-gui",
+      adapter,
+    );
+
+    const startPromise = runtime.startThread({
+      threadId: "thread-gui-activate-stop",
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      agentKind: "generic-gui",
+      config: {
+        model: "model-a",
+      },
+      prompt: "hi",
+      presentationMode: "gui",
+      initialSize: {
+        cols: 132,
+        rows: 42,
+      },
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    await runtime.interruptThread({ threadId: "thread-gui-activate-stop" });
+
+    resolveStructuredSession?.({
+      launchOptions: {},
+      activate,
+      openThread,
+      startTurn,
+      interruptTurn,
+      setListener,
+      dispose,
+    });
+
+    await expect(startPromise).resolves.toEqual({ threadId: "thread-gui-activate-stop" });
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(openThread).not.toHaveBeenCalled();
+    expect(setListener).not.toHaveBeenCalled();
+    expect(startTurn).not.toHaveBeenCalled();
+    expect(interruptTurn).not.toHaveBeenCalled();
+  });
+
   it("settles a Codex GUI /goal initial turn after the goal item is emitted", async () => {
     const emitted: Array<Record<string, unknown>> = [];
     const runtime = makeRuntime((event) => {

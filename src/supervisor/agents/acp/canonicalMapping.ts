@@ -38,6 +38,13 @@ interface AcpToolCallItemState {
   itemType: CanonicalItemType;
   payload: Record<string, unknown>;
   isSubAgent: boolean;
+  /**
+   * ACP `Terminal` id that hosts this tool's output, if any. Captured on the
+   * first `tool_call`/`tool_call_update` whose `content` references a terminal,
+   * so later updates can still snapshot PTY output even when the agent omits
+   * the content array on subsequent notifications.
+   */
+  terminalId?: string;
 }
 
 interface ActiveAcpSubAgent {
@@ -69,6 +76,21 @@ export interface AcpMapperState {
    * for Copilot's `task_complete` summary). Their `tool_call_update`s must be
    * dropped so we don't emit ghost updates against the wrong item. */
   suppressedToolCallIds: Set<string>;
+  /**
+   * Resolve the live output of a client-hosted ACP terminal by its
+   * `terminalId`. Gemini's shell tool surfaces output via `createTerminal`
+   * (separate JSON-RPC channel) and references the terminal from
+   * `ToolCallContent` blocks of type `"terminal"`. The session wires this
+   * callback in so the mapper can inline that output on the canonical payload's
+   * `result` field — without it, the chat row has no body to render.
+   */
+  resolveTerminalOutput?: (terminalId: string) => string | undefined;
+  /**
+   * Resolve client-hosted terminal output by command text when an ACP agent
+   * creates a terminal but omits the terminal content reference from its
+   * tool_call payload.
+   */
+  resolveTerminalOutputByCommand?: (command: string) => string | undefined;
 }
 
 export function createAcpMapperState(threadId: string): AcpMapperState {
@@ -105,8 +127,13 @@ export function closeOpenContentItems(state: AcpMapperState): RuntimeEvent[] {
 
 export function closeOpenTurnItems(state: AcpMapperState): RuntimeEvent[] {
   const events = closeOpenContentItems(state);
-  for (const { itemId } of state.toolCallItems.values()) {
-    events.push({ type: "item.completed", threadId: state.threadId, itemId });
+  for (const item of state.toolCallItems.values()) {
+    events.push({
+      type: "item.completed",
+      threadId: state.threadId,
+      itemId: item.itemId,
+      payload: finalizeToolCallPayload(state, item),
+    });
   }
   if (state.openPlanItemId) {
     events.push({
@@ -273,6 +300,7 @@ export function mapAcpSessionUpdate(
         kind?: string | null;
         status?: "pending" | "in_progress" | "completed" | "failed";
         rawInput?: unknown;
+        content?: unknown;
         locations?: Array<{ path?: string | null; line?: number | null }> | null;
       };
       // Gemini's `update_topic` is a meta-tool that re-titles the current
@@ -318,8 +346,22 @@ export function mapAcpSessionUpdate(
             : "running";
       const itemType = classifyToolCallItemType(toolCall.kind, toolCall.title, toolCall.locations);
       const isSubAgent = isAcpSubAgentToolCall(toolCall);
-      const payload = buildAcpToolCallPayload(itemType, toolCall, status, isSubAgent);
-      state.toolCallItems.set(toolCall.toolCallId, { itemId, itemType, payload, isSubAgent });
+      const payload = buildAcpToolCallPayload(
+        itemType,
+        toolCall,
+        status,
+        isSubAgent,
+        state.resolveTerminalOutput,
+        state.resolveTerminalOutputByCommand,
+      );
+      const terminalId = findTerminalIdInContent((toolCall as { content?: unknown }).content);
+      state.toolCallItems.set(toolCall.toolCallId, {
+        itemId,
+        itemType,
+        payload,
+        isSubAgent,
+        ...(terminalId ? { terminalId } : {}),
+      });
       events.push({
         type: "item.started",
         threadId,
@@ -327,7 +369,22 @@ export function mapAcpSessionUpdate(
         itemType,
         payload,
       });
-      if (isSubAgent) {
+      if (toolCall.status === "completed" || toolCall.status === "failed") {
+        events.push({
+          type: "item.completed",
+          threadId,
+          itemId,
+          payload: finalizeToolCallPayload(state, {
+            itemId,
+            itemType,
+            payload,
+            isSubAgent,
+            ...(terminalId ? { terminalId } : {}),
+          }),
+        });
+        state.toolCallItems.delete(toolCall.toolCallId);
+      }
+      if (isSubAgent && toolCall.status !== "completed" && toolCall.status !== "failed") {
         pendingSubAgent = { toolCallId: toolCall.toolCallId, itemId };
       }
       break;
@@ -341,6 +398,7 @@ export function mapAcpSessionUpdate(
         status?: "pending" | "in_progress" | "completed" | "failed";
         rawInput?: unknown;
         rawOutput?: unknown;
+        content?: unknown;
         locations?: Array<{ path?: string | null; line?: number | null }> | null;
       };
       if (state.suppressedToolCallIds.has(toolCall.toolCallId)) {
@@ -358,7 +416,15 @@ export function mapAcpSessionUpdate(
           : toolCall.status === "failed"
             ? "error"
             : "running";
-      const payload = buildAcpToolCallUpdatePayload(item, toolCall, status);
+      const updateTerminalId = findTerminalIdInContent((toolCall as { content?: unknown }).content);
+      if (updateTerminalId) item.terminalId = updateTerminalId;
+      const payload = buildAcpToolCallUpdatePayload(
+        item,
+        toolCall,
+        status,
+        state.resolveTerminalOutput,
+        state.resolveTerminalOutputByCommand,
+      );
       item.payload = mergeToolPayload(item.payload, payload);
       events.push({
         type: isTerminal ? "item.completed" : "item.updated",
@@ -474,19 +540,24 @@ function buildAcpToolCallPayload(
     title?: string | null;
     kind?: string | null;
     rawInput?: unknown;
+    content?: unknown;
     locations?: Array<{ path?: string | null; line?: number | null }> | null;
   },
   status: "running" | "success" | "error",
   isSubAgent: boolean,
+  resolveTerminalOutput?: (terminalId: string) => string | undefined,
+  resolveTerminalOutputByCommand?: (command: string) => string | undefined,
 ): Record<string, unknown> {
   const title = normalizeToolText(toolCall.title);
   const kind = normalizeToolText(toolCall.kind);
   const locations = extractToolLocations(toolCall.locations);
   const name = title ?? kind ?? "tool";
+  const contentResult = extractToolCallContentText(toolCall.content, resolveTerminalOutput);
   const base: Record<string, unknown> = {
     name,
     args: toolCall.rawInput,
     status,
+    ...(contentResult !== undefined ? { result: contentResult } : {}),
     ...(title ? { title } : {}),
     ...(kind ? { kind } : {}),
     ...(locations.length > 0 ? { locations } : {}),
@@ -495,9 +566,18 @@ function buildAcpToolCallPayload(
   if (itemType === "command_execution") {
     const cmd = readStringField(toolCall.rawInput, "command");
     const cwd = readStringField(toolCall.rawInput, "cwd");
+    // Gemini's ACP shell tool puts the command in `title`, not `rawInput.command`,
+    // so fall back to the title (minus a generic descriptor) when rawInput is bare.
+    const fallback = commandFromToolTitle(title, kind);
+    const command = cmd ?? fallback ?? "";
+    const commandResult =
+      contentResult === undefined && command.length > 0
+        ? resolveTerminalOutputByCommand?.(command)
+        : undefined;
     return {
       ...base,
-      command: cmd ?? "",
+      ...(commandResult !== undefined ? { result: commandResult } : {}),
+      command,
       ...(cwd ? { cwd } : {}),
     };
   }
@@ -524,16 +604,39 @@ function buildAcpToolCallUpdatePayload(
     title?: string | null;
     kind?: string | null;
     rawOutput?: unknown;
+    content?: unknown;
     locations?: Array<{ path?: string | null; line?: number | null }> | null;
   },
   status: "running" | "success" | "error",
+  resolveTerminalOutput?: (terminalId: string) => string | undefined,
+  resolveTerminalOutputByCommand?: (command: string) => string | undefined,
 ): Record<string, unknown> {
   const title = normalizeToolText(toolCall.title);
   const kind = normalizeToolText(toolCall.kind);
   const locations = extractToolLocations(toolCall.locations);
+  // ACP carries tool output either as `rawOutput` (Copilot), inline
+  // `content: ToolCallContent[]` text blocks, or `content` entries of type
+  // `"terminal"` that point at a client-hosted PTY (Gemini's run_shell_command).
+  // Prefer the structured rawOutput when present so the renderer can pretty-print
+  // JSON; otherwise inline text / terminal output (the `item.terminalId` hint
+  // lets us keep snapshotting PTY output when the agent stops including the
+  // terminal reference on later status updates).
+  const contentResult = extractToolCallContentText(
+    toolCall.content,
+    resolveTerminalOutput,
+    item.terminalId,
+  );
+  const result =
+    toolCall.rawOutput !== undefined
+      ? toolCall.rawOutput
+      : contentResult !== undefined
+        ? contentResult
+        : item.itemType === "command_execution"
+          ? resolveTerminalOutputForCommandPayload(item.payload, resolveTerminalOutputByCommand)
+          : undefined;
   const payload: Record<string, unknown> = {
     status,
-    ...(toolCall.rawOutput !== undefined ? { result: toolCall.rawOutput } : {}),
+    ...(result !== undefined ? { result } : {}),
     ...(title || kind ? { name: title ?? kind } : {}),
     ...(title ? { title } : {}),
     ...(kind ? { kind } : {}),
@@ -547,6 +650,29 @@ function buildAcpToolCallUpdatePayload(
     if (diffSummary) payload.diffSummary = diffSummary;
   }
   return payload;
+}
+
+function finalizeToolCallPayload(
+  state: AcpMapperState,
+  item: AcpToolCallItemState,
+): Record<string, unknown> {
+  if (item.itemType !== "command_execution" || item.payload.result !== undefined) {
+    return item.payload;
+  }
+  const result = resolveTerminalOutputForCommandPayload(
+    item.payload,
+    state.resolveTerminalOutputByCommand,
+  );
+  return result !== undefined ? { ...item.payload, result } : item.payload;
+}
+
+function resolveTerminalOutputForCommandPayload(
+  payload: Record<string, unknown>,
+  resolveTerminalOutputByCommand: ((command: string) => string | undefined) | undefined,
+): string | undefined {
+  const command = typeof payload.command === "string" ? payload.command : undefined;
+  if (!command || !resolveTerminalOutputByCommand) return undefined;
+  return resolveTerminalOutputByCommand(command);
 }
 
 function getActiveSubAgent(state: AcpMapperState): ActiveAcpSubAgent | undefined {
@@ -692,6 +818,90 @@ function mergeToolPayload(
     };
   }
   return merged;
+}
+
+/** Find the first `ToolCallContent` entry of type `"terminal"` and return its id. */
+function findTerminalIdInContent(content: unknown): string | undefined {
+  if (!Array.isArray(content)) return undefined;
+  for (const entry of content) {
+    if (!entry || typeof entry !== "object") continue;
+    const e = entry as Record<string, unknown>;
+    if (e.type === "terminal" && typeof e.terminalId === "string" && e.terminalId.length > 0) {
+      return e.terminalId;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Pull text from an ACP `ToolCallContent[]` collection. ACP carries tool
+ * output as one of:
+ *   - `{ type: "content", content: { type: "text", text } }` — inline text
+ *   - `{ type: "terminal", terminalId }` — reference to a client-hosted PTY,
+ *     used by Gemini's run_shell_command tool. The session passes a resolver
+ *     so we can inline that PTY's current captured stdout/stderr.
+ * Diff blocks are left to richer renderers and skipped at this layer.
+ *
+ * Pass `terminalIdHint` when the caller knows the PTY id from earlier updates
+ * but the current notification omits the `content` array — Gemini sends the
+ * terminal reference on the initial `tool_call` and may not repeat it on
+ * status-only `tool_call_update`s.
+ */
+function extractToolCallContentText(
+  content: unknown,
+  resolveTerminalOutput?: (terminalId: string) => string | undefined,
+  terminalIdHint?: string,
+): string | undefined {
+  const parts: string[] = [];
+  const seenTerminals = new Set<string>();
+  if (Array.isArray(content)) {
+    for (const entry of content) {
+      if (!entry || typeof entry !== "object") continue;
+      const e = entry as Record<string, unknown>;
+      if (e.type === "terminal") {
+        const terminalId = typeof e.terminalId === "string" ? e.terminalId : undefined;
+        if (!terminalId || !resolveTerminalOutput) continue;
+        seenTerminals.add(terminalId);
+        const out = resolveTerminalOutput(terminalId);
+        if (out && out.length > 0) parts.push(out);
+        continue;
+      }
+      if (e.type !== "content") continue;
+      const inner = e.content;
+      if (!inner || typeof inner !== "object") continue;
+      const block = inner as Record<string, unknown>;
+      if (block.type === "text" && typeof block.text === "string" && block.text.length > 0) {
+        parts.push(block.text);
+      }
+    }
+  }
+  if (terminalIdHint && resolveTerminalOutput && !seenTerminals.has(terminalIdHint)) {
+    const out = resolveTerminalOutput(terminalIdHint);
+    if (out && out.length > 0) parts.push(out);
+  }
+  return parts.length > 0 ? parts.join("\n") : undefined;
+}
+
+/**
+ * Try to recover the shell command from an ACP `tool_call` title when the
+ * agent didn't put it under `rawInput.command`. Gemini's ACP server passes the
+ * bare command as the title (e.g. `"git status"`), so the title IS the command
+ * unless it's a generic placeholder like `"shell"` / `"execute"` /
+ * `"shell exec"`. Returns `undefined` when the title is just a descriptor —
+ * the renderer then falls back to its own `(command)` placeholder, matching
+ * the prior behavior.
+ */
+function commandFromToolTitle(
+  title: string | undefined,
+  kind: string | undefined,
+): string | undefined {
+  if (!title) return undefined;
+  const trimmed = title.trim();
+  if (trimmed.length === 0) return undefined;
+  const lower = trimmed.toLowerCase();
+  if (lower === (kind ?? "").toLowerCase()) return undefined;
+  if (/^(shell|execute|exec|run|run\s+command|shell\s+exec)$/.test(lower)) return undefined;
+  return trimmed;
 }
 
 function normalizeToolText(value: string | null | undefined): string | undefined {

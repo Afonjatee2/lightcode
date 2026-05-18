@@ -12,11 +12,10 @@
 import { spawn as spawnChild, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
-import { basename, join, posix, win32 } from "node:path";
+import { basename, join } from "node:path";
 import { homedir } from "node:os";
 import { Readable, Writable } from "node:stream";
-import { pathToFileURL } from "node:url";
-import { spawn as spawnPty, type IDisposable, type IPty } from "node-pty";
+import { spawn as spawnPty } from "node-pty";
 import {
   ClientSideConnection,
   ndJsonStream,
@@ -29,8 +28,6 @@ import {
   type CreateElicitationResponse,
   type CreateTerminalRequest,
   type CreateTerminalResponse,
-  type ElicitationContentValue,
-  type ElicitationPropertySchema,
   type KillTerminalRequest,
   type PromptCapabilities,
   type ReadTextFileRequest,
@@ -70,14 +67,19 @@ import {
   mapAcpSessionUpdate,
   type AcpMapperState,
 } from "./canonicalMapping";
-import {
-  createContextUsageEvent,
-  readNonNegativeInteger,
-  usageFromTokenCounts,
-} from "../contextUsage";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import {
+  buildPosixExportPrefix,
   createKnownSessionRef,
+  detectShell,
+  getPosixLoginShellArgs,
+  getProjectShellEnv,
+  getWindowsSystemCommand,
+  getWindowsPathOverrideEnv,
+  getWslCommand,
+  quotePosixShellArg,
+  quotePowerShellLiteral,
+  resolveWslShellPath,
   type AgentLaunchOptions,
   type CommandSpec,
   type CreateStructuredSessionInput,
@@ -87,106 +89,29 @@ import {
   type StructuredSessionUpdate,
 } from "../base";
 import { mapAcpSlashCommands, normalizeAcpModeId } from "./probe";
+import {
+  applyAcpModeUpdateToConfig,
+  findSelectConfigOption,
+  findThoughtLevelConfig,
+  resolveAcpMode,
+  resolveModelConfigValue,
+} from "./sessionConfig";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
-/** CWD to pass into the ACP session (the agent's working directory). */
-function resolveSessionCwd(location: ProjectLocation): string {
-  switch (location.kind) {
-    case "windows":
-      return location.path;
-    case "wsl":
-      return location.linuxPath;
-    case "posix":
-      return location.path;
-  }
-}
+import {
+  basenameForProjectPath,
+  guessMimeType,
+  resolveAcpHostFsPath,
+  resolveAcpProjectPath,
+  resolveAcpResourcePath,
+  resolveSessionCwd,
+  resolveSpawnCwd,
+  sliceTextFileContent,
+  toAcpResourceUri,
+} from "./sessionPaths";
 
-/** CWD for the spawned process on the host OS (must be a valid native path). */
-function resolveSpawnCwd(location: ProjectLocation): string | undefined {
-  // WSL projects launch wsl.exe from Windows — the linux path doesn't exist
-  // on the host FS. wsl.exe receives its cwd via --cd, so no spawn cwd needed.
-  if (location.kind === "wsl") return undefined;
-  return location.path;
-}
-
-function basenameForProjectPath(location: ProjectLocation, filePath: string): string {
-  switch (location.kind) {
-    case "windows":
-      return win32.basename(filePath);
-    case "wsl":
-    case "posix":
-      return posix.basename(filePath);
-  }
-}
-
-function isWindowsAbsolutePath(filePath: string): boolean {
-  return /^[A-Za-z]:[\\/]/.test(filePath) || filePath.startsWith("\\\\");
-}
-
-export function resolveAcpResourcePath(location: ProjectLocation, rawPath: string): string {
-  if (isWindowsAbsolutePath(rawPath)) {
-    return rawPath;
-  }
-  switch (location.kind) {
-    case "windows":
-      return win32.join(location.path, rawPath);
-    case "wsl":
-      return rawPath.startsWith("/") ? rawPath : posix.join(location.linuxPath, rawPath);
-    case "posix":
-      return rawPath.startsWith("/") ? rawPath : posix.join(location.path, rawPath);
-  }
-}
-
-function isProjectRelativePath(location: ProjectLocation, absolutePath: string): boolean {
-  switch (location.kind) {
-    case "windows": {
-      const relative = win32.relative(location.path, absolutePath);
-      return relative === "" || (!relative.startsWith("..") && !win32.isAbsolute(relative));
-    }
-    case "wsl": {
-      const relative = posix.relative(location.linuxPath, absolutePath);
-      return relative === "" || (!relative.startsWith("..") && !posix.isAbsolute(relative));
-    }
-    case "posix": {
-      const relative = posix.relative(location.path, absolutePath);
-      return relative === "" || (!relative.startsWith("..") && !posix.isAbsolute(relative));
-    }
-  }
-}
-
-function resolveAcpProjectPath(location: ProjectLocation, rawPath: string): string {
-  const absolutePath = resolveAcpResourcePath(location, rawPath);
-  if (!isProjectRelativePath(location, absolutePath)) {
-    throw RequestError.invalidParams({ message: `Path is outside the project: ${rawPath}` });
-  }
-  return absolutePath;
-}
-
-function resolveAcpHostFsPath(location: ProjectLocation, rawPath: string): string {
-  const absolutePath = resolveAcpProjectPath(location, rawPath);
-  if (location.kind !== "wsl" || isWindowsAbsolutePath(absolutePath)) {
-    return absolutePath;
-  }
-  const relative = posix.relative(location.linuxPath, absolutePath);
-  return relative === ""
-    ? location.uncPath
-    : win32.join(location.uncPath, ...relative.split("/").filter(Boolean));
-}
-
-export function toAcpResourceUri(location: ProjectLocation, rawPath: string): string {
-  const absolutePath = resolveAcpResourcePath(location, rawPath);
-  if (isWindowsAbsolutePath(absolutePath)) {
-    return pathToFileURL(absolutePath).href;
-  }
-  switch (location.kind) {
-    case "windows":
-      return pathToFileURL(absolutePath).href;
-    case "wsl":
-    case "posix":
-      return new URL(`file://${absolutePath.replace(/\\/g, "/")}`).href;
-  }
-}
+export { resolveAcpResourcePath, toAcpResourceUri };
 
 /**
  * Convert Lightcode `PromptSegment[]` + prompt text into ACP `ContentBlock[]`.
@@ -247,501 +172,220 @@ async function segmentsToContentBlocks(
   return blocks;
 }
 
-function guessMimeType(path: string): string {
-  const ext = path.split(".").pop()?.toLowerCase();
-  switch (ext) {
-    case "png":
-      return "image/png";
-    case "jpg":
-    case "jpeg":
-      return "image/jpeg";
-    case "gif":
-      return "image/gif";
-    case "webp":
-      return "image/webp";
-    case "svg":
-      return "image/svg+xml";
-    default:
-      return "application/octet-stream";
-  }
+import {
+  appendTerminalOutput,
+  MAX_ACP_TERMINALS_PER_SESSION,
+  type AcpTerminalRecord,
+} from "./sessionTerminal";
+import {
+  appendInterruptAckTextTail,
+  createAcpPromptUsageEvent,
+  normalizeAcpStopReason,
+  rewriteLoadSessionError,
+} from "./sessionErrors";
+import {
+  buildAcpElicitationAnswerEvents,
+  normalizeAcpElicitationResponse,
+} from "./sessionElicitation";
+
+export { normalizeAcpStopReason, rewriteLoadSessionError };
+
+function buildTerminalCommandLine(command: string, args: string[]): string {
+  return [command, ...args].join(" ");
 }
 
-type AcpTerminalRecord = {
-  pty: IPty;
-  output: string;
-  outputByteLimit: number | undefined;
-  truncated: boolean;
-  exitStatus: TerminalExitStatus | undefined;
-  waiters: Array<(status: TerminalExitStatus) => void>;
-  subscriptions: IDisposable[];
-};
-
-// Cap concurrent host PTYs per ACP session. Legitimate use rarely exceeds a
-// handful; the cap is a defensive bound against a misbehaving agent that
-// creates terminals without releasing them and leaks file descriptors.
-const MAX_ACP_TERMINALS_PER_SESSION = 32;
-
-function truncateTerminalOutput(
-  output: string,
-  limit: number | undefined,
-): { output: string; truncated: boolean } {
-  if (limit === undefined || limit < 0 || Buffer.byteLength(output, "utf8") <= limit) {
-    return { output, truncated: false };
-  }
-  let low = 0;
-  let high = output.length;
-  while (low < high) {
-    const mid = Math.floor((low + high) / 2);
-    if (Buffer.byteLength(output.slice(mid), "utf8") <= limit) {
-      high = mid;
-    } else {
-      low = mid + 1;
-    }
-  }
-  return { output: output.slice(low), truncated: true };
+function normalizeTerminalCommandText(command: string | undefined): string | undefined {
+  const normalized = command
+    ?.trim()
+    .replace(/^cmd(?:\.exe)?\s+\/d\s+\/s\s+\/c\s+/i, "")
+    .replace(/^cmd(?:\.exe)?\s+\/c\s+/i, "")
+    .replace(/^powershell(?:\.exe)?\s+.*?-command\s+/i, "")
+    .replace(/^pwsh(?:\.exe)?\s+.*?-command\s+/i, "")
+    .replace(/\s+/g, " ");
+  return normalized && normalized.length > 0 ? normalized : undefined;
 }
 
-function appendTerminalOutput(record: AcpTerminalRecord, chunk: string): void {
-  const next = truncateTerminalOutput(record.output + chunk, record.outputByteLimit);
-  record.output = next.output;
-  record.truncated = record.truncated || next.truncated;
-}
-
-function sliceTextFileContent(
-  content: string,
-  line: number | null | undefined,
-  limit: number | null | undefined,
-): string {
-  if (line == null && limit == null) return content;
-  const startLine = Math.max(1, Math.trunc(line ?? 1));
-  const maxLines =
-    limit === undefined || limit === null ? undefined : Math.max(0, Math.trunc(limit));
-  const lines = content.split(/\r?\n/u);
-  const selected = lines.slice(
-    startLine - 1,
-    maxLines === undefined ? undefined : startLine - 1 + maxLines,
-  );
-  return selected.join("\n");
-}
-
-function createAcpPromptUsageEvent(threadId: string, usage: unknown): RuntimeEvent | undefined {
-  if (!usage || typeof usage !== "object") return undefined;
-  const obj = usage as Record<string, unknown>;
-  return createContextUsageEvent(
-    threadId,
-    usageFromTokenCounts({
-      usedTokens: readNonNegativeInteger(obj.totalTokens),
-      inputTokens: readNonNegativeInteger(obj.inputTokens),
-      outputTokens: readNonNegativeInteger(obj.outputTokens),
-      thoughtTokens: readNonNegativeInteger(obj.thoughtTokens),
-      cachedReadTokens: readNonNegativeInteger(obj.cachedReadTokens),
-      cachedWriteTokens: readNonNegativeInteger(obj.cachedWriteTokens),
-    }),
+function isSameTerminalCommand(expectedNormalized: string, actual: string): boolean {
+  const actualNormalized = normalizeTerminalCommandText(actual);
+  if (!actualNormalized) return false;
+  return (
+    actualNormalized === expectedNormalized || actualNormalized.endsWith(` ${expectedNormalized}`)
   );
 }
 
-/**
- * Replace the raw JSON-RPC error from `session/load` with a message the
- * renderer can show verbatim. Provider-agnostic on purpose: the same code
- * path triggers whenever any ACP agent rejects a `session/load` call (lost,
- * rotated, or never-persisted sessionId).
- */
-export function rewriteLoadSessionError(error: unknown, _sessionId: string): Error {
-  const detail = extractLoadSessionDetail(error);
-  const message = detail.notFound
-    ? "This conversation can't be resumed — the agent no longer recognizes this session. Start a new thread to continue."
-    : `This conversation can't be resumed: ${detail.message ?? (error instanceof Error ? error.message : String(error))}. Start a new thread to continue.`;
-  return Object.assign(new Error(message), { cause: error });
+function acpModeKey(modeId: string): string {
+  return normalizeAcpModeId(modeId).toLowerCase();
 }
 
-function extractLoadSessionDetail(error: unknown): { message?: string; notFound: boolean } {
-  let message: string | undefined;
-  let notFound = false;
-  if (error instanceof RequestError) {
-    message = error.message;
-    const data = error.data as { message?: unknown } | undefined;
-    if (data && typeof data.message === "string") {
-      message = data.message;
-      if (/not\s+found/i.test(data.message)) notFound = true;
-    }
-  } else if (error instanceof Error) {
-    message = error.message;
-    if (/session.*not\s+found/i.test(error.message)) notFound = true;
+function hasNativeAcpPermissionMode(policy: string, availableModeIds: string[]): boolean {
+  const available = new Set(availableModeIds.map(acpModeKey));
+  const normalizedPolicy = policy.toLowerCase();
+
+  if (available.has(normalizedPolicy)) return true;
+  if (normalizedPolicy === "never") {
+    return available.has("yolo") || available.has("autopilot");
   }
-  return notFound
-    ? { ...(message ? { message } : {}), notFound: true }
-    : { ...(message ? { message } : {}), notFound: false };
+  if (normalizedPolicy === "autopilot") {
+    return available.has("autopilot") || available.has("yolo");
+  }
+  if (normalizedPolicy === "auto_edit") {
+    return available.has("autoedit");
+  }
+  return false;
 }
 
-const INTERRUPT_ACK_TEXT_TAIL_LIMIT = 512;
-const USER_INTERRUPT_ACK_RE = /\boperation cancelled by user\b/i;
-
-function appendInterruptAckTextTail(current: string, next: string): string {
-  if (next.length === 0) return current;
-  const combined = current.length === 0 ? next : current + next;
-  return combined.slice(-INTERRUPT_ACK_TEXT_TAIL_LIMIT);
-}
-
-export function normalizeAcpStopReason(
-  stopReason: string,
-  input: { interruptRequested: boolean; recentAgentText?: string },
-): string {
-  if (
-    stopReason === "end_turn" &&
-    input.interruptRequested &&
-    input.recentAgentText &&
-    USER_INTERRUPT_ACK_RE.test(input.recentAgentText)
-  ) {
-    return "cancelled";
-  }
-  return stopReason;
-}
-
-/**
- * Resolve the ACP mode ID from Lightcode's ThreadConfig.
- *
- * Different agents expose different mode IDs:
- *   Gemini:  "default", "autoEdit", "yolo", "plan"
- *   Generic: "code", "architect", "ask"
- *
- * We pick the best match from the agent's advertised available modes.
- */
-function resolveAcpMode(config: ThreadConfig, availableModeIds: string[]): string | undefined {
-  const available = new Map(
-    availableModeIds.map((modeId) => [normalizeAcpModeId(modeId).toLowerCase(), modeId]),
-  );
-
-  if (config.mode === "plan") {
-    if (available.has("plan")) return available.get("plan");
-    if (available.has("architect")) return available.get("architect");
-    return undefined;
-  }
-
-  const approvalPolicy = config.approvalPolicy?.toLowerCase();
-  if (approvalPolicy && available.has(approvalPolicy)) {
-    return available.get(approvalPolicy);
-  }
-
-  if (config.mode === "autopilot" || config.approvalPolicy === "autopilot") {
-    if (available.has("autopilot")) return available.get("autopilot");
-    if (available.has("yolo")) return available.get("yolo");
-  }
-
-  // Agent mode: pick based on approval policy
-  if (config.approvalPolicy === "autopilot") {
-    if (available.has("autopilot")) return available.get("autopilot");
-  }
-  if (config.approvalPolicy === "never") {
-    if (available.has("yolo")) return available.get("yolo");
-    if (available.has("autopilot")) return available.get("autopilot");
-  }
-  if (config.approvalPolicy === "auto_edit") {
-    if (available.has("autoedit")) return available.get("autoedit");
-  }
-
-  // Default agent mode
-  if (available.has("agent")) return available.get("agent");
-  if (available.has("default")) return available.get("default");
-  if (available.has("code")) return available.get("code");
-
-  return undefined;
-}
-
-type AcpConfigOptionLike = {
-  id?: string;
-  name?: string;
-  category?: string | null;
-  type?: string;
-  currentValue?: string;
-  options?: unknown;
-};
-
-type AcpConfigSelectOptionLike = {
-  value?: string;
-  name?: string;
-};
-
-type AcpConfigSelectGroupLike = {
-  options?: unknown;
-};
-
-function findSelectConfigOption(
-  configOptions: unknown,
-  category: string,
-): AcpConfigOptionLike | undefined {
-  if (!Array.isArray(configOptions)) {
-    return undefined;
-  }
-
-  return configOptions.find((candidate) => {
-    if (typeof candidate !== "object" || candidate === null) {
-      return false;
-    }
-    const option = candidate as AcpConfigOptionLike;
-    return option.category === category && option.type === "select";
-  }) as AcpConfigOptionLike | undefined;
-}
-
-function findThoughtLevelConfig(configOptions: unknown): AcpConfigOptionLike | undefined {
-  return findSelectConfigOption(configOptions, "thought_level");
-}
-
-function isSelectOption(value: unknown): value is AcpConfigSelectOptionLike {
-  return typeof value === "object" && value !== null && "value" in value;
-}
-
-function flattenSelectOptions(options: unknown): AcpConfigSelectOptionLike[] {
-  if (!Array.isArray(options)) {
-    return [];
-  }
-
-  return options.flatMap((entry) => {
-    if (isSelectOption(entry)) {
-      return [entry];
-    }
-    if (typeof entry === "object" && entry !== null && "options" in entry) {
-      return flattenSelectOptions((entry as AcpConfigSelectGroupLike).options);
-    }
-    return [];
-  });
-}
-
-function normalizeConfigOptionAlias(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/[[\]]/g, "-")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function parseBracketParams(value: string): Record<string, string> {
-  const match = /\[([^\]]*)\]/.exec(value);
-  const raw = match?.[1]?.trim();
-  if (!raw) return {};
-
-  const params: Record<string, string> = {};
-  for (const part of raw.split(",")) {
-    const [rawKey, rawValue] = part.split("=");
-    const key = rawKey?.trim();
-    const val = rawValue?.trim();
-    if (key && val) params[key] = val;
-  }
-  return params;
-}
-
-function modelOptionAliases(option: AcpConfigSelectOptionLike): string[] {
-  const aliases = new Set<string>();
-  const value = typeof option.value === "string" ? option.value : undefined;
-  const name = typeof option.name === "string" ? option.name : undefined;
-
-  for (const candidate of [value, name]) {
-    if (candidate) aliases.add(candidate);
-  }
-
-  if (value) {
-    const base = value.replace(/\[[^\]]*\]/g, "");
-    if (base) aliases.add(base);
-    const params = parseBracketParams(value);
-    const thinking = params.thinking === "true";
-    if (params.fast === "true") {
-      if (base) aliases.add(`${base}-fast`);
-      if (name) aliases.add(`${name}-fast`);
-    }
-    if (params.context && base) {
-      aliases.add(`${base}-${params.context}`);
-      if (params.fast === "true") {
-        aliases.add(`${base}-${params.context}-fast`);
-      }
-    }
-    const effort = params.reasoning ?? params.effort;
-    if (effort && base) {
-      aliases.add(`${base}-${effort}`);
-      if (params.context) {
-        aliases.add(`${base}-${params.context}-${effort}`);
-      }
-      if (effort === "xhigh") {
-        aliases.add(`${base}-extra-high`);
-        if (params.context) {
-          aliases.add(`${base}-${params.context}-extra-high`);
-        }
-      } else if (effort === "extra-high") {
-        aliases.add(`${base}-xhigh`);
-        if (params.context) {
-          aliases.add(`${base}-${params.context}-xhigh`);
-        }
-      }
-      if (thinking) {
-        aliases.add(`${base}-${effort}-thinking`);
-        if (params.context) {
-          aliases.add(`${base}-${params.context}-${effort}-thinking`);
-        }
-        if (effort === "xhigh") {
-          aliases.add(`${base}-extra-high-thinking`);
-          if (params.context) {
-            aliases.add(`${base}-${params.context}-extra-high-thinking`);
-          }
-        } else if (effort === "extra-high") {
-          aliases.add(`${base}-xhigh-thinking`);
-          if (params.context) {
-            aliases.add(`${base}-${params.context}-xhigh-thinking`);
-          }
-        }
-      }
-      if (params.fast === "true") {
-        aliases.add(`${base}-${effort}-fast`);
-        if (params.context) {
-          aliases.add(`${base}-${params.context}-${effort}-fast`);
-        }
-        if (effort === "xhigh") {
-          aliases.add(`${base}-extra-high-fast`);
-          if (params.context) {
-            aliases.add(`${base}-${params.context}-extra-high-fast`);
-          }
-        } else if (effort === "extra-high") {
-          aliases.add(`${base}-xhigh-fast`);
-          if (params.context) {
-            aliases.add(`${base}-${params.context}-xhigh-fast`);
-          }
-        }
-        if (thinking) {
-          aliases.add(`${base}-${effort}-thinking-fast`);
-          if (params.context) {
-            aliases.add(`${base}-${params.context}-${effort}-thinking-fast`);
-          }
-          if (effort === "xhigh") {
-            aliases.add(`${base}-extra-high-thinking-fast`);
-            if (params.context) {
-              aliases.add(`${base}-${params.context}-extra-high-thinking-fast`);
-            }
-          } else if (effort === "extra-high") {
-            aliases.add(`${base}-xhigh-thinking-fast`);
-            if (params.context) {
-              aliases.add(`${base}-${params.context}-xhigh-thinking-fast`);
-            }
-          }
-        }
-      }
-    }
-    if (base === "default") {
-      aliases.add("auto");
-    }
-  }
-
-  if (name?.toLowerCase() === "auto") {
-    aliases.add("auto");
-  }
-
-  return [...aliases].map(normalizeConfigOptionAlias);
-}
-
-function modelConfigTargetAliases(config: ThreadConfig): string[] {
-  const aliases = new Set<string>();
-  const modelId = config.model;
-  if (!modelId) {
-    return [];
-  }
-
-  const effortAliases =
-    config.effort === "xhigh" ? ["xhigh", "extra-high"] : config.effort ? [config.effort] : [];
-  const contextPrefixes =
-    config.contextSize && config.contextSize !== "default"
-      ? [`${modelId}-${config.contextSize}`]
-      : [];
-  const modelPrefixes = [...contextPrefixes, modelId];
-
-  for (const prefix of modelPrefixes) {
-    for (const effort of effortAliases) {
-      if (config.fast === true) {
-        if (config.thinking === true) {
-          aliases.add(`${prefix}-${effort}-thinking-fast`);
-        }
-        aliases.add(`${prefix}-${effort}-fast`);
-      }
-      if (config.thinking === true) {
-        aliases.add(`${prefix}-${effort}-thinking`);
-      }
-      aliases.add(`${prefix}-${effort}`);
-    }
-    if (config.fast === true) {
-      if (config.thinking === true) {
-        aliases.add(`${prefix}-thinking-fast`);
-      }
-      aliases.add(`${prefix}-fast`);
-    }
-    if (config.thinking === true) {
-      aliases.add(`${prefix}-thinking`);
-    }
-    aliases.add(prefix);
-  }
-
-  return [...aliases].map(normalizeConfigOptionAlias);
-}
-
-function resolveModelConfigValue(
-  config: ThreadConfig,
-  configOptions: unknown,
-): { configId: string; value: string; currentValue?: string } | undefined {
-  const targets = modelConfigTargetAliases(config);
-  if (targets.length === 0) {
-    return undefined;
-  }
-  const option = findSelectConfigOption(configOptions, "model");
-  if (!option?.id) {
-    return undefined;
-  }
-
-  const candidates = flattenSelectOptions(option.options);
-  const match = targets
-    .map((target) =>
-      candidates.find((candidate) =>
-        modelOptionAliases(candidate).some((alias) => alias === target),
-      ),
-    )
-    .find((candidate) => candidate !== undefined);
-  const value = typeof match?.value === "string" ? match.value : undefined;
-  if (!value) {
-    return undefined;
-  }
-
-  return {
-    configId: option.id,
-    value,
-    ...(option.currentValue ? { currentValue: option.currentValue } : {}),
+function selectAutoApprovedPermissionOption(request: RequestPermissionRequest): string | undefined {
+  const readOptionId = (kind: string) => {
+    const optionId = request.options.find((option) => option.kind === kind)?.optionId?.trim();
+    return optionId && optionId.length > 0 ? optionId : undefined;
   };
+
+  return readOptionId("allow_always") ?? readOptionId("allow_once");
 }
 
-function applyAcpModeUpdateToConfig(currentConfig: ThreadConfig, modeId: string): ThreadConfig {
-  const normalized = normalizeAcpModeId(modeId).toLowerCase();
-
-  if (normalized === "plan" || normalized === "architect") {
-    return { ...currentConfig, mode: "plan" };
+function processEnvRecord(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value === "string") env[key] = value;
   }
+  return env;
+}
 
-  if (normalized === "autoedit") {
-    return { ...currentConfig, mode: "agent", approvalPolicy: "auto_edit" };
-  }
-
-  if (normalized === "autopilot") {
+function buildAcpTerminalEnv(location: ProjectLocation): Record<string, string> {
+  const env = processEnvRecord();
+  if (location.kind === "windows") {
     return {
-      ...currentConfig,
-      mode: "agent",
-      approvalPolicy: currentConfig.approvalPolicy === "autopilot" ? "autopilot" : "never",
+      ...env,
+      ...(getProjectShellEnv(location.path) ?? getWindowsPathOverrideEnv() ?? {}),
+    };
+  }
+  if (location.kind === "posix") {
+    return { ...env, ...(getProjectShellEnv(location.path) ?? {}) };
+  }
+  return env;
+}
+
+function encodePowerShellCommand(script: string): string {
+  return Buffer.from(script, "utf16le").toString("base64");
+}
+
+function buildWindowsTerminalScript(command: string, args: string[]): string {
+  if (args.length === 0) return `$ErrorActionPreference = 'Stop'; ${command}`;
+  return [
+    "$ErrorActionPreference = 'Stop'",
+    `$cmd = ${quotePowerShellLiteral(command)}`,
+    `$args = @(${args.map(quotePowerShellLiteral).join(", ")})`,
+    "& $cmd @args",
+  ].join("; ");
+}
+
+function buildPosixTerminalScript(command: string, args: string[]): string {
+  return args.length === 0
+    ? command
+    : `exec ${[command, ...args].map(quotePosixShellArg).join(" ")}`;
+}
+
+function acpTerminalEnvEntries(
+  entries: ReadonlyArray<{ name: string; value: string }> | null | undefined,
+): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const entry of entries ?? []) {
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(entry.name)) {
+      env[entry.name] = entry.value;
+    }
+  }
+  return env;
+}
+
+function resolveAcpTerminalCwd(location: ProjectLocation, cwd: string): string {
+  return location.kind === "wsl"
+    ? resolveAcpProjectPath(location, cwd)
+    : resolveAcpHostFsPath(location, cwd);
+}
+
+function buildAcpTerminalLaunch(
+  location: ProjectLocation,
+  cwd: string,
+  command: string,
+  args: string[],
+  requestEnv: Record<string, string>,
+): { command: string; args: string[]; cwd?: string; env: Record<string, string> } {
+  if (location.kind === "windows") {
+    const env = { ...buildAcpTerminalEnv(location), ...requestEnv };
+    const shell = detectShell();
+    if (typeof shell === "string") {
+      return {
+        command: shell,
+        args: [
+          "-NoLogo",
+          "-NoProfile",
+          "-EncodedCommand",
+          encodePowerShellCommand(buildWindowsTerminalScript(command, args)),
+        ],
+        cwd,
+        env,
+      };
+    }
+    return {
+      command: getWindowsSystemCommand("cmd.exe"),
+      args: ["/d", "/s", "/c", args.length === 0 ? command : [command, ...args].join(" ")],
+      cwd,
+      env,
     };
   }
 
-  if (normalized === "yolo") {
-    return { ...currentConfig, mode: "agent", approvalPolicy: "never" };
+  if (location.kind === "wsl") {
+    const exports = buildPosixExportPrefix({ TERM: "xterm-256color", ...requestEnv });
+    const script = `${exports}${buildPosixTerminalScript(command, args)}`;
+    return {
+      command: getWslCommand(),
+      args: [
+        "-d",
+        location.distro,
+        "--cd",
+        cwd,
+        "--",
+        resolveWslShellPath(location.distro),
+        "-l",
+        "-i",
+        "-c",
+        script,
+      ],
+      env: processEnvRecord(),
+    };
   }
 
-  if (normalized !== "agent" && normalized !== "default" && normalized !== "code") {
-    return { ...currentConfig, mode: "agent", approvalPolicy: normalizeAcpModeId(modeId) };
+  if (args.length === 0) {
+    return {
+      command: process.env.SHELL || "/bin/bash",
+      args: getPosixLoginShellArgs(command),
+      cwd,
+      env: { ...buildAcpTerminalEnv(location), ...requestEnv },
+    };
   }
 
   return {
-    ...currentConfig,
-    mode: "agent",
-    approvalPolicy: currentConfig.approvalPolicy === undefined ? undefined : "default",
+    command,
+    args,
+    cwd,
+    env: { ...buildAcpTerminalEnv(location), ...requestEnv },
+  };
+}
+
+function completeAcpTerminal(record: AcpTerminalRecord, status: TerminalExitStatus): void {
+  if (record.exitStatus) return;
+  record.exitStatus = status;
+  const waiters = record.waiters.splice(0);
+  for (const resolve of waiters) {
+    resolve(record.exitStatus);
+  }
+}
+
+function childExitStatus(code: number | null, signal: NodeJS.Signals | null): TerminalExitStatus {
+  return {
+    ...(typeof code === "number" ? { exitCode: code } : {}),
+    ...(signal ? { signal: String(signal) } : {}),
+    ...(code === null && !signal ? { exitCode: 0 } : {}),
   };
 }
 
@@ -800,6 +444,15 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private agentSessionCapabilities: SessionCapabilities | undefined;
   private readonly acpTerminals = new Map<string, AcpTerminalRecord>();
   private acpTerminalSeq = 0;
+  /**
+   * Final stdout/stderr snapshot kept around after `releaseTerminal` so the
+   * canonical mapper can still surface output when the agent emits its
+   * completed `tool_call_update` AFTER releasing the terminal. Without this
+   * the live `acpTerminals` entry is gone and the chat row would render
+   * without a body even though we have the bytes in hand.
+   */
+  private readonly releasedAcpTerminalOutput = new Map<string, string>();
+  private readonly acpTerminalCommandById = new Map<string, string>();
 
   private mapperState: AcpMapperState | undefined;
   /**
@@ -838,10 +491,24 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
   }
 
+  private shouldAutoApproveSyntheticPermissionRequest(): boolean {
+    const config = this.currentConfig;
+    const policy = config?.approvalPolicy;
+    if (!config || config.mode === "plan" || policy !== "never") return false;
+    return !hasNativeAcpPermissionMode(policy, this.availableModeIds);
+  }
+
   /** Initialize the canonical mapper once we have a stable thread id. */
   private ensureMapperState(): AcpMapperState {
     if (!this.mapperState || this.mapperState.threadId !== this.threadId) {
       this.mapperState = createAcpMapperState(this.threadId);
+      // Bridge the client-hosted ACP terminal store into the mapper so
+      // `ToolCallContent` entries of type `"terminal"` (Gemini's shell tool)
+      // get inlined as the canonical `result` payload.
+      this.mapperState.resolveTerminalOutput = (terminalId) =>
+        this.acpTerminals.get(terminalId)?.output ?? this.releasedAcpTerminalOutput.get(terminalId);
+      this.mapperState.resolveTerminalOutputByCommand = (command) =>
+        this.resolveAcpTerminalOutputByCommand(command);
     }
     return this.mapperState;
   }
@@ -1371,6 +1038,11 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       this.pendingPromptInterrupt = false;
       this.currentTurnInterruptRequested = false;
       this.recentInterruptAckTextTail = "";
+      // The mapper's per-turn item state has been cleared via
+      // `closeOpenTurnItems`, so any output snapshots from terminals that
+      // belonged to this turn are no longer reachable. Drop them so the cache
+      // can't grow across a long-lived session.
+      this.releasedAcpTerminalOutput.clear();
     }
   }
 
@@ -1503,22 +1175,59 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
     const terminalId = `acp-terminal-${this.acpTerminalSeq++}`;
     const cwd = params.cwd
-      ? resolveAcpHostFsPath(this.projectLocation, params.cwd)
-      : resolveAcpHostFsPath(this.projectLocation, this.cwd);
-    const env = { ...process.env };
-    for (const entry of params.env ?? []) {
-      env[entry.name] = entry.value;
-    }
+      ? resolveAcpTerminalCwd(this.projectLocation, params.cwd)
+      : resolveAcpTerminalCwd(this.projectLocation, this.cwd);
+    const launch = buildAcpTerminalLaunch(
+      this.projectLocation,
+      cwd,
+      params.command,
+      params.args ?? [],
+      acpTerminalEnvEntries(params.env),
+    );
     const outputByteLimit =
       typeof params.outputByteLimit === "number" ? params.outputByteLimit : undefined;
-    const pty = spawnPty(params.command, params.args ?? [], {
-      cwd,
-      env,
+
+    if (process.platform === "win32") {
+      const child = spawnChild(launch.command, launch.args, {
+        ...(launch.cwd ? { cwd: launch.cwd } : {}),
+        env: launch.env,
+        stdio: ["ignore", "pipe", "pipe"],
+        shell: false,
+        windowsHide: true,
+      });
+      const record: AcpTerminalRecord = {
+        kill: () => terminateChildProcessTree(child),
+        commandLine: buildTerminalCommandLine(params.command, params.args ?? []),
+        output: "",
+        outputByteLimit,
+        truncated: false,
+        exitStatus: undefined,
+        waiters: [],
+        subscriptions: [],
+      };
+      this.acpTerminals.set(terminalId, record);
+      this.acpTerminalCommandById.set(terminalId, record.commandLine);
+      child.stdout?.on("data", (chunk) => appendTerminalOutput(record, String(chunk)));
+      child.stderr?.on("data", (chunk) => appendTerminalOutput(record, String(chunk)));
+      child.once("error", (error) => {
+        appendTerminalOutput(record, `${error.message}\n`);
+        completeAcpTerminal(record, { exitCode: 1 });
+      });
+      child.once("exit", (code, signal) => {
+        completeAcpTerminal(record, childExitStatus(code, signal));
+      });
+      return { terminalId };
+    }
+
+    const pty = spawnPty(launch.command, launch.args, {
+      ...(launch.cwd ? { cwd: launch.cwd } : {}),
+      env: launch.env,
       cols: 80,
       rows: 24,
     });
     const record: AcpTerminalRecord = {
-      pty,
+      kill: () => pty.kill(),
+      commandLine: buildTerminalCommandLine(params.command, params.args ?? []),
       output: "",
       outputByteLimit,
       truncated: false,
@@ -1527,17 +1236,14 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       subscriptions: [],
     };
     this.acpTerminals.set(terminalId, record);
+    this.acpTerminalCommandById.set(terminalId, record.commandLine);
     record.subscriptions.push(pty.onData((data) => appendTerminalOutput(record, data)));
     record.subscriptions.push(
       pty.onExit((event) => {
-        record.exitStatus = {
+        completeAcpTerminal(record, {
           exitCode: event.exitCode,
           ...(event.signal ? { signal: String(event.signal) } : {}),
-        };
-        const waiters = record.waiters.splice(0);
-        for (const resolve of waiters) {
-          resolve(record.exitStatus);
-        }
+        });
       }),
     );
     return { terminalId };
@@ -1574,7 +1280,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.assertRequestSession(params.sessionId);
     const record = this.getAcpTerminal(params.terminalId);
     if (!record.exitStatus) {
-      record.pty.kill();
+      record.kill();
     }
   }
 
@@ -1594,17 +1300,32 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
   private disposeAcpTerminal(terminalId: string, record: AcpTerminalRecord): void {
     this.acpTerminals.delete(terminalId);
+    if (record.output.length > 0) {
+      this.releasedAcpTerminalOutput.set(terminalId, record.output);
+    }
     for (const subscription of record.subscriptions.splice(0)) {
       subscription.dispose();
     }
     if (!record.exitStatus) {
-      record.pty.kill();
+      record.kill();
     }
-    const status = record.exitStatus ?? { signal: "SIGTERM" };
-    const waiters = record.waiters.splice(0);
-    for (const resolve of waiters) {
-      resolve(status);
+    completeAcpTerminal(record, record.exitStatus ?? { signal: "SIGTERM" });
+  }
+
+  private resolveAcpTerminalOutputByCommand(command: string): string | undefined {
+    const target = normalizeTerminalCommandText(command);
+    if (!target) return undefined;
+
+    for (const [_terminalId, record] of [...this.acpTerminals].reverse()) {
+      if (!record.output || !isSameTerminalCommand(target, record.commandLine)) continue;
+      return record.output;
     }
+    for (const [terminalId, output] of [...this.releasedAcpTerminalOutput].reverse()) {
+      const commandLine = this.acpTerminalCommandById.get(terminalId);
+      if (!output || !commandLine || !isSameTerminalCommand(target, commandLine)) continue;
+      return output;
+    }
+    return undefined;
   }
 
   private readonly pendingPermissionResolvers = new Map<
@@ -1613,7 +1334,11 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   >();
   private readonly pendingElicitationResolvers = new Map<
     ThreadServerRequestId,
-    { resolve: (response: unknown) => void; elicitationId?: string }
+    {
+      resolve: (response: unknown) => void;
+      elicitationId?: string;
+      request: CreateElicitationRequest;
+    }
   >();
   private readonly pendingElicitationRequestIdsByElicitationId = new Map<
     string,
@@ -1661,6 +1386,14 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       this.pendingElicitationRequestIdsByElicitationId.delete(entry.elicitationId);
     }
     entry.resolve(response);
+    this.emitRuntimeEvents(
+      buildAcpElicitationAnswerEvents({
+        threadId: this.threadId,
+        itemId: `acp-question-answer-${String(requestId)}`,
+        request: entry.request,
+        response,
+      }),
+    );
     return true;
   }
 
@@ -1674,20 +1407,10 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private handlePermissionRequest(
     params: RequestPermissionRequest,
   ): Promise<RequestPermissionResponse> {
-    // Client-side bypass for agents that don't expose a yolo/autopilot mode.
-    // When the user selects "never" approval policy, auto-resolve without
-    // emitting to the UI. Agents that DO expose a bypass mode are switched
-    // into it before turn-start, so they won't call requestPermission in the
-    // first place — this branch only fires when the agent forwarded the
-    // prompt anyway.
-    if (this.currentConfig?.approvalPolicy === "never") {
-      const allow =
-        params.options.find((opt) => opt.kind === "allow_always") ??
-        params.options.find((opt) => opt.kind === "allow_once");
-      if (allow) {
-        return Promise.resolve({
-          outcome: { outcome: "selected", optionId: allow.optionId },
-        });
+    if (this.shouldAutoApproveSyntheticPermissionRequest()) {
+      const optionId = selectAutoApprovedPermissionOption(params);
+      if (optionId) {
+        return Promise.resolve({ outcome: { outcome: "selected", optionId } });
       }
     }
 
@@ -1725,6 +1448,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         resolve: (response: unknown) => {
           resolve(normalizeAcpElicitationResponse(response, params));
         },
+        request: params,
         ...(urlElicitationId !== undefined ? { elicitationId: urlElicitationId } : {}),
       });
 
@@ -1887,72 +1611,6 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         return { status: "idle", attention: "none" };
     }
   }
-}
-
-function normalizeAcpElicitationResponse(
-  response: unknown,
-  request: CreateElicitationRequest,
-): CreateElicitationResponse {
-  if (!response || typeof response !== "object") return { action: "cancel" };
-  const obj = response as Record<string, unknown>;
-  const action = obj.action;
-  const meta = readAcpResponseMeta(obj);
-  if (action === "decline") return { action: "decline", ...meta };
-  if (action !== "accept") return { action: "cancel", ...meta };
-
-  const content =
-    request.mode === "form"
-      ? normalizeAcpElicitationContent(obj.content, request.requestedSchema.properties ?? {})
-      : undefined;
-  return {
-    action: "accept",
-    ...(content !== undefined ? { content } : {}),
-    ...meta,
-  };
-}
-
-function readAcpResponseMeta(
-  response: Record<string, unknown>,
-): { _meta: Record<string, unknown> | null } | {} {
-  if (!Object.hasOwn(response, "_meta")) return {};
-  const meta = response._meta;
-  if (meta === null) return { _meta: null };
-  if (!meta || typeof meta !== "object" || Array.isArray(meta)) return {};
-  return { _meta: meta as Record<string, unknown> };
-}
-
-function normalizeAcpElicitationContent(
-  content: unknown,
-  properties: Record<string, ElicitationPropertySchema>,
-): Record<string, ElicitationContentValue> | undefined {
-  if (!content || typeof content !== "object" || Array.isArray(content)) return undefined;
-  const source = content as Record<string, unknown>;
-  const normalized: Record<string, ElicitationContentValue> = {};
-  for (const [key, schema] of Object.entries(properties)) {
-    if (!Object.hasOwn(source, key)) continue;
-    const value = source[key];
-    if (!schema || typeof schema !== "object" || !("type" in schema)) continue;
-    switch (schema.type) {
-      case "string":
-        if (typeof value === "string") normalized[key] = value;
-        break;
-      case "integer":
-      case "number":
-        if (typeof value === "number" && Number.isFinite(value)) normalized[key] = value;
-        break;
-      case "boolean":
-        if (typeof value === "boolean") normalized[key] = value;
-        break;
-      case "array":
-        if (Array.isArray(value) && value.every((entry) => typeof entry === "string")) {
-          normalized[key] = value;
-        }
-        break;
-      default:
-        break;
-    }
-  }
-  return normalized;
 }
 
 // ── Factory ──────────────────────────────────────────────────────

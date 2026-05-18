@@ -447,8 +447,10 @@ describe("ProviderModelMenu", () => {
 
   it("shows shortcut sub-provider labels before provider icons", async () => {
     useSharedSettings.setState({
-      favoriteModels: [{ agentKind: "opencode", modelId: "github-copilot/model-1" }],
-      recentModels: [{ agentKind: "opencode", modelId: "openai/model-1" }],
+      favoriteModels: [
+        { agentKind: "opencode", modelId: "github-copilot/model-1", presentationMode: "gui" },
+      ],
+      recentModels: [{ agentKind: "opencode", modelId: "openai/model-1", presentationMode: "gui" }],
     });
 
     render(
@@ -456,6 +458,7 @@ describe("ProviderModelMenu", () => {
         providers={[makeSubProviderBackedProvider(), makeNamedProvider("claude", "Claude", 3)]}
         currentAgentKind="opencode"
         currentModel="github-copilot/model-2"
+        presentationMode="gui"
         onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
       />,
     );
@@ -484,9 +487,43 @@ describe("ProviderModelMenu", () => {
     await assertShortcutRailOrder("OpenAI Model 1", "OpenAI");
   });
 
+  it("keeps shortcut favorites and recents scoped to the current presentation mode", async () => {
+    useSharedSettings.setState({
+      favoriteModels: [
+        { agentKind: "codex", modelId: "gui-fav", presentationMode: "gui" },
+        { agentKind: "codex", modelId: "terminal-fav", presentationMode: "terminal" },
+      ],
+      recentModels: [
+        { agentKind: "codex", modelId: "gui-recent", presentationMode: "gui" },
+        { agentKind: "codex", modelId: "terminal-recent", presentationMode: "terminal" },
+      ],
+    });
+
+    render(
+      <ProviderModelMenu
+        providers={[
+          makeNamedProvider("codex", "Codex", 1),
+          makeNamedProvider("claude", "Claude", 1),
+        ]}
+        currentAgentKind="codex"
+        currentModel="model-1"
+        presentationMode="gui"
+        onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Select model" }));
+
+    const listbox = await screen.findByRole("listbox", { name: "Models" });
+    expect(within(listbox).getByText("Gui Fav")).toBeInTheDocument();
+    expect(within(listbox).getByText("Gui Recent")).toBeInTheDocument();
+    expect(within(listbox).queryByText("Terminal Fav")).not.toBeInTheDocument();
+    expect(within(listbox).queryByText("Terminal Recent")).not.toBeInTheDocument();
+  });
+
   it("does not duplicate favorites into a separate section when only one provider is visible", async () => {
     useSharedSettings.setState({
-      favoriteModels: [{ agentKind: "codex", modelId: "model-2" }],
+      favoriteModels: [{ agentKind: "codex", modelId: "model-2", presentationMode: "gui" }],
       recentModels: [],
     });
 
@@ -495,6 +532,7 @@ describe("ProviderModelMenu", () => {
         providers={[makeProvider(3)]}
         currentAgentKind="codex"
         currentModel="model-1"
+        presentationMode="gui"
         onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
       />,
     );
@@ -511,7 +549,7 @@ describe("ProviderModelMenu", () => {
 
   it("hoists the selected favorite to the top of the single-provider list when reopened", async () => {
     useSharedSettings.setState({
-      favoriteModels: [{ agentKind: "codex", modelId: "model-500" }],
+      favoriteModels: [{ agentKind: "codex", modelId: "model-500", presentationMode: "gui" }],
       recentModels: [],
     });
 
@@ -520,6 +558,7 @@ describe("ProviderModelMenu", () => {
         providers={[makeProvider(500)]}
         currentAgentKind="codex"
         currentModel="model-500"
+        presentationMode="gui"
         onChange={vi.fn<(next: { agentKind: string; model: string }) => void>()}
       />,
     );

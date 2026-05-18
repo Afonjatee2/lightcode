@@ -24,6 +24,7 @@ export const canonicalItemTypeSchema = z.enum([
   "image_view",
   "dynamic_tool_call",
   "web_search",
+  "question_answer",
   "error",
 ]);
 export type CanonicalItemType = z.infer<typeof canonicalItemTypeSchema>;
@@ -197,6 +198,31 @@ export const errorItemPayloadSchema = z.object({
   message: z.string(),
 });
 export type ErrorItemPayload = z.infer<typeof errorItemPayloadSchema>;
+
+/**
+ * Provider-agnostic record of a user's reply to a structured user-input request
+ * (e.g. Claude's `AskUserQuestion`, Codex's user_input, ACP elicitation forms).
+ * Renders as a compact inline module showing each question, the chosen options
+ * with their descriptions, and any custom freeform answer the user typed.
+ */
+export const questionAnswerSelectionSchema = z.object({
+  label: z.string(),
+  description: z.string().optional(),
+});
+export type QuestionAnswerSelection = z.infer<typeof questionAnswerSelectionSchema>;
+
+export const questionAnswerEntrySchema = z.object({
+  header: z.string(),
+  question: z.string(),
+  selected: z.array(questionAnswerSelectionSchema),
+  customAnswer: z.string().optional(),
+});
+export type QuestionAnswerEntry = z.infer<typeof questionAnswerEntrySchema>;
+
+export const questionAnswerItemPayloadSchema = z.object({
+  questions: z.array(questionAnswerEntrySchema),
+});
+export type QuestionAnswerItemPayload = z.infer<typeof questionAnswerItemPayloadSchema>;
 
 export const contextUsageBreakdownEntrySchema = z.object({
   id: z.string().min(1),

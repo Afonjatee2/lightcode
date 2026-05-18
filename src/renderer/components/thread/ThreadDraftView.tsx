@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TerminalSquare, X, Zap } from "lucide-react";
+import { Zap } from "lucide-react";
 import { toast } from "@heroui/react";
 import type {
   AgentStatus,
@@ -10,256 +10,40 @@ import type {
   ThreadPresentationMode,
 } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
-import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import { getComposerControls } from "@/renderer/components/providers";
 import { getConfigNormalizer } from "@/renderer/components/providers/ProviderIcon";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { useGitStore } from "@/renderer/state/gitStore";
-import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId";
 import { PixelLoader } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { capabilitiesForPresentation, filterHiddenModels } from "./threadComposerOptions";
+import {
+  agentWithCapabilities,
+  formatAgentList,
+  formatEffortLabel,
+  resolveContextSizeValue,
+  resolveEffortValue,
+  resolveFastValue,
+  resolveInitialPresentationMode,
+  resolveModelValue,
+  resolvePreferredAgentKind,
+  resolveProviderDraftConfig,
+  resolveSavedProviderDraftConfig,
+  resolveThinkingValue,
+} from "./threadDraftViewHelpers";
 import { friendlyError } from "@/shared/messages";
 import { PresentationModeTabs } from "./PresentationModeTabs";
 import { ThreadDraftComposerArea, type DraftStartInput } from "./ThreadDraftComposerArea";
 import type { ComposerControl } from "./ThreadComposer";
 import { AgentDiscoveryScreen } from "./AgentDiscoveryScreen";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
-
-function resolvePreferredAgentKind(
-  installedAgents: AgentStatus[],
-  lastDraftConfig?: ProjectDraftConfig,
-): AgentStatus["kind"] | undefined {
-  if (lastDraftConfig) {
-    const savedAgent = installedAgents.find((agent) => agent.kind === lastDraftConfig.agentKind);
-    if (savedAgent) {
-      return savedAgent.kind;
-    }
-  }
-
-  return installedAgents[0]?.kind;
-}
-
-function resolveSavedProviderDraftConfig(
-  agentKind: AgentStatus["kind"],
-  lastDraftConfig: ProjectDraftConfig | undefined,
-  providerConfigs: Record<string, ProviderDraftConfig>,
-): Partial<ProviderDraftConfig> | undefined {
-  if (lastDraftConfig?.agentKind === agentKind && lastDraftConfig.model.trim()) {
-    return lastDraftConfig;
-  }
-
-  return providerConfigs[agentKind];
-}
-
-function resolveModelValue(agent: AgentStatus, preferred?: string): string {
-  const models = agent.capabilities.models;
-  return preferred && models.some((m) => m.id === preferred) ? preferred : (models[0]?.id ?? "");
-}
-
-function resolveEffortValue(agent: AgentStatus, model: string, preferred?: string): string {
-  const efforts = agent.capabilities.modelEfforts?.[model] ?? agent.capabilities.efforts ?? [];
-  if (preferred && efforts.includes(preferred)) {
-    return preferred;
-  }
-
-  const fallback = agent.capabilities.defaultEffort;
-  if (fallback && efforts.includes(fallback)) {
-    return fallback;
-  }
-
-  return efforts[0] ?? "";
-}
-
-function resolveContextSizeValue(
-  agent: AgentStatus,
-  model: string,
-  preferred?: string,
-): string | undefined {
-  const allowed = agent.capabilities.modelContextSizes?.[model];
-  if (!allowed?.length) return agent.capabilities.defaultContextSize;
-  if (preferred && allowed.includes(preferred)) return preferred;
-  // First entry in the per-model list is the model's default; this lets the
-  // adapter spec a different default per model (e.g. Sonnet→200k, Opus→1M)
-  // without needing a separate map.
-  return allowed[0];
-}
-
-function resolveFastValue(agent: AgentStatus, model: string, preferred?: boolean): boolean {
-  if (!agent.capabilities.fastModels?.includes(model)) return false;
-  return preferred === true;
-}
-
-function resolveThinkingValue(agent: AgentStatus, model: string, preferred?: boolean): boolean {
-  if (!agent.capabilities.thinkingModels?.includes(model)) return false;
-  return preferred === true;
-}
-
-function resolveModeValue(agent: AgentStatus, preferred?: string): string {
-  const modes = agent.capabilities.modes;
-  return preferred && modes.includes(preferred as "agent" | "plan" | "autopilot")
-    ? preferred
-    : (modes[0] ?? "agent");
-}
-
-function normalizeOptionName(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-function formatEffortLabel(id: string): string {
-  if (id === "xhigh") return "Extra High";
-  return id.charAt(0).toUpperCase() + id.slice(1);
-}
-
-function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
-  const policies = agent.capabilities.approvalPolicies;
-  if (
-    agent.kind.startsWith("acp-generic:") &&
-    policies.some((policy) => policy.id === "default") &&
-    policies.some((policy) => policy.id === "never")
-  ) {
-    return "default";
-  }
-
-  const configuredBypass = agent.capabilities.bypassApprovalPolicy;
-  if (configuredBypass && policies.some((policy) => policy.id === configuredBypass)) {
-    return configuredBypass;
-  }
-
-  const preferredIds = new Set(["never", "yolo", "auto", "bypassPermissions", "dontAsk"]);
-  const byId = policies.find((policy) => preferredIds.has(policy.id));
-  if (byId) {
-    return byId.id;
-  }
-
-  const preferredLabels = new Set([
-    "full access",
-    "yolo",
-    "bypass permissions",
-    "don't ask",
-    "dont ask",
-  ]);
-  const byLabel = policies.find((policy) => preferredLabels.has(normalizeOptionName(policy.label)));
-  return byLabel?.id;
-}
-
-function resolveApprovalPolicyValue(agent: AgentStatus, preferred?: string): string {
-  const policies = agent.capabilities.approvalPolicies;
-  if (agent.kind === "codex" && !preferred) {
-    return "";
-  }
-
-  return preferred && policies.some((p) => p.id === preferred)
-    ? preferred
-    : (findDefaultApprovalPolicy(agent) ?? policies[0]?.id ?? "");
-}
-
-function findDefaultSandboxMode(agent: AgentStatus): string | undefined {
-  const modes = agent.capabilities.sandboxModes;
-  const preferredIds = new Set(["danger-full-access", "full-access"]);
-  const byId = modes.find((mode) => preferredIds.has(mode.id));
-  if (byId) {
-    return byId.id;
-  }
-
-  const byLabel = modes.find((mode) => normalizeOptionName(mode.label) === "full access");
-  return byLabel?.id;
-}
-
-function resolveSandboxModeValue(agent: AgentStatus, preferred?: string): string {
-  const modes = agent.capabilities.sandboxModes;
-  if (agent.kind === "codex" && !preferred) {
-    return "";
-  }
-
-  return preferred && modes.some((m) => m.id === preferred)
-    ? preferred
-    : (findDefaultSandboxMode(agent) ?? modes[0]?.id ?? "");
-}
-
-function resolveInitialPresentationMode(
-  agent: AgentStatus | undefined,
-  lastByAgent: Record<string, ThreadPresentationMode>,
-): ThreadPresentationMode {
-  if (!agent) return "gui";
-  const supported = agent.capabilities.presentationModes ?? [agent.capabilities.presentationMode];
-  const last = lastByAgent[agent.kind];
-  if (last && supported.includes(last)) return last;
-  if (supported.includes("gui")) return "gui";
-  return supported[0] ?? agent.capabilities.presentationMode ?? "gui";
-}
-
-function normalizeCursorPreferredDraft(
-  agent: AgentStatus,
-  preferred?: Partial<ProviderDraftConfig>,
-): Partial<ProviderDraftConfig> | undefined {
-  if (agent.kind !== "cursor" || !preferred?.model) {
-    return preferred;
-  }
-  if (agent.capabilities.models.some((model) => model.id === preferred.model)) {
-    return preferred;
-  }
-
-  const parsed = parseCursorModelId(preferred.model);
-  const baseModel = migrateCursorBaseId(parsed.baseId);
-  if (!agent.capabilities.models.some((model) => model.id === baseModel)) {
-    return preferred;
-  }
-
-  return {
-    ...preferred,
-    model: baseModel,
-    ...(parsed.effort && !preferred.effort ? { effort: parsed.effort } : {}),
-    fast: preferred.fast ?? parsed.fast,
-    thinking: preferred.thinking ?? parsed.thinking,
-  };
-}
-
-function resolveProviderDraftConfig(
-  agent: AgentStatus,
-  preferred?: Partial<ProviderDraftConfig>,
-): ProviderDraftConfig {
-  const normalizedPreferred = normalizeCursorPreferredDraft(agent, preferred);
-  const nextModel = resolveModelValue(agent, normalizedPreferred?.model);
-  const nextEffort = resolveEffortValue(agent, nextModel, normalizedPreferred?.effort);
-  const nextContext = resolveContextSizeValue(agent, nextModel, normalizedPreferred?.contextSize);
-  const nextFast = resolveFastValue(agent, nextModel, normalizedPreferred?.fast);
-  const nextThinking = resolveThinkingValue(agent, nextModel, normalizedPreferred?.thinking);
-  const nextMode = resolveModeValue(agent, normalizedPreferred?.mode) as
-    | "agent"
-    | "plan"
-    | "autopilot";
-  const nextApproval = resolveApprovalPolicyValue(agent, normalizedPreferred?.approvalPolicy);
-  const nextSandbox = resolveSandboxModeValue(agent, normalizedPreferred?.sandboxMode);
-
-  return {
-    model: nextModel,
-    effort: nextEffort,
-    ...(nextContext ? { contextSize: nextContext } : {}),
-    ...(nextFast ? { fast: nextFast } : {}),
-    ...(nextThinking ? { thinking: nextThinking } : {}),
-    mode: nextMode,
-    approvalPolicy: nextApproval,
-    sandboxMode: nextSandbox,
-  };
-}
-
-function agentWithCapabilities(
-  agent: AgentStatus,
-  presentationMode: ThreadPresentationMode,
-): AgentStatus {
-  return {
-    ...agent,
-    capabilities: capabilitiesForPresentation(agent.capabilities, presentationMode),
-  };
-}
-
-function formatAgentList(names: string[]): string {
-  if (names.length === 0) return "a supported coding agent";
-  if (names.length === 1) return names[0]!;
-  return `${names.slice(0, -1).join(", ")}, or ${names.at(-1)}`;
-}
+import {
+  ThreadDraftCompactHeader,
+  ThreadDraftDropIndicators,
+  ThreadDraftHero,
+  type ThreadDraftDropIndicator,
+} from "./ThreadDraftChrome";
 
 export function ThreadDraftView(props: {
   project: Project;
@@ -276,13 +60,7 @@ export function ThreadDraftView(props: {
   paneAlign?: "left" | "center" | "right";
   showCloseButton?: boolean;
   isDragging?: boolean;
-  dropIndicator?:
-    | false
-    | "replace"
-    | "insert-left"
-    | "insert-right"
-    | "insert-top"
-    | "insert-bottom";
+  dropIndicator?: ThreadDraftDropIndicator;
   paneIndex?: number;
   paneCount?: number;
   /**
@@ -837,6 +615,7 @@ export function ThreadDraftView(props: {
         providers,
         currentAgentKind: selectedAgent.kind,
         currentModel: model,
+        presentationMode,
         hideLabelOnWrap: true,
         tier: 5,
         onChange: (next) => latestProviderModelChangeRef.current(next),
@@ -889,6 +668,7 @@ export function ThreadDraftView(props: {
     contextSize,
     fast,
     thinking,
+    presentationMode,
   ]);
 
   const providerDraftControls = useMemo(() => {
@@ -981,85 +761,20 @@ export function ThreadDraftView(props: {
       className={`relative flex h-full min-h-0 flex-col ${props.isDragging ? "opacity-50" : ""}`}
     >
       {props.compact && (
-        <div className={`px-2 ${headerNeedsTrafficLightPad ? macosTrafficLightPadClass : ""}`}>
-          <div
-            ref={props.dragHandleRef}
-            className={`${props.dragHandleRef ? "lightcode-content-over-drag-region cursor-grab active:cursor-grabbing" : "lightcode-content-over-drag-region--drag"} ${alignClass} flex w-full max-w-[920px] items-center gap-2 py-1`}
-          >
-            <TerminalSquare className="size-3.5 shrink-0 text-muted/60" />
-            <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight text-muted">
-              New thread
-            </span>
-            <div className="flex shrink-0 items-center">
-              <span className="px-1 text-sm leading-tight text-muted/60">{project.name}</span>
-              {props.showCloseButton && props.onClose && (
-                <button
-                  type="button"
-                  aria-label="Close pane"
-                  className="lightcode-overlay-header__controls shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-foreground"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    props.onClose?.();
-                  }}
-                >
-                  <X className="size-3.5" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
+        <ThreadDraftCompactHeader
+          alignClass={alignClass}
+          dragHandleRef={props.dragHandleRef}
+          headerNeedsTrafficLightPad={headerNeedsTrafficLightPad}
+          onClose={props.onClose}
+          projectName={project.name}
+          showCloseButton={props.showCloseButton}
+        />
       )}
       <div
         className={`${props.compact ? alignClass : "mx-auto"} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-3 pb-2 ${props.compact ? "" : "pt-2"}`}
       >
-        {props.dropIndicator === "replace" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 z-20 rounded-2xl bg-accent/10 ring-1 ring-inset ring-accent/30"
-          />
-        )}
-        {props.dropIndicator === "insert-left" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 bottom-0 left-0 z-20 w-0.5 rounded-full bg-accent"
-          />
-        )}
-        {props.dropIndicator === "insert-right" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 right-0 bottom-0 z-20 w-0.5 rounded-full bg-accent"
-          />
-        )}
-        {props.dropIndicator === "insert-top" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute top-0 right-0 left-0 z-20 h-0.5 rounded-full bg-accent"
-          />
-        )}
-        {props.dropIndicator === "insert-bottom" && (
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute right-0 bottom-0 left-0 z-20 h-0.5 rounded-full bg-accent"
-          />
-        )}
-        {/* Center area — logo */}
-        <div className="flex flex-1 flex-col items-center justify-center">
-          <div className="w-full max-w-[920px] overflow-visible pb-3 text-center">
-            <h1
-              className={`inline-flex items-baseline gap-3 overflow-visible pb-[0.12em] leading-[1.28] font-semibold tracking-normal ${props.compact ? "text-[clamp(1.375rem,2.75vw,1.875rem)]" : "text-[clamp(1.875rem,4.25vw,3.125rem)]"}`}
-            >
-              <span className="inline-block pr-[0.04em] pb-[0.12em] text-transparent [background-image:linear-gradient(135deg,var(--foreground)_0%,color-mix(in_oklab,var(--accent)_60%,var(--foreground))_52%,var(--muted)_100%)] [background-size:100%_100%] bg-clip-text">
-                Lightcode
-              </span>
-              <TerminalSquare className="translate-y-[-0.04em] size-[0.48em] shrink-0 text-[color:color-mix(in_oklab,var(--accent)_58%,var(--foreground))] opacity-90" />
-            </h1>
-            <p
-              className={`mx-auto mt-1.5 max-w-full truncate pb-[0.08em] leading-snug font-medium tracking-normal text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono ${props.compact ? "text-[clamp(0.6875rem,1.05vw,0.8125rem)]" : "text-[clamp(0.75rem,1.35vw,0.9375rem)]"}`}
-            >
-              {project.name}
-            </p>
-          </div>
-        </div>
+        <ThreadDraftDropIndicators dropIndicator={props.dropIndicator} />
+        <ThreadDraftHero compact={props.compact} projectName={project.name} />
 
         <PresentationModeTabs
           presentationMode={presentationMode}

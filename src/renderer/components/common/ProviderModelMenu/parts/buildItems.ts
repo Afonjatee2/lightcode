@@ -1,4 +1,4 @@
-import type { AgentCapability } from "@/shared/contracts";
+import type { AgentCapability, ThreadPresentationMode } from "@/shared/contracts";
 import { deriveSubProvider, listSubProviderOrder } from "./deriveSubProvider";
 import type { ProviderModelItem } from "./types";
 
@@ -12,6 +12,7 @@ export interface ProviderModelMenuProvider {
 export interface ModelRef {
   agentKind: string;
   modelId: string;
+  presentationMode?: ThreadPresentationMode;
 }
 
 export interface BuildProviderModelItemsInput {

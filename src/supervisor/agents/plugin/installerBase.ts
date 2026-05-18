@@ -512,17 +512,65 @@ export async function resolveInstallNodePath(
 // ── Shared hooks.json IO ─────────────────────────────────────────────────
 
 /**
- * Read and JSON-parse a hooks document. Returns `null` if the file is
- * missing or unparseable — callers can then distinguish "missing" from
- * "malformed" by following with `existsSync(path)` if they need to.
+ * Read and JSON-parse a hooks document. Empty or zero-filled files are treated
+ * as an empty document. Returns `null` if the file is missing or otherwise
+ * unparseable — callers can then distinguish "missing" from "malformed" by
+ * following with `existsSync(path)` if they need to.
  */
 export function parseExistingHooksJson(path: string): unknown | null {
   if (!existsSync(path)) return null;
   try {
-    return JSON.parse(readFileSync(path, "utf8")) as unknown;
+    const buffer = readFileSync(path);
+    for (const text of hooksJsonTextCandidates(buffer)) {
+      if (text.trim() === "") return {};
+      try {
+        return JSON.parse(text) as unknown;
+      } catch {
+        // Try the next plausible encoding/sanitized variant.
+      }
+    }
+    return null;
   } catch {
     return null;
   }
+}
+
+function hooksJsonTextCandidates(buffer: Buffer): string[] {
+  const candidates = [stripLeadingJsonPadding(buffer.toString("utf8"))];
+
+  if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+    candidates.push(stripLeadingJsonPadding(buffer.subarray(2).toString("utf16le")));
+  } else if (looksLikeUtf16Le(buffer)) {
+    candidates.push(stripLeadingJsonPadding(buffer.toString("utf16le")));
+  }
+
+  return [...new Set(candidates)];
+}
+
+function stripLeadingJsonPadding(text: string): string {
+  let start = 0;
+  while (
+    start < text.length &&
+    (text.charCodeAt(start) === 0 || text.charCodeAt(start) === 0xfeff)
+  ) {
+    start += 1;
+  }
+  return start > 0 ? text.slice(start) : text;
+}
+
+function looksLikeUtf16Le(buffer: Buffer): boolean {
+  const sampleLength = Math.min(buffer.length, 256);
+  if (sampleLength < 4) return false;
+
+  let oddNulls = 0;
+  let evenNulls = 0;
+  for (let index = 0; index < sampleLength; index += 1) {
+    if (buffer[index] !== 0) continue;
+    if (index % 2 === 0) evenNulls += 1;
+    else oddNulls += 1;
+  }
+
+  return oddNulls > sampleLength / 4 && evenNulls < oddNulls / 4;
 }
 
 /** Write a hooks document with stable 2-space indent and trailing newline. */

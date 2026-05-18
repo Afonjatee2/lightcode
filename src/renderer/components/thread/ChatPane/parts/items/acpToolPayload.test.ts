@@ -5,6 +5,7 @@ import {
   extractAcpDiffSummary,
   extractAcpPatchTargetPath,
   extractAcpResultPart,
+  extractReadFileResultPart,
 } from "./acpToolPayload";
 
 const FILE_DIFF = [
@@ -93,6 +94,94 @@ describe("acpToolPayload", () => {
         "",
       ].join("\n"),
     );
+  });
+
+  describe("extractReadFileResultPart", () => {
+    it("unwraps OpenCode read output and highlights from the wrapper path", () => {
+      const result = [
+        "<path>src/foo.ts</path>",
+        "<type>file</type>",
+        "<content>",
+        "1: export const x = 1;",
+        "2: export const y = 2;",
+        "</content>",
+      ].join("\n");
+
+      expect(extractReadFileResultPart({ kind: "read", result })).toEqual({
+        text: "export const x = 1;\nexport const y = 2;",
+        language: "typescript",
+      });
+    });
+
+    it("falls back to args.filePath when the wrapper has no <path> tag", () => {
+      const result = ["<content>", "1: print('hi')", "</content>"].join("\n");
+
+      expect(
+        extractReadFileResultPart({
+          kind: "read",
+          args: { filePath: "scripts/run.py" },
+          result,
+        }),
+      ).toEqual({
+        text: "print('hi')",
+        language: "python",
+      });
+    });
+
+    it("strips line-number prefixes on unwrapped read output", () => {
+      expect(
+        extractReadFileResultPart({
+          kind: "read",
+          path: "src/foo.tsx",
+          result: "1: const a = 1;\n2: const b = 2;",
+        }),
+      ).toEqual({
+        text: "const a = 1;\nconst b = 2;",
+        language: "tsx",
+      });
+    });
+
+    it("leaves text alone when fewer than half the lines look line-numbered", () => {
+      const result = "no numbers here\n1: only one prefixed";
+      expect(extractReadFileResultPart({ kind: "read", path: "notes.md", result })).toEqual({
+        text: result,
+        language: "markdown",
+      });
+    });
+
+    it("falls back to plain when no path is available", () => {
+      expect(extractReadFileResultPart({ kind: "read", result: "plain output" })).toEqual({
+        text: "plain output",
+        language: "plain",
+      });
+    });
+  });
+
+  it("prefers OpenCode's metadata.changes diff over synthesizing from oldString/newString", () => {
+    const metadataDiff = [
+      "@@ -1,3 +1,3 @@",
+      " context above",
+      "-before",
+      "+after",
+      " context below",
+      "",
+    ].join("\n");
+
+    const payload = {
+      path: "src/foo.ts",
+      args: { file_path: "src/foo.ts", old_string: "before", new_string: "after" },
+      result: "Success. Updated the following files:\nM src/foo.ts",
+      metadata: {
+        changes: [{ path: "src/foo.ts", kind: { type: "update" }, diff: metadataDiff }],
+      },
+    };
+
+    const part = extractAcpDiffResultPart(payload);
+    expect(part.language).toBe("diff");
+    expect(part.text).toContain(" context above");
+    expect(part.text).toContain(" context below");
+    expect(part.text).toContain("-before");
+    expect(part.text).toContain("+after");
   });
 
   it("synthesizes diffs and summaries from apply_patch patchText args", () => {

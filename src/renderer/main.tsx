@@ -17,10 +17,11 @@ if (import.meta.env.DEV) {
     const head = args[0];
     if (
       typeof head === "string" &&
-      (head.startsWith("<Focusable>") || head.startsWith("<Pressable>")) &&
-      ((head.includes("interactive ARIA role") &&
-        (head.includes('Got "none"') || head.includes('Got "presentation"'))) ||
-        (head.startsWith("<Pressable>") && head.includes("child must be focusable")))
+      (((head.startsWith("<Focusable>") || head.startsWith("<Pressable>")) &&
+        ((head.includes("interactive ARIA role") &&
+          (head.includes('Got "none"') || head.includes('Got "presentation"'))) ||
+          (head.startsWith("<Pressable>") && head.includes("child must be focusable")))) ||
+        head.startsWith("A PressResponder was rendered without a pressable child."))
     ) {
       return;
     }

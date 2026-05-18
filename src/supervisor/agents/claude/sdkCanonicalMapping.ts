@@ -18,7 +18,7 @@ import type {
 } from "@/shared/contracts";
 import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
 import { createContextUsageEvent, readNonNegativeInteger } from "../contextUsage";
-import { chosenOptionIds } from "../questionAnswers";
+import { buildQuestionAnswerEvents } from "../questionAnswerEvents";
 import {
   goalPayloadFromProviderState,
   parseGoalSlashCommand,
@@ -37,59 +37,15 @@ import {
   type PlanStepStatus,
 } from "../planAggregator";
 
-interface TextItemState {
-  itemId: string;
-  emittedText: boolean;
-  fallbackText: string;
-  completed: boolean;
-  messageId?: string;
-}
+import {
+  createClaudeMapperState,
+  type ClaudeMapperState,
+  type PlanAggregatorRole,
+  type TextItemState,
+  type ToolItemState,
+} from "./sdkCanonicalMappingState";
 
-type PlanAggregatorRole = "TodoWrite" | "TaskCreate" | "TaskUpdate" | "TaskStop";
-
-interface ToolItemState {
-  itemId: string;
-  itemType: CanonicalItemType;
-  toolName: string;
-  input: Record<string, unknown>;
-  partialInputJson: string;
-  lastInputFingerprint?: string;
-  progress?: ToolCallProgress;
-  /**
-   * Tool calls handled by the plan aggregator are tracked in `toolItemsById`
-   * for tool_result correlation, but their `item.started`/`item.updated`/
-   * `item.completed` events are suppressed — the aggregator emits the
-   * canonical `plan` item events instead.
-   */
-  planAggregatorRole?: PlanAggregatorRole;
-}
-
-export interface ClaudeMapperState {
-  threadId: string;
-  currentTurnId?: string;
-  assistantTextItems: Map<number, TextItemState>;
-  reasoningItems: Map<number, TextItemState>;
-  toolItemsByIndex: Map<number, ToolItemState>;
-  toolItemsById: Map<string, ToolItemState>;
-  currentAssistantMessageId?: string;
-  streamedAssistantMessageIds: Set<string>;
-  currentCompactionItemId?: string;
-  activeGoalItemId?: string;
-  activeGoalObjective?: string;
-  activeGoalStartedAtMs?: number;
-  planAggregator?: PlanAggregatorState;
-}
-
-export function createClaudeMapperState(threadId: string): ClaudeMapperState {
-  return {
-    threadId,
-    assistantTextItems: new Map(),
-    reasoningItems: new Map(),
-    toolItemsByIndex: new Map(),
-    toolItemsById: new Map(),
-    streamedAssistantMessageIds: new Set(),
-  };
-}
+export { createClaudeMapperState, type ClaudeMapperState };
 
 function newItemId(prefix: string): string {
   return `${prefix}-${randomUUID()}`;
@@ -560,7 +516,7 @@ export function mapClaudePermissionRequest(input: {
   const isExitPlanMode = isExitPlanModeToolName(input.toolName);
   const summary = isExitPlanMode
     ? "Proposed plan"
-    : (input.title ?? summarizeToolRequest(input.toolName, input.toolInput));
+    : (input.description ?? input.title ?? summarizeToolRequest(input.toolName, input.toolInput));
   const suggestions = (input.suggestions ?? []) as PermissionSuggestion[];
   const details: PermissionRequestDetails = {
     toolName: input.toolName,
@@ -676,9 +632,13 @@ export function mapClaudeQuestionRequest(input: {
 
 /**
  * Build the chat items rendered in place of the suppressed `AskUserQuestion`
- * tool_call once the user has answered. Each question becomes a user-side
- * message showing the chosen option labels, so the conversation has a visible
- * trace of what the user picked.
+ * tool_call once the user has answered. Emits a single `question_answer`
+ * item carrying the structured questions, selected options (with their
+ * descriptions), and any custom freeform text the user typed.
+ *
+ * `answers` is the form's raw response map keyed by question text — the
+ * value per question is the option id, an array of option ids, an object
+ * with `optionIds` / `answers`, or a custom freeform string.
  */
 export function buildClaudeQuestionAnswerEvents(input: {
   threadId: string;
@@ -686,39 +646,17 @@ export function buildClaudeQuestionAnswerEvents(input: {
   questions: ClaudeQuestion[];
   answers: Record<string, unknown>;
 }): RuntimeEvent[] {
-  const lines = formatQuestionAnswerLines(input.questions, input.answers);
-  if (lines.length === 0) return [];
-  const text = lines.join("\n");
-  return [
-    {
-      type: "item.started",
-      threadId: input.threadId,
-      itemId: input.itemId,
-      itemType: "user_message",
-      payload: { content: [{ kind: "text", text }] },
-    },
-    { type: "item.completed", threadId: input.threadId, itemId: input.itemId },
-  ];
-}
-
-function formatQuestionAnswerLines(
-  questions: ClaudeQuestion[],
-  answers: Record<string, unknown>,
-): string[] {
-  const lines: string[] = [];
-  for (const question of questions) {
-    const raw = answers[question.question];
-    const chosen = chosenOptionIds(raw);
-    if (chosen.length === 0) continue;
-    const labels = chosen.map((id) => labelForOption(question, id));
-    lines.push(labels.join(", "));
-  }
-  return lines;
-}
-
-function labelForOption(question: ClaudeQuestion, optionId: string): string {
-  const match = question.options.find((opt) => opt.optionId === optionId);
-  return match?.label ?? optionId;
+  return buildQuestionAnswerEvents({
+    threadId: input.threadId,
+    itemId: input.itemId,
+    questions: input.questions.map((question) => ({
+      keys: [question.question, question.header],
+      header: question.header,
+      question: question.question,
+      options: question.options,
+    })),
+    answers: input.answers,
+  });
 }
 
 export interface ClaudeQuestion {

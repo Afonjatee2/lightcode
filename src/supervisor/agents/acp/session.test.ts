@@ -1,7 +1,6 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RequestError } from "@agentclientprotocol/sdk";
 import type { CreateStructuredSessionInput } from "../base";
@@ -159,6 +158,8 @@ function makeConfigSyncSession(
   session["elicitationRequestSeq"] = 0;
   session["acpTerminals"] = new Map();
   session["acpTerminalSeq"] = 0;
+  session["releasedAcpTerminalOutput"] = new Map();
+  session["acpTerminalCommandById"] = new Map();
   session["agentPromptCapabilities"] = undefined;
   session["agentSessionCapabilities"] = undefined;
   session["cwd"] = "C:\\repo";
@@ -273,9 +274,24 @@ describe("ACP resource path helpers", () => {
   it.skipIf(process.platform !== "win32")(
     "builds ACP-safe file URIs for Windows relative paths",
     () => {
+      // Legacy two-slash form: Gemini-CLI strips exactly "file://" and resolves
+      // the remainder against the workspace cwd. The three-slash RFC form would
+      // leave "/C:/..." and double the drive to "C:\C:\..." on Windows.
       expect(
         toAcpResourceUri({ kind: "windows", path: "C:\\repo" }, ".agents/docs/ui patterns.md"),
-      ).toBe("file:///C:/repo/.agents/docs/ui%20patterns.md");
+      ).toBe("file://C:/repo/.agents/docs/ui%20patterns.md");
+    },
+  );
+
+  it.skipIf(process.platform !== "win32")(
+    "Windows file URI survives Gemini-CLI's slice('file://') + path.resolve",
+    async () => {
+      const { win32 } = await import("node:path");
+      const cwd = "C:\\Users\\me\\repo";
+      const uri = toAcpResourceUri({ kind: "windows", path: cwd }, "README.md");
+      const sliced = uri.slice("file://".length);
+      expect(sliced).toBe("C:/Users/me/repo/README.md");
+      expect(win32.resolve(cwd, sliced)).toBe("C:\\Users\\me\\repo\\README.md");
     },
   );
 
@@ -412,7 +428,7 @@ describe("ACP client protocol helpers", () => {
       prompt: [
         {
           type: "resource_link",
-          uri: pathToFileURL(imagePath).href,
+          uri: toAcpResourceUri({ kind: HOST_KIND, path: projectRoot }, imagePath),
           name: "missing.png",
           mimeType: "image/png",
         },
@@ -460,6 +476,48 @@ describe("ACP client protocol helpers", () => {
     });
     release({ sessionId: "session-1", terminalId: created.terminalId });
   });
+
+  it.skipIf(process.platform !== "win32")(
+    "runs Windows ACP terminal command lines through PowerShell",
+    async () => {
+      const projectRoot = makePosixProject();
+      const { session } = makeConfigSyncSession();
+      (session as unknown as Record<string, unknown>)["projectLocation"] = {
+        kind: "windows",
+        path: projectRoot,
+      };
+
+      const create = (
+        session as unknown as { handleCreateTerminal: Function }
+      ).handleCreateTerminal.bind(session);
+      const wait = (
+        session as unknown as { handleWaitForTerminalExit: Function }
+      ).handleWaitForTerminalExit.bind(session);
+      const output = (
+        session as unknown as { handleTerminalOutput: Function }
+      ).handleTerminalOutput.bind(session);
+      const release = (
+        session as unknown as { handleReleaseTerminal: Function }
+      ).handleReleaseTerminal.bind(session);
+
+      const created = create({
+        sessionId: "session-1",
+        command: "Get-Location",
+        cwd: projectRoot,
+        outputByteLimit: 65536,
+      });
+
+      await expect(
+        wait({ sessionId: "session-1", terminalId: created.terminalId }),
+      ).resolves.toMatchObject({ exitCode: 0 });
+      expect(output({ sessionId: "session-1", terminalId: created.terminalId })).toMatchObject({
+        output: expect.stringContaining(projectRoot),
+        truncated: false,
+        exitStatus: { exitCode: 0 },
+      });
+      release({ sessionId: "session-1", terminalId: created.terminalId });
+    },
+  );
 
   it("calls session/close on dispose when the ACP agent advertises close support", async () => {
     const { connection, session } = makeConfigSyncSession();
@@ -1049,31 +1107,8 @@ describe("ACP permission request handling", () => {
     });
   }
 
-  it("auto-approves when approvalPolicy is 'never' and an allow option exists", async () => {
+  it("auto-approves full-access prompts when no native ACP mode exists", async () => {
     const { listener, session } = makeConfigSyncSession({
-      availableModeIds: ["agent"],
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "never",
-      },
-    });
-
-    const response = await invokePermission(session, [
-      { optionId: "deny", name: "Deny", kind: "reject_once" },
-      { optionId: "allow", name: "Allow", kind: "allow_once" },
-    ]);
-
-    expect(response).toEqual({ outcome: { outcome: "selected", optionId: "allow" } });
-    // The bypass path never emits a runtime-request event or a needs_approval
-    // status — those are only for prompts that reach the renderer.
-    expect(listener.onRuntimeEvent).not.toHaveBeenCalled();
-    expect(listener.onUpdate).not.toHaveBeenCalled();
-  });
-
-  it("prefers allow_always over allow_once when bypassing", async () => {
-    const { session } = makeConfigSyncSession({
       availableModeIds: ["agent"],
       currentConfig: {
         model: "model-a",
@@ -1089,21 +1124,27 @@ describe("ACP permission request handling", () => {
     ]);
 
     expect(response).toEqual({ outcome: { outcome: "selected", optionId: "always" } });
+    expect(listener.onUpdate).not.toHaveBeenCalledWith({
+      status: "needs_approval",
+      attention: "needs_approval",
+    });
+    expect(listener.onRuntimeEvent).not.toHaveBeenCalled();
   });
 
-  it("falls back to UI prompt when approvalPolicy is not 'never'", async () => {
+  it("does not auto-approve prompts when a native ACP permission mode exists", async () => {
     const { listener, session } = makeConfigSyncSession({
-      availableModeIds: ["agent"],
+      availableModeIds: ["agent", "yolo"],
       currentConfig: {
         model: "model-a",
         effort: "low",
         mode: "agent",
-        approvalPolicy: "default",
+        approvalPolicy: "never",
       },
     });
 
-    // Don't await — this should hang waiting for resolveServerRequest.
-    void invokePermission(session, [{ optionId: "allow", name: "Allow", kind: "allow_once" }]);
+    void invokePermission(session, [
+      { optionId: "always", name: "Allow always", kind: "allow_always" },
+    ]);
     await Promise.resolve();
 
     expect(listener.onUpdate).toHaveBeenCalledWith({

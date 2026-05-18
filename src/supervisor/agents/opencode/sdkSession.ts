@@ -40,6 +40,10 @@ import {
   type ThreadHistoryEntry,
 } from "../base";
 import { chosenOptionIds } from "../questionAnswers";
+import {
+  buildQuestionAnswerEvents,
+  type QuestionAnswerSourceQuestion,
+} from "../questionAnswerEvents";
 import { mapOpenCodeSlashCommands } from "./detection";
 import { classifyOpenCodeError } from "./opencodeErrors";
 import { buildOpenCodePermissionRules } from "./permissionRules";
@@ -68,6 +72,7 @@ interface PendingQuestion {
   requestID: string;
   answerKeys: OpenCodeQuestionAnswerContext["answerKeys"];
   optionValues: OpenCodeQuestionAnswerContext["optionValues"];
+  sourceQuestions: QuestionAnswerSourceQuestion[];
 }
 
 type PendingRequest = PendingPermission | PendingQuestion;
@@ -76,6 +81,58 @@ export interface OpenCodeQuestionAnswerContext {
   answerKeys: string[];
   optionValues: Record<string, string>;
 }
+
+type OpenCodePromptPart =
+  | { type: "text"; text: string }
+  | { type: "file"; mime: string; filename?: string; url: string };
+
+const OCTET_STREAM_MIME = "application/octet-stream";
+
+const TEXT_FILE_EXTENSIONS = new Set([
+  "bash",
+  "c",
+  "cc",
+  "conf",
+  "cpp",
+  "cs",
+  "css",
+  "csv",
+  "cxx",
+  "diff",
+  "env",
+  "go",
+  "graphql",
+  "h",
+  "hpp",
+  "html",
+  "java",
+  "js",
+  "jsx",
+  "kt",
+  "log",
+  "lua",
+  "mjs",
+  "patch",
+  "php",
+  "ps1",
+  "py",
+  "rb",
+  "rs",
+  "scss",
+  "sh",
+  "sql",
+  "svelte",
+  "swift",
+  "toml",
+  "ts",
+  "tsx",
+  "txt",
+  "vue",
+  "xml",
+  "yaml",
+  "yml",
+  "zsh",
+]);
 
 function encodePosixFileUrl(path: string): string {
   return `file://${path.split("/").map(encodeURIComponent).join("/")}`;
@@ -108,26 +165,57 @@ function fileUrlForPath(location: ProjectLocation, path: string): string {
 }
 
 function inferMimeFromPath(path: string): string {
-  const lower = path.toLowerCase();
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".gif")) return "image/gif";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".svg")) return "image/svg+xml";
-  if (lower.endsWith(".pdf")) return "application/pdf";
-  return "application/octet-stream";
+  const ext = path
+    .split(/[\\/.]/)
+    .pop()
+    ?.toLowerCase();
+  switch (ext) {
+    case "png":
+      return "image/png";
+    case "jpg":
+    case "jpeg":
+      return "image/jpeg";
+    case "gif":
+      return "image/gif";
+    case "webp":
+      return "image/webp";
+    case "svg":
+      return "image/svg+xml";
+    case "pdf":
+      return "application/pdf";
+    case "md":
+    case "markdown":
+      return "text/markdown";
+    case "json":
+      return "application/json";
+    default:
+      return ext && TEXT_FILE_EXTENSIONS.has(ext) ? "text/plain" : OCTET_STREAM_MIME;
+  }
+}
+
+function mimeForSegment(seg: PromptSegment, absolutePath: string): string {
+  const inferred = inferMimeFromPath(absolutePath);
+  if (seg.kind !== "attachment") return inferred;
+  if (!seg.mimeType || seg.mimeType === OCTET_STREAM_MIME) return inferred;
+  return seg.mimeType;
+}
+
+function shouldSendFilePart(mime: string): boolean {
+  if (mime === OCTET_STREAM_MIME) return false;
+  return (
+    mime.startsWith("image/") ||
+    mime.startsWith("text/") ||
+    mime === "application/json" ||
+    mime === "application/pdf"
+  );
 }
 
 function segmentsToParts(
   prompt: string,
   segments: PromptSegment[] | undefined,
   location: ProjectLocation,
-): Array<
-  { type: "text"; text: string } | { type: "file"; mime: string; filename?: string; url: string }
-> {
-  const parts: Array<
-    { type: "text"; text: string } | { type: "file"; mime: string; filename?: string; url: string }
-  > = [];
+): OpenCodePromptPart[] {
+  const parts: OpenCodePromptPart[] = [];
 
   if (segments && segments.length > 0) {
     for (const seg of segments) {
@@ -137,8 +225,11 @@ function segmentsToParts(
       }
       const absolute = resolveAbsolutePath(location, seg.path);
       const url = fileUrlForPath(location, absolute);
-      const mime =
-        seg.kind === "attachment" && seg.mimeType ? seg.mimeType : inferMimeFromPath(absolute);
+      const mime = mimeForSegment(seg, absolute);
+      if (!shouldSendFilePart(mime)) {
+        parts.push({ type: "text", text: `@${absolute}` });
+        continue;
+      }
       const filename = absolute.split(/[\\/]/).pop();
       parts.push({
         type: "file",
@@ -420,6 +511,16 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
         }
       } catch {
         // Same — best-effort reply.
+      }
+      if (answers !== undefined) {
+        this.emitRuntimeEvents(
+          buildQuestionAnswerEvents({
+            threadId: this.threadId,
+            itemId: `opencode-question-answer-${pending.requestID}`,
+            questions: pending.sourceQuestions,
+            answers: openCodeResponseAnswers(response, pending),
+          }),
+        );
       }
     }
   }
@@ -724,6 +825,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
         requestID: event.properties.id,
         answerKeys: questionMetadata.answerKeys,
         optionValues: questionMetadata.optionValues,
+        sourceQuestions: questionMetadata.sourceQuestions,
       });
     }
 
@@ -783,26 +885,74 @@ function parsePermissionReply(response: unknown): "once" | "always" | "reject" {
 function buildQuestionMetadata(properties: { questions?: unknown }): {
   answerKeys: string[];
   optionValues: Record<string, string>;
+  sourceQuestions: QuestionAnswerSourceQuestion[];
 } {
   const answerKeys: string[] = [];
   const optionValues: Record<string, string> = {};
+  const sourceQuestions: QuestionAnswerSourceQuestion[] = [];
   const questions = Array.isArray(properties.questions) ? properties.questions : [];
   for (let qi = 0; qi < questions.length; qi += 1) {
     const question = questions[qi];
     if (!question || typeof question !== "object") continue;
-    answerKeys.push(`q${qi}`);
-    const options = (question as { options?: unknown }).options;
-    if (!Array.isArray(options)) continue;
-    for (let oi = 0; oi < options.length; oi += 1) {
-      const option = options[oi];
-      if (!option || typeof option !== "object") continue;
-      const label = (option as { label?: unknown }).label;
-      if (typeof label === "string") {
-        optionValues[`q${qi}.${oi}`] = label;
+    const questionRecord = question as Record<string, unknown>;
+    const questionId = `q${qi}`;
+    answerKeys.push(questionId);
+    const questionText = typeof questionRecord.question === "string" ? questionRecord.question : "";
+    const header =
+      typeof questionRecord.header === "string" && questionRecord.header.length > 0
+        ? questionRecord.header
+        : questionText.length > 0
+          ? questionText
+          : questionId;
+    const sourceOptions: Array<{ optionId: string; label: string; description?: string }> = [];
+    const rawOptions = questionRecord.options;
+    if (Array.isArray(rawOptions)) {
+      for (let oi = 0; oi < rawOptions.length; oi += 1) {
+        const option = rawOptions[oi];
+        if (!option || typeof option !== "object") continue;
+        const optionRecord = option as Record<string, unknown>;
+        const label = optionRecord.label;
+        if (typeof label !== "string") continue;
+        const optionId = `q${qi}.${oi}`;
+        optionValues[optionId] = label;
+        sourceOptions.push({
+          optionId,
+          label,
+          ...(typeof optionRecord.description === "string" && optionRecord.description.length > 0
+            ? { description: optionRecord.description }
+            : {}),
+        });
       }
     }
+    sourceQuestions.push({
+      keys: [questionId],
+      header,
+      question: questionText,
+      options: sourceOptions,
+    });
   }
-  return { answerKeys, optionValues };
+  return { answerKeys, optionValues, sourceQuestions };
+}
+
+function openCodeResponseAnswers(
+  response: unknown,
+  pending: OpenCodeQuestionAnswerContext,
+): Record<string, unknown> {
+  if (!response || typeof response !== "object") return {};
+  const obj = response as { answers?: unknown; optionId?: unknown; optionIds?: unknown };
+  const answers = obj.answers;
+  if (answers && typeof answers === "object" && !Array.isArray(answers)) {
+    return answers as Record<string, unknown>;
+  }
+  const firstKey = pending.answerKeys[0];
+  if (!firstKey) return {};
+  if (Array.isArray(obj.optionIds)) {
+    return { [firstKey]: obj.optionIds };
+  }
+  if (typeof obj.optionId === "string") {
+    return { [firstKey]: obj.optionId };
+  }
+  return {};
 }
 
 export function parseOpenCodeQuestionAnswers(

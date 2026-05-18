@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import type { CanonicalContentBlock, Thread } from "@/shared/contracts";
+import type { CanonicalContentBlock, Project, Thread } from "@/shared/contracts";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { useAppStore } from "@/renderer/state/appStore";
 import { ChatPane } from "./ChatPane";
@@ -11,6 +11,10 @@ const { hydrateThreadRuntimeItems } = vi.hoisted(() => ({
 const { hydrateFileCheckpoints, finalizeFileCheckpoint } = vi.hoisted(() => ({
   hydrateFileCheckpoints: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
   finalizeFileCheckpoint: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+}));
+const { virtualizerScrollToIndex } = vi.hoisted(() => ({
+  virtualizerScrollToIndex:
+    vi.fn<(index: number, options?: { align?: "auto" | "center" | "end" | "start" }) => void>(),
 }));
 
 vi.mock("@/renderer/state/chatRuntimePersister", () => ({
@@ -37,16 +41,30 @@ vi.mock("@tanstack/react-virtual", () => ({
     getTotalSize: () => options.count * 96,
     measure: vi.fn<() => void>(),
     measureElement: vi.fn<(element: HTMLDivElement | null) => void>(),
-    scrollToIndex: vi.fn<() => void>(() => {
+    scrollToIndex: (
+      index: number,
+      scrollOptions?: { align?: "auto" | "center" | "end" | "start" },
+    ) => {
+      virtualizerScrollToIndex(index, scrollOptions);
       const element = options.getScrollElement?.();
       if (element instanceof HTMLElement) {
         element.scrollTop = element.scrollHeight;
       }
-    }),
+    },
   }),
 }));
 
 const originalResizeObserver = globalThis.ResizeObserver;
+
+const project: Project = {
+  id: "project-1",
+  name: "Repo",
+  location: {
+    kind: "windows",
+    path: "C:\\repo",
+  },
+  createdAt: "2026-03-28T00:00:00.000Z",
+};
 
 class MockResizeObserver {
   static instances = new Set<MockResizeObserver>();
@@ -145,6 +163,37 @@ describe("ChatPane", () => {
     });
 
     await waitFor(() => expect(metrics.getScrollTop()).toBe(300));
+  });
+
+  it("reconciles the virtualizer when sticky content growth pins to the bottom", async () => {
+    const thread = makeThread();
+    seedAssistantMessage(thread.id, "Inspect output");
+    useAppStore.setState({ projects: [project] });
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const scrollElement = getScrollElement(container);
+    const contentElement = getContentElement(scrollElement);
+    const metrics = installScrollMetrics(scrollElement, {
+      scrollHeight: 200,
+      clientHeight: 100,
+      scrollTop: 0,
+    });
+
+    act(() => {
+      metrics.setScrollTop(200);
+      fireEvent.scroll(scrollElement);
+    });
+    virtualizerScrollToIndex.mockClear();
+
+    act(() => {
+      metrics.setScrollHeight(300);
+      MockResizeObserver.notify(contentElement);
+    });
+
+    expect(virtualizerScrollToIndex).toHaveBeenCalledWith(0, { align: "end" });
+    expect(metrics.getScrollTop()).toBe(300);
   });
 
   it("disables native browser scroll anchoring on the managed chat scroller", async () => {
@@ -733,7 +782,7 @@ describe("ChatPane", () => {
     });
 
     const label = screen.getByText("Working for 1m 10s");
-    expect(label).toHaveClass("text-warning");
+    expect(label).toHaveClass("text-muted");
 
     act(() => {
       vi.advanceTimersByTime(10_000);

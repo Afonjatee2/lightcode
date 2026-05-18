@@ -3,15 +3,13 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
-  PromptSegment,
-  RuntimeEvent,
-  SessionRef,
-  ThreadAttention,
-  ThreadConfig,
-  ThreadServerRequestId,
-  ThreadStatus,
   areAgentSlashCommandsEqual,
   type AgentSlashCommand,
+  type PromptSegment,
+  type RuntimeEvent,
+  type SessionRef,
+  type ThreadConfig,
+  type ThreadServerRequestId,
 } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { terminateChildProcessTree } from "@/shared/processTree";
@@ -34,36 +32,28 @@ import {
   translateCodexCanonicalResponse,
   type CodexMapperState,
 } from "./canonicalMapping";
+import {
+  deriveCodexStructuredState,
+  extractCodexStatusErrorMessage,
+  extractThreadField,
+  extractTurnField,
+  isRecoverableResumeError,
+  parseCodexSocketMessage,
+  toCodexSandboxPolicy,
+  type CodexThreadStatus,
+} from "./acpProtocol";
+import { buildCodexQuestionAnswerEvents } from "./acpQuestionAnswer";
+import {
+  buildCodexCollaborationMode,
+  buildCodexTurnInput,
+  parseCodexGoalCommand,
+  type CodexGoalCommand,
+} from "./acpTurn";
 import { CodexStdioTransport } from "./stdioTransport";
 import { mapCodexSlashCommands, readCodexInitCommands } from "./probe";
 
-export type CodexThreadStatus =
-  | { type: "active"; activeFlags?: string[] }
-  | { type: "idle" }
-  | { type: "notLoaded" }
-  | { type: "systemError" };
-
-type CodexSocketMessage =
-  | {
-      kind: "response";
-      id: string;
-      result?: unknown;
-      error?: unknown;
-    }
-  | {
-      kind: "request";
-      id: string | number;
-      method: string;
-      params?: Record<string, unknown>;
-    }
-  | {
-      kind: "notification";
-      method: string;
-      params?: Record<string, unknown>;
-    }
-  | {
-      kind: "unknown";
-    };
+export { deriveCodexStructuredState, parseCodexSocketMessage } from "./acpProtocol";
+export type { CodexThreadStatus } from "./acpProtocol";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -87,209 +77,6 @@ function spawnAppServer(command: CommandSpec): ChildProcess {
 
 function toSessionRef(threadId: string): SessionRef {
   return createKnownSessionRef(threadId);
-}
-
-// Codex's `turn/start` requires a non-empty `developer_instructions` string
-// inside `collaborationMode.settings`. We send these on every turn so that
-// switching between Plan and Default mode mid-session takes effect (Codex
-// would otherwise treat the prior mode as sticky).
-const PLAN_MODE_DEVELOPER_INSTRUCTIONS =
-  "You are operating in plan mode. Produce a clear, step-by-step plan for the user's request. Do not edit files, run shell commands, or call mutating tools — gather context with read-only tools as needed, then present the plan and wait for the user to approve before executing any changes.";
-
-const DEFAULT_MODE_DEVELOPER_INSTRUCTIONS =
-  "You are operating in default mode. Any prior plan-mode instructions no longer apply: you may edit files, run commands, and use mutating tools as appropriate to fulfill the user's request.";
-
-// Codex `/goal` is a Codex CLI feature (experimental, gated by --enable goals).
-// We mirror the TUI's sub-commands inline so the user can type them in the
-// composer; the actual state lives in the Codex app-server and emits
-// `thread/goal/{updated,cleared}` notifications that the canonical mapper
-// surfaces as the shared goal chat item.
-type CodexGoalCommand =
-  | { kind: "set"; objective: string }
-  | { kind: "clear" }
-  | { kind: "view" }
-  | { kind: "pause" }
-  | { kind: "resume" };
-
-function parseCodexGoalCommand(prompt: string): CodexGoalCommand | undefined {
-  const match = /^\/goal(?:\s+([\s\S]*))?$/u.exec(prompt.trim());
-  if (!match) return undefined;
-  const rawArgs = match[1]?.trim() ?? "";
-  if (rawArgs.length === 0) return { kind: "view" };
-  if (/^(clear|reset|off|none)$/iu.test(rawArgs)) return { kind: "clear" };
-  if (/^pause$/iu.test(rawArgs)) return { kind: "pause" };
-  if (/^resume$/iu.test(rawArgs)) return { kind: "resume" };
-  return { kind: "set", objective: rawArgs };
-}
-
-// `thread/start` accepts a SandboxMode string ("read-only" / "workspace-write" /
-// "danger-full-access"), but `turn/start` accepts a SandboxPolicy *object*
-// under the `sandboxPolicy` key. Sending a kebab-case string under `sandbox`
-// to `turn/start` is silently dropped, so per-turn sandbox overrides — like
-// switching from Supervised to Full Access mid-thread — never reach Codex.
-function toCodexSandboxPolicy(
-  mode: string | undefined,
-): { type: "readOnly" } | { type: "workspaceWrite" } | { type: "dangerFullAccess" } | undefined {
-  switch (mode) {
-    case "read-only":
-      return { type: "readOnly" };
-    case "workspace-write":
-      return { type: "workspaceWrite" };
-    case "danger-full-access":
-      return { type: "dangerFullAccess" };
-    default:
-      return undefined;
-  }
-}
-
-function extractThreadField(result: unknown, field: string): string | undefined {
-  return extractObjectStringField(result, "thread", field);
-}
-
-function extractTurnField(result: unknown, field: string): string | undefined {
-  return extractObjectStringField(result, "turn", field);
-}
-
-function extractObjectStringField(
-  result: unknown,
-  objectField: string,
-  field: string,
-): string | undefined {
-  if (!result || typeof result !== "object" || !(objectField in result)) {
-    return undefined;
-  }
-  const object = (result as Record<string, unknown>)[objectField];
-  if (!object || typeof object !== "object" || !(field in object)) {
-    return undefined;
-  }
-  const value = (object as Record<string, unknown>)[field];
-  return typeof value === "string" ? value : undefined;
-}
-
-export function deriveCodexStructuredState(status: CodexThreadStatus): {
-  status: ThreadStatus;
-  attention: ThreadAttention;
-} {
-  if (status.type === "systemError") {
-    return {
-      status: "error",
-      attention: "error",
-    };
-  }
-
-  if (status.type === "idle") {
-    return {
-      status: "idle",
-      attention: "none",
-    };
-  }
-
-  if (status.type === "notLoaded") {
-    return {
-      status: "inactive",
-      attention: "none",
-    };
-  }
-
-  const activeFlags = new Set(status.activeFlags ?? []);
-  if (activeFlags.has("waitingOnApproval")) {
-    return {
-      status: "needs_approval",
-      attention: "needs_approval",
-    };
-  }
-
-  if (activeFlags.has("waitingOnUserInput")) {
-    return {
-      status: "needs_reply",
-      attention: "needs_reply",
-    };
-  }
-
-  return {
-    status: "working",
-    attention: "working",
-  };
-}
-
-export function parseCodexSocketMessage(payload: unknown): CodexSocketMessage {
-  if (!payload || typeof payload !== "object") {
-    return { kind: "unknown" };
-  }
-
-  const message = payload as Record<string, unknown>;
-  const method = typeof message.method === "string" ? message.method : undefined;
-  const params =
-    typeof message.params === "object" && message.params !== null
-      ? (message.params as Record<string, unknown>)
-      : undefined;
-
-  if (method) {
-    if ("id" in message) {
-      return {
-        kind: "request",
-        id: message.id as ThreadServerRequestId,
-        method,
-        ...(params ? { params } : {}),
-      };
-    }
-
-    return {
-      kind: "notification",
-      method,
-      ...(params ? { params } : {}),
-    };
-  }
-
-  if ("id" in message) {
-    return {
-      kind: "response",
-      id: String(message.id),
-      ...("result" in message ? { result: message.result } : {}),
-      ...("error" in message ? { error: message.error } : {}),
-    };
-  }
-
-  return { kind: "unknown" };
-}
-
-/**
- * Pull a human-readable message out of a Codex `thread/status/changed` payload
- * when the new status is `systemError`. Codex's typed shape carries no message
- * field, but observed wire payloads sometimes include `message`, `error`, or a
- * nested `details` blob, so we probe the common spots before falling back to a
- * generic string.
- */
-function extractCodexStatusErrorMessage(status: unknown): string {
-  if (status && typeof status === "object") {
-    const record = status as Record<string, unknown>;
-    const direct = record.message ?? record.error ?? record.reason ?? record.detail;
-    if (typeof direct === "string" && direct.trim().length > 0) {
-      return direct;
-    }
-    const details = record.details;
-    if (details && typeof details === "object") {
-      const nested = (details as Record<string, unknown>).message;
-      if (typeof nested === "string" && nested.trim().length > 0) {
-        return nested;
-      }
-    }
-  }
-  return "Codex reported a system error. The session may be out of usage or otherwise unable to continue.";
-}
-
-function isRecoverableResumeError(message: string): boolean {
-  const lower = message.toLowerCase();
-  return (
-    lower.includes("not found") ||
-    lower.includes("does not exist") ||
-    lower.includes("missing thread") ||
-    lower.includes("unknown thread") ||
-    lower.includes("no session") ||
-    lower.includes("expired") ||
-    lower.includes("invalid thread") ||
-    lower.includes("session not found")
-  );
 }
 
 // ── Structured Session ──────────────────────────────────────────
@@ -692,53 +479,9 @@ export class CodexStructuredSession implements StructuredSessionHandle {
 
     this.listener?.onUpdate({ status: "working", attention: "working" });
 
-    // Build structured input using native Codex protocol types:
-    //   - "localImage" for image attachments (path-based)
-    //   - "mention"    for file reference segments (@-mentions)
-    //   - "text"       for the prompt text
-    const input: Record<string, unknown>[] = [];
-
-    for (const seg of segments ?? []) {
-      if (seg.kind === "attachment") {
-        const isImage = /\.(png|jpe?g|gif|webp|svg|bmp|ico|avif)$/i.test(seg.path);
-        if (isImage) {
-          input.push({ type: "localImage", path: seg.path });
-        } else {
-          input.push({
-            type: "mention",
-            path: seg.path,
-            name: seg.path.split(/[\\/]/).pop() ?? seg.path,
-          });
-        }
-      } else if (seg.kind === "file") {
-        input.push({
-          type: "mention",
-          path: seg.path,
-          name: seg.path.split(/[\\/]/).pop() ?? seg.path,
-        });
-      }
-    }
-
-    input.push({ type: "text", text: prompt, text_elements: [] });
-
+    const input = buildCodexTurnInput(prompt, segments);
     const sandboxPolicy = toCodexSandboxPolicy(config.sandboxMode);
-    // Plan mode is sticky at the session level once set, so always send the
-    // current mode on every turn — otherwise toggling Plan off won't revert.
-    // `collaborationMode.settings` is a *required* field and its three
-    // string members (model / reasoning_effort / developer_instructions)
-    // reject `null`s and empty objects — Codex's JSON-RPC validator wants
-    // real strings on every turn.
-    const collaborationMode = {
-      mode: config.mode === "plan" ? "plan" : "default",
-      settings: {
-        model: config.model,
-        reasoning_effort: config.effort ?? "medium",
-        developer_instructions:
-          config.mode === "plan"
-            ? PLAN_MODE_DEVELOPER_INSTRUCTIONS
-            : DEFAULT_MODE_DEVELOPER_INSTRUCTIONS,
-      },
-    };
+    const collaborationMode = buildCodexCollaborationMode(config);
     try {
       const result = await this.request("turn/start", {
         threadId,
@@ -797,6 +540,15 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       id: inbound?.id ?? requestId,
       result,
     });
+    if (inbound?.method === "item/tool/requestUserInput") {
+      this.emitRuntimeEvents(
+        buildCodexQuestionAnswerEvents({
+          threadId: this.threadId,
+          params: inbound.params,
+          response,
+        }),
+      );
+    }
   }
 
   async dispose(): Promise<void> {
@@ -1088,7 +840,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   private request(
     method: string,
     params: Record<string, unknown>,
-    timeoutMs = 5_000,
+    timeoutMs = 30_000,
   ): Promise<unknown> {
     const id = `lightcode-${this.requestSequence++}`;
 

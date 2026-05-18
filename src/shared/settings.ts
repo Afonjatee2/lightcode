@@ -13,6 +13,12 @@ import {
 } from "./contracts";
 import { DEFAULT_SEARCH_EXCLUDE } from "./searchExclude";
 
+const modelPickerEntrySchema = z.object({
+  agentKind: z.string().min(1),
+  modelId: z.string().min(1),
+  presentationMode: threadPresentationModeSchema.default("terminal"),
+});
+
 /**
  * Cache entry recording whether a given agent supports the **CLI hook plugin**
  * path for status detection on this machine. Keyed by `AgentKind` (and for
@@ -120,13 +126,13 @@ export const sharedSettingsSchema = z.object({
    * noisier transitions.
    */
   notifyL2Cli: z.boolean(),
-  /** User-starred (provider, model) entries surfaced at the top of the model picker. */
-  favoriteModels: z.array(z.object({ agentKind: z.string().min(1), modelId: z.string().min(1) })),
+  /** User-starred (provider, presentation, model) entries surfaced at the top of the model picker. */
+  favoriteModels: z.array(modelPickerEntrySchema),
   /**
-   * Most-recent (provider, model) launches for the model picker. Newest first; the menu
+   * Most-recent (provider, presentation, model) launches for the model picker. Newest first; the menu
    * caps to 5 entries that aren't already in `favoriteModels`.
    */
-  recentModels: z.array(z.object({ agentKind: z.string().min(1), modelId: z.string().min(1) })),
+  recentModels: z.array(modelPickerEntrySchema),
   /**
    * Dev-only: force agents off the CLI hook plugin path (L1) so they fall back
    * to L2 terminal parsing. The UI toggle is only visible in the dev build;

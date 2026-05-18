@@ -1,0 +1,109 @@
+import { z } from "zod";
+import type { RuntimeEvent } from "../contracts";
+import { projectSchema, threadContextUsageSchema, threadSchema } from "../contracts";
+
+export const pickFilesOptionsSchema = z
+  .object({
+    title: z.string().optional(),
+    filters: z
+      .array(
+        z.object({
+          name: z.string().min(1),
+          extensions: z.array(z.string().min(1)),
+        }),
+      )
+      .optional(),
+  })
+  .optional();
+
+export const saveClipboardImagePayloadSchema = z.object({
+  threadId: z.string().min(1),
+  data: z.instanceof(Uint8Array),
+  extension: z.string().min(1),
+});
+
+export const saveHandoffContextPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  content: z.string(),
+});
+
+export const readThreadPayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+
+export const subAgentSubscribePayloadSchema = z.object({
+  threadId: z.string().min(1),
+  parentItemId: z.string().min(1),
+});
+export type SubAgentSubscribePayload = z.infer<typeof subAgentSubscribePayloadSchema>;
+export interface SubAgentSubscribeResult {
+  history: RuntimeEvent[];
+}
+
+export const dbStateKeySchema = z.string().min(1);
+export const dbStatePayloadSchema = z.object({
+  key: z.string().min(1),
+  value: z.string(),
+});
+export const dbDeleteThreadPayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+export const dbDeleteProjectPayloadSchema = z.object({
+  projectId: z.string().min(1),
+});
+export const dbSyncAllPayloadSchema = z.object({
+  projects: z.array(projectSchema),
+  threads: z.array(threadSchema),
+  viewJson: z.string(),
+});
+
+export const persistedRuntimeItemSchema = z.object({
+  id: z.string().min(1),
+  type: z.string().min(1),
+  state: z.enum(["started", "updated", "completed"]),
+  payload: z.unknown(),
+  streams: z.record(z.string(), z.string()),
+  parentItemId: z.string().optional(),
+});
+export type PersistedRuntimeItem = z.infer<typeof persistedRuntimeItemSchema>;
+
+export const dbReplaceRuntimeItemsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  items: z.array(persistedRuntimeItemSchema),
+});
+export const dbGetRuntimeItemsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+
+export const persistedCompletedTurnSchema = z.object({
+  startedAt: z.string().min(1),
+  endedAt: z.string().min(1),
+  anchorItemId: z.string().nullable(),
+});
+export type PersistedCompletedTurn = z.infer<typeof persistedCompletedTurnSchema>;
+
+export const dbGetCompletedTurnsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+export const dbReplaceCompletedTurnsPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  turns: z.array(persistedCompletedTurnSchema),
+});
+export const dbReplaceRuntimeSnapshotPayloadSchema = z.object({
+  threadId: z.string().min(1),
+  items: z.array(persistedRuntimeItemSchema),
+  turns: z.array(persistedCompletedTurnSchema),
+  contextUsage: threadContextUsageSchema.nullable().optional(),
+});
+
+export const dbGetThreadContextUsagePayloadSchema = z.object({
+  threadId: z.string().min(1),
+});
+
+export const openExternalPayloadSchema = z.string().min(1);
+
+export const windowChromePayloadSchema = z.object({
+  backgroundColor: z.string(),
+  symbolColor: z.string(),
+});
+export type WindowChromePayload = z.infer<typeof windowChromePayloadSchema>;

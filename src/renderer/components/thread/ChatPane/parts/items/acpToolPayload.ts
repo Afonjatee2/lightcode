@@ -11,7 +11,7 @@
  * fields lack extra body details and that's fine.
  */
 
-import type { ViewportLanguage } from "./languageDetect";
+import { detectLanguageFromPath, type ViewportLanguage } from "./languageDetect";
 
 export interface AcpToolResult {
   /** Short preview text. */
@@ -69,6 +69,65 @@ export function extractAcpResultPart(payload: unknown): ExtractedPart {
     }
   }
   return { text: safeJson(result), language: "json" };
+}
+
+/**
+ * Read-tool result serializer. Unwraps OpenCode's
+ * `<path>…</path><type>file</type><content>…</content>` wrapper and strips
+ * the per-line `\d+: ` prefix that read tools emit for LLM consumption, then
+ * picks a syntax-highlight language from the file path (args or wrapper).
+ * Falls back to {@link extractAcpResultPart} for shapes we don't recognise.
+ */
+export function extractReadFileResultPart(payload: unknown): ExtractedPart {
+  const base = extractAcpResultPart(payload);
+  if (base.text.length === 0) return base;
+  const pathFromPayload =
+    readPayloadString(payload, "path") ??
+    readAcpStringField(payload, "filePath") ??
+    readAcpStringField(payload, "file_path") ??
+    readAcpStringField(payload, "path");
+  const unwrapped = unwrapReadFileWrapper(base.text);
+  const text = unwrapped ? unwrapped.content : base.text;
+  const path = unwrapped?.path ?? pathFromPayload;
+  const stripped = stripLineNumberPrefix(text);
+  const language = detectLanguageFromPath(path);
+  return { text: stripped, language };
+}
+
+function unwrapReadFileWrapper(
+  text: string,
+): { path: string | undefined; content: string } | undefined {
+  const contentMatch = /<content>\r?\n?([\s\S]*?)\r?\n?<\/content>\s*$/.exec(text);
+  if (!contentMatch) return undefined;
+  const pathMatch = /<path>([\s\S]*?)<\/path>/.exec(text);
+  const path = pathMatch?.[1]?.trim();
+  return { path: path && path.length > 0 ? path : undefined, content: contentMatch[1] ?? "" };
+}
+
+/**
+ * Strip `\d+:\s?` line-number prefixes that read tools prepend to every line.
+ * Requires at least half the non-empty lines to match before stripping, so
+ * regular code that happens to contain `\d+:` lines isn't mangled.
+ */
+function stripLineNumberPrefix(text: string): string {
+  if (text.length === 0) return text;
+  const lines = text.split(/\r?\n/);
+  const out: string[] = [];
+  let prefixed = 0;
+  let nonEmpty = 0;
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0) nonEmpty += 1;
+    const match = /^\s*\d+:\s?(.*)$/.exec(line);
+    if (match) {
+      prefixed += 1;
+      out.push(match[1] ?? "");
+    } else {
+      out.push(line);
+    }
+  }
+  if (nonEmpty === 0 || prefixed * 2 <= nonEmpty) return text;
+  return out.join("\n");
 }
 
 /** Serialize `args` for accordion bodies. String args (apply_patch) pass through; objects become pretty-printed JSON. */
@@ -183,7 +242,10 @@ interface StructuredFileChange {
 function readStructuredFileChanges(payload: unknown): StructuredFileChange[] {
   if (!payload || typeof payload !== "object") return [];
   const p = payload as Record<string, unknown>;
-  const containers = [p, p.args, p.result];
+  // OpenCode reports the precise per-edit diff at `metadata.changes[].diff` on
+  // completion; preferring it over `args.changes`/synthesis keeps the unified
+  // diff's context lines intact for InlineDiffView.
+  const containers = [p, p.args, p.result, p.metadata];
   for (const container of containers) {
     if (!container || typeof container !== "object" || Array.isArray(container)) continue;
     const changes = (container as Record<string, unknown>).changes;

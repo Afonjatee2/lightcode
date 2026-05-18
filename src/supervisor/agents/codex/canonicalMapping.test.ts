@@ -1021,7 +1021,6 @@ describe("mapCodexNotification — streaming deltas", () => {
           toolName: "command_execution",
           displayName: "Run",
           input: { command: "pnpm test", cwd: "C:\\repo" },
-          decisionReason: "Command needs approval",
         },
       },
     });
@@ -1044,7 +1043,6 @@ describe("mapCodexNotification — streaming deltas", () => {
           toolName: "file_read",
           displayName: "Read file",
           input: { path: "src/index.ts" },
-          decisionReason: "Read outside workspace",
         },
       },
     });
@@ -1074,7 +1072,6 @@ describe("mapCodexServerRequest — approvals", () => {
             command: "pnpm test",
             cwd: "C:\\repo",
           },
-          decisionReason: "Command needs approval",
         },
         options: [
           { optionId: "accept", label: "Allow" },

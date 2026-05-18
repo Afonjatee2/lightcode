@@ -61,6 +61,7 @@ export interface CodexAccountInfo {
 /** Default approval policies when no enterprise requirements restrict the list. */
 const DEFAULT_APPROVAL_POLICIES: Array<{ id: string; label: string }> = [
   { id: "on-request", label: "On Request" },
+  { id: "on-failure", label: "On Failure" },
   { id: "never", label: "Full Access" },
   { id: "untrusted", label: "Untrusted" },
 ];
@@ -445,7 +446,6 @@ export async function probeCodexCapabilities(
   location: ProjectLocation,
   options?: { wslExecPath?: string; timeoutMs?: number; label?: string },
 ): Promise<CodexProbeResult | undefined> {
-  const tag = options?.label ? `[codex-probe:${options.label}]` : "[codex-probe]";
   const result = await runWithCodexAppServer(location, options, async ({ client, initResult }) => {
     const [modelResult, requirementsResult] = await Promise.all([
       client.request("model/list", { includeHidden: false }),
@@ -480,17 +480,6 @@ export async function probeCodexCapabilities(
       : undefined;
 
   Object.assign(probeResult, mapCodexRequirements(requirements));
-
-  console.log(
-    "%s success — models: %d, efforts: %s, defaultEffort: %s, modelEfforts: %d, approvalPolicies: %s, sandboxModes: %s",
-    tag,
-    probeResult.models?.length ?? 0,
-    probeResult.efforts?.join(", ") ?? "(default)",
-    probeResult.defaultEffort ?? "(default)",
-    probeResult.modelEfforts ? Object.keys(probeResult.modelEfforts).length : 0,
-    probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(default)",
-    probeResult.sandboxModes?.map((m) => m.id).join(", ") ?? "(default)",
-  );
 
   return probeResult;
 }

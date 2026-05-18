@@ -20,14 +20,16 @@ const components = {
 
 export function MarkdownPreview(props: { content: string }) {
   return (
-    <div className="lightcode-markdown-preview h-full overflow-auto px-6 py-4">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeRaw]}
-        components={components}
-      >
-        {props.content}
-      </ReactMarkdown>
+    <div className="h-full overflow-auto px-6 py-4">
+      <div className="lightcode-markdown-preview mx-auto w-full max-w-3xl">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeRaw]}
+          components={components}
+        >
+          {props.content}
+        </ReactMarkdown>
+      </div>
     </div>
   );
 }

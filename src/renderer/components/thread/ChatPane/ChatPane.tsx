@@ -387,11 +387,10 @@ const ChatScrollControls = forwardRef<
     const el = scrollRef.current;
     if (!el) return;
     const virtualScrollToBottom = virtualScrollToBottomRef.current;
-    if (options.reconcileVirtualizer && virtualScrollToBottom) {
+    if ((options.reconcileVirtualizer || stickToBottomRef.current) && virtualScrollToBottom) {
       virtualScrollToBottom();
-    } else {
-      el.scrollTop = el.scrollHeight;
     }
+    el.scrollTop = el.scrollHeight;
     lastScrollTopRef.current = el.scrollTop;
     stickToBottomRef.current = true;
     setShowScrollDown(false);
@@ -708,7 +707,7 @@ function WorkingFor({ turn, isPaused }: { turn: TurnTiming; isPaused: boolean })
   }, [turn.startedAt, turn.endedAt, isPaused]);
 
   const className = isPaused
-    ? "text-warning"
+    ? "text-muted"
     : turn.endedAt === null
       ? "lightcode-thinking-text"
       : "text-muted";

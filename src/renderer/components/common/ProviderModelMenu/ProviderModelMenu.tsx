@@ -11,6 +11,7 @@ import { Check, ChevronDown, Search, Star } from "lucide-react";
 import { Popover, Tooltip } from "@heroui/react";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import type { ThreadPresentationMode } from "@/shared/contracts";
 import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId";
 import { Button } from "../Button";
 import {
@@ -26,10 +27,8 @@ export type { ProviderModelMenuProvider };
 const MODEL_MENU_ROW_HEIGHT = 28;
 const MODEL_MENU_PROVIDER_HEADER_BOTTOM_GAP = 4;
 const MODEL_MENU_MAX_HEIGHT = 288;
-const MODEL_MENU_LISTBOX_PADDING_TOP = 6;
 const MODEL_MENU_LISTBOX_PADDING_BOTTOM = 6;
-const MODEL_MENU_LISTBOX_VERTICAL_PADDING =
-  MODEL_MENU_LISTBOX_PADDING_TOP + MODEL_MENU_LISTBOX_PADDING_BOTTOM;
+const MODEL_MENU_LISTBOX_VERTICAL_PADDING = MODEL_MENU_LISTBOX_PADDING_BOTTOM;
 const MODEL_MENU_OVERSCAN_ROWS = 16;
 const MODEL_DESCRIPTION_TOOLTIP_DELAY_MS = 1000;
 
@@ -54,6 +53,7 @@ export interface ProviderModelMenuProps {
   currentModel: string;
   /** When set, only this provider's rows are rendered. */
   lockedAgentKind?: string;
+  presentationMode?: ThreadPresentationMode;
   isDisabled?: boolean;
   hideLabelOnWrap?: boolean;
   forceHideLabel?: boolean;
@@ -195,12 +195,21 @@ function splitModelLabel(label: string): { name: string; hint?: string } {
   };
 }
 
+function refsForPresentation(
+  refs: readonly ModelRef[],
+  presentationMode: ThreadPresentationMode | undefined,
+): readonly ModelRef[] {
+  if (!presentationMode) return refs;
+  return refs.filter((ref) => ref.presentationMode === presentationMode);
+}
+
 export function ProviderModelMenu(props: ProviderModelMenuProps) {
   const {
     providers,
     currentAgentKind,
     currentModel,
     lockedAgentKind,
+    presentationMode,
     isDisabled,
     hideLabelOnWrap,
     forceHideLabel = false,
@@ -268,8 +277,15 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
   // cheap as a trigger label lookup.
   const deferredAgentKind = useDeferredValue(currentAgentKind);
   const deferredModel = useDeferredValue(effectiveCurrentModel);
-  const sectionFavorites = isOpen ? (sessionFavorites ?? favorites) : favorites;
-  const sectionRecents = isOpen ? (sessionRecents ?? recents) : recents;
+  const activeFavorites = refsForPresentation(favorites, presentationMode);
+  const sectionFavorites = refsForPresentation(
+    isOpen ? (sessionFavorites ?? favorites) : favorites,
+    presentationMode,
+  );
+  const sectionRecents = refsForPresentation(
+    isOpen ? (sessionRecents ?? recents) : recents,
+    presentationMode,
+  );
   const items = isOpen
     ? buildProviderModelItems({
         providers,
@@ -278,7 +294,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
         currentAgentKind: deferredAgentKind,
         currentModel: deferredModel,
         favorites: sectionFavorites,
-        favoriteStateRefs: favorites,
+        favoriteStateRefs: activeFavorites,
         recents: sectionRecents,
       })
     : [];
@@ -391,7 +407,9 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
               items={items}
               selectedKeys={selectedKeys}
               scrollRef={windowedListRef}
-              toggleFavorite={toggleFavoriteModel}
+              toggleFavorite={(providerKind, modelId) =>
+                toggleFavoriteModel(providerKind, modelId, presentationMode ?? "terminal")
+              }
               onSelect={handleSelect}
             />
           )}
@@ -553,7 +571,7 @@ function WindowedProviderModelList(props: {
       aria-activedescendant={
         activeIndex >= 0 ? `${domIdPrefix}-${items[activeIndex]?.id}` : undefined
       }
-      className="lightcode-model-menu-listbox no-scrollbar max-h-72 overflow-y-auto pt-1.5 pb-1.5 outline-none"
+      className="lightcode-model-menu-listbox no-scrollbar max-h-72 overflow-y-auto pb-1.5 outline-none"
       style={{ height: viewportHeight }}
       tabIndex={0}
       onScroll={(event) => {
@@ -766,8 +784,7 @@ function StickyWindowedHeader(props: {
   return (
     <div
       data-sticky-windowed-header=""
-      className="sticky z-20 h-0 overflow-visible"
-      style={{ top: MODEL_MENU_LISTBOX_PADDING_TOP }}
+      className="sticky top-0 z-20 h-0 overflow-visible"
       aria-hidden="true"
     >
       {content}

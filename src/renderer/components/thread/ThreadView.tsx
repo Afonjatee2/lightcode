@@ -227,10 +227,6 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     launchRequestRef.current = launchKey;
     onLaunchConsumed?.();
 
-    if (thread.config.model) {
-      useSharedSettings.getState().pushRecentModel(thread.agentKind, thread.config.model);
-    }
-
     // Optimistic user_message for the FIRST prompt in a fresh GUI thread.
     // Without this the chat sits empty for the duration of the supervisor's
     // structured-session bringup (process spawn + ACP handshake +
@@ -238,6 +234,12 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     // this id when it emits its own canonical user_message events so the
     // renderer's per-id dedupe drops the duplicate.
     const presentation = thread.presentationMode ?? "terminal";
+    if (thread.config.model) {
+      useSharedSettings
+        .getState()
+        .pushRecentModel(thread.agentKind, thread.config.model, presentation);
+    }
+
     let optimisticUserMessageItemId: string | undefined;
     if (
       presentation === "gui" &&

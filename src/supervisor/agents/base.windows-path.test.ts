@@ -103,6 +103,22 @@ describe.skipIf(process.platform !== "win32")("Windows executable path fallback"
     );
   });
 
+  it("prefers npm .cmd shims over extensionless POSIX shims", () => {
+    spawnSyncMock.mockReturnValueOnce({
+      error: undefined,
+      status: 0,
+      stdout: [
+        "C:\\Users\\demo\\AppData\\Roaming\\npm\\gemini",
+        "C:\\Users\\demo\\AppData\\Roaming\\npm\\gemini.cmd",
+      ].join("\r\n"),
+      stderr: "",
+    });
+
+    expect(resolveExecutablePath("gemini")).toBe(
+      "C:\\Users\\demo\\AppData\\Roaming\\npm\\gemini.cmd",
+    );
+  });
+
   it("applies the same fallback to async resolution", async () => {
     execFileAsyncMock.mockRejectedValueOnce(new Error("not found")).mockResolvedValueOnce({
       stdout: "C:\\Users\\demo\\scoop\\shims\\opencode.exe\r\n",
@@ -127,6 +143,20 @@ describe.skipIf(process.platform !== "win32")("Windows executable path fallback"
         timeout: 5_000,
         windowsHide: true,
       }),
+    );
+  });
+
+  it("prefers npm .cmd shims during async resolution", async () => {
+    execFileAsyncMock.mockResolvedValueOnce({
+      stdout: [
+        "C:\\Users\\demo\\AppData\\Roaming\\npm\\gemini",
+        "C:\\Users\\demo\\AppData\\Roaming\\npm\\gemini.cmd",
+      ].join("\r\n"),
+      stderr: "",
+    });
+
+    await expect(resolveExecutablePathAsync("gemini")).resolves.toBe(
+      "C:\\Users\\demo\\AppData\\Roaming\\npm\\gemini.cmd",
     );
   });
 });

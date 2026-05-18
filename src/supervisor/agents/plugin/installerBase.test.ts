@@ -20,6 +20,7 @@ import {
   isPluginAssetsFresh,
   isWslPluginContext,
   memoByCtx,
+  parseExistingHooksJson,
   PLUGIN_ASSET_FILES,
   quoteHookCommandArg,
   readBundledPluginVersion,
@@ -119,6 +120,43 @@ describe("readPluginManifest + readBundledPluginVersion", () => {
         throw new Error("boom");
       }),
     ).toBe("0.0.0");
+  });
+});
+
+describe("parseExistingHooksJson", () => {
+  it("parses JSON with leading NUL padding", () => {
+    const dir = makeTempDir();
+    const hooksPath = join(dir, "hooks.json");
+    writeFileSync(
+      hooksPath,
+      Buffer.concat([Buffer.alloc(64), Buffer.from('{"version":1}', "utf8")]),
+    );
+
+    expect(parseExistingHooksJson(hooksPath)).toEqual({ version: 1 });
+  });
+
+  it("treats zero-filled files as empty hooks documents", () => {
+    const dir = makeTempDir();
+    const hooksPath = join(dir, "hooks.json");
+    writeFileSync(hooksPath, Buffer.alloc(64));
+
+    expect(parseExistingHooksJson(hooksPath)).toEqual({});
+  });
+
+  it("parses UTF-16LE hooks files", () => {
+    const dir = makeTempDir();
+    const hooksPath = join(dir, "hooks.json");
+    writeFileSync(hooksPath, Buffer.from('{"version":1}', "utf16le"));
+
+    expect(parseExistingHooksJson(hooksPath)).toEqual({ version: 1 });
+  });
+
+  it("returns null for malformed hooks files", () => {
+    const dir = makeTempDir();
+    const hooksPath = join(dir, "hooks.json");
+    writeFileSync(hooksPath, "not-json", "utf8");
+
+    expect(parseExistingHooksJson(hooksPath)).toBeNull();
   });
 });
 

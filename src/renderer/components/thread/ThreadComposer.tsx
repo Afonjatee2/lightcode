@@ -12,7 +12,7 @@ import {
 } from "@/renderer/components/common";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { PermissionIcon } from "@/renderer/components/providers/PermissionIcon";
-import type { LabeledOption } from "@/shared/contracts";
+import type { LabeledOption, ThreadPresentationMode } from "@/shared/contracts";
 
 export type OptionMenuOption = string | { id: string; label: string; hint?: string };
 
@@ -65,6 +65,7 @@ export type ComposerControl =
       currentAgentKind: string;
       currentModel: string;
       lockedAgentKind?: string;
+      presentationMode?: ThreadPresentationMode;
       isDisabled?: boolean;
       hideLabelOnWrap?: boolean;
       openSignal?: number;
@@ -192,7 +193,7 @@ export function ThreadComposer(props: {
   const derivedToolbarLayoutKey = controls
     .map((control) => {
       if (control.kind === "provider-model") {
-        return `provider-model:${control.currentAgentKind}:${control.currentModel}:${control.hideLabelOnWrap ? "hide" : "show"}`;
+        return `provider-model:${control.currentAgentKind}:${control.currentModel}:${control.presentationMode ?? ""}:${control.hideLabelOnWrap ? "hide" : "show"}`;
       }
       if (control.kind === "effort-context") {
         return `effort-context:${control.effortValue ?? ""}:${control.contextValue ?? ""}:${control.thinkingValue ?? ""}:${control.hideLabelOnWrap ? "hide" : "show"}`;
@@ -298,6 +299,7 @@ export function ThreadComposer(props: {
           currentAgentKind={control.currentAgentKind}
           currentModel={control.currentModel}
           {...(control.lockedAgentKind ? { lockedAgentKind: control.lockedAgentKind } : {})}
+          {...(control.presentationMode ? { presentationMode: control.presentationMode } : {})}
           {...(control.isDisabled !== undefined ? { isDisabled: control.isDisabled } : {})}
           {...(control.openSignal !== undefined ? { openSignal: control.openSignal } : {})}
           {...(control.hideLabelOnWrap || shouldHideLabel

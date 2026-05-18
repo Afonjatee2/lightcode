@@ -44,6 +44,7 @@ import { commandIntentDisplay } from "./commandSummary";
 import { InlineDiffView } from "./InlineDiffView";
 import { detectLanguageFromPath, type ViewportLanguage } from "./languageDetect";
 import { deriveToolDisplay, isSubAgentTool } from "./toolDisplay";
+import { FileContentPlaceholder, useReadAbsoluteFile } from "./useReadAbsoluteFile";
 
 interface ToolCallGroupProps {
   threadId: string;
@@ -201,6 +202,11 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
   const actions = useChatPaneActions();
   const [isExpanded, setIsExpanded] = useState(false);
   const row = getInlineRow(item, isExpanded);
+  const fetchTarget =
+    row?.fetchPath && actions?.projectLocation
+      ? { path: row.fetchPath, projectLocation: actions.projectLocation }
+      : null;
+  const fetched = useReadAbsoluteFile(isExpanded ? fetchTarget : null);
   if (!row) return null;
   const Icon = row.Icon;
 
@@ -247,7 +253,16 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
       </Disclosure.Heading>
       <Disclosure.Content>
         <Disclosure.Body className="pb-1 pl-4 pt-1">
-          {row.bodyText ? (
+          {fetchTarget ? (
+            fetched.content !== undefined ? (
+              <CommandOutputViewport
+                text={fetched.content}
+                language={detectLanguageFromPath(fetchTarget.path)}
+              />
+            ) : (
+              <FileContentPlaceholder state={fetched.state} reason={fetched.reason} />
+            )
+          ) : row.bodyText ? (
             row.bodyKind === "diff" ? (
               <InlineDiffView diffText={row.bodyText} filePath={row.bodyFilePath ?? ""} />
             ) : (
@@ -257,7 +272,7 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
               />
             )
           ) : null}
-          <ToolCallSections sections={row.sections} />
+          {fetchTarget ? null : <ToolCallSections sections={row.sections} />}
         </Disclosure.Body>
       </Disclosure.Content>
     </Disclosure>
@@ -281,6 +296,13 @@ type InlineRow = {
   bodyLanguage?: ViewportLanguage | undefined;
   bodyKind?: "text" | "diff" | undefined;
   bodyFilePath?: string | undefined;
+  /**
+   * Absolute path to lazily read from disk when the row is expanded. Set for
+   * ACP read tools (e.g. Gemini's `read_file`) that report `locations[]` but
+   * no file content in `result`. The renderer fetches via `readAbsoluteFile`
+   * and shows the body with syntax highlighting.
+   */
+  fetchPath?: string | undefined;
 };
 
 function InlineRowTitle({
@@ -328,9 +350,11 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
   const display = deriveToolDisplay(payload);
   const diffPart = isEditLikeToolPayload(payload) ? extractAcpDiffResultPart(payload) : undefined;
   const diffText = diffPart?.text || undefined;
-  const hasDetails = payload.args !== undefined || payload.result !== undefined || !!diffText;
+  const lazyReadPath = pickLazyReadPath(payload);
+  const hasDetails =
+    payload.args !== undefined || payload.result !== undefined || !!diffText || !!lazyReadPath;
   const sections: ToolCallSection[] =
-    isExpanded && hasDetails && !diffText
+    isExpanded && hasDetails && !diffText && !lazyReadPath
       ? [
           { label: "args", part: extractAcpArgsPart(payload) },
           { label: "result", part: extractAcpResultPart(payload) },
@@ -357,7 +381,20 @@ function getToolCallRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow |
     bodyText: isExpanded ? diffText : undefined,
     bodyKind: diffText ? "diff" : "text",
     bodyFilePath: display.parts?.filePath ? display.parts.path : undefined,
+    fetchPath: lazyReadPath,
   };
+}
+
+/**
+ * For ACP read tools that didn't carry the file content in the result (e.g.
+ * Gemini's `read_file`), return the absolute path so the renderer can lazily
+ * fetch the file from disk when the row is expanded. Returns undefined when
+ * the payload already contains a result — those use the existing result path.
+ */
+function pickLazyReadPath(payload: ToolCallPayload): string | undefined {
+  if (payload.kind !== "read") return undefined;
+  if (payload.result !== undefined) return undefined;
+  return payload.locations?.find((location) => location.path.length > 0)?.path;
 }
 
 function isEditLikeToolPayload(payload: ToolCallPayload): boolean {

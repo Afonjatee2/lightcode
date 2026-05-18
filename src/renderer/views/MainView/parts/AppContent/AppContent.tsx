@@ -211,7 +211,7 @@ export function AppContent() {
         const handoffPrompt = `This task was handed off from a ${extractedContext.sourceProvider} session. Use the attached context file as prior conversation context.`;
         const launchSegments: PromptSegment[] = [
           { kind: "text", content: `${handoffPrompt}\n\n` },
-          { kind: "attachment", path: filePath },
+          { kind: "attachment", path: filePath, mimeType: "text/markdown" },
           { kind: "text", content: "\n\n" },
           ...(segments ?? [{ kind: "text" as const, content: prompt }]),
         ];

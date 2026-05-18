@@ -483,23 +483,8 @@ export async function probeAcpCapabilities(
       if (mapped.approvalPolicies.length) probeResult.approvalPolicies = mapped.approvalPolicies;
     }
 
-    console.log(
-      [
-        `${tag} success`,
-        `  models: ${probeResult.models?.length ?? 0}`,
-        `  efforts: ${probeResult.efforts?.join(", ") ?? "(none)"}`,
-        `  defaultEffort: ${probeResult.defaultEffort ?? "(none)"}`,
-        `  modelEfforts: ${probeResult.modelEfforts ? Object.keys(probeResult.modelEfforts).length : 0}`,
-        `  modes: ${probeResult.modes?.join(", ") ?? "(none)"}`,
-        `  approvalPolicies: ${probeResult.approvalPolicies?.map((p) => p.id).join(", ") ?? "(none)"}`,
-        `  slashCommands: ${probeResult.slashCommands?.length ?? 0}`,
-        `  raw ACP modes: ${result.modes?.availableModes?.map((m) => m.id).join(", ") ?? "(none)"}`,
-      ].join("\n"),
-    );
-
     return probeResult;
-  } catch (err) {
-    console.log("%s failed: %s", tag, err instanceof Error ? err.message : err);
+  } catch {
     if (Object.keys(probeResult).length > 0) {
       return probeResult;
     }

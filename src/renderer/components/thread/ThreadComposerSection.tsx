@@ -33,6 +33,7 @@ import { ThreadErrorDock } from "./ThreadErrorDock";
 import { ThreadGoalDock } from "./ThreadGoalDock";
 import { ThreadPendingSteerStrip } from "./ThreadPendingSteerStrip";
 import { ThreadRuntimeRequestPanel } from "./ThreadRuntimeRequestPanel";
+import { getApprovalDenyOption } from "./ThreadRuntimeRequestPanel/helpers";
 import { ThreadAuthRequiredDock } from "./ThreadAuthRequiredDock";
 import { ThreadTodoDock } from "./ThreadTodoDock";
 import { hasReportedContextUsage, resolveThreadContextUsageSummary } from "./threadContextUsage";
@@ -145,6 +146,7 @@ function buildControls(
       currentAgentKind: thread.agentKind,
       currentModel: effectiveConfig.model,
       lockedAgentKind: thread.agentKind,
+      presentationMode,
       isDisabled,
       hideLabelOnWrap: true,
       tier: 5,
@@ -389,6 +391,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const usesPendingSteerPath = !usesTerminalPresentation && thread.status === "working";
   const runtimeRequests = useAppStore((s) => s.runtimeRequestsByThread[thread.id]);
   const activeRuntimeRequest = !usesTerminalPresentation ? runtimeRequests?.[0] : undefined;
+  const approvalDenyOption = activeRuntimeRequest
+    ? getApprovalDenyOption(activeRuntimeRequest)
+    : undefined;
   const reportedContextUsage = useAppStore((s) =>
     !usesTerminalPresentation ? s.runtimeContextByThread[thread.id] : undefined,
   );
@@ -520,6 +525,28 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
       ? (props.terminalPaneRef.current?.focus(), new Promise<void>((r) => setTimeout(r, 80)))
       : Promise.resolve();
 
+    // If an approval is pending, send a decline before submitting the message.
+    // The user's text becomes the next turn; the supervisor sees the denial
+    // first, then the follow-up prompt explaining what to do differently.
+    const denyPendingApproval = () => {
+      if (!activeRuntimeRequest || !approvalDenyOption) return Promise.resolve();
+      useAppStore.getState().applyRuntimeEvent(thread.id, {
+        type: "request.resolved",
+        threadId: thread.id,
+        requestId: activeRuntimeRequest.requestId,
+        outcome: "declined",
+      });
+      return props
+        .onResolveServerRequest({
+          requestId: activeRuntimeRequest.requestId,
+          method: "requestPermission",
+          response: { optionId: approvalDenyOption.optionId },
+        })
+        .catch((err) => {
+          console.error("[chat] auto-deny on composer submit failed", err);
+        });
+    };
+
     // GUI threads + working status → stage as pending steer (replace-latest).
     // The supervisor fires the cancel and drains the slot when the in-flight
     // turn returns with `cancelled` stopReason. No optimistic chat paint —
@@ -541,6 +568,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     }
 
     void focusPromise
+      .then(denyPendingApproval)
       .then(runSubmission)
       .then(() => {
         if (!clearedBeforeSendSettled) {
@@ -762,9 +790,11 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                       compact
                       disabled={!(showServerComposer || showTerminalComposer)}
                       placeholder={
-                        isServerControlled
-                          ? `Ask ${agentStatus?.label ?? "the agent"} anything about this workspace`
-                          : "Send a message..."
+                        approvalDenyOption
+                          ? "Deny and tell the agent what to do differently…"
+                          : isServerControlled
+                            ? `Ask ${agentStatus?.label ?? "the agent"} anything about this workspace`
+                            : "Send a message..."
                       }
                       projectLocation={projectLocation}
                       projectId={thread.projectId}

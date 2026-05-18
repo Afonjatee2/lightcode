@@ -1,7 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, watch, type FSWatcher } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, isAbsolute, join } from "node:path";
-import { defaultSharedSettings, normalizeSharedSettings } from "@/shared/settings";
+import { isAbsolute, join } from "node:path";
 import type {
   AgentKind,
   AgentStatusesResponse,
@@ -169,64 +168,12 @@ import { ThreadSessionManager, writeSubmittedPrompt } from "./runtime/threadSess
 import { CliHookPluginCoordinator } from "./runtime/cliHookPluginCoordinator";
 import { dispatchAgentEvent } from "./runtime/agentEventDispatcher";
 import { hookDebugEnvelope, isLightcodeHookDebug } from "./runtime/hookDebug";
+import { SupervisorSharedSettingsCache } from "./runtime/supervisorSharedSettings";
 import { WslBridgeServer } from "./wsl/bridge";
 import { WslBridgeClient } from "./wsl/bridge/client";
 import { resolveWslHelpersDir } from "./wsl/wslDeploy";
-import { decryptSecret, transformSensitiveAgentSecrets } from "./secretStorage";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
-
-function readSupervisorSharedSettings(settingsPath: string) {
-  if (!existsSync(settingsPath)) return { ...defaultSharedSettings };
-  try {
-    return transformSensitiveAgentSecrets(
-      normalizeSharedSettings(JSON.parse(readFileSync(settingsPath, "utf8"))),
-      dirname(settingsPath),
-      decryptSecret,
-    );
-  } catch {
-    return { ...defaultSharedSettings };
-  }
-}
-
-class SupervisorSharedSettingsCache {
-  private cached: ReturnType<typeof readSupervisorSharedSettings> | undefined;
-  private watcher: FSWatcher | undefined;
-
-  constructor(private readonly settingsPath: string) {}
-
-  read(): ReturnType<typeof readSupervisorSharedSettings> {
-    this.cached ??= readSupervisorSharedSettings(this.settingsPath);
-    this.ensureWatcher();
-    return this.cached;
-  }
-
-  invalidate(): void {
-    this.cached = undefined;
-  }
-
-  dispose(): void {
-    this.watcher?.close();
-    this.watcher = undefined;
-    this.cached = undefined;
-  }
-
-  private ensureWatcher(): void {
-    if (this.watcher) return;
-    try {
-      this.watcher = watch(this.settingsPath, () => {
-        this.cached = undefined;
-      });
-      this.watcher.on("error", () => {
-        this.watcher?.close();
-        this.watcher = undefined;
-        this.cached = undefined;
-      });
-    } catch {
-      // Settings may not exist on first boot; the next read will retry.
-    }
-  }
-}
 
 export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);

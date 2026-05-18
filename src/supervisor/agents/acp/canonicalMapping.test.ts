@@ -157,6 +157,203 @@ describe("mapAcpSessionUpdate", () => {
     expect(state.toolCallItems.has("tc-1")).toBe(false);
   });
 
+  it("falls back to the tool title for command_execution when rawInput.command is missing", () => {
+    // Gemini's ACP run_shell_command tool emits `kind: "execute"` with the
+    // command in `title` instead of `rawInput.command`. Without the fallback
+    // the chat row renders `Run: (command)` because canonical `command` is
+    // empty.
+    const state = createAcpMapperState("t-gemini-shell");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-gemini",
+        title: "git status",
+        kind: "execute",
+        status: "in_progress",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const started = events[0] as { itemType: string; payload: Record<string, unknown> };
+    expect(started.itemType).toBe("command_execution");
+    expect(started.payload.command).toBe("git status");
+    expect(started.payload.title).toBe("git status");
+  });
+
+  it("inlines ACP terminal output when the tool_call references a `terminal` content block", () => {
+    // Gemini's shell tool spawns a client-hosted PTY via `createTerminal` and
+    // references it from `content: [{ type: "terminal", terminalId }]`. The
+    // session passes a resolver into the mapper state that returns the live
+    // PTY output for that id; we must surface it on the canonical `result`.
+    const state = createAcpMapperState("t-gemini-terminal");
+    state.resolveTerminalOutput = (id) =>
+      id === "acp-terminal-0" ? "On branch master\nnothing to commit" : undefined;
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-term",
+        title: "git status",
+        kind: "execute",
+        status: "in_progress",
+        content: [{ type: "terminal", terminalId: "acp-terminal-0" }],
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const completed = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-term",
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    // Even though the completion update has no `content` array, the mapper
+    // remembers the terminalId from the initial tool_call and re-snapshots
+    // the PTY output via the resolver.
+    const terminal = completed[0] as { type: string; payload: Record<string, unknown> };
+    expect(terminal.type).toBe("item.completed");
+    expect(terminal.payload.result).toBe("On branch master\nnothing to commit");
+  });
+
+  it("inlines ACP terminal output by command when terminal content is omitted", () => {
+    const state = createAcpMapperState("t-gemini-terminal-by-command");
+    state.resolveTerminalOutputByCommand = (command) =>
+      command === "git diff --name-only HEAD"
+        ? "src/main.ts\nsrc/supervisor/runtime.ts"
+        : undefined;
+    const started = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-term-command",
+        title: "git diff --name-only HEAD",
+        kind: "execute",
+        status: "in_progress",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const itemId = (started[0] as { itemId: string }).itemId;
+
+    const closed = closeOpenTurnItems(state);
+
+    expect(closed).toEqual([
+      {
+        type: "item.completed",
+        threadId: "t-gemini-terminal-by-command",
+        itemId,
+        payload: expect.objectContaining({
+          result: "src/main.ts\nsrc/supervisor/runtime.ts",
+        }),
+      },
+    ]);
+  });
+
+  it("completes terminal tool_call updates that arrive already terminal", () => {
+    const state = createAcpMapperState("t-gemini-terminal-immediate");
+    state.resolveTerminalOutputByCommand = (command) =>
+      command === "git status" ? "On branch master\nnothing to commit" : undefined;
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-term-immediate",
+        title: "git status",
+        kind: "execute",
+        status: "completed",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+
+    expect(events).toHaveLength(2);
+    expect(events[0]?.type).toBe("item.started");
+    expect(events[1]).toMatchObject({
+      type: "item.completed",
+      payload: { result: "On branch master\nnothing to commit" },
+    });
+    expect(closeOpenTurnItems(state)).toEqual([]);
+  });
+
+  it("surfaces ACP content text on the canonical result so Gemini shell output renders", () => {
+    // Gemini's ACP shell tool emits its stdout in `content: [{ type: "content",
+    // content: { type: "text", text: "..." } }]` rather than `rawOutput`. The
+    // chat row's accordion body reads from `payload.result`, so we must mirror
+    // the content text onto `result` here.
+    const state = createAcpMapperState("t-gemini-output");
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-gemini-out",
+        title: "git status",
+        kind: "execute",
+        status: "in_progress",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const completed = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-gemini-out",
+        status: "completed",
+        content: [
+          {
+            type: "content",
+            content: { type: "text", text: "On branch master\nnothing to commit" },
+          },
+        ],
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const terminal = completed[0] as { type: string; payload: Record<string, unknown> };
+    expect(terminal.type).toBe("item.completed");
+    expect(terminal.payload.result).toBe("On branch master\nnothing to commit");
+  });
+
+  it("prefers rawOutput over content text when both are present", () => {
+    // Copilot-style updates carry the structured payload on `rawOutput` and
+    // sometimes also echo a text summary in `content`. Keep rawOutput so the
+    // renderer can pretty-print JSON.
+    const state = createAcpMapperState("t-rawoutput-wins");
+    mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-mixed",
+        title: "shell exec",
+        kind: "execute",
+        status: "in_progress",
+        rawInput: { command: "ls" },
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const completed = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call_update",
+        toolCallId: "tc-mixed",
+        status: "completed",
+        rawOutput: { stdout: "file.txt" },
+        content: [{ type: "content", content: { type: "text", text: "fallback text" } }],
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const terminal = completed[0] as { payload: Record<string, unknown> };
+    expect(terminal.payload.result).toEqual({ stdout: "file.txt" });
+  });
+
+  it("does not use a generic ACP title as the command (Copilot 'shell exec')", () => {
+    // If the title is just a generic descriptor like "shell exec" we'd rather
+    // show the renderer's `(command)` placeholder than mis-label the row.
+    const state = createAcpMapperState("t-copilot-shell-generic");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-copilot-generic",
+        title: "shell exec",
+        kind: "execute",
+        status: "in_progress",
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const started = events[0] as { itemType: string; payload: Record<string, unknown> };
+    expect(started.itemType).toBe("command_execution");
+    expect(started.payload.command).toBe("");
+  });
+
   it("seals orphaned tool calls at turn end", () => {
     const state = createAcpMapperState("t-stop-tool");
     const started = mapAcpSessionUpdate(
@@ -173,7 +370,12 @@ describe("mapAcpSessionUpdate", () => {
     const itemId = (started[0] as { itemId: string }).itemId;
 
     expect(closeOpenTurnItems(state)).toEqual([
-      { type: "item.completed", threadId: "t-stop-tool", itemId },
+      {
+        type: "item.completed",
+        threadId: "t-stop-tool",
+        itemId,
+        payload: expect.objectContaining({ command: "pnpm run test" }),
+      },
     ]);
     expect(state.toolCallItems.size).toBe(0);
   });

@@ -62,8 +62,16 @@ interface SharedSettingsState extends SharedSettings {
     error?: boolean;
   }) => void;
   setNotifyL2Cli: (value: boolean) => void;
-  toggleFavoriteModel: (agentKind: string, modelId: string) => void;
-  pushRecentModel: (agentKind: string, modelId: string) => void;
+  toggleFavoriteModel: (
+    agentKind: string,
+    modelId: string,
+    presentationMode: ThreadPresentationMode,
+  ) => void;
+  pushRecentModel: (
+    agentKind: string,
+    modelId: string,
+    presentationMode: ThreadPresentationMode,
+  ) => void;
 }
 
 const RECENT_MODELS_LIMIT = 16;
@@ -341,23 +349,41 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ notifyL2Cli });
     persistSettings(selectSharedSettings(get()));
   },
-  toggleFavoriteModel: (agentKind, modelId) => {
+  toggleFavoriteModel: (agentKind, modelId, presentationMode) => {
     const current = get().favoriteModels;
-    const idx = current.findIndex((m) => m.agentKind === agentKind && m.modelId === modelId);
+    const idx = current.findIndex(
+      (m) =>
+        m.agentKind === agentKind &&
+        m.modelId === modelId &&
+        m.presentationMode === presentationMode,
+    );
     const next =
       idx >= 0
         ? [...current.slice(0, idx), ...current.slice(idx + 1)]
-        : [...current, { agentKind, modelId }];
+        : [...current, { agentKind, modelId, presentationMode }];
     set({ favoriteModels: next });
     persistSettings(selectSharedSettings(get()));
   },
-  pushRecentModel: (agentKind, modelId) => {
+  pushRecentModel: (agentKind, modelId, presentationMode) => {
     const current = get().recentModels;
-    const filtered = current.filter((m) => !(m.agentKind === agentKind && m.modelId === modelId));
-    const next = [{ agentKind, modelId }, ...filtered].slice(0, RECENT_MODELS_LIMIT);
+    const samePresentation = current.filter((m) => m.presentationMode === presentationMode);
+    const otherPresentations = current.filter((m) => m.presentationMode !== presentationMode);
+    const filtered = samePresentation.filter(
+      (m) => !(m.agentKind === agentKind && m.modelId === modelId),
+    );
+    const nextForPresentation = [{ agentKind, modelId, presentationMode }, ...filtered].slice(
+      0,
+      RECENT_MODELS_LIMIT,
+    );
+    const next = [...nextForPresentation, ...otherPresentations].slice(0, RECENT_MODELS_LIMIT * 2);
     if (
       current.length === next.length &&
-      current.every((m, i) => m.agentKind === next[i]!.agentKind && m.modelId === next[i]!.modelId)
+      current.every(
+        (m, i) =>
+          m.agentKind === next[i]!.agentKind &&
+          m.modelId === next[i]!.modelId &&
+          m.presentationMode === next[i]!.presentationMode,
+      )
     ) {
       return;
     }
