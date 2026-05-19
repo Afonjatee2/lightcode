@@ -6,20 +6,14 @@ import { readBridge } from "@/renderer/bridge";
 import { runAgentLoginCommand } from "@/renderer/actions/agentLoginActions";
 import { openSettings } from "@/renderer/actions/panelActions";
 import { Button } from "@/renderer/components/common";
-import { useAppStore } from "@/renderer/state/appStore";
-import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import {
-  acpGenericInstanceId,
   agentAuthTarget,
+  currentWslDistros,
   findAgentAuthMethodForStatus,
+  findTerminalAuthMethodForStatus,
   scopeEnvForStatus,
 } from "@/renderer/utils/acpRegistryAuth";
 import { ThreadDockHeader, ThreadDockSection } from "./ThreadDockUI";
-
-function currentWslDistros(): string[] {
-  const key = buildWslProjectDistrosKey(useAppStore.getState().projects);
-  return key ? key.split("\0") : [];
-}
 
 async function refreshAgentStatus(status: AgentStatus): Promise<void> {
   await readBridge().refreshAgentStatuses(currentWslDistros(), {
@@ -32,8 +26,8 @@ export function ThreadAuthRequiredDock(props: { agentStatus: AgentStatus; projec
   const { agentStatus, project } = props;
   const [pendingAction, setPendingAction] = useState<"login" | "refresh" | undefined>();
   const agentAuthMethod = findAgentAuthMethodForStatus(agentStatus);
-  const registryAgentId = acpGenericInstanceId(agentStatus.kind);
-  const canUseAgentAuth = agentAuthMethod !== undefined && registryAgentId !== undefined;
+  const terminalAuthMethod = findTerminalAuthMethodForStatus(agentStatus);
+  const canUseAgentAuth = agentAuthMethod !== undefined;
   const canUseTerminalLogin = Boolean(agentStatus.loginCommand);
   const hasDirectLogin = canUseAgentAuth || canUseTerminalLogin;
   const description = agentAuthMethod
@@ -47,8 +41,8 @@ export function ThreadAuthRequiredDock(props: { agentStatus: AgentStatus; projec
     if (canUseAgentAuth) {
       setPendingAction("login");
       try {
-        await readBridge().authenticateAcpRegistryAgent({
-          agentId: registryAgentId,
+        await readBridge().authenticateAcpAgent({
+          agentKind: agentStatus.kind,
           methodId: agentAuthMethod.id,
           ...agentAuthTarget(agentStatus),
         });
@@ -69,6 +63,7 @@ export function ThreadAuthRequiredDock(props: { agentStatus: AgentStatus; projec
       runAgentLoginCommand({
         label: agentStatus.label,
         command: agentStatus.loginCommand,
+        ...(terminalAuthMethod?.env ? { env: terminalAuthMethod.env } : {}),
         ...(project ? { project } : {}),
       });
     }

@@ -26,6 +26,10 @@ import { parseAcpGenericInstanceConfig } from "@/shared/contracts";
 import {
   authenticateAcpAgent,
   createAcpStructuredSession,
+  dedupeAcpAuthMethods,
+  isAcpAgentAuthMethod,
+  isAcpEnvVarAuthMethod,
+  isAcpTerminalAuthMethod,
   logoutAcpAgent,
   probeAcpCapabilities,
   type AcpProbeResult,
@@ -41,10 +45,6 @@ import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
 
 /** Prefix for generic-ACP `kind` values. Unique per registered instance. */
 export const ACP_GENERIC_KIND_PREFIX = "acp-generic:";
-type AcpAuthMethod = NonNullable<AcpProbeResult["authMethods"]>[number];
-type AcpEnvVarAuthMethod = Extract<AcpAuthMethod, { type: "env_var" }>;
-type AcpTerminalAuthMethod = Extract<AcpAuthMethod, { type: "terminal" }>;
-type AcpAgentAuthMethod = Exclude<AcpAuthMethod, AcpEnvVarAuthMethod | AcpTerminalAuthMethod>;
 
 export function acpGenericKind(instanceId: string): string {
   return `${ACP_GENERIC_KIND_PREFIX}${instanceId}`;
@@ -105,7 +105,7 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
         ? {
             ...rawProbe,
             ...(rawProbe.authMethods
-              ? { authMethods: dedupeAuthMethods(rawProbe.authMethods) }
+              ? { authMethods: dedupeAcpAuthMethods(rawProbe.authMethods) }
               : {}),
           }
         : undefined;
@@ -142,6 +142,10 @@ export function createAcpGenericAdapter(instance: AgentInstanceConfig): AgentAda
       const command = buildGenericCommand(input.projectLocation, cfg, instance);
       return createAcpStructuredSession(command, input);
     },
+    async buildAcpAuthCommand(ctx?: AgentEnvContext) {
+      const location = detectProbeLocation(ctx);
+      return buildGenericCommand(location, cfg, instance);
+    },
   };
 
   return adapter;
@@ -161,6 +165,20 @@ export async function authenticateAcpGenericInstance(
     ...(command.env ? { env: command.env } : {}),
     label: instance.displayName ?? cfg.binary,
   });
+}
+
+export async function verifyAcpGenericAuthentication(
+  instance: AgentInstanceConfig,
+  ctx?: AgentEnvContext,
+): Promise<boolean> {
+  const cfg = parseAcpGenericInstanceConfig(instance.config);
+  const result = await probeGenericCapabilities(
+    ctx,
+    cfg,
+    instance,
+    instance.displayName ?? cfg.binary,
+  );
+  return result?.authState === "authenticated";
 }
 
 export async function logoutAcpGenericInstance(
@@ -321,27 +339,6 @@ function isProbablyInstalled(binary: string): boolean {
   return true;
 }
 
-function isEnvVarAuthMethod(method: AcpAuthMethod): method is AcpEnvVarAuthMethod {
-  return ("type" in method && method.type === "env_var") || "vars" in method;
-}
-
-function isTerminalAuthMethod(method: AcpAuthMethod): method is AcpTerminalAuthMethod {
-  return "type" in method && method.type === "terminal";
-}
-
-function isAgentAuthMethod(method: AcpAuthMethod): method is AcpAgentAuthMethod {
-  return !isEnvVarAuthMethod(method) && !isTerminalAuthMethod(method);
-}
-
-// Some ACP agents advertise both an env_var method and a
-// typeless "agent" method for the same credential — the agent-owned one is a
-// stub whose authenticate() just acks. Drop those duplicates so the UI shows
-// only the real flow.
-function dedupeAuthMethods(methods: readonly AcpAuthMethod[]): AcpAuthMethod[] {
-  const envVarNames = new Set(methods.filter(isEnvVarAuthMethod).map((method) => method.name));
-  return methods.filter((method) => !(isAgentAuthMethod(method) && envVarNames.has(method.name)));
-}
-
 function resolveGenericAuthState(
   cfg: AcpGenericInstanceConfig,
   instance: AgentInstanceConfig,
@@ -353,7 +350,7 @@ function resolveGenericAuthState(
     return value && value.length > 0 ? "authenticated" : "missing";
   }
   for (const method of probeResult?.authMethods ?? []) {
-    if (!isEnvVarAuthMethod(method)) continue;
+    if (!isAcpEnvVarAuthMethod(method)) continue;
     const requiredVars = method.vars.filter((variable) => variable.optional !== true);
     if (
       requiredVars.some(
@@ -376,7 +373,7 @@ function resolveGenericAuthState(
   }
   if (
     probeResult?.authMethods?.some(
-      (method) => isTerminalAuthMethod(method) || isAgentAuthMethod(method),
+      (method) => isAcpTerminalAuthMethod(method) || isAcpAgentAuthMethod(method),
     )
   ) {
     return "missing";
@@ -400,7 +397,7 @@ function resolveGenericLoginCommand(
   cfg: AcpGenericInstanceConfig,
   probeResult: AcpProbeResult | undefined,
 ): string | undefined {
-  const terminalMethod = probeResult?.authMethods?.find(isTerminalAuthMethod);
+  const terminalMethod = probeResult?.authMethods?.find(isAcpTerminalAuthMethod);
   if (!terminalMethod) return undefined;
   return [cfg.binary, ...(cfg.args ?? []), ...(terminalMethod.args ?? [])].join(" ");
 }
@@ -408,7 +405,7 @@ function resolveGenericLoginCommand(
 function resolveGenericProviderMetadata(
   probeResult: AcpProbeResult | undefined,
 ): AgentStatus["providerMetadata"] | undefined {
-  const methods = probeResult?.authMethods?.filter(isEnvVarAuthMethod);
+  const methods = probeResult?.authMethods?.filter(isAcpEnvVarAuthMethod);
   if (!methods?.length) return undefined;
   return { authMethod: [...new Set(methods.map((method) => method.name))].join(", ") };
 }

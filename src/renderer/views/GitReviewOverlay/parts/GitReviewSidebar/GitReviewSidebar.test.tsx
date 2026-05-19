@@ -122,9 +122,11 @@ vi.mock("@/renderer/state/sharedSettingsStore", () => ({
       conflictResolverProvider: string;
       conflictResolverModel: string;
       conflictResolverEffort: string;
+      conflictResolverPresentationMode: "terminal" | "gui";
       wslConflictResolverProvider: string;
       wslConflictResolverModel: string;
       wslConflictResolverEffort: string;
+      wslConflictResolverPresentationMode: "terminal" | "gui";
     }) => unknown,
   ) =>
     selector({
@@ -137,9 +139,11 @@ vi.mock("@/renderer/state/sharedSettingsStore", () => ({
       conflictResolverProvider: "auto",
       conflictResolverModel: "",
       conflictResolverEffort: "",
+      conflictResolverPresentationMode: "gui",
       wslConflictResolverProvider: "auto",
       wslConflictResolverModel: "",
       wslConflictResolverEffort: "",
+      wslConflictResolverPresentationMode: "gui",
     }),
 }));
 

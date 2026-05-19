@@ -85,6 +85,8 @@ export function GeneralSettings() {
   const setPreventSleepWhileWorking = useSharedSettings(
     (state) => state.setPreventSleepWhileWorking,
   );
+  const closeToTray = useSharedSettings((state) => state.closeToTray);
+  const setCloseToTray = useSharedSettings((state) => state.setCloseToTray);
   const threadRemoveAction = useSharedSettings((state) => state.threadRemoveAction);
   const setThreadRemoveAction = useSharedSettings((state) => state.setThreadRemoveAction);
   const newThreadMode = useSharedSettings((state) => state.newThreadMode);
@@ -321,6 +323,28 @@ export function GeneralSettings() {
               onChange={(selected) => {
                 startTransition(() => {
                   setPreventSleepWhileWorking(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Close to tray</p>
+              <p className="text-xs text-muted">
+                When you close the window, keep Lightcode running in the system tray. Disable to
+                quit on close.
+              </p>
+            </div>
+            <Switch
+              isSelected={closeToTray}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setCloseToTray(selected);
                 });
               }}
             >

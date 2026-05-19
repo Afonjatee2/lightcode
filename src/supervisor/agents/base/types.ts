@@ -1,9 +1,11 @@
 import type {
+  AgentAuthMethod,
   AgentCapability,
   AgentKind,
   AgentProviderMetadata,
   AgentSlashCommand,
   AgentStatus,
+  AgentUpdateInfo,
   AuthState,
   ProjectLocation,
   PromptSegment,
@@ -132,16 +134,35 @@ export interface StatusProbeResult {
 
 export type StatusProbe = (ctx: DetectProbeCtx) => Promise<StatusProbeResult | undefined>;
 
+/**
+ * Return shape for {@link DetectionSpec.capabilitiesProbe}. Bundles the
+ * capability partial with optional ACP auth bits so a single ACP probe can
+ * surface both `models/efforts/modes` and `authMethods/authLogoutSupported`
+ * without round-tripping the agent twice.
+ *
+ * `authState` is the ACP-protocol-native auth signal: `"authenticated"` when
+ * the probe's `newSession` call succeeded, `"missing"` when it returned the
+ * `auth_required` JSON-RPC error. When set, `detectAgentInstall` honors it
+ * over the spec's heuristic `authProbes` so post-logout state is reflected
+ * without depending on env-var or config-dir checks the agent doesn't clear.
+ */
+export type CapabilitiesProbeResult = Partial<AgentCapability> & {
+  authMethods?: AgentAuthMethod[];
+  authLogoutSupported?: boolean;
+  authState?: AuthState;
+};
+
 export interface DetectionSpec {
   kind: AgentKind;
   label: string;
   binary: string;
   loginCommand?: string;
   capabilities: AgentCapability;
+  update?: AgentUpdateInfo;
   versionArgs?: string[];
   statusProbe?: StatusProbe;
   authProbes?: AuthProbe[];
-  capabilitiesProbe?: (ctx: DetectProbeCtx) => Promise<Partial<AgentCapability> | undefined>;
+  capabilitiesProbe?: (ctx: DetectProbeCtx) => Promise<CapabilitiesProbeResult | undefined>;
 }
 
 export interface AgentMetadata {
@@ -149,6 +170,7 @@ export interface AgentMetadata {
   label: string;
   binary?: string;
   capabilities: AgentCapability;
+  update?: AgentUpdateInfo;
   spawnEnv?: {
     native?: Record<string, string>;
     wsl?: Record<string, string>;
@@ -174,6 +196,19 @@ export interface AgentLauncher {
 
 export interface AgentDetector {
   detectInstall(ctx?: AgentEnvContext): Promise<AgentStatus>;
+}
+
+/**
+ * Optional contract implemented by ACP-speaking adapters so the supervisor can
+ * spawn the agent in ACP mode for `authenticate()` / `unstable_logout()` calls
+ * (separate from the long-running structured session). Each adapter knows the
+ * exact flags + executable path resolution for its own binary; returning the
+ * same CommandSpec used during `probeAcpCapabilities` keeps the auth handshake
+ * consistent with detection.
+ */
+export interface AgentAcpAuth {
+  buildAcpAuthCommand(ctx?: AgentEnvContext): Promise<CommandSpec | undefined>;
+  buildAcpLogoutCommand?(ctx?: AgentEnvContext): Promise<CommandSpec | undefined>;
 }
 
 export interface AgentPromptFormatter {
@@ -235,6 +270,46 @@ export interface AgentOneShotRunner {
   ): { command: string; args: string[]; stdin?: string } | undefined;
 }
 
+/**
+ * Optional per-adapter contract for updating the installed agent binary in a
+ * given environment (Windows / WSL distro). Adapters that wrap a CLI with a
+ * built-in self-updater (e.g. `claude update`, `opencode upgrade`) return that
+ * spec; others may return `undefined` to let the supervisor fall back to
+ * package-manager detection (npm / brew / winget) or a re-run of the install
+ * script.
+ *
+ * Commands are executed by the supervisor via the standard agent command
+ * runner, so they inherit the same login-shell / WSL routing used for detection.
+ */
+export interface AgentUpdaterCommand {
+  /** Executable name or absolute path (e.g. "claude", "npm", "brew"). */
+  binary: string;
+  args: string[];
+  /** Optional environment overrides merged onto the parent process env. */
+  env?: Record<string, string>;
+  /** Strategy label surfaced to the renderer for telemetry / messaging. */
+  strategy:
+    | "built-in"
+    | "npm-global"
+    | "pnpm-global"
+    | "bun-global"
+    | "brew"
+    | "winget"
+    | "installer";
+}
+
+export interface AgentUpdater {
+  /**
+   * Build the update command for a given (env, installed-status) pair. Return
+   * `undefined` to defer to the shared package-manager fallback.
+   *
+   * Implementations should be cheap — only synchronous probing or path
+   * inspection. Heavy work (network, version comparison) lives in detect /
+   * status probes.
+   */
+  buildUpdateCommand?(ctx: AgentEnvContext, status: AgentStatus): AgentUpdaterCommand | undefined;
+}
+
 export interface AgentCliHookPluginSupport {
   readonly pluginId: string;
   readonly pluginVersion: string;
@@ -260,6 +335,8 @@ export interface AgentAdapter
     AgentTerminalObserver,
     AgentSessionTracker,
     AgentOneShotRunner,
+    AgentUpdater,
+    Partial<AgentAcpAuth>,
     Partial<AgentCliHookPluginSupport> {}
 
 export interface TerminalStatusHint {

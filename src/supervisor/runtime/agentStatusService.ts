@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { promisify } from "node:util";
 import { z } from "zod";
 import {
@@ -142,6 +142,7 @@ export async function detectWslAgentStatuses(
               installed: true,
               authState: "unknown" as const,
               capabilities: adapter.capabilities,
+              ...(adapter.update ? { update: adapter.update } : {}),
               envKind: "wsl" as const,
               envDistro: distro,
             };
@@ -160,6 +161,7 @@ export async function detectWslAgentStatuses(
               installed: false,
               authState: "unknown" as const,
               capabilities: adapter.capabilities,
+              ...(adapter.update ? { update: adapter.update } : {}),
               envKind: "wsl" as const,
               envDistro: distro,
             };
@@ -244,10 +246,11 @@ export class AgentStatusService {
     wslDistros: readonly string[],
     scope: RefreshAgentScope,
   ): Promise<AgentStatusesResponse> {
+    const existing = this.readCachedStatuses(wslDistros);
     // Without a baseline cache we have no merge target — fall back to a full
     // detection so the renderer ends up with a complete list. Callers
     // typically hit this path well after startup, so this is rare.
-    if (!existsSync(this.options.statusCachePath)) {
+    if (!existing.fromCache) {
       this.startupDetectionLaunched = true;
       const fresh = await this.runDetectionTask(() => this.runDetection(wslDistros));
       return { ...fresh, fromCache: false };
@@ -261,7 +264,6 @@ export class AgentStatusService {
 
     const targetEnvs = this.resolveScopedEnvs(scope.envs, wslDistros);
     const disabled = this.readDisabledAgents();
-    const existing = this.readCachedStatuses(wslDistros);
 
     const probed = await Promise.all(
       targetAdapters.flatMap((adapter) =>
@@ -309,6 +311,7 @@ export class AgentStatusService {
         installed: true,
         authState: "unknown",
         capabilities: adapter.capabilities,
+        ...(adapter.update ? { update: adapter.update } : {}),
         envKind,
         ...(envDistro ? { envDistro } : {}),
       };
@@ -332,6 +335,7 @@ export class AgentStatusService {
         installed: false,
         authState: "unknown",
         capabilities: adapter.capabilities,
+        ...(adapter.update ? { update: adapter.update } : {}),
         envKind,
         ...(envDistro ? { envDistro } : {}),
       };
@@ -350,9 +354,6 @@ export class AgentStatusService {
    */
   private readCachedStatuses(wslDistros: readonly string[]): AgentStatusesResponse {
     try {
-      if (!existsSync(this.options.statusCachePath)) {
-        return { windows: [], wsl: [], fromCache: false };
-      }
       const raw = readFileSync(this.options.statusCachePath, "utf8");
       const cache = JSON.parse(raw) as {
         windows?: unknown[];
@@ -375,14 +376,21 @@ export class AgentStatusService {
   private withCachedCapabilityDefaults(status: AgentStatus): AgentStatus {
     const adapter = this.options.adapters.get(status.kind);
     const fallbackSlashCommands = adapter?.capabilities.slashCommands;
-    if (status.capabilities.slashCommands !== undefined || fallbackSlashCommands === undefined) {
+    const fallbackUpdate = adapter?.update;
+    if (
+      (status.capabilities.slashCommands !== undefined || fallbackSlashCommands === undefined) &&
+      (status.update !== undefined || fallbackUpdate === undefined)
+    ) {
       return status;
     }
     return {
       ...status,
+      ...(status.update === undefined && fallbackUpdate ? { update: fallbackUpdate } : {}),
       capabilities: {
         ...status.capabilities,
-        slashCommands: fallbackSlashCommands,
+        ...(status.capabilities.slashCommands === undefined && fallbackSlashCommands
+          ? { slashCommands: fallbackSlashCommands }
+          : {}),
       },
     };
   }

@@ -1,6 +1,7 @@
 import type { RefCallback } from "react";
 import { TerminalSquare, X } from "lucide-react";
 import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
+import { ProjectSwitchMenu } from "./ProjectSwitchMenu";
 
 export type ThreadDraftDropIndicator =
   | false
@@ -15,7 +16,8 @@ export function ThreadDraftCompactHeader(props: {
   dragHandleRef?: RefCallback<Element> | undefined;
   headerNeedsTrafficLightPad: boolean;
   onClose?: (() => void) | undefined;
-  projectName: string;
+  projectId: string;
+  paneId?: string | undefined;
   showCloseButton?: boolean | undefined;
 }) {
   return (
@@ -29,7 +31,11 @@ export function ThreadDraftCompactHeader(props: {
           New thread
         </span>
         <div className="flex shrink-0 items-center">
-          <span className="px-1 text-sm leading-tight text-muted/60">{props.projectName}</span>
+          <ProjectSwitchMenu
+            currentProjectId={props.projectId}
+            variant="compact"
+            {...(props.paneId ? { paneId: props.paneId } : {})}
+          />
           {props.showCloseButton && props.onClose && (
             <button
               type="button"
@@ -88,7 +94,11 @@ export function ThreadDraftDropIndicators(props: {
   );
 }
 
-export function ThreadDraftHero(props: { compact?: boolean | undefined; projectName: string }) {
+export function ThreadDraftHero(props: {
+  compact?: boolean | undefined;
+  projectId: string;
+  paneId?: string | undefined;
+}) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center">
       <div className="w-full max-w-[920px] overflow-visible pb-3 text-center">
@@ -100,11 +110,15 @@ export function ThreadDraftHero(props: { compact?: boolean | undefined; projectN
           </span>
           <TerminalSquare className="translate-y-[-0.04em] size-[0.48em] shrink-0 text-[color:color-mix(in_oklab,var(--accent)_58%,var(--foreground))] opacity-90" />
         </h1>
-        <p
-          className={`mx-auto mt-1.5 max-w-full truncate pb-[0.08em] leading-snug font-medium tracking-normal text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono ${props.compact ? "text-[clamp(0.6875rem,1.05vw,0.8125rem)]" : "text-[clamp(0.75rem,1.35vw,0.9375rem)]"}`}
+        <div
+          className={`mt-1.5 flex justify-center ${props.compact ? "text-[clamp(0.6875rem,1.05vw,0.8125rem)]" : "text-[clamp(0.75rem,1.35vw,0.9375rem)]"}`}
         >
-          {props.projectName}
-        </p>
+          <ProjectSwitchMenu
+            currentProjectId={props.projectId}
+            variant="hero"
+            {...(props.paneId ? { paneId: props.paneId } : {})}
+          />
+        </div>
       </div>
     </div>
   );

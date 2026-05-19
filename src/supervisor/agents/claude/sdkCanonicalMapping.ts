@@ -752,13 +752,21 @@ function toolPayload(
   if (tool.itemType === "plan") {
     return { steps: extractPlanSteps(tool.input) };
   }
+  const kind = inferToolKind(tool.toolName);
   return {
     name: tool.toolName,
+    ...(kind ? { kind } : {}),
     args: tool.input,
     result,
     status,
     ...(tool.progress ? { progress: tool.progress } : {}),
   };
+}
+
+function inferToolKind(toolName: string): "read" | undefined {
+  const n = toolName.toLowerCase();
+  if (n === "read" || n === "notebookread") return "read";
+  return undefined;
 }
 
 function inferFileChangeKind(toolName: string): "create" | "edit" | "delete" {

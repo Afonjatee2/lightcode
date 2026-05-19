@@ -244,7 +244,7 @@ function copyArtifactsBack(stageReleaseDir, outputDir) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const platform = args.platform ?? detectHostPlatform();
-  const arch = args.arch ?? process.arch;
+  const arch = args.arch;
   const target = args.target; // optional, e.g. dmg/zip/nsis/AppImage/deb
   const skipBuild = Boolean(args["skip-build"]);
   const publish = args.publish ?? "never";
@@ -312,8 +312,8 @@ async function main() {
     );
     const electronBuilderArgs = [PLATFORM_FLAG[platform]];
     if (target) {
-      electronBuilderArgs.push(`${target}:${arch}`);
-    } else {
+      electronBuilderArgs.push(arch ? `${target}:${arch}` : target);
+    } else if (arch) {
       electronBuilderArgs.push(`--${arch}`);
     }
     electronBuilderArgs.push("--publish", publish);
@@ -333,13 +333,12 @@ async function main() {
 }
 
 function buildElectronBuilderConfig() {
-  // Reproduce the project's electron-builder.config.cjs, but with a drastically
-  // simplified `files:` block — the stage's node_modules contains only the
-  // runtime externals we listed, so we can include all of node_modules
-  // without dragging renderer-only transitive peers along.
+  // Generate the staged electron-builder config with a drastically simplified
+  // `files:` block — the stage's node_modules contains only the runtime
+  // externals we listed, so we can include all of node_modules without dragging
+  // renderer-only transitive peers along.
   //
-  // Channel-keyed values come from scripts/electron-builder.shared.cjs, the
-  // same source the project-root config uses.
+  // Channel-keyed values come from scripts/electron-builder.shared.cjs.
   const channel = channelTable.normalizeChannel(process.env.LIGHTCODE_CHANNEL);
   const appId = channelTable.appIdFor(channel);
   const productName = channelTable.productNameFor(channel);
@@ -376,6 +375,8 @@ extraResources:
     to: agent-plugins
     filter:
       - "**/*"
+  - from: build/icon${iconSuffix}.png
+    to: app-icon.png
 
 extraMetadata:
   main: dist/main/main.cjs

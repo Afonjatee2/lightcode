@@ -52,6 +52,7 @@ export function SettingsSidebar(props: {
   const isAgentsActive =
     activeSection === "agents" ||
     activeSection === "acpRegistry" ||
+    activeSection === "agentsGeneral" ||
     activeSection.startsWith("agents:");
   const devMode = isDevApp();
 
@@ -109,6 +110,15 @@ export function SettingsSidebar(props: {
                 label="Refresh detected agents"
                 isDisabled={isRefreshingAgents}
                 onPress={onRefreshAgents}
+              />
+            )}
+            {isAgentsActive && (
+              <SidebarButton
+                iconOnly
+                icon={<Settings2 className="size-4" />}
+                label="Agents · General"
+                isActive={activeSection === "agentsGeneral"}
+                onPress={() => onSectionChange("agentsGeneral")}
               />
             )}
             {isAgentsActive && (
@@ -242,6 +252,12 @@ export function SettingsSidebar(props: {
             />
             {isAgentsActive && (
               <div className="space-y-0.5 pl-4">
+                <SidebarButton
+                  icon={<Settings2 className="size-4" />}
+                  label="General"
+                  isActive={activeSection === "agentsGeneral"}
+                  onPress={() => onSectionChange("agentsGeneral")}
+                />
                 <SidebarButton
                   icon={<Boxes className="size-4" />}
                   label="Agent Registry"

@@ -12,8 +12,9 @@ const buildAgentCommandMock = vi.hoisted(() =>
     ) => { command: string; args: string[] }
   >(),
 );
+const mkdtempMock = vi.hoisted(() => vi.fn<(prefix: string) => Promise<string>>());
+const rmMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>());
 const writeFileMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>());
-const unlinkMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => Promise<void>>());
 
 vi.mock("node:child_process", () => {
   const { promisify } = require("node:util") as typeof import("node:util");
@@ -34,8 +35,9 @@ vi.mock("node:child_process", () => {
 });
 
 vi.mock("node:fs/promises", () => ({
+  mkdtemp: mkdtempMock,
+  rm: rmMock,
   writeFile: writeFileMock,
-  unlink: unlinkMock,
 }));
 
 vi.mock("./agents/base", () => ({
@@ -53,8 +55,9 @@ describe("GitHubService", () => {
       command,
       args,
     }));
+    mkdtempMock.mockImplementation(async (prefix) => `${prefix}abc123`);
+    rmMock.mockResolvedValue(undefined);
     writeFileMock.mockResolvedValue(undefined);
-    unlinkMock.mockResolvedValue(undefined);
   });
 
   describe("checkGhAvailable", () => {
@@ -65,6 +68,7 @@ describe("GitHubService", () => {
 
       expect(result).toEqual({ available: true });
       expect(buildAgentCommandMock).toHaveBeenCalledWith(location, "gh", ["--version"]);
+      expect(execFileAsyncMock.mock.calls[0]![2]).toMatchObject({ cwd: location.path });
     });
 
     it("returns available false when gh is not found", async () => {
@@ -209,8 +213,9 @@ describe("GitHubService", () => {
 
       expect(result.number).toBe(50);
       expect(result.state).toBe("open");
+      expect(mkdtempMock).toHaveBeenCalledTimes(1);
       expect(writeFileMock).toHaveBeenCalledTimes(1);
-      expect(unlinkMock).toHaveBeenCalledTimes(1);
+      expect(rmMock).toHaveBeenCalledTimes(1);
       // First call: pr create
       const createArgs = buildAgentCommandMock.mock.calls[0]![2] as string[];
       expect(createArgs).toContain("pr");
@@ -252,7 +257,7 @@ describe("GitHubService", () => {
         new GitHubService().createPr(location, "feature/x", "main", "PR", "", false),
       ).rejects.toThrow("gh pr create failed");
 
-      expect(unlinkMock).toHaveBeenCalledTimes(1);
+      expect(rmMock).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -364,7 +369,7 @@ describe("GitHubService", () => {
       expect(ghArgs[2]).toBe("42");
       expect(ghArgs[3]).toBe("--comment");
       expect(ghArgs[4]).toBe("--body-file");
-      expect(unlinkMock).toHaveBeenCalledTimes(1);
+      expect(rmMock).toHaveBeenCalledTimes(1);
     });
 
     it("rejects request-changes with empty body", async () => {

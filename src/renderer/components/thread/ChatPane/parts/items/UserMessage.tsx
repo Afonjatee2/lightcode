@@ -45,6 +45,7 @@ export const UserMessage = memo(function UserMessage({
     (block) => block.kind === "file" && block.source !== "attachment",
   );
   const attachments = buildUserPromptAttachments(content);
+  const imageAttachments = attachments.filter((a) => a.isImage);
 
   const syncVisualOverflow = useEffectEvent(() => {
     const element = contentRef.current;
@@ -92,9 +93,9 @@ export const UserMessage = memo(function UserMessage({
             <AttachmentBar
               attachments={attachments}
               layout="flush"
-              hideImageNames
+              imagesAsPreview
               onPreviewImage={(att) => {
-                const idx = attachments.filter((a) => a.isImage).findIndex((a) => a.id === att.id);
+                const idx = imageAttachments.findIndex((a) => a.id === att.id);
                 if (idx >= 0) setLightboxIndex(idx);
               }}
             />
@@ -137,7 +138,7 @@ export const UserMessage = memo(function UserMessage({
       {checkpointRevertControl}
       {lightboxIndex !== null ? (
         <ImageLightbox
-          images={attachments.filter((a) => a.isImage)}
+          images={imageAttachments}
           initialIndex={lightboxIndex}
           onClose={() => setLightboxIndex(null)}
         />

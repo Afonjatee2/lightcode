@@ -6,9 +6,11 @@ import {
   applyTerminalHintToConfig,
   createKnownSessionRef,
   detectAgentInstall,
+  detectProbeLocation,
   iterm2ProgressOscHint,
   shellExecOscHint,
   type AgentAdapter,
+  type AgentEnvContext,
   type CreateStructuredSessionInput,
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
@@ -50,6 +52,7 @@ export function createCopilotAdapter(): AgentAdapter {
     kind: "copilot",
     label: "GitHub Copilot",
     binary: "copilot",
+    ...(copilotDetectionSpec.update ? { update: copilotDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;
     },
@@ -114,6 +117,14 @@ export function createCopilotAdapter(): AgentAdapter {
         resolveAgentBinaryPath(input.projectLocation, "copilot"),
       );
       return createAcpStructuredSession(command, input);
+    },
+    async buildAcpAuthCommand(ctx?: AgentEnvContext) {
+      const location = detectProbeLocation(ctx);
+      return buildCopilotCommand(
+        location,
+        ["--acp", "--stdio"],
+        resolveAgentBinaryPath(location, "copilot"),
+      );
     },
     createInitialSessionRef() {
       return undefined;

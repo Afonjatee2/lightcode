@@ -15,6 +15,7 @@ export function createAutoUpdaterController(
   channel: LightcodeChannel,
   isDev: boolean,
   reportError: (error: unknown, tags?: LightcodeDiagnosticTags) => void = () => {},
+  beforeInstall: () => void = () => {},
 ): AutoUpdaterController {
   let initialized = false;
 
@@ -94,6 +95,7 @@ export function createAutoUpdaterController(
   }
 
   function installUpdate(): void {
+    beforeInstall();
     autoUpdater.quitAndInstall(process.platform === "win32", true);
   }
 

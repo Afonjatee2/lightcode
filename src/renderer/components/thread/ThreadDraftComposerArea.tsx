@@ -24,6 +24,7 @@ import {
 } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
+import { ThreadAgentUpdateDock } from "./ThreadAgentUpdateDock";
 import { ThreadAuthRequiredDock } from "./ThreadAuthRequiredDock";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import {
@@ -65,6 +66,11 @@ export function ThreadDraftComposerArea(props: {
 }) {
   const [prompt, setPrompt] = useState("");
   const [hasContent, setHasContent] = useState(false);
+  // Set to true while an agent-binary update is running for this project's env.
+  // Locks the composer Send so the user can't fire a thread mid-upgrade — the
+  // launched agent would race with the still-running install and could pick up
+  // either binary, which is a confusing state to debug.
+  const [agentUpdating, setAgentUpdating] = useState(false);
   const mentionRef = useRef<MentionInputHandle>(null);
   const attachments = useAttachments();
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -264,24 +270,26 @@ export function ThreadDraftComposerArea(props: {
         controls={controls}
         toolbarLayoutKey={toolbarLayoutKey}
         fixedContent={
-          authRequired || showCommandPanel ? (
-            <>
-              {authRequired ? (
-                <ThreadAuthRequiredDock agentStatus={props.selectedAgent} project={props.project} />
-              ) : null}
-              {showCommandPanel ? (
-                <ThreadCommandPanel
-                  commands={filteredCommands}
-                  activeIndex={slashActiveIndex}
-                  onActiveIndexChange={setSlashActiveIndex}
-                  onSelect={(cmd) => {
-                    mentionRef.current?.insertSlashCommand(cmd.id);
-                    setSlashQuery(null);
-                  }}
-                />
-              ) : null}
-            </>
-          ) : null
+          <>
+            {authRequired ? (
+              <ThreadAuthRequiredDock agentStatus={props.selectedAgent} project={props.project} />
+            ) : null}
+            <ThreadAgentUpdateDock
+              agentStatus={props.selectedAgent}
+              onUpdatingChange={setAgentUpdating}
+            />
+            {showCommandPanel ? (
+              <ThreadCommandPanel
+                commands={filteredCommands}
+                activeIndex={slashActiveIndex}
+                onActiveIndexChange={setSlashActiveIndex}
+                onSelect={(cmd) => {
+                  mentionRef.current?.insertSlashCommand(cmd.id);
+                  setSlashQuery(null);
+                }}
+              />
+            ) : null}
+          </>
         }
         attachmentBar={
           <AttachmentBar
@@ -342,7 +350,9 @@ export function ThreadDraftComposerArea(props: {
         }
         placeholder="Send a message..."
         prompt={prompt}
-        submitDisabled={authRequired || !(hasContent || attachments.attachments.length > 0)}
+        submitDisabled={
+          authRequired || agentUpdating || !(hasContent || attachments.attachments.length > 0)
+        }
         submitLabel="Launch thread"
         onPromptChange={setPrompt}
         onSubmit={() => {

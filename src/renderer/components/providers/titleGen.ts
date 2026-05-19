@@ -4,13 +4,18 @@ import type {
   GenerateTitleResult,
   ProjectLocation,
 } from "@/shared/contracts";
-import { getTitleGenDefaults } from "./ProviderIcon";
+import { getTitleGenDefaults, sortByAutoPreference } from "./ProviderIcon";
 
 function resolveTitleGenModel(agent: AgentStatus): string {
   const defaults = getTitleGenDefaults(agent.kind);
   if (defaults?.model && agent.capabilities.models.some((m) => m.id === defaults.model)) {
     return defaults.model;
   }
+  // Fall back to any "mini" variant — title gen is a lightweight task.
+  const mini = agent.capabilities.models.find(
+    (m) => /\bmini\b/i.test(m.id) || /\bmini\b/i.test(m.label),
+  );
+  if (mini) return mini.id;
   return agent.capabilities.models[0]?.id ?? "";
 }
 
@@ -24,6 +29,13 @@ function resolveTitleGenEfforts(agent: AgentStatus, model: string): string[] {
 
 function isTitleGenCandidate(agent: AgentStatus): boolean {
   return agent.installed && agent.authState !== "missing";
+}
+
+function hasPreferredTitleGenModel(agent: AgentStatus): boolean {
+  const defaults = getTitleGenDefaults(agent.kind);
+  // Empty/missing registration means "no specific model required" — provider qualifies.
+  if (!defaults?.model) return true;
+  return agent.capabilities.models.some((m) => m.id === defaults.model);
 }
 
 function toErrorMessage(error: unknown): string {
@@ -86,7 +98,11 @@ export function getTitleGenCandidates(
 ): AgentStatus[] {
   const available = agentStatuses.filter(isTitleGenCandidate);
   if (provider === "auto") {
-    return available;
+    // Per-section provider fallback: prefer providers whose registered title-gen
+    // model actually exists in their installed model list. Only fall back to the
+    // unfiltered list if nobody qualifies, so the user is never left with nothing.
+    const withPreferred = available.filter(hasPreferredTitleGenModel);
+    return sortByAutoPreference(withPreferred.length > 0 ? withPreferred : available);
   }
   return available.filter((agent) => agent.kind === provider);
 }

@@ -669,10 +669,15 @@ export class ThreadSessionManager {
       }
     }
 
+    // Start the PTY at the renderer-reported xterm size so the shell's first
+    // output (Node deprecation warnings, dev server banners, etc.) wraps to
+    // the actual viewport — those lines are emitted before any resize IPC
+    // can land, and xterm never reflows pre-wrapped scrollback. Fall back to
+    // 120×30 only if the renderer hasn't measured yet.
     const pty = spawn(shellCommand.command, shellCommand.args, {
       name: process.platform === "win32" ? "xterm-color" : terminalEnv.TERM,
-      cols: 120,
-      rows: 30,
+      cols: payload.initialSize?.cols ?? 120,
+      rows: payload.initialSize?.rows ?? 30,
       ...(shellCommand.cwd ? { cwd: shellCommand.cwd } : {}),
       env: shellEnv,
     });

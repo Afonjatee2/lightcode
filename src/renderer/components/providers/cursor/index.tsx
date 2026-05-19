@@ -28,8 +28,8 @@ registerTitleGenDefaults("cursor", {
 });
 registerConflictResolverDefaults("cursor", {
   label: "Cursor",
-  hint: "Auto",
-  model: "auto",
+  hint: "Composer 2 Fast",
+  model: "composer-2-fast",
   effort: "",
 });
 

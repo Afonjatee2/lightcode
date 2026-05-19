@@ -53,6 +53,20 @@ export const agentProviderMetadataSchema = z.object({
 });
 export type AgentProviderMetadata = z.infer<typeof agentProviderMetadataSchema>;
 
+const agentUpdateCommandSchema = z.object({
+  binary: z.string().min(1),
+  args: z.array(z.string()),
+});
+
+export const agentUpdateInfoSchema = z.object({
+  builtIn: agentUpdateCommandSchema.optional(),
+  npm: z.string().min(1).optional(),
+  homebrewCask: z.string().min(1).optional(),
+  brew: z.string().min(1).optional(),
+  winget: z.string().min(1).optional(),
+});
+export type AgentUpdateInfo = z.infer<typeof agentUpdateInfoSchema>;
+
 export const agentAuthEnvVarSchema = z.object({
   name: z.string().min(1),
   label: z.string().nullable().optional(),
@@ -185,6 +199,7 @@ export const agentStatusSchema = z.object({
   icon: z.string().optional(),
   executablePath: z.string().optional(),
   version: z.string().optional(),
+  update: agentUpdateInfoSchema.optional(),
   authState: authStateSchema,
   loginCommand: z.string().min(1).optional(),
   providerMetadata: agentProviderMetadataSchema.optional(),
@@ -295,27 +310,65 @@ export const setAcpRegistryAgentAuthPayloadSchema = z.object({
 });
 export type SetAcpRegistryAgentAuthPayload = z.infer<typeof setAcpRegistryAgentAuthPayloadSchema>;
 
-export const authenticateAcpRegistryAgentPayloadSchema = z.object({
-  agentId: z.string().min(1),
+export const authenticateAcpAgentPayloadSchema = z.object({
+  agentKind: z.string().min(1),
   methodId: z.string().min(1),
   envKind: z.enum(["windows", "wsl", "posix"]).optional(),
   wslDistro: z.string().min(1).optional(),
 });
-export type AuthenticateAcpRegistryAgentPayload = z.infer<
-  typeof authenticateAcpRegistryAgentPayloadSchema
->;
+export type AuthenticateAcpAgentPayload = z.infer<typeof authenticateAcpAgentPayloadSchema>;
 
-export const logoutAcpRegistryAgentPayloadSchema = z.object({
-  agentId: z.string().min(1),
+export const logoutAcpAgentPayloadSchema = z.object({
+  agentKind: z.string().min(1),
   envKind: z.enum(["windows", "wsl", "posix"]).optional(),
   wslDistro: z.string().min(1).optional(),
 });
-export type LogoutAcpRegistryAgentPayload = z.infer<typeof logoutAcpRegistryAgentPayloadSchema>;
+export type LogoutAcpAgentPayload = z.infer<typeof logoutAcpAgentPayloadSchema>;
 
 export const acpRegistryMutationResultSchema = z.object({
   installed: z.array(installedAcpRegistryAgentSchema),
 });
 export type AcpRegistryMutationResult = z.infer<typeof acpRegistryMutationResultSchema>;
+
+export const updateAgentBinaryPayloadSchema = z.object({
+  agentKind: agentKindSchema,
+  envKind: z.enum(["windows", "wsl", "posix"]),
+  wslDistro: z.string().min(1).optional(),
+});
+export type UpdateAgentBinaryPayload = z.infer<typeof updateAgentBinaryPayloadSchema>;
+
+export const updateAgentBinaryResultSchema = z.object({
+  ok: z.boolean(),
+  /** Updater output captured from stdout/stderr (last ~4KB), for surfacing in the UI on failure. */
+  output: z.string().optional(),
+  /** Strategy that was used: built-in updater, npm/bun/pnpm/brew/winget, or installer fallback. */
+  strategy: z
+    .enum([
+      "built-in",
+      "npm-global",
+      "pnpm-global",
+      "bun-global",
+      "brew",
+      "winget",
+      "installer",
+      "unsupported",
+    ])
+    .optional(),
+});
+export type UpdateAgentBinaryResult = z.infer<typeof updateAgentBinaryResultSchema>;
+
+export const getLatestAgentVersionPayloadSchema = z.object({
+  agentKind: agentKindSchema,
+});
+export type GetLatestAgentVersionPayload = z.infer<typeof getLatestAgentVersionPayloadSchema>;
+
+export const getLatestAgentVersionResultSchema = z.object({
+  /** Latest published version reported by the upstream registry, undefined when probing failed. */
+  version: z.string().min(1).optional(),
+  /** Where the version came from, surfaced for telemetry / debug. */
+  source: z.enum(["npm", "homebrew-cask", "unknown"]).optional(),
+});
+export type GetLatestAgentVersionResult = z.infer<typeof getLatestAgentVersionResultSchema>;
 
 export function areAgentSlashCommandsEqual(
   left: readonly AgentSlashCommand[] | undefined,

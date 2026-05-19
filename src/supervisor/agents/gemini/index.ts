@@ -7,7 +7,9 @@ import {
   buildAgentCommand,
   createKnownSessionRef,
   detectAgentInstall,
+  detectProbeLocation,
   type AgentAdapter,
+  type AgentEnvContext,
   type CreateStructuredSessionInput,
   type TerminalStatusHint,
 } from "../base";
@@ -41,6 +43,7 @@ export function createGeminiAdapter(): AgentAdapter {
     kind: "gemini",
     label: "Gemini",
     binary: "gemini",
+    ...(geminiDetectionSpec.update ? { update: geminiDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;
     },
@@ -112,6 +115,16 @@ export function createGeminiAdapter(): AgentAdapter {
         input.projectLocation.kind === "windows" ? { GEMINI_PTY_INFO: "child_process" } : undefined,
       );
       return createAcpStructuredSession(command, input);
+    },
+    async buildAcpAuthCommand(ctx?: AgentEnvContext) {
+      const location = detectProbeLocation(ctx);
+      return buildAgentCommand(
+        location,
+        "gemini",
+        ["--acp", "--skip-trust"],
+        resolveAgentBinaryPath(location, "gemini"),
+        location.kind === "windows" ? { GEMINI_PTY_INFO: "child_process" } : undefined,
+      );
     },
 
     createInitialSessionRef() {

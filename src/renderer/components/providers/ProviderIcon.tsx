@@ -259,6 +259,27 @@ export function getConfigNormalizer(kind: string): ConfigNormalizer | undefined 
   return CONFIG_NORMALIZER_REGISTRY.get(kind);
 }
 
+/**
+ * Preference order used by Auto for utility tasks (title gen, commit gen, conflict resolver).
+ * Codex first by user preference; others fall back alphabetically afterwards by registration order.
+ */
+export const AUTO_PROVIDER_PREFERENCE_ORDER: readonly string[] = [
+  "codex",
+  "claude",
+  "gemini",
+  "opencode",
+  "cursor",
+  "copilot",
+];
+
+export function sortByAutoPreference<T extends { kind: string }>(items: readonly T[]): T[] {
+  const rank = (kind: string) => {
+    const idx = AUTO_PROVIDER_PREFERENCE_ORDER.indexOf(kind);
+    return idx < 0 ? AUTO_PROVIDER_PREFERENCE_ORDER.length : idx;
+  };
+  return [...items].sort((a, b) => rank(a.kind) - rank(b.kind));
+}
+
 // --- Commit generation defaults registry ---
 
 export interface CommitGenDefaults {
@@ -347,6 +368,31 @@ export function getConflictResolverDefaultsHint(): string | undefined {
     .join(", ");
 
   return entries ? `Defaults: ${entries}` : undefined;
+}
+
+interface ConflictResolverAgentLike {
+  kind: string;
+  installed?: boolean;
+  authState?: string;
+  capabilities: { models: { id: string }[] };
+}
+
+function hasPreferredConflictResolverModel(agent: ConflictResolverAgentLike): boolean {
+  const defaults = getConflictResolverDefaults(agent.kind);
+  if (!defaults?.model) return true;
+  return agent.capabilities.models.some((m) => m.id === defaults.model);
+}
+
+export function getConflictResolverCandidates<T extends ConflictResolverAgentLike>(
+  agentStatuses: readonly T[],
+  provider: string,
+): T[] {
+  const available = agentStatuses.filter((a) => a.installed !== false && a.authState !== "missing");
+  if (provider === "auto") {
+    const withPreferred = available.filter(hasPreferredConflictResolverModel);
+    return sortByAutoPreference(withPreferred.length > 0 ? withPreferred : available);
+  }
+  return available.filter((agent) => agent.kind === provider);
 }
 
 export function resolveConflictResolverConfig(

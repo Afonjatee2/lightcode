@@ -41,10 +41,13 @@ jobs:
         include:
           - os: windows-latest
             artifact: dist-windows
+            platform: win
           - os: ubuntu-latest
             artifact: dist-linux
+            platform: linux
           - os: macos-latest
             artifact: dist-mac
+            platform: mac
 
     runs-on: ${{ matrix.os }}
 
@@ -106,18 +109,8 @@ jobs:
 
       - name: Package
         run: |
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            pnpm run prepare:package-assets
-            pnpm exec electron-builder --config electron-builder.config.cjs --win
-          else
-            if [ "${{ matrix.os }}" = "macos-latest" ]; then
-              pnpm run prepare:agent-plugins
-              pnpm exec electron-builder --config electron-builder.config.cjs --mac
-            else
-              pnpm run prepare:package-assets
-              pnpm exec electron-builder --config electron-builder.config.cjs --linux
-            fi
-          fi
+          pnpm run prepare:package-assets
+          node scripts/build-desktop-artifact.mjs --platform "${{ matrix.platform }}" --skip-build
         shell: bash
         env:
           LIGHTCODE_CHANNEL: ${{ inputs.channel }}

@@ -184,7 +184,7 @@ describe("SettingsOverlay", () => {
     expect(screen.getByText("Agent gemini")).toBeInTheDocument();
   });
 
-  it("nests Agent Registry as the first agents subsection", () => {
+  it("nests agents subsections before installed agents", () => {
     statusesState.agentStatuses = [
       makeStatus("claude", {
         label: "Claude Code",
@@ -194,6 +194,7 @@ describe("SettingsOverlay", () => {
 
     render(<SettingsOverlay onClose={() => undefined} />);
 
+    // Subsections are only visible once Agents is selected.
     expect(screen.queryByRole("button", { name: "Agent Registry" })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Agents" }));
@@ -203,11 +204,11 @@ describe("SettingsOverlay", () => {
       .map((button) => button.textContent)
       .filter(Boolean);
     expect(buttons.slice(buttons.indexOf("Agents") + 1, buttons.indexOf("Claude Code"))).toEqual([
+      "General",
       "Agent Registry",
     ]);
 
     fireEvent.click(screen.getByRole("button", { name: "Agent Registry" }));
-
     expect(screen.getByText("Agent Registry Settings")).toBeInTheDocument();
   });
 

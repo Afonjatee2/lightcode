@@ -4,13 +4,18 @@ import type {
   GenerateCommitMessageResult,
   ProjectLocation,
 } from "@/shared/contracts";
-import { getCommitGenDefaults } from "./ProviderIcon";
+import { getCommitGenDefaults, sortByAutoPreference } from "./ProviderIcon";
 
 function resolveCommitGenModel(agent: AgentStatus): string {
   const defaults = getCommitGenDefaults(agent.kind);
   if (defaults?.model && agent.capabilities.models.some((m) => m.id === defaults.model)) {
     return defaults.model;
   }
+  // Fall back to any "mini" variant — commit gen is a lightweight task.
+  const mini = agent.capabilities.models.find(
+    (m) => /\bmini\b/i.test(m.id) || /\bmini\b/i.test(m.label),
+  );
+  if (mini) return mini.id;
   return agent.capabilities.models[0]?.id ?? "";
 }
 
@@ -24,6 +29,12 @@ function resolveCommitGenEfforts(agent: AgentStatus, model: string): string[] {
 
 function isCommitGenCandidate(agent: AgentStatus): boolean {
   return agent.installed && agent.authState !== "missing";
+}
+
+function hasPreferredCommitGenModel(agent: AgentStatus): boolean {
+  const defaults = getCommitGenDefaults(agent.kind);
+  if (!defaults?.model) return true;
+  return agent.capabilities.models.some((m) => m.id === defaults.model);
 }
 
 function toErrorMessage(error: unknown): string {
@@ -87,7 +98,8 @@ export function getCommitGenCandidates(
 ): AgentStatus[] {
   const available = agentStatuses.filter(isCommitGenCandidate);
   if (provider === "auto") {
-    return available;
+    const withPreferred = available.filter(hasPreferredCommitGenModel);
+    return sortByAutoPreference(withPreferred.length > 0 ? withPreferred : available);
   }
   return available.filter((agent) => agent.kind === provider);
 }

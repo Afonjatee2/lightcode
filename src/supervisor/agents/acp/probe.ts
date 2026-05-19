@@ -14,14 +14,35 @@ import {
   ClientSideConnection,
   ndJsonStream,
   PROTOCOL_VERSION,
+  RequestError,
   type Client,
   type AuthMethod,
   type ModelInfo,
   type SessionNotification,
   type SessionMode,
 } from "@agentclientprotocol/sdk";
-import type { AgentSlashCommand, ThreadMode } from "@/shared/contracts";
+import type { AgentSlashCommand, AuthState, ThreadMode } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
+
+const ACP_AUTH_REQUIRED_ERROR = RequestError.authRequired();
+
+function isAcpAuthRequiredError(error: unknown): boolean {
+  if (error instanceof RequestError) {
+    return (
+      error.code === ACP_AUTH_REQUIRED_ERROR.code &&
+      error.message.startsWith(ACP_AUTH_REQUIRED_ERROR.message)
+    );
+  }
+  if (typeof error === "object" && error !== null && "code" in error) {
+    const candidate = error as { code: unknown; message?: unknown };
+    return (
+      candidate.code === ACP_AUTH_REQUIRED_ERROR.code &&
+      typeof candidate.message === "string" &&
+      candidate.message.startsWith(ACP_AUTH_REQUIRED_ERROR.message)
+    );
+  }
+  return false;
+}
 
 // ── Types ────────────────────────────────────────────────────────
 
@@ -29,6 +50,14 @@ export interface AcpProbeResult {
   authMethods?: AuthMethod[];
   authLogoutSupported?: boolean;
   sessionEstablished?: boolean;
+  /**
+   * Auth state derived directly from the ACP handshake — `"authenticated"`
+   * when `newSession` succeeded, `"missing"` when the agent returned the
+   * `auth_required` JSON-RPC error (code -32000). Left undefined when the
+   * probe couldn't decide (spawn / transport / non-auth errors), so callers
+   * fall back to their own heuristics.
+   */
+  authState?: AuthState;
   models?: Array<{ id: string; label: string; description?: string; tooltipDescription?: string }>;
   modelMetadata?: Record<string, Record<string, unknown>>;
   efforts?: string[];
@@ -397,7 +426,18 @@ export async function probeAcpCapabilities(
           latestSlashCommands = mapAcpSlashCommands(rawCommands);
         }
 
-        return connection.newSession({ cwd: sessionCwd, mcpServers: [] });
+        try {
+          return await connection.newSession({ cwd: sessionCwd, mcpServers: [] });
+        } catch (err) {
+          // ACP's spec-compliant signal that the agent is not signed in.
+          // Propagate it as a distinct authState so the detection layer can
+          // surface "missing" without falling back to env-var / file probes
+          // that don't reflect post-logout state.
+          if (isAcpAuthRequiredError(err)) {
+            probeResult.authState = "missing";
+          }
+          throw err;
+        }
       })(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("ACP probe timed out")), timeoutMs),
@@ -415,6 +455,7 @@ export async function probeAcpCapabilities(
     }
 
     probeResult.sessionEstablished = true;
+    probeResult.authState = "authenticated";
     if (result.models?.availableModels?.length) {
       probeResult.models = mapAcpModels(result.models.availableModels);
       const modelMetadata = mapAcpModelMetadata(result.models.availableModels);

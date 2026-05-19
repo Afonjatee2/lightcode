@@ -8,17 +8,24 @@ import {
   extractAcpGenericInstanceId,
   isAcpGenericKind,
   logoutAcpGenericInstance,
+  verifyAcpGenericAuthentication,
 } from ".";
 
-vi.mock("../acp", () => ({
-  authenticateAcpAgent: vi.fn<() => Promise<void>>(),
-  createAcpStructuredSession: vi.fn<() => undefined>(),
-  logoutAcpAgent: vi.fn<() => Promise<void>>(),
-  probeAcpCapabilities:
-    vi.fn<
-      (...args: Parameters<typeof probeAcpCapabilities>) => ReturnType<typeof probeAcpCapabilities>
-    >(),
-}));
+vi.mock("../acp", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../acp")>();
+  return {
+    ...actual,
+    authenticateAcpAgent: vi.fn<() => Promise<void>>(),
+    createAcpStructuredSession: vi.fn<() => undefined>(),
+    logoutAcpAgent: vi.fn<() => Promise<void>>(),
+    probeAcpCapabilities:
+      vi.fn<
+        (
+          ...args: Parameters<typeof probeAcpCapabilities>
+        ) => ReturnType<typeof probeAcpCapabilities>
+      >(),
+  };
+});
 
 /**
  * The acp-generic adapter is the proof-point that any ACP-speaking binary
@@ -389,6 +396,18 @@ describe("createAcpGenericAdapter", () => {
     expect(args).toContain("Ubuntu");
     expect(args.at(-1)).toContain("BROWSER=");
     expect(args.at(-1)).toContain("cmd.exe /c start");
+  });
+
+  it("verifies authentication with a fresh ACP probe", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValueOnce({ authState: "authenticated" });
+
+    await expect(verifyAcpGenericAuthentication(baseInstance)).resolves.toBe(true);
+  });
+
+  it("treats missing auth after browser login as incomplete", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValueOnce({ authState: "missing" });
+
+    await expect(verifyAcpGenericAuthentication(baseInstance)).resolves.toBe(false);
   });
 
   it("logs out in the requested WSL environment", async () => {

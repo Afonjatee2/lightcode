@@ -33,10 +33,10 @@ const bridge = {
     vi.fn<(payload: { agentId: string }) => Promise<{ installed: InstalledAcpRegistryAgent[] }>>(),
   removeAcpRegistryAgent:
     vi.fn<(payload: { agentId: string }) => Promise<{ installed: InstalledAcpRegistryAgent[] }>>(),
-  authenticateAcpRegistryAgent:
+  authenticateAcpAgent:
     vi.fn<
       (payload: {
-        agentId: string;
+        agentKind: string;
         methodId: string;
         envKind?: AgentStatus["envKind"];
         wslDistro?: string;
@@ -188,7 +188,7 @@ describe("AcpRegistrySettings", () => {
     bridge.installAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
     bridge.updateAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
     bridge.removeAcpRegistryAgent.mockReset().mockResolvedValue({ installed: [] });
-    bridge.authenticateAcpRegistryAgent.mockReset().mockResolvedValue(undefined);
+    bridge.authenticateAcpAgent.mockReset().mockResolvedValue(undefined);
     bridge.focusWindow.mockReset().mockResolvedValue(undefined);
     bridge.openExternal.mockReset().mockResolvedValue(undefined);
     runAgentLoginCommandMock.mockReset();
@@ -213,7 +213,9 @@ describe("AcpRegistrySettings", () => {
     render(<AcpRegistrySettings />);
 
     await screen.findByRole("heading", { name: "Agent Registry" });
-    const codexCard = screen.getByText(/First-class Codex CLI integration/u).closest(".rounded-lg");
+    const codexCard = (await screen.findByText(/First-class Codex CLI integration/u)).closest(
+      ".rounded-lg",
+    );
     expect(codexCard).toBeTruthy();
     expect(within(codexCard as HTMLElement).getByText("Detected")).toBeInTheDocument();
     expect(within(codexCard as HTMLElement).queryByRole("button", { name: "Install" })).toBeNull();
@@ -518,8 +520,8 @@ describe("AcpRegistrySettings", () => {
 
     fireEvent.click(within(glmCard as HTMLElement).getByRole("button", { name: "Login" }));
 
-    expect(bridge.authenticateAcpRegistryAgent).toHaveBeenCalledWith({
-      agentId: "glm-acp-agent",
+    expect(bridge.authenticateAcpAgent).toHaveBeenCalledWith({
+      agentKind: "acp-generic:glm-acp-agent",
       methodId: "sso",
     });
     await waitFor(() => expect(bridge.focusWindow).toHaveBeenCalled());
@@ -616,8 +618,8 @@ describe("AcpRegistrySettings", () => {
       within(glmCard as HTMLElement).getByRole("button", { name: "Login WSL (Ubuntu)" }),
     );
 
-    expect(bridge.authenticateAcpRegistryAgent).toHaveBeenCalledWith({
-      agentId: "glm-acp-agent",
+    expect(bridge.authenticateAcpAgent).toHaveBeenCalledWith({
+      agentKind: "acp-generic:glm-acp-agent",
       methodId: "sso",
       envKind: "wsl",
       wslDistro: "Ubuntu",

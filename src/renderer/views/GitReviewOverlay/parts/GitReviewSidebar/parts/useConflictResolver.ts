@@ -1,9 +1,23 @@
-import type { GitFileChange, Project } from "@/shared/contracts";
+import type { GitFileChange, Project, ThreadPresentationMode } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
-import { getConflictResolverDefaults } from "@/renderer/components/providers/ProviderIcon";
+import {
+  getConflictResolverCandidates,
+  getConflictResolverDefaults,
+} from "@/renderer/components/providers/ProviderIcon";
+
+function resolvePresentationMode(
+  preferred: ThreadPresentationMode,
+  capabilities: {
+    presentationMode: ThreadPresentationMode;
+    presentationModes?: ThreadPresentationMode[] | undefined;
+  },
+): ThreadPresentationMode {
+  const supported = capabilities.presentationModes ?? [capabilities.presentationMode];
+  return supported.includes(preferred) ? preferred : capabilities.presentationMode;
+}
 
 export function useConflictResolver(params: {
   project: Project;
@@ -25,6 +39,9 @@ export function useConflictResolver(params: {
   const conflictResolverEffort = useSharedSettings((s) =>
     isWsl ? s.wslConflictResolverEffort : s.conflictResolverEffort,
   );
+  const conflictResolverPresentationMode = useSharedSettings((s) =>
+    isWsl ? s.wslConflictResolverPresentationMode : s.conflictResolverPresentationMode,
+  );
 
   const projectAgentStatuses = getProjectAgentStatuses(
     project.location,
@@ -32,21 +49,17 @@ export function useConflictResolver(params: {
     wslAgentStatuses,
   );
 
-  const canResolveWithAgent = projectAgentStatuses.some(
-    (a) =>
-      a.installed &&
-      a.authState !== "missing" &&
-      (conflictResolverProvider === "auto" || a.kind === conflictResolverProvider),
-  );
+  const canResolveWithAgent =
+    getConflictResolverCandidates(projectAgentStatuses, conflictResolverProvider).length > 0;
 
   function handleResolveWithAgent() {
     if (mergeConflictFiles.length === 0) return;
 
-    const candidates = projectAgentStatuses.filter((a) => a.installed && a.authState !== "missing");
-    const provider =
-      conflictResolverProvider === "auto"
-        ? candidates[0]
-        : candidates.find((a) => a.kind === conflictResolverProvider);
+    const candidates = getConflictResolverCandidates(
+      projectAgentStatuses,
+      conflictResolverProvider,
+    );
+    const provider = candidates[0];
     if (!provider) return;
 
     const defaults = getConflictResolverDefaults(provider.kind);
@@ -59,6 +72,11 @@ export function useConflictResolver(params: {
       `Resolve the merge conflicts in this worktree. The conflicted files are:\n${fileList}\n\n` +
       `For each file, open it and resolve the conflict markers (<<<<<<< =======  >>>>>>>).`;
 
+    const presentationMode = resolvePresentationMode(
+      conflictResolverPresentationMode,
+      provider.capabilities,
+    );
+
     const store = useAppStore.getState();
     const thread = store.createThread({
       projectId: project.id,
@@ -69,6 +87,7 @@ export function useConflictResolver(params: {
         approvalPolicy: provider.capabilities.bypassApprovalPolicy ?? "bypassPermissions",
       },
       prompt,
+      presentationMode,
       ...(worktreePath ? { worktreePath } : {}),
       ...(worktreeBranch ? { worktreeBranch } : {}),
     });

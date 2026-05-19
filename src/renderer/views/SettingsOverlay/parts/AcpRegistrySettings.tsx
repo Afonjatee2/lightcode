@@ -32,6 +32,7 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import {
   agentAuthTarget,
   findAgentAuthMethodForStatus,
+  findTerminalAuthMethodForStatus,
   registryAdapterKind,
   scopeEnvForStatus,
 } from "@/renderer/utils/acpRegistryAuth";
@@ -266,7 +267,11 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     setPendingAuthAgentId(agentId);
     setError(undefined);
     readBridge()
-      .authenticateAcpRegistryAgent({ agentId, methodId, ...agentAuthTarget(status) })
+      .authenticateAcpAgent({
+        agentKind: registryAdapterKind(agentId),
+        methodId,
+        ...agentAuthTarget(status),
+      })
       .then(() => readBridge().focusWindow())
       .then(() =>
         refreshStatuses({
@@ -340,6 +345,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     );
     const missingAuthStatus = authStatuses.find((status) => status.authState === "missing");
     const loginCommand = missingAuthStatus?.loginCommand;
+    const terminalAuthMethod = findTerminalAuthMethodForStatus(missingAuthStatus);
     const loginProject = projectForStatus(missingAuthStatus);
     const installTargets: InstallTarget[] = [];
     const shouldOfferWslTargets = isWindowsPlatform && wslProjectsByDistro.size > 0;
@@ -472,6 +478,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                           runAgentLoginCommand({
                             label: missingAuthStatus.label ?? agent.label,
                             command: loginCommand,
+                            ...(terminalAuthMethod?.env ? { env: terminalAuthMethod.env } : {}),
                             ...(loginProject ? { project: loginProject } : {}),
                           })
                         }
@@ -518,6 +525,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     const needsLogin = localStatus?.authState === "missing";
     const loginCommand = localStatus?.loginCommand;
     const agentAuthMethod = findAgentAuthMethodForStatus(localStatus);
+    const terminalAuthMethod = findTerminalAuthMethodForStatus(localStatus);
     const agentAuthStatuses = needsLogin
       ? detectedStatuses.filter((status) => status.authState === "missing")
       : detectedStatuses;
@@ -659,6 +667,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                           runAgentLoginCommand({
                             label: localStatus?.label ?? agent.name,
                             command: loginCommand,
+                            ...(terminalAuthMethod?.env ? { env: terminalAuthMethod.env } : {}),
                             ...(loginProject ? { project: loginProject } : {}),
                           })
                         }

@@ -27,13 +27,16 @@ interface SharedSettingsState extends SharedSettings {
   setCommitGenConfig: (provider: string, model: string, effort: string) => void;
   setTitleGenConfig: (provider: string, model: string, effort: string) => void;
   setConflictResolverConfig: (provider: string, model: string, effort: string) => void;
+  setConflictResolverPresentationMode: (mode: ThreadPresentationMode) => void;
   setWslCommitGenConfig: (provider: string, model: string, effort: string) => void;
   setWslTitleGenConfig: (provider: string, model: string, effort: string) => void;
   setWslConflictResolverConfig: (provider: string, model: string, effort: string) => void;
+  setWslConflictResolverPresentationMode: (mode: ThreadPresentationMode) => void;
   setAgentSetting: (agentKind: string, key: string, value: boolean | string) => void;
   setModelHidden: (agentKind: string, modelId: string, hidden: boolean) => void;
   setHiddenModels: (agentKind: string, hiddenIds: string[]) => void;
   setAgentDisabled: (agentKind: string, disabled: boolean) => void;
+  setProviderOrder: (order: string[]) => void;
   setCollapseTerminalComposer: (value: boolean) => void;
   setStaleThreadUnloadMinutes: (value: number) => void;
   setAutoArchiveDoneAfterDays: (value: number) => void;
@@ -42,6 +45,7 @@ interface SharedSettingsState extends SharedSettings {
   setGuiChatFontSize: (value: number) => void;
   setTerminalPanelFontSize: (value: number) => void;
   setPreventSleepWhileWorking: (value: boolean) => void;
+  setCloseToTray: (value: boolean) => void;
   setThreadRemoveAction: (value: ThreadRemoveAction) => void;
   setNewThreadMode: (value: NewThreadMode) => void;
   setAutoShowTerminalPanel: (value: boolean) => void;
@@ -166,6 +170,11 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ conflictResolverProvider, conflictResolverModel, conflictResolverEffort });
     persistSettings(selectSharedSettings(get()));
   },
+  setConflictResolverPresentationMode: (conflictResolverPresentationMode) => {
+    if (get().conflictResolverPresentationMode === conflictResolverPresentationMode) return;
+    set({ conflictResolverPresentationMode });
+    persistSettings(selectSharedSettings(get()));
+  },
   setWslCommitGenConfig: (wslCommitGenProvider, wslCommitGenModel, wslCommitGenEffort) => {
     set({ wslCommitGenProvider, wslCommitGenModel, wslCommitGenEffort });
     persistSettings(selectSharedSettings(get()));
@@ -180,6 +189,11 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     wslConflictResolverEffort,
   ) => {
     set({ wslConflictResolverProvider, wslConflictResolverModel, wslConflictResolverEffort });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setWslConflictResolverPresentationMode: (wslConflictResolverPresentationMode) => {
+    if (get().wslConflictResolverPresentationMode === wslConflictResolverPresentationMode) return;
+    set({ wslConflictResolverPresentationMode });
     persistSettings(selectSharedSettings(get()));
   },
   setAgentSetting: (agentKind, key, value) => {
@@ -206,6 +220,13 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
       ? [...new Set([...current, agentKind])]
       : current.filter((k) => k !== agentKind);
     set({ disabledAgents: next });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setProviderOrder: (order) => {
+    const current = get().providerOrder;
+    const next = [...new Set(order.filter((kind) => typeof kind === "string" && kind.length > 0))];
+    if (current.length === next.length && current.every((kind, i) => kind === next[i])) return;
+    set({ providerOrder: next });
     persistSettings(selectSharedSettings(get()));
   },
   setCollapseTerminalComposer: (collapseTerminalComposer) => {
@@ -238,6 +259,11 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
   },
   setPreventSleepWhileWorking: (preventSleepWhileWorking) => {
     set({ preventSleepWhileWorking });
+    persistSettings(selectSharedSettings(get()));
+  },
+  setCloseToTray: (closeToTray) => {
+    if (get().closeToTray === closeToTray) return;
+    set({ closeToTray });
     persistSettings(selectSharedSettings(get()));
   },
   setThreadRemoveAction: (threadRemoveAction) => {
@@ -405,6 +431,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     conflictResolverProvider: state.conflictResolverProvider,
     conflictResolverModel: state.conflictResolverModel,
     conflictResolverEffort: state.conflictResolverEffort,
+    conflictResolverPresentationMode: state.conflictResolverPresentationMode,
     wslCommitGenProvider: state.wslCommitGenProvider,
     wslCommitGenModel: state.wslCommitGenModel,
     wslCommitGenEffort: state.wslCommitGenEffort,
@@ -414,9 +441,11 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     wslConflictResolverProvider: state.wslConflictResolverProvider,
     wslConflictResolverModel: state.wslConflictResolverModel,
     wslConflictResolverEffort: state.wslConflictResolverEffort,
+    wslConflictResolverPresentationMode: state.wslConflictResolverPresentationMode,
     agentSettings: state.agentSettings,
     hiddenModels: state.hiddenModels,
     disabledAgents: state.disabledAgents,
+    providerOrder: state.providerOrder,
     acpRegistryInstalledAgents: state.acpRegistryInstalledAgents,
     agentInstances: state.agentInstances,
     collapseTerminalComposer: state.collapseTerminalComposer,
@@ -427,6 +456,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     guiChatFontSize: state.guiChatFontSize,
     terminalPanelFontSize: state.terminalPanelFontSize,
     preventSleepWhileWorking: state.preventSleepWhileWorking,
+    closeToTray: state.closeToTray,
     threadRemoveAction: state.threadRemoveAction,
     newThreadMode: state.newThreadMode,
     autoShowTerminalPanel: state.autoShowTerminalPanel,

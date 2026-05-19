@@ -436,6 +436,31 @@ describe("sdkCanonicalMapping — tool use", () => {
     });
   });
 
+  it.each([["Read"], ["NotebookRead"]] as const)(
+    "tags %s tool_use payloads with kind: read so the renderer applies syntax highlighting",
+    (toolName) => {
+      const state = createClaudeMapperState("thread-1");
+      const events = mapClaudeSdkMessage(
+        streamEvent({
+          type: "content_block_start",
+          index: 0,
+          content_block: {
+            type: "tool_use",
+            id: `toolu_${toolName}`,
+            name: toolName,
+            input: { file_path: "src/foo.ts" },
+          },
+        }),
+        state,
+      );
+
+      expect(events[0]).toMatchObject({
+        type: "item.started",
+        payload: expect.objectContaining({ kind: "read" }),
+      });
+    },
+  );
+
   it("does not extract nested keys from partial input JSON for plan tools", () => {
     const state = createClaudeMapperState("thread-1");
     mapClaudeSdkMessage(

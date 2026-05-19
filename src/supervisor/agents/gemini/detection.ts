@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AgentCapability } from "@/shared/contracts";
 import { compactAgentProviderMetadata } from "@/shared/contracts";
-import { probeAcpCapabilities } from "../acp";
+import { dedupeAcpAuthMethods, probeAcpCapabilities } from "../acp";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,
@@ -130,6 +130,9 @@ export const geminiDetectionSpec: DetectionSpec = {
   binary: "gemini",
   loginCommand: "gemini auth login",
   capabilities: defaultGeminiCapabilities,
+  update: {
+    npm: "@google/gemini-cli",
+  },
   statusProbe: probeGeminiMetadata,
   authProbes: [envVarAuthProbe(["GEMINI_API_KEY"]), configDirAuthProbe],
   async capabilitiesProbe(ctx) {
@@ -156,6 +159,9 @@ export const geminiDetectionSpec: DetectionSpec = {
       const tokens = geminiModelContextTokens(model.id);
       if (tokens !== undefined) modelTokens.set(model.id, tokens);
     }
+    const dedupedAuthMethods = probeResult.authMethods?.length
+      ? dedupeAcpAuthMethods(probeResult.authMethods)
+      : undefined;
     return {
       ...(probeResult.models?.length ? { models: probeResult.models } : {}),
       ...(probeResult.efforts?.length ? { efforts: probeResult.efforts } : {}),
@@ -166,6 +172,9 @@ export const geminiDetectionSpec: DetectionSpec = {
         : {}),
       ...(probeResult.slashCommands?.length ? { slashCommands: probeResult.slashCommands } : {}),
       ...buildContextSizeCapabilities(modelTokens),
+      ...(dedupedAuthMethods?.length ? { authMethods: dedupedAuthMethods } : {}),
+      ...(probeResult.authLogoutSupported ? { authLogoutSupported: true } : {}),
+      ...(probeResult.authState ? { authState: probeResult.authState } : {}),
     };
   },
 };

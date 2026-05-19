@@ -15,7 +15,14 @@ export function writeScriptToShell(shellId: string, script: string) {
   const unsub = readBridge().onSupervisorEvent((event) => {
     if (event.type === "thread-output" && event.threadId === shellId) {
       unsub();
-      void readBridge().writeTerminal({ threadId: shellId, data: command + "\r" });
+      void readBridge()
+        .writeTerminal({ threadId: shellId, data: command + "\r" })
+        .catch((error) => {
+          console.warn(
+            `[shellUtils] Unable to write command to shell ${shellId}:`,
+            error instanceof Error ? error.message : error,
+          );
+        });
     }
   });
 }

@@ -104,6 +104,7 @@ export function createCodexAdapter(): AgentAdapter {
     kind: "codex",
     label: "Codex",
     binary: "codex",
+    ...(codexDetectionSpec.update ? { update: codexDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;
     },

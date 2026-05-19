@@ -5,6 +5,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { closeAllPanels } from "@/renderer/actions/panelActions";
+import type { TerminalSize } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { BottomTerminalLayout } from "./parts/BottomTerminalLayout";
 import { RightTerminalLayout } from "./parts/RightTerminalLayout";
@@ -60,38 +61,31 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
     transition: fadeOpacity < 1 ? "none" : "opacity 150ms ease-out",
   } as const;
 
-  // Re-spawn shells for persisted tabs and splits on mount.
-  useEffect(() => {
-    for (const tab of tabs) {
-      const project = projects.find((p) => p.id === tab.projectId);
-      if (!project) continue;
-      const location = tab.worktreePath
-        ? buildWorktreeLocation(project.location, tab.worktreePath)
-        : project.location;
-
-      if (!spawnedRef.current.has(tab.id)) {
-        spawnedRef.current.add(tab.id);
-        void readBridge()
-          .startShell({
-            shellId: tab.id,
-            projectLocation: location,
-            ...(tab.worktreePath ? { worktreePath: tab.worktreePath } : {}),
-          })
-          .catch(() => undefined);
-      }
-
-      if (tab.splitId && !spawnedRef.current.has(tab.splitId)) {
-        spawnedRef.current.add(tab.splitId);
-        void readBridge()
-          .startShell({
-            shellId: tab.splitId,
-            projectLocation: location,
-            ...(tab.worktreePath ? { worktreePath: tab.worktreePath } : {}),
-          })
-          .catch(() => undefined);
-      }
-    }
-  }, [tabs, projects]);
+  // Deferred shell spawn: each XTermSurface emits onTerminalResize once it
+  // has mounted, fit, and measured the real viewport. We start the PTY then,
+  // passing the measured cols/rows as initialSize so the shell's first output
+  // (Node deprecation warnings, dev server banners, vite logs) wraps to the
+  // actual viewport instead of the 120-col fallback — xterm never reflows
+  // pre-wrapped scrollback, so getting the very first lines right matters.
+  function handleTerminalResize(terminalId: string, size: TerminalSize) {
+    if (spawnedRef.current.has(terminalId)) return;
+    const owningTab = tabs.find((t) => t.id === terminalId || t.splitId === terminalId);
+    if (!owningTab) return;
+    const project = projects.find((p) => p.id === owningTab.projectId);
+    if (!project) return;
+    const location = owningTab.worktreePath
+      ? buildWorktreeLocation(project.location, owningTab.worktreePath)
+      : project.location;
+    spawnedRef.current.add(terminalId);
+    void readBridge()
+      .startShell({
+        shellId: terminalId,
+        projectLocation: location,
+        ...(owningTab.worktreePath ? { worktreePath: owningTab.worktreePath } : {}),
+        initialSize: size,
+      })
+      .catch(() => undefined);
+  }
 
   function handleCloseTab(tab: DevTerminalTab) {
     const remaining = tabs.filter((t) => t.id !== tab.id);
@@ -129,21 +123,9 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
 
   function handleSplitTab(tab: DevTerminalTab) {
     if (!activeProject) return;
-    const project = projects.find((p) => p.id === tab.projectId);
-    if (!project) return;
-
-    const splitId = splitTabAction(tab.id);
-    const location = tab.worktreePath
-      ? buildWorktreeLocation(project.location, tab.worktreePath)
-      : project.location;
-    void readBridge()
-      .startShell({
-        shellId: splitId,
-        projectLocation: location,
-        ...(tab.worktreePath ? { worktreePath: tab.worktreePath } : {}),
-      })
-      .catch(() => undefined);
-    spawnedRef.current.add(splitId);
+    // The split's XTermSurface mounts on next render and will trigger
+    // handleTerminalResize, which spawns the shell with the real size.
+    splitTabAction(tab.id);
   }
 
   function handleCloseSplit(tab: DevTerminalTab) {
@@ -213,6 +195,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
         handleSelectionChange={handleSelectionChange}
         getTabContextItems={getTabContextItems}
         handleTabContextAction={handleTabContextAction}
+        onTerminalResize={handleTerminalResize}
       />
     );
   }
@@ -232,6 +215,7 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
       hideHeader={hideHeader}
       handleCloseTab={handleCloseTab}
       handleSelectionChange={handleSelectionChange}
+      onTerminalResize={handleTerminalResize}
     />
   );
 }

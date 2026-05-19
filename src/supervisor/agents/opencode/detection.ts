@@ -343,6 +343,10 @@ export const opencodeDetectionSpec: DetectionSpec = {
   binary: "opencode",
   loginCommand: "opencode auth login",
   capabilities: opencodeDefaultCapabilities,
+  update: {
+    builtIn: { binary: "opencode", args: ["upgrade"] },
+    npm: "opencode-ai",
+  },
   statusProbe: probeOpenCodeStatus,
   authProbes: [
     // Auth file lives on the host; for WSL projects we report "unknown"

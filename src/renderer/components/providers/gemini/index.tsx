@@ -15,20 +15,20 @@ registerProviderIcon("gemini", GeminiIcon);
 registerProviderLabel("gemini", "Gemini");
 registerCommitGenDefaults("gemini", {
   label: "Gemini",
-  hint: "Flash",
-  model: "gemini-2.5-flash",
+  hint: "3 Flash",
+  model: "gemini-3-flash",
   effort: "",
 });
 registerTitleGenDefaults("gemini", {
   label: "Gemini",
-  hint: "Flash Lite",
-  model: "gemini-2.5-flash-lite",
+  hint: "3.1 Flash Lite",
+  model: "gemini-3.1-flash-lite",
   effort: "",
 });
 registerConflictResolverDefaults("gemini", {
   label: "Gemini",
-  hint: "Auto",
-  model: "",
+  hint: "3.1 Pro",
+  model: "gemini-3.1-pro",
   effort: "",
 });
 

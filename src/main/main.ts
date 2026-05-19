@@ -14,6 +14,7 @@ import {
 import { SupervisorClient } from "./supervisor/SupervisorClient";
 import { createAutoUpdaterController } from "./updates/autoUpdater";
 import { createMainWindow } from "./window/createMainWindow";
+import { createTray, type TrayHandle } from "./tray";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { type LightcodePaths, resolveLightcodeBaseDir } from "@/shared/lightcodePaths";
 import { getAppName } from "@/shared/appName";
@@ -47,6 +48,26 @@ const WINDOW_CHROME_HEIGHT = 32;
 let mainWindow: BrowserWindow | null = null;
 let lightcodePaths: LightcodePaths | null = null;
 let windowsJobObjectManager: WindowsJobObjectManager | null = null;
+// Retained module-scope so the native Tray icon stays reachable from GC.
+let tray: TrayHandle | null = null;
+let isQuitting = false;
+
+function isCloseToTrayEnabled(): boolean {
+  if (!lightcodePaths) return false;
+  try {
+    return readSharedSettingsFile(lightcodePaths.settingsPath).closeToTray;
+  } catch {
+    return false;
+  }
+}
+
+function handleMainWindowClose(event: Electron.Event): void {
+  if (isQuitting) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (!isCloseToTrayEnabled()) return;
+  event.preventDefault();
+  mainWindow.hide();
+}
 
 const workingThreads = new Set<string>();
 const sleepInhibitor = createSleepInhibitor();
@@ -93,6 +114,9 @@ if (!hasSingleInstanceLock) {
     }
     if (mainWindow.isMinimized()) {
       mainWindow.restore();
+    }
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
     }
     mainWindow.focus();
   });
@@ -158,6 +182,9 @@ if (!hasSingleInstanceLock) {
       channel,
       isDev,
       captureMainException,
+      () => {
+        isQuitting = true;
+      },
     );
 
     registerIpcHandlers({
@@ -187,11 +214,22 @@ if (!hasSingleInstanceLock) {
       onClosed: () => {
         mainWindow = null;
       },
+      onClose: handleMainWindowClose,
       onRendererProcessGone: (details) => {
         captureMainException(new Error(`Renderer process gone: ${details.reason}`), {
           "lightcode.feature_area": "renderer",
           "lightcode.process": "renderer",
         });
+      },
+    });
+
+    tray = createTray({
+      window: mainWindow,
+      channel,
+      appName: getAppName(channel, isDev),
+      onQuit: () => {
+        isQuitting = true;
+        app.quit();
       },
     });
 
@@ -235,6 +273,13 @@ if (!hasSingleInstanceLock) {
     }
 
     app.on("activate", () => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        if (!mainWindow.isVisible()) {
+          mainWindow.show();
+        }
+        mainWindow.focus();
+        return;
+      }
       if (BrowserWindow.getAllWindows().length === 0) {
         mainWindow = createMainWindow({
           title: getAppName(channel, isDev),
@@ -255,6 +300,7 @@ if (!hasSingleInstanceLock) {
           onClosed: () => {
             mainWindow = null;
           },
+          onClose: handleMainWindowClose,
           onRendererProcessGone: (details) => {
             captureMainException(new Error(`Renderer process gone: ${details.reason}`), {
               "lightcode.feature_area": "renderer",
@@ -266,10 +312,13 @@ if (!hasSingleInstanceLock) {
     });
 
     app.on("before-quit", () => {
+      isQuitting = true;
       supervisorClient.dispose();
       windowsJobObjectManager?.dispose();
       windowsJobObjectManager = null;
       sleepInhibitor.dispose();
+      tray?.destroy();
+      tray = null;
     });
   });
 }
@@ -279,7 +328,10 @@ app.on("will-quit", () => {
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  // macOS keeps the app running; on Windows/Linux, exit only when close-to-tray
+  // is disabled. When close-to-tray is enabled, the window is hidden (not
+  // destroyed) on close, so this handler typically won't fire — but if all
+  // windows are destroyed for another reason, fall through to quit.
+  if (process.platform === "darwin") return;
+  app.quit();
 });

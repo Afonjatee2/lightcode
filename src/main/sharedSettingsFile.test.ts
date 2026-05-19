@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { defaultSharedSettings } from "@/shared/settings";
 import { readSharedSettingsFile, writeSharedSettingsFile } from "./sharedSettingsFile";
 
 const tempDirs: string[] = [];
@@ -37,6 +38,7 @@ describe("sharedSettingsFile", () => {
       conflictResolverProvider: "auto",
       conflictResolverModel: "",
       conflictResolverEffort: "",
+      conflictResolverPresentationMode: "gui",
       wslCommitGenProvider: "auto",
       wslCommitGenModel: "",
       wslCommitGenEffort: "",
@@ -46,9 +48,11 @@ describe("sharedSettingsFile", () => {
       wslConflictResolverProvider: "auto",
       wslConflictResolverModel: "",
       wslConflictResolverEffort: "",
+      wslConflictResolverPresentationMode: "gui",
       agentSettings: {},
       hiddenModels: {},
       disabledAgents: [],
+      providerOrder: [],
       acpRegistryInstalledAgents: {},
       agentInstances: {},
       collapseTerminalComposer: false,
@@ -59,6 +63,7 @@ describe("sharedSettingsFile", () => {
       guiChatFontSize: 13,
       terminalPanelFontSize: 12,
       preventSleepWhileWorking: true,
+      closeToTray: true,
       threadRemoveAction: "archive",
       newThreadMode: "page",
       autoShowTerminalPanel: true,
@@ -91,6 +96,7 @@ describe("sharedSettingsFile", () => {
       conflictResolverProvider: "auto",
       conflictResolverModel: "",
       conflictResolverEffort: "",
+      conflictResolverPresentationMode: "gui",
       wslCommitGenProvider: "auto",
       wslCommitGenModel: "",
       wslCommitGenEffort: "",
@@ -100,9 +106,11 @@ describe("sharedSettingsFile", () => {
       wslConflictResolverProvider: "auto",
       wslConflictResolverModel: "",
       wslConflictResolverEffort: "",
+      wslConflictResolverPresentationMode: "gui",
       agentSettings: {},
       hiddenModels: {},
       disabledAgents: [],
+      providerOrder: [],
       acpRegistryInstalledAgents: {},
       agentInstances: {},
       collapseTerminalComposer: false,
@@ -113,6 +121,7 @@ describe("sharedSettingsFile", () => {
       guiChatFontSize: 13,
       terminalPanelFontSize: 12,
       preventSleepWhileWorking: true,
+      closeToTray: true,
       threadRemoveAction: "archive",
       newThreadMode: "page",
       autoShowTerminalPanel: true,
@@ -133,6 +142,48 @@ describe("sharedSettingsFile", () => {
       agentHookSupport: {},
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
+  });
+
+  it("returns defaults when the settings file does not exist", () => {
+    const settingsPath = join(makeTempDir(), "missing.json");
+    expect(readSharedSettingsFile(settingsPath)).toEqual(defaultSharedSettings);
+  });
+
+  it("returns defaults when the settings file contains invalid JSON", () => {
+    const settingsPath = join(makeTempDir(), "settings.json");
+    writeFileSync(settingsPath, "{not: valid: json}", "utf8");
+    expect(readSharedSettingsFile(settingsPath)).toEqual(defaultSharedSettings);
+  });
+
+  it("returns defaults when the settings file is empty", () => {
+    const settingsPath = join(makeTempDir(), "settings.json");
+    writeFileSync(settingsPath, "", "utf8");
+    expect(readSharedSettingsFile(settingsPath)).toEqual(defaultSharedSettings);
+  });
+
+  it("returns defaults when the settings file contains a non-object root", () => {
+    const settingsPath = join(makeTempDir(), "settings.json");
+    writeFileSync(settingsPath, "[1, 2, 3]", "utf8");
+    const settings = readSharedSettingsFile(settingsPath);
+    // normalizeSharedSettings should reject arrays / non-records — even if it
+    // chooses to coerce rather than throw, the result must still be a valid
+    // SharedSettings object containing all required defaults.
+    expect(settings.themeMode).toBe(defaultSharedSettings.themeMode);
+    expect(settings.providerConfigs).toEqual({});
+  });
+
+  it("creates parent directories on write", () => {
+    const settingsPath = join(makeTempDir(), "nested/deep/settings.json");
+    writeSharedSettingsFile(settingsPath, defaultSharedSettings);
+    expect(readSharedSettingsFile(settingsPath)).toEqual(defaultSharedSettings);
+  });
+
+  it("writes pretty-printed JSON terminated by a newline", () => {
+    const settingsPath = join(makeTempDir(), "settings.json");
+    writeSharedSettingsFile(settingsPath, defaultSharedSettings);
+    const raw = readFileSync(settingsPath, "utf8");
+    expect(raw.endsWith("\n")).toBe(true);
+    expect(raw).toContain("\n  "); // two-space indent
   });
 
   it("preserves valid settings when provider configs contain invalid entries", () => {

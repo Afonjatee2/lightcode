@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildCopilotArgs } from "./argv";
+import { copilotDetectionSpec } from "./detection";
 import {
   createCopilotAdapter,
   detectCopilotInvalidSessionRef,
@@ -7,6 +8,12 @@ import {
   detectCopilotStatusLineModel,
   detectCopilotTerminalStatus,
 } from "./index";
+
+describe("copilotDetectionSpec", () => {
+  it("uses Copilot CLI login for terminal authentication", () => {
+    expect(copilotDetectionSpec.loginCommand).toBe("copilot login");
+  });
+});
 
 describe("detectCopilotTerminalStatus", () => {
   it("detects idle from the Copilot prompt placeholder", () => {

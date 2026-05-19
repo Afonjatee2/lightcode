@@ -12,6 +12,7 @@ build/icons/
 .tmp/
 tmp/
 .agent/
+lightcode-diff.patch
 .spec-workflow/
 **/worktrees/
 .cursor/

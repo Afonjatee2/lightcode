@@ -1,6 +1,7 @@
 import { stripAnsi } from "@/shared/ansi";
 import type {
   AgentCapability,
+  AgentAuthMethod,
   AgentProviderMetadata,
   AuthState,
   LabeledOption,
@@ -14,10 +15,11 @@ import {
   readCommandOutputAsync,
   readWslLoginShellCommandOutputAsync,
   type AgentEnvContext,
+  type CapabilitiesProbeResult,
   type CommandSpec,
   type DetectionSpec,
 } from "../base";
-import { probeAcpCapabilities } from "../acp";
+import { dedupeAcpAuthMethods, probeAcpCapabilities } from "../acp";
 import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
 
 export const cursorDefaultCapabilities: AgentCapability = {
@@ -38,6 +40,28 @@ export const cursorDefaultCapabilities: AgentCapability = {
   bypassApprovalPolicy: "never",
   settingDefs: [],
 };
+
+const CURSOR_EXISTING_LOGIN_METHOD_ID = "cursor_login";
+
+export function buildCursorTerminalAuthMethod(location: ProjectLocation): AgentAuthMethod {
+  return {
+    type: "terminal",
+    id: "cursor-agent-login",
+    name: "Cursor login",
+    args: ["login"],
+    ...(location.kind === "wsl" ? { env: { NO_OPEN_BROWSER: "1" } } : {}),
+  };
+}
+
+function cursorAuthMethods(
+  location: ProjectLocation,
+  acpAuthMethods: AgentAuthMethod[] | undefined,
+): AgentAuthMethod[] {
+  return [
+    buildCursorTerminalAuthMethod(location),
+    ...(acpAuthMethods?.filter((method) => method.id !== CURSOR_EXISTING_LOGIN_METHOD_ID) ?? []),
+  ];
+}
 
 const MODEL_LINE_RE = /^([^\s-]+(?:-[^\s-]+)*)\s+-\s+(.+)$/;
 
@@ -68,6 +92,29 @@ async function readCursorProbeOutputAsync(
     ...(spec.cwd ? { cwd: spec.cwd } : {}),
     ...(spec.env ? { env: spec.env } : {}),
   });
+}
+
+export function parseCursorLogoutHelpOutput(output: string): boolean {
+  const text = stripAnsi(output);
+  return /Usage:\s+agent\s+logout\b/i.test(text) && /clear stored authentication/i.test(text);
+}
+
+async function probeCursorLogoutSupport(
+  ctx: Parameters<NonNullable<DetectionSpec["capabilitiesProbe"]>>[0],
+): Promise<boolean> {
+  if (!ctx.executablePath) return false;
+  const probeCwd = getAgentProbeCwd(ctx.location);
+  const result = await readAgentCommandOutput(
+    ctx.location,
+    ctx.executablePath,
+    ["logout", "--help"],
+    {
+      timeoutMs: 5_000,
+      wslLinuxCwd: "/tmp",
+      posixCwd: probeCwd,
+    },
+  );
+  return parseCursorLogoutHelpOutput(`${result.stdout}\n${result.stderr}`);
 }
 
 export function parseCursorModels(output: string): LabeledOption[] {
@@ -395,9 +442,9 @@ export function buildCursorAcpModelPickerCapabilities(
   };
 }
 
-async function probeCursorAcpModelPickerCapabilities(
+async function probeCursorAcpCapabilities(
   ctx: Parameters<NonNullable<DetectionSpec["capabilitiesProbe"]>>[0],
-): Promise<Partial<AgentCapability> | undefined> {
+): Promise<CapabilitiesProbeResult | undefined> {
   if (!ctx.executablePath) return undefined;
   const spec = buildAgentCommand(ctx.location, "cursor-agent", ["acp"], ctx.executablePath);
   const probeCwd = getAgentProbeCwd(ctx.location);
@@ -410,8 +457,27 @@ async function probeCursorAcpModelPickerCapabilities(
         ? `cursor-acp:wsl:${ctx.location.distro}`
         : `cursor-acp:${ctx.location.kind}`,
   });
-  if (!result?.models?.length) return undefined;
-  return buildCursorAcpModelPickerCapabilities(result.models);
+  if (!result) return undefined;
+  const capabilities = result.models?.length
+    ? buildCursorAcpModelPickerCapabilities(result.models)
+    : undefined;
+  const dedupedAuthMethods = result.authMethods?.length
+    ? dedupeAcpAuthMethods(result.authMethods)
+    : undefined;
+  if (
+    !capabilities &&
+    !dedupedAuthMethods?.length &&
+    !result.authLogoutSupported &&
+    !result.authState
+  ) {
+    return undefined;
+  }
+  return {
+    ...(capabilities ?? {}),
+    ...(dedupedAuthMethods?.length ? { authMethods: dedupedAuthMethods } : {}),
+    ...(result.authLogoutSupported ? { authLogoutSupported: true } : {}),
+    ...(result.authState ? { authState: result.authState } : {}),
+  };
 }
 
 const CURSOR_EFFORT_ORDER: Record<string, number> = {
@@ -634,6 +700,10 @@ export const cursorDetectionSpec: DetectionSpec = {
   binary: "cursor-agent",
   loginCommand: "cursor-agent login",
   capabilities: cursorDefaultCapabilities,
+  update: {
+    builtIn: { binary: "cursor-agent", args: ["update"] },
+    homebrewCask: "cursor-cli",
+  },
   statusProbe: probeCursorStatus,
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;
@@ -643,17 +713,42 @@ export const cursorDetectionSpec: DetectionSpec = {
             "--list-models",
           ])
         : readCursorProbeOutputAsync(ctx.executablePath, ["--list-models"]);
-    const [cliResult, acpCapabilities] = await Promise.all([
+    const [cliResult, acpProbeResult, logoutSupported] = await Promise.all([
       cliResultPromise,
-      probeCursorAcpModelPickerCapabilities(ctx).catch(() => undefined),
+      probeCursorAcpCapabilities(ctx).catch(() => undefined),
+      probeCursorLogoutSupport(ctx).catch(() => false),
     ]);
     const cliModels = cliResult.ok ? parseCursorModels(cliResult.stdout) : [];
     const terminalCapabilities =
       cliModels.length > 0 ? buildCursorModelPickerCapabilities(cliModels) : undefined;
-    if (!terminalCapabilities && !acpCapabilities) return undefined;
+    // The ACP probe carries both presentation-specific model picker capabilities
+    // (which belong under `presentationCapabilities.gui`) and adapter-wide auth
+    // metadata (which lives at the top level — auth is per-binary, not
+    // per-presentation). Split the two so each lands in the right slot.
+    const {
+      authMethods: acpAuthMethods,
+      authLogoutSupported: acpAuthLogoutSupported,
+      authState: acpAuthState,
+      ...acpGuiCapabilities
+    } = acpProbeResult ?? {};
+    const authMethods = cursorAuthMethods(ctx.location, acpAuthMethods);
+    const hasGuiCapabilities = Object.keys(acpGuiCapabilities).length > 0;
+    if (
+      !terminalCapabilities &&
+      !hasGuiCapabilities &&
+      authMethods.length === 0 &&
+      !acpAuthLogoutSupported &&
+      !logoutSupported &&
+      !acpAuthState
+    ) {
+      return undefined;
+    }
     return {
       ...(terminalCapabilities ?? {}),
-      ...(acpCapabilities ? { presentationCapabilities: { gui: acpCapabilities } } : {}),
+      ...(hasGuiCapabilities ? { presentationCapabilities: { gui: acpGuiCapabilities } } : {}),
+      authMethods,
+      ...(acpAuthLogoutSupported || logoutSupported ? { authLogoutSupported: true } : {}),
+      ...(acpAuthState ? { authState: acpAuthState } : {}),
     };
   },
 };

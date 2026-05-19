@@ -3,6 +3,7 @@ export type SettingsSection =
   | "notifications"
   | "ai"
   | "acpRegistry"
+  | "agentsGeneral"
   | "search"
   | "agents"
   | "archived"

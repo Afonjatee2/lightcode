@@ -1,4 +1,4 @@
-import type { AgentCapability, ThreadPresentationMode } from "@/shared/contracts";
+import type { AgentCapability, AgentStatus, ThreadPresentationMode } from "@/shared/contracts";
 import { deriveSubProvider, listSubProviderOrder } from "./deriveSubProvider";
 import type { ProviderModelItem } from "./types";
 
@@ -7,6 +7,15 @@ export interface ProviderModelMenuProvider {
   label: string;
   icon?: string;
   capabilities: AgentCapability;
+}
+
+export function statusToMenuProvider(agent: AgentStatus): ProviderModelMenuProvider {
+  return {
+    kind: agent.kind,
+    label: agent.label,
+    ...(agent.icon ? { icon: agent.icon } : {}),
+    capabilities: agent.capabilities,
+  };
 }
 
 export interface ModelRef {
@@ -30,6 +39,11 @@ export interface BuildProviderModelItemsInput {
   recents?: readonly ModelRef[];
   /** Display cap for recents (default 5). */
   recentsLimit?: number;
+  /**
+   * User-defined provider display order. Kinds in this list win over the built-in
+   * `PROVIDER_ORDER` default; anything missing falls to the default order at the tail.
+   */
+  providerOrder?: readonly string[];
 }
 
 const DEFAULT_LABEL = (id: string) =>
@@ -39,7 +53,7 @@ const DEFAULT_LABEL = (id: string) =>
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join(" ");
 
-/** Display order for provider sections. Unknown kinds fall to the end. */
+/** Default display order for provider sections. Unknown kinds fall to the end. */
 const PROVIDER_ORDER: readonly string[] = [
   "claude",
   "codex",
@@ -49,9 +63,25 @@ const PROVIDER_ORDER: readonly string[] = [
   "copilot",
 ];
 
-function providerSortKey(kind: string): number {
-  const idx = PROVIDER_ORDER.indexOf(kind);
-  return idx < 0 ? PROVIDER_ORDER.length : idx;
+function makeProviderSortKey(userOrder: readonly string[] | undefined): (kind: string) => number {
+  const trimmed = userOrder?.filter((k) => k.length > 0) ?? [];
+  if (trimmed.length === 0) {
+    return (kind) => {
+      const idx = PROVIDER_ORDER.indexOf(kind);
+      return idx < 0 ? PROVIDER_ORDER.length : idx;
+    };
+  }
+  const userIndex = new Map<string, number>();
+  trimmed.forEach((kind, i) => {
+    if (!userIndex.has(kind)) userIndex.set(kind, i);
+  });
+  const userTailBase = trimmed.length;
+  return (kind) => {
+    const fromUser = userIndex.get(kind);
+    if (fromUser !== undefined) return fromUser;
+    const fromDefault = PROVIDER_ORDER.indexOf(kind);
+    return userTailBase + (fromDefault < 0 ? PROVIDER_ORDER.length : fromDefault);
+  };
 }
 
 interface ModelEntry {
@@ -253,7 +283,9 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
     favoriteStateRefs,
     recents,
     recentsLimit = 5,
+    providerOrder,
   } = input;
+  const providerSortKey = makeProviderSortKey(providerOrder);
   const visibleProviders = (
     lockedAgentKind ? providers.filter((p) => p.kind === lockedAgentKind) : providers
   )
@@ -297,7 +329,17 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
     headerLabel: string,
     refs: readonly ModelRef[],
   ): void {
-    const items = refs
+    // Favorites/recents store one entry per (agentKind, modelId, presentationMode).
+    // When the caller doesn't filter by presentationMode (e.g. settings pages),
+    // the same model can appear multiple times — collapse to one row.
+    const seenRefKeys = new Set<string>();
+    const dedupedRefs = refs.filter((ref) => {
+      const key = refKey(ref);
+      if (seenRefKeys.has(key)) return false;
+      seenRefKeys.add(key);
+      return true;
+    });
+    const items = dedupedRefs
       .filter((ref) => visibleKinds.has(ref.agentKind))
       .map((ref) => resolveModelRef(ref, visibleProvidersByKind))
       .filter((m): m is ResolvedModelRef => m !== undefined)

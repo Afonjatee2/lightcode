@@ -1,24 +1,40 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ToggleButton, ToggleButtonGroup, Tooltip } from "@heroui/react";
 import { Monitor } from "lucide-react";
-import type { AgentStatus } from "@/shared/contracts";
+import type { AgentStatus, ThreadPresentationMode } from "@/shared/contracts";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import {
+  getCommitGenCandidates,
   getCommitGenDefaultsHint,
+  getConflictResolverCandidates,
   getConflictResolverDefaultsHint,
+  getTitleGenCandidates,
   getTitleGenDefaultsHint,
   resolveCommitGenConfig,
   resolveTitleGenConfig,
   resolveConflictResolverConfig,
+  sortByAutoPreference,
 } from "@/renderer/components/providers";
-import { Select, TuxIcon } from "@/renderer/components/common";
+import {
+  EffortContextMenu,
+  ProviderModelMenu,
+  TuxIcon,
+  type ProviderModelMenuProvider,
+} from "@/renderer/components/common";
+
+type EnvKind = "windows" | "wsl";
+type Mode = "auto" | "custom" | "disabled";
+
+function deriveMode(provider: string): Mode {
+  if (provider === "auto") return "auto";
+  if (provider === "disabled") return "disabled";
+  return "custom";
+}
 
 function GenConfigSection(props: {
   heading: string;
-  providerLabel: string;
-  modelLabel: string;
-  effortLabel: string;
+  description: string;
   provider: string;
   model: string;
   effort: string;
@@ -27,120 +43,171 @@ function GenConfigSection(props: {
     model: string,
     effort: string,
   ) => { model: string; effort: string; availableEfforts: string[] };
+  getCandidates: (statuses: AgentStatus[], provider: string) => AgentStatus[];
   allowDisabled?: boolean;
   defaultsHint?: string | undefined;
   agentStatuses: AgentStatus[];
   onConfigChange: (provider: string, model: string, effort: string) => void;
+  /** Extra controls rendered below the model/effort toolbar (e.g. presentation mode picker). */
+  extraControls?: ReactNode;
 }) {
   const {
     heading,
-    providerLabel,
-    modelLabel,
-    effortLabel,
+    description,
     provider,
     model,
     effort,
     resolve,
+    getCandidates,
+    agentStatuses,
     onConfigChange,
   } = props;
-  const agentStatuses = props.agentStatuses;
+
   const installedAgents = agentStatuses.filter((a) => a.installed);
-  const isDisabled = provider === "disabled";
-  const selectedAgent =
-    provider !== "auto" && !isDisabled
-      ? installedAgents.find((a) => a.kind === provider)
-      : undefined;
-  const resolved = resolve(selectedAgent, model, effort);
+  const mode = deriveMode(provider);
+  const customAgent =
+    mode === "custom" ? installedAgents.find((a) => a.kind === provider) : undefined;
+  // In Auto mode, ask the section's candidate helper so the toolbar mirrors the
+  // runtime fallback chain — including the "skip provider without preferred model"
+  // rule that's evaluated independently per section.
+  const autoAgent = mode === "auto" ? getCandidates(agentStatuses, "auto")[0] : undefined;
+  const displayAgent = customAgent ?? autoAgent;
+  const displayResolved = displayAgent
+    ? resolve(displayAgent, mode === "custom" ? model : "", mode === "custom" ? effort : "")
+    : undefined;
 
-  const providerOptions = [
-    ...(props.allowDisabled ? [{ id: "disabled", label: "Disabled" }] : []),
-    { id: "auto", label: "Auto (Recommended)" },
-    ...installedAgents.map((a) => ({ id: a.kind, label: a.label })),
-  ];
+  const providers: ProviderModelMenuProvider[] = installedAgents.map((a) => ({
+    kind: a.kind,
+    label: a.label,
+    ...(a.icon ? { icon: a.icon } : {}),
+    capabilities: a.capabilities,
+  }));
 
-  const modelOptions = selectedAgent ? [...selectedAgent.capabilities.models] : [];
+  const efforts =
+    displayResolved?.availableEfforts.map((id) => ({
+      id,
+      label: id.charAt(0).toUpperCase() + id.slice(1),
+    })) ?? [];
 
-  const effortOptions = selectedAgent
-    ? resolved.availableEfforts.map((id) => ({
-        id,
-        label: id.charAt(0).toUpperCase() + id.slice(1),
-      }))
-    : [];
+  function changeMode(next: Mode) {
+    if (next === mode) return;
+    if (next === "auto") {
+      onConfigChange("auto", "", "");
+      return;
+    }
+    if (next === "disabled") {
+      onConfigChange("disabled", "", "");
+      return;
+    }
+    const first = sortByAutoPreference(installedAgents)[0];
+    if (!first) return;
+    const r = resolve(first, "", "");
+    onConfigChange(first.kind, r.model, r.effort);
+  }
+
+  function handleProviderModel(next: { agentKind: string; model: string }) {
+    const nextAgent = installedAgents.find((a) => a.kind === next.agentKind);
+    const r = resolve(nextAgent, next.model, effort);
+    onConfigChange(next.agentKind, r.model, r.effort);
+  }
+
+  function handleEffort(value: string) {
+    if (!customAgent || !displayResolved) return;
+    onConfigChange(provider, displayResolved.model, value);
+  }
+
+  const showToolbar = (mode === "custom" || mode === "auto") && displayAgent && displayResolved;
+  const isReadOnly = mode === "auto";
+
+  const heading2 = props.defaultsHint ? (
+    <Tooltip delay={300}>
+      <Tooltip.Trigger tabIndex={-1} role="none">
+        <h2 className="w-fit cursor-default text-sm font-semibold text-foreground">{heading}</h2>
+      </Tooltip.Trigger>
+      <Tooltip.Content className="text-xs">{props.defaultsHint}</Tooltip.Content>
+    </Tooltip>
+  ) : (
+    <h2 className="text-sm font-semibold text-foreground">{heading}</h2>
+  );
 
   return (
-    <div className="space-y-4">
-      {props.defaultsHint ? (
-        <Tooltip delay={300}>
-          <Tooltip.Trigger tabIndex={-1} role="none">
-            <h2 className="w-fit cursor-default text-sm font-semibold text-muted">{heading}</h2>
-          </Tooltip.Trigger>
-          <Tooltip.Content className="text-xs">{props.defaultsHint}</Tooltip.Content>
-        </Tooltip>
-      ) : (
-        <h2 className="text-sm font-semibold text-muted">{heading}</h2>
-      )}
-
-      <div className="flex items-center justify-between gap-4">
+    <section className="space-y-3">
+      <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground">Provider</p>
-          <p className="text-xs text-muted">{providerLabel}</p>
+          {heading2}
+          <p className="mt-0.5 text-xs text-muted">{description}</p>
         </div>
-        <Select
-          aria-label="Provider"
-          className="w-[200px] shrink-0"
-          options={providerOptions}
-          value={provider}
-          onChange={(value) => {
-            if (value === "auto" || value === "disabled") {
-              onConfigChange(value, "", "");
-            } else {
-              const agent = installedAgents.find((a) => a.kind === value);
-              const next = resolve(agent, "", "");
-              onConfigChange(value, next.model, next.effort);
-            }
-          }}
-        />
+
+        <div className="flex shrink-0 items-center gap-2">
+          {mode !== "disabled" && props.extraControls ? props.extraControls : null}
+          <ToggleButtonGroup
+            aria-label={`${heading} mode`}
+            className="h-7 [&_button]:h-7 [&_button]:min-h-0 [&_button]:min-w-0 [&_button]:px-2"
+            selectionMode="single"
+            disallowEmptySelection
+            size="sm"
+            selectedKeys={[mode]}
+            onSelectionChange={(keys) => {
+              const next = [...keys][0] as Mode | undefined;
+              if (next) changeMode(next);
+            }}
+          >
+            <ToggleButton id="auto">Auto</ToggleButton>
+            <ToggleButton id="custom" isDisabled={installedAgents.length === 0}>
+              Custom
+            </ToggleButton>
+            {props.allowDisabled ? <ToggleButton id="disabled">Disabled</ToggleButton> : null}
+          </ToggleButtonGroup>
+        </div>
       </div>
 
-      {selectedAgent && modelOptions.length > 0 ? (
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">Model</p>
-            <p className="text-xs text-muted">{modelLabel}</p>
-          </div>
-          <Select
-            aria-label="Model"
-            className="w-[200px] shrink-0"
-            options={modelOptions}
-            value={resolved.model}
-            onChange={(value) => {
-              const next = resolve(selectedAgent, value, effort);
-              onConfigChange(provider, next.model, next.effort);
-            }}
+      {showToolbar && displayAgent && displayResolved ? (
+        <div className="lightcode-composer-toolbar flex flex-wrap items-center gap-1">
+          <ProviderModelMenu
+            providers={providers}
+            currentAgentKind={displayAgent.kind}
+            currentModel={displayResolved.model}
+            isDisabled={isReadOnly}
+            onChange={handleProviderModel}
           />
+          {efforts.length > 0 ? (
+            <EffortContextMenu
+              efforts={efforts}
+              effortValue={displayResolved.effort}
+              isDisabled={isReadOnly}
+              onEffortChange={handleEffort}
+              contextSizes={[]}
+            />
+          ) : null}
         </div>
       ) : null}
-
-      {selectedAgent && effortOptions.length > 0 ? (
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">Effort</p>
-            <p className="text-xs text-muted">{effortLabel}</p>
-          </div>
-          <Select
-            aria-label="Effort"
-            className="w-[200px] shrink-0"
-            options={effortOptions}
-            value={resolved.effort}
-            onChange={(value) => onConfigChange(provider, resolved.model, value)}
-          />
-        </div>
-      ) : null}
-    </div>
+    </section>
   );
 }
 
-type EnvKind = "windows" | "wsl";
+function PresentationModeToggle(props: {
+  ariaLabel: string;
+  value: ThreadPresentationMode;
+  onChange: (value: ThreadPresentationMode) => void;
+}) {
+  return (
+    <ToggleButtonGroup
+      aria-label={props.ariaLabel}
+      className="h-7 [&_button]:h-7 [&_button]:min-h-0 [&_button]:min-w-0 [&_button]:px-2"
+      selectionMode="single"
+      disallowEmptySelection
+      size="sm"
+      selectedKeys={[props.value]}
+      onSelectionChange={(keys) => {
+        const next = [...keys][0] as ThreadPresentationMode | undefined;
+        if (next) props.onChange(next);
+      }}
+    >
+      <ToggleButton id="gui">Chat</ToggleButton>
+      <ToggleButton id="terminal">CLI</ToggleButton>
+    </ToggleButtonGroup>
+  );
+}
 
 export function AISettings() {
   const [envKind, setEnvKind] = useState<EnvKind>("windows");
@@ -188,6 +255,14 @@ export function AISettings() {
   const setConflictResolverConfig = useSharedSettings((s) =>
     envKind === "wsl" ? s.setWslConflictResolverConfig : s.setConflictResolverConfig,
   );
+  const conflictResolverPresentationMode = useSharedSettings((s) =>
+    envKind === "wsl" ? s.wslConflictResolverPresentationMode : s.conflictResolverPresentationMode,
+  );
+  const setConflictResolverPresentationMode = useSharedSettings((s) =>
+    envKind === "wsl"
+      ? s.setWslConflictResolverPresentationMode
+      : s.setConflictResolverPresentationMode,
+  );
 
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
@@ -222,44 +297,48 @@ export function AISettings() {
           <GenConfigSection
             heading="Title Generation"
             allowDisabled
-            providerLabel="Agent used to generate thread titles."
-            modelLabel="Model for title generation."
-            effortLabel="Reasoning effort for generation."
+            description="Generates short titles for new threads."
             defaultsHint={getTitleGenDefaultsHint()}
             agentStatuses={activeStatuses}
             provider={titleGenProvider}
             model={titleGenModel}
             effort={titleGenEffort}
             resolve={resolveTitleGenConfig}
+            getCandidates={getTitleGenCandidates}
             onConfigChange={setTitleGenConfig}
           />
 
           <GenConfigSection
             heading="Commit Message Generation"
-            providerLabel="Agent used to generate commit messages."
-            modelLabel="Model for commit message generation."
-            effortLabel="Reasoning effort for generation."
+            description="Generates commit messages from staged changes."
             defaultsHint={getCommitGenDefaultsHint()}
             agentStatuses={activeStatuses}
             provider={commitGenProvider}
             model={commitGenModel}
             effort={commitGenEffort}
             resolve={resolveCommitGenConfig}
+            getCandidates={getCommitGenCandidates}
             onConfigChange={setCommitGenConfig}
           />
 
           <GenConfigSection
             heading="Conflict Resolver"
-            providerLabel="Agent used to resolve merge conflicts."
-            modelLabel="Model for conflict resolution."
-            effortLabel="Reasoning effort for resolution."
+            description="Resolves merge conflicts during rebase or merge."
             defaultsHint={getConflictResolverDefaultsHint()}
             agentStatuses={activeStatuses}
             provider={conflictResolverProvider}
             model={conflictResolverModel}
             effort={conflictResolverEffort}
             resolve={resolveConflictResolverConfig}
+            getCandidates={getConflictResolverCandidates}
             onConfigChange={setConflictResolverConfig}
+            extraControls={
+              <PresentationModeToggle
+                ariaLabel="Open conflict resolver in"
+                value={conflictResolverPresentationMode}
+                onChange={setConflictResolverPresentationMode}
+              />
+            }
           />
         </div>
       </div>

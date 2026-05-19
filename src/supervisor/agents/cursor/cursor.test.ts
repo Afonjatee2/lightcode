@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildCursorTerminalAuthMethod,
   isCursorSemverSupportedForHooks,
   parseCursorAboutOutput,
+  parseCursorLogoutHelpOutput,
   parseCursorVersionLine,
   parseCursorWhoamiOutput,
 } from "./detection";
@@ -490,6 +492,66 @@ describe("buildCursorProbeSpec", () => {
       expect(cmdArgs).toEqual(["--list-models"]);
     },
   );
+});
+
+describe("Cursor logout support", () => {
+  it("detects the dedicated logout command help", () => {
+    expect(
+      parseCursorLogoutHelpOutput(`Usage: agent logout [options]
+
+Sign out and clear stored authentication
+
+Options:
+  -h, --help  Display help for command`),
+    ).toBe(true);
+  });
+
+  it("does not treat root help as logout command support", () => {
+    expect(
+      parseCursorLogoutHelpOutput(`Usage: agent [options] [command]
+
+Commands:
+  logout                    Sign out and clear stored authentication`),
+    ).toBe(false);
+  });
+
+  it("builds a Cursor logout command through the adapter", async () => {
+    const adapter = createCursorAdapter();
+    const command = await adapter.buildAcpLogoutCommand?.({ envKind: "wsl", wslDistro: "Ubuntu" });
+
+    expect(command?.command).toMatch(/wsl(?:\.exe)?$/i);
+    expect(command?.args.join("\n")).toContain("logout");
+  });
+});
+
+describe("Cursor terminal auth", () => {
+  it("disables Cursor's WSL browser opener so Lightcode can open the URL natively", () => {
+    expect(
+      buildCursorTerminalAuthMethod({
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/project",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\project",
+      }),
+    ).toEqual({
+      type: "terminal",
+      id: "cursor-agent-login",
+      name: "Cursor login",
+      args: ["login"],
+      env: { NO_OPEN_BROWSER: "1" },
+    });
+  });
+
+  it("uses the plain Cursor login command outside WSL", () => {
+    expect(
+      buildCursorTerminalAuthMethod({ kind: "windows", path: "C:\\Users\\demo\\project" }),
+    ).toEqual({
+      type: "terminal",
+      id: "cursor-agent-login",
+      name: "Cursor login",
+      args: ["login"],
+    });
+  });
 });
 
 describe("parseCursor account output", () => {

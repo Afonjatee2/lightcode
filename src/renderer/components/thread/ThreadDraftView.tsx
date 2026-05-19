@@ -69,6 +69,8 @@ export function ThreadDraftView(props: {
    * traffic-light controls when the sidebar is collapsed.
    */
   headerNeedsTrafficLightPad?: boolean | undefined;
+  /** Pane id when rendered as a draft pane; absent for the top-level draft view. */
+  paneId?: string | undefined;
   droppableRef?: React.RefObject<HTMLDivElement | null>;
   onClose?: (() => void) | undefined;
   dragHandleRef?: React.RefCallback<Element>;
@@ -766,7 +768,8 @@ export function ThreadDraftView(props: {
           dragHandleRef={props.dragHandleRef}
           headerNeedsTrafficLightPad={headerNeedsTrafficLightPad}
           onClose={props.onClose}
-          projectName={project.name}
+          projectId={project.id}
+          {...(props.paneId ? { paneId: props.paneId } : {})}
           showCloseButton={props.showCloseButton}
         />
       )}
@@ -774,7 +777,11 @@ export function ThreadDraftView(props: {
         className={`${props.compact ? alignClass : "mx-auto"} relative flex h-full min-h-0 w-full max-w-[1040px] flex-col ${paddingClass} px-3 pb-2 ${props.compact ? "" : "pt-2"}`}
       >
         <ThreadDraftDropIndicators dropIndicator={props.dropIndicator} />
-        <ThreadDraftHero compact={props.compact} projectName={project.name} />
+        <ThreadDraftHero
+          compact={props.compact}
+          projectId={project.id}
+          {...(props.paneId ? { paneId: props.paneId } : {})}
+        />
 
         <PresentationModeTabs
           presentationMode={presentationMode}

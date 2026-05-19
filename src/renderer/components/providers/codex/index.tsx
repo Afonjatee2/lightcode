@@ -18,21 +18,21 @@ registerProviderIcon("codex", CodexStatusIcon);
 registerProviderLabel("codex", "Codex");
 registerCommitGenDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.5",
-  model: "gpt-5.5",
-  effort: "low",
+  hint: "GPT-5.4 Mini xhigh",
+  model: "gpt-5.4-mini",
+  effort: "xhigh",
 });
 registerTitleGenDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.5",
-  model: "gpt-5.5",
-  effort: "low",
+  hint: "GPT-5.4 Mini medium",
+  model: "gpt-5.4-mini",
+  effort: "medium",
 });
 registerConflictResolverDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.5",
+  hint: "GPT-5.5 high",
   model: "gpt-5.5",
-  effort: "",
+  effort: "high",
 });
 
 registerConfigNormalizer("codex", ({ config, presentationMode }) => {

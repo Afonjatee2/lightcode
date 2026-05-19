@@ -3,7 +3,7 @@ import { Readable, Writable } from "node:stream";
 import { ClientSideConnection, ndJsonStream, PROTOCOL_VERSION } from "@agentclientprotocol/sdk";
 import type { AgentCapability, ProjectLocation } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import { probeAcpCapabilities, type AcpProbeResult } from "../acp";
+import { dedupeAcpAuthMethods, probeAcpCapabilities, type AcpProbeResult } from "../acp";
 import {
   batchWslCommandsAsync,
   buildAgentCommand,
@@ -11,6 +11,7 @@ import {
   readCommandOutputAsync,
   resolveExecutablePathAsync,
   type AuthProbe,
+  type CapabilitiesProbeResult,
   type DetectionSpec,
 } from "../base";
 import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
@@ -237,7 +238,7 @@ function withCopilotModelRates(
 async function probeCapabilities(
   location: ProjectLocation,
   executablePath?: string,
-): Promise<AgentCapability> {
+): Promise<CapabilitiesProbeResult> {
   const spec = buildCopilotCommand(location, ["--acp", "--stdio"], executablePath);
   const sessionCwd = getAgentProbeCwd(location);
   const processCwd = resolveProbeSpawnCwd(location, spec.cwd);
@@ -260,6 +261,10 @@ async function probeCapabilities(
     mergedPolicies.set(policy.id, policy);
   }
 
+  const dedupedAuthMethods = probe?.authMethods?.length
+    ? dedupeAcpAuthMethods(probe.authMethods)
+    : undefined;
+
   return {
     ...copilotDefaultCapabilities,
     ...(probe?.models?.length
@@ -273,6 +278,9 @@ async function probeCapabilities(
     ...(probe?.modes?.length ? { modes: probe.modes } : {}),
     ...(probe?.slashCommands?.length ? { slashCommands: probe.slashCommands } : {}),
     approvalPolicies: [...mergedPolicies.values()],
+    ...(dedupedAuthMethods?.length ? { authMethods: dedupedAuthMethods } : {}),
+    ...(probe?.authLogoutSupported ? { authLogoutSupported: true } : {}),
+    ...(probe?.authState ? { authState: probe.authState } : {}),
   };
 }
 
@@ -280,8 +288,12 @@ export const copilotDetectionSpec: DetectionSpec = {
   kind: "copilot",
   label: "GitHub Copilot",
   binary: "copilot",
-  loginCommand: "gh auth login",
+  loginCommand: "copilot login",
   capabilities: copilotDefaultCapabilities,
+  update: {
+    builtIn: { binary: "copilot", args: ["update"] },
+    npm: "@github/copilot",
+  },
   authProbes: [envVarAuthProbe(["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"]), ghAuthProbe],
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;

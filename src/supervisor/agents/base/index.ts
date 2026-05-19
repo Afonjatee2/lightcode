@@ -36,7 +36,10 @@ import type {
   AgentPromptFormatter,
   AgentSessionTracker,
   AgentTerminalObserver,
+  AgentUpdater,
+  AgentUpdaterCommand,
   AuthProbe,
+  CapabilitiesProbeResult,
   CommandSpec,
   CreateStructuredSessionInput,
   DetectionSpec,
@@ -54,6 +57,7 @@ import type {
 } from "./types";
 
 export type {
+  AgentAcpAuth,
   AgentAdapter,
   AgentArgvSpec,
   AgentCliHookPluginSupport,
@@ -66,7 +70,10 @@ export type {
   AgentPromptFormatter,
   AgentSessionTracker,
   AgentTerminalObserver,
+  AgentUpdater,
+  AgentUpdaterCommand,
   AuthProbe,
+  CapabilitiesProbeResult,
   CommandSpec,
   CreateStructuredSessionInput,
   DetectionSpec,
@@ -372,7 +379,7 @@ export function cliSubcommandAuthProbe(args: string[]): AuthProbe {
 
 const PROBE_WSL_LINUX_PATH = "/tmp";
 
-function detectProbeLocation(ctx: AgentEnvContext | undefined): ProjectLocation {
+export function detectProbeLocation(ctx: AgentEnvContext | undefined): ProjectLocation {
   if (ctx?.envKind === "wsl" && ctx.wslDistro) {
     return {
       kind: "wsl",
@@ -555,6 +562,9 @@ export async function detectAgentInstall(
 
   let capabilities = spec.capabilities;
   let statusProbeResult: StatusProbeResult | undefined;
+  let probedAuthMethods: AgentStatus["authMethods"];
+  let probedAuthLogoutSupported: boolean | undefined;
+  let probedAuthState: AuthState | undefined;
   if (executablePath) {
     const probeCtx: DetectProbeCtx = { location, executablePath, version };
     const [capabilityPartial, nextStatusProbeResult] = await Promise.all([
@@ -562,7 +572,22 @@ export async function detectAgentInstall(
       spec.statusProbe ? spec.statusProbe(probeCtx) : Promise.resolve(undefined),
     ]);
     if (capabilityPartial) {
-      capabilities = { ...capabilities, ...capabilityPartial };
+      const {
+        authMethods: probeAuthMethods,
+        authLogoutSupported: probeAuthLogoutSupported,
+        authState: probeAuthStateValue,
+        ...capabilityRest
+      } = capabilityPartial;
+      capabilities = { ...capabilities, ...capabilityRest };
+      if (probeAuthMethods?.length) {
+        probedAuthMethods = probeAuthMethods;
+      }
+      if (probeAuthLogoutSupported) {
+        probedAuthLogoutSupported = true;
+      }
+      if (probeAuthStateValue !== undefined) {
+        probedAuthState = probeAuthStateValue;
+      }
     }
     statusProbeResult = nextStatusProbeResult;
   }
@@ -570,6 +595,13 @@ export async function detectAgentInstall(
   let authState: AuthState;
   if (!executablePath) {
     authState = "missing";
+  } else if (probedAuthState !== undefined) {
+    // The ACP protocol probe gives a definitive answer (newSession succeeded
+    // → authenticated; `auth_required` error → missing). Treat it as the
+    // source of truth — env-var / config-dir / `gh auth status` heuristics
+    // can't see post-logout state and would otherwise keep reporting stale
+    // authentication.
+    authState = probedAuthState;
   } else {
     authState = statusProbeResult?.authState ?? "unknown";
     const probeCtx: DetectProbeCtx = { location, executablePath, version };
@@ -594,10 +626,13 @@ export async function detectAgentInstall(
     ...(spec.loginCommand ? { loginCommand: spec.loginCommand } : {}),
     ...(executablePath ? { executablePath } : {}),
     ...(version ? { version } : {}),
+    ...(spec.update ? { update: spec.update } : {}),
     authState,
     ...(statusProbeResult?.providerMetadata
       ? { providerMetadata: statusProbeResult.providerMetadata }
       : {}),
+    ...(probedAuthMethods ? { authMethods: probedAuthMethods } : {}),
+    ...(probedAuthLogoutSupported ? { authLogoutSupported: true } : {}),
     capabilities,
   };
 }

@@ -533,14 +533,24 @@ body {
 
 /* Counterpart to .lightcode-content-over-drag-region: used on pane headers
    when the pane can't be reordered (single-pane layouts), so the header
-   acts as the window drag region instead of a dnd handle. Interactive
-   children opt out via .lightcode-overlay-header__controls. */
+   acts as the window drag region instead of a dnd handle. macOS-only —
+   Windows/Linux use the OS-provided titleBarOverlay for window dragging.
+   Interactive children opt out via .lightcode-overlay-header__controls. */
 .lightcode-content-over-drag-region--drag {
   position: relative;
-  -webkit-app-region: drag;
-  app-region: drag;
   user-select: none;
   z-index: 20;
+}
+html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+/* Defeat the drag region whenever the header lives inside an overlay surface
+   (rendered above main content via OverlayShell). The single-pane drag
+   handle is a main-content-only affordance. */
+[data-overlay-surface] .lightcode-content-over-drag-region--drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 .lightcode-git-diff-content {
@@ -1546,6 +1556,30 @@ body {
 
 .lightcode-attachment-chip:hover .lightcode-attachment-chip__delete {
   display: inline-flex;
+}
+
+/* ── Attachment bar image preview (no chip wrapper) ───────── */
+
+.lightcode-attachment-image-preview {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  height: 1.9em;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0.4rem;
+  overflow: hidden;
+  cursor: var(--interactive-cursor);
+}
+
+.lightcode-attachment-image-preview img {
+  display: block;
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+  user-select: none;
 }
 
 /* ── Image Lightbox ──────────────────────────────────────── */

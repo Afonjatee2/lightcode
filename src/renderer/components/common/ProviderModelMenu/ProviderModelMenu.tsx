@@ -231,6 +231,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
 
   const favorites = useSharedSettings((s) => s.favoriteModels);
   const recents = useSharedSettings((s) => s.recentModels);
+  const providerOrder = useSharedSettings((s) => s.providerOrder);
   const toggleFavoriteModel = useSharedSettings((s) => s.toggleFavoriteModel);
   const latestFavoritesRef = useRef(favorites);
   const latestRecentsRef = useRef(recents);
@@ -296,6 +297,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
         favorites: sectionFavorites,
         favoriteStateRefs: activeFavorites,
         recents: sectionRecents,
+        providerOrder,
       })
     : [];
 

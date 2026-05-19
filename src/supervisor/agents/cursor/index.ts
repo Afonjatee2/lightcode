@@ -4,7 +4,9 @@ import {
   buildAgentCommand,
   createKnownSessionRef,
   detectAgentInstall,
+  detectProbeLocation,
   type AgentAdapter,
+  type AgentEnvContext,
   type CreateStructuredSessionInput,
   type TerminalStatusHint,
 } from "../base";
@@ -67,6 +69,7 @@ export function createCursorAdapter(): AgentAdapter {
     kind: "cursor",
     label: "Cursor",
     binary: "cursor-agent",
+    ...(cursorDetectionSpec.update ? { update: cursorDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;
     },
@@ -121,6 +124,24 @@ export function createCursorAdapter(): AgentAdapter {
         ...input,
         loadSessionErrorRewriter: rewriteCursorLoadSessionError,
       });
+    },
+    async buildAcpAuthCommand(ctx?: AgentEnvContext) {
+      const location = detectProbeLocation(ctx);
+      return buildAgentCommand(
+        location,
+        "cursor-agent",
+        ["acp"],
+        resolveAgentBinaryPath(location, "cursor-agent"),
+      );
+    },
+    async buildAcpLogoutCommand(ctx?: AgentEnvContext) {
+      const location = detectProbeLocation(ctx);
+      return buildAgentCommand(
+        location,
+        "cursor-agent",
+        ["logout"],
+        resolveAgentBinaryPath(location, "cursor-agent"),
+      );
     },
     buildDirectInput(prompt, _segments, _config, projectLocation) {
       // Cursor's TUI debounces fast incoming bytes as a paste burst. With

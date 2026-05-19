@@ -50,6 +50,13 @@ export const sharedSettingsSchema = z.object({
   conflictResolverProvider: z.string(),
   conflictResolverModel: z.string(),
   conflictResolverEffort: z.string(),
+  /**
+   * Where "Fix in Agent" opens the conflict-resolver thread: structured chat
+   * (`gui`) or terminal-native (`terminal`). Defaults to `gui`. If the resolved
+   * provider doesn't support the chosen mode, the consumer falls back to the
+   * provider's default presentation mode.
+   */
+  conflictResolverPresentationMode: threadPresentationModeSchema,
   wslCommitGenProvider: z.string(),
   wslCommitGenModel: z.string(),
   wslCommitGenEffort: z.string(),
@@ -59,12 +66,18 @@ export const sharedSettingsSchema = z.object({
   wslConflictResolverProvider: z.string(),
   wslConflictResolverModel: z.string(),
   wslConflictResolverEffort: z.string(),
+  wslConflictResolverPresentationMode: threadPresentationModeSchema,
   /** Per-agent settings keyed by agent kind, then setting key. */
   agentSettings: z.record(z.string(), z.record(z.string(), z.union([z.boolean(), z.string()]))),
   /** Per-agent hidden model IDs keyed by agent kind. */
   hiddenModels: z.record(z.string(), z.array(z.string())),
   /** Agent kinds that the user has disabled (hidden from the agent picker). */
   disabledAgents: z.array(z.string()),
+  /**
+   * User-defined display order for providers in the model picker. Provider kinds not in this
+   * list fall back to the built-in default order at the tail.
+   */
+  providerOrder: z.array(z.string()),
   /** User-installed registry agents keyed by ACP registry id. */
   acpRegistryInstalledAgents: z.record(z.string(), installedAcpRegistryAgentSchema),
   /** User-registered agent instances, currently used by generic ACP registry installs. */
@@ -85,6 +98,12 @@ export const sharedSettingsSchema = z.object({
   terminalPanelFontSize: z.number().int().min(8).max(20),
   /** Prevent OS sleep while any thread is actively working. */
   preventSleepWhileWorking: z.boolean(),
+  /**
+   * When true, closing the main window hides Lightcode to the system tray
+   * instead of quitting. The tray icon's Quit action (or Quit from the app
+   * menu) still exits the process.
+   */
+  closeToTray: z.boolean(),
   /** Default action for the thread remove button: archive or delete permanently. */
   threadRemoveAction: threadRemoveActionSchema,
   /** Default new-thread behaviour: full page or side-by-side panel. */
@@ -163,6 +182,7 @@ export const defaultSharedSettings: SharedSettings = {
   conflictResolverProvider: "auto",
   conflictResolverModel: "",
   conflictResolverEffort: "",
+  conflictResolverPresentationMode: "gui",
   wslCommitGenProvider: "auto",
   wslCommitGenModel: "",
   wslCommitGenEffort: "",
@@ -172,9 +192,11 @@ export const defaultSharedSettings: SharedSettings = {
   wslConflictResolverProvider: "auto",
   wslConflictResolverModel: "",
   wslConflictResolverEffort: "",
+  wslConflictResolverPresentationMode: "gui",
   agentSettings: {},
   hiddenModels: {},
   disabledAgents: [],
+  providerOrder: [],
   acpRegistryInstalledAgents: {},
   agentInstances: {},
   collapseTerminalComposer: false,
@@ -185,6 +207,7 @@ export const defaultSharedSettings: SharedSettings = {
   guiChatFontSize: 13,
   terminalPanelFontSize: 12,
   preventSleepWhileWorking: true,
+  closeToTray: true,
   threadRemoveAction: "archive",
   newThreadMode: "page",
   autoShowTerminalPanel: true,

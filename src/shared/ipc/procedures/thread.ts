@@ -1,12 +1,12 @@
 import {
-  authenticateAcpRegistryAgentPayloadSchema,
+  authenticateAcpAgentPayloadSchema,
   clearPendingSteerPayloadSchema,
   closeThreadPayloadSchema,
   extractContextPayloadSchema,
   getAgentStatusesPayloadSchema,
   installAcpRegistryAgentPayloadSchema,
   interruptThreadPayloadSchema,
-  logoutAcpRegistryAgentPayloadSchema,
+  logoutAcpAgentPayloadSchema,
   removeAcpRegistryAgentPayloadSchema,
   resizeTerminalPayloadSchema,
   resolveThreadServerRequestPayloadSchema,
@@ -16,13 +16,15 @@ import {
   startShellPayloadSchema,
   startThreadPayloadSchema,
   updateAcpRegistryAgentPayloadSchema,
+  updateAgentBinaryPayloadSchema,
+  getLatestAgentVersionPayloadSchema,
   writeTerminalPayloadSchema,
 } from "../../contracts";
 import type {
   AcpRegistryListResult,
   AcpRegistryMutationResult,
   AgentStatusesResponse,
-  AuthenticateAcpRegistryAgentPayload,
+  AuthenticateAcpAgentPayload,
   ClearPendingSteerPayload,
   CloseThreadPayload,
   ExtractContextPayload,
@@ -30,7 +32,7 @@ import type {
   GetAgentStatusesPayload,
   InstallAcpRegistryAgentPayload,
   InterruptThreadPayload,
-  LogoutAcpRegistryAgentPayload,
+  LogoutAcpAgentPayload,
   RefreshAgentScope,
   RemoveAcpRegistryAgentPayload,
   ResizeTerminalPayload,
@@ -43,6 +45,10 @@ import type {
   StartThreadResult,
   ThreadRuntimeSnapshot,
   UpdateAcpRegistryAgentPayload,
+  UpdateAgentBinaryPayload,
+  UpdateAgentBinaryResult,
+  GetLatestAgentVersionPayload,
+  GetLatestAgentVersionResult,
   WriteTerminalPayload,
 } from "../../contracts";
 import { defineIpcProcedure, defineNoArgProcedure, definePayloadProcedure } from "../core";
@@ -87,6 +93,16 @@ export const threadProcedures = {
     AcpRegistryMutationResult,
     "supervisor"
   >("updateAcpRegistryAgent", "supervisor", updateAcpRegistryAgentPayloadSchema),
+  updateAgentBinary: definePayloadProcedure<
+    UpdateAgentBinaryPayload,
+    UpdateAgentBinaryResult,
+    "supervisor"
+  >("updateAgentBinary", "supervisor", updateAgentBinaryPayloadSchema),
+  getLatestAgentVersion: definePayloadProcedure<
+    GetLatestAgentVersionPayload,
+    GetLatestAgentVersionResult,
+    "supervisor"
+  >("getLatestAgentVersion", "supervisor", getLatestAgentVersionPayloadSchema),
   removeAcpRegistryAgent: definePayloadProcedure<
     RemoveAcpRegistryAgentPayload,
     AcpRegistryMutationResult,
@@ -97,15 +113,15 @@ export const threadProcedures = {
     AcpRegistryMutationResult,
     "supervisor"
   >("setAcpRegistryAgentAuth", "supervisor", setAcpRegistryAgentAuthPayloadSchema),
-  authenticateAcpRegistryAgent: definePayloadProcedure<
-    AuthenticateAcpRegistryAgentPayload,
-    void,
-    "supervisor"
-  >("authenticateAcpRegistryAgent", "supervisor", authenticateAcpRegistryAgentPayloadSchema),
-  logoutAcpRegistryAgent: definePayloadProcedure<LogoutAcpRegistryAgentPayload, void, "supervisor">(
-    "logoutAcpRegistryAgent",
+  authenticateAcpAgent: definePayloadProcedure<AuthenticateAcpAgentPayload, void, "supervisor">(
+    "authenticateAcpAgent",
     "supervisor",
-    logoutAcpRegistryAgentPayloadSchema,
+    authenticateAcpAgentPayloadSchema,
+  ),
+  logoutAcpAgent: definePayloadProcedure<LogoutAcpAgentPayload, void, "supervisor">(
+    "logoutAcpAgent",
+    "supervisor",
+    logoutAcpAgentPayloadSchema,
   ),
   getThreadSnapshots: defineNoArgProcedure<ThreadRuntimeSnapshot[], "supervisor">(
     "getThreadSnapshots",

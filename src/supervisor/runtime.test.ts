@@ -1,9 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentStatus, RuntimeEvent } from "@/shared/contracts";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
+import { defaultSharedSettings } from "@/shared/settings";
 import type { SessionRuntime } from "./runtime/sessionTypes";
 
 const taskkillSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
@@ -11,6 +12,19 @@ const terminfoSpawnSyncMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unk
 const ptySpawnMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>());
 const appendFileMock = vi.hoisted(() =>
   vi.fn<(path: string, data: string, encoding: string) => Promise<void>>(),
+);
+const dispatchAcpAuthenticateMock = vi.hoisted(() =>
+  vi.fn<
+    (input: {
+      adapter: unknown;
+      methodId: string;
+      envKind?: "windows" | "wsl";
+      wslDistro?: string;
+    }) => Promise<void>
+  >(),
+);
+const verifyAcpGenericAuthenticationMock = vi.hoisted(() =>
+  vi.fn<(instance: unknown, ctx?: unknown) => Promise<boolean>>(),
 );
 
 vi.mock("node:child_process", async (importActual) => {
@@ -61,6 +75,22 @@ vi.mock("./agents/binaryResolver", async (importActual) => {
       location.kind === "windows" && process.platform !== "win32"
         ? undefined
         : actual.resolveAgentBinaryPath(location as never, binary),
+  };
+});
+
+vi.mock("./agents/acp", async (importActual) => {
+  const actual = await importActual<typeof import("./agents/acp")>();
+  return {
+    ...actual,
+    dispatchAcpAuthenticate: dispatchAcpAuthenticateMock,
+  };
+});
+
+vi.mock("./agents/acp-generic", async (importActual) => {
+  const actual = await importActual<typeof import("./agents/acp-generic")>();
+  return {
+    ...actual,
+    verifyAcpGenericAuthentication: verifyAcpGenericAuthenticationMock,
   };
 });
 
@@ -116,6 +146,8 @@ afterEach(() => {
   taskkillSpawnSyncMock.mockReset();
   ptySpawnMock.mockReset();
   appendFileMock.mockReset();
+  dispatchAcpAuthenticateMock.mockReset();
+  verifyAcpGenericAuthenticationMock.mockReset();
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -210,6 +242,88 @@ function createRuntimeSession(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 }
+
+function writeGenericAcpSettings(
+  dataDir: string,
+  authAcknowledged?: { native?: boolean; wsl?: Record<string, boolean> },
+): string {
+  const { settingsPath } = resolveLightcodePaths(dataDir);
+  writeFileSync(
+    settingsPath,
+    JSON.stringify(
+      {
+        ...defaultSharedSettings,
+        agentInstances: {
+          "my-acp": {
+            id: "my-acp",
+            driver: "acp-generic",
+            displayName: "My ACP",
+            ...(authAcknowledged ? { authAcknowledged } : {}),
+            config: {
+              binary: "my-acp",
+              args: ["--stdio"],
+              cwd: "project",
+              authMode: "none",
+            },
+          },
+        },
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  return settingsPath;
+}
+
+describe("authenticateAcpAgent", () => {
+  it("persists generic ACP auth only after verification succeeds", async () => {
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+    const settingsPath = writeGenericAcpSettings(dataDir);
+    dispatchAcpAuthenticateMock.mockResolvedValue(undefined);
+    verifyAcpGenericAuthenticationMock.mockResolvedValueOnce(true);
+
+    const runtime = makeRuntime(() => {});
+    await runtime.authenticateAcpAgent({
+      agentKind: "acp-generic:my-acp",
+      methodId: "browser-login",
+    });
+
+    expect(dispatchAcpAuthenticateMock).toHaveBeenCalledWith(
+      expect.objectContaining({ methodId: "browser-login" }),
+    );
+    expect(verifyAcpGenericAuthenticationMock).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "my-acp" }),
+      undefined,
+    );
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as {
+      agentInstances: Record<string, { authAcknowledged?: { native?: boolean } }>;
+    };
+    expect(settings.agentInstances["my-acp"]?.authAcknowledged?.native).toBe(true);
+  });
+
+  it("clears generic ACP auth when browser login does not complete", async () => {
+    const dataDir = makeTempDir();
+    process.env.LIGHTCODE_DATA_DIR = dataDir;
+    const settingsPath = writeGenericAcpSettings(dataDir, { native: true });
+    dispatchAcpAuthenticateMock.mockResolvedValue(undefined);
+    verifyAcpGenericAuthenticationMock.mockResolvedValueOnce(false);
+
+    const runtime = makeRuntime(() => {});
+    await expect(
+      runtime.authenticateAcpAgent({
+        agentKind: "acp-generic:my-acp",
+        methodId: "browser-login",
+      }),
+    ).rejects.toThrow("ACP authentication was not completed.");
+
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as {
+      agentInstances: Record<string, { authAcknowledged?: { native?: boolean } }>;
+    };
+    expect(settings.agentInstances["my-acp"]?.authAcknowledged).toBeUndefined();
+  });
+});
 
 describe("writeSubmittedPrompt", () => {
   beforeEach(() => {
@@ -2586,6 +2700,15 @@ describe("detectWslAgentStatuses", () => {
           label: "Claude Code",
           installed: true,
           authState: "unknown",
+          update: {
+            npm: "@anthropic-ai/claude-code",
+            winget: "Anthropic.ClaudeCode",
+            brew: "claude",
+            builtIn: {
+              binary: "claude",
+              args: ["update"],
+            },
+          },
           capabilities: {
             models: [{ id: "sonnet", label: "Sonnet" }],
             efforts: [],

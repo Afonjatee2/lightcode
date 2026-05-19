@@ -4,6 +4,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     globals: true,
+    // Default 5s is too tight for tests that vi.resetModules() + dynamic-import
+    // under heavy parallel load. Raise to 15s so import jitter doesn't flake
+    // the suite; per-test timeouts can still override.
+    testTimeout: 15_000,
+    hookTimeout: 15_000,
     coverage: {
       provider: "v8",
       reporter: ["text", "html"],

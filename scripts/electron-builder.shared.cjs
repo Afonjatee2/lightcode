@@ -1,6 +1,6 @@
-// Mirror of src/shared/channel.ts for use by electron-builder.config.cjs and
-// scripts/build-desktop-artifact.mjs. Keep field names identical to the TS
-// module; src/shared/channel.config-parity.test.ts asserts they don't drift.
+// Mirror of src/shared/channel.ts for use by scripts/build-desktop-artifact.mjs.
+// Keep field names identical to the TS module; src/shared/channel.config-parity.test.ts
+// asserts they don't drift.
 
 const CHANNELS = ["stable", "nightly"];
 

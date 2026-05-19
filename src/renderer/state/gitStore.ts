@@ -3,7 +3,9 @@ import type {
   GitBranchListResult,
   GitStatusResult,
   GitWorktreeInfo,
+  PrComment,
   PrData,
+  PrDetails,
   PrFile,
 } from "@/shared/contracts";
 
@@ -25,6 +27,8 @@ interface GitState {
   prFiles: Record<string, PrFile[]>;
   /** PR raw unified diffs keyed by `${projectId}#${prNumber}`. */
   prDiffs: Record<string, string>;
+  /** PR body + commits + comments + reviews + checks keyed by `${projectId}#${prNumber}`. */
+  prDetails: Record<string, PrDetails>;
 }
 
 interface GitProjectSnapshot {
@@ -50,6 +54,8 @@ interface GitActions {
   setWorktreeSourceInfoBatch: (entries: Record<string, WorktreeSourceInfo>) => void;
   setPrFiles: (key: string, files: PrFile[]) => void;
   setPrDiff: (key: string, diff: string) => void;
+  setPrDetails: (key: string, details: PrDetails) => void;
+  appendPrComment: (key: string, comment: PrComment) => void;
   clearPrCache: (key: string) => void;
   /** Optimistically move a single file from unstaged to staged. */
   optimisticStageFile: (key: string, filePath: string, isWorktree: boolean) => void;
@@ -261,6 +267,7 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
   worktreeSourceInfo: initialPersisted.worktreeSourceInfo ?? {},
   prFiles: {},
   prDiffs: {},
+  prDetails: {},
 
   setStatus: (projectId, status) => {
     if (areGitStatusesEqual(get().statuses[projectId], status)) return;
@@ -514,11 +521,34 @@ export const useGitStore = create<GitState & GitActions>()((set, get) => ({
 
   setPrDiff: (key, diff) => set((state) => ({ prDiffs: { ...state.prDiffs, [key]: diff } })),
 
+  setPrDetails: (key, details) =>
+    set((state) => ({ prDetails: { ...state.prDetails, [key]: details } })),
+
+  appendPrComment: (key, comment) =>
+    set((state) => {
+      const current = state.prDetails[key];
+      if (!current) return state;
+      // Replace any existing entry with the same id (re-fetch after optimistic insert)
+      // so the timeline doesn't grow stale duplicates.
+      const filtered = current.comments.filter((c) => c.id !== comment.id);
+      return {
+        prDetails: {
+          ...state.prDetails,
+          [key]: { ...current, comments: [...filtered, comment] },
+        },
+      };
+    }),
+
   clearPrCache: (key) =>
     set((state) => {
       const { [key]: _f, ...restFiles } = state.prFiles;
       const { [key]: _d, ...restDiffs } = state.prDiffs;
-      return { prFiles: restFiles, prDiffs: restDiffs };
+      const { [key]: _det, ...restDetails } = state.prDetails;
+      return {
+        prFiles: restFiles,
+        prDiffs: restDiffs,
+        prDetails: restDetails,
+      };
     }),
 
   optimisticUnstageAll: (key, isWorktree) =>

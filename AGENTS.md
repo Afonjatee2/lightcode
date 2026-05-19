@@ -4,7 +4,7 @@ Universal AI agent orchestrator — Electron desktop app managing Claude, Codex,
 
 ## Quick Reference
 
-- **Package manager:** `pnpm` (11.1.0, pinned in `package.json#packageManager`)
+- **Package manager:** `pnpm` (11.1.3, pinned in `package.json#packageManager`)
 - **Node:** >= 24.10.0
 - **Typecheck:** `pnpm run typecheck` (tsgo) / `pnpm run typecheck:compat` (tsc)
 - **Lint:** `pnpm run lint` (oxlint)
@@ -31,6 +31,7 @@ Universal AI agent orchestrator — Electron desktop app managing Claude, Codex,
 - For provider work, normalize provider-native payloads at the provider boundary. Shared UI/runtime code should consume provider-agnostic shapes only.
 - When changing Codex/OpenCode behavior, verify current provider payloads or protocol behavior and check cross-provider parity when applicable.
 - For focused fixes, prefer nearby tests plus touched-file lint/format checks. If asked to fix all checks, run and make green: `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test`.
+- **Prevent God Files:** Do not allow files to grow indefinitely. If a file becomes complex or violates single-responsibility principles during your work, refactor it by extracting related logic into new modules or sub-components. Splitting files is preferred over extending existing ones.
 - Use `pnpm exec vitest run ...` for targeted Vitest runs; do not use Jest-only flags like `--runInBand`.
 - With `exactOptionalPropertyTypes`, avoid passing explicit `undefined` for optional props; use conditional spreads when needed.
 

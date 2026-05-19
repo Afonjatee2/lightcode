@@ -14,12 +14,10 @@ import {
   acpRegistryListResultSchema,
   type AcpRegistryAgent,
   type AcpRegistryListResult,
-  type AuthenticateAcpRegistryAgentPayload,
   type AgentInstanceConfig,
   type AgentInstanceEnvVar,
   type AgentKind,
   type InstalledAcpRegistryAgent,
-  type LogoutAcpRegistryAgentPayload,
 } from "@/shared/contracts";
 import {
   defaultSharedSettings,
@@ -28,11 +26,7 @@ import {
 } from "@/shared/settings";
 import { downloadToFile } from "../runtime/download";
 import { decryptSecret, encryptSecret, transformSensitiveAgentSecrets } from "../secretStorage";
-import {
-  acpGenericKind,
-  authenticateAcpGenericInstance,
-  logoutAcpGenericInstance,
-} from "./acp-generic";
+import { acpGenericKind } from "./acp-generic";
 import type { AgentEnvContext } from "./base";
 
 const execFileAsync = promisify(execFile);
@@ -468,67 +462,18 @@ export function setAcpRegistryAgentAuth(input: {
   return Object.values(settings.acpRegistryInstalledAgents);
 }
 
-export async function authenticateAcpRegistryAgent(input: {
-  agentId: string;
-  methodId: string;
-  envKind?: AuthenticateAcpRegistryAgentPayload["envKind"];
-  wslDistro?: string;
-  settingsPath: string;
-}): Promise<void> {
-  const settings = readAcpRegistrySettings(input.settingsPath);
-  const instance = settings.agentInstances[input.agentId];
-  if (!instance || instance.driver !== "acp-generic") {
-    throw new Error(`ACP registry agent is not installed: ${input.agentId}`);
-  }
-  const envContext: AgentEnvContext | undefined = input.envKind
-    ? {
-        envKind: input.envKind,
-        ...(input.wslDistro ? { wslDistro: input.wslDistro } : {}),
-      }
-    : undefined;
-  await authenticateAcpGenericInstance(instance, input.methodId, envContext);
-  persistAuthAcknowledged(input.settingsPath, input.agentId, envContext, true);
-}
-
-export async function logoutAcpRegistryAgent(input: {
-  agentId: string;
-  envKind?: LogoutAcpRegistryAgentPayload["envKind"];
-  wslDistro?: string;
-  settingsPath: string;
-}): Promise<void> {
-  const settings = readAcpRegistrySettings(input.settingsPath);
-  const instance = settings.agentInstances[input.agentId];
-  if (!instance || instance.driver !== "acp-generic") {
-    throw new Error(`ACP registry agent is not installed: ${input.agentId}`);
-  }
-  const envContext: AgentEnvContext | undefined = input.envKind
-    ? {
-        envKind: input.envKind,
-        ...(input.wslDistro ? { wslDistro: input.wslDistro } : {}),
-      }
-    : undefined;
-  // Best-effort ACP-side logout — some agents (e.g. Cline) do not implement
-  // the ACP logout capability. The local ack is the source of truth for our
-  // UI, so swallow "not supported" but propagate other failures.
-  try {
-    await logoutAcpGenericInstance(instance, envContext);
-  } catch (error) {
-    if (!isUnsupportedAcpLogoutError(error)) throw error;
-  }
-  persistAuthAcknowledged(input.settingsPath, input.agentId, envContext, false);
-}
-
-function isUnsupportedAcpLogoutError(error: unknown): boolean {
-  const message = error instanceof Error ? error.message : String(error);
-  return /logout is not supported/i.test(message);
-}
-
 /**
  * Record/clear an interactive-login acknowledgement for one (agent, env) pair.
  * Env-var auth shares credentials across envs and is not tracked here; this
  * path only models browser/CLI login flows that are bound to a single env.
+ *
+ * Used by the unified ACP auth dispatcher (`runtime.ts`) after a successful
+ * `authenticate()` / `unstable_logout()` call against an acp-generic instance.
+ * Native ACP adapters (Copilot, Gemini, Cursor) do NOT call this — their
+ * detection probes read the agent's own auth state directly, so an explicit
+ * ack would just go stale.
  */
-function persistAuthAcknowledged(
+export function setAcpGenericAgentAuthAcknowledged(
   settingsPath: string,
   agentId: string,
   envContext: AgentEnvContext | undefined,

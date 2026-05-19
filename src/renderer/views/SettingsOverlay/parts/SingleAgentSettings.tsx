@@ -1,22 +1,27 @@
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { Button, Popover, Switch, Tooltip, toast } from "@heroui/react";
 import {
-  Button,
-  Label,
-  ListBox,
-  ListLayout,
-  Popover,
-  Switch,
-  toast,
-  type Selection,
-  Virtualizer,
-} from "@heroui/react";
-import { AlertTriangle, ArrowUpCircle, LogIn, LogOut, Save } from "lucide-react";
+  AlertTriangle,
+  ArrowUpCircle,
+  Check,
+  Download,
+  LogIn,
+  LogOut,
+  Minus,
+  Save,
+  Search,
+} from "lucide-react";
+import {
+  formatUpdateCommandLine,
+  isNewerVersion,
+  resolveSharedUpdateCommand,
+} from "@/shared/agents/updateResolver";
 import type {
   AgentEnvVarAuthMethod,
   AgentOwnedAuthMethod,
   AgentSettingDef,
   AgentStatus,
-  Project,
+  AgentTerminalAuthMethod,
 } from "@/shared/contracts";
 import { runAgentLoginCommand } from "@/renderer/actions/agentLoginActions";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -27,17 +32,23 @@ import { readBridge } from "@/renderer/bridge";
 import {
   acpGenericInstanceId,
   agentAuthTarget,
+  envLabelForStatus,
+  findProjectForStatus,
+  findTerminalAuthMethodForStatus,
   isAgentAuthMethod,
   isEnvVarAuthMethod,
+  isTerminalAuthMethod,
   scopeEnvForStatus,
+  statusUpdateScope,
 } from "@/renderer/utils/acpRegistryAuth";
-import { Input, Select } from "@/renderer/components/common";
+import { Input, PixelLoader, Select } from "@/renderer/components/common";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import {
-  LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD,
-  MENU_DROPDOWN_ROW_HEIGHT,
-  VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS,
-} from "@/renderer/components/common/dropdownVirtualization";
+  buildProviderModelItems,
+  statusToMenuProvider,
+  type ProviderModelItem,
+  type ProviderModelMenuProvider,
+} from "@/renderer/components/common/ProviderModelMenu";
 
 const SAVED_SECRET_MASK = "***********";
 
@@ -86,44 +97,77 @@ function AgentSettingRow(props: { agentKind: string; def: AgentSettingDef }) {
 
 function ModelVisibilityDropdown(props: {
   agentKind: string;
-  models: readonly { id: string; label: string }[];
+  provider: ProviderModelMenuProvider;
 }) {
-  const { agentKind, models } = props;
+  const { agentKind, provider } = props;
   const hiddenIds = useSharedSettings((s) => s.hiddenModels[agentKind]);
   const setHiddenModels = useSharedSettings((s) => s.setHiddenModels);
 
-  const hidden = hiddenIds ?? [];
-  const hiddenSet = new Set(hidden);
-  const visibleKeys: Selection = new Set(
-    models.filter((m) => !hiddenSet.has(m.id)).map((m) => m.id),
-  );
-  const hiddenCount = hidden.length;
-  const isVirtualized = models.length > LARGE_DROPDOWN_VIRTUALIZATION_THRESHOLD;
-  const listBox = (
-    <ListBox
-      aria-label="Visible models"
-      className={
-        isVirtualized
-          ? `lightcode-menu max-h-[400px] min-w-[280px] overflow-y-auto ${VIRTUALIZED_MENU_DROPDOWN_ITEM_CLASS}`
-          : "lightcode-menu max-h-[400px] min-w-[280px] overflow-y-auto"
-      }
-      items={models}
-      selectedKeys={visibleKeys}
-      selectionMode="multiple"
-      onSelectionChange={(keys) => {
-        const selected = keys === "all" ? new Set(models.map((m) => m.id)) : (keys as Set<string>);
-        const nextHidden = models.filter((m) => !selected.has(m.id)).map((m) => m.id);
-        setHiddenModels(agentKind, nextHidden);
-      }}
-    >
-      {(model) => (
-        <ListBox.Item id={model.id} textValue={model.label} className="focus-visible:outline-none">
-          <ListBox.ItemIndicator />
-          <Label className="flex-1 truncate">{model.label}</Label>
-        </ListBox.Item>
-      )}
-    </ListBox>
-  );
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const deferredSearch = useDeferredValue(search);
+
+  const allModels = provider.capabilities.models.filter((m) => m.id !== "auto");
+  const totalCount = allModels.length;
+  const hiddenSet = new Set(hiddenIds ?? []);
+  const visibleCount = totalCount - allModels.filter((m) => hiddenSet.has(m.id)).length;
+
+  useEffect(() => {
+    if (!isOpen) setSearch("");
+  }, [isOpen]);
+
+  const items = isOpen
+    ? buildProviderModelItems({
+        providers: [provider],
+        search: deferredSearch,
+      }).filter((item) => !(item.type === "model" && item.modelId === "auto"))
+    : [];
+
+  type SubGroupState = "all" | "some" | "none";
+  const subGroupModelIds = new Map<string, string[]>();
+  let activeSubHeaderId: string | null = null;
+  for (const item of items) {
+    if (item.type === "header-sub") {
+      activeSubHeaderId = item.id;
+      if (!subGroupModelIds.has(item.id)) subGroupModelIds.set(item.id, []);
+    } else if (item.type === "header-plain" || item.type === "header-provider") {
+      activeSubHeaderId = null;
+    } else if (item.type === "model" && activeSubHeaderId) {
+      subGroupModelIds.get(activeSubHeaderId)?.push(item.modelId);
+    }
+  }
+  const subGroupStates = new Map<string, SubGroupState>();
+  for (const [headerId, modelIds] of subGroupModelIds) {
+    const hiddenInGroup = modelIds.filter((id) => hiddenSet.has(id)).length;
+    const state: SubGroupState =
+      hiddenInGroup === 0 ? "all" : hiddenInGroup === modelIds.length ? "none" : "some";
+    subGroupStates.set(headerId, state);
+  }
+
+  function toggleModel(modelId: string) {
+    const next = new Set(hiddenSet);
+    if (next.has(modelId)) next.delete(modelId);
+    else next.add(modelId);
+    setHiddenModels(agentKind, [...next]);
+  }
+
+  function toggleSubGroup(headerId: string) {
+    const modelIds = subGroupModelIds.get(headerId);
+    if (!modelIds || modelIds.length === 0) return;
+    const state = subGroupStates.get(headerId) ?? "all";
+    // all → none; some/none → all
+    const nextHidden = state === "all";
+    const next = new Set(hiddenSet);
+    for (const id of modelIds) {
+      if (nextHidden) next.add(id);
+      else next.delete(id);
+    }
+    setHiddenModels(agentKind, [...next]);
+  }
+
+  function setAllHidden(hideAll: boolean) {
+    setHiddenModels(agentKind, hideAll ? allModels.map((m) => m.id) : []);
+  }
 
   return (
     <div className="flex items-center justify-between gap-4">
@@ -131,23 +175,69 @@ function ModelVisibilityDropdown(props: {
         <p className="text-sm font-medium text-foreground">Visible models</p>
         <p className="text-xs text-muted">Toggle models off to hide them from the selector.</p>
       </div>
-      <Popover>
+      <Popover isOpen={isOpen} onOpenChange={setIsOpen}>
         <Popover.Trigger>
           <Button variant="secondary" size="sm" className="min-w-[4.5rem] tabular-nums">
-            {models.length - hiddenCount} / {models.length}
+            {visibleCount} / {totalCount}
           </Button>
         </Popover.Trigger>
-        <Popover.Content className="p-0">
-          <Popover.Dialog className="overflow-hidden">
-            {isVirtualized ? (
-              <Virtualizer
-                layout={ListLayout}
-                layoutOptions={{ padding: 4, rowHeight: MENU_DROPDOWN_ROW_HEIGHT }}
-              >
-                {listBox}
-              </Virtualizer>
+        <Popover.Content placement="bottom end" className="w-80 p-0">
+          <Popover.Dialog className="flex max-h-[28rem] flex-col overflow-hidden !p-0">
+            <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+              <Search className="size-3.5 shrink-0 text-muted" />
+              <input
+                aria-label="Search models"
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted outline-none"
+                placeholder="Search models..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                onKeyDown={(event) => event.stopPropagation()}
+              />
+            </div>
+            <div className="flex items-center justify-between gap-2 border-b border-border/40 px-3 py-1.5 text-[10px] uppercase tracking-wider text-muted/80">
+              <span className="tabular-nums">
+                {visibleCount} of {totalCount} visible
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  className="text-foreground/70 hover:text-foreground"
+                  onClick={() => setAllHidden(false)}
+                >
+                  Show all
+                </button>
+                <span className="text-muted/40">·</span>
+                <button
+                  type="button"
+                  className="text-foreground/70 hover:text-foreground"
+                  onClick={() => setAllHidden(true)}
+                >
+                  Hide all
+                </button>
+              </div>
+            </div>
+            {items.length === 0 ? (
+              <div className="px-3 py-3 text-center text-sm text-muted">No models found</div>
             ) : (
-              listBox
+              <div
+                role="listbox"
+                aria-label="Visible models"
+                aria-multiselectable="true"
+                className="lightcode-menu no-scrollbar max-h-[22rem] overflow-y-auto py-1.5"
+              >
+                {items.map((item) => (
+                  <ModelVisibilityRow
+                    key={item.id}
+                    item={item}
+                    isVisible={item.type === "model" ? !hiddenSet.has(item.modelId) : false}
+                    {...(item.type === "header-sub"
+                      ? { subGroupState: subGroupStates.get(item.id) ?? "all" }
+                      : {})}
+                    onToggle={toggleModel}
+                    onToggleSubGroup={toggleSubGroup}
+                  />
+                ))}
+              </div>
             )}
           </Popover.Dialog>
         </Popover.Content>
@@ -156,11 +246,113 @@ function ModelVisibilityDropdown(props: {
   );
 }
 
-function envLabel(status: AgentStatus): string {
-  if (status.envKind === "wsl") return status.envDistro ? `WSL (${status.envDistro})` : "WSL";
-  if (status.envKind === "windows") return "Windows";
-  return "";
+function ModelVisibilityRow(props: {
+  item: ProviderModelItem;
+  isVisible: boolean;
+  subGroupState?: "all" | "some" | "none";
+  onToggle: (modelId: string) => void;
+  onToggleSubGroup?: (headerId: string) => void;
+}) {
+  const { item, isVisible, subGroupState, onToggle, onToggleSubGroup } = props;
+
+  if (item.type === "header-sub") {
+    const state = subGroupState ?? "all";
+    const handleToggle = () => onToggleSubGroup?.(item.id);
+    const checkClass =
+      state === "all"
+        ? "opacity-100 text-foreground"
+        : state === "some"
+          ? "opacity-100 text-foreground"
+          : "opacity-0";
+    return (
+      <div
+        role="option"
+        aria-selected={state === "all"}
+        aria-checked={state === "all" ? "true" : state === "none" ? "false" : "mixed"}
+        tabIndex={0}
+        className="lightcode-menu-item group mx-1.5 mb-1 flex h-7 cursor-default items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
+        onClick={handleToggle}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleToggle();
+          }
+        }}
+      >
+        {state === "some" ? (
+          <Minus className={`size-3 shrink-0 transition-opacity ${checkClass}`} />
+        ) : (
+          <Check className={`size-3 shrink-0 transition-opacity ${checkClass}`} />
+        )}
+        <span className="ml-1 min-w-0 truncate">{item.label}</span>
+      </div>
+    );
+  }
+  if (item.type === "header-plain") {
+    return (
+      <div
+        role="presentation"
+        className="mx-1.5 mb-1 flex h-7 items-center border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
+      >
+        {item.label}
+      </div>
+    );
+  }
+  if (item.type === "header-provider") {
+    return (
+      <div
+        role="presentation"
+        className="mx-1.5 mb-1 flex h-7 items-center gap-1.5 border-b border-border/40 bg-overlay px-2 text-[10px] font-semibold uppercase tracking-wider text-muted/80"
+      >
+        <ProviderIcon
+          kind={item.providerKind}
+          {...(item.providerIcon ? { icon: item.providerIcon } : {})}
+          tone="active"
+          className="size-3"
+        />
+        <span className="min-w-0 truncate">{item.label}</span>
+      </div>
+    );
+  }
+
+  const labelParts = item.label.split(" · ");
+  const name = labelParts[0] ?? item.label;
+  const hint = labelParts.length > 1 ? labelParts.slice(1).join(" · ") : undefined;
+  const mutedHint = [hint, item.contextDescription].filter(Boolean).join(" · ");
+
+  return (
+    <div
+      role="option"
+      aria-selected={isVisible}
+      tabIndex={0}
+      className="lightcode-menu-item group mx-1.5 flex h-7 cursor-default items-center text-foreground"
+      onClick={() => onToggle(item.modelId)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onToggle(item.modelId);
+        }
+      }}
+    >
+      <Check
+        className={`size-3 shrink-0 transition-opacity ${isVisible ? "opacity-100" : "opacity-0"}`}
+      />
+      <span className="ml-1 flex min-w-0 flex-1 items-center gap-1.5">
+        <span className="min-w-0 truncate">{name}</span>
+        {mutedHint ? (
+          <span className="shrink-0 text-[10px] leading-none text-muted/60">· {mutedHint}</span>
+        ) : null}
+      </span>
+      {item.subProviderLabel ? (
+        <span className="ml-auto shrink-0 truncate text-[10px] text-muted/70">
+          {item.subProviderLabel}
+        </span>
+      ) : null}
+    </div>
+  );
 }
+
+const envLabel = envLabelForStatus;
 
 function formatAgentMetadataSummary(
   status: AgentStatus,
@@ -207,21 +399,7 @@ function formatStatusList(statuses: readonly AgentStatus[]): string {
     .join(", ");
 }
 
-function findProjectForAgentStatus(
-  status: AgentStatus | undefined,
-  projects: readonly Project[],
-): Project | undefined {
-  if (!status) return undefined;
-  if (status.envKind === "wsl" && status.envDistro) {
-    return projects.find(
-      (project) => project.location.kind === "wsl" && project.location.distro === status.envDistro,
-    );
-  }
-  if (status.envKind === "windows") {
-    return projects.find((project) => project.location.kind === "windows");
-  }
-  return undefined;
-}
+const findProjectForAgentStatus = findProjectForStatus;
 
 function findEnvVarAuthMethod(statuses: readonly AgentStatus[]): AgentEnvVarAuthMethod | undefined {
   for (const status of statuses) {
@@ -243,8 +421,7 @@ function findAgentAuthMethod(
 
 function findTerminalLoginStatus(statuses: readonly AgentStatus[]): AgentStatus | undefined {
   return statuses.find(
-    (status) =>
-      status.loginCommand && status.authMethods?.some((candidate) => candidate.type === "terminal"),
+    (status) => status.loginCommand && status.authMethods?.some(isTerminalAuthMethod),
   );
 }
 
@@ -252,24 +429,32 @@ function statusEnvKey(status: AgentStatus): string {
   return status.envKind === "wsl" && status.envDistro ? `wsl:${status.envDistro}` : "native";
 }
 
+function supportsAcpLogoutStatus(status: AgentStatus, acpInstanceId: string | undefined): boolean {
+  return status.authLogoutSupported === true || acpInstanceId !== undefined;
+}
+
 function AcpAgentAuthEnvRow(props: {
   status: AgentStatus;
-  agentAuthMethod: AgentOwnedAuthMethod | undefined;
+  authMethod: AgentOwnedAuthMethod | AgentTerminalAuthMethod | undefined;
+  canLogout: boolean;
   authPending: boolean;
   pendingMessage: string | undefined;
   showEnvironmentLabel: boolean;
   onLogin: () => void;
   onLogout: () => void;
 }) {
-  const { status, agentAuthMethod, showEnvironmentLabel } = props;
+  const { status, authMethod, showEnvironmentLabel } = props;
   const isMissing = status.authState === "missing";
   const isAuthenticated = status.authState === "authenticated";
   const env = envLabel(status);
   const envSuffix = showEnvironmentLabel && env ? ` ${env}` : "";
   const envScope = env ? ` for ${env}` : "";
   const envSubject = env || "Agent";
-  const canLogin = isMissing && agentAuthMethod !== undefined;
-  const canLogout = isAuthenticated;
+  const canLogout = isAuthenticated && props.canLogout;
+  const canReLogin = isAuthenticated && !canLogout && authMethod !== undefined;
+  const canLogin = (isMissing || canReLogin) && authMethod !== undefined;
+  const loginLabel = canReLogin ? "Re-login" : "Login";
+  const pendingLabel = canLogout ? "Logging out" : "Logging in";
   const headerLabel = isMissing
     ? "Login required"
     : isAuthenticated
@@ -277,8 +462,8 @@ function AcpAgentAuthEnvRow(props: {
       : "Authentication";
   const headerPrefix = env ? `${env} · ` : "";
   const description = isMissing
-    ? agentAuthMethod
-      ? `Complete ${agentAuthMethod.name} sign-in${envScope}.`
+    ? authMethod
+      ? `Complete ${authMethod.name} sign-in${envScope}.`
       : `${envSubject} needs authentication.`
     : isAuthenticated
       ? `${envSubject} credentials are configured.`
@@ -303,30 +488,40 @@ function AcpAgentAuthEnvRow(props: {
       </div>
       {canLogin || canLogout ? (
         <div className="flex shrink-0 flex-row items-center gap-2">
-          {canLogin ? (
-            <Button
-              size="sm"
-              variant="tertiary"
-              isIconOnly
-              aria-label={`Login${envSuffix}`}
-              isPending={props.authPending}
-              onPress={props.onLogin}
+          {props.authPending ? (
+            <div
+              className="flex h-8 w-8 items-center justify-center"
+              role="status"
+              aria-label={pendingLabel}
             >
-              <LogIn className="size-4" />
-            </Button>
-          ) : null}
-          {canLogout ? (
-            <Button
-              size="sm"
-              variant="tertiary"
-              isIconOnly
-              aria-label={`Logout${envSuffix}`}
-              isPending={props.authPending}
-              onPress={props.onLogout}
-            >
-              <LogOut className="size-4 text-danger" />
-            </Button>
-          ) : null}
+              <PixelLoader size="xs" />
+            </div>
+          ) : (
+            <>
+              {canLogin ? (
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  isIconOnly
+                  aria-label={`${loginLabel}${envSuffix}`}
+                  onPress={props.onLogin}
+                >
+                  <LogIn className="size-4" />
+                </Button>
+              ) : null}
+              {canLogout ? (
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  isIconOnly
+                  aria-label={`Logout${envSuffix}`}
+                  onPress={props.onLogout}
+                >
+                  <LogOut className="size-4 text-danger" />
+                </Button>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
     </div>
@@ -338,8 +533,26 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   const [authPending, setAuthPending] = useState(false);
   const [authPendingMessage, setAuthPendingMessage] = useState<string | undefined>();
   const [authPendingEnvKey, setAuthPendingEnvKey] = useState<string | undefined>();
-  const [latestRegistryVersion, setLatestRegistryVersion] = useState<string | undefined>();
+  // Tag each cached "latest version" with the agent identity it belongs to.
+  // On agent switch, the new render derives `undefined` immediately because
+  // the stored owner no longer matches — without this, useEffect cleanup runs
+  // after paint and the button flashes the previous provider's target version
+  // for ~100ms before settling.
+  const [latestRegistryEntry, setLatestRegistryEntry] = useState<{
+    agentId: string;
+    version: string | undefined;
+  }>();
+  const [latestNpmEntry, setLatestNpmEntry] = useState<{
+    agentKind: string;
+    version: string | undefined;
+  }>();
   const [updatePending, setUpdatePending] = useState(false);
+  const [binaryUpdatePendingEnvKey, setBinaryUpdatePendingEnvKey] = useState<string | undefined>();
+  // After a successful update we hide the stale version and show a loader on
+  // that row until `refreshAgentStatuses` returns with the freshly-detected
+  // version. Without this the user sees "vOld" alongside the success toast and
+  // assumes the update silently failed.
+  const [redetectingEnvKey, setRedetectingEnvKey] = useState<string | undefined>();
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
   const projects = useAppStore((state) => state.projects);
@@ -358,6 +571,26 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
 
   const registryAgentId = acpGenericInstanceId(props.agentKind);
+  // Read-side guards: any stored "latest version" only counts when its owner
+  // matches the currently-rendered agent. A stale value carried over from the
+  // previous panel renders as `undefined` on the very first frame after the
+  // switch — no flash.
+  const latestRegistryVersion =
+    latestRegistryEntry && latestRegistryEntry.agentId === registryAgentId
+      ? latestRegistryEntry.version
+      : undefined;
+  const latestNpmVersion =
+    latestNpmEntry && latestNpmEntry.agentKind === props.agentKind
+      ? latestNpmEntry.version
+      : undefined;
+  const latestVersionProbeDone = latestNpmEntry?.agentKind === props.agentKind;
+  const newestInstalledVersion = installedStatuses.reduce<string | undefined>((latest, status) => {
+    const version = status.version;
+    if (!version) return latest;
+    if (!latest || isNewerVersion(version, latest)) return version;
+    return latest;
+  }, undefined);
+
   useEffect(() => {
     if (!registryAgentId) return;
     let cancelled = false;
@@ -366,13 +599,40 @@ export function SingleAgentSettings(props: { agentKind: string }) {
       .then((result) => {
         if (cancelled) return;
         const match = result.agents.find((entry) => entry.id === registryAgentId);
-        setLatestRegistryVersion(match?.version);
+        setLatestRegistryEntry({ agentId: registryAgentId, version: match?.version });
       })
       .catch(() => undefined);
     return () => {
       cancelled = true;
     };
   }, [registryAgentId]);
+
+  // Probe the upstream registry (npm) for the kind's latest version so we can
+  // gate the per-env Update button on "actually outdated" rather than just
+  // "installed". Skipped for ACP-registry agents since they have their own
+  // version-comparison path above.
+  useEffect(() => {
+    if (registryAgentId) return;
+    let cancelled = false;
+    const kind = props.agentKind;
+    readBridge()
+      .getLatestAgentVersion({ agentKind: kind })
+      .then((result) => {
+        if (cancelled) return;
+        setLatestNpmEntry({ agentKind: kind, version: result.version });
+      })
+      .catch((error) => {
+        // Surface IPC / network failures so users can diagnose missing update
+        // buttons via DevTools instead of seeing a silently empty UI.
+        console.warn(
+          `[SingleAgentSettings] getLatestAgentVersion(${kind}) failed:`,
+          error instanceof Error ? error.message : error,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [props.agentKind, registryAgentId]);
 
   if (!agent) {
     return (
@@ -388,12 +648,16 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   const defs = (agent.capabilities.settingDefs ?? []).filter(
     (def) => !def.platforms || def.platforms.includes(platform),
   );
-  const models = agent.capabilities.models.filter((m) => m.id !== "auto");
+  const hasSelectableModels = agent.capabilities.models.some((m) => m.id !== "auto");
+  const menuProvider = statusToMenuProvider(agent);
 
-  const versionRows: { label: string; version: string | undefined }[] = [];
+  const versionRows: { label: string; status: AgentStatus }[] = [];
   if (platform === "win32") {
-    for (const s of installedHere) versionRows.push({ label: envLabel(s), version: s.version });
-    for (const s of installedWsl) versionRows.push({ label: envLabel(s), version: s.version });
+    for (const s of installedHere) versionRows.push({ label: envLabel(s), status: s });
+    for (const s of installedWsl) versionRows.push({ label: envLabel(s), status: s });
+  } else {
+    for (const s of installedHere)
+      versionRows.push({ label: envLabel(s) || "Installed", status: s });
   }
   const showEnvironmentMetadataLabels = installedStatuses.length > 1;
   const missingAuthStatuses = installedStatuses.filter((status) => status.authState === "missing");
@@ -406,18 +670,23 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     return method ? [{ status, method }] : [];
   });
   const agentAuth = findAgentAuthMethod(agentAuthStatuses);
-  const terminalLoginStatus =
+  const loginStatus =
     findTerminalLoginStatus(installedStatuses) ??
     missingAuthStatuses.find((status) => status.loginCommand);
-  const loginStatus =
-    terminalLoginStatus ?? missingAuthStatuses.find((status) => status.loginCommand);
   const loginCommand = loginStatus?.loginCommand;
-  const loginProject = findProjectForAgentStatus(loginStatus, projects);
+  const terminalLoginMethod = findTerminalAuthMethodForStatus(loginStatus);
   const acpInstanceId = acpGenericInstanceId(agent.kind);
+  // Native ACP adapters (copilot/gemini/cursor) and generic ACP instances all
+  // speak the same `authenticate()` / `unstable_logout()` over the supervisor's
+  // unified dispatcher. The settings UI lets the user drive a sign-in or
+  // sign-out whenever the agent exposes a non-env-var auth method (the env-var
+  // case is handled separately by the credential-save block).
+  const supportsAcpAgentAuth =
+    acpInstanceId !== undefined ||
+    installedStatuses.some((status) => status.authMethods?.some(isAgentAuthMethod));
   const logoutStatuses = installedStatuses.filter(
     (status) =>
-      status.authState === "authenticated" &&
-      (status.authLogoutSupported === true || acpInstanceId !== undefined),
+      status.authState === "authenticated" && supportsAcpLogoutStatus(status, acpInstanceId),
   );
   const requiredAuthVars = envVarAuthMethod?.vars.filter((variable) => variable.optional !== true);
   const canSaveEnvAuth =
@@ -447,15 +716,15 @@ export function SingleAgentSettings(props: { agentKind: string }) {
       .finally(() => setAuthPending(false));
   };
   const authenticateAgent = (auth = agentAuth) => {
-    if (!auth || !acpInstanceId) return;
+    if (!auth || !supportsAcpAgentAuth) return;
     setAuthPending(true);
     setAuthPendingEnvKey(statusEnvKey(auth.status));
     setAuthPendingMessage(
       `Waiting for ${envLabel(auth.status) ? `${envLabel(auth.status)} ` : ""}${auth.method.name} authentication. Detected agents will refresh when it finishes.`,
     );
     readBridge()
-      .authenticateAcpRegistryAgent({
-        agentId: acpInstanceId,
+      .authenticateAcpAgent({
+        agentKind: props.agentKind,
         methodId: auth.method.id,
         ...agentAuthTarget(auth.status),
       })
@@ -467,7 +736,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
         }),
       )
       .then(() => toast.success(`${agent.label} authenticated.`))
-      .catch((error) =>
+      .catch((error: unknown) =>
         toast.danger(
           error instanceof Error ? error.message : `Unable to authenticate ${agent.label}.`,
         ),
@@ -478,12 +747,58 @@ export function SingleAgentSettings(props: { agentKind: string }) {
         setAuthPendingEnvKey(undefined);
       });
   };
-  const logoutAgent = (status: AgentStatus) => {
-    if (!acpInstanceId) return;
+  const runTerminalLogin = (status: AgentStatus, method: AgentTerminalAuthMethod | undefined) => {
+    if (!status.loginCommand) return;
+    const project = findProjectForAgentStatus(status, projects);
+    const env = envLabel(status);
     setAuthPending(true);
+    setAuthPendingEnvKey(statusEnvKey(status));
+    setAuthPendingMessage(
+      `Waiting for ${env ? `${env} ` : ""}${method?.name ?? "login"} authentication. Detected agents will refresh when it finishes.`,
+    );
+    const opened = runAgentLoginCommand({
+      label: status.label,
+      command: status.loginCommand,
+      ...(method?.env ? { env: method.env } : {}),
+      ...(project ? { project } : {}),
+      onCommandComplete: () => {
+        void readBridge()
+          .refreshAgentStatuses(wslDistros, {
+            agentKinds: [props.agentKind],
+            envs: [scopeEnvForStatus(status)],
+          })
+          .catch((error) =>
+            toast.danger(
+              error instanceof Error ? error.message : `Unable to refresh ${status.label} status.`,
+            ),
+          )
+          .finally(() => {
+            setAuthPending(false);
+            setAuthPendingMessage(undefined);
+            setAuthPendingEnvKey(undefined);
+          });
+      },
+    });
+    if (!opened) {
+      setAuthPending(false);
+      setAuthPendingMessage(undefined);
+      setAuthPendingEnvKey(undefined);
+    }
+  };
+  const logoutAgent = (status: AgentStatus) => {
+    // Native ACP adapters only support sign-out when the agent itself
+    // advertised `unstable_logout` in its capability bag. acp-generic instances
+    // always allow it because the local ack clear is what drives the UI state.
+    if (!supportsAcpLogoutStatus(status, acpInstanceId)) return;
+    const env = envLabel(status);
+    setAuthPending(true);
+    setAuthPendingEnvKey(statusEnvKey(status));
+    setAuthPendingMessage(
+      `Signing out${env ? ` ${env}` : ""}. Detected agents will refresh when it finishes.`,
+    );
     readBridge()
-      .logoutAcpRegistryAgent({
-        agentId: acpInstanceId,
+      .logoutAcpAgent({
+        agentKind: props.agentKind,
         ...agentAuthTarget(status),
       })
       .then(() =>
@@ -493,10 +808,14 @@ export function SingleAgentSettings(props: { agentKind: string }) {
         }),
       )
       .then(() => toast.success(`${agent.label} logged out.`))
-      .catch((error) =>
+      .catch((error: unknown) =>
         toast.danger(error instanceof Error ? error.message : `Unable to log out ${agent.label}.`),
       )
-      .finally(() => setAuthPending(false));
+      .finally(() => {
+        setAuthPending(false);
+        setAuthPendingMessage(undefined);
+        setAuthPendingEnvKey(undefined);
+      });
   };
   const hasAuthSettings =
     envVarAuthMethod !== undefined ||
@@ -529,8 +848,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     envVarAuthMethod !== undefined &&
     installedStatuses.length > 0 &&
     installedStatuses.every((status) => status.authState === "authenticated");
-  const usePerEnvAuthRows =
-    acpInstanceId !== undefined && hasInteractiveAuth && !envVarFullySatisfied;
+  const usePerEnvAuthRows = hasInteractiveAuth && !envVarFullySatisfied;
   const clearEnvVarCredentials = () => {
     if (!envVarAuthMethod || !acpInstanceId) return;
     const environment = Object.fromEntries(
@@ -557,7 +875,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     acpInstanceId !== undefined &&
     latestRegistryVersion !== undefined &&
     installedVersion !== undefined &&
-    latestRegistryVersion !== installedVersion;
+    isNewerVersion(latestRegistryVersion, installedVersion);
   const performUpdate = () => {
     if (!acpInstanceId || !updateAvailable) return;
     setUpdatePending(true);
@@ -574,6 +892,51 @@ export function SingleAgentSettings(props: { agentKind: string }) {
       .finally(() => setUpdatePending(false));
   };
 
+  const performBinaryUpdate = (status: AgentStatus) => {
+    const scope = statusUpdateScope(status);
+    const envKey = statusEnvKey(status);
+    const envSuffix = envLabel(status) ? ` (${envLabel(status)})` : "";
+    setBinaryUpdatePendingEnvKey(envKey);
+    readBridge()
+      .updateAgentBinary({
+        agentKind: props.agentKind,
+        envKind: scope.envKind,
+        ...(scope.wslDistro ? { wslDistro: scope.wslDistro } : {}),
+      })
+      .then(async (result) => {
+        if (result.ok) {
+          const targetSuffix = latestNpmVersion ? ` to v${latestNpmVersion}` : "";
+          toast.success(`${agent.label}${envSuffix} updated${targetSuffix}.`);
+          // Switch the row to a loader while we wait for the supervisor to
+          // re-detect the new installed version. The store updates via the
+          // `agent-status-updated` events emitted during refresh; once the row
+          // re-renders with the fresh version, we clear the loader.
+          setRedetectingEnvKey(envKey);
+          try {
+            await readBridge().refreshAgentStatuses(wslDistros, {
+              agentKinds: [props.agentKind],
+              envs: [scopeEnvForStatus(status)],
+            });
+          } finally {
+            setRedetectingEnvKey(undefined);
+          }
+          return;
+        }
+        const detail = result.output?.trim();
+        toast.danger(
+          detail
+            ? `Unable to update ${agent.label}${envSuffix}: ${detail.slice(0, 240)}`
+            : `Unable to update ${agent.label}${envSuffix}.`,
+        );
+      })
+      .catch((error) =>
+        toast.danger(
+          error instanceof Error ? error.message : `Unable to update ${agent.label}${envSuffix}.`,
+        ),
+      )
+      .finally(() => setBinaryUpdatePendingEnvKey(undefined));
+  };
+
   return (
     <div className="h-full min-h-0 overflow-y-auto px-6 pb-8 pt-4">
       <div className="mx-auto max-w-[720px]">
@@ -587,20 +950,121 @@ export function SingleAgentSettings(props: { agentKind: string }) {
             />
             <h1 className="text-lg font-semibold text-foreground">{agent.label}</h1>
             {updateAvailable ? (
-              <Button size="sm" variant="ghost" isPending={updatePending} onPress={performUpdate}>
-                <ArrowUpCircle className="size-4" />
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 min-h-6 gap-1 px-2 text-[11px]"
+                isPending={updatePending}
+                onPress={performUpdate}
+              >
+                <ArrowUpCircle className="size-3" />
                 Update to v{latestRegistryVersion}
               </Button>
             ) : null}
           </div>
           {versionRows.length > 0 ? (
             <div className="mt-1 space-y-0.5">
-              {versionRows.map((row, i) => (
-                <div key={`${row.label}-${i}`} className="flex gap-2 text-xs text-muted">
-                  <span className="w-[120px] shrink-0">{row.label}</span>
-                  <span className="tabular-nums">{row.version ? `v${row.version}` : "—"}</span>
-                </div>
-              ))}
+              {versionRows.map((row, i) => {
+                const envKey = statusEnvKey(row.status);
+                const isPending = binaryUpdatePendingEnvKey === envKey;
+                const installedVer = row.status.version;
+                const isRedetecting = redetectingEnvKey === envKey;
+                const registryTargetVersion =
+                  latestNpmVersion !== undefined &&
+                  installedVer !== undefined &&
+                  isNewerVersion(latestNpmVersion, installedVer)
+                    ? latestNpmVersion
+                    : undefined;
+                const peerTargetVersion =
+                  newestInstalledVersion !== undefined &&
+                  installedVer !== undefined &&
+                  isNewerVersion(newestInstalledVersion, installedVer)
+                    ? newestInstalledVersion
+                    : undefined;
+                const targetVersion = registryTargetVersion ?? peerTargetVersion;
+                const updateLabel = targetVersion
+                  ? `Update to v${targetVersion}`
+                  : "Check for updates";
+                const showUpdateButton =
+                  !isRedetecting &&
+                  acpInstanceId === undefined &&
+                  row.status.installed &&
+                  (targetVersion !== undefined ||
+                    (row.status.update?.builtIn !== undefined &&
+                      latestVersionProbeDone &&
+                      latestNpmVersion === undefined));
+                // Resolve the update command client-side from the same shared
+                // module the supervisor uses, so the tooltip always has the
+                // exact command we're about to run — no extra IPC roundtrip
+                // and no stale-supervisor edge case.
+                const previewScope = statusUpdateScope(row.status);
+                const previewCommand = showUpdateButton
+                  ? resolveSharedUpdateCommand({
+                      update: row.status.update,
+                      executablePath: row.status.executablePath,
+                      envKind: previewScope.envKind,
+                    })
+                  : undefined;
+                const previewCommandLine = previewCommand
+                  ? formatUpdateCommandLine(previewCommand)
+                  : undefined;
+                return (
+                  <div
+                    key={`${row.label}-${i}`}
+                    // Fixed row height so the per-env Update button can appear
+                    // without shifting siblings down. Height matches the
+                    // button's `h-5` so the row looks identical whether the
+                    // button is present or not.
+                    className="flex h-5 items-center gap-2 text-xs text-muted"
+                  >
+                    <span className="w-[120px] shrink-0">{row.label}</span>
+                    {isRedetecting ? (
+                      <PixelLoader size="xs" />
+                    ) : (
+                      <span className="tabular-nums">
+                        {installedVer ? `v${installedVer}` : "—"}
+                      </span>
+                    )}
+                    {showUpdateButton ? (
+                      <Tooltip delay={0}>
+                        <Tooltip.Trigger>
+                          <Button
+                            size="sm"
+                            variant="tertiary"
+                            className="ml-1 h-5 min-h-5 gap-1 px-2 py-0 text-[11px] leading-none"
+                            aria-label={`${updateLabel} for ${agent.label}${row.label ? ` (${row.label})` : ""}`}
+                            isPending={isPending}
+                            isDisabled={
+                              binaryUpdatePendingEnvKey !== undefined &&
+                              binaryUpdatePendingEnvKey !== envKey
+                            }
+                            onPress={() => performBinaryUpdate(row.status)}
+                          >
+                            <Download className="size-3" />
+                            {updateLabel}
+                          </Button>
+                        </Tooltip.Trigger>
+                        <Tooltip.Content placement="right" className="max-w-[440px]">
+                          {previewCommandLine ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[11px] text-muted">
+                                Will run in {row.label || "this environment"}:
+                              </span>
+                              <code className="font-mono text-[11px]">{previewCommandLine}</code>
+                            </div>
+                          ) : (
+                            <span className="text-[11px]">
+                              {targetVersion
+                                ? `Update ${agent.label} to v${targetVersion}`
+                                : `Check ${agent.label} for updates`}
+                            </span>
+                          )}
+                        </Tooltip.Content>
+                      </Tooltip>
+                    ) : null}
+                  </div>
+                );
+              })}
             </div>
           ) : (
             agent.version && <p className="mt-0.5 text-xs text-muted">v{agent.version}</p>
@@ -713,16 +1177,25 @@ export function SingleAgentSettings(props: { agentKind: string }) {
               ) : null}
               {installedStatuses.map((status) => {
                 const envKey = statusEnvKey(status);
-                const method = status.authMethods?.find(isAgentAuthMethod);
+                const agentMethod = status.authMethods?.find(isAgentAuthMethod);
+                const terminalMethod = findTerminalAuthMethodForStatus(status);
+                const method = agentMethod ?? terminalMethod;
                 return (
                   <AcpAgentAuthEnvRow
                     key={`${status.kind}-${envKey}-auth-row`}
                     status={status}
-                    agentAuthMethod={method}
-                    authPending={authPending}
+                    authMethod={method}
+                    canLogout={supportsAcpLogoutStatus(status, acpInstanceId)}
+                    authPending={authPendingEnvKey === envKey}
                     pendingMessage={authPendingEnvKey === envKey ? authPendingMessage : undefined}
                     showEnvironmentLabel={showAuthEnvironmentLabels}
-                    onLogin={() => method && authenticateAgent({ status, method })}
+                    onLogin={() => {
+                      if (agentMethod) {
+                        authenticateAgent({ status, method: agentMethod });
+                        return;
+                      }
+                      runTerminalLogin(status, terminalMethod);
+                    }}
                     onLogout={() => logoutAgent(status)}
                   />
                 );
@@ -792,7 +1265,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                       <LogOut className="size-4 text-danger" />
                     </Button>
                   </div>
-                ) : agentAuth && acpInstanceId ? (
+                ) : agentAuth && supportsAcpAgentAuth ? (
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     {(agentAuthEntries.length > 0 ? agentAuthEntries : [agentAuth]).map(
                       (entry, index) => (
@@ -870,13 +1343,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                     <Button
                       size="sm"
                       variant="tertiary"
-                      onPress={() =>
-                        runAgentLoginCommand({
-                          label: loginStatus.label,
-                          command: loginCommand,
-                          ...(loginProject ? { project: loginProject } : {}),
-                        })
-                      }
+                      onPress={() => runTerminalLogin(loginStatus, terminalLoginMethod)}
                     >
                       <LogIn className="size-4" />
                       {authMissing ? "Login" : "Re-login"}
@@ -895,7 +1362,7 @@ export function SingleAgentSettings(props: { agentKind: string }) {
                       </Button>
                     ))}
                   </div>
-                ) : logoutStatuses.length > 0 && acpInstanceId ? (
+                ) : logoutStatuses.length > 0 ? (
                   <div className="flex shrink-0 flex-col items-end gap-2">
                     {logoutStatuses.map((status, index) => (
                       <Button
@@ -1010,9 +1477,9 @@ export function SingleAgentSettings(props: { agentKind: string }) {
             </div>
           )}
 
-          {models.length > 0 && (
+          {hasSelectableModels && (
             <div className="mt-8 space-y-4">
-              <ModelVisibilityDropdown agentKind={agent.kind} models={models} />
+              <ModelVisibilityDropdown agentKind={agent.kind} provider={menuProvider} />
             </div>
           )}
         </div>

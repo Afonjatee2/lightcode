@@ -73,6 +73,7 @@ export function DraftPane(props: {
       isDetectingAgents={isDetectingAgents}
       compact
       paneAlign={props.paneAlign}
+      paneId={props.paneId}
       showCloseButton
       isDragging={isDragging}
       dropIndicator={dropIndicator}

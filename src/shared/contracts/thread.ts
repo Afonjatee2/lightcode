@@ -179,5 +179,6 @@ export const startShellPayloadSchema = z.object({
   shellId: z.string().min(1),
   projectLocation: projectLocationSchema,
   worktreePath: z.string().min(1).optional(),
+  initialSize: terminalSizeSchema.optional(),
 });
 export type StartShellPayload = z.infer<typeof startShellPayloadSchema>;

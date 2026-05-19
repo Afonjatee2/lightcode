@@ -60,6 +60,7 @@ export interface CreateMainWindowOptions {
   sentryEnabled: boolean;
   windowChromeHeight: number;
   onClosed(): void;
+  onClose?: (event: Electron.Event) => void;
   onRendererProcessGone?: (details: RenderProcessGoneDetails) => void;
   devServerUrl?: string;
 }
@@ -163,11 +164,12 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
   window.on("move", debouncedSave);
   window.on("maximize", debouncedSave);
   window.on("unmaximize", debouncedSave);
-  window.on("close", () => {
+  window.on("close", (event) => {
     if (boundsTimer) {
       clearTimeout(boundsTimer);
     }
     saveWindowBounds(window);
+    options.onClose?.(event);
   });
   window.on("closed", options.onClosed);
 

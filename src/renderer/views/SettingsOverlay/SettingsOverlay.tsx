@@ -10,6 +10,7 @@ import { GeneralSettings } from "./parts/GeneralSettings";
 import { NotificationSettings } from "./parts/NotificationSettings";
 import { AISettings } from "./parts/AISettings";
 import { AcpRegistrySettings } from "./parts/AcpRegistrySettings";
+import { AgentsGeneralSettings } from "./parts/AgentsGeneralSettings";
 import { SearchSettings } from "./parts/SearchSettings";
 import { ArchivedThreadsSettings } from "./parts/ArchivedThreadsSettings";
 import { AboutSettings } from "./parts/AboutSettings";
@@ -24,6 +25,7 @@ const SECTION_VIEWS: Partial<Record<SettingsSection, () => ReactNode>> = {
   ai: () => <AISettings />,
   search: () => <SearchSettings />,
   agents: () => <AgentSettingsEmpty />,
+  agentsGeneral: () => <AgentsGeneralSettings />,
   archived: () => <ArchivedThreadsSettings />,
   about: () => <AboutSettings />,
   dev: () => <DevSettings />,

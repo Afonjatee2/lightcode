@@ -90,6 +90,13 @@ vi.mock("@heroui/react", () => {
   Popover.Content = Wrapper;
   Popover.Dialog = Wrapper;
 
+  const Tooltip = Wrapper as typeof Wrapper & {
+    Trigger: typeof Wrapper;
+    Content: typeof Wrapper;
+  };
+  Tooltip.Trigger = Wrapper;
+  Tooltip.Content = Wrapper;
+
   return {
     Button,
     Label: (props: { children?: ReactNode }) => <span>{props.children}</span>,
@@ -97,6 +104,7 @@ vi.mock("@heroui/react", () => {
     ListLayout: () => null,
     Popover,
     Switch,
+    Tooltip,
     toast: toastMock,
     Virtualizer: Wrapper,
   };
@@ -106,20 +114,20 @@ const refreshAgentStatusesMock = vi.hoisted(() => vi.fn<() => Promise<void>>());
 const setAcpRegistryAgentAuthMock = vi.hoisted(() =>
   vi.fn<(payload: { agentId: string; environment: Record<string, string> }) => Promise<unknown>>(),
 );
-const authenticateAcpRegistryAgentMock = vi.hoisted(() =>
+const authenticateAcpAgentMock = vi.hoisted(() =>
   vi.fn<
     (payload: {
-      agentId: string;
+      agentKind: string;
       methodId: string;
       envKind?: AgentStatus["envKind"];
       wslDistro?: string;
     }) => Promise<void>
   >(),
 );
-const logoutAcpRegistryAgentMock = vi.hoisted(() =>
+const logoutAcpAgentMock = vi.hoisted(() =>
   vi.fn<
     (payload: {
-      agentId: string;
+      agentKind: string;
       envKind?: AgentStatus["envKind"];
       wslDistro?: string;
     }) => Promise<void>
@@ -131,19 +139,47 @@ const listAcpRegistryMock = vi.hoisted(() =>
   vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
 );
 
+const getLatestAgentVersionMock = vi.hoisted(() =>
+  vi
+    .fn<(payload: { agentKind: string }) => Promise<{ version?: string; source?: string }>>()
+    .mockResolvedValue({}),
+);
+
+const updateAgentBinaryMock = vi.hoisted(() =>
+  vi
+    .fn<
+      (payload: { agentKind: string; envKind: string; wslDistro?: string }) => Promise<{
+        ok: boolean;
+        output?: string;
+        strategy?: string;
+      }>
+    >()
+    .mockResolvedValue({ ok: true }),
+);
+
 vi.mock("@/renderer/bridge", () => ({
   readBridge: () => ({
     refreshAgentStatuses: refreshAgentStatusesMock,
     setAcpRegistryAgentAuth: setAcpRegistryAgentAuthMock,
-    authenticateAcpRegistryAgent: authenticateAcpRegistryAgentMock,
-    logoutAcpRegistryAgent: logoutAcpRegistryAgentMock,
+    authenticateAcpAgent: authenticateAcpAgentMock,
+    logoutAcpAgent: logoutAcpAgentMock,
     focusWindow: focusWindowMock,
     listAcpRegistry: listAcpRegistryMock,
+    getLatestAgentVersion: getLatestAgentVersionMock,
+    updateAgentBinary: updateAgentBinaryMock,
   }),
 }));
 
 const runAgentLoginCommandMock = vi.hoisted(() =>
-  vi.fn<(input: { label: string; command: string; project?: Project }) => void>(),
+  vi.fn<
+    (input: {
+      label: string;
+      command: string;
+      env?: Record<string, string>;
+      onCommandComplete?: (exitCode: number) => void;
+      project?: Project;
+    }) => boolean
+  >(),
 );
 
 vi.mock("@/renderer/actions/agentLoginActions", () => ({
@@ -183,6 +219,7 @@ vi.mock("@/renderer/components/common", () => ({
       onChange={(event) => props.onChange?.({ target: { value: event.target.value } })}
     />
   ),
+  PixelLoader: () => <span data-testid="pixel-loader" />,
   Select: () => <select aria-label="mock-select" />,
 }));
 
@@ -236,12 +273,15 @@ describe("SingleAgentSettings", () => {
     sharedSettingsState.setAgentSetting.mockReset();
     refreshAgentStatusesMock.mockReset().mockResolvedValue(undefined);
     setAcpRegistryAgentAuthMock.mockReset().mockResolvedValue({});
-    authenticateAcpRegistryAgentMock.mockReset().mockResolvedValue(undefined);
-    logoutAcpRegistryAgentMock.mockReset().mockResolvedValue(undefined);
+    authenticateAcpAgentMock.mockReset().mockResolvedValue(undefined);
+    logoutAcpAgentMock.mockReset().mockResolvedValue(undefined);
     focusWindowMock.mockReset().mockResolvedValue(undefined);
+    listAcpRegistryMock.mockReset().mockResolvedValue([]);
+    getLatestAgentVersionMock.mockReset().mockResolvedValue({});
+    updateAgentBinaryMock.mockReset().mockResolvedValue({ ok: true });
     toastMock.danger.mockReset();
     toastMock.success.mockReset();
-    runAgentLoginCommandMock.mockReset();
+    runAgentLoginCommandMock.mockReset().mockReturnValue(true);
   });
 
   it("renders identity metadata as a single compact summary line", () => {
@@ -314,6 +354,7 @@ describe("SingleAgentSettings", () => {
     expect(runAgentLoginCommandMock).toHaveBeenCalledWith({
       label: "Gemini",
       command: "gemini auth login",
+      onCommandComplete: expect.any(Function),
     });
   });
 
@@ -345,7 +386,80 @@ describe("SingleAgentSettings", () => {
     expect(runAgentLoginCommandMock).toHaveBeenCalledWith({
       label: "Codex WSL",
       command: "codex login",
+      onCommandComplete: expect.any(Function),
       project: wslProject,
+    });
+  });
+
+  it("shows terminal auth login actions per environment", () => {
+    const windowsProject = makeProject({
+      id: "windows-project",
+      name: "Windows Project",
+      location: { kind: "windows", path: "C:\\project" },
+    });
+    const wslProject = makeProject({
+      id: "wsl-project",
+      name: "WSL Project",
+      location: {
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/project",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\project",
+      },
+    });
+    appState.projects = [windowsProject, wslProject];
+    statusesState.agentStatuses = [
+      makeStatus("cursor", {
+        label: "Cursor",
+        authState: "missing",
+        loginCommand: "cursor-agent login",
+        authMethods: [
+          { type: "terminal", id: "cursor-agent-login", name: "Cursor login", args: ["login"] },
+        ],
+        envKind: "windows",
+      }),
+    ];
+    statusesState.wslAgentStatuses = [
+      makeStatus("cursor", {
+        label: "Cursor",
+        authState: "missing",
+        loginCommand: "cursor-agent login",
+        authMethods: [
+          {
+            type: "terminal",
+            id: "cursor-agent-login",
+            name: "Cursor login",
+            args: ["login"],
+            env: { NO_OPEN_BROWSER: "1" },
+          },
+        ],
+        envKind: "wsl",
+        envDistro: "Ubuntu",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="cursor" />);
+
+    expect(screen.getByRole("button", { name: /login windows/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /login wsl \(ubuntu\)/i })).toBeInTheDocument();
+    expect(screen.queryByText(/Windows, WSL \(Ubuntu\) needs authentication/u)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /login wsl \(ubuntu\)/i }));
+
+    const loginInput = runAgentLoginCommandMock.mock.calls[0]?.[0];
+    expect(loginInput).toEqual({
+      label: "Cursor",
+      command: "cursor-agent login",
+      env: { NO_OPEN_BROWSER: "1" },
+      onCommandComplete: expect.any(Function),
+      project: wslProject,
+    });
+    expect(screen.getByRole("status", { name: /logging in/i })).toBeInTheDocument();
+
+    loginInput?.onCommandComplete?.(0);
+    expect(refreshAgentStatusesMock).toHaveBeenCalledWith(["Ubuntu"], {
+      agentKinds: ["cursor"],
+      envs: [{ kind: "wsl", distro: "Ubuntu" }],
     });
   });
 
@@ -489,8 +603,8 @@ describe("SingleAgentSettings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /login/i }));
 
-    expect(authenticateAcpRegistryAgentMock).toHaveBeenCalledWith({
-      agentId: "sso-agent",
+    expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "acp-generic:sso-agent",
       methodId: "browser-login",
     });
     await waitFor(() => expect(focusWindowMock).toHaveBeenCalled());
@@ -519,8 +633,8 @@ describe("SingleAgentSettings", () => {
     expect(screen.getByLabelText("Factory API Key")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Login" }));
 
-    expect(authenticateAcpRegistryAgentMock).toHaveBeenCalledWith({
-      agentId: "factory-droid",
+    expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "acp-generic:factory-droid",
       methodId: "login",
     });
   });
@@ -539,7 +653,7 @@ describe("SingleAgentSettings", () => {
     expect(screen.queryByRole("button", { name: /re-login/i })).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /logout/i }));
 
-    expect(logoutAcpRegistryAgentMock).toHaveBeenCalledWith({ agentId: "sso-agent" });
+    expect(logoutAcpAgentMock).toHaveBeenCalledWith({ agentKind: "acp-generic:sso-agent" });
   });
 
   it("runs ACP agent-owned auth in the selected WSL environment", async () => {
@@ -565,8 +679,8 @@ describe("SingleAgentSettings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /login wsl \(ubuntu\)/i }));
 
-    expect(authenticateAcpRegistryAgentMock).toHaveBeenCalledWith({
-      agentId: "sso-agent",
+    expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "acp-generic:sso-agent",
       methodId: "browser-login",
       envKind: "wsl",
       wslDistro: "Ubuntu",
@@ -575,7 +689,7 @@ describe("SingleAgentSettings", () => {
 
   it("shows pending feedback while ACP agent-owned auth is running", async () => {
     let resolveAuth!: () => void;
-    authenticateAcpRegistryAgentMock.mockReturnValueOnce(
+    authenticateAcpAgentMock.mockReturnValueOnce(
       new Promise<void>((resolve) => {
         resolveAuth = resolve;
       }),
@@ -631,8 +745,8 @@ describe("SingleAgentSettings", () => {
     expect(screen.getByText(/Complete Login sign-in for WSL \(Ubuntu\)\./u)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /login wsl \(ubuntu\)/i }));
 
-    expect(authenticateAcpRegistryAgentMock).toHaveBeenCalledWith({
-      agentId: "factory-droid",
+    expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "acp-generic:factory-droid",
       methodId: "login",
       envKind: "wsl",
       wslDistro: "Ubuntu",
@@ -640,6 +754,12 @@ describe("SingleAgentSettings", () => {
   });
 
   it("logs out the selected authenticated ACP environment", async () => {
+    let resolveLogout!: () => void;
+    logoutAcpAgentMock.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveLogout = resolve;
+      }),
+    );
     statusesState.agentStatuses = [
       makeStatus("acp-generic:factory-droid", {
         label: "Factory Droid",
@@ -663,15 +783,147 @@ describe("SingleAgentSettings", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /logout windows/i }));
 
-    expect(logoutAcpRegistryAgentMock).toHaveBeenCalledWith({
-      agentId: "factory-droid",
+    expect(screen.getByRole("status", { name: /logging out/i })).toBeInTheDocument();
+    expect(logoutAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "acp-generic:factory-droid",
+      envKind: "windows",
+    });
+    resolveLogout();
+    await waitFor(() => expect(refreshAgentStatusesMock).toHaveBeenCalled());
+  });
+
+  it("does not show native ACP logout when the agent did not advertise logout support", () => {
+    statusesState.agentStatuses = [
+      makeStatus("gemini", {
+        label: "Gemini",
+        authState: "authenticated",
+        authMethods: [{ id: "oauth-personal", name: "Log in with Google" }],
+        envKind: "windows",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="gemini" />);
+
+    expect(screen.queryByRole("button", { name: /logout/i })).toBeNull();
+  });
+
+  it("offers re-login for authenticated native ACP agents without logout support", async () => {
+    statusesState.agentStatuses = [
+      makeStatus("copilot", {
+        label: "GitHub Copilot",
+        authState: "authenticated",
+        authMethods: [{ id: "github-copilot-login", name: "Copilot login" }],
+        envKind: "windows",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="copilot" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^re-login$/i }));
+
+    expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "copilot",
+      methodId: "github-copilot-login",
+      envKind: "windows",
+    });
+    await waitFor(() => expect(focusWindowMock).toHaveBeenCalled());
+  });
+
+  it("runs native ACP agent-owned auth in the selected environment", async () => {
+    statusesState.agentStatuses = [
+      makeStatus("gemini", {
+        label: "Gemini",
+        authState: "missing",
+        authMethods: [{ id: "oauth-personal", name: "Log in with Google" }],
+        envKind: "windows",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="gemini" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^login$/i }));
+
+    expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "gemini",
+      methodId: "oauth-personal",
+      envKind: "windows",
+    });
+    await waitFor(() => expect(focusWindowMock).toHaveBeenCalled());
+  });
+
+  it("logs out native ACP agents only when ACP logout is advertised", async () => {
+    statusesState.agentStatuses = [
+      makeStatus("gemini", {
+        label: "Gemini",
+        authState: "authenticated",
+        authLogoutSupported: true,
+        authMethods: [{ id: "oauth-personal", name: "Log in with Google" }],
+        envKind: "windows",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="gemini" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^logout$/i }));
+
+    expect(logoutAcpAgentMock).toHaveBeenCalledWith({
+      agentKind: "gemini",
       envKind: "windows",
     });
     await waitFor(() => expect(refreshAgentStatusesMock).toHaveBeenCalled());
   });
 
+  it("offers Cursor's built-in updater when no registry target is available", async () => {
+    const platformSpy = vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
+    statusesState.agentStatuses = [
+      makeStatus("cursor", {
+        label: "Cursor",
+        version: "2026.05.16-0338208",
+        envKind: "windows",
+        update: { builtIn: { binary: "cursor-agent", args: ["update"] } },
+      }),
+    ];
+    statusesState.wslAgentStatuses = [
+      makeStatus("cursor", {
+        label: "Cursor",
+        version: "2026.05.01-eea359f",
+        envKind: "wsl",
+        envDistro: "Ubuntu",
+        update: { builtIn: { binary: "cursor-agent", args: ["update"] } },
+      }),
+    ];
+    getLatestAgentVersionMock.mockResolvedValueOnce({
+      version: "2026.05.16-0338208",
+      source: "homebrew-cask",
+    });
+
+    render(<SingleAgentSettings agentKind="cursor" />);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", {
+          name: "Update to v2026.05.16-0338208 for Cursor (WSL (Ubuntu))",
+        }),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("button", { name: /for Cursor \(Windows\)/ })).toBeNull();
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Update to v2026.05.16-0338208 for Cursor (WSL (Ubuntu))",
+      }),
+    );
+
+    expect(updateAgentBinaryMock).toHaveBeenCalledWith({
+      agentKind: "cursor",
+      envKind: "wsl",
+      wslDistro: "Ubuntu",
+    });
+    platformSpy.mockRestore();
+  });
+
   it("shows an error toast when ACP agent-owned auth fails", async () => {
-    authenticateAcpRegistryAgentMock.mockRejectedValueOnce(new Error("browser closed"));
+    authenticateAcpAgentMock.mockRejectedValueOnce(new Error("browser closed"));
     statusesState.agentStatuses = [
       makeStatus("acp-generic:sso-agent", {
         label: "SSO Agent",

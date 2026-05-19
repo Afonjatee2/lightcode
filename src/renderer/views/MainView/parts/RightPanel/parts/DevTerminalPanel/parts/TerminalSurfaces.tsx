@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { XTermSurface, type XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
+import type { TerminalSize } from "@/shared/contracts";
 
 const SPLIT_MIN_PERCENT = 15;
 const SPLIT_DEFAULT_PERCENT = 50;
@@ -33,8 +34,17 @@ export function TerminalSurfaces(props: {
   focusRequestId: number;
   markTabActive: (tabId: string) => void;
   updateTabTitle: (tabId: string, title: string) => void;
+  onTerminalResize?: (terminalId: string, size: TerminalSize) => void;
 }) {
-  const { tabs, selectedTabId, activeTab, focusRequestId, markTabActive, updateTabTitle } = props;
+  const {
+    tabs,
+    selectedTabId,
+    activeTab,
+    focusRequestId,
+    markTabActive,
+    updateTabTitle,
+    onTerminalResize,
+  } = props;
   const fontSize = useSharedSettings((state) => state.terminalPanelFontSize);
   const [splitPercent, setSplitPercent] = useState(readSplitPercent);
   const terminalRefs = useRef(new Map<string, XTermSurfaceHandle>());
@@ -143,6 +153,9 @@ export function TerminalSurfaces(props: {
                 onActivity={() => markTabActive(tab.id)}
                 onBell={() => markTabActive(tab.id)}
                 onTitleChange={(title) => updateTabTitle(tab.id, title)}
+                {...(onTerminalResize
+                  ? { onTerminalResize: (size) => onTerminalResize(tab.id, size) }
+                  : {})}
               />
             </div>
           ))}
@@ -172,6 +185,9 @@ export function TerminalSurfaces(props: {
                   onActivity={() => markTabActive(tab.id)}
                   onBell={() => markTabActive(tab.id)}
                   onTitleChange={(title) => updateTabTitle(tab.splitId!, title)}
+                  {...(onTerminalResize
+                    ? { onTerminalResize: (size) => onTerminalResize(tab.splitId!, size) }
+                    : {})}
                 />
               </div>
             ))}
@@ -203,6 +219,9 @@ export function TerminalSurfaces(props: {
             onActivity={() => markTabActive(tab.id)}
             onBell={() => markTabActive(tab.id)}
             onTitleChange={(title) => updateTabTitle(tab.id, title)}
+            {...(onTerminalResize
+              ? { onTerminalResize: (size) => onTerminalResize(tab.id, size) }
+              : {})}
           />
         </div>
       ))}

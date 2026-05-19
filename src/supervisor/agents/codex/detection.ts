@@ -320,6 +320,10 @@ export const codexDetectionSpec: DetectionSpec = {
   binary: "codex",
   loginCommand: "codex login",
   capabilities: codexDefaultCapabilities,
+  update: {
+    builtIn: { binary: "codex", args: ["update"] },
+    npm: "@openai/codex",
+  },
   statusProbe: probeCodexStatus,
   authProbes: [
     // Auth file lives on the host — skip for WSL projects (matches prior "unknown").

@@ -2,8 +2,12 @@ import type {
   AgentEnvVarAuthMethod,
   AgentOwnedAuthMethod,
   AgentStatus,
+  AgentTerminalAuthMethod,
+  Project,
   RefreshAgentScopeEnv,
 } from "@/shared/contracts";
+import { useAppStore } from "@/renderer/state/appStore";
+import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 
 const ACP_GENERIC_PREFIX = "acp-generic:";
 
@@ -32,10 +36,22 @@ export function isAgentAuthMethod(
   return method !== undefined && !isEnvVarAuthMethod(method) && method.type !== "terminal";
 }
 
+export function isTerminalAuthMethod(
+  method: StatusAuthMethod | undefined,
+): method is AgentTerminalAuthMethod {
+  return method !== undefined && method.type === "terminal";
+}
+
 export function findAgentAuthMethodForStatus(
   status: AgentStatus | undefined,
 ): AgentOwnedAuthMethod | undefined {
   return status?.authMethods?.find(isAgentAuthMethod);
+}
+
+export function findTerminalAuthMethodForStatus(
+  status: AgentStatus | undefined,
+): AgentTerminalAuthMethod | undefined {
+  return status?.authMethods?.find(isTerminalAuthMethod);
 }
 
 export function agentAuthTarget(status: AgentStatus): {
@@ -52,4 +68,42 @@ export function scopeEnvForStatus(status: AgentStatus): RefreshAgentScopeEnv {
   return status.envKind === "wsl" && status.envDistro
     ? { kind: "wsl", distro: status.envDistro }
     : { kind: "native" };
+}
+
+export function statusUpdateScope(status: AgentStatus): {
+  envKind: "windows" | "wsl" | "posix";
+  wslDistro?: string;
+} {
+  if (status.envKind === "wsl" && status.envDistro) {
+    return { envKind: "wsl", wslDistro: status.envDistro };
+  }
+  if (status.envKind === "windows") return { envKind: "windows" };
+  return { envKind: "posix" };
+}
+
+export function envLabelForStatus(status: AgentStatus): string {
+  if (status.envKind === "wsl") return status.envDistro ? `WSL (${status.envDistro})` : "WSL";
+  if (status.envKind === "windows") return "Windows";
+  return "";
+}
+
+export function currentWslDistros(): string[] {
+  const key = buildWslProjectDistrosKey(useAppStore.getState().projects);
+  return key ? key.split("\0") : [];
+}
+
+export function findProjectForStatus(
+  status: AgentStatus | undefined,
+  projects: readonly Project[],
+): Project | undefined {
+  if (!status) return undefined;
+  if (status.envKind === "wsl" && status.envDistro) {
+    return projects.find(
+      (project) => project.location.kind === "wsl" && project.location.distro === status.envDistro,
+    );
+  }
+  if (status.envKind === "windows") {
+    return projects.find((project) => project.location.kind === "windows");
+  }
+  return undefined;
 }

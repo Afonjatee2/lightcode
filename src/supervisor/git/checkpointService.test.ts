@@ -6,6 +6,15 @@ import { afterEach, describe, expect, it } from "vitest";
 import type { ProjectLocation } from "@/shared/contracts";
 import { GitCheckpointService } from "./checkpointService";
 
+function hasGit(): boolean {
+  try {
+    execFileSync("git", ["--version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 const tempDirs: string[] = [];
 
 afterEach(() => {
@@ -33,7 +42,7 @@ function git(cwd: string, ...args: string[]): string {
   return execFileSync("git", args, { cwd, encoding: "utf8" });
 }
 
-describe("GitCheckpointService", () => {
+describe.skipIf(!hasGit())("GitCheckpointService", () => {
   it("captures turn snapshots and restores tracked plus untracked files", async () => {
     const { dir, location } = makeRepo();
     const service = new GitCheckpointService();

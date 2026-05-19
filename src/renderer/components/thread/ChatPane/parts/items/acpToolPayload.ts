@@ -85,7 +85,9 @@ export function extractReadFileResultPart(payload: unknown): ExtractedPart {
     readPayloadString(payload, "path") ??
     readAcpStringField(payload, "filePath") ??
     readAcpStringField(payload, "file_path") ??
-    readAcpStringField(payload, "path");
+    readAcpStringField(payload, "path") ??
+    readAcpStringField(payload, "notebook_path") ??
+    readAcpStringField(payload, "notebookPath");
   const unwrapped = unwrapReadFileWrapper(base.text);
   const text = unwrapped ? unwrapped.content : base.text;
   const path = unwrapped?.path ?? pathFromPayload;

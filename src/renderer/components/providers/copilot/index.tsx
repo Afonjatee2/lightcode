@@ -17,19 +17,19 @@ registerProviderIcon("copilot", CopilotIcon);
 registerProviderLabel("copilot", "Copilot");
 registerCommitGenDefaults("copilot", {
   label: "Copilot",
-  hint: "first available model",
+  hint: "auto",
   model: "",
-  effort: "low",
+  effort: "",
 });
 registerTitleGenDefaults("copilot", {
   label: "Copilot",
-  hint: "first available model",
+  hint: "auto",
   model: "",
-  effort: "low",
+  effort: "",
 });
 registerConflictResolverDefaults("copilot", {
   label: "Copilot",
-  hint: "first available model",
+  hint: "auto",
   model: "",
   effort: "",
 });

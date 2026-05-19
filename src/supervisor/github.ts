@@ -1,19 +1,27 @@
 import { execFile } from "node:child_process";
-import { writeFile, unlink } from "node:fs/promises";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { promisify } from "node:util";
-import type {
-  ProjectLocation,
-  PrData,
-  PrState,
-  PrCheck,
-  PrFile,
-  PrReviewDecision,
-  GhCheckAvailableResult,
-  GhGetPrChecksResult,
-  GhGetPrFilesResult,
-  GhGetPrDiffResult,
+import {
+  PR_CHECK_FAILURE_CONCLUSIONS,
+  type ProjectLocation,
+  type PrAuthor,
+  type PrComment,
+  type PrCommitSummary,
+  type PrData,
+  type PrDetails,
+  type PrReviewState,
+  type PrReviewSummary,
+  type PrState,
+  type PrCheck,
+  type PrFile,
+  type PrReviewDecision,
+  type GhCheckAvailableResult,
+  type GhGetPrChecksResult,
+  type GhGetPrDetailsResult,
+  type GhGetPrFilesResult,
+  type GhGetPrDiffResult,
 } from "@/shared/contracts";
 import { toWslUncPath } from "@/shared/wsl";
 import { buildAgentCommand, parallelWslCommandsAsync, quotePosixShellArg } from "./agents/base";
@@ -65,13 +73,34 @@ function classifyError(error: unknown, operation: string): Error {
 
 async function runGh(location: ProjectLocation, args: string[]): Promise<string> {
   const spec = buildAgentCommand(location, "gh", args);
+  const cwd = spec.cwd ?? (location.kind === "wsl" ? undefined : location.path);
   const { stdout } = await execFileAsync(spec.command, spec.args, {
     windowsHide: true,
     timeout: GH_TIMEOUT,
-    cwd: spec.cwd,
+    ...(cwd ? { cwd } : {}),
     env: spec.env ? { ...process.env, ...spec.env } : process.env,
   });
   return stdout;
+}
+
+async function createGhBodyFile(
+  location: ProjectLocation,
+  prefix: string,
+  body: string,
+): Promise<{ cliPath: string; cleanup(): Promise<void> }> {
+  const dirPrefix =
+    location.kind === "wsl"
+      ? toWslUncPath(location.distro, `/tmp/${prefix}-`)
+      : join(tmpdir(), `${prefix}-`);
+  const dir = await mkdtemp(dirPrefix);
+  const filename = "body.md";
+  const writePath = join(dir, filename);
+  const cliPath = location.kind === "wsl" ? `/tmp/${basename(dir)}/${filename}` : writePath;
+  await writeFile(writePath, body, { encoding: "utf-8", flag: "wx" });
+  return {
+    cliPath,
+    cleanup: () => rm(dir, { recursive: true, force: true }),
+  };
 }
 
 function mapPrState(raw: { state: string; isDraft: boolean }): PrState {
@@ -81,14 +110,6 @@ function mapPrState(raw: { state: string; isDraft: boolean }): PrState {
   if (s === "CLOSED") return "closed";
   return "open";
 }
-
-const FAILURE_CONCLUSIONS = new Set([
-  "FAILURE",
-  "TIMED_OUT",
-  "CANCELLED",
-  "ACTION_REQUIRED",
-  "STARTUP_FAILURE",
-]);
 
 // `gh pr {list,view} --json statusCheckRollup` returns an array of CheckRun
 // (status/conclusion) and StatusContext (state) entries — not a single string.
@@ -107,7 +128,7 @@ export function aggregateChecksStatus(rollup: unknown): string | undefined {
       continue;
     }
     const conclusion = typeof e.conclusion === "string" ? e.conclusion.toUpperCase() : "";
-    if (FAILURE_CONCLUSIONS.has(conclusion)) return "FAILURE";
+    if (PR_CHECK_FAILURE_CONCLUSIONS.has(conclusion)) return "FAILURE";
     const status = typeof e.status === "string" ? e.status.toUpperCase() : "";
     if (status && status !== "COMPLETED") hasPending = true;
   }
@@ -151,6 +172,147 @@ function mapPrData(raw: Record<string, unknown>, viewerLogin?: string): PrData {
     result.mergeStateStatus = mss;
   }
   return result;
+}
+
+function mapPrAuthor(raw: unknown): PrAuthor | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const obj = raw as Record<string, unknown>;
+  const login = typeof obj.login === "string" ? obj.login : undefined;
+  if (!login) return undefined;
+  const avatarUrl = typeof obj.avatarUrl === "string" ? obj.avatarUrl : undefined;
+  return avatarUrl ? { login, avatarUrl } : { login };
+}
+
+function mapPrCommit(raw: unknown): PrCommitSummary | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const oid = typeof obj.oid === "string" ? obj.oid : "";
+  if (!oid) return null;
+  const message = typeof obj.messageHeadline === "string" ? obj.messageHeadline : "";
+  const body = typeof obj.messageBody === "string" ? obj.messageBody : undefined;
+  const authoredDate = typeof obj.authoredDate === "string" ? obj.authoredDate : "";
+  // `gh pr view --json commits` returns an `authors` array (not a single `author`).
+  // Take the first entry as the primary author so the UI has a stable face to render.
+  const authors = Array.isArray(obj.authors) ? obj.authors : [];
+  const author = authors.length > 0 ? mapPrAuthor(authors[0]) : undefined;
+  return {
+    oid,
+    abbreviatedOid: oid.slice(0, 7),
+    messageHeadline: message,
+    ...(body ? { messageBody: body } : {}),
+    authoredDate,
+    ...(author ? { author } : {}),
+  };
+}
+
+function mapPrComment(raw: unknown): PrComment | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const id = typeof obj.id === "string" ? obj.id : "";
+  const body = typeof obj.body === "string" ? obj.body : "";
+  const createdAt = typeof obj.createdAt === "string" ? obj.createdAt : "";
+  const author = mapPrAuthor(obj.author);
+  if (!id || !author) return null;
+  const url = typeof obj.url === "string" ? obj.url : undefined;
+  return {
+    id,
+    author,
+    body,
+    createdAt,
+    ...(url ? { url } : {}),
+  };
+}
+
+function mapPrReview(raw: unknown): PrReviewSummary | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  const id = typeof obj.id === "string" ? obj.id : "";
+  const author = mapPrAuthor(obj.author);
+  if (!id || !author) return null;
+  const stateRaw = typeof obj.state === "string" ? obj.state.toUpperCase() : "";
+  const state: PrReviewState =
+    stateRaw === "APPROVED" ||
+    stateRaw === "CHANGES_REQUESTED" ||
+    stateRaw === "COMMENTED" ||
+    stateRaw === "DISMISSED" ||
+    stateRaw === "PENDING"
+      ? stateRaw
+      : "COMMENTED";
+  const submittedAt = typeof obj.submittedAt === "string" ? obj.submittedAt : undefined;
+  const body = typeof obj.body === "string" ? obj.body : "";
+  const url = typeof obj.url === "string" ? obj.url : undefined;
+  return {
+    id,
+    author,
+    state,
+    body,
+    ...(submittedAt ? { submittedAt } : {}),
+    ...(url ? { url } : {}),
+  };
+}
+
+function mapStatusCheck(raw: unknown): PrCheck | null {
+  if (!raw || typeof raw !== "object") return null;
+  const obj = raw as Record<string, unknown>;
+  // statusCheckRollup is a union: CheckRun (workflow check) or StatusContext (legacy commit status).
+  // CheckRun fields: name, status, conclusion, detailsUrl, workflowName
+  // StatusContext fields: context (name), state, targetUrl, description
+  const name =
+    typeof obj.name === "string" ? obj.name : typeof obj.context === "string" ? obj.context : "";
+  if (!name) return null;
+  const conclusion = typeof obj.conclusion === "string" ? obj.conclusion : "";
+  const state =
+    typeof obj.status === "string" ? obj.status : typeof obj.state === "string" ? obj.state : "";
+  const url =
+    typeof obj.detailsUrl === "string"
+      ? obj.detailsUrl
+      : typeof obj.targetUrl === "string"
+        ? obj.targetUrl
+        : undefined;
+  const workflowName = typeof obj.workflowName === "string" ? obj.workflowName : undefined;
+  return {
+    name,
+    state,
+    conclusion,
+    ...(url ? { url } : {}),
+    ...(workflowName ? { workflowName } : {}),
+  };
+}
+
+function mapPrDetails(raw: Record<string, unknown>): PrDetails {
+  const commits = Array.isArray(raw.commits)
+    ? raw.commits.map(mapPrCommit).filter((c): c is PrCommitSummary => c !== null)
+    : [];
+  const comments = Array.isArray(raw.comments)
+    ? raw.comments.map(mapPrComment).filter((c): c is PrComment => c !== null)
+    : [];
+  const reviews = Array.isArray(raw.reviews)
+    ? raw.reviews.map(mapPrReview).filter((r): r is PrReviewSummary => r !== null)
+    : [];
+  const checks = Array.isArray(raw.statusCheckRollup)
+    ? raw.statusCheckRollup.map(mapStatusCheck).filter((c): c is PrCheck => c !== null)
+    : [];
+  const mergedBy = mapPrAuthor(raw.mergedBy) ?? null;
+  const author = mapPrAuthor(raw.author);
+  return {
+    number: typeof raw.number === "number" ? raw.number : 0,
+    title: typeof raw.title === "string" ? raw.title : "",
+    body: typeof raw.body === "string" ? raw.body : "",
+    ...(author ? { author } : {}),
+    baseBranch: typeof raw.baseRefName === "string" ? raw.baseRefName : "",
+    headBranch: typeof raw.headRefName === "string" ? raw.headRefName : "",
+    additions: typeof raw.additions === "number" ? raw.additions : 0,
+    deletions: typeof raw.deletions === "number" ? raw.deletions : 0,
+    changedFiles: typeof raw.changedFiles === "number" ? raw.changedFiles : 0,
+    ...(typeof raw.createdAt === "string" ? { createdAt: raw.createdAt } : {}),
+    mergedAt: typeof raw.mergedAt === "string" ? raw.mergedAt : null,
+    mergedBy,
+    closedAt: typeof raw.closedAt === "string" ? raw.closedAt : null,
+    commits,
+    comments,
+    reviews,
+    checks,
+  };
 }
 
 /** Stable cache key for {@link GitHubService.viewerLoginCache}. */
@@ -198,14 +360,8 @@ export class GitHubService {
     // Write body to temp file to avoid shell escaping issues. For WSL projects,
     // gh runs inside the distro and can't read a Windows path, so write into
     // the distro's /tmp via UNC and pass the Linux path to --body-file.
-    const filename = `lightcode-pr-body-${Date.now()}.md`;
-    const writePath =
-      location.kind === "wsl"
-        ? toWslUncPath(location.distro, `/tmp/${filename}`)
-        : join(tmpdir(), filename);
-    const cliPath = location.kind === "wsl" ? `/tmp/${filename}` : writePath;
+    const tempFile = await createGhBodyFile(location, "lightcode-pr-body", body);
     try {
-      await writeFile(writePath, body, "utf-8");
       const createArgs = [
         "pr",
         "create",
@@ -216,7 +372,7 @@ export class GitHubService {
         "--title",
         title,
         "--body-file",
-        cliPath,
+        tempFile.cliPath,
         ...(isDraft ? ["--draft"] : []),
       ];
       await runGh(location, createArgs);
@@ -236,7 +392,7 @@ export class GitHubService {
     } catch (err) {
       throw classifyError(err, "pr create");
     } finally {
-      await unlink(writePath).catch(() => {});
+      await tempFile.cleanup().catch(() => {});
     }
   }
 
@@ -403,6 +559,74 @@ export class GitHubService {
     }
   }
 
+  async getPrDetails(location: ProjectLocation, prNumber: number): Promise<GhGetPrDetailsResult> {
+    try {
+      const stdout = await runGh(location, [
+        "pr",
+        "view",
+        String(prNumber),
+        "--json",
+        [
+          "number",
+          "title",
+          "body",
+          "author",
+          "baseRefName",
+          "headRefName",
+          "additions",
+          "deletions",
+          "changedFiles",
+          "createdAt",
+          "mergedAt",
+          "mergedBy",
+          "closedAt",
+          "commits",
+          "comments",
+          "reviews",
+          "statusCheckRollup",
+        ].join(","),
+      ]);
+      const raw = JSON.parse(stdout) as Record<string, unknown>;
+      return { details: mapPrDetails(raw) };
+    } catch (err) {
+      throw classifyError(err, "pr view --json (details)");
+    }
+  }
+
+  async postPrComment(
+    location: ProjectLocation,
+    prNumber: number,
+    body: string,
+  ): Promise<PrComment> {
+    const trimmed = body.trim();
+    if (trimmed.length === 0) {
+      throw new Error("Comment body is required.");
+    }
+    const tempFile = await createGhBodyFile(location, "lightcode-pr-comment", trimmed);
+    try {
+      const [stdout, viewerLogin] = await Promise.all([
+        runGh(location, ["pr", "comment", String(prNumber), "--body-file", tempFile.cliPath]),
+        this.getViewerLogin(location),
+      ]);
+      // `gh pr comment` prints the URL of the new comment. Fall back to a synthesized
+      // record so the renderer can append the new comment optimistically even when
+      // gh's stdout shape changes between releases.
+      const url = stdout.trim().split(/\s+/).pop() ?? "";
+      const created: PrComment = {
+        id: url || `local-${Date.now()}`,
+        author: { login: viewerLogin ?? "you" },
+        body: trimmed,
+        createdAt: new Date().toISOString(),
+        ...(url ? { url } : {}),
+      };
+      return created;
+    } catch (err) {
+      throw classifyError(err, "pr comment");
+    } finally {
+      await tempFile.cleanup().catch(() => {});
+    }
+  }
+
   async submitPrReview(
     location: ProjectLocation,
     prNumber: number,
@@ -429,19 +653,20 @@ export class GitHubService {
       }
     }
 
-    const filename = `lightcode-pr-review-${Date.now()}.md`;
-    const writePath =
-      location.kind === "wsl"
-        ? toWslUncPath(location.distro, `/tmp/${filename}`)
-        : join(tmpdir(), filename);
-    const cliPath = location.kind === "wsl" ? `/tmp/${filename}` : writePath;
+    const tempFile = await createGhBodyFile(location, "lightcode-pr-review", trimmed);
     try {
-      await writeFile(writePath, trimmed, "utf-8");
-      await runGh(location, ["pr", "review", String(prNumber), flag, "--body-file", cliPath]);
+      await runGh(location, [
+        "pr",
+        "review",
+        String(prNumber),
+        flag,
+        "--body-file",
+        tempFile.cliPath,
+      ]);
     } catch (err) {
       throw classifyError(err, "pr review");
     } finally {
-      await unlink(writePath).catch(() => {});
+      await tempFile.cleanup().catch(() => {});
     }
   }
 }

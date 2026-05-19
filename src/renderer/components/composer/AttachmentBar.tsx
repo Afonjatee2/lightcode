@@ -62,14 +62,43 @@ function AttachmentChip(props: {
   return <div className="lightcode-attachment-chip">{content}</div>;
 }
 
+function ImagePreview(props: {
+  attachment: Attachment;
+  onPreviewImage?: ((attachment: Attachment) => void) | undefined;
+}) {
+  const { attachment: att, onPreviewImage } = props;
+  const img = <img src={toLocalFileUrl(att.path)} alt={att.name} draggable={false} />;
+  if (onPreviewImage) {
+    return (
+      <button
+        type="button"
+        className="lightcode-attachment-image-preview"
+        onClick={() => onPreviewImage(att)}
+        aria-label={`Preview ${att.name}`}
+      >
+        {img}
+      </button>
+    );
+  }
+  return <span className="lightcode-attachment-image-preview">{img}</span>;
+}
+
 export function AttachmentBar(props: {
   attachments: Attachment[];
   onRemove?: ((id: string) => void) | undefined;
   onPreviewImage?: (attachment: Attachment) => void;
   layout?: "inset" | "flush";
   hideImageNames?: boolean;
+  imagesAsPreview?: boolean;
 }) {
-  const { attachments, onRemove, onPreviewImage, layout = "inset", hideImageNames } = props;
+  const {
+    attachments,
+    onRemove,
+    onPreviewImage,
+    layout = "inset",
+    hideImageNames,
+    imagesAsPreview,
+  } = props;
   if (attachments.length === 0) return null;
 
   const className =
@@ -79,15 +108,19 @@ export function AttachmentBar(props: {
 
   return (
     <div className={className}>
-      {attachments.map((att) => (
-        <AttachmentChip
-          key={att.id}
-          attachment={att}
-          onRemove={onRemove}
-          onPreviewImage={onPreviewImage}
-          {...(hideImageNames === undefined ? {} : { hideImageName: hideImageNames })}
-        />
-      ))}
+      {attachments.map((att) =>
+        imagesAsPreview && att.isImage ? (
+          <ImagePreview key={att.id} attachment={att} onPreviewImage={onPreviewImage} />
+        ) : (
+          <AttachmentChip
+            key={att.id}
+            attachment={att}
+            onRemove={onRemove}
+            onPreviewImage={onPreviewImage}
+            {...(hideImageNames === undefined ? {} : { hideImageName: hideImageNames })}
+          />
+        ),
+      )}
     </div>
   );
 }

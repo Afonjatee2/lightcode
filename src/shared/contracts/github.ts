@@ -32,7 +32,17 @@ export interface PrCheck {
   name: string;
   state: string;
   conclusion: string;
+  url?: string;
+  workflowName?: string;
 }
+
+export const PR_CHECK_FAILURE_CONCLUSIONS: ReadonlySet<string> = new Set([
+  "FAILURE",
+  "TIMED_OUT",
+  "CANCELLED",
+  "ACTION_REQUIRED",
+  "STARTUP_FAILURE",
+]);
 
 export interface PrFile {
   path: string;
@@ -41,6 +51,65 @@ export interface PrFile {
 }
 
 export type PrReviewDecision = "approve" | "request-changes" | "comment";
+
+export interface PrAuthor {
+  login: string;
+  avatarUrl?: string;
+}
+
+export interface PrCommitSummary {
+  oid: string;
+  abbreviatedOid: string;
+  messageHeadline: string;
+  messageBody?: string;
+  authoredDate: string;
+  author?: PrAuthor;
+  url?: string;
+}
+
+export interface PrComment {
+  id: string;
+  author: PrAuthor;
+  body: string;
+  createdAt: string;
+  url?: string;
+}
+
+export type PrReviewState =
+  | "APPROVED"
+  | "CHANGES_REQUESTED"
+  | "COMMENTED"
+  | "DISMISSED"
+  | "PENDING";
+
+export interface PrReviewSummary {
+  id: string;
+  author: PrAuthor;
+  state: PrReviewState;
+  body: string;
+  submittedAt?: string;
+  url?: string;
+}
+
+export interface PrDetails {
+  number: number;
+  title: string;
+  body: string;
+  author?: PrAuthor;
+  baseBranch: string;
+  headBranch: string;
+  additions: number;
+  deletions: number;
+  changedFiles: number;
+  createdAt?: string;
+  mergedAt?: string | null;
+  mergedBy?: PrAuthor | null;
+  closedAt?: string | null;
+  commits: PrCommitSummary[];
+  comments: PrComment[];
+  reviews: PrReviewSummary[];
+  checks: PrCheck[];
+}
 
 export interface GhCheckAvailableResult {
   available: boolean;
@@ -132,3 +201,20 @@ export const ghSubmitPrReviewPayloadSchema = z.object({
   body: z.string().default(""),
 });
 export type GhSubmitPrReviewPayload = z.infer<typeof ghSubmitPrReviewPayloadSchema>;
+
+export const ghGetPrDetailsPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  prNumber: z.number().int().min(1),
+});
+export type GhGetPrDetailsPayload = z.infer<typeof ghGetPrDetailsPayloadSchema>;
+
+export interface GhGetPrDetailsResult {
+  details: PrDetails;
+}
+
+export const ghPostPrCommentPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  prNumber: z.number().int().min(1),
+  body: z.string().min(1),
+});
+export type GhPostPrCommentPayload = z.infer<typeof ghPostPrCommentPayloadSchema>;

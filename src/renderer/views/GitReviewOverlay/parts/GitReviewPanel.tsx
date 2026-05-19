@@ -13,6 +13,7 @@ import type { Project, ProjectLocation, GitStatusResult } from "@/shared/contrac
 import { friendlyError } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import { useGitStore } from "@/renderer/state/gitStore";
+import { refreshGitProject } from "@/renderer/state/gitRefresh";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { BranchSelector } from "@/renderer/components/common";
 import { overlaySidebarSurfaceClass } from "@/renderer/components/layout/sidebarChrome";
@@ -92,8 +93,29 @@ export function GitReviewPanel(props: {
   }
 
   async function handleRefresh() {
-    await fetchStatus();
-    setRefreshKey((k) => k + 1);
+    setRefreshing(true);
+    try {
+      // Manual refresh runs a full sync: git fetch + snapshot (status,
+      // branches, worktrees, gh check) + per-worktree status + source-branch
+      // info + PR data. Matches the periodic fetchRemotes path in
+      // useGitRefresh so the button surface and the background loop converge
+      // on the same state.
+      await refreshGitProject({ id: project.id, location: project.location }, "manual", "full", {
+        fetchRemote: true,
+      });
+      if (statusKey && effectiveLocation !== project.location) {
+        // Worktree panel: refresh its own status separately since the
+        // project snapshot covered the project root, and the worktree's
+        // status may differ from any cached batch entry.
+        const status = await readBridge()
+          .getGitStatus({ projectLocation: effectiveLocation })
+          .catch(() => undefined);
+        if (status) useGitStore.getState().setWorktreeStatus(statusKey, status);
+      }
+    } finally {
+      setRefreshing(false);
+      setRefreshKey((k) => k + 1);
+    }
   }
 
   function handleSwitchBranch(branch: string, createNew: boolean) {

@@ -5,6 +5,8 @@ export * from "./ConfirmDialog";
 export * from "./ContextMenu";
 export * from "./EffortContextMenu";
 export * from "./FileIcon";
+export * from "./FlyingLightball";
+export * from "./LightballTabs";
 export * from "./FileStatusBadge";
 export * from "./Input";
 export * from "./OptionMenu";

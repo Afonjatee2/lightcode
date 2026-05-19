@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useReducer, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useReducer, useRef } from "react";
 import { useDroppable } from "@dnd-kit/react";
 import { type PaneLayout, type PaneLayoutAxis } from "@/shared/paneLayout";
 import { useIsInsertSplitHighlighted, useIsRootInsertHighlighted } from "@/renderer/dnd";
@@ -11,8 +11,10 @@ import {
 
 const DIVIDER_SIZE = 8;
 const ROOT_INSERT_ZONE_INSET = DIVIDER_SIZE / 2;
+const CONTAINER_RESIZE_COMMIT_IDLE_MS = 120;
 
 export type Rect = { left: number; top: number; width: number; height: number };
+type ContainerSize = { width: number; height: number };
 
 type ComputedPane = { paneId: string; rect: Rect };
 
@@ -29,6 +31,19 @@ type ComputedDivider = {
 };
 
 type ComputedLayout = { panes: ComputedPane[]; dividers: ComputedDivider[] };
+
+function sameContainerSize(a: ContainerSize, b: ContainerSize): boolean {
+  return a.width === b.width && a.height === b.height;
+}
+
+function getContainerRect(size: ContainerSize): Rect {
+  return {
+    left: 0,
+    top: 0,
+    width: Math.max(0, size.width - ROOT_INSERT_ZONE_INSET * 2),
+    height: Math.max(0, size.height - ROOT_INSERT_ZONE_INSET * 2),
+  };
+}
 
 export function computeLayout(
   layout: PaneLayout,
@@ -213,36 +228,86 @@ export function SplitPaneContainer(props: {
   const overlayRef = useRef<HTMLDivElement>(null);
   const paneElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
   const dividerElementRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
-
-  const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({
-    width: 0,
-    height: 0,
-  });
+  const containerSizeRef = useRef<ContainerSize>({ width: 0, height: 0 });
+  const layoutRef = useRef(props.layout);
+  layoutRef.current = props.layout;
 
   // Committed sizes per split, normalized lazily on first read.
   const committedSizesRef = useRef<Map<string, number[]>>(new Map());
   // Transient sizes during a drag — applied imperatively, not stored.
   const transientSizesRef = useRef<Map<string, number[]>>(new Map());
-  // Forces a re-render after a drag commit so React's pane styles converge
-  // with the imperatively-set DOM positions. Read isn't needed; calling
-  // `bumpLayoutTick` is the only side effect.
+  // Forces a re-render after an imperative layout commit so React's pane styles
+  // converge with the DOM positions. Read isn't needed; dispatching is the side effect.
   const [, bumpLayoutTick] = useReducer((tick: number) => tick + 1, 0);
 
   useLayoutEffect(() => {
     const element = containerRef.current;
     if (!element) return;
+
+    let resizeFrame: number | null = null;
+    let commitTimer: number | null = null;
+
+    function cancelPendingResizeWork() {
+      if (resizeFrame !== null) {
+        cancelAnimationFrame(resizeFrame);
+        resizeFrame = null;
+      }
+      if (commitTimer !== null) {
+        clearTimeout(commitTimer);
+        commitTimer = null;
+      }
+    }
+
+    function commitSize(next: ContainerSize) {
+      cancelPendingResizeWork();
+      if (sameContainerSize(containerSizeRef.current, next)) return;
+      containerSizeRef.current = next;
+      bumpLayoutTick();
+    }
+
+    function scheduleCommit() {
+      if (commitTimer !== null) {
+        clearTimeout(commitTimer);
+      }
+      commitTimer = window.setTimeout(() => {
+        commitTimer = null;
+        bumpLayoutTick();
+      }, CONTAINER_RESIZE_COMMIT_IDLE_MS);
+    }
+
+    function scheduleLiveLayout() {
+      if (resizeFrame !== null) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        applyLayoutForSize(containerSizeRef.current);
+      });
+    }
+
+    function applyObservedSize(next: ContainerSize) {
+      if (sameContainerSize(containerSizeRef.current, next)) return;
+      containerSizeRef.current = next;
+      if (paneElementRefs.current.size === 0) {
+        bumpLayoutTick();
+        return;
+      }
+      scheduleLiveLayout();
+      scheduleCommit();
+    }
+
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect;
-        setContainerSize((prev) =>
-          prev.width === width && prev.height === height ? prev : { width, height },
-        );
+        applyObservedSize({ width, height });
       }
     });
     observer.observe(element);
     const rect = element.getBoundingClientRect();
-    setContainerSize({ width: rect.width, height: rect.height });
-    return () => observer.disconnect();
+    commitSize({ width: rect.width, height: rect.height });
+    return () => {
+      observer.disconnect();
+      cancelPendingResizeWork();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- observer lifetime is fixed; resize work reads latest layout from refs
   }, []);
 
   function resolveSizes(storageKey: string, count: number): number[] {
@@ -256,28 +321,27 @@ export function SplitPaneContainer(props: {
   }
 
   // Account for the inset padding around the layout.
-  const innerWidth = Math.max(0, containerSize.width - ROOT_INSERT_ZONE_INSET * 2);
-  const innerHeight = Math.max(0, containerSize.height - ROOT_INSERT_ZONE_INSET * 2);
-  const containerRect: Rect = {
-    left: 0,
-    top: 0,
-    width: innerWidth,
-    height: innerHeight,
-  };
+  const containerRect = getContainerRect(containerSizeRef.current);
 
   const computed =
-    innerWidth > 0 && innerHeight > 0
+    containerRect.width > 0 && containerRect.height > 0
       ? computeLayout(props.layout, containerRect, resolveSizes)
       : { panes: [], dividers: [] };
 
-  function applyTransientLayout() {
-    const layoutNow = computeLayout(props.layout, containerRect, resolveSizes);
+  function applyLayoutForSize(size: ContainerSize) {
+    const rect = getContainerRect(size);
+    if (rect.width <= 0 || rect.height <= 0) return;
+    const layoutNow = computeLayout(layoutRef.current, rect, resolveSizes);
     for (const pane of layoutNow.panes) {
       setRectStyle(paneElementRefs.current.get(pane.paneId) ?? null, pane.rect);
     }
     for (const divider of layoutNow.dividers) {
       setRectStyle(dividerElementRefs.current.get(divider.zoneId) ?? null, divider.rect);
     }
+  }
+
+  function applyTransientLayout() {
+    applyLayoutForSize(containerSizeRef.current);
   }
 
   const cleanupRef = useRef<(() => void) | null>(null);
@@ -363,8 +427,8 @@ export function SplitPaneContainer(props: {
         style={{
           left: ROOT_INSERT_ZONE_INSET,
           top: ROOT_INSERT_ZONE_INSET,
-          width: innerWidth,
-          height: innerHeight,
+          right: ROOT_INSERT_ZONE_INSET,
+          bottom: ROOT_INSERT_ZONE_INSET,
         }}
       >
         {/* Sort by id so React keeps the same DOM slot per pane across layout

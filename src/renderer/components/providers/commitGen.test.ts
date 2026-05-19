@@ -74,10 +74,10 @@ const claudeStatus: AgentStatus = {
 };
 
 describe("resolveCommitGenConfig", () => {
-  it("falls back to provider defaults when the stored config is empty", () => {
+  it("falls back to the registered Codex default (5.4 Mini + xhigh)", () => {
     expect(resolveCommitGenConfig(codexStatus, "", "")).toEqual({
-      model: "gpt-5.5",
-      effort: "low",
+      model: "gpt-5.4-mini",
+      effort: "xhigh",
       availableEfforts: ["low", "medium", "high", "xhigh"],
     });
   });
@@ -92,7 +92,9 @@ describe("resolveCommitGenConfig", () => {
 });
 
 describe("getCommitGenCandidates", () => {
-  it("returns installed agents with non-missing auth", () => {
+  it("filters out providers whose registered model is not in capabilities", () => {
+    // The fake "gemini" entry has Claude capabilities (no gemini-3-flash), so it
+    // gets filtered out under auto's strict per-section preferred-model rule.
     expect(
       getCommitGenCandidates(
         [
@@ -103,9 +105,21 @@ describe("getCommitGenCandidates", () => {
         ],
         "auto",
       ),
-    ).toEqual([
-      codexStatus,
-      { ...claudeStatus, kind: "gemini", label: "Gemini WSL", authState: "unknown" },
+    ).toEqual([codexStatus]);
+  });
+
+  it("falls back to all installed agents when no provider has its preferred model", () => {
+    // Codex without its gpt-5.4-mini default — strict filter would empty the
+    // list, so the helper loosens to the full installed set sorted by preference.
+    const codexWithoutPreferred: AgentStatus = {
+      ...codexStatus,
+      capabilities: {
+        ...codexStatus.capabilities,
+        models: [{ id: "gpt-5.5", label: "5.5" }],
+      },
+    };
+    expect(getCommitGenCandidates([codexWithoutPreferred], "auto")).toEqual([
+      codexWithoutPreferred,
     ]);
   });
 });
@@ -113,7 +127,7 @@ describe("getCommitGenCandidates", () => {
 describe("provider default hints", () => {
   it("builds commit-generation hint text from provider registrations", () => {
     expect(getCommitGenDefaultsHint()).toBe(
-      "Defaults: Claude -> Haiku, Codex -> GPT-5.5, Copilot -> first available model, Cursor -> Composer 2 Fast, Gemini -> Flash",
+      "Defaults: Claude -> Sonnet high, Codex -> GPT-5.4 Mini xhigh, Copilot -> auto, Cursor -> Composer 2 Fast, Gemini -> 3 Flash",
     );
   });
 });
@@ -146,13 +160,13 @@ describe("generateCommitMessageWithFallback", () => {
     expect(invoke).toHaveBeenNthCalledWith(1, {
       projectLocation,
       agentKind: "codex",
-      model: "gpt-5.5",
-      effort: "low",
+      model: "gpt-5.4-mini",
+      effort: "xhigh",
     });
     expect(invoke).toHaveBeenNthCalledWith(2, {
       projectLocation,
       agentKind: "claude",
-      model: "haiku",
+      model: "sonnet",
       effort: "high",
     });
   });

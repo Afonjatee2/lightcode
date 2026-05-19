@@ -13,13 +13,23 @@ import {
 
 registerProviderIcon("claude", ClaudeIcon);
 registerProviderLabel("claude", "Claude Code");
-registerCommitGenDefaults("claude", { label: "Claude", hint: "Haiku", model: "haiku", effort: "" });
-registerTitleGenDefaults("claude", { label: "Claude", hint: "Haiku", model: "haiku", effort: "" });
+registerCommitGenDefaults("claude", {
+  label: "Claude",
+  hint: "Sonnet high",
+  model: "sonnet",
+  effort: "high",
+});
+registerTitleGenDefaults("claude", {
+  label: "Claude",
+  hint: "Haiku medium",
+  model: "haiku",
+  effort: "medium",
+});
 registerConflictResolverDefaults("claude", {
   label: "Claude",
-  hint: "Opus 4.7",
+  hint: "Opus 4.7 high",
   model: "claude-opus-4-7",
-  effort: "",
+  effort: "high",
 });
 
 registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfigChange }) => {

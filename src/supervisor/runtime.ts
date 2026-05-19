@@ -33,6 +33,8 @@ import type {
   GhCreatePrPayload,
   GhGetPrChecksPayload,
   GhGetPrChecksResult,
+  GhGetPrDetailsPayload,
+  GhGetPrDetailsResult,
   GhGetPrDiffPayload,
   GhGetPrDiffResult,
   GhGetPrFilesPayload,
@@ -41,9 +43,11 @@ import type {
   GhMergePrPayload,
   GhClosePrPayload,
   GhMarkPrReadyPayload,
+  GhPostPrCommentPayload,
   GhReopenPrPayload,
   GhSubmitPrReviewPayload,
   GhUpdatePrBranchPayload,
+  PrComment,
   GitAbortMergePayload,
   GitAddWorktreePayload,
   GitAddWorktreeResult,
@@ -89,12 +93,16 @@ import type {
   GitWatchProjectPayload,
   GitWatchWorktreesPayload,
   GitWorktreeListResult,
-  AuthenticateAcpRegistryAgentPayload,
+  AuthenticateAcpAgentPayload,
   InterruptThreadPayload,
   InstallAcpRegistryAgentPayload,
-  LogoutAcpRegistryAgentPayload,
+  LogoutAcpAgentPayload,
   SetAcpRegistryAgentAuthPayload,
   UpdateAcpRegistryAgentPayload,
+  UpdateAgentBinaryPayload,
+  UpdateAgentBinaryResult,
+  GetLatestAgentVersionPayload,
+  GetLatestAgentVersionResult,
   SetPendingSteerPayload,
   ClearPendingSteerPayload,
   ListProjectTreePayload,
@@ -131,22 +139,33 @@ import type { SupervisorEvent } from "@/shared/ipc";
 import type { LspMessagePayload, LspStartPayload, LspStopPayload } from "@/shared/lsp";
 import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { joinProjectPosixPath } from "@/shared/wsl";
-import { acpGenericKind } from "./agents/acp-generic";
+import {
+  acpGenericKind,
+  extractAcpGenericInstanceId,
+  verifyAcpGenericAuthentication,
+} from "./agents/acp-generic";
+import {
+  dispatchAcpAuthenticate,
+  dispatchAcpLogout,
+  envContextFromPayload,
+  isUnsupportedAcpLogoutError,
+} from "./agents/acp";
 import { buildAgentRegistry } from "./agents/registry";
 import {
-  authenticateAcpRegistryAgent as authenticateAcpRegistryAgentFromRegistry,
   autoUpdateAcpRegistryAgents,
   backfillAcpRegistryAgentIcons,
   fetchAcpRegistry,
   installAcpRegistryAgent as installAcpRegistryAgentFromRegistry,
-  logoutAcpRegistryAgent as logoutAcpRegistryAgentFromRegistry,
   readAcpRegistrySettings,
   removeAcpRegistryAgent as removeAcpRegistryAgentFromRegistry,
+  setAcpGenericAgentAuthAcknowledged,
   setAcpRegistryAgentAuth as setAcpRegistryAgentAuthInRegistry,
   updateAcpRegistryAgent as updateAcpRegistryAgentFromRegistry,
 } from "./agents/acpRegistry";
 import { prefetchNativeNodeRuntime } from "./runtime/prefetchNativeNode";
-import { readWslCommandOutputAsync, type AgentAdapter } from "./agents/base";
+import { readWslCommandOutputAsync, type AgentAdapter, type AgentEnvContext } from "./agents/base";
+import { getLatestVersionForAdapter, runUpdateCommandWithFallback } from "./agents/updateAgent";
+import { clearAgentBinaryPathCache } from "./agents/binaryResolver";
 import { generateCommitMessage } from "./commitMessageGenerator";
 import {
   extractContext as extractContextFn,
@@ -438,8 +457,62 @@ export class SupervisorRuntime {
     });
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
-    void this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
+    await this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
     return { installed };
+  }
+
+  async updateAgentBinary(payload: UpdateAgentBinaryPayload): Promise<UpdateAgentBinaryResult> {
+    const adapter = this.adapters.get(payload.agentKind);
+    if (!adapter) {
+      return {
+        ok: false,
+        strategy: "unsupported",
+        output: `No adapter registered for agent kind "${payload.agentKind}".`,
+      };
+    }
+
+    const envContext: AgentEnvContext = {
+      envKind: payload.envKind,
+      ...(payload.wslDistro ? { wslDistro: payload.wslDistro } : {}),
+      baseDir: this.baseDir,
+    };
+
+    const wslDistros = await this.agentStatusService.listWslDistros();
+    const statuses = await this.agentStatusService.getAgentStatuses({ wslDistros });
+    const pool = payload.envKind === "wsl" ? statuses.wsl : statuses.windows;
+    const status = pool.find(
+      (entry) =>
+        entry.kind === payload.agentKind &&
+        (payload.envKind !== "wsl" || entry.envDistro === payload.wslDistro),
+    );
+    if (!status || !status.installed) {
+      return {
+        ok: false,
+        strategy: "unsupported",
+        output: `${adapter.label} is not installed in the requested environment.`,
+      };
+    }
+
+    const result = await runUpdateCommandWithFallback(adapter, status, envContext);
+    if (result.ok) {
+      // Drop the cached executable path so the next detection probe runs a
+      // fresh `command -v` / `where.exe`. Without this we keep returning the
+      // old path; for most package managers the path doesn't change after
+      // an update, but for nvm/fnm/asdf and similar version-managed setups
+      // the new binary can land at a different prefix and the cached entry
+      // would resolve to a stale shim.
+      clearAgentBinaryPathCache();
+      await this.refreshAffectedAgentStatus(payload.agentKind);
+    }
+    return result;
+  }
+
+  async getLatestAgentVersion(
+    payload: GetLatestAgentVersionPayload,
+  ): Promise<GetLatestAgentVersionResult> {
+    const adapter = this.adapters.get(payload.agentKind);
+    if (!adapter) return { source: "unknown" };
+    return getLatestVersionForAdapter(adapter);
   }
 
   async removeAcpRegistryAgent(
@@ -469,31 +542,74 @@ export class SupervisorRuntime {
     return { installed };
   }
 
-  async authenticateAcpRegistryAgent(payload: AuthenticateAcpRegistryAgentPayload): Promise<void> {
-    await authenticateAcpRegistryAgentFromRegistry({
-      agentId: payload.agentId,
+  async authenticateAcpAgent(payload: AuthenticateAcpAgentPayload): Promise<void> {
+    const adapter = this.adapters.get(payload.agentKind);
+    if (!adapter) {
+      throw new Error(`Unknown agent: ${payload.agentKind}`);
+    }
+    const ctx = envContextFromPayload(payload.envKind, payload.wslDistro);
+    await dispatchAcpAuthenticate({
+      adapter,
       methodId: payload.methodId,
       ...(payload.envKind ? { envKind: payload.envKind } : {}),
       ...(payload.wslDistro ? { wslDistro: payload.wslDistro } : {}),
-      settingsPath: this.settingsPath,
     });
-    // Auth writes `authAcknowledged` into the instance — rebuild the cached
-    // adapters so the next status refresh sees the new ack state.
+    // Generic ACP instances persist a per-env login acknowledgement so the
+    // detection probe (which can't always tell whether the agent is signed in)
+    // reports `authState: "authenticated"` on the next refresh. Native ACP
+    // adapters (copilot/gemini/cursor) probe their own auth state directly
+    // and don't need an ack.
+    const instanceId = extractAcpGenericInstanceId(payload.agentKind);
+    if (instanceId !== undefined) {
+      const instance = readAcpRegistrySettings(this.settingsPath).agentInstances[instanceId];
+      const verified =
+        instance !== undefined && (await verifyAcpGenericAuthentication(instance, ctx));
+      if (!verified) {
+        setAcpGenericAgentAuthAcknowledged(this.settingsPath, instanceId, ctx, false);
+        this.sharedSettingsCache.invalidate();
+        this.refreshAgentRegistryAdapters();
+        void this.refreshAffectedAgentStatus(payload.agentKind);
+        throw new Error("ACP authentication was not completed.");
+      }
+      setAcpGenericAgentAuthAcknowledged(this.settingsPath, instanceId, ctx, true);
+    } else {
+      const status = await adapter.detectInstall(ctx);
+      if (status.authState === "missing") {
+        void this.refreshAffectedAgentStatus(payload.agentKind);
+        throw new Error("ACP authentication was not completed.");
+      }
+    }
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
-    void this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
+    void this.refreshAffectedAgentStatus(payload.agentKind);
   }
 
-  async logoutAcpRegistryAgent(payload: LogoutAcpRegistryAgentPayload): Promise<void> {
-    await logoutAcpRegistryAgentFromRegistry({
-      agentId: payload.agentId,
-      ...(payload.envKind ? { envKind: payload.envKind } : {}),
-      ...(payload.wslDistro ? { wslDistro: payload.wslDistro } : {}),
-      settingsPath: this.settingsPath,
-    });
+  async logoutAcpAgent(payload: LogoutAcpAgentPayload): Promise<void> {
+    const adapter = this.adapters.get(payload.agentKind);
+    if (!adapter) {
+      throw new Error(`Unknown agent: ${payload.agentKind}`);
+    }
+    const ctx = envContextFromPayload(payload.envKind, payload.wslDistro);
+    const instanceId = extractAcpGenericInstanceId(payload.agentKind);
+    // Best-effort ACP-side logout only applies to generic ACP instances. The
+    // local ack is their source of truth, so unsupported ACP logout can still
+    // clear the UI state. Native adapters must not report success unless the
+    // agent actually accepts the logout request.
+    try {
+      await dispatchAcpLogout({
+        adapter,
+        ...(payload.envKind ? { envKind: payload.envKind } : {}),
+        ...(payload.wslDistro ? { wslDistro: payload.wslDistro } : {}),
+      });
+    } catch (error) {
+      if (instanceId === undefined || !isUnsupportedAcpLogoutError(error)) throw error;
+    }
+    if (instanceId !== undefined) {
+      setAcpGenericAgentAuthAcknowledged(this.settingsPath, instanceId, ctx, false);
+    }
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
-    void this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
+    void this.refreshAffectedAgentStatus(payload.agentKind);
   }
 
   getThreadSnapshots(): ThreadRuntimeSnapshot[] {
@@ -961,6 +1077,18 @@ export class SupervisorRuntime {
       payload.projectLocation,
       payload.prNumber,
       payload.rebase,
+    );
+  }
+
+  async ghGetPrDetails(payload: GhGetPrDetailsPayload): Promise<GhGetPrDetailsResult> {
+    return this.githubService.getPrDetails(payload.projectLocation, payload.prNumber);
+  }
+
+  async ghPostPrComment(payload: GhPostPrCommentPayload): Promise<PrComment> {
+    return this.githubService.postPrComment(
+      payload.projectLocation,
+      payload.prNumber,
+      payload.body,
     );
   }
 

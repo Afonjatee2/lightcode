@@ -165,6 +165,12 @@ export const claudeDetectionSpec: DetectionSpec = {
   binary: "claude",
   loginCommand: "claude auth login",
   capabilities: claudeCapabilities,
+  update: {
+    builtIn: { binary: "claude", args: ["update"] },
+    npm: "@anthropic-ai/claude-code",
+    brew: "claude",
+    winget: "Anthropic.ClaudeCode",
+  },
   statusProbe: probeClaudeStatus,
   capabilitiesProbe: (ctx) => probeClaudeCapabilities(ctx),
 };

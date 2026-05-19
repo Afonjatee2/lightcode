@@ -67,6 +67,7 @@ export function OverlayShell(props: {
   const positionClass = mode === "fixed" ? "fixed inset-0 z-50" : "absolute inset-0 z-30";
   return (
     <div
+      data-overlay-surface=""
       className={`${positionClass} flex flex-col bg-background transition-opacity duration-150 ${
         visible ? "opacity-100" : "opacity-0"
       }`}
