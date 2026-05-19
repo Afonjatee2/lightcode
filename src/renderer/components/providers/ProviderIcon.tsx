@@ -1,5 +1,15 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { StatusTone } from "./statusTone";
+import {
+  getUtilityTaskCandidates,
+  getUtilityTaskDefaultsHint,
+  resolveUtilityTaskConfig,
+  type UtilityTaskCandidateAgent,
+  type UtilityTaskConfigAgent,
+  type UtilityTaskDefaults,
+} from "./utilityTask";
+
+export { AUTO_PROVIDER_PREFERENCE_ORDER, sortByAutoPreference } from "./utilityTask";
 
 // --- Icon registry ---
 
@@ -259,35 +269,9 @@ export function getConfigNormalizer(kind: string): ConfigNormalizer | undefined 
   return CONFIG_NORMALIZER_REGISTRY.get(kind);
 }
 
-/**
- * Preference order used by Auto for utility tasks (title gen, commit gen, conflict resolver).
- * Codex first by user preference; others fall back alphabetically afterwards by registration order.
- */
-export const AUTO_PROVIDER_PREFERENCE_ORDER: readonly string[] = [
-  "codex",
-  "claude",
-  "gemini",
-  "opencode",
-  "cursor",
-  "copilot",
-];
-
-export function sortByAutoPreference<T extends { kind: string }>(items: readonly T[]): T[] {
-  const rank = (kind: string) => {
-    const idx = AUTO_PROVIDER_PREFERENCE_ORDER.indexOf(kind);
-    return idx < 0 ? AUTO_PROVIDER_PREFERENCE_ORDER.length : idx;
-  };
-  return [...items].sort((a, b) => rank(a.kind) - rank(b.kind));
-}
-
 // --- Commit generation defaults registry ---
 
-export interface CommitGenDefaults {
-  label?: string;
-  hint?: string;
-  model: string;
-  effort: string;
-}
+export interface CommitGenDefaults extends UtilityTaskDefaults {}
 
 const COMMIT_GEN_REGISTRY = new Map<string, CommitGenDefaults>();
 
@@ -300,24 +284,12 @@ export function getCommitGenDefaults(kind: string): CommitGenDefaults | undefine
 }
 
 export function getCommitGenDefaultsHint(): string | undefined {
-  const entries = [...COMMIT_GEN_REGISTRY.values()]
-    .flatMap((defaults) =>
-      defaults.hint && defaults.label ? [`${defaults.label} -> ${defaults.hint}`] : [],
-    )
-    .sort()
-    .join(", ");
-
-  return entries ? `Defaults: ${entries}` : undefined;
+  return getUtilityTaskDefaultsHint(COMMIT_GEN_REGISTRY.values());
 }
 
 // --- Title generation defaults registry ---
 
-export interface TitleGenDefaults {
-  label?: string;
-  hint?: string;
-  model: string;
-  effort: string;
-}
+export interface TitleGenDefaults extends UtilityTaskDefaults {}
 
 const TITLE_GEN_REGISTRY = new Map<string, TitleGenDefaults>();
 
@@ -330,24 +302,12 @@ export function getTitleGenDefaults(kind: string): TitleGenDefaults | undefined 
 }
 
 export function getTitleGenDefaultsHint(): string | undefined {
-  const entries = [...TITLE_GEN_REGISTRY.values()]
-    .flatMap((defaults) =>
-      defaults.hint && defaults.label ? [`${defaults.label} -> ${defaults.hint}`] : [],
-    )
-    .sort()
-    .join(", ");
-
-  return entries ? `Defaults: ${entries}` : undefined;
+  return getUtilityTaskDefaultsHint(TITLE_GEN_REGISTRY.values());
 }
 
 // --- Conflict resolver defaults registry ---
 
-export interface ConflictResolverDefaults {
-  label?: string;
-  hint?: string;
-  model: string;
-  effort: string;
-}
+export interface ConflictResolverDefaults extends UtilityTaskDefaults {}
 
 const CONFLICT_RESOLVER_REGISTRY = new Map<string, ConflictResolverDefaults>();
 
@@ -360,73 +320,22 @@ export function getConflictResolverDefaults(kind: string): ConflictResolverDefau
 }
 
 export function getConflictResolverDefaultsHint(): string | undefined {
-  const entries = [...CONFLICT_RESOLVER_REGISTRY.values()]
-    .flatMap((defaults) =>
-      defaults.hint && defaults.label ? [`${defaults.label} -> ${defaults.hint}`] : [],
-    )
-    .sort()
-    .join(", ");
-
-  return entries ? `Defaults: ${entries}` : undefined;
+  return getUtilityTaskDefaultsHint(CONFLICT_RESOLVER_REGISTRY.values());
 }
 
-interface ConflictResolverAgentLike {
-  kind: string;
-  installed?: boolean;
-  authState?: string;
-  capabilities: { models: { id: string }[] };
-}
-
-function hasPreferredConflictResolverModel(agent: ConflictResolverAgentLike): boolean {
-  const defaults = getConflictResolverDefaults(agent.kind);
-  if (!defaults?.model) return true;
-  return agent.capabilities.models.some((m) => m.id === defaults.model);
-}
+type ConflictResolverAgentLike = UtilityTaskCandidateAgent;
 
 export function getConflictResolverCandidates<T extends ConflictResolverAgentLike>(
   agentStatuses: readonly T[],
   provider: string,
 ): T[] {
-  const available = agentStatuses.filter((a) => a.installed !== false && a.authState !== "missing");
-  if (provider === "auto") {
-    const withPreferred = available.filter(hasPreferredConflictResolverModel);
-    return sortByAutoPreference(withPreferred.length > 0 ? withPreferred : available);
-  }
-  return available.filter((agent) => agent.kind === provider);
+  return getUtilityTaskCandidates(agentStatuses, provider, getConflictResolverDefaults);
 }
 
 export function resolveConflictResolverConfig(
-  agent:
-    | {
-        kind: string;
-        capabilities: {
-          models: { id: string }[];
-          efforts: string[];
-          modelEfforts: Record<string, string[]>;
-          defaultEffort?: string | undefined;
-        };
-      }
-    | undefined,
+  agent: UtilityTaskConfigAgent | undefined,
   model: string,
   effort: string,
 ): { model: string; effort: string; availableEfforts: string[] } {
-  if (!agent) return { model: "", effort: "", availableEfforts: [] };
-
-  const defaults = getConflictResolverDefaults(agent.kind);
-  const nextModel = agent.capabilities.models.some((m) => m.id === model)
-    ? model
-    : defaults?.model && agent.capabilities.models.some((m) => m.id === defaults.model)
-      ? defaults.model
-      : (agent.capabilities.models[0]?.id ?? "");
-
-  const modelEfforts = agent.capabilities.modelEfforts[nextModel];
-  const availableEfforts = modelEfforts?.length ? modelEfforts : agent.capabilities.efforts;
-  if (availableEfforts.length === 0) return { model: nextModel, effort: "", availableEfforts };
-
-  if (availableEfforts.includes(effort)) return { model: nextModel, effort, availableEfforts };
-
-  const fallback = [defaults?.effort, agent.capabilities.defaultEffort, availableEfforts[0]].find(
-    (c) => c && availableEfforts.includes(c!),
-  );
-  return { model: nextModel, effort: fallback ?? "", availableEfforts };
+  return resolveUtilityTaskConfig(agent, model, effort, getConflictResolverDefaults);
 }
