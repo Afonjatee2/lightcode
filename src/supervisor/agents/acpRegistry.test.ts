@@ -3,6 +3,30 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import type { AcpRegistryListResult } from "@/shared/contracts";
+import { REGISTRY_INSTALL_PROBE_TIMEOUT_MS } from "./acp-generic";
+
+const probeAcpGenericInstanceMock = vi.hoisted(() =>
+  vi
+    .fn<
+      (...args: unknown[]) => Promise<{
+        authState: string;
+        authMethods: Array<{ id: string; name: string }>;
+      }>
+    >()
+    .mockResolvedValue({
+      authState: "missing",
+      authMethods: [{ id: "login", name: "Login" }],
+    }),
+);
+
+vi.mock("./acp-generic", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./acp-generic")>();
+  return {
+    ...actual,
+    probeAcpGenericInstance: probeAcpGenericInstanceMock,
+  };
+});
+
 import {
   autoUpdateAcpRegistryAgents,
   backfillAcpRegistryAgentIcons,
@@ -70,6 +94,11 @@ describe("ACP registry family mapping", () => {
         version: "1.0.0",
         config: { binary: "npx" },
       });
+      expect(probeAcpGenericInstanceMock).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "codex-acp", driver: "acp-generic" }),
+        undefined,
+        { timeoutMs: REGISTRY_INSTALL_PROBE_TIMEOUT_MS },
+      );
     } finally {
       vi.unstubAllGlobals();
     }

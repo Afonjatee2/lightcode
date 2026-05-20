@@ -154,15 +154,17 @@ describe("dispatchAcpLogout", () => {
         { command: "cursor-agent", args: ["acp"] },
         {
           async buildAcpLogoutCommand() {
-            return { command: "cursor-agent", args: ["logout"], cwd: "C:\\repo" };
+            return { command: "cursor-agent", args: ["logout"], cwd: "/repo" };
           },
         },
       ),
-      envKind: "windows",
+      // WSL probe locations pass spec.cwd through; posix hosts redirect into agent-probe.
+      envKind: "wsl",
+      wslDistro: "Ubuntu",
     });
 
     expect(readCommandOutputAsyncMock).toHaveBeenCalledWith("cursor-agent", ["logout"], {
-      cwd: "C:\\repo",
+      cwd: "/repo",
     });
   });
 

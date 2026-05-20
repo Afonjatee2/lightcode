@@ -16,6 +16,7 @@ import {
   extractAcpDiffSummary,
   extractAcpDiffResultPart,
   extractAcpResultPart,
+  readAcpContentEditTexts,
   type ExtractedPart,
 } from "./acpToolPayload";
 import { InlineDiffView } from "./InlineDiffView";
@@ -35,6 +36,7 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
   const argContent = isCreate ? extractCreateContent(payload) : undefined;
   const diffPart = !isCreate ? extractAcpDiffResultPart(payload) : undefined;
   const diffText = diffPart?.text ? diffPart.text : undefined;
+  const contentEdit = readAcpContentEditTexts(payload);
   const paneActions = useChatPaneActions();
 
   // Some SDKs (e.g. Claude `Write`) don't surface the new file contents on
@@ -108,7 +110,11 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
       onExpandedChange={setIsExpanded}
     >
       {diffText !== undefined ? (
-        <InlineDiffView diffText={diffText} filePath={payload.path} />
+        <InlineDiffView
+          diffText={diffText}
+          filePath={payload.path}
+          {...(contentEdit ? { oldText: contentEdit.oldText, newText: contentEdit.newText } : {})}
+        />
       ) : argContent !== undefined ? (
         <CommandOutputViewport text={argContent} language={language} />
       ) : fetched.content !== undefined ? (

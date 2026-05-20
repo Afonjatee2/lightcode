@@ -11,6 +11,7 @@
  * fields lack extra body details and that's fine.
  */
 
+import { buildLineUnifiedDiff, countLineChangeStats } from "@/shared/lineUnifiedDiff";
 import { detectLanguageFromPath, type ViewportLanguage } from "./languageDetect";
 
 export interface AcpToolResult {
@@ -141,8 +142,28 @@ export function extractAcpArgsPart(payload: unknown): ExtractedPart {
   return { text: safeJson(args), language: "json" };
 }
 
+/** Cursor ACP content-diff blocks stored on the payload by the supervisor mapper. */
+export function readAcpContentEditTexts(
+  payload: unknown,
+): { path: string; oldText: string; newText: string } | undefined {
+  if (!payload || typeof payload !== "object") return undefined;
+  const record = payload as Record<string, unknown>;
+  const path = readPayloadString(payload, "path");
+  const newText = readString(record.editNewText);
+  if (!path || newText === undefined) return undefined;
+  const oldText = readString(record.editOldText) ?? "";
+  return { path, oldText, newText };
+}
+
 /** Return only ACP result bodies that are unified diffs, or synthesize one from edit args. */
 export function extractAcpDiffResultPart(payload: unknown): ExtractedPart {
+  const contentEdit = readAcpContentEditTexts(payload);
+  if (contentEdit) {
+    return {
+      text: buildLineUnifiedDiff(contentEdit.path, contentEdit.oldText, contentEdit.newText),
+      language: "diff",
+    };
+  }
   const resultPart = extractAcpResultPart(payload);
   if (resultPart.language === "diff") return resultPart;
   const synthesized = synthesizeEditDiff(payload);
@@ -179,6 +200,11 @@ export function extractAcpPatchTargetPath(payload: unknown): string | undefined 
 }
 
 export function extractAcpDiffSummary(payload: unknown): DiffSummary | undefined {
+  const contentEdit = readAcpContentEditTexts(payload);
+  if (contentEdit) {
+    const stats = countLineChangeStats(contentEdit.oldText, contentEdit.newText);
+    return stats.added === 0 && stats.removed === 0 ? undefined : stats;
+  }
   const changesSummary = summarizeStructuredFileChanges(payload);
   if (changesSummary) return changesSummary;
   const diffPart = extractAcpDiffResultPart(payload);

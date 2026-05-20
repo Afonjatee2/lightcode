@@ -46,6 +46,9 @@ import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
 /** Prefix for generic-ACP `kind` values. Unique per registered instance. */
 export const ACP_GENERIC_KIND_PREFIX = "acp-generic:";
 
+/** First-time `npx` installs can exceed the default probe budget. */
+export const REGISTRY_INSTALL_PROBE_TIMEOUT_MS = 90_000;
+
 export function acpGenericKind(instanceId: string): string {
   return `${ACP_GENERIC_KIND_PREFIX}${instanceId}`;
 }
@@ -211,11 +214,27 @@ function detectProbeLocation(ctx: AgentEnvContext | undefined): ProjectLocation 
   return { kind: "posix", path: homedir() };
 }
 
+export async function probeAcpGenericInstance(
+  instance: AgentInstanceConfig,
+  ctx?: AgentEnvContext,
+  options?: { timeoutMs?: number },
+): Promise<AcpProbeResult | undefined> {
+  const cfg = parseAcpGenericInstanceConfig(instance.config);
+  return probeGenericCapabilities(
+    ctx,
+    cfg,
+    instance,
+    instance.displayName ?? cfg.binary,
+    options?.timeoutMs,
+  );
+}
+
 async function probeGenericCapabilities(
   ctx: AgentEnvContext | undefined,
   cfg: AcpGenericInstanceConfig,
   instance: AgentInstanceConfig,
   label: string,
+  timeoutMs?: number,
 ): Promise<AcpProbeResult | undefined> {
   const location = detectProbeLocation(ctx);
   const command = buildGenericCommand(location, cfg, instance);
@@ -232,6 +251,7 @@ async function probeGenericCapabilities(
     ...(processCwd ? { processCwd } : {}),
     ...(command.env ? { env: command.env } : {}),
     label,
+    ...(timeoutMs !== undefined ? { timeoutMs } : {}),
   });
 }
 
@@ -348,6 +368,17 @@ function resolveGenericAuthState(
   if (cfg.authMode === "envVar" && cfg.authEnvVar) {
     const value = instance.environment?.[cfg.authEnvVar]?.value ?? process.env[cfg.authEnvVar];
     return value && value.length > 0 ? "authenticated" : "missing";
+  }
+  if (probeResult?.authState === "missing") {
+    return "missing";
+  }
+  if (
+    probeResult?.authState === "authenticated" &&
+    !probeResult.authMethods?.some(
+      (method) => isAcpTerminalAuthMethod(method) || isAcpAgentAuthMethod(method),
+    )
+  ) {
+    return "authenticated";
   }
   for (const method of probeResult?.authMethods ?? []) {
     if (!isAcpEnvVarAuthMethod(method)) continue;

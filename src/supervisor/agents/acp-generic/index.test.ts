@@ -290,6 +290,17 @@ describe("createAcpGenericAdapter", () => {
     ]);
   });
 
+  it("trusts ACP probe authState when newSession returns auth_required", async () => {
+    vi.mocked(probeAcpCapabilities).mockResolvedValue({
+      authState: "missing",
+      authMethods: [{ id: "login", name: "Login" }],
+    });
+    const adapter = createAcpGenericAdapter(baseInstance);
+    const status = await adapter.detectInstall();
+    expect(status.authState).toBe("missing");
+    expect(status.authMethods).toEqual([{ id: "login", name: "Login" }]);
+  });
+
   it("reports advertised agent auth as missing even when a session probe succeeds", async () => {
     // `sessionEstablished` is not a reliable proxy for "signed in" — some
     // agents (e.g. Cline) accept newSession unauthenticated. Until we have a

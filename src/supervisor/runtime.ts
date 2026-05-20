@@ -444,6 +444,7 @@ export class SupervisorRuntime {
     });
     this.sharedSettingsCache.invalidate();
     this.refreshAgentRegistryAdapters();
+    await this.refreshAffectedAgentStatus(acpGenericKind(payload.agentId));
     return { installed };
   }
 

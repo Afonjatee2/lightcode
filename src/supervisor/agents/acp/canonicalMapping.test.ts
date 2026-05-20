@@ -413,6 +413,37 @@ describe("mapAcpSessionUpdate", () => {
     expect(state.openPlanSteps).toBeUndefined();
   });
 
+  it("extracts file_change path and diff from ACP content diff blocks when rawInput is empty", () => {
+    const state = createAcpMapperState("t-fc-content-diff");
+    const events = mapAcpSessionUpdate(
+      note({
+        sessionUpdate: "tool_call",
+        toolCallId: "tc-fc-content-diff",
+        title: "Edit File",
+        kind: "edit",
+        status: "completed",
+        rawInput: {},
+        content: [
+          {
+            type: "diff",
+            path: "src/renderer/App.tsx",
+            oldText: "const x = 1;\n",
+            newText: "const x = 2;\n",
+          },
+        ],
+      } as Parameters<typeof mapAcpSessionUpdate>[0]["update"]),
+      state,
+    );
+    const started = events[0] as { itemType: string; payload: Record<string, unknown> };
+    expect(started.itemType).toBe("file_change");
+    expect(started.payload.path).toBe("src/renderer/App.tsx");
+    expect(started.payload.changeKind).toBe("edit");
+    expect(started.payload.diffSummary).toEqual({ added: 1, removed: 1 });
+    expect(started.payload.result).toContain("diff --git a/src/renderer/App.tsx");
+    expect(started.payload.result).toContain("-const x = 1;");
+    expect(started.payload.result).toContain("+const x = 2;");
+  });
+
   it("extracts file_change path from apply_patch text args", () => {
     const state = createAcpMapperState("t-fc");
     const events = mapAcpSessionUpdate(

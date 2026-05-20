@@ -26,6 +26,12 @@ import type {
   RuntimeEvent,
   ToolCallPayload,
 } from "@/shared/contracts";
+import {
+  extractAcpFileChangesFromContent,
+  hasSubstantialAcpRawOutput,
+  joinAcpContentFileChangeDiffs,
+  summarizeAcpContentFileChanges,
+} from "./acpFileChangeContent";
 import { readDiffSummary, readFileChangePath } from "../fileChangeSummary";
 import {
   createContextUsageEvent,
@@ -582,13 +588,20 @@ function buildAcpToolCallPayload(
     };
   }
   if (itemType === "file_change") {
-    const path = extractFileChangePath(toolCall.rawInput, title, kind, locations);
-    const diffSummary = readDiffSummary(toolCall.rawInput);
+    const contentDiffs = extractAcpFileChangesFromContent(toolCall.content);
+    const contentDiffText = joinAcpContentFileChangeDiffs(contentDiffs);
+    const primary = contentDiffs[0];
+    const path = extractFileChangePath(toolCall.rawInput, title, kind, locations) ?? primary?.path;
+    const diffSummary =
+      summarizeAcpContentFileChanges(contentDiffs) ??
+      readDiffSummary(toolCall.rawInput, contentDiffText);
     return {
       ...base,
+      ...(contentDiffText ? { result: contentDiffText } : {}),
       path: path ?? "",
       changeKind: classifyFileChangeKind(kind, title, toolCall.rawInput),
       ...(diffSummary ? { diffSummary } : {}),
+      ...(primary ? { editOldText: primary.oldText, editNewText: primary.newText } : {}),
     };
   }
   if (itemType === "web_search") {
@@ -626,14 +639,17 @@ function buildAcpToolCallUpdatePayload(
     resolveTerminalOutput,
     item.terminalId,
   );
-  const result =
-    toolCall.rawOutput !== undefined
-      ? toolCall.rawOutput
-      : contentResult !== undefined
-        ? contentResult
-        : item.itemType === "command_execution"
-          ? resolveTerminalOutputForCommandPayload(item.payload, resolveTerminalOutputByCommand)
-          : undefined;
+  const isFileChange = item.itemType === "file_change";
+  const contentDiffs = isFileChange ? extractAcpFileChangesFromContent(toolCall.content) : [];
+  const contentDiffText = isFileChange ? joinAcpContentFileChangeDiffs(contentDiffs) : undefined;
+  const result = pickAcpToolCallResult({
+    contentDiffText,
+    rawOutput: toolCall.rawOutput,
+    contentResult,
+    itemType: item.itemType,
+    payload: item.payload,
+    resolveTerminalOutputByCommand,
+  });
   const payload: Record<string, unknown> = {
     status,
     ...(result !== undefined ? { result } : {}),
@@ -643,13 +659,40 @@ function buildAcpToolCallUpdatePayload(
     ...(locations.length > 0 ? { locations } : {}),
     ...(item.isSubAgent ? { isSubAgent: true } : {}),
   };
-  if (item.itemType === "file_change") {
-    const path = extractFileChangePath(toolCall.rawOutput, title, kind, locations);
+  if (isFileChange) {
+    const primary = contentDiffs[0];
+    const path = extractFileChangePath(toolCall.rawOutput, title, kind, locations) ?? primary?.path;
     if (path) payload.path = path;
-    const diffSummary = readDiffSummary(toolCall.rawOutput);
+    const diffSummary =
+      summarizeAcpContentFileChanges(contentDiffs) ??
+      readDiffSummary(toolCall.rawOutput, contentDiffText);
     if (diffSummary) payload.diffSummary = diffSummary;
+    if (primary) {
+      payload.editOldText = primary.oldText;
+      payload.editNewText = primary.newText;
+    }
   }
   return payload;
+}
+
+function pickAcpToolCallResult(args: {
+  contentDiffText: string | undefined;
+  rawOutput: unknown;
+  contentResult: string | undefined;
+  itemType: AcpToolCallItemState["itemType"];
+  payload: AcpToolCallItemState["payload"];
+  resolveTerminalOutputByCommand: ((command: string) => string | undefined) | undefined;
+}): unknown {
+  if (args.contentDiffText !== undefined) return args.contentDiffText;
+  if (hasSubstantialAcpRawOutput(args.rawOutput)) return args.rawOutput;
+  if (args.contentResult !== undefined) return args.contentResult;
+  if (args.itemType === "command_execution") {
+    return resolveTerminalOutputForCommandPayload(
+      args.payload,
+      args.resolveTerminalOutputByCommand,
+    );
+  }
+  return undefined;
 }
 
 function finalizeToolCallPayload(

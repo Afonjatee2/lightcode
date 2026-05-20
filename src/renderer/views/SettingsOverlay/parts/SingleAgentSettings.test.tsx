@@ -639,6 +639,28 @@ describe("SingleAgentSettings", () => {
     });
   });
 
+  it("shows auth controls when probe advertised methods but authState is still unknown", () => {
+    statusesState.agentStatuses = [
+      makeStatus("acp-generic:factory-droid", {
+        label: "Factory Droid",
+        authState: "unknown",
+        authMethods: [
+          { id: "login", name: "Login" },
+          {
+            id: "factory-key",
+            name: "Factory API Key",
+            vars: [{ name: "FACTORY_API_KEY", label: "Factory API Key" }],
+          } as never,
+        ],
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="acp-generic:factory-droid" />);
+
+    expect(screen.getByLabelText("Factory API Key")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Login" })).toBeInTheDocument();
+  });
+
   it("offers logout (not re-login) for an authenticated ACP agent env", async () => {
     statusesState.agentStatuses = [
       makeStatus("acp-generic:sso-agent", {
@@ -714,6 +736,33 @@ describe("SingleAgentSettings", () => {
 
     resolveAuth();
     await waitFor(() => expect(refreshAgentStatusesMock).toHaveBeenCalled());
+  });
+
+  it("shows Windows login when WSL is signed in but Windows status omitted auth methods", () => {
+    statusesState.agentStatuses = [
+      makeStatus("acp-generic:factory-droid", {
+        label: "Factory Droid",
+        authState: "unknown",
+        envKind: "windows",
+      }),
+    ];
+    statusesState.wslAgentStatuses = [
+      makeStatus("acp-generic:factory-droid", {
+        label: "Factory Droid",
+        authState: "authenticated",
+        authMethods: [{ id: "login", name: "Login" }],
+        envKind: "wsl",
+        envDistro: "Ubuntu",
+      }),
+    ];
+
+    render(<SingleAgentSettings agentKind="acp-generic:factory-droid" />);
+
+    expect(screen.getByText(/Windows · Login required/u)).toBeInTheDocument();
+    expect(screen.getByText(/Complete Login sign-in for Windows\./u)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /login windows/i })).toBeInTheDocument();
+    expect(screen.getByText(/WSL \(Ubuntu\) · Signed in/u)).toBeInTheDocument();
+    expect(screen.queryByText(/Windows · Authentication/u)).toBeNull();
   });
 
   it("labels the remaining WSL auth action when Windows is already signed in", async () => {

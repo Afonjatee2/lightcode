@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { homedir } from "node:os";
 import {
   copyFileSync,
   chmodSync,
@@ -26,8 +27,17 @@ import {
 } from "@/shared/settings";
 import { downloadToFile } from "../runtime/download";
 import { decryptSecret, encryptSecret, transformSensitiveAgentSecrets } from "../secretStorage";
-import { acpGenericKind } from "./acp-generic";
-import type { AgentEnvContext } from "./base";
+import {
+  acpGenericKind,
+  probeAcpGenericInstance,
+  REGISTRY_INSTALL_PROBE_TIMEOUT_MS,
+} from "./acp-generic";
+import {
+  buildNpxPrefetchArgs,
+  clearNpxExecutionCache,
+  isNpxCacheCorruptionError,
+} from "./acpRegistryNpx";
+import { buildAgentCommand, type AgentEnvContext } from "./base";
 
 const execFileAsync = promisify(execFile);
 
@@ -298,6 +308,80 @@ function mergeRegistryInstance(
   return next;
 }
 
+function nativeInstallLocation():
+  | { kind: "windows"; path: string }
+  | { kind: "posix"; path: string } {
+  return {
+    kind: process.platform === "win32" ? "windows" : "posix",
+    path: homedir(),
+  };
+}
+
+async function prefetchNpxDistribution(agent: AcpRegistryAgent): Promise<void> {
+  const dist = agent.distribution.npx;
+  if (!dist) return;
+  const spec = buildAgentCommand(
+    nativeInstallLocation(),
+    "npx",
+    buildNpxPrefetchArgs(dist),
+    undefined,
+    dist.env ? { ...dist.env } : undefined,
+  );
+  const execOptions = {
+    timeout: 120_000,
+    windowsHide: true,
+    ...(spec.cwd ? { cwd: spec.cwd } : {}),
+    ...(spec.env ? { env: { ...process.env, ...spec.env } } : {}),
+  };
+
+  const runPrefetch = () => execFileAsync(spec.command, spec.args, execOptions);
+
+  try {
+    await runPrefetch();
+  } catch (error) {
+    if (isNpxCacheCorruptionError(error)) {
+      try {
+        clearNpxExecutionCache();
+        await runPrefetch();
+        return;
+      } catch (retryError) {
+        console.warn(
+          `[acp-registry] npx prefetch failed for ${agent.id} after cache reset:`,
+          retryError instanceof Error ? retryError.message : String(retryError),
+        );
+        return;
+      }
+    }
+    console.warn(
+      `[acp-registry] npx prefetch failed for ${agent.id}:`,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
+/**
+ * Warm an ACP registry install: prefetch `npx` packages, then run a capability
+ * probe so auth methods are known before the settings UI renders.
+ */
+async function warmRegistryInstall(
+  agent: AcpRegistryAgent,
+  instance: AgentInstanceConfig,
+): Promise<void> {
+  if (agent.distribution.npx) {
+    await prefetchNpxDistribution(agent);
+  }
+  try {
+    await probeAcpGenericInstance(instance, undefined, {
+      timeoutMs: REGISTRY_INSTALL_PROBE_TIMEOUT_MS,
+    });
+  } catch (error) {
+    console.warn(
+      `[acp-registry] install probe failed for ${agent.id}:`,
+      error instanceof Error ? error.message : String(error),
+    );
+  }
+}
+
 export async function installAcpRegistryAgent(input: {
   agentId: string;
   baseDir: string;
@@ -319,6 +403,7 @@ export async function installAcpRegistryAgent(input: {
     [agent.id]: registryInstallRecord(agent, acpGenericKind(agent.id), "generic"),
   };
   writeAcpRegistrySettings(input.settingsPath, settings);
+  await warmRegistryInstall(agent, instance);
   return Object.values(settings.acpRegistryInstalledAgents);
 }
 

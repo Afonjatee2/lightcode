@@ -25,6 +25,7 @@
  */
 
 import type { SessionNotification } from "@agentclientprotocol/sdk";
+import { buildLineUnifiedDiff } from "@/shared/lineUnifiedDiff";
 
 export function transformCursorAcpSessionUpdate(
   notification: SessionNotification,
@@ -138,12 +139,21 @@ function formatEditOutput(rawOutput: Record<string, unknown>): string | undefine
   // Prefer a ready-made unified diff Cursor sometimes attaches.
   const diff = readString(rawOutput.diff) ?? readString(rawOutput.unifiedDiff);
   if (diff) return diff;
-  // Some edit variants return `{oldString, newString, path}` shape — let the
-  // renderer's edit-diff synthesizer handle that path via rawOutput pass-through
-  // would require keeping the object; since we have no path here, the best we
-  // can do is leave the original rawOutput so generic mapping keeps it
-  // available for downstream synthesis. Return undefined to signal "no change".
-  return undefined;
+  const path =
+    readString(rawOutput.path) ?? readString(rawOutput.filePath) ?? readString(rawOutput.file_path);
+  const oldText =
+    readString(rawOutput.oldText) ??
+    readString(rawOutput.old_text) ??
+    readString(rawOutput.oldString) ??
+    readString(rawOutput.old_string) ??
+    "";
+  const newText =
+    readString(rawOutput.newText) ??
+    readString(rawOutput.new_text) ??
+    readString(rawOutput.newString) ??
+    readString(rawOutput.new_string);
+  if (!path || newText === undefined) return undefined;
+  return buildLineUnifiedDiff(path, oldText, newText);
 }
 
 function readString(value: unknown): string | undefined {

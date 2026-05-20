@@ -36,6 +36,7 @@ import {
   extractAcpArgsPart,
   extractAcpDiffSummary,
   extractAcpDiffResultPart,
+  readAcpContentEditTexts,
   extractAcpResultPart,
   extractAcpResultText,
   readAcpStringField,
@@ -264,7 +265,13 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
             )
           ) : row.bodyText ? (
             row.bodyKind === "diff" ? (
-              <InlineDiffView diffText={row.bodyText} filePath={row.bodyFilePath ?? ""} />
+              <InlineDiffView
+                diffText={row.bodyText}
+                filePath={row.bodyFilePath ?? ""}
+                {...(row.bodyOldText !== undefined && row.bodyNewText !== undefined
+                  ? { oldText: row.bodyOldText, newText: row.bodyNewText }
+                  : {})}
+              />
             ) : (
               <CommandOutputViewport
                 text={row.bodyText}
@@ -296,6 +303,8 @@ type InlineRow = {
   bodyLanguage?: ViewportLanguage | undefined;
   bodyKind?: "text" | "diff" | undefined;
   bodyFilePath?: string | undefined;
+  bodyOldText?: string | undefined;
+  bodyNewText?: string | undefined;
   /**
    * Absolute path to lazily read from disk when the row is expanded. Set for
    * ACP read tools (e.g. Gemini's `read_file`) that report `locations[]` but
@@ -449,6 +458,7 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
   const createContent = isCreate ? extractCreateContent(payload) : undefined;
   const diffPart = !isCreate ? extractAcpDiffResultPart(payload) : undefined;
   const diffText = diffPart?.text || undefined;
+  const contentEdit = readAcpContentEditTexts(payload);
   const sections: ToolCallSection[] =
     isExpanded &&
     !diffText &&
@@ -488,7 +498,10 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
     rightLabel,
     rightLabelClassName: isError ? "text-danger" : "text-[color:var(--muted)]",
     hasDetails:
-      !!item.streams.file_change_output || createContent !== undefined || hasAuxFields(payload),
+      !!diffText ||
+      !!item.streams.file_change_output ||
+      createContent !== undefined ||
+      hasAuxFields(payload),
     sections,
     bodyText: isExpanded
       ? (diffText ?? createContent ?? item.streams.file_change_output)
@@ -496,6 +509,7 @@ function getFileChangeRow(item: RuntimeChatItem, isExpanded: boolean): InlineRow
     bodyLanguage: createContent !== undefined ? detectLanguageFromPath(payload.path) : undefined,
     bodyKind: diffText ? "diff" : "text",
     bodyFilePath: payload.path,
+    ...(contentEdit ? { bodyOldText: contentEdit.oldText, bodyNewText: contentEdit.newText } : {}),
   };
 }
 

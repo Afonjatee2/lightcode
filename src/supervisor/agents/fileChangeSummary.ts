@@ -12,6 +12,9 @@ export function readDiffSummary(...sources: unknown[]): DiffSummary | undefined 
 }
 
 function readDiffSummaryInner(source: unknown): DiffSummary | undefined {
+  if (typeof source === "string") {
+    return readPatchTextDiffSummary(source);
+  }
   if (!source || typeof source !== "object") return undefined;
   const record = source as Record<string, unknown>;
   return (

@@ -142,6 +142,24 @@ describe("transformCursorAcpSessionUpdate", () => {
     ).toBe("46 results");
   });
 
+  it("synthesizes a unified diff from Cursor edit rawOutput oldText/newText/path", () => {
+    const input = toolCallUpdate({
+      kind: "edit",
+      status: "completed",
+      rawOutput: {
+        path: "styles.css",
+        oldText: ".body { color: red; }",
+        newText: ".body { color: blue; }",
+      },
+    });
+    const rawOutput = (transformCursorAcpSessionUpdate(input).update as { rawOutput?: unknown })
+      .rawOutput;
+    expect(typeof rawOutput).toBe("string");
+    expect(rawOutput).toContain("diff --git a/styles.css b/styles.css");
+    expect(rawOutput).toContain("-.body { color: red; }");
+    expect(rawOutput).toContain("+.body { color: blue; }");
+  });
+
   it("passes a Cursor edit `diff` string through as rawOutput so the renderer treats it as a diff", () => {
     const diff = [
       "diff --git a/styles.css b/styles.css",

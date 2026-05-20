@@ -54,6 +54,28 @@ export function findTerminalAuthMethodForStatus(
   return status?.authMethods?.find(isTerminalAuthMethod);
 }
 
+/** First agent-owned auth method advertised by any env for the same install. */
+export function findAgentAuthMethodInStatuses(
+  statuses: readonly AgentStatus[],
+): AgentOwnedAuthMethod | undefined {
+  for (const status of statuses) {
+    const method = status.authMethods?.find(isAgentAuthMethod);
+    if (method) return method;
+  }
+  return undefined;
+}
+
+/** First terminal auth method advertised by any env for the same install. */
+export function findTerminalAuthMethodInStatuses(
+  statuses: readonly AgentStatus[],
+): AgentTerminalAuthMethod | undefined {
+  for (const status of statuses) {
+    const method = findTerminalAuthMethodForStatus(status);
+    if (method) return method;
+  }
+  return undefined;
+}
+
 export function agentAuthTarget(status: AgentStatus): {
   envKind?: AgentStatus["envKind"];
   wslDistro?: string;

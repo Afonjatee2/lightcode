@@ -33,8 +33,10 @@ import {
   acpGenericInstanceId,
   agentAuthTarget,
   envLabelForStatus,
+  findAgentAuthMethodInStatuses,
   findProjectForStatus,
   findTerminalAuthMethodForStatus,
+  findTerminalAuthMethodInStatuses,
   isAgentAuthMethod,
   isEnvVarAuthMethod,
   isTerminalAuthMethod,
@@ -444,8 +446,9 @@ function AcpAgentAuthEnvRow(props: {
   onLogout: () => void;
 }) {
   const { status, authMethod, showEnvironmentLabel } = props;
-  const isMissing = status.authState === "missing";
   const isAuthenticated = status.authState === "authenticated";
+  const isMissing =
+    status.authState === "missing" || (status.authState === "unknown" && authMethod !== undefined);
   const env = envLabel(status);
   const envSuffix = showEnvironmentLabel && env ? ` ${env}` : "";
   const envScope = env ? ` for ${env}` : "";
@@ -669,7 +672,18 @@ export function SingleAgentSettings(props: { agentKind: string }) {
     const method = status.authMethods?.find(isAgentAuthMethod);
     return method ? [{ status, method }] : [];
   });
-  const agentAuth = findAgentAuthMethod(agentAuthStatuses);
+  const sharedAgentAuthMethod = findAgentAuthMethodInStatuses(installedStatuses);
+  const sharedTerminalAuthMethod = findTerminalAuthMethodInStatuses(installedStatuses);
+  const agentAuth =
+    findAgentAuthMethod(agentAuthStatuses) ??
+    (sharedAgentAuthMethod
+      ? {
+          status:
+            agentAuthStatuses.find((status) => status.authMethods?.some(isAgentAuthMethod)) ??
+            installedStatuses[0]!,
+          method: sharedAgentAuthMethod,
+        }
+      : undefined);
   const loginStatus =
     findTerminalLoginStatus(installedStatuses) ??
     missingAuthStatuses.find((status) => status.loginCommand);
@@ -817,12 +831,16 @@ export function SingleAgentSettings(props: { agentKind: string }) {
         setAuthPendingEnvKey(undefined);
       });
   };
+  const hasAdvertisedAuthMethods = installedStatuses.some(
+    (status) => (status.authMethods?.length ?? 0) > 0,
+  );
   const hasAuthSettings =
     envVarAuthMethod !== undefined ||
     agentAuth !== undefined ||
     loginCommand !== undefined ||
     missingAuthStatuses.length > 0 ||
-    logoutStatuses.length > 0;
+    logoutStatuses.length > 0 ||
+    hasAdvertisedAuthMethods;
   const includeAuthFallbackMetadata = !hasAuthSettings;
   const metadataStatuses = installedStatuses.filter(
     (status) =>
@@ -830,7 +848,10 @@ export function SingleAgentSettings(props: { agentKind: string }) {
         includeAuthFallback: includeAuthFallbackMetadata,
       }) !== undefined,
   );
-  const authMissing = missingAuthStatuses.length > 0;
+  const authMissing =
+    missingAuthStatuses.length > 0 ||
+    (hasAdvertisedAuthMethods &&
+      !installedStatuses.some((status) => status.authState === "authenticated"));
   const missingAuthLabel = formatStatusList(missingAuthStatuses);
   const showAuthEnvironmentLabels = installedStatuses.length > 1;
   const showEnvVarOnly = envVarAuthMethod !== undefined && !authMissing;
@@ -1177,9 +1198,17 @@ export function SingleAgentSettings(props: { agentKind: string }) {
               ) : null}
               {installedStatuses.map((status) => {
                 const envKey = statusEnvKey(status);
-                const agentMethod = status.authMethods?.find(isAgentAuthMethod);
-                const terminalMethod = findTerminalAuthMethodForStatus(status);
+                const agentMethod =
+                  status.authMethods?.find(isAgentAuthMethod) ?? sharedAgentAuthMethod;
+                const terminalMethod =
+                  findTerminalAuthMethodForStatus(status) ?? sharedTerminalAuthMethod;
                 const method = agentMethod ?? terminalMethod;
+                const isAuthenticated = status.authState === "authenticated";
+                const needsInteractiveRow =
+                  isAuthenticated ||
+                  status.authState === "missing" ||
+                  (status.authState === "unknown" && method !== undefined);
+                if (!needsInteractiveRow) return null;
                 return (
                   <AcpAgentAuthEnvRow
                     key={`${status.kind}-${envKey}-auth-row`}
