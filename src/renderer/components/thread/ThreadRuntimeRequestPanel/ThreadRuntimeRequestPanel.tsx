@@ -134,7 +134,12 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
   const summary = request.payload.summary;
   const planFileAction =
     planFilePath && onOpenPlanFile ? (
-      <Button size="sm" variant="tertiary" onPress={() => onOpenPlanFile(planFilePath)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="@max-[44rem]:w-full"
+        onPress={() => onOpenPlanFile(planFilePath)}
+      >
         <FileText className="size-3.5" />
         Open plan
       </Button>
@@ -147,6 +152,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
         isDisabled={resolving}
         leadingAction={planFileAction}
         showAllOptions
+        stackOnNarrow={isPlanApproval}
         onSelect={(optionId) => decide([optionId])}
       />
     ) : null;
@@ -186,7 +192,7 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
 
   return (
     <ThreadDockSection className="!text-xs" placement="composer" collapsed={false}>
-      <div className="flex flex-wrap items-start gap-x-2 gap-y-1 px-2 py-1.5 leading-snug">
+      <div className="@container flex flex-wrap items-start gap-x-2 gap-y-1 px-2 py-1.5 leading-snug">
         <Icon
           className={`mt-0.5 size-3.5 shrink-0 ${structuredElicitation || isQuestion || isPlanApproval ? "text-foreground-muted" : "text-warning"}`}
         />
@@ -221,7 +227,15 @@ export function ThreadRuntimeRequestPanel(props: ThreadRuntimeRequestPanelProps)
           ) : null}
         </div>
         {approvalActions ? (
-          <div className="ml-auto shrink-0 self-end">{approvalActions}</div>
+          <div
+            className={
+              isPlanApproval
+                ? "ml-auto max-w-full shrink-0 self-end @max-[44rem]:ml-0 @max-[44rem]:basis-full @max-[44rem]:self-stretch"
+                : "ml-auto shrink-0 self-end"
+            }
+          >
+            {approvalActions}
+          </div>
         ) : userInputFormActions ? (
           <div className="ml-auto shrink-0 self-start">{userInputFormActions}</div>
         ) : null}

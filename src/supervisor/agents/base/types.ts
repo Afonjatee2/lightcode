@@ -110,7 +110,18 @@ export interface CreateStructuredSessionInput {
   sessionRef?: SessionRef;
   presentationMode?: ThreadPresentationMode;
   loadSessionErrorRewriter?: (error: unknown, sessionId: string) => Error;
+  /**
+   * Per-adapter hook to normalize a provider's ACP `session/update` wire
+   * payload before the shared generic mapper consumes it. Use only to bridge
+   * provider-specific quirks (e.g. Cursor's near-empty tool_call payloads) —
+   * the shared mapper must remain provider-agnostic.
+   */
+  acpSessionUpdateTransform?: AcpSessionUpdateTransform;
 }
+
+export type AcpSessionUpdateTransform = (
+  notification: import("@agentclientprotocol/sdk").SessionNotification,
+) => import("@agentclientprotocol/sdk").SessionNotification;
 
 export interface AgentArgvSpec {
   binary: string;

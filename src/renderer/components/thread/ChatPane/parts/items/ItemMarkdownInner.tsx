@@ -21,6 +21,7 @@ import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { CodeBlock } from "./CodeBlock";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { InlineFolderPathChip } from "./InlineFolderPathChip";
+import { LC_SELECTOR_LANG, tryParseSelectorPayload } from "./SelectorBadge";
 import { normalizeGfmTableSeparators, normalizeShortCodeFenceClosers } from "./ItemMarkdown";
 import { normalizeHighlightLanguage } from "./languageDetect";
 import { parseProjectPathRef, type ProjectPathRef } from "./parseProjectPathRef";
@@ -101,11 +102,19 @@ export default function ItemMarkdownInner({ text }: ItemMarkdownInnerProps) {
 
 const MD_COMPONENTS: StreamdownComponents = {
   pre({ children }) {
-    const block = extractMarkdownCodeBlock(children);
-    if (block && block.language) {
-      return (
-        <CodeBlock text={block.text} lang={block.language} className={markdownCodeBlockClass} />
-      );
+    const codeChild = findCodeChild(children);
+    const codeProps = codeChild?.props as { className?: string; children?: ReactNode } | undefined;
+    const rawLang = extractRawLangFromClassName(codeProps?.className);
+    if (rawLang === LC_SELECTOR_LANG) {
+      const text = flattenMdChildren(codeProps?.children).replace(/\r?\n$/, "");
+      if (tryParseSelectorPayload(text)) return null;
+    }
+    if (codeChild) {
+      const language = normalizeHighlightLanguage(codeProps?.className);
+      if (language) {
+        const text = flattenMdChildren(codeProps?.children).replace(/\r?\n$/, "");
+        return <CodeBlock text={text} lang={language} className={markdownCodeBlockClass} />;
+      }
     }
     return <pre>{markCodeChildAsBlock(children)}</pre>;
   },
@@ -149,19 +158,6 @@ function MdCode(props: { className: string; isBlock?: boolean; children?: ReactN
   return <code className={inlineCodeChipClass}>{props.children}</code>;
 }
 
-function extractMarkdownCodeBlock(children: ReactNode): {
-  text: string;
-  language: ReturnType<typeof normalizeHighlightLanguage>;
-} | null {
-  const codeChild = findCodeChild(children);
-  if (!codeChild) return null;
-  const props = codeChild.props as { className?: string; children?: ReactNode };
-  return {
-    text: flattenMdChildren(props.children).replace(/\r?\n$/, ""),
-    language: normalizeHighlightLanguage(props.className),
-  };
-}
-
 /**
  * Tag the fenced-block `<code>` child with `data-block` so the `code` override
  * can distinguish fenced blocks (no language) from inline code, which never
@@ -172,6 +168,15 @@ function markCodeChildAsBlock(children: ReactNode): ReactNode {
     if (!isValidElement(child)) return child;
     return cloneElement(child as ReactElement<Record<string, unknown>>, { "data-block": "true" });
   });
+}
+
+function extractRawLangFromClassName(className: string | undefined): string | null {
+  if (!className) return null;
+  for (const token of className.split(/\s+/)) {
+    if (token.startsWith("language-")) return token.slice("language-".length).toLowerCase();
+    if (token.startsWith("lang-")) return token.slice("lang-".length).toLowerCase();
+  }
+  return null;
 }
 
 function findCodeChild(children: ReactNode): ReactElement | null {

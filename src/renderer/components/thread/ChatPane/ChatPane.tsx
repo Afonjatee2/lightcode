@@ -45,7 +45,6 @@ import { SubAgentOverlay } from "./parts/items/SubAgentOverlay";
 interface ChatPaneProps {
   thread: Thread;
   hiddenRuntimeItemId?: string | undefined;
-  hiddenRuntimeItemIsLive?: boolean;
   hasSupplementaryContent?: boolean;
   layoutChangeToken?: string | null;
 }
@@ -68,13 +67,7 @@ const EMPTY_FILE_CHECKPOINT_TURNS: NonNullable<
  * composer (see `ThreadRuntimeRequestPanel`), not in the chat list.
  */
 export function ChatPane(props: ChatPaneProps) {
-  const {
-    thread,
-    hiddenRuntimeItemId,
-    hiddenRuntimeItemIsLive = false,
-    hasSupplementaryContent = false,
-    layoutChangeToken,
-  } = props;
+  const { thread, hiddenRuntimeItemId, hasSupplementaryContent = false, layoutChangeToken } = props;
   const { id: threadId, projectId, status, worktreePath, worktreeBranch } = thread;
   const contentRef = useRef<HTMLDivElement>(null);
   // `scrollEl` mirrors `scrollRef.current` as React state so the virtualizer
@@ -204,8 +197,7 @@ export function ChatPane(props: ChatPaneProps) {
   // Anchor on thread.status alone — gating on item state caused the loader to
   // disappear in the gap between an item flipping to `completed` and the next
   // `item.started` arriving, even though the runtime was still working the
-  // turn. The pinned plan/budget item already advertises its own running
-  // state, so suppress the tail when that's live to avoid double indicators.
+  // turn.
   const turn = resolveTurnTiming(thread);
   const mostRecentCompletedTurnAnchor = useAppStore((s) => {
     if (isLive || turn?.endedAt == null) return null;
@@ -218,7 +210,7 @@ export function ChatPane(props: ChatPaneProps) {
     !isLive &&
     turn?.endedAt != null &&
     isCompletedTurnAnchorAtTimelineTail(mostRecentCompletedTurnAnchor, timelineEntries);
-  const showTailLoader = (isLive || completedTurnCanRenderInTail) && !hiddenRuntimeItemIsLive;
+  const showTailLoader = isLive || completedTurnCanRenderInTail;
   // The agent is not actually working while it waits for a user answer, so the
   // tail loader keeps rendering but its elapsed-time counter freezes for the
   // duration of the wait and resumes once the thread flips back to working.

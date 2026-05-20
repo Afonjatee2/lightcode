@@ -7,13 +7,13 @@ export const SIDEBAR_MIN_WIDTH = 220;
 const SIDEBAR_MAX_WIDTH = 500;
 const SIDEBAR_DEFAULT_WIDTH = 350;
 const PANEL_MIN_WIDTH = 320;
-const PANEL_MAX_WIDTH = 700;
+const PANEL_MAX_WIDTH = 1100;
 const PANEL_DEFAULT_WIDTH = 480;
 const PANEL_BOTTOM_MIN_HEIGHT = 200;
 const PANEL_BOTTOM_MAX_HEIGHT = 500;
 const PANEL_BOTTOM_DEFAULT_HEIGHT = 300;
 const GIT_PANEL_MIN_WIDTH = 280;
-const GIT_PANEL_MAX_WIDTH = 500;
+const GIT_PANEL_MAX_WIDTH = 900;
 const GIT_PANEL_DEFAULT_WIDTH = 350;
 
 export const CONTENT_MIN_WIDTH = 540;
@@ -26,6 +26,7 @@ export function useResizablePanels(refs: {
   panelInnerRef: RefObject<HTMLDivElement | null>;
   gitPanelRef: RefObject<HTMLDivElement | null>;
   gitPanelInnerRef: RefObject<HTMLDivElement | null>;
+  mainRef: RefObject<HTMLElement | null>;
   overlayRef: RefObject<HTMLDivElement | null>;
 }) {
   const [sidebarWidth, setSidebarWidth] = useState(() =>
@@ -127,18 +128,50 @@ export function useResizablePanels(refs: {
     localStorage.setItem("lightcode-git-panel-width", String(gitPanelWidth));
   }, [gitPanelWidth]);
 
-  // Cleanup an in-flight resize if the component unmounts mid-drag.
-  const cleanupRef = useRef<(() => void) | null>(null);
+  // Ends an in-flight resize (teardown + persist final size). Called on unmount
+  // and when external code (e.g. auto-hide on narrow content) needs to abort
+  // the drag so the user stops modifying a panel that's about to be hidden.
+  const endResizeRef = useRef<(() => void) | null>(null);
   useEffect(() => {
     return () => {
-      cleanupRef.current?.();
+      endResizeRef.current?.();
     };
   }, []);
+
+  const cancelActiveResize = useCallback(() => {
+    endResizeRef.current?.();
+  }, []);
+
+  // Set the right panel's width (DOM + state) clamped to its allowed range.
+  // Used by auto-hide to shrink the panel below the threshold that triggered
+  // the hide, so reopening it does not immediately re-trigger auto-hide.
+  const updatePanelWidth = useCallback(
+    (next: number) => {
+      const clamped = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, Math.floor(next)));
+      sizeRef.current.panelWidth = clamped;
+      applyPanelWidth(clamped);
+      setPanelWidth(clamped);
+    },
+    [applyPanelWidth],
+  );
+
+  const updateGitPanelWidth = useCallback(
+    (next: number) => {
+      const clamped = Math.min(
+        GIT_PANEL_MAX_WIDTH,
+        Math.max(GIT_PANEL_MIN_WIDTH, Math.floor(next)),
+      );
+      sizeRef.current.gitPanelWidth = clamped;
+      applyGitPanelWidth(clamped);
+      setGitPanelWidth(clamped);
+    },
+    [applyGitPanelWidth],
+  );
 
   const startResize = useCallback(
     (target: ResizeTarget, event: React.MouseEvent) => {
       event.preventDefault();
-      cleanupRef.current?.();
+      endResizeRef.current?.();
 
       const startX = event.clientX;
       const startY = event.clientY;
@@ -151,6 +184,25 @@ export function useResizablePanels(refs: {
               ? sizeRef.current.gitPanelWidth
               : 0;
       const startHeight = target === "panel-bottom" ? sizeRef.current.panelHeight : 0;
+
+      // Cap right-side panel drags so main content never falls below
+      // CONTENT_MIN_WIDTH — otherwise the auto-hide ResizeObserver kicks in
+      // mid-drag and the panel disappears under the cursor.
+      const mainW = refs.mainRef.current?.getBoundingClientRect().width ?? 0;
+      const dynamicMaxPanel =
+        target === "panel" && mainW > 0
+          ? Math.min(
+              PANEL_MAX_WIDTH,
+              Math.max(PANEL_MIN_WIDTH, mainW + startWidth - CONTENT_MIN_WIDTH),
+            )
+          : PANEL_MAX_WIDTH;
+      const dynamicMaxGitPanel =
+        target === "git-panel" && mainW > 0
+          ? Math.min(
+              GIT_PANEL_MAX_WIDTH,
+              Math.max(GIT_PANEL_MIN_WIDTH, mainW + startWidth - CONTENT_MIN_WIDTH),
+            )
+          : GIT_PANEL_MAX_WIDTH;
 
       // The element whose CSS transition must be paused for the duration of the drag,
       // otherwise its width/height will lag behind the per-frame ref writes below.
@@ -189,7 +241,7 @@ export function useResizablePanels(refs: {
           applySidebarWidth(next);
         } else if (target === "panel") {
           const delta = startX - x;
-          const next = Math.min(PANEL_MAX_WIDTH, Math.max(PANEL_MIN_WIDTH, startWidth + delta));
+          const next = Math.min(dynamicMaxPanel, Math.max(PANEL_MIN_WIDTH, startWidth + delta));
           if (next === sizeRef.current.panelWidth) return;
           sizeRef.current.panelWidth = next;
           applyPanelWidth(next);
@@ -205,7 +257,7 @@ export function useResizablePanels(refs: {
         } else if (target === "git-panel") {
           const delta = startX - x;
           const next = Math.min(
-            GIT_PANEL_MAX_WIDTH,
+            dynamicMaxGitPanel,
             Math.max(GIT_PANEL_MIN_WIDTH, startWidth + delta),
           );
           if (next === sizeRef.current.gitPanelWidth) return;
@@ -227,16 +279,16 @@ export function useResizablePanels(refs: {
           rafId = null;
         }
         document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
+        document.removeEventListener("mouseup", endResize);
         if (affected) affected.style.transitionDuration = prevTransitionDuration;
         if (overlay) {
           overlay.style.display = "none";
           overlay.style.cursor = "";
         }
-        cleanupRef.current = null;
+        endResizeRef.current = null;
       }
 
-      function onMouseUp() {
+      function endResize() {
         if (hasPending) flush();
         teardown();
         // Single batched re-render at the end persists the final size to localStorage.
@@ -246,9 +298,9 @@ export function useResizablePanels(refs: {
         setGitPanelWidth(sizeRef.current.gitPanelWidth);
       }
 
-      cleanupRef.current = teardown;
+      endResizeRef.current = endResize;
       document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      document.addEventListener("mouseup", endResize);
     },
     [
       applyGitPanelWidth,
@@ -256,6 +308,7 @@ export function useResizablePanels(refs: {
       applyPanelWidth,
       applySidebarWidth,
       refs.gitPanelRef,
+      refs.mainRef,
       refs.overlayRef,
       refs.panelRef,
       refs.sidebarRef,
@@ -287,5 +340,8 @@ export function useResizablePanels(refs: {
     handlePanelResizeStart,
     handlePanelBottomResizeStart,
     handleGitPanelResizeStart,
+    cancelActiveResize,
+    updatePanelWidth,
+    updateGitPanelWidth,
   };
 }

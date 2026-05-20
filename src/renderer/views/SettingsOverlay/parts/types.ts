@@ -6,6 +6,7 @@ export type SettingsSection =
   | "agentsGeneral"
   | "search"
   | "agents"
+  | "browser"
   | "archived"
   | "about"
   | "dev"

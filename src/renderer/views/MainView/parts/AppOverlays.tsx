@@ -30,6 +30,7 @@ import { closeThreads } from "@/renderer/utils/shellUtils";
 import { performWorktreeRemoval } from "@/renderer/actions/worktreeActions";
 
 import { WelcomeOverlay } from "@/renderer/views/WelcomeOverlay";
+import { BrowserOverlay } from "@/renderer/views/MainView/parts/BrowserOverlay";
 
 export function AppOverlays() {
   const projects = useAppStore((s) => s.projects);
@@ -50,6 +51,7 @@ export function AppOverlays() {
     ? projects.find((p) => p.id === prReviewContext.projectId)
     : undefined;
   const prReviewVisible = !!prReviewContext && !!prReviewProject;
+  const browserOverlayOpen = usePanelStore((s) => s.browserOverlayOpen);
 
   return (
     <>
@@ -165,6 +167,7 @@ export function AppOverlays() {
           </Suspense>
         ) : null}
       </OverlayShell>
+      <BrowserOverlay open={browserOverlayOpen} />
     </>
   );
 }

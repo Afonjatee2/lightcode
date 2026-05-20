@@ -10,6 +10,7 @@ import {
   type RendererCrashKind,
   type RendererCrashReport,
 } from "./RendererCrashScreen";
+import { isIgnorableWindowError } from "./rendererGlobalErrors";
 
 if (import.meta.env.DEV) {
   const warn = console.warn.bind(console);
@@ -100,6 +101,10 @@ function showCrash(
 
 window.addEventListener("error", (event) => {
   if (!(event instanceof ErrorEvent)) return;
+  if (isIgnorableWindowError(event)) {
+    event.preventDefault();
+    return;
+  }
   // Sentry's Electron renderer integration already captures global errors; this only swaps UI.
   showCrash("uncaught", event.error ?? event.message, buildSource(event), { capture: false });
 });

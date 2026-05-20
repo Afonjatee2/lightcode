@@ -13,6 +13,7 @@ import { normalizeChatProjectPath } from "../../chatPathUtils";
 import { chatMessageSurfaceClass } from "./chatMessageSurface";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { ItemMarkdown } from "./ItemMarkdown";
+import { extractSelectorPayloads } from "./SelectorBadge";
 
 interface UserMessageProps {
   item: RuntimeChatItem;
@@ -33,7 +34,7 @@ export const UserMessage = memo(function UserMessage({
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasVisualOverflow, setHasVisualOverflow] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const hasVisualOverflowRef = useRef(false);
   const payload = getRuntimeItemPayload<MessageItemPayload>(item, "user_message");
   const content = payload?.content ?? [];
@@ -44,11 +45,14 @@ export const UserMessage = memo(function UserMessage({
   const hasInlineFileMentions = content.some(
     (block) => block.kind === "file" && block.source !== "attachment",
   );
-  const attachments = buildUserPromptAttachments(content);
+  const attachments = enrichWithSelectorPayloads(
+    buildUserPromptAttachments(content),
+    extractSelectorPayloads(rawText),
+  );
   const imageAttachments = attachments.filter((a) => a.isImage);
 
   const syncVisualOverflow = useEffectEvent(() => {
-    const element = contentRef.current;
+    const element = bodyRef.current;
     if (!element) return;
     const nextHasVisualOverflow = measureUserMessageOverflow(element);
     if (hasVisualOverflowRef.current !== nextHasVisualOverflow) {
@@ -64,7 +68,7 @@ export const UserMessage = memo(function UserMessage({
   }, [text, attachments.length]);
 
   useLayoutEffect(() => {
-    const element = contentRef.current;
+    const element = bodyRef.current;
     if (!element) return;
     const observer = new ResizeObserver(() => {
       syncVisualOverflow();
@@ -79,15 +83,37 @@ export const UserMessage = memo(function UserMessage({
   const isCollapsed = isCollapsible && !isExpanded;
   const tooltipLabel = isExpanded ? "Show less" : "Show more";
   const Icon = isExpanded ? ChevronUp : ChevronDown;
+  const collapseClass = isCollapsed
+    ? collapsedMessageClass
+    : isCollapsible
+      ? "max-h-[50vh] overflow-y-auto"
+      : "";
+  const baseBodyClass = `min-w-0 leading-snug ${checkpointRevertControl ? "pr-7" : ""} ${collapseClass}`;
+  const inlineBodyClass = `${baseBodyClass} lightcode-user-message-inline-content whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] text-foreground`;
+
+  let bodyContent: ReactNode = null;
+  let bodyClass = baseBodyClass;
+  if (slashCommand) {
+    bodyClass = inlineBodyClass;
+    bodyContent = (
+      <>
+        <span className="lightcode-slash-chip lightcode-slash-chip--user-message mr-1.5">
+          <span className="lightcode-slash-chip__slash">/</span>
+          <span className="lightcode-slash-chip__name">{slashCommand}</span>
+        </span>
+        {renderUserMessageInlineContent(content, slashCommandPrefixLength, actions)}
+      </>
+    );
+  } else if (hasInlineFileMentions) {
+    bodyClass = inlineBodyClass;
+    bodyContent = renderUserMessageInlineContent(content, 0, actions);
+  } else if (text.length > 0) {
+    bodyContent = <ItemMarkdown text={text} />;
+  }
+
   return (
     <Surface variant="tertiary" className={`${chatMessageSurfaceClass} relative`}>
-      <div
-        ref={contentRef}
-        data-user-message-content="true"
-        className={`min-w-0 space-y-1.5 leading-snug ${checkpointRevertControl ? "pr-7" : ""} ${
-          isCollapsed ? collapsedMessageClass : isCollapsible ? "max-h-[50vh] overflow-y-auto" : ""
-        }`}
-      >
+      <div className="min-w-0 space-y-1.5 leading-snug">
         {attachments.length > 0 ? (
           <div className="-mt-1">
             <AttachmentBar
@@ -101,20 +127,10 @@ export const UserMessage = memo(function UserMessage({
             />
           </div>
         ) : null}
-        {slashCommand ? (
-          <div className="lightcode-user-message-inline-content whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] leading-snug text-foreground">
-            <span className="lightcode-slash-chip lightcode-slash-chip--user-message mr-1.5">
-              <span className="lightcode-slash-chip__slash">/</span>
-              <span className="lightcode-slash-chip__name">{slashCommand}</span>
-            </span>
-            {renderUserMessageInlineContent(content, slashCommandPrefixLength, actions)}
+        {bodyContent !== null ? (
+          <div ref={bodyRef} data-user-message-content="true" className={bodyClass}>
+            {bodyContent}
           </div>
-        ) : hasInlineFileMentions ? (
-          <div className="lightcode-user-message-inline-content whitespace-pre-wrap break-words text-[length:var(--lc-chat-font-size)] leading-snug text-foreground">
-            {renderUserMessageInlineContent(content, 0, actions)}
-          </div>
-        ) : text.length > 0 ? (
-          <ItemMarkdown text={text} />
         ) : null}
       </div>
       {isCollapsible ? (
@@ -206,6 +222,44 @@ function renderUserMessageInlineContent(
   });
 
   return nodes;
+}
+
+function enrichWithSelectorPayloads(
+  attachments: Attachment[],
+  payloads: ReturnType<typeof extractSelectorPayloads>,
+): Attachment[] {
+  if (payloads.length === 0) return attachments;
+  const byName = new Map<string, { selector: string; url?: string }>();
+  for (const p of payloads) {
+    if (p.name && p.selector) {
+      byName.set(p.name, { selector: p.selector, ...(p.url ? { url: p.url } : {}) });
+    }
+  }
+  let nextUnmatchedIdx = 0;
+  return attachments.map((a) => {
+    if (!a.isImage) return a;
+    if (a.selector) return a;
+    const byMatch = byName.get(a.name);
+    if (byMatch?.selector) {
+      return {
+        ...a,
+        selector: byMatch.selector,
+        ...(byMatch.url ? { sourceUrl: byMatch.url } : {}),
+      };
+    }
+    while (nextUnmatchedIdx < payloads.length) {
+      const candidate = payloads[nextUnmatchedIdx++]!;
+      if (candidate.name && byName.has(candidate.name)) continue;
+      if (candidate.selector) {
+        return {
+          ...a,
+          selector: candidate.selector,
+          ...(candidate.url ? { sourceUrl: candidate.url } : {}),
+        };
+      }
+    }
+    return a;
+  });
 }
 
 function buildUserPromptAttachments(content: CanonicalContentBlock[]): Attachment[] {

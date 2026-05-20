@@ -10,6 +10,7 @@ import type {
   ThreadStatus,
   ThreadStatusSource,
 } from "../contracts";
+import type { BrowserState, BrowserTabInfo } from "./procedures/browser";
 import type { IpcProcedurePayload, SupervisorProcedureName } from "./procedureMap";
 
 export type SupervisorRequest = {
@@ -77,6 +78,13 @@ export type SupervisorEvent =
       languageId: string;
       error?: string;
     };
+
+export type BrowserEvent =
+  | { type: "state"; state: BrowserState }
+  | { type: "tab-updated"; tab: BrowserTabInfo }
+  | { type: "tab-attention"; tabId: string }
+  | { type: "open-panel" }
+  | { type: "picker-cancelled" };
 
 export type UpdateStatus =
   | { type: "checking" }

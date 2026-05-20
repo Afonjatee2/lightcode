@@ -12,6 +12,7 @@ import { useWslDetection } from "@/renderer/hooks/useWslDetection";
 import { useGitRefresh } from "@/renderer/hooks/useGitRefresh";
 import { useThreadLifecycle } from "@/renderer/hooks/useThreadLifecycle";
 import { useDndHandlers } from "@/renderer/hooks/useDndHandlers";
+import { useBrowserSync } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useBrowserSync";
 
 import { AppOverlays } from "@/renderer/views/MainView/parts/AppOverlays";
 import { WorktreeDeleteDialogs } from "@/renderer/views/MainView/parts/WorktreeDeleteDialogs";
@@ -28,6 +29,7 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
   const { wslAvailable } = useWslDetection(storeHydrated);
   useKeyboardShortcuts();
   useGitRefresh(storeHydrated);
+  useBrowserSync();
 
   const { handleSortEnd, handlePaneDrop, handleMainPanelDrop } = useDndHandlers();
 

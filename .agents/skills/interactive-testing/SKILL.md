@@ -1,6 +1,6 @@
 ---
 name: interactive-testing
-description: Smoke-test the running Lightcode Electron app end-to-end via Chrome DevTools Protocol. Use when the user asks to "smoke test", "test the app", "verify the refactor in the UI", "open the app and click through", or otherwise wants Claude to drive the real running app instead of relying on unit tests. Boots dev server + Electron with CDP enabled, attaches agent-browser, walks the surfaces most relevant to the current diff (provider selector, ThreadDraftView, ChatPane, ThreadRuntimeRequestPanel), and reports findings with screenshots.
+description: Smoke-test the running Lightcode Electron app end-to-end via Chrome DevTools Protocol. Use when the user asks to "smoke test", "test the app", "verify the refactor in the UI", "open the app and click through", or otherwise wants Claude to drive the real running app instead of relying on unit tests. Boots dev server + Electron with CDP enabled, uses raw CDP or agent-browser as appropriate, walks the surfaces most relevant to the current diff (provider selector, ThreadDraftView, ChatPane, ThreadRuntimeRequestPanel, Browser panel), and reports findings with screenshots.
 allowed-tools: Bash(pnpm:*), Bash(node:*), Bash(npx:*), Bash(agent-browser:*), Bash(git:*), Bash(taskkill:*), Bash(tasklist:*), Read, Edit, Grep, Glob
 ---
 
@@ -38,18 +38,29 @@ if (process.env.LIGHTCODE_CDP_PORT) {
 }
 ```
 
-### Patch 2 — Base data dir override (required for empty-settings runs)
+### Patch 2 — Base data dir + Electron profile override (required for empty-settings runs)
 
-Currently `main.ts` hardcodes the dev base dir as `~/.lightcode-dev`. Replace the `prepareLightcodeDataRoot(...)` call inside `app.whenReady()` with:
+Currently `main.ts` hardcodes the dev base dir as `~/.lightcode-dev`, while Electron `userData` stores renderer `localStorage` separately. Add a top-level base-dir override and use it before `app.whenReady()` so sqlite/settings and renderer storage are both isolated:
 
 ```ts
 const baseDirOverride = process.env.LIGHTCODE_BASE_DIR;
+
+if (baseDirOverride) {
+  app.setPath("userData", join(baseDirOverride, "userData"));
+} else if (isDev) {
+  app.setPath("userData", join(app.getPath("userData"), "Dev"));
+}
+```
+
+Then replace the `prepareLightcodeDataRoot(...)` call inside `app.whenReady()` with:
+
+```ts
 lightcodePaths = prepareLightcodeDataRoot(
   baseDirOverride ?? (isDev ? join(homedir(), ".lightcode-dev") : resolveLightcodeBaseDir(channel)),
 );
 ```
 
-This propagates automatically: `supervisorClient.start(lightcodePaths.baseDir)` (further down in `main.ts`) hands the same path to the supervisor, so sqlite, settings, attachments, worktrees, and agent plugins all relocate together.
+This propagates automatically: `supervisorClient.start(lightcodePaths.baseDir)` (further down in `main.ts`) hands the same path to the supervisor, so sqlite, settings, attachments, worktrees, and agent plugins all relocate together. The `app.setPath("userData", ...)` line prevents stale renderer `localStorage` (collapsed sidebar, terminal position, git cache, etc.) from leaking into fresh smoke runs.
 
 ### Verify `agent-browser`
 
@@ -58,6 +69,12 @@ agent-browser --version || npx agent-browser --version
 ```
 
 If neither resolves, install via `npm i -g @anthropic-ai/agent-browser` (or use `npx agent-browser` everywhere).
+
+Current CLI notes:
+
+- Use `agent-browser eval`, not `agent-browser evaluate`.
+- In PowerShell, quote refs: `npx agent-browser click '@e24'`; unquoted `@e24` is parsed by PowerShell.
+- `agent-browser connect 9222` can drift to `about:blank` with Electron. Prefer `npx agent-browser --cdp 9222 ...` for quick checks, and use the Browser-panel raw CDP script below for Browser panel work.
 
 ### Fallback if patches aren't accepted
 
@@ -80,8 +97,10 @@ If neither resolves, install via `npm i -g @anthropic-ai/agent-browser` (or use 
    $ts = Get-Date -Format "yyyyMMdd-HHmmss"
    $smokeRoot = "$HOME\.lightcode-smoke\$ts"
    $env:LIGHTCODE_BASE_DIR = "$smokeRoot\data"
+   $env:LIGHTCODE_SMOKE_OUT_DIR = "$smokeRoot\artifacts"
    $projectDir = "$smokeRoot\project"
    New-Item -ItemType Directory -Force $env:LIGHTCODE_BASE_DIR | Out-Null
+   New-Item -ItemType Directory -Force $env:LIGHTCODE_SMOKE_OUT_DIR | Out-Null
    New-Item -ItemType Directory -Force $projectDir | Out-Null
    ```
 
@@ -92,6 +111,7 @@ If neither resolves, install via `npm i -g @anthropic-ai/agent-browser` (or use 
    ```powershell
    $env:LIGHTCODE_CDP_PORT="9222"
    $env:LIGHTCODE_BASE_DIR="$smokeRoot\data"   # already set above, re-state for clarity
+   $env:LIGHTCODE_SMOKE_OUT_DIR="$smokeRoot\artifacts"
    pnpm run dev
    ```
 
@@ -106,21 +126,30 @@ If neither resolves, install via `npm i -g @anthropic-ai/agent-browser` (or use 
 
    Use the `Monitor` tool against the background bash task — do not blanket-sleep.
 
-5. **Attach agent-browser**:
+5. **Attach/check CDP target**:
 
    ```bash
-   agent-browser connect 9222
-   agent-browser tab            # list windows (Lightcode may have splash + main)
-   agent-browser tab --url "*index.html*"   # focus the main window if multiple
+   npx agent-browser --cdp 9222 get url
+   npx agent-browser --cdp 9222 snapshot -i
    ```
+
+   Expected URL is `http://127.0.0.1:3100/`. If `agent-browser` reports `about:blank` even though `/json/list` contains the Lightcode page, do not fight its target picker; use the raw CDP Browser smoke script for Browser-panel work.
 
 6. **Set color scheme** if the app uses dark mode (Lightcode does by default):
 
    ```bash
-   agent-browser --color-scheme dark snapshot -i
+   npx agent-browser --cdp 9222 --color-scheme dark snapshot -i
    ```
 
-7. **Add the seeded test project to the app** — see **Seeding a test project** below for the `pickFolder` stub + click sequence.
+7. **For Browser-panel changes, run the raw CDP harness before manual clicks**:
+
+   ```powershell
+   node .agents/skills/interactive-testing/scripts/lightcode-browser-smoke.mjs --port 9222 --outDir $env:LIGHTCODE_SMOKE_OUT_DIR
+   ```
+
+   This harness pins to the real Lightcode page target from `/json/list`, creates or reuses an in-app browser tab, navigates deterministic `data:` pages, verifies the embedded browser target DOM, checks toolbar/back/forward state, opens Settings > Browser, captures screenshots outside the repo, and reports console errors. Keeping artifacts outside the repo avoids `electronmon` restarts from screenshot file writes.
+
+8. **Add the seeded test project to the app** — see **Seeding a test project** below for the `pickFolder` stub + click sequence.
 
 ## Seeding a test project
 
@@ -143,10 +172,10 @@ This gives the app a real git repo (so git features in the sidebar / status pane
 
 ### Step B — Stub `pickFolder` after attach
 
-After `agent-browser connect 9222` but before clicking the Add-Project button:
+After attaching to the app target but before clicking the Add-Project button:
 
 ```bash
-agent-browser evaluate "(() => {
+npx agent-browser --cdp 9222 eval "(() => {
   const projectPath = $JSON_PROJECT_PATH;   // see note below
   const bridge = window.lightcode;
   if (!bridge) return 'bridge-missing';
@@ -155,7 +184,7 @@ agent-browser evaluate "(() => {
 })()"
 ```
 
-`$JSON_PROJECT_PATH` must be a JSON-encoded absolute path string — on Windows, escape backslashes (`"C:\\\\Users\\\\sdsle\\\\.lightcode-smoke\\\\..."`). Build it from PowerShell with `ConvertTo-Json` and inject into the evaluate command.
+`$JSON_PROJECT_PATH` must be a JSON-encoded absolute path string — on Windows, escape backslashes (`"C:\\\\Users\\\\sdsle\\\\.lightcode-smoke\\\\..."`). Build it from PowerShell with `ConvertTo-Json` and inject into the `eval` command.
 
 ### Step C — Trigger the add
 
@@ -167,11 +196,11 @@ Two entry points exist:
 For an empty-settings smoke run (the default), the WelcomeOverlay flow is what you'll see:
 
 ```bash
-agent-browser snapshot -i
+npx agent-browser --cdp 9222 snapshot -i
 # Find the "Get started" / "Add project" button by accessible name
-agent-browser click @eXX
+npx agent-browser --cdp 9222 click '@eXX'
 # WelcomeOverlay calls bridge.pickFolder() -> returns our stub -> addProject runs
-agent-browser snapshot -i
+npx agent-browser --cdp 9222 snapshot -i
 # Confirm the ThreadDraftView opened for the new project (handleStart calls openDraft)
 ```
 
@@ -180,7 +209,7 @@ If `pickFolder` returns the path but `addProject` doesn't fire, check `autoDetec
 ### Step D — Verify the project landed
 
 ```bash
-agent-browser evaluate "JSON.stringify(window.__lightcodeStore?.getState?.().projects ?? 'no-store')"
+npx agent-browser --cdp 9222 eval "JSON.stringify(window.__lightcodeStore?.getState?.().projects ?? 'no-store')"
 ```
 
 This requires the store to be exposed on window. If it isn't (Lightcode currently doesn't expose it), fall back to a visual check: the sidebar should now list the project, and ThreadDraftView should be open with the project's name in the header. Note this gap in the test report — it'd be a nice future patch to expose `useAppStore` on `window.__lightcodeStore` in dev for assertion ergonomics.
@@ -218,30 +247,30 @@ Always include the **baseline smoke** below, even if the diff is narrow — refa
 Execute in order. After each step, `snapshot -i` (or `screenshot`) and verify outcome before moving on.
 
 1. **App boots, main window renders**
-   - Attach. `agent-browser snapshot -i`.
+   - Attach. `npx agent-browser --cdp 9222 snapshot -i`.
    - Confirm: sidebar visible, no blank white screen, no React error boundary.
-   - Screenshot: `tmp/smoke-01-boot.png`.
+   - Screenshot: `$env:LIGHTCODE_SMOKE_OUT_DIR\smoke-01-boot.png`.
 
 2. **DevTools console errors check**
-   - `agent-browser evaluate "JSON.stringify((window as any).__devLogs ?? [])"` (only if such a log array exists) — otherwise use the runtime/CDP console-listener pattern below.
-   - Capture any `Uncaught` / `Warning: ...` from React. Save to `tmp/smoke-console.txt`. Non-zero count → flag.
+   - `npx agent-browser --cdp 9222 eval "JSON.stringify((window as any).__devLogs ?? [])"` (only if such a log array exists) — otherwise use the runtime/CDP console-listener pattern below.
+   - Capture any `Uncaught` / `Warning: ...` from React. Save to `$env:LIGHTCODE_SMOKE_OUT_DIR\smoke-console.txt`. Non-zero count → flag.
 
 3. **Provider selector renders all icons**
    - Open ProviderModelMenu (find by accessible name "Provider", or by ref from snapshot).
    - Snapshot the open menu. Confirm: Claude, Codex, Copilot, Cursor, Gemini, OpenCode icons all visible (whichever are configured).
-   - Screenshot: `tmp/smoke-02-providers.png`.
+   - Screenshot: `$env:LIGHTCODE_SMOKE_OUT_DIR\smoke-02-providers.png`.
 
 4. **ThreadDraftView — create a new thread**
    - Click "New Thread" (or whatever the entry point is — find via snapshot).
    - Confirm: ThreadDraftView renders with composer, model picker, project picker.
    - Type a benign prompt: `"echo hello from smoke test"`.
-   - Screenshot: `tmp/smoke-03-draft.png`.
+   - Screenshot: `$env:LIGHTCODE_SMOKE_OUT_DIR\smoke-03-draft.png`.
 
 5. **ChatPane — send and observe**
    - Submit the draft. Wait for thread state to transition.
    - Confirm: ChatPane renders, user message row appears, assistant streaming row appears.
    - Watch for: markdown rendered (not raw `**bold**`), no duplicated rows, no layout jump.
-   - Screenshot: `tmp/smoke-04-chat.png`.
+   - Screenshot: `$env:LIGHTCODE_SMOKE_OUT_DIR\smoke-04-chat.png`.
 
 6. **ThreadRuntimeRequestPanel — if a tool/permission prompt appears**
    - If the prompt asks for permission (file write, command exec), confirm the panel renders.
@@ -277,6 +306,26 @@ Add these on top of the baseline when the diff touches them.
 - Exercise at least one procedure per file you touched (db read, git status, settings read, thread launch).
 - Watch for `IPC handler not found` errors in the renderer console — strong sign a procedure name got dropped during the split.
 
+### Browser panel / browser MCP changes
+
+Run the Browser panel harness:
+
+```powershell
+node .agents/skills/interactive-testing/scripts/lightcode-browser-smoke.mjs --port 9222 --outDir $env:LIGHTCODE_SMOKE_OUT_DIR
+```
+
+Expected checks:
+
+- App page target is `http://127.0.0.1:3100/`.
+- Browser panel opens and creates/reuses an in-app tab.
+- Embedded browser target appears in `/json/list` and exposes the deterministic smoke page DOM.
+- Toolbar URL input is present and enabled.
+- Back/forward state round-trips after two navigations.
+- Settings > Browser is reachable.
+- Renderer console error count is zero.
+
+If this fails only when screenshots are written inside the repo, move artifacts back under `$env:LIGHTCODE_SMOKE_OUT_DIR`; repo-local screenshot writes can trigger `electronmon` restarts.
+
 ### Chat markdown changes (`ChatItemRow`, `QuestionAnswer`, `MarkdownPreview`)
 
 - Send a prompt that yields a code block, a list, and a table in the response — confirm all three render through Streamdown.
@@ -287,7 +336,7 @@ Add these on top of the baseline when the diff touches them.
 Install a CDP-level console listener at attach time so errors surface even if the user never opens DevTools:
 
 ```bash
-agent-browser evaluate "(() => {
+npx agent-browser --cdp 9222 eval "(() => {
   if ((window as any).__smokeErrors) return 'already-installed';
   (window as any).__smokeErrors = [];
   const orig = console.error.bind(console);
@@ -301,7 +350,7 @@ agent-browser evaluate "(() => {
 Drain at end:
 
 ```bash
-agent-browser evaluate "JSON.stringify((window as any).__smokeErrors)"
+npx agent-browser --cdp 9222 eval "JSON.stringify((window as any).__smokeErrors)"
 ```
 
 ## Reporting
@@ -310,7 +359,7 @@ End-of-test summary should be terse — 1 short paragraph + a bullet list:
 
 - **PASS / FAIL** verdict per surface (provider menu, draft view, chat pane, runtime panel).
 - Console errors collected (count + first 3).
-- Screenshots written to `tmp/smoke-*.png` (give the user the paths).
+- Screenshots written to `$env:LIGHTCODE_SMOKE_OUT_DIR\smoke-*.png` (give the user the paths).
 - Anything that regressed vs. expectation — link to the file:line you suspect.
 
 Do not narrate every snapshot in the final summary — that goes to chat as you work, not in the wrap-up.
@@ -319,7 +368,7 @@ Do not narrate every snapshot in the final summary — that goes to chat as you 
 
 - **Never blanket-kill `electron.exe`** — the user likely has other Electron apps running. Only kill the specific background task you spawned.
 - **Never run destructive prompts** through the smoke test. If you must trigger a permission panel, choose a request like "list files in cwd" not "delete X". Always click Deny on real permission prompts unless the user told you otherwise.
-- **Default to the isolated workspace.** With `LIGHTCODE_BASE_DIR` set, the app starts empty — no risk of touching real threads. If a smoke run is asked to use the user's actual `~/.lightcode-dev` (e.g. to repro a real bug), always create a fresh thread and never send into an existing one without explicit confirmation.
+- **Default to the isolated workspace.** With `LIGHTCODE_BASE_DIR` set and the `userData` patch in place, the app starts with empty sqlite/settings and isolated renderer storage — no risk of touching real threads or leaking old `localStorage`. If a smoke run is asked to use the user's actual `~/.lightcode-dev` (e.g. to repro a real bug), always create a fresh thread and never send into an existing one without explicit confirmation.
 - **Do not commit anything** during a smoke test — the dev session may have modified files (cache, settings). Leave git state untouched and report any unexpected modifications.
 - **Dev server is long-running.** Always launch with `run_in_background: true`. Do not sleep-loop waiting for it; use `Monitor` on the background task and let the harness notify you on log lines like `Local:   http://127.0.0.1:3100/`.
 - **Single instance lock**: in dev mode `main.ts` bypasses `requestSingleInstanceLock`, so multiple electron instances can coexist — but don't spawn two dev sessions at once anyway; port 9222 collides.
@@ -327,9 +376,11 @@ Do not narrate every snapshot in the final summary — that goes to chat as you 
 ## Troubleshooting
 
 - **`connect 9222` refuses**: confirm the `appendSwitch` patch landed in `main.ts`, confirm `LIGHTCODE_CDP_PORT=9222` was in env at launch, and confirm Electron actually started (look at `dev:app` output). Check `netstat -ano | findstr :9222`.
-- **Two tabs returned by `tab`**: pick the one whose URL contains `index.html` or `localhost:3100`. The other may be a DevTools window.
+- **`agent-browser` shows `about:blank` but the visible app is loaded**: query `http://127.0.0.1:9222/json/list`. If the Lightcode page target is present, use the raw CDP Browser smoke script or direct CDP instead of retrying `agent-browser connect`.
+- **Two tabs returned by `tab`**: pick the one whose URL contains `localhost:3100`. The other may be a DevTools window.
 - **Elements not in snapshot**: HeroUI portals (modals, menus) render to a different root — re-snapshot with the menu open, or pass `-C` to include div-onclick elements.
 - **App didn't pick up `LIGHTCODE_CDP_PORT`**: env var must be set in the same shell that runs `pnpm run dev`. On PowerShell, `$env:LIGHTCODE_CDP_PORT="9222"; pnpm run dev` — `LIGHTCODE_CDP_PORT=9222 pnpm run dev` is bash syntax and silently does nothing in PowerShell.
 - **Vite hot-reload mid-test**: if a file watch fires during the smoke run (e.g. you edited something), the renderer remounts and refs go stale. Re-snapshot before continuing. The `pickFolder` stub is also lost on remount — re-apply before clicking Add Project.
-- **App didn't pick up `LIGHTCODE_BASE_DIR`**: confirm patch 2 landed in `main.ts` (`grep LIGHTCODE_BASE_DIR src/main/main.ts`). Also confirm `$env:LIGHTCODE_BASE_DIR` was set in the _same_ PowerShell session that ran `pnpm run dev` — `concurrently` inherits env from that parent.
+- **App didn't pick up `LIGHTCODE_BASE_DIR`**: confirm patch 2 landed in `main.ts` (`grep LIGHTCODE_BASE_DIR src/main/main.ts`) and that `app.setPath("userData", join(baseDirOverride, "userData"))` exists. Also confirm `$env:LIGHTCODE_BASE_DIR` was set in the _same_ PowerShell session that ran `pnpm run dev` — `concurrently` inherits env from that parent.
+- **Smoke screenshots cause app restarts**: screenshots were probably written inside the repo. Use `$env:LIGHTCODE_SMOKE_OUT_DIR` under `$HOME\.lightcode-smoke\...`; `electronmon` may see repo-local artifact writes as renderer file changes.
 - **Project doesn't appear after click**: the `pickFolder` monkey-patch only sticks until the next renderer reload. Re-snapshot, re-apply the stub, retry. Also confirm the path you injected exists on disk and is a directory the supervisor can stat.

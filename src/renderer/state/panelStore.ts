@@ -19,7 +19,7 @@ export interface FilesPanelContext {
   rootLabel: string;
 }
 
-export type RightPanelTab = "git" | "files" | "terminal";
+export type RightPanelTab = "git" | "files" | "terminal" | "browser";
 
 interface PanelState {
   gitReviewContext: GitReviewContext | null;
@@ -28,6 +28,8 @@ interface PanelState {
   prReviewContext: PrReviewContext | null;
   filesPanelContext: FilesPanelContext | null;
   rightPanelTab: RightPanelTab;
+  browserPanelOpen: boolean;
+  browserOverlayOpen: boolean;
   settingsOpen: boolean;
   projectSettingsId: string | null;
   threadSortMode: ThreadSortMode;
@@ -39,6 +41,9 @@ interface PanelState {
   setPrReviewContext: (ctx: PrReviewContext | null) => void;
   setFilesPanelContext: (ctx: FilesPanelContext | null) => void;
   setRightPanelTab: (tab: RightPanelTab) => void;
+  setBrowserPanelOpen: (v: boolean) => void;
+  setBrowserOverlayOpen: (v: boolean) => void;
+  openBrowserPanel: () => void;
   openSettings: () => void;
   closeSettings: () => void;
   openProjectSettings: (projectId: string) => void;
@@ -66,6 +71,8 @@ export const usePanelStore = create<PanelState>((set) => ({
   prReviewContext: null,
   filesPanelContext: null,
   rightPanelTab: "git",
+  browserPanelOpen: false,
+  browserOverlayOpen: false,
   settingsOpen: false,
   projectSettingsId: null,
   threadSortMode: "updated",
@@ -126,6 +133,27 @@ export const usePanelStore = create<PanelState>((set) => ({
     }),
   setRightPanelTab: (tab) =>
     set((state) => (state.rightPanelTab === tab ? {} : { rightPanelTab: tab })),
+  setBrowserPanelOpen: (v) =>
+    set((state) =>
+      state.browserPanelOpen === v && (v || !state.browserOverlayOpen)
+        ? {}
+        : { browserPanelOpen: v, ...(v ? {} : { browserOverlayOpen: false }) },
+    ),
+  setBrowserOverlayOpen: (v) =>
+    set((state) =>
+      state.browserOverlayOpen === v
+        ? {}
+        : {
+            browserOverlayOpen: v,
+            ...(v ? { browserPanelOpen: true, rightPanelTab: "browser" as const } : {}),
+          },
+    ),
+  openBrowserPanel: () =>
+    set((state) =>
+      state.browserPanelOpen && state.rightPanelTab === "browser"
+        ? {}
+        : { browserPanelOpen: true, rightPanelTab: "browser" as const },
+    ),
   setThreadSortMode: (mode) =>
     set((state) => (state.threadSortMode === mode ? {} : { threadSortMode: mode })),
   openSettings: () => set((state) => (state.settingsOpen ? {} : { settingsOpen: true })),
@@ -141,8 +169,20 @@ export const usePanelStore = create<PanelState>((set) => ({
   closeAllPanels: () => {
     localStorage.removeItem(STORAGE_KEY);
     set((state) => {
-      if (state.gitReviewContext === null && state.filesPanelContext === null) return {};
-      return { gitReviewContext: null, filesPanelContext: null };
+      if (
+        state.gitReviewContext === null &&
+        state.filesPanelContext === null &&
+        !state.browserPanelOpen &&
+        !state.browserOverlayOpen
+      ) {
+        return {};
+      }
+      return {
+        gitReviewContext: null,
+        filesPanelContext: null,
+        browserPanelOpen: false,
+        browserOverlayOpen: false,
+      };
     });
   },
 }));

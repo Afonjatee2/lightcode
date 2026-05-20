@@ -833,6 +833,7 @@ export function ThreadDraftView(props: {
         <div className={`${props.compact ? alignClass : "mx-auto"} w-full max-w-[920px]`}>
           <ThreadDraftComposerArea
             project={project}
+            {...(props.paneId ? { paneId: props.paneId } : {})}
             selectedAgent={selectedAgent}
             controls={draftControls}
             config={{

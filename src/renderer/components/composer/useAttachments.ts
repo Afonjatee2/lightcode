@@ -9,6 +9,10 @@ export interface Attachment {
   name: string;
   mimeType?: string;
   isImage: boolean;
+  /** Optional CSS selector when this attachment was produced by the browser element picker. */
+  selector?: string;
+  /** Optional source page URL for picker attachments. */
+  sourceUrl?: string;
 }
 
 const MIME_BY_EXT: Record<string, string> = {
@@ -84,6 +88,27 @@ export function useAttachments() {
     });
   }
 
+  function addPicked(input: {
+    path: string;
+    name: string;
+    mimeType: string;
+    selector: string;
+    sourceUrl: string;
+  }) {
+    setAttachments((prev) => [
+      ...prev,
+      {
+        id: crypto.randomUUID(),
+        path: input.path,
+        name: input.name,
+        mimeType: input.mimeType,
+        isImage: isImagePath(input.name, input.mimeType),
+        selector: input.selector,
+        sourceUrl: input.sourceUrl,
+      },
+    ]);
+  }
+
   function removeAttachment(id: string) {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }
@@ -108,6 +133,7 @@ export function useAttachments() {
     attachments,
     addFiles,
     addClipboardImage,
+    addPicked,
     removeAttachment,
     clearAll,
     toSegments,

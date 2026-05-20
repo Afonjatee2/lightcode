@@ -40,3 +40,6 @@ publicHoistPattern:
 # nested layout. Without this, deep deps like @opentelemetry/* are not copied
 # into the asar even when listed in `files`.
 nodeLinker: hoisted
+
+minimumReleaseAgeExclude:
+  - electron@41.7.0

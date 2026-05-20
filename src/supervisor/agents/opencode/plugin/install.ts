@@ -24,6 +24,8 @@ import {
   stagePluginAssetsToWsl,
   type PluginManifest,
 } from "../../plugin/installerBase";
+import { buildOpenCodeBrowserMcp } from "../mcpBrowser";
+import { BROWSER_MCP_SERVER_NAME } from "../../browserMcp";
 
 /**
  * OpenCode plugin installer.
@@ -231,9 +233,11 @@ export function installOpenCodePlugin(
   }
 
   // Best-effort: scrub the dead `file://...` entry older lightcode versions
-  // wrote into opencode.json. Failure here doesn't block install — the plugin
-  // is already loadable via auto-discovery.
-  removePluginEntryFromConfig(join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME));
+  // wrote into opencode.json, and merge the browser MCP entry in one
+  // read/write cycle. Failure here doesn't block install — the plugin is
+  // already loadable via auto-discovery.
+  const nativeConfigPath = join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME);
+  updateOpenCodeConfigFile(nativeConfigPath, buildOpenCodeBrowserMcp({ kind: "windows" }));
 
   console.log(
     `[supervisor] OpenCode hook plugin staged v${manifest.version} at ${pluginDir} ` +
@@ -282,10 +286,11 @@ function installOpenCodePluginWsl(
     };
   }
 
-  // Same scrub on the WSL-side opencode.json.
+  // Same scrub on the WSL-side opencode.json — in one read/write cycle.
   const cfgDir = resolveOpenCodeWslConfigDir(distro);
   if (cfgDir) {
-    removePluginEntryFromConfig(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`);
+    const wslConfigPath = `${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`;
+    updateOpenCodeConfigFile(wslConfigPath, buildOpenCodeBrowserMcp({ kind: "wsl", distro }));
   }
 
   console.log(
@@ -394,32 +399,72 @@ function readJsonFileOrEmpty(path: string): ReadJsonOk | ReadJsonErr {
   }
 }
 
+type BrowserMcpServers =
+  | Record<
+      string,
+      { type: "remote"; url: string; headers: Record<string, string>; enabled?: boolean }
+    >
+  | undefined;
+
 /**
- * Strip the lightcode-managed `file://` plugin entry from an existing
- * `opencode.json` (left behind by an older lightcode build that registered
- * the plugin via the config file). Best-effort: missing files / malformed
- * config are swallowed.
+ * Update `opencode.json` in a single read+write: scrub any lightcode-managed
+ * `file://` plugin entry (left behind by older lightcode builds) and merge the
+ * browser MCP server entry under `mcp`. Pass `servers` as `undefined` to only
+ * scrub the plugin entry. Writes only when the resulting JSON actually differs
+ * from what's on disk. Best-effort: missing files / malformed JSON are
+ * swallowed.
  */
-function removePluginEntryFromConfig(configPath: string): void {
+function updateOpenCodeConfigFile(configPath: string, servers: BrowserMcpServers): void {
   const read = readJsonFileOrEmpty(configPath);
-  if (!read.ok || !read.value || typeof read.value !== "object" || Array.isArray(read.value)) {
-    return;
+  if (!read.ok) return;
+  const original =
+    read.value && typeof read.value === "object" && !Array.isArray(read.value)
+      ? (read.value as Record<string, unknown>)
+      : {};
+  const config: Record<string, unknown> = { ...original };
+
+  const existingPlugin = config.plugin;
+  if (Array.isArray(existingPlugin)) {
+    const filtered = existingPlugin.filter((entry) => {
+      if (typeof entry !== "string") return true;
+      return !entry.includes(LIGHTCODE_PLUGIN_SPEC_MARKER);
+    });
+    if (filtered.length === 0) {
+      delete config.plugin;
+    } else if (filtered.length !== existingPlugin.length) {
+      config.plugin = filtered;
+    }
   }
-  const config = read.value as Record<string, unknown>;
-  const existing = config.plugin;
-  if (!Array.isArray(existing)) return;
-  const filtered = existing.filter((entry) => {
-    if (typeof entry !== "string") return true;
-    return !entry.includes(LIGHTCODE_PLUGIN_SPEC_MARKER);
-  });
-  if (filtered.length === existing.length) return;
-  if (filtered.length === 0) {
-    delete config.plugin;
+
+  const mcpRaw = config.mcp;
+  const mcp: Record<string, unknown> =
+    mcpRaw && typeof mcpRaw === "object" && !Array.isArray(mcpRaw)
+      ? { ...(mcpRaw as Record<string, unknown>) }
+      : {};
+  if (!servers) {
+    delete mcp[BROWSER_MCP_SERVER_NAME];
   } else {
-    config.plugin = filtered;
+    for (const [name, entry] of Object.entries(servers)) {
+      mcp[name] = entry;
+    }
   }
+  if (Object.keys(mcp).length === 0) {
+    delete config.mcp;
+  } else {
+    config.mcp = mcp;
+  }
+
+  const next = `${JSON.stringify(config, null, 2)}\n`;
+  let current: string | null = null;
   try {
-    writeFileSync(configPath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+    current = readFileSync(configPath, "utf8");
+  } catch {
+    // missing — treat as different so we write
+  }
+  if (current === next) return;
+  try {
+    mkdirSync(dirname(configPath), { recursive: true });
+    writeFileSync(configPath, next, "utf8");
   } catch {
     // best-effort
   }
@@ -441,7 +486,7 @@ export function uninstallOpenCodePlugin(ctx?: AgentEnvContext): void {
     }
     const cfgDir = resolveOpenCodeWslConfigDir(ctx.wslDistro);
     if (cfgDir) {
-      removePluginEntryFromConfig(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`);
+      updateOpenCodeConfigFile(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`, undefined);
     }
     return;
   }
@@ -449,7 +494,10 @@ export function uninstallOpenCodePlugin(ctx?: AgentEnvContext): void {
   removeIfPresent(join(pluginsDir, OPENCODE_PLUGIN_DROP_FILE_NAME));
   removeIfPresent(join(pluginsDir, OPENCODE_PLUGIN_DROP_MANIFEST_NAME));
   cleanupLegacyDrops(pluginsDir);
-  removePluginEntryFromConfig(join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME));
+  updateOpenCodeConfigFile(
+    join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME),
+    undefined,
+  );
 }
 
 function removeIfPresent(path: string): void {

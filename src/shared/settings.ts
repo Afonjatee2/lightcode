@@ -160,6 +160,30 @@ export const sharedSettingsSchema = z.object({
   disableCliHookPlugin: z.boolean(),
   /** Per-agent CLI hook plugin support cache. Keyed by AgentKind (and WSL distro when applicable). */
   agentHookSupport: z.record(z.string(), agentHookSupportEntrySchema),
+  /** In-app browser panel + agent MCP bridge settings. */
+  browser: z.object({
+    /**
+     * When true, agents (Claude, Codex, Gemini, OpenCode) launched by Lightcode
+     * receive an MCP server that lets them drive the in-app browser panel
+     * (navigate, screenshot, click, type, etc.). When false no MCP is injected
+     * and agents fall back to whatever native browsing tools they have.
+     * Toggling only affects newly launched threads; live threads keep their
+     * MCP until they stop.
+     */
+    mcpEnabled: z.boolean(),
+    /**
+     * Gate for the MCP `eval` tool. When false (default) the tool
+     * returns a "disabled" error to the agent. Off-by-default because eval
+     * gives the agent arbitrary script execution in the embedded page.
+     */
+    allowEval: z.boolean(),
+    /**
+     * Gate for the MCP `cookies` / `storage` tools. When
+     * false (default) those tools refuse to operate. Off-by-default because
+     * cookies can include session tokens; storage can include auth state.
+     */
+    allowDataAccess: z.boolean(),
+  }),
 });
 export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 
@@ -226,6 +250,11 @@ export const defaultSharedSettings: SharedSettings = {
   recentModels: [],
   disableCliHookPlugin: false,
   agentHookSupport: {},
+  browser: {
+    mcpEnabled: true,
+    allowEval: false,
+    allowDataAccess: false,
+  },
 };
 
 function parseSettingOrDefault<T>(schema: z.ZodType<T>, value: unknown, fallback: T): T {

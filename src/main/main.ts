@@ -11,6 +11,12 @@ import {
   installLocalFileProtocolHandler,
   registerLocalFileProtocolScheme,
 } from "./attachments/localFiles";
+import {
+  BrowserMcpIngress,
+  BrowserPanelManager,
+  installPickerProtocolHandler,
+  registerPickerProtocolScheme,
+} from "./browser";
 import { SupervisorClient } from "./supervisor/SupervisorClient";
 import { createAutoUpdaterController } from "./updates/autoUpdater";
 import { createMainWindow } from "./window/createMainWindow";
@@ -27,12 +33,15 @@ import { readOrCreateSafeStorageSecretKey } from "./secretStorageKey";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const channel = resolveLightcodeChannel();
+const baseDirOverride = process.env.LIGHTCODE_BASE_DIR;
 
 if (process.env.LIGHTCODE_CDP_PORT) {
   app.commandLine.appendSwitch("remote-debugging-port", process.env.LIGHTCODE_CDP_PORT);
 }
 
-if (isDev) {
+if (baseDirOverride) {
+  app.setPath("userData", join(baseDirOverride, "userData"));
+} else if (isDev) {
   app.setPath("userData", join(app.getPath("userData"), "Dev"));
 }
 
@@ -48,6 +57,8 @@ const WINDOW_CHROME_HEIGHT = 32;
 let mainWindow: BrowserWindow | null = null;
 let lightcodePaths: LightcodePaths | null = null;
 let windowsJobObjectManager: WindowsJobObjectManager | null = null;
+let browserPanelManager: BrowserPanelManager | null = null;
+let browserMcpIngress: BrowserMcpIngress | null = null;
 // Retained module-scope so the native Tray icon stays reachable from GC.
 let tray: TrayHandle | null = null;
 let isQuitting = false;
@@ -58,6 +69,18 @@ function isCloseToTrayEnabled(): boolean {
     return readSharedSettingsFile(lightcodePaths.settingsPath).closeToTray;
   } catch {
     return false;
+  }
+}
+
+function primeBrowserAllowFlags(): void {
+  if (!browserMcpIngress || !lightcodePaths) return;
+  try {
+    const s = readSharedSettingsFile(lightcodePaths.settingsPath);
+    browserMcpIngress.setAllowEval(s.browser?.allowEval === true);
+    browserMcpIngress.setAllowDataAccess(s.browser?.allowDataAccess === true);
+  } catch {
+    browserMcpIngress.setAllowEval(false);
+    browserMcpIngress.setAllowDataAccess(false);
   }
 }
 
@@ -104,6 +127,7 @@ function handleSupervisorEventForSleep(event: SupervisorEvent): void {
 }
 
 registerLocalFileProtocolScheme();
+registerPickerProtocolScheme();
 
 if (!hasSingleInstanceLock) {
   app.quit();
@@ -123,8 +147,8 @@ if (!hasSingleInstanceLock) {
 
   app.whenReady().then(async () => {
     installLocalFileProtocolHandler();
+    installPickerProtocolHandler();
 
-    const baseDirOverride = process.env.LIGHTCODE_BASE_DIR;
     lightcodePaths = prepareLightcodeDataRoot(
       baseDirOverride ??
         (isDev ? join(homedir(), ".lightcode-dev") : resolveLightcodeBaseDir(channel)),
@@ -159,6 +183,14 @@ if (!hasSingleInstanceLock) {
       supervisorPath,
       wslHelpersDir,
       secretStorageKey,
+      resolveExtraEnv: () => {
+        const info = browserMcpIngress?.getInfo();
+        if (!info) return {};
+        return {
+          LIGHTCODE_BROWSER_MCP_URL: info.url,
+          LIGHTCODE_BROWSER_MCP_TOKEN: info.token,
+        };
+      },
       assignPid: async (pid) => {
         await windowsJobObjectManager?.assignPid(pid);
       },
@@ -187,12 +219,23 @@ if (!hasSingleInstanceLock) {
       },
     );
 
+    browserPanelManager = new BrowserPanelManager(lightcodePaths);
+    browserMcpIngress = new BrowserMcpIngress();
+    browserMcpIngress.setManagerAccessor(() => browserPanelManager);
+    primeBrowserAllowFlags();
+    const mcpInfoReady = browserMcpIngress.start().catch((err) => {
+      console.error("[lightcode] browser MCP ingress failed to start:", err);
+      return null;
+    });
+
     registerIpcHandlers({
       localHandlers: createLocalIpcHandlers({
         getMainWindow: () => mainWindow,
+        getBrowserPanelManager: () => browserPanelManager,
         requireLightcodePaths,
         updatePowerSaveBlocker,
         autoUpdater: autoUpdaterController,
+        onSharedSettingsChanged: primeBrowserAllowFlags,
       }),
       callSupervisor: (name, payload) => supervisorClient.call(name, payload),
     });
@@ -223,6 +266,8 @@ if (!hasSingleInstanceLock) {
       },
     });
 
+    browserPanelManager.bindHost(mainWindow);
+
     tray = createTray({
       window: mainWindow,
       channel,
@@ -243,6 +288,7 @@ if (!hasSingleInstanceLock) {
       );
     }
 
+    await mcpInfoReady;
     supervisorClient.start(lightcodePaths.baseDir);
 
     mainWindow.once("ready-to-show", () => {
@@ -316,6 +362,10 @@ if (!hasSingleInstanceLock) {
       supervisorClient.dispose();
       windowsJobObjectManager?.dispose();
       windowsJobObjectManager = null;
+      browserMcpIngress?.dispose();
+      browserMcpIngress = null;
+      browserPanelManager?.dispose();
+      browserPanelManager = null;
       sleepInhibitor.dispose();
       tray?.destroy();
       tray = null;

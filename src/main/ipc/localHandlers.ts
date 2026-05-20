@@ -1,4 +1,5 @@
-import { dialog, shell, type BrowserWindow } from "electron";
+import { clipboard, dialog, nativeImage, shell, type BrowserWindow } from "electron";
+import type { BrowserPanelManager } from "../browser";
 import {
   dbDeleteProject,
   dbDeleteThread,
@@ -34,9 +35,19 @@ import type { LightcodePaths } from "@/shared/lightcodePaths";
 
 interface CreateLocalIpcHandlersOptions {
   getMainWindow(): BrowserWindow | null;
+  getBrowserPanelManager(): BrowserPanelManager | null;
   requireLightcodePaths(): LightcodePaths;
   updatePowerSaveBlocker(): void;
   autoUpdater: AutoUpdaterController;
+  onSharedSettingsChanged?(): void;
+}
+
+function requireBrowserPanel(getter: () => BrowserPanelManager | null): BrowserPanelManager {
+  const mgr = getter();
+  if (!mgr) {
+    throw new Error("Browser panel manager is not initialized.");
+  }
+  return mgr;
 }
 
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
@@ -107,6 +118,7 @@ export function createLocalIpcHandlers(
         agentHookSupport: onDisk.agentHookSupport,
       });
       options.updatePowerSaveBlocker();
+      options.onSharedSettingsChanged?.();
     },
     setWindowChrome: async (payload: WindowChromePayload) => {
       const mainWindow = options.getMainWindow();
@@ -145,5 +157,54 @@ export function createLocalIpcHandlers(
     checkForUpdate: () => options.autoUpdater.checkForUpdate(),
     startUpdateDownload: () => options.autoUpdater.startUpdateDownload(),
     installUpdate: () => options.autoUpdater.installUpdate(),
+    browserGetState: () => requireBrowserPanel(options.getBrowserPanelManager).snapshot(),
+    browserCreateTab: (payload) =>
+      requireBrowserPanel(options.getBrowserPanelManager).createTab({
+        ...(payload.url !== undefined ? { url: payload.url } : {}),
+        ...(payload.activate !== undefined ? { activate: payload.activate } : {}),
+      }),
+    browserCloseTab: ({ tabId }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).closeTab(tabId),
+    browserActivateTab: ({ tabId }) => {
+      requireBrowserPanel(options.getBrowserPanelManager).setActiveTab(tabId);
+    },
+    browserMoveTab: ({ tabId, targetTabId, position }) => {
+      requireBrowserPanel(options.getBrowserPanelManager).moveTab(tabId, targetTabId, position);
+    },
+    browserNavigate: ({ tabId, url }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).navigate(tabId, url),
+    browserBack: ({ tabId }) => requireBrowserPanel(options.getBrowserPanelManager).back(tabId),
+    browserForward: ({ tabId }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).forward(tabId),
+    browserReload: ({ tabId }) => requireBrowserPanel(options.getBrowserPanelManager).reload(tabId),
+    browserHardReload: ({ tabId }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).hardReload(tabId),
+    browserToggleDevTools: ({ tabId }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).toggleDevTools(tabId),
+    browserClearHistory: ({ tabId }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).clearHistory(tabId),
+    browserClearCookies: ({ tabId }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).clearCookies(tabId),
+    browserClearCache: ({ tabId }) =>
+      requireBrowserPanel(options.getBrowserPanelManager).clearCache(tabId),
+    browserCopyScreenshot: async ({ tabId }) => {
+      const bytes = await requireBrowserPanel(options.getBrowserPanelManager).capturePng(tabId);
+      if (bytes) {
+        clipboard.writeImage(nativeImage.createFromBuffer(bytes));
+      }
+    },
+    browserCapturePreview: async ({ tabId }) => {
+      const bytes = await requireBrowserPanel(options.getBrowserPanelManager).capturePng(tabId);
+      if (!bytes) return { dataUrl: null };
+      return { dataUrl: `data:image/png;base64,${bytes.toString("base64")}` };
+    },
+    browserAttachWebContents: ({ tabId, webContentsId }) => {
+      requireBrowserPanel(options.getBrowserPanelManager).attachWebContents(tabId, webContentsId);
+    },
+    browserStartPicker: (payload) =>
+      requireBrowserPanel(options.getBrowserPanelManager).startPicker(payload),
+    browserCancelPicker: () => {
+      requireBrowserPanel(options.getBrowserPanelManager).cancelPicker();
+    },
   });
 }

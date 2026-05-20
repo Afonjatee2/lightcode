@@ -8,7 +8,7 @@ import {
   type MainLocalProcedureName,
   type SupervisorProcedureName,
 } from "./procedureMap";
-import type { SupervisorEvent, UpdateStatus } from "./events";
+import type { BrowserEvent, SupervisorEvent, UpdateStatus } from "./events";
 
 type ProcedureArgs<Name extends IpcProcedureName> =
   (typeof ipcProcedureMap)[Name]["__types"]["args"];
@@ -33,6 +33,7 @@ export type LightcodeBridge = LightcodeInvokeBridge & {
   sentryEnabled: boolean;
   onSupervisorEvent(listener: (event: SupervisorEvent) => void): () => void;
   onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
+  onBrowserEvent(listener: (event: BrowserEvent) => void): () => void;
 };
 
 export function createInvokeBridge(
@@ -83,4 +84,5 @@ export function defineSupervisorIpcHandlers<THandlers extends SupervisorIpcHandl
 export const IPC_EVENT_CHANNELS = {
   supervisorEvent: createChannel("supervisorEvent"),
   updateStatus: createChannel("updateStatus"),
+  browserEvent: createChannel("browserEvent"),
 } as const;

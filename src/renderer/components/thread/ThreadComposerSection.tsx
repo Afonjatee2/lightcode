@@ -19,6 +19,7 @@ import { EffortIcon } from "../providers/EffortIcon";
 import { readBridge } from "@/renderer/bridge";
 import { captureProductEvent, threadProductProperties } from "@/renderer/analytics/posthog";
 import { useAppStore } from "@/renderer/state/appStore";
+import { buildLcSelectorFence, useBrowserAttachInbox } from "@/renderer/state/browserAttachInbox";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
@@ -296,6 +297,22 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isInterrupting, setIsInterrupting] = useState(false);
   const attachments = useAttachments();
+  const pendingPickedAttachments = useBrowserAttachInbox((s) => s.itemsByThread[thread.id]);
+  const addPickedRef = useRef(attachments.addPicked);
+  addPickedRef.current = attachments.addPicked;
+  useEffect(() => {
+    if (!pendingPickedAttachments || pendingPickedAttachments.length === 0) return;
+    const drained = useBrowserAttachInbox.getState().drain(thread.id);
+    for (const item of drained) {
+      addPickedRef.current({
+        path: item.attachmentPath,
+        name: item.attachmentName,
+        mimeType: item.mimeType,
+        selector: item.selector,
+        sourceUrl: item.sourceUrl,
+      });
+    }
+  }, [pendingPickedAttachments, thread.id]);
   const [slashQuery, setSlashQuery] = useState<string | null>(null);
   const [slashActiveIndex, setSlashActiveIndex] = useState(0);
   const [controlOpenRequest, setControlOpenRequest] = useState<{
@@ -462,7 +479,20 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
 
   function submitPrompt(segments: PromptSegment[]) {
     const attachmentSegments = attachments.toSegments();
-    const allSegments = [...attachmentSegments, ...segments];
+    const selectorFences = attachments.attachments
+      .filter((a) => a.selector && a.sourceUrl)
+      .map((a) =>
+        buildLcSelectorFence({
+          selector: a.selector ?? "",
+          sourceUrl: a.sourceUrl ?? "",
+          attachmentName: a.name,
+        }),
+      );
+    const selectorSegments: PromptSegment[] = selectorFences.map((text) => ({
+      kind: "text" as const,
+      content: text,
+    }));
+    const allSegments = [...attachmentSegments, ...selectorSegments, ...segments];
     const flat = flattenSegments(allSegments);
     if (flat.length === 0 || !canSubmit) return;
     const localAction = resolveLocalSlashCommandAction(flat, {

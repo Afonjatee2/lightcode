@@ -37,7 +37,7 @@ describe("renderGeminiSettings", () => {
   it("renders only the trimmed hook surface with the resolved-node command prefix", () => {
     const commandPrefix =
       "'/home/demo/.nvm/versions/node/v22.11.0/bin/node' '/home/demo/.lightcode/agent-plugins/gemini/forward.mjs'";
-    const doc = renderGeminiSettings(commandPrefix);
+    const doc = renderGeminiSettings({ headExpression: commandPrefix });
 
     expect(doc.hooksConfig).toEqual({ notifications: false });
     expect(Object.keys(doc.hooks)).toEqual([
@@ -59,7 +59,7 @@ describe("renderGeminiSettings", () => {
   });
 
   it("does not register dropped redundant turn-open hooks", () => {
-    const doc = renderGeminiSettings("'/usr/bin/node' '/tmp/forward.mjs'");
+    const doc = renderGeminiSettings({ headExpression: "'/usr/bin/node' '/tmp/forward.mjs'" });
     expect(doc.hooks.BeforeModel).toBeUndefined();
     expect(doc.hooks.BeforeTool).toBeUndefined();
     expect(doc.hooks.AfterTool).toBeUndefined();

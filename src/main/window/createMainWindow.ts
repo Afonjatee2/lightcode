@@ -95,6 +95,7 @@ export function createMainWindow(options: CreateMainWindowOptions): BrowserWindo
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true,
       additionalArguments: [
         `--lc-app-version=${encodeURIComponent(options.appVersion)}`,
         `--lc-is-dev=${options.isDev ? "1" : "0"}`,

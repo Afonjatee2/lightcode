@@ -10,18 +10,24 @@ export function ApprovalActions(props: {
   isDisabled: boolean;
   leadingAction?: ReactNode;
   showAllOptions?: boolean;
+  stackOnNarrow?: boolean;
   onSelect: (optionId: string) => void;
 }) {
-  const { options, isDisabled, leadingAction, showAllOptions, onSelect } = props;
+  const { options, isDisabled, leadingAction, showAllOptions, stackOnNarrow, onSelect } = props;
   const negatives = options.filter(isNegativeOption);
   const positives = options.filter((o) => !isNegativeOption(o));
   const primary = positives[0];
   const positiveAlternates = positives.slice(1);
+  const rootClassName = stackOnNarrow
+    ? "flex items-center gap-1 @max-[44rem]:flex-col @max-[44rem]:items-stretch"
+    : "flex items-center gap-1";
+  const negativeButtonClassName = stackOnNarrow ? "text-muted @max-[44rem]:w-full" : "text-muted";
+  const buttonClassName = stackOnNarrow ? "@max-[44rem]:w-full" : "";
 
   if (!primary && negatives.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-1">
+    <div className={rootClassName}>
       {leadingAction}
       {negatives.map((option) => (
         <Button
@@ -29,7 +35,7 @@ export function ApprovalActions(props: {
           size="sm"
           isDisabled={isDisabled}
           variant="ghost"
-          className="text-muted"
+          className={negativeButtonClassName}
           onPress={() => onSelect(option.optionId)}
         >
           {option.label}
@@ -40,6 +46,7 @@ export function ApprovalActions(props: {
           size="sm"
           variant="tertiary"
           isDisabled={isDisabled}
+          className={buttonClassName}
           onPress={() => onSelect(primary.optionId)}
         >
           {primary.label}
@@ -52,6 +59,7 @@ export function ApprovalActions(props: {
               size="sm"
               variant="tertiary"
               isDisabled={isDisabled}
+              className={buttonClassName}
               onPress={() => onSelect(option.optionId)}
             >
               {option.label}

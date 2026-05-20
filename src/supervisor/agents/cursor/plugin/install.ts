@@ -7,7 +7,7 @@ import type { AgentEnvContext } from "../../base";
 import { resolveWslHomeDirectory } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
-  buildNativeHookCommandHeads,
+  buildNativeHookCmdShellCommand,
   buildWslHookCommandHead,
   copyForwardRuntimeFile,
   copyPluginAssetsIfStale,
@@ -228,7 +228,7 @@ export function installCursorPlugin(
     return { ok: false, reason: `malformed Cursor hooks.json at ${hooksPath} (invalid JSON)` };
   }
 
-  const commandHead = buildNativeHookCommandHeads(wrapperPath).command;
+  const commandHead = buildNativeHookCmdShellCommand(wrapperPath);
 
   try {
     const merged = mergeCursorHooksDocument(existing, commandHead);

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectLocation, SessionRef, ThreadConfig } from "@/shared/contracts";
 
 vi.mock("./codex/session", async (importOriginal) => {
@@ -113,7 +113,15 @@ const config: ThreadConfig = {
   sandboxMode: "workspace-write",
 };
 
+function clearBrowserMcpEnv(): void {
+  delete process.env.LIGHTCODE_BROWSER_MCP_URL;
+  delete process.env.LIGHTCODE_BROWSER_MCP_TOKEN;
+}
+
 describe("agent command builders", () => {
+  beforeEach(() => {
+    clearBrowserMcpEnv();
+  });
   it.skipIf(process.platform !== "win32")("builds a Windows Codex launch command", () => {
     const spec = launch(createCodexAdapter(), windowsProject, config, "hello");
     expect(spec.cwd).toBe("C:\\Users\\demo\\project");
@@ -152,6 +160,34 @@ describe("agent command builders", () => {
     expect(cmdArgs).not.toContain("--listen");
     expect(cmdArgs).not.toContain("--remote");
     expect(cmdArgs).not.toContain("--session-source");
+  });
+
+  it("injects Codex browser MCP config using a token env var", () => {
+    const oldUrl = process.env.LIGHTCODE_BROWSER_MCP_URL;
+    const oldToken = process.env.LIGHTCODE_BROWSER_MCP_TOKEN;
+    process.env.LIGHTCODE_BROWSER_MCP_URL = "http://127.0.0.1:9123";
+    process.env.LIGHTCODE_BROWSER_MCP_TOKEN = "secret-token";
+    try {
+      const spec = buildCodexAppServerCommand(windowsProject);
+      const { cmdArgs } = parseWindowsSpec(spec);
+
+      expect(cmdArgs).toContain('mcp_servers.lightcode_browser.url="http://127.0.0.1:9123/mcp"');
+      expect(cmdArgs).toContain(
+        'mcp_servers.lightcode_browser.bearer_token_env_var="LIGHTCODE_BROWSER_MCP_TOKEN"',
+      );
+      expect(cmdArgs).not.toContain('mcp_servers.lightcode_browser.bearer_token="secret-token"');
+    } finally {
+      if (oldUrl === undefined) {
+        delete process.env.LIGHTCODE_BROWSER_MCP_URL;
+      } else {
+        process.env.LIGHTCODE_BROWSER_MCP_URL = oldUrl;
+      }
+      if (oldToken === undefined) {
+        delete process.env.LIGHTCODE_BROWSER_MCP_TOKEN;
+      } else {
+        process.env.LIGHTCODE_BROWSER_MCP_TOKEN = oldToken;
+      }
+    }
   });
 
   it("resumes the server thread when structured session provides a threadId", () => {

@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { ChatPaneActionsContext, type ChatPaneActions } from "../../chatPaneActionsContext";
 import ItemMarkdownInner from "./ItemMarkdownInner";
+import { LC_SELECTOR_LANG } from "./SelectorBadge";
 
 const { codeBlockSpy } = vi.hoisted(() => ({
   codeBlockSpy:
@@ -75,6 +76,26 @@ describe("ItemMarkdownInner", () => {
 
     expect(screen.queryByTestId("code-block")).not.toBeInTheDocument();
     expect(container.querySelector("pre > code")).toHaveTextContent("plain block");
+  });
+
+  it("hides browser selector metadata fences", () => {
+    const payload = JSON.stringify({
+      selector: "svg.lnXdpd > path",
+      url: "https://www.google.com/",
+      name: "selection.png",
+    });
+    const { container } = render(
+      <AppProvider>
+        <ItemMarkdownInner
+          text={`before\n\n\`\`\`${LC_SELECTOR_LANG}\n${payload}\n\`\`\`\n\nafter`}
+        />
+      </AppProvider>,
+    );
+
+    expect(container).toHaveTextContent("before");
+    expect(container).toHaveTextContent("after");
+    expect(container).not.toHaveTextContent("svg.lnXdpd > path");
+    expect(container.querySelector("pre")).toBeNull();
   });
 
   it("renders single newlines as line breaks", () => {

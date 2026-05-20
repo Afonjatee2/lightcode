@@ -1,29 +1,38 @@
 import { type CSSProperties, type ReactNode } from "react";
-import { FileDiff, FolderOpen, Maximize2, PanelRightClose, TerminalSquare } from "lucide-react";
+import {
+  FileDiff,
+  FolderOpen,
+  Globe,
+  Maximize2,
+  PanelRightClose,
+  TerminalSquare,
+} from "lucide-react";
 import { PanelHeaderProjectName } from "@/renderer/components/layout/PanelHeaderProjectName";
 import {
   panelHeaderIconButtonClass,
   panelHeaderRowClass,
   panelHeaderTabIconButtonClass,
 } from "@/renderer/components/layout/sidebarChrome";
+import type { RightPanelTab } from "@/renderer/state/panelStore";
 
-export type RightPanelTab = "terminal" | "git" | "files";
+export type { RightPanelTab };
 
 export function UnifiedRightPanel(props: {
   activeTab: RightPanelTab;
   onTabChange: (tab: RightPanelTab) => void;
-  terminalContent: ReactNode;
+  terminalContent?: ReactNode;
   gitContent: ReactNode;
   filesContent: ReactNode;
-  showTerminal: boolean;
-  showGit: boolean;
-  showFiles: boolean;
+  browserContent: ReactNode;
+  showTerminalTab?: boolean;
   projectName: string | undefined;
   onExpandGitToOverlay?: () => void;
   onExpandFilesToOverlay?: () => void;
+  onExpandBrowserToOverlay?: () => void;
   onOpenGit?: () => void;
   onOpenTerminal?: () => void;
   onOpenFiles?: () => void;
+  onOpenBrowser?: () => void;
   onClose: () => void;
 }) {
   const {
@@ -32,15 +41,16 @@ export function UnifiedRightPanel(props: {
     terminalContent,
     gitContent,
     filesContent,
-    showTerminal,
-    showGit,
-    showFiles,
+    browserContent,
+    showTerminalTab = true,
     projectName,
     onExpandGitToOverlay,
     onExpandFilesToOverlay,
+    onExpandBrowserToOverlay,
     onOpenGit,
     onOpenTerminal,
     onOpenFiles,
+    onOpenBrowser,
     onClose,
   } = props;
 
@@ -88,25 +98,37 @@ export function UnifiedRightPanel(props: {
             <Maximize2 className="size-3" />
           </button>
         )}
+        {activeTab === "browser" && onExpandBrowserToOverlay && (
+          <button
+            type="button"
+            className={`${dragCtl} ${panelHeaderIconButtonClass}`}
+            title="Open as overlay"
+            onClick={onExpandBrowserToOverlay}
+          >
+            <Maximize2 className="size-3" />
+          </button>
+        )}
         <div className="mx-0.5 h-3 w-px bg-border" />
-        <button
-          type="button"
-          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "terminal")}`}
-          title="Terminal"
-          onClick={() => {
-            onTabChange("terminal");
-            if (!showTerminal) onOpenTerminal?.();
-          }}
-        >
-          <TerminalSquare className="size-3.5" />
-        </button>
+        {showTerminalTab ? (
+          <button
+            type="button"
+            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "terminal")}`}
+            title="Terminal"
+            onClick={() => {
+              if (onOpenTerminal) onOpenTerminal();
+              else onTabChange("terminal");
+            }}
+          >
+            <TerminalSquare className="size-3.5" />
+          </button>
+        ) : null}
         <button
           type="button"
           className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "files")}`}
           title="Files"
           onClick={() => {
-            onTabChange("files");
-            if (!showFiles) onOpenFiles?.();
+            if (onOpenFiles) onOpenFiles();
+            else onTabChange("files");
           }}
         >
           <FolderOpen className="size-3.5" />
@@ -116,11 +138,22 @@ export function UnifiedRightPanel(props: {
           className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "git")}`}
           title="Git"
           onClick={() => {
-            onTabChange("git");
-            if (!showGit) onOpenGit?.();
+            if (onOpenGit) onOpenGit();
+            else onTabChange("git");
           }}
         >
           <FileDiff className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "browser")}`}
+          title="Browser"
+          onClick={() => {
+            if (onOpenBrowser) onOpenBrowser();
+            else onTabChange("browser");
+          }}
+        >
+          <Globe className="size-3.5" />
         </button>
         <button
           type="button"
@@ -134,14 +167,19 @@ export function UnifiedRightPanel(props: {
 
       {/* Content — stacked layers cross-fade on tab change */}
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("terminal")}>
-          {terminalContent}
-        </div>
+        {showTerminalTab ? (
+          <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("terminal")}>
+            {terminalContent}
+          </div>
+        ) : null}
         <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("git")}>
           {gitContent}
         </div>
         <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("files")}>
           {filesContent}
+        </div>
+        <div className="absolute inset-0 overflow-hidden" style={tabLayerStyle("browser")}>
+          {browserContent}
         </div>
       </div>
     </div>

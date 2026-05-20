@@ -10,7 +10,17 @@ function AttachmentChip(props: {
   hideImageName?: boolean;
 }) {
   const { attachment: att, onRemove, onPreviewImage, hideImageName } = props;
-  const showName = !att.isImage || !hideImageName;
+  const isPicked = !!att.selector;
+  const labelText = isPicked ? att.selector! : att.name;
+  const showLabel = isPicked || !att.isImage || !hideImageName;
+  const tooltip = isPicked
+    ? att.sourceUrl
+      ? `${att.selector}\n${att.sourceUrl}`
+      : att.selector
+    : undefined;
+  const labelClass = isPicked
+    ? "lightcode-attachment-chip__name lightcode-attachment-chip__selector"
+    : "lightcode-attachment-chip__name";
 
   const content = (
     <>
@@ -29,7 +39,11 @@ function AttachmentChip(props: {
           draggable={false}
         />
       )}
-      {showName ? <span className="lightcode-attachment-chip__name">{att.name}</span> : null}
+      {showLabel ? (
+        <span className={labelClass} {...(tooltip ? { title: tooltip } : {})}>
+          {labelText}
+        </span>
+      ) : null}
       {onRemove ? (
         <button
           type="button"
@@ -49,13 +63,20 @@ function AttachmentChip(props: {
 
   if (att.isImage && onPreviewImage) {
     return (
-      <button
-        type="button"
+      <div
         className="lightcode-attachment-chip"
+        role="button"
+        tabIndex={0}
         onClick={() => onPreviewImage(att)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onPreviewImage(att);
+          }
+        }}
       >
         {content}
-      </button>
+      </div>
     );
   }
 
@@ -109,7 +130,7 @@ export function AttachmentBar(props: {
   return (
     <div className={className}>
       {attachments.map((att) =>
-        imagesAsPreview && att.isImage ? (
+        imagesAsPreview && att.isImage && !att.selector ? (
           <ImagePreview key={att.id} attachment={att} onPreviewImage={onPreviewImage} />
         ) : (
           <AttachmentChip

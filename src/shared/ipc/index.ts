@@ -21,7 +21,23 @@ export {
   type MainLocalIpcHandlerMap,
   type SupervisorIpcHandlerMap,
 } from "./bridge";
-export type { SupervisorEvent, SupervisorReply, SupervisorRequest, UpdateStatus } from "./events";
+export type {
+  BrowserEvent,
+  SupervisorEvent,
+  SupervisorReply,
+  SupervisorRequest,
+  UpdateStatus,
+} from "./events";
+export {
+  browserPickResultSchema,
+  browserStateSchema,
+  browserTabSchema,
+  type BrowserPickResult,
+  type BrowserRect,
+  type BrowserState,
+  type BrowserStartPickerResult,
+  type BrowserTabInfo,
+} from "./procedures/browser";
 export {
   windowChromePayloadSchema,
   type PersistedCompletedTurn,

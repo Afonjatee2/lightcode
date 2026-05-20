@@ -1,4 +1,5 @@
-import { isWindows } from "@/renderer/bridge";
+import type { CSSProperties } from "react";
+import { isMac, isWindows } from "@/renderer/bridge";
 
 /**
  * Shared left-sidebar chrome: main app thread list, overflow/git/settings/file-editor panels.
@@ -18,6 +19,23 @@ export const macosTrafficLightGutterClass = "w-[68px] shrink-0" as const;
  * gate is pure CSS, so descendants don't subscribe to sidebar state.
  */
 export const macosTrafficLightPadClass = "lightcode-mac-traffic-light-pad" as const;
+
+/**
+ * Inline styles for full-width overlay title rows: titlebar height plus right inset on
+ * Windows/Linux (titleBarOverlay controls) so header actions stay clear of window buttons.
+ */
+export function overlayHeaderStyle(): CSSProperties {
+  const height = "env(titlebar-area-height, 32px)";
+  if (isMac()) {
+    return { height };
+  }
+  return {
+    height,
+    paddingRight: isWindows()
+      ? "max(calc(1rem + 4px), calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 4px))"
+      : "max(1rem, calc(100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw)))",
+  };
+}
 
 /** Shared header bar for right/bottom dock panels (project name + tab/close icons). */
 export const panelHeaderRowClass =

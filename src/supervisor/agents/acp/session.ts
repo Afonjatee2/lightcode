@@ -11,9 +11,12 @@
 
 import { spawn as spawnChild, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import { buildAcpBrowserMcpServers } from "./mcpBrowser";
+import { appendFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
+import { resolveLightcodePaths } from "@/shared/lightcodePaths";
 import { Readable, Writable } from "node:stream";
 import { spawn as spawnPty } from "node-pty";
 import {
@@ -398,6 +401,13 @@ export interface AcpStructuredSessionOptions {
    * sessionId that was being loaded; must return the Error to throw.
    */
   loadSessionErrorRewriter?: (error: unknown, sessionId: string) => Error;
+  /**
+   * Per-adapter notification preprocessor. When set, every `session/update`
+   * is run through it before the shared canonical mapper consumes it. Use to
+   * bridge provider-specific wire quirks; the shared mapper itself remains
+   * provider-agnostic.
+   */
+  sessionUpdateTransform?: (notification: SessionNotification) => SessionNotification;
 }
 
 export class AcpStructuredSession implements StructuredSessionHandle {
@@ -405,6 +415,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
 
   private loadSessionErrorRewriter: (error: unknown, sessionId: string) => Error =
     rewriteLoadSessionError;
+
+  private sessionUpdateTransform?: (notification: SessionNotification) => SessionNotification;
 
   private readonly child: ChildProcess;
   private readonly connection: ClientSideConnection;
@@ -488,6 +500,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.launchOptions = { suppressResumeConfigOverrides: true };
     if (options?.loadSessionErrorRewriter) {
       this.loadSessionErrorRewriter = options.loadSessionErrorRewriter;
+    }
+    if (options?.sessionUpdateTransform) {
+      this.sessionUpdateTransform = options.sessionUpdateTransform;
     }
   }
 
@@ -876,7 +891,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           const result = await this.connection.resumeSession({
             sessionId: sessionRef.providerSessionId,
             cwd: this.cwd,
-            mcpServers: [],
+            mcpServers: buildAcpBrowserMcpServers(this.projectLocation),
           });
           this.adoptSessionRef(sessionRef);
           availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
@@ -892,7 +907,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           const result = await this.connection.loadSession({
             sessionId: sessionRef.providerSessionId,
             cwd: this.cwd,
-            mcpServers: [],
+            mcpServers: buildAcpBrowserMcpServers(this.projectLocation),
           });
           this.adoptSessionRef(sessionRef);
           availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
@@ -908,7 +923,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       console.log("[acp] creating new session in", this.cwd);
       const result = await this.connection.newSession({
         cwd: this.cwd,
-        mcpServers: [],
+        mcpServers: buildAcpBrowserMcpServers(this.projectLocation),
       });
       this.sessionId = result.sessionId;
       this.stableSessionRef = createKnownSessionRef(result.sessionId);
@@ -1483,7 +1498,10 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    * These are the real-time updates the agent sends while processing
    * a turn: text chunks, tool calls, plan updates, etc.
    */
-  private handleSessionUpdate(params: SessionNotification): void {
+  private handleSessionUpdate(rawParams: SessionNotification): void {
+    maybeCaptureAcpUpdate(rawParams, this.threadId, this.sessionId, this.cwd);
+
+    const params = this.applySessionUpdateTransform(rawParams);
     const update: SessionUpdate = params.update;
 
     if (update.sessionUpdate === "available_commands_update") {
@@ -1611,6 +1629,19 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         return { status: "idle", attention: "none" };
     }
   }
+
+  private applySessionUpdateTransform(notification: SessionNotification): SessionNotification {
+    if (!this.sessionUpdateTransform) return notification;
+    try {
+      return this.sessionUpdateTransform(notification);
+    } catch (error) {
+      console.error(
+        "[acp] sessionUpdateTransform threw — using original notification:",
+        error instanceof Error ? error.message : String(error),
+      );
+      return notification;
+    }
+  }
 }
 
 // ── Factory ──────────────────────────────────────────────────────
@@ -1660,5 +1691,51 @@ export function createAcpStructuredSession(
     ...(input.loadSessionErrorRewriter
       ? { loadSessionErrorRewriter: input.loadSessionErrorRewriter }
       : {}),
+    ...(input.acpSessionUpdateTransform
+      ? { sessionUpdateTransform: input.acpSessionUpdateTransform }
+      : {}),
   });
+}
+
+/**
+ * Diagnostic capture of inbound ACP `session/update` notifications.
+ *
+ * Off by default. Set `LIGHTCODE_ACP_LOG=toolcalls` to capture just
+ * `tool_call` / `tool_call_update` updates (what we use to design
+ * per-adapter wire-format transforms); set `LIGHTCODE_ACP_LOG=full` to
+ * capture every update. Each line is a self-contained JSON object written
+ * to the channel's `logs/acp-sessions.jsonl`.
+ */
+const ACP_LOG_MODE = (() => {
+  const mode = process.env.LIGHTCODE_ACP_LOG;
+  return mode === "toolcalls" || mode === "full" ? mode : null;
+})();
+let acpLogDirEnsured = false;
+
+function maybeCaptureAcpUpdate(
+  params: SessionNotification,
+  threadId: string,
+  sessionId: string | undefined,
+  cwd: string,
+): void {
+  if (ACP_LOG_MODE === null) return;
+  const kind = params.update.sessionUpdate;
+  if (ACP_LOG_MODE === "toolcalls" && kind !== "tool_call" && kind !== "tool_call_update") return;
+  try {
+    const dir = resolveLightcodePaths(process.env.LIGHTCODE_DATA_DIR).logsDir;
+    if (!acpLogDirEnsured) {
+      mkdirSync(dir, { recursive: true });
+      acpLogDirEnsured = true;
+    }
+    const line = `${JSON.stringify({
+      ts: new Date().toISOString(),
+      threadId,
+      sessionId,
+      cwd,
+      notification: params,
+    })}\n`;
+    appendFileSync(join(dir, "acp-sessions.jsonl"), line, "utf8");
+  } catch {
+    // capture is best-effort and must never break a session
+  }
 }

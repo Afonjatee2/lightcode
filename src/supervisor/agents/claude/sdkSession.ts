@@ -25,6 +25,7 @@ import type {
   ThreadStatus,
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
+import { buildClaudeBrowserMcpServers } from "./mcpBrowser";
 import {
   createKnownSessionRef,
   getWslCommand,
@@ -63,8 +64,14 @@ import {
 } from "./sdkCanonicalMapping";
 import { mapClaudeSlashCommands } from "./probe";
 
+const CLAUDE_EXIT_PLAN_MODE_TOOL_NAMES: ReadonlySet<string> = new Set([
+  "ExitPlanMode",
+  "exit_plan_mode",
+]);
+
 type PendingPermission = {
   kind: "permission";
+  toolName: string;
   toolInput: Record<string, unknown>;
   suggestions?: PermissionUpdate[];
   resolve: (result: PermissionResult) => void;
@@ -134,6 +141,17 @@ function permissionModeForConfig(config: ThreadConfig): PermissionMode {
 
 function basePermissionModeForConfig(config: ThreadConfig): PermissionMode {
   return (config.approvalPolicy ?? CLAUDE_DEFAULT_APPROVAL_POLICY) as PermissionMode;
+}
+
+function buildDenyMessage(
+  decisionKind: PermissionDecision["kind"],
+  pending: PendingRequest,
+): string {
+  if (decisionKind === "cancel") return "User cancelled tool execution.";
+  if (pending.kind === "permission" && CLAUDE_EXIT_PLAN_MODE_TOOL_NAMES.has(pending.toolName)) {
+    return "User wants to keep planning. Stop here and wait for the user's next message; do not call ExitPlanMode again until the user explicitly approves the plan.";
+  }
+  return "User declined tool execution.";
 }
 
 // SDK-provided env is layered on top of the WSL login-shell env we primed,
@@ -625,10 +643,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
 
     pending.resolve({
       behavior: "deny",
-      message:
-        decision.kind === "cancel"
-          ? "User cancelled tool execution."
-          : "User declined tool execution.",
+      message: buildDenyMessage(decision.kind, pending),
     });
     this.emitRuntimeEvents([
       {
@@ -754,6 +769,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           void _exhaustive;
         }
       }
+      const browserMcpServers = buildClaudeBrowserMcpServers(this.input.projectLocation);
       const options: ClaudeQueryOptions = {
         cwd: projectCwd(this.input.projectLocation),
         model,
@@ -773,6 +789,9 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           ? { effort: this.currentConfig.effort as NonNullable<ClaudeQueryOptions["effort"]> }
           : {}),
         ...(claudeExecutablePath ? { pathToClaudeCodeExecutable: claudeExecutablePath } : {}),
+        ...(browserMcpServers
+          ? ({ mcpServers: browserMcpServers } as Partial<ClaudeQueryOptions>)
+          : {}),
         ...(this.input.projectLocation.kind === "wsl"
           ? {
               spawnClaudeCodeProcess: (spawnOptions) =>
@@ -854,6 +873,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
     return await new Promise<PermissionResult>((resolve) => {
       this.pendingRequests.set(requestId, {
         kind: "permission",
+        toolName,
         toolInput,
         ...(callbackOptions.suggestions ? { suggestions: [...callbackOptions.suggestions] } : {}),
         resolve,

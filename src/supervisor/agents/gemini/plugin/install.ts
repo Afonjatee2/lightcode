@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toWslUncPath } from "@/shared/wsl";
+import { buildGeminiBrowserMcpServers } from "../mcpBrowser";
 import type { AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
@@ -45,6 +46,17 @@ interface GeminiSettings {
     notifications: false;
   };
   hooks: Record<string, GeminiHookEntry[]>;
+  mcpServers?: Record<
+    string,
+    {
+      command?: string;
+      args?: string[];
+      env?: Record<string, string>;
+      httpUrl?: string;
+      headers?: Record<string, string>;
+      timeout?: number;
+    }
+  >;
 }
 
 /**
@@ -172,7 +184,11 @@ export function installGeminiPlugin(
 
   const settingsPath = join(pluginDir, "settings.json");
   const nativeCommands = buildNativeHookCommandHeads(wrapperPath);
-  const settings = renderGeminiSettings(nativeCommands.command);
+  const browserMcpServers = buildGeminiBrowserMcpServers({ kind: "windows" });
+  const settings = renderGeminiSettings({
+    headExpression: nativeCommands.command,
+    ...(browserMcpServers ? { mcpServers: browserMcpServers } : {}),
+  });
   writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 
   console.log(
@@ -205,7 +221,11 @@ function installGeminiPluginWsl(
 
   try {
     mkdirSync(dirname(uncSettingsPath), { recursive: true });
-    const settings = renderGeminiSettings(headExpression);
+    const browserMcpServers = buildGeminiBrowserMcpServers({ kind: "wsl", distro });
+    const settings = renderGeminiSettings({
+      headExpression,
+      ...(browserMcpServers ? { mcpServers: browserMcpServers } : {}),
+    });
     writeFileSync(uncSettingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
   } catch (error) {
     return {
@@ -291,7 +311,12 @@ function hasGeminiHooks(hooks: Record<string, unknown> | undefined): boolean {
   return true;
 }
 
-export function renderGeminiSettings(headExpression: string): GeminiSettings {
+export interface RenderGeminiSettingsOptions {
+  headExpression: string;
+  mcpServers?: GeminiSettings["mcpServers"];
+}
+
+export function renderGeminiSettings(opts: RenderGeminiSettingsOptions): GeminiSettings {
   const hooks: Record<string, GeminiHookEntry[]> = {};
   for (const spec of GEMINI_HOOK_SPECS) {
     const entry: GeminiHookEntry = {
@@ -299,7 +324,7 @@ export function renderGeminiSettings(headExpression: string): GeminiSettings {
         {
           name: `lightcode-status-${spec.event}`,
           type: "command",
-          command: `${headExpression} ${spec.event}`,
+          command: `${opts.headExpression} ${spec.event}`,
           timeout: 5000,
         },
       ],
@@ -307,5 +332,9 @@ export function renderGeminiSettings(headExpression: string): GeminiSettings {
     if (spec.matcher !== undefined) entry.matcher = spec.matcher;
     hooks[spec.event] = [entry];
   }
-  return { hooksConfig: { notifications: false }, hooks };
+  const settings: GeminiSettings = { hooksConfig: { notifications: false }, hooks };
+  if (opts.mcpServers && Object.keys(opts.mcpServers).length > 0) {
+    settings.mcpServers = opts.mcpServers;
+  }
+  return settings;
 }

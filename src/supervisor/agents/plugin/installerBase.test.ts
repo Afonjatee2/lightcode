@@ -15,6 +15,7 @@ import {
   copyPluginAssetsIfStale,
   createPluginSourceResolver,
   ctxCacheKey,
+  buildNativeHookCmdShellCommand,
   buildNativeHookCommandHead,
   buildNativeHookCommandHeads,
   isPluginAssetsFresh,
@@ -380,6 +381,23 @@ describe("buildNativeHookCommandHead", () => {
         ? 'pwsh.exe -NoProfile -ExecutionPolicy Bypass -File "C:\\Users\\a\\"b\\lightcode-hook.ps1"'
         : "'C:\\Users\\a\"b\\lightcode-hook.cmd'";
     expect(commandHead).toBe(expected);
+  });
+});
+
+describe("buildNativeHookCmdShellCommand", () => {
+  const isWindows = process.platform === "win32";
+  it.skipIf(!isWindows)(
+    "returns the cmd.exe-routed wrapper invocation on Windows (pwsh-free)",
+    () => {
+      const command = buildNativeHookCmdShellCommand("C:\\Users\\u\\lightcode-hook.cmd");
+      expect(command).toBe('cmd.exe /d /s /c call "C:\\Users\\u\\lightcode-hook.cmd"');
+      expect(command).not.toMatch(/pwsh|powershell/i);
+    },
+  );
+
+  it.skipIf(isWindows)("returns a single-quoted wrapper path on POSIX", () => {
+    const command = buildNativeHookCmdShellCommand("/home/u/lightcode-hook.sh");
+    expect(command).toBe("'/home/u/lightcode-hook.sh'");
   });
 });
 

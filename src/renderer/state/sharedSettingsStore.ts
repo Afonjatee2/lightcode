@@ -54,6 +54,10 @@ interface SharedSettingsState extends SharedSettings {
   setSearchUseIgnoreFiles: (value: boolean) => void;
   setSearchExclude: (value: Record<string, boolean>) => void;
   setDisableCliHookPlugin: (value: boolean) => void;
+  setBrowserSetting: <K extends keyof SharedSettings["browser"]>(
+    key: K,
+    value: SharedSettings["browser"][K],
+  ) => void;
   setProviderConfig: (agentKind: string, config: ProviderDraftConfig) => void;
   setLastPresentationMode: (agentKind: string, mode: ThreadPresentationMode) => void;
   setNotificationsEnabled: (value: boolean) => void;
@@ -298,6 +302,12 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ disableCliHookPlugin });
     persistSettings(selectSharedSettings(get()));
   },
+  setBrowserSetting: (key, value) => {
+    const current = get().browser;
+    if (current[key] === value) return;
+    set({ browser: { ...current, [key]: value } });
+    persistSettings(selectSharedSettings(get()));
+  },
   setProviderConfig: (agentKind, config) => {
     if (!config.model.trim()) {
       return;
@@ -474,6 +484,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     notifyL2Cli: state.notifyL2Cli,
     favoriteModels: state.favoriteModels,
     recentModels: state.recentModels,
+    browser: state.browser,
   };
 }
 

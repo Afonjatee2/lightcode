@@ -6,6 +6,7 @@ import {
   Bot,
   Boxes,
   FlaskConical,
+  Globe,
   Info,
   PanelLeft,
   PanelLeftClose,
@@ -158,6 +159,13 @@ export function SettingsSidebar(props: {
               })}
             <SidebarButton
               iconOnly
+              icon={<Globe className="size-4" />}
+              label="Browser"
+              isActive={activeSection === "browser"}
+              onPress={() => onSectionChange("browser")}
+            />
+            <SidebarButton
+              iconOnly
               icon={<Archive className="size-4" />}
               label="Archived Threads"
               isActive={activeSection === "archived"}
@@ -292,6 +300,12 @@ export function SettingsSidebar(props: {
                 })}
               </div>
             )}
+            <SidebarButton
+              icon={<Globe className="size-4" />}
+              label="Browser"
+              isActive={activeSection === "browser"}
+              onPress={() => onSectionChange("browser")}
+            />
             <SidebarButton
               icon={<Archive className="size-4" />}
               label="Archived Threads"

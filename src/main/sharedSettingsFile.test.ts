@@ -82,6 +82,7 @@ describe("sharedSettingsFile", () => {
       favoriteModels: [],
       recentModels: [],
       agentHookSupport: {},
+      browser: { mcpEnabled: true, allowEval: false, allowDataAccess: false },
     });
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
@@ -140,6 +141,7 @@ describe("sharedSettingsFile", () => {
       favoriteModels: [],
       recentModels: [],
       agentHookSupport: {},
+      browser: { mcpEnabled: true, allowEval: false, allowDataAccess: false },
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
   });

@@ -1,10 +1,11 @@
 import { memo } from "react";
+import { Surface } from "@heroui/react";
 import { ListChecks } from "lucide-react";
 import type { ToolCallPayload } from "@/shared/contracts";
-import { PixelLoader } from "@/renderer/components/common";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { ItemMarkdown } from "./ItemMarkdown";
 import { PathDisplay } from "@/renderer/components/common/PathDisplay";
+import { chatMessageSurfaceClass } from "./chatMessageSurface";
 
 interface PlanProposalProps {
   item: RuntimeChatItem;
@@ -29,19 +30,22 @@ export const PlanProposal = memo(function PlanProposal({ item }: PlanProposalPro
   if (!plan && !isStreaming && !planFilePath) return null;
 
   return (
-    <div className="my-1 flex flex-col gap-1">
-      <div className="inline-flex items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
-        <ListChecks className="size-3 shrink-0" />
-        <span>Proposed plan</span>
-        {isStreaming ? <PixelLoader size="xxs" className="text-[color:var(--muted)]" /> : null}
-      </div>
-      {plan ? <ItemMarkdown text={plan} /> : null}
-      {planFilePath ? (
-        <div className="text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
-          <PathDisplay path={planFilePath} />
+    <Surface variant="transparent" className={chatMessageSurfaceClass}>
+      <div className="flex min-w-0 flex-col gap-1">
+        <div className="inline-flex items-center gap-1.5 text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
+          <ListChecks
+            className={`size-3 shrink-0 ${isStreaming ? "lightcode-plan-proposal-icon" : ""}`}
+          />
+          <span className={isStreaming ? "lightcode-thinking-text" : ""}>Proposed plan</span>
         </div>
-      ) : null}
-    </div>
+        {plan ? <ItemMarkdown text={plan} /> : null}
+        {planFilePath ? (
+          <div className="text-[length:var(--lc-chat-font-size-meta)] text-foreground-muted">
+            <PathDisplay path={planFilePath} />
+          </div>
+        ) : null}
+      </div>
+    </Surface>
   );
 });
 

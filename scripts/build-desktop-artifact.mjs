@@ -303,6 +303,25 @@ async function main() {
 
     pruneStageBinaries(stageRoot);
 
+    // 6b. Rebuild only better-sqlite3 against Electron's V8 ABI. We skip
+    //     electron-builder's bundled @electron/rebuild step (npmRebuild: false
+    //     in the staged YAML) because it would also try to compile node-pty
+    //     from source, which fails — node-pty 1.1.0's published npm tarball
+    //     omits the winpty submodule (GetCommitHash.bat, shared/). node-pty
+    //     ships N-API prebuilt binaries which pnpm install already restored
+    //     into build/Release/, so it stays ABI-compatible with Electron.
+    const electronRebuildBin = join(
+      stageRoot,
+      "node_modules",
+      ".bin",
+      process.platform === "win32" ? "electron-rebuild.cmd" : "electron-rebuild",
+    );
+    const electronRebuildArgs = ["--only", "better-sqlite3"];
+    if (arch) {
+      electronRebuildArgs.push("--arch", arch);
+    }
+    run(electronRebuildBin, electronRebuildArgs, { cwd: stageRoot });
+
     // 7. Run electron-builder against the stage.
     const electronBuilderBin = join(
       stageRoot,
@@ -440,7 +459,7 @@ mac:
   entitlementsInherit: build/entitlements.mac.plist
   notarize: true
 
-npmRebuild: true
+npmRebuild: false
 `;
 }
 

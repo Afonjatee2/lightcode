@@ -830,7 +830,11 @@ describe("ThreadView", () => {
     );
   });
 
-  it("shows the pinned todo dock for GUI plan items without duplicating the latest plan row in chat", () => {
+  it("shows the pinned todo dock without duplicating the latest plan row or hiding the live timer", async () => {
+    const now = Date.now();
+    const activeTurnStartedAt = new Date(now - 70_000).toISOString();
+    const createdAt = new Date(now - 80_000).toISOString();
+
     useAppStore.setState({
       runtimeItemIdsByThread: {
         "thread-gui-plan": ["plan-old", "plan-1"],
@@ -882,8 +886,9 @@ describe("ThreadView", () => {
           providerSessionId: "session-gui-plan",
           discoveredAt: new Date().toISOString(),
         },
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdAt,
+        updatedAt: createdAt,
+        activeTurnStartedAt,
       },
       agentStatus: {
         kind: "copilot",
@@ -918,6 +923,7 @@ describe("ThreadView", () => {
     expect(screen.getAllByText("Build ACP todo dock")).toHaveLength(1);
     expect(screen.queryByText("Old inline todo")).not.toBeInTheDocument();
     expect(screen.queryByText("No messages yet")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/^Working for 1m/)).toBeInTheDocument());
   });
 
   it("shows the active GUI goal in the composer dock instead of the chat transcript", () => {

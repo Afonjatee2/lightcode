@@ -1,5 +1,5 @@
 import { startTransition } from "react";
-import { FolderPlus, Monitor, Search } from "lucide-react";
+import { FolderPlus, Globe, Monitor, Search } from "lucide-react";
 import { Button, Dropdown, Label, Tooltip } from "@heroui/react";
 import { TuxIcon } from "@/renderer/components/common";
 import { parseWslUncPath } from "@/shared/wsl";
@@ -158,6 +158,24 @@ export function SidebarHeaderControls(props: { wslAvailable: boolean }) {
           </Dropdown.Menu>
         </Dropdown.Popover>
       </Dropdown>
+      <Tooltip delay={150}>
+        <Tooltip.Trigger>
+          <Button
+            isIconOnly
+            aria-label="Open browser"
+            size="sm"
+            variant="ghost"
+            className="size-6 min-w-0 text-muted hover:text-foreground"
+            onPress={() => {
+              usePanelStore.getState().setBrowserPanelOpen(true);
+              usePanelStore.getState().setRightPanelTab("browser");
+            }}
+          >
+            <Globe className="size-3.5" />
+          </Button>
+        </Tooltip.Trigger>
+        <Tooltip.Content placement="bottom">Browser</Tooltip.Content>
+      </Tooltip>
     </div>
   );
 }

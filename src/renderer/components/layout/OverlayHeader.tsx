@@ -1,6 +1,9 @@
 import type { ReactNode } from "react";
 import { isMac } from "@/renderer/bridge";
-import { macosTrafficLightGutterClass } from "@/renderer/components/layout/sidebarChrome";
+import {
+  macosTrafficLightGutterClass,
+  overlayHeaderStyle,
+} from "@/renderer/components/layout/sidebarChrome";
 
 /**
  * Shared header bar for overlay-style layouts (main app, git review, settings).
@@ -17,7 +20,7 @@ export function OverlayHeader(props: {
   return (
     <div
       className="lightcode-overlay-header flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-2"
-      style={{ height: "env(titlebar-area-height, 32px)" }}
+      style={overlayHeaderStyle()}
     >
       {/* Space for macOS traffic lights */}
       {isMac() && <div className={macosTrafficLightGutterClass} />}

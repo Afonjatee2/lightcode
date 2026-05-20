@@ -14,17 +14,22 @@ import {
   parseCodexVersionLine,
   probeCodexCliSemver,
 } from "./plugin/install";
+import { buildCodexBrowserMcpArgs } from "./mcpBrowser";
 
 const DEFAULT_WSL_EXEC_PATH = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const CODEX_GOALS_FEATURE_FLAG = "goals";
 const codexGoalsSupportCache = new Map<string, boolean>();
 
-function buildCodexArgs(
-  config: ThreadConfig,
-  prompt: string,
-  enableGoals: boolean,
-  launchOptions?: AgentLaunchOptions,
-): string[] {
+interface BuildCodexArgsOptions {
+  config: ThreadConfig;
+  prompt: string;
+  enableGoals: boolean;
+  launchOptions?: AgentLaunchOptions;
+  location?: ProjectLocation;
+}
+
+function buildCodexArgs(opts: BuildCodexArgsOptions): string[] {
+  const { config, prompt, enableGoals, launchOptions, location } = opts;
   const args: string[] = [];
 
   if (enableGoals) {
@@ -41,6 +46,10 @@ function buildCodexArgs(
     "-c",
     "suppress_unstable_features_warning=true",
   );
+
+  if (location) {
+    args.push(...buildCodexBrowserMcpArgs(location));
+  }
 
   if (!launchOptions?.suppressResumeConfigOverrides) {
     if (config.model) {
@@ -75,10 +84,17 @@ export function buildCodexArgvFor(
   launchOptions?: AgentLaunchOptions,
 ): AgentArgvSpec {
   const enableGoals = isCodexGoalsSupported(location);
+  const baseArgsOptions: BuildCodexArgsOptions = {
+    config,
+    prompt: "",
+    enableGoals,
+    ...(launchOptions ? { launchOptions } : {}),
+    location,
+  };
   // When the structured session owns thread lifecycle, the TUI resumes the
   // server-created thread. Config is controlled by the server, not the CLI.
   if (launchOptions?.suppressResumeConfigOverrides) {
-    const baseArgs = buildCodexArgs(config, "", enableGoals, launchOptions);
+    const baseArgs = buildCodexArgs(baseArgsOptions);
     const args = launchOptions.resumeThreadId
       ? [
           "resume",
@@ -90,11 +106,11 @@ export function buildCodexArgvFor(
     return { binary: "codex", args };
   }
 
-  const codexArgs = buildCodexArgs(config, prompt, enableGoals, launchOptions);
+  const codexArgs = buildCodexArgs({ ...baseArgsOptions, prompt });
   const args = sessionRef
     ? [
         "resume",
-        ...buildCodexArgs(config, "", enableGoals, launchOptions),
+        ...buildCodexArgs(baseArgsOptions),
         sessionRef.providerSessionId,
         ...(prompt.trim().length > 0 ? [prompt] : []),
       ]
@@ -108,8 +124,10 @@ export function buildCodexAppServerCommand(
   wslExecPath?: string,
   wslNodePath?: string,
 ): CommandSpec {
+  const browserMcpArgs = buildCodexBrowserMcpArgs(location);
   const args = [
     ...(isCodexGoalsSupported(location, wslExecPath) ? ["--enable", CODEX_GOALS_FEATURE_FLAG] : []),
+    ...browserMcpArgs,
     "app-server",
   ];
   if (location.kind === "wsl") {

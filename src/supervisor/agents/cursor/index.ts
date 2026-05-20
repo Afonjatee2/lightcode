@@ -12,6 +12,7 @@ import {
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
+import { transformCursorAcpSessionUpdate } from "./acpTransform";
 import { buildCursorArgs } from "./argv";
 import {
   cursorDefaultCapabilities,
@@ -123,6 +124,7 @@ export function createCursorAdapter(): AgentAdapter {
       return createAcpStructuredSession(command, {
         ...input,
         loadSessionErrorRewriter: rewriteCursorLoadSessionError,
+        acpSessionUpdateTransform: transformCursorAcpSessionUpdate,
       });
     },
     async buildAcpAuthCommand(ctx?: AgentEnvContext) {

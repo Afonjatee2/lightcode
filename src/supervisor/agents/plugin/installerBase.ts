@@ -105,12 +105,9 @@ export function isPluginAssetsFresh(
   files: readonly string[] = PLUGIN_ASSET_FILES,
 ): boolean {
   for (const file of files) {
-    const source = join(sourceDir, file);
-    const target = join(targetDir, file);
-    if (!existsSync(target)) return false;
     try {
-      const sourceStat = statSync(source);
-      const targetStat = statSync(target);
+      const sourceStat = statSync(join(sourceDir, file));
+      const targetStat = statSync(join(targetDir, file));
       if (sourceStat.size !== targetStat.size) return false;
       if (sourceStat.mtimeMs > targetStat.mtimeMs) return false;
     } catch {
@@ -206,6 +203,27 @@ export function buildNativeHookCommandHead(
   resolvePath: (command: string) => string | undefined = resolveExecutablePath,
 ): string {
   return buildNativeHookCommandHeads(wrapperPath, resolvePath).command;
+}
+
+/**
+ * Native hook command head that avoids referencing `pwsh.exe` / `powershell.exe`
+ * in the command string on Windows.
+ *
+ * Cursor's hook runner reacts to a `pwsh.exe` token in the configured command
+ * by wrapping the host-provided JSON input in a PowerShell here-string
+ * pipeline (`@'<json>'@ | & <command>`) — but executes that wrapped script
+ * through the shell it found on PATH (sh/bash via Git for Windows on most
+ * developer machines), which can't parse PowerShell syntax and aborts with
+ * `eval: line 3: syntax error near unexpected token '&'`. Routing through the
+ * staged `lightcode-hook.cmd` wrapper via `cmd.exe /d /s /c call …` keeps the
+ * command pwsh-free and works under both sh and cmd shells. POSIX hosts get
+ * the same shape as `buildNativeHookCommandHead`.
+ */
+export function buildNativeHookCmdShellCommand(wrapperPath: string): string {
+  if (process.platform === "win32") {
+    return `cmd.exe /d /s /c call ${quoteHookCommandArg(wrapperPath, "native")}`;
+  }
+  return quoteHookCommandArg(wrapperPath, "native");
 }
 
 export interface WslPluginBaseDirs {
@@ -680,16 +698,14 @@ export function resolveForwardRuntimeSourcePath(): string {
 export function copyForwardRuntimeFile(targetDir: string): void {
   const source = resolveForwardRuntimeSourcePath();
   const target = join(targetDir, FORWARD_RUNTIME_FILE);
-  if (existsSync(target)) {
-    try {
-      const sourceStat = statSync(source);
-      const targetStat = statSync(target);
-      if (sourceStat.size === targetStat.size && sourceStat.mtimeMs <= targetStat.mtimeMs) {
-        return;
-      }
-    } catch {
-      // fall through to copy
+  try {
+    const sourceStat = statSync(source);
+    const targetStat = statSync(target);
+    if (sourceStat.size === targetStat.size && sourceStat.mtimeMs <= targetStat.mtimeMs) {
+      return;
     }
+  } catch {
+    // target missing or unreadable — fall through to copy
   }
   copyPluginAssetFile(source, target);
 }

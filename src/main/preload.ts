@@ -3,6 +3,7 @@ import { type LightcodeChannel, normalizeChannel } from "@/shared/channel";
 import {
   createInvokeBridge,
   IPC_EVENT_CHANNELS,
+  type BrowserEvent,
   type LightcodeBridge,
   type SupervisorEvent,
   type UpdateStatus,
@@ -102,6 +103,15 @@ const bridge: LightcodeBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.updateStatus, handler);
     return () => {
       ipcRenderer.removeListener(IPC_EVENT_CHANNELS.updateStatus, handler);
+    };
+  },
+  onBrowserEvent(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, payload: BrowserEvent) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_EVENT_CHANNELS.browserEvent, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_EVENT_CHANNELS.browserEvent, handler);
     };
   },
 };

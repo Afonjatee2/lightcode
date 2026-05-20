@@ -27,6 +27,7 @@ describe("ipcProcedureMap", () => {
   it("covers every main-local procedure with a local handler", () => {
     const handlers = createLocalIpcHandlers({
       getMainWindow: () => null as never,
+      getBrowserPanelManager: () => null,
       requireLightcodePaths: () =>
         ({
           baseDir: "C:\\tmp",

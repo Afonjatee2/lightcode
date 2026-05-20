@@ -17,7 +17,11 @@ import {
   selectIsOverlay,
   useSidebarOverlayStore,
 } from "@/renderer/state/sidebarOverlayStore";
-import { SIDEBAR_MIN_WIDTH, useResizablePanels } from "./parts/useResizablePanels";
+import {
+  CONTENT_MIN_WIDTH,
+  SIDEBAR_MIN_WIDTH,
+  useResizablePanels,
+} from "./parts/useResizablePanels";
 import { SIDEBAR_COLLAPSED_WIDTH, useSidebarOverlayEffects } from "./parts/useSidebarOverlay";
 import { AsideSlot } from "./parts/AsideSlot";
 import { usePanelVisibility } from "./parts/usePanelVisibility";
@@ -353,21 +357,64 @@ export function AppShell(props: {
     handlePanelResizeStart,
     handlePanelBottomResizeStart,
     handleGitPanelResizeStart,
+    cancelActiveResize,
+    updatePanelWidth,
+    updateGitPanelWidth,
   } = useResizablePanels({
     sidebarRef,
     panelRef,
     panelInnerRef,
     gitPanelRef,
     gitPanelInnerRef,
+    mainRef,
     overlayRef: resizeOverlayRef,
   });
+
+  // When content shrinks past the threshold while the user is mid-drag, we
+  // both hide panels and end the drag — otherwise the panel disappears but
+  // the mouse is still captured and keeps resizing an invisible target.
+  // We also shrink the panel widths so reopening them does not immediately
+  // re-trigger the auto-hide (the prior widths are what caused it).
+  const onRequestClosePanels = props.onRequestClosePanels;
+  const handleAutoHidePanels = onRequestClosePanels
+    ? () => {
+        cancelActiveResize();
+
+        const main = mainRef.current;
+        if (main) {
+          const mainW = main.getBoundingClientRect().width;
+          const panelW = panelRef.current?.getBoundingClientRect().width ?? 0;
+          const gitPanelW = gitPanelRef.current?.getBoundingClientRect().width ?? 0;
+          // Leave a small headroom past the hide threshold so resize jitter
+          // doesn't immediately re-trigger.
+          const targetMain = CONTENT_MIN_WIDTH + 24;
+          const totalAvailable = mainW + panelW + gitPanelW;
+          const allowanceForPanels = totalAvailable - targetMain;
+
+          if (panelW > 0 && gitPanelW > 0) {
+            const totalPanels = panelW + gitPanelW;
+            if (allowanceForPanels < totalPanels) {
+              const ratio = Math.max(0, allowanceForPanels) / totalPanels;
+              updatePanelWidth(panelW * ratio);
+              updateGitPanelWidth(gitPanelW * ratio);
+            }
+          } else if (panelW > 0) {
+            if (allowanceForPanels < panelW) updatePanelWidth(allowanceForPanels);
+          } else if (gitPanelW > 0) {
+            if (allowanceForPanels < gitPanelW) updateGitPanelWidth(allowanceForPanels);
+          }
+        }
+
+        onRequestClosePanels();
+      }
+    : undefined;
 
   useSidebarOverlayEffects({
     sidebarWidth,
     shellRef,
     mainRef,
     disabled: forceSidebarExpanded,
-    ...(props.onRequestClosePanels ? { onRequestClosePanels: props.onRequestClosePanels } : {}),
+    ...(handleAutoHidePanels ? { onRequestClosePanels: handleAutoHidePanels } : {}),
   });
 
   const { rightPanelOpen, gitPanelOpen } = usePanelVisibility();

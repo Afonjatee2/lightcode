@@ -60,16 +60,11 @@ function SidebarHeaderRow(props: {
   const showHeaderActions = !isCollapsed || closingOverlay;
 
   useLayoutEffect(() => {
-    // Only macOS reserves space for left-side window controls (traffic lights),
-    // so the wordmark only needs to collapse there. Other platforms have full width.
-    if (!isMac()) return;
-
     const el = ref.current;
     const fullContentEl = fullContentRef.current;
     if (!el || !fullContentEl) return;
 
     const update = () => {
-      // Switch to icon-only mode if the available width is less than the required width
       setHideWordmark(el.clientWidth < fullContentEl.scrollWidth);
     };
 

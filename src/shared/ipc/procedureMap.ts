@@ -1,4 +1,5 @@
 import { appProcedures } from "./procedures/app";
+import { browserProcedures } from "./procedures/browser";
 import { dbProcedures } from "./procedures/db";
 import { githubProcedures } from "./procedures/github";
 import { gitProcedures } from "./procedures/git";
@@ -18,6 +19,7 @@ export const groupedIpcProcedures = {
   db: dbProcedures,
   updates: updatesProcedures,
   lsp: lspProcedures,
+  browser: browserProcedures,
 } as const;
 
 export const ipcProcedureMap = {
@@ -30,6 +32,7 @@ export const ipcProcedureMap = {
   ...dbProcedures,
   ...updatesProcedures,
   ...lspProcedures,
+  ...browserProcedures,
 } as const;
 
 export type IpcProcedureMap = typeof ipcProcedureMap;
@@ -73,6 +76,25 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "checkForUpdate",
   "startUpdateDownload",
   "installUpdate",
+  "browserGetState",
+  "browserCreateTab",
+  "browserCloseTab",
+  "browserActivateTab",
+  "browserMoveTab",
+  "browserNavigate",
+  "browserBack",
+  "browserForward",
+  "browserReload",
+  "browserHardReload",
+  "browserToggleDevTools",
+  "browserClearHistory",
+  "browserClearCookies",
+  "browserClearCache",
+  "browserCopyScreenshot",
+  "browserCapturePreview",
+  "browserAttachWebContents",
+  "browserStartPicker",
+  "browserCancelPicker",
 ] as const satisfies readonly IpcProcedureName[];
 
 export type MainLocalProcedureName = (typeof MAIN_LOCAL_PROCEDURE_NAMES)[number];

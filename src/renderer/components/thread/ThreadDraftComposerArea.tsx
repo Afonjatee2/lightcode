@@ -16,6 +16,7 @@ import {
   type MentionInputHandle,
   useAttachments,
 } from "@/renderer/components/composer";
+import { useBrowserAttachInbox } from "@/renderer/state/browserAttachInbox";
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import {
   BranchSelector,
@@ -49,6 +50,7 @@ export type DraftStartInput = {
 
 export function ThreadDraftComposerArea(props: {
   project: Project;
+  paneId?: string;
   selectedAgent: AgentStatus;
   controls: ComposerControl[];
   config: ThreadConfig;
@@ -73,6 +75,26 @@ export function ThreadDraftComposerArea(props: {
   const [agentUpdating, setAgentUpdating] = useState(false);
   const mentionRef = useRef<MentionInputHandle>(null);
   const attachments = useAttachments();
+  const inboxKey = props.paneId;
+  const pendingPickedAttachments = useBrowserAttachInbox((s) =>
+    inboxKey ? s.itemsByThread[inboxKey] : undefined,
+  );
+  const addPickedRef = useRef(attachments.addPicked);
+  addPickedRef.current = attachments.addPicked;
+  useEffect(() => {
+    if (!inboxKey) return;
+    if (!pendingPickedAttachments || pendingPickedAttachments.length === 0) return;
+    const drained = useBrowserAttachInbox.getState().drain(inboxKey);
+    for (const item of drained) {
+      addPickedRef.current({
+        path: item.attachmentPath,
+        name: item.attachmentName,
+        mimeType: item.mimeType,
+        selector: item.selector,
+        sourceUrl: item.sourceUrl,
+      });
+    }
+  }, [pendingPickedAttachments, inboxKey]);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [branchSelection, setBranchSelection] = useState<BranchSelection | null>(null);
   const [slashQuery, setSlashQuery] = useState<string | null>(null);

@@ -57,6 +57,7 @@ import type {
 } from "./types";
 
 export type {
+  AcpSessionUpdateTransform,
   AgentAcpAuth,
   AgentAdapter,
   AgentArgvSpec,

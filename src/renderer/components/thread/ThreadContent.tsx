@@ -156,7 +156,6 @@ export function GuiThreadContent(
   const showTodoInRightRail = showTodoDock && todoDockPlacement === "right";
   const showThreadSideRail = runtimeDebugOpen || showTodoInRightRail;
   const hiddenRuntimeItemId = showTodoDock ? todoDockState?.sourceItemId : undefined;
-  const hiddenRuntimeItemIsLive = showTodoDock && todoDockState.itemState !== "completed";
   const dockLayoutToken =
     [
       showGoalDock ? `goal:${goalDockState.sourceItemId}` : null,
@@ -179,7 +178,6 @@ export function GuiThreadContent(
               thread={thread}
               hasSupplementaryContent={showTodoDock || showGoalDock}
               hiddenRuntimeItemId={hiddenRuntimeItemId}
-              hiddenRuntimeItemIsLive={hiddenRuntimeItemIsLive}
               layoutChangeToken={dockLayoutToken}
             />
           </div>

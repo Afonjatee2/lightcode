@@ -106,11 +106,37 @@ describe("installCursorPlugin", () => {
     expect(doc.hooks.sessionStart?.[0]?.command).toMatch(
       /agent-plugins[\\/]+cursor[\\/]+lightcode-hook\.(?:sh|cmd|ps1)['"]? sessionStart$/,
     );
-    expect(doc.hooks.sessionStart?.[0]?.command).toMatch(
-      process.platform === "win32"
-        ? /^(?:pwsh(?:\.exe)?|powershell(?:\.exe)?|cmd\.exe \/d \/s \/c call ")/
-        : /^(?!cmd\.exe)/,
-    );
+  });
+
+  // Cursor's hook runner mangles `pwsh.exe`-containing commands into a
+  // PowerShell here-string pipeline that bash/sh can't parse. The Cursor
+  // adapter must route through the `cmd.exe`-invoked `.cmd` wrapper
+  // instead — see installCursorPlugin in plugin/install.ts.
+  const isWindows = process.platform === "win32";
+  it.skipIf(!isWindows)("writes a pwsh-free `cmd.exe /d /s /c call` command on Windows", () => {
+    const baseDir = makeTempDir("install-windows-shape");
+    const globalCursorDirOverride = makeTempDir("cursor-home-windows-shape");
+    const result = installCursorPlugin({ envKind: "posix", baseDir }, { globalCursorDirOverride });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const doc = JSON.parse(readFileSync(result.paths.globalHooksPath, "utf8")) as {
+      hooks: Record<string, Array<{ command: string }>>;
+    };
+    const command = doc.hooks.sessionStart?.[0]?.command ?? "";
+    expect(command).toMatch(/^cmd\.exe \/d \/s \/c call "/);
+    expect(command).not.toMatch(/pwsh|powershell/i);
+  });
+
+  it.skipIf(isWindows)("writes a bare wrapper path on POSIX", () => {
+    const baseDir = makeTempDir("install-posix-shape");
+    const globalCursorDirOverride = makeTempDir("cursor-home-posix-shape");
+    const result = installCursorPlugin({ envKind: "posix", baseDir }, { globalCursorDirOverride });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const doc = JSON.parse(readFileSync(result.paths.globalHooksPath, "utf8")) as {
+      hooks: Record<string, Array<{ command: string }>>;
+    };
+    expect(doc.hooks.sessionStart?.[0]?.command ?? "").not.toMatch(/^cmd\.exe/);
   });
 
   it("preserves user-authored entries during a re-install", () => {

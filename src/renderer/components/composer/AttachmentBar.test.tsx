@@ -54,4 +54,28 @@ describe("AttachmentBar", () => {
     expect(container.firstElementChild).toHaveClass("lightcode-attachment-bar");
     expect(container.firstElementChild).not.toHaveClass("lightcode-attachment-bar--inset");
   });
+
+  it("renders the CSS selector instead of the file name on picked attachments", () => {
+    render(
+      <AttachmentBar
+        attachments={[
+          {
+            id: "image-1",
+            path: "/tmp/selection.png",
+            name: "selection.png",
+            mimeType: "image/png",
+            isImage: true,
+            selector: "svg.lnXdpd > path",
+            sourceUrl: "https://www.google.com/",
+          },
+        ]}
+      />,
+    );
+
+    const label = screen.getByText("svg.lnXdpd > path");
+    expect(label).toBeInTheDocument();
+    expect(label).toHaveClass("lightcode-attachment-chip__selector");
+    expect(label).toHaveAttribute("title", "svg.lnXdpd > path\nhttps://www.google.com/");
+    expect(screen.queryByText("selection.png")).not.toBeInTheDocument();
+  });
 });

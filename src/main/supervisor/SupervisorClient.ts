@@ -45,6 +45,12 @@ export interface SupervisorClientOptions {
    */
   wslHelpersDir: string;
   secretStorageKey: string;
+  /**
+   * Optional resolver invoked at every supervisor spawn, returning extra env
+   * vars to merge into the child env. Used by the in-app browser MCP wiring
+   * to inject `LIGHTCODE_BROWSER_MCP_*` per-launch.
+   */
+  resolveExtraEnv?: () => Record<string, string>;
   assignPid?(pid: number): Promise<void>;
   reportError?(error: unknown, tags?: LightcodeDiagnosticTags): void;
   onEvent(event: SupervisorEvent): void;
@@ -88,6 +94,7 @@ export class SupervisorClient {
     this.resolveStartedGate();
     this.stop(new Error("Supervisor restarting"));
 
+    const extraEnv = this.options.resolveExtraEnv?.() ?? {};
     const child = fork(this.options.supervisorPath, [], {
       stdio: ["ignore", "pipe", "pipe", "ipc"],
       env: {
@@ -101,6 +108,7 @@ export class SupervisorClient {
         // the legacy var. Safe to drop once min supported supervisor knows
         // about LIGHTCODE_WSL_HELPERS_DIR.
         LIGHTCODE_WSL_WATCHER_DIR: this.options.wslHelpersDir,
+        ...extraEnv,
       },
     });
 

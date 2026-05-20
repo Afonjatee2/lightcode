@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RequestError } from "@agentclientprotocol/sdk";
 import type { CreateStructuredSessionInput } from "../base";
 import type { ThreadConfig } from "@/shared/contracts";
@@ -311,6 +311,11 @@ describe("ACP resource path helpers", () => {
 });
 
 describe("ACP client protocol helpers", () => {
+  beforeEach(() => {
+    delete process.env.LIGHTCODE_BROWSER_MCP_URL;
+    delete process.env.LIGHTCODE_BROWSER_MCP_TOKEN;
+  });
+
   const HOST_KIND: "windows" | "posix" = process.platform === "win32" ? "windows" : "posix";
 
   function makePosixProject() {
