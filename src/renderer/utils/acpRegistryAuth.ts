@@ -7,7 +7,7 @@ import type {
   RefreshAgentScopeEnv,
 } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
-import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
+import { buildWslProjectDistrosKey, parseWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 
 const ACP_GENERIC_PREFIX = "acp-generic:";
 
@@ -110,8 +110,7 @@ export function envLabelForStatus(status: AgentStatus): string {
 }
 
 export function currentWslDistros(): string[] {
-  const key = buildWslProjectDistrosKey(useAppStore.getState().projects);
-  return key ? key.split("\0") : [];
+  return parseWslProjectDistrosKey(buildWslProjectDistrosKey(useAppStore.getState().projects));
 }
 
 export function findProjectForStatus(

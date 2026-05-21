@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AgentStatus, ProjectLocation } from "@/shared/contracts";
-import { isDetectingAgentsForLocation, useAgentStatusesStore } from "./agentStatusesStore";
+import {
+  isDetectingAgentsForLocation,
+  isDiscoveryActiveForLocation,
+  useAgentStatusesStore,
+} from "./agentStatusesStore";
 
 function makeStatus(overrides: Partial<AgentStatus> = {}): AgentStatus {
   return {
@@ -33,6 +37,7 @@ function reset() {
     windowsLoaded: false,
     wslLoaded: false,
     inFirstLaunchDiscovery: false,
+    discoveryScope: undefined,
     discoveredAgents: [],
   });
 }
@@ -70,6 +75,7 @@ describe("setAgentStatuses", () => {
     const state = useAgentStatusesStore.getState();
     expect(state.windowsLoaded).toBe(true);
     expect(state.inFirstLaunchDiscovery).toBe(false);
+    expect(state.discoveryScope).toBeUndefined();
   });
 });
 
@@ -82,6 +88,21 @@ describe("setWslAgentStatuses", () => {
     expect(state.wslAgentStatuses).toHaveLength(1);
     expect(state.agentStatuses).toHaveLength(0);
     expect(state.wslLoaded).toBe(true);
+  });
+
+  it("ends WSL discovery when WSL statuses arrive", () => {
+    useAgentStatusesStore.setState({
+      inFirstLaunchDiscovery: true,
+      discoveryScope: { kind: "wsl", distro: "Ubuntu" },
+      wslLoaded: false,
+    });
+    useAgentStatusesStore
+      .getState()
+      .setWslAgentStatuses([makeStatus({ envKind: "wsl", envDistro: "Ubuntu" })]);
+    const state = useAgentStatusesStore.getState();
+    expect(state.wslLoaded).toBe(true);
+    expect(state.inFirstLaunchDiscovery).toBe(false);
+    expect(state.discoveryScope).toBeUndefined();
   });
 
   it("preserves reference when re-applying identical statuses", () => {
@@ -107,6 +128,7 @@ describe("hydrateFromCache", () => {
     expect(state.windowsLoaded).toBe(true);
     expect(state.wslLoaded).toBe(true);
     expect(state.inFirstLaunchDiscovery).toBe(false);
+    expect(state.discoveryScope).toBeUndefined();
   });
 });
 
@@ -118,6 +140,7 @@ describe("beginFirstLaunchDiscovery", () => {
     useAgentStatusesStore.getState().beginFirstLaunchDiscovery();
     const state = useAgentStatusesStore.getState();
     expect(state.inFirstLaunchDiscovery).toBe(true);
+    expect(state.discoveryScope).toEqual({ kind: "native" });
     expect(state.discoveredAgents).toEqual([]);
   });
 
@@ -125,6 +148,15 @@ describe("beginFirstLaunchDiscovery", () => {
     useAgentStatusesStore.setState({ windowsLoaded: true });
     useAgentStatusesStore.getState().beginFirstLaunchDiscovery();
     expect(useAgentStatusesStore.getState().inFirstLaunchDiscovery).toBe(false);
+  });
+
+  it("can start WSL discovery after native statuses loaded", () => {
+    useAgentStatusesStore.setState({ windowsLoaded: true, wslLoaded: true });
+    useAgentStatusesStore.getState().beginFirstLaunchDiscovery({ kind: "wsl", distro: "Ubuntu" });
+    const state = useAgentStatusesStore.getState();
+    expect(state.inFirstLaunchDiscovery).toBe(true);
+    expect(state.discoveryScope).toEqual({ kind: "wsl", distro: "Ubuntu" });
+    expect(state.wslLoaded).toBe(false);
   });
 });
 
@@ -135,11 +167,25 @@ describe("pushDiscoveredAgent", () => {
     expect(useAgentStatusesStore.getState().discoveredAgents).toHaveLength(1);
   });
 
-  it("ignores WSL agents (discovery screen is for the host scope only)", () => {
+  it("ignores WSL agents during native discovery", () => {
+    useAgentStatusesStore.getState().beginFirstLaunchDiscovery();
     useAgentStatusesStore
       .getState()
       .pushDiscoveredAgent(makeStatus({ kind: "gemini", envKind: "wsl", envDistro: "Ubuntu" }));
     expect(useAgentStatusesStore.getState().discoveredAgents).toEqual([]);
+  });
+
+  it("appends matching WSL agents during WSL discovery", () => {
+    useAgentStatusesStore.getState().beginFirstLaunchDiscovery({ kind: "wsl", distro: "Ubuntu" });
+    useAgentStatusesStore
+      .getState()
+      .pushDiscoveredAgent(makeStatus({ kind: "gemini", envKind: "wsl", envDistro: "Ubuntu" }));
+    useAgentStatusesStore
+      .getState()
+      .pushDiscoveredAgent(makeStatus({ kind: "claude", envKind: "wsl", envDistro: "Debian" }));
+    expect(useAgentStatusesStore.getState().discoveredAgents.map((status) => status.kind)).toEqual([
+      "gemini",
+    ]);
   });
 });
 
@@ -153,6 +199,7 @@ describe("resetDiscoveredAgents", () => {
     const state = useAgentStatusesStore.getState();
     expect(state.discoveredAgents).toEqual([]);
     expect(state.inFirstLaunchDiscovery).toBe(false);
+    expect(state.discoveryScope).toBeUndefined();
   });
 
   it("is a no-op when there is nothing to clear", () => {
@@ -225,5 +272,38 @@ describe("isDetectingAgentsForLocation", () => {
     expect(isDetectingAgentsForLocation({ windowsLoaded: false, wslLoaded: true }, loc)).toBe(
       false,
     );
+  });
+});
+
+describe("isDiscoveryActiveForLocation", () => {
+  it("matches native discovery to native projects", () => {
+    const loc: ProjectLocation = { kind: "windows", path: "C:\\tmp" };
+    expect(
+      isDiscoveryActiveForLocation(
+        { inFirstLaunchDiscovery: true, discoveryScope: { kind: "native" } },
+        loc,
+      ),
+    ).toBe(true);
+  });
+
+  it("matches WSL discovery only to the same distro", () => {
+    const loc: ProjectLocation = {
+      kind: "wsl",
+      distro: "Ubuntu",
+      linuxPath: "/home/u/p",
+      uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\u\\p",
+    };
+    expect(
+      isDiscoveryActiveForLocation(
+        { inFirstLaunchDiscovery: true, discoveryScope: { kind: "wsl", distro: "Ubuntu" } },
+        loc,
+      ),
+    ).toBe(true);
+    expect(
+      isDiscoveryActiveForLocation(
+        { inFirstLaunchDiscovery: true, discoveryScope: { kind: "wsl", distro: "Debian" } },
+        loc,
+      ),
+    ).toBe(false);
   });
 });

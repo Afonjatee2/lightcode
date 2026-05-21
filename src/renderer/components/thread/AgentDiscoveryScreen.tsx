@@ -1,7 +1,7 @@
 import { PixelLoader } from "@/renderer/components/common";
 import { getRegisteredProviders, ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
-import type { AgentStatus } from "@/shared/contracts";
+import type { AgentStatus, ProjectLocation } from "@/shared/contracts";
 
 function readyBadge(status: AgentStatus): { label: string; toneClass: string } | null {
   if (!status.installed) return null;
@@ -11,10 +11,22 @@ function readyBadge(status: AgentStatus): { label: string; toneClass: string } |
   return { label: "Ready", toneClass: "text-success" };
 }
 
-export function AgentDiscoveryScreen() {
+function statusLine(scopedCount: number, installedCount: number, wslDistro: string | undefined) {
+  if (scopedCount === 0) {
+    return wslDistro ? "Warming up WSL shell environment…" : "Warming up shell environment…";
+  }
+  if (installedCount === 0) return "No agents installed yet";
+  if (installedCount === 1) return "1 agent ready";
+  return `${installedCount} agents ready`;
+}
+
+export function AgentDiscoveryScreen(props: { location?: ProjectLocation }) {
+  // `discoveredAgents` is already scoped by `pushDiscoveredAgent` to the active
+  // discovery scope, so no additional location filtering is needed here.
   const discovered = useAgentStatusesStore((s) => s.discoveredAgents);
   const byKind = new Map(discovered.map((status) => [status.kind, status]));
   const installedCount = discovered.reduce((n, s) => n + (s.installed ? 1 : 0), 0);
+  const wslDistro = props.location?.kind === "wsl" ? props.location.distro : undefined;
   // Provider plugins self-register at module-load time; reading the registry
   // each render keeps this screen in sync as new agent kinds are added.
   const providers = getRegisteredProviders();
@@ -25,7 +37,9 @@ export function AgentDiscoveryScreen() {
         <PixelLoader size="lg" className="text-foreground" />
         <h1 className="text-xl font-semibold tracking-tight">Discovering coding agents…</h1>
         <p className="max-w-sm text-sm text-muted">
-          Scanning your system for installed CLIs. This usually takes a couple of seconds.
+          {wslDistro
+            ? `Scanning ${wslDistro} for installed CLIs. This usually takes a couple of seconds.`
+            : "Scanning your system for installed CLIs. This usually takes a couple of seconds."}
         </p>
       </div>
 
@@ -59,13 +73,7 @@ export function AgentDiscoveryScreen() {
       </div>
 
       <div className="text-xs text-muted/70" aria-live="polite">
-        {discovered.length === 0
-          ? "Warming up shell environment…"
-          : installedCount === 0
-            ? "No agents installed yet"
-            : installedCount === 1
-              ? "1 agent ready"
-              : `${installedCount} agents ready`}
+        {statusLine(discovered.length, installedCount, wslDistro)}
       </div>
     </div>
   );

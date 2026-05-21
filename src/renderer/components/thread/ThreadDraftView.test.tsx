@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentStatus, Project } from "@/shared/contracts";
 import { HOME_PROJECT_ID, HOME_PROJECT_NAME } from "@/shared/homeScope";
+import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const { composerSpy } = vi.hoisted(() => ({
@@ -36,6 +37,18 @@ const project: Project = {
   location: {
     kind: "windows",
     path: "C:\\repo",
+  },
+  createdAt: "2026-03-28T00:00:00.000Z",
+};
+
+const wslProject: Project = {
+  id: "project-wsl",
+  name: "Repo WSL",
+  location: {
+    kind: "wsl",
+    distro: "Ubuntu",
+    linuxPath: "/home/demo/repo",
+    uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\repo",
   },
   createdAt: "2026-03-28T00:00:00.000Z",
 };
@@ -265,6 +278,15 @@ const singleEffortMultiContextCursorStatus: AgentStatus = {
 describe("ThreadDraftView", () => {
   beforeEach(() => {
     composerSpy.mockClear();
+    useAgentStatusesStore.setState({
+      agentStatuses: [],
+      wslAgentStatuses: [],
+      windowsLoaded: false,
+      wslLoaded: false,
+      inFirstLaunchDiscovery: false,
+      discoveryScope: undefined,
+      discoveredAgents: [],
+    });
     useSharedSettings.setState({
       providerConfigs: {},
       hiddenModels: {},
@@ -312,6 +334,24 @@ describe("ThreadDraftView", () => {
     // message so the renderer doesn't flash it before the cache or detection
     // events hydrate the store.
     expect(screen.getByText(/detecting agents/i)).toBeInTheDocument();
+    expect(screen.queryByText("No supported agents detected")).not.toBeInTheDocument();
+  });
+
+  it("shows the discovery reveal for a WSL project while its distro is probing", () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+    useAgentStatusesStore.getState().beginFirstLaunchDiscovery({ kind: "wsl", distro: "Ubuntu" });
+
+    render(
+      <ThreadDraftView
+        project={wslProject}
+        agentStatuses={[]}
+        isDetectingAgents
+        onStart={onStart}
+      />,
+    );
+
+    expect(screen.getByText("Discovering coding agents…")).toBeInTheDocument();
+    expect(screen.getByText(/Scanning Ubuntu/)).toBeInTheDocument();
     expect(screen.queryByText("No supported agents detected")).not.toBeInTheDocument();
   });
 

@@ -4,11 +4,13 @@ import {
   type RefObject,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
 import { useShallow } from "zustand/shallow";
 import { isMac, isWindows } from "@/renderer/bridge";
+import { useTwoRafReady } from "@/renderer/hooks/useTwoRafReady";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import {
@@ -25,6 +27,11 @@ import {
 import { SIDEBAR_COLLAPSED_WIDTH, useSidebarOverlayEffects } from "./parts/useSidebarOverlay";
 import { AsideSlot } from "./parts/AsideSlot";
 import { usePanelVisibility } from "./parts/usePanelVisibility";
+
+const RIGHT_OVERLAY_MIN_GUTTER = 80;
+const RIGHT_OVERLAY_EXIT_MS = 300;
+
+type RightOverlaySlot = "right" | "git";
 
 interface SidebarContextValue {
   isCollapsed: boolean;
@@ -249,7 +256,7 @@ function ShellSidebarAside(props: {
       ref={sidebarRef}
       className={`flex min-h-0 flex-col overflow-hidden transition-[border-color] duration-200 ${
         effectiveIsOverlay
-          ? `fixed inset-y-0 left-0 z-40 border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${
+          ? `fixed inset-y-0 left-0 z-[60] border-r border-[color:var(--border)] bg-background shadow-2xl transition-transform duration-200 ${
               effectiveClosingOverlay || !overlayReady ? "-translate-x-full" : "translate-x-0"
             }`
           : `relative ${
@@ -261,7 +268,11 @@ function ShellSidebarAside(props: {
         <div
           className={`lightcode-overlay-header flex shrink-0 items-center gap-3 ${
             isMac() ? "pl-3 pr-2 pt-0.5" : "px-2"
-          } ${effectiveIsOverlay ? "bg-background" : "bg-[var(--content-background)]"}`}
+          } ${
+            effectiveIsOverlay
+              ? "lightcode-overlay-header--no-drag bg-background"
+              : "bg-[var(--content-background)]"
+          }`}
           style={{
             height: "env(titlebar-area-height, 32px)",
             ...(effectiveIsCollapsed && !effectiveClosingOverlay
@@ -332,6 +343,7 @@ export function AppShell(props: {
   gitPanel?: ReactNode;
   forceSidebarExpanded?: boolean;
   onRequestClosePanels?: () => void;
+  onDismissRightOverlay?: () => void;
 }) {
   const { sidebar, content, sidebarHeader, contentHeader, rightPanel, gitPanel } = props;
   const forceSidebarExpanded = props.forceSidebarExpanded === true;
@@ -357,9 +369,6 @@ export function AppShell(props: {
     handlePanelResizeStart,
     handlePanelBottomResizeStart,
     handleGitPanelResizeStart,
-    cancelActiveResize,
-    updatePanelWidth,
-    updateGitPanelWidth,
   } = useResizablePanels({
     sidebarRef,
     panelRef,
@@ -370,57 +379,136 @@ export function AppShell(props: {
     overlayRef: resizeOverlayRef,
   });
 
-  // When content shrinks past the threshold while the user is mid-drag, we
-  // both hide panels and end the drag — otherwise the panel disappears but
-  // the mouse is still captured and keeps resizing an invisible target.
-  // We also shrink the panel widths so reopening them does not immediately
-  // re-trigger the auto-hide (the prior widths are what caused it).
   const onRequestClosePanels = props.onRequestClosePanels;
-  const handleAutoHidePanels = onRequestClosePanels
-    ? () => {
-        cancelActiveResize();
-
-        const main = mainRef.current;
-        if (main) {
-          const mainW = main.getBoundingClientRect().width;
-          const panelW = panelRef.current?.getBoundingClientRect().width ?? 0;
-          const gitPanelW = gitPanelRef.current?.getBoundingClientRect().width ?? 0;
-          // Leave a small headroom past the hide threshold so resize jitter
-          // doesn't immediately re-trigger.
-          const targetMain = CONTENT_MIN_WIDTH + 24;
-          const totalAvailable = mainW + panelW + gitPanelW;
-          const allowanceForPanels = totalAvailable - targetMain;
-
-          if (panelW > 0 && gitPanelW > 0) {
-            const totalPanels = panelW + gitPanelW;
-            if (allowanceForPanels < totalPanels) {
-              const ratio = Math.max(0, allowanceForPanels) / totalPanels;
-              updatePanelWidth(panelW * ratio);
-              updateGitPanelWidth(gitPanelW * ratio);
-            }
-          } else if (panelW > 0) {
-            if (allowanceForPanels < panelW) updatePanelWidth(allowanceForPanels);
-          } else if (gitPanelW > 0) {
-            if (allowanceForPanels < gitPanelW) updateGitPanelWidth(allowanceForPanels);
-          }
-        }
-
-        onRequestClosePanels();
-      }
-    : undefined;
+  const onDismissRightOverlay = props.onDismissRightOverlay ?? onRequestClosePanels;
 
   useSidebarOverlayEffects({
     sidebarWidth,
     shellRef,
-    mainRef,
     disabled: forceSidebarExpanded,
-    ...(handleAutoHidePanels ? { onRequestClosePanels: handleAutoHidePanels } : {}),
   });
+
+  // `shellWidth` is observed and published by `useSidebarOverlayEffects` so the
+  // right-overlay detection here shares the same single ResizeObserver instead
+  // of attaching a second one to the shell root.
+  const shellWidth = useSidebarOverlayStore((s) => s.shellWidth);
+  const [observedSidebarWidth, setObservedSidebarWidth] = useState(0);
+  useLayoutEffect(() => {
+    const sidebarEl = sidebarRef.current;
+    if (!sidebarEl) return;
+    const update = () => {
+      const next = sidebarEl.getBoundingClientRect().width;
+      setObservedSidebarWidth((prev) => (Math.abs(prev - next) < 0.5 ? prev : next));
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(sidebarEl);
+    return () => ro.disconnect();
+  }, []);
+  const layoutMetricsReady = shellWidth > 0;
 
   const { rightPanelOpen, gitPanelOpen } = usePanelVisibility();
   const isBottom = terminalPosition === "bottom";
   const hasHeaders = sidebarHeader != null || contentHeader != null;
   const hasContentHeader = contentHeader != null;
+
+  // When the right-side panel(s) cannot dock without squeezing main below
+  // CONTENT_MIN_WIDTH, render them as a fixed overlay anchored to the right
+  // edge (mirroring the sidebar's narrow overlay).
+  const dockedRightPanelOpen = !isBottom && rightPanelOpen;
+  const wantsRightOverlay = dockedRightPanelOpen || gitPanelOpen;
+  // Compute the docked main width even when panels are currently overlaid, so
+  // the transition between modes is driven by a stable signal.
+  const wouldBeMainWidth = layoutMetricsReady
+    ? shellWidth -
+      observedSidebarWidth -
+      (dockedRightPanelOpen ? panelWidth : 0) -
+      (gitPanelOpen ? gitPanelWidth : 0)
+    : null;
+  const computedRightOverlayActive =
+    !forceSidebarExpanded &&
+    wantsRightOverlay &&
+    wouldBeMainWidth !== null &&
+    wouldBeMainWidth < CONTENT_MIN_WIDTH;
+  const [rightOverlayMounted, setRightOverlayMounted] = useState(false);
+  const [rightOverlaySlot, setRightOverlaySlot] = useState<RightOverlaySlot | null>(null);
+  const [prevRightOverlay, setPrevRightOverlay] = useState<{
+    wantsRightOverlay: boolean;
+    rightOverlayActive: boolean;
+  } | null>(null);
+  const shouldAutoHideRightOverlay =
+    layoutMetricsReady &&
+    !forceSidebarExpanded &&
+    computedRightOverlayActive &&
+    prevRightOverlay?.wantsRightOverlay === true &&
+    !prevRightOverlay.rightOverlayActive;
+  const rightOverlayActive = computedRightOverlayActive && !shouldAutoHideRightOverlay;
+  const rightOverlayReady = useTwoRafReady(rightOverlayActive);
+  const rightOverlayDisplayed = rightOverlayActive || rightOverlayMounted;
+  const activeRightOverlaySlot: RightOverlaySlot | null = rightOverlayActive
+    ? dockedRightPanelOpen
+      ? "right"
+      : gitPanelOpen
+        ? "git"
+        : null
+    : null;
+  const displayedRightOverlaySlot = activeRightOverlaySlot ?? rightOverlaySlot;
+  const rightOverlayReadyForDisplay = rightOverlayActive && rightOverlayReady;
+  useEffect(() => {
+    if (!layoutMetricsReady) {
+      return;
+    }
+    setPrevRightOverlay((prev) =>
+      prev?.wantsRightOverlay === wantsRightOverlay &&
+      prev.rightOverlayActive === computedRightOverlayActive
+        ? prev
+        : { wantsRightOverlay, rightOverlayActive: computedRightOverlayActive },
+    );
+    if (shouldAutoHideRightOverlay) {
+      onDismissRightOverlay?.();
+    }
+  }, [
+    computedRightOverlayActive,
+    forceSidebarExpanded,
+    layoutMetricsReady,
+    onDismissRightOverlay,
+    shouldAutoHideRightOverlay,
+    wantsRightOverlay,
+  ]);
+  useEffect(() => {
+    if (rightOverlayActive) {
+      setRightOverlayMounted(true);
+      setRightOverlaySlot(activeRightOverlaySlot);
+      return;
+    }
+    if (wantsRightOverlay) {
+      // Auto-hide path: the overlay was never rendered (still docked when we
+      // decided to dismiss). Skip the slide-out timer; there is nothing on
+      // screen to animate.
+      setRightOverlayMounted(false);
+      setRightOverlaySlot(null);
+      return;
+    }
+    const timeout = window.setTimeout(() => {
+      setRightOverlayMounted(false);
+      setRightOverlaySlot(null);
+    }, RIGHT_OVERLAY_EXIT_MS);
+    return () => window.clearTimeout(timeout);
+  }, [activeRightOverlaySlot, rightOverlayActive, wantsRightOverlay]);
+
+  // Cap the overlay panel width so it does not cover the whole viewport when
+  // the window is very narrow — leave room for the user to click main to
+  // dismiss via the backdrop and to see the underlying content.
+  const overlayMaxWidth = layoutMetricsReady
+    ? Math.max(CONTENT_MIN_WIDTH, shellWidth - RIGHT_OVERLAY_MIN_GUTTER)
+    : undefined;
+  const overlayRightPanelWidth =
+    overlayMaxWidth !== undefined ? Math.min(panelWidth, overlayMaxWidth) : panelWidth;
+  const overlayGitPanelWidth =
+    overlayMaxWidth !== undefined ? Math.min(gitPanelWidth, overlayMaxWidth) : gitPanelWidth;
+  const rightOverlayTop = hasContentHeader ? "env(titlebar-area-height, 32px)" : "0px";
+  const rightPanelAsOverlay = rightOverlayDisplayed && displayedRightOverlaySlot === "right";
+  const gitPanelAsOverlay = rightOverlayDisplayed && displayedRightOverlaySlot === "git";
 
   return (
     <div
@@ -461,7 +549,11 @@ export function AppShell(props: {
         }}
       />
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden [isolation:isolate]">
+      <div
+        className={`flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden ${
+          rightOverlayDisplayed ? "" : "[isolation:isolate]"
+        }`}
+      >
         {contentHeader && (
           <div
             className={`lightcode-overlay-header ${macosTrafficLightPadClass} flex shrink-0 items-center gap-3 bg-[var(--content-background)] px-2`}
@@ -478,7 +570,21 @@ export function AppShell(props: {
 
         {/* z-0 keeps main + right panel (resize handles are z-20) below the title row when rows overlap
             (subpixel or env() mismatch on macOS can otherwise paint the panel over the content header). */}
-        <div className="relative z-0 flex min-h-0 min-w-0 flex-1 overflow-hidden">
+        <div
+          className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${
+            rightOverlayDisplayed ? "" : "z-0"
+          }`}
+        >
+          {rightOverlayDisplayed && onDismissRightOverlay && (
+            <div
+              className={`fixed inset-0 z-[45] bg-black/50 transition-opacity duration-200 ${
+                rightOverlayReadyForDisplay ? "opacity-100" : "opacity-0"
+              }`}
+              onClick={onDismissRightOverlay}
+              aria-hidden="true"
+            />
+          )}
+
           <div
             className={`relative flex min-h-0 min-w-0 flex-1 overflow-hidden ${isBottom && rightPanel ? "flex-col" : ""}`}
           >
@@ -493,12 +599,15 @@ export function AppShell(props: {
               <AsideSlot
                 orientation={isBottom ? "horizontal" : "vertical"}
                 isOpen={rightPanelOpen}
-                targetWidth={panelWidth}
+                targetWidth={rightPanelAsOverlay ? overlayRightPanelWidth : panelWidth}
                 targetHeight={panelHeight}
                 onResizeStart={isBottom ? handlePanelBottomResizeStart : handlePanelResizeStart}
                 panelRef={panelRef}
                 panelInnerRef={panelInnerRef}
                 ariaLabel="Resize terminal panel"
+                overlay={rightPanelAsOverlay}
+                overlayReady={rightOverlayReadyForDisplay}
+                overlayTop={rightOverlayTop}
               >
                 {rightPanel}
               </AsideSlot>
@@ -509,11 +618,14 @@ export function AppShell(props: {
             <AsideSlot
               orientation="vertical"
               isOpen={gitPanelOpen}
-              targetWidth={gitPanelWidth}
+              targetWidth={gitPanelAsOverlay ? overlayGitPanelWidth : gitPanelWidth}
               onResizeStart={handleGitPanelResizeStart}
               panelRef={gitPanelRef}
               panelInnerRef={gitPanelInnerRef}
               ariaLabel="Resize git panel"
+              overlay={gitPanelAsOverlay}
+              overlayReady={rightOverlayReadyForDisplay}
+              overlayTop={rightOverlayTop}
             >
               {gitPanel}
             </AsideSlot>

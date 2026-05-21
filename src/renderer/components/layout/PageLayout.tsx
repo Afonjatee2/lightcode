@@ -150,6 +150,7 @@ export function PageLayout(props: {
   gitPanel?: ReactNode;
   forceSidebarExpanded?: boolean;
   onRequestClosePanels?: () => void;
+  onDismissRightOverlay?: () => void;
 }) {
   const {
     title,
@@ -162,6 +163,7 @@ export function PageLayout(props: {
     gitPanel,
     forceSidebarExpanded,
     onRequestClosePanels,
+    onDismissRightOverlay,
   } = props;
 
   const sidebarHeader = (
@@ -185,6 +187,7 @@ export function PageLayout(props: {
       gitPanel={gitPanel}
       {...(forceSidebarExpanded === true ? { forceSidebarExpanded: true } : {})}
       {...(onRequestClosePanels != null ? { onRequestClosePanels } : {})}
+      {...(onDismissRightOverlay != null ? { onDismissRightOverlay } : {})}
     />
   );
 

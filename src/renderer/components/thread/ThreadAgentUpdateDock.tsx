@@ -18,14 +18,6 @@ import {
 } from "@/renderer/utils/acpRegistryAuth";
 import { ThreadDockHeader, ThreadDockSection } from "./ThreadDockUI";
 
-function UpdatePendingIcon({ className }: { className?: string }) {
-  return (
-    <span className={`inline-flex items-center justify-center ${className ?? ""}`}>
-      <PixelLoader size="xs" />
-    </span>
-  );
-}
-
 /**
  * Composer-placed status row that surfaces "{agent} v0.130.0 → v0.130.5 is
  * available" with an inline Update button. Reads the *project-scoped* status
@@ -145,7 +137,7 @@ export function ThreadAgentUpdateDock(props: {
   return (
     <ThreadDockSection placement="composer" collapsed={false} ariaLabel="Agent update available">
       <ThreadDockHeader
-        icon={pending ? UpdatePendingIcon : Download}
+        icon={Download}
         iconClassName="text-foreground"
         title="Update available"
         actions={
@@ -159,7 +151,7 @@ export function ThreadAgentUpdateDock(props: {
               onPress={() => void handleUpdate()}
             >
               {pending ? <PixelLoader size="xs" /> : <Download className="size-3.5" />}
-              Update to v{resolvedLatest}
+              Update
             </Button>
           </div>
         }

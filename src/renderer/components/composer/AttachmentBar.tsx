@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { Globe, X } from "lucide-react";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
 import { toLocalFileUrl } from "@/shared/promptContent";
@@ -138,6 +139,7 @@ export function AttachmentBar(props: {
   layout?: "inset" | "flush";
   hideImageNames?: boolean;
   imagesAsPreview?: boolean;
+  leading?: ReactNode;
 }) {
   const {
     attachments,
@@ -146,8 +148,9 @@ export function AttachmentBar(props: {
     layout = "inset",
     hideImageNames,
     imagesAsPreview,
+    leading,
   } = props;
-  if (attachments.length === 0) return null;
+  if (attachments.length === 0 && !leading) return null;
 
   const className =
     layout === "inset"
@@ -156,6 +159,7 @@ export function AttachmentBar(props: {
 
   return (
     <div className={className}>
+      {leading}
       {attachments.map((att) =>
         imagesAsPreview && att.isImage && !att.selector ? (
           <ImagePreview key={att.id} attachment={att} onPreviewImage={onPreviewImage} />

@@ -24,6 +24,10 @@ interface PickerOutcome {
 
 const PICKER_TEMP_THREAD_PREFIX = "picker-";
 
+function draftTargetId(projectId: string): string {
+  return `draft:${projectId}`;
+}
+
 function findActiveWebviewRect(tabId: string): DOMRect | null {
   const direct = document.querySelector<HTMLElement>(`webview[data-tab-id="${tabId}"]`);
   if (direct) {
@@ -56,6 +60,7 @@ function anchorFromSelectedRect(
 
 function resolveTargetThreadIds(): string[] {
   const state = useAppStore.getState();
+  if (state.view.kind === "draft") return [draftTargetId(state.view.projectId)];
   if (state.view.kind !== "thread") return [];
   return [...state.view.panes];
 }
@@ -69,6 +74,7 @@ export function useElementPicker() {
   const enqueueAttach = useBrowserAttachInbox((s) => s.enqueue);
   const targetThreadIds = useAppStore(
     useShallow((state) => {
+      if (state.view.kind === "draft") return [draftTargetId(state.view.projectId)];
       if (state.view.kind !== "thread") return [];
       return [...state.view.panes];
     }),

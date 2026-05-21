@@ -8,6 +8,8 @@ interface SidebarOverlayState {
   isNarrow: boolean;
   closingOverlay: boolean;
   overlayReady: boolean;
+  /** Latest shell (outer AppShell root) width in CSS pixels; 0 before first measurement. */
+  shellWidth: number;
   /**
    * When the sidebar transitions from overlay to collapsed, transitions on
    * width/min-width must be suppressed for one paint so the collapsed width
@@ -20,6 +22,7 @@ interface SidebarOverlayState {
   setNarrow: (next: boolean) => void;
   setClosingOverlay: (next: boolean) => void;
   setOverlayReady: (next: boolean) => void;
+  setShellWidth: (next: number) => void;
   setSkipTransition: (next: boolean) => void;
 }
 
@@ -28,6 +31,7 @@ export const useSidebarOverlayStore = create<SidebarOverlayState>((set) => ({
   isNarrow: false,
   closingOverlay: false,
   overlayReady: false,
+  shellWidth: 0,
   skipTransition: false,
   setCollapsed: (next) =>
     set((s) => {
@@ -43,6 +47,8 @@ export const useSidebarOverlayStore = create<SidebarOverlayState>((set) => ({
   setClosingOverlay: (next) =>
     set((s) => (s.closingOverlay === next ? s : { closingOverlay: next })),
   setOverlayReady: (next) => set((s) => (s.overlayReady === next ? s : { overlayReady: next })),
+  setShellWidth: (next) =>
+    set((s) => (Math.abs(s.shellWidth - next) < 0.5 ? s : { shellWidth: next })),
   setSkipTransition: (next) =>
     set((s) => (s.skipTransition === next ? s : { skipTransition: next })),
 }));

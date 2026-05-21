@@ -146,7 +146,7 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
   if (event.type === "windows-agent-statuses") {
     console.log(`[renderer] event: windows-agent-statuses (${event.statuses.length} agents)`);
     const store = useAgentStatusesStore.getState();
-    if (store.inFirstLaunchDiscovery) {
+    if (store.inFirstLaunchDiscovery && store.discoveryScope?.kind !== "wsl") {
       const statuses = event.statuses;
       setTimeout(() => {
         useAgentStatusesStore.getState().setAgentStatuses(statuses);
@@ -157,7 +157,15 @@ const unsubSupervisor = readBridge().onSupervisorEvent((event) => {
   }
   if (event.type === "wsl-agent-statuses") {
     console.log(`[renderer] event: wsl-agent-statuses (${event.statuses.length} agents)`);
-    useAgentStatusesStore.getState().setWslAgentStatuses(event.statuses);
+    const store = useAgentStatusesStore.getState();
+    if (store.inFirstLaunchDiscovery && store.discoveryScope?.kind === "wsl") {
+      const statuses = event.statuses;
+      setTimeout(() => {
+        useAgentStatusesStore.getState().setWslAgentStatuses(statuses);
+      }, 1000);
+    } else {
+      store.setWslAgentStatuses(event.statuses);
+    }
   }
 });
 

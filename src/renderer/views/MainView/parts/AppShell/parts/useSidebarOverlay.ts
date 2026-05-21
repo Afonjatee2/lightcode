@@ -1,6 +1,5 @@
 import { type RefObject, useEffect, useRef } from "react";
-import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
-import { usePanelStore } from "@/renderer/state/panelStore";
+import { useTwoRafReady } from "@/renderer/hooks/useTwoRafReady";
 import { selectShouldOverlay, useSidebarOverlayStore } from "@/renderer/state/sidebarOverlayStore";
 import { CONTENT_MIN_WIDTH } from "./useResizablePanels";
 
@@ -15,14 +14,6 @@ function readStableObservedWidth(entry: ResizeObserverEntry): number | null {
   return width;
 }
 
-function readAnyPanelOpen(): boolean {
-  const dev = useDevTerminalStore.getState();
-  const panel = usePanelStore.getState();
-  const gitPanelOpen = !!panel.gitReviewContext && panel.gitReviewAsPanel;
-  const filesPanelOpen = panel.filesPanelContext !== null;
-  return dev.isOpen || gitPanelOpen || filesPanelOpen;
-}
-
 /**
  * Wires DOM ResizeObservers and the overlay-ready raf chain to the
  * `sidebarOverlayStore`. Sidebar overlay state lives in zustand so that the
@@ -33,20 +24,17 @@ function readAnyPanelOpen(): boolean {
 export function useSidebarOverlayEffects(opts: {
   sidebarWidth: number;
   shellRef: RefObject<HTMLDivElement | null>;
-  mainRef: RefObject<HTMLElement | null>;
   disabled?: boolean;
-  onRequestClosePanels?: (() => void) | undefined;
 }) {
-  const { sidebarWidth, shellRef, mainRef, disabled = false, onRequestClosePanels } = opts;
-  const didAutoHideRef = useRef<"panels" | "sidebar" | null>(null);
+  const { sidebarWidth, shellRef, disabled = false } = opts;
   const didAutoCollapseOnNarrowRef = useRef(false);
-  const onRequestClosePanelsRef = useRef(onRequestClosePanels);
-  onRequestClosePanelsRef.current = onRequestClosePanels;
 
-  // Shell width → isNarrow. On the narrow transition we collapse the sidebar
-  // to the icon rail rather than overlaying it; overlay only triggers if the
-  // user manually re-expands the sidebar in narrow mode. Auto-collapsing is
-  // restored when the window grows back above the threshold.
+  // Shell width → isNarrow + shellWidth. On the narrow transition we collapse
+  // the sidebar to the icon rail rather than overlaying it; overlay only
+  // triggers if the user manually re-expands the sidebar in narrow mode.
+  // Auto-collapsing is restored when the window grows back above the threshold.
+  // `shellWidth` is also written so other shell consumers (right-overlay
+  // detection) can share this single observer instead of doubling up.
   useEffect(() => {
     if (disabled) return;
     const el = shellRef.current;
@@ -70,77 +58,18 @@ export function useSidebarOverlayEffects(opts: {
         }
       }
       store.setNarrow(next);
+      store.setShellWidth(width);
     });
     ro.observe(el);
     return () => ro.disconnect();
   }, [disabled, sidebarWidth, shellRef]);
 
-  // Main width → auto-hide panels first, then sidebar, when content is squeezed.
+  // shouldOverlay → overlayReady, via the shared two-RAF gate so the browser
+  // commits the off-screen `translateX(-full)` state before the slide-in
+  // transition starts.
+  const shouldOverlay = useSidebarOverlayStore(selectShouldOverlay);
+  const overlayReady = useTwoRafReady(shouldOverlay);
   useEffect(() => {
-    if (disabled) return;
-    const el = mainRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) return;
-      const width = readStableObservedWidth(entry);
-      if (width === null) return;
-      const s = useSidebarOverlayStore.getState();
-      if (width < CONTENT_MIN_WIDTH) {
-        if (didAutoHideRef.current) return;
-        if (readAnyPanelOpen()) {
-          didAutoHideRef.current = "panels";
-          onRequestClosePanelsRef.current?.();
-        } else if (!s.isCollapsed && !s.isNarrow) {
-          didAutoHideRef.current = "sidebar";
-          s.setCollapsed(true);
-        }
-      } else {
-        didAutoHideRef.current = null;
-      }
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [disabled, mainRef]);
-
-  // shouldOverlay → overlayReady, with two rafs of delay (matches the
-  // original behaviour: the overlay element mounts at translateX(-full),
-  // then we flip overlayReady to slide it in). Two-phase so the browser
-  // commits the off-screen position before the transition starts.
-  useEffect(() => {
-    let pendingFrame1: number | null = null;
-    let pendingFrame2: number | null = null;
-
-    const apply = (shouldOverlay: boolean) => {
-      if (pendingFrame1 !== null) cancelAnimationFrame(pendingFrame1);
-      if (pendingFrame2 !== null) cancelAnimationFrame(pendingFrame2);
-      pendingFrame1 = null;
-      pendingFrame2 = null;
-
-      if (!shouldOverlay) {
-        useSidebarOverlayStore.getState().setOverlayReady(false);
-        return;
-      }
-      pendingFrame1 = requestAnimationFrame(() => {
-        pendingFrame1 = null;
-        pendingFrame2 = requestAnimationFrame(() => {
-          pendingFrame2 = null;
-          useSidebarOverlayStore.getState().setOverlayReady(true);
-        });
-      });
-    };
-
-    apply(selectShouldOverlay(useSidebarOverlayStore.getState()));
-
-    const unsub = useSidebarOverlayStore.subscribe((state, prevState) => {
-      const cur = selectShouldOverlay(state);
-      if (cur !== selectShouldOverlay(prevState)) apply(cur);
-    });
-
-    return () => {
-      if (pendingFrame1 !== null) cancelAnimationFrame(pendingFrame1);
-      if (pendingFrame2 !== null) cancelAnimationFrame(pendingFrame2);
-      unsub();
-    };
-  }, []);
+    useSidebarOverlayStore.getState().setOverlayReady(overlayReady);
+  }, [overlayReady]);
 }

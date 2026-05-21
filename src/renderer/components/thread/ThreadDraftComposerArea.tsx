@@ -10,6 +10,7 @@ import { isHomeProjectId } from "@/shared/homeScope";
 import { readBridge } from "@/renderer/bridge";
 import {
   AttachmentBar,
+  BrowserChip,
   ComposerAddMenu,
   ImageLightbox,
   MentionInput,
@@ -76,7 +77,7 @@ export function ThreadDraftComposerArea(props: {
   const [agentUpdating, setAgentUpdating] = useState(false);
   const mentionRef = useRef<MentionInputHandle>(null);
   const attachments = useAttachments();
-  const inboxKey = props.paneId;
+  const inboxKey = props.paneId ?? `draft:${props.project.id}`;
   const pendingPickedAttachments = useBrowserAttachInbox((s) =>
     inboxKey ? s.itemsByThread[inboxKey] : undefined,
   );
@@ -324,6 +325,11 @@ export function ThreadDraftComposerArea(props: {
               const idx = imageAttachments.findIndex((a) => a.id === att.id);
               if (idx >= 0) setLightboxIndex(idx);
             }}
+            leading={
+              props.config.browserMcp === true ? (
+                <BrowserChip onRemove={() => props.onConfigChange({ browserMcp: false })} />
+              ) : undefined
+            }
           />
         }
         inputContent={

@@ -128,6 +128,7 @@ export async function detectWslAgentStatuses(
   adapters: Iterable<AgentAdapter>,
   distros: readonly string[],
   disabled?: ReadonlySet<string>,
+  onStatus?: (status: AgentStatus) => void,
 ): Promise<AgentStatus[]> {
   const adapterList = [...adapters];
   const statuses = await Promise.all(
@@ -135,8 +136,9 @@ export async function detectWslAgentStatuses(
       const ctx: AgentEnvContext = { envKind: "wsl", wslDistro: distro };
       return Promise.all(
         adapterList.map(async (adapter) => {
+          let status: AgentStatus;
           if (disabled?.has(adapter.kind)) {
-            return {
+            status = {
               kind: adapter.kind,
               label: adapter.label,
               installed: true,
@@ -146,26 +148,29 @@ export async function detectWslAgentStatuses(
               envKind: "wsl" as const,
               envDistro: distro,
             };
+          } else {
+            try {
+              const detected = await adapter.detectInstall(ctx);
+              status = { ...detected, envKind: "wsl" as const, envDistro: distro };
+            } catch (error) {
+              console.error(
+                `[supervisor] detectInstall(${adapter.kind}, wsl:${distro}) failed`,
+                error,
+              );
+              status = {
+                kind: adapter.kind,
+                label: adapter.label,
+                installed: false,
+                authState: "unknown" as const,
+                capabilities: adapter.capabilities,
+                ...(adapter.update ? { update: adapter.update } : {}),
+                envKind: "wsl" as const,
+                envDistro: distro,
+              };
+            }
           }
-          try {
-            const status = await adapter.detectInstall(ctx);
-            return { ...status, envKind: "wsl" as const, envDistro: distro };
-          } catch (error) {
-            console.error(
-              `[supervisor] detectInstall(${adapter.kind}, wsl:${distro}) failed`,
-              error,
-            );
-            return {
-              kind: adapter.kind,
-              label: adapter.label,
-              installed: false,
-              authState: "unknown" as const,
-              capabilities: adapter.capabilities,
-              ...(adapter.update ? { update: adapter.update } : {}),
-              envKind: "wsl" as const,
-              envDistro: distro,
-            };
-          }
+          onStatus?.(status);
+          return status;
         }),
       );
     }),
@@ -189,6 +194,7 @@ interface DetectionResults {
 export class AgentStatusService {
   private pendingDetection: Promise<DetectionResults> | undefined;
   private startupDetectionLaunched = false;
+  private startupDetectionWslDistros = new Set<string>();
 
   constructor(private readonly options: AgentStatusServiceOptions) {}
 
@@ -221,6 +227,9 @@ export class AgentStatusService {
       return this.runScopedDetection(wslDistros, payload.scope);
     }
     this.startupDetectionLaunched = true;
+    for (const distro of wslDistros) {
+      this.startupDetectionWslDistros.add(distro);
+    }
     const previousDetection = this.pendingDetection;
     const fresh = await this.runDetectionTask(async () => {
       if (previousDetection) {
@@ -428,12 +437,24 @@ export class AgentStatusService {
   }
 
   private detectStartupAgentStatusesBackground(wslDistros: readonly string[]): void {
-    if (this.startupDetectionLaunched) {
+    const newWslDistros = wslDistros.filter(
+      (distro) => !this.startupDetectionWslDistros.has(distro),
+    );
+    if (this.startupDetectionLaunched && newWslDistros.length === 0) {
       return;
     }
     this.startupDetectionLaunched = true;
-    if (this.pendingDetection) return;
-    void this.runDetectionTask(() => this.runDetection(wslDistros));
+    for (const distro of newWslDistros) {
+      this.startupDetectionWslDistros.add(distro);
+    }
+    const detectionWslDistros = [...this.startupDetectionWslDistros];
+    const previousDetection = this.pendingDetection;
+    void this.runDetectionTask(async () => {
+      if (previousDetection) {
+        await previousDetection.catch(() => ({ windows: [], wsl: [] }));
+      }
+      return this.runDetection(detectionWslDistros);
+    });
   }
 
   private async runDetection(wslDistros: readonly string[]): Promise<DetectionResults> {
@@ -495,7 +516,9 @@ export class AgentStatusService {
       return statuses;
     });
 
-    const wslPromise = detectWslAgentStatuses(adapters, wslDistros, disabled)
+    const wslPromise = detectWslAgentStatuses(adapters, wslDistros, disabled, (status) => {
+      this.options.emit({ type: "agent-detected", status });
+    })
       .then((statuses) => {
         this.options.emit({ type: "wsl-agent-statuses", statuses });
         return statuses;

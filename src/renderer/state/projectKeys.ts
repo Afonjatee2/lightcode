@@ -29,3 +29,7 @@ export function buildWslProjectDistrosKey(projects: readonly Project[]): string 
     .sort()
     .join("\0");
 }
+
+export function parseWslProjectDistrosKey(key: string): string[] {
+  return key ? key.split("\0") : [];
+}

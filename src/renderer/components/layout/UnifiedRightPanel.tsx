@@ -25,6 +25,8 @@ export function UnifiedRightPanel(props: {
   filesContent: ReactNode;
   browserContent: ReactNode;
   showTerminalTab?: boolean;
+  showFilesTab?: boolean;
+  showGitTab?: boolean;
   projectName: string | undefined;
   onExpandGitToOverlay?: () => void;
   onExpandFilesToOverlay?: () => void;
@@ -43,6 +45,8 @@ export function UnifiedRightPanel(props: {
     filesContent,
     browserContent,
     showTerminalTab = true,
+    showFilesTab = true,
+    showGitTab = true,
     projectName,
     onExpandGitToOverlay,
     onExpandFilesToOverlay,
@@ -122,28 +126,32 @@ export function UnifiedRightPanel(props: {
             <TerminalSquare className="size-3.5" />
           </button>
         ) : null}
-        <button
-          type="button"
-          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "files")}`}
-          title="Files"
-          onClick={() => {
-            if (onOpenFiles) onOpenFiles();
-            else onTabChange("files");
-          }}
-        >
-          <FolderOpen className="size-3.5" />
-        </button>
-        <button
-          type="button"
-          className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "git")}`}
-          title="Git"
-          onClick={() => {
-            if (onOpenGit) onOpenGit();
-            else onTabChange("git");
-          }}
-        >
-          <FileDiff className="size-3.5" />
-        </button>
+        {showFilesTab ? (
+          <button
+            type="button"
+            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "files")}`}
+            title="Files"
+            onClick={() => {
+              if (onOpenFiles) onOpenFiles();
+              else onTabChange("files");
+            }}
+          >
+            <FolderOpen className="size-3.5" />
+          </button>
+        ) : null}
+        {showGitTab ? (
+          <button
+            type="button"
+            className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "git")}`}
+            title="Git"
+            onClick={() => {
+              if (onOpenGit) onOpenGit();
+              else onTabChange("git");
+            }}
+          >
+            <FileDiff className="size-3.5" />
+          </button>
+        ) : null}
         <button
           type="button"
           className={`${dragCtl} ${panelHeaderTabIconButtonClass(activeTab === "browser")}`}

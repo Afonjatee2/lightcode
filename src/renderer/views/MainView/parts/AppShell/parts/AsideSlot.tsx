@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode, RefObject } from "react";
+import type { CSSProperties, MouseEvent, ReactNode, RefObject } from "react";
 
 export type AsideOrientation = "vertical" | "horizontal";
 
@@ -12,6 +12,11 @@ export function AsideSlot(props: {
   panelRef: RefObject<HTMLDivElement | null>;
   panelInnerRef: RefObject<HTMLDivElement | null>;
   ariaLabel: string;
+  /** When true, render as a fixed-position overlay from the right edge. */
+  overlay?: boolean;
+  /** Overlay slide-in state: false = off-screen right, true = on-screen. */
+  overlayReady?: boolean;
+  overlayTop?: string;
 }) {
   const {
     children,
@@ -23,23 +28,57 @@ export function AsideSlot(props: {
     panelRef,
     panelInnerRef,
     ariaLabel,
+    overlay = false,
+    overlayReady = false,
+    overlayTop = "0px",
   } = props;
 
   const isHorizontal = orientation === "horizontal";
-  const displayWidth = !isHorizontal ? (isOpen ? targetWidth : 0) : undefined;
-  const displayHeight = isHorizontal ? (isOpen ? targetHeight : 0) : undefined;
+  const showHandle = isOpen && !overlay;
 
-  // Timings:
+  // Docked path: width/height animates open <-> closed.
+  const dockedDisplayWidth = !isHorizontal ? (isOpen ? targetWidth : 0) : undefined;
+  const dockedDisplayHeight = isHorizontal ? (isOpen ? targetHeight : 0) : undefined;
   // Show: Faster fade in (300ms), fast width/height (150ms)
   // Hide: Fast width/height (150ms), fast-ish fade out (200ms)
   // During an active drag, useResizablePanels writes transitionDuration: 0ms directly
   // to the panel element so per-frame width/height updates aren't smoothed.
-  const duration = isOpen ? "300ms" : "200ms";
-  const sizeDuration = "150ms";
+  const dockedFadeDuration = isOpen ? "300ms" : "200ms";
+  const dockedSizeDuration = "150ms";
+
+  let asideClassName: string;
+  let asideStyle: CSSProperties;
+  if (overlay) {
+    asideClassName = `fixed bottom-0 right-0 z-50 flex flex-col overflow-hidden border-l border-[color:var(--border)] bg-[var(--content-background)] shadow-2xl transition-transform duration-300 will-change-transform ${
+      overlayReady ? "translate-x-0" : "translate-x-full"
+    }`;
+    asideStyle = {
+      top: overlayTop,
+      width: targetWidth,
+      minWidth: targetWidth,
+    };
+  } else {
+    asideClassName = `relative overflow-hidden bg-[var(--content-background)] ${
+      isHorizontal
+        ? "min-w-0 border-t border-[color:var(--border)]"
+        : "min-h-0 border-l border-[color:var(--border)]"
+    }`;
+    asideStyle = {
+      ...(isHorizontal
+        ? { height: dockedDisplayHeight, minHeight: dockedDisplayHeight }
+        : { width: dockedDisplayWidth, minWidth: dockedDisplayWidth }),
+      opacity: isOpen ? 1 : 0,
+      transitionProperty: "width, min-width, height, min-height, opacity, border-color",
+      transitionDuration: `${dockedSizeDuration}, ${dockedSizeDuration}, ${dockedSizeDuration}, ${dockedSizeDuration}, ${dockedFadeDuration}, 200ms`,
+      transitionTimingFunction: isOpen ? "ease-out" : "ease-in",
+      willChange: "width, min-width, height, min-height, opacity",
+    };
+  }
+  const asideKey = overlay ? "overlay-aside" : "docked-aside";
 
   return (
     <>
-      {isOpen && (
+      {showHandle && (
         <div
           key="handle"
           className={
@@ -51,25 +90,7 @@ export function AsideSlot(props: {
           aria-label={ariaLabel}
         />
       )}
-      <aside
-        key="aside"
-        ref={panelRef}
-        className={`relative overflow-hidden bg-[var(--content-background)] ${
-          isHorizontal
-            ? "min-w-0 border-t border-[color:var(--border)]"
-            : "min-h-0 border-l border-[color:var(--border)]"
-        }`}
-        style={{
-          ...(isHorizontal
-            ? { height: displayHeight, minHeight: displayHeight }
-            : { width: displayWidth, minWidth: displayWidth }),
-          opacity: isOpen ? 1 : 0,
-          transitionProperty: "width, min-width, height, min-height, opacity, border-color",
-          transitionDuration: `${sizeDuration}, ${sizeDuration}, ${sizeDuration}, ${sizeDuration}, ${duration}, 200ms`,
-          transitionTimingFunction: isOpen ? "ease-out" : "ease-in",
-          willChange: "width, min-width, height, min-height, opacity",
-        }}
-      >
+      <aside key={asideKey} ref={panelRef} className={asideClassName} style={asideStyle}>
         <div
           ref={panelInnerRef}
           className="h-full w-full"

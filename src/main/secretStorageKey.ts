@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { dirname, join } from "node:path";
 import { safeStorage } from "electron";
@@ -19,10 +19,15 @@ export function readOrCreateSafeStorageSecretKey(baseDir: string): string {
   }
 
   const path = keyFilePath(baseDir);
-  if (existsSync(path)) {
+  try {
     const encrypted = Buffer.from(readFileSync(path, "utf8"), "base64");
     const key = safeStorage.decryptString(encrypted);
     if (isValidKey(key)) return key;
+  } catch {
+    // Either the key file does not exist yet (first launch) or the OS-level
+    // safeStorage key is no longer available (e.g. credential reset, reinstall,
+    // different user). Fall through to regenerate; anything sealed with the
+    // prior key is unrecoverable regardless.
   }
 
   const key = randomBytes(32).toString("base64");

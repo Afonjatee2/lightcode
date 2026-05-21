@@ -78,6 +78,12 @@ export function closeAllPanels(): void {
   usePanelStore.getState().closeAllPanels();
 }
 
+/** Dismiss every panel that can occupy the right edge — used by the overlay backdrop. */
+export function dismissRightOverlay(): void {
+  usePanelStore.getState().closeAllPanels();
+  useDevTerminalStore.getState().closePanel();
+}
+
 function applyFilesPanel(
   projectId: string,
   worktreePath: string | undefined,

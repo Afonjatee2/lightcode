@@ -11,7 +11,7 @@ import { MainGitPanel } from "@/renderer/views/MainView/parts/MainGitPanel";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useProjectIds } from "@/renderer/state/useThread";
-import { closeAllPanels } from "@/renderer/actions/panelActions";
+import { closeAllPanels, dismissRightOverlay } from "@/renderer/actions/panelActions";
 import { setMainPanelDropZoneElement, useIsMainPanelDropActive } from "@/renderer/dnd";
 
 const FileEditorPanel = lazy(() =>
@@ -28,6 +28,7 @@ export function MainPageLayout(props: { wslAvailable: boolean; onTitleClick: () 
       title={getAppName(readBridge().channel, import.meta.env.DEV)}
       onTitleClick={onTitleClick}
       onRequestClosePanels={closeAllPanels}
+      onDismissRightOverlay={dismissRightOverlay}
       sidebarHeaderChildren={<SidebarHeaderControls wslAvailable={wslAvailable} />}
       sidebar={<Sidebar />}
       content={

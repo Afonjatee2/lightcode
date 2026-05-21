@@ -60,17 +60,15 @@ function resetSidebarOverlayStore() {
 
 function Harness() {
   const shellRef = useRef<HTMLDivElement>(null);
-  const mainRef = useRef<HTMLElement>(null);
 
   useSidebarOverlayEffects({
     sidebarWidth: 350,
     shellRef,
-    mainRef,
   });
 
   return (
     <div ref={shellRef} data-testid="shell">
-      <main ref={mainRef} data-testid="main" />
+      <main data-testid="main" />
     </div>
   );
 }

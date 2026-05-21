@@ -1,5 +1,6 @@
 import { useRef } from "react";
 import type { Project } from "@/shared/contracts";
+import { isHomeProjectId } from "@/shared/homeScope";
 import { BrowserPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel";
 import { DevTerminalPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/DevTerminalPanel";
 import {
@@ -132,6 +133,7 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
       : activeTab === "files"
         ? (resolvedFilesPanelContext?.rootLabel ?? projectNameForScope(activeProjectScope()))
         : projectNameForScope(activeProjectScope());
+  const isHomeScope = isHomeProjectId(activeProjectScope()?.projectId);
 
   function resolveNextProjectScope(): PanelProjectScope | null {
     return activeProjectScope() ?? fallbackScope();
@@ -188,6 +190,8 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
       }
       browserContent={renderBrowserContent ? <BrowserPanel visible /> : undefined}
       showTerminalTab={props.includeTerminal}
+      showFilesTab={!isHomeScope}
+      showGitTab={!isHomeScope}
       projectName={projectName}
       onExpandGitToOverlay={() => setGitOverlayOpen(true)}
       onExpandFilesToOverlay={() => setFileEditorOverlayMode("fullscreen")}

@@ -38,7 +38,10 @@ import { PresentationModeTabs } from "./PresentationModeTabs";
 import { ThreadDraftComposerArea, type DraftStartInput } from "./ThreadDraftComposerArea";
 import type { ComposerControl } from "./ThreadComposer";
 import { AgentDiscoveryScreen } from "./AgentDiscoveryScreen";
-import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
+import {
+  isDiscoveryActiveForLocation,
+  useAgentStatusesStore,
+} from "@/renderer/state/agentStatusesStore";
 import {
   ThreadDraftCompactHeader,
   ThreadDraftDropIndicators,
@@ -87,7 +90,9 @@ export function ThreadDraftView(props: {
   const gitBranch = useGitStore((s) => s.statuses[project.id]?.branch);
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
   const sharedSettingsHydrated = useSharedSettings((s) => s.sharedSettingsHydrated);
-  const inFirstLaunchDiscovery = useAgentStatusesStore((s) => s.inFirstLaunchDiscovery);
+  const showAgentDiscovery = useAgentStatusesStore((s) =>
+    isDiscoveryActiveForLocation(s, project.location),
+  );
   const isHomeScope = isHomeProjectId(project.id);
   const scopeLabel = isHomeScope ? HOME_PROJECT_NAME : undefined;
 
@@ -774,8 +779,8 @@ export function ThreadDraftView(props: {
       // arrive. Subsequent reloads (cache present, but the user opted out of
       // every agent or none are installed) fall back to the lightweight
       // pixel loader.
-      if (inFirstLaunchDiscovery) {
-        return <AgentDiscoveryScreen />;
+      if (showAgentDiscovery) {
+        return <AgentDiscoveryScreen location={project.location} />;
       }
       return (
         <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center">

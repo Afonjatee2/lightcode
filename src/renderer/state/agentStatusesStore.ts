@@ -6,6 +6,8 @@ import {
   type ProjectLocation,
 } from "@/shared/contracts";
 
+export type AgentDiscoveryScope = { kind: "native" } | { kind: "wsl"; distro: string };
+
 interface AgentStatusesStore {
   agentStatuses: AgentStatus[];
   wslAgentStatuses: AgentStatus[];
@@ -24,6 +26,7 @@ interface AgentStatusesStore {
    * launches where the cache is loaded eagerly.
    */
   inFirstLaunchDiscovery: boolean;
+  discoveryScope: AgentDiscoveryScope | undefined;
   /** Statuses streamed from `agent-detected` events during first-launch scan. */
   discoveredAgents: AgentStatus[];
   setAgentStatuses: (statuses: AgentStatus[]) => void;
@@ -34,7 +37,7 @@ interface AgentStatusesStore {
    * the empty initial state.
    */
   hydrateFromCache: (cached: { windows: AgentStatus[]; wsl: AgentStatus[] }) => void;
-  beginFirstLaunchDiscovery: () => void;
+  beginFirstLaunchDiscovery: (scope?: AgentDiscoveryScope) => void;
   resetDiscoveredAgents: () => void;
   pushDiscoveredAgent: (status: AgentStatus) => void;
   /**
@@ -78,36 +81,55 @@ function statusesEqual(a: AgentStatus[], b: AgentStatus[]): boolean {
   );
 }
 
+function isStatusInDiscoveryScope(
+  status: AgentStatus,
+  scope: AgentDiscoveryScope | undefined,
+): boolean {
+  if (scope?.kind === "wsl") {
+    return status.envKind === "wsl" && status.envDistro === scope.distro;
+  }
+  return status.envKind !== "wsl";
+}
+
+function buildStatusUpdatePatch(
+  prev: AgentStatusesStore,
+  incoming: AgentStatus[],
+  scope: "native" | "wsl",
+): Partial<AgentStatusesStore> {
+  const isWsl = scope === "wsl";
+  const currentList = isWsl ? prev.wslAgentStatuses : prev.agentStatuses;
+  const currentLoaded = isWsl ? prev.wslLoaded : prev.windowsLoaded;
+  const equal = statusesEqual(currentList, incoming);
+  const endsDiscovery =
+    prev.inFirstLaunchDiscovery &&
+    (isWsl ? prev.discoveryScope?.kind === "wsl" : prev.discoveryScope?.kind !== "wsl");
+  const discoveryPatch: Partial<AgentStatusesStore> = endsDiscovery
+    ? { inFirstLaunchDiscovery: false, discoveryScope: undefined }
+    : {};
+  if (equal && currentLoaded) {
+    return discoveryPatch;
+  }
+  const listPatch: Partial<AgentStatusesStore> = equal
+    ? {}
+    : isWsl
+      ? { wslAgentStatuses: incoming }
+      : { agentStatuses: incoming };
+  const loadedPatch: Partial<AgentStatusesStore> = isWsl
+    ? { wslLoaded: true }
+    : { windowsLoaded: true };
+  return { ...listPatch, ...loadedPatch, ...discoveryPatch };
+}
+
 export const useAgentStatusesStore = create<AgentStatusesStore>()((set) => ({
   agentStatuses: [],
   wslAgentStatuses: [],
   windowsLoaded: false,
   wslLoaded: false,
   inFirstLaunchDiscovery: false,
+  discoveryScope: undefined,
   discoveredAgents: [],
-  setAgentStatuses: (incoming) =>
-    set((prev) => {
-      const equal = statusesEqual(prev.agentStatuses, incoming);
-      if (equal && prev.windowsLoaded) {
-        return prev.inFirstLaunchDiscovery ? { inFirstLaunchDiscovery: false } : {};
-      }
-      return {
-        ...(equal ? {} : { agentStatuses: incoming }),
-        windowsLoaded: true,
-        inFirstLaunchDiscovery: false,
-      };
-    }),
-  setWslAgentStatuses: (incoming) =>
-    set((prev) => {
-      const equal = statusesEqual(prev.wslAgentStatuses, incoming);
-      if (equal && prev.wslLoaded) {
-        return prev;
-      }
-      return {
-        ...(equal ? {} : { wslAgentStatuses: incoming }),
-        wslLoaded: true,
-      };
-    }),
+  setAgentStatuses: (incoming) => set((prev) => buildStatusUpdatePatch(prev, incoming, "native")),
+  setWslAgentStatuses: (incoming) => set((prev) => buildStatusUpdatePatch(prev, incoming, "wsl")),
   hydrateFromCache: ({ windows, wsl }) =>
     set(() => ({
       agentStatuses: windows,
@@ -115,23 +137,32 @@ export const useAgentStatusesStore = create<AgentStatusesStore>()((set) => ({
       windowsLoaded: true,
       wslLoaded: true,
       inFirstLaunchDiscovery: false,
+      discoveryScope: undefined,
     })),
-  beginFirstLaunchDiscovery: () =>
+  beginFirstLaunchDiscovery: (scope) =>
     set((prev) => {
-      if (prev.windowsLoaded) {
+      const nextScope = scope ?? { kind: "native" };
+      if (nextScope.kind === "native" && prev.windowsLoaded) {
         return prev;
       }
-      return { inFirstLaunchDiscovery: true, discoveredAgents: [] };
+      return {
+        inFirstLaunchDiscovery: true,
+        discoveryScope: nextScope,
+        discoveredAgents: [],
+        ...(nextScope.kind === "wsl" ? { wslLoaded: false } : {}),
+      };
     }),
   resetDiscoveredAgents: () =>
     set((prev) =>
-      prev.discoveredAgents.length === 0 && !prev.inFirstLaunchDiscovery
+      prev.discoveredAgents.length === 0 &&
+      !prev.inFirstLaunchDiscovery &&
+      prev.discoveryScope === undefined
         ? prev
-        : { discoveredAgents: [], inFirstLaunchDiscovery: false },
+        : { discoveredAgents: [], inFirstLaunchDiscovery: false, discoveryScope: undefined },
     ),
   pushDiscoveredAgent: (status) =>
     set((prev) => {
-      if (status.envKind === "wsl") {
+      if (!isStatusInDiscoveryScope(status, prev.discoveryScope)) {
         return prev;
       }
       if (prev.discoveredAgents.some((existing) => existing.kind === status.kind)) {
@@ -173,4 +204,15 @@ export function isDetectingAgentsForLocation(
   location: ProjectLocation,
 ): boolean {
   return location.kind === "wsl" ? !state.wslLoaded : !state.windowsLoaded;
+}
+
+export function isDiscoveryActiveForLocation(
+  state: { inFirstLaunchDiscovery: boolean; discoveryScope: AgentDiscoveryScope | undefined },
+  location: ProjectLocation,
+): boolean {
+  if (!state.inFirstLaunchDiscovery) return false;
+  if (location.kind === "wsl") {
+    return state.discoveryScope?.kind === "wsl" && state.discoveryScope.distro === location.distro;
+  }
+  return state.discoveryScope?.kind !== "wsl";
 }

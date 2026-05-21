@@ -1,4 +1,4 @@
-import { startTransition, useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { FolderPlus, MessageSquareText } from "lucide-react";
 import { Button } from "@heroui/react";
 import type { ProjectLocation } from "@/shared/contracts";
@@ -12,9 +12,9 @@ import { readStoredBoolean, writeStoredBoolean } from "@/renderer/utils/localSto
 import { WELCOME_BACKGROUND_CODE } from "./welcomeBackgroundCode";
 import appIconUrl from "../../../build/icon.png";
 
-const WELCOME_SEEN_STORAGE_KEY = "lightcode-welcome-seen-v15";
+const WELCOME_SEEN_STORAGE_KEY = "lightcode-welcome-seen-v16";
 
-// Orbit + reveal animations finish ~2.4s after `visible` flips true. After
+// Orbit + reveal animations finish ~2.4s after the overlay mounts. After
 // that the comet has scaled to 0 and no longer needs its center sampled, so
 // the rAF loop driving `--comet-x/y` can stop.
 const ORBIT_DURATION_MS = 2400;
@@ -27,29 +27,34 @@ export function WelcomeOverlay() {
   const containerRectRef = useRef<DOMRect | null>(null);
 
   const homeScopeEnabled = useSharedSettings((state) => state.homeScopeEnabled);
-  const sharedSettingsHydrated = useSharedSettings((state) => state.sharedSettingsHydrated);
   const setHomeScopeEnabled = useSharedSettings((state) => state.setHomeScopeEnabled);
   const addProject = useAppStore((state) => state.addProject);
   const openDraft = useAppStore((state) => state.openDraft);
 
+  // `welcomeSeen` is read synchronously from localStorage so the overlay's
+  // open state is known on the very first render — no async settings gate, so
+  // the main UI never paints uncovered behind the overlay on first launch.
   const [welcomeSeen, setWelcomeSeen] = useState(() =>
     readStoredBoolean(WELCOME_SEEN_STORAGE_KEY, false),
   );
-  const open = sharedSettingsHydrated && !welcomeSeen;
+  const open = !welcomeSeen;
   const [mounted, setMounted] = useState(open);
-  const [visible, setVisible] = useState(false);
+  // Initialize `visible` to `open` so the overlay is fully opaque on first
+  // paint — the inner reveal/orbit animations are driven by CSS keyframes,
+  // not by toggling `visible`, so we don't need a RAF flip on entry.
+  const [visible, setVisible] = useState(open);
 
   useEffect(() => {
     if (open) {
       setMounted(true);
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
+      setVisible(true);
+      return;
     }
     setVisible(false);
   }, [open]);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!mounted) return;
     let rafId = 0;
     let stopped = false;
     const updateCometLight = () => {
@@ -74,7 +79,7 @@ export function WelcomeOverlay() {
       cancelAnimationFrame(rafId);
       clearTimeout(stopTimer);
     };
-  }, [visible]);
+  }, [mounted]);
 
   function handleTransitionEnd(e: React.TransitionEvent) {
     if (e.target === e.currentTarget && !visible) {
@@ -91,29 +96,21 @@ export function WelcomeOverlay() {
     if (!homeScopeEnabled) {
       setHomeScopeEnabled(true);
     }
+    dismissWelcome();
 
     const existingHomeProject = useAppStore.getState().projects.find(isHomeProject);
     if (existingHomeProject) {
-      startTransition(() => {
-        dismissWelcome();
-        openDraft(existingHomeProject.id);
-      });
+      openDraft(existingHomeProject.id);
       return;
     }
 
     void loadHomeScopeLocation()
       .then((location) => {
-        startTransition(() => {
-          const project = useAppStore.getState().ensureHomeProject(location);
-          dismissWelcome();
-          openDraft(project.id);
-        });
+        const project = useAppStore.getState().ensureHomeProject(location);
+        openDraft(project.id);
       })
       .catch(() => {
-        startTransition(() => {
-          dismissWelcome();
-          useAppStore.getState().openHome();
-        });
+        useAppStore.getState().openHome();
       });
   }
 
@@ -122,15 +119,13 @@ export function WelcomeOverlay() {
       .pickFolder()
       .then((path) => {
         if (!path) return;
-        startTransition(() => {
-          const location: ProjectLocation = isWindows()
-            ? { kind: "windows", path }
-            : { kind: "posix", path };
-          const project = addProject(location);
-          autoDetectSetupScript(project);
-          dismissWelcome();
-          openDraft(project.id);
-        });
+        const location: ProjectLocation = isWindows()
+          ? { kind: "windows", path }
+          : { kind: "posix", path };
+        dismissWelcome();
+        const project = addProject(location);
+        autoDetectSetupScript(project);
+        openDraft(project.id);
       });
   }
 

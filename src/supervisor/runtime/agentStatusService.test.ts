@@ -126,6 +126,30 @@ describe("AgentStatusService", () => {
     expect(detectInstall).toHaveBeenCalledTimes(1);
   });
 
+  it("runs startup detection again when a new WSL distro is requested", async () => {
+    const detectInstall = vi.fn<AgentAdapter["detectInstall"]>().mockResolvedValue(makeStatus());
+    const adapter = makeAdapter("codex", "Codex", detectInstall);
+    const { service, emit } = makeMultiAdapterService([adapter]);
+
+    await service.getAgentStatuses({ wslDistros: [] });
+    await vi.waitFor(() => {
+      expect(detectInstall).toHaveBeenCalledTimes(1);
+    });
+
+    await service.getAgentStatuses({ wslDistros: ["Ubuntu"] });
+
+    await vi.waitFor(() => {
+      expect(detectInstall).toHaveBeenCalledTimes(3);
+    });
+    const detected = emit.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === "agent-detected")
+      .map((event) => event.status);
+    expect(detected).toContainEqual(
+      expect.objectContaining({ kind: "codex", envKind: "wsl", envDistro: "Ubuntu" }),
+    );
+  });
+
   it("keeps explicit refresh able to probe again", async () => {
     const detectInstall = vi.fn<AgentAdapter["detectInstall"]>().mockResolvedValue(makeStatus());
     const { service } = makeService(detectInstall);
@@ -194,5 +218,21 @@ describe("AgentStatusService", () => {
       ([e]) => e.type === "windows-agent-statuses" || e.type === "wsl-agent-statuses",
     );
     expect(terminal).toHaveLength(0);
+  });
+
+  it("streams WSL agent detection events during full detection", async () => {
+    const detectInstall = vi.fn<AgentAdapter["detectInstall"]>().mockResolvedValue(makeStatus());
+    const adapter = makeAdapter("codex", "Codex", detectInstall);
+    const { service, emit } = makeMultiAdapterService([adapter]);
+
+    await service.refreshAgentStatuses({ wslDistros: ["Ubuntu"] });
+
+    const detected = emit.mock.calls
+      .map(([event]) => event)
+      .filter((event) => event.type === "agent-detected")
+      .map((event) => event.status);
+    expect(detected).toContainEqual(
+      expect.objectContaining({ kind: "codex", envKind: "wsl", envDistro: "Ubuntu" }),
+    );
   });
 });
