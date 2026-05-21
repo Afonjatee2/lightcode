@@ -146,7 +146,7 @@ export function resolveUtilityTaskConfig(
       "");
 
   const modelEfforts = agent.capabilities.modelEfforts[nextModel];
-  const availableEfforts = modelEfforts?.length ? modelEfforts : [...agent.capabilities.efforts];
+  const availableEfforts = modelEfforts ?? [...agent.capabilities.efforts];
   if (availableEfforts.length === 0) return { model: nextModel, effort: "", availableEfforts };
 
   if (availableEfforts.includes(effort)) return { model: nextModel, effort, availableEfforts };

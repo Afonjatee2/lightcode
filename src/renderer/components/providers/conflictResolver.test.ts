@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { resolveConflictResolverConfig } from "./ProviderIcon";
 import "./claude";
 import "./codex";
+import "./cursor";
 import "./gemini";
 
 const claudeStatus = {
@@ -37,6 +38,24 @@ const codexStatus = {
   },
 };
 
+const cursorStatus = {
+  kind: "cursor",
+  capabilities: {
+    models: [
+      { id: "composer-2.5", label: "Composer 2.5" },
+      { id: "composer-2.5-fast", label: "Composer 2.5 Fast" },
+      { id: "gpt-5.5", label: "GPT-5.5" },
+    ],
+    efforts: ["none", "low", "medium", "high", "xhigh", "max"],
+    defaultEffort: "medium" as string | undefined,
+    modelEfforts: {
+      "composer-2.5": [] as string[],
+      "composer-2.5-fast": [] as string[],
+      "gpt-5.5": ["none", "low", "medium", "high", "xhigh"],
+    } as Record<string, string[]>,
+  },
+};
+
 describe("resolveConflictResolverConfig", () => {
   it("falls back to registered defaults (Claude → Opus)", () => {
     const result = resolveConflictResolverConfig(claudeStatus, "", "");
@@ -69,9 +88,13 @@ describe("resolveConflictResolverConfig", () => {
     expect(result.availableEfforts).toEqual(["low", "medium", "high"]);
   });
 
-  it("falls back to global efforts when model has empty modelEfforts", () => {
-    // haiku has modelEfforts: [] → falls back to global efforts
+  it("does not fall back to global efforts when model has empty modelEfforts", () => {
     const result = resolveConflictResolverConfig(claudeStatus, "haiku", "");
-    expect(result.availableEfforts).toEqual(["low", "medium", "high", "xHigh", "max"]);
+    expect(result.availableEfforts).toEqual([]);
+  });
+
+  it("does not show efforts for Cursor Composer models without effort variants", () => {
+    const result = resolveConflictResolverConfig(cursorStatus, "composer-2.5", "");
+    expect(result).toEqual({ model: "composer-2.5", effort: "", availableEfforts: [] });
   });
 });
