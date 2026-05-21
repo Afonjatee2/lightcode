@@ -43,9 +43,7 @@ type JsonRpcResponse = JsonRpcResponseOk | JsonRpcResponseErr;
 /**
  * Single in-process MCP server. Speaks Streamable-HTTP MCP at `POST /mcp`
  * (JSON-RPC body, single JSON response). All five agent providers connect
- * here by URL — no per-thread Node child process. Also exposes legacy
- * `POST /<tool_name>` REST routes for backward compatibility with the old
- * stdio bridge until the v2 ship lands.
+ * here by URL — no per-thread Node child process.
  */
 export class BrowserMcpIngress {
   private server: Server | null = null;
@@ -189,18 +187,6 @@ export class BrowserMcpIngress {
         return;
       }
 
-      // Legacy REST: POST /<tool_name>. Retained so any older client still
-      // pointed at this endpoint continues to work during the transition.
-      if (req.method === "POST") {
-        const tool = path.replace(/^\/+/, "").replace(/\/+$/, "");
-        if (!tool) {
-          this.sendJson(res, 404, { error: "not found" });
-          return;
-        }
-        await this.handleLegacyRest(req, res, tool);
-        return;
-      }
-
       this.sendJson(res, 404, { error: "not found" });
     } catch (err) {
       this.sendJson(res, 500, { error: (err as Error).message ?? "internal" });
@@ -261,7 +247,7 @@ export class BrowserMcpIngress {
           result: {
             protocolVersion: MCP_PROTOCOL_VERSION,
             capabilities: { tools: {} },
-            serverInfo: { name: "lightcode_browser", version: "2.0.0" },
+            serverInfo: { name: "browser", version: "2.0.0" },
           },
         };
       }
@@ -327,40 +313,6 @@ export class BrowserMcpIngress {
         id,
         error: { code: -32000, message: (err as Error).message ?? "internal" },
       };
-    }
-  }
-
-  private async handleLegacyRest(
-    req: IncomingMessage,
-    res: ServerResponse,
-    tool: string,
-  ): Promise<void> {
-    if (!isKnownToolName(tool)) {
-      this.sendJson(res, 404, { error: `unknown tool: ${tool}` });
-      return;
-    }
-    const ctx = this.buildContext();
-    if (!ctx) {
-      this.sendJson(res, 503, { error: "browser not ready" });
-      return;
-    }
-    ctx.manager.revealPanel();
-    const raw = await this.readBody(req);
-    let args: Record<string, unknown> = {};
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object") args = parsed as Record<string, unknown>;
-      } catch {
-        this.sendJson(res, 400, { error: "invalid json" });
-        return;
-      }
-    }
-    try {
-      const result = await dispatchTool(tool, args, ctx);
-      this.sendJson(res, 200, result);
-    } catch (err) {
-      this.sendJson(res, 500, { error: (err as Error).message ?? "internal" });
     }
   }
 }

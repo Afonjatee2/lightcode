@@ -9,6 +9,7 @@
  */
 import type { AgentInstanceConfig } from "@/shared/contracts";
 import { createAcpGenericAdapter } from "./acp-generic";
+import { createAntigravityAdapter } from "./antigravity";
 import type { AgentAdapter } from "./base";
 import { createClaudeAdapter } from "./claude";
 import { createCopilotAdapter } from "./copilot";
@@ -32,6 +33,7 @@ export function buildAgentRegistry(userInstances: AgentInstanceConfig[]): AgentA
     createCopilotAdapter(),
     createCodexAdapter(),
     createGeminiAdapter(),
+    createAntigravityAdapter(),
     createCursorAdapter(),
     createOpenCodeAdapter(),
   ];

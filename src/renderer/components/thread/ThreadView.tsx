@@ -11,11 +11,13 @@ import type {
   ThreadPresentationMode,
   ThreadServerRequestId,
 } from "@/shared/contracts";
+import { isHomeProjectId } from "@/shared/homeScope";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 
 import { useAppStore } from "@/renderer/state/appStore";
 import { captureFileCheckpoint } from "@/renderer/state/fileCheckpointActions";
 import { TuxIcon } from "@/renderer/components/common";
+import { BrowserChip } from "@/renderer/components/composer";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
 import { captureThreadStarted } from "@/renderer/analytics/posthog";
@@ -69,6 +71,7 @@ function areThreadViewPropsEqual(prev: ThreadViewProps, next: ThreadViewProps): 
     prev.thread.done === next.thread.done &&
     prev.thread.canResumeWithConfig === next.thread.canResumeWithConfig &&
     prev.thread.sessionRef?.providerSessionId === next.thread.sessionRef?.providerSessionId &&
+    prev.thread.config.browserMcp === next.thread.config.browserMcp &&
     (!configAffectsLaunch || prev.thread.config === next.thread.config) &&
     prev.agentStatus === next.agentStatus &&
     prev.projectLocation === next.projectLocation &&
@@ -262,7 +265,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     }
 
     void (async () => {
-      if (optimisticUserMessageItemId) {
+      if (optimisticUserMessageItemId && !isHomeProjectId(thread.projectId)) {
         void captureFileCheckpoint({
           threadId: thread.id,
           checkpointItemId: optimisticUserMessageItemId,
@@ -308,6 +311,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     thread.config,
     thread.id,
     thread.presentationMode,
+    thread.projectId,
     thread.sessionRef,
     thread.worktreePath,
   ]);
@@ -366,6 +370,13 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                   {thread.title}
                 </Tooltip.Content>
               </Tooltip>
+              {thread.config.browserMcp === true ? (
+                <div className="lightcode-overlay-header__controls shrink-0">
+                  <BrowserChip
+                    onRemove={() => onConfigChange({ ...thread.config, browserMcp: false })}
+                  />
+                </div>
+              ) : null}
               <div className="flex shrink-0 items-center">
                 {projectName ? (
                   <span className="px-1 text-sm leading-tight text-muted/60 @max-[560px]:text-xs @max-[360px]:text-[11px]">

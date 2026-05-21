@@ -15,6 +15,7 @@ export * from "./claude";
 export * from "./copilot";
 export * from "./codex";
 export * from "./gemini";
+export * from "./antigravity";
 export * from "./cursor";
 export * from "./opencode";
 export * from "./acpGeneric";

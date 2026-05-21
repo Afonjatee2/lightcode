@@ -6,6 +6,7 @@ import { TerminalSurfaces } from "./TerminalSurfaces";
 const { state } = vi.hoisted(() => ({
   state: {
     focusCalls: [] as string[],
+    refitCalls: [] as string[],
   },
 }));
 
@@ -20,6 +21,7 @@ vi.mock("@/renderer/components/terminal/XTermSurface", async () => {
     XTermSurface: React.forwardRef<
       {
         focus: () => void;
+        refit: () => void;
         findNext: () => boolean;
         findPrevious: () => boolean;
         clearSearch: () => void;
@@ -28,6 +30,7 @@ vi.mock("@/renderer/components/terminal/XTermSurface", async () => {
     >(function MockXTermSurface(props, ref) {
       React.useImperativeHandle(ref, () => ({
         focus: () => state.focusCalls.push(props.terminalId),
+        refit: () => state.refitCalls.push(props.terminalId),
         findNext: () => false,
         findPrevious: () => false,
         clearSearch: () => undefined,
@@ -78,6 +81,7 @@ function renderSurfaces(props: {
 describe("TerminalSurfaces", () => {
   beforeEach(() => {
     state.focusCalls = [];
+    state.refitCalls = [];
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) =>
       setTimeout(() => callback(performance.now()), 0),
     );
@@ -111,6 +115,19 @@ describe("TerminalSurfaces", () => {
     await flushFocusFrames();
 
     expect(state.focusCalls).toEqual([tabB.id, tabB.id]);
+  });
+
+  it("refits the selected terminal when the selected tab changes", async () => {
+    const { rerender } = render(
+      renderSurfaces({ selectedTabId: tabA.id, activeTab: tabA, focusRequestId: 1 }),
+    );
+    await flushFocusFrames();
+    expect(state.refitCalls).toEqual([tabA.id]);
+
+    rerender(renderSurfaces({ selectedTabId: tabB.id, activeTab: tabB, focusRequestId: 1 }));
+    await flushFocusFrames();
+
+    expect(state.refitCalls).toEqual([tabA.id, tabB.id]);
   });
 
   it("does not focus the add-tab placeholder", async () => {

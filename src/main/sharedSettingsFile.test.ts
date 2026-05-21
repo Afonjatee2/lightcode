@@ -66,6 +66,7 @@ describe("sharedSettingsFile", () => {
       closeToTray: true,
       threadRemoveAction: "archive",
       newThreadMode: "page",
+      homeScopeEnabled: true,
       autoShowTerminalPanel: true,
       gitReviewMode: "panel",
       providerConfigs: {},
@@ -82,7 +83,7 @@ describe("sharedSettingsFile", () => {
       favoriteModels: [],
       recentModels: [],
       agentHookSupport: {},
-      browser: { mcpEnabled: true, allowEval: false, allowDataAccess: false },
+      browser: { allowEval: false, allowDataAccess: false },
     });
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
@@ -125,6 +126,7 @@ describe("sharedSettingsFile", () => {
       closeToTray: true,
       threadRemoveAction: "archive",
       newThreadMode: "page",
+      homeScopeEnabled: true,
       autoShowTerminalPanel: true,
       gitReviewMode: "panel",
       providerConfigs: {},
@@ -141,7 +143,7 @@ describe("sharedSettingsFile", () => {
       favoriteModels: [],
       recentModels: [],
       agentHookSupport: {},
-      browser: { mcpEnabled: true, allowEval: false, allowDataAccess: false },
+      browser: { allowEval: false, allowDataAccess: false },
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
   });

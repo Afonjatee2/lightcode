@@ -1515,12 +1515,17 @@ export class ThreadSessionManager {
       }
     }
 
-    const poll = async () => {
-      if (polling || session.sessionRef || session.status === "inactive" || attempt >= 5) {
+    const poll = async (force = false) => {
+      if (polling || session.sessionRef || session.status === "inactive") {
+        return;
+      }
+      if (!force && attempt >= 5) {
         return;
       }
       polling = true;
-      attempt += 1;
+      if (!force) {
+        attempt += 1;
+      }
       try {
         const ref = await session.adapter.discoverSessionRef?.(session.projectLocation);
         if (ref && !session.sessionRef && !existingIds.has(ref.providerSessionId)) {
@@ -1537,12 +1542,14 @@ export class ThreadSessionManager {
       } finally {
         polling = false;
       }
-      setTimeout(() => void poll(), 3000);
+      if (!force && attempt < 5) {
+        setTimeout(() => void poll(), 3000);
+      }
     };
 
     session.stopSessionRefWatcher = session.adapter.watchSessionRef?.(
       session.projectLocation,
-      () => void poll(),
+      () => void poll(true),
     );
     const initialDelay = session.adapter.initialSessionRefDiscoveryDelayMs ?? 0;
     if (initialDelay > 0) {

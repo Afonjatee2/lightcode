@@ -1,0 +1,106 @@
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import type { ProjectLocation } from "@/shared/contracts";
+import { resolveAgentHomeSubpath } from "../base";
+
+const INVALID_SESSION_RE = /not\s+found|invalid\s+conversation|no\s+such\s+conversation/i;
+
+export function detectAntigravityInvalidSessionRef(output: string): boolean {
+  return INVALID_SESSION_RE.test(output);
+}
+
+export const ANTIGRAVITY_CONFIG_SUBPATH = ".gemini/antigravity-cli";
+const ANTIGRAVITY_PARENT_SUBPATH = ".gemini";
+const CONVERSATIONS_SUBPATH = `${ANTIGRAVITY_CONFIG_SUBPATH}/conversations`;
+const LAST_CONVERSATIONS_SUBPATH = `${ANTIGRAVITY_CONFIG_SUBPATH}/cache/last_conversations.json`;
+
+export function resolveAntigravityConversationsDir(location: ProjectLocation): string | undefined {
+  return resolveAgentHomeSubpath(location, CONVERSATIONS_SUBPATH);
+}
+
+export function resolveAntigravityConfigDir(location: ProjectLocation): string | undefined {
+  return resolveAgentHomeSubpath(location, ANTIGRAVITY_CONFIG_SUBPATH);
+}
+
+function resolveAntigravityParentDir(location: ProjectLocation): string | undefined {
+  return resolveAgentHomeSubpath(location, ANTIGRAVITY_PARENT_SUBPATH);
+}
+
+export function antigravityConfigDirExists(location: ProjectLocation): boolean {
+  const dir = resolveAntigravityConfigDir(location);
+  return Boolean(dir && existsSync(dir));
+}
+
+interface AntigravityConversationFile {
+  id: string;
+  mtimeMs: number;
+}
+
+function readAntigravityConversationFiles(
+  location: ProjectLocation,
+): AntigravityConversationFile[] {
+  const dir = resolveAntigravityConversationsDir(location);
+  if (!dir || !existsSync(dir)) return [];
+  try {
+    return readdirSync(dir)
+      .filter((file) => file.endsWith(".pb"))
+      .map((file) => {
+        const path = join(dir, file);
+        return {
+          id: file.replace(/\.pb$/, ""),
+          mtimeMs: statSync(path).mtimeMs,
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+export function readAntigravityConversationIds(location: ProjectLocation): Set<string> {
+  return new Set(readAntigravityConversationFiles(location).map((file) => file.id));
+}
+
+export function readNewestAntigravityConversationId(
+  location: ProjectLocation,
+  previousIds: ReadonlySet<string>,
+): string | undefined {
+  return readAntigravityConversationFiles(location)
+    .filter((file) => !previousIds.has(file.id))
+    .sort((left, right) => right.mtimeMs - left.mtimeMs)[0]?.id;
+}
+
+// `agy` writes its workspace → most-recent conversation mapping here after
+// each session. Keys are the exact working directory string passed to the
+// CLI — Windows paths on native, posix paths in WSL.
+export function readAntigravityLastConversationForCwd(
+  location: ProjectLocation,
+  cwd: string,
+): string | undefined {
+  const path = resolveAgentHomeSubpath(location, LAST_CONVERSATIONS_SUBPATH);
+  if (!path) return undefined;
+  try {
+    const map = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    const value = map[cwd];
+    return typeof value === "string" && value.length > 0 ? value : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export function locationCwd(location: ProjectLocation): string {
+  return location.kind === "wsl" ? location.linuxPath : location.path;
+}
+
+// Watch the config root because `agy` stores cwd -> conversation mappings in
+// cache/last_conversations.json and conversation payloads under conversations/.
+export function resolveAntigravityWatchPath(location: ProjectLocation): string | undefined {
+  const configDir = resolveAntigravityConfigDir(location);
+  if (configDir && existsSync(configDir)) return configDir;
+  const parentDir = resolveAntigravityParentDir(location);
+  if (parentDir && existsSync(parentDir)) return parentDir;
+  return undefined;
+}
+
+export function describeAntigravityLocation(location: ProjectLocation): string {
+  return location.kind === "wsl" ? `wsl:${location.distro}` : location.kind;
+}

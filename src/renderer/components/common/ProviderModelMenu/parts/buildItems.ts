@@ -6,6 +6,7 @@ export interface ProviderModelMenuProvider {
   kind: string;
   label: string;
   icon?: string;
+  presentationMode?: ThreadPresentationMode;
   capabilities: AgentCapability;
 }
 
@@ -58,6 +59,7 @@ const PROVIDER_ORDER: readonly string[] = [
   "claude",
   "codex",
   "gemini",
+  "antigravity",
   "opencode",
   "cursor",
   "copilot",
@@ -357,6 +359,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         providerKind: m.ref.agentKind,
         modelId: m.ref.modelId,
         label: m.label,
+        ...(m.ref.presentationMode ? { presentationMode: m.ref.presentationMode } : {}),
         ...(providerIcon ? { providerIcon } : {}),
         ...(m.subProviderLabel ? { subProviderLabel: m.subProviderLabel } : {}),
         ...modelHintProps(m),
@@ -419,6 +422,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           providerKind: provider.kind,
           modelId: m.id,
           label: m.label,
+          ...(provider.presentationMode ? { presentationMode: provider.presentationMode } : {}),
           ...(provider.icon ? { providerIcon: provider.icon } : {}),
           ...(m.subLabel ? { subProviderLabel: m.subLabel } : {}),
           ...modelHintProps(m),
@@ -452,6 +456,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
         providerKind: provider.kind,
         modelId: m.id,
         label: m.label,
+        ...(provider.presentationMode ? { presentationMode: provider.presentationMode } : {}),
         ...(provider.icon ? { providerIcon: provider.icon } : {}),
         ...modelHintProps(m),
         ...(m.tooltipDescription ? { tooltipDescription: m.tooltipDescription } : {}),
@@ -478,6 +483,7 @@ export function buildProviderModelItems(input: BuildProviderModelItemsInput): Pr
           providerKind: provider.kind,
           modelId: m.id,
           label: m.label,
+          ...(provider.presentationMode ? { presentationMode: provider.presentationMode } : {}),
           ...(provider.icon ? { providerIcon: provider.icon } : {}),
           ...modelHintProps(m),
           ...(m.tooltipDescription ? { tooltipDescription: m.tooltipDescription } : {}),

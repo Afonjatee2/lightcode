@@ -1,4 +1,5 @@
 import { startTransition } from "react";
+import { isHomeProject } from "@/shared/homeScope";
 import { makeDraftPaneId } from "@/shared/paneId";
 import type { Project, Thread } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -101,7 +102,7 @@ export function useDndHandlers() {
     target: DragSourceData | null,
   ) {
     if (source.type === "project") {
-      const projects = useAppStore.getState().projects;
+      const projects = useAppStore.getState().projects.filter((project) => !isHomeProject(project));
       const reorder = resolveProjectReorder({
         projects,
         source,

@@ -80,6 +80,8 @@ export function TerminalSurfaces(props: {
 
     frame = requestAnimationFrame(() => {
       settledFrame = requestAnimationFrame(() => {
+        terminalRefs.current.get(selectedTabId)?.refit();
+        if (activeTab?.splitId) terminalRefs.current.get(activeTab.splitId)?.refit();
         terminalRefs.current.get(selectedTabId)?.focus();
       });
     });
@@ -88,7 +90,7 @@ export function TerminalSurfaces(props: {
       if (frame !== 0) cancelAnimationFrame(frame);
       if (settledFrame !== 0) cancelAnimationFrame(settledFrame);
     };
-  }, [activeTabId, focusRequestId, selectedTabId]);
+  }, [activeTab?.splitId, activeTabId, focusRequestId, selectedTabId]);
 
   function handleResizeStart(e: React.MouseEvent) {
     e.preventDefault();

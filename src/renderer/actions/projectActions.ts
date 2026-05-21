@@ -1,9 +1,32 @@
+import type { Project, ProjectLocation } from "@/shared/contracts";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
+
+// The home dir doesn't change at runtime, so cache the single IPC roundtrip
+// and reuse it across callers (MainView mount effect + WelcomeOverlay
+// "Ask Question" path).
+let homeScopeLocationPromise: Promise<ProjectLocation> | null = null;
+
+export function loadHomeScopeLocation(): Promise<ProjectLocation> {
+  if (!homeScopeLocationPromise) {
+    homeScopeLocationPromise = readBridge()
+      .getHomeScopeLocation()
+      .catch((err) => {
+        homeScopeLocationPromise = null;
+        throw err;
+      });
+  }
+  return homeScopeLocationPromise;
+}
+
+export async function ensureHomeScopeProject(): Promise<Project> {
+  const location = await loadHomeScopeLocation();
+  return useAppStore.getState().ensureHomeProject(location);
+}
 
 export function setProjectDisabled(projectId: string, disabled: boolean): void {
   const store = useAppStore.getState();

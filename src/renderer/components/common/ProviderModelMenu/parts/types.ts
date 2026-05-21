@@ -1,3 +1,5 @@
+import type { ThreadPresentationMode } from "@/shared/contracts";
+
 export interface ProviderModelHeaderPlain {
   type: "header-plain";
   id: string;
@@ -25,6 +27,7 @@ export interface ProviderModelRow {
   id: string;
   providerKind: string;
   providerIcon?: string;
+  presentationMode?: ThreadPresentationMode;
   modelId: string;
   label: string;
   /** Tail hint shown to the right of the model label. */

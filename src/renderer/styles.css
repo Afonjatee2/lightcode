@@ -26,6 +26,284 @@
   }
 }
 
+@keyframes lightcode-welcome-page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lightcode-welcome-reveal {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes lightcode-welcome-ring-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes lightcode-welcome-orbit {
+  0% {
+    opacity: 0;
+    transform: rotateX(50deg) rotateY(-30deg) rotateZ(-360deg) scale(18);
+  }
+  15% {
+    opacity: 1;
+  }
+  65% {
+    transform: rotateX(20deg) rotateY(-10deg) rotateZ(180deg) scale(2);
+    opacity: 1;
+  }
+  85% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(350deg) scale(0.01);
+    opacity: 1;
+  }
+  91%,
+  100% {
+    transform: rotateX(0deg) rotateY(0deg) rotateZ(360deg) scale(0);
+    opacity: 0;
+  }
+}
+
+@keyframes lightcode-welcome-splash {
+  0%,
+  85% {
+    opacity: 0;
+    transform: scale(0.01);
+  }
+  90% {
+    opacity: 1;
+    transform: scale(2);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(6);
+  }
+}
+
+@keyframes lightcode-welcome-light {
+  0%,
+  85% {
+    opacity: 0;
+    transform: scale(0.1);
+  }
+  90% {
+    opacity: 0.6;
+    transform: scale(0.8);
+  }
+  100% {
+    opacity: 0.2;
+    transform: scale(0.6);
+  }
+}
+
+.lightcode-welcome-page {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in oklab, var(--surface-secondary) 70%, transparent) 0%,
+      var(--background) 58%
+    ),
+    var(--background);
+  animation: lightcode-welcome-page-in 0.44s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.lightcode-welcome-stage {
+  transform: translate3d(0, -1.5vh, 0);
+}
+
+.lightcode-welcome-reveal {
+  animation: lightcode-welcome-reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: 2s;
+}
+
+.lightcode-welcome-reveal-1 {
+  animation-delay: 2.2s;
+}
+
+.lightcode-welcome-reveal-2 {
+  animation-delay: 2.4s;
+}
+
+.lightcode-welcome-ring {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 42%),
+    conic-gradient(
+      from 90deg,
+      transparent 0deg,
+      color-mix(in oklab, var(--accent) 82%, white) 58deg,
+      transparent 132deg,
+      transparent 360deg
+    );
+  animation:
+    lightcode-welcome-reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both,
+    lightcode-welcome-ring-spin 5.5s linear infinite;
+  animation-delay: 2s, 0s;
+  opacity: 0.74;
+  transform: translateZ(0);
+}
+
+.lightcode-welcome-light {
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.4) 0%,
+    rgba(255, 255, 255, 0.1) 40%,
+    transparent 70%
+  );
+  animation: lightcode-welcome-light 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: center;
+  filter: blur(8px);
+}
+
+.lightcode-welcome-orbit {
+  animation: lightcode-welcome-orbit 2.2s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  transform-origin: center;
+  transform-style: preserve-3d;
+}
+
+.lightcode-welcome-comet {
+  background: rgba(255, 255, 255, 1);
+  box-shadow:
+    0 0 6px 3px rgba(255, 255, 255, 1),
+    0 0 16px 8px rgba(255, 255, 255, 0.5),
+    0 0 32px 16px rgba(255, 255, 255, 0.2);
+  mix-blend-mode: screen;
+  filter: blur(1px);
+}
+
+.lightcode-welcome-comet::before,
+.lightcode-welcome-comet::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(
+    ellipse at center,
+    rgba(255, 255, 255, 1) 0%,
+    rgba(255, 255, 255, 0.4) 30%,
+    transparent 80%
+  );
+}
+
+.lightcode-welcome-comet::before {
+  width: 56px;
+  height: 2px;
+}
+
+.lightcode-welcome-comet::after {
+  width: 2px;
+  height: 56px;
+}
+
+.lightcode-welcome-splash {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 40%,
+    transparent 70%
+  );
+  animation: lightcode-welcome-splash 2.2s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  filter: blur(4px);
+}
+
+.lightcode-welcome-icon-glass {
+  background: color-mix(in oklab, var(--surface-secondary) 80%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 22px 80px color-mix(in oklab, var(--accent) 18%, transparent);
+}
+
+.lightcode-welcome-button {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: scale(1);
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  border-radius: 0.75rem;
+}
+
+.lightcode-welcome-button:hover,
+.lightcode-welcome-button[data-hovered="true"] {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: scale(1.02);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.lightcode-welcome-button:active,
+.lightcode-welcome-button[data-pressed="true"] {
+  background: rgba(255, 255, 255, 0.02);
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.lightcode-welcome-bg-glow {
+  background:
+    radial-gradient(
+      150px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 100%
+    ),
+    radial-gradient(
+      250px circle at var(--comet-x, -1000px) var(--comet-y, -1000px),
+      rgba(255, 255, 255, 0.06) 0%,
+      transparent 100%
+    );
+}
+
+.lightcode-welcome-code-wall {
+  mask-image:
+    radial-gradient(
+      200px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
+      rgba(0, 0, 0, 1) 0%,
+      rgba(0, 0, 0, 0.6) 40%,
+      transparent 100%
+    ),
+    radial-gradient(
+      300px circle at var(--comet-x, -1000px) var(--comet-y, -1000px),
+      rgba(0, 0, 0, 0.8) 0%,
+      rgba(0, 0, 0, 0.4) 40%,
+      transparent 100%
+    );
+  -webkit-mask-image:
+    radial-gradient(
+      200px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
+      rgba(0, 0, 0, 1) 0%,
+      rgba(0, 0, 0, 0.6) 40%,
+      transparent 100%
+    ),
+    radial-gradient(
+      300px circle at var(--comet-x, -1000px) var(--comet-y, -1000px),
+      rgba(0, 0, 0, 0.8) 0%,
+      rgba(0, 0, 0, 0.4) 40%,
+      transparent 100%
+    );
+  color: rgba(255, 255, 255, 0.8);
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New",
+    monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  column-width: 500px;
+  column-gap: 3rem;
+  user-select: none;
+}
+
 /* Goal dock active indicator — rotates a soft accent arc around the
    target icon to suggest work in progress. The icon itself is already a
    bullseye, so a thin ring traveling around it reads as "shining in
@@ -1527,6 +1805,14 @@ html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
   max-width: 12rem;
 }
 
+.lightcode-browser-chip {
+  gap: 0.25rem;
+  padding: 0.12rem 0.38rem;
+  border-radius: 0.35rem;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+}
+
 .lightcode-attachment-chip[role="button"] {
   cursor: var(--interactive-cursor);
 }
@@ -1574,6 +1860,13 @@ html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
   border: 1px solid var(--border);
   color: var(--muted);
   cursor: var(--interactive-cursor);
+}
+
+.lightcode-browser-chip .lightcode-attachment-chip__delete {
+  right: -0.25rem;
+  top: -0.25rem;
+  width: 0.85rem;
+  height: 0.85rem;
 }
 
 .lightcode-attachment-chip__delete:hover {

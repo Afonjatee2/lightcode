@@ -1,5 +1,6 @@
 import { Tooltip } from "@heroui/react";
 import {
+  ChevronRight,
   Download,
   House,
   PanelLeft,
@@ -13,6 +14,7 @@ import { useShallow } from "zustand/shallow";
 import { getAppName } from "@/shared/appName";
 import type { Thread } from "@/shared/contracts";
 import { formatBytes } from "@/shared/formatBytes";
+import { isHomeProject, isHomeProjectId } from "@/shared/homeScope";
 import { SidebarButton } from "@/renderer/components/common";
 import { ProviderIcon, getStatusTone } from "@/renderer/components/providers";
 import {
@@ -35,7 +37,9 @@ import { useScrollFade } from "@/renderer/hooks/useScrollFade";
 import { useAppStore } from "@/renderer/state/appStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useUpdateStore } from "@/renderer/state/updateStore";
+import { SidebarProjectThreadList } from "./parts/SidebarProjectThreadList";
 
 function UpdateButtons(props: { iconOnly?: boolean }) {
   const { iconOnly = false } = props;
@@ -120,10 +124,15 @@ function ThreadIcon(props: { thread: Thread }) {
 
 function CollapsedThreadRail() {
   const currentThreadIds = useCurrentThreadIds();
+  const homeScopeEnabled = useSharedSettings((s) => s.homeScopeEnabled);
   const activeThreads = useAppStore(
     useShallow((state) =>
       state.threads.filter(
-        (thread) => thread.status !== "inactive" && !thread.done && !thread.archived,
+        (thread) =>
+          thread.status !== "inactive" &&
+          !thread.done &&
+          !thread.archived &&
+          (homeScopeEnabled || !isHomeProjectId(thread.projectId)),
       ),
     ),
   );
@@ -159,14 +168,22 @@ function CollapsedThreadRail() {
 
 export function Sidebar() {
   const projectIds = useAppStore(
-    useShallow((state) => state.projects.map((project) => project.id)),
+    useShallow((state) =>
+      state.projects.filter((project) => !isHomeProject(project)).map((project) => project.id),
+    ),
   );
+  const homeProject = useAppStore((state) => state.projects.find(isHomeProject));
+  const homeScopeEnabled = useSharedSettings((s) => s.homeScopeEnabled);
   const currentProjectId = useCurrentProjectId();
   const currentWorktreePath = useCurrentWorktreePath();
   const sortMode = usePanelStore((s) => s.threadSortMode);
   const threadSearchOpen = usePanelStore((s) => s.threadSearchOpen);
   const openThreadSearch = usePanelStore((s) => s.openThreadSearch);
+  const isHomeProjectCollapsed = useSidebarUiStore((s) =>
+    homeProject ? (s.collapsedProjects[homeProject.id] ?? false) : false,
+  );
   const setProjectCollapsed = useSidebarUiStore((s) => s.setProjectCollapsed);
+  const toggleProjectCollapsed = useSidebarUiStore((s) => s.toggleProjectCollapsed);
   const setWorktreeCollapsed = useSidebarUiStore((s) => s.setWorktreeCollapsed);
   const { isCollapsed, collapse, expand } = useSidebar();
   const openHome = useAppStore((s) => s.openHome);
@@ -233,12 +250,36 @@ export function Sidebar() {
         style={{ minWidth: SIDEBAR_MIN_WIDTH }}
       >
         <div ref={setScrollContainer} className={sidebarBodyScrollClass()} style={scrollFadeStyle}>
-          {projectIds.length === 0 ? (
+          {projectIds.length === 0 && !(homeScopeEnabled && homeProject) ? (
             <div className="pt-4">
               <p className="text-center text-sm text-muted">Add a project to start</p>
             </div>
           ) : (
             <div className="space-y-4">
+              {homeScopeEnabled && homeProject ? (
+                <section className="space-y-0.5">
+                  <SidebarButton
+                    icon={
+                      <ChevronRight
+                        className={`size-3.5 shrink-0 text-muted transition-transform ${
+                          isHomeProjectCollapsed ? "" : "rotate-90"
+                        }`}
+                      />
+                    }
+                    label={
+                      <span className="flex items-center gap-1.5">
+                        <House className="size-3.5 shrink-0 text-muted" />
+                        <span className="truncate text-xs font-semibold text-foreground">Home</span>
+                      </span>
+                    }
+                    className="lightcode-sidebar-project-nudge !pl-1"
+                    onPress={() => toggleProjectCollapsed(homeProject.id)}
+                  />
+                  {isHomeProjectCollapsed ? null : (
+                    <SidebarProjectThreadList project={homeProject} sortMode={sortMode} />
+                  )}
+                </section>
+              ) : null}
               {projectIds.map((projectId, projectIndex) => (
                 <SidebarProjectSection
                   key={projectId}

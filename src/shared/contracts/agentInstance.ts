@@ -28,6 +28,7 @@ export const KNOWN_AGENT_DRIVERS = {
   codex: "codex" as AgentDriverKind,
   copilot: "copilot" as AgentDriverKind,
   gemini: "gemini" as AgentDriverKind,
+  antigravity: "antigravity" as AgentDriverKind,
   cursor: "cursor" as AgentDriverKind,
   opencode: "opencode" as AgentDriverKind,
   acpGeneric: "acp-generic" as AgentDriverKind,

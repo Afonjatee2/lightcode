@@ -1,4 +1,5 @@
 import { startTransition } from "react";
+import { isHomeProject } from "@/shared/homeScope";
 import { isDraftPaneId } from "@/shared/paneId";
 import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -20,7 +21,13 @@ let openThreadRequestId = 0;
 export function openNewThread(projectId?: string): void {
   openThreadRequestId += 1;
   const store = useAppStore.getState();
-  const targetProjectId = projectId ?? getCurrentProjectId() ?? store.projects[0]?.id;
+  const targetProjectId =
+    projectId ??
+    getCurrentProjectId() ??
+    (useSharedSettings.getState().homeScopeEnabled
+      ? store.projects.find(isHomeProject)?.id
+      : undefined) ??
+    store.projects.find((project) => !project.disabled && !isHomeProject(project))?.id;
   startTransition(() => {
     if (!targetProjectId) {
       useAppStore.getState().openHome();

@@ -441,9 +441,8 @@ function updateOpenCodeConfigFile(configPath: string, servers: BrowserMcpServers
     mcpRaw && typeof mcpRaw === "object" && !Array.isArray(mcpRaw)
       ? { ...(mcpRaw as Record<string, unknown>) }
       : {};
-  if (!servers) {
-    delete mcp[BROWSER_MCP_SERVER_NAME];
-  } else {
+  delete mcp[BROWSER_MCP_SERVER_NAME];
+  if (servers) {
     for (const [name, entry] of Object.entries(servers)) {
       mcp[name] = entry;
     }

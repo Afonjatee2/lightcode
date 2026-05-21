@@ -48,6 +48,7 @@ interface SharedSettingsState extends SharedSettings {
   setCloseToTray: (value: boolean) => void;
   setThreadRemoveAction: (value: ThreadRemoveAction) => void;
   setNewThreadMode: (value: NewThreadMode) => void;
+  setHomeScopeEnabled: (value: boolean) => void;
   setAutoShowTerminalPanel: (value: boolean) => void;
   setGitReviewMode: (value: GitReviewMode) => void;
   setEditorLspEnabled: (value: boolean) => void;
@@ -278,6 +279,11 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     set({ newThreadMode });
     persistSettings(selectSharedSettings(get()));
   },
+  setHomeScopeEnabled: (homeScopeEnabled) => {
+    if (get().homeScopeEnabled === homeScopeEnabled) return;
+    set({ homeScopeEnabled });
+    persistSettings(selectSharedSettings(get()));
+  },
   setAutoShowTerminalPanel: (autoShowTerminalPanel) => {
     set({ autoShowTerminalPanel });
     persistSettings(selectSharedSettings(get()));
@@ -469,6 +475,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     closeToTray: state.closeToTray,
     threadRemoveAction: state.threadRemoveAction,
     newThreadMode: state.newThreadMode,
+    homeScopeEnabled: state.homeScopeEnabled,
     autoShowTerminalPanel: state.autoShowTerminalPanel,
     gitReviewMode: state.gitReviewMode,
     providerConfigs: state.providerConfigs,

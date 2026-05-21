@@ -58,7 +58,11 @@ export interface ProviderModelMenuProps {
   hideLabelOnWrap?: boolean;
   forceHideLabel?: boolean;
   openSignal?: number;
-  onChange: (next: { agentKind: string; model: string }) => void;
+  onChange: (next: {
+    agentKind: string;
+    model: string;
+    presentationMode?: ThreadPresentationMode;
+  }) => void;
   onOpenChange?: (open: boolean) => void;
 }
 
@@ -320,7 +324,11 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
     // context/fast resolution doesn't block the close animation.
     handleOpenChange(false);
     startTransition(() => {
-      onChange({ agentKind: selected.providerKind, model: selected.modelId });
+      onChange({
+        agentKind: selected.providerKind,
+        model: selected.modelId,
+        ...(selected.presentationMode ? { presentationMode: selected.presentationMode } : {}),
+      });
     });
   }
 
@@ -409,8 +417,12 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
               items={items}
               selectedKeys={selectedKeys}
               scrollRef={windowedListRef}
-              toggleFavorite={(providerKind, modelId) =>
-                toggleFavoriteModel(providerKind, modelId, presentationMode ?? "terminal")
+              toggleFavorite={(providerKind, modelId, rowPresentationMode) =>
+                toggleFavoriteModel(
+                  providerKind,
+                  modelId,
+                  rowPresentationMode ?? presentationMode ?? "terminal",
+                )
               }
               onSelect={handleSelect}
             />
@@ -426,7 +438,11 @@ function WindowedProviderModelList(props: {
   items: ProviderModelItem[];
   selectedKeys: Set<string>;
   scrollRef: RefObject<HTMLDivElement | null>;
-  toggleFavorite: (providerKind: string, modelId: string) => void;
+  toggleFavorite: (
+    providerKind: string,
+    modelId: string,
+    presentationMode: ThreadPresentationMode | undefined,
+  ) => void;
   onSelect: (itemId: string) => void;
 }) {
   const { domIdPrefix, items, selectedKeys, scrollRef, toggleFavorite, onSelect } = props;
@@ -748,7 +764,7 @@ function WindowedProviderModelList(props: {
                 onPointerUp={(event) => event.stopPropagation()}
                 onClick={(event) => {
                   event.stopPropagation();
-                  toggleFavorite(item.providerKind, item.modelId);
+                  toggleFavorite(item.providerKind, item.modelId, item.presentationMode);
                 }}
               >
                 <Star className="size-3.5" fill={item.isFavorite ? "currentColor" : "none"} />

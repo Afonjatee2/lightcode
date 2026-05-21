@@ -1,6 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Paperclip } from "lucide-react";
-import { Button } from "@heroui/react";
 import type {
   AgentStatus,
   Project,
@@ -8,14 +6,17 @@ import type {
   ThreadConfig,
   ThreadPresentationMode,
 } from "@/shared/contracts";
+import { isHomeProjectId } from "@/shared/homeScope";
 import { readBridge } from "@/renderer/bridge";
 import {
   AttachmentBar,
+  ComposerAddMenu,
   ImageLightbox,
   MentionInput,
   type MentionInputHandle,
   useAttachments,
 } from "@/renderer/components/composer";
+import { getBrowserMcpScope } from "@/renderer/components/composer/browserMcpScope";
 import { useBrowserAttachInbox } from "@/renderer/state/browserAttachInbox";
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import {
@@ -129,6 +130,8 @@ export function ThreadDraftComposerArea(props: {
   const filteredCommands = filterSlashCommands(availableCommands, slashQuery);
   const showCommandPanel = filteredCommands.length > 0;
   const authRequired = props.selectedAgent.authState === "missing";
+  const isHomeScope = isHomeProjectId(props.project.id);
+  const browserMcpScope = getBrowserMcpScope(props.selectedAgent.kind, props.presentationMode);
   const controls: ComposerControl[] = controlOpenRequest
     ? props.controls.map((control) => {
         if (controlOpenRequest.target === "model" && control.kind === "provider-model") {
@@ -329,8 +332,8 @@ export function ThreadDraftComposerArea(props: {
             autoFocus={(props.paneCount ?? 1) === 1} // eslint-disable-line jsx-a11y/no-autofocus -- desktop app, expected UX
             compact={props.compact ?? false}
             placeholder="Send a message..."
-            projectLocation={props.project.location}
-            projectId={props.project.id}
+            projectLocation={isHomeScope ? undefined : props.project.location}
+            {...(!isHomeScope ? { projectId: props.project.id } : {})}
             onTextChange={(hasText) => {
               setHasContent(hasText);
               latestSegmentsRef.current = mentionRef.current?.serializeSegments() ?? [];
@@ -383,22 +386,18 @@ export function ThreadDraftComposerArea(props: {
         }}
         afterControls={(level) => (
           <>
-            <Button
-              isIconOnly
-              aria-label="Attach files"
-              className="lightcode-composer-menu min-w-9 px-2"
-              size="sm"
-              variant="ghost"
-              onPress={() => {
+            <ComposerAddMenu
+              browserMcpEnabled={props.config.browserMcp === true}
+              showBrowserOption={browserMcpScope !== "none"}
+              onPickFiles={() => {
                 void readBridge()
                   .pickFiles()
                   .then((paths) => {
                     if (paths) attachments.addFiles(paths);
                   });
               }}
-            >
-              <Paperclip className="size-4" />
-            </Button>
+              onToggleBrowserMcp={(next) => props.onConfigChange({ browserMcp: next })}
+            />
             {props.gitBranch ? (
               <BranchSelector
                 projectId={props.project.id}

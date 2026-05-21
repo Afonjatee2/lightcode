@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ProjectLocation } from "../../contracts";
 import type { KeybindingsConfig } from "../../keybindings";
 import { defineIpcProcedure, defineNoArgProcedure, definePayloadProcedure } from "../core";
 import {
@@ -41,6 +42,10 @@ export const appProcedures = {
     (url) => openExternalPayloadSchema.parse(url),
   ),
   focusWindow: defineNoArgProcedure<void, "main-local">("focusWindow", "main-local"),
+  getHomeScopeLocation: defineNoArgProcedure<ProjectLocation, "main-local">(
+    "getHomeScopeLocation",
+    "main-local",
+  ),
   getKeybindings: defineNoArgProcedure<KeybindingsConfig, "main-local">(
     "getKeybindings",
     "main-local",

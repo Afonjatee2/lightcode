@@ -26,6 +26,7 @@ import { useResolvedAppearance } from "@/renderer/components/ui/provider";
 
 export interface XTermSurfaceHandle {
   focus(): void;
+  refit(): void;
   findNext(query: string): boolean;
   findPrevious(query: string): boolean;
   clearSearch(): void;
@@ -118,6 +119,9 @@ export const XTermSurface = forwardRef<
   useImperativeHandle(ref, () => ({
     focus() {
       terminalRef.current?.focus();
+    },
+    refit() {
+      requestRefitRef.current?.();
     },
     findNext(query: string) {
       return searchRef.current?.findNext(query) ?? false;

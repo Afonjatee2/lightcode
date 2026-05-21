@@ -1,10 +1,12 @@
 import { startTransition, useEffect } from "react";
 import { buildPaneLayoutFromLegacy } from "@/shared/paneLayout";
 import { readBridge } from "@/renderer/bridge";
+import { ensureHomeScopeProject } from "@/renderer/actions/projectActions";
 
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { AppDndProvider } from "@/renderer/dnd";
 
 import { useKeyboardShortcuts } from "@/renderer/hooks/useKeyboardShortcuts";
@@ -24,6 +26,8 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
   const view = useAppStore((state) => state.view);
   const openHome = useAppStore((state) => state.openHome);
   const wslProjectDistrosKey = useAppStore((state) => buildWslProjectDistrosKey(state.projects));
+  const homeScopeEnabled = useSharedSettings((state) => state.homeScopeEnabled);
+  const sharedSettingsHydrated = useSharedSettings((state) => state.sharedSettingsHydrated);
 
   useThreadLifecycle(storeHydrated);
   const { wslAvailable } = useWslDetection(storeHydrated);
@@ -32,6 +36,14 @@ export function MainView(props: { storeHydrated: boolean; loadT0: number }) {
   useBrowserSync();
 
   const { handleSortEnd, handlePaneDrop, handleMainPanelDrop } = useDndHandlers();
+
+  useEffect(() => {
+    if (!storeHydrated || !sharedSettingsHydrated || !homeScopeEnabled) {
+      return;
+    }
+
+    void ensureHomeScopeProject().catch(() => undefined);
+  }, [storeHydrated, sharedSettingsHydrated, homeScopeEnabled]);
 
   useEffect(() => {
     if (!storeHydrated) {

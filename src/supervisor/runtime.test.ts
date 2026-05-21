@@ -822,6 +822,122 @@ describe("writeSubmittedPrompt", () => {
     vi.useRealTimers();
   });
 
+  it("allows session ref watcher events to discover after timed polling expires", async () => {
+    vi.useFakeTimers();
+    const emitted: Array<Record<string, unknown>> = [];
+    const runtime = makeRuntime((event) => {
+      emitted.push(event as Record<string, unknown>);
+    });
+    const pty = createMockPty();
+    let onWatcherChanged: (() => void) | undefined;
+    const stopWatcher = vi.fn<() => void>();
+    const discoverSessionRef =
+      vi.fn<() => Promise<{ providerSessionId: string; discoveredAt: string } | undefined>>();
+    discoverSessionRef
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({
+        providerSessionId: "antigravity-conversation-1",
+        discoveredAt: "2026-05-20T00:00:00.000Z",
+      });
+
+    ptySpawnMock.mockReturnValueOnce(pty);
+
+    (
+      runtime as unknown as {
+        spawnThread: (input: {
+          threadId: string;
+          agentKind: string;
+          adapter: Record<string, unknown>;
+          projectLocation: { kind: "windows"; path: string };
+          config: { model: string };
+          initialSize: { cols: number; rows: number };
+          launchPrompt: string;
+          command: { command: string; args: string[] };
+        }) => SessionRuntime;
+      }
+    ).spawnThread({
+      threadId: "thread-antigravity-late-session",
+      agentKind: "antigravity",
+      adapter: {
+        kind: "antigravity",
+        label: "Antigravity",
+        capabilities: {
+          models: [{ id: "auto", label: "Auto" }],
+          efforts: [],
+          modelEfforts: {},
+          modes: [],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+        },
+        initialSessionRefDiscoveryDelayMs: 1000,
+        discoverSessionRef,
+        watchSessionRef: vi.fn<(_location: unknown, onChanged: () => void) => () => void>(
+          (_location, onChanged) => {
+            onWatcherChanged = onChanged;
+            return stopWatcher;
+          },
+        ),
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      config: {
+        model: "auto",
+      },
+      initialSize: {
+        cols: 120,
+        rows: 30,
+      },
+      launchPrompt: "",
+      command: {
+        command: "agy",
+        args: [],
+      },
+    });
+
+    await vi.advanceTimersByTimeAsync(1000);
+    for (let i = 0; i < 4; i += 1) {
+      await vi.advanceTimersByTimeAsync(3000);
+    }
+
+    expect(discoverSessionRef).toHaveBeenCalledTimes(5);
+    expect(
+      emitted.some(
+        (event) =>
+          event.type === "thread-state" &&
+          (event.sessionRef as { providerSessionId?: string } | undefined)?.providerSessionId ===
+            "antigravity-conversation-1",
+      ),
+    ).toBe(false);
+
+    onWatcherChanged?.();
+    await Promise.resolve();
+
+    expect(discoverSessionRef).toHaveBeenCalledTimes(6);
+    expect(stopWatcher).toHaveBeenCalledTimes(1);
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-antigravity-late-session",
+        canResumeWithConfig: true,
+        sessionRef: {
+          providerSessionId: "antigravity-conversation-1",
+          discoveredAt: "2026-05-20T00:00:00.000Z",
+        },
+      }),
+    );
+    vi.useRealTimers();
+  });
+
   it("keeps terminal scrollback in a capped transcript buffer", () => {
     const runtime = makeRuntime(() => undefined);
     const session = createRuntimeSession({ prevChunk: "" });

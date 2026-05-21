@@ -44,6 +44,7 @@ export const AUTO_PROVIDER_PREFERENCE_ORDER: readonly string[] = [
   "codex",
   "claude",
   "gemini",
+  "antigravity",
   "opencode",
   "cursor",
   "copilot",

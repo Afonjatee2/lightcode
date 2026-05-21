@@ -53,6 +53,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "saveHandoffContext",
   "openExternal",
   "focusWindow",
+  "getHomeScopeLocation",
   "getKeybindings",
   "revealProjectEntry",
   "getSharedSettings",

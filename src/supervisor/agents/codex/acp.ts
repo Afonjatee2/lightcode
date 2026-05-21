@@ -227,7 +227,11 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         ? (await resolveNodeForDistro(input.projectLocation.distro)).nodePath
         : undefined;
     const appServer = spawnAppServer(
-      buildCodexAppServerCommand(input.projectLocation, wslExecPath, wslNodePath),
+      buildCodexAppServerCommand(input.projectLocation, {
+        ...(wslExecPath !== undefined ? { wslExecPath } : {}),
+        ...(wslNodePath !== undefined ? { wslNodePath } : {}),
+        browserMcpEnabled: input.config.browserMcp === true,
+      }),
     );
     const transport = new CodexStdioTransport(appServer);
 

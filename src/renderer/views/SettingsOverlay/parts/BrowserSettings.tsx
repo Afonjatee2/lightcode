@@ -2,7 +2,6 @@ import { Switch } from "@heroui/react";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 export function BrowserSettings() {
-  const mcpEnabled = useSharedSettings((s) => s.browser.mcpEnabled);
   const allowEval = useSharedSettings((s) => s.browser.allowEval);
   const allowDataAccess = useSharedSettings((s) => s.browser.allowDataAccess);
   const setBrowserSetting = useSharedSettings((s) => s.setBrowserSetting);
@@ -12,18 +11,13 @@ export function BrowserSettings() {
       <div className="mx-auto max-w-[720px]">
         <h1 className="mb-2 text-lg font-semibold text-foreground">Browser</h1>
         <p className="mb-6 text-xs text-muted">
-          The in-app browser lives in the right panel. When the MCP server is enabled, agents you
-          launch can navigate, click, type, query the DOM, and take screenshots inside this panel.
-          The browser keeps running in the background even when the panel is hidden.
+          The in-app browser lives in the right panel. Threads can opt in to the browser MCP via the
+          composer "+" menu; once enabled they can navigate, click, type, query the DOM, and take
+          screenshots inside this panel. The browser keeps running in the background even when the
+          panel is hidden.
         </p>
 
         <div className="space-y-4">
-          <SettingRow
-            title="Expose browser to agents (MCP)"
-            description="Newly launched agents will see navigate, click, screenshot, etc. Existing live agents keep their current configuration until restarted."
-            value={mcpEnabled}
-            onChange={(v) => setBrowserSetting("mcpEnabled", v)}
-          />
           <SettingRow
             title="Allow eval"
             description={
@@ -34,7 +28,6 @@ export function BrowserSettings() {
             }
             value={allowEval}
             onChange={(v) => setBrowserSetting("allowEval", v)}
-            disabled={!mcpEnabled}
           />
           <SettingRow
             title="Allow agents to read/write cookies and storage"
@@ -47,7 +40,6 @@ export function BrowserSettings() {
             }
             value={allowDataAccess}
             onChange={(v) => setBrowserSetting("allowDataAccess", v)}
-            disabled={!mcpEnabled}
           />
         </div>
       </div>

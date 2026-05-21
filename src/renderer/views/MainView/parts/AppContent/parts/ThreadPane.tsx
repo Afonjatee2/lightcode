@@ -6,6 +6,7 @@ import type {
   ThreadConfig,
   ThreadPresentationMode,
 } from "@/shared/contracts";
+import { isHomeProjectId } from "@/shared/homeScope";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { readBridge } from "@/renderer/bridge";
@@ -162,11 +163,13 @@ export function ThreadPane(props: {
             threadId: thread.id,
             itemId: optimisticUserMessageItemId,
           });
-          void captureFileCheckpoint({
-            threadId: thread.id,
-            checkpointItemId: optimisticUserMessageItemId,
-            projectLocation,
-          });
+          if (!isHomeProjectId(thread.projectId)) {
+            void captureFileCheckpoint({
+              threadId: thread.id,
+              checkpointItemId: optimisticUserMessageItemId,
+              projectLocation,
+            });
+          }
         }
         await readBridge().sendThreadInput({
           threadId: thread.id,

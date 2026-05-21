@@ -69,7 +69,11 @@ export type ComposerControl =
       isDisabled?: boolean;
       hideLabelOnWrap?: boolean;
       openSignal?: number;
-      onChange: (next: { agentKind: string; model: string }) => void;
+      onChange: (next: {
+        agentKind: string;
+        model: string;
+        presentationMode?: ThreadPresentationMode;
+      }) => void;
       tier?: number | undefined;
     }
   | {

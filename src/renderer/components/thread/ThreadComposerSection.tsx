@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { Tooltip } from "@heroui/react";
-import { ChevronDown, GitFork, Paperclip, Zap } from "lucide-react";
+import { ChevronDown, GitFork, Zap } from "lucide-react";
 import type {
   AgentStatus,
   ProjectLocation,
@@ -9,9 +9,16 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
 } from "@/shared/contracts";
-import { ProviderModelMenuProvider, BranchSelector, type BranchSelection, Button } from "../common";
+import { ProviderModelMenuProvider, BranchSelector, type BranchSelection } from "../common";
 import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId";
-import { AttachmentBar, ImageLightbox, MentionInput, useAttachments } from "../composer";
+import {
+  AttachmentBar,
+  ComposerAddMenu,
+  ImageLightbox,
+  MentionInput,
+  useAttachments,
+} from "../composer";
+import { getBrowserMcpScope } from "../composer/browserMcpScope";
 import type { MentionInputHandle } from "../composer";
 import { flattenSegments } from "../composer/serializeMentions";
 import { getComposerControls } from "../providers";
@@ -325,6 +332,8 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const presentationMode =
     thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
   const usesTerminalPresentation = presentationMode === "terminal";
+  const browserMcpScope = getBrowserMcpScope(thread.agentKind, presentationMode);
+  const browserMcpToggleableHere = browserMcpScope === "always";
   const availableCommands = resolveAvailableSlashCommands(
     thread.slashCommands,
     agentStatus?.capabilities.slashCommands,
@@ -916,22 +925,20 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                             onToggle={() => setContextDockOpen((open) => !open)}
                           />
                         ) : null}
-                        <Button
-                          isIconOnly
-                          aria-label="Attach files"
-                          className="lightcode-composer-menu min-w-9 px-2"
-                          size="sm"
-                          variant="ghost"
-                          onPress={() => {
+                        <ComposerAddMenu
+                          browserMcpEnabled={thread.config.browserMcp === true}
+                          showBrowserOption={browserMcpToggleableHere}
+                          onPickFiles={() => {
                             void readBridge()
                               .pickFiles()
                               .then((paths) => {
                                 if (paths) attachments.addFiles(paths);
                               });
                           }}
-                        >
-                          <Paperclip className="size-4" />
-                        </Button>
+                          onToggleBrowserMcp={(next) =>
+                            props.onConfigChange({ ...thread.config, browserMcp: next })
+                          }
+                        />
                         {branchName ? (
                           thread.worktreePath ? (
                             <Tooltip delay={0}>

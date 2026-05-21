@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HOME_PROJECT_ID, HOME_PROJECT_NAME } from "@/shared/homeScope";
 import type { PaneLayout } from "@/shared/paneLayout";
 import { useAppStore } from "./appStore";
 
@@ -41,6 +42,32 @@ describe("appStore runtime config sync", () => {
     });
 
     expect(useAppStore.getState().threads[0]?.config.effort).toBe("high");
+  });
+
+  it("ensures the hidden Home project without replacing its draft config", () => {
+    const location = { kind: "windows" as const, path: "C:\\Users\\demo" };
+    const first = useAppStore.getState().ensureHomeProject(location);
+
+    expect(first).toMatchObject({
+      id: HOME_PROJECT_ID,
+      name: HOME_PROJECT_NAME,
+      location,
+      disabled: true,
+    });
+
+    useAppStore.getState().updateProjectDraftConfig(HOME_PROJECT_ID, {
+      agentKind: "codex",
+      model: "gpt-5.5",
+      effort: "high",
+      mode: "agent",
+      approvalPolicy: "never",
+      sandboxMode: "danger-full-access",
+      worktreeMode: false,
+    });
+
+    const second = useAppStore.getState().ensureHomeProject(location);
+    expect(second.lastDraftConfig?.model).toBe("gpt-5.5");
+    expect(useAppStore.getState().projects).toHaveLength(1);
   });
 
   it("preserves a user's pending composer change when runtime echoes the prior config", () => {

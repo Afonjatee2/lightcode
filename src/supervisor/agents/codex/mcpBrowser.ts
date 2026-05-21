@@ -19,7 +19,8 @@ import {
  *
  * Returns an empty array if MCP is disabled.
  */
-export function buildCodexBrowserMcpArgs(location: BrowserMcpLocation): string[] {
+export function buildCodexBrowserMcpArgs(location: BrowserMcpLocation, enabled: boolean): string[] {
+  if (!enabled) return [];
   const cfg = resolveBrowserMcpHttpConfig(location);
   if (!cfg) return [];
 

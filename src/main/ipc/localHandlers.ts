@@ -1,3 +1,4 @@
+import { homedir } from "node:os";
 import { clipboard, dialog, nativeImage, shell, type BrowserWindow } from "electron";
 import type { BrowserPanelManager } from "../browser";
 import {
@@ -101,6 +102,10 @@ export function createLocalIpcHandlers(
       }
       win.focus();
     },
+    getHomeScopeLocation: () =>
+      process.platform === "win32"
+        ? { kind: "windows", path: homedir() }
+        : { kind: "posix", path: homedir() },
     getKeybindings: () => readKeybindingsFile(options.requireLightcodePaths().keybindingsPath),
     revealProjectEntry: async (payload) => {
       shell.showItemInFolder(resolveProjectFsPath(payload));

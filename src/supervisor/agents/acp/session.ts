@@ -891,7 +891,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           const result = await this.connection.resumeSession({
             sessionId: sessionRef.providerSessionId,
             cwd: this.cwd,
-            mcpServers: buildAcpBrowserMcpServers(this.projectLocation),
+            mcpServers: buildAcpBrowserMcpServers(this.projectLocation, config.browserMcp === true),
           });
           this.adoptSessionRef(sessionRef);
           availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
@@ -907,7 +907,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
           const result = await this.connection.loadSession({
             sessionId: sessionRef.providerSessionId,
             cwd: this.cwd,
-            mcpServers: buildAcpBrowserMcpServers(this.projectLocation),
+            mcpServers: buildAcpBrowserMcpServers(this.projectLocation, config.browserMcp === true),
           });
           this.adoptSessionRef(sessionRef);
           availableModeIds = result.modes?.availableModes?.map((m) => m.id) ?? [];
@@ -923,7 +923,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       console.log("[acp] creating new session in", this.cwd);
       const result = await this.connection.newSession({
         cwd: this.cwd,
-        mcpServers: buildAcpBrowserMcpServers(this.projectLocation),
+        mcpServers: buildAcpBrowserMcpServers(this.projectLocation, config.browserMcp === true),
       });
       this.sessionId = result.sessionId;
       this.stableSessionRef = createKnownSessionRef(result.sessionId);

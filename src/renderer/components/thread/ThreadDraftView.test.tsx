@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentStatus, Project } from "@/shared/contracts";
+import { HOME_PROJECT_ID, HOME_PROJECT_NAME } from "@/shared/homeScope";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 
 const { composerSpy } = vi.hoisted(() => ({
@@ -36,6 +37,17 @@ const project: Project = {
     kind: "windows",
     path: "C:\\repo",
   },
+  createdAt: "2026-03-28T00:00:00.000Z",
+};
+
+const homeProject: Project = {
+  id: HOME_PROJECT_ID,
+  name: HOME_PROJECT_NAME,
+  location: {
+    kind: "windows",
+    path: "C:\\Users\\demo",
+  },
+  disabled: true,
   createdAt: "2026-03-28T00:00:00.000Z",
 };
 
@@ -102,6 +114,31 @@ const geminiStatus: AgentStatus = {
     supportsDirectInput: true,
     liveInputMode: "terminal",
     presentationMode: "terminal",
+    settingDefs: [],
+  },
+};
+
+const antigravityStatus: AgentStatus = {
+  kind: "antigravity",
+  label: "Antigravity",
+  installed: true,
+  authState: "authenticated",
+  capabilities: {
+    models: [{ id: "auto", label: "Auto" }],
+    efforts: [],
+    modelEfforts: {},
+    modes: [],
+    approvalPolicies: [
+      { id: "default", label: "Default" },
+      { id: "yolo", label: "Bypass Permissions" },
+    ],
+    sandboxModes: [],
+    supportsResume: true,
+    supportsDirectInput: true,
+    liveInputMode: "terminal",
+    presentationMode: "terminal",
+    presentationModes: ["terminal"],
+    bypassApprovalPolicy: "yolo",
     settingDefs: [],
   },
 };
@@ -343,6 +380,62 @@ describe("ThreadDraftView", () => {
     });
   });
 
+  it("defaults Home Codex drafts to full access without changing project defaults", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+    useSharedSettings.setState({
+      providerConfigs: {
+        codex: {
+          model: "gpt-5.4",
+          effort: "high",
+          mode: "agent",
+          approvalPolicy: "",
+          sandboxMode: "",
+        },
+      },
+    });
+
+    render(
+      <ThreadDraftView
+        project={homeProject}
+        agentStatuses={[dualModeCodexStatus]}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          value?: string;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentAgentKind).toBe("codex");
+      expect(providerModel?.currentModel).toBe("gpt-5.4");
+      expect(props.controls.some((control) => control.value === "full-access")).toBe(true);
+    });
+
+    fireEvent.click(screen.getByText("set-prompt"));
+    fireEvent.click(screen.getByText("submit"));
+
+    expect(onStart).toHaveBeenCalledWith({
+      agentKind: "codex",
+      config: {
+        model: "gpt-5.4",
+        effort: "high",
+        mode: "agent",
+        approvalPolicy: "never",
+        sandboxMode: "danger-full-access",
+      },
+      presentationMode: "gui",
+      prompt: "hello world",
+    });
+    expect(useSharedSettings.getState().providerConfigs.codex?.approvalPolicy).toBe("");
+    expect(useSharedSettings.getState().providerConfigs.codex?.sandboxMode).toBe("");
+  });
+
   it("defaults synthetic generic ACP permissions to supervised", async () => {
     const onStart = vi.fn<(input: unknown) => void>();
 
@@ -394,6 +487,105 @@ describe("ThreadDraftView", () => {
         "CLI",
       ]);
       expect(screen.getByRole("tab", { name: "Chat" })).toHaveAttribute("aria-selected", "true");
+    });
+  });
+
+  it("surfaces terminal-only providers in the draft model picker", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[dualModeCodexStatus, antigravityStatus]}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          presentationMode?: string;
+          providers?: Array<{
+            kind: string;
+            presentationMode?: string;
+            capabilities: { models: Array<{ id: string; label: string }> };
+          }>;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      const antigravity = providerModel?.providers?.find(
+        (provider) => provider.kind === "antigravity",
+      );
+      expect(providerModel?.presentationMode).toBe("gui");
+      expect(antigravity?.presentationMode).toBe("terminal");
+      expect(antigravity?.capabilities.models).toEqual([{ id: "auto", label: "Auto" }]);
+    });
+  });
+
+  it("switches the draft surface when selecting a terminal-only provider", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+
+    render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[dualModeCodexStatus, antigravityStatus]}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          presentationMode?: string;
+          onChange?: (next: {
+            agentKind: string;
+            model: string;
+            presentationMode?: "terminal" | "gui";
+          }) => void;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentAgentKind).toBe("codex");
+    });
+
+    const initialProps = composerSpy.mock.lastCall?.[0] as {
+      controls: Array<{
+        kind?: string;
+        onChange?: (next: {
+          agentKind: string;
+          model: string;
+          presentationMode?: "terminal" | "gui";
+        }) => void;
+      }>;
+    };
+    const providerModel = initialProps.controls.find((c) => c.kind === "provider-model");
+
+    composerSpy.mockClear();
+    act(() => {
+      providerModel?.onChange?.({
+        agentKind: "antigravity",
+        model: "auto",
+        presentationMode: "terminal",
+      });
+    });
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          presentationMode?: string;
+        }>;
+      };
+      const nextProviderModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(nextProviderModel?.currentAgentKind).toBe("antigravity");
+      expect(nextProviderModel?.currentModel).toBe("auto");
+      expect(nextProviderModel?.presentationMode).toBe("terminal");
     });
   });
 

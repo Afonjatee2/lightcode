@@ -12,6 +12,7 @@ import { Button, Surface } from "@heroui/react";
 import { ArrowDown } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 import { isThreadTurnActive, type Thread } from "@/shared/contracts";
+import { isHomeProjectId } from "@/shared/homeScope";
 import { chatMessageSurfaceClass } from "./parts/items/chatMessageSurface";
 import { readBridge } from "@/renderer/bridge";
 import { useScrollFade } from "@/renderer/hooks/useScrollFade";
@@ -90,14 +91,17 @@ export function ChatPane(props: ChatPaneProps) {
   );
   const project = useAppStore((s) => s.projects.find((p) => p.id === projectId));
   const branch = resolveWorktreeBranch(projectId, worktreePath ?? "", worktreeBranch);
+  const isHomeScope = isHomeProjectId(projectId);
   const targetContext = useMemo(
     () => (project ? buildFileEditorContext(project, worktreePath, branch) : null),
     [project, worktreePath, branch],
   );
-  const projectRootNames = useProjectRootNames(targetContext?.projectLocation);
+  const projectRootNames = useProjectRootNames(
+    isHomeScope ? undefined : targetContext?.projectLocation,
+  );
 
   const paneActions: ChatPaneActions | null = useMemo(() => {
-    if (!project || !targetContext) return null;
+    if (!project || !targetContext || isHomeScope) return null;
     return {
       openProjectRelativePath: (path, lineNumber) => {
         void openFileInEditor(
@@ -139,19 +143,19 @@ export function ChatPane(props: ChatPaneProps) {
       projectLocation: targetContext.projectLocation,
       projectRootNames,
     };
-  }, [project, targetContext, branch, worktreePath, projectRootNames]);
+  }, [project, targetContext, isHomeScope, branch, worktreePath, projectRootNames]);
 
   useEffect(() => {
     void hydrateThreadRuntimeItems(threadId);
   }, [threadId]);
 
   useEffect(() => {
-    if (!targetContext) return;
+    if (!targetContext || isHomeScope) return;
     void hydrateFileCheckpoints({
       threadId,
       projectLocation: targetContext.projectLocation,
     });
-  }, [targetContext, threadId]);
+  }, [isHomeScope, targetContext, threadId]);
 
   const completedTurns = useAppStore(
     (s) => s.runtimeCompletedTurnsByThread[threadId] ?? EMPTY_COMPLETED_TURNS,
@@ -162,7 +166,7 @@ export function ChatPane(props: ChatPaneProps) {
   const finalizingFileCheckpointIdsRef = useRef(new Set<string>());
 
   useEffect(() => {
-    if (!targetContext || completedTurns.length === 0) return;
+    if (!targetContext || isHomeScope || completedTurns.length === 0) return;
     for (const turn of completedTurns) {
       const checkpointItemId = turn.anchorItemId;
       if (!checkpointItemId) continue;
@@ -187,7 +191,7 @@ export function ChatPane(props: ChatPaneProps) {
         finalizingFileCheckpointIdsRef.current.delete(checkpointItemId);
       });
     }
-  }, [completedTurns, fileCheckpointTurns, targetContext, threadId]);
+  }, [completedTurns, fileCheckpointTurns, isHomeScope, targetContext, threadId]);
 
   const isEmpty = timelineEntries.length === 0 && !hasSupplementaryContent;
   const isLive = isThreadTurnActive(status);
@@ -277,9 +281,9 @@ export function ChatPane(props: ChatPaneProps) {
                     entries={timelineEntries}
                     scrollElement={scrollEl}
                     suppressInlineTurnAnchorId={suppressInlineTurnAnchorId}
-                    canRevertCheckpoints={!isLive}
+                    canRevertCheckpoints={!isLive && !isHomeScope}
                     checkpointGuard={checkpointGuard}
-                    projectLocation={targetContext?.projectLocation}
+                    projectLocation={isHomeScope ? undefined : targetContext?.projectLocation}
                   />
                   {showTailLoader && turn ? (
                     <ChatTailLoader turn={turn} isPaused={isTurnPaused} />

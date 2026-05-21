@@ -21,3 +21,11 @@ export function readStoredBoolean(key: string, fallback: boolean): boolean {
   }
   return fallback;
 }
+
+export function writeStoredBoolean(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    /* ignore */
+  }
+}

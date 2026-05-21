@@ -6,6 +6,7 @@ import type {
   ProjectSearchSettings,
   AppView,
 } from "@/shared/contracts";
+import { HOME_PROJECT_ID, HOME_PROJECT_NAME } from "@/shared/homeScope";
 import { isDraftPaneId, parseDraftProjectId } from "@/shared/paneId";
 import { getProjectName } from "@/shared/wsl";
 import { reorderIds, type ReorderPlacement } from "../reorder";
@@ -34,6 +35,7 @@ function projectDraftConfigEqual(
 export interface ProjectSlice {
   projects: Project[];
   addProject: (location: ProjectLocation, nameOverride?: string) => Project;
+  ensureHomeProject: (location: ProjectLocation) => Project;
   deleteProject: (projectId: string) => void;
   updateProjectDraftConfig: (projectId: string, draftConfig: ProjectDraftConfig) => void;
   updateProjectScripts: (projectId: string, scripts: ProjectScripts) => void;
@@ -61,6 +63,42 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
     }));
 
     return project;
+  },
+  ensureHomeProject: (location) => {
+    let ensured: Project | undefined;
+
+    set((state) => {
+      const existing = state.projects.find((project) => project.id === HOME_PROJECT_ID);
+      if (!existing) {
+        ensured = {
+          id: HOME_PROJECT_ID,
+          name: HOME_PROJECT_NAME,
+          location,
+          disabled: true,
+          createdAt: new Date().toISOString(),
+        };
+        return { projects: [ensured, ...state.projects] };
+      }
+
+      if (
+        existing.name === HOME_PROJECT_NAME &&
+        existing.disabled === true &&
+        projectLocationsEqual(existing.location, location)
+      ) {
+        ensured = existing;
+        return {};
+      }
+
+      ensured = { ...existing, name: HOME_PROJECT_NAME, location, disabled: true };
+      const next = ensured;
+      return {
+        projects: state.projects.map((project) =>
+          project.id === HOME_PROJECT_ID ? next : project,
+        ),
+      };
+    });
+
+    return ensured!;
   },
   deleteProject: (projectId) =>
     set((state) => {
@@ -199,3 +237,11 @@ export const createProjectSlice: SliceCreator<ProjectSlice> = (set) => ({
       return { projects };
     }),
 });
+
+function projectLocationsEqual(a: ProjectLocation, b: ProjectLocation): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === "wsl" && b.kind === "wsl") {
+    return a.distro === b.distro && a.linuxPath === b.linuxPath && a.uncPath === b.uncPath;
+  }
+  return a.kind !== "wsl" && b.kind !== "wsl" && a.path === b.path;
+}

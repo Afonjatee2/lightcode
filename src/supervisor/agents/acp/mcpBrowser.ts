@@ -24,7 +24,11 @@ export interface AcpHttpMcpServer {
   headers: AcpHttpHeader[];
 }
 
-export function buildAcpBrowserMcpServers(location: BrowserMcpLocation): AcpHttpMcpServer[] {
+export function buildAcpBrowserMcpServers(
+  location: BrowserMcpLocation,
+  enabled: boolean,
+): AcpHttpMcpServer[] {
+  if (!enabled) return [];
   const cfg = resolveBrowserMcpHttpConfig(location);
   if (!cfg) return [];
   return [

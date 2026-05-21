@@ -17,6 +17,7 @@ export function ThreadDraftCompactHeader(props: {
   headerNeedsTrafficLightPad: boolean;
   onClose?: (() => void) | undefined;
   projectId: string;
+  scopeLabel?: string | undefined;
   paneId?: string | undefined;
   showCloseButton?: boolean | undefined;
 }) {
@@ -31,11 +32,15 @@ export function ThreadDraftCompactHeader(props: {
           New thread
         </span>
         <div className="flex shrink-0 items-center">
-          <ProjectSwitchMenu
-            currentProjectId={props.projectId}
-            variant="compact"
-            {...(props.paneId ? { paneId: props.paneId } : {})}
-          />
+          {props.scopeLabel ? (
+            <span className="px-1 text-sm leading-tight text-muted/60">{props.scopeLabel}</span>
+          ) : (
+            <ProjectSwitchMenu
+              currentProjectId={props.projectId}
+              variant="compact"
+              {...(props.paneId ? { paneId: props.paneId } : {})}
+            />
+          )}
           {props.showCloseButton && props.onClose && (
             <button
               type="button"
@@ -97,6 +102,7 @@ export function ThreadDraftDropIndicators(props: {
 export function ThreadDraftHero(props: {
   compact?: boolean | undefined;
   projectId: string;
+  scopeLabel?: string | undefined;
   paneId?: string | undefined;
 }) {
   return (
@@ -108,16 +114,21 @@ export function ThreadDraftHero(props: {
           <span className="inline-block pr-[0.04em] pb-[0.12em] text-transparent [background-image:linear-gradient(135deg,var(--foreground)_0%,color-mix(in_oklab,var(--accent)_60%,var(--foreground))_52%,var(--muted)_100%)] [background-size:100%_100%] bg-clip-text">
             Lightcode
           </span>
-          <TerminalSquare className="translate-y-[-0.04em] size-[0.48em] shrink-0 text-[color:color-mix(in_oklab,var(--accent)_58%,var(--foreground))] opacity-90" />
         </h1>
         <div
           className={`mt-1.5 flex justify-center ${props.compact ? "text-[clamp(0.6875rem,1.05vw,0.8125rem)]" : "text-[clamp(0.75rem,1.35vw,0.9375rem)]"}`}
         >
-          <ProjectSwitchMenu
-            currentProjectId={props.projectId}
-            variant="hero"
-            {...(props.paneId ? { paneId: props.paneId } : {})}
-          />
+          {props.scopeLabel ? (
+            <span className="min-w-0 truncate pb-[0.08em] leading-snug font-medium tracking-normal text-transparent [background-image:linear-gradient(135deg,var(--muted)_0%,color-mix(in_oklab,var(--accent)_30%,var(--muted))_100%)] [background-size:100%_100%] bg-clip-text font-mono">
+              {props.scopeLabel}
+            </span>
+          ) : (
+            <ProjectSwitchMenu
+              currentProjectId={props.projectId}
+              variant="hero"
+              {...(props.paneId ? { paneId: props.paneId } : {})}
+            />
+          )}
         </div>
       </div>
     </div>

@@ -769,7 +769,10 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           void _exhaustive;
         }
       }
-      const browserMcpServers = buildClaudeBrowserMcpServers(this.input.projectLocation);
+      const browserMcpServers = buildClaudeBrowserMcpServers(
+        this.input.projectLocation,
+        this.currentConfig.browserMcp === true,
+      );
       const options: ClaudeQueryOptions = {
         cwd: projectCwd(this.input.projectLocation),
         model,

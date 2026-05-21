@@ -9,6 +9,7 @@ import type {
   ThreadConfig,
   ThreadPresentationMode,
 } from "@/shared/contracts";
+import { HOME_PROJECT_NAME, isHomeProjectId } from "@/shared/homeScope";
 import { readBridge } from "@/renderer/bridge";
 import { getComposerControls } from "@/renderer/components/providers";
 import { getConfigNormalizer } from "@/renderer/components/providers/ProviderIcon";
@@ -87,6 +88,8 @@ export function ThreadDraftView(props: {
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
   const sharedSettingsHydrated = useSharedSettings((s) => s.sharedSettingsHydrated);
   const inFirstLaunchDiscovery = useAgentStatusesStore((s) => s.inFirstLaunchDiscovery);
+  const isHomeScope = isHomeProjectId(project.id);
+  const scopeLabel = isHomeScope ? HOME_PROJECT_NAME : undefined;
 
   // Debugging showed config-only edits were rebuilding the provider/model
   // payload. Keep the installed-agent list stable unless the source inputs
@@ -111,7 +114,12 @@ export function ThreadDraftView(props: {
   const [mode, setMode] = useState<"agent" | "plan" | "autopilot">("agent");
   const [approvalPolicy, setApprovalPolicy] = useState("");
   const [sandboxMode, setSandboxMode] = useState("");
-  const [worktreeMode, setWorktreeMode] = useState(lastDraftConfig?.worktreeMode ?? false);
+  // Not persisted across drafts — each new thread starts off.
+  const [browserMcp, setBrowserMcp] = useState(false);
+  const [worktreeMode, setWorktreeMode] = useState(
+    isHomeScope ? false : (lastDraftConfig?.worktreeMode ?? false),
+  );
+  const effectiveWorktreeMode = isHomeScope ? false : worktreeMode;
   const lastAppliedAgentKindRef = useRef<AgentStatus["kind"] | undefined>(undefined);
 
   // Presentation-mode picker — only meaningful for adapters that advertise
@@ -157,8 +165,9 @@ export function ThreadDraftView(props: {
   //   - `supportedPresentationModes` and `presentationMode` are derived from
   //     `selectedAgent` and `effectiveAgentKind`; including them would either
   //     duplicate the trigger or fire mid-edit on unrelated state.
-  // The model picker already filters providers to those that support the
-  // active surface, so a model swap should never flip CLI/Chat silently.
+  // Provider picks can switch CLI/Chat explicitly when the chosen provider
+  // only supports the other surface; provider-change re-resolution handles the
+  // same fallback for status/default changes.
   useEffect(() => {
     const previousAgentKind = previousPresentationAgentKindRef.current;
     previousPresentationAgentKindRef.current = selectedAgent?.kind;
@@ -188,7 +197,9 @@ export function ThreadDraftView(props: {
 
   function persistProviderConfig(providerKind: string, config: ProviderDraftConfig) {
     providerConfigsRef.current[providerKind] = config;
-    setProviderConfig(providerKind, config);
+    if (!isHomeScope) {
+      setProviderConfig(providerKind, config);
+    }
   }
 
   function persistProjectDraftConfig(draftConfig: ProjectDraftConfig) {
@@ -241,9 +252,11 @@ export function ThreadDraftView(props: {
     const saved = resolveSavedProviderDraftConfig(
       effectiveAgentKind,
       lastDraftConfig,
-      providerConfigsRef.current,
+      isHomeScope ? {} : providerConfigsRef.current,
     );
-    const resolved = resolveProviderDraftConfig(selectedAgentForConfig, saved);
+    const resolved = resolveProviderDraftConfig(selectedAgentForConfig, saved, {
+      preferUnrestrictedPermissions: isHomeScope,
+    });
     const nextModel = resolved.model;
     const nextEffort = resolved.effort ?? "";
     const nextContext = resolved.contextSize;
@@ -265,7 +278,9 @@ export function ThreadDraftView(props: {
 
     // Persist per-provider config app-wide, last-used provider per project.
     providerConfigsRef.current[effectiveAgentKind] = resolved;
-    setProviderConfig(effectiveAgentKind, resolved);
+    if (!isHomeScope) {
+      setProviderConfig(effectiveAgentKind, resolved);
+    }
     updateProjectDraftConfig(project.id, {
       agentKind: effectiveAgentKind,
       model: nextModel,
@@ -276,14 +291,15 @@ export function ThreadDraftView(props: {
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
-      worktreeMode,
+      worktreeMode: effectiveWorktreeMode,
     });
   }, [
     effectiveAgentKind,
     selectedAgentForConfig,
     project.id,
     lastDraftConfig,
-    worktreeMode,
+    effectiveWorktreeMode,
+    isHomeScope,
     updateProjectDraftConfig,
     setProviderConfig,
   ]);
@@ -324,7 +340,9 @@ export function ThreadDraftView(props: {
         ...(nextThinking ? { thinking: nextThinking } : {}),
       };
       providerConfigsRef.current[effectiveAgentKind] = corrected;
-      setProviderConfig(effectiveAgentKind, corrected);
+      if (!isHomeScope) {
+        setProviderConfig(effectiveAgentKind, corrected);
+      }
       updateProjectDraftConfig(project.id, {
         agentKind: effectiveAgentKind,
         model: nextModel,
@@ -335,7 +353,7 @@ export function ThreadDraftView(props: {
         mode,
         approvalPolicy,
         sandboxMode,
-        worktreeMode,
+        worktreeMode: effectiveWorktreeMode,
       });
     }
   }, [
@@ -349,14 +367,15 @@ export function ThreadDraftView(props: {
     mode,
     approvalPolicy,
     sandboxMode,
-    worktreeMode,
+    effectiveWorktreeMode,
+    isHomeScope,
     project.id,
     updateProjectDraftConfig,
     setProviderConfig,
   ]);
 
   useEffect(() => {
-    if (!sharedSettingsHydrated || hasLocalConfigEditRef.current) {
+    if (isHomeScope || !sharedSettingsHydrated || hasLocalConfigEditRef.current) {
       return;
     }
     if (!selectedAgentForConfig || !effectiveAgentKind) {
@@ -429,7 +448,7 @@ export function ThreadDraftView(props: {
       mode: nextMode,
       approvalPolicy: nextApproval,
       sandboxMode: nextSandbox,
-      worktreeMode,
+      worktreeMode: effectiveWorktreeMode,
     });
   }, [
     sharedSettingsHydrated,
@@ -445,7 +464,8 @@ export function ThreadDraftView(props: {
     approvalPolicy,
     sandboxMode,
     project.id,
-    worktreeMode,
+    effectiveWorktreeMode,
+    isHomeScope,
     updateProjectDraftConfig,
     setProviderConfig,
   ]);
@@ -463,23 +483,25 @@ export function ThreadDraftView(props: {
   );
   const providerModelProviders = useMemo(
     () =>
-      installedAgents
-        .filter((agent) => {
-          const supported = agent.capabilities.presentationModes ?? [
-            agent.capabilities.presentationMode,
-          ];
-          return supported.includes(presentationMode);
-        })
-        .map((agent) => ({
+      installedAgents.map((agent) => {
+        const supported = agent.capabilities.presentationModes ?? [
+          agent.capabilities.presentationMode,
+        ];
+        const agentPresentationMode = supported.includes(presentationMode)
+          ? presentationMode
+          : resolveInitialPresentationMode(agent, lastPresentationModeByAgent);
+        return {
           kind: agent.kind,
           label: agent.label,
           ...(agent.icon ? { icon: agent.icon } : {}),
+          presentationMode: agentPresentationMode,
           capabilities: filterHiddenModels(
-            capabilitiesForPresentation(agent.capabilities, presentationMode),
+            capabilitiesForPresentation(agent.capabilities, agentPresentationMode),
             allHiddenModels[agent.kind],
           ),
-        })),
-    [installedAgents, presentationMode, allHiddenModels],
+        };
+      }),
+    [installedAgents, presentationMode, lastPresentationModeByAgent, allHiddenModels],
   );
   const selectedAgentKind = selectedAgent?.kind;
   const factory = useMemo(
@@ -487,22 +509,32 @@ export function ThreadDraftView(props: {
     [selectedAgentKind],
   );
   const latestConfigPatchRef = useRef<(patch: Partial<ThreadConfig>) => void>(() => undefined);
-  const latestProviderModelChangeRef = useRef<(next: { agentKind: string; model: string }) => void>(
-    () => undefined,
-  );
+  const latestProviderModelChangeRef = useRef<
+    (next: { agentKind: string; model: string; presentationMode?: ThreadPresentationMode }) => void
+  >(() => undefined);
   const onConfigPatch = (patch: Partial<ThreadConfig>) => {
+    if ("browserMcp" in patch) {
+      // Per-thread capability flag — not part of ProviderDraftConfig, so it
+      // bypasses the resolver/persistence below.
+      setBrowserMcp(patch.browserMcp === true);
+      return;
+    }
     if (!selectedAgentForConfig) return;
     hasLocalConfigEditRef.current = true;
-    const resolved = resolveProviderDraftConfig(selectedAgentForConfig, {
-      model: patch.model ?? model,
-      effort: patch.effort ?? effort,
-      ...(patch.contextSize !== undefined ? { contextSize: patch.contextSize } : { contextSize }),
-      ...(patch.fast !== undefined ? { fast: patch.fast } : { fast }),
-      ...(patch.thinking !== undefined ? { thinking: patch.thinking } : { thinking }),
-      mode: patch.mode ?? mode,
-      approvalPolicy: patch.approvalPolicy ?? approvalPolicy,
-      sandboxMode: patch.sandboxMode ?? sandboxMode,
-    });
+    const resolved = resolveProviderDraftConfig(
+      selectedAgentForConfig,
+      {
+        model: patch.model ?? model,
+        effort: patch.effort ?? effort,
+        ...(patch.contextSize !== undefined ? { contextSize: patch.contextSize } : { contextSize }),
+        ...(patch.fast !== undefined ? { fast: patch.fast } : { fast }),
+        ...(patch.thinking !== undefined ? { thinking: patch.thinking } : { thinking }),
+        mode: patch.mode ?? mode,
+        approvalPolicy: patch.approvalPolicy ?? approvalPolicy,
+        sandboxMode: patch.sandboxMode ?? sandboxMode,
+      },
+      { preferUnrestrictedPermissions: isHomeScope },
+    );
 
     setModel(resolved.model);
     setEffort(resolved.effort ?? "");
@@ -530,23 +562,28 @@ export function ThreadDraftView(props: {
         mode: resolved.mode,
         approvalPolicy: resolved.approvalPolicy,
         sandboxMode: resolved.sandboxMode,
-        worktreeMode,
+        worktreeMode: effectiveWorktreeMode,
       });
     }
   };
   latestConfigPatchRef.current = onConfigPatch;
 
-  latestProviderModelChangeRef.current = ({ agentKind: nextKind, model: nextModel }) => {
+  latestProviderModelChangeRef.current = ({
+    agentKind: nextKind,
+    model: nextModel,
+    presentationMode: nextPresentationMode,
+  }) => {
     if (!selectedAgent) return;
     hasLocalConfigEditRef.current = true;
+    const targetPresentationMode = nextPresentationMode ?? presentationMode;
+    if (targetPresentationMode !== presentationMode) {
+      setPresentationMode(targetPresentationMode);
+    }
     if (nextKind !== selectedAgent.kind) {
       const targetAgent = installedAgents.find((agent) => agent.kind === nextKind);
       if (!targetAgent) return;
-      const targetAgentForConfig = agentWithCapabilities(targetAgent, presentationMode);
+      const targetAgentForConfig = agentWithCapabilities(targetAgent, targetPresentationMode);
 
-      // Snapshot current provider before switching, then attach the
-      // newly chosen model to the target provider's saved draft so
-      // resolveModelValue prefers it on the next effect run.
       if (effectiveAgentKind) {
         const snapshot: ProviderDraftConfig = {
           model,
@@ -560,11 +597,15 @@ export function ThreadDraftView(props: {
         };
         persistProviderConfig(effectiveAgentKind, snapshot);
       }
-      const targetSaved = providerConfigsRef.current[nextKind];
-      const resolved = resolveProviderDraftConfig(targetAgentForConfig, {
-        ...(targetSaved ?? {}),
-        model: nextModel,
-      });
+      const targetSaved = isHomeScope ? undefined : providerConfigsRef.current[nextKind];
+      const resolved = resolveProviderDraftConfig(
+        targetAgentForConfig,
+        {
+          ...(targetSaved ?? {}),
+          model: nextModel,
+        },
+        { preferUnrestrictedPermissions: isHomeScope },
+      );
       persistProviderConfig(nextKind, resolved);
       setModel(resolved.model);
       setEffort(resolved.effort ?? "");
@@ -586,7 +627,7 @@ export function ThreadDraftView(props: {
         mode: resolved.mode,
         approvalPolicy: resolved.approvalPolicy,
         sandboxMode: resolved.sandboxMode,
-        worktreeMode,
+        worktreeMode: effectiveWorktreeMode,
       });
     } else {
       latestConfigPatchRef.current({ model: nextModel });
@@ -769,6 +810,7 @@ export function ThreadDraftView(props: {
           headerNeedsTrafficLightPad={headerNeedsTrafficLightPad}
           onClose={props.onClose}
           projectId={project.id}
+          {...(scopeLabel ? { scopeLabel } : {})}
           {...(props.paneId ? { paneId: props.paneId } : {})}
           showCloseButton={props.showCloseButton}
         />
@@ -780,6 +822,7 @@ export function ThreadDraftView(props: {
         <ThreadDraftHero
           compact={props.compact}
           projectId={project.id}
+          {...(scopeLabel ? { scopeLabel } : {})}
           {...(props.paneId ? { paneId: props.paneId } : {})}
         />
 
@@ -845,11 +888,12 @@ export function ThreadDraftView(props: {
               ...(mode ? { mode } : {}),
               ...(approvalPolicy ? { approvalPolicy } : {}),
               ...(sandboxMode ? { sandboxMode } : {}),
+              ...(browserMcp ? { browserMcp: true } : {}),
             }}
             compact={props.compact}
             paneCount={props.paneCount}
             gitBranch={gitBranch}
-            worktreeMode={worktreeMode}
+            worktreeMode={effectiveWorktreeMode}
             supportsModePicker={supportsModePicker}
             presentationMode={presentationMode}
             onConfigChange={onConfigPatch}

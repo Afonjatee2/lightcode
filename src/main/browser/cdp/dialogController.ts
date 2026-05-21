@@ -24,7 +24,7 @@ type Disposition = { action: "accept" | "dismiss"; promptText?: string };
 /**
  * Owns the CDP-level Page.javascriptDialogOpening lifecycle. By default, any
  * dialog is auto-dismissed (preserves the existing UX where alerts don't pop
- * a modal over the embedded view). The agent can call browser_dialog to set
+ * a modal over the embedded view). The agent can call the dialog tool to set
  * a one-shot disposition for the next dialog, allowing accept/dismiss/answer
  * flows for confirm/prompt.
  */

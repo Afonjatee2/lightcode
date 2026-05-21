@@ -93,16 +93,8 @@ export function formatEffortLabel(id: string): string {
   return id.charAt(0).toUpperCase() + id.slice(1);
 }
 
-function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
+function findUnrestrictedApprovalPolicy(agent: AgentStatus): string | undefined {
   const policies = agent.capabilities.approvalPolicies;
-  if (
-    agent.kind.startsWith("acp-generic:") &&
-    policies.some((policy) => policy.id === "default") &&
-    policies.some((policy) => policy.id === "never")
-  ) {
-    return "default";
-  }
-
   const configuredBypass = agent.capabilities.bypassApprovalPolicy;
   if (configuredBypass && policies.some((policy) => policy.id === configuredBypass)) {
     return configuredBypass;
@@ -125,15 +117,40 @@ function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
   return byLabel?.id;
 }
 
-export function resolveApprovalPolicyValue(agent: AgentStatus, preferred?: string): string {
+function findDefaultApprovalPolicy(agent: AgentStatus): string | undefined {
   const policies = agent.capabilities.approvalPolicies;
-  if (agent.kind === "codex" && !preferred) {
+  if (
+    agent.kind.startsWith("acp-generic:") &&
+    policies.some((policy) => policy.id === "default") &&
+    policies.some((policy) => policy.id === "never")
+  ) {
+    return "default";
+  }
+
+  return findUnrestrictedApprovalPolicy(agent);
+}
+
+interface ResolveProviderDraftConfigOptions {
+  preferUnrestrictedPermissions?: boolean;
+}
+
+export function resolveApprovalPolicyValue(
+  agent: AgentStatus,
+  preferred?: string,
+  options: ResolveProviderDraftConfigOptions = {},
+): string {
+  const policies = agent.capabilities.approvalPolicies;
+  if (preferred !== undefined) {
+    return policies.some((p) => p.id === preferred) ? preferred : "";
+  }
+  if (agent.kind === "codex" && !options.preferUnrestrictedPermissions) {
     return "";
   }
 
-  return preferred && policies.some((p) => p.id === preferred)
-    ? preferred
-    : (findDefaultApprovalPolicy(agent) ?? policies[0]?.id ?? "");
+  const fallback = options.preferUnrestrictedPermissions
+    ? findUnrestrictedApprovalPolicy(agent)
+    : findDefaultApprovalPolicy(agent);
+  return fallback ?? policies[0]?.id ?? "";
 }
 
 function findDefaultSandboxMode(agent: AgentStatus): string | undefined {
@@ -148,15 +165,20 @@ function findDefaultSandboxMode(agent: AgentStatus): string | undefined {
   return byLabel?.id;
 }
 
-export function resolveSandboxModeValue(agent: AgentStatus, preferred?: string): string {
+export function resolveSandboxModeValue(
+  agent: AgentStatus,
+  preferred?: string,
+  options: ResolveProviderDraftConfigOptions = {},
+): string {
   const modes = agent.capabilities.sandboxModes;
-  if (agent.kind === "codex" && !preferred) {
+  if (preferred !== undefined) {
+    return modes.some((m) => m.id === preferred) ? preferred : "";
+  }
+  if (agent.kind === "codex" && !options.preferUnrestrictedPermissions) {
     return "";
   }
 
-  return preferred && modes.some((m) => m.id === preferred)
-    ? preferred
-    : (findDefaultSandboxMode(agent) ?? modes[0]?.id ?? "");
+  return findDefaultSandboxMode(agent) ?? modes[0]?.id ?? "";
 }
 
 export function resolveInitialPresentationMode(
@@ -200,6 +222,7 @@ function normalizeCursorPreferredDraft(
 export function resolveProviderDraftConfig(
   agent: AgentStatus,
   preferred?: Partial<ProviderDraftConfig>,
+  options: ResolveProviderDraftConfigOptions = {},
 ): ProviderDraftConfig {
   const normalizedPreferred = normalizeCursorPreferredDraft(agent, preferred);
   const nextModel = resolveModelValue(agent, normalizedPreferred?.model);
@@ -211,8 +234,12 @@ export function resolveProviderDraftConfig(
     | "agent"
     | "plan"
     | "autopilot";
-  const nextApproval = resolveApprovalPolicyValue(agent, normalizedPreferred?.approvalPolicy);
-  const nextSandbox = resolveSandboxModeValue(agent, normalizedPreferred?.sandboxMode);
+  const nextApproval = resolveApprovalPolicyValue(
+    agent,
+    normalizedPreferred?.approvalPolicy,
+    options,
+  );
+  const nextSandbox = resolveSandboxModeValue(agent, normalizedPreferred?.sandboxMode, options);
 
   return {
     model: nextModel,

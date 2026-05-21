@@ -19,6 +19,9 @@ export function SidebarHeaderControls(props: { wslAvailable: boolean }) {
   const addProject = useAppStore((state) => state.addProject);
   const openDraft = useAppStore((state) => state.openDraft);
   const threadSortMode = usePanelStore((s) => s.threadSortMode);
+  const browserPanelOpen = usePanelStore((s) => s.browserPanelOpen);
+  const rightPanelTab = usePanelStore((s) => s.rightPanelTab);
+  const browserVisible = browserPanelOpen && rightPanelTab === "browser";
 
   return (
     <div className="lightcode-overlay-header__controls flex items-center gap-1.5">
@@ -162,13 +165,18 @@ export function SidebarHeaderControls(props: { wslAvailable: boolean }) {
         <Tooltip.Trigger>
           <Button
             isIconOnly
-            aria-label="Open browser"
+            aria-label={browserVisible ? "Hide browser" : "Open browser"}
             size="sm"
             variant="ghost"
             className="size-6 min-w-0 text-muted hover:text-foreground"
             onPress={() => {
-              usePanelStore.getState().setBrowserPanelOpen(true);
-              usePanelStore.getState().setRightPanelTab("browser");
+              const store = usePanelStore.getState();
+              if (store.browserPanelOpen && store.rightPanelTab === "browser") {
+                store.setBrowserPanelOpen(false);
+              } else {
+                store.setBrowserPanelOpen(true);
+                store.setRightPanelTab("browser");
+              }
             }}
           >
             <Globe className="size-3.5" />

@@ -73,6 +73,70 @@ describe("ThreadView", () => {
     });
   });
 
+  it("renders Browser MCP as a removable header chip", () => {
+    const onConfigChange = vi.fn<(config: ThreadConfig) => void>();
+
+    renderThreadView({
+      thread: {
+        id: "thread-browser-mcp",
+        projectId: "project-1",
+        title: "Browser thread",
+        agentKind: "codex",
+        config: {
+          model: "gpt-5.4",
+          browserMcp: true,
+        },
+        status: "idle",
+        attention: "none",
+        canResumeWithConfig: true,
+        archived: false,
+        done: false,
+        starred: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "codex",
+        label: "Codex",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "gpt-5.4", label: "5.4" }],
+          efforts: ["low"],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "on-request", label: "On Request" }],
+          sandboxModes: [{ id: "read-only", label: "Read Only" }],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "terminal",
+          presentationMode: "terminal",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      onConfigChange,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    const browserLabels = screen.getAllByText("Browser");
+    expect(browserLabels).toHaveLength(1);
+    expect(
+      hasAncestorWithClassFragment(browserLabels[0]!, "lightcode-overlay-header__controls"),
+    ).toBe(true);
+
+    fireEvent.click(screen.getByLabelText("Disable Browser MCP"));
+
+    expect(onConfigChange).toHaveBeenCalledWith({
+      model: "gpt-5.4",
+      browserMcp: false,
+    });
+  });
+
   it("starts a queued launch after the terminal reports its first size", async () => {
     const onLaunchConsumed = vi.fn<() => void>();
 

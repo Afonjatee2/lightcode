@@ -48,7 +48,7 @@ function buildCodexArgs(opts: BuildCodexArgsOptions): string[] {
   );
 
   if (location) {
-    args.push(...buildCodexBrowserMcpArgs(location));
+    args.push(...buildCodexBrowserMcpArgs(location, config.browserMcp === true));
   }
 
   if (!launchOptions?.suppressResumeConfigOverrides) {
@@ -121,10 +121,15 @@ export function buildCodexArgvFor(
 
 export function buildCodexAppServerCommand(
   location: ProjectLocation,
-  wslExecPath?: string,
-  wslNodePath?: string,
+  options?: {
+    wslExecPath?: string;
+    wslNodePath?: string;
+    browserMcpEnabled?: boolean;
+  },
 ): CommandSpec {
-  const browserMcpArgs = buildCodexBrowserMcpArgs(location);
+  const wslExecPath = options?.wslExecPath;
+  const wslNodePath = options?.wslNodePath;
+  const browserMcpArgs = buildCodexBrowserMcpArgs(location, options?.browserMcpEnabled === true);
   const args = [
     ...(isCodexGoalsSupported(location, wslExecPath) ? ["--enable", CODEX_GOALS_FEATURE_FLAG] : []),
     ...browserMcpArgs,

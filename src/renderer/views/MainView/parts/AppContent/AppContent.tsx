@@ -11,6 +11,7 @@ import type {
   ThreadPresentationMode,
 } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
+import { isHomeProject } from "@/shared/homeScope";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { isDraftPaneId, parseDraftProjectId } from "@/shared/paneId";
 import { buildPaneLayoutFromLegacy, findPaneAlign } from "@/shared/paneLayout";
@@ -78,18 +79,21 @@ export function AppContent() {
       worktreeIsNewBranch,
       presentationMode,
     } = input;
+    const isHomeScope = isHomeProject(project);
 
     updateProjectDraftConfig(
       project.id,
       buildProjectDraftConfig({
         agentKind,
         config,
-        worktreeMode: Boolean(worktreeBranch || existingWorktreePath),
+        worktreeMode: !isHomeScope && Boolean(worktreeBranch || existingWorktreePath),
       }),
     );
 
     let worktreePath: string | undefined;
-    if (existingWorktreePath) {
+    if (isHomeScope) {
+      worktreePath = undefined;
+    } else if (existingWorktreePath) {
       worktreePath = existingWorktreePath;
     } else if (worktreeBranch) {
       try {

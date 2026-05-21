@@ -14,6 +14,9 @@ const { bridge } = vi.hoisted(() => ({
       .fn<() => Promise<{ windows: unknown[]; wsl: unknown[]; fromCache: boolean }>>()
       .mockResolvedValue({ windows: [], wsl: [], fromCache: false }),
     getThreadSnapshots: vi.fn<() => Promise<unknown[]>>().mockResolvedValue([]),
+    getHomeScopeLocation: vi
+      .fn<() => Promise<{ kind: "windows"; path: string }>>()
+      .mockResolvedValue({ kind: "windows", path: "C:\\Users\\demo" }),
     dbGetThreadRuntimeItems: vi
       .fn<(threadId: string) => Promise<unknown[]>>()
       .mockResolvedValue([]),

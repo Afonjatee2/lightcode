@@ -91,6 +91,8 @@ export function GeneralSettings() {
   const setThreadRemoveAction = useSharedSettings((state) => state.setThreadRemoveAction);
   const newThreadMode = useSharedSettings((state) => state.newThreadMode);
   const setNewThreadMode = useSharedSettings((state) => state.setNewThreadMode);
+  const homeScopeEnabled = useSharedSettings((state) => state.homeScopeEnabled);
+  const setHomeScopeEnabled = useSharedSettings((state) => state.setHomeScopeEnabled);
   const gitReviewMode = useSharedSettings((state) => state.gitReviewMode);
   const setGitReviewMode = useSharedSettings((state) => state.setGitReviewMode);
   const editorLspEnabled = useSharedSettings((state) => state.editorLspEnabled);
@@ -392,6 +394,27 @@ export function GeneralSettings() {
                 });
               }}
             />
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">Home scope</p>
+              <p className="text-xs text-muted">
+                Show a projectless Home scope for OS-level agent sessions.
+              </p>
+            </div>
+            <Switch
+              isSelected={homeScopeEnabled}
+              onChange={(selected) => {
+                startTransition(() => {
+                  setHomeScopeEnabled(selected);
+                });
+              }}
+            >
+              <Switch.Control>
+                <Switch.Thumb />
+              </Switch.Control>
+            </Switch>
           </div>
 
           <div className="flex items-center justify-between gap-4">

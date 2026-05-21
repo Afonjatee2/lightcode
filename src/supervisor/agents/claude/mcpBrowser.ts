@@ -18,7 +18,9 @@ interface ClaudeMcpServers {
 
 export function buildClaudeBrowserMcpServers(
   location: BrowserMcpLocation,
+  enabled: boolean,
 ): ClaudeMcpServers | undefined {
+  if (!enabled) return undefined;
   const cfg = resolveBrowserMcpHttpConfig(location);
   if (!cfg) return undefined;
   return {

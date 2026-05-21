@@ -18,7 +18,11 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { ChatItemAccordion } from "./ChatItemAccordion";
 import { CommandOutputViewport } from "./CommandOutputViewport";
-import { commandIntentDisplay, type CommandIntentKind } from "./commandSummary";
+import {
+  commandIntentDisplay,
+  summarizeShellCommand,
+  type CommandIntentKind,
+} from "./commandSummary";
 import { extractAcpResultText, readAcpStringField } from "./acpToolPayload";
 
 interface CommandExecutionProps {
@@ -44,6 +48,7 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
     payload?.status === "error",
   );
   const fullCommandLine = formatShellInvocation(cwd, command);
+  const displayCommandLine = fullCommandLine ? summarizeShellCommand(fullCommandLine) : "";
   const display = commandIntentDisplay(fullCommandLine);
   const Icon = iconForCommandIntent(display.kind);
 
@@ -60,12 +65,12 @@ export const CommandExecution = memo(function CommandExecution({ item }: Command
   const terminalBody = useMemo(
     () =>
       [
-        fullCommandLine ? `$ ${fullCommandLine}` : "$ (command)",
+        displayCommandLine ? `$ ${displayCommandLine}` : "$ (command)",
         plainOutput.length > 0 ? plainOutput : acpResultText,
       ]
         .filter((p) => p.length > 0)
         .join("\n\n"),
-    [fullCommandLine, plainOutput, acpResultText],
+    [displayCommandLine, plainOutput, acpResultText],
   );
 
   return (

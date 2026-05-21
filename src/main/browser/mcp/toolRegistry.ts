@@ -68,6 +68,15 @@ export const TOOLS: ToolSpec[] = [
     },
   },
   {
+    name: "open",
+    description: "Open a URL in the active Lightcode browser tab, creating a tab if needed.",
+    inputSchema: {
+      type: "object",
+      required: ["url"],
+      properties: { tabId: { type: "string" }, url: { type: "string" } },
+    },
+  },
+  {
     name: "activate_tab",
     description: "Make the given tab the active visible tab.",
     inputSchema: {
@@ -191,6 +200,19 @@ export const TOOLS: ToolSpec[] = [
     name: "snapshot",
     description:
       "Concise structured snapshot of the page: viewport + visible interactive elements with role, accessible name, text, opaque ref, rect. Prefer this over CSS selectors when reasoning about a page.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        tabId: { type: "string" },
+        maxNodes: { type: "number" },
+        includeHidden: { type: "boolean" },
+      },
+    },
+  },
+  {
+    name: "inspect",
+    description:
+      "Inspect the page with a structured snapshot of visible interactive elements, roles, text, refs, and bounds.",
     inputSchema: {
       type: "object",
       properties: {
@@ -459,13 +481,13 @@ export const TOOLS: ToolSpec[] = [
 
 export const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));
 
+const TOOL_ALIASES = new Map([
+  ["open", "navigate"],
+  ["inspect", "snapshot"],
+]);
+
 export function normalizeToolName(name: string): string {
-  if (TOOL_NAMES.has(name)) return name;
-  if (name.startsWith("browser_")) {
-    const stripped = name.slice("browser_".length);
-    if (TOOL_NAMES.has(stripped)) return stripped;
-  }
-  return name;
+  return TOOL_ALIASES.get(name) ?? name;
 }
 
 export function isKnownToolName(name: string): boolean {

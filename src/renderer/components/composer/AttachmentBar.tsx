@@ -1,7 +1,34 @@
-import { X } from "lucide-react";
+import { Globe, X } from "lucide-react";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
 import { toLocalFileUrl } from "@/shared/promptContent";
 import type { Attachment } from "./useAttachments";
+
+export function BrowserChip(props: { onRemove?: (() => void) | undefined }) {
+  const { onRemove } = props;
+  return (
+    <div
+      className="lightcode-attachment-chip lightcode-browser-chip"
+      title="Browser MCP enabled for this thread"
+    >
+      <Globe className="size-3 text-muted" />
+      <span className="lightcode-attachment-chip__name">Browser</span>
+      {onRemove ? (
+        <button
+          type="button"
+          className="lightcode-attachment-chip__delete"
+          aria-label="Disable Browser MCP"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
+        >
+          <X className="size-2" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
 
 function AttachmentChip(props: {
   attachment: Attachment;

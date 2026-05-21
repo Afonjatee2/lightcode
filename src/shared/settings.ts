@@ -108,6 +108,8 @@ export const sharedSettingsSchema = z.object({
   threadRemoveAction: threadRemoveActionSchema,
   /** Default new-thread behaviour: full page or side-by-side panel. */
   newThreadMode: newThreadModeSchema,
+  /** Show the projectless Home scope for OS-level agent sessions. */
+  homeScopeEnabled: z.boolean(),
   /** Automatically show the terminal panel when running commands or creating worktrees. */
   autoShowTerminalPanel: z.boolean(),
   /** Open git review as a right-side panel or a full page overlay. */
@@ -160,17 +162,12 @@ export const sharedSettingsSchema = z.object({
   disableCliHookPlugin: z.boolean(),
   /** Per-agent CLI hook plugin support cache. Keyed by AgentKind (and WSL distro when applicable). */
   agentHookSupport: z.record(z.string(), agentHookSupportEntrySchema),
-  /** In-app browser panel + agent MCP bridge settings. */
+  /**
+   * In-app browser panel + agent MCP bridge settings. Per-thread MCP opt-in
+   * is controlled via the composer "+" menu (sets `thread.config.browserMcp`),
+   * not a global toggle.
+   */
   browser: z.object({
-    /**
-     * When true, agents (Claude, Codex, Gemini, OpenCode) launched by Lightcode
-     * receive an MCP server that lets them drive the in-app browser panel
-     * (navigate, screenshot, click, type, etc.). When false no MCP is injected
-     * and agents fall back to whatever native browsing tools they have.
-     * Toggling only affects newly launched threads; live threads keep their
-     * MCP until they stop.
-     */
-    mcpEnabled: z.boolean(),
     /**
      * Gate for the MCP `eval` tool. When false (default) the tool
      * returns a "disabled" error to the agent. Off-by-default because eval
@@ -234,6 +231,7 @@ export const defaultSharedSettings: SharedSettings = {
   closeToTray: true,
   threadRemoveAction: "archive",
   newThreadMode: "page",
+  homeScopeEnabled: true,
   autoShowTerminalPanel: true,
   gitReviewMode: "panel",
   providerConfigs: {},
@@ -251,7 +249,6 @@ export const defaultSharedSettings: SharedSettings = {
   disableCliHookPlugin: false,
   agentHookSupport: {},
   browser: {
-    mcpEnabled: true,
     allowEval: false,
     allowDataAccess: false,
   },

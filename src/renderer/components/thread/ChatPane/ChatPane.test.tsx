@@ -584,6 +584,20 @@ describe("ChatPane", () => {
     await screen.findByText(/command output/);
   });
 
+  it("shows the requested command in expanded command accordions", async () => {
+    const thread = makeThread();
+    const command = String.raw`cd C:\Users\sdsle\work\lightcode && "C:\Program Files\WindowsApps\Microsoft.PowerShell_7.6.1.0_x64__8wekyb3d8bbwe\pwsh.exe" -Command 'git status --short'`;
+    seedCommandItem(thread.id, "cmd-1", command, "status output");
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    fireEvent.click(screen.getByText("Git: git status --short").closest("button")!);
+
+    expect(document.body).toHaveTextContent("$ git status --short");
+    expect(document.body).not.toHaveTextContent("WindowsApps");
+  });
+
   it("collapses long user messages behind a show more button", async () => {
     const thread = makeThread();
     seedUserMessage(
