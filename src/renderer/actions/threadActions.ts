@@ -117,16 +117,14 @@ export function reopenStoredThread(threadId: string): void {
     return;
   }
 
-  if (thread.presentationMode !== "gui") {
-    startTransition(() => {
-      store.updateThreadRuntime(thread.id, {
-        status: "launching",
-        attention: "none",
-        ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
-        canResumeWithConfig: thread.canResumeWithConfig || thread.sessionRef !== undefined,
-      });
+  startTransition(() => {
+    store.updateThreadRuntime(thread.id, {
+      status: "launching",
+      attention: "none",
+      ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
+      canResumeWithConfig: thread.canResumeWithConfig || thread.sessionRef !== undefined,
     });
-  }
+  });
   store.queueThreadLaunch(thread.id, "");
 }
 
