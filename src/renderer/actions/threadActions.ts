@@ -166,9 +166,14 @@ export function sweepStaleThreads(): void {
     if (
       visibleThreadIds.has(thread.id) ||
       (thread.status !== "idle" && thread.status !== "finished") ||
-      !thread.sessionRef ||
-      new Date(thread.updatedAt).getTime() > staleBefore
+      !thread.sessionRef
     ) {
+      continue;
+    }
+    const updatedAtMs = new Date(thread.updatedAt).getTime();
+    const lastViewedAtMs = store.lastViewedAtByThreadId[thread.id] ?? 0;
+    const lastActiveMs = Math.max(updatedAtMs, lastViewedAtMs);
+    if (lastActiveMs > staleBefore) {
       continue;
     }
 
