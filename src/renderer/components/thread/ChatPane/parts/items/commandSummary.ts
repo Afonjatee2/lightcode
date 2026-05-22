@@ -181,20 +181,26 @@ function intentFromSummarizedCommand(t: string): CommandIntentDisplay | null {
 
   const grepLike = parseGrepLikeSearch(trimmed);
   if (grepLike) {
+    if (grepLike.scope) {
+      const prefix = "Search: ";
+      return {
+        title: `${prefix}${grepLike.scope}`,
+        parts: { prefix, path: grepLike.scope },
+        kind: "search",
+      };
+    }
     return {
-      title: grepLike.scope
-        ? `Search: "${grepLike.pattern}" in ${grepLike.scope}`
-        : `Search: "${grepLike.pattern}"`,
+      title: `Search: "${grepLike.pattern}"`,
       kind: "search",
     };
   }
 
   const findSearch = parseFindSearch(trimmed);
   if (findSearch) {
+    const prefix = "Search: ";
     return {
-      title: findSearch.pattern
-        ? `Search files: "${findSearch.pattern}" in ${findSearch.scope}`
-        : `Search files: ${findSearch.scope}`,
+      title: `${prefix}${findSearch.scope}`,
+      parts: { prefix, path: findSearch.scope },
       kind: "search",
     };
   }

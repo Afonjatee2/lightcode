@@ -552,6 +552,42 @@ describe("sdkCanonicalMapping — tool parts", () => {
     });
   });
 
+  it("maps OpenCode local search tools as canonical search tool calls", () => {
+    const state = createOpenCodeMapperState("thread-1");
+    const args = {
+      pattern: String.raw`\"document\"|\"image\"|\"other\"`,
+      include: "*.ts",
+      path: "/repo/src",
+    };
+    const events = mapOpenCodeEvent(
+      toolPartUpdatedEvent({
+        id: "prt_search",
+        sessionID: "ses_test",
+        messageID: "msg_1",
+        type: "tool",
+        tool: "search",
+        callID: "call_search",
+        state: {
+          status: "running",
+          input: args,
+          time: { start: 0 },
+        },
+      }),
+      state,
+    );
+
+    expect(events.find((e) => e.type === "item.started")).toMatchObject({
+      itemType: "tool_call",
+      payload: {
+        kind: "search",
+        title: `"${args.pattern}" in /repo/src`,
+        locations: [{ path: "/repo/src" }],
+        args,
+        status: "running",
+      },
+    });
+  });
+
   it("maps OpenCode task tools to sub-agent tool calls", () => {
     const state = createOpenCodeMapperState("thread-1");
     const events = mapOpenCodeEvent(
