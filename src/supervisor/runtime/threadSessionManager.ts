@@ -113,9 +113,11 @@ export class ThreadSessionManager {
   readonly sessionsBySessionId = new Map<string, SessionRuntime>();
   private readonly startLocks = new Map<string, Promise<void>>();
   private readonly pendingStartInterrupts = new Set<string>();
+  private readonly pendingStartAborts = new Set<string>();
   private readonly logWriter = new BufferedLogWriter();
   private readonly outputPipeline: ThreadOutputPipeline;
   private readonly runtimeEventRouter: RuntimeEventRouter;
+  private disposed = false;
 
   constructor(private readonly options: ThreadSessionManagerOptions) {
     this.runtimeEventRouter = new RuntimeEventRouter(options.emit);
@@ -270,6 +272,9 @@ export class ThreadSessionManager {
   }
 
   async startThread(payload: StartThreadPayload): Promise<StartThreadResult> {
+    if (this.disposed) {
+      throw new Error("ThreadSessionManager is disposed.");
+    }
     const threadId = payload.threadId ?? randomUUID();
     const pending = this.startLocks.get(threadId);
     if (pending) {
@@ -290,6 +295,7 @@ export class ThreadSessionManager {
       this.startLocks.delete(threadId);
       if (!this.sessions.has(threadId)) {
         this.pendingStartInterrupts.delete(threadId);
+        this.pendingStartAborts.delete(threadId);
       }
     }
   }
@@ -378,6 +384,7 @@ export class ThreadSessionManager {
     if (!session) {
       if (this.startLocks.has(payload.threadId)) {
         this.pendingStartInterrupts.add(payload.threadId);
+        this.pendingStartAborts.add(payload.threadId);
         this.options.emit({
           type: "thread-state",
           threadId: payload.threadId,
@@ -624,6 +631,9 @@ export class ThreadSessionManager {
 
     const existing = this.sessions.get(payload.threadId);
     if (!existing) {
+      if (this.startLocks.has(payload.threadId)) {
+        this.pendingStartAborts.add(payload.threadId);
+      }
       return;
     }
 
@@ -755,6 +765,11 @@ export class ThreadSessionManager {
   }
 
   dispose(): void {
+    this.disposed = true;
+    for (const threadId of this.startLocks.keys()) {
+      this.pendingStartAborts.add(threadId);
+    }
+
     this.flushRuntimeEvents();
     for (const session of this.sessions.values()) {
       session.ignoreExit = true;
@@ -786,6 +801,10 @@ export class ThreadSessionManager {
       throw new Error(`Unknown thread session: ${threadId}`);
     }
     return session;
+  }
+
+  private isCurrentSession(session: SessionRuntime): boolean {
+    return this.sessions.get(session.threadId)?.instanceId === session.instanceId;
   }
 
   /**
@@ -967,6 +986,10 @@ export class ThreadSessionManager {
     payload: StartThreadPayload & { threadId: string },
   ): Promise<StartThreadResult> {
     await this.closeThread({ threadId: payload.threadId });
+    if (this.pendingStartAborts.delete(payload.threadId)) {
+      this.pendingStartInterrupts.delete(payload.threadId);
+      return { threadId: payload.threadId };
+    }
 
     const adapter = this.requireAdapter(payload.agentKind);
     const isServerControlled = adapter.capabilities.liveInputMode === "server";
@@ -1027,6 +1050,9 @@ export class ThreadSessionManager {
       payload.sessionRef,
       requestedPresentation,
     );
+    if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+      return { threadId: payload.threadId };
+    }
 
     if (structuredSession?.activate) {
       try {
@@ -1038,6 +1064,9 @@ export class ThreadSessionManager {
         }
         throw error;
       }
+    }
+    if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+      return { threadId: payload.threadId };
     }
 
     let openedStructuredThreadId: string | undefined;
@@ -1054,6 +1083,9 @@ export class ThreadSessionManager {
         }
         throw error;
       }
+    }
+    if (await this.abortPendingStart(payload.threadId, structuredSession)) {
+      return { threadId: payload.threadId };
     }
 
     if (!usesTerminalPresentation) {
@@ -1189,6 +1221,13 @@ export class ThreadSessionManager {
     if (structuredSession && !keepStructuredSession) {
       await structuredSession.dispose();
     }
+    if (this.pendingStartAborts.delete(payload.threadId)) {
+      this.pendingStartInterrupts.delete(payload.threadId);
+      if (structuredSession && keepStructuredSession) {
+        await structuredSession.dispose();
+      }
+      return { threadId: payload.threadId };
+    }
 
     const resolvedSessionRef = payload.sessionRef ?? command.sessionRef;
     this.spawnThread({
@@ -1249,6 +1288,18 @@ export class ThreadSessionManager {
       });
       return undefined;
     }
+  }
+
+  private async abortPendingStart(
+    threadId: string,
+    structuredSession: StructuredSessionHandle | undefined,
+  ): Promise<boolean> {
+    if (!this.pendingStartAborts.delete(threadId)) {
+      return false;
+    }
+    this.pendingStartInterrupts.delete(threadId);
+    await structuredSession?.dispose();
+    return true;
   }
 
   private spawnThread(input: {
@@ -1605,12 +1656,18 @@ export class ThreadSessionManager {
       await sleep(150);
     }
     this.safePtyKill(session);
+    if (!this.isCurrentSession(session)) {
+      return;
+    }
 
     // Prime the user's interactive-shell env before respawning. See the same
     // call in `startThreadInner` — must run before the structured-session
     // spawn so the child inherits the project-pinned PATH, not launchd's.
     if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
       await primeProjectShellEnv(session.projectLocation.path);
+    }
+    if (!this.isCurrentSession(session)) {
+      return;
     }
 
     const structuredSession = await this.createStructuredSession(
@@ -1622,6 +1679,10 @@ export class ThreadSessionManager {
       session.sessionRef,
       session.presentationMode,
     );
+    if (!this.isCurrentSession(session)) {
+      await structuredSession?.dispose();
+      return;
+    }
 
     if (structuredSession?.activate) {
       try {
@@ -1631,6 +1692,10 @@ export class ThreadSessionManager {
         throw error;
       }
     }
+    if (!this.isCurrentSession(session)) {
+      await structuredSession?.dispose();
+      return;
+    }
 
     if (structuredSession?.openThread) {
       try {
@@ -1639,6 +1704,10 @@ export class ThreadSessionManager {
         await structuredSession.dispose();
         throw error;
       }
+    }
+    if (!this.isCurrentSession(session)) {
+      await structuredSession?.dispose();
+      return;
     }
 
     if (!usesTerminalPresentation) {
@@ -1677,6 +1746,10 @@ export class ThreadSessionManager {
       session.agentKind,
       session.projectLocation,
     );
+    if (!this.isCurrentSession(session)) {
+      await structuredSession?.dispose();
+      return;
+    }
     const argv = session.adapter.buildResumeArgv(
       session.projectLocation,
       config,
@@ -1696,11 +1769,21 @@ export class ThreadSessionManager {
     if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
       await primeProjectShellEnv(session.projectLocation.path);
     }
+    if (!this.isCurrentSession(session)) {
+      await structuredSession?.dispose();
+      return;
+    }
     const command = resolveLaunchSpec(session.projectLocation, argv);
 
     const keepStructuredSession = structuredSession && useStructuredFlow;
     if (structuredSession && !keepStructuredSession) {
       await structuredSession.dispose();
+    }
+    if (!this.isCurrentSession(session)) {
+      if (structuredSession && keepStructuredSession) {
+        await structuredSession.dispose();
+      }
+      return;
     }
 
     this.spawnThread({
@@ -1747,6 +1830,9 @@ export class ThreadSessionManager {
         session.agentKind,
         session.projectLocation,
       );
+      if (!this.isCurrentSession(session)) {
+        return;
+      }
       const argv = session.adapter.buildLaunchArgv(
         session.projectLocation,
         session.config,
@@ -1764,6 +1850,9 @@ export class ThreadSessionManager {
       }
       if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
         await primeProjectShellEnv(session.projectLocation.path);
+      }
+      if (!this.isCurrentSession(session)) {
+        return;
       }
       const command = resolveLaunchSpec(session.projectLocation, argv);
 

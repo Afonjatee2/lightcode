@@ -326,6 +326,7 @@ describe("App", () => {
       threads: [],
       pendingThreadLaunches: {},
       pendingLaunchSegments: {},
+      lastViewedAtByThreadId: {},
       view: { kind: "home" },
     }));
     useGitStore.setState({
