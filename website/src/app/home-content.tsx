@@ -450,8 +450,9 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
               <span className="text-gray-500">agent ecosystem.</span>
             </h2>
             <p className="text-gray-400 max-w-2xl mx-auto">
-              Lightcode installs and runs every agent published to the Agent Client Protocol
-              registry — one workspace, unified credentials, native UI.
+              Bring ACP registry agents into the workspace where your coding already happens. Chats,
+              terminals, browser context, and Git changes stay close by, so you can follow the work
+              without bouncing between tools.
             </p>
           </div>
 
