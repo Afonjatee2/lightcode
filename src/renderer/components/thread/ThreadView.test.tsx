@@ -73,7 +73,10 @@ describe("ThreadView", () => {
     });
   });
 
-  it("renders Browser MCP as a removable header icon", () => {
+  it("renders Browser MCP as a read-only header icon in active threads", () => {
+    // Mid-thread toggles can't re-attach an MCP server to a running session,
+    // so the active-thread chip is informational only. The toggle lives in
+    // the draft composer.
     const onConfigChange = vi.fn<(config: ThreadConfig) => void>();
 
     renderThreadView({
@@ -127,13 +130,8 @@ describe("ThreadView", () => {
     expect(hasAncestorWithClassFragment(browserIcon, "lightcode-overlay-header__controls")).toBe(
       true,
     );
-
-    fireEvent.click(screen.getByLabelText("Disable Browser MCP"));
-
-    expect(onConfigChange).toHaveBeenCalledWith({
-      model: "gpt-5.4",
-      browserMcp: false,
-    });
+    expect(screen.queryByLabelText("Disable Browser MCP")).toBeNull();
+    expect(onConfigChange).not.toHaveBeenCalled();
   });
 
   it("renders OpenCode Browser MCP as a read-only header icon when provider setting is enabled", () => {

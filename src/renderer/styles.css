@@ -8,6 +8,18 @@
   inherits: false;
 }
 
+@property --ring-angle-1 {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+@property --ring-angle-2 {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
 @keyframes lightcode-composer-border-spin {
   from {
     transform: translate(-50%, -50%) rotate(0deg);
@@ -28,12 +40,44 @@
   }
 }
 
-@keyframes lightcode-welcome-ring-spin {
+@keyframes lightcode-ring-spin-1 {
   from {
-    transform: translate3d(0, 0, 0) rotate(0deg);
+    --ring-angle-1: 0deg;
   }
   to {
-    transform: translate3d(0, 0, 0) rotate(360deg);
+    --ring-angle-1: 360deg;
+  }
+}
+
+@keyframes lightcode-ring-spin-2 {
+  from {
+    --ring-angle-2: 360deg;
+  }
+  to {
+    --ring-angle-2: 0deg;
+  }
+}
+
+@keyframes lightcode-lightning-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent) 38%, transparent),
+      0 0 18px color-mix(in oklab, var(--accent) 22%, transparent),
+      0 0 32px color-mix(in oklab, var(--accent) 10%, transparent);
+  }
+  33% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent) 55%, transparent),
+      0 0 24px color-mix(in oklab, var(--accent) 30%, transparent),
+      0 0 40px color-mix(in oklab, var(--accent) 15%, transparent),
+      0 0 8px color-mix(in oklab, #fff 20%, transparent);
+  }
+  66% {
+    box-shadow:
+      0 0 0 1px color-mix(in oklab, var(--accent) 45%, transparent),
+      0 0 14px color-mix(in oklab, var(--accent) 24%, transparent),
+      0 0 28px color-mix(in oklab, var(--accent) 12%, transparent);
   }
 }
 
@@ -120,21 +164,67 @@
 }
 
 .lightcode-welcome-ring {
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.16), transparent 42%),
-    conic-gradient(
-      from 90deg,
-      transparent 0deg,
-      color-mix(in oklab, var(--accent) 82%, white) 58deg,
-      transparent 132deg,
-      transparent 360deg
-    );
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--accent) 38%, transparent),
+    0 0 18px color-mix(in oklab, var(--accent) 22%, transparent);
   animation:
     lightcode-welcome-reveal 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both,
-    lightcode-welcome-ring-spin 5.5s linear infinite;
-  animation-delay: 2s, 0s;
-  opacity: 0.74;
+    lightcode-lightning-glow 4s ease-in-out infinite;
+  animation-delay: 2s, 2.8s;
   transform: translateZ(0);
+}
+
+.lightcode-welcome-ring::before,
+.lightcode-welcome-ring::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 2px;
+  border-radius: inherit;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+.lightcode-welcome-ring::before {
+  background: conic-gradient(
+    from var(--ring-angle-1) at center,
+    transparent 0deg,
+    transparent 180deg,
+    color-mix(in oklab, var(--accent) 15%, transparent) 220deg,
+    var(--accent) 270deg,
+    #ffffff 295deg,
+    var(--accent) 320deg,
+    color-mix(in oklab, var(--accent) 15%, transparent) 350deg,
+    transparent 360deg
+  );
+  filter: blur(0.5px);
+  animation: lightcode-ring-spin-1 6s linear infinite;
+  will-change: transform;
+}
+
+.lightcode-welcome-ring::after {
+  background: conic-gradient(
+    from var(--ring-angle-2) at center,
+    transparent 0deg,
+    transparent 120deg,
+    color-mix(in oklab, var(--accent) 15%, transparent) 160deg,
+    var(--accent) 220deg,
+    #ffffff 250deg,
+    var(--accent) 280deg,
+    color-mix(in oklab, var(--accent) 15%, transparent) 320deg,
+    transparent 360deg
+  );
+  filter: blur(0.6px);
+  animation: lightcode-ring-spin-2 4s linear infinite;
+  will-change: transform;
 }
 
 .lightcode-welcome-light {

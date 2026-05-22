@@ -193,10 +193,15 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     (thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal") ===
     "terminal";
   const launchTerminalSize = usesTerminalPresentation ? terminalSize : DEFAULT_HIDDEN_TERMINAL_SIZE;
+  // Browser MCP is bound at session-create time for every provider (Claude SDK
+  // `mcpServers` baked into `query()`, Codex `-c` overrides, ACP `newSession`).
+  // Toggling mid-thread can't re-attach the server, so the indicator in the
+  // active-thread header is informational only — disabling it would mislead
+  // the user into thinking the tool is no longer in scope. The toggle lives
+  // exclusively in the draft composer's ComposerAddMenu.
   const showBrowserChip =
     thread.config.browserMcp === true ||
     (thread.agentKind === "opencode" && opencodeBrowserMcpEnabled);
-  const browserChipRemovable = thread.agentKind !== "opencode" && thread.config.browserMcp === true;
 
   useEffect(() => {
     const presentation =
@@ -379,16 +384,12 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                 </Tooltip.Content>
               </Tooltip>
               {showBrowserChip ? (
-                <div className="lightcode-overlay-header__controls shrink-0">
-                  <BrowserChip
-                    {...(thread.agentKind === "opencode"
-                      ? { title: "Browser MCP enabled for OpenCode" }
-                      : {})}
-                    {...(browserChipRemovable
-                      ? { onRemove: () => onConfigChange({ ...thread.config, browserMcp: false }) }
-                      : {})}
-                  />
-                </div>
+                <BrowserChip
+                  variant="header"
+                  {...(thread.agentKind === "opencode"
+                    ? { title: "Browser MCP enabled for OpenCode" }
+                    : {})}
+                />
               ) : null}
               <div className="flex shrink-0 items-center">
                 {projectName ? (
