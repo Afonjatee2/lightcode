@@ -7,9 +7,13 @@ import type { Attachment } from "./useAttachments";
 export function BrowserChip(props: { onRemove?: (() => void) | undefined; title?: string }) {
   const { onRemove, title = "Browser MCP enabled for this thread" } = props;
   return (
-    <div className="lightcode-attachment-chip lightcode-browser-chip" title={title}>
-      <Globe className="size-3 text-muted" />
-      <span className="lightcode-attachment-chip__name">Browser</span>
+    <div
+      className="lightcode-attachment-chip lightcode-browser-chip"
+      title={title}
+      aria-label={title}
+      role={onRemove ? "group" : "img"}
+    >
+      <Globe className="size-3 text-muted" aria-hidden="true" />
       {onRemove ? (
         <button
           type="button"

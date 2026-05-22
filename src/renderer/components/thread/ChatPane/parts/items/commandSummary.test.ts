@@ -96,25 +96,21 @@ describe("humanIntentTitle", () => {
 
   it("describes ripgrep commands as searches", () => {
     const full = `/bin/zsh -lc 'rg -n "agent status|AgentStatus" src/main src/supervisor src/shared -S'`;
-    expect(humanIntentTitle(full)).toBe("Search: src/main src/supervisor src/shared");
+    expect(humanIntentTitle(full)).toBe('Search: "agent status|AgentStatus"');
     expect(commandIntentDisplay(full).kind).toBe("search");
-    expect(commandIntentDisplay(full).parts).toEqual({
-      prefix: "Search: ",
-      path: "src/main src/supervisor src/shared",
-    });
+    expect(commandIntentDisplay(full).parts).toBeUndefined();
   });
 
   it("describes plain grep commands as searches", () => {
     const full = `grep -n "toastId" src/renderer/notifications.ts`;
-    expect(humanIntentTitle(full)).toBe("Search: src/renderer/notifications.ts");
+    expect(humanIntentTitle(full)).toBe('Search: "toastId"');
     expect(commandIntentDisplay(full).kind).toBe("search");
   });
 
   it("describes recursive grep with multiple paths as a search", () => {
     const full = `grep -rn "filteredCommands" src/renderer src/shared`;
     expect(commandIntentDisplay(full)).toEqual({
-      title: "Search: src/renderer src/shared",
-      parts: { prefix: "Search: ", path: "src/renderer src/shared" },
+      title: 'Search: "filteredCommands"',
       kind: "search",
     });
   });
@@ -126,7 +122,7 @@ describe("humanIntentTitle", () => {
 
   it("handles grep -e PATTERN form", () => {
     const full = `grep -rn -e "needle" src`;
-    expect(humanIntentTitle(full)).toBe("Search: src");
+    expect(humanIntentTitle(full)).toBe('Search: "needle"');
   });
 
   it("describes cat piped through sed as viewed lines", () => {
@@ -151,12 +147,9 @@ describe("humanIntentTitle", () => {
 
   it("describes find commands as searches", () => {
     const full = `find node_modules/.pnpm -maxdepth 4 -type f -name 'vitest.mjs' | sed -n '1,80p'`;
-    expect(humanIntentTitle(full)).toBe("Search: node_modules/.pnpm");
+    expect(humanIntentTitle(full)).toBe('Search: "vitest.mjs"');
     expect(commandIntentDisplay(full).kind).toBe("search");
-    expect(commandIntentDisplay(full).parts).toEqual({
-      prefix: "Search: ",
-      path: "node_modules/.pnpm",
-    });
+    expect(commandIntentDisplay(full).parts).toBeUndefined();
   });
 
   it("describes directory listings and package manager commands", () => {

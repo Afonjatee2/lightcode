@@ -392,14 +392,6 @@ function formatAcpSearchDisplay(
   const pattern = readStr(args, "pattern");
   const scope = readScope(args) ?? locationPath;
   const searchTerm = query ?? pattern;
-  if (searchTerm && scope) {
-    const prefix = "Search: ";
-    return {
-      title: `${prefix}${scope}`,
-      Icon: SearchCode,
-      parts: { prefix, path: scope },
-    };
-  }
   if (searchTerm) return { title: `Search: "${searchTerm}"`, Icon: SearchCode };
   if (scope) return withTarget("Search", scope, SearchCode);
   return title.toLowerCase().startsWith("search")

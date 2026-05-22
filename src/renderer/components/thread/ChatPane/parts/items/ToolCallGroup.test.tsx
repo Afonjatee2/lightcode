@@ -215,8 +215,7 @@ describe("ToolCallGroup", () => {
     );
 
     expect(document.body).toHaveTextContent("View 1:24: src/supervisor/runtime.test.ts");
-    expect(document.body).toHaveTextContent("Search:");
-    expect(document.body).toHaveTextContent(/node_modules.*pnpm/);
+    expect(screen.getByText('Search: "vitest.mjs"')).toBeInTheDocument();
     expect(screen.getByText("Git: git diff -- src/supervisor/runtime.ts")).toBeInTheDocument();
     expect(screen.getByText("Check: pnpm run test")).toBeInTheDocument();
     expect(screen.getByText("Install packages: pnpm install")).toBeInTheDocument();

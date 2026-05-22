@@ -78,7 +78,7 @@ describe("deriveToolDisplay", () => {
     expect(display.Icon).toBe(Pencil);
   });
 
-  it("labels ACP local search tools with only the scope", () => {
+  it("labels ACP local search tools with only the query", () => {
     const display = deriveToolDisplay(
       makePayload({
         name: "'attachment' in src/renderer/**",
@@ -88,11 +88,8 @@ describe("deriveToolDisplay", () => {
       }),
     );
 
-    expect(display.title).toBe("Search: src/renderer/**");
-    expect(display.parts).toEqual({
-      prefix: "Search: ",
-      path: "src/renderer/**",
-    });
+    expect(display.title).toBe('Search: "attachment"');
+    expect(display.parts).toBeUndefined();
     expect(display.Icon).toBe(SearchCode);
   });
 
@@ -106,11 +103,8 @@ describe("deriveToolDisplay", () => {
       }),
     );
 
-    expect(display.title).toBe("Search: src");
-    expect(display.parts).toEqual({
-      prefix: "Search: ",
-      path: "src",
-    });
+    expect(display.title).toBe(String.raw`Search: "\"document\"|\"image\"|\"other\""`);
+    expect(display.parts).toBeUndefined();
     expect(display.Icon).toBe(SearchCode);
   });
 

@@ -73,7 +73,7 @@ describe("ThreadView", () => {
     });
   });
 
-  it("renders Browser MCP as a removable header chip", () => {
+  it("renders Browser MCP as a removable header icon", () => {
     const onConfigChange = vi.fn<(config: ThreadConfig) => void>();
 
     renderThreadView({
@@ -123,11 +123,10 @@ describe("ThreadView", () => {
       onSubmitInput: async () => undefined,
     });
 
-    const browserLabels = screen.getAllByText("Browser");
-    expect(browserLabels).toHaveLength(1);
-    expect(
-      hasAncestorWithClassFragment(browserLabels[0]!, "lightcode-overlay-header__controls"),
-    ).toBe(true);
+    const browserIcon = screen.getByLabelText("Browser MCP enabled for this thread");
+    expect(hasAncestorWithClassFragment(browserIcon, "lightcode-overlay-header__controls")).toBe(
+      true,
+    );
 
     fireEvent.click(screen.getByLabelText("Disable Browser MCP"));
 
@@ -137,7 +136,7 @@ describe("ThreadView", () => {
     });
   });
 
-  it("renders OpenCode Browser MCP as a read-only header chip when provider setting is enabled", () => {
+  it("renders OpenCode Browser MCP as a read-only header icon when provider setting is enabled", () => {
     const onConfigChange = vi.fn<(config: ThreadConfig) => void>();
 
     renderThreadView({
@@ -186,7 +185,7 @@ describe("ThreadView", () => {
       onSubmitInput: async () => undefined,
     });
 
-    expect(screen.getByText("Browser")).toBeInTheDocument();
+    expect(screen.getByLabelText("Browser MCP enabled for OpenCode")).toBeInTheDocument();
     expect(screen.queryByLabelText("Disable Browser MCP")).toBeNull();
     expect(onConfigChange).not.toHaveBeenCalled();
   });
