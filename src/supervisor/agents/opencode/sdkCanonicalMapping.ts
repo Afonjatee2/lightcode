@@ -33,6 +33,7 @@ import {
   usageFromTokenCounts,
 } from "../contextUsage";
 
+import { normalizeOpenCodeFileChangeMetadata } from "./sdkCanonicalFileChangeMetadata";
 import {
   createOpenCodeMapperState,
   isOpenCodeChildSession,
@@ -364,10 +365,13 @@ function toolPayload(
     };
   }
   if (itemType === "file_change") {
-    const path = readFileChangePath(input, result, metadata, partMetadata, title) ?? "";
-    const diffSummary = readDiffSummary(input, result, metadata, partMetadata);
+    const fileChangeMetadata = normalizeOpenCodeFileChangeMetadata(metadata);
+    const path =
+      readFileChangePath(fileChangeMetadata, input, result, metadata, partMetadata, title) ?? "";
+    const diffSummary = readDiffSummary(fileChangeMetadata, input, result, metadata, partMetadata);
     return {
       ...base,
+      ...(fileChangeMetadata ? { metadata: fileChangeMetadata } : {}),
       // OpenCode's edit/write tools overwrite `state.title` on completion
       // with the human-readable result message ("Success. Updated the
       // following files: M src/foo.ts"). The path is extracted separately
@@ -375,7 +379,14 @@ function toolPayload(
       // instead of the polluted title.
       name: toolName,
       path,
-      changeKind: inferFileChangeKind(toolName, input, result, metadata, partMetadata),
+      changeKind: inferFileChangeKind(
+        toolName,
+        input,
+        result,
+        fileChangeMetadata,
+        metadata,
+        partMetadata,
+      ),
       ...(diffSummary ? { diffSummary } : {}),
     };
   }
