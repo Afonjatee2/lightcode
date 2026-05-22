@@ -29,6 +29,7 @@ import type {
   ThreadStatus,
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
+import { isOpenCodeBrowserMcpEnabled } from "@/shared/opencodeSettings";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,
@@ -47,6 +48,7 @@ import {
 import { mapOpenCodeSlashCommands } from "./detection";
 import { classifyOpenCodeError } from "./opencodeErrors";
 import { buildOpenCodePermissionRules } from "./permissionRules";
+import { syncOpenCodeBrowserMcpConfigFile } from "./plugin/install";
 import {
   acquireOpenCodeServer,
   resolveOpenCodeSessionDirectory,
@@ -351,8 +353,11 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     this.activated = true;
 
     try {
+      const browserMcpEnabled = isOpenCodeBrowserMcpEnabled(this.input.agentSettings);
+      syncOpenCodeBrowserMcpConfigFile(this.input.projectLocation, browserMcpEnabled);
       this.acquired = await acquireOpenCodeServer({
         projectLocation: this.input.projectLocation,
+        browserMcpEnabled,
       });
     } catch (cause) {
       // Surface server-startup failures (sandbox blocks, ENOENT, port races,

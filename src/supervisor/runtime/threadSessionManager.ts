@@ -40,6 +40,7 @@ import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { terminateProcessTree } from "@/shared/processTree";
 import {
   type AgentAdapter,
+  type AgentLaunchOptions,
   type CommandSpec,
   type StructuredSessionHandle,
   createKnownSessionRef,
@@ -1138,20 +1139,24 @@ export class ThreadSessionManager {
     // and WSL path rewriting) so attachments hand off cleanly as the launch
     // arg instead of being staged for a deferred PTY-write.
     const launchPrompt = useStructuredFlow || deferToTerminal ? "" : initialPrompt;
+    const launchOptions = this.launchOptionsWithAgentSettings(
+      adapter,
+      structuredSession?.launchOptions,
+    );
     const argv = payload.sessionRef
       ? adapter.buildResumeArgv(
           payload.projectLocation,
           payload.config,
           launchPrompt,
           payload.sessionRef,
-          structuredSession?.launchOptions,
+          launchOptions,
         )
       : adapter.buildLaunchArgv(
           payload.projectLocation,
           payload.config,
           launchPrompt,
           payload.sessionRef,
-          structuredSession?.launchOptions,
+          launchOptions,
         );
 
     // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
@@ -1232,6 +1237,7 @@ export class ThreadSessionManager {
         threadId,
         projectLocation,
         config,
+        agentSettings: this.resolveAgentSettings(adapter),
         ...(sessionRef ? { sessionRef } : {}),
         ...(presentationMode ? { presentationMode } : {}),
       });
@@ -1676,7 +1682,7 @@ export class ThreadSessionManager {
       config,
       launchPrompt,
       session.sessionRef,
-      structuredSession?.launchOptions,
+      this.launchOptionsWithAgentSettings(session.adapter, structuredSession?.launchOptions),
     );
     if (cliHookExtras.extraArgs.length > 0) {
       argv.args = this.mergeCliHookExtraArgs(
@@ -1745,6 +1751,8 @@ export class ThreadSessionManager {
         session.projectLocation,
         session.config,
         session.launchPrompt,
+        undefined,
+        this.launchOptionsWithAgentSettings(session.adapter),
       );
       if (cliHookExtras.extraArgs.length > 0) {
         argv.args = this.mergeCliHookExtraArgs(
@@ -1874,12 +1882,7 @@ export class ThreadSessionManager {
     return join(this.options.logsDir, `${threadId}.hints.log`);
   }
 
-  private resolveAgentProcessEnv(adapter: AgentAdapter): Record<string, string> {
-    const settingDefs = adapter.capabilities.settingDefs ?? [];
-    if (settingDefs.length === 0) {
-      return {};
-    }
-
+  private resolveAgentSettings(adapter: AgentAdapter): Record<string, boolean | string> {
     let settings = defaultSharedSettings;
     try {
       const raw = readFileSync(this.options.settingsPath, "utf8");
@@ -1887,8 +1890,26 @@ export class ThreadSessionManager {
     } catch {
       // use defaults
     }
+    return settings.agentSettings[adapter.kind] ?? {};
+  }
 
-    const agentValues = settings.agentSettings[adapter.kind] ?? {};
+  private launchOptionsWithAgentSettings(
+    adapter: AgentAdapter,
+    launchOptions?: AgentLaunchOptions,
+  ): AgentLaunchOptions {
+    return {
+      ...(launchOptions ?? {}),
+      agentSettings: this.resolveAgentSettings(adapter),
+    };
+  }
+
+  private resolveAgentProcessEnv(adapter: AgentAdapter): Record<string, string> {
+    const settingDefs = adapter.capabilities.settingDefs ?? [];
+    if (settingDefs.length === 0) {
+      return {};
+    }
+
+    const agentValues = this.resolveAgentSettings(adapter);
     const env: Record<string, string> = {};
     for (const definition of settingDefs) {
       if (definition.platforms && !definition.platforms.includes(process.platform)) {

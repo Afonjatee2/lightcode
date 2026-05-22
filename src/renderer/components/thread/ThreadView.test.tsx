@@ -60,7 +60,7 @@ describe("ThreadView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
-    useSharedSettings.setState({ collapseTerminalComposer: false });
+    useSharedSettings.setState({ agentSettings: {}, collapseTerminalComposer: false });
     useThreadTodoDockStore.setState({
       defaultPlacement: "composer",
       defaultCollapsed: false,
@@ -135,6 +135,60 @@ describe("ThreadView", () => {
       model: "gpt-5.4",
       browserMcp: false,
     });
+  });
+
+  it("renders OpenCode Browser MCP as a read-only header chip when provider setting is enabled", () => {
+    const onConfigChange = vi.fn<(config: ThreadConfig) => void>();
+
+    renderThreadView({
+      thread: {
+        id: "thread-opencode-browser-mcp",
+        projectId: "project-1",
+        title: "OpenCode browser thread",
+        agentKind: "opencode",
+        config: {
+          model: "opencode/big-pickle",
+        },
+        status: "idle",
+        attention: "none",
+        canResumeWithConfig: true,
+        archived: false,
+        done: false,
+        starred: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      agentStatus: {
+        kind: "opencode",
+        label: "OpenCode",
+        installed: true,
+        authState: "authenticated",
+        capabilities: {
+          models: [{ id: "opencode/big-pickle", label: "Big Pickle" }],
+          efforts: [],
+          modelEfforts: {},
+          modes: ["agent"],
+          approvalPolicies: [{ id: "default", label: "Default" }],
+          sandboxModes: [],
+          supportsResume: true,
+          supportsDirectInput: true,
+          liveInputMode: "server",
+          presentationMode: "gui",
+          settingDefs: [],
+        },
+      },
+      projectLocation: {
+        kind: "windows",
+        path: "C:\\repo",
+      },
+      onConfigChange,
+      onResolveServerRequest: async () => undefined,
+      onSubmitInput: async () => undefined,
+    });
+
+    expect(screen.getByText("Browser")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Disable Browser MCP")).toBeNull();
+    expect(onConfigChange).not.toHaveBeenCalled();
   });
 
   it("starts a queued launch after the terminal reports its first size", async () => {

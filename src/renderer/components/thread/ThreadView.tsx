@@ -12,6 +12,7 @@ import type {
   ThreadServerRequestId,
 } from "@/shared/contracts";
 import { isHomeProjectId } from "@/shared/homeScope";
+import { isOpenCodeBrowserMcpEnabled } from "@/shared/opencodeSettings";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 
 import { useAppStore } from "@/renderer/state/appStore";
@@ -181,6 +182,9 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   const launchRequestRef = useRef<string | null>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
   const [isTitleTooltipOpen, setIsTitleTooltipOpen] = useState(false);
+  const opencodeBrowserMcpEnabled = useSharedSettings((s) =>
+    isOpenCodeBrowserMcpEnabled(s.agentSettings.opencode),
+  );
 
   // Thread-level mode wins over the adapter-declared default. Existing rows
   // load from DB with `presentationMode: "terminal"` thanks to the schema
@@ -189,6 +193,10 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
     (thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal") ===
     "terminal";
   const launchTerminalSize = usesTerminalPresentation ? terminalSize : DEFAULT_HIDDEN_TERMINAL_SIZE;
+  const showBrowserChip =
+    thread.config.browserMcp === true ||
+    (thread.agentKind === "opencode" && opencodeBrowserMcpEnabled);
+  const browserChipRemovable = thread.agentKind !== "opencode" && thread.config.browserMcp === true;
 
   useEffect(() => {
     const presentation =
@@ -370,10 +378,15 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                   {thread.title}
                 </Tooltip.Content>
               </Tooltip>
-              {thread.config.browserMcp === true ? (
+              {showBrowserChip ? (
                 <div className="lightcode-overlay-header__controls shrink-0">
                   <BrowserChip
-                    onRemove={() => onConfigChange({ ...thread.config, browserMcp: false })}
+                    {...(thread.agentKind === "opencode"
+                      ? { title: "Browser MCP enabled for OpenCode" }
+                      : {})}
+                    {...(browserChipRemovable
+                      ? { onRemove: () => onConfigChange({ ...thread.config, browserMcp: false }) }
+                      : {})}
                   />
                 </div>
               ) : null}
