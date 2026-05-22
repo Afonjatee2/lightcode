@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentKind } from "@/shared/contracts";
 import type { AgentAdapter, StructuredSessionHandle } from "../agents/base";
 import type { SessionRuntime } from "./sessionTypes";
@@ -37,15 +40,19 @@ function deferred<T = void>(): {
 }
 
 function createManager(agentKind: AgentKind, adapter: AgentAdapter): ThreadSessionManager {
-  return new ThreadSessionManager({
+  const tempDir = mkdtempSync(join(tmpdir(), "lightcode-start-close-"));
+  tempDirs.push(tempDir);
+  const manager = new ThreadSessionManager({
     emit: vi.fn<() => void>(),
     isDev: false,
-    logsDir: "/tmp/lightcode-test-logs",
-    settingsPath: "/tmp/lightcode-test-settings.json",
+    logsDir: join(tempDir, "logs"),
+    settingsPath: join(tempDir, "settings.json"),
     readDisableCliHookPlugin: () => false,
     adapters: new Map([[agentKind, adapter]]),
     windowsShell: { shell: "powershell.exe", kind: "powershell", args: ["-NoLogo"] },
   });
+  managersToDispose.push(manager);
+  return manager;
 }
 
 function createStructuredSession(activation: Promise<void>): StructuredSessionHandle {
@@ -124,6 +131,17 @@ function createInactiveRuntime(
 }
 
 const guardedStructuredProviders = ["codex", "opencode"] as const;
+const managersToDispose: ThreadSessionManager[] = [];
+const tempDirs: string[] = [];
+
+afterEach(() => {
+  for (const manager of managersToDispose.splice(0)) {
+    manager.dispose();
+  }
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
 
 describe("ThreadSessionManager start guards", () => {
   it.each(guardedStructuredProviders)(
