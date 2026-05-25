@@ -8,7 +8,7 @@ import { formatBytes } from "@/shared/formatBytes";
 import appIconStableUrl from "../../../../../build/icon.png";
 import appIconNightlyUrl from "../../../../../build/icon-nightly.png";
 
-const GITHUB_REPO = "https://github.com/nicepkg/lightcode";
+const GITHUB_REPO = "https://github.com/SDSLeon/lightcode";
 const WEBSITE_URL = "https://www.lightcodeapp.com/";
 
 function AboutLink(props: { href: string; children: React.ReactNode }) {
