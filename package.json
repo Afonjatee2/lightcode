@@ -1,6 +1,6 @@
 {
   "name": "lightcode",
-  "version": "1.0.1",
+  "version": "1.0.1-nightly.202605250026",
   "private": true,
   "description": "The universal desktop orchestrator for AI agents. Run terminal-native and structured chat agents side-by-side.",
   "homepage": "https://www.lightcodeapp.com/",
