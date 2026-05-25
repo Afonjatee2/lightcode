@@ -33,6 +33,10 @@ function preventFocusSteal(event: React.MouseEvent<HTMLElement>): void {
   event.preventDefault();
 }
 
+function shouldPreferTerminalLogin(status: AgentStatus): boolean {
+  return status.kind === "grok" && Boolean(status.loginCommand);
+}
+
 export function ThreadAuthRequiredDock(props: { agentStatus: AgentStatus; project?: Project }) {
   const { agentStatus, project } = props;
   const [pendingAction, setPendingAction] = useState<"login" | "refresh" | undefined>();
@@ -41,14 +45,45 @@ export function ThreadAuthRequiredDock(props: { agentStatus: AgentStatus; projec
   const canUseAgentAuth = agentAuthMethod !== undefined;
   const canUseTerminalLogin = Boolean(agentStatus.loginCommand);
   const hasDirectLogin = canUseAgentAuth || canUseTerminalLogin;
-  const description = agentAuthMethod
-    ? `Complete ${agentAuthMethod.name} sign-in before this thread can run.`
-    : agentStatus.loginCommand
-      ? `Run ${agentStatus.loginCommand} before this thread can run.`
+  const preferTerminalLogin = shouldPreferTerminalLogin(agentStatus);
+  const useTerminalLogin = canUseTerminalLogin && (preferTerminalLogin || !canUseAgentAuth);
+  const description = useTerminalLogin
+    ? `Run ${agentStatus.loginCommand} before this thread can run.`
+    : agentAuthMethod
+      ? `Complete ${agentAuthMethod.name} sign-in before this thread can run.`
       : "Add credentials before this thread can run.";
 
   async function handleLogin() {
     if (pendingAction) return;
+
+    if (useTerminalLogin && agentStatus.loginCommand) {
+      setPendingAction("login");
+      const opened = runAgentLoginCommand({
+        label: agentStatus.label,
+        command: agentStatus.loginCommand,
+        ...(terminalAuthMethod?.env ? { env: terminalAuthMethod.env } : {}),
+        ...(project ? { project } : {}),
+        onCommandComplete: (exitCode) => {
+          // Unlock the button as soon as the command exits so the user can
+          // retry without waiting for the (post-exit) status refresh.
+          setPendingAction(undefined);
+          void refreshAgentStatus(agentStatus)
+            .then(() => {
+              if (exitCode === 0) toast.success(`${agentStatus.label} authenticated.`);
+            })
+            .catch((error: unknown) => {
+              toast.danger(
+                error instanceof Error
+                  ? error.message
+                  : `Unable to refresh ${agentStatus.label} status.`,
+              );
+            });
+        },
+      });
+      if (!opened) setPendingAction(undefined);
+      return;
+    }
+
     if (canUseAgentAuth) {
       setPendingAction("login");
       try {
@@ -68,31 +103,6 @@ export function ThreadAuthRequiredDock(props: { agentStatus: AgentStatus; projec
         setPendingAction(undefined);
       }
       return;
-    }
-
-    if (agentStatus.loginCommand) {
-      setPendingAction("login");
-      const opened = runAgentLoginCommand({
-        label: agentStatus.label,
-        command: agentStatus.loginCommand,
-        ...(terminalAuthMethod?.env ? { env: terminalAuthMethod.env } : {}),
-        ...(project ? { project } : {}),
-        onCommandComplete: (exitCode) => {
-          void refreshAgentStatus(agentStatus)
-            .then(() => {
-              if (exitCode === 0) toast.success(`${agentStatus.label} authenticated.`);
-            })
-            .catch((error: unknown) => {
-              toast.danger(
-                error instanceof Error
-                  ? error.message
-                  : `Unable to refresh ${agentStatus.label} status.`,
-              );
-            })
-            .finally(() => setPendingAction(undefined));
-        },
-      });
-      if (!opened) setPendingAction(undefined);
     }
   }
 
