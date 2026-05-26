@@ -1,9 +1,15 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  WslBridgeClient,
+  WslGitExecInput,
+  WslGitExecResult,
+  WslLocation,
+} from "./wsl/bridge/client";
 
-const { execFileMock, mkdirMock, readFileMock, readWslCommandOutputAsync, rmMock, statMock } =
-  vi.hoisted(() => ({
+const { execFileMock, mkdirMock, readFileMock, readWslCommandOutputAsync, statMock } = vi.hoisted(
+  () => ({
     execFileMock:
       vi.fn<
         (
@@ -17,9 +23,9 @@ const { execFileMock, mkdirMock, readFileMock, readWslCommandOutputAsync, rmMock
     readFileMock: vi.fn<() => Promise<string | Buffer>>(),
     readWslCommandOutputAsync:
       vi.fn<() => Promise<{ ok: boolean; stdout: string; stderr: string }>>(),
-    rmMock: vi.fn<() => Promise<void>>(),
     statMock: vi.fn<() => Promise<{ isFile(): boolean; size: number; mtimeMs: number }>>(),
-  }));
+  }),
+);
 
 vi.mock("./agents/base", async () => {
   const actual = await vi.importActual<typeof import("./agents/base")>("./agents/base");
@@ -35,7 +41,6 @@ vi.mock("node:fs/promises", async () => {
     ...actual,
     mkdir: mkdirMock,
     readFile: readFileMock,
-    rm: rmMock,
     stat: statMock,
   };
 });
@@ -198,6 +203,53 @@ describe("GitService.addWorktree", () => {
     expect(configCall).toBeDefined();
     expect(configCall![1]).toContain("master");
   });
+
+  it("resolves default WSL worktree paths through the bridge", async () => {
+    const home = vi.fn<() => Promise<{ home: string }>>(async () => ({ home: "/home/demo" }));
+    const bridgeMkdir = vi.fn<() => Promise<void>>(async () => undefined);
+    const gitExec = vi.fn<
+      (location: WslLocation, input: WslGitExecInput) => Promise<WslGitExecResult>
+    >(async () => ({
+      ok: true,
+      stdout: "",
+      stderr: "",
+      exitCode: 0,
+    }));
+    const service = new GitService();
+    service.setWslClient({ home, mkdir: bridgeMkdir, gitExec } as unknown as WslBridgeClient);
+
+    try {
+      await service.addWorktree(
+        {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/demo/work/lightcode",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\lightcode",
+        },
+        undefined,
+        "feature/x",
+        false,
+      );
+
+      expect(home).toHaveBeenCalledWith(expect.objectContaining({ distro: "Ubuntu" }));
+      expect(readWslCommandOutputAsync).not.toHaveBeenCalled();
+      expect(gitExec).toHaveBeenCalledWith(
+        expect.objectContaining({ linuxPath: "/home/demo/work/lightcode" }),
+        expect.objectContaining({
+          args: [
+            "worktree",
+            "add",
+            expect.stringMatching(
+              /^\/home\/demo\/.lightcode\/worktrees\/lightcode-[a-f0-9]{4}\/feature-x$/,
+            ),
+            "feature/x",
+          ],
+        }),
+      );
+    } finally {
+      service.setWslClient(undefined);
+    }
+  });
 });
 
 describe("GitService.revert", () => {
@@ -322,6 +374,191 @@ describe("GitService.commit", () => {
         windowsHide: true,
       }),
     );
+  });
+
+  it("runs WSL commits through the bridge with login-shell env when available", async () => {
+    const gitExec = vi.fn<
+      (location: WslLocation, input: WslGitExecInput) => Promise<WslGitExecResult>
+    >(async () => ({
+      ok: true,
+      stdout: "[main def5678] feat(dashboard): add taxonomy filters\n",
+      stderr: "",
+      exitCode: 0,
+    }));
+    const service = new GitService();
+    service.setWslClient({ gitExec } as unknown as WslBridgeClient);
+    const location = {
+      kind: "wsl" as const,
+      distro: "Ubuntu",
+      linuxPath: "/home/demo/work/repo",
+      uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+    };
+    const message = "feat(dashboard): add taxonomy filters";
+
+    try {
+      const result = await service.commit(location, message, false);
+
+      expect(result).toEqual({ hash: "def5678" });
+      expect(gitExec).toHaveBeenCalledWith(
+        expect.objectContaining({ linuxPath: "/home/demo/work/repo" }),
+        expect.objectContaining({
+          cwd: "/home/demo/work/repo",
+          args: ["commit", "-m", message],
+          loginEnv: true,
+          timeoutMs: expect.any(Number),
+        }),
+      );
+      expect(execFileMock).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
+  });
+
+  it("surfaces bridge stderr for failed WSL commits", async () => {
+    const gitExec = vi.fn<
+      (location: WslLocation, input: WslGitExecInput) => Promise<WslGitExecResult>
+    >(async () => ({
+      ok: false,
+      stdout: "",
+      stderr: "pre-commit hook failed",
+      exitCode: 1,
+      error: "git exited 1",
+    }));
+    const service = new GitService();
+    service.setWslClient({ gitExec } as unknown as WslBridgeClient);
+
+    try {
+      await expect(
+        service.commit(
+          {
+            kind: "wsl",
+            distro: "Ubuntu",
+            linuxPath: "/home/demo/work/repo",
+            uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+          },
+          "feat: test",
+          false,
+        ),
+      ).rejects.toThrow("pre-commit hook failed");
+      expect(execFileMock).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
+  });
+});
+
+describe("GitService WSL bridge exec", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("routes non-status WSL Git commands through the bridge", async () => {
+    const gitExec = vi.fn<
+      (location: WslLocation, input: WslGitExecInput) => Promise<WslGitExecResult>
+    >(async () => ({
+      ok: true,
+      stdout: "abc123 feat: demo\n",
+      stderr: "",
+      exitCode: 0,
+    }));
+    const service = new GitService();
+    service.setWslClient({ gitExec } as unknown as WslBridgeClient);
+
+    try {
+      const output = await service.getLogRange(
+        {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/demo/work/repo",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+        },
+        "main",
+        "HEAD",
+      );
+
+      expect(output).toBe("abc123 feat: demo\n");
+      expect(gitExec).toHaveBeenCalledWith(
+        expect.objectContaining({ distro: "Ubuntu" }),
+        expect.objectContaining({
+          cwd: "/home/demo/work/repo",
+          args: ["log", "--oneline", "main..HEAD"],
+          loginEnv: true,
+        }),
+      );
+      expect(execFileMock).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
+  });
+
+  it("routes WSL fetch through the bridge when the remote exists", async () => {
+    const gitExec = vi.fn<
+      (location: WslLocation, input: WslGitExecInput) => Promise<WslGitExecResult>
+    >(async (_location, input) => {
+      if (input.args[0] === "remote") {
+        return { ok: true, stdout: "origin\n", stderr: "", exitCode: 0 };
+      }
+      return { ok: true, stdout: "", stderr: "", exitCode: 0 };
+    });
+    const service = new GitService();
+    service.setWslClient({ gitExec } as unknown as WslBridgeClient);
+
+    try {
+      await service.fetch(
+        {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/demo/work/repo",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+        },
+        "origin",
+        false,
+      );
+
+      expect(gitExec).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({ distro: "Ubuntu" }),
+        expect.objectContaining({ args: ["remote"], loginEnv: true }),
+      );
+      expect(gitExec).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({ distro: "Ubuntu" }),
+        expect.objectContaining({ args: ["fetch", "origin"], loginEnv: true }),
+      );
+      expect(execFileMock).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
+  });
+
+  it("skips WSL fetch when the remote is not configured", async () => {
+    const gitExec = vi.fn<
+      (location: WslLocation, input: WslGitExecInput) => Promise<WslGitExecResult>
+    >(async () => ({ ok: true, stdout: "", stderr: "", exitCode: 0 }));
+    const service = new GitService();
+    service.setWslClient({ gitExec } as unknown as WslBridgeClient);
+
+    try {
+      await service.fetch(
+        {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/demo/work/repo",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+        },
+        "origin",
+        false,
+      );
+
+      expect(gitExec).toHaveBeenCalledTimes(1);
+      expect(gitExec).toHaveBeenCalledWith(
+        expect.objectContaining({ distro: "Ubuntu" }),
+        expect.objectContaining({ args: ["remote"], loginEnv: true }),
+      );
+      expect(execFileMock).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
   });
 });
 
@@ -481,6 +718,112 @@ describe("GitService.getStatus", () => {
       owner: "owner",
       repo: "repo",
     });
+  });
+
+  it("routes WSL status snapshots through the bridge when available", async () => {
+    const gitBatch = vi.fn<
+      (
+        location: WslLocation,
+        input: { commands: WslGitExecInput[]; timeoutMs?: number },
+      ) => Promise<{ results: WslGitExecResult[] }>
+    >(async () => ({
+      results: [
+        { ok: true, stdout: "true\n", stderr: "", exitCode: 0 },
+        {
+          ok: true,
+          stdout: ["# branch.oid abc123", "# branch.head main", "# branch.ab +0 -0"].join("\n"),
+          stderr: "",
+          exitCode: 0,
+        },
+        { ok: true, stdout: "", stderr: "", exitCode: 0 },
+        { ok: true, stdout: "", stderr: "", exitCode: 0 },
+        { ok: true, stdout: "", stderr: "", exitCode: 0 },
+      ],
+    }));
+    const service = new GitService();
+    service.setWslClient({ gitBatch } as unknown as WslBridgeClient);
+
+    try {
+      const result = await service.getStatus({
+        kind: "wsl",
+        distro: "Ubuntu",
+        linuxPath: "/home/demo/work/repo",
+        uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+      });
+
+      expect(result.branch).toBe("main");
+      expect(gitBatch).toHaveBeenCalledWith(
+        expect.objectContaining({ linuxPath: "/home/demo/work/repo" }),
+        expect.objectContaining({
+          commands: expect.arrayContaining([
+            expect.objectContaining({
+              cwd: "/home/demo/work/repo",
+              args: ["status", "--porcelain=v2", "-b"],
+            }),
+          ]),
+        }),
+      );
+      expect(execFileMock).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
+  });
+
+  it("routes WSL project snapshots and gh availability through the bridge", async () => {
+    const gitBatch = vi.fn<
+      (
+        location: WslLocation,
+        input: { commands: WslGitExecInput[]; timeoutMs?: number },
+      ) => Promise<{ results: WslGitExecResult[] }>
+    >(async () => ({
+      results: [
+        { ok: true, stdout: "true\n", stderr: "", exitCode: 0 },
+        { ok: true, stdout: "# branch.head main\n# branch.ab +0 -0\n", stderr: "", exitCode: 0 },
+        { ok: true, stdout: "", stderr: "", exitCode: 0 },
+        { ok: true, stdout: "", stderr: "", exitCode: 0 },
+        { ok: true, stdout: "", stderr: "", exitCode: 0 },
+        { ok: true, stdout: "refs/heads/main\tabc123\t*\n", stderr: "", exitCode: 0 },
+        {
+          ok: true,
+          stdout: "worktree /home/demo/work/repo\nHEAD abc123\nbranch refs/heads/main\n\n",
+          stderr: "",
+          exitCode: 0,
+        },
+      ],
+    }));
+    const ghVersion = vi.fn<
+      (
+        location: WslLocation,
+        input: Pick<WslGitExecInput, "cwd" | "loginEnv" | "timeoutMs">,
+      ) => Promise<WslGitExecResult>
+    >(async () => ({ ok: true, stdout: "gh version 2.0.0\n", stderr: "", exitCode: 0 }));
+    const service = new GitService();
+    service.setWslClient({ gitBatch, ghVersion } as unknown as WslBridgeClient);
+
+    try {
+      const snapshot = await service.batchedWslProjectSnapshot(
+        {
+          kind: "wsl",
+          distro: "Ubuntu",
+          linuxPath: "/home/demo/work/repo",
+          uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+        },
+        true,
+      );
+
+      expect(snapshot.status?.branch).toBe("main");
+      expect(snapshot.branches?.current).toBe("main");
+      expect(snapshot.worktrees?.[0]?.path).toBe("/home/demo/work/repo");
+      expect(snapshot.ghAvailable).toBe(true);
+      expect(ghVersion).toHaveBeenCalledWith(expect.objectContaining({ distro: "Ubuntu" }), {
+        cwd: "/home/demo/work/repo",
+        loginEnv: true,
+        timeoutMs: 10_000,
+      });
+      expect(execFileMock).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
   });
 
   it("returns remoteInfo null when no remotes exist", async () => {
@@ -854,15 +1197,72 @@ describe("GitService.removeWorktree", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    rmMock.mockResolvedValue(undefined);
   });
 
-  it("removes residual directories when git already detached the worktree", async () => {
+  it("removes worktrees with Git's double-force form", async () => {
+    mockGitCommands((args) => {
+      if (args[0] === "worktree" && args[1] === "list") {
+        return {
+          stdout: `worktree ${location.path}\nHEAD abc123\nbranch refs/heads/main\n\nworktree ${worktreePath.replace(/\\/g, "/")}\nHEAD def456\nbranch refs/heads/feature-x\n\n`,
+        };
+      }
+      return { stdout: "" };
+    });
+
+    await new GitService().removeWorktree(location, worktreePath, true);
+
+    const removeCall = execFileMock.mock.calls.find(
+      (call: unknown[]) =>
+        Array.isArray(call[1]) &&
+        (call[1] as string[])[0] === "worktree" &&
+        (call[1] as string[])[1] === "remove",
+    );
+    expect(removeCall?.[1]).toEqual(["worktree", "remove", "--force", "--force", worktreePath]);
+  });
+
+  it("prunes when Git removed worktree metadata but reported a remove error", async () => {
+    let listCalls = 0;
+    let pruneCalls = 0;
     mockGitCommands((args) => {
       if (args[0] === "worktree" && args[1] === "remove") {
         return {
-          error: new Error(`fatal: failed to delete '${worktreePath}': Directory not empty`),
+          error: new Error(
+            `fatal: validation failed, cannot remove working tree: '${worktreePath}/.git' does not exist`,
+          ),
         };
+      }
+      if (args[0] === "worktree" && args[1] === "prune") {
+        pruneCalls++;
+        return { stdout: "" };
+      }
+      if (args[0] === "worktree" && args[1] === "list") {
+        listCalls++;
+        if (listCalls === 1) {
+          return {
+            stdout: `worktree ${location.path}\nHEAD abc123\nbranch refs/heads/main\n\nworktree ${worktreePath.replace(/\\/g, "/")}\nHEAD def456\nbranch refs/heads/feature-x\n\n`,
+          };
+        }
+        return { stdout: `worktree ${location.path}\nHEAD abc123\nbranch refs/heads/main\n\n` };
+      }
+      return { stdout: "" };
+    });
+
+    await new GitService().removeWorktree(location, worktreePath, true);
+
+    expect(pruneCalls).toBe(1);
+  });
+
+  it("prunes when the worktree is already unregistered", async () => {
+    let removeCalls = 0;
+    let pruneCalls = 0;
+    mockGitCommands((args) => {
+      if (args[0] === "worktree" && args[1] === "remove") {
+        removeCalls++;
+        return { stdout: "" };
+      }
+      if (args[0] === "worktree" && args[1] === "prune") {
+        pruneCalls++;
+        return { stdout: "" };
       }
       if (args[0] === "worktree" && args[1] === "list") {
         return { stdout: `worktree ${location.path}\nHEAD abc123\nbranch refs/heads/main\n\n` };
@@ -872,15 +1272,11 @@ describe("GitService.removeWorktree", () => {
 
     await new GitService().removeWorktree(location, worktreePath, true);
 
-    expect(rmMock).toHaveBeenCalledWith(worktreePath, {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 150,
-    });
+    expect(removeCalls).toBe(0);
+    expect(pruneCalls).toBe(1);
   });
 
-  it("rethrows when git still reports the worktree as attached", async () => {
+  it("throws when prune does not remove the worktree registration", async () => {
     mockGitCommands((args) => {
       if (args[0] === "worktree" && args[1] === "remove") {
         return {
@@ -898,7 +1294,49 @@ describe("GitService.removeWorktree", () => {
     await expect(new GitService().removeWorktree(location, worktreePath, true)).rejects.toThrow(
       "failed to delete",
     );
-    expect(rmMock).not.toHaveBeenCalled();
+  });
+
+  it("does not remove residual WSL worktree directories through the bridge", async () => {
+    const wslLocation = {
+      kind: "wsl" as const,
+      distro: "Ubuntu",
+      linuxPath: "/home/demo/work/repo",
+      uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\demo\\work\\repo",
+    };
+    const wslWorktreePath = "/home/demo/.lightcode/worktrees/repo/feature-x";
+    const gitExec = vi.fn<
+      (location: WslLocation, input: WslGitExecInput) => Promise<WslGitExecResult>
+    >(async (_location, input) => {
+      if (input.args[0] === "worktree" && input.args[1] === "remove") {
+        return {
+          ok: false,
+          stdout: "",
+          stderr: `fatal: failed to delete '${wslWorktreePath}': Directory not empty`,
+          exitCode: 1,
+        };
+      }
+      if (input.args[0] === "worktree" && input.args[1] === "list") {
+        return {
+          ok: true,
+          stdout: "worktree /home/demo/work/repo\nHEAD abc123\nbranch refs/heads/main\n\n",
+          stderr: "",
+          exitCode: 0,
+        };
+      }
+      return { ok: true, stdout: "", stderr: "", exitCode: 0 };
+    });
+    const bridgeRm = vi.fn<() => Promise<void>>(async () => undefined);
+    const service = new GitService();
+    service.setWslClient({ gitExec, rm: bridgeRm } as unknown as WslBridgeClient);
+
+    try {
+      await service.removeWorktree(wslLocation, wslWorktreePath, true);
+
+      expect(bridgeRm).not.toHaveBeenCalled();
+      expect(readWslCommandOutputAsync).not.toHaveBeenCalled();
+    } finally {
+      service.setWslClient(undefined);
+    }
   });
 });
 
