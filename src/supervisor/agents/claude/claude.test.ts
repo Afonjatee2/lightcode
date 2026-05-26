@@ -136,10 +136,13 @@ describe("createClaudeAdapter buildAcpLogoutCommand", () => {
     const adapter = createClaudeAdapter();
     const command = await adapter.buildAcpLogoutCommand?.();
     expect(command).toBeDefined();
-    // `buildAgentCommand` wraps the argv in a login shell (`sh -c "exec
-    // 'claude' 'auth' 'logout'"`) on posix and in `wsl.exe -d <distro> --` on
-    // WSL — assert on the substring so both platforms pass.
-    expect(command?.args.join(" ")).toContain("'claude' 'auth' 'logout'");
+    const args = command?.args ?? [];
+    const rendered = args.includes("-EncodedCommand")
+      ? Buffer.from(args.at(-1) ?? "", "base64").toString("utf16le")
+      : args.join(" ");
+    expect(rendered).toMatch(/claude/i);
+    expect(rendered).toContain("auth");
+    expect(rendered).toContain("logout");
   });
 });
 

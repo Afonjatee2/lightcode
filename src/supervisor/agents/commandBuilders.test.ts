@@ -364,7 +364,7 @@ describe("agent command builders", () => {
       const { cmd, cmdArgs } = parseWindowsSpec(spec);
 
       expect(cmd).toBe("copilot");
-      expect(cmdArgs.some((arg) => arg.startsWith("--resume="))).toBe(true);
+      expect(cmdArgs.some((arg) => arg.startsWith("--session-id="))).toBe(true);
       expect(cmdArgs).toContain("--model");
       expect(cmdArgs).toContain("gpt-5");
       expect(cmdArgs).toContain("--effort");
@@ -410,7 +410,7 @@ describe("agent command builders", () => {
       const { cmd, cmdArgs } = parseWindowsSpec(spec);
 
       expect(cmd).toBe("copilot");
-      expect(cmdArgs).toContain("--resume=019d19c4-8050-7270-b8fc-589eee8136c2");
+      expect(cmdArgs).toContain("--session-id=019d19c4-8050-7270-b8fc-589eee8136c2");
       expect(cmdArgs).toContain("--model");
       expect(cmdArgs).toContain("gpt-5.4");
       expect(cmdArgs).toContain("--effort");

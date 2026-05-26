@@ -233,7 +233,12 @@ async function filePartToFallbackText(
   if (!part.url.startsWith("file:")) return `Attached file could not be sent: ${name}`;
 
   try {
-    const path = fileURLToPath(part.url);
+    let path: string;
+    try {
+      path = fileURLToPath(part.url);
+    } catch {
+      path = decodeURIComponent(new URL(part.url).pathname);
+    }
     if (part.mime !== "text/plain") return `Attached file could not be sent: ${path}`;
 
     const data = await readFile(path);
