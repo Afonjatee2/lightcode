@@ -1,5 +1,6 @@
 import { accessSync, constants as fsConstants, existsSync, readFileSync, statSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { homedir } from "node:os";
 import { join, resolve as resolvePath } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { spawn } from "node-pty";
@@ -712,7 +713,9 @@ export class ThreadSessionManager {
       await primeProjectShellEnv(payload.projectLocation.path);
     }
 
-    const shellCommand = this.buildShellCommand(payload.projectLocation);
+    const shellCommand = this.buildShellCommand(payload.projectLocation, {
+      startInHome: payload.startInHome === true,
+    });
     this.options.emit({ type: "thread-reset", threadId: payload.shellId });
     const terminalEnv = resolveTerminalColorEnv(payload.projectLocation);
 
@@ -2071,15 +2074,20 @@ export class ThreadSessionManager {
     session.pty.kill();
   }
 
-  private buildShellCommand(location: ProjectLocation): {
+  private buildShellCommand(
+    location: ProjectLocation,
+    options?: { startInHome?: boolean },
+  ): {
     command: string;
     args: string[];
     cwd?: string;
   } {
+    const startInHome = options?.startInHome === true;
     if (location.kind === "wsl") {
+      // `wsl --cd ~` lands in the distro's Linux home; otherwise the worktree.
       return {
         command: getWslCommand(),
-        args: ["-d", location.distro, "--cd", location.linuxPath],
+        args: ["-d", location.distro, "--cd", startInHome ? "~" : location.linuxPath],
       };
     }
 
@@ -2087,7 +2095,7 @@ export class ThreadSessionManager {
       return {
         command: this.options.windowsShell.shell,
         args: [...this.options.windowsShell.args],
-        cwd: location.path,
+        cwd: startInHome ? homedir() : location.path,
       };
     }
 
@@ -2095,7 +2103,7 @@ export class ThreadSessionManager {
     return {
       command: shell,
       args: ["-l"],
-      cwd: location.path,
+      cwd: startInHome ? homedir() : location.path,
     };
   }
 
