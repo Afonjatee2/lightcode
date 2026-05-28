@@ -40,14 +40,30 @@ function ensureElectronBinary() {
     return;
   }
 
-  console.log("[lightcode] Electron binary missing; running electron/install.js");
-  const installEnv = { ...process.env };
-  delete installEnv.ELECTRON_SKIP_BINARY_DOWNLOAD;
-  runNodeScript(join(electronDir, "install.js"), installEnv);
+  const installScript = join(electronDir, "install.js");
+  const maxAttempts = 3;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    console.log(
+      `[lightcode] Electron binary missing; running electron/install.js (attempt ${attempt}/${maxAttempts})`,
+    );
+    const installEnv = { ...process.env };
+    delete installEnv.ELECTRON_SKIP_BINARY_DOWNLOAD;
+    if (attempt > 1) {
+      // electron/install.js honors force_no_cache=true to bypass @electron/get's
+      // on-disk cache, which can silently resolve to a missing/partial artifact
+      // when an earlier download flaked.
+      installEnv.force_no_cache = "true";
+    }
+    runNodeScript(installScript, installEnv);
 
-  if (!hasElectronBinary(electronDir, pathFile)) {
-    throw new Error("[lightcode] Electron binary is unavailable after running electron/install.js");
+    if (hasElectronBinary(electronDir, pathFile)) {
+      return;
+    }
   }
+
+  throw new Error(
+    `[lightcode] Electron binary is unavailable after ${maxAttempts} attempts of electron/install.js`,
+  );
 }
 
 function ensureNodePty() {
