@@ -14,6 +14,7 @@ import {
   ComposerAddMenu,
   ImageLightbox,
   MentionInput,
+  VoiceInputButton,
   type MentionInputHandle,
   useAttachments,
 } from "@/renderer/components/composer";
@@ -26,6 +27,7 @@ import {
   type BranchSelection,
 } from "@/renderer/components/common";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadAgentUpdateDock } from "./ThreadAgentUpdateDock";
 import { ThreadAuthRequiredDock } from "./ThreadAuthRequiredDock";
@@ -76,6 +78,7 @@ export function ThreadDraftComposerArea(props: {
   // either binary, which is a confusing state to debug.
   const [agentUpdating, setAgentUpdating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showVoiceInputButton = useSharedSettings((s) => s.audio.showVoiceInputButton);
   const mentionRef = useRef<MentionInputHandle>(null);
   const attachments = useAttachments();
   const inboxKey = props.paneId ?? `draft:${props.project.id}`;
@@ -449,6 +452,20 @@ export function ThreadDraftComposerArea(props: {
                 onSwitchBranch={props.onSwitchBranch}
                 forceHideLabel={level >= 3}
                 iconOnly={level >= 3}
+              />
+            ) : null}
+            {showVoiceInputButton ? (
+              <VoiceInputButton
+                isDisabled={authRequired || agentUpdating || isSubmitting}
+                onTranscript={(text) => {
+                  mentionRef.current?.commitVoiceTranscript(text);
+                }}
+                onTranscriptPreview={(text) => {
+                  mentionRef.current?.previewVoiceTranscript(text);
+                }}
+                onTranscriptCancel={() => {
+                  mentionRef.current?.clearVoiceTranscriptPreview();
+                }}
               />
             ) : null}
           </>

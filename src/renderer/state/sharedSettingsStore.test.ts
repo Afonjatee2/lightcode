@@ -7,6 +7,13 @@ describe("sharedSettingsStore", () => {
     useSharedSettings.setState({
       themeMode: "dark",
       staleThreadUnloadMinutes: 20,
+      audio: {
+        showVoiceInputButton: true,
+        microphoneDeviceId: "",
+        transcriptionLanguage: "en",
+        transcriptionModel: "tiny",
+        useWebGpu: true,
+      },
       providerConfigs: {},
     });
   });
@@ -23,6 +30,11 @@ describe("sharedSettingsStore", () => {
   it("updates the stale thread unload timing", () => {
     useSharedSettings.getState().setStaleThreadUnloadMinutes(30);
     expect(useSharedSettings.getState().staleThreadUnloadMinutes).toBe(30);
+  });
+
+  it("updates audio settings", () => {
+    useSharedSettings.getState().setAudioSetting("transcriptionLanguage", "es");
+    expect(useSharedSettings.getState().audio.transcriptionLanguage).toBe("es");
   });
 
   it("updates provider config when only context size, fast, and thinking change", () => {
