@@ -86,7 +86,7 @@ export function UnifiedRightPanel(props: {
           <button
             type="button"
             className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-            title="Open as page"
+            title="Maximize"
             onClick={onExpandGitToOverlay}
           >
             <Maximize2 className="size-3" />
@@ -96,7 +96,7 @@ export function UnifiedRightPanel(props: {
           <button
             type="button"
             className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-            title="Open as page"
+            title="Maximize"
             onClick={onExpandFilesToOverlay}
           >
             <Maximize2 className="size-3" />
@@ -106,7 +106,7 @@ export function UnifiedRightPanel(props: {
           <button
             type="button"
             className={`${dragCtl} ${panelHeaderIconButtonClass}`}
-            title="Open as overlay"
+            title="Maximize"
             onClick={onExpandBrowserToOverlay}
           >
             <Maximize2 className="size-3" />

@@ -70,6 +70,7 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
   const browserOverlayOpen = usePanelStore((s) => s.browserOverlayOpen);
   const setBrowserPanelOpen = usePanelStore((s) => s.setBrowserPanelOpen);
   const setBrowserOverlayOpen = usePanelStore((s) => s.setBrowserOverlayOpen);
+  const setBrowserOverlayMaximized = usePanelStore((s) => s.setBrowserOverlayMaximized);
   const setGitReviewContext = usePanelStore((s) => s.setGitReviewContext);
   const setGitOverlayOpen = usePanelStore((s) => s.setGitOverlayOpen);
   const setFileEditorOverlayMode = useFileEditorStore((s) => s.setOverlayMode);
@@ -195,7 +196,10 @@ export function ProjectAuxiliaryPanel(props: { includeTerminal: boolean }) {
       projectName={projectName}
       onExpandGitToOverlay={() => setGitOverlayOpen(true)}
       onExpandFilesToOverlay={() => setFileEditorOverlayMode("fullscreen")}
-      onExpandBrowserToOverlay={() => setBrowserOverlayOpen(true)}
+      onExpandBrowserToOverlay={() => {
+        setBrowserOverlayMaximized(true);
+        setBrowserOverlayOpen(true);
+      }}
       onOpenGit={handleOpenGit}
       onOpenFiles={handleOpenFiles}
       {...(props.includeTerminal ? { onOpenTerminal: handleOpenTerminal } : {})}

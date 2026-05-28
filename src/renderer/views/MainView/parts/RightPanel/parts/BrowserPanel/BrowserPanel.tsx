@@ -18,10 +18,13 @@ const DEFAULT_HOME = "https://www.google.com";
 export function BrowserPanel(props: { visible: boolean }) {
   const tabs = useBrowserPanelStore((s) => s.tabs);
   const activeTabId = useBrowserPanelStore((s) => s.activeTabId);
+  const browserPanelOpen = usePanelStore((s) => s.browserPanelOpen);
   const browserOverlayOpen = usePanelStore((s) => s.browserOverlayOpen);
   const browserOverlayMaximized = usePanelStore((s) => s.browserOverlayMaximized);
+  const setBrowserPanelOpen = usePanelStore((s) => s.setBrowserPanelOpen);
   const setBrowserOverlayOpen = usePanelStore((s) => s.setBrowserOverlayOpen);
   const setBrowserOverlayMaximized = usePanelStore((s) => s.setBrowserOverlayMaximized);
+  const setRightPanelTab = usePanelStore((s) => s.setRightPanelTab);
   const visible = props.visible || browserOverlayOpen;
   const [menuPreviewDataUrl, setMenuPreviewDataUrl] = useState<string | null>(null);
   const {
@@ -79,6 +82,12 @@ export function BrowserPanel(props: { visible: boolean }) {
   const headerButtonClass = `${
     isFullscreenOverlay ? "lightcode-overlay-header__controls " : ""
   }${panelHeaderIconButtonClass}`;
+  const restoreToPanel = () => {
+    setBrowserOverlayMaximized(false);
+    setBrowserOverlayOpen(false);
+    setBrowserPanelOpen(true);
+    setRightPanelTab("browser");
+  };
   return (
     <div
       role="group"
@@ -100,36 +109,50 @@ export function BrowserPanel(props: { visible: boolean }) {
           ) : null}
           <div className="text-xs font-medium text-foreground">Browser</div>
           <div className="flex-1" />
-          {browserOverlayMaximized ? (
+          {browserPanelOpen ? (
             <button
               type="button"
               className={headerButtonClass}
-              title="Restore"
-              aria-label="Restore browser"
-              onClick={() => setBrowserOverlayMaximized(false)}
+              title="Minimize to panel"
+              aria-label="Minimize browser to right panel"
+              onClick={restoreToPanel}
             >
               <Minimize2 className="size-3.5" />
             </button>
           ) : (
-            <button
-              type="button"
-              className={headerButtonClass}
-              title="Maximize"
-              aria-label="Maximize browser"
-              onClick={() => setBrowserOverlayMaximized(true)}
-            >
-              <Maximize2 className="size-3.5" />
-            </button>
+            <>
+              {browserOverlayMaximized ? (
+                <button
+                  type="button"
+                  className={headerButtonClass}
+                  title="Restore"
+                  aria-label="Restore browser"
+                  onClick={() => setBrowserOverlayMaximized(false)}
+                >
+                  <Minimize2 className="size-3.5" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={headerButtonClass}
+                  title="Maximize"
+                  aria-label="Maximize browser"
+                  onClick={() => setBrowserOverlayMaximized(true)}
+                >
+                  <Maximize2 className="size-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                className={headerButtonClass}
+                title="Close"
+                aria-label="Close browser"
+                onClick={() => setBrowserOverlayOpen(false)}
+              >
+                <X className="size-3.5" />
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            className={headerButtonClass}
-            title="Close"
-            aria-label="Close browser"
-            onClick={() => setBrowserOverlayOpen(false)}
-          >
-            <X className="size-3.5" />
-          </button>
         </div>
       ) : null}
       <BrowserToolbar
