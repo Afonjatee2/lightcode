@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Button, toast } from "@heroui/react";
-import { Download, X } from "lucide-react";
+import { Tooltip, toast } from "@heroui/react";
+import { Download, Webhook, X } from "lucide-react";
 import type {
   AgentHookPluginStatus,
   AgentStatus,
@@ -27,6 +27,8 @@ import { useBrowserAttachInbox } from "@/renderer/state/browserAttachInbox";
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import {
   BranchSelector,
+  Button,
+  PixelLoader,
   generateWorktreeBranch,
   type BranchSelection,
 } from "@/renderer/components/common";
@@ -35,6 +37,7 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadAgentUpdateDock } from "./ThreadAgentUpdateDock";
 import { ThreadAuthRequiredDock } from "./ThreadAuthRequiredDock";
+import { ThreadDockHeader, ThreadDockSection } from "./ThreadDockUI";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import {
   filterSlashCommands,
@@ -127,36 +130,45 @@ function HookInstallProposal(props: {
   };
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-border/40 px-3 py-2 text-sm">
-      <div className="min-w-0">
-        <p className="font-medium text-foreground">Install CLI hooks for better status updates</p>
-        <p className="truncate text-xs text-muted">
-          Hooks are optional and install only when you choose them.
-        </p>
-      </div>
-      <div className="flex shrink-0 items-center gap-1.5">
-        <Button
-          size="sm"
-          variant="secondary"
-          className="h-7 min-h-7 gap-1 px-2 text-[11px]"
-          isPending={pending}
-          onPress={install}
-        >
-          <Download className="size-3" />
-          Install
-        </Button>
-        <Button
-          size="sm"
-          variant="tertiary"
-          isIconOnly
-          aria-label="Don't show hook install proposal"
-          className="h-7 min-h-7 w-7"
-          onPress={() => dismissHookInstallProposal(proposalKey)}
-        >
-          <X className="size-3" />
-        </Button>
-      </div>
-    </div>
+    <ThreadDockSection placement="composer" collapsed={false} ariaLabel="Install CLI hooks">
+      <ThreadDockHeader
+        icon={Webhook}
+        iconClassName="text-foreground"
+        title="Install CLI hooks"
+        actions={
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 min-w-0 px-2 text-xs text-foreground"
+              isDisabled={pending}
+              isPending={pending}
+              onPress={install}
+            >
+              {pending ? <PixelLoader size="xs" /> : <Download className="size-3.5" />}
+              Install
+            </Button>
+            <Tooltip delay={0}>
+              <Tooltip.Trigger>
+                <button
+                  aria-label="Don't show hook install proposal"
+                  className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-danger-500/10 hover:text-danger-500"
+                  type="button"
+                  onClick={() => dismissHookInstallProposal(proposalKey)}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </Tooltip.Trigger>
+              <Tooltip.Content>Dismiss</Tooltip.Content>
+            </Tooltip>
+          </div>
+        }
+      >
+        <span className="min-w-0 flex-1 truncate leading-5 text-[color:var(--muted)]">
+          Better status updates while agents run.
+        </span>
+      </ThreadDockHeader>
+    </ThreadDockSection>
   );
 }
 
