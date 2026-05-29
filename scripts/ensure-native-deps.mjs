@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
@@ -41,11 +41,19 @@ function ensureElectronBinary() {
   }
 
   const installScript = join(electronDir, "install.js");
+  const distDir = join(electronDir, "dist");
   const maxAttempts = 3;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     console.log(
       `[lightcode] Electron binary missing; running electron/install.js (attempt ${attempt}/${maxAttempts})`,
     );
+    // We only reach this loop when the executable is absent. A flaked or partial
+    // extraction can still leave dist/version + path.txt behind, which makes
+    // electron/install.js consider itself "already installed" and exit without
+    // re-downloading. Clear those markers so each attempt re-extracts for real.
+    rmSync(distDir, { recursive: true, force: true });
+    rmSync(pathFile, { force: true });
+
     const installEnv = { ...process.env };
     delete installEnv.ELECTRON_SKIP_BINARY_DOWNLOAD;
     if (attempt > 1) {
