@@ -165,7 +165,7 @@ export function createCursorAdapter(): AgentAdapter {
       return detectCursorTerminalStatus(text);
     },
     shouldApplyTerminalStatusWhileHookActive: cursorHookActiveTerminalFallback,
-    defaultOneShotModel: "composer-2-fast",
+    defaultOneShotModel: "composer-2.5",
     buildOneShotCommand(model) {
       const args = ["--print", "--force", "--trust", "--output-format", "json"];
       if (model && model !== "auto") {
