@@ -16,14 +16,17 @@ const CLAUDE_BUILT_IN_SLASH_COMMANDS: AgentCapability["slashCommands"] = [
 
 export const claudeCapabilities: AgentCapability = {
   models: [
+    { id: "claude-opus-4-8", label: "Opus 4.8" },
     { id: "claude-opus-4-7", label: "Opus 4.7" },
     { id: "claude-opus-4-6", label: "Opus 4.6" },
     { id: "sonnet", label: "Sonnet" },
     { id: "haiku", label: "Haiku" },
   ],
-  efforts: ["low", "medium", "high", "xHigh", "max"],
+  efforts: ["low", "medium", "high", "xHigh", "max", "ultracode"],
   defaultEffort: "high",
   modelEfforts: {
+    "claude-opus-4-8": ["low", "medium", "high", "xHigh", "max", "ultracode"],
+    "claude-opus-4-7": ["low", "medium", "high", "xHigh", "max", "ultracode"],
     "claude-opus-4-6": ["low", "medium", "high", "max"],
     haiku: [],
     sonnet: ["low", "medium", "high", "max"],
@@ -36,12 +39,13 @@ export const claudeCapabilities: AgentCapability = {
   // to 1M (the long-context build users select these for); Sonnet defaults to
   // 200k because the 1M tier is billed per-token at premium rates.
   modelContextSizes: {
+    "claude-opus-4-8": ["1m", "200k"],
     "claude-opus-4-7": ["1m", "200k"],
     "claude-opus-4-6": ["1m", "200k"],
     sonnet: ["200k", "1m"],
   },
   defaultContextSize: "200k",
-  fastModels: ["claude-opus-4-7", "claude-opus-4-6"],
+  fastModels: ["claude-opus-4-8", "claude-opus-4-7", "claude-opus-4-6"],
   modes: ["agent", "plan"],
   approvalPolicies: [
     { id: "default", label: "Default" },
