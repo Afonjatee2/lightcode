@@ -323,24 +323,21 @@ async function main() {
     //    platform-specific `claude` SEA binary (~200 MB).
     //    The stage tmpdir is fresh each run, so any generated pnpm-lock.yaml
     //    is ephemeral and gets discarded with the stage.
-    //    shamefully-hoist flattens ALL transitives (not just direct deps) to
-    //    the stage's top-level node_modules. Without it, electron-builder's own
-    //    grandchild dep async-exit-hook (electron-builder -> builder-util ->
-    //    temp-file -> async-exit-hook) lives only under node_modules/.pnpm and
-    //    fails to resolve from the bundled temp-file/main.js on Windows CI,
-    //    crashing the first electron-builder pass; the pnpm .cmd NODE_PATH
-    //    fallback then re-invokes it, and that second pass packs better-sqlite3
-    //    incorrectly (source-only, inside the asar, native binary dropped).
-    run(
-      "pnpm",
-      [
-        "install",
-        "--config.node-linker=hoisted",
-        "--config.shamefully-hoist=true",
-        "--config.dangerously-allow-all-builds=true",
-      ],
-      { cwd: stageRoot },
-    );
+    //    We install with npm, not pnpm, here. pnpm's hoisted layout still keeps
+    //    packages behind a node_modules/.pnpm virtual store with Windows
+    //    junctions; on CI runners electron-builder's own grandchild dependency
+    //    async-exit-hook (electron-builder -> builder-util -> temp-file ->
+    //    async-exit-hook) fails to resolve through those junctions, crashing the
+    //    first electron-builder pass. The pnpm .cmd NODE_PATH fallback then
+    //    re-invokes it, and that second pass packs better-sqlite3 incorrectly
+    //    (source-only, inside the asar, native binary dropped) -> the app
+    //    crashes at launch with "Could not locate the bindings file".
+    //    --config.shamefully-hoist=true did NOT fix it. npm produces a genuinely
+    //    flat node_modules (no .pnpm, no junctions) where every transitive
+    //    resolves, and electron-builder then uses its well-trodden npm collector.
+    //    npm runs native build scripts by default, so electron/better-sqlite3/
+    //    node-pty all build without pnpm's build-gating flags.
+    run("npm", ["install", "--no-audit", "--no-fund", "--loglevel=error"], { cwd: stageRoot });
 
     pruneStageBinaries(stageRoot);
     ensureNativeBuildCollected(stageRoot);
