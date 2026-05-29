@@ -200,7 +200,7 @@ function finish(sessionId) {
   try { p.kill(); } catch {}
 }
 
-const p = spawn(binary, [...args, "agent", "stdio"], { cwd, stdio: ["pipe","pipe","pipe"] });
+const p = spawn(binary, [...args, "agent", "stdio"], { cwd, stdio: ["pipe","pipe","pipe"], windowsHide: true });
 // Stdin EOF on terminate is the documented Grok-exit signal, but kill the
 // child explicitly too so a future Grok build that keeps the connection open
 // on EOF cannot orphan the process.

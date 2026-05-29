@@ -187,11 +187,22 @@ function resolveWindowsNodeCmdShim(commandPath: string):
       argsPrefix: string[];
     }
   | undefined {
-  if (!/\.cmd$/i.test(commandPath)) return undefined;
+  let effectivePath = commandPath;
+  if (!/\.cmd$/i.test(commandPath)) {
+    // Bare command names like "npx" resolve to "npx.cmd" via PATHEXT.
+    // Try the .cmd variant so we can bypass the batch-file wrapper and
+    // prevent a visible cmd.exe window from flashing on Windows.
+    const cmdVariant = `${commandPath}.cmd`;
+    if (existsSync(cmdVariant)) {
+      effectivePath = cmdVariant;
+    } else {
+      return undefined;
+    }
+  }
 
   let content: string;
   try {
-    content = readFileSync(commandPath, "utf8");
+    content = readFileSync(effectivePath, "utf8");
   } catch {
     return undefined;
   }
@@ -200,7 +211,7 @@ function resolveWindowsNodeCmdShim(commandPath: string):
   const relScript = match?.[1];
   if (!relScript) return undefined;
 
-  const baseDir = dirname(commandPath);
+  const baseDir = dirname(effectivePath);
   const scriptPath = join(baseDir, ...relScript.split(/[\\/]+/));
   if (!existsSync(scriptPath)) return undefined;
 
