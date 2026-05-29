@@ -1,3 +1,4 @@
+import { useShallow } from "zustand/shallow";
 import type { GitFileChange, Project, ThreadPresentationMode } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import {
@@ -30,16 +31,22 @@ export function useConflictResolver(params: {
 
   const agentStatuses = useAgentStatusesStore((s) => s.agentStatuses);
   const wslAgentStatuses = useAgentStatusesStore((s) => s.wslAgentStatuses);
-  const sharedSettings = useSharedSettings((s) => ({
-    conflictResolverProvider: s.conflictResolverProvider,
-    conflictResolverModel: s.conflictResolverModel,
-    conflictResolverEffort: s.conflictResolverEffort,
-    conflictResolverPresentationMode: s.conflictResolverPresentationMode,
-    wslConflictResolverProvider: s.wslConflictResolverProvider,
-    wslConflictResolverModel: s.wslConflictResolverModel,
-    wslConflictResolverEffort: s.wslConflictResolverEffort,
-    wslConflictResolverPresentationMode: s.wslConflictResolverPresentationMode,
-  }));
+  // useShallow is required: this selector builds a fresh object each call, and
+  // zustand v5's useSyncExternalStore does not memoize selector results. Without
+  // it the snapshot reference changes every render -> forceStoreRerender loops ->
+  // React #185 "Maximum update depth exceeded" the moment the git panel mounts.
+  const sharedSettings = useSharedSettings(
+    useShallow((s) => ({
+      conflictResolverProvider: s.conflictResolverProvider,
+      conflictResolverModel: s.conflictResolverModel,
+      conflictResolverEffort: s.conflictResolverEffort,
+      conflictResolverPresentationMode: s.conflictResolverPresentationMode,
+      wslConflictResolverProvider: s.wslConflictResolverProvider,
+      wslConflictResolverModel: s.wslConflictResolverModel,
+      wslConflictResolverEffort: s.wslConflictResolverEffort,
+      wslConflictResolverPresentationMode: s.wslConflictResolverPresentationMode,
+    })),
+  );
 
   const conflictResolverSettings = readConflictResolverSettingsForProject(
     project.location.kind,
