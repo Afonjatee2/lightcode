@@ -17,6 +17,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -215,6 +216,33 @@ function pruneStageBinaries(stageRoot) {
   }
 }
 
+// electron-builder's pnpm node-module collector copies each dependency using
+// that package's own package.json "files" allowlist. better-sqlite3's allowlist
+// is ["binding.gyp","src/**/*.[ch]pp","lib/**","deps/**"] -- it OMITS build/,
+// the directory where electron-rebuild writes the compiled better_sqlite3.node.
+// So the collector drops the native binary and packs better-sqlite3 source-only
+// INTO app.asar (asarUnpack cannot unpack a file that was never collected),
+// which crashes the app at launch with "Could not locate the bindings file".
+// Widen the staged package's allowlist to include its build output so the whole
+// module (binary included) is collected and the existing asarUnpack glob moves
+// it to app.asar.unpacked. node-pty is unaffected: its binaries live under
+// prebuilds/, which is already in node-pty's "files" allowlist.
+function ensureNativeBuildCollected(stageRoot) {
+  const pkgLink = join(stageRoot, "node_modules", "better-sqlite3", "package.json");
+  if (!existsSync(pkgLink)) {
+    throw new Error(`better-sqlite3 not found in stage; cannot widen files allowlist: ${pkgLink}`);
+  }
+  // Resolve through pnpm's hoisted junction to patch the real package.json that
+  // electron-builder's collector reads.
+  const pkgPath = realpathSync(pkgLink);
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8"));
+  if (Array.isArray(pkg.files) && !pkg.files.includes("build/**")) {
+    pkg.files.push("build/**");
+    writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+    console.log("[stage] widened better-sqlite3 files allowlist to include build/**");
+  }
+}
+
 function copyArtifactsBack(stageReleaseDir, outputDir) {
   mkdirSync(outputDir, { recursive: true });
   const copied = [];
@@ -295,13 +323,27 @@ async function main() {
     //    platform-specific `claude` SEA binary (~200 MB).
     //    The stage tmpdir is fresh each run, so any generated pnpm-lock.yaml
     //    is ephemeral and gets discarded with the stage.
+    //    shamefully-hoist flattens ALL transitives (not just direct deps) to
+    //    the stage's top-level node_modules. Without it, electron-builder's own
+    //    grandchild dep async-exit-hook (electron-builder -> builder-util ->
+    //    temp-file -> async-exit-hook) lives only under node_modules/.pnpm and
+    //    fails to resolve from the bundled temp-file/main.js on Windows CI,
+    //    crashing the first electron-builder pass; the pnpm .cmd NODE_PATH
+    //    fallback then re-invokes it, and that second pass packs better-sqlite3
+    //    incorrectly (source-only, inside the asar, native binary dropped).
     run(
       "pnpm",
-      ["install", "--config.node-linker=hoisted", "--config.dangerously-allow-all-builds=true"],
+      [
+        "install",
+        "--config.node-linker=hoisted",
+        "--config.shamefully-hoist=true",
+        "--config.dangerously-allow-all-builds=true",
+      ],
       { cwd: stageRoot },
     );
 
     pruneStageBinaries(stageRoot);
+    ensureNativeBuildCollected(stageRoot);
 
     // 6b. Rebuild only better-sqlite3 against Electron's V8 ABI. We skip
     //     electron-builder's bundled @electron/rebuild step (npmRebuild: false
