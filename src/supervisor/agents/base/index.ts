@@ -190,14 +190,12 @@ function resolveWindowsNodeCmdShim(commandPath: string):
   let effectivePath = commandPath;
   if (!/\.cmd$/i.test(commandPath)) {
     // Bare command names like "npx" resolve to "npx.cmd" via PATHEXT.
-    // Try the .cmd variant so we can bypass the batch-file wrapper and
-    // prevent a visible cmd.exe window from flashing on Windows.
-    const cmdVariant = `${commandPath}.cmd`;
-    if (existsSync(cmdVariant)) {
-      effectivePath = cmdVariant;
-    } else {
-      return undefined;
-    }
+    // Without this resolution the batch-file wrapper spawns cmd.exe which
+    // creates a visible console window on Windows — windowsHide: true on the
+    // parent spawn only applies to the immediate child, not grandchildren.
+    const resolved = resolveExecutablePath(commandPath);
+    if (!resolved || !/\.cmd$/i.test(resolved)) return undefined;
+    effectivePath = resolved;
   }
 
   let content: string;
