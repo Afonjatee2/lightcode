@@ -74,6 +74,15 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+        env:
+          # The packaging pipeline never launches Electron from the project's
+          # node_modules: `pnpm run build` only bundles, and packaging runs
+          # electron-builder in a clean staging dir that fetches its own Electron
+          # dist. The root postinstall's enforced Chromium download is therefore
+          # dead weight here, and its flaky/partial extractions (which exit 0 yet
+          # leave no usable binary) intermittently fail the build. Skip it; the
+          # other native deps (node-pty, better-sqlite3) are still verified.
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
 
       - name: Build app
         run: pnpm run build
