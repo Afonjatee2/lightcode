@@ -5,8 +5,8 @@
 // which makes posix_spawnp fail at runtime with the opaque
 // "posix_spawnp failed." error. Restore +x on every prebuild we ship.
 
-const { existsSync, statSync, chmodSync, readdirSync } = require("node:fs");
-const { join } = require("node:path");
+const { existsSync, statSync, chmodSync, readdirSync, mkdirSync, cpSync } = require("node:fs");
+const { join, resolve } = require("node:path");
 
 // electron-builder's Arch enum is numeric: ia32=0, x64=1, armv7l=2, arm64=3,
 // universal=4. Map to the node-pty prebuilds/<plat>-<arch> directory names.
@@ -44,6 +44,39 @@ function lookupAsarEntry(header, segments) {
     if (!node) return null;
   }
   return node;
+}
+
+// The packaging script (build-desktop-artifact.mjs) rebuilds better-sqlite3 for
+// every target arch and stages each under <stageRoot>/native/<arch>/. A single
+// multi-arch electron-builder pass packs only one of those binaries into BOTH
+// installers, so the off-host arch would otherwise ship a wrong-arch
+// better_sqlite3.node and crash. Inject the arch-correct staged binary into this
+// arch's app.asar.unpacked (where the asar-unpacked module loads it), before
+// code signing. Required for x64/arm64 — throw if the staged binary is missing.
+function injectBetterSqliteBinary(context, resourcesDir, archName) {
+  if (archName !== "x64" && archName !== "arm64") return;
+  const projectDir =
+    context.packager?.info?.projectDir ??
+    context.packager?.projectDir ??
+    resolve(context.appOutDir, "..", "..");
+  const staged = join(projectDir, "native", archName, "better_sqlite3.node");
+  if (!existsSync(staged)) {
+    throw new Error(
+      `[afterPack] FATAL: staged better-sqlite3 binary for ${archName} missing at ${staged}; ` +
+        `refusing to ship a wrong-arch package.`,
+    );
+  }
+  const destDir = join(
+    resourcesDir,
+    "app.asar.unpacked",
+    "node_modules",
+    "better-sqlite3",
+    "build",
+    "Release",
+  );
+  mkdirSync(destDir, { recursive: true });
+  cpSync(staged, join(destDir, "better_sqlite3.node"));
+  console.log(`[afterPack] injected ${archName} better_sqlite3.node`);
 }
 
 // Fail-fast guard: a packaged app is only shippable if its native modules can
@@ -156,6 +189,9 @@ module.exports = async function afterPack(context) {
       `[afterPack] FATAL: could not locate resources dir for platform ${context.electronPlatformName}`,
     );
   }
+  // Replace the (possibly off-host-arch) binary electron-builder packed with the
+  // arch-correct one staged per target arch.
+  injectBetterSqliteBinary(context, resourcesDir, ARCH_NAME[context.arch]);
   // Throws if a required native binary is missing or mis-packed, so a broken
   // app can never be packaged or published.
   assertNativeBinaries(resourcesDir, context.electronPlatformName, context.arch);

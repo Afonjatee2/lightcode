@@ -108,6 +108,13 @@ function detectHostPlatform() {
 
 const PLATFORM_FLAG = { mac: "--mac", linux: "--linux", win: "--win" };
 
+// Arches each platform ships when the caller does not pin --arch. Must mirror
+// the per-platform `target.arch` lists emitted by buildElectronBuilderConfig().
+// Drives the per-arch native rebuild below so every installer carries a
+// better_sqlite3.node compiled for its own arch (better-sqlite3 builds from
+// source and is arch-specific; node-pty ships per-arch prebuilds and is fine).
+const DEFAULT_TARGET_ARCHES = { win: ["x64", "arm64"], mac: ["x64", "arm64"], linux: ["x64"] };
+
 // A missing peer of a runtime external surfaces as `ERR_MODULE_NOT_FOUND` deep
 // inside SDK code at app launch. Walk each external's installed package.json
 // and pull in any non-optional peer that the root itself declares as a dep —
@@ -342,24 +349,48 @@ async function main() {
     pruneStageBinaries(stageRoot);
     ensureNativeBuildCollected(stageRoot);
 
-    // 6b. Rebuild only better-sqlite3 against Electron's V8 ABI. We skip
-    //     electron-builder's bundled @electron/rebuild step (npmRebuild: false
-    //     in the staged YAML) because it would also try to compile node-pty
-    //     from source, which fails — node-pty 1.1.0's published npm tarball
-    //     omits the winpty submodule (GetCommitHash.bat, shared/). node-pty
-    //     ships N-API prebuilt binaries which pnpm install already restored
-    //     into build/Release/, so it stays ABI-compatible with Electron.
+    // 6b. Rebuild better-sqlite3 against Electron's V8 ABI, ONCE PER TARGET ARCH,
+    //     staging each arch's binary under native/<arch>/. A single multi-arch
+    //     electron-builder pass (kept below to preserve a combined latest.yml
+    //     updater manifest) packs whatever single binary is in node_modules into
+    //     BOTH the x64 and arm64 installers, so the off-host arch would ship a
+    //     wrong-arch better_sqlite3.node and crash. after-pack.cjs injects the
+    //     correct staged binary per arch instead. (We skip electron-builder's
+    //     bundled @electron/rebuild via npmRebuild:false in the staged YAML
+    //     because it would also try to compile node-pty from source, which fails:
+    //     node-pty 1.1.0's npm tarball omits the winpty submodule. node-pty ships
+    //     N-API prebuilds per arch, so it stays ABI-correct without a rebuild.)
     const electronRebuildBin = join(
       stageRoot,
       "node_modules",
       ".bin",
       process.platform === "win32" ? "electron-rebuild.cmd" : "electron-rebuild",
     );
-    const electronRebuildArgs = ["--only", "better-sqlite3"];
-    if (arch) {
-      electronRebuildArgs.push("--arch", arch);
+    const builtBinary = join(
+      stageRoot,
+      "node_modules",
+      "better-sqlite3",
+      "build",
+      "Release",
+      "better_sqlite3.node",
+    );
+    const targetArches = arch ? [arch] : DEFAULT_TARGET_ARCHES[platform];
+    for (const targetArch of targetArches) {
+      // electron-rebuild rebuilds in place; cross-building for a non-host arch is
+      // supported on CI runners (Win has the MSVC ARM64 cross tools, mac has both
+      // SDK slices). A failure here aborts the build rather than shipping a broken
+      // binary.
+      run(electronRebuildBin, ["--only", "better-sqlite3", "--arch", targetArch], {
+        cwd: stageRoot,
+      });
+      if (!existsSync(builtBinary)) {
+        throw new Error(`electron-rebuild produced no better_sqlite3.node for arch ${targetArch}`);
+      }
+      const archStageDir = join(stageRoot, "native", targetArch);
+      mkdirSync(archStageDir, { recursive: true });
+      cpSync(builtBinary, join(archStageDir, "better_sqlite3.node"));
+      console.log(`[stage] staged better_sqlite3.node for ${targetArch}`);
     }
-    run(electronRebuildBin, electronRebuildArgs, { cwd: stageRoot });
 
     // 7. Run electron-builder against the stage.
     const electronBuilderBin = join(
