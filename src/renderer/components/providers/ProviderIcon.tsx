@@ -95,6 +95,13 @@ export function ProviderIcon(props: {
   className?: string | undefined;
   icon?: string | undefined;
   fallbackLabel?: string | undefined;
+  /**
+   * When true and the icon can't be resolved yet (no registered or external
+   * icon), reserve a same-size empty slot instead of rendering the generic
+   * letter fallback. Used while agent detection is still in flight so list
+   * rows don't flash a placeholder that jumps to the real icon on resolve.
+   */
+  pending?: boolean | undefined;
 }) {
   const Icon = ICON_REGISTRY.get(props.kind);
   const tone = props.tone ?? "inactive";
@@ -107,6 +114,9 @@ export function ProviderIcon(props: {
           {...(props.className ? { className: props.className } : {})}
         />
       );
+    }
+    if (props.pending) {
+      return <span aria-hidden className={props.className} />;
     }
     return (
       <GenericProviderIcon

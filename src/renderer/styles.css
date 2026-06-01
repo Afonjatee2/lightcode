@@ -1157,13 +1157,15 @@ html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
 
 .lightcode-provider-icon__generic {
   display: flex;
-  width: 100%;
-  height: 100%;
+  /* Match the 88% footprint of external mask icons so the bordered letter
+     doesn't read bigger than the brand icons it sits beside in list rows. */
+  width: 88%;
+  height: 88%;
   align-items: center;
   justify-content: center;
   border: 1px solid color-mix(in oklab, currentColor 34%, transparent);
   border-radius: 0.25rem;
-  font-size: 0.62em;
+  font-size: 0.56em;
   font-weight: 650;
   line-height: 1;
 }
