@@ -33,6 +33,24 @@ export function applyAppTheme(root: HTMLElement, appearance: Appearance, themeId
 // pre-paint bootstrap doesn't have to import (and eagerly hydrate) the store.
 const SHARED_SETTINGS_CACHE_KEY = "lightcode-shared-settings";
 
+// Resolved appearance + background, read by the inline pre-paint script in
+// index.html so the first frame matches the active theme. Keep the key in sync.
+const BOOT_CACHE_KEY = "lightcode-boot";
+
+/**
+ * Persists the resolved appearance + background so the next launch's pre-paint
+ * bootstrap (index.html) can match the active theme before the renderer mounts.
+ */
+export function persistThemeBoot(appearance: Appearance, themeId: string): void {
+  try {
+    const preset = getThemePreset(themeId);
+    const background = (appearance === "dark" ? preset.dark : preset.light)["--background"];
+    localStorage.setItem(BOOT_CACHE_KEY, JSON.stringify({ appearance, bg: background }));
+  } catch {
+    // Non-fatal; the bootstrap falls back to themeMode + system preference.
+  }
+}
+
 /** Whether the OS currently prefers a dark color scheme (defaults to dark). */
 export function systemPrefersDark(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {

@@ -9,7 +9,7 @@ import {
 import { Toast, toast as heroToast } from "@heroui/react";
 import { Copy } from "lucide-react";
 import { resolveThemeMode } from "@/shared/themeMode";
-import { applyAppTheme, systemPrefersDark } from "@/renderer/theme/applyAppTheme";
+import { applyAppTheme, persistThemeBoot, systemPrefersDark } from "@/renderer/theme/applyAppTheme";
 import { readBridge } from "@/renderer/bridge";
 import { captureRendererException } from "@/renderer/diagnostics/sentry";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -95,6 +95,7 @@ export function AppProvider(props: { children: ReactNode }) {
     root.classList.add(appearance);
     root.dataset.theme = appearance;
     applyAppTheme(root, appearance, themePreset);
+    persistThemeBoot(appearance, themePreset);
   }, [appearance, themePreset]);
 
   useEffect(() => {
