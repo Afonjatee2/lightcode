@@ -21,6 +21,7 @@ import {
 } from "../composer";
 import type { MentionInputHandle } from "../composer";
 import { flattenSegments } from "../composer/serializeMentions";
+import { getTriggerWords } from "@/renderer/components/providers";
 import { readBridge } from "@/renderer/bridge";
 import { captureProductEvent, threadProductProperties } from "@/renderer/analytics/posthog";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -767,6 +768,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                       }
                       projectLocation={projectLocation}
                       projectId={thread.projectId}
+                      triggerWords={getTriggerWords(thread.agentKind, thread.config.model)}
                       onTextChange={setHasContent}
                       onSubmit={submitPrompt}
                       onPasteImage={(file) => {
