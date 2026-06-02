@@ -15,7 +15,7 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { normalizeChatProjectPath } from "../../chatPathUtils";
-import { chatMessageSurfaceClass } from "./chatMessageSurface";
+import { chatPromptSurfaceClass } from "./chatMessageSurface";
 import { InlineFilePathChip } from "./InlineFilePathChip";
 import { ItemMarkdown } from "./ItemMarkdown";
 import { extractSelectorPayloads } from "./SelectorBadge";
@@ -118,7 +118,7 @@ export const UserMessage = memo(function UserMessage({
   }
 
   return (
-    <Surface variant="tertiary" className={`${chatMessageSurfaceClass} relative`}>
+    <Surface variant="tertiary" className={chatPromptSurfaceClass}>
       <div className="min-w-0 space-y-1.5 leading-snug">
         {attachments.length > 0 ? (
           <div className="-mt-1">

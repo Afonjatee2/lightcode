@@ -63,8 +63,8 @@ export function SidebarButton(props: {
     isDisabled || isDragging
       ? "cursor-not-allowed text-muted/40"
       : isActive && !isDraggingAnything
-        ? "bg-white/[0.08] text-foreground"
-        : `${inactiveText} ${!isDraggingAnything ? "hover:bg-white/[0.04] hover:text-foreground" : ""}`;
+        ? "bg-[var(--row-active)] text-foreground"
+        : `${inactiveText} ${!isDraggingAnything ? "hover:bg-[var(--row-hover)] hover:text-foreground" : ""}`;
 
   const sizeClass = size === "xs" ? "text-xs" : "text-sm";
   const dragRowDim = isDragging && !iconOnly && !isDisabled ? " opacity-60" : "";
