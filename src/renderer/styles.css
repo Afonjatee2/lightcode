@@ -742,6 +742,16 @@
     --terminal-surface: var(--surface);
     --composer-surface: var(--surface);
     --interactive-cursor: default;
+
+    /* Theme-adaptive interaction overlays. Derived from --foreground so they
+       invert per theme: a light wash on dark themes (matching the old
+       white/[x] look) and a dark wash on light themes — where a white wash was
+       invisible. Replaces hardcoded bg-white/[x] selection/hover and
+       border-white/x hairlines so every surface follows the active theme. */
+    --row-hover: color-mix(in oklab, var(--foreground) 6%, transparent);
+    --row-active: color-mix(in oklab, var(--foreground) 11%, transparent);
+    --hairline: color-mix(in oklab, var(--foreground) 9%, transparent);
+    --hairline-strong: color-mix(in oklab, var(--foreground) 15%, transparent);
   }
 
   .light,
@@ -799,7 +809,7 @@
     --content-background: oklch(0.2 0.004 286);
     --window-header-background: var(--sidebar-background);
     --terminal-surface: oklch(0.155 0.004 286);
-    --composer-surface: oklch(0.225 0.004 286);
+    --composer-surface: oklch(0.25 0.004 286);
   }
 
   * {
@@ -1417,9 +1427,11 @@ html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
 
 .lightcode-composer-shell {
   position: relative;
-  border: 1px solid var(--border);
+  /* Foreground-derived hairline (not --border) so the primary input stays
+     clearly outlined in every theme, including low-contrast light palettes. */
+  border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-4xl);
-  background: color-mix(in oklab, var(--composer-surface) 94%, transparent);
+  background: var(--composer-surface);
   transition: border-color 0.15s ease;
 }
 
@@ -1693,7 +1705,7 @@ html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
   height: 100%;
   width: var(--lc-context-progress);
   border-radius: inherit;
-  background: var(--snow, white);
+  background: var(--foreground);
 }
 
 .lightcode-context-dock__bar-fill--warning {
@@ -1708,7 +1720,7 @@ html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
   --toggle-button-bg-selected: transparent;
   --toggle-button-bg-selected-hover: var(--toggle-button-bg-hover);
   --toggle-button-bg-selected-pressed: var(--toggle-button-bg-pressed);
-  --toggle-button-fg-selected: var(--snow, white);
+  --toggle-button-fg-selected: var(--foreground);
 
   color: var(--muted);
   height: 2.25rem;
@@ -1716,11 +1728,11 @@ html[data-platform="darwin"] .lightcode-content-over-drag-region--drag {
 }
 
 .lightcode-composer-toggle[data-selected="true"] {
-  color: var(--snow, white);
+  color: var(--foreground);
 }
 
 .lightcode-composer-toggle--current {
-  color: var(--snow, white);
+  color: var(--foreground);
 }
 
 .lightcode-composer-toggle--fill-icon-selected[data-selected="true"] svg {

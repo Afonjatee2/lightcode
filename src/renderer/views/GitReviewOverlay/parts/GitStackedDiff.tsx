@@ -241,7 +241,7 @@ export function StackedFileCard(props: {
               <div
                 role="button"
                 tabIndex={0}
-                className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
                 title="Open in editor"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -256,7 +256,7 @@ export function StackedFileCard(props: {
               <div
                 role="button"
                 tabIndex={0}
-                className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+                className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
                 title={file.staged ? "Unstage" : "Stage"}
                 onClick={handleStageToggle}
                 onKeyDown={(e) =>

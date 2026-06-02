@@ -147,7 +147,7 @@ export function ConflictFileCard(props: {
             <div
               role="button"
               tabIndex={0}
-              className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+              className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
               title="Stage"
               onClick={handleStageConflict}
               onKeyDown={(e) =>
@@ -159,7 +159,7 @@ export function ConflictFileCard(props: {
             <div
               role="button"
               tabIndex={0}
-              className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+              className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
               title="Open in editor"
               onClick={handleOpenInEditor}
               onKeyDown={(e) =>

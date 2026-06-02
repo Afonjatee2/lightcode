@@ -87,8 +87,8 @@ export function FileRow(props: {
         type="button"
         className={`group flex w-full cursor-default items-center gap-1.5 rounded py-1 text-left text-xs transition-colors ${rowPadX} ${
           isSelected
-            ? "bg-white/[0.08] text-foreground"
-            : "text-muted hover:bg-white/[0.04] hover:text-foreground"
+            ? "bg-[var(--row-active)] text-foreground"
+            : "text-muted hover:bg-[var(--row-hover)] hover:text-foreground"
         }`}
         onClick={onSelect}
       >
@@ -114,7 +114,7 @@ export function FileRow(props: {
             <div
               role="button"
               tabIndex={0}
-              className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+              className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
               title="Open in editor"
               onClick={(e) => {
                 e.stopPropagation();
@@ -127,7 +127,7 @@ export function FileRow(props: {
             <div
               role="button"
               tabIndex={0}
-              className="rounded p-0.5 text-muted transition-colors hover:bg-white/[0.04] hover:text-foreground"
+              className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
               title={file.staged ? "Unstage" : "Stage"}
               onClick={(e) => {
                 e.stopPropagation();
