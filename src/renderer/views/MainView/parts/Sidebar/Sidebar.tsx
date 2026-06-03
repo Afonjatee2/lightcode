@@ -47,7 +47,6 @@ import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useUpdateStore } from "@/renderer/state/updateStore";
 import { SidebarProjectThreadList } from "./parts/SidebarProjectThreadList";
-import { resolveGrowableProjectId } from "./parts/sidebarGrowLayout";
 
 function UpdateButtons(props: { iconOnly?: boolean }) {
   const { iconOnly = false } = props;
@@ -203,11 +202,6 @@ export function Sidebar() {
       state.projects.filter((project) => !isHomeProject(project)).map((project) => project.id),
     ),
   );
-  const projectExpansionTokens = useAppStore(
-    useShallow((state) =>
-      state.projects.flatMap((project) => [project.id, project.disabled ? 1 : 0]),
-    ),
-  );
   const homeProject = useAppStore((state) => state.projects.find(isHomeProject));
   const homeScopeEnabled = useSharedSettings((s) => s.homeScopeEnabled);
   const currentProjectId = useCurrentProjectId();
@@ -217,20 +211,6 @@ export function Sidebar() {
   const openThreadSearch = usePanelStore((s) => s.openThreadSearch);
   const isHomeProjectCollapsed = useSidebarUiStore((s) =>
     homeProject ? (s.collapsedProjects[homeProject.id] ?? false) : false,
-  );
-  const collapsedProjects = useSidebarUiStore((s) => s.collapsedProjects);
-  const collapsedWorktrees = useSidebarUiStore((s) => s.collapsedWorktrees);
-  const growableProjectId = useAppStore(
-    useShallow((state) =>
-      resolveGrowableProjectId({
-        projectExpansionTokens,
-        collapsedProjects,
-        collapsedWorktrees,
-        homeScopeEnabled,
-        sortMode,
-        threads: state.threads,
-      }),
-    ),
   );
   const setProjectCollapsed = useSidebarUiStore((s) => s.setProjectCollapsed);
   const toggleProjectCollapsed = useSidebarUiStore((s) => s.toggleProjectCollapsed);
@@ -333,11 +313,7 @@ export function Sidebar() {
                     }
                   />
                   {isHomeProjectCollapsed ? null : (
-                    <SidebarProjectThreadList
-                      project={homeProject}
-                      sortMode={sortMode}
-                      growableProjectId={growableProjectId}
-                    />
+                    <SidebarProjectThreadList project={homeProject} sortMode={sortMode} />
                   )}
                 </section>
               ) : null}
@@ -347,7 +323,6 @@ export function Sidebar() {
                   projectId={projectId}
                   projectIndex={projectIndex}
                   sortMode={sortMode}
-                  growableProjectId={growableProjectId}
                 />
               ))}
             </div>
