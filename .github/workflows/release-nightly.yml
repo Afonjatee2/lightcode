@@ -117,7 +117,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CURRENT_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          previous_tag=$(gh release list --json tagName,isPrerelease,createdAt --limit 1000 \
+          previous_tag=$(gh release list --repo "${{ github.repository }}" --json tagName,isPrerelease,createdAt --limit 1000 \
             --jq '[.[] | select(.isPrerelease and .tagName != env.CURRENT_TAG and (.tagName | test("-nightly\\.")))] | sort_by(.createdAt) | last | .tagName // empty')
 
           args=(-f "tag_name=$CURRENT_TAG" -f "target_commitish=$CURRENT_TAG")
