@@ -3,14 +3,11 @@ import { Archive, Check, ChevronRight, CircleCheck, Columns2, Pencil, Trash2 } f
 import type { Project } from "@/shared/contracts";
 import { ContextMenu } from "@/renderer/components/common";
 import { RelativeTime } from "@/renderer/components/common/RelativeTime";
-import {
-  archiveThread,
-  deleteThread,
-  toggleMarkThreadDone,
-} from "@/renderer/actions/threadActions";
+import { archiveThread, toggleMarkThreadDone } from "@/renderer/actions/threadActions";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useIsWorktreeCollapsed, useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
+import { closeThreads } from "@/renderer/utils/shellUtils";
 import { InlineRenameInput } from "./InlineRenameInput";
 import type { ThreadListEntry } from "./groupThreads";
 
@@ -34,12 +31,18 @@ export function SidebarThreadGroup(props: {
     entry.group.threads[0]!.updatedAt,
   );
   const removeGroupThreads = () => {
+    const threadIds = entry.group.threads.map((t) => t.id);
     for (const t of entry.group.threads) {
       if (threadRemoveAction === "archive") {
         archiveThread(t.id);
-      } else {
-        deleteThread(t.id, t.worktreePath, t.projectId);
       }
+    }
+    if (threadRemoveAction === "delete") {
+      const deleteThread = useAppStore.getState().deleteThread;
+      for (const threadId of threadIds) {
+        deleteThread(threadId);
+      }
+      void closeThreads(threadIds);
     }
     clearThreadGroup(groupKey);
   };
