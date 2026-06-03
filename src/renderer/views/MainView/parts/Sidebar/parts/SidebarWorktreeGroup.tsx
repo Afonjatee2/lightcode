@@ -51,6 +51,10 @@ export function SidebarWorktreeGroup(props: {
   const groupThreadIds = group.threads.map((t) => t.id);
   const activeThreads = group.threads.filter((t) => !t.done);
   const isDone = group.threads.every((t) => t.done);
+  const latestThreadUpdatedAt = group.threads.reduce(
+    (latest, thread) => (thread.updatedAt > latest ? thread.updatedAt : latest),
+    group.threads[0]!.updatedAt,
+  );
 
   const { ref } = useSortable({
     id: `wt:${group.worktreePath}`,
@@ -160,9 +164,13 @@ export function SidebarWorktreeGroup(props: {
           onOpenFiles={() => openFilesPanel(project.id, group.worktreePath)}
           onOpenGitReview={() => openGitReview(project.id, group.worktreePath)}
           onOpenTerminal={() => openWorktreeTerminal(project.id, group.worktreePath)}
+          onDeleteWorktree={() =>
+            deleteWorktreeGroup(project.id, group.worktreePath, groupThreadIds)
+          }
           isDragging={isDragging}
           isDraggingAnything={!!source}
           isDone={isDone}
+          updatedAt={latestThreadUpdatedAt}
         />
       </ContextMenu>
     </div>

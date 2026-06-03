@@ -1,9 +1,15 @@
 import { Tooltip } from "@heroui/react";
-import { Archive, Check, ChevronRight, CircleCheck, Columns2, Pencil } from "lucide-react";
+import { Archive, Check, ChevronRight, CircleCheck, Columns2, Pencil, Trash2 } from "lucide-react";
 import type { Project } from "@/shared/contracts";
 import { ContextMenu } from "@/renderer/components/common";
-import { archiveThread, toggleMarkThreadDone } from "@/renderer/actions/threadActions";
+import { RelativeTime } from "@/renderer/components/common/RelativeTime";
+import {
+  archiveThread,
+  deleteThread,
+  toggleMarkThreadDone,
+} from "@/renderer/actions/threadActions";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useIsWorktreeCollapsed, useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
 import { InlineRenameInput } from "./InlineRenameInput";
 import type { ThreadListEntry } from "./groupThreads";
@@ -22,6 +28,21 @@ export function SidebarThreadGroup(props: {
   const activeThreads = entry.group.threads.filter((t) => !t.done);
   const isDone = activeThreads.length === 0;
   const isRenamingGroup = editingThreadId === collapseKey;
+  const threadRemoveAction = useSharedSettings((s) => s.threadRemoveAction);
+  const latestThreadUpdatedAt = entry.group.threads.reduce(
+    (latest, thread) => (thread.updatedAt > latest ? thread.updatedAt : latest),
+    entry.group.threads[0]!.updatedAt,
+  );
+  const removeGroupThreads = () => {
+    for (const t of entry.group.threads) {
+      if (threadRemoveAction === "archive") {
+        archiveThread(t.id);
+      } else {
+        deleteThread(t.id, t.worktreePath, t.projectId);
+      }
+    }
+    clearThreadGroup(groupKey);
+  };
 
   return (
     <div key={collapseKey} className="space-y-0.5">
@@ -76,7 +97,7 @@ export function SidebarThreadGroup(props: {
           }
         }}
       >
-        <div className="flex w-full items-center gap-1 rounded px-1.5 py-1">
+        <div className="group flex w-full items-center gap-1 rounded px-1.5 py-1">
           <button
             type="button"
             className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-xs font-medium text-muted transition-colors hover:text-foreground"
@@ -125,6 +146,40 @@ export function SidebarThreadGroup(props: {
               </button>
               <Tooltip.Content>Open all in group</Tooltip.Content>
             </Tooltip>
+          )}
+          {!isRenamingGroup && (
+            <span className="relative w-[2.4ch] shrink-0">
+              <RelativeTime
+                iso={latestThreadUpdatedAt}
+                className="block text-center font-mono text-[10px] tabular-nums text-muted group-hover:invisible"
+              />
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label={
+                  threadRemoveAction === "archive"
+                    ? `Archive ${entry.group.groupName}`
+                    : `Delete ${entry.group.groupName}`
+                }
+                className={`absolute inset-0 flex items-center justify-center rounded text-muted/55 opacity-0 transition group-hover:opacity-100 ${threadRemoveAction === "archive" ? "hover:text-warning" : "hover:text-danger"}`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  removeGroupThreads();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.stopPropagation();
+                    removeGroupThreads();
+                  }
+                }}
+              >
+                {threadRemoveAction === "archive" ? (
+                  <Archive className="size-3.5" />
+                ) : (
+                  <Trash2 className="size-3.5" />
+                )}
+              </div>
+            </span>
           )}
         </div>
       </ContextMenu>
