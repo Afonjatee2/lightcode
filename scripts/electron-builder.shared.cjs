@@ -45,7 +45,7 @@ function normalizeAppleTeamId(teamId) {
 
 function webAuthnKeychainAccessGroupFor(teamId, channel) {
   const normalizedTeamId = normalizeAppleTeamId(teamId);
-  return normalizedTeamId ? `${normalizedTeamId}.${appIdFor(channel)}.webauthn` : null;
+  return normalizedTeamId ? `${normalizedTeamId}.${appIdFor(channel)}` : null;
 }
 
 module.exports = {
