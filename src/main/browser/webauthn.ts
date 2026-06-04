@@ -12,9 +12,7 @@ export function configureMacWebAuthn(channel: LightcodeChannel): boolean {
 
   const keychainAccessGroup = webAuthnKeychainAccessGroupFor(BUILD_APPLE_TEAM_ID, channel);
   if (!keychainAccessGroup) {
-    console.error(
-      "[lightcode][webauthn] APPLE_TEAM_ID was not available at build time; macOS platform passkeys are disabled.",
-    );
+    console.error("[lightcode][webauthn] macOS platform passkeys are disabled for this build.");
     return false;
   }
 

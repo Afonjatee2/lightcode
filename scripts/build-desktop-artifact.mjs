@@ -198,21 +198,68 @@ function copyPackagedDist(stageRoot) {
   }
 }
 
-function prepareMacEntitlements(stageRoot, channel) {
+function readEnvValue(name) {
+  return (process.env[name] ?? "").trim();
+}
+
+function prepareMacProvisioningProfile(stageRoot) {
+  const profilePath = readEnvValue("MAC_PROVISIONING_PROFILE_PATH");
+  const profileBase64 = readEnvValue("MAC_PROVISIONING_PROFILE");
+  if (!profilePath && !profileBase64) {
+    return null;
+  }
+
+  const stagedPath = join(stageRoot, "build", "embedded.provisionprofile");
+  if (profilePath) {
+    const sourcePath = resolve(repoRoot, profilePath);
+    if (!existsSync(sourcePath)) {
+      throw new Error(`MAC_PROVISIONING_PROFILE_PATH does not exist: ${sourcePath}`);
+    }
+    cpSync(sourcePath, stagedPath);
+  } else {
+    writeFileSync(stagedPath, Buffer.from(profileBase64, "base64"));
+  }
+
+  if (statSync(stagedPath).size === 0) {
+    throw new Error("mac provisioning profile is empty");
+  }
+  console.log("[stage] staged mac provisioning profile for WebAuthn keychain entitlement");
+  return "build/embedded.provisionprofile";
+}
+
+function prepareMacEntitlements(stageRoot, channel, provisioningProfile) {
+  const wantsWebAuthnEntitlement =
+    process.env.LIGHTCODE_ENABLE_MAC_WEBAUTHN_ENTITLEMENT === "1" || provisioningProfile !== null;
+  if (!wantsWebAuthnEntitlement) {
+    console.log("[stage] mac WebAuthn keychain entitlement disabled; using base mac entitlements");
+    return {
+      entitlements: "build/entitlements.mac.plist",
+      entitlementsInherit: "build/entitlements.mac.plist",
+    };
+  }
+
+  if (!provisioningProfile) {
+    throw new Error(
+      "mac WebAuthn keychain entitlement requires MAC_PROVISIONING_PROFILE or MAC_PROVISIONING_PROFILE_PATH",
+    );
+  }
+
   const accessGroup = channelTable.webAuthnKeychainAccessGroupFor(
     process.env.APPLE_TEAM_ID,
     channel,
   );
   if (!accessGroup) {
-    console.log("[stage] APPLE_TEAM_ID not set; using base mac entitlements");
-    return "build/entitlements.mac.plist";
+    throw new Error("mac WebAuthn keychain entitlement requires a valid APPLE_TEAM_ID");
   }
 
   const sourcePath = join(stageRoot, "build", "entitlements.mac.plist");
   const generatedPath = join(stageRoot, "build", "entitlements.mac.generated.plist");
   const plist = readFileSync(sourcePath, "utf8");
   if (plist.includes("keychain-access-groups")) {
-    return "build/entitlements.mac.plist";
+    return {
+      entitlements: "build/entitlements.mac.plist",
+      entitlementsInherit: "build/entitlements.mac.plist",
+    };
   }
 
   const keychainEntitlement = [
@@ -226,7 +273,10 @@ function prepareMacEntitlements(stageRoot, channel) {
   }
   writeFileSync(generatedPath, plist.replace("</dict>", `${keychainEntitlement}\n</dict>`));
   console.log(`[stage] enabled mac WebAuthn keychain access group ${accessGroup}`);
-  return "build/entitlements.mac.generated.plist";
+  return {
+    entitlements: "build/entitlements.mac.generated.plist",
+    entitlementsInherit: "build/entitlements.mac.plist",
+  };
 }
 
 // The Claude Agent SDK lists `@anthropic-ai/claude-agent-sdk-<plat>-<arch>` as
@@ -345,10 +395,12 @@ async function main() {
 
     // 5. Stage electron-builder config.
     const channel = channelTable.normalizeChannel(process.env.LIGHTCODE_CHANNEL);
-    const macEntitlements = prepareMacEntitlements(stageRoot, channel);
+    const macProvisioningProfile =
+      platform === "mac" ? prepareMacProvisioningProfile(stageRoot) : null;
+    const macEntitlements = prepareMacEntitlements(stageRoot, channel, macProvisioningProfile);
     writeFileSync(
       join(stageRoot, "electron-builder.yml"),
-      buildElectronBuilderConfig({ macEntitlements }),
+      buildElectronBuilderConfig({ ...macEntitlements, macProvisioningProfile }),
     );
 
     // 6. Install prod + stage devdeps with a flat layout.
@@ -471,7 +523,11 @@ function buildElectronBuilderConfig(options = {}) {
   const prefix = channelTable.artifactPrefixFor(channel);
   const iconSuffix = channel === "nightly" ? "-nightly" : "";
   const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
-  const macEntitlements = options.macEntitlements ?? "build/entitlements.mac.plist";
+  const macEntitlements = options.entitlements ?? "build/entitlements.mac.plist";
+  const macEntitlementsInherit = options.entitlementsInherit ?? "build/entitlements.mac.plist";
+  const macProvisioningProfileLine = options.macProvisioningProfile
+    ? `\n  provisioningProfile: ${options.macProvisioningProfile}`
+    : "";
   const packagedDistFilesYaml = PACKAGED_DIST_FILES.map((glob) =>
     glob.startsWith("!") ? `  - "${glob}"` : `  - ${glob}`,
   ).join("\n");
@@ -567,7 +623,7 @@ mac:
   extendInfo:
     NSMicrophoneUsageDescription: Lightcode uses the microphone for local voice input in the composer.
   entitlements: ${macEntitlements}
-  entitlementsInherit: ${macEntitlements}
+  entitlementsInherit: ${macEntitlementsInherit}${macProvisioningProfileLine}
   notarize: true
 
 npmRebuild: false
