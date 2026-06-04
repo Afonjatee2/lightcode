@@ -6,7 +6,7 @@
 
 <p align="center">
   <strong>One window for all your AI coding agents.</strong><br />
-  Run Claude, Codex, OpenCode, Gemini, Antigravity, Cursor, and Copilot side-by-side. Terminal and chat, any layout.
+  Run Claude, Codex, OpenCode, Gemini, Antigravity, Cursor, and Copilot side-by-side. Terminal or chat, in any layout.
 </p>
 
 <p align="center">
@@ -29,7 +29,7 @@
 
 ## Why Lightcode?
 
-If you use more than one AI coding agent, you know the pain: separate terminals, separate apps, no shared context. Lightcode puts them all in one place.
+If you use more than one AI coding agent, you know the pain: separate terminals, separate apps, no shared context. Lightcode brings them into one workspace.
 
 ### Infinite Threads & Layouts
 
