@@ -19,6 +19,9 @@ function terminalTermCacheKey(location: ProjectLocation): string {
 function hasGhosttyTerminfo(location: ProjectLocation): boolean {
   const options = { stdio: "ignore" as const, timeout: 250, windowsHide: true };
   if (location.kind === "wsl") {
+    // WSL terminfo lives in the distro, so probe it through wsl.exe. The
+    // terminal/PTY path intentionally stays on direct wsl.exe (not the bridge),
+    // and the result is cached per distro so this runs at most once per distro.
     if (process.platform !== "win32") return false;
     const result = spawnSync(
       getWslCommand(),

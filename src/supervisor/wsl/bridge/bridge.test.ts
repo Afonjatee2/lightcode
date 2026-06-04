@@ -350,6 +350,51 @@ describeOnPosix("bridge.mjs fs endpoints", () => {
     expect(envelope.data.results[1]?.stdout).toContain("# branch.head");
   });
 
+  it("runs structured process batches without a shell", async () => {
+    const { status, body } = await post(`${bridge.baseUrl}/v1/process/batch`, {
+      timeoutMs: 10_000,
+      commands: [
+        {
+          command: process.execPath,
+          cwd: projectRoot,
+          args: ["-e", "process.stdout.write(process.cwd())"],
+        },
+      ],
+    });
+
+    expect(status).toBe(200);
+    const envelope = body as {
+      ok: boolean;
+      data: { results: Array<{ ok: boolean; stdout: string; exitCode: number }> };
+    };
+    expect(envelope.ok).toBe(true);
+    expect(envelope.data.results[0]).toMatchObject({
+      ok: true,
+      stdout: projectRoot,
+      exitCode: 0,
+    });
+  });
+
+  it("strips inherited Git control variables from process env", async () => {
+    await bridge.dispose();
+    bridge = await startBridge({ GIT_DIR: "/tmp/host-git-dir" });
+
+    const { status, body } = await post(`${bridge.baseUrl}/v1/process/exec`, {
+      command: "sh",
+      cwd: projectRoot,
+      args: ["-lc", 'printf "%s" "${GIT_DIR:-missing}"'],
+      timeoutMs: 10_000,
+    });
+
+    expect(status).toBe(200);
+    const envelope = body as {
+      ok: boolean;
+      data: { ok: boolean; stdout: string; exitCode: number };
+    };
+    expect(envelope.ok).toBe(true);
+    expect(envelope.data).toMatchObject({ ok: true, stdout: "missing", exitCode: 0 });
+  });
+
   it("runs login-env git execs without exposing the bridge secret to hooks", async () => {
     git(projectRoot, "init");
     git(projectRoot, "config", "user.email", "test@example.com");

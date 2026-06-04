@@ -17,7 +17,9 @@ import {
   locationCwd,
   readAntigravityConversationIds,
   readAntigravityLastConversationForCwd,
+  readAntigravityLastConversationForCwdAsync,
   readNewestAntigravityConversationForCwd,
+  readNewestAntigravityConversationIdAsync,
   resolveAntigravityWatchPaths,
 } from "./session";
 import { detectAntigravityTerminalStatus } from "./terminal";
@@ -28,6 +30,7 @@ export function createAntigravityAdapter(): AgentAdapter {
   let capabilities: AgentCapability = defaultAntigravityCapabilities;
   let preSpawnConversationIds = new Set<string>();
   let preSpawnLastConversationForCwd: string | undefined;
+  let preSpawnStartedAt = 0;
 
   return {
     kind: "antigravity",
@@ -53,12 +56,20 @@ export function createAntigravityAdapter(): AgentAdapter {
       // `agy` has no flag to pre-assign a conversation id; the conversation db
       // only appears once the session starts. Snapshot the existing ids + the
       // workspace's cached "last" id so `discoverSessionRef` can pick out the
-      // brand-new conversation created for this launch.
-      preSpawnConversationIds = readAntigravityConversationIds(location);
-      preSpawnLastConversationForCwd = readAntigravityLastConversationForCwd(
-        location,
-        locationCwd(location),
-      );
+      // brand-new conversation created for this launch. On WSL we can't read
+      // those files synchronously, so leave the snapshot empty and rely on the
+      // post-spawn start time to window the async discovery instead.
+      preSpawnStartedAt = Date.now();
+      if (location.kind === "wsl") {
+        preSpawnConversationIds = new Set();
+        preSpawnLastConversationForCwd = undefined;
+      } else {
+        preSpawnConversationIds = readAntigravityConversationIds(location);
+        preSpawnLastConversationForCwd = readAntigravityLastConversationForCwd(
+          location,
+          locationCwd(location),
+        );
+      }
       const args = buildAntigravityArgs(config, prompt);
       return { binary: "agy", args };
     },
@@ -75,6 +86,25 @@ export function createAntigravityAdapter(): AgentAdapter {
 
     async discoverSessionRef(location: ProjectLocation) {
       const cwd = locationCwd(location);
+      // WSL can't synchronously read the conversation db's workspace URI over
+      // the bridge, so fall back to the cached "last" id plus a time-windowed
+      // newest-by-mtime scan (anchored to the launch time) for the live case.
+      if (location.kind === "wsl") {
+        const latest = await readAntigravityLastConversationForCwdAsync(location, cwd);
+        if (
+          latest &&
+          latest !== preSpawnLastConversationForCwd &&
+          !preSpawnConversationIds.has(latest)
+        ) {
+          return createKnownSessionRef(latest);
+        }
+        const newest = await readNewestAntigravityConversationIdAsync(
+          location,
+          preSpawnConversationIds,
+          preSpawnStartedAt - 1000,
+        );
+        return newest ? createKnownSessionRef(newest) : undefined;
+      }
       // Primary: the conversation db created for THIS workspace. It exists as
       // soon as the interactive session starts, and the workspace match rules
       // out concurrent one-shot calls (title/commit/PR), which run in an

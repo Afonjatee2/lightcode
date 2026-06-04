@@ -325,7 +325,7 @@ export class ThreadSessionManager {
     const usesStructuredFlow =
       session.adapter.capabilities.liveInputMode === "server" || session.presentationMode === "gui";
     const effectiveSegments = payload.segments
-      ? rewriteSegmentsForWsl(payload.segments, session.projectLocation, {
+      ? await rewriteSegmentsForWsl(payload.segments, session.projectLocation, {
           preserveImageAttachments: usesStructuredFlow,
         })
       : undefined;
@@ -676,7 +676,7 @@ export class ThreadSessionManager {
       throw new Error("Thread does not support structured turns.");
     }
     const effectiveSegments = payload.segments
-      ? rewriteSegmentsForWsl(payload.segments, session.projectLocation, {
+      ? await rewriteSegmentsForWsl(payload.segments, session.projectLocation, {
           preserveImageAttachments: true,
         })
       : undefined;
@@ -1175,7 +1175,7 @@ export class ThreadSessionManager {
     const usesTerminalPresentation = requestedPresentation === "terminal";
     const useStructuredFlow = isServerControlled || !usesTerminalPresentation;
     const effectiveSegments = payload.segments
-      ? rewriteSegmentsForWsl(payload.segments, payload.projectLocation, {
+      ? await rewriteSegmentsForWsl(payload.segments, payload.projectLocation, {
           preserveImageAttachments: useStructuredFlow,
         })
       : undefined;
