@@ -49,10 +49,14 @@ import {
 } from "@/renderer/utils/acpRegistryAuth";
 import { Input, PixelLoader, Select } from "@/renderer/components/common";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import {
+  providerMenuKey,
+  providerVisibilityKey,
+} from "@/renderer/components/common/ProviderModelMenu/parts/providerIdentity";
+import { expandAgentToVisibilityProviders } from "@/renderer/components/thread/buildModelPickerControls";
 import { SettingsPage } from "./SettingsForm";
 import {
   buildProviderModelItems,
-  statusToMenuProvider,
   type ProviderModelItem,
   type ProviderModelMenuProvider,
 } from "@/renderer/components/common/ProviderModelMenu";
@@ -107,11 +111,11 @@ function AgentSettingRow(props: { agentKind: string; def: AgentSettingDef }) {
 }
 
 function ModelVisibilityDropdown(props: {
-  agentKind: string;
+  settingsKey: string;
   provider: ProviderModelMenuProvider;
 }) {
-  const { agentKind, provider } = props;
-  const hiddenIds = useSharedSettings((s) => s.hiddenModels[agentKind]);
+  const { settingsKey, provider } = props;
+  const hiddenIds = useSharedSettings((s) => s.hiddenModels[settingsKey]);
   const setHiddenModels = useSharedSettings((s) => s.setHiddenModels);
 
   const [isOpen, setIsOpen] = useState(false);
@@ -159,7 +163,7 @@ function ModelVisibilityDropdown(props: {
     const next = new Set(hiddenSet);
     if (next.has(modelId)) next.delete(modelId);
     else next.add(modelId);
-    setHiddenModels(agentKind, [...next]);
+    setHiddenModels(settingsKey, [...next]);
   }
 
   function toggleSubGroup(headerId: string) {
@@ -173,17 +177,19 @@ function ModelVisibilityDropdown(props: {
       if (nextHidden) next.add(id);
       else next.delete(id);
     }
-    setHiddenModels(agentKind, [...next]);
+    setHiddenModels(settingsKey, [...next]);
   }
 
   function setAllHidden(hideAll: boolean) {
-    setHiddenModels(agentKind, hideAll ? allModels.map((m) => m.id) : []);
+    setHiddenModels(settingsKey, hideAll ? allModels.map((m) => m.id) : []);
   }
 
   return (
     <div className="flex items-center justify-between gap-4 py-2 border-b border-border/10 last:border-0 group">
       <div className="flex flex-col min-w-0 flex-1">
-        <p className="text-sm font-medium text-foreground">Visible models</p>
+        <p className="text-sm font-medium text-foreground">
+          {provider.kind === "cursor" ? `Visible ${provider.label} models` : "Visible models"}
+        </p>
         <p className="text-[11px] text-muted line-clamp-1 group-hover:line-clamp-none transition-all">
           Toggle models off to hide them from the selector.
         </p>
@@ -974,8 +980,8 @@ export function SingleAgentSettings(props: { agentKind: string }) {
   const defs = (agent.capabilities.settingDefs ?? []).filter(
     (def) => !def.platforms || def.platforms.includes(platform),
   );
-  const hasSelectableModels = agent.capabilities.models.some((m) => m.id !== "auto");
-  const menuProvider = statusToMenuProvider(agent);
+  const modelVisibilityProviders = expandAgentToVisibilityProviders(agent);
+  const hasSelectableModels = modelVisibilityProviders.length > 0;
 
   const versionRows: { label: string; status: AgentStatus }[] = [];
   if (platform === "win32") {
@@ -1636,7 +1642,13 @@ export function SingleAgentSettings(props: { agentKind: string }) {
 
         {hasSelectableModels && (
           <div className="mt-6">
-            <ModelVisibilityDropdown agentKind={agent.kind} provider={menuProvider} />
+            {modelVisibilityProviders.map((provider) => (
+              <ModelVisibilityDropdown
+                key={providerMenuKey(provider)}
+                settingsKey={providerVisibilityKey(provider)}
+                provider={provider}
+              />
+            ))}
           </div>
         )}
       </div>
