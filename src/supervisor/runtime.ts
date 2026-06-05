@@ -796,6 +796,7 @@ export class SupervisorRuntime {
       manifestPath: payload.manifestPath,
       location: payload.location,
       ...(payload.transcriptDir ? { transcriptDir: payload.transcriptDir } : {}),
+      ...(payload.includeAgentChats ? { includeAgentChats: true } : {}),
     });
     return { run };
   }
