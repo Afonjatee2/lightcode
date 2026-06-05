@@ -49,16 +49,19 @@ Every provider is a folder under `src/supervisor/agents/<kind>/` with the same i
 
 Opening two provider folders side-by-side answers "what does this provider do differently" by file-name alignment alone.
 
-| Provider     | Models                                                              | Efforts                  | Live Input            | Structured Session     |
-| ------------ | ------------------------------------------------------------------- | ------------------------ | --------------------- | ---------------------- |
-| Claude       | opus-4-7, opus-4-6[1m], sonnet, haiku                               | low, medium, high, max   | terminal              | No                     |
-| Codex        | gpt-5.4, gpt-5.4-mini, gpt-5.3-codex, gpt-5.2-codex, etc.           | low, medium, high, xhigh | terminal / GUI server | Yes (stdio app-server) |
-| Gemini       | auto, gemini-3.1-pro-preview, gemini-2.5-pro/flash/flash-lite, etc. | (none)                   | terminal              | No                     |
-| Copilot      | (probed via ACP)                                                    | low, medium, high, xhigh | terminal              | Yes (ACP)              |
-| Cursor       | auto, composer-\*, GPT/Opus/Sonnet variants                         | (embedded in model name) | terminal              | No                     |
-| Grok         | grok-build (probed via ACP)                                         | (none)                   | terminal              | Yes (ACP)              |
-| Antigravity  | auto (managed by `agy`)                                             | (none)                   | terminal              | No                     |
-| Command Code | Kimi/Claude/GPT/Gemini/GLM/… (static, `--list-models`)              | (none)                   | terminal              | No                     |
+Model/effort lists below are the **statically declared defaults**. Several providers ship `models: []` / `efforts: []` and fill them at runtime from a capabilities probe (Codex/Gemini/Copilot/Grok/OpenCode) — the listed values are illustrative, not authoritative. Read the provider's `detection.ts` for the live source of truth.
+
+| Provider     | Models                                                 | Efforts                                  | Live Input            | Structured Session     |
+| ------------ | ------------------------------------------------------ | ---------------------------------------- | --------------------- | ---------------------- |
+| Claude       | opus-4-8, opus-4-7, opus-4-6, sonnet, haiku            | low, medium, high, xHigh, max, ultracode | terminal              | No                     |
+| Codex        | (probed dynamically via app-server)                    | (probed dynamically)                     | terminal / GUI server | Yes (stdio app-server) |
+| Gemini       | (probed dynamically via ACP)                           | (probed dynamically)                     | terminal              | No                     |
+| Copilot      | (probed via ACP)                                       | (probed via ACP)                         | terminal              | Yes (ACP)              |
+| Cursor       | auto, composer-\*, GPT/Opus/Sonnet variants            | (embedded in model name)                 | terminal              | No                     |
+| Grok         | grok-build (probed via ACP)                            | (none)                                   | terminal              | Yes (ACP)              |
+| OpenCode     | (probed dynamically via SDK)                           | (probed dynamically)                     | terminal / GUI server | Yes (SDK server)       |
+| Antigravity  | auto (managed by `agy`)                                | (none)                                   | terminal              | No                     |
+| Command Code | Kimi/Claude/GPT/Gemini/GLM/… (static, `--list-models`) | (none)                                   | terminal              | No                     |
 
 ## Adding a New Provider — Full Checklist
 
