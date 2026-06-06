@@ -159,6 +159,31 @@ const antigravityStatus: AgentStatus = {
   },
 };
 
+const commandCodeStatus: AgentStatus = {
+  kind: "commandcode",
+  label: "Command Code",
+  installed: true,
+  authState: "authenticated",
+  capabilities: {
+    models: [
+      { id: "moonshotai/Kimi-K2.5", label: "Kimi K2.5" },
+      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
+    ],
+    efforts: [],
+    modelEfforts: {},
+    modes: ["agent", "plan"],
+    approvalPolicies: [{ id: "yolo", label: "Bypass Permissions" }],
+    sandboxModes: [],
+    supportsResume: true,
+    supportsDirectInput: true,
+    liveInputMode: "terminal",
+    presentationMode: "terminal",
+    presentationModes: ["terminal"],
+    defaultApprovalPolicy: "yolo",
+    settingDefs: [],
+  },
+};
+
 const claudeStatus: AgentStatus = {
   kind: "claude",
   label: "Claude",
@@ -722,6 +747,73 @@ describe("ThreadDraftView", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("tab", { name: "Chat" })).toHaveAttribute("aria-selected", "true");
+    });
+  });
+
+  it("adds a provider to the mounted draft picker when it becomes installed", async () => {
+    const onStart = vi.fn<(input: unknown) => void>();
+    const lastDraftConfig = {
+      agentKind: "commandcode",
+      model: "moonshotai/Kimi-K2.5",
+      effort: "",
+      mode: "agent",
+      approvalPolicy: "yolo",
+      sandboxMode: "",
+    } as const;
+    const { rerender } = render(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[dualModeCodexStatus]}
+        lastDraftConfig={lastDraftConfig}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          providers?: Array<{ kind: string }>;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentAgentKind).toBe("codex");
+      expect(providerModel?.providers?.map((provider) => provider.kind)).toEqual(["codex"]);
+    });
+
+    rerender(
+      <ThreadDraftView
+        project={project}
+        agentStatuses={[dualModeCodexStatus, commandCodeStatus]}
+        lastDraftConfig={lastDraftConfig}
+        onStart={onStart}
+      />,
+    );
+
+    await waitFor(() => {
+      const props = composerSpy.mock.lastCall?.[0] as {
+        controls: Array<{
+          kind?: string;
+          currentAgentKind?: string;
+          currentModel?: string;
+          presentationMode?: string;
+          providers?: Array<{
+            kind: string;
+            capabilities: { models: Array<{ id: string; label: string }> };
+          }>;
+        }>;
+      };
+      const providerModel = props.controls.find((c) => c.kind === "provider-model");
+      expect(providerModel?.currentAgentKind).toBe("codex");
+      expect(providerModel?.currentModel).toBe("gpt-5.4");
+      const commandCodeProvider = providerModel?.providers?.find(
+        (provider) => provider.kind === "commandcode",
+      );
+      expect(commandCodeProvider?.capabilities.models.map((model) => model.id)).toEqual([
+        "moonshotai/Kimi-K2.5",
+        "gpt-5.4-mini",
+      ]);
     });
   });
 
