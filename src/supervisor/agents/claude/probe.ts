@@ -11,6 +11,7 @@ import { CLAUDE_FAST_MODE_DISABLED_MESSAGE } from "./detection";
 import { resolveFastModeCachePath } from "./fastModeCache";
 import { resolveFastAvailability } from "./fastModeProbe";
 import { AsyncPromptQueue } from "./promptQueue";
+import { spawnClaudeProbeProcess } from "./sdkProbeProcess";
 
 const CLAUDE_TERMINAL_AUTH_METHOD: AgentAuthMethod = {
   type: "terminal",
@@ -136,6 +137,7 @@ async function probeClaudeSdkPartialNative(
           settingSources: ["user", "project", "local"],
           allowedTools: [],
           stderr: () => {},
+          spawnClaudeCodeProcess: spawnClaudeProbeProcess,
         },
       });
       const init = await q.initializationResult();
