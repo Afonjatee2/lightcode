@@ -85,13 +85,6 @@ export interface SessionRuntime {
    * Cleared on stop-acknowledged, PTY exit, teardown, and `clearSessionTimers`.
    */
   structuredInterruptWatchdog?: ReturnType<typeof setTimeout> | undefined;
-  /**
-   * GUI Codex launches optimistically enter `working` before the app-server
-   * listener is attached. Codex then replays the newly opened thread's idle
-   * state before the first turn has been submitted; suppress that transient
-   * idle so the renderer does not close and reopen the same launch turn.
-   */
-  suppressInitialStructuredIdle?: boolean | undefined;
   prevChunk: string;
   /**
    * ANSI-stripped text from the **latest** PTY `data` chunk (post OSC extract).

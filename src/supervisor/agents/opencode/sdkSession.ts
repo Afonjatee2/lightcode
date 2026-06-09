@@ -942,16 +942,20 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
 
     if (event.type === "session.status") {
       const upd = mapStatusUpdate(event.properties);
+      const pending = this.pendingRequestStatus();
+      if (!pending && upd.status === "idle") this.emitGuiTurnCompleted();
       this.listener?.onUpdate({
-        ...(this.pendingRequestStatus() ?? upd),
+        ...(pending ?? upd),
         ...this.sessionRefUpdate(),
       });
       return;
     }
 
     if (event.type === "session.idle") {
+      const pending = this.pendingRequestStatus();
+      if (!pending) this.emitGuiTurnCompleted();
       this.listener?.onUpdate({
-        ...(this.pendingRequestStatus() ?? { status: "idle", attention: "none" }),
+        ...(pending ?? { status: "idle", attention: "none" }),
         ...this.sessionRefUpdate(),
       });
       return;
@@ -1004,6 +1008,26 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
       const canonical = mapOpenCodeEvent(event, this.mapperState);
       if (canonical.length > 0) this.emitRuntimeEvents(canonical);
     }
+  }
+
+  /**
+   * GUI working/idle is owned by the ordered `turn.completed` runtime event in
+   * the renderer. OpenCode's SDK has no turn-boundary event, so synthesize one
+   * onto the runtime stream whenever the session settles to idle. The renderer
+   * close is idempotent (a no-op when no turn is open), so this keeps OpenCode
+   * uniform with the turn-emitting providers (Codex/Claude/ACP) without needing
+   * to track turn ids here.
+   */
+  private emitGuiTurnCompleted(): void {
+    if (!this.isGui) return;
+    this.emitRuntimeEvents([
+      {
+        type: "turn.completed",
+        threadId: this.threadId,
+        turnId: "opencode-turn",
+        state: "completed",
+      },
+    ]);
   }
 
   private emitRuntimeEvents(events: RuntimeEvent[]): void {

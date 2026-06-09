@@ -74,11 +74,7 @@ import {
 } from "./threadSession/userInterrupt";
 import { writeSubmittedPrompt } from "./threadSession/promptWrite";
 import { getIterm2StatusL2TerminalEnv, resolveTerminalColorEnv } from "./threadSession/terminalEnv";
-import {
-  hookDebugProjectLabel,
-  requireSessionPty,
-  shouldReleaseInitialStructuredIdleSuppression,
-} from "./threadSession/helpers";
+import { hookDebugProjectLabel, requireSessionPty } from "./threadSession/helpers";
 import { RuntimeEventRouter } from "./threadSession/runtimeEventRouter";
 
 export { isUserInterruptKeystroke, USER_INTERRUPT_RECOVERY_GRACE_MS, writeSubmittedPrompt };
@@ -585,6 +581,16 @@ export class ThreadSessionManager {
     }
     if (!session.structuredSession?.interruptTurn || session.structuredTurnInterruptRequested) {
       return;
+    }
+    // A stop that lands before the provider opened a turn (e.g. during the
+    // launch idle blip, when the session is already idle) gets no provider
+    // turn-end to ride `forceCloseActiveTurn` on, and the renderer's optimistic
+    // working turn would never close (GUI working/idle is driven by the ordered
+    // turn lifecycle, not the deduped status channel). Close it directly. When a
+    // turn is genuinely active the provider's interrupt → turn.completed path
+    // closes it instead, so this is not premature.
+    if (session.status !== "working") {
+      this.outputPipeline.emitState(session, undefined, { forceCloseActiveTurn: true });
     }
     session.structuredTurnInterruptRequested = true;
     this.armStructuredInterruptWatchdog(session);
@@ -1292,8 +1298,6 @@ export class ThreadSessionManager {
         presentationMode: requestedPresentation,
         initialStatus: optimisticUserMessageItemId && !startInterrupted ? "working" : "idle",
         initialAttention: optimisticUserMessageItemId && !startInterrupted ? "working" : "none",
-        suppressInitialStructuredIdle:
-          optimisticUserMessageItemId !== undefined && !startInterrupted,
       });
       if (
         !startInterrupted &&
@@ -1518,7 +1522,6 @@ export class ThreadSessionManager {
     presentationMode?: import("@/shared/contracts").ThreadPresentationMode;
     initialStatus?: import("@/shared/contracts").ThreadStatus;
     initialAttention?: import("@/shared/contracts").ThreadAttention;
-    suppressInitialStructuredIdle?: boolean;
   }): SessionRuntime {
     // `thread-reset` is only consumed by the terminal panel (renderer scrollback
     // reset) and the renderer-side runtime-event/server-request slice clear.
@@ -1611,7 +1614,6 @@ export class ThreadSessionManager {
       pendingTerminalPrompt: input.pendingTerminalPrompt,
       pendingTerminalSegments: input.pendingTerminalSegments,
       ...(input.presentationMode ? { presentationMode: input.presentationMode } : {}),
-      ...(input.suppressInitialStructuredIdle ? { suppressInitialStructuredIdle: true } : {}),
       prevChunk: "",
       lastStrippedPtyChunk: "",
       ptyOscCarry: "",
@@ -1688,32 +1690,6 @@ export class ThreadSessionManager {
           session.slashCommands = update.slashCommands;
         }
 
-        if (
-          session.suppressInitialStructuredIdle === true &&
-          update.status === "idle" &&
-          session.status === "working" &&
-          session.structuredTurnInterruptRequested !== true
-        ) {
-          if (update.sessionRef || configChanged || slashCommandsChanged) {
-            this.outputPipeline.emitState(session);
-          }
-          return;
-        }
-        if (session.suppressInitialStructuredIdle === true && update.status !== "idle") {
-          session.suppressInitialStructuredIdle = undefined;
-        }
-
-        // Wire-ordering: `thread-state` (status) events are emitted to the
-        // renderer immediately, but this session's runtime events are batched
-        // (RuntimeEventBuffer, ~16ms). Without flushing here, a turn-end `idle`
-        // can overtake the turn's final runtime events on the IPC wire; those
-        // trailing events then land after `idle` in the renderer and re-open the
-        // GUI turn to "working" via reopenGuiTurnForLiveRuntimeActivity, leaving a
-        // stale "working" until the next snapshot reconcile (on thread switch).
-        // Flushing first guarantees the renderer applies the final events before
-        // the status change, mirroring its own flushPendingRuntimeEventsSync.
-        this.flushRuntimeEvents();
-
         this.outputPipeline.updateState(
           session,
           update.status,
@@ -1753,12 +1729,6 @@ export class ThreadSessionManager {
           session.ignoreExit
         ) {
           return;
-        }
-        if (
-          session.suppressInitialStructuredIdle === true &&
-          shouldReleaseInitialStructuredIdleSuppression(event)
-        ) {
-          session.suppressInitialStructuredIdle = undefined;
         }
         // Streaming output is a sign of life — restart the stale-kill clock so a
         // healthy agent still emitting tool/text deltas after a stop request is

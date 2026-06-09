@@ -492,7 +492,7 @@ describe("SupervisorRuntime thread input", () => {
     );
   });
 
-  it("flushes buffered runtime events before emitting a structured turn-end idle", () => {
+  it("forwards a structured turn-end idle as a plain thread-state (no suppression)", () => {
     const emitted: Array<Record<string, unknown>> = [];
     const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
@@ -560,39 +560,26 @@ describe("SupervisorRuntime thread input", () => {
     const listener = (session.structuredSession.setListener as ReturnType<typeof vi.fn>).mock
       .calls[0]?.[0] as {
       onUpdate: (update: { status: string; attention: string }) => void;
-      onRuntimeEvent: (event: RuntimeEvent) => void;
     };
 
     // Isolate the turn-end sequence from any spawn-time emits.
     emitted.length = 0;
 
-    // The turn's final assistant delta is appended to the 16ms runtime-event
-    // batch buffer (timer not yet fired — no emit yet).
-    listener.onRuntimeEvent({
-      type: "content.delta",
-      threadId: "thread-gui-flush",
-      itemId: "assistant-1",
-      stream: "assistant_text",
-      delta: "done",
-    });
-
-    // Turn completes: the structured session reports idle. The status
-    // `thread-state` is emitted immediately, so without flushing first it would
-    // overtake the still-buffered runtime event on the wire and let the renderer
-    // re-open the GUI turn to "working".
+    // The structured session reports idle on the status channel at turn end. The
+    // supervisor forwards it as a plain thread-state — no suppression, no
+    // reordering, no flush band-aid. GUI working/idle is owned by the ordered
+    // `turn.completed` runtime event in the renderer, so this idle is advisory
+    // there (the renderer ignores it for GUI threads).
     listener.onUpdate({ status: "idle", attention: "none" });
 
-    const runtimeIdx = emitted.findIndex(
-      (e) =>
-        e.type === "thread-runtime-event" ||
-        e.type === "thread-runtime-events" ||
-        e.type === "thread-runtime-events-multi",
+    expect(emitted).toContainEqual(
+      expect.objectContaining({
+        type: "thread-state",
+        threadId: "thread-gui-flush",
+        status: "idle",
+        attention: "none",
+      }),
     );
-    const idleIdx = emitted.findIndex((e) => e.type === "thread-state" && e.status === "idle");
-
-    expect(runtimeIdx).toBeGreaterThanOrEqual(0);
-    expect(idleIdx).toBeGreaterThanOrEqual(0);
-    expect(runtimeIdx).toBeLessThan(idleIdx);
   });
 
   it("drains a pending steer when the working turn fails with error status", async () => {
@@ -1539,7 +1526,7 @@ describe("SupervisorRuntime thread input", () => {
     },
   );
 
-  it("starts Codex GUI presentation on the structured session without a PTY and stays visually working", async () => {
+  it("starts Codex GUI presentation on the structured session without a PTY and forwards the launch idle blip", async () => {
     const emitted: Array<Record<string, unknown>> = [];
     const runtime = makeRuntime((event) => {
       emitted.push(event as Record<string, unknown>);
@@ -1642,17 +1629,17 @@ describe("SupervisorRuntime thread input", () => {
         status: "launching",
       }),
     );
-    expect(threadStates).not.toContainEqual(
+    // The launch idle blip is now forwarded as-is (suppression removed). The
+    // renderer ignores thread-state idle for GUI threads and keeps its optimistic
+    // working turn open until the ordered `turn.completed` arrives — verified in
+    // appStore.test.ts.
+    expect(threadStates).toContainEqual(
       expect.objectContaining({
         status: "idle",
+        attention: "none",
+        sessionRef: expect.objectContaining({ providerSessionId: "session-1" }),
       }),
     );
-    expect(threadStates.at(-1)).toMatchObject({
-      status: "working",
-      sessionRef: {
-        providerSessionId: "session-1",
-      },
-    });
   });
 
   it("lets canonical turn completion close an optimistic GUI launch turn without assistant items", async () => {

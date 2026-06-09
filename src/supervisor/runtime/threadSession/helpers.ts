@@ -1,5 +1,5 @@
 import type { IPty } from "node-pty";
-import type { ProjectLocation, RuntimeEvent } from "@/shared/contracts";
+import type { ProjectLocation } from "@/shared/contracts";
 import type { SessionRuntime } from "../sessionTypes";
 
 export function hookDebugProjectLabel(loc: ProjectLocation): string {
@@ -11,23 +11,6 @@ export function hookDebugProjectLabel(loc: ProjectLocation): string {
     case "posix":
       return `posix:${loc.path}`;
   }
-}
-
-/**
- * Startup idle suppression is only for empty sync blips; visible runtime output
- * or turn completion means a follow-up idle should close the optimistic working
- * window.
- */
-export function shouldReleaseInitialStructuredIdleSuppression(event: RuntimeEvent): boolean {
-  if (event.type === "item.started") {
-    return event.itemType !== "user_message";
-  }
-  if (event.type === "turn.completed") {
-    return true;
-  }
-  return (
-    event.type === "content.delta" || event.type === "request.opened" || event.type === "error"
-  );
 }
 
 export function requireSessionPty(session: SessionRuntime): IPty {

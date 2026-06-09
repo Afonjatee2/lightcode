@@ -1,15 +1,18 @@
-import type {
-  CanonicalItemType,
-  CanonicalRequestType,
-  FileCheckpointRecord,
-  FileCheckpointTurn,
-  RequestPayload,
-  RuntimeContentStreamKind,
-  RuntimeEvent,
-  ThreadContextUsage,
-  ToolCallPayload,
+import {
+  type CanonicalItemType,
+  type CanonicalRequestType,
+  type FileCheckpointRecord,
+  type FileCheckpointTurn,
+  isThreadTurnActive,
+  type RequestPayload,
+  type RuntimeContentStreamKind,
+  type RuntimeEvent,
+  type ThreadAttention,
+  type ThreadContextUsage,
+  type ToolCallPayload,
 } from "@/shared/contracts";
 import type { AppStoreState, SliceCreator } from "./shared";
+import { appendCompletedTurnIfClosed, deriveTurnTiming } from "./turnTiming";
 
 const STALE_SUB_AGENT_ERROR_MESSAGE = "Interrupted: agent session ended before completion.";
 
@@ -410,17 +413,16 @@ function applyRuntimeEventsToState(
     runtimeCompletedTurnsByThread: state.runtimeCompletedTurnsByThread ?? {},
     threads: state.threads ?? [],
   };
+  // GUI threads close their turn on the ordered `turn.completed` runtime event;
+  // the close lands on idle when visible, finished when not.
+  const isVisible = state.view?.kind === "thread" && state.view.panes.includes(threadId);
   let changed = false;
   let bumpStructural = false;
 
   for (const event of coalesceRuntimeEvents(events)) {
-    const patch = applyRuntimeEventToRuntimeState(nextState, threadId, event);
+    const patch = applyRuntimeEventToRuntimeState(nextState, threadId, event, isVisible);
     if (Object.keys(patch).length === 0) continue;
     nextState = { ...nextState, ...patch };
-    const reopenPatch = reopenGuiTurnForLiveRuntimeActivity(nextState, threadId, event);
-    if (Object.keys(reopenPatch).length > 0) {
-      nextState = { ...nextState, ...reopenPatch };
-    }
     changed = true;
     if (eventAffectsStructuralVersion(event)) bumpStructural = true;
   }
@@ -441,87 +443,43 @@ function applyRuntimeEventsToState(
   };
 }
 
-function reopenGuiTurnForLiveRuntimeActivity(
+/**
+ * Close a GUI thread's turn when the ordered `turn.completed` runtime event
+ * arrives. This is the single source of truth for GUI working→idle: because
+ * `turn.completed` rides the same ordered stream as the turn's own content, it
+ * can never arrive before that content, so a stale "working" can't survive a
+ * trailing item/delta the way it did under the old activity-based reopen
+ * heuristic. Idempotent (no-op when no turn is open) and never overrides a
+ * sticky error.
+ */
+function closeGuiTurnOnCompletion(
   state: RuntimeEventState,
   threadId: string,
-  event: RuntimeEvent,
+  isVisible: boolean,
 ): Partial<RuntimeEventState> {
-  if (!isLiveAssistantActivity(state, threadId, event)) return {};
-  let changed = false;
-  let nextCompletedTurns = state.runtimeCompletedTurnsByThread;
-  const nowIso = new Date().toISOString();
-  const threads = state.threads.map((thread) => {
-    if (
-      thread.id !== threadId ||
-      thread.presentationMode !== "gui" ||
-      (thread.status !== "idle" && thread.status !== "finished")
-    ) {
-      return thread;
-    }
+  const thread = state.threads.find((t) => t.id === threadId);
+  if (!thread || thread.presentationMode !== "gui") return {};
+  if (thread.status === "error" || !isThreadTurnActive(thread.status)) return {};
 
-    changed = true;
-    const activeTurnStartedAt = thread.lastTurnStartedAt ?? thread.updatedAt ?? nowIso;
-    const startedAt = parseTurnMs(thread.lastTurnStartedAt);
-    const endedAt = parseTurnMs(thread.lastTurnEndedAt);
-    if (startedAt !== null && endedAt !== null) {
-      nextCompletedTurns = removeCompletedTurnWindow(
-        nextCompletedTurns,
-        threadId,
-        startedAt,
-        endedAt,
-      );
-    }
-    return {
-      ...thread,
-      status: "working" as const,
-      attention: "working" as const,
-      activeTurnStartedAt,
-      lastTurnEndedAt: undefined,
-    };
-  });
-  if (!changed) return {};
+  const nowIso = new Date().toISOString();
+  const nextTurnTiming = deriveTurnTiming(thread, "idle", { enteredLiveAt: nowIso, nowIso });
+  const turnUpdate = appendCompletedTurnIfClosed(state, threadId, thread, nextTurnTiming);
+  const threads = state.threads.map((t) =>
+    t.id === threadId
+      ? {
+          ...t,
+          status: isVisible ? ("idle" as const) : ("finished" as const),
+          attention: "none" as ThreadAttention,
+          ...nextTurnTiming,
+        }
+      : t,
+  );
   return {
     threads,
-    ...(nextCompletedTurns !== state.runtimeCompletedTurnsByThread
-      ? { runtimeCompletedTurnsByThread: nextCompletedTurns }
+    ...(turnUpdate.runtimeCompletedTurnsByThread !== state.runtimeCompletedTurnsByThread
+      ? { runtimeCompletedTurnsByThread: turnUpdate.runtimeCompletedTurnsByThread }
       : {}),
   };
-}
-
-function isLiveAssistantActivity(
-  state: RuntimeEventState,
-  threadId: string,
-  event: RuntimeEvent,
-): boolean {
-  if (event.type === "item.started") {
-    return event.itemType !== "user_message" && event.itemType !== "error";
-  }
-  if (event.type !== "item.updated" && event.type !== "content.delta") return false;
-  const item = state.runtimeItemsByIdByThread[threadId]?.[event.itemId];
-  return item !== undefined && item.state !== "completed" && item.type !== "user_message";
-}
-
-function parseTurnMs(iso: string | undefined): number | null {
-  if (!iso) return null;
-  const ms = new Date(iso).getTime();
-  return Number.isFinite(ms) ? ms : null;
-}
-
-function removeCompletedTurnWindow(
-  turnsByThread: RuntimeEventSlice["runtimeCompletedTurnsByThread"],
-  threadId: string,
-  startedAt: number,
-  endedAt: number,
-): RuntimeEventSlice["runtimeCompletedTurnsByThread"] {
-  const turns = turnsByThread[threadId];
-  if (!turns?.length) return turnsByThread;
-  const filtered = turns.filter((turn) => turn.startedAt !== startedAt || turn.endedAt !== endedAt);
-  if (filtered.length === turns.length) return turnsByThread;
-  if (filtered.length > 0) {
-    return { ...turnsByThread, [threadId]: filtered };
-  }
-  const { [threadId]: _removed, ...rest } = turnsByThread;
-  return rest;
 }
 
 /**
@@ -547,18 +505,23 @@ function applyRuntimeEventToRuntimeState(
   state: RuntimeEventState,
   threadId: string,
   event: RuntimeEvent,
+  isVisible: boolean,
 ): Partial<RuntimeEventState> {
   switch (event.type) {
     case "session.started":
     case "session.exited":
     case "turn.started":
     case "warning":
-      // No item state to mutate. Status flows through the existing thread-state channel.
+      // No item state to mutate. `turn.started` working is driven by the
+      // optimistic open + thread-state channel; the GUI turn closes on
+      // `turn.completed` below.
       return {};
 
-    case "turn.completed":
-      if (event.state !== "interrupted" && event.state !== "cancelled") return {};
-      return pruneTrailingInterruptedReasoningItems(state, threadId);
+    case "turn.completed": {
+      const closePatch = closeGuiTurnOnCompletion(state, threadId, isVisible);
+      if (event.state !== "interrupted" && event.state !== "cancelled") return closePatch;
+      return { ...closePatch, ...pruneTrailingInterruptedReasoningItems(state, threadId) };
+    }
 
     case "item.started": {
       const existingIds = state.runtimeItemIdsByThread[threadId] ?? [];
