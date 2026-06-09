@@ -80,6 +80,8 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "dbReplaceThreadCompletedTurns",
   "dbReplaceThreadRuntimeSnapshot",
   "dbGetThreadContextUsage",
+  "dbGetProjectNotes",
+  "dbSetProjectNotes",
   "checkForUpdate",
   "startUpdateDownload",
   "installUpdate",

@@ -20,7 +20,7 @@ export interface FilesPanelContext {
   rootLabel: string;
 }
 
-export type RightPanelTab = "git" | "files" | "terminal" | "browser" | "usage";
+export type RightPanelTab = "git" | "files" | "terminal" | "browser" | "usage" | "notes";
 
 interface PanelState {
   gitReviewContext: GitReviewContext | null;
@@ -31,6 +31,7 @@ interface PanelState {
   rightPanelTab: RightPanelTab;
   browserPanelOpen: boolean;
   usagePanelOpen: boolean;
+  notesPanelOpen: boolean;
   browserOverlayOpen: boolean;
   browserOverlayMaximized: boolean;
   browserOverlayDrawerWidth: number;
@@ -52,6 +53,8 @@ interface PanelState {
   setBrowserPanelOpen: (v: boolean) => void;
   setUsagePanelOpen: (v: boolean) => void;
   openUsagePanel: () => void;
+  setNotesPanelOpen: (v: boolean) => void;
+  openNotesPanel: () => void;
   setBrowserOverlayOpen: (v: boolean) => void;
   setBrowserOverlayMaximized: (v: boolean) => void;
   setBrowserOverlayDrawerWidth: (v: number) => void;
@@ -109,6 +112,7 @@ export const usePanelStore = create<PanelState>((set) => ({
   rightPanelTab: "git",
   browserPanelOpen: false,
   usagePanelOpen: false,
+  notesPanelOpen: false,
   browserOverlayOpen: false,
   browserOverlayMaximized: false,
   browserOverlayDrawerWidth: loadInitialDrawerWidth(),
@@ -223,6 +227,14 @@ export const usePanelStore = create<PanelState>((set) => ({
         ? {}
         : { usagePanelOpen: true, rightPanelTab: "usage" as const },
     ),
+  setNotesPanelOpen: (v) =>
+    set((state) => (state.notesPanelOpen === v ? {} : { notesPanelOpen: v })),
+  openNotesPanel: () =>
+    set((state) =>
+      state.notesPanelOpen && state.rightPanelTab === "notes"
+        ? {}
+        : { notesPanelOpen: true, rightPanelTab: "notes" as const },
+    ),
   setThreadSortMode: (mode) =>
     set((state) => (state.threadSortMode === mode ? {} : { threadSortMode: mode })),
   openSettings: () =>
@@ -255,6 +267,7 @@ export const usePanelStore = create<PanelState>((set) => ({
         state.filesPanelContext === null &&
         !state.browserPanelOpen &&
         !state.usagePanelOpen &&
+        !state.notesPanelOpen &&
         !state.browserOverlayOpen &&
         !state.browserOverlayMaximized
       ) {
@@ -265,6 +278,7 @@ export const usePanelStore = create<PanelState>((set) => ({
         filesPanelContext: null,
         browserPanelOpen: false,
         usagePanelOpen: false,
+        notesPanelOpen: false,
         browserOverlayOpen: false,
         browserOverlayMaximized: false,
       };
