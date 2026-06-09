@@ -1703,6 +1703,17 @@ export class ThreadSessionManager {
           session.suppressInitialStructuredIdle = undefined;
         }
 
+        // Wire-ordering: `thread-state` (status) events are emitted to the
+        // renderer immediately, but this session's runtime events are batched
+        // (RuntimeEventBuffer, ~16ms). Without flushing here, a turn-end `idle`
+        // can overtake the turn's final runtime events on the IPC wire; those
+        // trailing events then land after `idle` in the renderer and re-open the
+        // GUI turn to "working" via reopenGuiTurnForLiveRuntimeActivity, leaving a
+        // stale "working" until the next snapshot reconcile (on thread switch).
+        // Flushing first guarantees the renderer applies the final events before
+        // the status change, mirroring its own flushPendingRuntimeEventsSync.
+        this.flushRuntimeEvents();
+
         this.outputPipeline.updateState(
           session,
           update.status,
