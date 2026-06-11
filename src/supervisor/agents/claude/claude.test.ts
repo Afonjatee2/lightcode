@@ -134,7 +134,7 @@ describe("createClaudeAdapter structured sessions", () => {
 });
 
 describe("claudeCapabilities", () => {
-  it("advertises Fable 5 as a 1M-only non-fast model guarded by the probe", () => {
+  it("advertises Fable 5 as a non-fast model with both context tiers, guarded by the probe", () => {
     expect(claudeCapabilities.models).toContainEqual({ id: "claude-fable-5", label: "Fable 5" });
     expect(claudeCapabilities.modelEfforts["claude-fable-5"]).toEqual([
       "low",
@@ -144,7 +144,7 @@ describe("claudeCapabilities", () => {
       "max",
       "ultracode",
     ]);
-    expect(claudeCapabilities.modelContextSizes?.["claude-fable-5"]).toEqual(["1m"]);
+    expect(claudeCapabilities.modelContextSizes?.["claude-fable-5"]).toEqual(["1m", "200k"]);
     expect(claudeCapabilities.fastModels).not.toContain("claude-fable-5");
   });
 

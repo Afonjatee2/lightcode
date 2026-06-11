@@ -46,11 +46,12 @@ export const claudeCapabilities: AgentCapability = {
     { id: "200k", label: "200k" },
     { id: "1m", label: "1M" },
   ],
-  // Order matters: the first entry is the per-model default. Opus tiers default
-  // to 1M (the long-context build users select these for); Sonnet defaults to
-  // 200k because the 1M tier is billed per-token at premium rates.
+  // Order matters: the first entry is the per-model default. Fable 5 and the
+  // Opus tiers default to 1M (the long-context build users select these for);
+  // Sonnet defaults to 200k because the 1M tier is billed per-token at premium
+  // rates.
   modelContextSizes: {
-    "claude-fable-5": ["1m"],
+    "claude-fable-5": ["1m", "200k"],
     "claude-opus-4-8": ["1m", "200k"],
     "claude-opus-4-7": ["1m", "200k"],
     "claude-opus-4-6": ["1m", "200k"],

@@ -56,7 +56,7 @@ const BUILTIN_MODEL_EFFORTS: AgentCapability["modelEfforts"] = {
 };
 
 const BUILTIN_MODEL_CONTEXT_SIZES: NonNullable<AgentCapability["modelContextSizes"]> = {
-  [FABLE_5_MODEL_ID]: ["1m"],
+  [FABLE_5_MODEL_ID]: ["1m", "200k"],
   [OPUS_48_MODEL_ID]: ["1m", "200k"],
   [OPUS_47_MODEL_ID]: ["1m", "200k"],
   "claude-opus-4-6": ["1m", "200k"],
