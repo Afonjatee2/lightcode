@@ -181,11 +181,8 @@ describe("createClaudeProfileAdapter", () => {
 
     expect(adapter.kind).toBe("claude:work");
     expect(adapter.label).toBe("Claude Work");
-    expect(adapter.capabilities.subProviders).toContainEqual({
-      id: "claude-profile",
-      label: "Work",
-    });
-    expect(adapter.capabilities.modelSubProvider?.sonnet).toBe("claude-profile");
+    expect(adapter.capabilities.subProviders).toBeUndefined();
+    expect(adapter.capabilities.modelSubProvider).toBeUndefined();
 
     const expectedConfigDir = path.join(homedir(), ".lightcode/claude-profiles/work");
     expect(

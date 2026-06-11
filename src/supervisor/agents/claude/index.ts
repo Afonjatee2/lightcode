@@ -2,12 +2,7 @@ import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import path, { posix as posixPath } from "node:path";
 
-import type {
-  AgentCapability,
-  AgentInstanceConfig,
-  ProjectLocation,
-  PromptSegment,
-} from "@/shared/contracts";
+import type { AgentInstanceConfig, ProjectLocation, PromptSegment } from "@/shared/contracts";
 import { claudeProfileKind, parseClaudeProfileInstanceConfig } from "@/shared/contracts";
 import {
   brailleSpinnerOscTitleHint,
@@ -45,7 +40,6 @@ warnIfPluginManifestMissing("claude", CLAUDE_PLUGIN_VERSION);
 interface ClaudeAdapterOptions {
   kind?: string;
   label?: string;
-  profileLabel?: string;
   configDir?: string;
 }
 
@@ -70,33 +64,12 @@ function profileEnvForLocation(
   return { CLAUDE_CONFIG_DIR: resolveTildePath(configDir, location) };
 }
 
-function capabilitiesWithProfile(
-  capabilities: AgentCapability,
-  profileLabel: string | undefined,
-): AgentCapability {
-  const label = profileLabel?.trim();
-  if (!label) return capabilities;
-  const subProviderId = "claude-profile";
-  return {
-    ...capabilities,
-    subProviders: [
-      ...(capabilities.subProviders?.filter((entry) => entry.id !== subProviderId) ?? []),
-      { id: subProviderId, label },
-    ],
-    modelSubProvider: {
-      ...(capabilities.modelSubProvider ?? {}),
-      ...Object.fromEntries(capabilities.models.map((model) => [model.id, subProviderId])),
-    },
-  };
-}
-
 export function createClaudeProfileAdapter(instance: AgentInstanceConfig): AgentAdapter {
   const cfg = parseClaudeProfileInstanceConfig(instance.config);
   const profileLabel = instance.displayName ?? instance.id;
   return createClaudeAdapter({
     kind: claudeProfileKind(instance.id),
     label: `Claude ${profileLabel}`,
-    profileLabel,
     configDir: cfg.configDir,
   });
 }
@@ -104,7 +77,6 @@ export function createClaudeProfileAdapter(instance: AgentInstanceConfig): Agent
 export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAdapter {
   const kind = options.kind ?? "claude";
   const label = options.label ?? "Claude Code";
-  const baseCapabilities = capabilitiesWithProfile(claudeCapabilities, options.profileLabel);
   const profileEnv = (location: ProjectLocation) =>
     profileEnvForLocation(options.configDir, location);
 
@@ -112,7 +84,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
     kind,
     label,
     binary: "claude",
-    capabilities: baseCapabilities,
+    capabilities: claudeCapabilities,
     ...(claudeDetectionSpec.update ? { update: claudeDetectionSpec.update } : {}),
     // WSL OAuth flows try to open a browser; no-op it so the PTY doesn't hang.
     spawnEnv: { wsl: { BROWSER: "/bin/true" } },
@@ -154,7 +126,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
               ...claudeDetectionSpec,
               kind,
               label,
-              capabilities: baseCapabilities,
+              capabilities: claudeCapabilities,
               statusProbe: (probeCtx: DetectProbeCtx) => {
                 const env = profileEnv(probeCtx.location);
                 return probeClaudeStatus(probeCtx, env ? { env } : undefined);
@@ -169,7 +141,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
         ...status,
         kind,
         label,
-        capabilities: capabilitiesWithProfile(status.capabilities, options.profileLabel),
+        capabilities: status.capabilities,
       };
     },
     buildLaunchArgv(location, config, prompt, _sessionRef, _launchOptions) {
