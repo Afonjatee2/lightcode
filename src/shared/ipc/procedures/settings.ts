@@ -3,7 +3,11 @@ import type { AgentInstanceConfig, SetClaudeProfileEnvironmentPayload } from "..
 import { setClaudeProfileEnvironmentPayloadSchema } from "../../contracts";
 import type { SharedSettings, SharedSettingsInput } from "../../settings";
 import { defineNoArgProcedure, definePayloadProcedure } from "../core";
-import { windowChromePayloadSchema, type WindowChromePayload } from "../schemas";
+import {
+  windowChromePayloadSchema,
+  type WindowChromePayload,
+  type WindowChromeResult,
+} from "../schemas";
 
 export const settingsProcedures = {
   getSharedSettings: defineNoArgProcedure<SharedSettings, "main-local">(
@@ -23,9 +27,9 @@ export const settingsProcedures = {
     AgentInstanceConfig,
     "main-local"
   >("setClaudeProfileEnvironment", "main-local", setClaudeProfileEnvironmentPayloadSchema),
-  setWindowChrome: definePayloadProcedure<WindowChromePayload, void, "main-local">(
-    "setWindowChrome",
-    "main-local",
-    windowChromePayloadSchema,
-  ),
+  setWindowChrome: definePayloadProcedure<
+    WindowChromePayload,
+    WindowChromeResult | void,
+    "main-local"
+  >("setWindowChrome", "main-local", windowChromePayloadSchema),
 } as const;

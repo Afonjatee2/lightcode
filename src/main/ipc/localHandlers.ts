@@ -40,7 +40,9 @@ import {
   defineMainLocalIpcHandlers,
   type MainLocalIpcHandlerMap,
   type WindowChromePayload,
+  type WindowChromeResult,
 } from "@/shared/ipc";
+import { supportsNativeWindowMaterial, syncNativeThemeForMaterial } from "../window/windowMaterial";
 import type { AgentInstanceConfig } from "@/shared/contracts";
 import type { LightcodePaths } from "@/shared/lightcodePaths";
 import { UsageLoginManager } from "../usageLogin/UsageLoginManager";
@@ -52,6 +54,8 @@ interface CreateLocalIpcHandlersOptions {
   updatePowerSaveBlocker(): void;
   autoUpdater: AutoUpdaterController;
   onSharedSettingsChanged?(): void;
+  /** Relaunch the app (exposed via the relaunchApp IPC). */
+  requestRelaunch(): void;
 }
 
 function requireBrowserPanel(getter: () => BrowserPanelManager | null): BrowserPanelManager {
@@ -132,6 +136,9 @@ export function createLocalIpcHandlers(
       }
       win.focus();
     },
+    relaunchApp: () => {
+      options.requestRelaunch();
+    },
     getHomeScopeLocation: () =>
       process.platform === "win32"
         ? { kind: "windows", path: homedir() }
@@ -191,10 +198,11 @@ export function createLocalIpcHandlers(
       options.onSharedSettingsChanged?.();
       return instance;
     },
-    setWindowChrome: async (payload: WindowChromePayload) => {
+    setWindowChrome: async (payload: WindowChromePayload): Promise<WindowChromeResult> => {
+      const nativeCapable = supportsNativeWindowMaterial();
       const mainWindow = options.getMainWindow();
       if (!mainWindow) {
-        return;
+        return { nativeCapable };
       }
       if (process.platform === "win32" || process.platform === "linux") {
         mainWindow.setTitleBarOverlay({
@@ -203,6 +211,20 @@ export function createLocalIpcHandlers(
           height: 32,
         });
       }
+      // Toggle the native translucency material live. macOS vibrancy is created
+      // with the window and revealed/hidden purely via CSS, so there is nothing
+      // to switch here. Windows acrylic is toggled at runtime (no relaunch).
+      const wantsMaterial = payload.materialEnabled === true && nativeCapable;
+      if (process.platform === "win32") {
+        mainWindow.setBackgroundMaterial(wantsMaterial ? "acrylic" : "none");
+        mainWindow.setBackgroundColor(
+          wantsMaterial ? "#00000000" : payload.appearance === "dark" ? "#141416" : "#f1f1f4",
+        );
+      }
+      if (wantsMaterial && payload.appearance) {
+        syncNativeThemeForMaterial(payload.appearance);
+      }
+      return { nativeCapable };
     },
     dbGetProjects: () => dbGetProjects(),
     dbGetThreads: () => dbGetThreads(),
