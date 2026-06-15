@@ -94,6 +94,12 @@ minimumReleaseAgeExclude:
   - "@esbuild/win32-arm64@0.28.1"
   - "@esbuild/win32-ia32@0.28.1"
   - "@esbuild/win32-x64@0.28.1"
+  # 2026-06-15 Dependabot advisory batch: security patches published within the
+  # 7-day guard window, adopted immediately (alerts #88-#102).
+  - "@opentelemetry/core@2.8.0"
+  - "dompurify@3.4.10"
+  - "protobufjs@7.6.4"
+  - "form-data@4.0.6"
 
 # Supply-chain guard: refuse to install any package version published less
 # than this many minutes ago. 7 days catches the typical window in which
@@ -103,12 +109,20 @@ minimumReleaseAgeExclude:
 minimumReleaseAge: 10080
 
 # Force-bump vulnerable transitive dependencies flagged by GitHub Dependabot.
-# These selectors only rewrite versions that fall inside the advisory range,
-# leaving already-patched copies (e.g. dompurify 3.4.5) untouched.
+# Each selector is scoped to the affected major so it only rewrites versions
+# inside the advisory range and never force-upgrades a different major line.
 overrides:
   "axios@<1.16.0": "^1.16.0"
   "tmp@<0.2.6": "^0.2.6"
   "brace-expansion@>=5.0.0 <5.0.6": "^5.0.6"
-  "dompurify@<3.3.2": "^3.3.2"
   "esbuild@<0.28.1": "0.28.1"
   "shell-quote@<1.8.4": "^1.8.4"
+  # 2026-06-15 advisory batch (alerts #88-#102).
+  "dompurify@>=3.0.0 <3.4.10": "3.4.10"
+  "@opentelemetry/core@>=2.0.0 <2.8.0": "2.8.0"
+  "protobufjs@>=7.0.0 <7.6.4": "7.6.4"
+  "form-data@>=4.0.0 <4.0.6": "4.0.6"
+  "tar@>=7.0.0 <7.5.16": "^7.5.16"
+  "vite@>=8.0.0 <8.0.16": "^8.0.16"
+  "js-yaml@>=4.0.0 <4.2.0": "^4.2.0"
+  "@babel/core@>=7.0.0 <7.29.6": "^7.29.6"
