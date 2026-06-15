@@ -64,6 +64,36 @@ minimumReleaseAgeExclude:
   - "react-dom@19.2.7"
   - "@types/react@19.2.16"
   - "lucide-react@1.17.0"
+  # esbuild 0.28.1 is the security patch for GHSA-gv7w-rqvm-qjhr (RCE via
+  # NPM_CONFIG_REGISTRY). Adopted immediately via the override below; it and its
+  # platform binaries were published too recently to clear the 7-day guard.
+  - "esbuild@0.28.1"
+  - "@esbuild/aix-ppc64@0.28.1"
+  - "@esbuild/android-arm@0.28.1"
+  - "@esbuild/android-arm64@0.28.1"
+  - "@esbuild/android-x64@0.28.1"
+  - "@esbuild/darwin-arm64@0.28.1"
+  - "@esbuild/darwin-x64@0.28.1"
+  - "@esbuild/freebsd-arm64@0.28.1"
+  - "@esbuild/freebsd-x64@0.28.1"
+  - "@esbuild/linux-arm@0.28.1"
+  - "@esbuild/linux-arm64@0.28.1"
+  - "@esbuild/linux-ia32@0.28.1"
+  - "@esbuild/linux-loong64@0.28.1"
+  - "@esbuild/linux-mips64el@0.28.1"
+  - "@esbuild/linux-ppc64@0.28.1"
+  - "@esbuild/linux-riscv64@0.28.1"
+  - "@esbuild/linux-s390x@0.28.1"
+  - "@esbuild/linux-x64@0.28.1"
+  - "@esbuild/netbsd-arm64@0.28.1"
+  - "@esbuild/netbsd-x64@0.28.1"
+  - "@esbuild/openbsd-arm64@0.28.1"
+  - "@esbuild/openbsd-x64@0.28.1"
+  - "@esbuild/openharmony-arm64@0.28.1"
+  - "@esbuild/sunos-x64@0.28.1"
+  - "@esbuild/win32-arm64@0.28.1"
+  - "@esbuild/win32-ia32@0.28.1"
+  - "@esbuild/win32-x64@0.28.1"
 
 # Supply-chain guard: refuse to install any package version published less
 # than this many minutes ago. 7 days catches the typical window in which
@@ -80,3 +110,5 @@ overrides:
   "tmp@<0.2.6": "^0.2.6"
   "brace-expansion@>=5.0.0 <5.0.6": "^5.0.6"
   "dompurify@<3.3.2": "^3.3.2"
+  "esbuild@<0.28.1": "0.28.1"
+  "shell-quote@<1.8.4": "^1.8.4"
