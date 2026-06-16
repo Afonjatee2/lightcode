@@ -171,8 +171,9 @@ export function AppProvider(props: { children: ReactNode; contentReady?: boolean
   }, [appearance, glassEnabled, contentReady]);
 
   // User-tuned sidebar frosting (Appearance slider): override the glass tint
-  // alpha for the active appearance. No-op off Windows / when an appearance has
-  // no override, leaving the styles.css per-platform default authoritative.
+  // alpha for the active appearance. No-op on platforms without a native blur
+  // material / when an appearance has no override, leaving the styles.css
+  // per-platform default authoritative.
   useEffect(() => {
     applySidebarGlassTint(
       document.documentElement,

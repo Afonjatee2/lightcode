@@ -2,11 +2,11 @@ import { startTransition, useEffect, useState, type CSSProperties } from "react"
 import { ChevronDown, RotateCcw } from "lucide-react";
 import { Slider, SliderFill, SliderOutput, SliderThumb, SliderTrack, Switch } from "@heroui/react";
 import type { ThemeMode } from "@/shared/contracts";
-import { isMac, isWindows } from "@/renderer/bridge";
+import { isMac } from "@/renderer/bridge";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useResolvedAppearance } from "@/renderer/components/ui/provider";
 import { getThemePreset } from "@/renderer/theme/themePresets";
-import { WINDOWS_GLASS_TINT_DEFAULT, applySidebarGlassTint } from "@/renderer/theme/sidebarGlass";
+import { applySidebarGlassTint, sidebarGlassTintDefault } from "@/renderer/theme/sidebarGlass";
 import { useNativeMaterialActive } from "@/renderer/hooks/useGlassState";
 import { Select } from "@/renderer/components/common";
 import { SettingRow, SettingsPage } from "./SettingsForm";
@@ -30,15 +30,17 @@ export function AppearanceSettings() {
   const sidebarGlassTint = useSharedSettings((state) => state.sidebarGlassTint);
   const setSidebarGlassTint = useSharedSettings((state) => state.setSidebarGlassTint);
 
-  // Frosting slider: tunes the active appearance's glass tint. Windows-only (the
-  // override only applies there); local state drives a live preview during drag
-  // and the store persists on release. Seeds from the override, else the default.
-  // Gated on the live acrylic material so it never shows as a no-op where the
-  // token isn't consumed (Windows 10 / older builds use the fallback gradient).
+  // Frosting slider: tunes the active appearance's glass tint. Applies on the
+  // native-material platforms (Windows 11 acrylic, macOS vibrancy), which both
+  // consume the tint var; local state drives a live preview during drag and the
+  // store persists on release. Seeds from the override, else the platform
+  // default. Gated on the live native material so it never shows as a no-op
+  // where the token isn't consumed (Windows 10 / Linux use the fallback
+  // gradient and report no native material).
   const nativeMaterialActive = useNativeMaterialActive();
-  const showGlassTintSlider = isWindows() && nativeMaterialActive;
+  const showGlassTintSlider = nativeMaterialActive;
   const glassTintOverride = sidebarGlassTint[appearance];
-  const glassTintDefault = WINDOWS_GLASS_TINT_DEFAULT[appearance];
+  const glassTintDefault = sidebarGlassTintDefault(appearance);
   const [glassTint, setGlassTint] = useState(glassTintOverride ?? glassTintDefault);
   useEffect(() => {
     setGlassTint(glassTintOverride ?? glassTintDefault);
