@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import { Surface } from "@heroui/react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Brain, ChevronDown } from "lucide-react";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
@@ -21,6 +22,7 @@ interface ReasoningProps {
 }
 
 export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
+  const { t } = useLingui();
   const rawText = item.streams.reasoning_text ?? "";
   const deferredText = useDeferredValue(rawText);
   const text = deferredText;
@@ -106,7 +108,9 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
           className="inline-flex min-w-0 items-center gap-1.5 self-start leading-none italic opacity-80 hover:text-foreground hover:opacity-100"
         >
           <Brain className="size-3 shrink-0" />
-          <span>Thought</span>
+          <span>
+            <Trans>Thought</Trans>
+          </span>
           <ChevronDown
             className={`size-3 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
           />
@@ -127,14 +131,14 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
           <Brain
             ref={brainRef}
             className="lightcode-brain-thinking size-3 shrink-0"
-            aria-label="Thinking"
+            aria-label={t`Thinking`}
           />
           <span
             ref={thinkingTextRef}
             className="lightcode-thinking-text"
-            data-lightcode-shimmer-text="Thinking"
+            data-lightcode-shimmer-text={t`Thinking`}
           >
-            Thinking
+            <Trans>Thinking</Trans>
           </span>
         </div>
         {hasText ? (

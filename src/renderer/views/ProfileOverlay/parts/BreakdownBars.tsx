@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { useLingui } from "@lingui/react/macro";
 import type { ProfileBreakdownEntry } from "@/shared/contracts";
 
 function SkeletonRow() {
@@ -26,6 +27,7 @@ export function BreakdownBars(props: {
   /** Formats the raw count shown next to the percent (default `toLocaleString`). */
   formatValue?: (count: number) => string;
 }) {
+  const { t } = useLingui();
   const {
     title,
     caption,
@@ -52,7 +54,7 @@ export function BreakdownBars(props: {
           ))}
         </div>
       ) : rows.length === 0 ? (
-        <p className="py-1 text-sm text-muted">{emptyText ?? "No data yet."}</p>
+        <p className="py-1 text-sm text-muted">{emptyText ?? t`No data yet.`}</p>
       ) : (
         <div className="flex flex-col gap-3">
           {rows.map((entry) => (

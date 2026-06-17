@@ -1,4 +1,5 @@
 import { ListFilter } from "lucide-react";
+import { useLingui } from "@lingui/react/macro";
 import type { ProfileAccountRef } from "@/shared/contracts";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
 import { DevicePicker, type DeviceOption } from "./DevicePicker";
@@ -15,9 +16,14 @@ export function AccountFilter(props: {
   options: ProfileAccountRef[];
   onChange: (account: string | undefined) => void;
 }) {
+  const { t } = useLingui();
   const { value, options, onChange } = props;
   const pickerOptions: DeviceOption[] = [
-    { id: ALL_ACCOUNTS, label: "All accounts", icon: <ListFilter className="size-4 text-muted" /> },
+    {
+      id: ALL_ACCOUNTS,
+      label: t`All accounts`,
+      icon: <ListFilter className="size-4 text-muted" />,
+    },
     ...options.map((o) => ({
       id: o.key,
       label: o.label,

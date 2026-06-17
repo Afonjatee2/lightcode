@@ -1,6 +1,7 @@
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { Check, Copy, Download, Maximize2 } from "lucide-react";
 import { Tooltip } from "@heroui/react";
+import { useLingui } from "@lingui/react/macro";
 import type { ToolCallPayload } from "@/shared/contracts";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { readBridge } from "@/renderer/bridge";
@@ -40,19 +41,21 @@ export const ImageView = memo(function ImageView({ item }: ImageViewProps) {
  * image, and reveals on hover / keyboard focus to keep the picture uncluttered.
  */
 export function ImageCard({ source }: { source: ImageViewSource }) {
+  const { t } = useLingui();
   const [isLightboxOpen, setLightboxOpen] = useState(false);
+  const imageAlt = source.alt || t`Image`;
 
   return (
     <figure className="group relative m-0 inline-flex max-w-full overflow-hidden rounded-2xl border border-[color:var(--border)] bg-[var(--composer-surface)]">
       <button
         type="button"
         className="block cursor-zoom-in bg-black/20"
-        aria-label="Open image preview"
+        aria-label={t`Open image preview`}
         onClick={() => setLightboxOpen(true)}
       >
         <img
           src={source.src}
-          alt={source.alt}
+          alt={imageAlt}
           draggable={false}
           className="block max-h-[22rem] w-auto max-w-full object-contain"
         />
@@ -60,13 +63,13 @@ export function ImageCard({ source }: { source: ImageViewSource }) {
       <div className="pointer-events-none absolute right-1.5 top-1.5 flex items-center gap-0.5 rounded-lg bg-black/50 p-0.5 opacity-0 backdrop-blur-sm transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100 focus-within:pointer-events-auto focus-within:opacity-100">
         <CopyImageButton source={source} />
         <DownloadImageButton src={source.src} fileName={source.fileName} />
-        <IconButton label="Open preview" onClick={() => setLightboxOpen(true)}>
+        <IconButton label={t`Open preview`} onClick={() => setLightboxOpen(true)}>
           <Maximize2 className="size-3.5" />
         </IconButton>
       </div>
       {isLightboxOpen ? (
         <ImageLightboxView
-          images={[{ src: source.src, alt: source.alt }]}
+          images={[{ src: source.src, alt: imageAlt }]}
           initialIndex={0}
           onClose={() => setLightboxOpen(false)}
         />
@@ -76,6 +79,7 @@ export function ImageCard({ source }: { source: ImageViewSource }) {
 }
 
 function CopyImageButton({ source }: { source: ImageViewSource }) {
+  const { t } = useLingui();
   const [copied, setCopied] = useState(false);
 
   async function onCopy() {
@@ -94,13 +98,14 @@ function CopyImageButton({ source }: { source: ImageViewSource }) {
   }
 
   return (
-    <IconButton label={copied ? "Copied" : "Copy image"} onClick={onCopy}>
+    <IconButton label={copied ? t`Copied` : t`Copy image`} onClick={onCopy}>
       {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
     </IconButton>
   );
 }
 
 function DownloadImageButton({ src, fileName }: { src: string; fileName: string }) {
+  const { t } = useLingui();
   async function onDownload() {
     try {
       const data = await fetchImageBytes(src);
@@ -111,7 +116,7 @@ function DownloadImageButton({ src, fileName }: { src: string; fileName: string 
   }
 
   return (
-    <IconButton label="Download image" onClick={onDownload}>
+    <IconButton label={t`Download image`} onClick={onDownload}>
       <Download className="size-3.5" />
     </IconButton>
   );

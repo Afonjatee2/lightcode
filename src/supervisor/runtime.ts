@@ -963,6 +963,7 @@ export class SupervisorRuntime {
         adapter,
         payload.model,
         payload.effort,
+        payload.language,
       ),
     };
   }
@@ -976,6 +977,7 @@ export class SupervisorRuntime {
         payload.prompt,
         payload.model,
         payload.effort,
+        payload.language,
       ),
     };
   }
@@ -989,6 +991,7 @@ export class SupervisorRuntime {
       payload.baseBranch,
       payload.model,
       payload.effort,
+      payload.language,
     );
   }
 

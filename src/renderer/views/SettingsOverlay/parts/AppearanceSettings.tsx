@@ -1,5 +1,6 @@
 import { startTransition, useEffect, useState, type CSSProperties } from "react";
 import { ChevronDown, RotateCcw } from "lucide-react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { Slider, SliderFill, SliderOutput, SliderThumb, SliderTrack, Switch } from "@heroui/react";
 import type { ThemeMode } from "@/shared/contracts";
 import { isMac } from "@/renderer/bridge";
@@ -11,9 +12,10 @@ import { useNativeMaterialActive } from "@/renderer/hooks/useGlassState";
 import { Select } from "@/renderer/components/common";
 import { SettingRow, SettingsPage } from "./SettingsForm";
 import { ThemeGallery, ThemeSwatch } from "./ThemeGallery";
-import { fontSizeOptions, themeOptions } from "./settingsOptions";
+import { fontSizeOptions, themeOptions, useLocalizedOptions } from "./settingsOptions";
 
 export function AppearanceSettings() {
+  const { t } = useLingui();
   const themeMode = useSharedSettings((state) => state.themeMode);
   const setThemeMode = useSharedSettings((state) => state.setThemeMode);
   const themePreset = useSharedSettings((state) => state.themePreset);
@@ -64,13 +66,18 @@ export function AppearanceSettings() {
     });
   };
 
+  const themeOpts = useLocalizedOptions(themeOptions);
+
   return (
-    <SettingsPage title="Appearance">
-      <SettingRow title="Mode" description="Match your system, or force light or dark.">
+    <SettingsPage title={t`Appearance`}>
+      <SettingRow
+        title={t`Mode`}
+        description={<Trans>Match your system, or force light or dark.</Trans>}
+      >
         <Select
-          aria-label="Appearance mode"
+          aria-label={t`Appearance mode`}
           className="w-[160px] shrink-0"
-          options={themeOptions}
+          options={themeOpts}
           value={themeMode}
           onChange={(value) => {
             startTransition(() => {
@@ -88,9 +95,14 @@ export function AppearanceSettings() {
           className="-mx-2 flex w-[calc(100%+1rem)] items-center justify-between gap-4 rounded-lg px-2 py-1 text-left transition-colors hover:bg-[var(--row-hover)]"
         >
           <div className="min-w-0">
-            <p className="text-sm font-medium text-foreground">Theme</p>
+            <p className="text-sm font-medium text-foreground">
+              <Trans>Theme</Trans>
+            </p>
             <p className="text-xs text-muted">
-              Popular editor themes adapted to Lightcode. Each follows the light or dark mode above.
+              <Trans>
+                Popular editor themes adapted to Lightcode. Each follows the light or dark mode
+                above.
+              </Trans>
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2.5">
@@ -105,16 +117,16 @@ export function AppearanceSettings() {
       </div>
 
       <SettingRow
-        title="GUI chat font size"
+        title={t`GUI chat font size`}
         description={
-          <>
+          <Trans>
             Agent chat (ACP / markdown). Command rows use this size minus 1&nbsp;px; tool and plan
             lines minus 2&nbsp;px.
-          </>
+          </Trans>
         }
       >
         <Select
-          aria-label="GUI chat font size"
+          aria-label={t`GUI chat font size`}
           className="w-[160px] shrink-0"
           options={fontSizeOptions}
           value={String(guiChatFontSize)}
@@ -127,11 +139,11 @@ export function AppearanceSettings() {
       </SettingRow>
 
       <SettingRow
-        title="Translucent sidebar"
+        title={t`Translucent sidebar`}
         description={
           isMac()
-            ? "Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported."
-            : "Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere."
+            ? t`Frost the sidebar with the system blur material (vibrancy), echoing recent macOS. Falls back to a translucent tint where unsupported.`
+            : t`Make the sidebar translucent — the system blur material on Windows 11, a translucent tint elsewhere.`
         }
       >
         <Switch
@@ -150,11 +162,11 @@ export function AppearanceSettings() {
 
       {showGlassTintSlider ? (
         <SettingRow
-          title="Sidebar frosting"
-          description={`Frosting of the ${appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind.`}
+          title={t`Sidebar frosting`}
+          description={t`Frosting of the ${appearance}-mode sidebar over the system blur. Higher holds the theme color; lower shows more of what's behind.`}
         >
           <Slider
-            aria-label="Sidebar frosting"
+            aria-label={t`Sidebar frosting`}
             className="w-[220px] shrink-0"
             minValue={0}
             maxValue={100}
@@ -175,8 +187,8 @@ export function AppearanceSettings() {
                   until there's an override to clear. */}
               <button
                 type="button"
-                aria-label="Reset sidebar frosting to default"
-                title="Reset to default"
+                aria-label={t`Reset sidebar frosting to default`}
+                title={t`Reset to default`}
                 onClick={resetGlassTint}
                 className={`inline-flex items-center justify-center rounded p-0.5 text-muted transition-colors hover:text-foreground ${
                   glassTintOverride == null ? "invisible" : ""

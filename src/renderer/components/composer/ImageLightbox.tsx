@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useLingui } from "@lingui/react/macro";
 import { toLocalFileUrl } from "@/shared/promptContent";
 import type { Attachment } from "./useAttachments";
 
@@ -22,10 +23,10 @@ export function ImageLightbox(props: {
   initialIndex: number;
   onClose: () => void;
 }) {
-  const images = useMemo<LightboxImage[]>(
-    () => props.images.map((img) => ({ src: toLocalFileUrl(img.path), alt: img.name })),
-    [props.images],
-  );
+  const images: LightboxImage[] = props.images.map((img) => ({
+    src: toLocalFileUrl(img.path),
+    alt: img.name,
+  }));
   return (
     <ImageLightboxView images={images} initialIndex={props.initialIndex} onClose={props.onClose} />
   );
@@ -42,6 +43,7 @@ export function ImageLightboxView(props: {
   initialIndex: number;
   onClose: () => void;
 }) {
+  const { t } = useLingui();
   const { images, initialIndex, onClose } = props;
   const [index, setIndex] = useState(initialIndex);
   const current = images[index];
@@ -73,12 +75,12 @@ export function ImageLightboxView(props: {
       onClick={onClose}
       role="dialog"
       aria-modal="true"
-      aria-label={current.alt ?? "Image preview"}
+      aria-label={current.alt ?? t`Image preview`}
     >
       <button
         type="button"
         className="lightcode-image-lightbox__close"
-        aria-label="Close preview"
+        aria-label={t`Close preview`}
         onClick={onClose}
       >
         <X className="size-5" />
@@ -88,7 +90,7 @@ export function ImageLightboxView(props: {
         <button
           type="button"
           className="lightcode-image-lightbox__nav lightcode-image-lightbox__nav--prev"
-          aria-label="Previous image"
+          aria-label={t`Previous image`}
           onClick={(e) => {
             e.stopPropagation();
             setIndex((prev) => (prev > 0 ? prev - 1 : images.length - 1));
@@ -111,7 +113,7 @@ export function ImageLightboxView(props: {
         <button
           type="button"
           className="lightcode-image-lightbox__nav lightcode-image-lightbox__nav--next"
-          aria-label="Next image"
+          aria-label={t`Next image`}
           onClick={(e) => {
             e.stopPropagation();
             setIndex((prev) => (prev < images.length - 1 ? prev + 1 : 0));

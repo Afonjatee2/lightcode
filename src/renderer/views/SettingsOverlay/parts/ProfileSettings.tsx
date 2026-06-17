@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Pencil, Share2 } from "lucide-react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { ProfileBreakdownEntry, ProfileTokenProvider } from "@/shared/contracts";
 import { Button, PixelLoader } from "@/renderer/components/common";
 import { useProfileData } from "@/renderer/views/ProfileOverlay/useProfileData";
@@ -29,6 +30,7 @@ function toEntry(p: ProfileTokenProvider): ProfileBreakdownEntry {
 
 /** Profile + usage statistics, rendered as a Settings section. */
 export function ProfileSettings() {
+  const { t } = useLingui();
   const data = useProfileData();
   const [editOpen, setEditOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -56,7 +58,7 @@ export function ProfileSettings() {
   if (!core) {
     return (
       <div className="flex h-64 items-center justify-center px-6 text-center text-sm text-muted">
-        {data.error ?? "Couldn't load your profile stats."}
+        {data.error ?? t`Couldn't load your profile stats.`}
       </div>
     );
   }
@@ -98,11 +100,11 @@ export function ProfileSettings() {
     <>
       <Button size="sm" variant="ghost" onPress={() => setShareOpen(true)} className="gap-1.5">
         <Share2 className="size-4" />
-        Share
+        <Trans>Share</Trans>
       </Button>
       <Button size="sm" variant="ghost" onPress={() => setEditOpen(true)} className="gap-1.5">
         <Pencil className="size-4" />
-        Edit
+        <Trans>Edit</Trans>
       </Button>
     </>
   );
@@ -129,24 +131,28 @@ export function ProfileSettings() {
         />
         <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
           <ActivityInsights core={core} />
-          <PluginUsage items={core.skills} title="Skills" emptyText="No skills used yet." />
+          <PluginUsage items={core.skills} title={t`Skills`} emptyText={t`No skills used yet.`} />
         </div>
         <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
           <PluginUsage
             items={core.subagents}
-            title="Subagents"
-            emptyText="No subagents used yet."
+            title={t`Subagents`}
+            emptyText={t`No subagents used yet.`}
           />
-          <PluginUsage items={core.mcps} title="MCP servers" emptyText="No MCP tools used yet." />
+          <PluginUsage
+            items={core.mcps}
+            title={t`MCP servers`}
+            emptyText={t`No MCP tools used yet.`}
+          />
         </div>
         <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
           <BreakdownBars
-            title="Providers"
-            caption={providersByTokens ? "by tokens" : "by prompts"}
+            title={t`Providers`}
+            caption={providersByTokens ? t`by tokens` : t`by prompts`}
             entries={providerEntries}
             loading={tokensLoading && !tokens}
             loadingRows={Math.min(4, Math.max(1, core.providers.length || 4))}
-            emptyText="No activity yet."
+            emptyText={t`No activity yet.`}
             {...(providersByTokens ? tokenFormat : {})}
           />
           <ModelUsage
@@ -158,15 +164,15 @@ export function ProfileSettings() {
         </div>
         {hasMultipleAccounts ? (
           <BreakdownBars
-            title="Accounts"
-            caption={accountsByTokens ? "by tokens" : "by prompts"}
+            title={t`Accounts`}
+            caption={accountsByTokens ? t`by tokens` : t`by prompts`}
             entries={accountEntries}
             limit={12}
             {...(accountsByTokens ? tokenFormat : {})}
           />
         ) : null}
         <div className="grid grid-cols-1 gap-x-10 gap-y-8 sm:grid-cols-2">
-          <BreakdownBars title="Modes" entries={core.modes} emptyText="No threads yet." />
+          <BreakdownBars title={t`Modes`} entries={core.modes} emptyText={t`No threads yet.`} />
           <AiActions actions={core.aiActions} />
         </div>
       </div>

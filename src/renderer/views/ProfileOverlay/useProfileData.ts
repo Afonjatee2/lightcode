@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLingui } from "@lingui/react/macro";
 import type {
   ProfileCoreStats,
   ProfileDevice,
@@ -37,6 +38,7 @@ export interface ProfileData {
  * Cloud will populate the rest.
  */
 export function useProfileData(): ProfileData {
+  const { t } = useLingui();
   const [devices, setDevices] = useState<ProfileDevice[]>([]);
   const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
   const [selection, setSelection] = useState<ProfileSelection>({ scope: "device" });
@@ -90,7 +92,7 @@ export function useProfileData(): ProfileData {
         if (active) setCore(result);
       })
       .catch((err: unknown) => {
-        if (active) setError(err instanceof Error ? err.message : "Failed to load profile stats.");
+        if (active) setError(err instanceof Error ? err.message : t`Failed to load profile stats.`);
       })
       .finally(() => {
         if (active) setCoreLoading(false);
@@ -112,7 +114,7 @@ export function useProfileData(): ProfileData {
     return () => {
       active = false;
     };
-  }, [scope, deviceId, provider]);
+  }, [scope, deviceId, provider, t]);
 
   async function saveIdentity(identity: ProfileIdentity): Promise<void> {
     const response = await readBridge().setProfileIdentity(identity);

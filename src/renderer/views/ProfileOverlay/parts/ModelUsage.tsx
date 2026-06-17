@@ -1,3 +1,5 @@
+import { msg } from "@lingui/core/macro";
+import { useLingui } from "@lingui/react/macro";
 import type { ProfileBreakdownEntry, ProfileTokenStats } from "@/shared/contracts";
 import { formatCompact } from "../format";
 import type { ActivityMetric } from "./ActivitySection";
@@ -9,6 +11,7 @@ export function ModelUsage(props: {
   tokensLoading: boolean;
   metric: ActivityMetric;
 }) {
+  const { t } = useLingui();
   const { tokens, coreModels, tokensLoading, metric } = props;
 
   // Follow the Prompts/Tokens toggle: token-weighted when "tokens" is active and
@@ -25,14 +28,14 @@ export function ModelUsage(props: {
   const footer =
     byTokens && tokens!.providers.length > 0 ? (
       <p className="pt-1 text-[11px] text-muted/60">
-        Tokens from {tokens!.providers.map((p) => p.label).join(", ")}
+        {t(msg`Tokens from ${tokens!.providers.map((p) => p.label).join(", ")}`)}
       </p>
     ) : undefined;
 
   return (
     <BreakdownBars
-      title="Model usage"
-      caption={byTokens ? "by tokens" : "by prompts"}
+      title={t`Model usage`}
+      caption={byTokens ? t`by tokens` : t`by prompts`}
       entries={models}
       loading={pending}
       loadingRows={Math.min(4, Math.max(1, coreModels.length || 4))}
