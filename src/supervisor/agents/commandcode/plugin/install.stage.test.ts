@@ -20,7 +20,8 @@ describe("installCommandCodePlugin (native staging)", () => {
   beforeEach(() => {
     baseDir = mkdtempSync(join(tmpdir(), "cc-lc-base-"));
     ccDir = mkdtempSync(join(tmpdir(), "cc-global-"));
-    ctx = { envKind: "posix", baseDir } as AgentEnvContext;
+    const envKind = process.platform === "win32" ? "windows" : "posix";
+    ctx = { envKind, baseDir } as AgentEnvContext;
   });
   afterEach(() => {
     rmSync(baseDir, { recursive: true, force: true });
