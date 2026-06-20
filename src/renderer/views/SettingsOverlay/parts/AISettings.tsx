@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ToggleButton, ToggleButtonGroup, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Monitor } from "lucide-react";
@@ -57,6 +57,13 @@ function GenConfigSection(props: {
   extraControls?: ReactNode;
   /** When set, model lists mirror the selected thread presentation surface (CLI vs Chat/ACP). */
   presentationMode?: ThreadPresentationMode;
+  /**
+   * Restrict the provider list to agents that support one-shot generation. Set
+   * for the one-shot sections (Title / Commit Message); left off for the
+   * conflict resolver, which launches a full interactive session instead and so
+   * works with every provider.
+   */
+  requireOneShot?: boolean;
 }) {
   const { t } = useLingui();
   const {
@@ -74,9 +81,30 @@ function GenConfigSection(props: {
   } = props;
 
   const installedAgents = agentStatuses.filter((a) => a.installed);
+  // One-shot sections (title / commit) only offer providers that can run a
+  // one-shot generation; the conflict resolver leaves this off (full session),
+  // so providers like Factory Droid stay available there.
+  const eligibleAgents = props.requireOneShot
+    ? installedAgents.filter((a) => a.capabilities.supportsOneShot === true)
+    : installedAgents;
   const mode = deriveMode(provider);
   const customAgent =
-    mode === "custom" ? installedAgents.find((a) => a.kind === provider) : undefined;
+    mode === "custom" ? eligibleAgents.find((a) => a.kind === provider) : undefined;
+
+  // Self-heal a stale saved selection. A one-shot section can still point at a
+  // provider that was selectable before one-shot filtering existed but can't run
+  // a one-shot (e.g. Grok / Factory Droid). That provider is gone from the
+  // picker, so the toolbar disappears with no way to re-pick — reset to Auto.
+  // Guarded on the provider being *installed but ineligible* so it never fires
+  // mid-detection (when the provider is merely absent from the list yet).
+  const savedProviderIneligible =
+    props.requireOneShot === true &&
+    mode === "custom" &&
+    customAgent === undefined &&
+    installedAgents.some((a) => a.kind === provider && a.capabilities.supportsOneShot !== true);
+  useEffect(() => {
+    if (savedProviderIneligible) onConfigChange("auto", "", "", false);
+  }, [savedProviderIneligible, onConfigChange]);
   // In Auto mode, ask the section's candidate helper so the toolbar mirrors the
   // runtime fallback chain — including the "skip provider without preferred model"
   // rule that's evaluated independently per section.
@@ -98,7 +126,7 @@ function GenConfigSection(props: {
       )
     : undefined;
 
-  const providers = buildProviderModelMenuProviders(installedAgents, {
+  const providers = buildProviderModelMenuProviders(eligibleAgents, {
     ...(presentationMode ? { presentationMode } : {}),
   });
 
@@ -112,7 +140,7 @@ function GenConfigSection(props: {
       onConfigChange("disabled", "", "", false);
       return;
     }
-    const first = sortByAutoPreference(installedAgents)[0];
+    const first = sortByAutoPreference(eligibleAgents)[0];
     if (!first) return;
     const r = resolve(agentForPresentation(first), "", "");
     onConfigChange(first.kind, r.model, r.effort, false);
@@ -194,7 +222,7 @@ function GenConfigSection(props: {
             <ToggleButton id="auto">
               <Trans>Auto</Trans>
             </ToggleButton>
-            <ToggleButton id="custom" isDisabled={installedAgents.length === 0}>
+            <ToggleButton id="custom" isDisabled={eligibleAgents.length === 0}>
               <Trans>Custom</Trans>
             </ToggleButton>
             {props.allowDisabled ? (
@@ -350,6 +378,7 @@ export function AISettings() {
       <GenConfigSection
         heading={t`Title Generation`}
         allowDisabled
+        requireOneShot
         description={t`Generates short titles for new threads.`}
         defaultsHint={getTitleGenDefaultsHint()}
         agentStatuses={activeStatuses}
@@ -364,6 +393,7 @@ export function AISettings() {
 
       <GenConfigSection
         heading={t`Commit Message Generation`}
+        requireOneShot
         description={t`Generates commit messages from staged changes.`}
         defaultsHint={getCommitGenDefaultsHint()}
         agentStatuses={activeStatuses}
