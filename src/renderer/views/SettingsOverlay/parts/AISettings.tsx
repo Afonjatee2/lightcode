@@ -64,6 +64,8 @@ function GenConfigSection(props: {
    * works with every provider.
    */
   requireOneShot?: boolean;
+  /** Search anchor for the section host — see ./settingsSearchIndex. */
+  anchorId?: string;
 }) {
   const { t } = useLingui();
   const {
@@ -198,7 +200,10 @@ function GenConfigSection(props: {
   );
 
   return (
-    <section className="space-y-3">
+    <section
+      {...(props.anchorId ? { id: props.anchorId, "data-settings-anchor": props.anchorId } : {})}
+      className={`space-y-3 ${props.anchorId ? "scroll-mt-4" : ""}`}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           {heading2}
@@ -376,6 +381,7 @@ export function AISettings() {
       }
     >
       <GenConfigSection
+        anchorId="ai.titleGeneration"
         heading={t`Title Generation`}
         allowDisabled
         requireOneShot
@@ -392,6 +398,7 @@ export function AISettings() {
       />
 
       <GenConfigSection
+        anchorId="ai.commitMessageGeneration"
         heading={t`Commit Message Generation`}
         requireOneShot
         description={t`Generates commit messages from staged changes.`}
@@ -407,6 +414,7 @@ export function AISettings() {
       />
 
       <GenConfigSection
+        anchorId="ai.conflictResolver"
         heading={t`Conflict Resolver`}
         description={t`Resolves merge conflicts during rebase or merge.`}
         defaultsHint={getConflictResolverDefaultsHint()}

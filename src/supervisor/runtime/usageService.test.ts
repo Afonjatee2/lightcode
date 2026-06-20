@@ -206,6 +206,72 @@ describe("UsageService", () => {
     expect(result.snapshots).toHaveLength(0);
   });
 
+  it("auto-refreshes each provider on its own per-provider cadence", async () => {
+    let now = NOW;
+    const settingsPath = tempCachePath();
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        usage: {
+          autoRefresh: true,
+          refreshIntervalMinutes: 10,
+          providerRefreshIntervals: { claude: 2 },
+        },
+      }),
+      "utf8",
+    );
+    const host: HostPort = {
+      now: () => now,
+      credentials: {
+        getOAuthToken: (id) =>
+          Promise.resolve(
+            id === "claude" || id === "codex" ? { accessToken: `${id}-tok` } : undefined,
+          ),
+        getSecret: () => Promise.resolve(undefined),
+      },
+      http: {
+        request: () => Promise.resolve({ status: 200, headers: {}, body: CLAUDE_BODY }),
+      },
+    };
+    const service = new UsageService({
+      emit: () => {},
+      cachePath: tempCachePath(),
+      settingsPath,
+      host,
+      providerIds: ["claude", "codex"],
+    });
+
+    // Seed both snapshots at NOW.
+    await service.refreshProviderUsage({});
+
+    // +2min: only Claude (2-min override) is due; Codex (10-min default) is not.
+    now = NOW + 2 * 60_000;
+    expect(await service.refreshDueProviders()).toEqual(["claude"]);
+
+    // +10min: both are due — Claude again on its faster clock, Codex for the first time.
+    now = NOW + 10 * 60_000;
+    expect((await service.refreshDueProviders()).sort()).toEqual(["claude", "codex"]);
+  });
+
+  it("auto-refresh respects the global off switch even with per-provider intervals", async () => {
+    const settingsPath = tempCachePath();
+    writeFileSync(
+      settingsPath,
+      JSON.stringify({
+        usage: { autoRefresh: false, providerRefreshIntervals: { claude: 2 } },
+      }),
+      "utf8",
+    );
+    const service = new UsageService({
+      emit: () => {},
+      cachePath: tempCachePath(),
+      settingsPath,
+      host: makeHost({ claude: { accessToken: "tok" } }),
+      providerIds: ["claude", "codex"],
+    });
+    expect(await service.refreshDueProviders()).toEqual([]);
+  });
+
   it("collects Claude profile usage from the profile config directory", async () => {
     const profileDir = join(tmpdir(), `lightcode-usage-claude-profile-${process.pid}`);
     cachePaths.push(profileDir);
