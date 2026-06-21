@@ -686,7 +686,10 @@ export class SupervisorRuntime {
       ...(native?.executablePath ? { executablePath: native.executablePath } : {}),
       wslDistros,
       allowSpawn: native?.authState === "authenticated",
-    }).catch(() => undefined);
+    }).catch((error) => {
+      console.warn("[supervisor] antigravity account probe failed:", error);
+      return undefined;
+    });
     if (account) this.antigravityAccountCache = { value: account, at: Date.now() };
     return account ? { account } : {};
   }
@@ -1087,13 +1090,23 @@ export class SupervisorRuntime {
           ? session.projectLocation.uncPath
           : session.projectLocation.path;
       if (sessionPath.replace(/\\/g, "/").toLowerCase() === normalizedTarget) {
-        await this.closeThread({ threadId }).catch(() => undefined);
+        await this.closeThread({ threadId }).catch((error) => {
+          console.warn(
+            `[supervisor] failed to close thread ${threadId} during worktree removal:`,
+            error,
+          );
+        });
       }
     }
 
     for (const [threadId, shell] of this.shellSessions) {
       if (shell.worktreePath?.replace(/\\/g, "/").toLowerCase() === normalizedTarget) {
-        await this.closeThread({ threadId }).catch(() => undefined);
+        await this.closeThread({ threadId }).catch((error) => {
+          console.warn(
+            `[supervisor] failed to close shell thread ${threadId} during worktree removal:`,
+            error,
+          );
+        });
       }
     }
 
@@ -1515,7 +1528,9 @@ export class SupervisorRuntime {
     await this._projectWatcher?.dispose();
     await this.threadSessionManager.dispose();
     this.sharedSettingsCache.dispose();
-    await this.cliHookPluginCoordinator.dispose().catch(() => undefined);
+    await this.cliHookPluginCoordinator.dispose().catch((error) => {
+      console.warn("[supervisor] CLI hook plugin coordinator dispose failed:", error);
+    });
     const { shutdownSpawnedOpenCodeServers } = await import("./agents/opencode/sdkClient");
     shutdownSpawnedOpenCodeServers();
   }
