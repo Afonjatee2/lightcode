@@ -4491,6 +4491,10 @@ msgid "Rate limited"
 msgstr "Hız sınırlı"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "Hız sınırlı · {retry} sonra tekrar deneyin"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "Hız sınırlı. Kısa süre sonra tekrar deneyin."
 

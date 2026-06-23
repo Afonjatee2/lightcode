@@ -4509,6 +4509,10 @@ msgid "Rate limited"
 msgstr "Débit limité"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "Débit limité · réessayez dans {retry}"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "Débit limité. Réessayez sous peu."
 

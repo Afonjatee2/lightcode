@@ -4500,6 +4500,10 @@ msgid "Rate limited"
 msgstr "Limite de taxa atingido"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "Limite de taxa atingido · tente novamente em {retry}"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "Limite de taxa atingido. Tente novamente em breve."
 

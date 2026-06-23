@@ -4486,6 +4486,10 @@ msgid "Rate limited"
 msgstr "Bị giới hạn tốc độ"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "Bị giới hạn tốc độ · thử lại sau {retry}"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "Bị giới hạn tốc độ. Hãy thử lại sau giây lát."
 

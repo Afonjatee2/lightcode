@@ -4495,6 +4495,10 @@ msgid "Rate limited"
 msgstr "Превышен лимит запросов"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "Превышен лимит запросов · повтор через {retry}"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "Превышен лимит запросов. Повторите чуть позже."
 

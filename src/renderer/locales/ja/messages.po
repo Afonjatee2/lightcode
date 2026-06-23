@@ -4434,6 +4434,10 @@ msgid "Rate limited"
 msgstr "レート制限あり"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "レート制限あり · {retry}後に再試行"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "レート制限あり。しばらくしてからもう一度お試しください。"
 

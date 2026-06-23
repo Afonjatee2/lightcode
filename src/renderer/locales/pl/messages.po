@@ -4497,6 +4497,10 @@ msgid "Rate limited"
 msgstr "Ograniczono liczbę żądań"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "Osiągnięto limit żądań · spróbuj ponownie za {retry}"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "Osiągnięto limit żądań. Spróbuj ponownie wkrótce."
 

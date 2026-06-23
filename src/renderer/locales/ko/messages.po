@@ -4435,6 +4435,10 @@ msgid "Rate limited"
 msgstr "속도 제한"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "속도 제한 · {retry} 후 다시 시도"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "속도 제한에 도달했습니다. 잠시 후 다시 시도하세요."
 

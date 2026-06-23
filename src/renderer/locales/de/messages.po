@@ -4508,6 +4508,10 @@ msgid "Rate limited"
 msgstr "Ratenbegrenzt"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "Rate-Limit erreicht · erneuter Versuch in {retry}"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "Rate-Limit erreicht. Versuchen Sie es in Kürze noch einmal."
 

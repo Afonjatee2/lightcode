@@ -4426,6 +4426,10 @@ msgid "Rate limited"
 msgstr "已限速"
 
 #: src/renderer/components/providers/usageFormat.ts
+msgid "Rate limited · retry in {retry}"
+msgstr "已限速 · {retry} 后重试"
+
+#: src/renderer/components/providers/usageFormat.ts
 msgid "Rate limited. Try again shortly."
 msgstr "已限速。请稍后重试。"
 
