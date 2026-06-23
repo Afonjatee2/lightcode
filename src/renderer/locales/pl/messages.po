@@ -950,6 +950,14 @@ msgstr "zablokowane:"
 msgid "Bold"
 msgstr "Pogrubienie"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+msgid "Bookmark this page"
+msgstr "Dodaj tę stronę do zakładek"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+msgid "Bookmarks"
+msgstr "Zakładki"
+
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Bottom"
 msgstr "Dół"
@@ -977,6 +985,14 @@ msgstr "Reguły ochrony gałęzi zablokowały to scalanie."
 msgid "Branches"
 msgstr "Gałęzie"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
+msgid "Bring back to panel"
+msgstr "Przywróć do panelu"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
+msgid "Bring it back into this panel, or jump to the window it’s running in."
+msgstr "Przywróć ją do tego panelu lub przejdź do okna, w którym działa."
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 #: src/renderer/views/MainView/parts/CreateProject/CreateProjectModal.tsx
 msgid "Browse for parent folder"
@@ -998,6 +1014,10 @@ msgstr "Przeglądaj swoje repozytoria GitHub lub wklej adres URL do klonowania."
 #: src/renderer/views/SettingsOverlay/parts/SettingsSidebar.tsx
 msgid "Browser"
 msgstr "Przeglądarka"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
+msgid "Browser is open in a separate window"
+msgstr "Przeglądarka jest otwarta w osobnym oknie"
 
 #: src/renderer/components/composer/MentionPopover.tsx
 msgid "Browser MCP"
@@ -1241,6 +1261,10 @@ msgstr "Usunięto profil Claude'a."
 #: src/renderer/views/ProjectSettingsOverlay/parts/ScriptsSection.tsx
 msgid "Cleanup script"
 msgstr "Skrypt czyszczący"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+msgid "Clear browsing history"
+msgstr "Wyczyść historię przeglądania"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Clear Browsing History"
@@ -2526,6 +2550,10 @@ msgstr "Przejdź do paska adresu przeglądarki"
 msgid "Focus the in-app browser address bar"
 msgstr "Przejdź do paska adresu przeglądarki w aplikacji"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserDockSlot.tsx
+msgid "Focus window"
+msgstr "Przejdź do okna"
+
 #: src/renderer/views/MainView/parts/CreateProject/CloneProjectModal.tsx
 msgid "Folder name"
 msgstr "Nazwa folderu"
@@ -2788,6 +2816,10 @@ msgstr "Ukryj pasek boczny"
 #: src/renderer/views/MainView/parts/RightPanel/parts/DevTerminalPanel/parts/RightTerminalLayout.tsx
 msgid "Hide terminal"
 msgstr "Ukryj terminal"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+msgid "History"
+msgstr "Historia"
 
 #: src/renderer/views/HomeView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
@@ -3400,6 +3432,15 @@ msgstr "Najczęściej używane rozumowanie"
 msgid "Move"
 msgstr "Przenieś"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
+msgid "Move browser back to main window"
+msgstr "Przenieś przeglądarkę z powrotem do głównego okna"
+
+#: src/renderer/components/layout/UnifiedRightPanel.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
+msgid "Move browser to window"
+msgstr "Przenieś przeglądarkę do okna"
+
 #: src/renderer/components/common/BranchSelector/parts/BranchFooterActions.tsx
 msgid "Move changes to a new worktree"
 msgstr "Przenieś zmiany do nowego drzewa roboczego"
@@ -3602,6 +3643,10 @@ msgstr "Nie zarejestrowano jeszcze żadnych commitów AI, PR ani rozwiązanych "
 msgid "No archived threads."
 msgstr "Brak zarchiwizowanych wątków."
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserBookmarkBar.tsx
+msgid "No bookmarks yet — add the current page with the star."
+msgstr "Brak zakładek — dodaj bieżącą stronę gwiazdką."
+
 #: src/renderer/components/common/BranchSelector/parts/BranchListBox.tsx
 msgid "No branches found"
 msgstr "Nie znaleziono gałęzi"
@@ -3678,6 +3723,10 @@ msgid "No GitHub CLI accounts found. Sign in with <0>gh auth login</0>, or "
 "<1>paste a clone URL</1>."
 msgstr "Nie znaleziono kont GitHub CLI. Zaloguj się za pomocą <0>gh auth "
 "login</0> lub <1>wklej sklonowany adres URL</1>."
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+msgid "No history yet"
+msgstr "Brak historii"
 
 #: src/renderer/components/thread/ChatPane/ChatRuntimeDebugPanel.tsx
 msgid "No matches for “{query}”."
@@ -4569,6 +4618,11 @@ msgstr "Usuń {pattern}"
 msgid "Remove action"
 msgstr "Usuń akcję"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserBookmarkBar.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+msgid "Remove bookmark"
+msgstr "Usuń zakładkę"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Remove Claude profile"
 msgstr "Usuń profil Claude"
@@ -4708,7 +4762,7 @@ msgstr "Przywróć domyślne zmatowienie paska bocznego"
 msgid "Reset to default"
 msgstr "Przywróć domyślne"
 
-#: src/renderer/components/layout/BrowserDrawerShell.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserHost.tsx
 msgid "Resize browser drawer"
 msgstr "Zmień rozmiar szuflady przeglądarki"
 
@@ -5019,7 +5073,7 @@ msgstr "Wyszukaj modele"
 msgid "Search models..."
 msgstr "Wyszukaj modele..."
 
-#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserOmnibox.tsx
 msgid "Search or enter address"
 msgstr "Wyszukaj lub wpisz adres"
 
@@ -5138,6 +5192,7 @@ msgid "Set shortcut"
 msgstr "Ustaw skrót"
 
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
 #: src/renderer/views/SettingsOverlay/SettingsOverlay.tsx
 msgid "Settings"
@@ -5175,6 +5230,10 @@ msgstr "Wyświetl bezprojektowy zakres główny dla sesji agenta na poziomie "
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Show all"
 msgstr "Pokaż wszystko"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
+msgid "Show bookmark bar"
+msgstr "Pokaż pasek zakładek"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Show Bookmark Bar"
@@ -5791,6 +5850,7 @@ msgstr "Motyw"
 
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/Reasoning.tsx
+#: src/renderer/components/thread/ThreadComposer.tsx
 msgid "Thinking"
 msgstr "Myślenie"
 
