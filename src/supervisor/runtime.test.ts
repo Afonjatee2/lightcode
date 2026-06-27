@@ -1094,6 +1094,10 @@ describe("SupervisorRuntime thread input", () => {
     ).handlePtyData(session, "second");
 
     expect(appendFileMock).not.toHaveBeenCalled();
+    // Advance only past the 25ms dev-log buffer flush, not `runAllTimersAsync`:
+    // the runtime's UsageService auto-refresh tick reschedules itself forever
+    // (by design), so draining every timer trips fake-timers' 10000-iteration
+    // infinite-loop guard non-deterministically under load.
     await vi.advanceTimersByTimeAsync(25);
     expect(appendFileMock).toHaveBeenCalledTimes(1);
     expect(appendFileMock.mock.calls[0]?.[1]).toBe("firstsecond");
