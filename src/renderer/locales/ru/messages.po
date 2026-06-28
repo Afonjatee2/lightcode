@@ -527,6 +527,10 @@ msgstr "Добавить проект"
 msgid "Add project options"
 msgstr "Параметры добавления проекта"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Add provider"
+msgstr "Добавить провайдера"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "Add Remote"
 msgstr "Добавить удалённый репозиторий"
@@ -623,6 +627,10 @@ msgstr "Оркестратор AI-агентов — управление код
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
 msgstr "Действия ИИ в Git"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "AI providers"
+msgstr "Провайдеры ИИ"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1602,6 +1610,11 @@ msgstr "Разрешение конфликтов"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictGroup.tsx
 msgid "Conflicts"
 msgstr "Конфликты"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Connect the AI providers OpenCode can use and sign out of them here."
+msgstr "Подключайте провайдеров ИИ, которые может использовать OpenCode, и "
+"выходите из них здесь."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Console"
@@ -3201,6 +3214,7 @@ msgstr "Войти {0}"
 msgid "Login required"
 msgstr "Требуется вход"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Logout"
 msgstr "Выйти"
@@ -3830,6 +3844,10 @@ msgstr "Нет промптов"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel.tsx
 msgid "No providers are being tracked."
 msgstr "Провайдеры не отслеживаются."
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "No providers connected yet."
+msgstr "Пока нет подключённых провайдеров."
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "No providers ready yet"
@@ -5435,6 +5453,11 @@ msgstr "Выйти"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 msgid "Sign out {label}"
 msgstr "Выйти {label}"
+
+#. placeholder {0}: provider.label
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Sign out of {0}"
+msgstr "Выйти из {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Signed in"

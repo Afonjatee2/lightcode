@@ -528,6 +528,10 @@ msgstr "Dodaj projekt"
 msgid "Add project options"
 msgstr "Dodaj opcje projektu"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Add provider"
+msgstr "Dodaj dostawcę"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "Add Remote"
 msgstr "Dodaj zdalne repozytorium"
@@ -624,6 +628,10 @@ msgstr "Koordynator agentów AI — zarządzaj agentami kodującymi za pośredni
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
 msgstr "Akcje AI w git"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "AI providers"
+msgstr "Dostawcy AI"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1601,6 +1609,11 @@ msgstr "Rozwiązywanie konfliktów"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictGroup.tsx
 msgid "Conflicts"
 msgstr "Konflikty"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Connect the AI providers OpenCode can use and sign out of them here."
+msgstr "Połącz dostawców AI, których może używać OpenCode, i wyloguj się z nich "
+"tutaj."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Console"
@@ -3202,6 +3215,7 @@ msgstr "Zaloguj się {0}"
 msgid "Login required"
 msgstr "Wymagane logowanie"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Logout"
 msgstr "Wyloguj się"
@@ -3831,6 +3845,10 @@ msgstr "Brak podpowiedzi"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel.tsx
 msgid "No providers are being tracked."
 msgstr "Żaden dostawca nie jest śledzony."
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "No providers connected yet."
+msgstr "Nie połączono jeszcze żadnych dostawców."
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "No providers ready yet"
@@ -5437,6 +5455,11 @@ msgstr "Wyloguj się"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 msgid "Sign out {label}"
 msgstr "Wyloguj się z {label}"
+
+#. placeholder {0}: provider.label
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Sign out of {0}"
+msgstr "Wyloguj się z {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Signed in"

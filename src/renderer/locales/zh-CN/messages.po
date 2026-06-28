@@ -522,6 +522,10 @@ msgstr "添加项目"
 msgid "Add project options"
 msgstr "添加项目选项"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Add provider"
+msgstr "添加提供商"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "Add Remote"
 msgstr "添加远程仓库"
@@ -616,6 +620,10 @@ msgstr "AI 代理协调器 — 通过终端和本机 ACP 管理编码代理。"
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
 msgstr "AI git操作"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "AI providers"
+msgstr "AI 提供商"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1585,6 +1593,10 @@ msgstr "冲突解决者"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictGroup.tsx
 msgid "Conflicts"
 msgstr "冲突"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Connect the AI providers OpenCode can use and sign out of them here."
+msgstr "在此连接 OpenCode 可使用的 AI 提供商，并退出登录。"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Console"
@@ -3142,6 +3154,7 @@ msgstr "登录{0}"
 msgid "Login required"
 msgstr "需要登录"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Logout"
 msgstr "退出"
@@ -3766,6 +3779,10 @@ msgstr "无提示"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel.tsx
 msgid "No providers are being tracked."
 msgstr "未跟踪任何提供商。"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "No providers connected yet."
+msgstr "尚未连接任何提供商。"
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "No providers ready yet"
@@ -5351,6 +5368,11 @@ msgstr "退出登录"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 msgid "Sign out {label}"
 msgstr "退出{label}"
+
+#. placeholder {0}: provider.label
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Sign out of {0}"
+msgstr "退出 {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Signed in"

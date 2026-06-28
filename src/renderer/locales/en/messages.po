@@ -523,6 +523,10 @@ msgstr "Add Project"
 msgid "Add project options"
 msgstr "Add project options"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Add provider"
+msgstr "Add provider"
+
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
 msgid "Add Remote"
 msgstr "Add Remote"
@@ -619,6 +623,10 @@ msgstr "AI agent orchestrator — manage coding agents via Terminal and Native "
 #: src/renderer/views/ProfileOverlay/parts/AiActions.tsx
 msgid "AI git actions"
 msgstr "AI git actions"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "AI providers"
+msgstr "AI providers"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
@@ -1595,6 +1603,10 @@ msgstr "Conflict Resolver"
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/ConflictGroup.tsx
 msgid "Conflicts"
 msgstr "Conflicts"
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Connect the AI providers OpenCode can use and sign out of them here."
+msgstr "Connect the AI providers OpenCode can use and sign out of them here."
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 msgid "Console"
@@ -3177,6 +3189,7 @@ msgstr "Login {0}"
 msgid "Login required"
 msgstr "Login required"
 
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Logout"
 msgstr "Logout"
@@ -3805,6 +3818,10 @@ msgstr "No prompts"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/UsagePanel.tsx
 msgid "No providers are being tracked."
 msgstr "No providers are being tracked."
+
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "No providers connected yet."
+msgstr "No providers connected yet."
 
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 msgid "No providers ready yet"
@@ -5403,6 +5420,11 @@ msgstr "Sign out"
 #: src/renderer/views/MainView/parts/RightPanel/parts/UsagePanel/parts/UsageProviderCard.tsx
 msgid "Sign out {label}"
 msgstr "Sign out {label}"
+
+#. placeholder {0}: provider.label
+#: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
+msgid "Sign out of {0}"
+msgstr "Sign out of {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings.tsx
 msgid "Signed in"

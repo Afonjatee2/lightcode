@@ -1082,9 +1082,13 @@ describe("createCodexAdapter buildAcpLogoutCommand", () => {
     const command = await adapter.buildAcpLogoutCommand?.();
     expect(command).toBeDefined();
     const args = command?.args ?? [];
+    // Include the resolved command itself: when the binary resolves to an
+    // absolute path it is direct-spawned (`command` = /…/codex, `args` =
+    // ["logout"]); when unresolved it is shell-wrapped (`exec 'codex' 'logout'`
+    // lives in args). Inspecting both keeps the assertion correct either way.
     const rendered = args.includes("-EncodedCommand")
       ? Buffer.from(args.at(-1) ?? "", "base64").toString("utf16le")
-      : args.join(" ");
+      : `${command?.command ?? ""} ${args.join(" ")}`;
     expect(rendered).toMatch(/codex/i);
     expect(rendered).toContain("logout");
   });

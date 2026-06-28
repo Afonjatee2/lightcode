@@ -19,17 +19,29 @@ import {
 
 registerProviderIcon("codex", CodexStatusIcon);
 registerProviderLabel("codex", "Codex");
+// Title/commit defaults were chosen by an empirical benchmark (latency + blind
+// quality judging) across the Codex model/effort matrix on real prompts and
+// diffs — not by model-tier intuition. Two findings drove these:
+//   1. The dominant latency cost is reasoning effort, not model size. The old
+//      mini-at-xhigh commit default ran ~13-20x slower (≈54s median, 116s max)
+//      than low effort for no quality gain.
+//   2. gpt-5.4-mini at low effort scored in the top quality cluster on BOTH
+//      tasks while being the most consistent (no case bombed) and the cheapest.
+//      Bigger models did not reliably win: gpt-5.4 and gpt-5.3-codex-spark
+//      mislabeled a feature commit as "fix", and the fast lane / xhigh added
+//      latency without quality. So we keep mini and only fix the effort.
+// Frontier gpt-5.5 stays for the conflict resolver (a real interactive task).
 registerCommitGenDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.4 Mini xhigh",
+  hint: "GPT-5.4 Mini low",
   model: "gpt-5.4-mini",
-  effort: "xhigh",
+  effort: "low",
 });
 registerTitleGenDefaults("codex", {
   label: "Codex",
-  hint: "GPT-5.4 Mini medium",
+  hint: "GPT-5.4 Mini low",
   model: "gpt-5.4-mini",
-  effort: "medium",
+  effort: "low",
 });
 registerConflictResolverDefaults("codex", {
   label: "Codex",
