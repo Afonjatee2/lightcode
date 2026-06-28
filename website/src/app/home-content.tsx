@@ -179,7 +179,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[1000px] bg-[radial-gradient(circle_at_center,_var(--tw-gradient-from)_0%,_transparent_70%)] from-white/[0.03] to-transparent pointer-events-none" />
 
       {/* Navigation */}
-      <nav className="relative z-10 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
+      <nav className="relative z-50 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
           <Terminal className="w-8 h-8 text-white" />
           <span className="text-xl font-bold tracking-tight text-white">Lightcode</span>

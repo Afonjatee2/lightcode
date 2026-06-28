@@ -89,7 +89,7 @@ export function ChangelogContent() {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,_rgba(255,255,255,0.05)_0%,_transparent_100%)]" />
 
       {/* Navigation */}
-      <nav className="relative z-10 flex items-center justify-between gap-4 px-8 py-6 max-w-5xl mx-auto">
+      <nav className="relative z-50 flex items-center justify-between gap-4 px-8 py-6 max-w-5xl mx-auto">
         <Link
           href="/"
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
