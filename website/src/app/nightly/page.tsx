@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { getLatestNightlyRelease } from "@/lib/releases";
 import { createPageMetadata } from "@/lib/seo";
 import { NightlyContent } from "./nightly-content";
@@ -12,5 +13,9 @@ export const metadata: Metadata = createPageMetadata({
 
 export default async function NightlyPage() {
   const release = await getLatestNightlyRelease();
-  return <NightlyContent release={release} />;
+  return (
+    <I18nProvider>
+      <NightlyContent release={release} />
+    </I18nProvider>
+  );
 }

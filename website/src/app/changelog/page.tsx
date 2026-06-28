@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { createPageMetadata } from "@/lib/seo";
 import { ChangelogContent } from "./changelog-content";
 
@@ -9,5 +10,9 @@ export const metadata: Metadata = createPageMetadata({
 });
 
 export default function ChangelogPage() {
-  return <ChangelogContent />;
+  return (
+    <I18nProvider>
+      <ChangelogContent />
+    </I18nProvider>
+  );
 }

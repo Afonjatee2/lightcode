@@ -1,14 +1,29 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Check, Globe } from "lucide-react";
-import { LOCALES } from "@/lib/i18n/config";
+import { DEFAULT_LOCALE, isLocale, LOCALES, type Locale } from "@/lib/i18n/config";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 
 export function LanguageSelector() {
-  const { locale, setLocale, t } = useI18n();
+  const { locale, t } = useI18n();
+  const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Map the current path to its equivalent under another locale. The default
+  // locale is unprefixed; every other locale gets a "/<code>" prefix.
+  const pathForLocale = (target: Locale): string => {
+    const segments = pathname.split("/").filter(Boolean);
+    if (segments.length > 0 && segments[0] !== DEFAULT_LOCALE && isLocale(segments[0])) {
+      segments.shift();
+    }
+    const rest = segments.join("/");
+    if (target === DEFAULT_LOCALE) return rest ? `/${rest}` : "/";
+    return rest ? `/${target}/${rest}` : `/${target}`;
+  };
 
   // Close on outside click or Escape.
   useEffect(() => {
@@ -56,8 +71,8 @@ export function LanguageSelector() {
                 <button
                   type="button"
                   onClick={() => {
-                    setLocale(l.code);
                     setOpen(false);
+                    if (l.code !== locale) router.push(pathForLocale(l.code));
                   }}
                   className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-1.5 text-left text-sm transition-colors hover:bg-white/10 ${
                     selected ? "text-white" : "text-gray-300"

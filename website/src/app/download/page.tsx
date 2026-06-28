@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { getLatestRelease } from "@/lib/releases";
 import { createPageMetadata } from "@/lib/seo";
 import { DownloadContent } from "./download-content";
@@ -13,5 +14,9 @@ export const metadata: Metadata = createPageMetadata({
 
 export default async function DownloadPage() {
   const release = await getLatestRelease();
-  return <DownloadContent release={release} />;
+  return (
+    <I18nProvider>
+      <DownloadContent release={release} />
+    </I18nProvider>
+  );
 }

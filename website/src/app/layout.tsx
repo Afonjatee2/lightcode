@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import "./globals.css";
-import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { createPageMetadata, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/seo";
 
 // Token from Google Search Console's "HTML tag" verification method. Set it as
@@ -58,7 +57,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="antialiased dark:bg-black dark:text-white min-h-screen">
-        <I18nProvider>{children}</I18nProvider>
+        {children}
         <Analytics />
         <SpeedInsights />
       </body>

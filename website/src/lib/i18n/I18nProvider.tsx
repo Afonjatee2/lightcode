@@ -1,50 +1,38 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import { DEFAULT_LOCALE, isLocale, resolveBrowserLocale, type Locale } from "./config";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { DEFAULT_LOCALE, type Locale } from "./config";
 import { translate, type MessageKey } from "./messages";
-
-const STORAGE_KEY = "lightcode-website-locale";
 
 interface I18nValue {
   locale: Locale;
-  setLocale: (locale: Locale) => void;
   t: (key: MessageKey, vars?: Record<string, string | number>) => string;
 }
 
 const I18nContext = createContext<I18nValue | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  // Start from the default so server and first client render agree (no hydration
-  // mismatch); the stored / browser locale is applied right after mount.
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
-
-  useEffect(() => {
-    let stored: string | null = null;
-    try {
-      stored = localStorage.getItem(STORAGE_KEY);
-    } catch {
-      /* localStorage may be unavailable */
-    }
-    setLocaleState(isLocale(stored) ? stored : resolveBrowserLocale(navigator.language));
-  }, []);
-
+/**
+ * The active locale is owned by the URL: the default locale renders at the root
+ * (e.g. "/") and every other locale under a path prefix (e.g. "/es"). Each page
+ * passes its route locale here, so the server renders the right language and
+ * there is no client-side locale flip. Language switching is navigation — see
+ * <LanguageSelector>.
+ */
+export function I18nProvider({
+  locale = DEFAULT_LOCALE,
+  children,
+}: {
+  locale?: Locale;
+  children: ReactNode;
+}) {
+  // Keep <html lang> in sync with the route locale (the root layout renders a
+  // static lang="en"; this corrects it on prefixed locale routes after hydration).
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const setLocale = (next: Locale) => {
-    setLocaleState(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, next);
-    } catch {
-      /* ignore */
-    }
-  };
-
   const value: I18nValue = {
     locale,
-    setLocale,
     t: (key, vars) => translate(locale, key, vars),
   };
 

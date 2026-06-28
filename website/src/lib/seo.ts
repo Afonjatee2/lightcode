@@ -2,8 +2,25 @@ import type { Metadata } from "next";
 
 import { LANDING_FAQ_ITEMS } from "@/lib/landingFaq";
 import type { ReleaseInfo } from "@/lib/releases";
-import { DEFAULT_LOCALE } from "./i18n/config";
+import { DEFAULT_LOCALE, LOCALE_CODES, type Locale } from "./i18n/config";
 import { translate } from "./i18n/messages";
+
+// Open Graph wants language_TERRITORY, not the BCP-47 tags we route with.
+const OG_LOCALE: Record<Locale, string> = {
+  en: "en_US",
+  es: "es_ES",
+  fr: "fr_FR",
+  de: "de_DE",
+  "pt-BR": "pt_BR",
+  ru: "ru_RU",
+  uk: "uk_UA",
+  pl: "pl_PL",
+  tr: "tr_TR",
+  vi: "vi_VN",
+  ja: "ja_JP",
+  ko: "ko_KR",
+  "zh-CN": "zh_CN",
+};
 
 export const SITE_NAME = "Lightcode";
 export const SITE_URL = "https://lightcodeapp.com";
@@ -42,16 +59,44 @@ export function absoluteUrl(path: string): string {
   return new URL(path, SITE_URL).toString();
 }
 
+/**
+ * Canonical path for a page in a given locale. The default locale (en) is served
+ * unprefixed at the root (e.g. "/download") so the already-indexed English URLs
+ * are preserved; every other locale is prefixed (e.g. "/es/download").
+ */
+export function localizedPath(path: string, locale: Locale): string {
+  if (locale === DEFAULT_LOCALE) return path;
+  if (path === "/") return `/${locale}`;
+  return `/${locale}${path}`;
+}
+
+/**
+ * hreflang cluster for a page: an absolute URL per locale plus an `x-default`
+ * pointing at the unprefixed (English) URL. Used for both <link rel="alternate">
+ * tags and the sitemap's xhtml:link alternates.
+ */
+export function buildLanguageAlternates(path: string): Record<string, string> {
+  const languages: Record<string, string> = {};
+  for (const code of LOCALE_CODES) {
+    languages[code] = absoluteUrl(localizedPath(path, code));
+  }
+  languages["x-default"] = absoluteUrl(path);
+  return languages;
+}
+
 export function createPageMetadata({
   title,
   description,
   path,
+  locale = DEFAULT_LOCALE,
 }: {
   title: string;
   description: string;
   path: string;
+  locale?: Locale;
 }): Metadata {
-  const url = absoluteUrl(path);
+  const canonical = localizedPath(path, locale);
+  const url = absoluteUrl(canonical);
 
   return {
     title: {
@@ -60,34 +105,30 @@ export function createPageMetadata({
     description,
     keywords: SEO_KEYWORDS,
     alternates: {
-      canonical: path,
+      canonical,
+      languages: buildLanguageAlternates(path),
     },
+    // og:image / twitter:image are supplied by the file-convention card at
+    // app/opengraph-image.tsx (1200x630). SOCIAL_IMAGE_PATH (the app screenshot)
+    // is kept for the SoftwareApplication JSON-LD `image` instead.
     openGraph: {
       title,
       description,
       url,
       siteName: SITE_NAME,
-      locale: "en_US",
+      locale: OG_LOCALE[locale],
+      alternateLocale: LOCALE_CODES.filter((l) => l !== locale).map((l) => OG_LOCALE[l]),
       type: "website",
-      images: [
-        {
-          url: SOCIAL_IMAGE_PATH,
-          width: 1973,
-          height: 1276,
-          alt: SOCIAL_IMAGE_ALT,
-        },
-      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [SOCIAL_IMAGE_PATH],
     },
   };
 }
 
-export function createHomeJsonLd(release: ReleaseInfo) {
+export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_LOCALE) {
   const organization = {
     "@context": "https://schema.org",
     "@type": "Organization",
@@ -171,10 +212,10 @@ export function createHomeJsonLd(release: ReleaseInfo) {
     "@type": "FAQPage",
     mainEntity: LANDING_FAQ_ITEMS.map((item) => ({
       "@type": "Question",
-      name: translate(DEFAULT_LOCALE, item.questionKey),
+      name: translate(locale, item.questionKey),
       acceptedAnswer: {
         "@type": "Answer",
-        text: translate(DEFAULT_LOCALE, item.answerKey),
+        text: translate(locale, item.answerKey),
       },
     })),
   };
