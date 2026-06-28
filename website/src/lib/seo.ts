@@ -94,9 +94,9 @@ export function createHomeJsonLd(release: ReleaseInfo) {
     url: SITE_URL,
     logo: {
       "@type": "ImageObject",
-      url: absoluteUrl("/icon.png"),
-      width: 358,
-      height: 358,
+      url: absoluteUrl("/icon-512.png"),
+      width: 512,
+      height: 512,
     },
     sameAs: [GITHUB_URL],
   };
