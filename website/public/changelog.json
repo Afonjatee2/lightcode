@@ -60,6 +60,10 @@
         },
         {
           "kind": "fixed",
+          "text": "System notifications now appear reliably, and clicking one brings Lightcode to the front and opens the thread that triggered it."
+        },
+        {
+          "kind": "fixed",
           "text": "Starting and updating agents is more reliable, with Windows launching native agent binaries directly, native updates resolving through Homebrew including cask-backed apps, and Claude shutting down its spawned tool processes when you close a thread."
         },
         {
