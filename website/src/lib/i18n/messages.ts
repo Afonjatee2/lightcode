@@ -115,20 +115,24 @@ const MESSAGES = {
     ko: "초고속",
     "zh-CN": "超快",
   },
+  // Lead the H1 with the brand name. "Lightcode" is a contested term on Google
+  // (a music project + other software cos rank for it), so the strongest on-page
+  // heading must state the brand first. The em-dash prefix is invariant; each
+  // locale keeps its existing translation of the value-prop after it.
   "hero.title1": {
-    en: "Universal orchestrator",
-    es: "Orquestador universal",
-    fr: "Orchestrateur universel",
-    de: "Universeller Orchestrator",
-    "pt-BR": "Orquestrador universal",
-    ru: "Универсальный оркестратор",
-    uk: "Універсальний оркестратор",
-    pl: "Uniwersalny orkiestrator",
-    tr: "Evrensel orkestratör",
-    vi: "Trình điều phối đa năng",
-    ja: "ユニバーサルなオーケストレーター",
-    ko: "범용 오케스트레이터",
-    "zh-CN": "通用编排器",
+    en: "Lightcode — Universal orchestrator",
+    es: "Lightcode — Orquestador universal",
+    fr: "Lightcode — Orchestrateur universel",
+    de: "Lightcode — Universeller Orchestrator",
+    "pt-BR": "Lightcode — Orquestrador universal",
+    ru: "Lightcode — Универсальный оркестратор",
+    uk: "Lightcode — Універсальний оркестратор",
+    pl: "Lightcode — Uniwersalny orkiestrator",
+    tr: "Lightcode — Evrensel orkestratör",
+    vi: "Lightcode — Trình điều phối đa năng",
+    ja: "Lightcode — ユニバーサルなオーケストレーター",
+    ko: "Lightcode — 범용 오케스트레이터",
+    "zh-CN": "Lightcode — 通用编排器",
   },
   "hero.title2": {
     en: "for AI coding agents.",

@@ -18,6 +18,8 @@ export const SITE_DESCRIPTION =
 
 export const SEO_KEYWORDS = [
   "Lightcode",
+  "Lightcode app",
+  "Lightcode desktop app",
   "AI coding agents",
   "Claude Code desktop app",
   "Codex desktop app",
@@ -106,7 +108,16 @@ export function createHomeJsonLd(release: ReleaseInfo) {
     "@type": "SoftwareApplication",
     "@id": `${SITE_URL}/#software`,
     name: SITE_NAME,
-    alternateName: ["Lightcode Desktop", "Lightcode AI Agent Orchestrator"],
+    // Brand aliases help Google disambiguate the app from the unrelated
+    // "Lightcode" music project and other software firms ranking for the term,
+    // and tie the entity to the lightcodeapp.com domain-match query.
+    alternateName: [
+      "Lightcode App",
+      "Lightcode Desktop",
+      "Lightcode Desktop App",
+      "Lightcode AI Agent Orchestrator",
+      "lightcodeapp.com",
+    ],
     applicationCategory: "DeveloperApplication",
     applicationSubCategory: "AI coding assistant workspace",
     operatingSystem: "macOS, Windows, Linux",

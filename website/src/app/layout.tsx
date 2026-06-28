@@ -5,6 +5,11 @@ import "./globals.css";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { createPageMetadata, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/seo";
 
+// Token from Google Search Console's "HTML tag" verification method. Set it as
+// the GOOGLE_SITE_VERIFICATION env var (Vercel → Project → Settings → Env Vars);
+// the <meta name="google-site-verification"> tag is emitted only when present.
+const googleSiteVerification = process.env.GOOGLE_SITE_VERIFICATION;
+
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   applicationName: SITE_NAME,
@@ -42,6 +47,7 @@ export const metadata: Metadata = {
     apple: [{ url: "/icon-192.png", type: "image/png", sizes: "192x192" }],
   },
   manifest: "/manifest.webmanifest",
+  ...(googleSiteVerification ? { verification: { google: googleSiteVerification } } : {}),
 };
 
 export default function RootLayout({

@@ -358,8 +358,8 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           <img
             src="/hero-screenshot.png"
             alt="Lightcode — Claude and Codex agents running side-by-side"
-            width={3248}
-            height={2122}
+            width={1973}
+            height={1276}
             decoding="async"
             className="w-full h-auto rounded-xl shadow-2xl shadow-black/50 opacity-90 group-hover:opacity-100 transition-opacity duration-500"
           />
