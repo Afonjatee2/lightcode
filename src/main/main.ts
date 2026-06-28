@@ -22,6 +22,7 @@ import { buildBrowserUserAgent } from "./browser/userAgent";
 import { SupervisorClient } from "./supervisor/SupervisorClient";
 import { createAutoUpdaterController } from "./updates/autoUpdater";
 import { createMainWindow } from "./window/createMainWindow";
+import { showAndFocusWindow } from "./window/showAndFocusWindow";
 import { createTray, type TrayHandle } from "./tray";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { type LightcodePaths, resolveLightcodeBaseDir } from "@/shared/lightcodePaths";
@@ -144,16 +145,6 @@ function handleMainWindowClose(event: Electron.Event): void {
   if (!isCloseToTrayEnabled()) return;
   event.preventDefault();
   mainWindow.hide();
-}
-
-function showAndFocusWindow(window: BrowserWindow): void {
-  if (window.isMinimized()) {
-    window.restore();
-  }
-  if (!window.isVisible()) {
-    window.show();
-  }
-  window.focus();
 }
 
 function focusBrowserExtractWindow(): void {

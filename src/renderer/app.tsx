@@ -7,6 +7,7 @@ import type { RuntimeEvent } from "@/shared/contracts";
 import type { SupervisorEvent, UpdateStatus } from "@/shared/ipc";
 import { readBridge } from "./bridge";
 import {
+  handleNotificationClick,
   handleThreadStateNotification,
   shouldInspectThreadStateForNotification,
 } from "./notifications";
@@ -228,6 +229,7 @@ const mainWindowCleanups: Array<() => void> = isBrowserExtractWindow
   : [
       readBridge().onSupervisorEvent(handleSupervisorEvent),
       readBridge().onUpdateStatus(handleUpdateStatus),
+      readBridge().onNotificationClick(handleNotificationClick),
       installRuntimeItemsPersister(),
     ];
 let uninstallProductAnalytics: (() => void) | null = null;

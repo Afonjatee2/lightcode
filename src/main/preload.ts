@@ -6,6 +6,7 @@ import {
   type BrowserEvent,
   type LightcodeBridge,
   type LightcodeWindowKind,
+  type NotificationClickEvent,
   type SupervisorEvent,
   type UpdateStatus,
 } from "@/shared/ipc";
@@ -121,6 +122,15 @@ const bridge: LightcodeBridge = {
     ipcRenderer.on(IPC_EVENT_CHANNELS.browserEvent, handler);
     return () => {
       ipcRenderer.removeListener(IPC_EVENT_CHANNELS.browserEvent, handler);
+    };
+  },
+  onNotificationClick(listener) {
+    const handler = (_event: Electron.IpcRendererEvent, payload: NotificationClickEvent) => {
+      listener(payload);
+    };
+    ipcRenderer.on(IPC_EVENT_CHANNELS.notificationClick, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC_EVENT_CHANNELS.notificationClick, handler);
     };
   },
 };

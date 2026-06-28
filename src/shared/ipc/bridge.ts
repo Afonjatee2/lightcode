@@ -8,7 +8,7 @@ import {
   type MainLocalProcedureName,
   type SupervisorProcedureName,
 } from "./procedureMap";
-import type { BrowserEvent, SupervisorEvent, UpdateStatus } from "./events";
+import type { BrowserEvent, NotificationClickEvent, SupervisorEvent, UpdateStatus } from "./events";
 
 export type LightcodeWindowKind = "main" | "browserExtract";
 
@@ -38,6 +38,7 @@ export type LightcodeBridge = LightcodeInvokeBridge & {
   onSupervisorEvent(listener: (event: SupervisorEvent) => void): () => void;
   onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
   onBrowserEvent(listener: (event: BrowserEvent) => void): () => void;
+  onNotificationClick(listener: (event: NotificationClickEvent) => void): () => void;
 };
 
 export function createInvokeBridge(
@@ -89,4 +90,5 @@ export const IPC_EVENT_CHANNELS = {
   supervisorEvent: createChannel("supervisorEvent"),
   updateStatus: createChannel("updateStatus"),
   browserEvent: createChannel("browserEvent"),
+  notificationClick: createChannel("notificationClick"),
 } as const;
