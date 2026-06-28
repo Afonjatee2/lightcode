@@ -20,6 +20,7 @@ import { motion } from "framer-motion";
 import { downloadUrlFor, type ReleaseInfo } from "@/lib/releases";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { LanguageSelector } from "@/components/LanguageSelector";
+import { LandingFaq } from "./landing-faq";
 
 const ACP_REGISTRY_CDN = "https://cdn.agentclientprotocol.com/registry/v1/latest";
 
@@ -488,6 +489,8 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           </motion.div>
         </div>
       </section>
+
+      <LandingFaq />
 
       {/* Footer */}
       <footer className="relative z-10 py-12 border-t border-white/5 bg-black">

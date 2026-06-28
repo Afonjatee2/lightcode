@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
+import { createPageMetadata } from "@/lib/seo";
 import { ChangelogContent } from "./changelog-content";
 
-export const metadata: Metadata = {
-  title: "Changelog - Lightcode",
+export const metadata: Metadata = createPageMetadata({
+  title: "Lightcode Changelog",
   description: "Everything new in Lightcode — features, improvements, and fixes, newest first.",
-};
+  path: "/changelog",
+});
 
 export default function ChangelogPage() {
   return <ChangelogContent />;
