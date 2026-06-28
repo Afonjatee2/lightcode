@@ -70,12 +70,12 @@
       }
       .wm .dot {
         display: inline-block;
-        width: 0.15em;
-        height: 0.15em;
-        border-radius: 50%;
-        background: #8b7bff;
+        width: 0.24em;
+        height: 1em;
         vertical-align: baseline;
-        margin: 0 0.08em;
+        fill: #8b7bff;
+        overflow: visible;
+        margin: 0 0.04em;
       }
       .wm .c {
         font-weight: 500;
@@ -141,7 +141,11 @@
     <h2>Logotype — baseline dot</h2>
     <div class="row" style="align-items: center">
       <img src="out/build/icon-64.png" width="64" />
-      <div class="wm">Pora<span class="dot"></span><span class="c">code</span></div>
+      <div class="wm">
+        Pora<svg class="dot" viewBox="0 0 24 100" aria-hidden="true">
+          <circle cx="12" cy="93" r="9" /></svg
+        ><span class="c">code</span>
+      </div>
     </div>
   </body>
 </html>

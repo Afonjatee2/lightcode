@@ -136,12 +136,12 @@
       }
       .wm .dot {
         display: inline-block;
-        width: 0.15em;
-        height: 0.15em;
-        border-radius: 50%;
-        background: var(--indigo);
+        width: 0.24em;
+        height: 1em;
         vertical-align: baseline;
-        margin: 0 0.08em;
+        fill: var(--indigo);
+        overflow: visible;
+        margin: 0 0.04em;
       }
       .wm .code {
         font-weight: 500;
@@ -289,18 +289,28 @@
       </div>
       <div class="grid">
         <div class="card">
-          <div class="wm">Pora<span class="dot"></span><span class="code">code</span></div>
+          <div class="wm">
+            Pora<svg class="dot" viewBox="0 0 24 100" aria-hidden="true">
+              <circle cx="12" cy="93" r="9" /></svg
+            ><span class="code">code</span>
+          </div>
           <div class="label">Primary logotype — Geist 700/500, baseline indigo dot.</div>
         </div>
         <div class="card">
-          <div class="wm mono" style="font-weight: 600">pora<span class="dot"></span>code</div>
+          <div class="wm mono" style="font-weight: 600">
+            pora<svg class="dot" viewBox="0 0 24 100" aria-hidden="true">
+              <circle cx="12" cy="93" r="9" /></svg
+            >code
+          </div>
           <div class="label">CLI / mono lockup — Geist Mono.</div>
         </div>
         <div class="card">
           <div class="row">
             <svg width="56" height="56" style="color: var(--moon)"><use href="#p" /></svg>
             <div class="wm" style="font-size: 34px">
-              Pora<span class="dot"></span><span class="code">code</span>
+              Pora<svg class="dot" viewBox="0 0 24 100" aria-hidden="true">
+                <circle cx="12" cy="93" r="9" /></svg
+              ><span class="code">code</span>
             </div>
           </div>
           <div class="label">Icon + logotype.</div>
@@ -309,7 +319,9 @@
           <div class="row">
             <svg width="48" height="48" style="color: var(--moon)"><use href="#pGlyph" /></svg>
             <div class="wm" style="font-size: 28px">
-              Pora<span class="dot"></span><span class="code">code</span>
+              Pora<svg class="dot" viewBox="0 0 24 100" aria-hidden="true">
+                <circle cx="12" cy="93" r="9" /></svg
+              ><span class="code">code</span>
               <span class="mut">Cloud</span>
             </div>
           </div>
