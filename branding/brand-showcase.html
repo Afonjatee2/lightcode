@@ -157,11 +157,17 @@
         letter-spacing: -0.02em;
         line-height: 1;
       }
-      .wm .dot {
-        color: var(--indigo);
+      .dot {
+        display: inline-block;
+        width: 0.15em;
+        height: 0.15em;
+        border-radius: 50%;
+        background: var(--indigo);
+        vertical-align: baseline;
+        margin: 0 0.06em 0.04em;
       }
       .wm .code {
-        font-weight: 500;
+        font-weight: 600;
       }
       .wm .mut {
         font-weight: 500;
@@ -697,7 +703,7 @@
       <div class="lock">
         <svg width="96" height="96" style="color: var(--moon)"><use href="#p" /></svg>
         <div class="wm" style="font-size: 64px">
-          Pora<span class="dot">.</span><span class="code">code</span>
+          Pora<span class="dot"></span><span class="code">code</span>
         </div>
       </div>
       <div class="tag">
@@ -802,13 +808,13 @@
       <div class="grid">
         <div class="card">
           <div class="wm" style="font-size: 44px">
-            Pora<span class="dot">.</span><span class="code">code</span>
+            Pora<span class="dot"></span><span class="code">code</span>
           </div>
           <div class="cap">primary logotype — Geist 700/500</div>
         </div>
         <div class="card">
           <div class="wm mono" style="font-size: 38px; font-weight: 600">
-            pora<span class="dot">.</span>code
+            pora<span class="dot"></span>code
           </div>
           <div class="cap">CLI / mono lockup</div>
         </div>
@@ -816,7 +822,7 @@
           <div class="row" style="display: flex; align-items: center; gap: 16px">
             <svg width="52" height="52" style="color: var(--moon)"><use href="#p" /></svg>
             <div class="wm" style="font-size: 34px">
-              Pora<span class="dot">.</span><span class="code">code</span>
+              Pora<span class="dot"></span><span class="code">code</span>
             </div>
           </div>
           <div class="cap">horizontal lockup</div>
@@ -824,7 +830,7 @@
         <div class="card" style="text-align: center">
           <svg width="64" height="64" style="color: var(--moon)"><use href="#p" /></svg>
           <div class="wm" style="font-size: 26px; margin-top: 12px">
-            Pora<span class="dot">.</span><span class="code">code</span>
+            Pora<span class="dot"></span><span class="code">code</span>
           </div>
           <div class="cap">stacked lockup</div>
         </div>
@@ -833,20 +839,20 @@
       <div class="grid">
         <div class="card">
           <div class="wm" style="font-size: 30px">
-            Pora<span class="dot">.</span><span class="code">code</span>
+            Pora<span class="dot"></span><span class="code">code</span>
           </div>
           <div class="cap">desktop app</div>
         </div>
         <div class="card">
           <div class="wm" style="font-size: 30px">
-            Pora<span class="dot">.</span><span class="code">code</span>
+            Pora<span class="dot"></span><span class="code">code</span>
             <span class="mut">CLI</span>
           </div>
           <div class="cap">command-line tool</div>
         </div>
         <div class="card">
           <div class="wm" style="font-size: 30px">
-            Pora<span class="dot">.</span><span class="code">code</span>
+            Pora<span class="dot"></span><span class="code">code</span>
             <span class="mut">Cloud</span>
           </div>
           <div class="cap">hosted paid tier</div>
@@ -869,7 +875,7 @@
         </div>
         <div class="card">
           <div class="wm" style="font-size: 34px">
-            Pora<span class="dot">.</span><span class="code">code</span>
+            Pora<span class="dot"></span><span class="code">code</span>
           </div>
           <div class="cap">in the logotype</div>
         </div>
@@ -1103,9 +1109,7 @@
       <h3>Social / OG card (1200×630)</h3>
       <div class="og">
         <svg width="72" height="72" style="color: var(--moon)"><use href="#p" /></svg>
-        <div class="t">
-          Pora<span style="color: var(--indigo)">.</span><span style="font-weight: 500">code</span>
-        </div>
+        <div class="t">Pora<span class="dot"></span><span style="font-weight: 500">code</span></div>
         <div class="s">It's time to code. Run Claude, Codex &amp; Gemini side by side.</div>
       </div>
     </section>

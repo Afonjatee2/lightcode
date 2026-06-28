@@ -69,7 +69,13 @@
         letter-spacing: -0.02em;
       }
       .wm .dot {
-        color: #8b7bff;
+        display: inline-block;
+        width: 0.15em;
+        height: 0.15em;
+        border-radius: 50%;
+        background: #8b7bff;
+        vertical-align: baseline;
+        margin: 0 0.06em 0.04em;
       }
       .wm .c {
         font-weight: 500;
@@ -135,7 +141,7 @@
     <h2>Logotype — baseline dot</h2>
     <div class="row" style="align-items: center">
       <img src="out/build/icon-64.png" width="64" />
-      <div class="wm">Pora<span class="dot">.</span><span class="c">code</span></div>
+      <div class="wm">Pora<span class="dot"></span><span class="c">code</span></div>
     </div>
   </body>
 </html>

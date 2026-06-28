@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 200" width="760" height="200">
-  <!-- Logotype: "Pora.code" — Geist; "code" lighter; the "." is the indigo BASELINE dot.
-       NOTE: text uses live fonts; OUTLINE the glyphs (Geist Sans 700/500) before shipping. -->
-  <text x="6" y="142" font-family="Geist, Inter, system-ui, sans-serif" font-size="148" letter-spacing="-4" fill="#EAF0FB">
-    <tspan font-weight="700">Pora</tspan><tspan font-weight="700" fill="#8B7BFF">.</tspan><tspan font-weight="500">code</tspan>
-  </text>
+  <!-- Logotype "Pora.code": the dot is a true ROUND circle (the Pora dot), baseline,
+       matching the icon — NOT the font's square period. "code" is lighter weight.
+       NOTE: text uses live Geist; OUTLINE the glyphs and fine-tune kerning before shipping. -->
+  <text x="350" y="150" text-anchor="end" font-family="Geist, Inter, system-ui, sans-serif" font-weight="700" font-size="150" letter-spacing="-4" fill="#EAF0FB">Pora</text>
+  <circle cx="372" cy="132" r="16" fill="#8B7BFF"/>
+  <text x="394" y="150" text-anchor="start" font-family="Geist, Inter, system-ui, sans-serif" font-weight="600" font-size="150" letter-spacing="-4" fill="#EAF0FB">code</text>
 </svg>

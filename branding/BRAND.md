@@ -79,7 +79,7 @@ A bold geometric **"P"** + the **Pora dot** at the baseline-right (reads as `P.`
 
 ## 5. Logotype (wordmark)
 
-- **Logotype:** **`Pora.code`** — set in Geist Sans; "Pora" in 600, "code" in 500; the **`.`** is the indigo **baseline** dot. (The dot is a logo device, low/at the baseline — not centered.)
+- **Logotype:** **`Pora.code`** — set in Geist Sans; "Pora" in 700, "code" in 600; the dot is the indigo **baseline** dot. ⚠️ The dot must be a **true round circle** (the Pora dot), drawn as its own element — **never the font's period glyph**, because Geist renders periods as a _square_. Place it low/at the baseline, not centered.
 - **Written product name (prose, stores, legal):** **Poracode** — one word, no dot.
 - **CLI / technical lockup:** `pora.code` lowercase in Geist Mono.
 - **Tier lockup:** glyph + **Poracode Cloud** (Cloud in `--dim`).
