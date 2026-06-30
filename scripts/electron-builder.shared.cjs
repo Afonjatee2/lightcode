@@ -27,7 +27,7 @@ function appIdFor(channel) {
 }
 
 function userDataDirNameFor(channel) {
-  return channel === "nightly" ? ".lightcode-nightly" : ".lightcode";
+  return channel === "nightly" ? ".poracode-nightly" : ".poracode";
 }
 
 function updaterChannelFor(channel) {

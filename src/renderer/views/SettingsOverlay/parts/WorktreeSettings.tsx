@@ -30,7 +30,7 @@ export function WorktreeSettings() {
       <SettingRow
         anchorId="worktrees.storageLocation"
         title={t`Storage location`}
-        description={t`Use one global folder, or nest worktrees inside each project at .lightcode/worktrees.`}
+        description={t`Use one global folder, or nest worktrees inside each project at .poracode/worktrees.`}
       >
         <Select
           aria-label={t`Worktree storage location`}

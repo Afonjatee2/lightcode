@@ -29,7 +29,7 @@ import {
  * GitHub Copilot CLI plugin installer.
  *
  * Two writes per install:
- *   1. **Plugin staging** under `~/.lightcode/agent-plugins/copilot/` — copies
+ *   1. **Plugin staging** under `~/.poracode/agent-plugins/copilot/` — copies
  *      `forward.mjs` + `plugin.json` + the shared forwarder runtime + the
  *      native wrapper script. Same shape as Claude/Codex/Gemini.
  *   2. **Global hook config** at `${COPILOT_HOME ?? ~/.copilot}/hooks/lightcode-status.json`.

@@ -30,7 +30,7 @@ describe("getCursorPluginPaths", () => {
 
 describe("mergeCursorHooksDocument", () => {
   it("renders entries for all five lifecycle events with version 1", () => {
-    const head = '"/home/demo/.lightcode/agent-plugins/cursor/lightcode-hook.sh"';
+    const head = '"/home/demo/.poracode/agent-plugins/cursor/lightcode-hook.sh"';
     const merged = mergeCursorHooksDocument(null, head);
 
     expect(merged.version).toBe(1);
@@ -58,7 +58,7 @@ describe("mergeCursorHooksDocument", () => {
 
   it("preserves user-defined entries while replacing stale Poracode entries", () => {
     const userEntry = { type: "command", command: "/usr/local/bin/my-policy.sh" };
-    const staleHead = '"/home/demo/.lightcode/agent-plugins/cursor/lightcode-hook.sh"';
+    const staleHead = '"/home/demo/.poracode/agent-plugins/cursor/lightcode-hook.sh"';
     const existing = {
       version: 1,
       hooks: {
@@ -69,7 +69,7 @@ describe("mergeCursorHooksDocument", () => {
       },
     };
 
-    const newHead = '"/home/demo/.lightcode/agent-plugins/cursor/forward.mjs-NEW"';
+    const newHead = '"/home/demo/.poracode/agent-plugins/cursor/forward.mjs-NEW"';
     const merged = mergeCursorHooksDocument(existing, newHead);
 
     const sessionStart = merged.hooks.sessionStart as Array<Record<string, unknown>>;

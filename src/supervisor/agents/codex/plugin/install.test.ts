@@ -26,8 +26,8 @@ import {
 } from "./install";
 import { buildNativeHookCommandHead } from "../../plugin/installerBase";
 
-const forwardPath = "C:\\Users\\demo\\.lightcode\\agent-plugins\\codex\\forward.mjs";
-const forwardPathUnix = "/home/demo/.lightcode/agent-plugins/codex/forward.mjs";
+const forwardPath = "C:\\Users\\demo\\.poracode\\agent-plugins\\codex\\forward.mjs";
+const forwardPathUnix = "/home/demo/.poracode/agent-plugins/codex/forward.mjs";
 
 /**
  * Test helpers build a `commandHead` matching one of the two shapes
@@ -167,7 +167,7 @@ describe("mergeCodexHooksDocument", () => {
       hooks: [
         {
           type: "command",
-          command: `node "C:\\old\\.lightcode\\agent-plugins\\codex\\forward.mjs" Stop`,
+          command: `node "C:\\old\\.poracode\\agent-plugins\\codex\\forward.mjs" Stop`,
         },
       ],
     };
@@ -181,13 +181,13 @@ describe("mergeCodexHooksDocument", () => {
 
   it("prunes stale Poracode groups by native wrapper fingerprint", () => {
     const head = nativeCommandHead(
-      "C:\\Users\\demo\\.lightcode\\agent-plugins\\codex\\lightcode-hook.cmd",
+      "C:\\Users\\demo\\.poracode\\agent-plugins\\codex\\lightcode-hook.cmd",
     );
     const stale = {
       hooks: [
         {
           type: "command",
-          command: `"C:\\old\\.lightcode\\agent-plugins\\codex\\lightcode-hook.cmd" Stop`,
+          command: `"C:\\old\\.poracode\\agent-plugins\\codex\\lightcode-hook.cmd" Stop`,
         },
       ],
     };

@@ -282,7 +282,7 @@ export class SupervisorRuntime {
     const rawBaseDir = process.env.LIGHTCODE_DATA_DIR?.trim();
     const envBaseDir =
       rawBaseDir && rawBaseDir !== "undefined" && isAbsolute(rawBaseDir) ? rawBaseDir : undefined;
-    const baseDir = envBaseDir ?? join(homedir(), ".lightcode");
+    const baseDir = envBaseDir ?? join(homedir(), ".poracode");
     this.baseDir = baseDir;
     const paths = resolveLightcodePaths(baseDir);
     this.logsDir = paths.terminalLogsDir;

@@ -39,8 +39,8 @@ export interface AgentEnvContext {
   /**
    * Poracode data base dir for native (non-WSL) plugin staging. Populated by
    * the supervisor so dev runs (`~/.lightcode-dev`) stage plugins separately
-   * from prod (`~/.lightcode`). WSL plugin installs ignore this and stage
-   * into the distro's `$HOME/.lightcode/` via `resolveWslHomeDirectoryAsync`.
+   * from prod (`~/.poracode`). WSL plugin installs ignore this and stage
+   * into the distro's `$HOME/.poracode/` via `resolveWslHomeDirectoryAsync`.
    */
   baseDir?: string;
   browserMcpEnabled?: boolean;

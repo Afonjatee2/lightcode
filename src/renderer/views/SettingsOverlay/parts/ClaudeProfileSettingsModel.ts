@@ -124,7 +124,7 @@ export function slugifyProfileName(value: string): string {
 }
 
 export function defaultConfigDir(name: string): string {
-  return `~/.lightcode/claude-profiles/${slugifyProfileName(name)}`;
+  return `~/.poracode/claude-profiles/${slugifyProfileName(name)}`;
 }
 
 export function uniqueProfileId(name: string, existing: Readonly<Record<string, unknown>>): string {

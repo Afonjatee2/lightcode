@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { mergeCommandCodeSettings, removeCommandCodeHooks } from "./install";
 
 // A command head that matches LIGHTCODE_FORWARD_RE (staged wrapper path).
-const HEAD = "'/home/u/.lightcode/agent-plugins/commandcode/lightcode-hook.sh'";
+const HEAD = "'/home/u/.poracode/agent-plugins/commandcode/lightcode-hook.sh'";
 const EVENTS = ["PreToolUse", "PostToolUse", "Stop"] as const;
 
 function commandsFor(doc: Record<string, unknown>, event: string): string[] {

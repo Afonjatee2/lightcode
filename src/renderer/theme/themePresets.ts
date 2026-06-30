@@ -52,7 +52,7 @@ export const THEME_SPECS: AppThemeSpec[] = [
       content: "#f6f6f9",
     },
     dark: {
-      bg: "#08080c",
+      bg: "#070709",
       surface: "#0e0e14",
       fg: "#eaf0fb",
       accent: "#8b7bff",
@@ -60,6 +60,33 @@ export const THEME_SPECS: AppThemeSpec[] = [
       border: "#24242e",
       sidebar: "#0e0e14",
       content: "#0b0b11",
+    },
+  },
+
+  // Lightcode Legacy — the original pre-Poracode look (neutral graphite +
+  // blue accent), preserved as a selectable theme so the old style isn't lost.
+  {
+    id: "lightcode-legacy",
+    label: "Lightcode Legacy",
+    light: {
+      bg: "#f1f1f4",
+      surface: "#fafafb",
+      fg: "#18181b",
+      accent: "#478cc4",
+      accentFg: "#ffffff",
+      border: "#cacace",
+      sidebar: "#ececef",
+      content: "#f6f6f9",
+    },
+    dark: {
+      bg: "#141416",
+      surface: "#1a1a1c",
+      fg: "#fcfcfc",
+      accent: "#88bae4",
+      accentFg: "#111113",
+      border: "#303033",
+      sidebar: "#1a1a1c",
+      content: "#161618",
     },
   },
 

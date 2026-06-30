@@ -272,18 +272,18 @@ export const sharedSettingsSchema = z.object({
   autoShowTerminalPanel: z.boolean(),
   /**
    * Where git worktrees are created: under a global root (`global`) or nested in
-   * each project at `<project>/.lightcode/worktrees` (`project-relative`).
+   * each project at `<project>/.poracode/worktrees` (`project-relative`).
    */
   worktreeStorageMode: worktreeStorageModeSchema,
   /**
    * Custom global worktree root for native projects. Empty string = built-in
-   * default (`~/.lightcode/worktrees`). Only used when `worktreeStorageMode` is
+   * default (`~/.poracode/worktrees`). Only used when `worktreeStorageMode` is
    * `global`.
    */
   worktreeBasePath: z.string(),
   /**
    * Custom global worktree root for WSL projects (a Linux path). Empty string =
-   * WSL default (`~/.lightcode/worktrees` in the distro home). Only used when
+   * WSL default (`~/.poracode/worktrees` in the distro home). Only used when
    * `worktreeStorageMode` is `global`.
    */
   wslWorktreeBasePath: z.string(),

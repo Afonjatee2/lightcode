@@ -10,7 +10,7 @@ import type { AgentEventIntent } from "@/shared/contracts";
  * keeps running to detect the working->idle edge.
  *
  * NOTE: `forward.mjs` has its own copy of this switch because it ships as a
- * standalone ESM file inside `~/.lightcode/agent-plugins/copilot/` and cannot
+ * standalone ESM file inside `~/.poracode/agent-plugins/copilot/` and cannot
  * import from a `.ts` file. Keep the two in sync.
  */
 export function copilotIntentFor(eventName: string): AgentEventIntent | undefined {

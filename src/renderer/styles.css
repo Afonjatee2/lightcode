@@ -883,7 +883,7 @@
   [data-theme="dark"] {
     color-scheme: dark;
     /* Poracode "moonlight" — dark/cool surfaces, indigo accent. */
-    --background: #08080c;
+    --background: #070709;
     --foreground: #eaf0fb;
     --surface: #0e0e14;
     --surface-secondary: #16161f;

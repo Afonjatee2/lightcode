@@ -246,7 +246,7 @@ export interface WslPluginBaseDirs {
 export function getWslPluginBaseDirs(distro: string, kind: string): WslPluginBaseDirs | undefined {
   const home = getCachedWslHomeDirectory(distro);
   if (!home) return undefined;
-  const linuxBase = `${home}/.lightcode/agent-plugins/${kind}`;
+  const linuxBase = `${home}/.poracode/agent-plugins/${kind}`;
   return { home, linuxBase, uncBase: toWslUncPath(distro, linuxBase) };
 }
 
@@ -862,7 +862,7 @@ export interface StagePluginAssetsToWslOptions {
 
 /**
  * Stage a provider's plugin assets into a WSL distro under
- * `<home>/.lightcode/agent-plugins/<kind>/`. Returns the deploy result on
+ * `<home>/.poracode/agent-plugins/<kind>/`. Returns the deploy result on
  * success; on failure returns a `reason` string the caller should propagate.
  * Centralizes the `deployFilesToWslHome → !deploy → reason` pattern shared
  * across copilot/cursor/opencode (and matches the shape used by claude/codex

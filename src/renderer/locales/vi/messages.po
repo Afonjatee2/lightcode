@@ -6485,9 +6485,9 @@ msgstr "Sử dụng tập tin bỏ qua"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Use one global folder, or nest worktrees inside each project at "
-".lightcode/worktrees."
+".poracode/worktrees."
 msgstr "Dùng một thư mục toàn cục, hoặc lồng các cây làm việc bên trong mỗi dự "
-"án tại .lightcode/worktrees."
+"án tại .poracode/worktrees."
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"

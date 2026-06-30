@@ -262,7 +262,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     section: "worktrees",
     anchor: "worktrees.storageLocation",
     title: msg`Storage location`,
-    description: msg`Use one global folder, or nest worktrees inside each project at .lightcode/worktrees.`,
+    description: msg`Use one global folder, or nest worktrees inside each project at .poracode/worktrees.`,
     keywords: "worktree storage mode global per-project nested location",
   },
   {

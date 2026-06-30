@@ -21,7 +21,7 @@ export function appIdFor(channel: LightcodeChannel): string {
 }
 
 export function userDataDirNameFor(channel: LightcodeChannel): string {
-  return channel === "nightly" ? ".lightcode-nightly" : ".lightcode";
+  return channel === "nightly" ? ".poracode-nightly" : ".poracode";
 }
 
 export function updaterChannelFor(channel: LightcodeChannel): string | undefined {

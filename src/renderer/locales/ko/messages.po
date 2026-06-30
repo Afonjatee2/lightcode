@@ -6408,8 +6408,8 @@ msgstr "무시 파일 사용"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Use one global folder, or nest worktrees inside each project at "
-".lightcode/worktrees."
-msgstr "하나의 전역 폴더를 사용하거나, 각 프로젝트의 .lightcode/worktrees에 작업 트리를 중첩합니다."
+".poracode/worktrees."
+msgstr "하나의 전역 폴더를 사용하거나, 각 프로젝트의 .poracode/worktrees에 작업 트리를 중첩합니다."
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"

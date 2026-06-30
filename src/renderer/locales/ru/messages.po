@@ -6498,9 +6498,9 @@ msgstr "Использовать файлы ignore"
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/WorktreeSettings.tsx
 msgid "Use one global folder, or nest worktrees inside each project at "
-".lightcode/worktrees."
+".poracode/worktrees."
 msgstr "Используйте одну глобальную папку или вкладывайте worktree внутрь "
-"каждого проекта в .lightcode/worktrees."
+"каждого проекта в .poracode/worktrees."
 
 #: src/renderer/views/MainView/parts/AppOverlays.tsx
 msgid "Use Session"

@@ -12,7 +12,7 @@
  *
  * Shipped via `prepare-agent-plugins.mjs` into each provider's plugin dir at
  * staging time, so `import "./lightcode-hook-runtime.mjs"` resolves as a
- * sibling of `forward.mjs` inside `~/.lightcode/agent-plugins/<kind>/`.
+ * sibling of `forward.mjs` inside `~/.poracode/agent-plugins/<kind>/`.
  */
 
 import { readFileSync } from "node:fs";
