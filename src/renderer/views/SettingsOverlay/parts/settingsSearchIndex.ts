@@ -42,7 +42,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     section: "general",
     anchor: "general.language",
     title: msg`Language`,
-    description: msg`Choose the display language for Lightcode's interface.`,
+    description: msg`Choose the display language for Poracode's interface.`,
     keywords: "locale display interface translation ui",
   },
   {
@@ -77,7 +77,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     section: "general",
     anchor: "general.closeToTray",
     title: msg`Close to tray`,
-    description: msg`When you close the window, keep Lightcode running in the system tray. Disable to quit on close.`,
+    description: msg`When you close the window, keep Poracode running in the system tray. Disable to quit on close.`,
     keywords: "tray minimize background quit close window exit",
   },
   {
@@ -144,7 +144,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     section: "appearance",
     anchor: "appearance.theme",
     title: msg`Theme`,
-    description: msg`Popular editor themes adapted to Lightcode. Each follows the light or dark mode above.`,
+    description: msg`Popular editor themes adapted to Poracode. Each follows the light or dark mode above.`,
     keywords: "color preset editor theme gallery swatch palette",
   },
   {
@@ -381,14 +381,14 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     section: "browser",
     anchor: "browser.linkOpenTarget",
     title: msg`Open links in`,
-    description: msg`Choose whether links from Lightcode and browser popups stay in Lightcode or open externally.`,
+    description: msg`Choose whether links from Poracode and browser popups stay in Poracode or open externally.`,
     keywords: "open links target app system external default browser",
   },
   {
     section: "browser",
     anchor: "browser.linkPresentationMode",
     title: msg`Show opened links in`,
-    description: msg`When links open in a Lightcode browser tab, choose where the browser is revealed.`,
+    description: msg`When links open in a Poracode browser tab, choose where the browser is revealed.`,
     keywords: "presentation panel overlay fullscreen reveal browser tab layout",
   },
   {

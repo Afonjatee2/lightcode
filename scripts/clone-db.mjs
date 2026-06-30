@@ -1,4 +1,4 @@
-// Clones the production Lightcode SQLite DB into the dev base dir so dev runs
+// Clones the production Poracode SQLite DB into the dev base dir so dev runs
 // start from real data. One-way (prod -> dev) by design; never the reverse.
 //
 // Source: ~/.lightcode/state.sqlite

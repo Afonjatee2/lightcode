@@ -1,7 +1,7 @@
 import type { AgentEventIntent } from "@/shared/contracts";
 
 /**
- * Map GitHub Copilot CLI hook event name to a Lightcode universal intent.
+ * Map GitHub Copilot CLI hook event name to a Poracode universal intent.
  *
  * Copilot CLI exposes 6 hook events: sessionStart, sessionEnd,
  * userPromptSubmitted, preToolUse, postToolUse, errorOccurred. There is no

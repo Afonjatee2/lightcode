@@ -28,7 +28,7 @@ export interface CliHookPluginCoordinatorOptions {
   adapters: Map<AgentKind, AgentAdapter>;
   settingsPath: string;
   /**
-   * Lightcode data base dir for native plugin staging. Forwarded to each
+   * Poracode data base dir for native plugin staging. Forwarded to each
    * adapter's `ctx.baseDir` so dev (`~/.lightcode-dev`) and prod
    * (`~/.lightcode`) keep separate plugin stages instead of stomping the
    * same `agent-plugins/` directory. Omit only in tests — production callers

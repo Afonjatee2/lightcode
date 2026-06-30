@@ -5,7 +5,7 @@
  * the user's appearance mode (system / light / dark), so e.g. Catppuccin is
  * Latte in light and Mocha in dark. Palettes are adapted from the popular
  * VS Code / Cursor / editor themes of the same name and remapped onto
- * Lightcode's token set — the app keeps its own layout, radius, and typography.
+ * Poracode's token set — the app keeps its own layout, radius, and typography.
  *
  * `THEME_SPECS` holds the authored anchor colors (the source of truth, also
  * consumed by the contrast test); `APP_THEME_PRESETS` is the derived token set.
@@ -33,33 +33,33 @@ export interface AppThemePreset {
 export const DEFAULT_THEME_ID = "default";
 
 export const THEME_SPECS: AppThemeSpec[] = [
-  // Lightcode base. Mirrors the `.light` / `.dark` values in styles.css and is
+  // Poracode base. Mirrors the `.light` / `.dark` values in styles.css and is
   // used only for the gallery preview — at runtime the base theme clears all
   // overrides so styles.css stays the source of truth (see applyAppTheme).
   {
     id: DEFAULT_THEME_ID,
-    label: "Lightcode",
+    label: "Poracode",
     // sRGB hex of the styles.css oklch values (anchors must be hex so muted can
     // be contrast-derived). Preview-only — runtime clears overrides for default.
     light: {
       bg: "#f1f1f4",
       surface: "#fafafb",
       fg: "#18181b",
-      accent: "#478cc4",
+      accent: "#6f5cf0",
       accentFg: "#ffffff",
       border: "#cacace",
       sidebar: "#ececef",
       content: "#f6f6f9",
     },
     dark: {
-      bg: "#141416",
-      surface: "#1a1a1c",
-      fg: "#fcfcfc",
-      accent: "#88bae4",
-      accentFg: "#111113",
-      border: "#303033",
-      sidebar: "#1a1a1c",
-      content: "#161618",
+      bg: "#08080c",
+      surface: "#0e0e14",
+      fg: "#eaf0fb",
+      accent: "#8b7bff",
+      accentFg: "#0a0a12",
+      border: "#24242e",
+      sidebar: "#0e0e14",
+      content: "#0b0b11",
     },
   },
 

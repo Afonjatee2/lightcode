@@ -809,7 +809,7 @@ export interface VerifyStagedPluginOptions {
   /**
    * Optional provider-specific extra check run after the asset existence
    * checks pass. Returns true to continue treating the install as good.
-   * Used by Cursor (hooks.json must contain a Lightcode entry) and OpenCode
+   * Used by Cursor (hooks.json must contain a Poracode entry) and OpenCode
    * (dropped files must byte-match the staging dir).
    */
   extraCheck?: () => boolean;

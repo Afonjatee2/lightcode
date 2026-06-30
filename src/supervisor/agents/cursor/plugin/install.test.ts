@@ -19,7 +19,7 @@ afterEach(() => {
 });
 
 describe("getCursorPluginPaths", () => {
-  it("returns the staging dir under Lightcode's plugin tree", () => {
+  it("returns the staging dir under Poracode's plugin tree", () => {
     const baseDir = makeTempDir("paths");
     const paths = getCursorPluginPaths({ envKind: "posix", baseDir });
 
@@ -56,7 +56,7 @@ describe("mergeCursorHooksDocument", () => {
     expect((merged.hooks.postToolUse?.[0] as { matcher?: string })?.matcher).toBe("*");
   });
 
-  it("preserves user-defined entries while replacing stale Lightcode entries", () => {
+  it("preserves user-defined entries while replacing stale Poracode entries", () => {
     const userEntry = { type: "command", command: "/usr/local/bin/my-policy.sh" };
     const staleHead = '"/home/demo/.lightcode/agent-plugins/cursor/lightcode-hook.sh"';
     const existing = {
@@ -148,7 +148,7 @@ describe("installCursorPlugin", () => {
     expect(first.ok).toBe(true);
     if (!first.ok) return;
 
-    // User adds a non-Lightcode hook between installs.
+    // User adds a non-Poracode hook between installs.
     const docPath = first.paths.globalHooksPath;
     const docBefore = JSON.parse(readFileSync(docPath, "utf8")) as {
       version: number;

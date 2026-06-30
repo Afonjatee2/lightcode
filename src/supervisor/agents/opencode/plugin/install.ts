@@ -60,7 +60,7 @@ import { buildOpenCodeBrowserMcp } from "../mcpBrowser";
  *
  * The plugin reads `LIGHTCODE_HOOK_URL` / `LIGHTCODE_HOOK_SECRET` /
  * `LIGHTCODE_THREAD_ID` etc. from `process.env` at hook time. When those
- * vars are unset (i.e. the user runs `opencode` outside Lightcode) the
+ * vars are unset (i.e. the user runs `opencode` outside Poracode) the
  * handlers no-op.
  */
 
@@ -81,7 +81,7 @@ const OPENCODE_PLUGIN_DROP_FILE_NAME = "lightcode-status.js";
 const OPENCODE_PLUGIN_DROP_MANIFEST_NAME = "lightcode-status.plugin.json";
 
 /**
- * Older Lightcode versions dropped a `.mjs` here, which OpenCode never loaded
+ * Older Poracode versions dropped a `.mjs` here, which OpenCode never loaded
  * (auto-discovery is `*.{ts,js}` only). Cleaned up at install/uninstall time
  * so users upgrading don't end up with two stale siblings.
  */

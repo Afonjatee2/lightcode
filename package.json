@@ -1,9 +1,9 @@
 {
-  "name": "lightcode",
+  "name": "poracode",
   "version": "1.4.1",
   "private": true,
   "description": "The universal desktop orchestrator for AI agents. Run terminal-native and structured chat agents side-by-side.",
-  "homepage": "https://lightcodeapp.com/",
+  "homepage": "https://poracode.com/",
   "license": "Apache-2.0",
   "author": "SDSLeon",
   "repository": {

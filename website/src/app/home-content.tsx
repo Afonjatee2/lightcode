@@ -182,7 +182,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
       <nav className="relative z-50 flex items-center justify-between px-8 py-6 max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
           <Terminal className="w-8 h-8 text-white" />
-          <span className="text-xl font-bold tracking-tight text-white">Lightcode</span>
+          <span className="text-xl font-bold tracking-tight text-white">Poracode</span>
         </div>
         <div className="flex items-center gap-4">
           <a href="/changelog" className="text-sm text-gray-400 hover:text-white transition-colors">
@@ -357,7 +357,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
         >
           <img
             src="/hero-screenshot.png"
-            alt="Lightcode — Claude and Codex agents running side-by-side"
+            alt="Poracode — Claude and Codex agents running side-by-side"
             width={1973}
             height={1276}
             decoding="async"
@@ -497,7 +497,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
         <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-6">
           <div className="flex items-center gap-2 opacity-50">
             <Terminal className="w-5 h-5" />
-            <span className="font-bold tracking-tight">Lightcode</span>
+            <span className="font-bold tracking-tight">Poracode</span>
           </div>
           <p className="text-gray-500 text-sm">{t("footer.copyright", { year: 2026 })}</p>
           <div className="flex gap-6">

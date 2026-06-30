@@ -11,7 +11,7 @@ import appIconStableUrl from "../../../../../build/icon.png";
 import appIconNightlyUrl from "../../../../../build/icon-nightly.png";
 
 const GITHUB_REPO = "https://github.com/SDSLeon/lightcode";
-const WEBSITE_URL = "https://lightcodeapp.com/";
+const WEBSITE_URL = "https://poracode.com/";
 
 function AboutLink(props: { href: string; children: React.ReactNode }) {
   return (

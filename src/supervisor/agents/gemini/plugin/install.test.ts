@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 describe("getGeminiPluginPaths", () => {
-  it("places Gemini settings under Lightcode's plugin dir", () => {
+  it("places Gemini settings under Poracode's plugin dir", () => {
     const baseDir = makeBaseDir();
     const paths = getGeminiPluginPaths({ envKind: "posix", baseDir });
 

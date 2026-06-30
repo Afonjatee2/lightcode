@@ -36,7 +36,7 @@ import {
  *      loads global hooks at every session and always trusts them — no
  *      `/hooks-trust` prompt is required. Done at install time, not per-spawn.
  *
- * Both files are owned by Lightcode — we replace them on reinstall and never
+ * Both files are owned by Poracode — we replace them on reinstall and never
  * merge into user-authored config.
  */
 

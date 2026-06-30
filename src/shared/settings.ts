@@ -240,7 +240,7 @@ export const sharedSettingsSchema = z.object({
   /** Prevent OS sleep while any thread is actively working. */
   preventSleepWhileWorking: z.boolean(),
   /**
-   * When true, closing the main window hides Lightcode to the system tray
+   * When true, closing the main window hides Poracode to the system tray
    * instead of quitting. The tray icon's Quit action (or Quit from the app
    * menu) still exits the process.
    */

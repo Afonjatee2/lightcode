@@ -36,7 +36,7 @@ import {
  *      Copilot CLI loads this at every session regardless of cwd. Done at
  *      install time, not per-spawn — no per-project file is written.
  *
- * Both files are owned by Lightcode — we replace them on reinstall and never
+ * Both files are owned by Poracode — we replace them on reinstall and never
  * merge into user-authored config.
  */
 

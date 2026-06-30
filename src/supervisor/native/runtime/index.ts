@@ -5,7 +5,7 @@
  * but for the host platform (mac/linux/win32). Three layers, in order of
  * cost:
  *
- *   1. **Lightcode-managed runtime** (zero-shell-spawn fast path).
+ *   1. **Poracode-managed runtime** (zero-shell-spawn fast path).
  *      A previous background install dropped the pinned LTS at
  *      `~/.lightcode/runtime/<archive-dir>/`. A single `existsSync` decides.
  *

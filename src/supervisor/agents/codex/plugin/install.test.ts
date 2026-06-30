@@ -58,7 +58,7 @@ afterEach(() => {
 });
 
 describe("getCodexPluginPaths", () => {
-  it("places Codex hooks under Lightcode's private CODEX_HOME", () => {
+  it("places Codex hooks under Poracode's private CODEX_HOME", () => {
     const baseDir = mkdtempSync(join(tmpdir(), "lightcode-codex-paths-"));
     const paths = getCodexPluginPaths({ envKind: "posix", baseDir });
 
@@ -124,7 +124,7 @@ describe("parseCodexVersionLine + isCodexSemverSupportedForHooks", () => {
 });
 
 describe("mergeCodexHooksDocument", () => {
-  it("creates only Lightcode entries when hooks.json was absent (WSL shape)", () => {
+  it("creates only Poracode entries when hooks.json was absent (WSL shape)", () => {
     const head = wslCommandHead(forwardPath);
     const doc = mergeCodexHooksDocument(null, head);
     expect(Object.keys(doc.hooks)).toEqual([
@@ -141,7 +141,7 @@ describe("mergeCodexHooksDocument", () => {
     expect(stopHook?.command).toBe(commandFor(head, "Stop"));
   });
 
-  it("preserves user matcher groups and appends Lightcode", () => {
+  it("preserves user matcher groups and appends Poracode", () => {
     const head = wslCommandHead(forwardPath);
     const userGroup = {
       matcher: "*",
@@ -161,7 +161,7 @@ describe("mergeCodexHooksDocument", () => {
     expect(lc?.command).toBe(commandFor(head, "Stop"));
   });
 
-  it("prunes stale Lightcode groups by forward.mjs path fingerprint and replaces", () => {
+  it("prunes stale Poracode groups by forward.mjs path fingerprint and replaces", () => {
     const head = wslCommandHead(forwardPath);
     const stale = {
       hooks: [
@@ -179,7 +179,7 @@ describe("mergeCodexHooksDocument", () => {
     expect(h?.command).toBe(commandFor(head, "Stop"));
   });
 
-  it("prunes stale Lightcode groups by native wrapper fingerprint", () => {
+  it("prunes stale Poracode groups by native wrapper fingerprint", () => {
     const head = nativeCommandHead(
       "C:\\Users\\demo\\.lightcode\\agent-plugins\\codex\\lightcode-hook.cmd",
     );

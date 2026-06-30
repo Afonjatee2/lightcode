@@ -357,7 +357,7 @@ describe("detectOpenCodeTerminalStatus", () => {
 });
 
 describe("opencodeIntentFor", () => {
-  it("maps OpenCode lifecycle hooks to Lightcode intents", () => {
+  it("maps OpenCode lifecycle hooks to Poracode intents", () => {
     expect(opencodeIntentFor("session.created")).toBe("session.started");
     expect(opencodeIntentFor("tool.execute.before")).toBe("session.turn_started");
     expect(opencodeIntentFor("permission.asked")).toBe("session.needs_approval");

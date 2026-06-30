@@ -1129,7 +1129,7 @@ export class SupervisorRuntime {
   }
 
   /**
-   * The worktree roots Lightcode considers "managed" for prune: the built-in
+   * The worktree roots Poracode considers "managed" for prune: the built-in
    * default, the resolved global root (custom base or project-relative), and the
    * project-relative root. Per-project custom bases are excluded on purpose so we
    * never auto-delete a user-chosen directory.

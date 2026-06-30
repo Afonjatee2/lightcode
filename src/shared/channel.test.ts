@@ -14,13 +14,13 @@ describe("channel", () => {
   });
 
   it("returns the right product names", () => {
-    expect(productNameFor("stable")).toBe("Lightcode");
-    expect(productNameFor("nightly")).toBe("Lightcode Nightly");
+    expect(productNameFor("stable")).toBe("Poracode");
+    expect(productNameFor("nightly")).toBe("Poracode Nightly");
   });
 
   it("returns the right app ids", () => {
-    expect(appIdFor("stable")).toBe("com.lightcode.app");
-    expect(appIdFor("nightly")).toBe("com.lightcode.app.nightly");
+    expect(appIdFor("stable")).toBe("com.poracode.app");
+    expect(appIdFor("nightly")).toBe("com.poracode.app.nightly");
   });
 
   it("returns the right user data dir names", () => {
@@ -34,8 +34,8 @@ describe("channel", () => {
   });
 
   it("returns artifact prefixes that are distinct between channels", () => {
-    expect(artifactPrefixFor("stable")).toBe("Lightcode");
-    expect(artifactPrefixFor("nightly")).toBe("Lightcode-Nightly");
+    expect(artifactPrefixFor("stable")).toBe("Poracode");
+    expect(artifactPrefixFor("nightly")).toBe("Poracode-Nightly");
     expect(artifactPrefixFor("stable")).not.toBe(artifactPrefixFor("nightly"));
   });
 });

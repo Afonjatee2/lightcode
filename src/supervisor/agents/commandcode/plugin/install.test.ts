@@ -22,7 +22,7 @@ function commandsFor(doc: Record<string, unknown>, event: string): string[] {
 }
 
 describe("mergeCommandCodeSettings", () => {
-  it("adds a Lightcode hook for all three events", () => {
+  it("adds a Poracode hook for all three events", () => {
     const doc = mergeCommandCodeSettings({}, HEAD);
     for (const ev of EVENTS) {
       expect(commandsFor(doc, ev)).toEqual([`${HEAD} ${ev}`]);
@@ -35,7 +35,7 @@ describe("mergeCommandCodeSettings", () => {
     expect(doc.tasteOnboarding).toBe(true);
   });
 
-  it("preserves the user's own non-Lightcode hooks", () => {
+  it("preserves the user's own non-Poracode hooks", () => {
     const existing = {
       hooks: { Stop: [{ hooks: [{ type: "command", command: "my-own-hook.sh" }] }] },
     };
@@ -45,7 +45,7 @@ describe("mergeCommandCodeSettings", () => {
     expect(cmds).toHaveLength(2);
   });
 
-  it("is idempotent — reinstall replaces, never duplicates, the Lightcode entry", () => {
+  it("is idempotent — reinstall replaces, never duplicates, the Poracode entry", () => {
     const twice = mergeCommandCodeSettings(mergeCommandCodeSettings({}, HEAD), HEAD);
     for (const ev of EVENTS) {
       expect(commandsFor(twice, ev)).toEqual([`${HEAD} ${ev}`]);
@@ -54,7 +54,7 @@ describe("mergeCommandCodeSettings", () => {
 });
 
 describe("removeCommandCodeHooks", () => {
-  it("removes only Lightcode entries, preserving user hooks and other keys", () => {
+  it("removes only Poracode entries, preserving user hooks and other keys", () => {
     const installed = mergeCommandCodeSettings(
       {
         model: "kimi",
