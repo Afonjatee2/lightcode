@@ -1,6 +1,18 @@
 {
   "releases": [
     {
+      "version": "1.4.1",
+      "date": "2026-06-30",
+      "title": "Claude Sonnet 5 with a 1M-token context",
+      "summary": "A focused update that brings Claude Sonnet 5 to the model picker, complete with its frontier reasoning effort levels and a one-million-token context window.",
+      "changes": [
+        {
+          "kind": "added",
+          "text": "You can now run Claude Sonnet 5 from the model picker, with its frontier reasoning effort levels and a one-million-token context window, once your Claude CLI is up to date."
+        }
+      ]
+    },
+    {
       "version": "1.4.0",
       "date": "2026-06-28",
       "title": "Lightcode in 13 languages, a dockable browser & custom shortcuts",
