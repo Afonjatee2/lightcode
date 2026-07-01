@@ -25,12 +25,10 @@ const CLAUDE_BUILT_IN_SLASH_COMMANDS: AgentCapability["slashCommands"] = [
 const PREMIUM_EFFORT_TIERS: string[] = [...CLAUDE_EFFORT_TIERS];
 
 /**
- * Master switch for the Fable 5 model. Flip to `true` to surface it again in the
- * model pickers — its effort/context/auto metadata is retained below so
- * re-enabling is a one-line change. While `false`, Fable 5 is hidden everywhere
- * (the leftover keyed entries are inert without a matching `models` row).
+ * Master switch for the Fable 5 model. Flip to `false` to hide it from the
+ * model pickers while keeping its effort/context/auto metadata ready below.
  */
-const FABLE_5_ENABLED = false;
+const FABLE_5_ENABLED = true;
 const SONNET_5_MODEL_ID = "claude-sonnet-5";
 
 export const claudeCapabilities: AgentCapability = {
