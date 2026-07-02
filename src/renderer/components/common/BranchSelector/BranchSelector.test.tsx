@@ -51,7 +51,7 @@ describe("BranchSelector", () => {
   beforeEach(() => {
     bridge.gitAddWorktree.mockReset();
     bridge.gitAddWorktree.mockResolvedValue({
-      path: "C:\\Users\\demo\\.lightcode\\worktrees\\repo\\feature-x",
+      path: "C:\\Users\\demo\\.poracode\\worktrees\\repo\\feature-x",
       changesTransferred: true,
     });
     refreshGitProject.mockReset();

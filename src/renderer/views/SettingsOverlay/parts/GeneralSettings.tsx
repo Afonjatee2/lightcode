@@ -43,7 +43,7 @@ export function GeneralSettings() {
       <SettingRow
         anchorId="general.language"
         title={t`Language`}
-        description={<Trans>Choose the display language for Lightcode's interface.</Trans>}
+        description={<Trans>Choose the display language for Poracode's interface.</Trans>}
       >
         <Select
           aria-label={t`Language`}
@@ -138,7 +138,7 @@ export function GeneralSettings() {
         title={t`Close to tray`}
         description={
           <Trans>
-            When you close the window, keep Lightcode running in the system tray. Disable to quit on
+            When you close the window, keep Poracode running in the system tray. Disable to quit on
             close.
           </Trans>
         }
