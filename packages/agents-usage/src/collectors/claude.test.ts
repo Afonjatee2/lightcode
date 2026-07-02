@@ -92,6 +92,92 @@ describe("parseClaudeUsage", () => {
     expect(fable?.label).toBe("Weekly (Fable)");
     expect(fable?.usedPercent).toBe(17);
   });
+
+  it("maps model-scoped weekly limits from the limits array", () => {
+    // Newer responses report per-model weeklies only via `limits[]` — the
+    // top-level `seven_day_fable`/`seven_day_opus` fields come back null.
+    const snap = parseClaudeUsage(
+      {
+        five_hour: { utilization: 46, resets_at: "2026-07-02T21:29:59Z" },
+        seven_day: { utilization: 20, resets_at: "2026-07-07T04:59:59Z" },
+        seven_day_opus: null,
+        seven_day_fable: null,
+        limits: [
+          { kind: "session", group: "session", percent: 46, resets_at: "2026-07-02T21:29:59Z" },
+          { kind: "weekly_all", group: "weekly", percent: 20, resets_at: "2026-07-07T04:59:59Z" },
+          {
+            kind: "weekly_scoped",
+            group: "weekly",
+            percent: 32,
+            resets_at: "2026-07-07T04:59:59Z",
+            scope: { model: { id: null, display_name: "Fable" }, surface: null },
+          },
+        ],
+      },
+      FAKE_NOW_MS,
+    );
+    const fable = snap.windows.find((w) => w.id === "weekly-fable");
+    expect(fable?.label).toBe("Weekly (Fable)");
+    expect(fable?.usedPercent).toBe(32);
+    expect(fable?.resetsAt).toBe(Date.parse("2026-07-07T04:59:59Z"));
+    // session/weekly_all entries duplicate the top-level fields — no doubles.
+    expect(snap.windows.map((w) => w.id)).toEqual(["session-5h", "weekly", "weekly-fable"]);
+  });
+
+  it("fills session and weekly from limits when the top-level fields are absent", () => {
+    const snap = parseClaudeUsage(
+      {
+        limits: [
+          { kind: "session", group: "session", percent: 12, resets_at: "2026-07-02T21:29:59Z" },
+          { kind: "weekly_all", group: "weekly", percent: 3, resets_at: "2026-07-07T04:59:59Z" },
+        ],
+      },
+      FAKE_NOW_MS,
+    );
+    expect(snap.windows.find((w) => w.id === "session-5h")?.usedPercent).toBe(12);
+    expect(snap.windows.find((w) => w.id === "weekly")?.usedPercent).toBe(3);
+  });
+
+  it("prefers the top-level per-model field over a limits entry for the same window", () => {
+    const snap = parseClaudeUsage(
+      {
+        seven_day_fable: { utilization: 25, resets_at: "2026-06-01T00:00:00Z" },
+        limits: [
+          {
+            kind: "weekly_scoped",
+            group: "weekly",
+            percent: 32,
+            scope: { model: { display_name: "Fable" } },
+          },
+        ],
+      },
+      FAKE_NOW_MS,
+    );
+    const fables = snap.windows.filter((w) => w.id === "weekly-fable");
+    expect(fables).toHaveLength(1);
+    expect(fables[0]?.usedPercent).toBe(25);
+  });
+
+  it("skips limits entries with unknown scopes, kinds, or missing percent", () => {
+    const snap = parseClaudeUsage(
+      {
+        limits: [
+          {
+            kind: "weekly_scoped",
+            percent: 10,
+            scope: { model: { display_name: "Some Future Model" } },
+          },
+          { kind: "weekly_scoped", percent: 10 },
+          { kind: "daily_mystery", percent: 10 },
+          { kind: "weekly_all" },
+          "not-an-object",
+          null,
+        ],
+      },
+      FAKE_NOW_MS,
+    );
+    expect(snap.windows).toEqual([]);
+  });
 });
 
 describe("collectClaude", () => {

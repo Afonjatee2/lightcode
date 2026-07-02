@@ -24,6 +24,16 @@ interface ClaudeWindowRaw {
   resets_at?: string | null;
 }
 
+interface ClaudeLimitRaw {
+  kind?: string;
+  group?: string;
+  percent?: number;
+  resets_at?: string | null;
+  scope?: {
+    model?: { id?: string | null; display_name?: string | null } | null;
+  } | null;
+}
+
 interface ClaudeUsageResponse {
   five_hour?: ClaudeWindowRaw;
   seven_day?: ClaudeWindowRaw;
@@ -31,6 +41,7 @@ interface ClaudeUsageResponse {
   seven_day_sonnet?: ClaudeWindowRaw;
   seven_day_fable?: ClaudeWindowRaw;
   seven_day_fable_5?: ClaudeWindowRaw;
+  limits?: ClaudeLimitRaw[] | null;
   /** Pay-as-you-go overage, billed in `currency` (USD) — not a rate window. */
   extra_usage?: {
     is_enabled?: boolean;
@@ -84,6 +95,43 @@ function normalizeClaudePercent(value: number | undefined): number | undefined {
   return Math.min(100, Math.max(0, Math.round(value * 10) / 10));
 }
 
+/**
+ * Newer `/api/oauth/usage` responses stopped reporting per-model weekly
+ * windows as top-level `seven_day_<model>` fields (those come back null) and
+ * instead carry them in a generic `limits` array — `weekly_scoped` entries
+ * whose scope names the model ("Fable", "Opus", ...). Map those onto the same
+ * canonical window ids. The window-id vocabulary is closed, so only known
+ * model names map; unknown scopes are skipped rather than inventing ids.
+ */
+const SCOPED_WEEKLY_WINDOWS: Record<string, { id: UsageWindowId; label: string }> = {
+  opus: { id: "weekly-opus", label: "Weekly (Opus)" },
+  sonnet: { id: "weekly-sonnet", label: "Weekly (Sonnet)" },
+  fable: { id: "weekly-fable", label: "Weekly (Fable)" },
+};
+
+function windowFromLimit(limit: ClaudeLimitRaw): UsageWindow | undefined {
+  const usedPercent = normalizeClaudePercent(limit.percent);
+  if (usedPercent === undefined) return undefined;
+  let target: { id: UsageWindowId; label: string } | undefined;
+  if (limit.kind === "session") {
+    target = { id: "session-5h", label: "Session (5h)" };
+  } else if (limit.kind === "weekly_all") {
+    target = { id: "weekly", label: "Weekly" };
+  } else if (limit.kind === "weekly_scoped") {
+    const model = limit.scope?.model?.display_name?.trim().toLowerCase();
+    target = model ? SCOPED_WEEKLY_WINDOWS[model] : undefined;
+  }
+  if (!target) return undefined;
+  const resetsAt = toEpochMs(limit.resets_at);
+  return {
+    id: target.id,
+    label: target.label,
+    usedPercent,
+    unit: "percent",
+    ...(resetsAt !== undefined ? { resetsAt } : {}),
+  };
+}
+
 /** Pure: map a parsed `/api/oauth/usage` body to a snapshot. */
 export function parseClaudeUsage(
   body: unknown,
@@ -100,6 +148,16 @@ export function parseClaudeUsage(
     windowFrom("weekly-fable", "Weekly (Fable)", data.seven_day_fable ?? data.seven_day_fable_5),
   ]) {
     if (w) windows.push(w);
+  }
+
+  // Supplement from `limits[]` — the top-level fields stay authoritative when
+  // both report the same window.
+  if (Array.isArray(data.limits)) {
+    for (const limit of data.limits) {
+      if (!limit || typeof limit !== "object") continue;
+      const w = windowFromLimit(limit);
+      if (w && !windows.some((existing) => existing.id === w.id)) windows.push(w);
+    }
   }
 
   // Pay-as-you-go overage: surfaced as its own dollar-denominated "Extra usage"
