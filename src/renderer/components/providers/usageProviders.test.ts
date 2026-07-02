@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { UsageWindow } from "@lightcode/agents-usage";
 import type { AgentInstanceConfigMap } from "@/shared/contracts";
 import {
+  isClaudeUsageProvider,
   pickUsageRings,
   resolveDisplayedProviders,
   usageProvidersForAgentInstances,
@@ -31,6 +32,12 @@ const agentInstances: AgentInstanceConfigMap = {
 };
 
 describe("usageProviders", () => {
+  it("recognizes base Claude and Claude profile usage providers", () => {
+    expect(isClaudeUsageProvider("claude")).toBe(true);
+    expect(isClaudeUsageProvider("claude:work")).toBe(true);
+    expect(isClaudeUsageProvider("codex")).toBe(false);
+  });
+
   it("adds Claude profile providers after the base Claude provider", () => {
     const providers = usageProvidersForAgentInstances(agentInstances);
     const claudeIndex = providers.findIndex((provider) => provider.id === "claude");
@@ -59,6 +66,17 @@ describe("usageProviders", () => {
     expect(pickUsageRings("claude:work", windows)).toEqual({
       outer: windows[1],
       inner: windows[0],
+    });
+  });
+
+  it("uses the Fable weekly window as a Claude inner ring when present", () => {
+    const windows: UsageWindow[] = [
+      { id: "session-5h", label: "Session", usedPercent: 80, unit: "percent" },
+      { id: "weekly-fable", label: "Weekly (Fable)", usedPercent: 25, unit: "percent" },
+    ];
+    expect(pickUsageRings("claude", windows)).toEqual({
+      outer: windows[0],
+      inner: windows[1],
     });
   });
 
