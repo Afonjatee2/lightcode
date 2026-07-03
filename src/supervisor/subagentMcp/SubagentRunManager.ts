@@ -4,6 +4,7 @@ import type {
   ProjectLocation,
   RuntimeEvent,
   ThreadConfig,
+  ThreadServerRequestId,
   ToolCallPayload,
 } from "@/shared/contracts";
 import type { AgentAdapter, StructuredSessionHandle } from "@/supervisor/agents/base";
@@ -33,6 +34,12 @@ interface RunRecord {
   /** Accumulated assistant text from `content.delta` events. */
   output: string;
   handle: StructuredSessionHandle | undefined;
+  /**
+   * Child-side ids of forwarded `request.opened` events still awaiting a
+   * resolution. Drained on settle/cancel via synthetic `request.resolved`
+   * events so the parent's request panel doesn't show a stale prompt.
+   */
+  pendingRequestIds: Set<string>;
   cancelRequested: boolean;
   settled: boolean;
   settledPromise: Promise<void>;
@@ -50,6 +57,36 @@ function childItemPrefix(runId: string): string {
 /** Synthetic parent tool_call item id that hosts the subagent's child items. */
 function syntheticItemId(runId: string): string {
   return `sub:${runId}`;
+}
+
+/**
+ * Delimiter joining a runId to a child's server-request id when a forwarded
+ * `request.opened` is namespaced into the parent stream. A double-colon can't
+ * appear in a hex runId, and parsing splits on the FIRST occurrence, so an
+ * original request id that itself contains "::" still round-trips intact.
+ */
+const REQUEST_ID_SEPARATOR = "::";
+
+/** Namespace a child request id under its run for the parent stream. */
+function namespacedRequestId(runId: string, requestId: string): string {
+  return `${runId}${REQUEST_ID_SEPARATOR}${requestId}`;
+}
+
+/**
+ * Recover `{ runId, requestId }` from a namespaced id. Returns `undefined` when
+ * the id isn't a namespaced subagent request (non-string, or no delimiter),
+ * signalling the caller to fall through to the normal session resolve path.
+ */
+function parseNamespacedRequestId(
+  namespaced: ThreadServerRequestId,
+): { runId: string; requestId: string } | undefined {
+  if (typeof namespaced !== "string") return undefined;
+  const idx = namespaced.indexOf(REQUEST_ID_SEPARATOR);
+  if (idx <= 0) return undefined;
+  return {
+    runId: namespaced.slice(0, idx),
+    requestId: namespaced.slice(idx + REQUEST_ID_SEPARATOR.length),
+  };
 }
 
 /**
@@ -127,6 +164,7 @@ export class SubagentRunManager {
       status: "running",
       output: "",
       handle: undefined,
+      pendingRequestIds: new Set<string>(),
       cancelRequested: false,
       settled: false,
       settledPromise,
@@ -187,6 +225,25 @@ export class SubagentRunManager {
     record.cancelRequested = true;
     await this.teardown(record);
     this.settle(record, "cancelled");
+  }
+
+  /**
+   * Route a resolution for a forwarded child request back to its handle.
+   * `namespacedRequestId` is the `${runId}::${requestId}` id the parent stream
+   * carried. Returns `false` when it isn't a subagent request (no delimiter, or
+   * an unknown run) so the caller can fall through to the normal session path;
+   * `true` once the owning run is found (best-effort resolve on its handle).
+   */
+  resolveChildServerRequest(requestId: ThreadServerRequestId, response: unknown): boolean {
+    const parsed = parseNamespacedRequestId(requestId);
+    if (!parsed) return false;
+    const record = this.runs.get(parsed.runId);
+    if (!record) return false;
+    record.pendingRequestIds.delete(parsed.requestId);
+    if (record.handle?.resolveServerRequest) {
+      void record.handle.resolveServerRequest(parsed.requestId, response).catch(() => {});
+    }
+    return true;
   }
 
   /**
@@ -256,10 +313,13 @@ export class SubagentRunManager {
 
   /**
    * Consume a child event: accumulate assistant output, drive lifecycle from
-   * turn completion, and forward only item-level events onto the parent stream.
-   * Turn/session/context/request events are intentionally NOT forwarded — they
-   * belong to the child's own lifecycle and would corrupt the parent thread's
-   * turn state if replayed under the parent threadId.
+   * turn completion, and forward item-level + server-request events onto the
+   * parent stream. Server requests are re-tagged (threadId → parent, requestId
+   * namespaced under the run) so a child asking for permission/user input
+   * surfaces in the parent's request panel and its resolution routes back via
+   * {@link resolveChildServerRequest}. Turn/session/context events are NOT
+   * forwarded — they belong to the child's own lifecycle and would corrupt the
+   * parent thread's turn state if replayed under the parent threadId.
    */
   private onChildEvent(record: RunRecord, event: RuntimeEvent): void {
     switch (event.type) {
@@ -272,6 +332,14 @@ export class SubagentRunManager {
       case "item.completed":
         this.deps.host.appendRuntimeEvent(record.parentThreadId, this.retag(record, event));
         return;
+      case "request.opened":
+        record.pendingRequestIds.add(event.requestId);
+        this.deps.host.appendRuntimeEvent(record.parentThreadId, this.retag(record, event));
+        return;
+      case "request.resolved":
+        record.pendingRequestIds.delete(event.requestId);
+        this.deps.host.appendRuntimeEvent(record.parentThreadId, this.retag(record, event));
+        return;
       case "turn.completed":
         this.settle(record, event.state === "completed" ? "completed" : "failed");
         return;
@@ -281,12 +349,20 @@ export class SubagentRunManager {
   }
 
   /**
-   * Re-tag a child item event so it merges into the parent stream: point
-   * threadId at the parent, prefix every child itemId, and nest top-level child
-   * items under the synthetic tile (deeper items keep their prefixed parent).
+   * Re-tag a child event so it merges into the parent stream: point threadId at
+   * the parent, prefix every child itemId, nest top-level child items under the
+   * synthetic tile (deeper items keep their prefixed parent), and namespace
+   * server-request ids under the run so resolutions route back to the child.
    */
   private retag(record: RunRecord, event: RuntimeEvent): RuntimeEvent {
     const prefix = childItemPrefix(record.runId);
+    if (event.type === "request.opened" || event.type === "request.resolved") {
+      return {
+        ...event,
+        threadId: record.parentThreadId,
+        requestId: namespacedRequestId(record.runId, event.requestId),
+      };
+    }
     if (event.type === "item.started") {
       return {
         ...event,
@@ -316,6 +392,19 @@ export class SubagentRunManager {
     if (record.settled) return;
     record.settled = true;
     if (record.status === "running") record.status = status;
+
+    // Clear any still-open forwarded requests so the parent's request panel
+    // doesn't strand a stale prompt for a child that's gone.
+    for (const requestId of record.pendingRequestIds) {
+      this.deps.host.appendRuntimeEvent(record.parentThreadId, {
+        type: "request.resolved",
+        threadId: record.parentThreadId,
+        requestId: namespacedRequestId(record.runId, requestId),
+        outcome: "cancelled",
+      });
+    }
+    record.pendingRequestIds.clear();
+
     void this.teardown(record);
 
     const text = errorMessage ? `${record.output}\n${errorMessage}`.trim() : record.output;

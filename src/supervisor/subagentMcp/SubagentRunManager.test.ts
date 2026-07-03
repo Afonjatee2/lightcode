@@ -24,6 +24,7 @@ class FakeHandle implements StructuredSessionHandle {
   disposed = false;
   interrupted = false;
   startTurns: Array<{ prompt: string; config: ThreadConfig }> = [];
+  resolvedRequests: Array<{ requestId: string | number; response: unknown }> = [];
 
   setListener(listener: StructuredSessionListener): void {
     this.listener = listener;
@@ -34,12 +35,24 @@ class FakeHandle implements StructuredSessionHandle {
   async interruptTurn(): Promise<void> {
     this.interrupted = true;
   }
+  async resolveServerRequest(requestId: string | number, response: unknown): Promise<void> {
+    this.resolvedRequests.push({ requestId, response });
+  }
   async dispose(): Promise<void> {
     this.disposed = true;
   }
 
   emit(event: RuntimeEvent): void {
     this.listener?.onRuntimeEvent?.(event);
+  }
+  openRequest(requestId: string): void {
+    this.emit({
+      type: "request.opened",
+      threadId: "child",
+      requestId,
+      requestType: "tool_call_approval",
+      payload: { summary: "May I run this tool?" },
+    });
   }
   completeTurn(state: "completed" | "failed" | "interrupted" | "cancelled"): void {
     this.emit({ type: "turn.completed", threadId: "child", turnId: "turn-1", state });
@@ -269,5 +282,115 @@ describe("SubagentRunManager", () => {
     h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
     await flush();
     expect(h.inputs[0]!.config.model).toBe("gpt-5.5");
+  });
+
+  it("forwards a child request.opened, namespacing the requestId under the run", async () => {
+    const h = makeHarness();
+    const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    h.handles[0]!.openRequest("perm-1");
+
+    const opened = h.appended
+      .map((a) => a.event)
+      .find(
+        (e): e is Extract<RuntimeEvent, { type: "request.opened" }> => e.type === "request.opened",
+      );
+    expect(opened).toBeDefined();
+    expect(opened!.threadId).toBe(PARENT);
+    expect(opened!.requestId).toBe(`${runId}::perm-1`);
+    expect(opened!.requestType).toBe("tool_call_approval");
+  });
+
+  it("routes a namespaced resolution back to the child handle and strips the prefix", async () => {
+    const h = makeHarness();
+    const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    h.handles[0]!.openRequest("perm-1");
+
+    const handled = h.manager.resolveChildServerRequest(`${runId}::perm-1`, { optionId: "allow" });
+    expect(handled).toBe(true);
+    expect(h.handles[0]!.resolvedRequests).toEqual([
+      { requestId: "perm-1", response: { optionId: "allow" } },
+    ]);
+  });
+
+  it("round-trips a request id that itself contains the delimiter", async () => {
+    const h = makeHarness();
+    const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    h.handles[0]!.openRequest("weird::id");
+
+    const handled = h.manager.resolveChildServerRequest(`${runId}::weird::id`, { optionId: "ok" });
+    expect(handled).toBe(true);
+    expect(h.handles[0]!.resolvedRequests[0]!.requestId).toBe("weird::id");
+  });
+
+  it("returns false for non-subagent request ids (unknown run / no delimiter / number)", () => {
+    const h = makeHarness();
+    expect(h.manager.resolveChildServerRequest("plain-request-id", {})).toBe(false);
+    expect(h.manager.resolveChildServerRequest("deadbeef::perm", {})).toBe(false);
+    expect(h.manager.resolveChildServerRequest(42, {})).toBe(false);
+  });
+
+  it("emits a synthetic request.resolved for an unresolved forwarded request on settle", async () => {
+    const h = makeHarness();
+    const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    h.handles[0]!.openRequest("perm-1");
+    h.handles[0]!.completeTurn("completed");
+    await h.manager.waitFor(runId, 1000);
+
+    const resolved = h.appended
+      .map((a) => a.event)
+      .filter(
+        (e): e is Extract<RuntimeEvent, { type: "request.resolved" }> =>
+          e.type === "request.resolved",
+      )
+      .find((e) => e.requestId === `${runId}::perm-1`);
+    expect(resolved).toBeDefined();
+    expect(resolved!.threadId).toBe(PARENT);
+    expect(resolved!.outcome).toBe("cancelled");
+  });
+
+  it("clears a forwarded request on cancel and drops its resolution afterward", async () => {
+    const h = makeHarness();
+    const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    h.handles[0]!.openRequest("perm-1");
+    await h.manager.cancel(runId);
+
+    const resolved = h.appended
+      .map((a) => a.event)
+      .find(
+        (e): e is Extract<RuntimeEvent, { type: "request.resolved" }> =>
+          e.type === "request.resolved" && e.requestId === `${runId}::perm-1`,
+      );
+    expect(resolved).toBeDefined();
+    // The run record still exists, so the id is recognized, but its pending set
+    // was cleared on settle — the resolve is a no-op on the (already torn-down) handle.
+    expect(h.manager.resolveChildServerRequest(`${runId}::perm-1`, {})).toBe(true);
+    expect(h.handles[0]!.resolvedRequests).toEqual([]);
+  });
+
+  it("does not re-forward a child request.resolved after it was already resolved", async () => {
+    const h = makeHarness();
+    const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "go" });
+    await flush();
+    h.handles[0]!.openRequest("perm-1");
+    h.handles[0]!.emit({
+      type: "request.resolved",
+      threadId: "child",
+      requestId: "perm-1",
+      outcome: "accepted",
+    });
+
+    const resolvedEvents = h.appended
+      .map((a) => a.event)
+      .filter(
+        (e): e is Extract<RuntimeEvent, { type: "request.resolved" }> =>
+          e.type === "request.resolved" && e.requestId === `${runId}::perm-1`,
+      );
+    expect(resolvedEvents).toHaveLength(1);
+    expect(resolvedEvents[0]!.outcome).toBe("accepted");
   });
 });

@@ -2,7 +2,30 @@ import type { AgentKind, AgentStatus } from "@/shared/contracts";
 import type { AgentAdapter } from "@/supervisor/agents/base";
 import { DEFAULT_WAIT_TIMEOUT_MS, SubagentSpawnError } from "./SubagentRunManager";
 import type { SubagentRunManager } from "./SubagentRunManager";
-import type { McpToolResult, SpawnableAgent, SpawnAgentRequest } from "./types";
+import type { McpToolResult, ModelTier, SpawnableAgent, SpawnAgentRequest } from "./types";
+
+const FAST_CHEAP_KEYWORDS = ["haiku", "mini", "nano", "lite", "flash", "small", "spark", "fast"];
+const MAX_CAPABILITY_KEYWORDS = ["opus", "fable", "pro", "max", "ultra", "big"];
+
+/** Whether `keyword` appears in `haystack` as a whole word (not as a substring of a larger word). */
+function hasWholeWordMatch(haystack: string, keyword: string): boolean {
+  return new RegExp(`\\b${keyword}\\b`, "i").test(haystack);
+}
+
+/**
+ * Classify a model into a coarse cost/capability tier from its id/label,
+ * keyword-matched case-insensitively and provider-agnostic (no per-provider
+ * special-casing). Matches whole words only, so e.g. "gemini" doesn't
+ * false-positive on the "mini" keyword.
+ */
+export function classifyModelTier(modelId: string, modelLabel: string): ModelTier {
+  const haystack = `${modelId} ${modelLabel}`;
+  if (FAST_CHEAP_KEYWORDS.some((keyword) => hasWholeWordMatch(haystack, keyword)))
+    return "fast-cheap";
+  if (MAX_CAPABILITY_KEYWORDS.some((keyword) => hasWholeWordMatch(haystack, keyword)))
+    return "max-capability";
+  return "balanced";
+}
 
 export interface ToolSpec {
   name: string;
@@ -29,7 +52,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "list_agents",
     description:
-      "List the AI agents you can spawn as subagents, each with its available models and effort levels. Pick fast/cheap models for light tasks (search, summarization, bulk edits) and stronger models for implementation or review.",
+      "List the AI agents you can spawn as subagents, each with its available models and effort levels. Pick fast/cheap models for light tasks (search, summarization, bulk edits) and stronger models for implementation or review. Each model carries a tier hint: fast-cheap | balanced | max-capability.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -132,7 +155,11 @@ export function buildSpawnableAgents(
     if (!status.installed || status.authState !== "authenticated") continue;
     const adapter = adapters.get(status.kind);
     if (!adapter?.createStructuredSession) continue;
-    const models = status.capabilities.models.map((m) => ({ value: m.id, label: m.label }));
+    const models = status.capabilities.models.map((m) => ({
+      value: m.id,
+      label: m.label,
+      tier: classifyModelTier(m.id, m.label),
+    }));
     if (models.length === 0) continue;
     const efforts = status.capabilities.efforts;
     const defaultModel = models[0]?.value;

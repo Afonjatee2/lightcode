@@ -10,7 +10,15 @@ import { baseAgentKind, type ThreadPresentationMode } from "@/shared/contracts";
  *              (Codex `-c` argv, ACP `newSession.mcpServers`). Badge controls
  *              launch; once running it is read-only.
  * - "none":    no per-thread gating point exists (Claude TUI: no MCP wired;
- *              Gemini / OpenCode: not wired in this phase).
+ *              Gemini TUI / OpenCode TUI: install-time / launch-time global
+ *              config).
+ *
+ * Mapping matches `browserMcpScope.ts` except OpenCode: the browser MCP is
+ * enabled for OpenCode via a global agent setting (so its per-thread scope is
+ * "none"), but subagents has no global equivalent — the per-thread badge is
+ * the only gate, and `syncOpenCodeSubagentMcpConfigFile` is wired into both
+ * the terminal argv builders and the SDK activate path, so both presentations
+ * are "launch".
  *
  * Source of truth: `src/supervisor/agents/*\/mcpSubagent.ts` and their callers.
  */
@@ -21,15 +29,10 @@ export function getSubagentMcpScope(
   presentationMode: ThreadPresentationMode,
 ): SubagentMcpScope {
   const baseKind = baseAgentKind(agentKind);
+  if (baseKind === "opencode") return "launch";
   if (presentationMode === "gui") {
     if (baseKind === "claude") return "always";
-    if (
-      baseKind === "gemini" ||
-      baseKind === "opencode" ||
-      baseKind === "antigravity" ||
-      baseKind === "commandcode"
-    )
-      return "none";
+    if (baseKind === "antigravity" || baseKind === "commandcode") return "none";
     return "launch";
   }
   if (baseKind === "codex") return "launch";

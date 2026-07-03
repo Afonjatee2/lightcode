@@ -27,6 +27,7 @@ import {
   type TerminalSize,
   type ThreadConfig,
   type ThreadRuntimeSnapshot,
+  type ThreadServerRequestId,
   type ThreadStatus,
   type WriteTerminalPayload,
   type RuntimeEvent,
@@ -40,7 +41,11 @@ import {
   resolveBrowserMcpHttpConfigForLaunch,
   type BrowserMcpHttpConfig,
 } from "@/supervisor/agents/browserMcp";
-import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
+import {
+  resolveSubagentMcpHttpConfigForLaunch,
+  type SubagentMcpHostGatewayResolver,
+  type SubagentMcpHttpConfig,
+} from "@/supervisor/agents/subagentMcp";
 import {
   type AgentAdapter,
   type AgentLaunchOptions,
@@ -122,7 +127,20 @@ export interface ThreadSessionManagerOptions {
     register(threadId: string): SubagentMcpHttpConfig | undefined;
     unregister(threadId: string): void;
     cancelAll(threadId: string): void;
+    /**
+     * Try to route a server-request resolution to a subagent child run. Returns
+     * `true` when the id belonged to a subagent (namespaced under a run) and was
+     * handled; `false` to fall through to the normal session resolve path.
+     */
+    resolveChildRequest(requestId: ThreadServerRequestId, response: unknown): boolean;
   };
+  /**
+   * Optional: resolves the WSL → host gateway IP so subagents MCP URLs can be
+   * rewritten for agents launched inside a WSL distro (the ingress binds
+   * `0.0.0.0` on Windows for this). Windows-only in practice; absent/undefined
+   * on macOS/Linux, which makes the WSL rewrite path inert.
+   */
+  subagentMcpHostGateway?: SubagentMcpHostGatewayResolver;
 }
 
 function shouldPrimeNativeProjectShellEnv(
@@ -1009,6 +1027,12 @@ export class ThreadSessionManager {
   }
 
   async resolveThreadServerRequest(payload: ResolveThreadServerRequestPayload): Promise<void> {
+    // Forwarded subagent requests carry a run-namespaced id; route them to the
+    // owning child handle first and only fall through to the parent session
+    // when the id isn't a subagent request.
+    if (this.options.subagentMcp?.resolveChildRequest(payload.requestId, payload.response)) {
+      return;
+    }
     const session = this.requireSession(payload.threadId);
     if (!session.structuredSession?.resolveServerRequest) {
       throw new Error(`Thread ${payload.threadId} does not support server request resolution.`);
@@ -1341,7 +1365,11 @@ export class ThreadSessionManager {
       payload.projectLocation,
       payload.config,
     );
-    const subagentMcp = this.resolveSubagentMcpForLaunch(payload.threadId, payload.config);
+    const subagentMcp = this.resolveSubagentMcpForLaunch(
+      payload.threadId,
+      payload.projectLocation,
+      payload.config,
+    );
     const structuredSession = await this.createStructuredSession(
       adapter,
       payload.threadId,
@@ -2037,7 +2065,11 @@ export class ThreadSessionManager {
       session.projectLocation,
       config,
     );
-    const subagentMcp = this.resolveSubagentMcpForLaunch(session.threadId, config);
+    const subagentMcp = this.resolveSubagentMcpForLaunch(
+      session.threadId,
+      session.projectLocation,
+      config,
+    );
     const structuredSession = await this.createStructuredSession(
       session.adapter,
       session.threadId,
@@ -2215,7 +2247,11 @@ export class ThreadSessionManager {
         session.projectLocation,
         session.config,
       );
-      const subagentMcp = this.resolveSubagentMcpForLaunch(session.threadId, session.config);
+      const subagentMcp = this.resolveSubagentMcpForLaunch(
+        session.threadId,
+        session.projectLocation,
+        session.config,
+      );
       const cliHookExtras = await this.resolveCliHookPluginExtras(
         session.threadId,
         session.agentKind,
@@ -2458,14 +2494,22 @@ export class ThreadSessionManager {
   /**
    * Resolve the subagents MCP http config for a launch when the thread opted
    * in (`config.subagentMcp === true`). Registers the thread with the ingress
-   * (idempotent — reuses an existing token). Native only for the MVP.
+   * (idempotent — reuses an existing token), then rewrites the loopback URL to
+   * the WSL → host gateway IP for WSL projects (native projects pass through
+   * unchanged). Parallel to `resolveBrowserMcpForLaunch`.
    */
   private resolveSubagentMcpForLaunch(
     threadId: string,
+    location: ProjectLocation,
     config: ThreadConfig,
   ): SubagentMcpHttpConfig | undefined {
     if (config.subagentMcp !== true) return undefined;
-    return this.options.subagentMcp?.register(threadId);
+    const native = this.options.subagentMcp?.register(threadId);
+    return resolveSubagentMcpHttpConfigForLaunch(
+      native,
+      location,
+      this.options.subagentMcpHostGateway,
+    );
   }
 
   private isBrowserMcpEnabledForLaunch(

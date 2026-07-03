@@ -13,6 +13,10 @@ import { fileURLToPath } from "node:url";
 import type { ProjectLocation } from "@/shared/contracts";
 import { toWslUncPath } from "@/shared/wsl";
 import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
+import {
+  SUBAGENT_MCP_SERVER_NAME,
+  type SubagentMcpHttpConfig,
+} from "@/supervisor/agents/subagentMcp";
 import { getCachedWslHomeDirectory, type AgentEnvContext } from "../../base";
 import { BROWSER_MCP_SERVER_NAME } from "../../browserMcp";
 import {
@@ -27,7 +31,8 @@ import {
   stagePluginAssetsToWsl,
   type PluginManifest,
 } from "../../plugin/installerBase";
-import { buildOpenCodeBrowserMcp } from "../mcpBrowser";
+import { buildOpenCodeBrowserMcp, type OpenCodeMcpServers } from "../mcpBrowser";
+import { buildOpenCodeSubagentMcp } from "../mcpSubagent";
 
 /**
  * OpenCode plugin installer.
@@ -96,6 +101,12 @@ const OPENCODE_LEGACY_DROP_FILES = ["lightcode-status.mjs"] as const;
 const LIGHTCODE_PLUGIN_SPEC_MARKER = "agent-plugins/opencode/";
 
 const OPENCODE_CONFIG_FILE_NAME = "opencode.json";
+
+/**
+ * All `mcp` server keys Lightcode owns in `opencode.json`. Scrubbed together at
+ * install/uninstall so no stale lightcode-managed entry survives a reinstall.
+ */
+const LIGHTCODE_MANAGED_MCP_KEYS = [BROWSER_MCP_SERVER_NAME, SUBAGENT_MCP_SERVER_NAME] as const;
 
 export interface OpenCodePluginPaths {
   pluginDir: string;
@@ -238,7 +249,7 @@ export function installOpenCodePlugin(
   // wrote into opencode.json. Browser MCP is synced at OpenCode launch time so
   // it can honor the user's provider setting.
   const nativeConfigPath = join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME);
-  updateOpenCodeConfigFile(nativeConfigPath, undefined);
+  updateOpenCodeConfigFile(nativeConfigPath, { remove: LIGHTCODE_MANAGED_MCP_KEYS });
 
   console.log(
     `[supervisor] OpenCode hook plugin staged v${manifest.version} at ${pluginDir} ` +
@@ -292,7 +303,7 @@ function installOpenCodePluginWsl(
   const cfgDir = resolveOpenCodeWslConfigDir(distro);
   if (cfgDir) {
     const wslConfigPath = `${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`;
-    updateOpenCodeConfigFile(wslConfigPath, undefined);
+    updateOpenCodeConfigFile(wslConfigPath, { remove: LIGHTCODE_MANAGED_MCP_KEYS });
   }
 
   console.log(
@@ -401,22 +412,27 @@ function readJsonFileOrEmpty(path: string): ReadJsonOk | ReadJsonErr {
   }
 }
 
-type BrowserMcpServers =
-  | Record<
-      string,
-      { type: "remote"; url: string; headers: Record<string, string>; enabled?: boolean }
-    >
-  | undefined;
+interface OpenCodeMcpConfigUpdate {
+  /**
+   * Lightcode-managed `mcp` server keys to strip before (re)adding. Callers
+   * pass only the keys they own so unrelated MCP servers (and each other's
+   * entries — browser vs subagents) are preserved across independent syncs.
+   */
+  remove: readonly string[];
+  /** MCP server entries to (re)add. Omit to only remove. */
+  add?: OpenCodeMcpServers;
+}
 
 /**
  * Update `opencode.json` in a single read+write: scrub any lightcode-managed
  * `file://` plugin entry (left behind by older lightcode builds) and merge the
- * browser MCP server entry under `mcp`. Pass `servers` as `undefined` to only
- * scrub the plugin entry. Writes only when the resulting JSON actually differs
- * from what's on disk. Best-effort: missing files / malformed JSON are
- * swallowed.
+ * requested lightcode-managed MCP server entries under `mcp`. Only the keys in
+ * `update.remove` are touched, so browser and subagents syncs can run
+ * independently without clobbering one another. Writes only when the resulting
+ * JSON actually differs from what's on disk. Best-effort: missing files /
+ * malformed JSON are swallowed.
  */
-function updateOpenCodeConfigFile(configPath: string, servers: BrowserMcpServers): void {
+function updateOpenCodeConfigFile(configPath: string, update: OpenCodeMcpConfigUpdate): void {
   const read = readJsonFileOrEmpty(configPath);
   if (!read.ok) return;
   const original =
@@ -443,9 +459,9 @@ function updateOpenCodeConfigFile(configPath: string, servers: BrowserMcpServers
     mcpRaw && typeof mcpRaw === "object" && !Array.isArray(mcpRaw)
       ? { ...(mcpRaw as Record<string, unknown>) }
       : {};
-  delete mcp[BROWSER_MCP_SERVER_NAME];
-  if (servers) {
-    for (const [name, entry] of Object.entries(servers)) {
+  for (const name of update.remove) delete mcp[name];
+  if (update.add) {
+    for (const [name, entry] of Object.entries(update.add)) {
       mcp[name] = entry;
     }
   }
@@ -476,19 +492,45 @@ export function syncOpenCodeBrowserMcpConfigFile(
   enabled: boolean,
   browserMcp?: BrowserMcpHttpConfig,
 ): void {
+  const add = enabled ? buildOpenCodeBrowserMcp(location, browserMcp) : undefined;
+  const update: OpenCodeMcpConfigUpdate = {
+    remove: [BROWSER_MCP_SERVER_NAME],
+    ...(add ? { add } : {}),
+  };
+  writeOpenCodeConfigUpdate(location, update);
+}
+
+/**
+ * Merge (or clear) the cross-provider subagents MCP server entry in
+ * `opencode.json`. Mirrors `syncOpenCodeBrowserMcpConfigFile`; the endpoint is
+ * pre-resolved so there is no location/WSL fallback. Passing an undefined
+ * `subagentMcp` clears the entry.
+ */
+export function syncOpenCodeSubagentMcpConfigFile(
+  location: ProjectLocation,
+  subagentMcp?: SubagentMcpHttpConfig,
+): void {
+  const add = buildOpenCodeSubagentMcp(subagentMcp);
+  const update: OpenCodeMcpConfigUpdate = {
+    remove: [SUBAGENT_MCP_SERVER_NAME],
+    ...(add ? { add } : {}),
+  };
+  writeOpenCodeConfigUpdate(location, update);
+}
+
+function writeOpenCodeConfigUpdate(
+  location: ProjectLocation,
+  update: OpenCodeMcpConfigUpdate,
+): void {
   if (location.kind === "wsl") {
     const cfgDir = resolveOpenCodeWslConfigDir(location.distro);
     if (!cfgDir) return;
-    updateOpenCodeConfigFile(
-      `${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`,
-      enabled ? buildOpenCodeBrowserMcp(location, browserMcp) : undefined,
-    );
+    updateOpenCodeConfigFile(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`, update);
     return;
   }
-
   updateOpenCodeConfigFile(
     join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME),
-    enabled ? buildOpenCodeBrowserMcp(location, browserMcp) : undefined,
+    update,
   );
 }
 
@@ -508,7 +550,9 @@ export function uninstallOpenCodePlugin(ctx?: AgentEnvContext): void {
     }
     const cfgDir = resolveOpenCodeWslConfigDir(ctx.wslDistro);
     if (cfgDir) {
-      updateOpenCodeConfigFile(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`, undefined);
+      updateOpenCodeConfigFile(`${cfgDir.uncDir}\\${OPENCODE_CONFIG_FILE_NAME}`, {
+        remove: LIGHTCODE_MANAGED_MCP_KEYS,
+      });
     }
     removeStagedPluginDir("opencode", ctx);
     return;
@@ -517,10 +561,9 @@ export function uninstallOpenCodePlugin(ctx?: AgentEnvContext): void {
   removeIfPresent(join(pluginsDir, OPENCODE_PLUGIN_DROP_FILE_NAME));
   removeIfPresent(join(pluginsDir, OPENCODE_PLUGIN_DROP_MANIFEST_NAME));
   cleanupLegacyDrops(pluginsDir);
-  updateOpenCodeConfigFile(
-    join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME),
-    undefined,
-  );
+  updateOpenCodeConfigFile(join(resolveOpenCodeNativeConfigDir(), OPENCODE_CONFIG_FILE_NAME), {
+    remove: LIGHTCODE_MANAGED_MCP_KEYS,
+  });
   removeStagedPluginDir("opencode", ctx);
 }
 

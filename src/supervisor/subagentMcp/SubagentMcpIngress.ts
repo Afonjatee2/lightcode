@@ -49,7 +49,14 @@ type JsonRpcResponse = JsonRpcResponseOk | JsonRpcResponseErr;
  * own 256-bit bearer token, and `tools/call` resolves the caller's parent
  * thread from that token so spawned children attach to the right parent.
  *
- * Binds `127.0.0.1` only — WSL reach-through is out of scope for the MVP.
+ * Bind address: `127.0.0.1` everywhere except Windows, where we bind `0.0.0.0`
+ * so an agent launched inside a WSL distro can reach this host ingress over the
+ * WSL2 NAT gateway IP (a distro's loopback can't hit the host's `127.0.0.1`).
+ * This mirrors `BrowserMcpIngress`'s posture. Tradeoff: on Windows the port is
+ * reachable from any interface, so the per-thread 256-bit bearer token is the
+ * security boundary — every request must present a token that maps to a
+ * registered parent thread (see `resolveThreadId`). We keep the tighter
+ * loopback bind on macOS/Linux since WSL only exists on Windows.
  */
 export class SubagentMcpIngress {
   private server: Server | null = null;
@@ -64,7 +71,10 @@ export class SubagentMcpIngress {
     return await new Promise<SubagentMcpIngressInfo>((resolve, reject) => {
       const server = createServer((req, res) => this.handle(req, res));
       server.on("error", reject);
-      server.listen(0, "127.0.0.1", () => {
+      // See the class doc comment: 0.0.0.0 on Windows for WSL reach-through,
+      // loopback elsewhere. Bearer-token auth is the security boundary.
+      const bindHost = process.platform === "win32" ? "0.0.0.0" : "127.0.0.1";
+      server.listen(0, bindHost, () => {
         const addr = server.address();
         const port = typeof addr === "object" && addr ? addr.port : 0;
         this.server = server;

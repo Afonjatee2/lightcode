@@ -1,15 +1,20 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
+import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
 import {
   getGeminiPluginPaths,
   installGeminiPlugin,
   isGeminiPluginInstalled,
   renderGeminiSettings,
+  syncGeminiBrowserMcpSettings,
+  syncGeminiSubagentMcpSettings,
 } from "./install";
 
 const tempDirs: string[] = [];
+let savedBrowserMcpEnv: { url?: string; token?: string };
 
 function makeBaseDir(): string {
   const dir = mkdtempSync(join(tmpdir(), "lightcode-gemini-plugin-"));
@@ -17,9 +22,30 @@ function makeBaseDir(): string {
   return dir;
 }
 
+beforeEach(() => {
+  // The install path bakes a browser MCP entry from these env vars when set.
+  // Clear them so mcpServers assertions are deterministic in CI/dev shells.
+  savedBrowserMcpEnv = {
+    ...(process.env.LIGHTCODE_BROWSER_MCP_URL !== undefined
+      ? { url: process.env.LIGHTCODE_BROWSER_MCP_URL }
+      : {}),
+    ...(process.env.LIGHTCODE_BROWSER_MCP_TOKEN !== undefined
+      ? { token: process.env.LIGHTCODE_BROWSER_MCP_TOKEN }
+      : {}),
+  };
+  delete process.env.LIGHTCODE_BROWSER_MCP_URL;
+  delete process.env.LIGHTCODE_BROWSER_MCP_TOKEN;
+});
+
 afterEach(() => {
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true });
+  }
+  if (savedBrowserMcpEnv.url !== undefined) {
+    process.env.LIGHTCODE_BROWSER_MCP_URL = savedBrowserMcpEnv.url;
+  }
+  if (savedBrowserMcpEnv.token !== undefined) {
+    process.env.LIGHTCODE_BROWSER_MCP_TOKEN = savedBrowserMcpEnv.token;
   }
 });
 
@@ -93,5 +119,84 @@ describe("installGeminiPlugin", () => {
         ? /^(?:pwsh(?:\.exe)?|powershell(?:\.exe)?|cmd\.exe \/d \/s \/c call ")/
         : /^(?!cmd\.exe)/,
     );
+  });
+});
+
+const subagentCfg: SubagentMcpHttpConfig = {
+  url: "http://127.0.0.1:9200/mcp",
+  token: "subagent-token",
+  headers: { Authorization: "Bearer subagent-token" },
+};
+
+const browserCfg: BrowserMcpHttpConfig = {
+  url: "http://127.0.0.1:45678/mcp",
+  token: "browser-secret",
+  headers: { Authorization: "Bearer browser-secret" },
+};
+
+type McpSettings = {
+  mcpServers?: Record<string, { httpUrl?: string; headers?: Record<string, string> }>;
+};
+
+function readSettings(path: string): McpSettings {
+  return JSON.parse(readFileSync(path, "utf8")) as McpSettings;
+}
+
+describe("syncGeminiSubagentMcpSettings", () => {
+  it("registers and clears the subagents MCP entry without touching other keys", () => {
+    const baseDir = makeBaseDir();
+    const ctx = { envKind: "posix" as const, baseDir };
+    const install = installGeminiPlugin(ctx);
+    expect(install.ok).toBe(true);
+    if (!install.ok) return;
+    const settingsPath = install.paths.settingsPath;
+
+    syncGeminiSubagentMcpSettings(ctx, subagentCfg);
+    expect(readSettings(settingsPath).mcpServers).toEqual({
+      subagents: {
+        httpUrl: subagentCfg.url,
+        headers: subagentCfg.headers,
+        timeout: 30_000,
+      },
+    });
+
+    // Clearing removes the subagents key and drops mcpServers entirely.
+    syncGeminiSubagentMcpSettings(ctx, undefined);
+    expect(readSettings(settingsPath).mcpServers).toBeUndefined();
+  });
+
+  it("coexists with the browser MCP entry (neither sync clobbers the other)", () => {
+    const baseDir = makeBaseDir();
+    const ctx = { envKind: "posix" as const, baseDir };
+    const install = installGeminiPlugin(ctx);
+    expect(install.ok).toBe(true);
+    if (!install.ok) return;
+    const settingsPath = install.paths.settingsPath;
+
+    syncGeminiSubagentMcpSettings(ctx, subagentCfg);
+    syncGeminiBrowserMcpSettings({ ...ctx, browserMcpEnabled: true }, browserCfg);
+
+    expect(readSettings(settingsPath).mcpServers).toEqual({
+      subagents: {
+        httpUrl: subagentCfg.url,
+        headers: subagentCfg.headers,
+        timeout: 30_000,
+      },
+      browser: {
+        httpUrl: browserCfg.url,
+        headers: browserCfg.headers,
+        timeout: 30_000,
+      },
+    });
+
+    // Disabling the browser MCP leaves the subagents entry intact.
+    syncGeminiBrowserMcpSettings({ ...ctx, browserMcpEnabled: false }, undefined);
+    expect(readSettings(settingsPath).mcpServers).toEqual({
+      subagents: {
+        httpUrl: subagentCfg.url,
+        headers: subagentCfg.headers,
+        timeout: 30_000,
+      },
+    });
   });
 });

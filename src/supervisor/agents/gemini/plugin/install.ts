@@ -2,8 +2,13 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { toWslUncPath } from "@/shared/wsl";
-import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
-import { buildGeminiBrowserMcpServers } from "../mcpBrowser";
+import { BROWSER_MCP_SERVER_NAME, type BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
+import {
+  SUBAGENT_MCP_SERVER_NAME,
+  type SubagentMcpHttpConfig,
+} from "@/supervisor/agents/subagentMcp";
+import { buildGeminiBrowserMcpServers, type GeminiMcpServerEntry } from "../mcpBrowser";
+import { buildGeminiSubagentMcpServers } from "../mcpSubagent";
 import type { AgentEnvContext } from "../../base";
 import {
   FORWARD_RUNTIME_FILE,
@@ -138,6 +143,40 @@ function resolveSettingsWritePath(ctx: AgentEnvContext | undefined, settingsPath
   return isWslPluginContext(ctx) ? toWslUncPath(ctx.wslDistro, settingsPath) : settingsPath;
 }
 
+/**
+ * Merge (or clear) a single lightcode-managed `mcpServers` entry, preserving
+ * every other key. Browser and subagents each own one key, so their syncs can
+ * run independently against the same `settings.json` without clobbering one
+ * another. Returns `undefined` when the map ends up empty so the caller can
+ * drop `mcpServers` entirely.
+ */
+function upsertGeminiMcpServer(
+  existing: GeminiSettings["mcpServers"],
+  name: string,
+  entry: GeminiMcpServerEntry | undefined,
+): GeminiSettings["mcpServers"] {
+  const next: Record<string, GeminiMcpServerEntry> = { ...(existing ?? {}) };
+  if (entry) next[name] = entry;
+  else delete next[name];
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function writeGeminiMcpServer(
+  settingsPath: string,
+  name: string,
+  entry: GeminiMcpServerEntry | undefined,
+): void {
+  try {
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as GeminiSettings;
+    const next = upsertGeminiMcpServer(settings.mcpServers, name, entry);
+    if (next) settings.mcpServers = next;
+    else delete settings.mcpServers;
+    writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+  } catch {
+    // Best-effort; stale settings should not block thread launch.
+  }
+}
+
 export function syncGeminiBrowserMcpSettings(
   ctx: AgentEnvContext | undefined,
   browserMcp?: BrowserMcpHttpConfig,
@@ -146,23 +185,33 @@ export function syncGeminiBrowserMcpSettings(
   const paths = getGeminiPluginPaths(ctx);
   if (!paths.settingsPath) return;
   const settingsPath = resolveSettingsWritePath(ctx, paths.settingsPath);
-  try {
-    const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as GeminiSettings;
-    if (ctx.browserMcpEnabled && browserMcp) {
-      const location = isWslPluginContext(ctx)
-        ? ({ kind: "wsl", distro: ctx.wslDistro } as const)
-        : process.platform === "win32"
-          ? ({ kind: "windows" } as const)
-          : ({ kind: "posix" } as const);
-      const servers = buildGeminiBrowserMcpServers(location, browserMcp);
-      if (servers) settings.mcpServers = servers;
-    } else {
-      delete settings.mcpServers;
-    }
-    writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
-  } catch {
-    // Best-effort; stale settings should not block thread launch.
+  let entry: GeminiMcpServerEntry | undefined;
+  if (ctx.browserMcpEnabled && browserMcp) {
+    const location = isWslPluginContext(ctx)
+      ? ({ kind: "wsl", distro: ctx.wslDistro } as const)
+      : process.platform === "win32"
+        ? ({ kind: "windows" } as const)
+        : ({ kind: "posix" } as const);
+    entry = buildGeminiBrowserMcpServers(location, browserMcp)?.[BROWSER_MCP_SERVER_NAME];
   }
+  writeGeminiMcpServer(settingsPath, BROWSER_MCP_SERVER_NAME, entry);
+}
+
+/**
+ * Merge (or clear) the cross-provider subagents MCP server entry in Gemini's
+ * staged `settings.json`. Mirrors `syncGeminiBrowserMcpSettings`; the endpoint
+ * is pre-resolved so there is no location/WSL fallback. Passing an undefined
+ * `subagentMcp` clears the entry.
+ */
+export function syncGeminiSubagentMcpSettings(
+  ctx: AgentEnvContext | undefined,
+  subagentMcp?: SubagentMcpHttpConfig,
+): void {
+  const paths = getGeminiPluginPaths(ctx);
+  if (!paths.settingsPath) return;
+  const settingsPath = resolveSettingsWritePath(ctx, paths.settingsPath);
+  const entry = buildGeminiSubagentMcpServers(subagentMcp)?.[SUBAGENT_MCP_SERVER_NAME];
+  writeGeminiMcpServer(settingsPath, SUBAGENT_MCP_SERVER_NAME, entry);
 }
 
 export interface InstallGeminiPluginOptions {

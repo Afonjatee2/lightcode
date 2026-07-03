@@ -6,6 +6,8 @@ import {
   buildCodexSubagentMcpEnv,
   CODEX_SUBAGENT_MCP_TOKEN_ENV,
 } from "../codex/mcpSubagent";
+import { buildGeminiSubagentMcpServers } from "../gemini/mcpSubagent";
+import { buildOpenCodeSubagentMcp } from "../opencode/mcpSubagent";
 import type { SubagentMcpHttpConfig } from "./index";
 
 const cfg: SubagentMcpHttpConfig = {
@@ -42,6 +44,21 @@ describe("Subagent MCP provider configs", () => {
     expect(buildCodexSubagentMcpEnv(cfg)).toEqual({
       [CODEX_SUBAGENT_MCP_TOKEN_ENV]: "subagent-token",
     });
+    expect(buildGeminiSubagentMcpServers(cfg)).toEqual({
+      subagents: {
+        httpUrl: cfg.url,
+        headers: cfg.headers,
+        timeout: 30_000,
+      },
+    });
+    expect(buildOpenCodeSubagentMcp(cfg)).toEqual({
+      subagents: {
+        type: "remote",
+        url: cfg.url,
+        headers: cfg.headers,
+        enabled: true,
+      },
+    });
   });
 
   it("uses a token env var distinct from the browser MCP one", () => {
@@ -60,5 +77,7 @@ describe("Subagent MCP provider configs", () => {
     expect(buildClaudeSubagentMcpServers(true)).toBeUndefined();
     expect(buildCodexSubagentMcpArgs(true)).toEqual([]);
     expect(buildCodexSubagentMcpEnv(undefined)).toBeUndefined();
+    expect(buildGeminiSubagentMcpServers(undefined)).toBeUndefined();
+    expect(buildOpenCodeSubagentMcp(undefined)).toBeUndefined();
   });
 });

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import type { AgentCapability, PromptSegment } from "@/shared/contracts";
+import type { AgentCapability, ProjectLocation, PromptSegment } from "@/shared/contracts";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import { createAcpStructuredSession } from "../acp";
 import {
@@ -24,6 +24,7 @@ import {
   isGeminiPluginInstalled,
   readBundledGeminiPluginVersion,
   syncGeminiBrowserMcpSettings,
+  syncGeminiSubagentMcpSettings,
   uninstallGeminiPlugin,
 } from "./plugin/install";
 import { detectGeminiInvalidSessionRef } from "./session";
@@ -41,6 +42,18 @@ function geminiHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
 
 function geminiOscTitleHint(title: { text: string }): TerminalStatusHint | null {
   return detectGeminiOscTitleStatus(title.text);
+}
+
+/**
+ * Minimal env context for resolving the staged Gemini `settings.json` path from
+ * a terminal launch's `ProjectLocation`. The plugin base dir falls back to the
+ * active channel (same as the CLI hook coordinator), so the path matches the
+ * one `pluginLaunchExtras` writes the browser MCP entry into.
+ */
+function geminiEnvContextForLocation(location: ProjectLocation): AgentEnvContext {
+  return location.kind === "wsl"
+    ? { envKind: "wsl", wslDistro: location.distro }
+    : { envKind: location.kind };
 }
 
 export function createGeminiAdapter(): AgentAdapter {
@@ -98,7 +111,14 @@ export function createGeminiAdapter(): AgentAdapter {
       return status;
     },
 
-    buildLaunchArgv(_location, config, prompt) {
+    buildLaunchArgv(location, config, prompt, _sessionRef, launchOptions) {
+      // Register (or clear) the subagents MCP server in the staged settings.json
+      // before spawn. The browser MCP entry is merged separately in
+      // `pluginLaunchExtras`; both syncs preserve the other's key.
+      syncGeminiSubagentMcpSettings(
+        geminiEnvContextForLocation(location),
+        launchOptions?.subagentMcp,
+      );
       // Pre-assign the session UUID via --session-id so we know it before
       // spawn. Avoids racing post-spawn discovery against one-shot `gemini -p`
       // calls (title gen, commit-msg, PR summary) that also create entries in
@@ -112,7 +132,11 @@ export function createGeminiAdapter(): AgentAdapter {
       };
     },
 
-    buildResumeArgv(_location, config, prompt, sessionRef) {
+    buildResumeArgv(location, config, prompt, sessionRef, launchOptions) {
+      syncGeminiSubagentMcpSettings(
+        geminiEnvContextForLocation(location),
+        launchOptions?.subagentMcp,
+      );
       const args = buildGeminiArgs(config, prompt, sessionRef.providerSessionId);
       return { binary: "gemini", args };
     },

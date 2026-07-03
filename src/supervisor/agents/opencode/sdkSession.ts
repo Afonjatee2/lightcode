@@ -53,7 +53,10 @@ import {
   readOpenCodeErrorText,
 } from "./opencodeErrors";
 import { buildOpenCodePermissionRules } from "./permissionRules";
-import { syncOpenCodeBrowserMcpConfigFile } from "./plugin/install";
+import {
+  syncOpenCodeBrowserMcpConfigFile,
+  syncOpenCodeSubagentMcpConfigFile,
+} from "./plugin/install";
 import {
   acquireOpenCodeServer,
   resolveOpenCodeSessionDirectory,
@@ -420,6 +423,7 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
         this.browserMcpEnabled,
         this.input.browserMcp,
       );
+      syncOpenCodeSubagentMcpConfigFile(this.input.projectLocation, this.input.subagentMcp);
       this.acquired = await acquireOpenCodeServer({
         projectLocation: this.input.projectLocation,
         browserMcpEnabled: this.browserMcpEnabled,

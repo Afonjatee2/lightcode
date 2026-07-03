@@ -99,6 +99,41 @@ export function isWorkflowTool(payload: ToolCallPayload | undefined): boolean {
   return payload?.name === "Workflow";
 }
 
+/** MCP server that hosts the subagent-spawning tools. */
+const SUBAGENT_MCP_SERVER = "subagents";
+/**
+ * The two subagents tools that emit a synthetic sub-agent TILE
+ * (`payload.isSubAgent === true`, itemId `sub:<runId>`). Their raw provider
+ * tool-call rows duplicate that tile, so they are suppressed from rendering.
+ * The other subagents tools (`list_agents`, `wait_for_agent`, `get_status`,
+ * `cancel`) have no tile and MUST stay visible.
+ */
+const SUBAGENT_SPAWN_TOOL_NAMES: ReadonlySet<string> = new Set(["run_agent", "spawn_agent"]);
+
+/**
+ * Whether a `tool_call` payload is the RAW MCP call to the subagents server's
+ * spawning tools (`run_agent` / `spawn_agent`) that should be suppressed as a
+ * duplicate of the synthetic sub-agent tile.
+ *
+ * Matches every provider naming form: Claude SDK and Codex both surface these
+ * as `mcp__subagents__run_agent` / `mcp__subagents__spawn_agent` (Codex builds
+ * the name via `mcp__<server>__<tool>`); providers that carry the server name
+ * separately as `serverId` (with `name` set to the bare tool) are handled too
+ * via `parseMcpName`.
+ *
+ * NEVER matches the synthetic tile itself: `payload.isSubAgent === true` is
+ * excluded up front so the tile can never be suppressed by this predicate.
+ */
+export function isSubAgentSpawnToolRow(payload: ToolCallPayload | undefined): boolean {
+  if (!payload || payload.isSubAgent === true) return false;
+  const mcp = parseMcpName(payload);
+  if (!mcp) return false;
+  // Strip host-injected namespace prefixes (`claude_ai_`, `plugin_<vendor>_`)
+  // that some connectors add, matching `prettyMcpServer`'s normalization.
+  const server = mcp.server.replace(/^claude_ai_/, "").replace(/^plugin_[^_]+_/, "");
+  return server === SUBAGENT_MCP_SERVER && SUBAGENT_SPAWN_TOOL_NAMES.has(mcp.tool);
+}
+
 export function deriveToolDisplay(payload: ToolCallPayload): ToolDisplay {
   const args = readArgsObject(payload);
 

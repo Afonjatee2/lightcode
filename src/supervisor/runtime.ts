@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import type {
@@ -231,6 +231,32 @@ import { resolveWslHelpersDir } from "./wsl/wslDeploy";
 
 export { detectWslAgentStatuses, writeSubmittedPrompt };
 
+/**
+ * Resolve the WSL → host gateway IP for a distro so subagents MCP URLs can be
+ * rewritten for in-distro agents. In WSL2 NAT mode the host is reachable at the
+ * `nameserver` address in the distro's `/etc/resolv.conf`, which the Windows
+ * host reads over the `\\wsl.localhost\<distro>\etc\resolv.conf` UNC path.
+ *
+ * Windows-only: returns `undefined` on macOS/Linux (no such path), and on any
+ * read/parse failure — the caller treats `undefined` as "not reachable" and
+ * declines to hand the agent an unreachable loopback URL.
+ */
+function resolveWslHostGatewayIp(distro: string): string | undefined {
+  if (process.platform !== "win32") return undefined;
+  try {
+    const uncPath = `\\\\wsl.localhost\\${distro}\\etc\\resolv.conf`;
+    const contents = readFileSync(uncPath, "utf8");
+    for (const line of contents.split(/\r?\n/)) {
+      const match = /^\s*nameserver\s+(\S+)\s*$/u.exec(line);
+      const ip = match?.[1];
+      if (ip && ip !== "127.0.0.1" && ip !== "::1") return ip;
+    }
+  } catch {
+    // fall through — distro unreachable or resolv.conf missing.
+  }
+  return undefined;
+}
+
 export class SupervisorRuntime {
   private readonly isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
   private readonly baseDir: string;
@@ -460,6 +486,11 @@ export class SupervisorRuntime {
         register: (threadId) => this.subagentMcpIngress.registerThread(threadId),
         unregister: (threadId) => this.subagentMcpIngress.unregisterThread(threadId),
         cancelAll: (threadId) => this.subagentRunManager.cancelAllForThread(threadId),
+        resolveChildRequest: (requestId, response) =>
+          this.subagentRunManager.resolveChildServerRequest(requestId, response),
+      },
+      subagentMcpHostGateway: {
+        resolveHostGatewayIp: (distro) => resolveWslHostGatewayIp(distro),
       },
     });
     this.sessions = this.threadSessionManager.sessions;

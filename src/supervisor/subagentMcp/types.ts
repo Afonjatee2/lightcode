@@ -3,10 +3,18 @@ import type { ProjectLocation, RuntimeEvent, ThreadConfig } from "@/shared/contr
 /** Terminal states a subagent run can settle into. */
 export type SubagentRunStatus = "running" | "completed" | "failed" | "cancelled";
 
+/**
+ * Coarse capability/cost hint for a model, so calling agents can route without
+ * guessing from labels alone: fast-cheap for light tasks, max-capability for
+ * the hardest ones, balanced as the default.
+ */
+export type ModelTier = "fast-cheap" | "balanced" | "max-capability";
+
 /** A model choice offered to the calling agent for a spawnable agent. */
 export interface SpawnableAgentModel {
   value: string;
   label: string;
+  tier?: ModelTier;
 }
 
 /**
