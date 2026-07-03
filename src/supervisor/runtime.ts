@@ -128,6 +128,8 @@ import type {
   ClearPendingSteerPayload,
   ListProjectTreePayload,
   ListProjectTreeResult,
+  BrowseHostDirectoryPayload,
+  BrowseHostDirectoryResult,
   MoveProjectEntryPayload,
   PrData,
   ReadAbsoluteFilePayload,
@@ -151,6 +153,7 @@ import type {
   StartThreadPayload,
   StartThreadResult,
   StageThreadInputPayload,
+  TerminalSize,
   ThreadRuntimeSnapshot,
   WriteExternalFilePayload,
   WriteExternalFileResult,
@@ -847,6 +850,10 @@ export class SupervisorRuntime {
     return this.threadSessionManager.readTerminalScrollback(threadId);
   }
 
+  readTerminalSize(threadId: string): TerminalSize | null {
+    return this.threadSessionManager.readTerminalSize(threadId);
+  }
+
   subagentSubscribe(payload: { threadId: string; parentItemId: string }): {
     history: import("@/shared/contracts").RuntimeEvent[];
   } {
@@ -1427,6 +1434,12 @@ export class SupervisorRuntime {
 
   async listProjectTree(payload: ListProjectTreePayload): Promise<ListProjectTreeResult> {
     return this.projectTreeService.listProjectTree(payload);
+  }
+
+  async browseHostDirectory(
+    payload: BrowseHostDirectoryPayload,
+  ): Promise<BrowseHostDirectoryResult> {
+    return this.projectTreeService.browseHostDirectory(payload);
   }
 
   async searchProjectTree(payload: SearchProjectTreePayload): Promise<SearchProjectTreeResult> {
