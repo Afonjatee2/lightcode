@@ -2065,8 +2065,8 @@ msgid "Device used by the composer voice input button."
 msgstr "Von der Composer-Spracheingabetaste verwendetes Gerät."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
-msgid "Disable"
-msgstr "Deaktivieren"
+#~ msgid "Disable"
+#~ msgstr "Deaktivieren"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable {tierLabel} effort"
@@ -2279,8 +2279,8 @@ msgid "Electron"
 msgstr "Electron"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
-msgid "Enable"
-msgstr "Aktivieren"
+#~ msgid "Enable"
+#~ msgstr "Aktivieren"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Enable {tierLabel} effort"

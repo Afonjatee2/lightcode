@@ -2046,8 +2046,8 @@ msgid "Device used by the composer voice input button."
 msgstr "Device used by the composer voice input button."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
-msgid "Disable"
-msgstr "Disable"
+#~ msgid "Disable"
+#~ msgstr "Disable"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable {tierLabel} effort"
@@ -2257,8 +2257,8 @@ msgid "Electron"
 msgstr "Electron"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
-msgid "Enable"
-msgstr "Enable"
+#~ msgid "Enable"
+#~ msgstr "Enable"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Enable {tierLabel} effort"
