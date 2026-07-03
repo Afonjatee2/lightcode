@@ -1,5 +1,6 @@
 import { dirname as posixDirname } from "node:path/posix";
 import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
+import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
 import type { ProjectLocation, SessionRef, ThreadConfig } from "@/shared/contracts";
 import {
   buildAgentCommand,
@@ -15,6 +16,7 @@ import {
   probeCodexCliSemver,
 } from "./plugin/install";
 import { buildCodexBrowserMcpArgs, buildCodexBrowserMcpEnv } from "./mcpBrowser";
+import { buildCodexSubagentMcpArgs, buildCodexSubagentMcpEnv } from "./mcpSubagent";
 import { resolveCodexWindowsLaunchBinary } from "./windowsExecutable";
 
 const CODEX_GOALS_FEATURE_FLAG = "goals";
@@ -50,6 +52,9 @@ function buildCodexArgs(opts: BuildCodexArgsOptions): string[] {
   if (location) {
     args.push(
       ...buildCodexBrowserMcpArgs(location, config.browserMcp === true, launchOptions?.browserMcp),
+    );
+    args.push(
+      ...buildCodexSubagentMcpArgs(config.subagentMcp === true, launchOptions?.subagentMcp),
     );
   }
 
@@ -89,7 +94,11 @@ export function buildCodexArgvFor(
   launchOptions?: AgentLaunchOptions,
 ): AgentArgvSpec {
   const binary = resolveCodexWindowsLaunchBinary(location) ?? "codex";
-  const browserMcpEnv = buildCodexBrowserMcpEnv(launchOptions?.browserMcp);
+  const mcpEnv = {
+    ...buildCodexBrowserMcpEnv(launchOptions?.browserMcp),
+    ...buildCodexSubagentMcpEnv(launchOptions?.subagentMcp),
+  };
+  const hasMcpEnv = Object.keys(mcpEnv).length > 0;
   const enableGoals = isCodexGoalsSupported(location);
   const baseArgsOptions: BuildCodexArgsOptions = {
     config,
@@ -113,7 +122,7 @@ export function buildCodexArgvFor(
     return {
       binary,
       args,
-      ...(browserMcpEnv ? { env: browserMcpEnv } : {}),
+      ...(hasMcpEnv ? { env: mcpEnv } : {}),
     };
   }
 
@@ -130,7 +139,7 @@ export function buildCodexArgvFor(
   return {
     binary,
     args,
-    ...(browserMcpEnv ? { env: browserMcpEnv } : {}),
+    ...(hasMcpEnv ? { env: mcpEnv } : {}),
   };
 }
 
@@ -141,6 +150,8 @@ export function buildCodexAppServerCommand(
     wslNodePath?: string;
     browserMcpEnabled?: boolean;
     browserMcp?: BrowserMcpHttpConfig;
+    subagentMcpEnabled?: boolean;
+    subagentMcp?: SubagentMcpHttpConfig;
   },
 ): CommandSpec {
   const wslExecPath = options?.wslExecPath;
@@ -150,10 +161,19 @@ export function buildCodexAppServerCommand(
     options?.browserMcpEnabled === true,
     options?.browserMcp,
   );
-  const browserMcpEnv = buildCodexBrowserMcpEnv(options?.browserMcp);
+  const subagentMcpArgs = buildCodexSubagentMcpArgs(
+    options?.subagentMcpEnabled === true,
+    options?.subagentMcp,
+  );
+  const mcpEnv = {
+    ...buildCodexBrowserMcpEnv(options?.browserMcp),
+    ...buildCodexSubagentMcpEnv(options?.subagentMcp),
+  };
+  const hasMcpEnv = Object.keys(mcpEnv).length > 0;
   const args = [
     ...(isCodexGoalsSupported(location, wslExecPath) ? ["--enable", CODEX_GOALS_FEATURE_FLAG] : []),
     ...browserMcpArgs,
+    ...subagentMcpArgs,
     "app-server",
   ];
   if (location.kind === "wsl") {
@@ -172,9 +192,7 @@ export function buildCodexAppServerCommand(
         "--",
         "/usr/bin/env",
         `PATH=${pathSegments.join(":")}`,
-        ...(browserMcpEnv
-          ? Object.entries(browserMcpEnv).map(([name, value]) => `${name}=${value}`)
-          : []),
+        ...(hasMcpEnv ? Object.entries(mcpEnv).map(([name, value]) => `${name}=${value}`) : []),
         wslExecPath ?? "codex",
         ...args,
       ],
@@ -185,7 +203,7 @@ export function buildCodexAppServerCommand(
     "codex",
     args,
     resolveCodexWindowsLaunchBinary(location) ?? wslExecPath,
-    browserMcpEnv,
+    hasMcpEnv ? mcpEnv : undefined,
   );
 }
 

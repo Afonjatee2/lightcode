@@ -444,6 +444,13 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     keywords: "reorder rearrange sort providers drag model picker sequence position",
     conditional: true,
   },
+  {
+    section: "agentsGeneral",
+    anchor: "agentsGeneral.subagentRoutingGuide",
+    title: msg`Subagent routing guide`,
+    description: msg`Instructions agents follow when choosing which agent or model to delegate to.`,
+    keywords: "subagent subagents routing delegate delegation guide instructions spawn agent model",
+  },
 
   // Dev (only in dev builds)
   {

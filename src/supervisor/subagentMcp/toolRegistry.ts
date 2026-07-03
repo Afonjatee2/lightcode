@@ -1,0 +1,229 @@
+import type { AgentKind, AgentStatus } from "@/shared/contracts";
+import type { AgentAdapter } from "@/supervisor/agents/base";
+import { DEFAULT_WAIT_TIMEOUT_MS, SubagentSpawnError } from "./SubagentRunManager";
+import type { SubagentRunManager } from "./SubagentRunManager";
+import type { McpToolResult, SpawnableAgent, SpawnAgentRequest } from "./types";
+
+export interface ToolSpec {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/** Base routing guidance always included in the MCP `initialize` instructions. */
+export const SUBAGENT_MCP_INSTRUCTIONS_BASE = [
+  "Use the subagents MCP server to delegate work to the other AI agents connected to this Lightcode session.",
+  "Call list_agents first to see which agents and models are available.",
+  "Routing: prefer fast/cheap agents+models for search, bulk edits, and summarization; reserve the strongest agents for implementation and review.",
+  "Run independent tasks concurrently as parallel spawn_agent calls, then collect them with wait_for_agent.",
+  "Use run_agent for a single blocking delegation; use spawn_agent + wait_for_agent for long tasks or fan-out.",
+  "Give each subagent a self-contained prompt — it does not share your conversation context.",
+].join(" ");
+
+export function buildSubagentInstructions(routingGuide?: string): string {
+  const guide = routingGuide?.trim();
+  return guide ? `${SUBAGENT_MCP_INSTRUCTIONS_BASE}\n\n${guide}` : SUBAGENT_MCP_INSTRUCTIONS_BASE;
+}
+
+export const TOOLS: ToolSpec[] = [
+  {
+    name: "list_agents",
+    description:
+      "List the AI agents you can spawn as subagents, each with its available models and effort levels. Pick fast/cheap models for light tasks (search, summarization, bulk edits) and stronger models for implementation or review.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "spawn_agent",
+    description:
+      "Start a subagent in the background and return its run_id immediately. Use with wait_for_agent for long tasks or to run several agents in parallel. Choose the smallest/fastest model that can do the job.",
+    inputSchema: {
+      type: "object",
+      required: ["agent", "prompt"],
+      properties: {
+        agent: { type: "string", description: "Agent kind from list_agents." },
+        model: {
+          type: "string",
+          description: "Model value from list_agents. Omit for the agent default.",
+        },
+        effort: { type: "string", description: "Optional effort/reasoning level." },
+        prompt: { type: "string", description: "Self-contained task for the subagent." },
+        name: { type: "string", description: "Optional short label for the run." },
+      },
+    },
+  },
+  {
+    name: "wait_for_agent",
+    description:
+      "Block until a spawned subagent finishes (or the timeout elapses) and return its status and output.",
+    inputSchema: {
+      type: "object",
+      required: ["run_id"],
+      properties: {
+        run_id: { type: "string" },
+        timeout_s: {
+          type: "number",
+          description: 'Max seconds to wait. On timeout, status is "running".',
+        },
+      },
+    },
+  },
+  {
+    name: "run_agent",
+    description:
+      'Spawn a subagent and block until it finishes, returning its status and output in one call. Prefer a fast/cheap model unless the task needs a stronger one. If it returns with status "running" (timeout), keep waiting via wait_for_agent or stop it via cancel using the returned run_id.',
+    inputSchema: {
+      type: "object",
+      required: ["agent", "prompt"],
+      properties: {
+        agent: { type: "string", description: "Agent kind from list_agents." },
+        model: {
+          type: "string",
+          description: "Model value from list_agents. Omit for the agent default.",
+        },
+        effort: { type: "string", description: "Optional effort/reasoning level." },
+        prompt: { type: "string", description: "Self-contained task for the subagent." },
+        name: { type: "string", description: "Optional short label for the run." },
+        timeout_s: {
+          type: "number",
+          description:
+            'Max seconds to block. On timeout, status is "running" — keep waiting with wait_for_agent.',
+        },
+      },
+    },
+  },
+  {
+    name: "get_status",
+    description:
+      "Check a spawned subagent without blocking: returns its current status and the output produced so far.",
+    inputSchema: {
+      type: "object",
+      required: ["run_id"],
+      properties: { run_id: { type: "string" } },
+    },
+  },
+  {
+    name: "cancel",
+    description: "Interrupt and dispose a running subagent by run_id.",
+    inputSchema: {
+      type: "object",
+      required: ["run_id"],
+      properties: { run_id: { type: "string" } },
+    },
+  },
+];
+
+export const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));
+
+export function isKnownToolName(name: string): boolean {
+  return TOOL_NAMES.has(name);
+}
+
+/**
+ * Build the spawnable-agent catalog from the adapter registry + agent statuses,
+ * filtered to installed + authenticated providers whose adapter can create a
+ * structured session.
+ */
+export function buildSpawnableAgents(
+  adapters: Map<AgentKind, AgentAdapter>,
+  statuses: readonly AgentStatus[],
+): SpawnableAgent[] {
+  const out: SpawnableAgent[] = [];
+  for (const status of statuses) {
+    if (!status.installed || status.authState !== "authenticated") continue;
+    const adapter = adapters.get(status.kind);
+    if (!adapter?.createStructuredSession) continue;
+    const models = status.capabilities.models.map((m) => ({ value: m.id, label: m.label }));
+    if (models.length === 0) continue;
+    const efforts = status.capabilities.efforts;
+    const defaultModel = models[0]?.value;
+    out.push({
+      kind: status.kind,
+      label: status.label,
+      models,
+      ...(efforts.length > 0 ? { efforts } : {}),
+      ...(defaultModel ? { defaultModel } : {}),
+    });
+  }
+  return out;
+}
+
+export interface SubagentToolContext {
+  parentThreadId: string;
+  runManager: SubagentRunManager;
+  listSpawnableAgents: () => Promise<SpawnableAgent[]>;
+}
+
+function jsonResult(value: unknown): McpToolResult {
+  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
+}
+
+function errorResult(message: string): McpToolResult {
+  return { content: [{ type: "text", text: message }], isError: true };
+}
+
+function parseSpawnRequest(args: Record<string, unknown>): SpawnAgentRequest {
+  const agent = typeof args.agent === "string" ? args.agent : "";
+  const prompt = typeof args.prompt === "string" ? args.prompt : "";
+  if (!agent) throw new SubagentSpawnError("agent is required");
+  if (!prompt.trim()) throw new SubagentSpawnError("prompt is required");
+  return {
+    agent,
+    prompt,
+    ...(typeof args.model === "string" ? { model: args.model } : {}),
+    ...(typeof args.effort === "string" ? { effort: args.effort } : {}),
+    ...(typeof args.name === "string" ? { name: args.name } : {}),
+  };
+}
+
+/** Dispatch a tools/call. Never throws — validation failures return isError results. */
+export async function dispatchTool(
+  name: string,
+  args: Record<string, unknown>,
+  ctx: SubagentToolContext,
+): Promise<McpToolResult> {
+  try {
+    switch (name) {
+      case "list_agents":
+        return jsonResult(await ctx.listSpawnableAgents());
+      case "spawn_agent": {
+        const request = parseSpawnRequest(args);
+        const { runId } = ctx.runManager.spawn(ctx.parentThreadId, request);
+        return jsonResult({ run_id: runId });
+      }
+      case "wait_for_agent": {
+        const runId = typeof args.run_id === "string" ? args.run_id : "";
+        if (!runId) return errorResult("run_id is required");
+        const timeoutMs =
+          typeof args.timeout_s === "number" && Number.isFinite(args.timeout_s)
+            ? Math.max(0, args.timeout_s * 1000)
+            : DEFAULT_WAIT_TIMEOUT_MS;
+        return jsonResult(await ctx.runManager.waitFor(runId, timeoutMs));
+      }
+      case "run_agent": {
+        const request = parseSpawnRequest(args);
+        const timeoutMs =
+          typeof args.timeout_s === "number" && Number.isFinite(args.timeout_s)
+            ? Math.max(0, args.timeout_s * 1000)
+            : DEFAULT_WAIT_TIMEOUT_MS;
+        const { runId } = ctx.runManager.spawn(ctx.parentThreadId, request);
+        const result = await ctx.runManager.waitFor(runId, timeoutMs);
+        return jsonResult({ run_id: runId, ...result });
+      }
+      case "get_status": {
+        const runId = typeof args.run_id === "string" ? args.run_id : "";
+        if (!runId) return errorResult("run_id is required");
+        return jsonResult(ctx.runManager.getStatus(runId));
+      }
+      case "cancel": {
+        const runId = typeof args.run_id === "string" ? args.run_id : "";
+        if (!runId) return errorResult("run_id is required");
+        await ctx.runManager.cancel(runId);
+        return jsonResult({ ok: true });
+      }
+      default:
+        return errorResult(`Unknown tool: ${name}`);
+    }
+  } catch (error) {
+    return errorResult(error instanceof Error ? error.message : String(error));
+  }
+}

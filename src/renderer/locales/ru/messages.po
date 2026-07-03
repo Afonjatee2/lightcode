@@ -1020,8 +1020,7 @@ msgstr "Просмотрите свои репозитории GitHub или в�
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/components/composer/AttachmentBar.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -1043,7 +1042,7 @@ msgstr "Browser MCP"
 msgid "Browser MCP enabled for OpenCode"
 msgstr "Browser MCP включён для OpenCode"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Browser MCP enabled for this thread"
 msgstr "Browser MCP включён для этого треда"
 
@@ -2065,7 +2064,7 @@ msgstr "Отключить"
 msgid "Disable {tierLabel} effort"
 msgstr "Отключить уровень рассуждений {tierLabel}"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Disable Browser MCP"
 msgstr "Отключить Browser MCP"
 
@@ -2077,6 +2076,10 @@ msgstr "Отключить плагин хука CLI (L1)"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "Отключить проект"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Subagents"
+msgstr "Отключить субагентов"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and "
@@ -2211,6 +2214,12 @@ msgstr "Отбрасывает входящие конверты хуков на
 "переходили на L2 (прогресс OSC 9;4) без влияния на установку или "
 "уведомления iTerm2. Вступает в силу при следующем событии хука — "
 "перезапуск не требуется."
+
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk "
+"refactors, Claude Opus for anything subtle."
+msgstr "напр., Codex GPT-5.5 fast для быстрых запросов, OpenCode GLM для "
+"массовых рефакторингов, Claude Opus для всего тонкого."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -3025,6 +3034,13 @@ msgstr "Установка"
 msgid "Installing in this terminal. Closes when finished."
 msgstr "Установка выполняется в этом терминале. Он закроется после завершения."
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Instructions agents follow when choosing which agent or model to "
+"delegate to."
+msgstr "Инструкции, которым следуют агенты при выборе агента или модели для "
+"делегирования."
+
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Прервано: сессия агента завершилась до окончания."
@@ -3294,6 +3310,7 @@ msgstr "Развернуть"
 msgid "Maximize browser"
 msgstr "Развернуть браузер"
 
+#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "MCP servers"
 msgstr "Серверы MCP"
@@ -5691,13 +5708,23 @@ msgstr "Субагент не найден."
 msgid "Subagent Result"
 msgstr "Результат субагента"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Subagent routing guide"
+msgstr "Руководство по маршрутизации субагентов"
+
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Запуски субагентов"
 
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Субагенты"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Subagents enabled for this thread"
+msgstr "Субагенты включены для этого треда"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

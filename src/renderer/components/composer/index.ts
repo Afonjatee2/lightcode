@@ -1,6 +1,14 @@
 export { MentionInput, type MentionInputHandle } from "./MentionInput";
-export { AttachmentBar, BrowserChip } from "./AttachmentBar";
-export { ComposerAddMenu } from "./ComposerAddMenu";
+export { AttachmentBar, McpChip } from "./AttachmentBar";
+export { ComposerAddMenu, type ComposerMcpMenuItem } from "./ComposerAddMenu";
+export {
+  browserMcpServer,
+  composerMcpServers,
+  mcpTogglePatch,
+  subagentMcpServer,
+  type ComposerMcpConfigKey,
+  type ComposerMcpServerDescriptor,
+} from "./composerMcpServers";
 export { VoiceInputButton, type VoiceInputHandle } from "./VoiceInputButton";
 export {
   ImageLightboxHost,

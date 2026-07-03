@@ -16,6 +16,8 @@ import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId"
 import {
   AttachmentBar,
   ComposerAddMenu,
+  composerMcpServers,
+  mcpTogglePatch,
   MentionInput,
   openAttachmentLightbox,
   VoiceInputButton,
@@ -274,11 +276,17 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const presentationMode =
     thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
   const usesTerminalPresentation = presentationMode === "terminal";
-  // Browser MCP is bound at session-create time for every provider, so a
-  // mid-thread toggle would not actually attach (or detach) the MCP server in
-  // the running agent process. The toggle is hidden in the active-thread
-  // composer; users set it in the draft composer before launch.
-  const browserMcpToggleableHere = false;
+  // Every composer MCP server is bound at session-create time, so a mid-thread
+  // toggle would not attach/detach the server in the running agent process. The
+  // toggles are hidden in the active-thread composer (`visible: false`); users
+  // set them in the draft composer before launch.
+  const mcpServers = composerMcpServers.map((descriptor) => ({
+    descriptor,
+    enabled: thread.config[descriptor.configKey] === true,
+    visible: false,
+    onToggle: (next: boolean) =>
+      props.onConfigChange({ ...thread.config, ...mcpTogglePatch(descriptor.configKey, next) }),
+  }));
   const availableCommands = resolveAvailableSlashCommands(
     thread.slashCommands,
     agentStatus?.capabilities.slashCommands,
@@ -963,8 +971,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                           />
                         ) : null}
                         <ComposerAddMenu
-                          browserMcpEnabled={thread.config.browserMcp === true}
-                          showBrowserOption={browserMcpToggleableHere}
+                          mcpServers={mcpServers}
                           onPickFiles={() => {
                             void readBridge()
                               .pickFiles()
@@ -972,9 +979,6 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                                 if (paths) attachments.addFiles(paths);
                               });
                           }}
-                          onToggleBrowserMcp={(next) =>
-                            props.onConfigChange({ ...thread.config, browserMcp: next })
-                          }
                         />
                         {branchName ? (
                           thread.worktreePath ? (

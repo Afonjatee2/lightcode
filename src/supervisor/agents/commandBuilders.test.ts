@@ -221,6 +221,29 @@ describe("agent command builders", () => {
     }
   });
 
+  it("injects Codex subagents MCP config when enabled, using a distinct token env var", () => {
+    const subagentMcp = {
+      url: "http://127.0.0.1:9200/mcp",
+      token: "subagent-token",
+      headers: { Authorization: "Bearer subagent-token" },
+    };
+    const spec = buildCodexAppServerCommand(windowsProject, {
+      subagentMcpEnabled: true,
+      subagentMcp,
+    });
+    const { cmdArgs } = parseWindowsSpec(spec);
+
+    expect(cmdArgs).toContain('mcp_servers.subagents.url="http://127.0.0.1:9200/mcp"');
+    expect(cmdArgs).toContain(
+      'mcp_servers.subagents.bearer_token_env_var="LIGHTCODE_SUBAGENT_MCP_TOKEN"',
+    );
+    expect(cmdArgs).not.toContain('mcp_servers.subagents.bearer_token="subagent-token"');
+
+    const disabledSpec = buildCodexAppServerCommand(windowsProject);
+    const { cmdArgs: disabledArgs } = parseWindowsSpec(disabledSpec);
+    expect(disabledArgs.some((a) => a.startsWith("mcp_servers.subagents"))).toBe(false);
+  });
+
   it("resumes the server thread when structured session provides a threadId", () => {
     const spec = launch(createCodexAdapter(), windowsProject, config, "", undefined, {
       suppressResumeConfigOverrides: true,

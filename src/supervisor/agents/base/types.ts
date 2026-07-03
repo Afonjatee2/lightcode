@@ -19,6 +19,7 @@ import type {
 } from "@/shared/contracts";
 import type { OscNotification, OscShellEvent, OscTitle } from "@/shared/osc";
 import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
+import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
 
 export interface CommandSpec {
   command: string;
@@ -52,6 +53,7 @@ export interface AgentLaunchOptions {
   resumeThreadId?: string;
   agentSettings?: Record<string, boolean | string>;
   browserMcp?: BrowserMcpHttpConfig;
+  subagentMcp?: SubagentMcpHttpConfig;
 }
 
 export interface StructuredSessionUpdate {
@@ -115,6 +117,7 @@ export interface CreateStructuredSessionInput {
   agentSettings?: Record<string, boolean | string>;
   env?: Record<string, string>;
   browserMcp?: BrowserMcpHttpConfig;
+  subagentMcp?: SubagentMcpHttpConfig;
   sessionRef?: SessionRef;
   presentationMode?: ThreadPresentationMode;
   loadSessionErrorRewriter?: (error: unknown, sessionId: string) => Error;

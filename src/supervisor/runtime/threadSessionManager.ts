@@ -40,6 +40,7 @@ import {
   resolveBrowserMcpHttpConfigForLaunch,
   type BrowserMcpHttpConfig,
 } from "@/supervisor/agents/browserMcp";
+import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
 import {
   type AgentAdapter,
   type AgentLaunchOptions,
@@ -108,6 +109,19 @@ export interface ThreadSessionManagerOptions {
   }): Promise<{ env: Record<string, string>; extraArgs: string[] } | undefined>;
   wslBridge?: {
     ensureBridge(distro: string): Promise<{ baseUrl: string; secret: string } | undefined>;
+  };
+  /**
+   * Optional: cross-provider subagents MCP hooks. When a thread launches with
+   * `config.subagentMcp === true`, the manager registers it with the ingress
+   * and threads the resulting http config into the structured session / launch
+   * options. On interrupt + close it cancels the thread's child runs; on close
+   * it also unregisters the thread. All heavy lifting lives in the subagentMcp
+   * module — these are thin hooks only.
+   */
+  subagentMcp?: {
+    register(threadId: string): SubagentMcpHttpConfig | undefined;
+    unregister(threadId: string): void;
+    cancelAll(threadId: string): void;
   };
 }
 
@@ -189,6 +203,29 @@ export class ThreadSessionManager {
 
   private enqueueRuntimeEvent(threadId: string, event: RuntimeEvent): void {
     this.runtimeEventRouter.append(threadId, event);
+  }
+
+  /**
+   * Subagent host hook: resolve a live parent thread's project location + config
+   * so a spawned child can inherit them. Returns undefined once the thread is
+   * gone. Consumed by {@link SubagentRunManager}.
+   */
+  getSubagentParentContext(
+    threadId: string,
+  ): { projectLocation: ProjectLocation; config: ThreadConfig } | undefined {
+    const session = this.sessions.get(threadId);
+    if (!session) return undefined;
+    return { projectLocation: session.projectLocation, config: session.config };
+  }
+
+  /**
+   * Subagent host hook: append a (already re-tagged) child runtime event into a
+   * parent thread's event stream. Dropped if the parent thread is no longer
+   * live. Consumed by {@link SubagentRunManager}.
+   */
+  appendSubagentRuntimeEvent(parentThreadId: string, event: RuntimeEvent): void {
+    if (!this.sessions.has(parentThreadId)) return;
+    this.enqueueRuntimeEvent(parentThreadId, event);
   }
 
   /**
@@ -437,6 +474,7 @@ export class ThreadSessionManager {
       }
       throw new Error(`Unknown thread session: ${payload.threadId}`);
     }
+    this.options.subagentMcp?.cancelAll(payload.threadId);
     await this.interruptStructuredTurn(session);
   }
 
@@ -847,6 +885,8 @@ export class ThreadSessionManager {
       this.sessionsBySessionId.delete(existing.sessionRef.providerSessionId);
     }
     this.clearAllSubAgentStateForThread(payload.threadId);
+    this.options.subagentMcp?.cancelAll(payload.threadId);
+    this.options.subagentMcp?.unregister(payload.threadId);
     await existing.structuredSession?.dispose();
     if (existing.structuredSession) {
       await sleep(150);
@@ -1301,6 +1341,7 @@ export class ThreadSessionManager {
       payload.projectLocation,
       payload.config,
     );
+    const subagentMcp = this.resolveSubagentMcpForLaunch(payload.threadId, payload.config);
     const structuredSession = await this.createStructuredSession(
       adapter,
       payload.threadId,
@@ -1308,6 +1349,7 @@ export class ThreadSessionManager {
       payload.projectLocation,
       payload.config,
       browserMcp,
+      subagentMcp,
       payload.sessionRef,
       requestedPresentation,
     );
@@ -1436,21 +1478,24 @@ export class ThreadSessionManager {
       adapter,
       structuredSession?.launchOptions,
     );
-    const launchOptionsWithBrowserMcp = this.launchOptionsWithBrowserMcp(launchOptions, browserMcp);
+    const launchOptionsWithMcp = this.launchOptionsWithSubagentMcp(
+      this.launchOptionsWithBrowserMcp(launchOptions, browserMcp),
+      subagentMcp,
+    );
     const argv = payload.sessionRef
       ? adapter.buildResumeArgv(
           payload.projectLocation,
           payload.config,
           launchPrompt,
           payload.sessionRef,
-          launchOptionsWithBrowserMcp,
+          launchOptionsWithMcp,
         )
       : adapter.buildLaunchArgv(
           payload.projectLocation,
           payload.config,
           launchPrompt,
           payload.sessionRef,
-          launchOptionsWithBrowserMcp,
+          launchOptionsWithMcp,
         );
 
     // Append CLI hook plugin args (e.g. Claude `--settings <path>`); env vars
@@ -1536,6 +1581,7 @@ export class ThreadSessionManager {
     projectLocation: ProjectLocation,
     config: ThreadConfig,
     browserMcp: BrowserMcpHttpConfig | undefined,
+    subagentMcp: SubagentMcpHttpConfig | undefined,
     sessionRef?: SessionRef,
     presentationMode?: import("@/shared/contracts").ThreadPresentationMode,
   ): Promise<StructuredSessionHandle | undefined> {
@@ -1549,6 +1595,7 @@ export class ThreadSessionManager {
         config,
         agentSettings: this.resolveAgentSettings(adapter),
         ...(browserMcp ? { browserMcp } : {}),
+        ...(subagentMcp ? { subagentMcp } : {}),
         ...(sessionRef ? { sessionRef } : {}),
         ...(presentationMode ? { presentationMode } : {}),
       });
@@ -1990,6 +2037,7 @@ export class ThreadSessionManager {
       session.projectLocation,
       config,
     );
+    const subagentMcp = this.resolveSubagentMcpForLaunch(session.threadId, config);
     const structuredSession = await this.createStructuredSession(
       session.adapter,
       session.threadId,
@@ -1997,6 +2045,7 @@ export class ThreadSessionManager {
       session.projectLocation,
       config,
       browserMcp,
+      subagentMcp,
       session.sessionRef,
       session.presentationMode,
     );
@@ -2078,9 +2127,12 @@ export class ThreadSessionManager {
       config,
       launchPrompt,
       session.sessionRef,
-      this.launchOptionsWithBrowserMcp(
-        this.launchOptionsWithAgentSettings(session.adapter, structuredSession?.launchOptions),
-        browserMcp,
+      this.launchOptionsWithSubagentMcp(
+        this.launchOptionsWithBrowserMcp(
+          this.launchOptionsWithAgentSettings(session.adapter, structuredSession?.launchOptions),
+          browserMcp,
+        ),
+        subagentMcp,
       ),
     );
     if (cliHookExtras.extraArgs.length > 0) {
@@ -2163,6 +2215,7 @@ export class ThreadSessionManager {
         session.projectLocation,
         session.config,
       );
+      const subagentMcp = this.resolveSubagentMcpForLaunch(session.threadId, session.config);
       const cliHookExtras = await this.resolveCliHookPluginExtras(
         session.threadId,
         session.agentKind,
@@ -2178,9 +2231,12 @@ export class ThreadSessionManager {
         session.config,
         session.launchPrompt,
         undefined,
-        this.launchOptionsWithBrowserMcp(
-          this.launchOptionsWithAgentSettings(session.adapter),
-          browserMcp,
+        this.launchOptionsWithSubagentMcp(
+          this.launchOptionsWithBrowserMcp(
+            this.launchOptionsWithAgentSettings(session.adapter),
+            browserMcp,
+          ),
+          subagentMcp,
         ),
       );
       if (cliHookExtras.extraArgs.length > 0) {
@@ -2387,6 +2443,29 @@ export class ThreadSessionManager {
       ...launchOptions,
       ...(browserMcp !== undefined ? { browserMcp } : {}),
     };
+  }
+
+  private launchOptionsWithSubagentMcp(
+    launchOptions: AgentLaunchOptions,
+    subagentMcp: SubagentMcpHttpConfig | undefined,
+  ): AgentLaunchOptions {
+    return {
+      ...launchOptions,
+      ...(subagentMcp !== undefined ? { subagentMcp } : {}),
+    };
+  }
+
+  /**
+   * Resolve the subagents MCP http config for a launch when the thread opted
+   * in (`config.subagentMcp === true`). Registers the thread with the ingress
+   * (idempotent — reuses an existing token). Native only for the MVP.
+   */
+  private resolveSubagentMcpForLaunch(
+    threadId: string,
+    config: ThreadConfig,
+  ): SubagentMcpHttpConfig | undefined {
+    if (config.subagentMcp !== true) return undefined;
+    return this.options.subagentMcp?.register(threadId);
   }
 
   private isBrowserMcpEnabledForLaunch(

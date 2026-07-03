@@ -127,6 +127,7 @@ interface SharedSettingsState extends SharedSettings {
     modelId: string,
     fallbackMode: ThreadPresentationMode,
   ) => boolean;
+  setSubagentRoutingGuide: (value: string) => void;
   pushRecentModel: (
     agentKind: string,
     modelId: string,
@@ -598,6 +599,11 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     persistSettings(selectSharedSettings(get()));
     return !isFavorite;
   },
+  setSubagentRoutingGuide: (subagentRoutingGuide) => {
+    if (get().subagentRoutingGuide === subagentRoutingGuide) return;
+    set({ subagentRoutingGuide });
+    persistSettings(selectSharedSettings(get()));
+  },
   pushRecentModel: (agentKind, modelId, presentationMode) => {
     const current = get().recentModels;
     const samePresentation = current.filter((m) => m.presentationMode === presentationMode);
@@ -705,6 +711,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     browser: state.browser,
     audio: state.audio,
     usage: state.usage,
+    subagentRoutingGuide: state.subagentRoutingGuide,
   };
 }
 

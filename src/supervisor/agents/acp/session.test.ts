@@ -742,6 +742,64 @@ describe("ACP client protocol helpers", () => {
       ],
     });
   });
+
+  it("passes selected subagents MCP to ACP session open calls", async () => {
+    const { connection, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["subagentMcp"] = {
+      url: "http://127.0.0.1:9200/mcp",
+      token: "subagent-token",
+      headers: { Authorization: "Bearer subagent-token" },
+    };
+
+    await expect(session.openThread({ model: "model-a", subagentMcp: true })).resolves.toBe(
+      "session-1",
+    );
+
+    expect(connection.newSession).toHaveBeenCalledWith({
+      cwd: "C:\\repo",
+      mcpServers: [
+        {
+          type: "http",
+          name: "subagents",
+          url: "http://127.0.0.1:9200/mcp",
+          headers: [{ name: "Authorization", value: "Bearer subagent-token" }],
+        },
+      ],
+    });
+  });
+
+  it("appends both browser and subagents MCP servers when both are selected", async () => {
+    process.env.LIGHTCODE_BROWSER_MCP_URL = "http://127.0.0.1:9123";
+    process.env.LIGHTCODE_BROWSER_MCP_TOKEN = "secret-token";
+    const { connection, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["subagentMcp"] = {
+      url: "http://127.0.0.1:9200/mcp",
+      token: "subagent-token",
+      headers: { Authorization: "Bearer subagent-token" },
+    };
+
+    await expect(
+      session.openThread({ model: "model-a", browserMcp: true, subagentMcp: true }),
+    ).resolves.toBe("session-1");
+
+    expect(connection.newSession).toHaveBeenCalledWith({
+      cwd: "C:\\repo",
+      mcpServers: [
+        {
+          type: "http",
+          name: "browser",
+          url: "http://127.0.0.1:9123/mcp",
+          headers: [{ name: "Authorization", value: "Bearer secret-token" }],
+        },
+        {
+          type: "http",
+          name: "subagents",
+          url: "http://127.0.0.1:9200/mcp",
+          headers: [{ name: "Authorization", value: "Bearer subagent-token" }],
+        },
+      ],
+    });
+  });
 });
 
 describe("ACP turn config sync", () => {

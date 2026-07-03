@@ -366,6 +366,15 @@ export const sharedSettingsSchema = z.object({
   audio: audioSettingsSchema,
   /** Provider usage tracking (auto-refresh cadence, per-provider opt-out, cost). */
   usage: usageSettingsSchema,
+  /**
+   * Free-text routing instructions appended to the subagents MCP server
+   * `instructions`, guiding how an agent picks which connected agent/model to
+   * delegate to when spawning subagents (e.g. "Codex GPT-5.5 fast for quick
+   * lookups, Claude Opus for anything subtle"). Empty string = no guidance.
+   * Per-thread opt-in lives on `thread.config.subagentMcp`; this is the global
+   * guidance text shared across every subagent-enabled thread.
+   */
+  subagentRoutingGuide: z.string(),
 });
 export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 
@@ -480,6 +489,7 @@ export const defaultSharedSettings: SharedSettings = {
     collapsedProviders: [],
     selectedRingGroups: {},
   },
+  subagentRoutingGuide: "",
 };
 
 function parseSettingOrDefault<T>(schema: z.ZodType<T>, value: unknown, fallback: T): T {

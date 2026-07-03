@@ -219,6 +219,9 @@ import { UsageService } from "./runtime/usageService";
 import { type SessionRuntime, type ShellSessionRuntime } from "./runtime/sessionTypes";
 import { ThreadSessionManager, writeSubmittedPrompt } from "./runtime/threadSessionManager";
 import { CliHookPluginCoordinator } from "./runtime/cliHookPluginCoordinator";
+import { SubagentMcpIngress } from "./subagentMcp/SubagentMcpIngress";
+import { SubagentRunManager } from "./subagentMcp/SubagentRunManager";
+import { buildSpawnableAgents } from "./subagentMcp/toolRegistry";
 import { dispatchAgentEvent } from "./runtime/agentEventDispatcher";
 import { hookDebugEnvelope, isLightcodeHookDebug } from "./runtime/hookDebug";
 import { SupervisorSharedSettingsCache } from "./runtime/supervisorSharedSettings";
@@ -248,6 +251,8 @@ export class SupervisorRuntime {
   private readonly threadSessionManager: ThreadSessionManager;
   private readonly lspManager: LanguageServerManager;
   private readonly cliHookPluginCoordinator: CliHookPluginCoordinator;
+  private readonly subagentMcpIngress: SubagentMcpIngress;
+  private readonly subagentRunManager: SubagentRunManager;
   private wslHookBridge: WslBridgeServer | undefined;
   private extractionAbortControllers = new Map<string, AbortController>();
 
@@ -407,6 +412,39 @@ export class SupervisorRuntime {
 
     this.cliHookPluginCoordinator.startIngress();
 
+    // Cross-provider subagents: an in-process MCP server (SubagentMcpIngress)
+    // lets any agent spawn the other connected agents as subagents. The run
+    // manager owns child structured sessions; the ingress mints per-thread
+    // tokens and routes tools/call to the caller's parent thread. The run
+    // manager's host is the thread session manager (assigned just below — the
+    // closures resolve it lazily at call time).
+    this.subagentRunManager = new SubagentRunManager({
+      adapters: this.adapters,
+      host: {
+        getParentContext: (threadId) =>
+          this.threadSessionManager.getSubagentParentContext(threadId),
+        appendRuntimeEvent: (parentThreadId, event) =>
+          this.threadSessionManager.appendSubagentRuntimeEvent(parentThreadId, event),
+      },
+    });
+    this.subagentMcpIngress = new SubagentMcpIngress({
+      runManager: this.subagentRunManager,
+      getSpawnableAgents: async () => {
+        const { windows } = await this.agentStatusService.getAgentStatuses({ wslDistros: [] });
+        return buildSpawnableAgents(this.adapters, windows);
+      },
+      // User-configured routing guidance, read live from shared settings (the
+      // cache invalidates on file change) so edits take effect on the next turn
+      // without a supervisor restart. Empty/whitespace-only = no guidance.
+      getRoutingGuide: () => {
+        const guide = this.sharedSettingsCache.read().subagentRoutingGuide.trim();
+        return guide.length > 0 ? guide : undefined;
+      },
+    });
+    void this.subagentMcpIngress.start().catch((error) => {
+      console.warn("[supervisor] subagent MCP ingress failed to start:", error);
+    });
+
     this.threadSessionManager = new ThreadSessionManager({
       emit,
       isDev: this.isDev,
@@ -418,6 +456,11 @@ export class SupervisorRuntime {
       ...(this.wslHookBridge ? { wslBridge: this.wslHookBridge } : {}),
       resolvePluginEnvForSpawn: (input) =>
         this.cliHookPluginCoordinator.resolvePluginEnvForSpawn(input),
+      subagentMcp: {
+        register: (threadId) => this.subagentMcpIngress.registerThread(threadId),
+        unregister: (threadId) => this.subagentMcpIngress.unregisterThread(threadId),
+        cancelAll: (threadId) => this.subagentRunManager.cancelAllForThread(threadId),
+      },
     });
     this.sessions = this.threadSessionManager.sessions;
     this.shellSessions = this.threadSessionManager.shellSessions;
@@ -1528,6 +1571,7 @@ export class SupervisorRuntime {
     this.lspManager.dispose();
     await this._projectWatcher?.dispose();
     await this.threadSessionManager.dispose();
+    this.subagentMcpIngress.dispose();
     this.sharedSettingsCache.dispose();
     await this.cliHookPluginCoordinator.dispose().catch((error) => {
       console.warn("[supervisor] CLI hook plugin coordinator dispose failed:", error);

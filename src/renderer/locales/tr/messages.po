@@ -1020,8 +1020,7 @@ msgstr "GitHub depolarınıza göz atın veya bir klon URL'si yapıştırın."
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/components/composer/AttachmentBar.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -1043,7 +1042,7 @@ msgstr "Tarayıcı MCP'si"
 msgid "Browser MCP enabled for OpenCode"
 msgstr "OpenCode için tarayıcı MCP'si etkinleştirildi"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Browser MCP enabled for this thread"
 msgstr "Bu konu için Tarayıcı MCP'si etkinleştirildi"
 
@@ -2065,7 +2064,7 @@ msgstr "Devre dışı bırak"
 msgid "Disable {tierLabel} effort"
 msgstr "{tierLabel} efor düzeyini devre dışı bırak"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Disable Browser MCP"
 msgstr "Tarayıcı MCP'yi Devre Dışı Bırak"
 
@@ -2077,6 +2076,10 @@ msgstr "CLI kanca eklentisini devre dışı bırak (L1)"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "Projeyi Devre Dışı Bırak"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Subagents"
+msgstr "Alt aracıları Devre Dışı Bırak"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and "
@@ -2210,6 +2213,12 @@ msgstr "Aracıların kurulum veya iTerm2 bildirimlerine dokunmadan L2'ye (OSC 9;
 "ilerlemesi) geri dönmesi için gelen kanca zarflarını denetleyicide "
 "bırakır (yok sayar). Bir sonraki kanca olayında etkili olur; yeniden "
 "başlatmaya gerek yoktur."
+
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk "
+"refactors, Claude Opus for anything subtle."
+msgstr "örn. hızlı aramalar için Codex GPT-5.5 fast, toplu yeniden düzenlemeler "
+"için OpenCode GLM, ince işler için Claude Opus."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -3024,6 +3033,13 @@ msgstr "Kuruluyor"
 msgid "Installing in this terminal. Closes when finished."
 msgstr "Bu terminale kuruluyor. Bittiğinde kapanır."
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Instructions agents follow when choosing which agent or model to "
+"delegate to."
+msgstr "Aracıların hangi aracıya veya modele devredeceğini seçerken izlediği "
+"talimatlar."
+
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Kesintiye uğradı: Ajan oturumu tamamlanmadan sona erdi."
@@ -3292,6 +3308,7 @@ msgstr "Büyüt"
 msgid "Maximize browser"
 msgstr "Tarayıcıyı büyüt"
 
+#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "MCP servers"
 msgstr "MCP sunucuları"
@@ -5693,13 +5710,23 @@ msgstr "Alt aracı bulunamadı."
 msgid "Subagent Result"
 msgstr "Alt Aracı Sonucu"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Subagent routing guide"
+msgstr "Alt aracı yönlendirme kılavuzu"
+
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Alt ajan çalıştırmaları"
 
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Alt aracılar"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Subagents enabled for this thread"
+msgstr "Bu konu için alt aracılar etkinleştirildi"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

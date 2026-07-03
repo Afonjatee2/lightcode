@@ -1,25 +1,33 @@
 import type { ReactNode } from "react";
 import { Tooltip } from "@heroui/react";
-import { Globe, X } from "lucide-react";
+import { X } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
 import { toLocalFileUrl } from "@/shared/promptContent";
+import type { ComposerMcpServerDescriptor } from "./composerMcpServers";
 import type { Attachment } from "./useAttachments";
 
-export function BrowserChip(props: {
+/**
+ * Enabled-MCP indicator, parameterized by a {@link ComposerMcpServerDescriptor}
+ * from the composer MCP registry so adding a new MCP needs no new chip code.
+ *
+ * - `chip` (default): a removable pill in the composer attachment bar.
+ * - `header`: a non-interactive status icon in the active-thread header. The
+ *   MCP server set is bound at session-create time, so a mid-thread change
+ *   can't reconfigure the running session — the icon is informational only, but
+ *   rendered as a <button> to match the sibling header status controls.
+ */
+export function McpChip(props: {
+  descriptor: ComposerMcpServerDescriptor;
   onRemove?: (() => void) | undefined;
   title?: string;
   variant?: "chip" | "header";
 }) {
   const { t } = useLingui();
-  const { onRemove, variant = "chip" } = props;
-  const title = props.title ?? t`Browser MCP enabled for this thread`;
+  const { descriptor, onRemove, variant = "chip" } = props;
+  const Icon = descriptor.icon;
+  const title = props.title ?? t(descriptor.enabledTitle);
   if (variant === "header") {
-    // Same structure as the other header buttons (CircleCheck / ArrowRightLeft
-    // / Bug / X) so the indicator slots into the row without alignment drift.
-    // Non-interactive — mid-thread browserMcp changes can't reconfigure the
-    // running session — but rendering as <button> keeps it consistent with the
-    // sibling status icon, which is also a no-op button.
     return (
       <Tooltip delay={0}>
         <Tooltip.Trigger>
@@ -29,7 +37,7 @@ export function BrowserChip(props: {
             aria-label={title}
             onClick={(e) => e.stopPropagation()}
           >
-            <Globe className="size-3.5" aria-hidden="true" />
+            <Icon className="size-3.5" aria-hidden="true" />
           </button>
         </Tooltip.Trigger>
         <Tooltip.Content>{title}</Tooltip.Content>
@@ -43,13 +51,13 @@ export function BrowserChip(props: {
       aria-label={title}
       role={onRemove ? "group" : "img"}
     >
-      <Globe className="size-3 text-muted" aria-hidden="true" />
-      <span className="lightcode-attachment-chip__name">{t`Browser`}</span>
+      <Icon className="size-3 text-muted" aria-hidden="true" />
+      <span className="lightcode-attachment-chip__name">{t(descriptor.label)}</span>
       {onRemove ? (
         <button
           type="button"
           className="lightcode-attachment-chip__delete"
-          aria-label={t`Disable Browser MCP`}
+          aria-label={t(descriptor.disableLabel)}
           onMouseDown={(e) => e.preventDefault()}
           onClick={(e) => {
             e.stopPropagation();

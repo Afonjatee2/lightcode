@@ -1007,8 +1007,7 @@ msgstr "浏览您的 GitHub 存储库或粘贴克隆 URL。"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/components/composer/AttachmentBar.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -1030,7 +1029,7 @@ msgstr "浏览器 MCP"
 msgid "Browser MCP enabled for OpenCode"
 msgstr "为 OpenCode 启用的浏览器 MCP"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Browser MCP enabled for this thread"
 msgstr "为此线程启用浏览器 MCP"
 
@@ -2040,7 +2039,7 @@ msgstr "禁用"
 msgid "Disable {tierLabel} effort"
 msgstr "禁用{tierLabel}级别"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Disable Browser MCP"
 msgstr "禁用浏览器 MCP"
 
@@ -2052,6 +2051,10 @@ msgstr "禁用 CLI 挂钩插件 (L1)"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "禁用项目"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Subagents"
+msgstr "禁用子代理"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and "
@@ -2181,6 +2184,11 @@ msgid "Drops incoming hook envelopes on the supervisor so agents fall back to "
 "Takes effect on the next hook event — no restart needed."
 msgstr "在监管进程上丢弃传入的挂钩信封，以便代理回退到 L2（OSC 9;4 进度），而无需触及安装或 iTerm2 "
 "通知。在下一个挂钩事件时生效——无需重启。"
+
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk "
+"refactors, Claude Opus for anything subtle."
+msgstr "例如：Codex GPT-5.5 fast 用于快速查询，OpenCode GLM 用于批量重构，Claude Opus 用于任何微妙的任务。"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -2970,6 +2978,12 @@ msgstr "安装中"
 msgid "Installing in this terminal. Closes when finished."
 msgstr "在此终端中安装。完成后关闭。"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Instructions agents follow when choosing which agent or model to "
+"delegate to."
+msgstr "代理在选择要委派给哪个代理或模型时遵循的说明。"
+
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "已中断：代理会话在完成之前结束。"
@@ -3232,6 +3246,7 @@ msgstr "最大化"
 msgid "Maximize browser"
 msgstr "最大化浏览器"
 
+#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "MCP servers"
 msgstr "MCP服务器"
@@ -5604,13 +5619,23 @@ msgstr "未找到子代理。"
 msgid "Subagent Result"
 msgstr "子代理结果"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Subagent routing guide"
+msgstr "子代理路由指南"
+
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "子代理运行次数"
 
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "子代理"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Subagents enabled for this thread"
+msgstr "已为此线程启用子代理"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

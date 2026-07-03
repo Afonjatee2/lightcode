@@ -1009,8 +1009,7 @@ msgstr "GitHub リポジトリを参照するか、クローン URL を貼り付
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/components/composer/AttachmentBar.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -1032,7 +1031,7 @@ msgstr "ブラウザMCP"
 msgid "Browser MCP enabled for OpenCode"
 msgstr "OpenCode に対応したブラウザ MCP"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Browser MCP enabled for this thread"
 msgstr "このスレッドに対してブラウザ MCP が有効になっています"
 
@@ -2042,7 +2041,7 @@ msgstr "無効にする"
 msgid "Disable {tierLabel} effort"
 msgstr "{tierLabel}の推論レベルを無効化"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Disable Browser MCP"
 msgstr "ブラウザMCPを無効にする"
 
@@ -2054,6 +2053,10 @@ msgstr "CLI フック プラグインを無効にする (L1)"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "プロジェクトを無効にする"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Subagents"
+msgstr "サブエージェントを無効にする"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and "
@@ -2183,6 +2186,12 @@ msgid "Drops incoming hook envelopes on the supervisor so agents fall back to "
 "Takes effect on the next hook event — no restart needed."
 msgstr "受信したフック エンベロープをスーパーバイザー側で破棄し、インストールや iTerm2 通知に影響を与えずにエージェントが L2 (OSC "
 "9;4 の進行状況) にフォールバックするようにします。次のフック イベントから有効になります。再起動は不要です。"
+
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk "
+"refactors, Claude Opus for anything subtle."
+msgstr "例：クイックな調査には Codex GPT-5.5 fast、大量のリファクタリングには OpenCode GLM、繊細な作業には "
+"Claude Opus。"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -2976,6 +2985,12 @@ msgstr "インストール中"
 msgid "Installing in this terminal. Closes when finished."
 msgstr "この端末にインストールします。終了したら閉じます。"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Instructions agents follow when choosing which agent or model to "
+"delegate to."
+msgstr "どのエージェントやモデルに委任するかを選ぶ際に、エージェントが従う指示。"
+
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "中断されました: エージェントセッションが完了前に終了しました。"
@@ -3239,6 +3254,7 @@ msgstr "最大化する"
 msgid "Maximize browser"
 msgstr "ブラウザを最大化する"
 
+#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "MCP servers"
 msgstr "MCPサーバー"
@@ -5616,13 +5632,23 @@ msgstr "サブエージェントが見つかりません。"
 msgid "Subagent Result"
 msgstr "サブエージェントの結果"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Subagent routing guide"
+msgstr "サブエージェントのルーティングガイド"
+
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "サブエージェント実行"
 
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "サブエージェント"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Subagents enabled for this thread"
+msgstr "このスレッドに対してサブエージェントが有効になっています"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

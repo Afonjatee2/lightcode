@@ -15,8 +15,10 @@ import { isHomeProjectId } from "@/shared/homeScope";
 import { readBridge } from "@/renderer/bridge";
 import {
   AttachmentBar,
-  BrowserChip,
   ComposerAddMenu,
+  composerMcpServers,
+  McpChip,
+  mcpTogglePatch,
   MentionInput,
   openAttachmentLightbox,
   VoiceInputButton,
@@ -274,6 +276,15 @@ export function ThreadDraftComposerArea(props: {
   const authRequired = props.selectedAgent.authState === "missing";
   const isHomeScope = isHomeProjectId(props.project.id);
   const browserMcpScope = getBrowserMcpScope(props.selectedAgent.kind, props.presentationMode);
+  // Registry-driven MCP toggles: the "+" add menu and enabled chips both iterate
+  // this list, so a new MCP server means adding one descriptor to the registry.
+  const mcpServers = composerMcpServers.map((descriptor) => ({
+    descriptor,
+    enabled: props.config[descriptor.configKey] === true,
+    visible: descriptor.getScope(props.selectedAgent.kind, props.presentationMode) !== "none",
+    onToggle: (next: boolean) => props.onConfigChange(mcpTogglePatch(descriptor.configKey, next)),
+  }));
+  const enabledMcpServers = mcpServers.filter((server) => server.enabled);
 
   // Worktree creation lives in the composer toolbar. The "bring over uncommitted
   // changes" affordance only appears when the new worktree forks from the
@@ -558,8 +569,16 @@ export function ThreadDraftComposerArea(props: {
               if (idx >= 0) openAttachmentLightbox(imageAttachments, idx);
             }}
             leading={
-              props.config.browserMcp === true ? (
-                <BrowserChip onRemove={() => props.onConfigChange({ browserMcp: false })} />
+              enabledMcpServers.length > 0 ? (
+                <>
+                  {enabledMcpServers.map((server) => (
+                    <McpChip
+                      key={server.descriptor.id}
+                      descriptor={server.descriptor}
+                      onRemove={() => server.onToggle(false)}
+                    />
+                  ))}
+                </>
               ) : undefined
             }
           />
@@ -637,8 +656,7 @@ export function ThreadDraftComposerArea(props: {
         afterControls={() => (
           <>
             <ComposerAddMenu
-              browserMcpEnabled={props.config.browserMcp === true}
-              showBrowserOption={browserMcpScope !== "none"}
+              mcpServers={mcpServers}
               onPickFiles={() => {
                 void readBridge()
                   .pickFiles()
@@ -646,7 +664,6 @@ export function ThreadDraftComposerArea(props: {
                     if (paths) attachments.addFiles(paths);
                   });
               }}
-              onToggleBrowserMcp={(next) => props.onConfigChange({ browserMcp: next })}
             />
             {showVoiceInputButton ? (
               <VoiceInputButton

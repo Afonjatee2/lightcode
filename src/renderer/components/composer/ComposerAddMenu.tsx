@@ -1,18 +1,25 @@
 import { useState } from "react";
-import { Globe, Paperclip, Plus } from "lucide-react";
-import { Label, ListBox, Popover, Tooltip } from "@heroui/react";
+import { Paperclip, Plus } from "lucide-react";
+import { Header, Label, ListBox, Popover, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@/renderer/components/common";
+import type { ComposerMcpServerDescriptor } from "./composerMcpServers";
+
+export type ComposerMcpMenuItem = {
+  descriptor: ComposerMcpServerDescriptor;
+  enabled: boolean;
+  visible: boolean;
+  onToggle: (next: boolean) => void;
+};
 
 export function ComposerAddMenu(props: {
-  browserMcpEnabled: boolean;
-  showBrowserOption: boolean;
+  mcpServers: readonly ComposerMcpMenuItem[];
   onPickFiles: () => void;
-  onToggleBrowserMcp: (next: boolean) => void;
 }) {
-  const { browserMcpEnabled, showBrowserOption, onPickFiles, onToggleBrowserMcp } = props;
+  const { mcpServers, onPickFiles } = props;
   const { t } = useLingui();
   const [isOpen, setIsOpen] = useState(false);
+  const visibleMcpServers = mcpServers.filter((server) => server.visible);
 
   const handleSelect = (id: string) => {
     setIsOpen(false);
@@ -20,9 +27,8 @@ export function ComposerAddMenu(props: {
       onPickFiles();
       return;
     }
-    if (id === "browser") {
-      onToggleBrowserMcp(!browserMcpEnabled);
-    }
+    const server = visibleMcpServers.find((entry) => entry.descriptor.id === id);
+    if (server) server.onToggle(!server.enabled);
   };
 
   const button = (
@@ -65,21 +71,36 @@ export function ComposerAddMenu(props: {
                   <Trans>Attach</Trans>
                 </span>
               </ListBox.Item>
-              {showBrowserOption ? (
+              {visibleMcpServers.length > 0 ? (
                 <ListBox.Item
-                  id="browser"
-                  textValue={t`Browser`}
-                  className="focus-visible:outline-none"
+                  id="mcp-servers-header"
+                  isDisabled
+                  textValue={t`MCP servers`}
+                  className="!cursor-default !bg-transparent !opacity-100"
                 >
-                  <Globe className="size-4 text-muted" />
-                  <Label className="flex-1 truncate">
-                    <Trans>Browser</Trans>
-                  </Label>
-                  <span className="ms-auto truncate text-xs text-muted">
-                    {browserMcpEnabled ? t`Disable` : t`Enable`}
-                  </span>
+                  <Header className="px-1 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+                    <Trans>MCP servers</Trans>
+                  </Header>
                 </ListBox.Item>
               ) : null}
+              {visibleMcpServers.map((server) => {
+                const Icon = server.descriptor.icon;
+                const label = t(server.descriptor.label);
+                return (
+                  <ListBox.Item
+                    key={server.descriptor.id}
+                    id={server.descriptor.id}
+                    textValue={label}
+                    className="focus-visible:outline-none"
+                  >
+                    <Icon className="size-4 text-muted" />
+                    <Label className="flex-1 truncate">{label}</Label>
+                    <span className="ms-auto truncate text-xs text-muted">
+                      {server.enabled ? t`Disable` : t`Enable`}
+                    </span>
+                  </ListBox.Item>
+                );
+              })}
             </ListBox>
           </Popover.Dialog>
         </Popover.Content>

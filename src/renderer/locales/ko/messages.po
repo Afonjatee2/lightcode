@@ -1009,8 +1009,7 @@ msgstr "GitHub 리포지토리를 찾아보거나 복제 URL을 붙여넣으세�
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/components/composer/AttachmentBar.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -1032,7 +1031,7 @@ msgstr "브라우저 MCP"
 msgid "Browser MCP enabled for OpenCode"
 msgstr "OpenCode에 브라우저 MCP가 활성화됨"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Browser MCP enabled for this thread"
 msgstr "이 스레드에 대해 브라우저 MCP가 활성화되었습니다."
 
@@ -2043,7 +2042,7 @@ msgstr "비활성화"
 msgid "Disable {tierLabel} effort"
 msgstr "{tierLabel} 추론 강도 비활성화"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Disable Browser MCP"
 msgstr "브라우저 MCP 비활성화"
 
@@ -2055,6 +2054,10 @@ msgstr "CLI 후크 플러그인 비활성화(L1)"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "프로젝트 비활성화"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Subagents"
+msgstr "하위 에이전트 비활성화"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and "
@@ -2184,6 +2187,12 @@ msgid "Drops incoming hook envelopes on the supervisor so agents fall back to "
 "Takes effect on the next hook event — no restart needed."
 msgstr "에이전트가 설치 또는 iTerm2 알림을 건드리지 않고 L2(OSC 9;4 진행)로 돌아갈 수 있도록 감독자에게 수신 후크 "
 "봉투를 삭제합니다. 다음 후크 이벤트에 적용됩니다. 다시 시작할 필요가 없습니다."
+
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk "
+"refactors, Claude Opus for anything subtle."
+msgstr "예: 빠른 조회에는 Codex GPT-5.5 fast, 대규모 리팩터링에는 OpenCode GLM, 미묘한 작업에는 Claude "
+"Opus."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -2976,6 +2985,12 @@ msgstr "설치 중"
 msgid "Installing in this terminal. Closes when finished."
 msgstr "이 터미널에 설치 중입니다. 완료되면 닫힙니다."
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Instructions agents follow when choosing which agent or model to "
+"delegate to."
+msgstr "에이전트가 어떤 에이전트나 모델에 위임할지 선택할 때 따르는 지침입니다."
+
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "중단됨: 에이전트 세션이 완료되기 전에 종료되었습니다."
@@ -3239,6 +3254,7 @@ msgstr "최대화"
 msgid "Maximize browser"
 msgstr "브라우저 최대화"
 
+#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "MCP servers"
 msgstr "MCP 서버"
@@ -5614,13 +5630,23 @@ msgstr "하위 에이전트를 찾을 수 없습니다."
 msgid "Subagent Result"
 msgstr "하위 에이전트 결과"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Subagent routing guide"
+msgstr "하위 에이전트 라우팅 가이드"
+
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "서브에이전트 실행"
 
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "하위 에이전트"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Subagents enabled for this thread"
+msgstr "이 스레드에 대해 하위 에이전트가 활성화되었습니다."
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

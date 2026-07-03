@@ -139,6 +139,7 @@ describe("sharedSettingsFile", () => {
         collapsedProviders: [],
         selectedRingGroups: {},
       },
+      subagentRoutingGuide: "",
     });
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
@@ -242,6 +243,7 @@ describe("sharedSettingsFile", () => {
         collapsedProviders: [],
         selectedRingGroups: {},
       },
+      subagentRoutingGuide: "",
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
   });

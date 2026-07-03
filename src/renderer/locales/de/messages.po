@@ -1024,8 +1024,7 @@ msgstr "Durchsuchen Sie Ihre GitHub-Repositorys oder fügen Sie eine Klon-URL "
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/components/composer/AttachmentBar.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -1047,7 +1046,7 @@ msgstr "Browser-MCP"
 msgid "Browser MCP enabled for OpenCode"
 msgstr "Browser-MCP für OpenCode aktiviert"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Browser MCP enabled for this thread"
 msgstr "Browser-MCP für diesen Thread aktiviert"
 
@@ -2073,7 +2072,7 @@ msgstr "Deaktivieren"
 msgid "Disable {tierLabel} effort"
 msgstr "Stufe {tierLabel} deaktivieren"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Disable Browser MCP"
 msgstr "Browser-MCP deaktivieren"
 
@@ -2085,6 +2084,10 @@ msgstr "CLI-Hook-Plugin deaktivieren (L1)"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "Projekt deaktivieren"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Subagents"
+msgstr "Subagenten deaktivieren"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and "
@@ -2219,6 +2222,12 @@ msgstr "Lässt eingehende Hook-Umschläge auf dem Supervisor fallen, sodass "
 "Agenten auf L2 (OSC 9;4-Fortschritt) zurückgreifen, ohne Installations- "
 "oder iTerm2-Benachrichtigungen zu berühren. Wird beim nächsten "
 "Hook-Ereignis wirksam – kein Neustart erforderlich."
+
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk "
+"refactors, Claude Opus for anything subtle."
+msgstr "z. B. Codex GPT-5.5 fast für schnelle Recherchen, OpenCode GLM für "
+"umfangreiche Refactorings, Claude Opus für alles Kniffelige."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -3036,6 +3045,13 @@ msgstr "Installieren"
 msgid "Installing in this terminal. Closes when finished."
 msgstr "Installation in diesem Terminal. Wird nach Abschluss geschlossen."
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Instructions agents follow when choosing which agent or model to "
+"delegate to."
+msgstr "Anweisungen, denen Agenten folgen, wenn sie auswählen, an welchen "
+"Agenten oder welches Modell delegiert wird."
+
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Unterbrochen: Agentensitzung wurde vorzeitig beendet."
@@ -3304,6 +3320,7 @@ msgstr "Maximieren"
 msgid "Maximize browser"
 msgstr "Browser maximieren"
 
+#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "MCP servers"
 msgstr "MCP-Server"
@@ -5715,13 +5732,23 @@ msgstr "Subagent nicht gefunden."
 msgid "Subagent Result"
 msgstr "Subagent-Ergebnis"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Subagent routing guide"
+msgstr "Leitfaden für Subagenten-Routing"
+
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Subagent-Ausführungen"
 
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Subagenten"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Subagents enabled for this thread"
+msgstr "Subagenten für diesen Thread aktiviert"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

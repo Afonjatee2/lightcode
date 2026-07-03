@@ -19,7 +19,7 @@ import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { useAppStore } from "@/renderer/state/appStore";
 import { captureFileCheckpoint } from "@/renderer/state/fileCheckpointActions";
 import { TuxIcon } from "@/renderer/components/common";
-import { BrowserChip } from "@/renderer/components/composer";
+import { browserMcpServer, McpChip } from "@/renderer/components/composer";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
 import { captureThreadStarted } from "@/renderer/analytics/posthog";
@@ -394,7 +394,8 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                 </Tooltip.Content>
               </Tooltip>
               {showBrowserChip ? (
-                <BrowserChip
+                <McpChip
+                  descriptor={browserMcpServer}
                   variant="header"
                   {...(thread.agentKind === "opencode"
                     ? { title: t`Browser MCP enabled for OpenCode` }

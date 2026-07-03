@@ -1019,8 +1019,7 @@ msgstr "Duyệt qua kho GitHub của bạn hoặc dán URL nhân bản."
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
-#: src/renderer/components/composer/AttachmentBar.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/views/MainView/parts/ProjectAuxiliaryPanel.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel.tsx
@@ -1042,7 +1041,7 @@ msgstr "MCP trình duyệt"
 msgid "Browser MCP enabled for OpenCode"
 msgstr "MCP trình duyệt được bật cho OpenCode"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Browser MCP enabled for this thread"
 msgstr "Đã bật MCP trình duyệt cho chủ đề này"
 
@@ -2063,7 +2062,7 @@ msgstr "Vô hiệu hóa"
 msgid "Disable {tierLabel} effort"
 msgstr "Tắt mức nỗ lực {tierLabel}"
 
-#: src/renderer/components/composer/AttachmentBar.tsx
+#: src/renderer/components/composer/composerMcpServers.ts
 msgid "Disable Browser MCP"
 msgstr "Tắt MCP trình duyệt"
 
@@ -2075,6 +2074,10 @@ msgstr "Vô hiệu hóa plugin hook CLI (L1)"
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "Vô hiệu hóa dự án"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Subagents"
+msgstr "Tắt tác nhân phụ"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and "
@@ -2208,6 +2211,12 @@ msgid "Drops incoming hook envelopes on the supervisor so agents fall back to "
 msgstr "Loại bỏ các gói hook đến tại trình giám sát để các tác nhân quay về L2 "
 "(tiến trình OSC 9;4) mà không động đến cài đặt hay thông báo iTerm2. Có "
 "hiệu lực ở sự kiện hook tiếp theo — không cần khởi động lại."
+
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk "
+"refactors, Claude Opus for anything subtle."
+msgstr "ví dụ: Codex GPT-5.5 fast cho các tra cứu nhanh, OpenCode GLM cho tái "
+"cấu trúc hàng loạt, Claude Opus cho những việc tinh tế."
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -3015,6 +3024,13 @@ msgstr "Đang cài đặt"
 msgid "Installing in this terminal. Closes when finished."
 msgstr "Cài đặt trong thiết bị đầu cuối này. Đóng lại khi hoàn thành."
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Instructions agents follow when choosing which agent or model to "
+"delegate to."
+msgstr "Hướng dẫn mà các tác nhân tuân theo khi chọn tác nhân hoặc mô hình để "
+"ủy thác."
+
 #: src/renderer/state/slices/runtimeEventSlice.ts
 msgid "Interrupted: agent session ended before completion."
 msgstr "Bị gián đoạn: phiên tác nhân đã kết thúc trước khi hoàn thành."
@@ -3283,6 +3299,7 @@ msgstr "Tối đa hóa"
 msgid "Maximize browser"
 msgstr "Tối đa hóa trình duyệt"
 
+#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "MCP servers"
 msgstr "Máy chủ MCP"
@@ -5681,13 +5698,23 @@ msgstr "Không tìm thấy tác nhân phụ."
 msgid "Subagent Result"
 msgstr "Kết quả tác nhân phụ"
 
+#: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
+#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+msgid "Subagent routing guide"
+msgstr "Hướng dẫn định tuyến tác nhân phụ"
+
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Lượt chạy subagent"
 
+#: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Tác nhân phụ"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Subagents enabled for this thread"
+msgstr "Đã bật tác nhân phụ cho chủ đề này"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
