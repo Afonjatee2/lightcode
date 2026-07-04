@@ -1,6 +1,22 @@
 {
   "releases": [
     {
+      "version": "1.4.3",
+      "date": "2026-07-02",
+      "title": "Fable 5 weekly usage tracking",
+      "summary": "A focused patch for Claude usage tracking: the usage panel now shows your per-model weekly limits, including Claude Fable 5's, and Claude usage stays signed in and up to date.",
+      "changes": [
+        {
+          "kind": "added",
+          "text": "The Claude card in the usage panel now tracks per-model weekly limits, so you can watch your Claude Fable 5 weekly quota fill and reset alongside the session and overall weekly bars."
+        },
+        {
+          "kind": "fixed",
+          "text": "Claude usage keeps loading after your sign-in token expires — Lightcode now renews it automatically instead of showing a misleading “Not signed in”."
+        }
+      ]
+    },
+    {
       "version": "1.4.2",
       "date": "2026-07-01",
       "title": "Claude Fable 5 returns",
