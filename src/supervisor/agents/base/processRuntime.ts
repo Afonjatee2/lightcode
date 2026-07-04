@@ -648,10 +648,15 @@ const PRIMED_ENV_MARKER = "__LIGHTCODE_ENV_BEGIN__";
 /** Matches a line that opens a new exported var: `NAME=value`. */
 const PRIMED_ENV_VAR_RE = /^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/;
 
-function parsePrimedEnvDump(lines: string[]): Record<string, string> {
+export function parsePrimedEnvDump(lines: string[]): Record<string, string> {
   const env: Record<string, string> = {};
   let currentKey: string | undefined;
-  for (const line of lines) {
+  // `env` output ends with a newline, so splitting yields trailing empty
+  // strings. Without trimming them, the continuation branch below would append
+  // "\n" to whichever variable happens to be last in the dump (e.g. GH_HOST →
+  // "github.com\n", which breaks gh's URL building in every spawned process).
+  const end = lines.findLastIndex((line) => line.length > 0) + 1;
+  for (const line of lines.slice(0, end)) {
     const match = PRIMED_ENV_VAR_RE.exec(line);
     if (match) {
       const [, key, value] = match;
