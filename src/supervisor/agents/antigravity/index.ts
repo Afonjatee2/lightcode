@@ -177,5 +177,19 @@ export function createAntigravityAdapter(): AgentAdapter {
         pty: true,
       };
     },
+
+    // Antigravity has no structured (GUI) runtime, so it joins the subagent
+    // roster via the one-shot child lane. Unlike title/commit generation this
+    // does NOT isolate the cwd — a child runs in the parent's project directory
+    // so it can actually read/edit the repo. `agy -p` print mode is fully
+    // non-interactive (no approval prompts), so there is no extra bypass flag.
+    buildSubagentOneShotCommand({ model, effort, prompt }) {
+      return {
+        command: "agy",
+        args: ["--model", resolveAntigravityModel(model, effort), "-p", prompt],
+        stdin: "",
+        pty: true,
+      };
+    },
   };
 }

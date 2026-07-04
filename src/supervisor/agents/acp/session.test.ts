@@ -57,6 +57,7 @@ function makeConfigSyncSession(
   overrides: {
     availableModeIds?: string[];
     currentConfig?: ThreadConfig;
+    agentMcpCapabilities?: { http?: boolean; sse?: boolean };
   } = {},
 ) {
   const connection = {
@@ -132,6 +133,10 @@ function makeConfigSyncSession(
     "autoEdit",
     "autopilot",
   ];
+  // Default to advertising HTTP MCP support so the mcpServers-gating (added for
+  // the Factory Droid bug) is a no-op for these pass-through tests. The gating
+  // itself is covered by a dedicated test below.
+  session["agentMcpCapabilities"] = overrides.agentMcpCapabilities ?? { http: true };
   session["currentConfigOptions"] = [];
   session["modeConfigId"] = undefined;
   session["modelConfigValue"] = undefined;
@@ -765,6 +770,30 @@ describe("ACP client protocol helpers", () => {
           headers: [{ name: "Authorization", value: "Bearer subagent-token" }],
         },
       ],
+    });
+  });
+
+  it("drops HTTP MCP servers when the agent does not advertise mcpCapabilities.http", async () => {
+    // Regression: Factory Droid (droid exec --output-format acp-daemon) fails
+    // newSession with an internal error when handed an HTTP MCP server. Agents
+    // that don't advertise http support get the servers dropped and launch
+    // normally without them.
+    const { connection, session } = makeConfigSyncSession({
+      agentMcpCapabilities: { http: false },
+    });
+    (session as unknown as Record<string, unknown>)["subagentMcp"] = {
+      url: "http://127.0.0.1:9200/mcp",
+      token: "subagent-token",
+      headers: { Authorization: "Bearer subagent-token" },
+    };
+
+    await expect(session.openThread({ model: "model-a", subagentMcp: true })).resolves.toBe(
+      "session-1",
+    );
+
+    expect(connection.newSession).toHaveBeenCalledWith({
+      cwd: "C:\\repo",
+      mcpServers: [],
     });
   });
 

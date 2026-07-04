@@ -1,3 +1,4 @@
+import { tmpdir } from "node:os";
 import { describe, expect, it } from "vitest";
 import type { ProjectLocation, RuntimeEvent, ThreadConfig } from "@/shared/contracts";
 import type {
@@ -265,6 +266,55 @@ describe("SubagentRunManager", () => {
     expect(childInput.config.sandboxMode).toBe("workspace-write");
     expect(childInput.presentationMode).toBe("gui");
     expect(childInput).not.toHaveProperty("subagentMcp");
+  });
+
+  it("drives a CLI-only agent as a one-shot child, streaming stdout into the tile", async () => {
+    // A one-shot adapter: no structured session, just a bypass-permissions CLI
+    // that echoes and exits 0.
+    const appended: Array<{ threadId: string; event: RuntimeEvent }> = [];
+    const adapter = {
+      kind: "commandcode",
+      label: "Command Code",
+      capabilities: { models: [{ id: "cc-1", label: "CC One" }], efforts: [] },
+      buildSubagentOneShotCommand: () => ({
+        command: process.execPath,
+        args: ["-e", "process.stdout.write('done work')"],
+        stdin: "",
+      }),
+    } as unknown as AgentAdapter;
+    // Real spawn path → use an existing cwd (buildPosixCommand sets cwd).
+    const realProject: ProjectLocation = { kind: "posix", path: tmpdir() };
+    const host: SubagentRunHost = {
+      getParentContext: (threadId) =>
+        threadId === PARENT ? { projectLocation: realProject, config: { model: "p" } } : undefined,
+      appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
+    };
+    const manager = new SubagentRunManager({
+      adapters: new Map([["commandcode" as never, adapter]]),
+      host,
+    });
+
+    const { runId } = manager.spawn(PARENT, { agent: "commandcode", prompt: "go" });
+    const result = await manager.waitFor(runId, 5000);
+    expect(result).toEqual({ status: "completed", output: "done work" });
+
+    // The streamed text opened an assistant_message nested under the tile.
+    const started = appended
+      .map((a) => a.event)
+      .find(
+        (e): e is Extract<RuntimeEvent, { type: "item.started" }> =>
+          e.type === "item.started" && e.itemType === "assistant_message",
+      );
+    expect(started?.parentItemId).toBe(`sub:${runId}`);
+
+    // The synthetic tile completed with the accumulated output as its result.
+    const tileDone = appended
+      .map((a) => a.event)
+      .find(
+        (e): e is Extract<RuntimeEvent, { type: "item.completed" }> =>
+          e.type === "item.completed" && e.itemId === `sub:${runId}`,
+      );
+    expect(tileDone?.payload).toMatchObject({ status: "success", result: "done work" });
   });
 
   it("throws for unknown agents and missing prompts", () => {

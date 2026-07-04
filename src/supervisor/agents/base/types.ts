@@ -302,8 +302,42 @@ export interface RunOneShotInput {
   signal?: AbortSignal | undefined;
 }
 
+/** Input for {@link AgentOneShotRunner.buildSubagentOneShotCommand}. */
+export interface SubagentOneShotCommandInput {
+  model: string;
+  effort?: string | undefined;
+  prompt: string;
+  /** Parent thread's project location — the child runs in this cwd (WSL-aware). */
+  location: ProjectLocation;
+}
+
+/**
+ * A CLI invocation for a one-shot subagent child. Deliberately omits
+ * `isolateCwd` (used by title/commit generation to avoid clobbering the session
+ * cache): a subagent child MUST run in the parent's real project directory to do
+ * useful work. Providers append their unlocked/bypass-permissions flag here (the
+ * child has no interactive approval channel — it must never block waiting for
+ * input).
+ */
+export interface OneShotChildCommand {
+  command: string;
+  args: string[];
+  stdin?: string;
+  pty?: boolean;
+  env?: Record<string, string>;
+}
+
 export interface AgentOneShotRunner {
   defaultOneShotModel?: string;
+  /**
+   * Build a bypass-permissions CLI invocation so an agent WITHOUT a structured
+   * (GUI) runtime can still be spawned as a one-shot subagent child. Implemented
+   * only by CLI-only providers (e.g. Command Code, Antigravity). Distinct from
+   * {@link buildOneShotCommand} — that lane is read-only title/commit generation
+   * and may isolate the cwd; this one runs real work in the project cwd with
+   * permissions unlocked.
+   */
+  buildSubagentOneShotCommand?(input: SubagentOneShotCommandInput): OneShotChildCommand | undefined;
   buildOneShotCommand?(
     model: string,
     effort?: string,

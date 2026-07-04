@@ -70,4 +70,35 @@ describe("buildSpawnableAgents", () => {
       { value: "claude-opus-4", label: "Opus 4.8", tier: "max-capability" },
     ]);
   });
+
+  it("marks structured-runtime agents with execution: structured", () => {
+    const adapters = new Map<AgentKind, AgentAdapter>([
+      [
+        "claude" as AgentKind,
+        { createStructuredSession: async () => ({}) } as unknown as AgentAdapter,
+      ],
+    ]);
+    const [agent] = buildSpawnableAgents(adapters, [makeStatus()]);
+    expect(agent?.execution).toBe("structured");
+  });
+
+  it("includes CLI-only agents via buildSubagentOneShotCommand, marked one-shot", () => {
+    const adapters = new Map<AgentKind, AgentAdapter>([
+      [
+        "claude" as AgentKind,
+        {
+          buildSubagentOneShotCommand: () => ({ command: "x", args: [] }),
+        } as unknown as AgentAdapter,
+      ],
+    ]);
+    const [agent] = buildSpawnableAgents(adapters, [makeStatus()]);
+    expect(agent?.execution).toBe("one-shot");
+  });
+
+  it("excludes agents that support neither a structured session nor a one-shot child", () => {
+    const adapters = new Map<AgentKind, AgentAdapter>([
+      ["claude" as AgentKind, {} as unknown as AgentAdapter],
+    ]);
+    expect(buildSpawnableAgents(adapters, [makeStatus()])).toEqual([]);
+  });
 });

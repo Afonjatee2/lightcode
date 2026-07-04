@@ -43,6 +43,10 @@ export function buildCodexSubagentMcpArgs(
     `mcp_servers.${name}.url=${JSON.stringify(subagentMcp.url)}`,
     "-c",
     `mcp_servers.${name}.bearer_token_env_var="${CODEX_SUBAGENT_MCP_TOKEN_ENV}"`,
+    // Codex kills MCP tool calls after tool_timeout_sec (default 60s);
+    // wait_for_agent/run_agent block up to MAX_WAIT_TIMEOUT_MS (240s).
+    "-c",
+    `mcp_servers.${name}.tool_timeout_sec=300`,
   ];
 }
 

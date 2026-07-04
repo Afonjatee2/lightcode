@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   resolveSubagentMcpHttpConfigForLaunch,
-  type SubagentMcpHostGatewayResolver,
+  type SubagentMcpHostAccess,
+  type SubagentMcpHostAccessResolver,
   type SubagentMcpHttpConfig,
 } from "./index";
 
@@ -11,45 +12,53 @@ const NATIVE: SubagentMcpHttpConfig = {
   headers: { Authorization: "Bearer tok-abc" },
 };
 
-function fakeGateway(ip: string | undefined): SubagentMcpHostGatewayResolver {
-  return { resolveHostGatewayIp: vi.fn<(distro: string) => string | undefined>(() => ip) };
+function fakeHostAccess(access: SubagentMcpHostAccess | undefined): SubagentMcpHostAccessResolver {
+  return {
+    resolveHostAccess: vi.fn<(distro: string) => Promise<SubagentMcpHostAccess | undefined>>(
+      async () => access,
+    ),
+  };
+}
+
+function gateway(ip: string): SubagentMcpHostAccessResolver {
+  return fakeHostAccess({ kind: "gateway", ip });
 }
 
 describe("resolveSubagentMcpHttpConfigForLaunch", () => {
-  it("returns undefined when the thread has no native config", () => {
+  it("returns undefined when the thread has no native config", async () => {
     expect(
-      resolveSubagentMcpHttpConfigForLaunch(
+      await resolveSubagentMcpHttpConfigForLaunch(
         undefined,
         { kind: "posix" },
-        fakeGateway("172.20.0.1"),
+        gateway("172.20.0.1"),
       ),
     ).toBeUndefined();
   });
 
-  it("passes a posix location's config through unchanged", () => {
-    const result = resolveSubagentMcpHttpConfigForLaunch(NATIVE, { kind: "posix" });
+  it("passes a posix location's config through unchanged", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(NATIVE, { kind: "posix" });
     expect(result).toBe(NATIVE);
   });
 
-  it("passes a windows location's config through unchanged", () => {
-    const result = resolveSubagentMcpHttpConfigForLaunch(NATIVE, { kind: "windows" });
+  it("passes a windows location's config through unchanged", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(NATIVE, { kind: "windows" });
     expect(result).toBe(NATIVE);
   });
 
-  it("does not invoke the gateway resolver for native locations", () => {
-    const gateway = fakeGateway("172.20.0.1");
-    resolveSubagentMcpHttpConfigForLaunch(NATIVE, { kind: "windows" }, gateway);
-    expect(gateway.resolveHostGatewayIp).not.toHaveBeenCalled();
+  it("does not invoke the host-access resolver for native locations", async () => {
+    const resolver = gateway("172.20.0.1");
+    await resolveSubagentMcpHttpConfigForLaunch(NATIVE, { kind: "windows" }, resolver);
+    expect(resolver.resolveHostAccess).not.toHaveBeenCalled();
   });
 
-  it("rewrites the loopback host to the WSL gateway IP, preserving port/path/token", () => {
-    const gateway = fakeGateway("172.20.0.1");
-    const result = resolveSubagentMcpHttpConfigForLaunch(
+  it("rewrites the loopback host to the WSL gateway IP, preserving port/path/token", async () => {
+    const resolver = gateway("172.20.0.1");
+    const result = await resolveSubagentMcpHttpConfigForLaunch(
       NATIVE,
       { kind: "wsl", distro: "Ubuntu" },
-      gateway,
+      resolver,
     );
-    expect(gateway.resolveHostGatewayIp).toHaveBeenCalledWith("Ubuntu");
+    expect(resolver.resolveHostAccess).toHaveBeenCalledWith("Ubuntu");
     expect(result).toEqual({
       url: "http://172.20.0.1:54321/mcp",
       token: "tok-abc",
@@ -57,17 +66,26 @@ describe("resolveSubagentMcpHttpConfigForLaunch", () => {
     });
   });
 
-  it("rewrites a `localhost` host too", () => {
-    const result = resolveSubagentMcpHttpConfigForLaunch(
+  it("rewrites a `localhost` host too", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(
       { ...NATIVE, url: "http://localhost:54321/mcp" },
       { kind: "wsl", distro: "Ubuntu" },
-      fakeGateway("10.0.0.5"),
+      gateway("10.0.0.5"),
     );
     expect(result?.url).toBe("http://10.0.0.5:54321/mcp");
   });
 
-  it("accepts a full wsl ProjectLocation shape", () => {
-    const result = resolveSubagentMcpHttpConfigForLaunch(
+  it("passes the native config through unchanged for mirrored-mode WSL (loopback)", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(
+      NATIVE,
+      { kind: "wsl", distro: "Ubuntu" },
+      fakeHostAccess({ kind: "loopback" }),
+    );
+    expect(result).toBe(NATIVE);
+  });
+
+  it("accepts a full wsl ProjectLocation shape", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(
       NATIVE,
       {
         kind: "wsl",
@@ -75,33 +93,33 @@ describe("resolveSubagentMcpHttpConfigForLaunch", () => {
         linuxPath: "/home/me/proj",
         uncPath: "\\\\wsl.localhost\\Debian\\home\\me\\proj",
       },
-      fakeGateway("192.168.1.2"),
+      gateway("192.168.1.2"),
     );
     expect(result?.url).toBe("http://192.168.1.2:54321/mcp");
   });
 
-  it("falls back to undefined for WSL when no gateway resolver is wired", () => {
-    const result = resolveSubagentMcpHttpConfigForLaunch(NATIVE, {
+  it("falls back to undefined for WSL when no host-access resolver is wired", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(NATIVE, {
       kind: "wsl",
       distro: "Ubuntu",
     });
     expect(result).toBeUndefined();
   });
 
-  it("falls back to undefined for WSL when the gateway IP can't be resolved", () => {
-    const result = resolveSubagentMcpHttpConfigForLaunch(
+  it("falls back to undefined for WSL when host access can't be resolved", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(
       NATIVE,
       { kind: "wsl", distro: "Ubuntu" },
-      fakeGateway(undefined),
+      fakeHostAccess(undefined),
     );
     expect(result).toBeUndefined();
   });
 
-  it("returns undefined for WSL when the native URL is unparseable", () => {
-    const result = resolveSubagentMcpHttpConfigForLaunch(
+  it("returns undefined for WSL when the native URL is unparseable", async () => {
+    const result = await resolveSubagentMcpHttpConfigForLaunch(
       { ...NATIVE, url: "not a url" },
       { kind: "wsl", distro: "Ubuntu" },
-      fakeGateway("172.20.0.1"),
+      gateway("172.20.0.1"),
     );
     expect(result).toBeUndefined();
   });

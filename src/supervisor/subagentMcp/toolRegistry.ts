@@ -1,8 +1,17 @@
 import type { AgentKind, AgentStatus } from "@/shared/contracts";
 import type { AgentAdapter } from "@/supervisor/agents/base";
-import { DEFAULT_WAIT_TIMEOUT_MS, SubagentSpawnError } from "./SubagentRunManager";
+import {
+  DEFAULT_WAIT_TIMEOUT_MS,
+  MAX_WAIT_TIMEOUT_MS,
+  SubagentSpawnError,
+} from "./SubagentRunManager";
 import type { SubagentRunManager } from "./SubagentRunManager";
+import { resolveSubagentExecution } from "./types";
 import type { McpToolResult, ModelTier, SpawnableAgent, SpawnAgentRequest } from "./types";
+
+/** Shared `timeout_s` schema description for `wait_for_agent` and `run_agent`. */
+const TIMEOUT_S_DESCRIPTION =
+  'Max seconds to wait (capped at 240). On timeout, status is "running" — call wait_for_agent again to keep waiting.';
 
 const FAST_CHEAP_KEYWORDS = ["haiku", "mini", "nano", "lite", "flash", "small", "spark", "fast"];
 const MAX_CAPABILITY_KEYWORDS = ["opus", "fable", "pro", "max", "ultra", "big"];
@@ -52,7 +61,7 @@ export const TOOLS: ToolSpec[] = [
   {
     name: "list_agents",
     description:
-      "List the AI agents you can spawn as subagents, each with its available models and effort levels. Pick fast/cheap models for light tasks (search, summarization, bulk edits) and stronger models for implementation or review. Each model carries a tier hint: fast-cheap | balanced | max-capability.",
+      "List the AI agents you can spawn as subagents, each with its available models and effort levels. Pick fast/cheap models for light tasks (search, summarization, bulk edits) and stronger models for implementation or review. Each model carries a tier hint: fast-cheap | balanced | max-capability. Each agent carries an execution lane: structured (full session) or one-shot (single prompt in, streamed text out; runs non-interactively with permissions bypassed — it cannot receive follow-up input, so put ALL context and instructions in the initial prompt).",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -85,7 +94,7 @@ export const TOOLS: ToolSpec[] = [
         run_id: { type: "string" },
         timeout_s: {
           type: "number",
-          description: 'Max seconds to wait. On timeout, status is "running".',
+          description: TIMEOUT_S_DESCRIPTION,
         },
       },
     },
@@ -108,8 +117,7 @@ export const TOOLS: ToolSpec[] = [
         name: { type: "string", description: "Optional short label for the run." },
         timeout_s: {
           type: "number",
-          description:
-            'Max seconds to block. On timeout, status is "running" — keep waiting with wait_for_agent.',
+          description: TIMEOUT_S_DESCRIPTION,
         },
       },
     },
@@ -143,8 +151,14 @@ export function isKnownToolName(name: string): boolean {
 
 /**
  * Build the spawnable-agent catalog from the adapter registry + agent statuses,
- * filtered to installed + authenticated providers whose adapter can create a
- * structured session.
+ * filtered to installed + authenticated providers the run manager can drive as a
+ * child. An adapter qualifies via either lane:
+ * - `structured`: implements `createStructuredSession` (full GUI runtime).
+ * - `one-shot`: has no structured runtime but implements
+ *   `buildSubagentOneShotCommand` (a bypass-permissions CLI invocation) — this
+ *   pulls CLI-only providers (Antigravity, Command Code) into the roster.
+ * The `execution` field is surfaced so calling agents can see which lane a child
+ * uses (one-shot children stream a single result and can't be steered).
  */
 export function buildSpawnableAgents(
   adapters: Map<AgentKind, AgentAdapter>,
@@ -154,7 +168,9 @@ export function buildSpawnableAgents(
   for (const status of statuses) {
     if (!status.installed || status.authState !== "authenticated") continue;
     const adapter = adapters.get(status.kind);
-    if (!adapter?.createStructuredSession) continue;
+    if (!adapter) continue;
+    const execution = resolveSubagentExecution(adapter);
+    if (!execution) continue;
     const models = status.capabilities.models.map((m) => ({
       value: m.id,
       label: m.label,
@@ -167,6 +183,7 @@ export function buildSpawnableAgents(
       kind: status.kind,
       label: status.label,
       models,
+      execution,
       ...(efforts.length > 0 ? { efforts } : {}),
       ...(defaultModel ? { defaultModel } : {}),
     });
@@ -202,6 +219,15 @@ function parseSpawnRequest(args: Record<string, unknown>): SpawnAgentRequest {
   };
 }
 
+/** Caller-supplied `timeout_s` → ms, clamped to [0, {@link MAX_WAIT_TIMEOUT_MS}]. */
+function parseWaitTimeoutMs(value: unknown): number {
+  const requestedMs =
+    typeof value === "number" && Number.isFinite(value)
+      ? Math.max(0, value * 1000)
+      : DEFAULT_WAIT_TIMEOUT_MS;
+  return Math.min(requestedMs, MAX_WAIT_TIMEOUT_MS);
+}
+
 /** Dispatch a tools/call. Never throws — validation failures return isError results. */
 export async function dispatchTool(
   name: string,
@@ -220,18 +246,11 @@ export async function dispatchTool(
       case "wait_for_agent": {
         const runId = typeof args.run_id === "string" ? args.run_id : "";
         if (!runId) return errorResult("run_id is required");
-        const timeoutMs =
-          typeof args.timeout_s === "number" && Number.isFinite(args.timeout_s)
-            ? Math.max(0, args.timeout_s * 1000)
-            : DEFAULT_WAIT_TIMEOUT_MS;
-        return jsonResult(await ctx.runManager.waitFor(runId, timeoutMs));
+        return jsonResult(await ctx.runManager.waitFor(runId, parseWaitTimeoutMs(args.timeout_s)));
       }
       case "run_agent": {
         const request = parseSpawnRequest(args);
-        const timeoutMs =
-          typeof args.timeout_s === "number" && Number.isFinite(args.timeout_s)
-            ? Math.max(0, args.timeout_s * 1000)
-            : DEFAULT_WAIT_TIMEOUT_MS;
+        const timeoutMs = parseWaitTimeoutMs(args.timeout_s);
         const { runId } = ctx.runManager.spawn(ctx.parentThreadId, request);
         const result = await ctx.runManager.waitFor(runId, timeoutMs);
         return jsonResult({ run_id: runId, ...result });

@@ -40,6 +40,8 @@ describe("Subagent MCP provider configs", () => {
       'mcp_servers.subagents.url="http://127.0.0.1:9200/mcp"',
       "-c",
       'mcp_servers.subagents.bearer_token_env_var="LIGHTCODE_SUBAGENT_MCP_TOKEN"',
+      "-c",
+      "mcp_servers.subagents.tool_timeout_sec=300",
     ]);
     expect(buildCodexSubagentMcpEnv(cfg)).toEqual({
       [CODEX_SUBAGENT_MCP_TOKEN_ENV]: "subagent-token",
@@ -48,7 +50,7 @@ describe("Subagent MCP provider configs", () => {
       subagents: {
         httpUrl: cfg.url,
         headers: cfg.headers,
-        timeout: 30_000,
+        timeout: 300_000,
       },
     });
     expect(buildOpenCodeSubagentMcp(cfg)).toEqual({

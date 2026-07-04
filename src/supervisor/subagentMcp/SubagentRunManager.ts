@@ -8,6 +8,8 @@ import type {
   ToolCallPayload,
 } from "@/shared/contracts";
 import type { AgentAdapter, StructuredSessionHandle } from "@/supervisor/agents/base";
+import { runOneShotChild, type OneShotChildHandle } from "./oneShotChild";
+import { resolveSubagentExecution } from "./types";
 import type {
   SpawnAgentRequest,
   SubagentRunHost,
@@ -15,8 +17,18 @@ import type {
   SubagentWaitResult,
 } from "./types";
 
-/** Default `wait_for_agent` / `run_agent` blocking timeout. */
-export const DEFAULT_WAIT_TIMEOUT_MS = 600_000;
+/**
+ * Default `wait_for_agent` / `run_agent` blocking timeout. Blocking waits must
+ * finish under every MCP client's own tool-call kill timer, or the client
+ * aborts the HTTP call and the caller sees an opaque transport error instead
+ * of the graceful `status: "running"` re-poll result. Known ceilings: Codex
+ * `tool_timeout_sec` and Gemini's per-server `timeout` (both set to 300s in
+ * their `mcpSubagent.ts` builders — keep in sync), and undici's 300s
+ * default headers timeout for fetch-based clients (Claude SDK).
+ */
+export const DEFAULT_WAIT_TIMEOUT_MS = 120_000;
+/** Hard cap on caller-supplied `timeout_s` — see {@link DEFAULT_WAIT_TIMEOUT_MS}. */
+export const MAX_WAIT_TIMEOUT_MS = 240_000;
 /** Max concurrent live children per parent thread. */
 export const MAX_CONCURRENT_CHILDREN_PER_PARENT = 4;
 
@@ -34,6 +46,8 @@ interface RunRecord {
   /** Accumulated assistant text from `content.delta` events. */
   output: string;
   handle: StructuredSessionHandle | undefined;
+  /** One-shot child driver handle (set instead of `handle` for CLI-only agents). */
+  oneShot: OneShotChildHandle | undefined;
   /**
    * Child-side ids of forwarded `request.opened` events still awaiting a
    * resolution. Drained on settle/cancel via synthetic `request.resolved`
@@ -116,7 +130,7 @@ export class SubagentRunManager {
     if (!adapter) {
       throw new SubagentSpawnError(`Unknown agent: ${request.agent}`);
     }
-    if (!adapter.createStructuredSession) {
+    if (!resolveSubagentExecution(adapter)) {
       throw new SubagentSpawnError(`Agent ${request.agent} cannot be spawned as a subagent`);
     }
     const parent = this.deps.host.getParentContext(parentThreadId);
@@ -164,6 +178,7 @@ export class SubagentRunManager {
       status: "running",
       output: "",
       handle: undefined,
+      oneShot: undefined,
       pendingRequestIds: new Set<string>(),
       cancelRequested: false,
       settled: false,
@@ -274,6 +289,13 @@ export class SubagentRunManager {
     childConfig: ThreadConfig,
     prompt: string,
   ): Promise<void> {
+    // CLI-only agents (no structured runtime) run through the one-shot child
+    // driver: a single bypass-permissions CLI invocation whose stdout is
+    // streamed into the parent tile as a growing text item.
+    if (resolveSubagentExecution(adapter) === "one-shot") {
+      this.runOneShotChild(record, adapter, projectLocation, childConfig, prompt);
+      return;
+    }
     try {
       const handle = await adapter.createStructuredSession?.({
         threadId: record.childThreadId,
@@ -309,6 +331,71 @@ export class SubagentRunManager {
         error instanceof Error ? error.message : String(error),
       );
     }
+  }
+
+  /**
+   * Drive a CLI-only agent as a one-shot child. Streams stdout into the parent
+   * stream as a single growing `assistant_message` item (opened lazily on the
+   * first chunk, mirroring the structured mapper's assistant-text streaming) and
+   * settles from the process exit code. The synthetic tile + re-tag / output
+   * accumulation are reused via {@link onChildEvent}.
+   */
+  private runOneShotChild(
+    record: RunRecord,
+    adapter: AgentAdapter,
+    projectLocation: ProjectLocation,
+    childConfig: ThreadConfig,
+    prompt: string,
+  ): void {
+    const itemId = `${record.runId}-oneshot-out`;
+    let opened = false;
+    const ensureOpen = () => {
+      if (opened) return;
+      opened = true;
+      this.onChildEvent(record, {
+        type: "item.started",
+        threadId: record.childThreadId,
+        itemId,
+        itemType: "assistant_message",
+      });
+    };
+
+    const handle = runOneShotChild({
+      adapter,
+      projectLocation,
+      model: childConfig.model,
+      effort: childConfig.effort,
+      prompt,
+      onTextDelta: (delta) => {
+        ensureOpen();
+        this.onChildEvent(record, {
+          type: "content.delta",
+          threadId: record.childThreadId,
+          itemId,
+          stream: "assistant_text",
+          delta,
+        });
+      },
+      onSettle: ({ status, errorMessage }) => {
+        if (opened) {
+          this.onChildEvent(record, {
+            type: "item.completed",
+            threadId: record.childThreadId,
+            itemId,
+          });
+        }
+        // On cancel, `cancel()`/`cancelAllForThread()` set `cancelRequested` and
+        // synchronously called `settle("cancelled")` in the same tick, so by the
+        // time this exit-driven callback fires the record is already settled and
+        // this call is an idempotent no-op — the process exit status never
+        // overrides the recorded `cancelled`.
+        this.settle(record, status, errorMessage);
+      },
+    });
+
+    record.oneShot = handle;
+    // A cancel that landed between spawn() and here: tear the fresh process down.
+    if (record.cancelRequested) handle.cancel();
   }
 
   /**
@@ -426,6 +513,10 @@ export class SubagentRunManager {
   }
 
   private async teardown(record: RunRecord): Promise<void> {
+    if (record.oneShot) {
+      record.oneShot.cancel();
+      record.oneShot = undefined;
+    }
     const handle = record.handle;
     if (!handle) return;
     record.handle = undefined;

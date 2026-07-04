@@ -19,7 +19,9 @@ export function buildGeminiSubagentMcpServers(
     [SUBAGENT_MCP_SERVER_NAME]: {
       httpUrl: subagentMcp.url,
       headers: subagentMcp.headers,
-      timeout: 30_000,
+      // Must exceed MAX_WAIT_TIMEOUT_MS (240s): wait_for_agent/run_agent hold
+      // the tool call open up to that long before returning "running".
+      timeout: 300_000,
     },
   };
 }

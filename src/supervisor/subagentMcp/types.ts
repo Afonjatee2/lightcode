@@ -22,12 +22,38 @@ export interface SpawnableAgentModel {
  * status service + adapter registry, filtered to installed + authenticated
  * providers whose adapter implements `createStructuredSession`.
  */
+/**
+ * How a spawnable agent executes as a child:
+ * - `structured`: a full provider structured (GUI) runtime session — supports
+ *   incremental tool calls, permission forwarding, live steering.
+ * - `one-shot`: a single non-interactive CLI invocation (bypass-permissions);
+ *   streams stdout as its output and settles when the process exits. No
+ *   interactive approval channel.
+ */
+export type SpawnableAgentExecution = "structured" | "one-shot";
+
+/**
+ * Single source of truth for which lane an adapter runs as a subagent child:
+ * `structured` if it has a GUI runtime, else `one-shot` if it can build a
+ * bypass-permissions CLI invocation, else `undefined` (not spawnable). Uses a
+ * structural param so it stays free of an `AgentAdapter` import (no cycles).
+ */
+export function resolveSubagentExecution(adapter: {
+  createStructuredSession?: unknown;
+  buildSubagentOneShotCommand?: unknown;
+}): SpawnableAgentExecution | undefined {
+  if (adapter.createStructuredSession) return "structured";
+  if (adapter.buildSubagentOneShotCommand) return "one-shot";
+  return undefined;
+}
+
 export interface SpawnableAgent {
   kind: string;
   label: string;
   models: SpawnableAgentModel[];
   efforts?: string[];
   defaultModel?: string;
+  execution?: SpawnableAgentExecution;
 }
 
 /** Arguments accepted by `spawn_agent` / `run_agent`. */

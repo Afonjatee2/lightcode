@@ -11,7 +11,11 @@
 
 import { spawn as spawnChild, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { buildAcpBrowserMcpServers } from "./mcpBrowser";
+import {
+  buildAcpBrowserMcpServers,
+  gateAcpHttpMcpServers,
+  type AcpHttpMcpServer,
+} from "./mcpBrowser";
 import { buildAcpSubagentMcpServers } from "./mcpSubagent";
 import { appendFileSync, mkdirSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
@@ -33,6 +37,7 @@ import {
   type CreateTerminalRequest,
   type CreateTerminalResponse,
   type KillTerminalRequest,
+  type McpCapabilities,
   type PromptCapabilities,
   type ReadTextFileRequest,
   type ReadTextFileResponse,
@@ -75,6 +80,7 @@ import {
 } from "./canonicalMapping";
 import { terminateChildProcessTree } from "@/shared/processTree";
 import { ensureNodePtySpawnHelperExecutable } from "@/supervisor/nodePty";
+import { processEnvRecord } from "@/supervisor/processEnv";
 import {
   buildPosixExportPrefix,
   createKnownSessionRef,
@@ -252,14 +258,6 @@ function selectAutoApprovedPermissionOption(request: RequestPermissionRequest): 
   };
 
   return readOptionId("allow_always") ?? readOptionId("allow_once");
-}
-
-function processEnvRecord(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (typeof value === "string") env[key] = value;
-  }
-  return env;
 }
 
 function buildAcpTerminalEnv(location: ProjectLocation): Record<string, string> {
@@ -498,6 +496,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private thoughtLevelConfigId: string | undefined;
   private agentPromptCapabilities: PromptCapabilities | undefined;
   private agentSessionCapabilities: SessionCapabilities | undefined;
+  private agentMcpCapabilities: McpCapabilities | undefined;
   private readonly acpTerminals = new Map<string, AcpTerminalRecord>();
   private acpTerminalSeq = 0;
   /**
@@ -915,6 +914,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     });
     this.agentPromptCapabilities = initResult.agentCapabilities?.promptCapabilities;
     this.agentSessionCapabilities = initResult.agentCapabilities?.sessionCapabilities;
+    this.agentMcpCapabilities = initResult.agentCapabilities?.mcpCapabilities;
     console.log(
       "[acp] initialized — protocol v%d, agent: %s",
       initResult.protocolVersion,
@@ -933,19 +933,40 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    * We store them to map Lightcode's `ThreadConfig` to the correct
    * ACP mode/model IDs (which vary per agent).
    */
+  /**
+   * Drop HTTP MCP servers when the agent's `initialize` response does not
+   * advertise `mcpCapabilities.http === true`. Some ACP agents (e.g. Factory
+   * Droid via `droid exec --output-format acp-daemon`) reject `newSession`
+   * outright with an internal error when handed an HTTP MCP server they can't
+   * support, instead of ignoring it — which would kill the thread launch. This
+   * is provider-agnostic: it keys purely off the advertised capability, so
+   * agents that DO support HTTP MCP (Cursor, Grok, Gemini) keep their servers.
+   */
+  private gateHttpMcpServers(servers: AcpHttpMcpServer[]): AcpHttpMcpServer[] {
+    const kept = gateAcpHttpMcpServers(servers, this.agentMcpCapabilities);
+    if (kept.length < servers.length) {
+      console.log(
+        "[acp] dropping %d HTTP MCP server(s) — agent does not advertise mcpCapabilities.http; launching without them: %s",
+        servers.length - kept.length,
+        servers.map((s) => s.name).join(", "),
+      );
+    }
+    return kept;
+  }
+
   async openThread(config: ThreadConfig, sessionRef?: SessionRef): Promise<string> {
     let availableModeIds: string[] = [];
     let configOptions: unknown[] = [];
     this.currentConfig = undefined;
     this.currentSlashCommands = undefined;
-    const mcpServers = [
+    const mcpServers = this.gateHttpMcpServers([
       ...(await buildAcpBrowserMcpServers(
         this.projectLocation,
         config.browserMcp === true,
         this.browserMcp,
       )),
       ...buildAcpSubagentMcpServers(config.subagentMcp === true, this.subagentMcp),
-    ];
+    ]);
 
     if (sessionRef) {
       if (this.agentSessionCapabilities?.resume !== undefined) {

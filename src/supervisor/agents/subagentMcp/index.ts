@@ -16,10 +16,12 @@
  * upstream with a fixed env token) — the subagents ingress uses PER-THREAD
  * bearer tokens that can't be baked into a shared per-distro proxy. Instead we
  * mirror `BrowserMcpIngress`'s network posture: the supervisor ingress binds
- * `0.0.0.0` on Windows so an agent inside a WSL distro can reach the host over
- * the WSL2 NAT gateway IP (loopback inside the distro can't hit the host's
- * `127.0.0.1`). At launch we rewrite the loopback URL host to that gateway IP.
- * The per-thread bearer token stays the security boundary — see
+ * `0.0.0.0` on Windows so an agent inside a WSL distro can reach the host. HOW
+ * it reaches the host depends on the distro's networking mode (resolved by the
+ * host-side `SubagentMcpHostAccessResolver`): in NAT mode we rewrite the
+ * loopback URL host to the distro's default-route gateway IP; in mirrored mode
+ * the native `127.0.0.1` URL works as-is and is passed through unchanged. The
+ * per-thread bearer token stays the security boundary — see
  * `resolveSubagentMcpHttpConfigForLaunch` and `SubagentMcpIngress.start`.
  */
 
@@ -46,40 +48,53 @@ export type SubagentMcpLocation =
   | { kind: "wsl"; distro: string };
 
 /**
- * Host-side resolver for the WSL → host gateway IP of a distro. Implemented in
- * the supervisor wiring (Windows-only; reads `nameserver` from
- * `\\wsl.localhost\<distro>\etc\resolv.conf`). Returns `undefined` when it
- * can't be determined (non-Windows host, distro unreachable) so the caller can
- * fall back to "not available".
+ * How an in-distro process reaches the host-bound ingress. Structurally equal
+ * to `WslHostAccess` from `@/supervisor/wsl/hostAccess` — redeclared locally so
+ * this provider-boundary module stays free of a runtime dependency on the WSL
+ * wiring (mirrors how `browserMcp` declares its own `BrowserMcpBridge`).
+ * - `gateway`: rewrite the loopback URL host to `ip` (NAT mode).
+ * - `loopback`: the native `127.0.0.1` URL works as-is (mirrored mode).
  */
-export interface SubagentMcpHostGatewayResolver {
-  resolveHostGatewayIp(distro: string): string | undefined;
+export type SubagentMcpHostAccess = { kind: "gateway"; ip: string } | { kind: "loopback" };
+
+/**
+ * Host-side resolver for how a WSL distro reaches host-bound services.
+ * Implemented in the supervisor wiring (Windows-only; probes the live distro
+ * for its networking mode + default route, falling back to resolv.conf).
+ * Resolves to `undefined` when it can't be determined (non-Windows host, distro
+ * unreachable) so the caller can fall back to "not available".
+ */
+export interface SubagentMcpHostAccessResolver {
+  resolveHostAccess(distro: string): Promise<SubagentMcpHostAccess | undefined>;
 }
 
 /**
  * Resolve the subagents MCP http config for a given project location.
  *
  * - Native (windows/posix): the native loopback config is returned unchanged.
- * - WSL: the loopback host in `native.url` is rewritten to the WSL → host
- *   gateway IP so the in-distro agent can reach the `0.0.0.0`-bound ingress.
- *   The per-thread token + headers are preserved verbatim.
+ * - WSL, NAT mode (`gateway`): the loopback host in `native.url` is rewritten
+ *   to the distro's default-route gateway IP so the in-distro agent can reach
+ *   the `0.0.0.0`-bound ingress. Token + headers are preserved verbatim.
+ * - WSL, mirrored mode (`loopback`): the native config is returned unchanged —
+ *   `localhost` inside the distro reaches the host directly.
  *
- * Returns `undefined` when the thread hasn't registered (`native` absent), or —
- * for WSL — when no gateway resolver is wired or the gateway IP can't be
+ * Resolves to `undefined` when the thread hasn't registered (`native` absent),
+ * or — for WSL — when no host-access resolver is wired or host access can't be
  * resolved. This mirrors the browser helper's "no bridge → undefined" fallback:
  * we never hand a WSL agent an unreachable `127.0.0.1` URL.
  */
-export function resolveSubagentMcpHttpConfigForLaunch(
+export async function resolveSubagentMcpHttpConfigForLaunch(
   native: SubagentMcpHttpConfig | undefined,
   location: SubagentMcpLocation,
-  hostGateway?: SubagentMcpHostGatewayResolver,
-): SubagentMcpHttpConfig | undefined {
+  hostAccess?: SubagentMcpHostAccessResolver,
+): Promise<SubagentMcpHttpConfig | undefined> {
   if (!native) return undefined;
   if (location.kind !== "wsl") return native;
-  if (!hostGateway) return undefined;
-  const ip = hostGateway.resolveHostGatewayIp(location.distro);
-  if (!ip) return undefined;
-  const url = rewriteLoopbackHost(native.url, ip);
+  if (!hostAccess) return undefined;
+  const access = await hostAccess.resolveHostAccess(location.distro);
+  if (!access) return undefined;
+  if (access.kind === "loopback") return native;
+  const url = rewriteLoopbackHost(native.url, access.ip);
   if (!url) return undefined;
   return { url, token: native.token, headers: native.headers };
 }

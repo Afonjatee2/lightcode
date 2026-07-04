@@ -128,6 +128,26 @@ describe("createCommandCodeAdapter", () => {
     expect(defaultCommandCodeCapabilities.presentationModes).toEqual(["terminal"]);
   });
 
+  it("builds a bypass-permissions one-shot subagent command with --trust", () => {
+    const adapter = createCommandCodeAdapter();
+    const cmd = adapter.buildSubagentOneShotCommand?.({
+      model: "claude-opus-4-8",
+      prompt: "do the work",
+      location: project,
+    });
+    expect(cmd?.command).toBe("command-code");
+    // `--trust` is the bypass flag (a one-shot child has no approval channel).
+    expect(cmd?.args).toContain("--trust");
+    expect(cmd?.args).toEqual([
+      "--trust",
+      "--skip-onboarding",
+      "--model",
+      "claude-opus-4-8",
+      "-p",
+      "do the work",
+    ]);
+  });
+
   it("exposes the update spec on the adapter so the npm latest-version probe works", () => {
     // Regression guard: the registry card's "latest version" probe reads
     // `adapter.update`, not the detection status. Without this field a

@@ -5,6 +5,7 @@ import { stripAnsi } from "@/shared/ansi";
 import type { ProjectLocation } from "@/shared/contracts";
 import { buildAgentCommand, type CommandSpec } from "./agents/base";
 import { ensureNodePtySpawnHelperExecutable } from "./nodePty";
+import { processEnvRecord } from "./processEnv";
 
 export interface OneShotSpecOptions {
   /**
@@ -121,14 +122,6 @@ export function spawnAgent(
   });
 }
 
-function mergedPtyEnv(env: Record<string, string> | undefined): Record<string, string> {
-  const merged: Record<string, string> = {};
-  for (const [key, value] of Object.entries({ ...process.env, ...env })) {
-    if (typeof value === "string") merged[key] = value;
-  }
-  return merged;
-}
-
 export function spawnAgentPty(
   spec: CommandSpec,
   input: string,
@@ -149,7 +142,7 @@ export function spawnAgentPty(
         cols: 120,
         rows: 30,
         ...(spec.cwd ? { cwd: spec.cwd } : {}),
-        env: mergedPtyEnv(spec.env),
+        env: { ...processEnvRecord(), ...spec.env },
       });
     } catch (error) {
       reject(error);

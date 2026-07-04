@@ -181,5 +181,25 @@ export function createCommandCodeAdapter(): AgentAdapter {
         env: COMMANDCODE_SKIP_UPDATES_ENV,
       };
     },
+
+    // Command Code has no structured (GUI) runtime, so it joins the subagent
+    // roster via the one-shot child lane. `--trust` is its bypass-permissions
+    // flag (approve every tool without prompting) — required because a one-shot
+    // child has no interactive approval channel and must never block on input.
+    buildSubagentOneShotCommand({ model, prompt }) {
+      return {
+        command: "command-code",
+        args: [
+          "--trust",
+          "--skip-onboarding",
+          "--model",
+          model || COMMANDCODE_DEFAULT_MODEL_ID,
+          "-p",
+          prompt,
+        ],
+        stdin: "",
+        env: COMMANDCODE_SKIP_UPDATES_ENV,
+      };
+    },
   };
 }

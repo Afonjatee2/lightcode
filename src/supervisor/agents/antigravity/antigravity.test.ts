@@ -176,6 +176,24 @@ describe("createAntigravityAdapter", () => {
       pty: true,
     });
   });
+
+  it("builds a subagent one-shot command that runs in the project cwd (no isolateCwd)", () => {
+    const adapter = createAntigravityAdapter();
+    const cmd = adapter.buildSubagentOneShotCommand?.({
+      model: ANTIGRAVITY_DEFAULT_MODEL_ID,
+      effort: "High",
+      prompt: "implement it",
+      location: project,
+    });
+    expect(cmd).toEqual({
+      command: "agy",
+      args: ["--model", "Gemini 3.5 Flash (High)", "-p", "implement it"],
+      stdin: "",
+      pty: true,
+    });
+    // A subagent child must NOT isolate the cwd — it works in the real repo.
+    expect(cmd).not.toHaveProperty("isolateCwd");
+  });
 });
 
 describe("parseAntigravityModelsOutput", () => {

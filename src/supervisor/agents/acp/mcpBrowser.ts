@@ -25,6 +25,37 @@ export interface AcpHttpMcpServer {
   headers: AcpHttpHeader[];
 }
 
+/**
+ * Advertised MCP transport support from the ACP `initialize` response
+ * (`agentCapabilities.mcpCapabilities`). Redeclared structurally so this
+ * provider-boundary module doesn't depend on the SDK types directly.
+ */
+export interface AcpMcpCapabilities {
+  http?: boolean;
+  sse?: boolean;
+}
+
+/**
+ * Gate HTTP MCP servers on the agent's advertised `mcpCapabilities.http`.
+ *
+ * Some ACP agents (e.g. Factory Droid via `droid exec --output-format
+ * acp-daemon`) fail `newSession` with an internal error when passed an HTTP MCP
+ * server they don't support, instead of ignoring it — which kills the thread
+ * launch. Agents that advertise `http === true` (Cursor, Grok, Gemini) keep
+ * their servers. This is provider-agnostic: it keys purely off the capability.
+ *
+ * Returns the (possibly empty) surviving list, so callers can inspect the
+ * length delta to log/report what was dropped.
+ */
+export function gateAcpHttpMcpServers(
+  servers: AcpHttpMcpServer[],
+  mcpCapabilities: AcpMcpCapabilities | undefined,
+): AcpHttpMcpServer[] {
+  if (servers.length === 0) return servers;
+  if (mcpCapabilities?.http === true) return servers;
+  return [];
+}
+
 export function buildAcpBrowserMcpServers(
   location: BrowserMcpLocation,
   enabled: boolean,
