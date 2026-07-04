@@ -1,10 +1,15 @@
 import type { OpencodeClient } from "@opencode-ai/sdk/v2/client";
 import type { ProjectLocation } from "@/shared/contracts";
 import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
+import {
+  SUBAGENT_MCP_SERVER_NAME,
+  type SubagentMcpHttpConfig,
+} from "@/supervisor/agents/subagentMcp";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { BROWSER_MCP_SERVER_NAME } from "../browserMcp";
 import { buildOpenCodeServerCommand } from "./argv";
 import { buildOpenCodeBrowserMcp } from "./mcpBrowser";
+import { buildOpenCodeSubagentMcp } from "./mcpSubagent";
 import { classifyOpenCodeError, isOpenCodeConnectionLoss } from "./opencodeErrors";
 import {
   disposeSpawnedOpenCodeServerHandles,
@@ -24,15 +29,25 @@ export function resolveOpenCodeSessionDirectory(location: ProjectLocation): stri
   }
 }
 
-function poolKey(location: ProjectLocation): string {
-  switch (location.kind) {
-    case "windows":
-      return `windows:${location.path}`;
-    case "wsl":
-      return `wsl:${location.distro}:${location.linuxPath}`;
-    case "posix":
-      return `posix:${location.path}`;
-  }
+function poolKey(location: ProjectLocation, dedicatedKey?: string): string {
+  const base = ((): string => {
+    switch (location.kind) {
+      case "windows":
+        return `windows:${location.path}`;
+      case "wsl":
+        return `wsl:${location.distro}:${location.linuxPath}`;
+      case "posix":
+        return `posix:${location.path}`;
+    }
+  })();
+  // A `dedicatedKey` (the thread id) carves this acquisition out of the shared
+  // per-project pool into its own single-tenant entry. Used when a thread hosts
+  // the per-thread subagents MCP: its bearer token identifies exactly one parent
+  // thread, so it must not be registered on a server shared by sibling threads
+  // (which would misattribute their spawns). The entry still refcounts and tears
+  // down through the same machinery — with one acquirer it dies when that thread
+  // disposes.
+  return dedicatedKey ? `${base}::dedicated:${dedicatedKey}` : base;
 }
 
 export interface AcquiredOpenCodeServer {
@@ -157,6 +172,21 @@ export interface AcquireOpenCodeServerInput {
   browserMcpEnabled?: boolean;
   browserMcp?: BrowserMcpHttpConfig;
   /**
+   * Per-thread cross-provider subagents MCP config. When present, the server is
+   * dedicated (see `dedicatedKey`) and the `subagents` MCP is registered on it
+   * dynamically via `client.mcp.add` — the per-thread bearer token identifies
+   * the parent thread, so it must never touch the shared config file (global,
+   * would clobber) or a shared server (pooled, would misattribute spawns).
+   */
+  subagentMcp?: SubagentMcpHttpConfig;
+  /**
+   * When set, this acquisition gets its own single-tenant pool entry keyed by
+   * this value (the thread id) instead of joining the shared per-project pool.
+   * Callers that host the per-thread subagents MCP pass their thread id here so
+   * the dynamic `mcp.add` registration is isolated to one thread's server.
+   */
+  dedicatedKey?: string;
+  /**
    * If set, the server stays alive for this many milliseconds after the last
    * release before being torn down. A re-acquire within the window reuses the
    * same server and cancels the pending teardown. Callers that want
@@ -190,6 +220,33 @@ async function syncBrowserMcp(
   await client.mcp.connect({ directory, name: BROWSER_MCP_SERVER_NAME });
 }
 
+/**
+ * Register the per-thread cross-provider subagents MCP on this (dedicated)
+ * server. Mirrors {@link syncBrowserMcp}'s dynamic `mcp.add` + `mcp.connect`,
+ * but — unlike the browser MCP — the subagents endpoint is delivered
+ * pre-resolved via `input.subagentMcp`, and the entry is never written to the
+ * global config file (the per-thread token would clobber across launches).
+ * Only runs when a `subagentMcp` config is present, which the caller pairs with
+ * a `dedicatedKey` so this registration is isolated to one thread's server.
+ */
+async function syncSubagentMcp(
+  input: Pick<AcquireOpenCodeServerInput, "projectLocation" | "subagentMcp">,
+  client: OpencodeClient,
+): Promise<void> {
+  if (!input.subagentMcp) return;
+  const directory = resolveOpenCodeSessionDirectory(input.projectLocation);
+  const servers = buildOpenCodeSubagentMcp(input.subagentMcp);
+  const subagents = servers?.[SUBAGENT_MCP_SERVER_NAME];
+  if (!subagents) return;
+
+  await client.mcp
+    .add({ directory, name: SUBAGENT_MCP_SERVER_NAME, config: subagents })
+    .catch((err) => {
+      if (isOpenCodeConnectionLoss(err)) throw err;
+    });
+  await client.mcp.connect({ directory, name: SUBAGENT_MCP_SERVER_NAME });
+}
+
 export async function acquireOpenCodeServer(
   input: AcquireOpenCodeServerInput,
 ): Promise<AcquiredOpenCodeServer> {
@@ -200,7 +257,7 @@ async function acquireOpenCodeServerInner(
   input: AcquireOpenCodeServerInput,
   retryMcpConnectionLoss: boolean,
 ): Promise<AcquiredOpenCodeServer> {
-  const key = poolKey(input.projectLocation);
+  const key = poolKey(input.projectLocation, input.dedicatedKey);
   let entry = pool.get(key);
 
   if (!entry) {
@@ -246,9 +303,10 @@ async function acquireOpenCodeServerInner(
   const idleCloseDelayMs = input.idleCloseDelayMs;
   try {
     await syncBrowserMcp(input, snapshot.client);
+    await syncSubagentMcp(input, snapshot.client);
   } catch (error) {
     if (!retryMcpConnectionLoss || !isOpenCodeConnectionLoss(error)) {
-      console.warn("[opencode] failed to sync Browser MCP:", error);
+      console.warn("[opencode] failed to sync managed MCP servers:", error);
     } else {
       released = true;
       acquiringEntry.refCount -= 1;

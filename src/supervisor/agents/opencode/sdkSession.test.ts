@@ -88,6 +88,78 @@ describe("OpencodeSdkSession", () => {
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 
+  it("requests a dedicated server and forwards the subagents MCP when hosting", async () => {
+    const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        global: { event: vi.fn<() => Promise<{ stream: AsyncGenerator<Event> }>>() },
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<() => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_host" } }),
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose,
+    });
+
+    const subagentMcp = {
+      url: "http://127.0.0.1:9500/mcp",
+      token: "tok-parent",
+      headers: { Authorization: "Bearer tok-parent" },
+    };
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-host-42",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+      subagentMcp,
+    });
+
+    await session.activate();
+
+    expect(mocks.acquireOpenCodeServer).toHaveBeenCalledWith(
+      expect.objectContaining({ subagentMcp, dedicatedKey: "thread-host-42" }),
+    );
+
+    await session.dispose();
+  });
+
+  it("does not request a dedicated server when not hosting the subagents MCP", async () => {
+    const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    mocks.acquireOpenCodeServer.mockResolvedValue({
+      client: {
+        global: { event: vi.fn<() => Promise<{ stream: AsyncGenerator<Event> }>>() },
+        command: { list: vi.fn<() => Promise<{ data: [] }>>().mockResolvedValue({ data: [] }) },
+        session: {
+          create: vi
+            .fn<() => Promise<{ data: { id: string } }>>()
+            .mockResolvedValue({ data: { id: "ses_plain" } }),
+        },
+      },
+      baseUrl: "http://127.0.0.1:0",
+      handle: {},
+      dispose,
+    });
+
+    const session = await OpencodeSdkSession.create({
+      threadId: "thread-plain",
+      projectLocation,
+      config,
+      presentationMode: "gui",
+    });
+
+    await session.activate();
+
+    const input = mocks.acquireOpenCodeServer.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(input.dedicatedKey).toBeUndefined();
+    expect(input.subagentMcp).toBeUndefined();
+
+    await session.dispose();
+  });
+
   it("stores the created session id in launch options for terminal TUI handoff", async () => {
     const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mocks.acquireOpenCodeServer.mockResolvedValue({

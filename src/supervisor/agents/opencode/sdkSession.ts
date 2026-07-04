@@ -53,14 +53,12 @@ import {
   readOpenCodeErrorText,
 } from "./opencodeErrors";
 import { buildOpenCodePermissionRules } from "./permissionRules";
-import {
-  syncOpenCodeBrowserMcpConfigFile,
-  syncOpenCodeSubagentMcpConfigFile,
-} from "./plugin/install";
+import { syncOpenCodeBrowserMcpConfigFile } from "./plugin/install";
 import {
   acquireOpenCodeServer,
   resolveOpenCodeSessionDirectory,
   type AcquiredOpenCodeServer,
+  type AcquireOpenCodeServerInput,
 } from "./sdkClient";
 import {
   closeOpenItems,
@@ -423,12 +421,11 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
         this.browserMcpEnabled,
         this.input.browserMcp,
       );
-      syncOpenCodeSubagentMcpConfigFile(this.input.projectLocation, this.input.subagentMcp);
-      this.acquired = await acquireOpenCodeServer({
-        projectLocation: this.input.projectLocation,
-        browserMcpEnabled: this.browserMcpEnabled,
-        ...(this.input.browserMcp !== undefined ? { browserMcp: this.input.browserMcp } : {}),
-      });
+      // The subagents MCP is hosted, when opted in, by registering it on a
+      // dedicated per-thread server via `mcp.add` (see `acquireOpenCodeServer`)
+      // — never through the global config file, whose per-thread token would
+      // clobber across launches and misattribute sibling threads' spawns.
+      this.acquired = await acquireOpenCodeServer(this.buildAcquireInput());
     } catch (cause) {
       // Surface server-startup failures (sandbox blocks, ENOENT, port races,
       // macOS quarantine) as classified user-facing strings rather than the
@@ -903,12 +900,28 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     await previous?.dispose().catch((error) => {
       console.warn("[opencode] failed to dispose previous session:", error);
     });
-    this.acquired = await acquireOpenCodeServer({
+    this.acquired = await acquireOpenCodeServer(this.buildAcquireInput());
+    if (this.isGui) this.startEventStream();
+  }
+
+  /**
+   * Assemble the {@link acquireOpenCodeServer} input for this session. When the
+   * thread opted into hosting the subagents MCP (`input.subagentMcp` present),
+   * request a dedicated single-tenant server keyed by the thread id and hand
+   * over the pre-resolved config so it can be registered via `mcp.add`. Threads
+   * without it (including children spawned by the run manager, whose recursion
+   * guard never sets `subagentMcp`) keep sharing the per-project pool — the
+   * dedicated-server cost is strictly opt-in.
+   */
+  private buildAcquireInput(): AcquireOpenCodeServerInput {
+    return {
       projectLocation: this.input.projectLocation,
       browserMcpEnabled: this.browserMcpEnabled,
       ...(this.input.browserMcp !== undefined ? { browserMcp: this.input.browserMcp } : {}),
-    });
-    if (this.isGui) this.startEventStream();
+      ...(this.input.subagentMcp !== undefined
+        ? { subagentMcp: this.input.subagentMcp, dedicatedKey: this.threadId }
+        : {}),
+    };
   }
 
   private classifyOpenCodeError(cause: unknown, operation: string): string {

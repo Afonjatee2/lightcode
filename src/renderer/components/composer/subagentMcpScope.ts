@@ -16,14 +16,23 @@ import { baseAgentKind, type ThreadPresentationMode } from "@/shared/contracts";
  * Mapping is kept identical to `browserMcpScope.ts` so the Subagents badge
  * appears in exactly the same surfaces as the Browser badge.
  *
- * OpenCode is "none" and cannot host per-thread MCP at all: its config file
- * is GLOBAL (`~/.config/opencode/opencode.json`) and its GUI server is pooled
- * per project, so a per-thread bearer token written there would be
- * overwritten/deleted by the next OpenCode launch and could attribute one
- * thread's subagent spawns to another thread. The browser MCP tolerates this
- * only because its token is app-global. OpenCode can still be SPAWNED as a
- * subagent — children are driven through the SDK session directly and don't
- * need the config file.
+ * OpenCode GUI is "launch": the structured session hosts the subagents MCP by
+ * acquiring a DEDICATED per-thread `opencode serve` (pool key includes the
+ * thread id) and registering the server dynamically via `client.mcp.add`
+ * (mirroring the browser MCP), so the per-thread bearer token never touches the
+ * GLOBAL `~/.config/opencode/opencode.json` (where it would be clobbered by the
+ * next launch) nor a POOLED server shared by sibling threads (where it would
+ * misattribute their spawns). The dedicated server dies with the thread. See
+ * `opencode/sdkClient.ts` (`dedicatedKey` + `syncSubagentMcp`).
+ *
+ * OpenCode TUI stays "none": the terminal TUI reads the same global config, and
+ * an always-present `{env:...}` template entry (the only per-process-gatable
+ * shape, since OpenCode rejects a templated `enabled`) would pollute the GUI
+ * shared-pool servers with a broken empty-URL `subagents` entry. OpenCode can
+ * still be SPAWNED as a subagent — children run through the SDK session and the
+ * run manager's recursion guard never sets `subagentMcp`.
+ *
+ * `antigravity`/`commandcode` GUI stay "none": no dedicated-server hosting path.
  *
  * Source of truth: `src/supervisor/agents/*\/mcpSubagent.ts` and their callers.
  */
@@ -36,8 +45,8 @@ export function getSubagentMcpScope(
   const baseKind = baseAgentKind(agentKind);
   if (presentationMode === "gui") {
     if (baseKind === "claude") return "always";
-    if (baseKind === "opencode" || baseKind === "antigravity" || baseKind === "commandcode")
-      return "none";
+    if (baseKind === "opencode") return "launch";
+    if (baseKind === "antigravity" || baseKind === "commandcode") return "none";
     return "launch";
   }
   if (baseKind === "codex") return "launch";

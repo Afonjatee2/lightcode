@@ -108,6 +108,107 @@ describe("acquireOpenCodeServer", () => {
     expect(secondHandle.dispose).toHaveBeenCalledTimes(1);
   });
 
+  function makeSubagentClient() {
+    return {
+      mcp: {
+        add: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+        connect: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
+      },
+    };
+  }
+
+  const subagentMcp = {
+    url: "http://127.0.0.1:9400/mcp",
+    token: "parent-thread-token",
+    headers: { Authorization: "Bearer parent-thread-token" },
+  };
+
+  it("dedicates a per-thread server and registers the subagents MCP via mcp.add", async () => {
+    const handle = makeHandle("http://127.0.0.1:4200");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+    const client = makeSubagentClient();
+    mocks.createOpencodeClient.mockReturnValue(client);
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const acquired = await acquireOpenCodeServer({
+      projectLocation: { kind: "posix", path: "/repo-dedicated" },
+      subagentMcp,
+      dedicatedKey: "thread-parent",
+    });
+
+    expect(client.mcp.add).toHaveBeenCalledTimes(1);
+    expect(client.mcp.add).toHaveBeenCalledWith({
+      directory: "/repo-dedicated",
+      name: "subagents",
+      config: {
+        type: "remote",
+        url: subagentMcp.url,
+        headers: subagentMcp.headers,
+        enabled: true,
+      },
+    });
+    expect(client.mcp.connect).toHaveBeenCalledWith({
+      directory: "/repo-dedicated",
+      name: "subagents",
+    });
+
+    // Dedicated entry has a single tenant → disposes with the thread.
+    await acquired.dispose();
+    expect(handle.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keys the dedicated server distinctly from the shared per-project pool", async () => {
+    const sharedHandle = makeHandle("http://127.0.0.1:4300");
+    const dedicatedHandle = makeHandle("http://127.0.0.1:4301");
+    mocks.spawnOpenCodeServer
+      .mockReturnValueOnce(sharedHandle)
+      .mockReturnValueOnce(dedicatedHandle);
+    mocks.createOpencodeClient.mockReturnValueOnce({}).mockReturnValueOnce(makeSubagentClient());
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const location = { kind: "posix", path: "/repo-split" } as const;
+
+    // A plain (child / non-hosting) acquire joins the shared pool …
+    const shared = await acquireOpenCodeServer({ projectLocation: location });
+    // … while a hosting thread on the SAME project gets its own server.
+    const dedicated = await acquireOpenCodeServer({
+      projectLocation: location,
+      subagentMcp,
+      dedicatedKey: "thread-host",
+    });
+
+    expect(mocks.spawnOpenCodeServer).toHaveBeenCalledTimes(2);
+    expect(shared.baseUrl).toBe("http://127.0.0.1:4300");
+    expect(dedicated.baseUrl).toBe("http://127.0.0.1:4301");
+
+    // Tearing down the dedicated server must not touch the shared one.
+    await dedicated.dispose();
+    expect(dedicatedHandle.dispose).toHaveBeenCalledTimes(1);
+    expect(sharedHandle.dispose).not.toHaveBeenCalled();
+    await shared.dispose();
+    expect(sharedHandle.dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one server for two child acquires that do not host the subagents MCP", async () => {
+    const handle = makeHandle("http://127.0.0.1:4400");
+    mocks.spawnOpenCodeServer.mockReturnValue(handle);
+    mocks.createOpencodeClient.mockReturnValue({});
+
+    const { acquireOpenCodeServer } = await import("./sdkClient");
+    const location = { kind: "posix", path: "/repo-shared" } as const;
+
+    const first = await acquireOpenCodeServer({ projectLocation: location });
+    const second = await acquireOpenCodeServer({ projectLocation: location });
+
+    expect(mocks.spawnOpenCodeServer).toHaveBeenCalledTimes(1);
+    expect(first.baseUrl).toBe(second.baseUrl);
+
+    await first.dispose();
+    expect(handle.dispose).not.toHaveBeenCalled(); // second still holds a ref
+    await second.dispose();
+    expect(handle.dispose).toHaveBeenCalledTimes(1);
+  });
+
   it("shutdownSpawnedOpenCodeServers clears pool bookkeeping and disposes tracked spawns only", async () => {
     const { acquireOpenCodeServer, shutdownSpawnedOpenCodeServers } = await import("./sdkClient");
     const handle = makeHandle("http://127.0.0.1:4096");
