@@ -9,6 +9,7 @@ export {
   type ComposerMcpConfigKey,
   type ComposerMcpServerDescriptor,
 } from "./composerMcpServers";
+export { ComposerVoiceInput } from "./ComposerVoiceInput";
 export { VoiceInputButton, type VoiceInputHandle } from "./VoiceInputButton";
 export {
   ImageLightboxHost,

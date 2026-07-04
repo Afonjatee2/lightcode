@@ -128,7 +128,7 @@ import {
 export { resolveAcpReadableHostFsPath, resolveAcpResourcePath, toAcpResourceUri };
 
 /**
- * Convert Lightcode `PromptSegment[]` + prompt text into ACP `ContentBlock[]`.
+ * Convert Poracode `PromptSegment[]` + prompt text into ACP `ContentBlock[]`.
  */
 async function segmentsToContentBlocks(
   prompt: string,
@@ -462,7 +462,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private readonly projectLocation: ProjectLocation;
   private readonly browserMcp: BrowserMcpHttpConfig | undefined;
   private readonly subagentMcp: SubagentMcpHttpConfig | undefined;
-  /** Lightcode thread id (stable identifier we report in RuntimeEvents). */
+  /** Poracode thread id (stable identifier we report in RuntimeEvents). */
   private readonly threadId: string;
   private readonly stderrChunks: string[] = [];
   private listener: StructuredSessionListener | undefined;
@@ -519,7 +519,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private bufferedRuntimeEvents: RuntimeEvent[] = [];
   /**
    * True while `loadSession` is replaying historical `session/update`
-   * notifications. Lightcode persists thread history in its own DB, so
+   * notifications. Poracode persists thread history in its own DB, so
    * surfacing the replay as new canonical events would duplicate every
    * message in the chat pane. We drop ACP→canonical mapping for the duration
    * and let normal mapping resume once the load completes.
@@ -930,7 +930,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    * Phase 2: Create or resume an ACP session.
    *
    * The agent's response includes its available modes and models.
-   * We store them to map Lightcode's `ThreadConfig` to the correct
+   * We store them to map Poracode's `ThreadConfig` to the correct
    * ACP mode/model IDs (which vary per agent).
    */
   /**
@@ -1100,7 +1100,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       const usageEvent = createAcpPromptUsageEvent(this.threadId, result.usage);
       if (usageEvent) this.emitRuntimeEvents([usageEvent]);
 
-      // Map stopReason to Lightcode status
+      // Map stopReason to Poracode status
       const normalizedStopReason = normalizeAcpStopReason(result.stopReason, {
         interruptRequested: this.currentTurnInterruptRequested,
         recentAgentText: this.recentInterruptAckTextTail,
@@ -1486,7 +1486,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   /**
    * Handle `requestPermission` calls from the agent.
    *
-   * Maps ACP permission requests to Lightcode's `ThreadServerRequest` system.
+   * Maps ACP permission requests to Poracode's `ThreadServerRequest` system.
    * The agent blocks until we respond — we create a pending promise and emit
    * the request to the UI via the listener.
    */
@@ -1607,7 +1607,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     // existing behaviour, and the canonical channel runs in parallel.
     //
     // During session resume/load the agent may replay persisted history as
-    // `session/update` notifications. Lightcode already has those messages
+    // `session/update` notifications. Poracode already has those messages
     // in its own DB, so we skip canonical mapping for the replay window to
     // avoid duplicating every message in the chat pane.
     if (!this.isReplayingHistory && Date.now() >= (this.replayHistoryUntil || 0)) {

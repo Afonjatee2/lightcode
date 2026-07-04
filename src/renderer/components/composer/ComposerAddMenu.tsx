@@ -1,9 +1,13 @@
 import { useState } from "react";
 import { Paperclip, Plus } from "lucide-react";
-import type { Key, Selection } from "@heroui/react";
-import { Dropdown, Label, Tooltip } from "@heroui/react";
+import type { Selection } from "@heroui/react";
+import { Header, Label, ListBox, Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Button } from "@/renderer/components/common";
+import {
+  ResponsiveMenuSurface,
+  useResponsiveMenu,
+} from "@/renderer/components/common/ResponsiveMenuSurface";
 import type { ComposerMcpServerDescriptor } from "./composerMcpServers";
 
 export type ComposerMcpMenuItem = {
@@ -14,10 +18,9 @@ export type ComposerMcpMenuItem = {
 };
 
 /**
- * Presentational switch used inside the MCP submenu rows. The row itself is a
- * `menuitemcheckbox` (multiple-selection menu), so the accessible checked state
- * comes from selection — this visual is `aria-hidden`. Matches the switch look
- * used by `EffortContextMenu`.
+ * Presentational switch used inside the MCP rows. The desktop rows are a
+ * multi-selection listbox, so the accessible checked state comes from
+ * selection; this visual is aria-hidden.
  */
 function MenuSwitch(props: { checked: boolean }) {
   const { checked } = props;
@@ -39,10 +42,12 @@ function MenuSwitch(props: { checked: boolean }) {
 
 export function ComposerAddMenu(props: {
   mcpServers: readonly ComposerMcpMenuItem[];
+  showFileOption?: boolean;
   onPickFiles: () => void;
 }) {
-  const { mcpServers, onPickFiles } = props;
+  const { mcpServers, showFileOption = true, onPickFiles } = props;
   const { t } = useLingui();
+  const { mobile } = useResponsiveMenu();
   const [isOpen, setIsOpen] = useState(false);
   const visibleMcpServers = mcpServers.filter((server) => server.visible);
 
@@ -50,16 +55,15 @@ export function ComposerAddMenu(props: {
     visibleMcpServers.filter((server) => server.enabled).map((server) => server.descriptor.id),
   );
 
-  const handleRootAction = (key: Key) => {
-    if (String(key) === "file") {
-      setIsOpen(false);
-      onPickFiles();
-    }
+  if (!showFileOption && visibleMcpServers.length === 0) return null;
+
+  const handlePickFiles = () => {
+    setIsOpen(false);
+    onPickFiles();
   };
 
-  // Multiple-selection menu → toggling a row keeps the submenu (and the whole
-  // "+" menu) open. Diff the new selection against current state to fire the
-  // single toggle that changed.
+  // Multiple-selection menu: diff the new selection against current state to
+  // fire only the single toggle that changed.
   const handleMcpSelection = (keys: Selection) => {
     for (const server of visibleMcpServers) {
       const next = keys !== "all" && keys.has(server.descriptor.id);
@@ -74,24 +78,62 @@ export function ComposerAddMenu(props: {
       className="lightcode-composer-menu min-w-9 px-2"
       size="sm"
       variant="ghost"
+      {...(mobile ? { onPress: () => setIsOpen(true) } : {})}
     >
       <Plus className="size-4" />
     </Button>
   );
 
-  return (
-    <Dropdown isOpen={isOpen} onOpenChange={setIsOpen}>
-      <Dropdown.Trigger>
-        <Tooltip delay={300}>
-          {button}
-          <Tooltip.Content placement="top">
-            <Trans>Add</Trans>
-          </Tooltip.Content>
-        </Tooltip>
-      </Dropdown.Trigger>
-      <Dropdown.Popover placement="top">
-        <Dropdown.Menu aria-label={t`Add to composer`} onAction={handleRootAction}>
-          <Dropdown.Item id="file" textValue={t`File`} className="focus-visible:outline-none">
+  const mobileList = (
+    <div className="m-sheet-list">
+      {showFileOption ? (
+        <button type="button" className="m-sheet-action" onClick={handlePickFiles}>
+          <Paperclip className="size-4 text-muted" />
+          <span className="flex-1 truncate">
+            <Trans>File</Trans>
+          </span>
+          <span className="shrink-0 text-xs text-muted">
+            <Trans>Attach</Trans>
+          </span>
+        </button>
+      ) : null}
+      {visibleMcpServers.length > 0 ? (
+        <>
+          <span className="px-2 pt-1 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+            <Trans>MCP servers</Trans>
+          </span>
+          {visibleMcpServers.map((server) => {
+            const Icon = server.descriptor.icon;
+            const label = t(server.descriptor.label);
+            return (
+              <button
+                key={server.descriptor.id}
+                type="button"
+                className="m-sheet-action"
+                aria-pressed={server.enabled}
+                onClick={() => server.onToggle(!server.enabled)}
+              >
+                <Icon className="size-4 text-muted" />
+                <span className="flex-1 truncate">{label}</span>
+                <MenuSwitch checked={server.enabled} />
+              </button>
+            );
+          })}
+        </>
+      ) : null}
+    </div>
+  );
+
+  const desktopList = (
+    <div className="min-w-52">
+      {showFileOption ? (
+        <ListBox
+          aria-label={t`Add to composer`}
+          className="lightcode-menu max-h-60 overflow-y-auto"
+          selectionMode="none"
+          onAction={handlePickFiles}
+        >
+          <ListBox.Item id="file" textValue={t`File`} className="focus-visible:outline-none">
             <Paperclip className="size-4 text-muted" />
             <Label className="flex-1 truncate">
               <Trans>File</Trans>
@@ -99,48 +141,65 @@ export function ComposerAddMenu(props: {
             <span className="ms-auto truncate text-xs text-muted">
               <Trans>Attach</Trans>
             </span>
-          </Dropdown.Item>
-          {visibleMcpServers.length > 0 ? (
-            <Dropdown.SubmenuTrigger>
-              <Dropdown.Item
-                id="mcp-servers"
-                textValue={t`MCP servers`}
-                className="focus-visible:outline-none"
-              >
-                <Label className="flex-1 truncate">
-                  <Trans>MCP servers</Trans>
-                </Label>
-                <Dropdown.SubmenuIndicator />
-              </Dropdown.Item>
-              <Dropdown.Popover>
-                <Dropdown.Menu
-                  aria-label={t`MCP servers`}
-                  selectionMode="multiple"
-                  selectedKeys={enabledKeys}
-                  onSelectionChange={handleMcpSelection}
+          </ListBox.Item>
+        </ListBox>
+      ) : null}
+      {visibleMcpServers.length > 0 ? (
+        <div className={showFileOption ? "mt-1 border-t border-border pt-1" : undefined}>
+          <Header className="block px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+            <Trans>MCP servers</Trans>
+          </Header>
+          <ListBox
+            aria-label={t`MCP servers`}
+            className="lightcode-menu max-h-60 overflow-y-auto"
+            selectionMode="multiple"
+            selectedKeys={enabledKeys}
+            onSelectionChange={handleMcpSelection}
+          >
+            {visibleMcpServers.map((server) => {
+              const Icon = server.descriptor.icon;
+              const label = t(server.descriptor.label);
+              return (
+                <ListBox.Item
+                  key={server.descriptor.id}
+                  id={server.descriptor.id}
+                  textValue={label}
+                  className="focus-visible:outline-none data-[selected=true]:bg-transparent"
                 >
-                  {visibleMcpServers.map((server) => {
-                    const Icon = server.descriptor.icon;
-                    const label = t(server.descriptor.label);
-                    return (
-                      <Dropdown.Item
-                        key={server.descriptor.id}
-                        id={server.descriptor.id}
-                        textValue={label}
-                        className="min-w-52 focus-visible:outline-none data-[selected=true]:bg-transparent"
-                      >
-                        <Icon className="size-4 text-muted" />
-                        <Label className="flex-1 truncate">{label}</Label>
-                        <MenuSwitch checked={server.enabled} />
-                      </Dropdown.Item>
-                    );
-                  })}
-                </Dropdown.Menu>
-              </Dropdown.Popover>
-            </Dropdown.SubmenuTrigger>
-          ) : null}
-        </Dropdown.Menu>
-      </Dropdown.Popover>
-    </Dropdown>
+                  <Icon className="size-4 text-muted" />
+                  <Label className="flex-1 truncate">{label}</Label>
+                  <MenuSwitch checked={server.enabled} />
+                </ListBox.Item>
+              );
+            })}
+          </ListBox>
+        </div>
+      ) : null}
+    </div>
+  );
+
+  return (
+    <ResponsiveMenuSurface
+      isOpen={isOpen}
+      onOpenChange={setIsOpen}
+      label={t`Add to composer`}
+      trigger={
+        mobile ? (
+          button
+        ) : (
+          <Tooltip delay={300}>
+            {button}
+            <Tooltip.Content placement="top">
+              <Trans>Add</Trans>
+            </Tooltip.Content>
+          </Tooltip>
+        )
+      }
+      placement="top"
+      contentClassName="p-0"
+      dialogClassName="overflow-hidden"
+    >
+      {mobile ? mobileList : desktopList}
+    </ResponsiveMenuSurface>
   );
 }
