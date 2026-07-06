@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persistStoreSlice, readPersistedSlice } from "@/renderer/utils/persistStoreSlice";
 import type { ThreadSortMode } from "@/renderer/views/MainView/parts/Sidebar/parts/sortMode";
 import { useFileEditorStore } from "./fileEditorStore";
 
@@ -83,15 +84,21 @@ interface PanelState {
   closeAllPanels: () => void;
 }
 
-const STORAGE_KEY = "lightcode-git-panel-context";
-const DRAWER_WIDTH_STORAGE_KEY = "lightcode-browser-drawer-width";
+/**
+ * Legacy hand-rolled storage keys, read once as the initial seed so existing
+ * installs keep their state; the slice under PERSIST_KEY takes over on the first
+ * write and wins on every launch where it exists.
+ */
+const LEGACY_GIT_CONTEXT_KEY = "lightcode-git-panel-context";
+const LEGACY_DRAWER_WIDTH_KEY = "lightcode-browser-drawer-width";
+const PERSIST_KEY = "lightcode-panel";
 const DEFAULT_DRAWER_WIDTH = 640;
 const MIN_DRAWER_WIDTH = 420;
 const MAX_DRAWER_WIDTH = 1400;
 
 function loadInitialGitContext(): GitReviewContext | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(LEGACY_GIT_CONTEXT_KEY);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -105,7 +112,7 @@ function clampDrawerWidth(v: number): number {
 
 function loadInitialDrawerWidth(): number {
   try {
-    const raw = localStorage.getItem(DRAWER_WIDTH_STORAGE_KEY);
+    const raw = localStorage.getItem(LEGACY_DRAWER_WIDTH_KEY);
     if (raw === null) return DEFAULT_DRAWER_WIDTH;
     const parsed = Number.parseInt(raw, 10);
     return clampDrawerWidth(parsed);
@@ -114,8 +121,15 @@ function loadInitialDrawerWidth(): number {
   }
 }
 
-export const usePanelStore = create<PanelState>((set) => ({
-  gitReviewContext: loadInitialGitContext(),
+const initialPersisted = readPersistedSlice<{
+  gitReviewContext: GitReviewContext | null;
+  browserOverlayDrawerWidth: number;
+}>(PERSIST_KEY);
+
+export const usePanelStore = create<PanelState>()((set) => ({
+  gitReviewContext: initialPersisted
+    ? (initialPersisted.gitReviewContext ?? null)
+    : loadInitialGitContext(),
   gitReviewAsPanel: false,
   gitOverlayOpen: false,
   prReviewContext: null,
@@ -126,7 +140,9 @@ export const usePanelStore = create<PanelState>((set) => ({
   notesPanelOpen: false,
   browserOverlayOpen: false,
   browserOverlayMaximized: false,
-  browserOverlayDrawerWidth: loadInitialDrawerWidth(),
+  browserOverlayDrawerWidth: clampDrawerWidth(
+    initialPersisted?.browserOverlayDrawerWidth ?? loadInitialDrawerWidth(),
+  ),
   settingsOpen: false,
   settingsSection: null,
   projectSettingsId: null,
@@ -145,11 +161,6 @@ export const usePanelStore = create<PanelState>((set) => ({
         prev.worktreePath === ctx.worktreePath)
     ) {
       return;
-    }
-    if (ctx) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(ctx));
-    } else {
-      localStorage.removeItem(STORAGE_KEY);
     }
     set({ gitReviewContext: ctx });
   },
@@ -218,11 +229,6 @@ export const usePanelStore = create<PanelState>((set) => ({
     set((state) => {
       const clamped = clampDrawerWidth(v);
       if (state.browserOverlayDrawerWidth === clamped) return {};
-      try {
-        localStorage.setItem(DRAWER_WIDTH_STORAGE_KEY, String(clamped));
-      } catch {
-        // localStorage may be unavailable (private mode, sandbox); fall back to in-memory.
-      }
       return { browserOverlayDrawerWidth: clamped };
     }),
   openBrowserPanel: () =>
@@ -276,7 +282,6 @@ export const usePanelStore = create<PanelState>((set) => ({
   closeCloneProjectModal: () =>
     set((state) => (state.cloneProjectModalOpen ? { cloneProjectModalOpen: false } : {})),
   closeAllPanels: () => {
-    localStorage.removeItem(STORAGE_KEY);
     set((state) => {
       // The floating browser overlay (drawer/fullscreen) is intentionally NOT
       // touched here: it is a standalone surface with its own close controls.
@@ -301,6 +306,18 @@ export const usePanelStore = create<PanelState>((set) => ({
       };
     });
   },
+}));
+
+// Only the two cross-launch slices persist; every other panel/overlay flag is
+// session-scoped and resets on launch. Persisting just this slice keeps the
+// frequent session-only toggles (right-panel tab, settings/search/modal open,
+// sort mode, …) off localStorage — they change the store constantly but never
+// the persisted value. Initial hydration is synchronous, seeded above from
+// readPersistedSlice so the restored git panel and drawer width are present
+// before first paint.
+persistStoreSlice(usePanelStore, PERSIST_KEY, (state) => ({
+  gitReviewContext: state.gitReviewContext,
+  browserOverlayDrawerWidth: state.browserOverlayDrawerWidth,
 }));
 
 // Returns true when any full-window overlay (z-50) is currently rendered above

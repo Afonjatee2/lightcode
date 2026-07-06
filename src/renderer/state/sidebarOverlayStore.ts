@@ -1,7 +1,14 @@
 import { create } from "zustand";
 import { readStoredBoolean } from "@/renderer/utils/localStorage";
+import { persistStoreSlice, readPersistedSlice } from "@/renderer/utils/persistStoreSlice";
 
-const COLLAPSED_STORAGE_KEY = "lightcode-sidebar-collapsed";
+/**
+ * Legacy hand-rolled key, read once as the initial seed so existing installs
+ * keep their collapsed state; the slice under PERSIST_KEY takes over on the
+ * first write.
+ */
+const LEGACY_COLLAPSED_KEY = "lightcode-sidebar-collapsed";
+const PERSIST_KEY = "lightcode-sidebar-overlay";
 
 interface SidebarOverlayState {
   isCollapsed: boolean;
@@ -26,23 +33,16 @@ interface SidebarOverlayState {
   setSkipTransition: (next: boolean) => void;
 }
 
-export const useSidebarOverlayStore = create<SidebarOverlayState>((set) => ({
-  isCollapsed: readStoredBoolean(COLLAPSED_STORAGE_KEY, false),
+const initialPersisted = readPersistedSlice<{ isCollapsed: boolean }>(PERSIST_KEY);
+
+export const useSidebarOverlayStore = create<SidebarOverlayState>()((set) => ({
+  isCollapsed: initialPersisted?.isCollapsed ?? readStoredBoolean(LEGACY_COLLAPSED_KEY, false),
   isNarrow: false,
   closingOverlay: false,
   overlayReady: false,
   shellWidth: 0,
   skipTransition: false,
-  setCollapsed: (next) =>
-    set((s) => {
-      if (s.isCollapsed === next) return s;
-      try {
-        localStorage.setItem(COLLAPSED_STORAGE_KEY, String(next));
-      } catch {
-        /* ignore */
-      }
-      return { isCollapsed: next };
-    }),
+  setCollapsed: (next) => set((s) => (s.isCollapsed === next ? s : { isCollapsed: next })),
   setNarrow: (next) => set((s) => (s.isNarrow === next ? s : { isNarrow: next })),
   setClosingOverlay: (next) =>
     set((s) => (s.closingOverlay === next ? s : { closingOverlay: next })),
@@ -51,6 +51,15 @@ export const useSidebarOverlayStore = create<SidebarOverlayState>((set) => ({
     set((s) => (Math.abs(s.shellWidth - next) < 0.5 ? s : { shellWidth: next })),
   setSkipTransition: (next) =>
     set((s) => (s.skipTransition === next ? s : { skipTransition: next })),
+}));
+
+// Only the user's collapse preference survives relaunch; the overlay animation
+// and measurement flags (shellWidth/isNarrow/…) are session-scoped. Persisting
+// just this slice keeps the ResizeObserver-driven setShellWidth/setNarrow writes
+// off localStorage — they change the store many times per resize but never the
+// persisted value.
+persistStoreSlice(useSidebarOverlayStore, PERSIST_KEY, (state) => ({
+  isCollapsed: state.isCollapsed,
 }));
 
 export function selectShouldOverlay(s: SidebarOverlayState): boolean {
