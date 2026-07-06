@@ -7,11 +7,9 @@ import {
   type PromptSegment,
   type TerminalSize,
   type Thread,
-  type ThreadConfig,
-  type ThreadServerRequestId,
 } from "@/shared/contracts";
 import { stripAnsiPreservingLayout } from "@/shared/ansi";
-import { buildWorktreeLocation } from "@/shared/worktree";
+import { resolveProjectLocation } from "@/shared/worktree";
 import { friendlyError } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import type { XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSurface";
@@ -21,7 +19,6 @@ import { ThreadComposerSection } from "@/renderer/components/thread/ThreadCompos
 import { useThreadDockState } from "@/renderer/components/thread/useThreadDockState";
 import type { TerminalPaneHandle } from "@/renderer/components/thread/TerminalPane";
 import { useProjectAgentStatuses } from "@/renderer/hooks/uiSelectors";
-import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useProject } from "@/renderer/state/useThread";
 import { MobileTerminal } from "../MobileTerminal";
@@ -47,11 +44,6 @@ export interface ThreadViewProps {
   readonly loading?: boolean;
   readonly onThreadAction: (action: ThreadAction) => void;
   readonly onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
-  readonly onResolveServerRequest: (input: {
-    requestId: ThreadServerRequestId;
-    method: string;
-    response: unknown;
-  }) => Promise<void>;
   /** Open the unified workspace panel (Changes/Files) for this thread. */
   readonly onOpenWorkspace?: (tab: WorkspaceTab) => void;
   /** Open a project/worktree file from a shared chat file chip. */
@@ -143,10 +135,9 @@ export function ThreadView(props: ThreadViewProps) {
   }
 
   const agentStatus = projectAgentStatuses.find((status) => status.kind === thread.agentKind);
-  const projectLocation =
-    project && thread.worktreePath
-      ? buildWorktreeLocation(project.location, thread.worktreePath)
-      : project?.location;
+  const projectLocation = project
+    ? resolveProjectLocation(project.location, thread.worktreePath)
+    : undefined;
   const isTerminal = (thread.presentationMode ?? "terminal") === "terminal";
 
   if (!projectLocation) return null;
@@ -186,21 +177,6 @@ export function ThreadView(props: ThreadViewProps) {
       });
   }
 
-  const handleConfigChange = (config: ThreadConfig) => {
-    const store = useAppStore.getState();
-    store.updateThreadConfig(thread.id, config);
-    // Mirrors the desktop pane: switching models after a failure clears the
-    // error chrome since the user has acted on it.
-    if (thread.status === "error") {
-      store.updateThreadRuntime(thread.id, {
-        status: "idle",
-        attention: "none",
-        canResumeWithConfig: thread.canResumeWithConfig,
-        ...(thread.sessionRef ? { sessionRef: thread.sessionRef } : {}),
-      });
-    }
-  };
-
   // Collapse the floating dock (and drop the keyboard) after a message actually
   // sends. Wrapping onSubmitInput keeps this behavior mobile-local — the shared
   // renderer composer stays unaware of the dock. Only the resolved (successful)
@@ -223,8 +199,6 @@ export function ThreadView(props: ThreadViewProps) {
     projectLocation,
     paneCount: 1,
     terminalPaneRef,
-    onConfigChange: handleConfigChange,
-    onResolveServerRequest: props.onResolveServerRequest,
     onSubmitInput: handleSubmitInput,
     ...(props.onOpenWorkspaceFile ? { onOpenProjectRelativePath: props.onOpenWorkspaceFile } : {}),
     ...(props.onOpenWorkspaceFolder

@@ -2,18 +2,15 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 import { Tooltip, toast } from "@heroui/react";
 import { ChevronDown, GitFork } from "lucide-react";
 import { useLingui } from "@lingui/react/macro";
-import type {
-  AgentStatus,
-  ProjectLocation,
-  PromptSegment,
-  Thread,
-  ThreadConfig,
-  ThreadServerRequestId,
-} from "@/shared/contracts";
+import type { AgentStatus, ProjectLocation, PromptSegment, Thread } from "@/shared/contracts";
 import { friendlyError } from "@/shared/messages";
-import { ProviderModelMenuProvider, BranchSelector, type BranchSelection } from "../common";
+import {
+  changeThreadConfig,
+  resolveThreadServerRequest,
+  submitThreadInput,
+} from "@/renderer/actions/threadRuntimeActions";
+import { BranchSelector, type BranchSelection } from "../common";
 import { modelVisibilityKey } from "@/renderer/components/common/ProviderModelMenu/parts/providerIdentity";
-import { migrateCursorBaseId, parseCursorModelId } from "@/shared/cursorModelId";
 import {
   AttachmentBar,
   ComposerAddMenu,
@@ -40,28 +37,13 @@ import { applyOptimisticRequestResolution } from "@/renderer/state/runtimeReques
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useThread } from "@/renderer/state/useThread";
-import { openFileInEditor } from "@/renderer/utils/gitHelpers";
-import { ActiveSubAgentTile } from "./ChatPane/parts/items/ActiveSubAgentTile";
 import { selectActiveSubAgentParentItemIds } from "./ChatPane/chatPaneSelectors";
-import { ThreadCommandPanel } from "./ThreadCommandPanel";
 import { ThreadComposer, type ComposerControl } from "./ThreadComposer";
 import { supportsUsableFastMode } from "./threadDraftViewHelpers";
-import { ThreadContextDock } from "./ThreadContextDock";
 import { ThreadContextIndicator } from "./ThreadContextIndicator";
-import { ThreadErrorDock } from "./ThreadErrorDock";
-import { ThreadGoalDock } from "./ThreadGoalDock";
-import { ThreadPendingSteerStrip } from "./ThreadPendingSteerStrip";
-import { ThreadRuntimeRequestPanel } from "./ThreadRuntimeRequestPanel";
 import { getApprovalDenyOption } from "./ThreadRuntimeRequestPanel/helpers";
-import { ThreadAuthRequiredDock } from "./ThreadAuthRequiredDock";
-import { ThreadTodoDock } from "./ThreadTodoDock";
 import { hasReportedContextUsage, resolveThreadContextUsageSummary } from "./threadContextUsage";
-import { capabilitiesForPresentation, filterHiddenModels } from "./threadComposerOptions";
-import {
-  appendProviderComposerControls,
-  buildModelPickerControls,
-  patchConfigForModelChange,
-} from "./buildModelPickerControls";
+import { buildControls } from "./buildModelPickerControls";
 import {
   filterSlashCommands,
   handleSlashCommandPanelKeyDown,
@@ -74,106 +56,7 @@ import { isAuthErrorMessage, type ThreadErrorDockState } from "./threadErrorStat
 import type { ThreadGoalDockState } from "./threadGoalState";
 import type { ThreadTodoDockState } from "./threadTodoState";
 import type { TerminalPaneHandle } from "./TerminalPane";
-
-function normalizeCursorComposerConfig(
-  agentKind: string,
-  config: ThreadConfig,
-  capabilities: AgentStatus["capabilities"],
-): ThreadConfig {
-  if (agentKind !== "cursor" || capabilities.models.some((model) => model.id === config.model)) {
-    return config;
-  }
-
-  const parsed = parseCursorModelId(config.model);
-  const baseModel = migrateCursorBaseId(parsed.baseId);
-  if (!capabilities.models.some((model) => model.id === baseModel)) {
-    const fallback = capabilities.models[0]?.id;
-    return fallback
-      ? {
-          ...config,
-          model: fallback,
-          effort: undefined,
-          contextSize: undefined,
-          fast: false,
-          thinking: false,
-        }
-      : config;
-  }
-
-  return {
-    ...config,
-    model: baseModel,
-    ...(parsed.effort && !config.effort ? { effort: parsed.effort } : {}),
-    fast: config.fast ?? parsed.fast,
-    thinking: config.thinking ?? parsed.thinking,
-  };
-}
-
-function buildControls(
-  thread: Thread,
-  agentStatus: AgentStatus | undefined,
-  hiddenModelIds: readonly string[] | undefined,
-  onConfigChange: (config: ThreadConfig) => void,
-): ComposerControl[] {
-  const presentationMode =
-    thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
-  if (!agentStatus) return [];
-
-  const presentationCapabilities = capabilitiesForPresentation(
-    agentStatus.capabilities,
-    presentationMode,
-  );
-  const filteredCaps = filterHiddenModels(presentationCapabilities, hiddenModelIds);
-  const effectiveConfig = normalizeCursorComposerConfig(
-    thread.agentKind,
-    thread.config,
-    filteredCaps,
-  );
-  const isDisabled = !thread.canResumeWithConfig;
-  const onPatch = (patch: Partial<ThreadConfig>) =>
-    onConfigChange({ ...thread.config, ...effectiveConfig, ...patch });
-  const provider: ProviderModelMenuProvider = {
-    kind: thread.agentKind,
-    label: agentStatus.label,
-    ...(agentStatus.icon ? { icon: agentStatus.icon } : {}),
-    capabilities: filteredCaps,
-  };
-
-  return appendProviderComposerControls(
-    buildModelPickerControls({
-      providers: [provider],
-      selectedAgentKind: thread.agentKind,
-      model: effectiveConfig.model,
-      ...(effectiveConfig.effort ? { effort: effectiveConfig.effort } : {}),
-      ...(effectiveConfig.contextSize ? { contextSize: effectiveConfig.contextSize } : {}),
-      ...(effectiveConfig.fast ? { fast: effectiveConfig.fast } : {}),
-      ...(effectiveConfig.thinking ? { thinking: effectiveConfig.thinking } : {}),
-      capabilities: filteredCaps,
-      lockedAgentKind: thread.agentKind,
-      presentationMode,
-      isDisabled,
-      onProviderModelChange: ({ model }) => {
-        onPatch(
-          patchConfigForModelChange(filteredCaps, model, {
-            ...(effectiveConfig.effort ? { effort: effectiveConfig.effort } : {}),
-            ...(effectiveConfig.contextSize ? { contextSize: effectiveConfig.contextSize } : {}),
-            ...(effectiveConfig.fast ? { fast: effectiveConfig.fast } : {}),
-            ...(effectiveConfig.thinking ? { thinking: effectiveConfig.thinking } : {}),
-          }),
-        );
-      },
-      onConfigPatch: onPatch,
-    }),
-    {
-      agentKind: thread.agentKind,
-      capabilities: filteredCaps,
-      config: thread.config,
-      presentationMode,
-      isDisabled,
-      onConfigChange: onPatch,
-    },
-  );
-}
+import { ThreadComposerDocks } from "./ThreadComposerDocks";
 
 type ThreadComposerSectionProps = {
   threadId: string;
@@ -189,13 +72,13 @@ type ThreadComposerSectionProps = {
   errorDockStates: ThreadErrorDockState[];
   onGoalDockDismiss: () => void;
   onDismissError: (sourceItemId: string) => void;
-  onConfigChange: (config: ThreadConfig) => void;
-  onResolveServerRequest: (input: {
-    requestId: ThreadServerRequestId;
-    method: string;
-    response: unknown;
-  }) => Promise<void>;
-  onSubmitInput: (prompt: string, segments?: PromptSegment[]) => Promise<void>;
+  /**
+   * Optional override for the thread-input submit. Desktop omits this so the
+   * composer calls `submitThreadInput` from the actions module directly. Mobile
+   * injects its own wrapper so it can collapse the floating dock after the send
+   * resolves and route through the mobile transport.
+   */
+  onSubmitInput?: ((prompt: string, segments?: PromptSegment[]) => Promise<void>) | undefined;
   onOpenProjectRelativePath?: ((path: string, lineNumber?: number) => void) | undefined;
   onTodoDockCollapsedChange: (collapsed: boolean) => void;
   onTodoDockPlacementChange: (placement: "composer" | "right") => void;
@@ -286,7 +169,10 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     enabled: thread.config[descriptor.configKey] === true,
     visible: false,
     onToggle: (next: boolean) =>
-      props.onConfigChange({ ...thread.config, ...mcpTogglePatch(descriptor.configKey, next) }),
+      changeThreadConfig(thread.id, {
+        ...thread.config,
+        ...mcpTogglePatch(descriptor.configKey, next),
+      }),
   }));
   const availableCommands = resolveAvailableSlashCommands(
     thread.slashCommands,
@@ -365,7 +251,9 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
   const hiddenModelIds = useSharedSettings(
     (s) => s.hiddenModels[modelVisibilityKey(thread.agentKind, presentationMode)],
   );
-  const controls = buildControls(thread, agentStatus, hiddenModelIds, props.onConfigChange);
+  const controls = buildControls(thread, agentStatus, hiddenModelIds, (config) =>
+    changeThreadConfig(thread.id, config),
+  );
   const controlsWithOpenSignal = controls.map((control): ComposerControl => {
     if (controlOpenRequest?.target === "model" && control.kind === "provider-model") {
       return { ...control, openSignal: controlOpenRequest.nonce };
@@ -480,7 +368,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
       presentationMode,
     });
     if (localAction?.kind === "set-mode") {
-      props.onConfigChange({ ...thread.config, mode: localAction.mode });
+      changeThreadConfig(thread.id, { ...thread.config, mode: localAction.mode });
       mentionRef.current?.clear();
       mentionRef.current?.focus();
       setPrompt("");
@@ -501,7 +389,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     }
     if (localAction?.kind === "toggle-fast") {
       if (agentStatus && supportsUsableFastMode(agentStatus.capabilities, thread.config.model)) {
-        props.onConfigChange({ ...thread.config, fast: thread.config.fast !== true });
+        changeThreadConfig(thread.id, { ...thread.config, fast: thread.config.fast !== true });
       }
       mentionRef.current?.clear();
       mentionRef.current?.focus();
@@ -550,17 +438,15 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
         activeRuntimeRequest,
         "declined",
       );
-      return props
-        .onResolveServerRequest({
-          requestId: activeRuntimeRequest.requestId,
-          method: "requestPermission",
-          response: { optionId: approvalDenyOption.optionId },
-        })
-        .catch((err) => {
-          console.error("[chat] auto-deny on composer submit failed", err);
-          rollback();
-          throw err;
-        });
+      return resolveThreadServerRequest(thread.id, {
+        requestId: activeRuntimeRequest.requestId,
+        method: "requestPermission",
+        response: { optionId: approvalDenyOption.optionId },
+      }).catch((err) => {
+        console.error("[chat] auto-deny on composer submit failed", err);
+        rollback();
+        throw err;
+      });
     };
 
     // GUI threads + working status → stage as pending steer (replace-latest).
@@ -568,6 +454,10 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     // turn returns with `cancelled` stopReason. No optimistic chat paint —
     // the strip above the composer is the visual confirmation; the real
     // user_message item lands when the turn drains and starts.
+    const submit =
+      props.onSubmitInput ??
+      ((outgoingPrompt: string, outgoingSegments?: PromptSegment[]) =>
+        submitThreadInput(thread.id, outgoingPrompt, outgoingSegments));
     const runSubmission = () =>
       usesPendingSteerPath
         ? readBridge().setPendingSteer({
@@ -576,7 +466,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
             ...(allSegments.length > 0 ? { segments: allSegments } : {}),
             config: thread.config,
           })
-        : props.onSubmitInput(flat, allSegments.length > 0 ? allSegments : undefined);
+        : submit(flat, allSegments.length > 0 ? allSegments : undefined);
 
     if (!usesTerminalPresentation) {
       clearSubmittedComposer();
@@ -762,103 +652,49 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                     pendingSteer ||
                     activeRuntimeRequest ||
                     showCommandPanel ? (
-                      <>
-                        {hasActiveSubAgent ? (
-                          <ActiveSubAgentTile
-                            threadId={thread.id}
-                            projectLocation={projectLocation}
-                          />
-                        ) : null}
-                        {showContextInComposer ? (
-                          <ThreadContextDock
-                            summary={contextSummary}
-                            onClose={() => setContextDockOpen(false)}
-                          />
-                        ) : null}
-                        {showErrorInComposer
-                          ? errorDockStates.map((state) => (
-                              <ThreadErrorDock
-                                key={state.sourceItemId}
-                                state={state}
-                                onDismiss={() => props.onDismissError(state.sourceItemId)}
-                              />
-                            ))
-                          : null}
-                        {showGoalInComposer ? (
-                          <ThreadGoalDock
-                            state={goalDockState!}
-                            onDismiss={props.onGoalDockDismiss}
-                          />
-                        ) : null}
-                        {showTodoInComposer ? (
-                          <ThreadTodoDock
-                            collapsed={todoDockCollapsed}
-                            placement={todoDockPlacement}
-                            state={todoDockState!}
-                            onCollapsedChange={props.onTodoDockCollapsedChange}
-                            onPlacementChange={props.onTodoDockPlacementChange}
-                            onRetire={() => props.onTodoDockRetire?.()}
-                          />
-                        ) : null}
-                        {authRequired && agentStatus ? (
-                          <ThreadAuthRequiredDock
-                            agentStatus={agentStatus}
-                            {...(project ? { project } : {})}
-                          />
-                        ) : null}
-                        {pendingSteer ? (
-                          <ThreadPendingSteerStrip
-                            pending={pendingSteer}
-                            onCancel={handleCancelPendingSteer}
-                          />
-                        ) : null}
-                        {activeRuntimeRequest ? (
-                          <ThreadRuntimeRequestPanel
-                            key={activeRuntimeRequest.requestId}
-                            threadId={thread.id}
-                            agentLabel={agentStatus?.label}
-                            request={activeRuntimeRequest}
-                            onResolve={props.onResolveServerRequest}
-                            onPlanApproved={(optionId) =>
-                              props.onConfigChange({
-                                ...thread.config,
-                                mode: "agent",
-                                ...(optionId === "default" || optionId === "auto"
-                                  ? { approvalPolicy: optionId }
-                                  : {}),
-                              })
-                            }
-                            onOpenPlanFile={
-                              project
-                                ? (path) => {
-                                    if (props.onOpenProjectRelativePath) {
-                                      props.onOpenProjectRelativePath(path);
-                                      return;
-                                    }
-                                    void openFileInEditor(
-                                      project,
-                                      thread.worktreePath,
-                                      branchName,
-                                      path,
-                                      { markdownPreview: true },
-                                    );
-                                  }
-                                : undefined
-                            }
-                          />
-                        ) : null}
-                        {showCommandPanel ? (
-                          <ThreadCommandPanel
-                            commands={filteredCommands}
-                            activeIndex={slashActiveIndex}
-                            onActiveIndexChange={setSlashActiveIndex}
-                            onSelect={(cmd) => {
-                              mentionRef.current?.insertSlashCommand(cmd.id);
-                              setSlashQuery(null);
-                            }}
-                          />
-                        ) : null}
-                      </>
+                      <ThreadComposerDocks
+                        hasActiveSubAgent={hasActiveSubAgent}
+                        showContextInComposer={showContextInComposer}
+                        showErrorInComposer={showErrorInComposer}
+                        showGoalInComposer={showGoalInComposer}
+                        showTodoInComposer={showTodoInComposer}
+                        authRequired={authRequired}
+                        showCommandPanel={showCommandPanel}
+                        threadId={thread.id}
+                        projectLocation={projectLocation}
+                        threadConfig={thread.config}
+                        worktreePath={thread.worktreePath}
+                        branchName={branchName}
+                        agentStatus={agentStatus}
+                        project={project}
+                        contextSummary={contextSummary}
+                        errorDockStates={errorDockStates}
+                        goalDockState={goalDockState}
+                        todoDockState={todoDockState}
+                        todoDockCollapsed={todoDockCollapsed}
+                        todoDockPlacement={todoDockPlacement}
+                        pendingSteer={pendingSteer}
+                        activeRuntimeRequest={activeRuntimeRequest}
+                        filteredCommands={filteredCommands}
+                        slashActiveIndex={slashActiveIndex}
+                        onCloseContextDock={() => setContextDockOpen(false)}
+                        onDismissError={props.onDismissError}
+                        onGoalDockDismiss={props.onGoalDockDismiss}
+                        onTodoDockCollapsedChange={props.onTodoDockCollapsedChange}
+                        onTodoDockPlacementChange={props.onTodoDockPlacementChange}
+                        {...(props.onTodoDockRetire
+                          ? { onTodoDockRetire: props.onTodoDockRetire }
+                          : {})}
+                        onCancelPendingSteer={handleCancelPendingSteer}
+                        {...(props.onOpenProjectRelativePath
+                          ? { onOpenProjectRelativePath: props.onOpenProjectRelativePath }
+                          : {})}
+                        onSlashActiveIndexChange={setSlashActiveIndex}
+                        onSelectCommand={(cmd) => {
+                          mentionRef.current?.insertSlashCommand(cmd.id);
+                          setSlashQuery(null);
+                        }}
+                      />
                     ) : null
                   }
                   attachmentBar={
