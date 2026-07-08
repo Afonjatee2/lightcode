@@ -82,7 +82,13 @@ function ControlledDockHarness() {
       onExpandedChange={setExpanded}
     >
       <div data-composer-input-anchor="">
-        <div role="textbox" tabIndex={0} contentEditable suppressContentEditableWarning />
+        <div
+          role="textbox"
+          tabIndex={0}
+          contentEditable
+          suppressContentEditableWarning
+          aria-label="Composer input"
+        />
       </div>
     </FloatingComposerDock>
   );
@@ -100,7 +106,13 @@ function FocusLossHarness(props: { collapseOnFocusLoss?: boolean }) {
       {...(props.collapseOnFocusLoss ? { collapseOnFocusLoss: true } : {})}
     >
       <div data-composer-input-anchor="">
-        <div role="textbox" tabIndex={0} contentEditable suppressContentEditableWarning />
+        <div
+          role="textbox"
+          tabIndex={0}
+          contentEditable
+          suppressContentEditableWarning
+          aria-label="Composer input"
+        />
       </div>
     </FloatingComposerDock>
   );
@@ -130,7 +142,13 @@ describe("FloatingComposerDock", () => {
         onComposerFocusChange={(focused) => order.push(`focus:${String(focused)}`)}
       >
         <div data-composer-input-anchor="">
-          <div role="textbox" tabIndex={0} contentEditable suppressContentEditableWarning />
+          <div
+            role="textbox"
+            tabIndex={0}
+            contentEditable
+            suppressContentEditableWarning
+            aria-label="Composer input"
+          />
         </div>
       </FloatingComposerDock>,
     );
@@ -162,7 +180,13 @@ describe("FloatingComposerDock", () => {
           onExpandedChange={onExpandedChange}
         >
           <div data-composer-input-anchor="">
-            <div role="textbox" tabIndex={0} contentEditable suppressContentEditableWarning />
+            <div
+              role="textbox"
+              tabIndex={0}
+              contentEditable
+              suppressContentEditableWarning
+              aria-label="Composer input"
+            />
           </div>
         </FloatingComposerDock>,
       );
@@ -193,7 +217,13 @@ describe("FloatingComposerDock", () => {
           onExpandedChange={onExpandedChange}
         >
           <div data-composer-input-anchor="">
-            <div role="textbox" tabIndex={0} contentEditable suppressContentEditableWarning />
+            <div
+              role="textbox"
+              tabIndex={0}
+              contentEditable
+              suppressContentEditableWarning
+              aria-label="Composer input"
+            />
           </div>
         </FloatingComposerDock>,
       );
@@ -226,7 +256,13 @@ describe("FloatingComposerDock", () => {
     render(
       <FloatingComposerDock keyboardKey="thread-1" scrimLabel="Close composer">
         <div data-composer-input-anchor="">
-          <div role="textbox" tabIndex={0} contentEditable suppressContentEditableWarning />
+          <div
+            role="textbox"
+            tabIndex={0}
+            contentEditable
+            suppressContentEditableWarning
+            aria-label="Composer input"
+          />
         </div>
       </FloatingComposerDock>,
     );
@@ -257,7 +293,13 @@ describe("FloatingComposerDock", () => {
           collapsedTapLabel="Open composer"
         >
           <div data-composer-input-anchor="">
-            <div role="textbox" tabIndex={0} contentEditable suppressContentEditableWarning />
+            <div
+              role="textbox"
+              tabIndex={0}
+              contentEditable
+              suppressContentEditableWarning
+              aria-label="Composer input"
+            />
           </div>
         </FloatingComposerDock>,
       );

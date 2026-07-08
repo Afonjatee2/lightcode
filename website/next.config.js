@@ -1,5 +1,27 @@
+const path = require("path");
+
+// TypeScript 7 note: this site type-checks with the native TS7 compiler
+// (`pnpm typecheck`), which has no JS API until 7.1. Next's build-time
+// TypeScript step requires `typescript/lib/typescript.js` (TS6 API) and
+// otherwise aborts — unless it can resolve `@typescript/native-preview`,
+// its marker for "a native TS compiler is in use", in which case it skips
+// build-time type checking. devDependencies therefore alias
+// `@typescript/native-preview` to the same GA `typescript@7` package.
+// Remove the alias once Next supports the canonical typescript@7 package.
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // With typescript@7 installed, Next cannot read the `@/*` alias from
+  // tsconfig paths (that integration needs the TS JS API, absent until 7.1),
+  // so the webpack build must define the alias itself. Turbopack resolves
+  // tsconfig paths on its own and ignores this.
+  webpack(config) {
+    config.resolve.alias["@"] = path.resolve(__dirname, "src");
+    return config;
+  },
+  // Acknowledge the webpack config above so Turbopack builds (the default
+  // since Next 16) don't error; Turbopack needs no alias configuration.
+  turbopack: {},
   async headers() {
     return [
       {
