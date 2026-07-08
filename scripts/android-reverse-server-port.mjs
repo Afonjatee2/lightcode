@@ -26,16 +26,17 @@ function parsePort(value) {
 }
 
 function resolveAdb() {
+  const adbExecutable = process.platform === "win32" ? "adb.exe" : "adb";
   const sdkRoot = (process.env.ANDROID_HOME ?? process.env.ANDROID_SDK_ROOT ?? "").trim();
   if (sdkRoot) {
-    return resolve(sdkRoot, "platform-tools", "adb");
+    return resolve(sdkRoot, "platform-tools", adbExecutable);
   }
 
   try {
     const properties = readFileSync(resolve(process.cwd(), "android/local.properties"), "utf8");
     const sdkDir = properties.match(/^sdk\.dir=(.+)$/m)?.[1]?.trim();
     if (sdkDir) {
-      return resolve(sdkDir, "platform-tools", "adb");
+      return resolve(sdkDir, "platform-tools", adbExecutable);
     }
   } catch {
     // No local.properties — fall back to PATH.
