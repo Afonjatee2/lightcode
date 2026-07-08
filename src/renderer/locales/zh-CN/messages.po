@@ -37,7 +37,7 @@ msgid "{0, plural, one {# paired connection} other {# paired connections}}"
 msgstr "{0, plural, one {# 个已配对连接} other {# 个已配对连接}}"
 
 #. placeholder {0}: remote.desktops.length
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "{0, plural, one {# paired desktop} other {# paired desktops}}"
 msgstr "{0, plural, one {# 个已配对桌面} other {# 个已配对桌面}}"
 
@@ -1172,7 +1172,8 @@ msgstr "浏览父文件夹"
 msgid "Browse your GitHub repositories or paste a clone URL."
 msgstr "浏览您的 GitHub 存储库或粘贴克隆 URL。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/composerMcpServers.ts
@@ -1594,6 +1595,7 @@ msgid "Close goal"
 msgstr "关闭目标"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Close group"
 msgstr "关闭组"
 
@@ -1734,6 +1736,11 @@ msgstr "折叠输入框"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Collapse error"
 msgstr "折叠错误"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Collapse group"
+msgstr "折叠分组"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -1930,7 +1937,8 @@ msgstr "连接错误。"
 msgid "Connection failed."
 msgstr "连接失败。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/DesktopsView.tsx
 msgid "Connections"
 msgstr "连接"
@@ -2389,7 +2397,7 @@ msgstr "桌面端点"
 msgid "Desktop is unreachable."
 msgstr "无法访问桌面。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
 #: src/mobile/views/MoreView.tsx
 msgid "Desktop Settings"
 msgstr "桌面设置"
@@ -2480,7 +2488,7 @@ msgstr "放弃更改"
 msgid "Discard changes to <0>{title}</0>? This cannot be undone."
 msgstr "要放弃 <0>{title}</0> 的更改吗？此操作无法撤销。"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Discard unsaved changes in {path}?"
@@ -2803,6 +2811,11 @@ msgstr "全部展开"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Expand error"
 msgstr "展开错误"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Expand group"
+msgstr "展开分组"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -3236,6 +3249,10 @@ msgstr "知道了"
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Group"
 msgstr "分组"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Group name"
+msgstr "分组名称"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Group open threads"
@@ -3994,7 +4011,8 @@ msgstr "模型"
 msgid "Modes"
 msgstr "模式"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "多"
@@ -4154,7 +4172,7 @@ msgstr "新建文件"
 msgid "New File"
 msgstr "新文件"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New file name"
 msgstr "新文件名"
 
@@ -4167,7 +4185,7 @@ msgstr "新建文件夹"
 msgid "New Folder"
 msgstr "新建文件夹"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New folder name"
 msgstr "新文件夹名称"
 
@@ -4193,8 +4211,13 @@ msgstr "新快速线程"
 msgid "New tab"
 msgstr "新标签页"
 
-#: src/mobile/RootLayout.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "New tab in group"
+msgstr "在分组中新建标签页"
+
+#: src/mobile/chrome.ts
 #: src/mobile/views/QuickCompose.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/app.tsx
 #: src/renderer/components/thread/ThreadDraftChrome.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -4333,7 +4356,7 @@ msgstr "没有找到命令"
 msgid "No commits found."
 msgstr "没有找到提交。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "尚未配对连接"
 
@@ -5204,7 +5227,8 @@ msgstr "项目设置"
 msgid "Project-specific overrides on top of the global search settings."
 msgstr "在全局搜索设置基础上的项目特定覆盖。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Projects"
 msgstr "项目"
@@ -6117,7 +6141,7 @@ msgstr "搜索快捷键"
 msgid "Search the current view"
 msgstr "搜索当前视图"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay.tsx
 msgid "Search threads"
@@ -6220,6 +6244,10 @@ msgid "Separate Claude Code accounts by config directory, or point a profile at 
 "vars, models, and effort."
 msgstr "按配置目录区分Claude Code账户，或将配置指向外部服务商（z.ai，…）。打开某个配置以设置其环境变量、模型和思考级别。"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Set group color"
+msgstr "设置分组颜色"
+
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Set or view an experimental goal"
 msgstr "设置或查看实验目标"
@@ -6228,7 +6256,8 @@ msgstr "设置或查看实验目标"
 msgid "Set shortcut"
 msgstr "设置快捷键"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
@@ -7097,7 +7126,7 @@ msgstr "该工作树有本地更改。Poracode 可以暂时贮藏（stash）它�
 msgid "Thought"
 msgstr "思考"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -7366,7 +7395,7 @@ msgstr "无法合并"
 msgid "Unable to open {0} login."
 msgstr "无法打开{0}登录。"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 msgid "Unable to open file"
 msgstr "无法打开文件"
@@ -7492,6 +7521,10 @@ msgstr "无法更新线程。"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unassigned"
 msgstr "未分配"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Ungroup"
+msgstr "取消分组"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Ungroup All"
@@ -7666,9 +7699,11 @@ msgstr "正在更新{0}"
 msgid "Updating {0} ({env})"
 msgstr "更新{0}({env})"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx

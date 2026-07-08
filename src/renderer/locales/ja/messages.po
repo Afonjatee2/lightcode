@@ -37,7 +37,7 @@ msgid "{0, plural, one {# paired connection} other {# paired connections}}"
 msgstr "{0, plural, one {# 件のペアリング済み接続} other {# 件のペアリング済み接続}}"
 
 #. placeholder {0}: remote.desktops.length
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "{0, plural, one {# paired desktop} other {# paired desktops}}"
 msgstr "{0, plural, one {# 台のペアリング済みデスクトップ} other {# 台のペアリング済みデスクトップ}}"
 
@@ -1176,7 +1176,8 @@ msgstr "親フォルダーを参照します"
 msgid "Browse your GitHub repositories or paste a clone URL."
 msgstr "GitHub リポジトリを参照するか、クローン URL を貼り付けます。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/composerMcpServers.ts
@@ -1598,6 +1599,7 @@ msgid "Close goal"
 msgstr "ゴールを閉じる"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Close group"
 msgstr "グループを閉じる"
 
@@ -1738,6 +1740,11 @@ msgstr "コンポーザーを折りたたむ"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Collapse error"
 msgstr "エラーを折りたたむ"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Collapse group"
+msgstr "グループを折りたたむ"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -1936,7 +1943,8 @@ msgstr "接続エラーです。"
 msgid "Connection failed."
 msgstr "接続に失敗しました。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/DesktopsView.tsx
 msgid "Connections"
 msgstr "接続"
@@ -2395,7 +2403,7 @@ msgstr "デスクトップエンドポイント"
 msgid "Desktop is unreachable."
 msgstr "デスクトップに到達できません。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
 #: src/mobile/views/MoreView.tsx
 msgid "Desktop Settings"
 msgstr "デスクトップ設定"
@@ -2486,7 +2494,7 @@ msgstr "変更を破棄"
 msgid "Discard changes to <0>{title}</0>? This cannot be undone."
 msgstr "<0>{title}</0> の変更を破棄しますか？この操作は元に戻せません。"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Discard unsaved changes in {path}?"
@@ -2811,6 +2819,11 @@ msgstr "すべて展開"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Expand error"
 msgstr "エラーを展開"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Expand group"
+msgstr "グループを展開"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -3247,6 +3260,10 @@ msgstr "了解"
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Group"
 msgstr "グループ"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Group name"
+msgstr "グループ名"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Group open threads"
@@ -4007,7 +4024,8 @@ msgstr "モデル"
 msgid "Modes"
 msgstr "モード"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "多い"
@@ -4167,7 +4185,7 @@ msgstr "新規ファイル"
 msgid "New File"
 msgstr "新しいファイル"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New file name"
 msgstr "新規ファイル名"
 
@@ -4180,7 +4198,7 @@ msgstr "新規フォルダー"
 msgid "New Folder"
 msgstr "新しいフォルダー"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New folder name"
 msgstr "新規フォルダー名"
 
@@ -4206,8 +4224,13 @@ msgstr "新しいクイックスレッド"
 msgid "New tab"
 msgstr "新しいタブ"
 
-#: src/mobile/RootLayout.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "New tab in group"
+msgstr "グループ内に新しいタブ"
+
+#: src/mobile/chrome.ts
 #: src/mobile/views/QuickCompose.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/app.tsx
 #: src/renderer/components/thread/ThreadDraftChrome.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -4346,7 +4369,7 @@ msgstr "コマンドが見つかりません"
 msgid "No commits found."
 msgstr "コミットが見つかりませんでした。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "ペアリング済みの接続はありません"
 
@@ -5220,7 +5243,8 @@ msgstr "プロジェクト設定"
 msgid "Project-specific overrides on top of the global search settings."
 msgstr "グローバル検索設定に加えてプロジェクト固有のオーバーライド。"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Projects"
 msgstr "プロジェクト"
@@ -6134,7 +6158,7 @@ msgstr "ショートカットを検索"
 msgid "Search the current view"
 msgstr "現在のビューを検索"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay.tsx
 msgid "Search threads"
@@ -6239,6 +6263,10 @@ msgstr "Claude "
 "Codeのアカウントを設定ディレクトリごとに分離するか、プロファイルを外部プロバイダー（z.aiなど）に向けます。プロファイルを開くと、その環"
 "境変数・モデル・推論レベルを設定できます。"
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Set group color"
+msgstr "グループの色を設定"
+
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Set or view an experimental goal"
 msgstr "実験目標を設定または表示する"
@@ -6247,7 +6275,8 @@ msgstr "実験目標を設定または表示する"
 msgid "Set shortcut"
 msgstr "ショートカットを設定"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
@@ -7120,7 +7149,7 @@ msgstr "このワークツリーにはローカルな変更があります。Por
 msgid "Thought"
 msgstr "思考"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -7390,7 +7419,7 @@ msgstr "マージできません"
 msgid "Unable to open {0} login."
 msgstr "{0}ログインを開けません。"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 msgid "Unable to open file"
 msgstr "ファイルを開けません"
@@ -7516,6 +7545,10 @@ msgstr "スレッドを更新できません。"
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unassigned"
 msgstr "未割り当て"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Ungroup"
+msgstr "グループ解除"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Ungroup All"
@@ -7690,9 +7723,11 @@ msgstr "{0}を更新しています"
 msgid "Updating {0} ({env})"
 msgstr "{0}({env}) を更新しています"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx

@@ -38,7 +38,7 @@ msgstr "{0, plural, one {# подключение} few {# подключения
 "подключений} other {# подключения}}"
 
 #. placeholder {0}: remote.desktops.length
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "{0, plural, one {# paired desktop} other {# paired desktops}}"
 msgstr "{0, plural, one {# связанный десктоп} few {# связанных десктопа} many "
 "{# связанных десктопов} other {# связанного десктопа}}"
@@ -1198,7 +1198,8 @@ msgstr "Выбрать родительскую папку"
 msgid "Browse your GitHub repositories or paste a clone URL."
 msgstr "Просмотрите свои репозитории GitHub или вставьте URL для клонирования."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/composerMcpServers.ts
@@ -1624,6 +1625,7 @@ msgid "Close goal"
 msgstr "Закрыть цель"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Close group"
 msgstr "Закрыть группу"
 
@@ -1764,6 +1766,11 @@ msgstr "Свернуть Composer"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Collapse error"
 msgstr "Свернуть ошибку"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Collapse group"
+msgstr "Свернуть группу"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -1964,7 +1971,8 @@ msgstr "Ошибка подключения."
 msgid "Connection failed."
 msgstr "Не удалось подключиться."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/DesktopsView.tsx
 msgid "Connections"
 msgstr "Подключения"
@@ -2429,7 +2437,7 @@ msgstr "Конечная точка рабочего стола"
 msgid "Desktop is unreachable."
 msgstr "Десктоп недоступен."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
 #: src/mobile/views/MoreView.tsx
 msgid "Desktop Settings"
 msgstr "Настройки десктопа"
@@ -2522,7 +2530,7 @@ msgstr "Отменить изменения"
 msgid "Discard changes to <0>{title}</0>? This cannot be undone."
 msgstr "Отменить изменения в <0>{title}</0>? Это нельзя будет отменить."
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Discard unsaved changes in {path}?"
@@ -2854,6 +2862,11 @@ msgstr "Развернуть всё"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Expand error"
 msgstr "Развернуть ошибку"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Expand group"
+msgstr "Развернуть группу"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -3306,6 +3319,10 @@ msgstr "Понятно"
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Group"
 msgstr "Группа"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Group name"
+msgstr "Название группы"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Group open threads"
@@ -4078,7 +4095,8 @@ msgstr "Модели"
 msgid "Modes"
 msgstr "Режимы"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "Больше"
@@ -4239,7 +4257,7 @@ msgstr "Новый файл"
 msgid "New File"
 msgstr "Новый файл"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New file name"
 msgstr "Имя нового файла"
 
@@ -4252,7 +4270,7 @@ msgstr "Новая папка"
 msgid "New Folder"
 msgstr "Новая папка"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New folder name"
 msgstr "Имя новой папки"
 
@@ -4278,8 +4296,13 @@ msgstr "Новый быстрый тред"
 msgid "New tab"
 msgstr "Новая вкладка"
 
-#: src/mobile/RootLayout.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "New tab in group"
+msgstr "Новая вкладка в группе"
+
+#: src/mobile/chrome.ts
 #: src/mobile/views/QuickCompose.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/app.tsx
 #: src/renderer/components/thread/ThreadDraftChrome.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -4418,7 +4441,7 @@ msgstr "Команды не найдены"
 msgid "No commits found."
 msgstr "Коммиты не найдены."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "Нет подключений"
 
@@ -5303,7 +5326,8 @@ msgid "Project-specific overrides on top of the global search settings."
 msgstr "Переопределения для конкретного проекта поверх глобальных настроек "
 "поиска."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Projects"
 msgstr "Проекты"
@@ -6228,7 +6252,7 @@ msgstr "Поиск сочетаний клавиш"
 msgid "Search the current view"
 msgstr "Поиск в текущем виде"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay.tsx
 msgid "Search threads"
@@ -6334,6 +6358,10 @@ msgstr "Разделяйте аккаунты Claude Code по каталогу 
 "направляйте профиль на внешнего провайдера (z.ai, …). Откройте профиль, "
 "чтобы настроить его переменные окружения, модели и уровни рассуждений."
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Set group color"
+msgstr "Задать цвет группы"
+
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Set or view an experimental goal"
 msgstr "Задать или просмотреть экспериментальную цель"
@@ -6342,7 +6370,8 @@ msgstr "Задать или просмотреть эксперименталь�
 msgid "Set shortcut"
 msgstr "Назначить сочетание клавиш"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
@@ -7233,7 +7262,7 @@ msgstr "В этом worktree есть локальные изменения. Por
 msgid "Thought"
 msgstr "Мысль"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -7507,7 +7536,7 @@ msgstr "Не удалось выполнить merge"
 msgid "Unable to open {0} login."
 msgstr "Не удалось открыть вход в {0}."
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 msgid "Unable to open file"
 msgstr "Не удалось открыть файл"
@@ -7634,6 +7663,10 @@ msgstr "Не удалось обновить поток."
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unassigned"
 msgstr "Не назначено"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Ungroup"
+msgstr "Разгруппировать"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Ungroup All"
@@ -7808,9 +7841,11 @@ msgstr "Обновление {0}"
 msgid "Updating {0} ({env})"
 msgstr "Обновление {0} ({env})"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx

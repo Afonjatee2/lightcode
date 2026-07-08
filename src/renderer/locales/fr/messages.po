@@ -37,7 +37,7 @@ msgid "{0, plural, one {# paired connection} other {# paired connections}}"
 msgstr "{0, plural, one {# connexion associée} other {# connexions associées}}"
 
 #. placeholder {0}: remote.desktops.length
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "{0, plural, one {# paired desktop} other {# paired desktops}}"
 msgstr "{0, plural, one {# ordinateur associé} other {# ordinateurs associés}}"
 
@@ -1199,7 +1199,8 @@ msgstr "Rechercher le dossier parent"
 msgid "Browse your GitHub repositories or paste a clone URL."
 msgstr "Parcourez vos référentiels GitHub ou collez une URL de clonage."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/components/composer/composerMcpServers.ts
@@ -1626,6 +1627,7 @@ msgid "Close goal"
 msgstr "Fermer l'objectif"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
 msgid "Close group"
 msgstr "Fermer le groupe"
 
@@ -1766,6 +1768,11 @@ msgstr "Réduire le compositeur"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Collapse error"
 msgstr "Réduire l'erreur"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Collapse group"
+msgstr "Réduire le groupe"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 #: src/renderer/views/SettingsOverlay/parts/TerminalSettings.tsx
@@ -1967,7 +1974,8 @@ msgstr "Erreur de connexion."
 msgid "Connection failed."
 msgstr "Échec de la connexion."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/DesktopsView.tsx
 msgid "Connections"
 msgstr "Connexions"
@@ -2434,7 +2442,7 @@ msgstr "Point de terminaison du bureau"
 msgid "Desktop is unreachable."
 msgstr "L'ordinateur est injoignable."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
 #: src/mobile/views/MoreView.tsx
 msgid "Desktop Settings"
 msgstr "Paramètres du bureau"
@@ -2528,7 +2536,7 @@ msgid "Discard changes to <0>{title}</0>? This cannot be undone."
 msgstr "Ignorer les modifications de <0>{title}</0> ? Cette action est "
 "irréversible."
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/FileEditorPane.tsx
 msgid "Discard unsaved changes in {path}?"
@@ -2863,6 +2871,11 @@ msgstr "Tout développer"
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 msgid "Expand error"
 msgstr "Développer l'erreur"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabStrip.tsx
+msgid "Expand group"
+msgstr "Développer le groupe"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Expand to review or revoke access."
@@ -3316,6 +3329,10 @@ msgstr "Compris"
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Group"
 msgstr "Groupe"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Group name"
+msgstr "Nom du groupe"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "Group open threads"
@@ -4088,7 +4105,8 @@ msgstr "Modèles"
 msgid "Modes"
 msgstr "Modes"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/views/ProfileOverlay/parts/ActivityHeatmap.tsx
 msgid "More"
 msgstr "Plus"
@@ -4249,7 +4267,7 @@ msgstr "Nouveau fichier"
 msgid "New File"
 msgstr "Nouveau fichier"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New file name"
 msgstr "Nom du nouveau fichier"
 
@@ -4262,7 +4280,7 @@ msgstr "Nouveau dossier"
 msgid "New Folder"
 msgstr "Nouveau dossier"
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useFileTree.ts
 msgid "New folder name"
 msgstr "Nom du nouveau dossier"
 
@@ -4289,8 +4307,13 @@ msgstr "Nouveau fil de discussion rapide"
 msgid "New tab"
 msgstr "Nouvel onglet"
 
-#: src/mobile/RootLayout.tsx
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "New tab in group"
+msgstr "Nouvel onglet dans le groupe"
+
+#: src/mobile/chrome.ts
 #: src/mobile/views/QuickCompose.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/app.tsx
 #: src/renderer/components/thread/ThreadDraftChrome.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -4429,7 +4452,7 @@ msgstr "Aucune commande trouvée"
 msgid "No commits found."
 msgstr "Aucun commit trouvé."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/WideShell.tsx
 msgid "No connection paired"
 msgstr "Aucune connexion associée"
 
@@ -5316,7 +5339,8 @@ msgid "Project-specific overrides on top of the global search settings."
 msgstr "Remplacements spécifiques au projet en plus des paramètres de recherche "
 "globaux."
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ManageProjectsView.tsx
 msgid "Projects"
 msgstr "Projets"
@@ -6246,7 +6270,7 @@ msgstr "Rechercher des raccourcis"
 msgid "Search the current view"
 msgstr "Rechercher dans la vue actuelle"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/views/ThreadsView.tsx
 #: src/renderer/views/ThreadSearchOverlay/ThreadSearchOverlay.tsx
 msgid "Search threads"
@@ -6353,6 +6377,10 @@ msgstr "Séparez les comptes Claude Code par dossier de configuration, ou "
 "profil pour configurer ses variables d'environnement, ses modèles et "
 "son effort."
 
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Set group color"
+msgstr "Définir la couleur du groupe"
+
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Set or view an experimental goal"
 msgstr "Définir ou afficher un objectif expérimental"
@@ -6361,7 +6389,8 @@ msgstr "Définir ou afficher un objectif expérimental"
 msgid "Set shortcut"
 msgstr "Définir un raccourci"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/components/thread/ThreadAuthRequiredDock.tsx
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
 #: src/renderer/views/MainView/parts/Sidebar/Sidebar.tsx
@@ -7258,7 +7287,7 @@ msgstr "Cet arbre de travail a des modifications locales. Poracode peut les "
 msgid "Thought"
 msgstr "Pensée"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/NarrowShell.tsx
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useElementPicker.ts
@@ -7533,7 +7562,7 @@ msgstr "Fusion impossible"
 msgid "Unable to open {0} login."
 msgstr "Impossible d'ouvrir la connexion {0}."
 
-#: src/mobile/views/FilesView.tsx
+#: src/mobile/views/useOpenFile.ts
 #: src/renderer/commands/registry.ts
 msgid "Unable to open file"
 msgstr "Impossible d'ouvrir le fichier"
@@ -7660,6 +7689,10 @@ msgstr "Impossible de mettre à jour le fil."
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Unassigned"
 msgstr "Non attribué"
+
+#: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserTabGroupMenu.tsx
+msgid "Ungroup"
+msgstr "Dissocier"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Ungroup All"
@@ -7834,9 +7867,11 @@ msgstr "Mise à jour de {0}"
 msgid "Updating {0} ({env})"
 msgstr "Mise à jour de {0} ({env})"
 
-#: src/mobile/RootLayout.tsx
+#: src/mobile/chrome.ts
+#: src/mobile/NarrowShell.tsx
 #: src/mobile/settingsSections.ts
 #: src/mobile/ThreadUsageIndicator.tsx
+#: src/mobile/WideShell.tsx
 #: src/renderer/components/layout/UnifiedRightPanel.tsx
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/thread/ThreadContextDock.tsx
