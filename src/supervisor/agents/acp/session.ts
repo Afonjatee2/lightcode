@@ -23,6 +23,7 @@ import { homedir } from "node:os";
 import { Readable, Writable } from "node:stream";
 import {
   ClientSideConnection,
+  CreateElicitationRequest as AcpCreateElicitationRequest,
   ndJsonStream,
   PROTOCOL_VERSION,
   RequestError,
@@ -89,6 +90,7 @@ import {
   resolveAcpMode,
   resolveModelConfigValue,
 } from "./sessionConfig";
+import { setUnstableSessionModel } from "./unstableModelCompat";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -421,7 +423,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         }
       } else {
         try {
-          await this.connection.unstable_setSessionModel({
+          // Fallback for agents without a "model" config option that still
+          // speak the removed pre-1.0 model API (see unstableModelCompat.ts).
+          await setUnstableSessionModel(this.connection, {
             sessionId: this.sessionId,
             modelId: config.model,
           });
@@ -1106,7 +1110,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   ): Promise<CreateElicitationResponse> {
     return new Promise<CreateElicitationResponse>((resolve) => {
       const requestId = `acp-elicit-${this.elicitationRequestSeq++}`;
-      const urlElicitationId = params.mode === "url" ? params.elicitationId : undefined;
+      const urlElicitationId = AcpCreateElicitationRequest.isUrl(params)
+        ? params.elicitationId
+        : undefined;
 
       this.pendingElicitationResolvers.set(requestId, {
         resolve: (response: unknown) => {
