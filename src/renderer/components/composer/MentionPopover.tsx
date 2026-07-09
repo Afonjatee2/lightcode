@@ -1,17 +1,25 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Globe } from "lucide-react";
-import { Trans } from "@lingui/react/macro";
+import type { LucideIcon } from "lucide-react";
 import type { FileEntry } from "@/shared/contracts";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
 
-export type BrowserMentionEntry = {
-  type: "browser";
-  path: "browser";
-  name: "Browser";
+/**
+ * A composer MCP server (Browser, Subagents, Computer Use, …) surfaced as an
+ * `@`-mention. `path` doubles as the MCP id passed back on select; `icon` and
+ * `detail` are supplied already-resolved by the composer so the popover stays
+ * registry-agnostic.
+ */
+export type McpMentionEntry = {
+  type: "mcp";
+  path: string;
+  name: string;
+  icon: LucideIcon;
+  detail: string;
+  enabled: boolean;
 };
 
-export type MentionEntry = FileEntry | BrowserMentionEntry;
+export type MentionEntry = FileEntry | McpMentionEntry;
 
 function getParentDir(path: string): string {
   const lastSlash = path.lastIndexOf("/");
@@ -60,9 +68,10 @@ export function MentionPopover(props: {
     >
       <div ref={listRef} className="lightcode-mention-popover__list" role="listbox">
         {results.map((entry, index) => {
-          const dir = getParentDir(entry.path);
           const isActive = index === activeIndex;
-          const isBrowser = entry.type === "browser";
+          const isMcp = entry.type === "mcp";
+          const McpIcon = isMcp ? entry.icon : null;
+          const dir = isMcp ? "" : getParentDir(entry.path);
           return (
             <div
               key={`${entry.type}:${entry.path}`}
@@ -79,8 +88,11 @@ export function MentionPopover(props: {
                 onSelect(entry);
               }}
             >
-              {isBrowser ? (
-                <Globe className="lightcode-mention-popover__icon text-muted" aria-hidden="true" />
+              {McpIcon ? (
+                <McpIcon
+                  className="lightcode-mention-popover__icon text-muted"
+                  aria-hidden="true"
+                />
               ) : (
                 <img
                   className="lightcode-mention-popover__icon"
@@ -90,9 +102,9 @@ export function MentionPopover(props: {
                 />
               )}
               <span className="lightcode-mention-popover__label truncate">{entry.name}</span>
-              {isBrowser ? (
+              {isMcp ? (
                 <span className="lightcode-mention-popover__detail ml-auto shrink-0 text-xs text-[var(--muted)]">
-                  <Trans>Browser MCP</Trans>
+                  {entry.detail}
                 </span>
               ) : dir ? (
                 <span className="lightcode-mention-popover__detail ml-auto shrink-0 text-xs text-[var(--muted)]">

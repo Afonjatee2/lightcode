@@ -27,6 +27,7 @@ import { terminateChildProcessTree } from "@/shared/processTree";
 import { buildClaudeBrowserMcpServers } from "./mcpBrowser";
 import { buildClaudeChromeMcpServers } from "./mcpChrome";
 import { buildClaudeSubagentMcpServers } from "./mcpSubagent";
+import { buildClaudeComputerUseMcpServers } from "./mcpComputerUse";
 import {
   createKnownSessionRef,
   getPrimedPosixEnv,
@@ -681,9 +682,20 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
       );
       const chromeMcpServers = buildClaudeChromeMcpServers(
         this.input.projectLocation,
-        this.input.mcpIdentity ?? { threadId: this.input.threadId },
+        this.currentConfig.chromeMcp === true,
+        this.input.chromeMcp,
       );
-      const mcpServers = { ...browserMcpServers, ...subagentMcpServers, ...chromeMcpServers };
+      const computerUseMcpServers = buildClaudeComputerUseMcpServers(
+        this.input.projectLocation,
+        this.currentConfig.computerUse === true,
+        this.input.computerUseMcp,
+      );
+      const mcpServers = {
+        ...browserMcpServers,
+        ...subagentMcpServers,
+        ...chromeMcpServers,
+        ...computerUseMcpServers,
+      };
       const hasMcpServers = Object.keys(mcpServers).length > 0;
       let spawnClaudeCodeProcess: ((spawnOptions: SpawnOptions) => SpawnedProcess) | undefined;
       switch (this.input.projectLocation.kind) {

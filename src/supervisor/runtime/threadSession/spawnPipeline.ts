@@ -27,6 +27,14 @@ import {
   type SubagentMcpHttpConfig,
 } from "@/supervisor/agents/subagentMcp";
 import {
+  resolveComputerUseMcpHttpConfigForLaunch,
+  type ComputerUseMcpHttpConfig,
+} from "@/supervisor/agents/computerUseMcp";
+import {
+  resolveChromeMcpHttpConfigForLaunch,
+  type ChromeMcpHttpConfig,
+} from "@/supervisor/agents/chromeMcp";
+import {
   type AgentAdapter,
   type AgentLaunchOptions,
   type CommandSpec,
@@ -195,6 +203,16 @@ export class SpawnPipeline {
       payload.projectLocation,
       payload.config,
     );
+    const computerUse = this.resolveComputerUseMcpForLaunch(
+      payload.projectLocation,
+      payload.config,
+      mcpIdentity,
+    );
+    const chromeMcp = this.resolveChromeMcpForLaunch(
+      payload.projectLocation,
+      payload.config,
+      mcpIdentity,
+    );
     const structuredSession = await this.createStructuredSession(
       adapter,
       payload.threadId,
@@ -203,6 +221,8 @@ export class SpawnPipeline {
       payload.config,
       browserMcp,
       subagentMcp,
+      computerUse,
+      chromeMcp,
       mcpIdentity,
       payload.sessionRef,
       requestedPresentation,
@@ -333,6 +353,8 @@ export class SpawnPipeline {
       structuredSession?.launchOptions,
       browserMcp,
       subagentMcp,
+      computerUse,
+      chromeMcp,
     );
     const argv = payload.sessionRef
       ? adapter.buildResumeArgv(
@@ -363,6 +385,8 @@ export class SpawnPipeline {
       payload.projectLocation,
       payload.config,
       browserMcp,
+      computerUse,
+      chromeMcp,
     );
     if (cliHookExtras.extraArgs.length > 0) {
       argv.args = mergeCliHookExtraArgs(
@@ -478,6 +502,12 @@ export class SpawnPipeline {
       session.projectLocation,
       config,
     );
+    const computerUse = this.resolveComputerUseMcpForLaunch(
+      session.projectLocation,
+      config,
+      mcpIdentity,
+    );
+    const chromeMcp = this.resolveChromeMcpForLaunch(session.projectLocation, config, mcpIdentity);
     const structuredSession = await this.createStructuredSession(
       session.adapter,
       session.threadId,
@@ -486,6 +516,8 @@ export class SpawnPipeline {
       config,
       browserMcp,
       subagentMcp,
+      computerUse,
+      chromeMcp,
       mcpIdentity,
       session.sessionRef,
       session.presentationMode,
@@ -558,6 +590,8 @@ export class SpawnPipeline {
       session.projectLocation,
       config,
       browserMcp,
+      computerUse,
+      chromeMcp,
     );
     if (!ctx.isCurrentSession(session)) {
       await structuredSession?.dispose();
@@ -573,6 +607,8 @@ export class SpawnPipeline {
         structuredSession?.launchOptions,
         browserMcp,
         subagentMcp,
+        computerUse,
+        chromeMcp,
       ),
     );
     if (cliHookExtras.extraArgs.length > 0) {
@@ -929,12 +965,16 @@ export class SpawnPipeline {
     launchOptions: AgentLaunchOptions | undefined,
     browserMcp: BrowserMcpHttpConfig | undefined,
     subagentMcp: SubagentMcpHttpConfig | undefined,
+    computerUse: ComputerUseMcpHttpConfig | undefined,
+    chromeMcp: ChromeMcpHttpConfig | undefined,
   ): AgentLaunchOptions {
     return {
       ...(launchOptions ?? {}),
       agentSettings: this.ctx.resolveAgentSettings(adapter),
       ...(browserMcp !== undefined ? { browserMcp } : {}),
       ...(subagentMcp !== undefined ? { subagentMcp } : {}),
+      ...(computerUse !== undefined ? { computerUseMcp: computerUse } : {}),
+      ...(chromeMcp !== undefined ? { chromeMcp } : {}),
     };
   }
 
@@ -953,6 +993,39 @@ export class SpawnPipeline {
       identity,
     );
     return cfg;
+  }
+
+  /**
+   * Resolve the computer-use MCP http config for a launch when the thread opted
+   * in (`config.computerUse === true`). Unlike browser MCP there is no
+   * force-disable ctx gate — computer-use scope gating happens in the renderer,
+   * so the per-thread config flag is authoritative. The resolver declines for
+   * WSL projects by design (computer-use is disabled for WSL). Parallel to
+   * `resolveBrowserMcpForLaunch`.
+   */
+  resolveComputerUseMcpForLaunch(
+    location: ProjectLocation,
+    config: ThreadConfig,
+    identity?: McpThreadIdentity,
+  ): ComputerUseMcpHttpConfig | undefined {
+    const enabled = config.computerUse === true;
+    return resolveComputerUseMcpHttpConfigForLaunch(location, enabled, identity);
+  }
+
+  /**
+   * Resolve the external-Chrome MCP http config for a launch when the thread
+   * opted in (`config.chromeMcp === true`). Mirrors
+   * {@link resolveComputerUseMcpForLaunch}: the per-thread config flag is
+   * authoritative (scope gating lives in the renderer) and the resolver declines
+   * for WSL projects by design.
+   */
+  resolveChromeMcpForLaunch(
+    location: ProjectLocation,
+    config: ThreadConfig,
+    identity?: McpThreadIdentity,
+  ): ChromeMcpHttpConfig | undefined {
+    const enabled = config.chromeMcp === true;
+    return resolveChromeMcpHttpConfigForLaunch(location, enabled, identity);
   }
 
   /**
@@ -1017,6 +1090,8 @@ export class SpawnPipeline {
     config: ThreadConfig,
     browserMcp: BrowserMcpHttpConfig | undefined,
     subagentMcp: SubagentMcpHttpConfig | undefined,
+    computerUse: ComputerUseMcpHttpConfig | undefined,
+    chromeMcp: ChromeMcpHttpConfig | undefined,
     mcpIdentity: McpThreadIdentity | undefined,
     sessionRef?: SessionRef,
     presentationMode?: ThreadPresentationMode,
@@ -1033,6 +1108,8 @@ export class SpawnPipeline {
         ...(mcpIdentity ? { mcpIdentity } : {}),
         ...(browserMcp ? { browserMcp } : {}),
         ...(subagentMcp ? { subagentMcp } : {}),
+        ...(computerUse ? { computerUseMcp: computerUse } : {}),
+        ...(chromeMcp ? { chromeMcp } : {}),
         ...(sessionRef ? { sessionRef } : {}),
         ...(presentationMode ? { presentationMode } : {}),
       });

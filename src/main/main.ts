@@ -22,6 +22,11 @@ import {
   registerPickerProtocolScheme,
 } from "./browser";
 import { buildBrowserUserAgent } from "./browser/userAgent";
+import {
+  ComputerUseDesktopOverlay,
+  ComputerUseMcpIngress,
+  type ComputerUseMcpIngressInfo,
+} from "./computer-use";
 import { SupervisorClient } from "./supervisor/SupervisorClient";
 import { createAutoUpdaterController } from "./updates/autoUpdater";
 import { createMainWindow } from "./window/createMainWindow";
@@ -126,6 +131,8 @@ let lightcodePaths: LightcodePaths | null = null;
 let windowsJobObjectManager: WindowsJobObjectManager | null = null;
 let browserPanelManager: BrowserPanelManager | null = null;
 let browserMcpIngress: BrowserMcpIngress | null = null;
+let computerUseMcpIngress: ComputerUseMcpIngress | null = null;
+let computerUseDesktopOverlay: ComputerUseDesktopOverlay | null = null;
 let chromeBridgeServer: ChromeBridgeServer | null = null;
 let chromeMcpIngress: ChromeMcpIngress | null = null;
 let remoteAccessServer: RemoteAccessServer | null = null;
@@ -401,6 +408,11 @@ if (!hasSingleInstanceLock) {
           env.LIGHTCODE_CHROME_MCP_URL = chromeInfo.url;
           env.LIGHTCODE_CHROME_MCP_TOKEN = chromeInfo.token;
         }
+        const computerUseInfo = computerUseMcpIngress?.getInfo();
+        if (computerUseInfo) {
+          env.LIGHTCODE_COMPUTER_USE_MCP_URL = computerUseInfo.url;
+          env.LIGHTCODE_COMPUTER_USE_MCP_TOKEN = computerUseInfo.token;
+        }
         return env;
       },
       assignPid: async (pid) => {
@@ -472,6 +484,34 @@ if (!hasSingleInstanceLock) {
     chromeBridgeServer.start().catch((err) => {
       console.error("[lightcode] chrome bridge server failed to start:", err);
     });
+    // Computer-use drives the host desktop and is only supported on macOS and
+    // Windows (matches createComputerUseDriver). On other platforms the ingress
+    // would advertise tools that all fail and would still inject a token into
+    // launches, so skip it entirely — resolveExtraEnv then naturally yields
+    // nothing because getInfo() stays null.
+    let computerUseMcpInfoReady: Promise<ComputerUseMcpIngressInfo | null> = Promise.resolve(null);
+    if (process.platform === "win32" || process.platform === "darwin") {
+      computerUseDesktopOverlay = new ComputerUseDesktopOverlay({
+        onExit: (threadIds) => {
+          computerUseMcpIngress?.interruptActiveActions();
+          for (const threadId of threadIds) {
+            void supervisorClient.call("interruptThread", { threadId }).catch((error) => {
+              console.error(
+                `[lightcode] failed to interrupt computer-use thread ${threadId}:`,
+                error,
+              );
+            });
+          }
+        },
+      });
+      computerUseMcpIngress = new ComputerUseMcpIngress({
+        onActivity: (event) => computerUseDesktopOverlay?.setActivity(event),
+      });
+      computerUseMcpInfoReady = computerUseMcpIngress.start().catch((err) => {
+        console.error("[lightcode] computer use MCP ingress failed to start:", err);
+        return null;
+      });
+    }
 
     const writeSharedSettingsPatch = (patch: {
       [K in keyof SharedSettings]?: SharedSettings[K];
@@ -930,8 +970,7 @@ if (!hasSingleInstanceLock) {
       );
     }
 
-    await mcpInfoReady;
-    await chromeMcpReady;
+    await Promise.all([mcpInfoReady, chromeMcpReady, computerUseMcpInfoReady]);
     supervisorClient.start(lightcodePaths.baseDir);
 
     if (readSharedSettingsFile(lightcodePaths.settingsPath).remoteAccessEnabled) {
@@ -1017,6 +1056,10 @@ if (!hasSingleInstanceLock) {
       windowsJobObjectManager = null;
       browserMcpIngress?.dispose();
       browserMcpIngress = null;
+      computerUseMcpIngress?.dispose();
+      computerUseMcpIngress = null;
+      computerUseDesktopOverlay?.dispose();
+      computerUseDesktopOverlay = null;
       chromeMcpIngress?.dispose();
       chromeMcpIngress = null;
       chromeBridgeServer?.dispose();

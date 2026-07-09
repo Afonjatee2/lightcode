@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Tooltip, toast } from "@heroui/react";
-import { Download, Webhook, X } from "lucide-react";
+import { Download, Monitor, Webhook, X } from "lucide-react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type {
   AgentHookPluginStatus,
@@ -17,18 +17,21 @@ import {
   AttachmentBar,
   ComposerAddMenu,
   composerMcpServers,
+  COMPUTER_USE_MCP_ID,
+  ComputerUseChip,
   McpChip,
   mcpTogglePatch,
   ComposerVoiceInput,
   MentionInput,
   openAttachmentLightbox,
   type ComposerMcpMenuItem,
+  type McpMentionItem,
   type MentionInputHandle,
   type VoiceInputHandle,
   useAttachments,
 } from "@/renderer/components/composer";
-import { browserMcpServer } from "@/renderer/components/composer/composerMcpServers";
 import { getTriggerWords } from "@/renderer/components/providers";
+import { getComputerUseScope } from "@/renderer/components/composer/computerUseScope";
 import { useBrowserAttachInbox } from "@/renderer/state/browserAttachInbox";
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
 import {
@@ -195,6 +198,11 @@ function DraftComposerAfterControls(props: {
   isDisabled: boolean;
   mentionRef: RefObject<MentionInputHandle | null>;
   voiceInputRef: RefObject<VoiceInputHandle | null>;
+  computerUse: {
+    enabled: boolean;
+    visible: boolean;
+    onToggle: (next: boolean) => void;
+  };
 }) {
   return (
     <>
@@ -202,6 +210,7 @@ function DraftComposerAfterControls(props: {
         mcpServers={props.mcpServers}
         showFileOption={!props.isRemote}
         onPickFiles={props.onPickFiles}
+        computerUse={props.computerUse}
       />
       <ComposerVoiceInput
         show={props.showVoiceInputButton}
@@ -242,6 +251,9 @@ export function ThreadDraftComposerArea(props: {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isRemote = isRemoteSession();
   const showVoiceInputButton = useSharedSettings((s) => s.audio.showVoiceInputButton) && !isRemote;
+  // Persistent (standing-default) composer MCP enablement, keyed by MCP id.
+  const persistentMcpServers = useSharedSettings((s) => s.enabledMcpServers);
+  const setMcpServerEnabled = useSharedSettings((s) => s.setMcpServerEnabled);
   const mentionRef = useRef<MentionInputHandle>(null);
   const voiceInputRef = useRef<VoiceInputHandle>(null);
   const attachments = useAttachments();
@@ -304,20 +316,28 @@ export function ThreadDraftComposerArea(props: {
   const showCommandPanel = filteredCommands.length > 0;
   const authRequired = props.selectedAgent.authState === "missing";
   const isHomeScope = isHomeProjectId(props.project.id);
-  const browserMcpScope = browserMcpServer.getScope(
-    props.selectedAgent.capabilities,
-    props.presentationMode,
-  );
-  // Registry-driven MCP toggles: the "+" add menu and enabled chips both iterate
-  // this list, so a new MCP server means adding one descriptor to the registry.
+  // Registry-driven MCP toggles. The "+" add menu now flips the *persistent*
+  // enablement (a standing default applied to every new thread), keyed by MCP
+  // id — not the per-thread config flag. A new MCP server means adding one
+  // descriptor to the registry.
   const mcpServers = composerMcpServers.map((descriptor) => ({
     descriptor,
-    enabled: props.config[descriptor.configKey] === true,
+    enabled: persistentMcpServers[descriptor.id] === true,
     visible:
-      descriptor.getScope(props.selectedAgent.capabilities, props.presentationMode) !== "none",
-    onToggle: (next: boolean) => props.onConfigChange(mcpTogglePatch(descriptor.configKey, next)),
+      descriptor.getScope(
+        props.selectedAgent.capabilities,
+        props.presentationMode,
+        props.project.location,
+      ) !== "none",
+    onToggle: (next: boolean) => setMcpServerEnabled(descriptor.id, next),
   }));
-  const enabledMcpServers = mcpServers.filter((server) => server.enabled);
+  // Composer chips represent per-thread *mentions* only: a server whose config
+  // flag is on for this draft but that isn't persistently enabled. Persistently
+  // enabled servers are on for every thread and show no chip.
+  const mentionedMcpServers = composerMcpServers.filter(
+    (descriptor) =>
+      props.config[descriptor.configKey] === true && persistentMcpServers[descriptor.id] !== true,
+  );
 
   // Worktree creation lives in the composer toolbar. The "bring over uncommitted
   // changes" affordance only appears when the new worktree forks from the
@@ -359,6 +379,60 @@ export function ThreadDraftComposerArea(props: {
     if (branchSelection?.worktreePath) return;
     selectNewWorktree({ transferUncommitted: mode === "new-with-changes" });
   }
+
+  const computerUseScope = getComputerUseScope(
+    props.selectedAgent.capabilities,
+    props.presentationMode,
+    props.project.location,
+    readBridge()?.platform,
+  );
+  const computerUseEnabled = props.config.computerUse === true;
+  const computerUsePersistent = persistentMcpServers[COMPUTER_USE_MCP_ID] === true;
+  // Same chip rule as the registry servers: a chip only for a per-thread mention,
+  // never for the persistent standing default.
+  const showComputerUseChip =
+    computerUseScope !== "none" && computerUseEnabled && !computerUsePersistent;
+  const onConfigChange = props.onConfigChange;
+  // `@`-mention affordances: disabled servers enable the capability for this
+  // draft; already-effective servers remain available and insert a textual
+  // mention that directs the agent to use them for this turn.
+  const mcpMentions: McpMentionItem[] = [
+    ...composerMcpServers
+      .filter(
+        (descriptor) =>
+          descriptor.getScope(
+            props.selectedAgent.capabilities,
+            props.presentationMode,
+            props.project.location,
+          ) !== "none",
+      )
+      .map((descriptor) => ({
+        id: descriptor.id,
+        name: t(descriptor.label),
+        icon: descriptor.icon,
+        detail: t`MCP server`,
+        enabled: props.config[descriptor.configKey] === true,
+      })),
+    ...(computerUseScope !== "none"
+      ? [
+          {
+            id: COMPUTER_USE_MCP_ID,
+            name: t`Computer Use`,
+            icon: Monitor,
+            detail: t`Computer Use`,
+            enabled: computerUseEnabled,
+          },
+        ]
+      : []),
+  ];
+  const onMcpMentionSelect = (id: string) => {
+    if (id === COMPUTER_USE_MCP_ID) {
+      onConfigChange({ computerUse: true });
+      return;
+    }
+    const descriptor = composerMcpServers.find((server) => server.id === id);
+    if (descriptor) onConfigChange(mcpTogglePatch(descriptor.configKey, true));
+  };
   const controls: ComposerControl[] = controlOpenRequest
     ? props.controls.map((control) => {
         if (controlOpenRequest.target === "model" && control.kind === "provider-model") {
@@ -389,6 +463,13 @@ export function ThreadDraftComposerArea(props: {
     canTransferUncommitted ? "can-transfer" : "no-transfer",
     controlKinds,
   ].join("|");
+
+  useEffect(() => {
+    if (computerUseScope === "none" && computerUseEnabled) {
+      onConfigChange({ computerUse: false });
+    }
+  }, [computerUseScope, computerUseEnabled, onConfigChange]);
+
   function resetDraftRefs() {
     latestSegmentsRef.current = [];
     attachmentsRef.current = [];
@@ -606,15 +687,22 @@ export function ThreadDraftComposerArea(props: {
               if (idx >= 0) openAttachmentLightbox(imageAttachments, idx);
             }}
             leading={
-              enabledMcpServers.length > 0 ? (
+              mentionedMcpServers.length > 0 || showComputerUseChip ? (
                 <>
-                  {enabledMcpServers.map((server) => (
+                  {mentionedMcpServers.map((descriptor) => (
                     <McpChip
-                      key={server.descriptor.id}
-                      descriptor={server.descriptor}
-                      onRemove={() => server.onToggle(false)}
+                      key={descriptor.id}
+                      descriptor={descriptor}
+                      onRemove={() =>
+                        props.onConfigChange(mcpTogglePatch(descriptor.configKey, false))
+                      }
                     />
                   ))}
+                  {showComputerUseChip ? (
+                    <ComputerUseChip
+                      onRemove={() => props.onConfigChange({ computerUse: false })}
+                    />
+                  ) : null}
                 </>
               ) : undefined
             }
@@ -635,8 +723,8 @@ export function ThreadDraftComposerArea(props: {
               const segments = mentionRef.current?.serializeSegments() ?? [];
               latestSegmentsRef.current = segments;
             }}
-            showBrowserMention={browserMcpScope !== "none" && props.config.browserMcp !== true}
-            onBrowserMentionSelect={() => props.onConfigChange({ browserMcp: true })}
+            mcpMentions={mcpMentions}
+            onMcpMentionSelect={onMcpMentionSelect}
             triggerWords={getTriggerWords(props.selectedAgent.kind, props.config.model)}
             {...(!isRemote
               ? {
@@ -711,6 +799,11 @@ export function ThreadDraftComposerArea(props: {
             isDisabled={authRequired || agentUpdating || isSubmitting}
             mentionRef={mentionRef}
             voiceInputRef={voiceInputRef}
+            computerUse={{
+              enabled: computerUsePersistent,
+              visible: computerUseScope !== "none",
+              onToggle: (next) => setMcpServerEnabled(COMPUTER_USE_MCP_ID, next),
+            }}
           />
         }
       />
