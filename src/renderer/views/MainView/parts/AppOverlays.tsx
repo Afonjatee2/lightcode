@@ -33,6 +33,7 @@ import { useBrowserPanelStore } from "@/renderer/state/browserPanelStore";
 import type { UsageLoginConfirmationAction } from "@/shared/contracts";
 import { WelcomeOverlay } from "@/renderer/views/WelcomeOverlay";
 import { WhatsNewOverlay } from "@/renderer/views/WhatsNewOverlay";
+import { RemoteProjectModal } from "@/renderer/views/RemoteProjectModal/RemoteProjectModal";
 import { useLoginTerminalStore } from "@/renderer/state/loginTerminalStore";
 
 function useEverEnabled(active: boolean): boolean {
@@ -197,6 +198,7 @@ export function AppOverlays() {
       </OverlayShell>
       <DeferredBrowserHost />
       <UsageLoginConfirmationDialog />
+      <RemoteProjectModal />
       <DeferredLoginTerminalOverlay />
       <DeferredCreateProjectModal />
       <DeferredCloneProjectModal />

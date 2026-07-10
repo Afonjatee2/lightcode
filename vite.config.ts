@@ -208,6 +208,31 @@ function mobileDevIndex(): Plugin {
   };
 }
 
+function mobileSshRuntime(): Plugin {
+  return {
+    name: "lightcode:mobile-ssh-runtime",
+    apply: "serve",
+    configureServer(server) {
+      if (!mobileOnly) return;
+      const root = resolve(process.cwd(), "resources/mobile-ssh-runtime");
+      server.middlewares.use((req, res, next) => {
+        const pathname = (req.url ?? "").split("?", 1)[0];
+        const name = pathname?.match(
+          /^\/lightcode-ssh-runtime\/(manifest\.json|runtime\.bin)$/,
+        )?.[1];
+        if (!name) return next();
+        const path = resolve(root, name);
+        if (!path.startsWith(root) || !existsSync(path)) return next();
+        res.setHeader(
+          "Content-Type",
+          extname(path) === ".json" ? "application/json" : "application/octet-stream",
+        );
+        createReadStream(path).pipe(res);
+      });
+    },
+  };
+}
+
 function materialIconAssets(): Plugin[] {
   return [
     {
@@ -268,6 +293,7 @@ function materialIconAssets(): Plugin[] {
 export default defineConfig(({ mode }) => ({
   plugins: [
     resizeObserverLoopErrorFilter(),
+    mobileSshRuntime(),
     rendererBootstrapTiming(),
     mobileDevIndex(),
     reactDevtoolsStandalone(),

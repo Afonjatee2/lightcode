@@ -65,8 +65,7 @@ import type { SharedSettings } from "@/shared/settings";
 import { headersToRecord, readBoundedResponseBody } from "@/shared/http";
 import type { LightcodePaths } from "@/shared/lightcodePaths";
 import { UsageLoginManager } from "../usageLogin/UsageLoginManager";
-
-export { getRemoteAccessPairingInfo } from "../remote/pairingInfo";
+import type { SshConnectionManager } from "../ssh/SshConnectionManager";
 
 interface CreateLocalIpcHandlersOptions {
   getMainWindow(): BrowserWindow | null;
@@ -77,6 +76,7 @@ interface CreateLocalIpcHandlersOptions {
   setRemoteAccessTailscaleHttps(enabled: boolean): Promise<RemoteAccessPairingInfo>;
   startTailscale(): Promise<StartTailscaleResult>;
   setRemoteAccessAdvertisedUrl(url: string): Promise<RemoteAccessPairingInfo>;
+  sshConnectionManager: SshConnectionManager;
   requireLightcodePaths(): LightcodePaths;
   updatePowerSaveBlocker(): void;
   autoUpdater: AutoUpdaterController;
@@ -277,6 +277,9 @@ export function createLocalIpcHandlers(
       options.setGlobalShortcutsSuspended?.(payload.suspended),
     getRemoteAccessPairing: () => getRemoteAccessPairingInfo(options.getRemoteAccessServer()),
     setRemoteAccessEnabled: (payload) => options.setRemoteAccessEnabled(payload.enabled),
+    sshDiscoverHosts: () => options.sshConnectionManager.discoverHosts(),
+    sshConnect: (payload) => options.sshConnectionManager.connect(payload),
+    sshDisconnect: ({ connectionId }) => options.sshConnectionManager.disconnect(connectionId),
     getRemoteAccessTailscaleStatus: () => options.getRemoteAccessTailscaleStatus(),
     setRemoteAccessTailscaleHttps: (payload) =>
       options.setRemoteAccessTailscaleHttps(payload.enabled),

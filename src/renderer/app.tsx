@@ -54,11 +54,8 @@ import {
 import { useCommandPaletteStore } from "@/renderer/commands/commandPaletteStore";
 import { BrowserPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel";
 import { useBrowserSync } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useBrowserSync";
-import {
-  captureAppStarted,
-  flushProductAnalytics,
-  installProductAnalytics,
-} from "@/renderer/analytics/posthog";
+import { captureAppStarted, installProductAnalytics } from "@/renderer/analytics/posthog";
+import { flushProductAnalytics } from "@/renderer/analytics/productAnalytics";
 import { DeferredCommandPalette as PrewarmedCommandPalette } from "@/renderer/deferredFeatures";
 
 // ── Module-level IPC listeners ──────────────────────────────────

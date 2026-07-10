@@ -25,6 +25,12 @@ export {
   type SupervisorIpcHandlerMap,
 } from "./bridge";
 export type { RemoteAccessTailscaleStatus, StartTailscaleResult } from "./procedures/app";
+export type {
+  SshConnectPayload,
+  SshConnectResult,
+  SshDisconnectPayload,
+  SshDiscoveredHost,
+} from "../ssh";
 export {
   isAgentStatusSupervisorEvent,
   type AgentStatusSupervisorEvent,
