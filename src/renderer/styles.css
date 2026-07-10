@@ -792,6 +792,19 @@
   --switch-control-bg: color-mix(in oklab, var(--surface) 70%, var(--foreground));
 }
 
+/* Switches and sliders are continuous controls, so their geometry stays pill-
+   shaped even though Poracode intentionally uses a sharp global --radius for
+   fields, menus, and cards. HeroUI derives rounded-xl/rounded-lg from that
+   global token; component-scoped radii preserve the pre-refactor controls
+   without softening the rest of the interface. */
+.switch__control,
+.switch__thumb,
+.slider .slider__track,
+.slider .slider__thumb,
+.slider .slider__thumb::after {
+  border-radius: 9999px;
+}
+
 @layer base {
   :root {
     /* Intentional overrides from HeroUI defaults */

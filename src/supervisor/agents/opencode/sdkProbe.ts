@@ -164,7 +164,7 @@ export async function probeOpenCodeInventoryViaSdk(
 ): Promise<OpenCodeSdkInventory | undefined> {
   const resolvedExecPath = resolveAgentBinaryPath(location, executablePath);
   const command = buildOpenCodeServerCommand(location, resolvedExecPath);
-  const handle = await spawnOpenCodeServer(command);
+  const handle = spawnOpenCodeServer(command);
 
   let baseUrl: string;
   try {

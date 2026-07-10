@@ -89,7 +89,9 @@ export class BrowserPanelManager {
     private readonly browserUserAgent: string,
     private readonly options: BrowserPanelManagerOptions = {},
   ) {
-    this.unsubscribePicker = onPickerCommit((commit) => this.onPickerCommit(commit));
+    this.unsubscribePicker = onPickerCommit((commit) => {
+      void this.onPickerCommit(commit);
+    });
   }
 
   private schedulePersist(): void {

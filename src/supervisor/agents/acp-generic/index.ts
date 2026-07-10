@@ -22,7 +22,7 @@ import type {
   AuthState,
   ProjectLocation,
 } from "@/shared/contracts";
-import { parseAcpGenericInstanceConfig } from "@/shared/contracts";
+import { acpGenericKind, parseAcpGenericInstanceConfig } from "@/shared/contracts";
 import {
   authenticateAcpAgent,
   createAcpStructuredSession,
@@ -43,26 +43,8 @@ import {
 } from "../base";
 import { getAgentProbeCwd, resolveProbeSpawnCwd } from "../probeCwd";
 
-/** Prefix for generic-ACP `kind` values. Unique per registered instance. */
-export const ACP_GENERIC_KIND_PREFIX = "acp-generic:";
-
 /** First-time `npx` installs can exceed the default probe budget. */
 export const REGISTRY_INSTALL_PROBE_TIMEOUT_MS = 90_000;
-
-export function acpGenericKind(instanceId: string): string {
-  return `${ACP_GENERIC_KIND_PREFIX}${instanceId}`;
-}
-
-export function isAcpGenericKind(kind: string): boolean {
-  return kind.startsWith(ACP_GENERIC_KIND_PREFIX);
-}
-
-/** Extract the instance id portion of an `acp-generic:<id>` kind. */
-export function extractAcpGenericInstanceId(kind: string): string | undefined {
-  return kind.startsWith(ACP_GENERIC_KIND_PREFIX)
-    ? kind.slice(ACP_GENERIC_KIND_PREFIX.length)
-    : undefined;
-}
 
 const GENERIC_ACP_DEFAULT_CAPABILITIES: AgentCapability = {
   models: [],

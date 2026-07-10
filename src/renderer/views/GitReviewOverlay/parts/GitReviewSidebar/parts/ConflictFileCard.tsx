@@ -164,7 +164,7 @@ export function ConflictFileCard(props: {
               tabIndex={0}
               className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
               title={t`Stage`}
-              onClick={handleStageConflict}
+              onClick={(event) => void handleStageConflict(event)}
               onKeyDown={(e) =>
                 handleKeyActivate(e, () => void handleStageConflict(e), { stopPropagation: true })
               }

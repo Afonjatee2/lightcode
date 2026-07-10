@@ -29,6 +29,14 @@ const bridgeMock = vi.hoisted(() => ({
 
 const toastDanger = vi.hoisted(() => vi.fn<(message: string) => void>());
 
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
 vi.mock("@/renderer/bridge", () => ({
   readBridge: () => bridgeMock,
 }));
@@ -182,27 +190,40 @@ describe("mobile ThreadView", () => {
   });
 
   it("reports failed terminal thread reloads", async () => {
-    bridgeMock.startThread.mockRejectedValueOnce(new Error("restart failed"));
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      const close = createDeferred();
+      bridgeMock.closeThread.mockReturnValueOnce(close.promise);
+      bridgeMock.startThread.mockRejectedValueOnce(new Error("restart failed"));
 
-    render(
-      <ThreadView
-        thread={makeTerminalThread()}
-        terminalScrollback=""
-        onThreadAction={() => undefined}
-        onSubmitInput={() => Promise.resolve()}
-      />,
-    );
+      render(
+        <ThreadView
+          thread={makeTerminalThread()}
+          terminalScrollback=""
+          onThreadAction={() => undefined}
+          onSubmitInput={() => Promise.resolve()}
+        />,
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: "Reload terminal" }));
+      fireEvent.click(screen.getByRole("button", { name: "Reload terminal" }));
 
-    await waitFor(() => {
       expect(bridgeMock.closeThread).toHaveBeenCalledWith({ threadId: "thread-1" });
-    });
-    await new Promise((resolve) => window.setTimeout(resolve, 300));
 
-    await waitFor(() => {
+      await act(async () => {
+        close.resolve();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+
+      await act(() => vi.advanceTimersByTimeAsync(249));
+      expect(bridgeMock.startThread).not.toHaveBeenCalled();
+      expect(toastDanger).not.toHaveBeenCalled();
+
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      expect(bridgeMock.startThread).toHaveBeenCalledTimes(1);
       expect(toastDanger).toHaveBeenCalledWith("restart failed");
-    });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("does not apply terminal keyboard padding while the floating composer is focused", async () => {

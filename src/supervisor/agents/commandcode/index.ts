@@ -50,9 +50,9 @@ export function createCommandCodeAdapter(): AgentAdapter {
   let capabilities: AgentCapability = defaultCommandCodeCapabilities;
 
   return {
-    kind: "commandcode",
-    label: "Command Code",
-    binary: "command-code",
+    kind: commandCodeDetectionSpec.kind,
+    label: commandCodeDetectionSpec.label,
+    binary: commandCodeDetectionSpec.binary,
     // Surface the update spec on the adapter (not just on the detection status)
     // so the shared updater and the npm "latest version" probe behind the
     // Settings registry card can read `adapter.update`. Mirrors every other

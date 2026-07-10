@@ -11,7 +11,8 @@ import type {
 } from "@/shared/contracts";
 import { Button, OptionMenu, PixelLoader } from "@/renderer/components/common";
 import { modelVisibilityKey } from "@/renderer/components/common/ProviderModelMenu/parts/providerIdentity";
-import { ProviderIcon, getComposerControls } from "@/renderer/components/providers";
+import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import { getComposerControls } from "@/renderer/components/providers/providerComposer";
 import { EffortIcon } from "@/renderer/components/providers/EffortIcon";
 import { PermissionIcon } from "@/renderer/components/providers/PermissionIcon";
 import { readBridge } from "@/renderer/bridge";
@@ -355,14 +356,14 @@ export function ContinueInProviderDialog(props: {
                 <Button
                   variant="secondary"
                   isDisabled={!selectedKind}
-                  onPress={() => handleAction(false)}
+                  onPress={() => void handleAction(false)}
                 >
                   <Trans>Clone</Trans>
                 </Button>
                 <Button
                   variant="primary"
                   isDisabled={!selectedKind}
-                  onPress={() => handleAction(true)}
+                  onPress={() => void handleAction(true)}
                 >
                   <Trans>Move</Trans>
                 </Button>

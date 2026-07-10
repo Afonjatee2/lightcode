@@ -36,16 +36,22 @@ vi.mock("./permissions", () => ({
   isNavigationUrlAllowed: () => true,
 }));
 
-function createWebContents() {
+function createWebContents(initialUrl = "https://example.com/") {
+  const handlers = new Map<string, (...args: unknown[]) => void>();
+  let currentUrl = initialUrl;
   return {
     session: {},
     setUserAgent: vi.fn<(userAgent: string) => void>(),
-    getURL: vi.fn<() => string>(() => "https://example.com/"),
+    getURL: vi.fn<() => string>(() => currentUrl),
     getTitle: vi.fn<() => string>(() => "Example"),
     isDestroyed: vi.fn<() => boolean>(() => false),
     isLoadingMainFrame: vi.fn<() => boolean>(() => false),
-    on: vi.fn<() => void>(),
-    removeListener: vi.fn<() => void>(),
+    on: vi.fn<(event: string, handler: (...args: unknown[]) => void) => void>((event, handler) => {
+      handlers.set(event, handler);
+    }),
+    removeListener: vi.fn<(event: string) => void>((event) => {
+      handlers.delete(event);
+    }),
     navigationHistory: {
       canGoBack: vi.fn<() => boolean>(() => true),
       canGoForward: vi.fn<() => boolean>(() => true),
@@ -54,6 +60,13 @@ function createWebContents() {
       clear: vi.fn<() => void>(),
     },
     reload: vi.fn<() => void>(),
+    loadURL: vi.fn<(url: string) => Promise<void>>((url) => {
+      currentUrl = url;
+      return Promise.resolve();
+    }),
+    emit(event: string, ...args: unknown[]) {
+      handlers.get(event)?.(...args);
+    },
   };
 }
 
@@ -97,6 +110,35 @@ describe("BrowserTab", () => {
     expect(webContents.setUserAgent).toHaveBeenCalledWith(userAgent);
     expect(installSessionPermissions).toHaveBeenCalledWith(webContents.session);
     expect(installNavigationGuards).toHaveBeenCalled();
+  });
+
+  it("does not clear newly navigated history after initial page cleanup", async () => {
+    vi.useFakeTimers();
+    try {
+      const { BrowserTab } = await import("./BrowserTab");
+      const tab = new BrowserTab({
+        tabId: "tab-1",
+        initialUrl: "data:text/html,first",
+        userAgent: "ua",
+        onUpdate: vi.fn<() => void>(),
+        onAttention: vi.fn<() => void>(),
+        onPopup: vi.fn<() => void>(),
+      });
+      const webContents = createWebContents("data:text/html,first");
+      tab.attach(webContents as never);
+
+      webContents.emit("did-stop-loading");
+      expect(webContents.navigationHistory.clear).toHaveBeenCalledTimes(1);
+
+      await tab.loadURL("data:text/html,second");
+      webContents.emit("did-navigate", {}, "data:text/html,second");
+      webContents.emit("did-stop-loading");
+      await vi.advanceTimersByTimeAsync(500);
+
+      expect(webContents.navigationHistory.clear).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("navigates back/forward on Ctrl+[ and Ctrl+] keydown", async () => {

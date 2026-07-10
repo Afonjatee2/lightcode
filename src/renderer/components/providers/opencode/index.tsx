@@ -1,16 +1,14 @@
 export * from "./OpenCodeIcon";
 
 import { OpenCodeIcon } from "./OpenCodeIcon";
+import providerManifest from "./manifest";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import { fullAccessToggle, planWorkToggle } from "../composerControlBuilders";
-import {
-  registerCommitGenDefaults,
-  registerComposerControls,
-  registerConflictResolverDefaults,
-  registerProviderIcon,
-  registerProviderLabel,
-  registerTitleGenDefaults,
-} from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
+import { registerComposerControls } from "../providerComposer";
+import { registerCommitGenDefaults } from "../commitGen";
+import { registerConflictResolverDefaults } from "../conflictResolver";
+import { registerTitleGenDefaults } from "../titleGen";
 
 // `big-pickle` is OpenCode's free always-on house model — every other model
 // in `opencode models` is gated behind a user-configured paid provider, so
@@ -19,28 +17,29 @@ import {
 // own copy at `src/supervisor/agents/opencode/index.ts`; keep them in sync.
 const OPENCODE_DEFAULT_MODEL = "opencode/big-pickle";
 
-registerProviderIcon("opencode", OpenCodeIcon);
-registerProviderLabel("opencode", "OpenCode");
-registerCommitGenDefaults("opencode", {
+const PROVIDER_KIND = providerManifest.kind;
+
+registerProviderIcon(PROVIDER_KIND, OpenCodeIcon);
+registerCommitGenDefaults(PROVIDER_KIND, {
   label: "OpenCode",
   hint: "Big Pickle",
   model: OPENCODE_DEFAULT_MODEL,
   effort: "",
 });
-registerTitleGenDefaults("opencode", {
+registerTitleGenDefaults(PROVIDER_KIND, {
   label: "OpenCode",
   hint: "Big Pickle",
   model: OPENCODE_DEFAULT_MODEL,
   effort: "",
 });
-registerConflictResolverDefaults("opencode", {
+registerConflictResolverDefaults(PROVIDER_KIND, {
   label: "OpenCode",
   hint: "Big Pickle",
   model: OPENCODE_DEFAULT_MODEL,
   effort: "",
 });
 
-registerComposerControls("opencode", {
+registerComposerControls(PROVIDER_KIND, {
   // Plan toggle — wired on both surfaces. GUI threads forward it via
   // `agent: "plan"` on `prompt_async`; TUI threads pass `--agent plan` at
   // launch (see `buildOpenCodeArgs`).

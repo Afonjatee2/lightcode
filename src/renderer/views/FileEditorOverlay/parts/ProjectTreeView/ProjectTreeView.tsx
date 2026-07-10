@@ -221,10 +221,12 @@ export function ProjectTreeView(props: {
                           row={row}
                           draft={tree.draft}
                           setDraft={tree.setDraft}
-                          onSelectFile={tree.handleSelectFile}
+                          onSelectFile={(path) => void tree.handleSelectFile(path)}
                           {...(props.onPinFile ? { onPinFile: props.onPinFile } : {})}
-                          onToggleDirectory={tree.toggleDirectory}
-                          onEntryAction={tree.handleEntryAction}
+                          onToggleDirectory={(path) => void tree.toggleDirectory(path)}
+                          onEntryAction={(entry, action) =>
+                            void tree.handleEntryAction(entry, action)
+                          }
                           onMovePath={tree.handleMovePath}
                           onHandleRename={tree.handleRenameEntry}
                           onHandleCreate={tree.handleCreateEntry}

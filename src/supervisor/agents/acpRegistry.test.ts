@@ -19,6 +19,21 @@ const probeAcpGenericInstanceMock = vi.hoisted(() =>
     }),
 );
 
+const execFileMock = vi.hoisted(() =>
+  vi.fn<(...args: unknown[]) => void>((...args) => {
+    const callback = args.at(-1);
+    if (typeof callback !== "function") {
+      throw new Error("Expected execFile callback");
+    }
+    (callback as (error: Error | null, stdout: string, stderr: string) => void)(null, "", "");
+  }),
+);
+
+vi.mock("node:child_process", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:child_process")>();
+  return { ...actual, execFile: execFileMock };
+});
+
 vi.mock("./acp-generic", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./acp-generic")>();
   return {
@@ -33,24 +48,12 @@ import {
   cacheLocalAcpRegistryIcons,
   installAcpRegistryAgent,
   readAcpRegistrySettings,
-  resolveRegistryAgentFamilyKind,
   setAcpRegistryAgentAuth,
   updateAcpRegistryAgent,
 } from "./acpRegistry";
 import { isEncryptedSecret } from "../secretStorage";
 
-describe("ACP registry family mapping", () => {
-  it("maps known registry agents to provider families for presentation only", () => {
-    expect(resolveRegistryAgentFamilyKind("codex-acp")).toBe("codex");
-    expect(resolveRegistryAgentFamilyKind("cursor")).toBe("cursor");
-    expect(resolveRegistryAgentFamilyKind("gemini")).toBe("gemini");
-    expect(resolveRegistryAgentFamilyKind("opencode")).toBe("opencode");
-  });
-
-  it("leaves unknown registry agents for the generic ACP adapter", () => {
-    expect(resolveRegistryAgentFamilyKind("agoragentic-acp")).toBeUndefined();
-  });
-
+describe("ACP registry installs", () => {
   it("installs known ACP wrappers as generic ACP instances", async () => {
     const dir = mkdtempSync(join(tmpdir(), "lightcode-acp-registry-"));
     const settingsPath = join(dir, "settings.json");
@@ -101,6 +104,15 @@ describe("ACP registry family mapping", () => {
         undefined,
         { timeoutMs: REGISTRY_INSTALL_PROBE_TIMEOUT_MS },
       );
+      expect(execFileMock).toHaveBeenCalledOnce();
+      const [command, args, options] = execFileMock.mock.calls[0] ?? [];
+      const invocation = [String(command), ...(Array.isArray(args) ? args.map(String) : [])].join(
+        " ",
+      );
+      expect(invocation).toContain("npx");
+      expect(invocation).toContain("codex-acp@1.0.0");
+      expect(invocation).toContain("--help");
+      expect(options).toMatchObject({ timeout: 120_000, windowsHide: true });
     } finally {
       vi.unstubAllGlobals();
     }

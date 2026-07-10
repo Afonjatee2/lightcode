@@ -264,3 +264,4 @@ describe("humanIntentTitle", () => {
     expect(commandIntentDisplay("git diff -- src/foo.ts").kind).toBe("git");
   });
 });
+// @vitest-environment node

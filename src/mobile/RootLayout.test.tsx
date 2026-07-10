@@ -249,7 +249,9 @@ describe("mobile RootLayout", () => {
       expect(heldHeader).toHaveAttribute("inert");
       expect(screen.getByTestId("thread-title-row")).toHaveAttribute("data-thread-id", "thread-1");
 
-      act(() => vi.advanceTimersByTime(1200));
+      act(() => {
+        vi.advanceTimersByTime(1200);
+      });
       expect(container.querySelector(".m-topbar--transition-hold")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();

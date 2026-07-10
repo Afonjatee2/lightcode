@@ -294,6 +294,7 @@ describe("useRemoteServersStore", () => {
     expect(socketFactory).toHaveBeenCalledTimes(1);
     snapshot.mockClear();
     sync.dispatchRemoteSupervisorEvent.mockClear();
+    vi.useFakeTimers();
 
     sockets[0]?.onmessage?.({
       data: JSON.stringify({
@@ -303,8 +304,8 @@ describe("useRemoteServersStore", () => {
       }),
     });
 
-    // Refreshes are debounced (finding #5), so give the scheduler time to fire.
-    await vi.waitFor(() => expect(snapshot).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(snapshot).toHaveBeenCalledTimes(1);
     expect(useRemoteServersStore.getState().runtime.d1?.projects).toHaveLength(2);
     expect(useRemoteServersStore.getState().runtime.d1?.threads[0]?.title).toBe(
       "Changed elsewhere",
@@ -514,6 +515,7 @@ describe("useRemoteServersStore", () => {
     await useRemoteServersStore.getState().openRemoteThread("d1", "rt-1");
     snapshot.mockClear();
     sync.dispatchRemoteSupervisorEvent.mockClear();
+    vi.useFakeTimers();
 
     socket.onmessage?.({
       data: JSON.stringify({
@@ -528,7 +530,8 @@ describe("useRemoteServersStore", () => {
     expect(sync.dispatchRemoteSupervisorEvent).not.toHaveBeenCalled();
     // …but it still triggers a (debounced) snapshot refresh so the sidebar picks
     // up the renamed thread.
-    await vi.waitFor(() => expect(snapshot).toHaveBeenCalledTimes(1));
+    await vi.advanceTimersByTimeAsync(600);
+    expect(snapshot).toHaveBeenCalledTimes(1);
     expect(useRemoteServersStore.getState().runtime.d1?.threads[0]?.title).toBe("Renamed remotely");
   });
 

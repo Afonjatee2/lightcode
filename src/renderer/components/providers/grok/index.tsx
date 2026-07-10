@@ -1,18 +1,17 @@
 export * from "./GrokIcon";
 
 import { GrokIcon } from "./GrokIcon";
+import providerManifest from "./manifest";
 import { fullAccessToggle } from "../composerControlBuilders";
-import {
-  registerCommitGenDefaults,
-  registerComposerControls,
-  registerConflictResolverDefaults,
-  registerProviderIcon,
-  registerProviderLabel,
-  registerTitleGenDefaults,
-} from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
+import { registerComposerControls } from "../providerComposer";
+import { registerCommitGenDefaults } from "../commitGen";
+import { registerConflictResolverDefaults } from "../conflictResolver";
+import { registerTitleGenDefaults } from "../titleGen";
 
-registerProviderIcon("grok", GrokIcon);
-registerProviderLabel("grok", "Grok Build");
+const PROVIDER_KIND = providerManifest.kind;
+
+registerProviderIcon(PROVIDER_KIND, GrokIcon);
 
 // Grok has two models, both covered by the subscription (no per-token cost), so
 // pick by fit: `grok-composer-2.5-fast` is Grok's own default — fast, ideal for
@@ -20,21 +19,21 @@ registerProviderLabel("grok", "Grok Build");
 // conflict resolver, which is a real code-editing session. (The old `grok-build`
 // model id was retired upstream — the 0.2.x catalog is grok-4.5 +
 // grok-composer-2.5-fast.)
-registerCommitGenDefaults("grok", {
+registerCommitGenDefaults(PROVIDER_KIND, {
   label: "Grok",
   hint: "Composer 2.5 Fast",
   model: "grok-composer-2.5-fast",
   effort: "",
 });
 
-registerTitleGenDefaults("grok", {
+registerTitleGenDefaults(PROVIDER_KIND, {
   label: "Grok",
   hint: "Composer 2.5 Fast",
   model: "grok-composer-2.5-fast",
   effort: "",
 });
 
-registerConflictResolverDefaults("grok", {
+registerConflictResolverDefaults(PROVIDER_KIND, {
   label: "Grok",
   hint: "Grok 4.5",
   model: "grok-4.5",
@@ -46,7 +45,7 @@ registerConflictResolverDefaults("grok", {
 // (re-verified on grok 0.2.93). Effort needs no control here: the shared
 // model picker reads `capabilities.modelEfforts` filled by the ACP probe.
 // See `supervisor/agents/grok/detection.ts` and `supervisor/agents/grok/argv.ts`.
-registerComposerControls("grok", ({ capabilities, config, isDisabled, onConfigChange }) => {
+registerComposerControls(PROVIDER_KIND, ({ capabilities, config, isDisabled, onConfigChange }) => {
   if (!capabilities.approvalPolicies?.length) return [];
   const bypassPolicy = capabilities.bypassPermissions?.approvalPolicy ?? "bypassPermissions";
   const isBypass = config.approvalPolicy === bypassPolicy;

@@ -49,11 +49,12 @@ import { writeSubmittedPrompt } from "./threadSession/promptWrite";
 import { resolveTerminalColorEnv } from "./threadSession/terminalEnv";
 import { requireSessionPty, shouldPrimeNativeProjectShellEnv } from "./threadSession/helpers";
 import { RuntimeEventRouter } from "./threadSession/runtimeEventRouter";
+import { SessionRuntimeLifecycle } from "./threadSession/sessionRuntimeLifecycle";
 import type { ThreadSessionManagerOptions } from "./threadSession/managerOptions";
 import { PtyLifecycle } from "./threadSession/ptyLifecycle";
 import { describeSpawnFailure, sanitizedProcessEnv } from "./threadSession/spawnDiagnostics";
-import { applyLaunchArgsConfigRewrite, mergeCliHookExtraArgs } from "./threadSession/cliHookArgs";
 import { CliHookSessionCoordinator } from "./threadSession/cliHookPlugin";
+import { InvalidSessionRecoveryCoordinator } from "./threadSession/invalidSessionRecovery";
 import { StructuredInterruptWatchdog } from "./threadSession/structuredInterruptWatchdog";
 import { SteerCoordinator, clearPendingSteerSlot } from "./threadSession/steerCoordinator";
 import { buildShellCommand } from "./threadSession/shellCommand";
@@ -79,6 +80,7 @@ export class ThreadSessionManager {
   private readonly structuredInterruptWatchdog: StructuredInterruptWatchdog;
   private readonly cliHookPlugin: CliHookSessionCoordinator;
   private readonly spawnPipeline: SpawnPipeline;
+  private readonly invalidSessionRecovery: InvalidSessionRecoveryCoordinator;
   private readonly structuredTurnQueue: StructuredTurnQueue;
   private disposed = false;
 
@@ -128,28 +130,49 @@ export class ThreadSessionManager {
       isBrowserMcpEnabledForLaunch: (adapter, config) =>
         this.isBrowserMcpEnabledForLaunch(adapter, config),
     });
-    this.spawnPipeline = new SpawnPipeline({
-      options: this.options,
+    const sessionRuntimeLifecycle = new SessionRuntimeLifecycle({
       sessions: this.sessions,
       sessionsBySessionId: this.sessionsBySessionId,
-      pendingStartInterrupts: this.pendingStartInterrupts,
-      pendingStartAborts: this.pendingStartAborts,
       ptyLifecycle: this.ptyLifecycle,
       outputPipeline: this.outputPipeline,
       runtimeEventRouter: this.runtimeEventRouter,
       steerCoordinator: this.steerCoordinator,
       structuredInterruptWatchdog: this.structuredInterruptWatchdog,
-      cliHookPlugin: this.cliHookPlugin,
-      closeThread: (payload) => this.closeThread(payload),
+      emit: this.options.emit,
+      isCurrentSession: (session) => this.isCurrentSession(session),
       failStructuredSession: (session, error) => this.failStructuredSession(session, error),
       indexSessionRef: (session, prevId) => this.indexSessionRef(session, prevId),
       pollSessionRefDiscovery: (session) => this.pollSessionRefDiscovery(session),
+    });
+    this.spawnPipeline = new SpawnPipeline({
+      options: this.options,
+      sessions: this.sessions,
+      pendingStartInterrupts: this.pendingStartInterrupts,
+      pendingStartAborts: this.pendingStartAborts,
+      ptyLifecycle: this.ptyLifecycle,
+      outputPipeline: this.outputPipeline,
+      runtimeEventRouter: this.runtimeEventRouter,
+      sessionRuntimeLifecycle,
+      cliHookPlugin: this.cliHookPlugin,
+      closeThread: (payload) => this.closeThread(payload),
+      failStructuredSession: (session, error) => this.failStructuredSession(session, error),
       isCurrentSession: (session) => this.isCurrentSession(session),
       isBrowserMcpEnabledForLaunch: (adapter, config) =>
         this.isBrowserMcpEnabledForLaunch(adapter, config),
       resolveAgentSettings: (adapter) => this.resolveAgentSettings(adapter),
       emitOptimisticUserMessage: (threadId, prompt, segments) =>
         this.structuredTurnQueue.emitOptimisticUserMessage(threadId, prompt, segments),
+    });
+    this.invalidSessionRecovery = new InvalidSessionRecoveryCoordinator({
+      spawnPipeline: this.spawnPipeline,
+      cliHookPlugin: this.cliHookPlugin,
+      outputPipeline: this.outputPipeline,
+      ptyLifecycle: this.ptyLifecycle,
+      isCurrentSession: (session) => this.isCurrentSession(session),
+      failStructuredSession: (session, error) => this.failStructuredSession(session, error),
+      settleAfterStructuredDispose: () => sleep(150),
+      primeProjectShellEnv,
+      resolveLaunchSpec,
     });
   }
 
@@ -902,109 +925,7 @@ export class ThreadSessionManager {
   }
 
   private recoverInvalidSessionRef(session: SessionRuntime): void {
-    if (session.invalidSessionRecoveryStarted || !session.sessionRef) {
-      return;
-    }
-    session.invalidSessionRecoveryStarted = true;
-    void (async () => {
-      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-
-      session.ignoreExit = true;
-      this.outputPipeline.clearSessionTimers(session);
-      session.stopSessionRefWatcher?.();
-      session.stopSessionRefWatcher = undefined;
-      await session.structuredSession?.dispose();
-      if (session.structuredSession) {
-        await sleep(150);
-      }
-      this.ptyLifecycle.kill(session);
-
-      if (this.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-
-      const browserMcp = await this.spawnPipeline.resolveBrowserMcpForLaunch(
-        session.adapter,
-        session.projectLocation,
-        session.config,
-      );
-      const subagentMcp = await this.spawnPipeline.resolveSubagentMcpForLaunch(
-        session.threadId,
-        session.projectLocation,
-        session.config,
-      );
-      const computerUse = this.spawnPipeline.resolveComputerUseMcpForLaunch(
-        session.projectLocation,
-        session.config,
-        { threadId: session.threadId },
-      );
-      const chromeMcp = this.spawnPipeline.resolveChromeMcpForLaunch(
-        session.projectLocation,
-        session.config,
-        { threadId: session.threadId },
-      );
-      const cliHookExtras = await this.cliHookPlugin.resolveCliHookPluginExtras(
-        session.threadId,
-        session.agentKind,
-        session.projectLocation,
-        session.config,
-        browserMcp,
-        computerUse,
-        chromeMcp,
-      );
-      if (!this.isCurrentSession(session)) {
-        return;
-      }
-      const argv = session.adapter.buildLaunchArgv(
-        session.projectLocation,
-        session.config,
-        session.launchPrompt,
-        undefined,
-        this.spawnPipeline.composeLaunchOptions(
-          session.adapter,
-          undefined,
-          browserMcp,
-          subagentMcp,
-          computerUse,
-          chromeMcp,
-        ),
-      );
-      if (cliHookExtras.extraArgs.length > 0) {
-        argv.args = mergeCliHookExtraArgs(
-          session.adapter,
-          argv.args,
-          cliHookExtras.extraArgs,
-          session.launchPrompt,
-        );
-      }
-      argv.args = await applyLaunchArgsConfigRewrite(
-        session.adapter,
-        argv.args,
-        session.config,
-        session.projectLocation,
-      );
-      if (shouldPrimeNativeProjectShellEnv(session.projectLocation)) {
-        await primeProjectShellEnv(session.projectLocation.path);
-      }
-      if (!this.isCurrentSession(session)) {
-        return;
-      }
-      const command = resolveLaunchSpec(session.projectLocation, argv);
-
-      this.spawnPipeline.spawnThread({
-        threadId: session.threadId,
-        agentKind: session.agentKind,
-        adapter: session.adapter,
-        projectLocation: session.projectLocation,
-        config: session.config,
-        initialSize: session.terminalSize,
-        launchPrompt: session.launchPrompt,
-        command,
-        ...(Object.keys(cliHookExtras.env).length > 0 ? { extraEnv: cliHookExtras.env } : {}),
-      });
-    })();
+    void this.invalidSessionRecovery.recover(session);
   }
 
   private resolveLogPath(threadId: string): string {

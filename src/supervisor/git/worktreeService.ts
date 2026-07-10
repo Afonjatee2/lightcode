@@ -25,7 +25,7 @@ import {
   type WorktreePathOptions,
 } from "./exec";
 import { copyIgnoredFilesIntoWorktree } from "./copyIgnoredFiles";
-import { parseStatusPorcelainV2 } from "./statusService";
+import { parseStatusPorcelainV2 } from "./statusParsing";
 
 function trimTrailingSeparators(path: string): string {
   const trimmed = path.replace(/[\\/]+$/, "");

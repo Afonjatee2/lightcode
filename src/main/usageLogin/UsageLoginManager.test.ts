@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { allUsageProviderDescriptors } from "@lightcode/agents-usage";
 import { hasUsageSecret } from "@/shared/usageSecretStore";
 
 vi.mock("electron", () => ({ clipboard: { writeText: vi.fn<(text: string) => void>() } }));
@@ -80,6 +81,17 @@ function newManager(panel: ReturnType<typeof makePanel>) {
   return new UsageLoginManager({ cacheDir } as never, () => panel as never);
 }
 
+describe("UsageLoginManager provider catalog", () => {
+  it("keeps every login config backed by a canonical usage descriptor", () => {
+    const manager = newManager(makePanel());
+    const descriptorIds = new Set(allUsageProviderDescriptors().map((descriptor) => descriptor.id));
+
+    expect(Object.keys(manager.getLoginState().stored).every((id) => descriptorIds.has(id))).toBe(
+      true,
+    );
+  });
+});
+
 describe("UsageLoginManager cookie flow", () => {
   it("captures Grok cookies without a live usage probe gate", async () => {
     const panel = makePanel();
@@ -92,6 +104,7 @@ describe("UsageLoginManager cookie flow", () => {
         loginUrl: "https://grok.com/",
         cookieUrl: "https://grok.com/",
         authCookiePattern: /^sso(?:-rw)?$/i,
+        providerLabel: "Grok",
       }),
     );
     expect(panel.captureLoginCookies.mock.calls[0]?.[0]).not.toHaveProperty("validateSession");

@@ -215,7 +215,7 @@ export class ServerInstance {
           : {}),
       });
 
-      connection.sendNotification("initialized", {});
+      await connection.sendNotification("initialized", {});
       this.onStatus("ready");
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -259,7 +259,7 @@ export class ServerInstance {
       return this.connection.sendRequest(msg.method, msg.params);
     }
     // It's a notification — fire and forget
-    this.connection.sendNotification(msg.method, msg.params);
+    await this.connection.sendNotification(msg.method, msg.params);
     return undefined;
   }
 

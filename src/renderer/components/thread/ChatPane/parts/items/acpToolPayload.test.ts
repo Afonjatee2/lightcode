@@ -444,3 +444,4 @@ describe("acpToolPayload", () => {
     expect(extractAcpDiffSummary(payload)).toEqual({ added: 3, removed: 3 });
   });
 });
+// @vitest-environment node

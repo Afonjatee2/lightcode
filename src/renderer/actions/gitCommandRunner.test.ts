@@ -64,3 +64,4 @@ describe("gitCommandRunner", () => {
     });
   });
 });
+// @vitest-environment node

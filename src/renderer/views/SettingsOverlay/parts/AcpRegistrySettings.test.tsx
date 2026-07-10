@@ -8,6 +8,7 @@ import type {
   Project,
 } from "@/shared/contracts";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
+import { getProviderManifests } from "@/renderer/components/providers/providerManifest";
 
 const statusesState = {
   agentStatuses: [] as AgentStatus[],
@@ -98,7 +99,61 @@ vi.mock("@/renderer/components/providers/ProviderIcon", () => ({
 }));
 
 import { AcpRegistrySettings } from "./AcpRegistrySettings";
-import { NATIVE_AGENT_REGISTRY_ENTRIES } from "./agentRegistryNative";
+import {
+  APP_SUPPORTED_ACP_AGENT_IDS,
+  KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS,
+  NATIVE_AGENT_REGISTRY_ENTRIES,
+  REGISTRY_AGENT_FAMILY_KIND,
+} from "./agentRegistryNative";
+
+describe("native ACP registry aliases", () => {
+  const aliases = NATIVE_AGENT_REGISTRY_ENTRIES.flatMap((entry) =>
+    (entry.acpRegistryAliases ?? []).map((alias) => ({ ...alias, familyKind: entry.id })),
+  );
+
+  it("derives unique registry ids and their native family mappings", () => {
+    const aliasIds = aliases.map((alias) => alias.id);
+
+    expect(new Set(aliasIds).size).toBe(aliasIds.length);
+    expect([...KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS].toSorted()).toEqual(aliasIds.toSorted());
+    expect(REGISTRY_AGENT_FAMILY_KIND).toEqual({
+      "claude-acp": "claude",
+      "codex-acp": "codex",
+      cursor: "cursor",
+      gemini: "gemini",
+      "github-copilot": "copilot",
+      "github-copilot-cli": "copilot",
+      "grok-build": "grok",
+      opencode: "opencode",
+    });
+  });
+
+  it("derives the native-support subset from alias metadata", () => {
+    const aliasesWithNativeSupport = aliases
+      .filter((alias) => alias.nativeSupport === true)
+      .map((alias) => alias.id)
+      .toSorted();
+
+    expect([...APP_SUPPORTED_ACP_AGENT_IDS].toSorted()).toEqual(aliasesWithNativeSupport);
+    expect([...APP_SUPPORTED_ACP_AGENT_IDS].toSorted()).toEqual([
+      "cursor",
+      "gemini",
+      "github-copilot",
+      "github-copilot-cli",
+    ]);
+    expect(
+      [...APP_SUPPORTED_ACP_AGENT_IDS].every((id) => KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS.has(id)),
+    ).toBe(true);
+  });
+
+  it("keeps native agents in parity with renderer provider manifests", () => {
+    expect(NATIVE_AGENT_REGISTRY_ENTRIES.map((entry) => entry.id).toSorted()).toEqual(
+      getProviderManifests()
+        .map((manifest) => manifest.kind)
+        .toSorted(),
+    );
+  });
+});
 
 const baseCapabilities = {
   models: [],

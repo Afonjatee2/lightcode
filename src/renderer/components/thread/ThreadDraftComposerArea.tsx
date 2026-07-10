@@ -30,7 +30,6 @@ import {
   type VoiceInputHandle,
   useAttachments,
 } from "@/renderer/components/composer";
-import { getTriggerWords } from "@/renderer/components/providers";
 import { getComputerUseScope } from "@/renderer/components/composer/computerUseScope";
 import { useBrowserAttachInbox } from "@/renderer/state/browserAttachInbox";
 import { flattenSegments } from "@/renderer/components/composer/serializeMentions";
@@ -725,7 +724,6 @@ export function ThreadDraftComposerArea(props: {
             }}
             mcpMentions={mcpMentions}
             onMcpMentionSelect={onMcpMentionSelect}
-            triggerWords={getTriggerWords(props.selectedAgent.kind, props.config.model)}
             {...(!isRemote
               ? {
                   onPasteImage: (file: File) => {

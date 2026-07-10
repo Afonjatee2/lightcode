@@ -262,3 +262,4 @@ describe("handleComposerControlShortcut", () => {
     expect(event.preventDefault).not.toHaveBeenCalled();
   });
 });
+// @vitest-environment node

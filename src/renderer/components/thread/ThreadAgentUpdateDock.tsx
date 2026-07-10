@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { toast } from "@heroui/react";
 import { Download } from "lucide-react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import type { AgentStatus } from "@/shared/contracts";
+import { extractAcpGenericInstanceId, type AgentStatus } from "@/shared/contracts";
 import {
   formatUpdateCommandLine,
   isNewerVersion,
@@ -11,7 +11,6 @@ import {
 import { readBridge } from "@/renderer/bridge";
 import { Button, PixelLoader } from "@/renderer/components/common";
 import {
-  acpGenericInstanceId,
   currentWslDistros,
   envLabelForStatus,
   scopeEnvForStatus,
@@ -45,7 +44,7 @@ export function ThreadAgentUpdateDock(props: {
   >(undefined);
   const [pending, setPending] = useState(false);
 
-  const registryAgentId = acpGenericInstanceId(agentStatus.kind);
+  const registryAgentId = extractAcpGenericInstanceId(agentStatus.kind);
 
   useEffect(() => {
     if (registryAgentId) return;

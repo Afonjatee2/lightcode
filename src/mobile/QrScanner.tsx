@@ -107,7 +107,7 @@ export function QrScanner(props: {
           // Transient per-frame decode failure; keep scanning.
         }
       }
-      if (!stopped) raf = requestAnimationFrame(scanFrame);
+      if (!stopped) raf = requestAnimationFrame(() => void scanFrame());
     }
 
     async function start() {
@@ -144,7 +144,7 @@ export function QrScanner(props: {
           }
         }
         setStarting(false);
-        raf = requestAnimationFrame(scanFrame);
+        raf = requestAnimationFrame(() => void scanFrame());
       } catch (err) {
         setStarting(false);
         const name = (err as { readonly name?: string }).name;

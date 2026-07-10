@@ -72,7 +72,9 @@ export class SubagentMcpIngress {
   async start(): Promise<SubagentMcpIngressInfo> {
     if (this.info) return this.info;
     return await new Promise<SubagentMcpIngressInfo>((resolve, reject) => {
-      const server = createServer((req, res) => this.handle(req, res));
+      const server = createServer((req, res) => {
+        void this.handle(req, res);
+      });
       server.on("error", reject);
       // See the class doc comment: 0.0.0.0 on Windows for WSL reach-through,
       // loopback elsewhere. Bearer-token auth is the security boundary.

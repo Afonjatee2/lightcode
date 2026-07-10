@@ -1,0 +1,21 @@
+import type { RemoteAccessPairingInfo } from "@/shared/remote";
+import type { RemoteAccessServer } from "./RemoteAccessServer";
+
+export function getRemoteAccessPairingInfo(
+  server: RemoteAccessServer | null,
+): RemoteAccessPairingInfo {
+  if (!server) {
+    return { status: "disabled" };
+  }
+  const info = server.getInfo();
+  if (!info) {
+    return { status: "starting" };
+  }
+  return {
+    status: "ready",
+    httpBaseUrl: info.httpBaseUrl,
+    wsBaseUrl: info.wsBaseUrl,
+    pairingUrl: server.issuePairingUrl("Settings QR"),
+    sessions: server.listAccessSessions(),
+  };
+}

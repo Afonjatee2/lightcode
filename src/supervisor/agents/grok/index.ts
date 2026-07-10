@@ -42,9 +42,9 @@ export function createGrokAdapter(): AgentAdapter {
   let capabilities = grokDefaultCapabilities;
 
   return {
-    kind: "grok",
-    label: "Grok Build",
-    binary: "grok",
+    kind: grokDetectionSpec.kind,
+    label: grokDetectionSpec.label,
+    binary: grokDetectionSpec.binary,
     ...(grokDetectionSpec.update ? { update: grokDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;

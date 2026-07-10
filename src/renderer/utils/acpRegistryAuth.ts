@@ -9,17 +9,7 @@ import type {
 import { useAppStore } from "@/renderer/state/appStore";
 import { buildWslProjectDistrosKey, parseWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 
-const ACP_GENERIC_PREFIX = "acp-generic:";
-
 type StatusAuthMethod = NonNullable<AgentStatus["authMethods"]>[number];
-
-export function acpGenericInstanceId(kind: string): string | undefined {
-  return kind.startsWith(ACP_GENERIC_PREFIX) ? kind.slice(ACP_GENERIC_PREFIX.length) : undefined;
-}
-
-export function registryAdapterKind(agentId: string): string {
-  return `${ACP_GENERIC_PREFIX}${agentId}`;
-}
 
 export function shouldPreferTerminalLogin(status: AgentStatus): boolean {
   return status.preferTerminalLogin === true && Boolean(status.loginCommand);

@@ -845,7 +845,9 @@ describe("ThreadsView header-driven (floating) search", () => {
       expect(screen.getByLabelText("Search threads")).toBeInTheDocument();
 
       // …and unmounts once the exit timer fires.
-      act(() => vi.advanceTimersByTime(400));
+      act(() => {
+        vi.advanceTimersByTime(400);
+      });
       expect(screen.queryByLabelText("Search threads")).not.toBeInTheDocument();
     } finally {
       vi.useRealTimers();

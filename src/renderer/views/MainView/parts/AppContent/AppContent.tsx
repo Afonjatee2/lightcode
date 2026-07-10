@@ -343,7 +343,7 @@ export function AppContent() {
           paneAlign={paneAlign}
           headerNeedsTrafficLightPad={headerNeedsTrafficLightPad}
           onClose={() => closePane(paneId)}
-          onContinueInProvider={handleContinueInProvider}
+          onContinueInProvider={(...args) => void handleContinueInProvider(...args)}
         />
       );
       return (

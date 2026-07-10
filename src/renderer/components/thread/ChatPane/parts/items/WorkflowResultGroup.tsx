@@ -29,6 +29,9 @@ interface WorkflowResultGroupProps {
 export const WorkflowResultGroup = memo(function WorkflowResultGroup({
   resultText,
 }: WorkflowResultGroupProps) {
+  const { t } = useLingui();
+  const actions = useChatPaneActions();
+  const [isExpanded, setIsExpanded] = useState(false);
   const trimmed = resultText.trim();
   if (!trimmed) return null;
 
@@ -40,9 +43,6 @@ export const WorkflowResultGroup = memo(function WorkflowResultGroup({
 
   const parsed = tryParseJson(trimmed);
   const list = parsed !== undefined ? findResultList(parsed) : null;
-  const { t } = useLingui();
-  const actions = useChatPaneActions();
-  const [isExpanded, setIsExpanded] = useState(false);
 
   // No structured list to fan out — render the text inline. Wrapping a single
   // string in a "Workflow result" disclosure adds chrome without information.

@@ -67,11 +67,11 @@ The **Structured Session** column reflects whether the adapter implements `creat
 
 ## Adding a New Provider — Full Checklist
 
-A provider is "self-contained" in spirit, but a working provider still touches a
-fixed set of **shared registration points**. Missing one does not fail typecheck —
-it silently drops a feature (no installer, no update badge, no Login button, wrong
-menu order). Work this list top to bottom; the ⚠️ items are the ones most often
-forgotten.
+A provider is split across a supervisor adapter and a renderer plugin. Lightweight
+renderer metadata is discovered automatically; the supervisor registry remains
+explicit, with a parity test that discovers every adjacent `detection.ts` and fails
+when a factory is omitted. Work this list top to bottom; the ⚠️ items are the ones
+most often forgotten.
 
 ### 1. Supervisor adapter — `src/supervisor/agents/<kind>/`
 
@@ -115,34 +115,36 @@ forgotten.
 ### 2. Supervisor registry
 
 - [ ] `src/supervisor/agents/registry.ts` — import the factory + add it to `builtIns`.
+- [ ] `src/supervisor/agents/registry.test.ts` — keep the intentional built-in order
+      assertion current. Directory parity, unique kinds, and populated identity
+      fields are checked automatically.
 
-### 3. Shared contracts
-
-- [ ] `src/shared/contracts/agentInstance.ts` — add the kind to `KNOWN_AGENT_DRIVERS`. (Note: this map currently has **no runtime readers** — the shipped Grok provider omits its entry with no observable effect — so today this is for completeness, not feature-gating.)
-
-### 4. Renderer provider — `src/renderer/components/providers/<kind>/`
+### 3. Renderer provider — `src/renderer/components/providers/<kind>/`
 
 - [ ] `<Kind>Icon.tsx` — `createProviderIcon({ cssPrefix, path, viewBox })`.
-- [ ] `index.tsx` — `registerProviderIcon`, `registerProviderLabel`,
-      `registerComposerControls` (plan/work toggle + approval control), and
+- [ ] `manifest.ts` — export a lightweight `RendererProviderManifest` with the
+      canonical `kind`, localized `label`, discovery/model-picker `order`, and an
+      optional `utilityOrder` override. Manifests are discovered automatically;
+      do not add shared provider-order arrays.
+- [ ] `index.tsx` — import the manifest and use its `kind` for
+      `registerProviderIcon`, `registerComposerControls` (plan/work toggle +
+      approval control), and
       `registerCommitGenDefaults` / `registerTitleGenDefaults` /
       `registerConflictResolverDefaults` if the provider should appear in "auto"
-      utility-task selection.
-- [ ] `src/renderer/components/providers/index.ts` — add `export * from "./<kind>"`.
+      utility-task selection. The renderer bootstrap discovers `index.tsx`
+      automatically; no provider-barrel export is needed.
+- [ ] If `manifest.ts` adds or changes its user-facing label, run
+      `pnpm i18n:extract` and translate it in all 12 non-English catalogs.
 
-### 5. Renderer shared registration (⚠️ the easy-to-forget edits)
+### 4. Renderer native install registration
 
-- [ ] ⚠️ `…/ProviderModelMenu/parts/buildItems.ts` — add to `PROVIDER_ORDER`
-      (model-picker section order).
-- [ ] ⚠️ `src/renderer/components/providers/utilityTask.ts` — add to
-      `AUTO_PROVIDER_PREFERENCE_ORDER` (auto utility-task ranking).
-- [ ] ⚠️ `src/renderer/components/composer/browserMcpScope.ts` — map the kind to a
-      Browser-MCP scope (`"none"` for a TUI-only CLI).
 - [ ] ⚠️ `…/SettingsOverlay/parts/agentRegistryNative.ts` — add a
       `NATIVE_AGENT_REGISTRY_ENTRIES` entry (per-platform install command +
-      `docsUrl`). Without this there is **no in-app install** for the provider.
+      `docsUrl`, plus any ACP registry aliases). Without this there is **no in-app
+      install** for the provider. Browser-MCP scope belongs in the supervisor
+      `DetectionSpec` capability instead of a renderer provider map.
 
-### 6. Tests & verification
+### 5. Tests & verification
 
 - [ ] `tests/integration/providers-lifecycle.integration.test.ts` — add a
       `PREFERRED_MODEL` entry (auto-skips when the CLI is not installed).
@@ -154,7 +156,10 @@ forgotten.
 - [ ] ACP/structured GUI session → `createStructuredSession` + `buildAcpAuthCommand`/
       `buildAcpLogoutCommand` (see Grok/Copilot/Cursor).
 - [ ] L1 hook plugin → `pluginId`/`installPlugin`/`pluginLaunchExtras` + a
-      `plugin/` dir (see Grok/Claude/Codex/Gemini).
+      `plugin/` dir containing `plugin.json` and exactly one staged runtime
+      (`forward.mjs` or OpenCode's `lightcode-status.mjs`). Packaging discovers
+      these directories automatically; `prepareAgentPlugins.test.ts` pins the
+      current provider set and staged asset shape.
 - [ ] OSC status (title spinner / iTerm2 progress) → `handleOscTitle`/
       `handleOscNotification` (see Grok). Only wire when the CLI actually emits OSC.
 
@@ -167,8 +172,8 @@ forgotten.
 The codebase is provider-agnostic by design (targeting 5-10 providers). Each provider is a fully self-contained plugin:
 
 - **Supervisor side:** All provider-specific logic (heuristics, commands, detection, parsing) lives in the adapter's own file(s) under `src/supervisor/agents/`. The `SupervisorRuntime` calls adapter methods generically — no provider-specific if/else chains in runtime code.
-- **Renderer side:** Each provider has its own directory under `src/renderer/components/providers/<kind>/` containing icons, status components, and registration calls. Shared provider utilities (`statusTone.ts`, `StatusIcon.tsx`, `ProviderIcon.tsx`, `commitGen.ts`) live at the `providers/` root and are provider-agnostic.
-- **Registry pattern:** Provider behavior is fully self-contained, but registration still goes through a fixed set of shared integration points (the supervisor registry, the renderer provider registries, the model-picker/utility order arrays, the Browser-MCP scope map, and the native install registry). No provider-specific `if/else` lands in shared _logic_ — but each provider must be _listed_ in those registries. See [Adding a New Provider — Full Checklist](#adding-a-new-provider--full-checklist) for the exhaustive list; missing an entry silently drops a feature rather than failing the build.
+- **Renderer side:** Each provider has its own directory under `src/renderer/components/providers/<kind>/` containing a lightweight manifest, icons, status components, and registration calls. `providerManifest.ts` eagerly discovers metadata while `bootstrap.ts` independently loads UI registrations at the desktop/mobile entrypoints. Leaf registries (`ProviderIcon.tsx`, `providerComposer.ts`, `providerSlashCommands.ts`) and feature-owned utility modules (`commitGen.ts`, `titleGen.ts`, `conflictResolver.ts`) stay side-effect-free until a provider module registers with them; the providers barrel does not bootstrap.
+- **Registry pattern:** Provider behavior is fully self-contained. The supervisor factory list is explicit and guarded by directory-parity tests; renderer metadata and UI modules are filesystem-discovered; native install metadata remains an explicit renderer registry. No provider-specific `if/else` lands in shared runtime or layout logic. See [Adding a New Provider — Full Checklist](#adding-a-new-provider--full-checklist) for the remaining integration points.
 
 ## WSL Routing
 

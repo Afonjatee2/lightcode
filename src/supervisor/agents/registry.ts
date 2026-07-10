@@ -3,9 +3,9 @@
  * To add a built-in provider: import its factory, add to the array.
  * To remove: delete its import + array entry, then delete its folder.
  *
- * This array is ONE of several registration points. Full checklist (install,
- * update, auth, picker order, etc.): .agents/docs/agent-adapters.md
- * → "Adding a New Provider — Full Checklist".
+ * `registry.test.ts` discovers adjacent detection specs and fails if this list
+ * omits one. Renderer metadata and native install wiring remain separate; see
+ * .agents/docs/agent-adapters.md → "Adding a New Provider — Full Checklist".
  *
  * For runtime-extensible ACP-speaking agents, pass `userInstances` to
  * `buildAgentRegistry` — each `acp-generic` instance becomes a discrete

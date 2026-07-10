@@ -3,204 +3,28 @@ import { isThreadTurnActive } from "@/shared/contracts";
 import {
   bucketCount,
   bucketDurationMs,
-  sanitizeProductAnalyticsEvent,
-  type ProductAnalyticsEventName,
   type ProductAnalyticsProperties,
 } from "@/shared/analytics/posthogPrivacy";
-import { readBridge } from "@/renderer/bridge";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore } from "@/renderer/state/devTerminalStore";
 import { useFileEditorStore } from "@/renderer/state/fileEditorStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useSidebarOverlayStore } from "@/renderer/state/sidebarOverlayStore";
+import {
+  captureProductEvent,
+  configureProductAnalytics,
+  flushProductAnalytics,
+} from "./productAnalytics";
 
-const INSTALL_ID_STORAGE_KEY = "lightcode-posthog-anonymous-id";
 const FLUSH_INTERVAL_MS = 10_000;
-const FLUSH_BATCH_SIZE = 20;
-const MAX_BUFFERED_EVENTS = 1_000;
 
-interface ProductAnalyticsConfig {
-  apiKey: string;
-  host: string;
-  enabled: boolean;
-}
-
-interface BufferedProductEvent {
-  event: ProductAnalyticsEventName;
-  properties: Record<string, string | number | boolean | null>;
-  capturedAt: string;
-}
+export { captureProductEvent, flushProductAnalytics } from "./productAnalytics";
 
 type ThreadProductInput = Pick<
   Thread,
   "agentKind" | "config" | "presentationMode" | "sessionRef" | "worktreePath"
 >;
-
-let analyticsConfig: ProductAnalyticsConfig | null = null;
-let installId: string | null = null;
-const sessionId = crypto.randomUUID();
-const buffer: BufferedProductEvent[] = [];
-let flushPromise: Promise<void> | null = null;
-
-function readBuildEnv(value: unknown): string {
-  return typeof value === "string" ? value.trim() : "";
-}
-
-function readBooleanBuildEnv(value: unknown): boolean | null {
-  const text = readBuildEnv(value);
-  if (!text) return null;
-  return text !== "0" && text !== "false";
-}
-
-function readBuildPostHogKey(): string {
-  return readBuildEnv(import.meta.env.VITE_POSTHOG_KEY);
-}
-
-function readBuildPostHogHost(): string {
-  return readBuildEnv(import.meta.env.VITE_POSTHOG_HOST);
-}
-
-function readBuildPostHogEnabled(): boolean | null {
-  return readBooleanBuildEnv(import.meta.env.VITE_POSTHOG_ENABLED);
-}
-
-function readBuildPostHogEnableDev(): boolean | null {
-  return readBooleanBuildEnv(import.meta.env.VITE_POSTHOG_ENABLE_DEV);
-}
-
-function readRuntimePostHogEnabled(value: boolean | undefined): boolean {
-  return value !== false;
-}
-
-function resolvePostHogConfig(): ProductAnalyticsConfig {
-  const bridge = readBridge();
-  const runtimeKey = bridge.posthogKey?.trim() ?? "";
-  const buildKey = readBuildPostHogKey();
-  const apiKey = runtimeKey || buildKey;
-  const host = bridge.posthogHost?.trim() || readBuildPostHogHost() || "https://us.i.posthog.com";
-  const explicitEnabled = readBuildPostHogEnabled();
-  const enableDev = bridge.posthogEnableDev === true || readBuildPostHogEnableDev() === true;
-  const enabled =
-    Boolean(apiKey) &&
-    readRuntimePostHogEnabled(bridge.posthogEnabled) &&
-    explicitEnabled !== false &&
-    (!bridge.isDev || enableDev || bridge.posthogEnableDev);
-
-  return {
-    apiKey,
-    host: host.replace(/\/+$/, ""),
-    enabled,
-  };
-}
-
-function readInstallId(): string {
-  try {
-    const existing = localStorage.getItem(INSTALL_ID_STORAGE_KEY);
-    if (existing) return existing;
-    const next = crypto.randomUUID();
-    localStorage.setItem(INSTALL_ID_STORAGE_KEY, next);
-    return next;
-  } catch {
-    return crypto.randomUUID();
-  }
-}
-
-function ensureConfig(): ProductAnalyticsConfig | null {
-  if (!analyticsConfig) {
-    analyticsConfig = resolvePostHogConfig();
-  }
-  if (!analyticsConfig.enabled) return null;
-  installId ??= readInstallId();
-  return installId ? analyticsConfig : null;
-}
-
-function buildBaseProperties(): ProductAnalyticsProperties {
-  const bridge = readBridge();
-  return {
-    $process_person_profile: false,
-    app_version: bridge.appVersion,
-    arch: bridge.arch,
-    channel: bridge.channel,
-    chrome: bridge.chromeVersion,
-    electron: bridge.electronVersion,
-    is_dev: bridge.isDev,
-    node: bridge.nodeVersion,
-    platform: bridge.platform,
-    session_id: sessionId,
-  };
-}
-
-function enqueue(event: BufferedProductEvent): void {
-  buffer.push(event);
-  if (buffer.length > MAX_BUFFERED_EVENTS) {
-    buffer.splice(0, buffer.length - MAX_BUFFERED_EVENTS);
-  }
-  if (buffer.length >= FLUSH_BATCH_SIZE) {
-    void flushProductAnalytics();
-  }
-}
-
-export function captureProductEvent(
-  event: ProductAnalyticsEventName,
-  properties: ProductAnalyticsProperties = {},
-): void {
-  const activeConfig = ensureConfig();
-  if (!activeConfig || !installId) return;
-  const sanitized = sanitizeProductAnalyticsEvent(event, {
-    ...buildBaseProperties(),
-    ...properties,
-  });
-  if (!sanitized) return;
-  enqueue({
-    event: sanitized.event,
-    properties: sanitized.properties,
-    capturedAt: new Date().toISOString(),
-  });
-}
-
-async function flushProductAnalyticsBatch(): Promise<void> {
-  const activeConfig = ensureConfig();
-  if (!activeConfig || !installId || buffer.length === 0) return;
-
-  const batch = buffer.splice(0, FLUSH_BATCH_SIZE);
-  try {
-    const response = await fetch(`${activeConfig.host}/batch/`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      keepalive: true,
-      body: JSON.stringify({
-        api_key: activeConfig.apiKey,
-        batch: batch.map((item) => ({
-          event: item.event,
-          distinct_id: installId,
-          properties: item.properties,
-          timestamp: item.capturedAt,
-        })),
-      }),
-    });
-    if (!response.ok) {
-      throw new Error(`PostHog batch failed with status ${response.status}`);
-    }
-  } catch {
-    buffer.unshift(...batch);
-    if (buffer.length > MAX_BUFFERED_EVENTS) {
-      buffer.splice(MAX_BUFFERED_EVENTS);
-    }
-  }
-}
-
-export async function flushProductAnalytics(): Promise<void> {
-  if (flushPromise) {
-    await flushPromise;
-    return;
-  }
-
-  flushPromise = flushProductAnalyticsBatch().finally(() => {
-    flushPromise = null;
-  });
-  await flushPromise;
-}
 
 function viewProperties(): ProductAnalyticsProperties {
   const view = useAppStore.getState().view;
@@ -429,9 +253,7 @@ function computeRightPanelOpen(): boolean {
 }
 
 export function installProductAnalytics(): () => void {
-  analyticsConfig = resolvePostHogConfig();
-  if (!analyticsConfig.enabled) return () => {};
-  installId = readInstallId();
+  if (!configureProductAnalytics()) return () => {};
   const unsubscribe = installStoreSubscriptions();
   const intervalId = window.setInterval(() => {
     void flushProductAnalytics();

@@ -48,3 +48,4 @@ describe("shared message i18n integration", () => {
     expect(summary.length).toBeGreaterThan(0);
   });
 });
+// @vitest-environment node

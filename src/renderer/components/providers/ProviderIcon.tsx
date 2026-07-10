@@ -1,17 +1,8 @@
 import type { CSSProperties, ReactNode } from "react";
-import { baseAgentKind } from "@/shared/contracts";
+import { ACP_GENERIC_KIND_PREFIX, CLAUDE_PROFILE_KIND_PREFIX } from "@/shared/contracts";
 import type { StatusTone } from "./statusTone";
 import { syncMaskScanPhase } from "./syncMaskScanPhase";
-import {
-  getUtilityTaskCandidates,
-  getUtilityTaskDefaultsHint,
-  resolveUtilityTaskConfig,
-  type UtilityTaskCandidateAgent,
-  type UtilityTaskConfigAgent,
-  type UtilityTaskDefaults,
-} from "./utilityTask";
-
-export { AUTO_PROVIDER_PREFERENCE_ORDER, sortByAutoPreference } from "./utilityTask";
+import { lookupProviderRegistration } from "./providerRegistry";
 
 // --- Icon registry ---
 
@@ -73,25 +64,20 @@ function ExternalProviderIcon(props: { src: string; tone: StatusTone; className?
 }
 
 function fallbackInitial(label: string | undefined): string {
-  const raw = label?.replace(/^acp-generic:/, "").trim() ?? "";
+  const raw = label?.startsWith(ACP_GENERIC_KIND_PREFIX)
+    ? label.slice(ACP_GENERIC_KIND_PREFIX.length).trim()
+    : (label?.trim() ?? "");
   return (raw.match(/[A-Za-z0-9]/)?.[0] ?? "?").toUpperCase();
 }
 
 function claudeProfileBadgeLabel(kind: string, fallbackLabel: string | undefined): string {
-  const profileId = kind.slice("claude:".length);
+  const profileId = kind.slice(CLAUDE_PROFILE_KIND_PREFIX.length);
   const label = fallbackLabel?.trim();
   if (!label) return profileId;
-  if (label === kind || label.toLowerCase().startsWith("claude:")) return profileId;
+  if (label === kind || label.toLowerCase().startsWith(CLAUDE_PROFILE_KIND_PREFIX))
+    return profileId;
   const profileLabel = label.replace(/^claude\s+/i, "").trim();
   return profileLabel || profileId;
-}
-
-/** Registry lookup that falls back to the base kind for instance-scoped kinds. */
-function lookupByKind<T>(registry: Map<string, T>, kind: string): T | undefined {
-  const exact = registry.get(kind);
-  if (exact !== undefined) return exact;
-  const baseKind = baseAgentKind(kind);
-  return baseKind !== kind ? registry.get(baseKind) : undefined;
 }
 
 function GenericProviderIcon(props: { label?: string; tone: StatusTone; className?: string }) {
@@ -123,7 +109,7 @@ export function ProviderIcon(props: {
    */
   pending?: boolean | undefined;
 }) {
-  const Icon = lookupByKind(ICON_REGISTRY, props.kind);
+  const Icon = lookupProviderRegistration(ICON_REGISTRY, props.kind);
   const tone = props.tone ?? "inactive";
   if (!Icon) {
     if (props.icon) {
@@ -149,7 +135,7 @@ export function ProviderIcon(props: {
   const rendered = (
     <Icon tone={tone} {...(props.className ? { className: props.className } : {})} />
   );
-  if (props.kind.startsWith("claude:")) {
+  if (props.kind.startsWith(CLAUDE_PROFILE_KIND_PREFIX)) {
     return (
       <span className={`relative inline-flex ${props.className ?? ""}`}>
         {rendered}
@@ -160,238 +146,4 @@ export function ProviderIcon(props: {
     );
   }
   return rendered;
-}
-
-// --- Provider label registry ---
-//
-// Each provider plugin registers its long-form display label here. Consumers
-// like the first-launch discovery screen enumerate the registry to render an
-// up-to-date list of supported agents — no central hardcoded list to update
-// when a new provider is added.
-
-const LABEL_REGISTRY = new Map<string, string>();
-
-export function registerProviderLabel(kind: string, label: string) {
-  LABEL_REGISTRY.set(kind, label);
-}
-
-export function getProviderLabel(kind: string): string | undefined {
-  return LABEL_REGISTRY.get(kind);
-}
-
-export function getRegisteredProviders(): { kind: string; label: string }[] {
-  return Array.from(LABEL_REGISTRY, ([kind, label]) => ({ kind, label }));
-}
-
-// --- Composer controls registry ---
-
-import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
-import type {
-  AgentCapability,
-  AgentSlashCommand,
-  ThreadConfig,
-  ThreadPresentationMode,
-} from "@/shared/contracts";
-
-export interface ComposerControlsInput {
-  capabilities: AgentCapability;
-  config: ThreadConfig;
-  isDisabled: boolean;
-  onConfigChange: (patch: Partial<ThreadConfig>) => void;
-  /**
-   * Active presentation mode for this thread. Adapters can branch on it to
-   * surface controls only available in the structured/chat path (e.g. Codex
-   * plan toggle in `gui` mode where the ACP control channel exposes it).
-   * Optional — built-in providers that don't care can ignore it.
-   */
-  presentationMode?: ThreadPresentationMode;
-}
-
-type ComposerControlsFactory = (input: ComposerControlsInput) => ComposerControl[];
-
-/**
- * Adapters can register either a single factory (when controls don't differ
- * by surface) or a surface-keyed object that splits controls by presentation
- * mode. The dispatcher concatenates `shared` first, then the active surface's
- * factory, so a provider with both pieces gets `[...shared, ...gui]` in GUI
- * mode and `[...shared, ...terminal]` in terminal mode.
- *
- * When `presentationMode` is unknown (e.g. the "Continue in another provider"
- * dialog, which is surface-agnostic), only `shared` runs — that's the set of
- * controls a provider claims apply universally.
- */
-export type ComposerControlsRegistration =
-  | ComposerControlsFactory
-  | {
-      shared?: ComposerControlsFactory;
-      gui?: ComposerControlsFactory;
-      terminal?: ComposerControlsFactory;
-    };
-
-const COMPOSER_CONTROLS_REGISTRY = new Map<string, ComposerControlsRegistration>();
-
-export function registerComposerControls(kind: string, registration: ComposerControlsRegistration) {
-  COMPOSER_CONTROLS_REGISTRY.set(kind, registration);
-}
-
-export function getComposerControls(kind: string): ComposerControlsFactory | undefined {
-  const registration = lookupByKind(COMPOSER_CONTROLS_REGISTRY, kind);
-  if (!registration) return undefined;
-  if (typeof registration === "function") return registration;
-  return (input) => {
-    const out: ComposerControl[] = [];
-    if (registration.shared) out.push(...registration.shared(input));
-    if (input.presentationMode === "gui" && registration.gui) {
-      out.push(...registration.gui(input));
-    } else if (input.presentationMode === "terminal" && registration.terminal) {
-      out.push(...registration.terminal(input));
-    }
-    return out;
-  };
-}
-
-// --- GUI slash-command registry ---
-//
-// Some providers expose a GUI-only slash-command palette (open the model
-// picker, toggle Fast, switch plan/agent). Adapters register a builder so
-// the composer can offer these autocomplete entries and route the matching
-// `/command` typed in the input to a local action without dispatching to
-// the agent process.
-
-export interface GuiSlashCommandContext {
-  hasEffort: boolean;
-  supportsFast: boolean;
-}
-
-export type LocalSlashCommandAction =
-  | { kind: "set-mode"; mode: "agent" | "plan" }
-  | { kind: "open-control"; target: "model" | "effort" }
-  | { kind: "toggle-fast" };
-
-export interface GuiSlashCommandRegistration {
-  buildCommands: (context: GuiSlashCommandContext) => readonly AgentSlashCommand[];
-  resolveLocalAction: (typedCommand: string) => LocalSlashCommandAction | null;
-}
-
-const GUI_SLASH_COMMAND_REGISTRY = new Map<string, GuiSlashCommandRegistration>();
-
-export function registerGuiSlashCommands(kind: string, registration: GuiSlashCommandRegistration) {
-  GUI_SLASH_COMMAND_REGISTRY.set(kind, registration);
-}
-
-export function getGuiSlashCommands(kind: string): GuiSlashCommandRegistration | undefined {
-  return lookupByKind(GUI_SLASH_COMMAND_REGISTRY, kind);
-}
-
-// --- Config normalizer registry ---
-//
-// Adapters whose supported config values vary by presentation surface (e.g.
-// Codex plan mode is ACP-only) register a normalizer that returns a patch
-// dropping unsupported values when the active presentation mode changes.
-
-export interface ConfigNormalizerInput {
-  capabilities: AgentCapability;
-  config: ThreadConfig;
-  presentationMode: ThreadPresentationMode;
-}
-
-type ConfigNormalizer = (input: ConfigNormalizerInput) => Partial<ThreadConfig>;
-
-const CONFIG_NORMALIZER_REGISTRY = new Map<string, ConfigNormalizer>();
-
-export function registerConfigNormalizer(kind: string, normalizer: ConfigNormalizer) {
-  CONFIG_NORMALIZER_REGISTRY.set(kind, normalizer);
-}
-
-export function getConfigNormalizer(kind: string): ConfigNormalizer | undefined {
-  return lookupByKind(CONFIG_NORMALIZER_REGISTRY, kind);
-}
-
-// --- Trigger word registry ---
-//
-// The composer can promote certain literal words into chips to hint at a
-// special agent capability. Those affordances only make sense for
-// providers/models that actually expose the underlying feature, so each such
-// provider registers a matcher returning which trigger words apply to a given
-// model. Providers that opt into nothing leave every word as plain text.
-
-import type { TriggerWordDef } from "@/renderer/components/composer/triggerWords";
-
-type TriggerWordMatcher = (model: string | undefined) => readonly TriggerWordDef[];
-
-const TRIGGER_WORD_REGISTRY = new Map<string, TriggerWordMatcher>();
-
-export function registerTriggerWords(kind: string, resolve: TriggerWordMatcher) {
-  TRIGGER_WORD_REGISTRY.set(kind, resolve);
-}
-
-/** Trigger words the given provider+model opts into (empty when none apply). */
-export function getTriggerWords(
-  kind: string | undefined,
-  model: string | undefined,
-): readonly TriggerWordDef[] {
-  if (!kind) return [];
-  const matcher = lookupByKind(TRIGGER_WORD_REGISTRY, kind);
-  return matcher ? matcher(model) : [];
-}
-
-// --- Utility-task defaults registry factory ---
-
-function createUtilityTaskRegistry() {
-  const registry = new Map<string, UtilityTaskDefaults>();
-  return {
-    register(kind: string, defaults: UtilityTaskDefaults) {
-      registry.set(kind, defaults);
-    },
-    get(kind: string): UtilityTaskDefaults | undefined {
-      return lookupByKind(registry, kind);
-    },
-    getHint(): string | undefined {
-      return getUtilityTaskDefaultsHint(registry.values());
-    },
-  };
-}
-
-// --- Commit generation defaults registry ---
-
-export interface CommitGenDefaults extends UtilityTaskDefaults {}
-
-const commitGenRegistry = createUtilityTaskRegistry();
-export const registerCommitGenDefaults = commitGenRegistry.register;
-export const getCommitGenDefaults = commitGenRegistry.get;
-export const getCommitGenDefaultsHint = commitGenRegistry.getHint;
-
-// --- Title generation defaults registry ---
-
-export interface TitleGenDefaults extends UtilityTaskDefaults {}
-
-const titleGenRegistry = createUtilityTaskRegistry();
-export const registerTitleGenDefaults = titleGenRegistry.register;
-export const getTitleGenDefaults = titleGenRegistry.get;
-export const getTitleGenDefaultsHint = titleGenRegistry.getHint;
-
-// --- Conflict resolver defaults registry ---
-
-export interface ConflictResolverDefaults extends UtilityTaskDefaults {}
-
-const conflictResolverRegistry = createUtilityTaskRegistry();
-export const registerConflictResolverDefaults = conflictResolverRegistry.register;
-export const getConflictResolverDefaults = conflictResolverRegistry.get;
-export const getConflictResolverDefaultsHint = conflictResolverRegistry.getHint;
-
-type ConflictResolverAgentLike = UtilityTaskCandidateAgent;
-
-export function getConflictResolverCandidates<T extends ConflictResolverAgentLike>(
-  agentStatuses: readonly T[],
-  provider: string,
-): T[] {
-  return getUtilityTaskCandidates(agentStatuses, provider, getConflictResolverDefaults);
-}
-
-export function resolveConflictResolverConfig(
-  agent: UtilityTaskConfigAgent | undefined,
-  model: string,
-  effort: string,
-): { model: string; effort: string; availableEfforts: string[] } {
-  return resolveUtilityTaskConfig(agent, model, effort, getConflictResolverDefaults);
 }

@@ -23,3 +23,4 @@ describe("isMicrophoneAccessDeniedError", () => {
     expect(isMicrophoneAccessDeniedError(null)).toBe(false);
   });
 });
+// @vitest-environment node

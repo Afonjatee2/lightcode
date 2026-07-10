@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
 import type { Project } from "@/shared/contracts";
 import { buildActiveProjectsKey, buildWslProjectDistrosKey } from "./projectKeys";

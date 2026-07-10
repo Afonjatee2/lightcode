@@ -16,6 +16,16 @@ vi.mock("../agents/base", async (importActual) => {
   };
 });
 
+// These tests synchronize lifecycle races with explicit deferred promises;
+// the production-only 150ms process-settle pause adds no behavioral coverage.
+vi.mock("node:timers/promises", async (importActual) => {
+  const actual = await importActual<typeof import("node:timers/promises")>();
+  return {
+    ...actual,
+    setTimeout: vi.fn<(delay?: number) => Promise<void>>(async () => undefined),
+  };
+});
+
 import { ThreadSessionManager } from "./threadSessionManager";
 
 vi.mock("node-pty", () => ({
@@ -66,10 +76,16 @@ function createManager(agentKind: AgentKind, adapter: AgentAdapter): ThreadSessi
   return manager;
 }
 
-function createStructuredSession(activation: Promise<void>): StructuredSessionHandle {
+function createStructuredSession(
+  activation: Promise<void>,
+  onActivate?: () => void,
+): StructuredSessionHandle {
   return {
     launchOptions: {},
-    activate: vi.fn<NonNullable<StructuredSessionHandle["activate"]>>(() => activation),
+    activate: vi.fn<NonNullable<StructuredSessionHandle["activate"]>>(() => {
+      onActivate?.();
+      return activation;
+    }),
     openThread: vi.fn<NonNullable<StructuredSessionHandle["openThread"]>>(async () => "ses_test"),
     setListener: vi.fn<StructuredSessionHandle["setListener"]>(),
     dispose: vi.fn<StructuredSessionHandle["dispose"]>(async () => undefined),
@@ -159,7 +175,10 @@ describe("ThreadSessionManager start guards", () => {
     "disposes a %s structured GUI session that is closed before activation completes",
     async (agentKind) => {
       const activation = deferred<void>();
-      const structuredSession = createStructuredSession(activation.promise);
+      const activationStarted = deferred<void>();
+      const structuredSession = createStructuredSession(activation.promise, () =>
+        activationStarted.resolve(),
+      );
       const adapter = createAdapter(agentKind, structuredSession);
       const manager = createManager(agentKind, adapter);
 
@@ -172,9 +191,8 @@ describe("ThreadSessionManager start guards", () => {
         initialSize: { cols: 80, rows: 24 },
         presentationMode: "gui",
       });
-      await vi.waitFor(() => {
-        expect(structuredSession.activate).toHaveBeenCalledTimes(1);
-      });
+      await activationStarted.promise;
+      expect(structuredSession.activate).toHaveBeenCalledTimes(1);
 
       await manager.closeThread({ threadId: `thread-${agentKind}` });
       activation.resolve();
@@ -190,7 +208,10 @@ describe("ThreadSessionManager start guards", () => {
     "disposes a %s structured GUI session that is interrupted before activation completes",
     async (agentKind) => {
       const activation = deferred<void>();
-      const structuredSession = createStructuredSession(activation.promise);
+      const activationStarted = deferred<void>();
+      const structuredSession = createStructuredSession(activation.promise, () =>
+        activationStarted.resolve(),
+      );
       const adapter = createAdapter(agentKind, structuredSession);
       const manager = createManager(agentKind, adapter);
 
@@ -203,9 +224,8 @@ describe("ThreadSessionManager start guards", () => {
         initialSize: { cols: 80, rows: 24 },
         presentationMode: "gui",
       });
-      await vi.waitFor(() => {
-        expect(structuredSession.activate).toHaveBeenCalledTimes(1);
-      });
+      await activationStarted.promise;
+      expect(structuredSession.activate).toHaveBeenCalledTimes(1);
 
       await manager.interruptThread({ threadId: `thread-${agentKind}` });
       activation.resolve();
@@ -221,7 +241,10 @@ describe("ThreadSessionManager start guards", () => {
     "disposes a %s structured GUI session when the manager is disposed during activation",
     async (agentKind) => {
       const activation = deferred<void>();
-      const structuredSession = createStructuredSession(activation.promise);
+      const activationStarted = deferred<void>();
+      const structuredSession = createStructuredSession(activation.promise, () =>
+        activationStarted.resolve(),
+      );
       const adapter = createAdapter(agentKind, structuredSession);
       const manager = createManager(agentKind, adapter);
 
@@ -234,11 +257,10 @@ describe("ThreadSessionManager start guards", () => {
         initialSize: { cols: 80, rows: 24 },
         presentationMode: "gui",
       });
-      await vi.waitFor(() => {
-        expect(structuredSession.activate).toHaveBeenCalledTimes(1);
-      });
+      await activationStarted.promise;
+      expect(structuredSession.activate).toHaveBeenCalledTimes(1);
 
-      manager.dispose();
+      await manager.dispose();
       activation.resolve();
       await start;
 
@@ -252,7 +274,10 @@ describe("ThreadSessionManager start guards", () => {
     "disposes a replacement %s structured GUI session when the thread is closed during restart",
     async (agentKind) => {
       const activation = deferred<void>();
-      const replacementSession = createStructuredSession(activation.promise);
+      const activationStarted = deferred<void>();
+      const replacementSession = createStructuredSession(activation.promise, () =>
+        activationStarted.resolve(),
+      );
       const adapter = createAdapter(agentKind, replacementSession);
       const existingSession = createInactiveRuntime(
         agentKind,
@@ -267,9 +292,8 @@ describe("ThreadSessionManager start guards", () => {
         prompt: "resume work",
         config: { model: `${agentKind}/model` },
       });
-      await vi.waitFor(() => {
-        expect(replacementSession.activate).toHaveBeenCalledTimes(1);
-      });
+      await activationStarted.promise;
+      expect(replacementSession.activate).toHaveBeenCalledTimes(1);
 
       await manager.closeThread({ threadId: existingSession.threadId });
       activation.resolve();

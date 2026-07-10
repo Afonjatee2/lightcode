@@ -1,10 +1,12 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
 import type { AgentStatus } from "@/shared/contracts";
 import {
   readConflictResolverSettingsForProject,
+  resolveConflictResolverConfig,
   resolveConflictResolverLaunchConfig,
 } from "./conflictResolver";
-import { resolveConflictResolverConfig } from "./ProviderIcon";
 import "./claude";
 import "./codex";
 import "./cursor";

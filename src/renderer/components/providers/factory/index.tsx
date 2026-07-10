@@ -1,7 +1,7 @@
 export * from "./FactoryIcon";
 
 import { FactoryIcon } from "./FactoryIcon";
-import { registerProviderIcon, registerProviderLabel } from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
 
 // Factory's "Droid" is a runtime-registered ACP agent (`acp-generic`), so this
 // module only supplies the renderer presentation for its usage tile — the icon
@@ -9,4 +9,3 @@ import { registerProviderIcon, registerProviderLabel } from "../ProviderIcon";
 // registrations (composer controls, utility defaults) belong to the agent
 // adapter, not here.
 registerProviderIcon("factory", FactoryIcon);
-registerProviderLabel("factory", "Droid");

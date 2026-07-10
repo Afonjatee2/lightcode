@@ -1,10 +1,12 @@
+// @vitest-environment node
+
 import { describe, expect, it, vi } from "vitest";
 import type { AgentStatus, GenerateCommitMessagePayload } from "@/shared/contracts";
-import { getCommitGenDefaultsHint } from "./ProviderIcon";
 import {
   generateCommitMessageWithFallback,
   generateCommitMessageWithFallbackDetails,
   getCommitGenCandidates,
+  getCommitGenDefaultsHint,
   resolveCommitGenConfig,
 } from "./commitGen";
 import "./claude";

@@ -99,7 +99,7 @@ function CopyImageButton({ source }: { source: ImageViewSource }) {
   }
 
   return (
-    <IconButton label={copied ? t`Copied` : t`Copy image`} onClick={onCopy}>
+    <IconButton label={copied ? t`Copied` : t`Copy image`} onClick={() => void onCopy()}>
       {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
     </IconButton>
   );
@@ -118,7 +118,7 @@ function DownloadImageButton({ src, fileName }: { src: string; fileName: string 
   }
 
   return (
-    <IconButton label={t`Download image`} onClick={onDownload}>
+    <IconButton label={t`Download image`} onClick={() => void onDownload()}>
       <Download className="size-3.5" />
     </IconButton>
   );

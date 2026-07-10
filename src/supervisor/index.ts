@@ -44,8 +44,8 @@ async function handleRequest(request: SupervisorRequest): Promise<unknown> {
   return handler(request.payload as never);
 }
 
-process.on("message", async (message: SupervisorRequest) => {
-  const reply = await handleRequest(message)
+process.on("message", (message: SupervisorRequest) => {
+  void handleRequest(message)
     .then(
       (data): SupervisorReply => ({
         replyTo: message.id,
@@ -60,9 +60,8 @@ process.on("message", async (message: SupervisorRequest) => {
         ok: false,
         error: error instanceof Error ? error.message : String(error),
       };
-    });
-
-  process.send?.(reply);
+    })
+    .then((reply) => process.send?.(reply));
 });
 
 process.on("disconnect", () => {

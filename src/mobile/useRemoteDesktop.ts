@@ -19,35 +19,28 @@ import {
   type RemoteShellSnapshot,
   type RemoteThreadSnapshot,
 } from "@/shared/remote";
-import { reconnectBackoffDelay } from "@/shared/remote/backoff";
 import { performThreadInputSubmit } from "@/renderer/actions/threadRuntimeActions";
 import { useAppStore } from "@/renderer/state/appStore";
 import { readBridge } from "@/renderer/bridge";
 import type { DraftStartInput } from "@/renderer/components/thread/ThreadDraftComposerArea";
 import { i18n } from "@/renderer/i18n/i18n";
 import { setRemoteBridgeClient } from "./bridge";
-import {
-  handleBrowserServerMessage,
-  resetBrowserMirror,
-  setBrowserSocketSender,
-} from "./browserMirror";
+import { resetBrowserMirror } from "./browserMirror";
 import { buildGitAddWorktreePayload } from "./navHelpers";
 import { isNativeApp } from "./pwaInstall";
 import { unregisterPush } from "./push/pushRegistration";
+import { resetTerminalFeed } from "./terminalFeed";
+import { RemoteDesktopClient } from "./remoteClient";
 import {
-  handleTerminalServerMessage,
-  resetTerminalFeed,
-  setTerminalSocketSender,
-} from "./terminalFeed";
-import { RemoteClientError, RemoteDesktopClient } from "./remoteClient";
-import { createRemoteSocketSender } from "./remoteSocketSender";
+  createRemoteSocketCoordinator,
+  isUnauthorizedRemoteError,
+} from "./remoteSocketCoordinator";
 import { applyDesktopSettings, resetDesktopSettings } from "./settingsSync";
 import { sortThreadsByRecency } from "./presentation";
 import {
   applyAgentStatuses,
   applyShellSnapshot,
   applyThreadSnapshot,
-  dispatchRemoteSupervisorEvent,
   resetRemoteStores,
 } from "./storeSync";
 import {
@@ -103,20 +96,8 @@ export const CONNECTION_LABELS: Record<ConnectionState, MessageDescriptor> = {
   error: msg`Error`,
 };
 
-/** WebSocket reconnect backoff: full-jitter exponential, capped. */
-const RECONNECT_BASE_MS = 1000;
-const RECONNECT_MAX_MS = 20000;
 const REMOTE_THREAD_APPEAR_ATTEMPTS = 10;
 const REMOTE_THREAD_APPEAR_DELAY_MS = 250;
-/** How long to wait for a health-check pong before treating the socket as dead. */
-const HEALTH_PING_TIMEOUT_MS = 5000;
-// Foreground keepalive: periodically probe a seemingly-open socket so a
-// half-open stream (e.g. a Wi-Fi→cellular handoff that fires no offline/close
-// event) is detected while the app stays visible, not only on resume.
-const HEALTH_PING_INTERVAL_MS = 25000;
-// Force-close a WebSocket handshake that never completes (routable-but-dead
-// host / captive portal) so a stuck `connecting` flag can't wedge reconnects.
-const CONNECT_TIMEOUT_MS = 15000;
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -128,33 +109,6 @@ function describeError(error: unknown, fallback: string): string {
 
 function firstThreadIdByRecency(threads: readonly Thread[]): string | undefined {
   return sortThreadsByRecency(threads)[0]?.id;
-}
-
-function isUnauthorizedRemoteError(error: unknown): error is RemoteClientError {
-  return error instanceof RemoteClientError && (error.status === 401 || error.status === 403);
-}
-
-function isUnauthorizedClose(code: number, reason: string): boolean {
-  return code === 1008 || reason === "Remote access session expired";
-}
-
-/** Status-affecting events warrant a snapshot refresh; streaming deltas don't. */
-function shouldRefreshAfterSupervisorEvent(value: unknown): boolean {
-  if (!value || typeof value !== "object") return false;
-  const type = (value as { type?: unknown }).type;
-  return (
-    type === "thread-state" ||
-    type === "thread-exited" ||
-    type === "thread-reset" ||
-    type === "windows-agent-statuses" ||
-    type === "wsl-agent-statuses" ||
-    // A project was added/cloned/removed remotely (by this or another client);
-    // re-pull the shell snapshot so the project list reflects it.
-    type === "remote-projects-changed" ||
-    // Thread metadata was changed by another client/desktop; refresh the
-    // sidebar snapshot while streaming chat deltas keep the open thread live.
-    type === "remote-threads-changed"
-  );
 }
 
 const MOBILE_TERMINAL_START_STATUSES = new Set<ThreadStatus>([
@@ -306,279 +260,22 @@ export function useRemoteDesktop() {
     const desktopCandidate = activeDesktop;
     if (!desktopCandidate) return;
     const desktop: StoredDesktop = desktopCandidate;
-    let closed = false;
-    let ws: WebSocket | null = null;
-    // Guards against the online/visibility listeners spawning a second socket
-    // while one is already opening.
-    let connecting = false;
-    let timer = 0;
-    let refreshTimer = 0;
-    // Debounced refreshes coalesce; keep the STRONGEST flags requested since the
-    // last flush so an event-driven refresh can't downgrade a pending recovery
-    // one (which would drop the auxiliary re-poll + selected-thread re-fetch that
-    // heal the gaps left by a disconnect/resync).
-    let pendingRecovery = false;
-    let pendingRefreshSelected = false;
-    // Consecutive failed connect attempts since the last successful open;
-    // drives the exponential backoff and resets to 0 on every open().
-    let attempt = 0;
-    // Tracked locally so reconnects resume from the latest event; the seq is
-    // persisted via markDesktopConnected on the debounced refresh below.
-    let lastSeenSeq = desktop.lastSeenSeq;
-    // Half-open detection: while backgrounded the OS can silently kill the TCP
-    // path without a close event, leaving readyState OPEN over a dead stream.
-    // We ping the server on resume; if no matching pong lands in time, we force
-    // a close to fall into the reconnect path.
-    let pingTimer = 0;
-    let pendingPingId: string | null = null;
-    // Watchdog for a handshake stuck in CONNECTING (see CONNECT_TIMEOUT_MS).
-    let connectWatchdog = 0;
-
-    /**
-     * Debounced snapshot refresh.
-     * - `recovery` (reconnect / resync / visibility / online): full refresh incl.
-     *   auxiliary data and the selected thread's history.
-     * - event-driven (default): skip auxiliary polls (they stream as events) and
-     *   only re-fetch the selected thread when the triggering event was about it.
-     */
-    function scheduleRefresh(
-      options: { readonly triggerThreadId?: string; readonly recovery?: boolean } = {},
-    ) {
-      const recovery = options.recovery ?? false;
-      const refreshSelectedThread =
-        recovery ||
-        (options.triggerThreadId !== undefined &&
-          options.triggerThreadId === selectedThreadIdRef.current);
-      pendingRecovery ||= recovery;
-      pendingRefreshSelected ||= refreshSelectedThread;
-      window.clearTimeout(refreshTimer);
-      refreshTimer = window.setTimeout(() => {
-        const runRecovery = pendingRecovery;
-        const runRefreshSelected = pendingRefreshSelected;
-        pendingRecovery = false;
-        pendingRefreshSelected = false;
-        void refresh(desktop, {
-          refreshSelectedThread: runRefreshSelected,
-          includeAuxiliary: runRecovery,
-        });
-      }, 600);
-    }
-
-    /** Schedule the next reconnect with capped, jittered backoff. */
-    function scheduleReconnect() {
-      if (closed) return;
-      // A device with no network connection won't recover until it comes
-      // back; surface that distinctly and let the "online" listener wake us.
-      setConnection(navigator.onLine === false ? "offline" : "reconnecting");
-      window.clearTimeout(timer);
-      timer = window.setTimeout(
-        connect,
-        reconnectBackoffDelay(attempt, { baseMs: RECONNECT_BASE_MS, maxMs: RECONNECT_MAX_MS }),
-      );
-      attempt += 1;
-    }
-
-    function connect() {
-      // The browser may queue this from a backoff timer that fired after the
-      // device went offline; defer until the "online" event wakes us.
-      if (closed || navigator.onLine === false) return;
-      // Already open, or an attempt is in flight — don't stack sockets.
-      if (connecting || ws?.readyState === WebSocket.OPEN) return;
-      connecting = true;
-      void (async () => {
-        try {
-          const client = clientFor(desktop);
-          const ticket = await client.websocketTicket();
-          if (closed) {
-            connecting = false;
-            return;
-          }
-          const socket = new WebSocket(client.websocketUrl(ticket, lastSeenSeq));
-          ws = socket;
-          // A handshake that never resolves would otherwise keep `connecting`
-          // true forever, no-oping every reconnect path; force-close it so the
-          // close handler can reset state and schedule a retry.
-          window.clearTimeout(connectWatchdog);
-          connectWatchdog = window.setTimeout(() => {
-            if (socket.readyState === WebSocket.CONNECTING) socket.close();
-          }, CONNECT_TIMEOUT_MS);
-          socket.addEventListener("open", () => {
-            connecting = false;
-            window.clearTimeout(connectWatchdog);
-            attempt = 0;
-            socketOpenRef.current = true;
-            setConnection("online");
-            setMessage("");
-            // Browser mirroring (watch/input) rides this socket; registering the
-            // sender re-subscribes a watching BrowserView after reconnects.
-            const socketSender = createRemoteSocketSender(socket);
-            setBrowserSocketSender(socketSender);
-            // Live terminal streaming (CLI threads + dev shells) rides this
-            // socket too; registering re-subscribes on-screen terminals.
-            setTerminalSocketSender(socketSender);
-            // A refresh that failed while the socket was down would otherwise
-            // be masked by this handler — re-fetch so the failure either heals
-            // or resurfaces its error message. This is a recovery refresh.
-            scheduleRefresh({ recovery: true });
-          });
-          socket.addEventListener("message", (event) => {
-            try {
-              const parsed = client.parseSocketMessage(String(event.data));
-              // Correlated health-check pong: clear the pending timer so the
-              // socket isn't force-closed as half-open.
-              if (parsed.type === "pong") {
-                if (pendingPingId !== null && parsed.id === pendingPingId) {
-                  pendingPingId = null;
-                  window.clearTimeout(pingTimer);
-                }
-                return;
-              }
-              if (handleBrowserServerMessage(parsed)) return;
-              if (handleTerminalServerMessage(parsed)) return;
-              if (parsed.type === "event") {
-                lastSeenSeq = Math.max(lastSeenSeq, parsed.seq);
-                // Live path: stream events straight into the shared stores so
-                // open transcripts update without a fetch round-trip.
-                dispatchRemoteSupervisorEvent(parsed.event);
-                if (shouldRefreshAfterSupervisorEvent(parsed.event)) {
-                  // Pass the triggering thread so an unrelated thread's status
-                  // event doesn't re-download the OPEN thread's whole history.
-                  const triggerThreadId =
-                    parsed.event &&
-                    typeof parsed.event === "object" &&
-                    typeof (parsed.event as { threadId?: unknown }).threadId === "string"
-                      ? (parsed.event as { threadId: string }).threadId
-                      : undefined;
-                  scheduleRefresh(triggerThreadId !== undefined ? { triggerThreadId } : {});
-                }
-              }
-              if (parsed.type === "resync-required") {
-                // Replay window expired — a full recovery refresh.
-                scheduleRefresh({ recovery: true });
-              }
-            } catch {
-              // Bad frames are ignored; HTTP refresh remains authoritative.
-            }
-          });
-          socket.addEventListener("close", (event) => {
-            connecting = false;
-            window.clearTimeout(connectWatchdog);
-            socketOpenRef.current = false;
-            pendingPingId = null;
-            window.clearTimeout(pingTimer);
-            if (ws === socket) ws = null;
-            setBrowserSocketSender(null);
-            setTerminalSocketSender(null);
-            if (isUnauthorizedClose(event.code, event.reason)) {
-              setConnection("unauthorized");
-              setMessage(
-                event.reason
-                  ? event.reason
-                  : i18n._(msg`Pairing expired — pair again to reconnect.`),
-              );
-              return;
-            }
-            scheduleReconnect();
-          });
-        } catch (error) {
-          connecting = false;
-          if (isUnauthorizedRemoteError(error)) {
-            window.clearTimeout(timer);
-            setConnection("unauthorized");
-            setMessage(error.message);
-            return;
-          }
-          scheduleReconnect();
-        }
-      })();
-    }
-
-    /**
-     * Verify a seemingly-open socket is actually alive. The OS can silently
-     * kill the TCP path while backgrounded, leaving readyState OPEN over a dead
-     * stream — the server prunes it via ping/pong but the client never notices,
-     * so the pill shows "Live" forever. Send a correlated protocol ping; if no
-     * matching pong arrives within the timeout, force-close to reconnect.
-     */
-    function sendHealthPing() {
-      const socket = ws;
-      if (socket?.readyState !== WebSocket.OPEN) return;
-      // A ping is already outstanding; let its timer resolve.
-      if (pendingPingId !== null) return;
-      const id = crypto.randomUUID();
-      pendingPingId = id;
-      try {
-        socket.send(JSON.stringify({ type: "ping", id, sentAt: Date.now() }));
-      } catch {
-        // Send failed on an ostensibly-open socket → it's dead; close now.
-        // Clear the outstanding-ping marker synchronously so a resume that lands
-        // before the async close event isn't blocked from probing/reconnecting.
-        pendingPingId = null;
-        window.clearTimeout(pingTimer);
-        socket.close();
-        return;
-      }
-      window.clearTimeout(pingTimer);
-      pingTimer = window.setTimeout(() => {
-        // No pong for our id in time — the stream is half-open. Closing fires
-        // the close handler, which schedules the reconnect.
-        if (pendingPingId === id) socket.close();
-      }, HEALTH_PING_TIMEOUT_MS);
-    }
-
-    // The OS network transitions let us react instantly instead of waiting
-    // out a backoff timer: drop to "offline" the moment the radio dies, and
-    // retry immediately (reset backoff) the moment it returns.
-    function handleOnline() {
-      if (closed) return;
-      attempt = 0;
-      window.clearTimeout(timer);
-      connect();
-      // If the socket survived (stale-open), connect() is a no-op; re-pull a
-      // snapshot so state is correct after the network gap either way.
-      scheduleRefresh({ recovery: true });
-    }
-    function handleOffline() {
-      if (closed) return;
-      setConnection("offline");
-    }
-    // Re-establishing on tab focus catches sockets the OS quietly killed while
-    // the PWA was backgrounded (common on mobile) without firing a close event.
-    function handleVisibility() {
-      if (closed || document.visibilityState !== "visible") return;
-      if (ws?.readyState === WebSocket.OPEN) {
-        // Looks open, but it may be half-open after backgrounding — probe it.
-        sendHealthPing();
-        scheduleRefresh({ recovery: true });
-        return;
-      }
-      handleOnline();
-    }
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-    document.addEventListener("visibilitychange", handleVisibility);
-    // Foreground keepalive so a half-open socket is caught even without a
-    // visibility/online transition (e.g. a network handoff on a visible tab).
-    const heartbeat = window.setInterval(() => {
-      if (document.visibilityState === "visible") sendHealthPing();
-    }, HEALTH_PING_INTERVAL_MS);
-
-    connect();
-    return () => {
-      closed = true;
-      socketOpenRef.current = false;
-      window.clearTimeout(timer);
-      window.clearTimeout(refreshTimer);
-      window.clearTimeout(pingTimer);
-      window.clearTimeout(connectWatchdog);
-      window.clearInterval(heartbeat);
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-      document.removeEventListener("visibilitychange", handleVisibility);
-      setBrowserSocketSender(null);
-      setTerminalSocketSender(null);
-      ws?.close();
-    };
+    const coordinator = createRemoteSocketCoordinator({
+      createClient: () => clientFor(desktop),
+      initialLastSeenSeq: desktop.lastSeenSeq,
+      getSelectedThreadId: () => selectedThreadIdRef.current,
+      requestRefresh: (options) => {
+        void refresh(desktop, options);
+      },
+      onConnectionChange: setConnection,
+      onMessageChange: setMessage,
+      onOpenChange: (open) => {
+        socketOpenRef.current = open;
+      },
+      getPairingExpiredMessage: () => i18n._(msg`Pairing expired — pair again to reconnect.`),
+    });
+    coordinator.start();
+    return () => coordinator.dispose();
     // The socket is keyed on the connection identity (not the desktop object,
     // which is replaced after every refresh) so refreshes don't tear it down.
     // reconnectNonce forces a fresh connect when the user taps Reconnect.

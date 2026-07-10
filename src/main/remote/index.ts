@@ -1,3 +1,4 @@
+export * from "./DesktopRemoteAccessController";
 export * from "./RemoteAccessServer";
 export * from "./RemoteBrowserGateway";
 export * from "./RemotePortForwardGateway";
@@ -6,4 +7,5 @@ export * from "./identity";
 export * from "./portForward/portForwarding";
 export * from "./portForward/portProxy";
 export * from "./push";
+export * from "./pairingInfo";
 export * from "./staticMobileApp";

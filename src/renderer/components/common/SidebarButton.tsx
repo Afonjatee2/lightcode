@@ -76,6 +76,7 @@ export function SidebarButton(props: {
         <Tooltip.Trigger className="flex min-h-0 flex-col">
           <button
             ref={ref as React.Ref<HTMLButtonElement>}
+            aria-label={typeof label === "string" ? label : undefined}
             className={`flex h-8 w-8 shrink-0 cursor-default items-center justify-center rounded-3xl outline-none transition-colors focus-visible:focus-ring ${stateClass} ${className ?? ""}`}
             disabled={isDisabled}
             onClick={onPress}

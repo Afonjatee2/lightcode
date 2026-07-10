@@ -4,6 +4,12 @@ import { ProviderIcon } from "./ProviderIcon";
 import "./claude";
 
 describe("ProviderIcon", () => {
+  it("uses the ACP instance id for generic fallback initials", () => {
+    render(<ProviderIcon kind="acp-generic:example-agent" />);
+
+    expect(screen.getByText("E")).toBeInTheDocument();
+  });
+
   it("uses the Claude profile label for the profile badge initial", () => {
     render(<ProviderIcon kind="claude:home" fallbackLabel="Claude Home" />);
 

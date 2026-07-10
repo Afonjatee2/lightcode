@@ -29,7 +29,7 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { PixelLoader, SidebarButton } from "@/renderer/components/common";
 import { useScrollFade } from "@/renderer/hooks/useScrollFade";
 import { useSidebar } from "@/renderer/views/MainView/parts/AppShell/AppShell";
-import { getCommitGenCandidates } from "@/renderer/components/providers";
+import { getCommitGenCandidates } from "@/renderer/components/providers/commitGen";
 import {
   gitReviewColumnClass,
   gitReviewSidebarListScrollClass,

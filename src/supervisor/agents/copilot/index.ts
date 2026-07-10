@@ -50,9 +50,9 @@ export function createCopilotAdapter(): AgentAdapter {
   let capabilities = copilotDefaultCapabilities;
 
   return {
-    kind: "copilot",
-    label: "GitHub Copilot",
-    binary: "copilot",
+    kind: copilotDetectionSpec.kind,
+    label: copilotDetectionSpec.label,
+    binary: copilotDetectionSpec.binary,
     ...(copilotDetectionSpec.update ? { update: copilotDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;

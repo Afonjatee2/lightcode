@@ -1,4 +1,5 @@
 import { toast } from "@heroui/react";
+import "@/renderer/components/providers/bootstrap";
 import { msg as linguiMsg } from "@lingui/core/macro";
 import { Trans } from "@lingui/react/macro";
 import { useEffect } from "react";

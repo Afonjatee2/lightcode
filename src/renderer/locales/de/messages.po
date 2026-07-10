@@ -125,8 +125,8 @@ msgstr "{0}-Hooks für {envName} entfernt."
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-msgid "{0} install targets"
-msgstr "{0} Installationsziele"
+#~ msgid "{0} install targets"
+#~ msgstr "{0} Installationsziele"
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
@@ -234,6 +234,10 @@ msgstr "{0}% voll"
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0}mo ago"
 msgstr "vor {0} Mon."
+
+#: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
+msgid "{agentLabel} install targets"
+msgstr "{agentLabel} Installationsziele"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "{agentLabel}: {statusLabel}. Hover for status details."
@@ -804,6 +808,10 @@ msgstr "Immer ausgeschlossen"
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
 msgid "Another chat uses this same tree. File restore could overwrite that chat's changes."
 msgstr "Ein anderer Chat verwendet denselben Baum. Die Dateiwiederherstellung könnte die Änderungen dieses Chats überschreiben."
+
+#: src/renderer/components/providers/antigravity/manifest.ts
+msgid "Antigravity"
+msgstr "Antigravity"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "App Browser"
@@ -1457,6 +1465,10 @@ msgstr "Claude-{0}-Profil gespeichert."
 msgid "Claude {displayName} profile added."
 msgstr "Claude-{displayName}-Profil hinzugefügt."
 
+#: src/renderer/components/providers/claude/manifest.ts
+msgid "Claude Code"
+msgstr "Claude Code"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Claude profile config directory"
 msgstr "Claude-Profilkonfigurationsverzeichnis"
@@ -1717,6 +1729,10 @@ msgstr "Geschlossen"
 msgid "Code copied. "
 msgstr "Code kopiert."
 
+#: src/renderer/components/providers/codex/manifest.ts
+msgid "Codex"
+msgstr "Codex"
+
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Collapse"
@@ -1768,6 +1784,10 @@ msgstr "Befehl"
 #: src/renderer/views/ProjectSettingsOverlay/parts/ActionsSection.tsx
 msgid "Command (e.g., npm run dev)"
 msgstr "Befehl (z. B. npm run dev)"
+
+#: src/renderer/components/providers/commandcode/manifest.ts
+msgid "Command Code"
+msgstr "Command Code"
 
 #: src/renderer/commands/CommandPalette.tsx
 #: src/renderer/components/thread/ThreadCommandPanel.tsx
@@ -2271,6 +2291,10 @@ msgstr "aktuelle Serie"
 #: src/renderer/views/ProfileOverlay/parts/StatStrip.tsx
 msgid "Current streak"
 msgstr "Aktuelle Serie"
+
+#: src/renderer/components/providers/cursor/manifest.ts
+msgid "Cursor"
+msgstr "Cursor"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -3183,6 +3207,10 @@ msgstr "Voller Zugriff"
 msgid "Fullscreen overlay"
 msgstr "Vollbild-Overlay"
 
+#: src/renderer/components/providers/gemini/manifest.ts
+msgid "Gemini"
+msgstr "Gemini"
+
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -3261,6 +3289,10 @@ msgstr "Git-Status für {0}"
 msgid "Git status for {0}: not a Git repository"
 msgstr "Git-Status für {0}: kein Git-Repository"
 
+#: src/renderer/components/providers/copilot/manifest.ts
+msgid "GitHub Copilot"
+msgstr "GitHub Copilot"
+
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "GitHub Repository"
 msgstr "GitHub-Repository"
@@ -3300,6 +3332,10 @@ msgstr "Gesetzte Ziele"
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "Got it"
 msgstr "Verstanden"
+
+#: src/renderer/components/providers/grok/manifest.ts
+msgid "Grok Build"
+msgstr "Grok Build"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Group"
@@ -4943,6 +4979,10 @@ msgstr "Aufwandsauswahl öffnen"
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Open the model picker"
 msgstr "Modellauswahl öffnen"
+
+#: src/renderer/components/providers/opencode/manifest.ts
+msgid "OpenCode"
+msgstr "OpenCode"
 
 #. placeholder {0}: request.receivedAt
 #. placeholder {1}: index + 1
@@ -8072,8 +8112,8 @@ msgid "Windows"
 msgstr "Windows"
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-msgid "Windows is not supported yet. Install inside WSL or on macOS/Linux."
-msgstr "Windows wird noch nicht unterstützt. Installieren Sie innerhalb der WSL oder unter macOS/Linux."
+#~ msgid "Windows is not supported yet. Install inside WSL or on macOS/Linux."
+#~ msgstr "Windows wird noch nicht unterstützt. Installieren Sie innerhalb der WSL oder unter macOS/Linux."
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Work"

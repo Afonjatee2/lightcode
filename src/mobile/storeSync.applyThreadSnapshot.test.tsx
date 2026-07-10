@@ -7,7 +7,7 @@ import { applyThreadSnapshot, dispatchRemoteSupervisorEvent, resetRemoteStores }
 
 // storeSync coalesces live runtime deltas onto an animation frame; drive that
 // frame deterministically so we can assert ordering around applyThreadSnapshot.
-let rafCallbacks: FrameRequestCallback[] = [];
+let rafCallbacks: Array<FrameRequestCallback | null> = [];
 
 const THREAD_ID = "thread-1";
 
@@ -68,7 +68,7 @@ describe("applyThreadSnapshot", () => {
     });
     vi.stubGlobal("cancelAnimationFrame", (handle: number): void => {
       // Handles are 1-based indices into rafCallbacks.
-      delete rafCallbacks[handle - 1];
+      rafCallbacks[handle - 1] = null;
     });
     resetRemoteStores();
   });
@@ -106,7 +106,7 @@ describe("applyThreadSnapshot", () => {
         delta: "world",
       },
     });
-    expect(rafCallbacks.filter(Boolean).length).toBe(1);
+    expect(rafCallbacks.filter((callback) => callback !== null).length).toBe(1);
     // Still just "hello " — the queued delta has not landed.
     expect(assistantStreamText("msg-1")).toBe("hello ");
 
@@ -122,7 +122,7 @@ describe("applyThreadSnapshot", () => {
     );
 
     // Draining any remaining frame must not re-append the already-flushed delta.
-    for (const cb of rafCallbacks.filter(Boolean)) cb(0);
+    for (const callback of rafCallbacks) callback?.(0);
 
     expect(assistantStreamText("msg-1")).toBe("hello world");
     // The snapshot's structural version bumped exactly once for the replace.
@@ -197,7 +197,7 @@ describe("applyThreadSnapshot", () => {
         itemType: "reasoning",
       },
     });
-    for (const cb of rafCallbacks.filter(Boolean)) cb(0);
+    for (const callback of rafCallbacks) callback?.(0);
 
     expect(useAppStore.getState().threads[0]?.status).toBe("idle");
     expect(useAppStore.getState().runtimeItemIdsByThread[THREAD_ID]).toContain("late-reasoning");

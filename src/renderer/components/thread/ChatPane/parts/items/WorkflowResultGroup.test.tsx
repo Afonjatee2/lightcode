@@ -79,6 +79,18 @@ describe("WorkflowResultGroup", () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it("renders structured results after mounting with empty input", () => {
+    const { rerender } = render(<WorkflowResultGroup resultText="   " />);
+
+    rerender(
+      <WorkflowResultGroup
+        resultText={JSON.stringify([{ dimension: "render", summary: "Hooks stay stable." }])}
+      />,
+    );
+
+    expect(getTopTriggerText()).toContain("1 dimension");
+  });
+
   it("singularizes the noun when only one item is present", () => {
     const result = JSON.stringify([{ dimension: "x", summary: "y" }]);
     render(<WorkflowResultGroup resultText={result} />);

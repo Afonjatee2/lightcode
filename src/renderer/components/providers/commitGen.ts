@@ -6,8 +6,17 @@ import type {
 } from "@/shared/contracts";
 import { resolveFastValue } from "@/renderer/components/thread/threadDraftViewHelpers";
 import { toErrorMessage } from "@/shared/errorMessage";
-import { getCommitGenDefaults } from "./ProviderIcon";
-import { getMiniModelId, getUtilityTaskCandidates, resolveUtilityTaskConfig } from "./utilityTask";
+import {
+  createUtilityTaskRegistry,
+  getMiniModelId,
+  getUtilityTaskCandidates,
+  resolveUtilityTaskConfig,
+} from "./utilityTask";
+
+const commitGenRegistry = createUtilityTaskRegistry();
+export const registerCommitGenDefaults = commitGenRegistry.register;
+export const getCommitGenDefaults = commitGenRegistry.get;
+export const getCommitGenDefaultsHint = commitGenRegistry.getHint;
 
 export function resolveCommitGenConfig(
   agent: AgentStatus | undefined,

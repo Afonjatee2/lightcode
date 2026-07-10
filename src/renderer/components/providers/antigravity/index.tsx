@@ -1,18 +1,17 @@
 export * from "./AntigravityIcon";
 
 import { AntigravityIcon } from "./AntigravityIcon";
+import providerManifest from "./manifest";
 import { standardPlanApprovalControls } from "../composerControlBuilders";
-import {
-  registerCommitGenDefaults,
-  registerComposerControls,
-  registerConflictResolverDefaults,
-  registerProviderIcon,
-  registerProviderLabel,
-  registerTitleGenDefaults,
-} from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
+import { registerComposerControls } from "../providerComposer";
+import { registerCommitGenDefaults } from "../commitGen";
+import { registerConflictResolverDefaults } from "../conflictResolver";
+import { registerTitleGenDefaults } from "../titleGen";
 
-registerProviderIcon("antigravity", AntigravityIcon);
-registerProviderLabel("antigravity", "Antigravity");
+const PROVIDER_KIND = providerManifest.kind;
+
+registerProviderIcon(PROVIDER_KIND, AntigravityIcon);
 
 // Antigravity runs the same Google models as the Gemini provider, expressed
 // through its per-variant effort suffix (Low/Medium/High). A local benchmark
@@ -22,23 +21,23 @@ registerProviderLabel("antigravity", "Antigravity");
 // mislabels the fix, Pro mislabels the feat and is ~2-3x slower); Pro stays for
 // the heavier conflict resolver. Without these, Antigravity fell through to its
 // first listed model for every task — leaving the conflict resolver on weak Flash.
-registerTitleGenDefaults("antigravity", {
+registerTitleGenDefaults(PROVIDER_KIND, {
   label: "Antigravity",
   hint: "Gemini 3.5 Flash Low",
   model: "Gemini 3.5 Flash",
   effort: "Low",
 });
-registerCommitGenDefaults("antigravity", {
+registerCommitGenDefaults(PROVIDER_KIND, {
   label: "Antigravity",
   hint: "Gemini 3.5 Flash Medium",
   model: "Gemini 3.5 Flash",
   effort: "Medium",
 });
-registerConflictResolverDefaults("antigravity", {
+registerConflictResolverDefaults(PROVIDER_KIND, {
   label: "Antigravity",
   hint: "Gemini 3.1 Pro High",
   model: "Gemini 3.1 Pro",
   effort: "High",
 });
 
-registerComposerControls("antigravity", (input) => standardPlanApprovalControls(input));
+registerComposerControls(PROVIDER_KIND, (input) => standardPlanApprovalControls(input));

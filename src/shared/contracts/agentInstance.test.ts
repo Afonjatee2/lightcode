@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  ACP_GENERIC_KIND_PREFIX,
+  acpGenericKind,
   agentInstanceConfigSchema,
+  baseAgentKind,
   claudeProfileKind,
+  extractAcpGenericInstanceId,
   extractClaudeProfileInstanceId,
+  isAcpGenericKind,
   isClaudeProfileKind,
   parseAcpGenericInstanceConfig,
   parseClaudeProfileInstanceConfig,
@@ -61,6 +66,22 @@ describe("parseAcpGenericInstanceConfig", () => {
     // `binary` though — the second call should throw with a Zod message.
     expect(() => parseAcpGenericInstanceConfig(undefined)).toThrow(Error);
     expect(() => parseAcpGenericInstanceConfig(null)).toThrow(Error);
+  });
+});
+
+describe("ACP generic kind helpers", () => {
+  it("round-trips instance ids through the shared kind namespace", () => {
+    const kind = acpGenericKind("example-agent");
+
+    expect(kind).toBe(`${ACP_GENERIC_KIND_PREFIX}example-agent`);
+    expect(isAcpGenericKind(kind)).toBe(true);
+    expect(extractAcpGenericInstanceId(kind)).toBe("example-agent");
+    expect(baseAgentKind(kind)).toBe("acp-generic");
+  });
+
+  it("rejects unrelated provider kinds", () => {
+    expect(isAcpGenericKind("codex")).toBe(false);
+    expect(extractAcpGenericInstanceId("codex")).toBeUndefined();
   });
 });
 

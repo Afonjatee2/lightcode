@@ -17,7 +17,7 @@ import {
   getComputerUseScope,
   resolveMcpScope,
 } from "@/renderer/components/composer";
-import { getConfigNormalizer } from "@/renderer/components/providers/ProviderIcon";
+import { getConfigNormalizer } from "@/renderer/components/providers/providerComposer";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { PixelLoader } from "@/renderer/components/common";
 import { modelVisibilityKey } from "@/renderer/components/common/ProviderModelMenu/parts/providerIdentity";

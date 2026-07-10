@@ -1,4 +1,5 @@
 import { clipboard } from "electron";
+import { allUsageProviderDescriptors } from "@lightcode/agents-usage";
 import type { BrowserPanelManager } from "../browser";
 import type { LightcodePaths } from "@/shared/lightcodePaths";
 import type { UsageLoginStateResponse } from "@/shared/contracts";
@@ -71,14 +72,13 @@ type ProviderLoginConfig =
   | LocalStorageLoginConfig
   | ApiKeyLoginConfig;
 
-const PROVIDER_LABELS: Record<string, string> = {
-  commandcode: "Command Code",
-  copilot: "GitHub Copilot",
-  factory: "Droid",
-  grok: "Grok",
-  opencode: "OpenCode",
-  zai: "z.ai",
-};
+const USAGE_PROVIDER_BY_ID = new Map(
+  allUsageProviderDescriptors().map((descriptor) => [descriptor.id, descriptor]),
+);
+
+function usageProviderLabel(providerId: string): string {
+  return USAGE_PROVIDER_BY_ID.get(providerId)?.label ?? providerId;
+}
 
 const PROVIDER_CONFIGS: Record<string, ProviderLoginConfig> = {
   commandcode: {
@@ -137,6 +137,12 @@ const PROVIDER_CONFIGS: Record<string, ProviderLoginConfig> = {
   zai: { kind: "api-key" },
 };
 
+for (const providerId of Object.keys(PROVIDER_CONFIGS)) {
+  if (!USAGE_PROVIDER_BY_ID.has(providerId)) {
+    throw new Error(`Usage login config has no provider descriptor: ${providerId}`);
+  }
+}
+
 const LOGIN_TIMEOUT_MS = 5 * 60 * 1000;
 
 interface GitHubDeviceCodeResponse {
@@ -151,10 +157,6 @@ interface GitHubDeviceCodeResponse {
 interface GitHubAccessTokenResponse {
   access_token?: string;
   error?: string;
-}
-
-export function isCookieLoginProvider(providerId: string): boolean {
-  return providerId in PROVIDER_CONFIGS;
 }
 
 export class UsageLoginManager {
@@ -229,7 +231,7 @@ export class UsageLoginManager {
       // API-key providers have no browser step; the renderer calls submitApiKey.
       return Promise.resolve({
         ok: false,
-        error: `${PROVIDER_LABELS[providerId] ?? providerId} uses a pasted API key`,
+        error: `${usageProviderLabel(providerId)} uses a pasted API key`,
       });
     }
     const panel = this.getBrowserPanel();
@@ -265,7 +267,7 @@ export class UsageLoginManager {
       cookieUrl: config.cookieUrl,
       authCookiePattern: config.authCookiePattern,
       timeoutMs: LOGIN_TIMEOUT_MS,
-      providerLabel: PROVIDER_LABELS[providerId] ?? providerId,
+      providerLabel: usageProviderLabel(providerId),
       ...(config.validateSession ? { validateSession: config.validateSession } : {}),
     });
     if (!result.ok || !result.cookie) {
@@ -289,7 +291,7 @@ export class UsageLoginManager {
       keys: Object.keys(config.store),
       requiredKey: config.requiredKey,
       timeoutMs: LOGIN_TIMEOUT_MS,
-      providerLabel: PROVIDER_LABELS[providerId] ?? providerId,
+      providerLabel: usageProviderLabel(providerId),
     });
     if (!result.ok || !result.values) {
       return {
@@ -323,7 +325,7 @@ export class UsageLoginManager {
       return { ok: false, error: (err as Error).message ?? "Failed to open login tab" };
     }
 
-    const providerLabel = PROVIDER_LABELS[providerId] ?? providerId;
+    const providerLabel = usageProviderLabel(providerId);
     clipboard.writeText(device.user_code);
     panel.showUsageLoginDeviceCode({
       providerId,

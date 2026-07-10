@@ -174,4 +174,7 @@ async function main() {
   console.error(JSON.stringify(rawData || data, null, 2));
 }
 
-main();
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

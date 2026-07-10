@@ -79,7 +79,11 @@ export function PullFromSourceDialog() {
         <Button slot="close" variant="ghost" className="text-muted" isDisabled={isPulling}>
           <Trans>Cancel</Trans>
         </Button>
-        <Button variant="tertiary" onPress={handleStashPullReapply} isPending={isPulling}>
+        <Button
+          variant="tertiary"
+          onPress={() => void handleStashPullReapply()}
+          isPending={isPulling}
+        >
           <Trans>Stash & Pull</Trans>
         </Button>
       </AlertDialog.Footer>

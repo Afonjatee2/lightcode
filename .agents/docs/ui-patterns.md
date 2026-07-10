@@ -43,22 +43,36 @@ Match the canonical dialog look — do not restyle. Reference: `CreatePrModal`, 
 
 ## Provider Registration (Plugin Pattern)
 
-The renderer is provider-agnostic. Provider-specific rendering is registered via side-effect imports in `src/renderer/components/providers/` — no provider-specific if/else in shared UI, layout, or thread components:
+The renderer is provider-agnostic. Provider-specific rendering is registered by
+modules discovered under `src/renderer/components/providers/` — no
+provider-specific if/else in shared UI, layout, or thread components:
 
 ```
 registerProviderIcon(kind, IconComponent)     — Icon for sidebar, thread header
-registerProviderLabel(kind, label)             — Provider kind → display name
+registerComposerControls(kind, controls)      — Provider composer controls
 registerCommitGenDefaults(kind, defaults)      — Default model/effort for commit generation
 ```
 
-Each provider directory (`claude/`, `codex/`, `gemini/`) contains its icon component and registration calls. The index file (`providers/index.ts`) re-exports all providers via side-effect imports.
+Each chat-provider directory contains a lightweight `manifest.ts` with its
+localized label and ordering metadata, plus an `index.tsx` with icon/control
+registration calls. `providerManifest.ts` eagerly discovers the manifests;
+`bootstrap.ts` separately discovers the UI modules. Do not add provider-specific
+barrel exports or shared model/utility ordering arrays.
 
 Shared provider utilities live at the `providers/` root:
 
 - `statusTone.ts` — Status → tone mapping
 - `StatusIcon.tsx` — Animated status indicator
-- `ProviderIcon.tsx` — Registry + lookup component
-- `commitGen.ts` — Multi-provider commit generation with fallback
+- `ProviderIcon.tsx` — Icon registry + lookup component only
+- `providerComposer.ts` — Composer-control and config-normalizer registrations
+- `providerSlashCommands.ts` — GUI slash-command registrations
+- `utilityTask.ts` — Shared utility-task ranking, candidate, and registry primitives
+- `commitGen.ts`, `titleGen.ts`, `conflictResolver.ts` — Feature-owned defaults and execution
+
+Import these leaf modules directly inside renderer features. The providers barrel
+does not bootstrap registrations; desktop and mobile entrypoints explicitly load
+`bootstrap.ts`, keeping pure utility imports and Node tests free of provider TSX
+side effects.
 
 ## Code Organization (Renderer)
 
@@ -67,7 +81,7 @@ Shared provider utilities live at the `providers/` root:
 | `components/` dir | Purpose                                                                                                                       |
 | ----------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `thread/`         | ThreadView, ThreadDraftView, ThreadComposer, TerminalPane, ChatPane, ThreadRuntimeRequestPanel, PresentationModeTabs          |
-| `composer/`       | Composer parts — MentionInput, AttachmentBar, ComposerAddMenu, browserMcpScope                                                |
+| `composer/`       | Composer parts — MentionInput, AttachmentBar, ComposerAddMenu, MCP server controls                                            |
 | `terminal/`       | XTermSurface (xterm.js integration), TerminalLinkProvider                                                                     |
 | `diff/`           | DiffCardList                                                                                                                  |
 | `providers/`      | Per-provider icons/registration + shared provider utilities                                                                   |

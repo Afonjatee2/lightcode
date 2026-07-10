@@ -6,8 +6,17 @@ import type {
 } from "@/shared/contracts";
 import { resolveFastValue } from "@/renderer/components/thread/threadDraftViewHelpers";
 import { toErrorMessage } from "@/shared/errorMessage";
-import { getTitleGenDefaults } from "./ProviderIcon";
-import { getMiniModelId, getUtilityTaskCandidates, resolveUtilityTaskConfig } from "./utilityTask";
+import {
+  createUtilityTaskRegistry,
+  getMiniModelId,
+  getUtilityTaskCandidates,
+  resolveUtilityTaskConfig,
+} from "./utilityTask";
+
+const titleGenRegistry = createUtilityTaskRegistry();
+export const registerTitleGenDefaults = titleGenRegistry.register;
+export const getTitleGenDefaults = titleGenRegistry.get;
+export const getTitleGenDefaultsHint = titleGenRegistry.getHint;
 
 export function resolveTitleGenConfig(
   agent: AgentStatus | undefined,

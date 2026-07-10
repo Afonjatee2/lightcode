@@ -31,6 +31,7 @@ vi.mock("./ThreadComposer", () => ({
   },
 }));
 
+import "@/renderer/components/providers/bootstrap";
 import { ThreadDraftView } from "./ThreadDraftView";
 
 const project: Project = {

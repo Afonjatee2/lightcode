@@ -87,7 +87,9 @@ export class StreamableHttpMcpIngress<TContext> {
     if (this.info) return this.info;
     const bindHost = this.options.bindHost ?? "0.0.0.0";
     return await new Promise<StreamableHttpMcpIngressInfo>((resolve, reject) => {
-      const server = createServer((req, res) => this.handle(req, res));
+      const server = createServer((req, res) => {
+        void this.handle(req, res);
+      });
       server.on("error", reject);
       // Access is guarded by a 256-bit bearer token regenerated per app launch;
       // the URL is only ever passed to immediate child processes via env vars.

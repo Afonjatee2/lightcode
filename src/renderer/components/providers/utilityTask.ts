@@ -1,4 +1,6 @@
 import { baseAgentKind } from "@/shared/contracts";
+import { getProviderUtilityRank } from "./providerManifest";
+import { lookupProviderRegistration } from "./providerRegistry";
 
 export interface UtilityTaskDefaults {
   label?: string;
@@ -27,7 +29,7 @@ export interface UtilityTaskCandidateOptions {
   /**
    * Drop providers that cannot run a one-shot generation. Used by the title /
    * commit-message sections, which shell out to a single non-interactive call;
-   * interactive-only providers (e.g. Factory Droid / Grok) would always throw
+   * interactive-only runtime-registered providers would always throw
    * "does not support one-shot generation". Conflict resolution launches a full
    * thread session instead, so it leaves this unset and keeps every provider.
    */
@@ -55,23 +57,12 @@ interface ResolveUtilityTaskOptions {
   ) => readonly (string | undefined)[];
 }
 
-export const AUTO_PROVIDER_PREFERENCE_ORDER: readonly string[] = [
-  "codex",
-  "claude",
-  "gemini",
-  "antigravity",
-  "commandcode",
-  "opencode",
-  "cursor",
-  "copilot",
-];
-
 export function sortByAutoPreference<T extends { kind: string }>(items: readonly T[]): T[] {
-  const rank = (kind: string) => {
-    const idx = AUTO_PROVIDER_PREFERENCE_ORDER.indexOf(baseAgentKind(kind));
-    return idx < 0 ? AUTO_PROVIDER_PREFERENCE_ORDER.length : idx;
-  };
-  return [...items].sort((a, b) => rank(a.kind) - rank(b.kind));
+  return [...items].sort(
+    (left, right) =>
+      getProviderUtilityRank(baseAgentKind(left.kind)) -
+      getProviderUtilityRank(baseAgentKind(right.kind)),
+  );
 }
 
 export function getUtilityTaskDefaultsHint(
@@ -85,6 +76,22 @@ export function getUtilityTaskDefaultsHint(
     .join(", ");
 
   return entries ? `Defaults: ${entries}` : undefined;
+}
+
+/** Create one feature-owned defaults registry with provider-base fallback. */
+export function createUtilityTaskRegistry() {
+  const registry = new Map<string, UtilityTaskDefaults>();
+  return {
+    register(kind: string, defaults: UtilityTaskDefaults) {
+      registry.set(kind, defaults);
+    },
+    get(kind: string): UtilityTaskDefaults | undefined {
+      return lookupProviderRegistration(registry, kind);
+    },
+    getHint(): string | undefined {
+      return getUtilityTaskDefaultsHint(registry.values());
+    },
+  };
 }
 
 export function getMiniModelId(agent: UtilityTaskConfigAgent): string | undefined {

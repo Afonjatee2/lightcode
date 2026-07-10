@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, within } from "@testing-library/react";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -355,6 +355,7 @@ describe("SettingsOverlay", () => {
   });
 
   it("refreshes agent probing from the agents sidebar and shows the discovery overlay", async () => {
+    vi.useFakeTimers();
     statusesState.agentStatuses = [
       makeStatus("claude", {
         label: "Claude Code",
@@ -383,27 +384,34 @@ describe("SettingsOverlay", () => {
       }),
     );
 
-    render(<SettingsOverlay onClose={() => undefined} />);
+    try {
+      render(<SettingsOverlay onClose={() => undefined} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Refresh detected agents" }));
+      fireEvent.click(screen.getByRole("button", { name: "Refresh detected agents" }));
 
-    expect(beginFirstLaunchDiscoveryMock).toHaveBeenCalledWith({
-      kind: "all",
-      wslDistros: ["Ubuntu"],
-    });
-    expect(resetDiscoveredAgentsMock).not.toHaveBeenCalled();
-    expect(refreshAgentStatusesMock).toHaveBeenCalledWith(["Ubuntu"]);
-    expect(screen.getByText("Discovering coding agents…")).toBeInTheDocument();
+      expect(beginFirstLaunchDiscoveryMock).toHaveBeenCalledWith({
+        kind: "all",
+        wslDistros: ["Ubuntu"],
+      });
+      expect(resetDiscoveredAgentsMock).not.toHaveBeenCalled();
+      expect(refreshAgentStatusesMock).toHaveBeenCalledWith(["Ubuntu"]);
+      expect(screen.getByText("Discovering coding agents…")).toBeInTheDocument();
 
-    resolveRefresh?.();
+      await act(async () => {
+        resolveRefresh?.();
+        await vi.advanceTimersByTimeAsync(0);
+      });
 
-    await waitFor(
-      () => {
-        expect(screen.queryByText("Discovering coding agents…")).not.toBeInTheDocument();
-      },
-      { timeout: 2500 },
-    );
-    expect(resetDiscoveredAgentsMock).toHaveBeenCalledTimes(1);
+      await act(() => vi.advanceTimersByTimeAsync(999));
+      expect(screen.getByText("Discovering coding agents…")).toBeInTheDocument();
+      expect(resetDiscoveredAgentsMock).not.toHaveBeenCalled();
+
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      expect(screen.queryByText("Discovering coding agents…")).not.toBeInTheDocument();
+      expect(resetDiscoveredAgentsMock).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("cancels the visible agent refresh overlay", () => {

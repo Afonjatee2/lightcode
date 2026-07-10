@@ -47,6 +47,7 @@ import {
 import type { RemoteAccessPairingInfo, RemoteGitSummaries } from "@/shared/remote";
 import { readKeybindingsFile, writeKeybindingsFile } from "../keybindingsFile";
 import type { RemoteAccessServer } from "../remote";
+import { getRemoteAccessPairingInfo } from "../remote/pairingInfo";
 import type { AutoUpdaterController } from "../updates/autoUpdater";
 import {
   defineMainLocalIpcHandlers,
@@ -61,6 +62,8 @@ import type { AgentInstanceConfig } from "@/shared/contracts";
 import { headersToRecord, readBoundedResponseBody } from "@/shared/http";
 import type { LightcodePaths } from "@/shared/lightcodePaths";
 import { UsageLoginManager } from "../usageLogin/UsageLoginManager";
+
+export { getRemoteAccessPairingInfo } from "../remote/pairingInfo";
 
 interface CreateLocalIpcHandlersOptions {
   getMainWindow(): BrowserWindow | null;
@@ -89,25 +92,6 @@ function requireBrowserPanel(getter: () => BrowserPanelManager | null): BrowserP
     throw new Error("Browser panel manager is not initialized.");
   }
   return mgr;
-}
-
-export function getRemoteAccessPairingInfo(
-  server: RemoteAccessServer | null,
-): RemoteAccessPairingInfo {
-  if (!server) {
-    return { status: "disabled" };
-  }
-  const info = server.getInfo();
-  if (!info) {
-    return { status: "starting" };
-  }
-  return {
-    status: "ready",
-    httpBaseUrl: info.httpBaseUrl,
-    wsBaseUrl: info.wsBaseUrl,
-    pairingUrl: server.issuePairingUrl("Settings QR"),
-    sessions: server.listAccessSessions(),
-  };
 }
 
 let usageLoginManager: UsageLoginManager | null = null;

@@ -6,7 +6,7 @@ import type {
   ReadProjectFileResult,
 } from "@/shared/contracts";
 import { readBridge } from "../bridge";
-import { captureProductEvent } from "../analytics/posthog";
+import { captureProductEvent } from "../analytics/productAnalytics";
 import { captureRendererException } from "../diagnostics/sentry";
 import { hasUnresolvedConflicts } from "@/renderer/utils/mergeConflicts";
 import { useGitStore } from "./gitStore";

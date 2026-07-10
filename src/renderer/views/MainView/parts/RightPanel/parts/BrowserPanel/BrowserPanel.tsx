@@ -53,10 +53,10 @@ export function BrowserPanel(props: { visible: boolean; surface?: "main" | "wind
   const hasActiveTab = tabs.length > 0 && activeTabId !== null;
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const createTab = useCallback(async () => {
-    try {
-      await readBridge().browserCreateTab({ url: DEFAULT_HOME, activate: true });
-    } catch {}
+  const createTab = useCallback(() => {
+    void readBridge()
+      .browserCreateTab({ url: DEFAULT_HOME, activate: true })
+      .catch(() => {});
   }, []);
 
   // Attached imperatively (rather than a JSX onKeyDown) because this container

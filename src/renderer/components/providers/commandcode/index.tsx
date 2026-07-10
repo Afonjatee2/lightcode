@@ -1,18 +1,17 @@
 export * from "./CommandCodeIcon";
 
 import { CommandCodeIcon } from "./CommandCodeIcon";
+import providerManifest from "./manifest";
 import { standardPlanApprovalControls } from "../composerControlBuilders";
-import {
-  registerCommitGenDefaults,
-  registerComposerControls,
-  registerConflictResolverDefaults,
-  registerProviderIcon,
-  registerProviderLabel,
-  registerTitleGenDefaults,
-} from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
+import { registerComposerControls } from "../providerComposer";
+import { registerCommitGenDefaults } from "../commitGen";
+import { registerConflictResolverDefaults } from "../conflictResolver";
+import { registerTitleGenDefaults } from "../titleGen";
 
-registerProviderIcon("commandcode", CommandCodeIcon);
-registerProviderLabel("commandcode", "Command Code");
+const PROVIDER_KIND = providerManifest.kind;
+
+registerProviderIcon(PROVIDER_KIND, CommandCodeIcon);
 // Command Code is usage-priced and gates Claude/GPT models behind paid plans:
 // the previous defaults (gpt-5.4-mini, claude-sonnet-4-6, google/gemini-3.1-flash-
 // lite) all return "403 MODEL_NOT_IN_PLAN" on the base plan, so Auto generation
@@ -22,23 +21,23 @@ registerProviderLabel("commandcode", "Command Code");
 // "-Fast"/"-Highspeed" tiers (e.g. GLM-5.2-Fast) are quicker but cost more, so
 // they're not worth it for frequent title/commit runs. `deepseek-v4-pro` adds
 // reasoning for the rarer, heavier conflict resolver. Pro users can override.
-registerCommitGenDefaults("commandcode", {
+registerCommitGenDefaults(PROVIDER_KIND, {
   label: "Command Code",
   hint: "DeepSeek V4 Flash",
   model: "deepseek/deepseek-v4-flash",
   effort: "",
 });
-registerTitleGenDefaults("commandcode", {
+registerTitleGenDefaults(PROVIDER_KIND, {
   label: "Command Code",
   hint: "DeepSeek V4 Flash",
   model: "deepseek/deepseek-v4-flash",
   effort: "",
 });
-registerConflictResolverDefaults("commandcode", {
+registerConflictResolverDefaults(PROVIDER_KIND, {
   label: "Command Code",
   hint: "DeepSeek V4 Pro",
   model: "deepseek/deepseek-v4-pro",
   effort: "",
 });
 
-registerComposerControls("commandcode", (input) => standardPlanApprovalControls(input));
+registerComposerControls(PROVIDER_KIND, (input) => standardPlanApprovalControls(input));

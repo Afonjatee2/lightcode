@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RequestError } from "@agentclientprotocol/sdk";
+import { RequestError, type RequestPermissionRequest } from "@agentclientprotocol/sdk";
 import type { CreateStructuredSessionInput } from "../base";
 import type { ThreadConfig } from "@/shared/contracts";
 import {
@@ -31,7 +31,6 @@ type TestableAcpSession = {
     config: ThreadConfig,
     sessionRef?: import("@/shared/contracts").SessionRef,
   ): Promise<string>;
-  applyTurnConfig(config: ThreadConfig): Promise<void>;
   startTurn(
     prompt: string,
     config: ThreadConfig,
@@ -41,6 +40,7 @@ type TestableAcpSession = {
   interruptTurn(): Promise<void>;
   dispose(): Promise<void>;
   resolveServerRequest(requestId: string, response: unknown): Promise<void>;
+  handlePermissionRequest(params: RequestPermissionRequest): Promise<unknown>;
   handleSessionUpdate(params: { update: unknown }): void;
   setListener(listener: unknown): void;
 };
@@ -55,7 +55,6 @@ afterEach(() => {
 
 function makeConfigSyncSession(
   overrides: {
-    availableModeIds?: string[];
     currentConfig?: ThreadConfig;
     agentMcpCapabilities?: { http?: boolean; sse?: boolean };
   } = {},
@@ -129,21 +128,10 @@ function makeConfigSyncSession(
   session["threadId"] = "thread-1";
   session["projectLocation"] = { kind: "windows", path: "C:\\repo" };
   session["listener"] = listener;
-  session["availableModeIds"] = overrides.availableModeIds ?? [
-    "default",
-    "plan",
-    "yolo",
-    "autoEdit",
-    "autopilot",
-  ];
   // Default to advertising HTTP MCP support so the mcpServers-gating (added for
   // the Factory Droid bug) is a no-op for these pass-through tests. The gating
   // itself is covered by a dedicated test below.
   session["agentMcpCapabilities"] = overrides.agentMcpCapabilities ?? { http: true };
-  session["currentConfigOptions"] = [];
-  session["modeConfigId"] = undefined;
-  session["modelConfigValue"] = undefined;
-  session["thoughtLevelConfigId"] = "thought-level";
   session["currentConfig"] = overrides.currentConfig ?? {
     model: "model-a",
     effort: "low",
@@ -161,11 +149,6 @@ function makeConfigSyncSession(
   session["currentTurnInterruptRequested"] = false;
   session["recentInterruptAckTextTail"] = "";
   session["mapperState"] = undefined;
-  session["pendingPermissionResolvers"] = new Map();
-  session["pendingElicitationResolvers"] = new Map();
-  session["pendingElicitationRequestIdsByElicitationId"] = new Map();
-  session["permissionRequestSeq"] = 0;
-  session["elicitationRequestSeq"] = 0;
   session["acpTerminals"] = new Map();
   session["acpTerminalSeq"] = 0;
   session["releasedAcpTerminalOutput"] = new Map();
@@ -835,255 +818,6 @@ describe("ACP client protocol helpers", () => {
 });
 
 describe("ACP turn config sync", () => {
-  it("applies model, mode, and effort changes before a new turn", async () => {
-    const { connection, session } = makeConfigSyncSession();
-
-    await session.applyTurnConfig({
-      model: "model-b",
-      effort: "high",
-      mode: "plan",
-      approvalPolicy: "default",
-    });
-
-    expect(connection.setSessionMode).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      modeId: "plan",
-    });
-    expect(connection.request).toHaveBeenCalledWith("session/set_model", {
-      sessionId: "session-1",
-      modelId: "model-b",
-    });
-    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      configId: "thought-level",
-      value: "high",
-    });
-  });
-
-  it("falls back to ACP autopilot mode when approvals change but yolo is unavailable", async () => {
-    const { connection, session } = makeConfigSyncSession({
-      availableModeIds: ["default", "autopilot"],
-    });
-
-    await session.applyTurnConfig({
-      model: "model-a",
-      effort: "low",
-      mode: "agent",
-      approvalPolicy: "never",
-    });
-
-    expect(connection.setSessionMode).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      modeId: "autopilot",
-    });
-  });
-
-  it("applies arbitrary ACP mode ids from approval policies", async () => {
-    const { connection, session } = makeConfigSyncSession({
-      availableModeIds: ["normal", "auto-low", "auto-high"],
-    });
-    Object.assign(session as unknown as Record<string, unknown>, {
-      modeConfigId: "autonomy-level",
-    });
-
-    await session.applyTurnConfig({
-      model: "model-a",
-      effort: "low",
-      mode: "agent",
-      approvalPolicy: "auto-high",
-    });
-
-    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      configId: "autonomy-level",
-      value: "auto-high",
-    });
-    expect(connection.setSessionMode).not.toHaveBeenCalled();
-  });
-
-  it("uses ACP session config options for Cursor-style model aliases", async () => {
-    const { connection, session } = makeConfigSyncSession();
-    connection.setSessionConfigOption.mockResolvedValueOnce({
-      configOptions: [
-        {
-          id: "model",
-          category: "model",
-          type: "select",
-          currentValue: "composer-2[fast=true]",
-          options: [{ value: "composer-2[fast=true]", name: "composer-2" }],
-        },
-      ],
-    });
-    Object.assign(session as unknown as Record<string, unknown>, {
-      currentConfigOptions: [
-        {
-          id: "model",
-          category: "model",
-          type: "select",
-          currentValue: "kimi-k2.5[]",
-          options: [
-            { value: "default[]", name: "Auto" },
-            { value: "composer-2[fast=true]", name: "composer-2" },
-          ],
-        },
-      ],
-      modelConfigValue: "kimi-k2.5[]",
-    });
-
-    await session.applyTurnConfig({
-      model: "composer-2",
-      fast: true,
-      effort: "low",
-      mode: "agent",
-      approvalPolicy: "default",
-    });
-
-    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      configId: "model",
-      value: "composer-2[fast=true]",
-    });
-    expect(connection.request).not.toHaveBeenCalled();
-  });
-
-  it("prioritizes Cursor-style effort aliases over the base ACP model alias", async () => {
-    const { connection, session } = makeConfigSyncSession();
-    Object.assign(session as unknown as Record<string, unknown>, {
-      currentConfigOptions: [
-        {
-          id: "model",
-          category: "model",
-          type: "select",
-          currentValue: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
-          options: [
-            {
-              value: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
-              name: "GPT-5.5",
-            },
-            {
-              value: "gpt-5.5[context=272k,reasoning=high,fast=true]",
-              name: "GPT-5.5 High Fast",
-            },
-          ],
-        },
-      ],
-      modelConfigValue: "gpt-5.5[context=272k,reasoning=medium,fast=false]",
-    });
-
-    await session.applyTurnConfig({
-      model: "gpt-5.5",
-      effort: "high",
-      fast: true,
-      mode: "agent",
-      approvalPolicy: "default",
-    });
-
-    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      configId: "model",
-      value: "gpt-5.5[context=272k,reasoning=high,fast=true]",
-    });
-    expect(connection.request).not.toHaveBeenCalled();
-  });
-
-  it("uses ACP session config options for mode when the agent exposes one", async () => {
-    const { connection, session } = makeConfigSyncSession();
-    connection.setSessionConfigOption.mockResolvedValueOnce({
-      configOptions: [
-        {
-          id: "mode",
-          category: "mode",
-          type: "select",
-          currentValue: "plan",
-          options: [{ value: "plan", name: "Plan" }],
-        },
-      ],
-    });
-    Object.assign(session as unknown as Record<string, unknown>, {
-      currentConfigOptions: [
-        {
-          id: "mode",
-          category: "mode",
-          type: "select",
-          currentValue: "agent",
-          options: [
-            { value: "agent", name: "Agent" },
-            { value: "plan", name: "Plan" },
-          ],
-        },
-      ],
-      modeConfigId: "mode",
-    });
-
-    await session.applyTurnConfig({
-      model: "model-a",
-      effort: "low",
-      mode: "plan",
-      approvalPolicy: "default",
-    });
-
-    expect(connection.setSessionConfigOption).toHaveBeenCalledWith({
-      sessionId: "session-1",
-      configId: "mode",
-      value: "plan",
-    });
-    expect(connection.setSessionMode).not.toHaveBeenCalled();
-  });
-
-  it("maps ACP autopilot updates back to agent approval config", () => {
-    const { listener, session } = makeConfigSyncSession({
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "default",
-      },
-    });
-
-    session.handleSessionUpdate({
-      update: {
-        sessionUpdate: "current_mode_update",
-        currentModeId: "autopilot",
-      },
-    });
-
-    expect(listener.onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({
-          mode: "agent",
-          approvalPolicy: "never",
-        }),
-      }),
-    );
-  });
-
-  it("maps arbitrary ACP mode updates back to approval config", () => {
-    const { listener, session } = makeConfigSyncSession({
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "normal",
-      },
-    });
-
-    session.handleSessionUpdate({
-      update: {
-        sessionUpdate: "current_mode_update",
-        currentModeId: "auto-high",
-      },
-    });
-
-    expect(listener.onUpdate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({
-          mode: "agent",
-          approvalPolicy: "auto-high",
-        }),
-      }),
-    );
-  });
-
   it("preserves the live status when the agent echoes a current_mode_update mid-turn", () => {
     const { listener, session } = makeConfigSyncSession({
       currentConfig: {
@@ -1256,6 +990,31 @@ describe("ACP turn config sync", () => {
     expect(connection.cancel).toHaveBeenCalledWith({ sessionId: "session-1" });
   });
 
+  it("wires permission resolution and interrupt cancellation through the request coordinator", async () => {
+    const { listener, session } = makeConfigSyncSession();
+    const request: RequestPermissionRequest = {
+      sessionId: "session-1",
+      toolCall: { toolCallId: "tool-1", title: "Run tests", kind: "execute" },
+      options: [{ optionId: "once", name: "Allow once", kind: "allow_once" }],
+    };
+
+    const selected = session.handlePermissionRequest(request);
+    await session.resolveServerRequest("acp-perm-0", { optionId: "once" });
+    await expect(selected).resolves.toEqual({
+      outcome: { outcome: "selected", optionId: "once" },
+    });
+
+    const cancelled = session.handlePermissionRequest(request);
+    await session.interruptTurn();
+    await expect(cancelled).resolves.toEqual({ outcome: { outcome: "cancelled" } });
+    expect(listener.onRuntimeEvent).toHaveBeenLastCalledWith({
+      type: "request.resolved",
+      threadId: "thread-1",
+      requestId: "acp-perm-1",
+      outcome: "cancelled",
+    });
+  });
+
   it("defers cancel via pendingPromptInterrupt when no prompt is in flight, then fires once startTurn enters prompt()", async () => {
     const { connection, session } = makeConfigSyncSession();
 
@@ -1354,230 +1113,6 @@ describe("ACP turn config sync", () => {
     expect(listener.onUpdate).toHaveBeenLastCalledWith({
       status: "idle",
       attention: "none",
-    });
-  });
-});
-
-describe("ACP permission request handling", () => {
-  function invokePermission(
-    session: TestableAcpSession,
-    options: Array<{ optionId: string; name: string; kind: string }>,
-  ): Promise<unknown> {
-    const handler = (
-      session as unknown as { handlePermissionRequest: Function }
-    ).handlePermissionRequest.bind(session);
-    return handler({
-      sessionId: "session-1",
-      toolCall: { toolCallId: "tc-1", title: "test", kind: "execute" },
-      options,
-    });
-  }
-
-  it("auto-approves full-access prompts when no native ACP mode exists", async () => {
-    const { listener, session } = makeConfigSyncSession({
-      availableModeIds: ["agent"],
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "never",
-      },
-    });
-
-    const response = await invokePermission(session, [
-      { optionId: "once", name: "Allow once", kind: "allow_once" },
-      { optionId: "always", name: "Allow always", kind: "allow_always" },
-    ]);
-
-    expect(response).toEqual({ outcome: { outcome: "selected", optionId: "always" } });
-    expect(listener.onUpdate).not.toHaveBeenCalledWith({
-      status: "needs_approval",
-      attention: "needs_approval",
-    });
-    expect(listener.onRuntimeEvent).not.toHaveBeenCalled();
-  });
-
-  it("auto-approves bypassPermissions policy when no native ACP mode exists", async () => {
-    const { listener, session } = makeConfigSyncSession({
-      availableModeIds: ["agent"],
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "bypassPermissions",
-      },
-    });
-
-    const response = await invokePermission(session, [
-      { optionId: "once", name: "Allow once", kind: "allow_once" },
-      { optionId: "always", name: "Allow always", kind: "allow_always" },
-    ]);
-
-    expect(response).toEqual({ outcome: { outcome: "selected", optionId: "always" } });
-    expect(listener.onUpdate).not.toHaveBeenCalledWith({
-      status: "needs_approval",
-      attention: "needs_approval",
-    });
-    expect(listener.onRuntimeEvent).not.toHaveBeenCalled();
-  });
-
-  it("auto-approves 'yolo' policy when no native ACP mode exists", async () => {
-    const { session } = makeConfigSyncSession({
-      availableModeIds: ["agent"],
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "yolo",
-      },
-    });
-
-    const response = await invokePermission(session, [
-      { optionId: "once", name: "Allow once", kind: "allow_once" },
-      { optionId: "always", name: "Allow always", kind: "allow_always" },
-    ]);
-
-    expect(response).toEqual({ outcome: { outcome: "selected", optionId: "always" } });
-  });
-
-  it("does not auto-approve non-bypass policies", async () => {
-    const { listener, session } = makeConfigSyncSession({
-      availableModeIds: ["agent"],
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "default",
-      },
-    });
-
-    void invokePermission(session, [
-      { optionId: "always", name: "Allow always", kind: "allow_always" },
-    ]);
-    await Promise.resolve();
-
-    expect(listener.onUpdate).toHaveBeenCalledWith({
-      status: "needs_approval",
-      attention: "needs_approval",
-    });
-  });
-
-  it("does not auto-approve prompts when a native ACP permission mode exists", async () => {
-    const { listener, session } = makeConfigSyncSession({
-      availableModeIds: ["agent", "yolo"],
-      currentConfig: {
-        model: "model-a",
-        effort: "low",
-        mode: "agent",
-        approvalPolicy: "never",
-      },
-    });
-
-    void invokePermission(session, [
-      { optionId: "always", name: "Allow always", kind: "allow_always" },
-    ]);
-    await Promise.resolve();
-
-    expect(listener.onUpdate).toHaveBeenCalledWith({
-      status: "needs_approval",
-      attention: "needs_approval",
-    });
-    expect(listener.onRuntimeEvent).toHaveBeenCalled();
-  });
-});
-
-describe("ACP elicitation request handling", () => {
-  function invokeElicitation(session: TestableAcpSession, params: unknown): Promise<unknown> {
-    const handler = (
-      session as unknown as { handleElicitationRequest: Function }
-    ).handleElicitationRequest.bind(session);
-    return handler(params);
-  }
-
-  it("emits form elicitation as user input and resolves with ACP accept content", async () => {
-    const { listener, session } = makeConfigSyncSession();
-
-    const responsePromise = invokeElicitation(session, {
-      mode: "form",
-      sessionId: "session-1",
-      message: "Choose deployment scope",
-      requestedSchema: {
-        type: "object",
-        properties: {
-          scope: { type: "string" },
-          count: { type: "integer" },
-          confirm: { type: "boolean" },
-          tags: { type: "array", items: { type: "string", enum: ["fast", "safe"] } },
-        },
-      },
-    });
-    await Promise.resolve();
-
-    expect(listener.onUpdate).toHaveBeenCalledWith({
-      status: "needs_reply",
-      attention: "needs_reply",
-    });
-    expect(listener.onRuntimeEvent).toHaveBeenCalledWith({
-      type: "request.opened",
-      threadId: "thread-1",
-      requestId: "acp-elicit-0",
-      requestType: "tool_user_input",
-      payload: {
-        summary: "Choose deployment scope",
-        details: {
-          acpElicitation: expect.objectContaining({
-            mode: "form",
-            message: "Choose deployment scope",
-          }),
-        },
-      },
-    });
-
-    await session.resolveServerRequest("acp-elicit-0", {
-      action: "accept",
-      content: {
-        scope: "Scope A",
-        count: 2,
-        confirm: true,
-        tags: ["fast"],
-        ignored: "not in schema",
-      },
-    });
-
-    await expect(responsePromise).resolves.toEqual({
-      action: "accept",
-      content: {
-        scope: "Scope A",
-        count: 2,
-        confirm: true,
-        tags: ["fast"],
-      },
-    });
-  });
-
-  it("resolves URL elicitation when ACP sends completion notification", async () => {
-    const { listener, session } = makeConfigSyncSession();
-
-    const responsePromise = invokeElicitation(session, {
-      mode: "url",
-      sessionId: "session-1",
-      message: "Authenticate",
-      elicitationId: "elicit-1",
-      url: "https://example.com/auth",
-    });
-    await Promise.resolve();
-
-    const complete = (
-      session as unknown as { handleElicitationComplete: Function }
-    ).handleElicitationComplete.bind(session);
-    complete({ elicitationId: "elicit-1" });
-
-    await expect(responsePromise).resolves.toEqual({ action: "accept" });
-    expect(listener.onRuntimeEvent).toHaveBeenLastCalledWith({
-      type: "request.resolved",
-      threadId: "thread-1",
-      requestId: "acp-elicit-0",
-      outcome: "answered",
     });
   });
 });

@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
 import type { AgentStatus, Thread } from "@/shared/contracts";
 import { formatTokenCount } from "./formatTokenCount";

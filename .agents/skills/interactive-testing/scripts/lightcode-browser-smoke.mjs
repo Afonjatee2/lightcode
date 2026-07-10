@@ -29,9 +29,9 @@ try {
   const initial = await rendererSnapshot();
   assert(initial.url === appUrl, "App target", `expected ${appUrl}, got ${initial.url}`);
   assert(
-    initial.text.includes("Lightcode"),
+    initial.text.includes("Lightcode") || initial.text.includes("Poracode"),
     "App boot",
-    "renderer body contains Lightcode shell text",
+    "renderer body contains the app shell text",
   );
 
   step("opening Browser panel");
@@ -95,7 +95,7 @@ try {
 
   await callBridge("browserBack", { tabId });
   state = await waitForBrowserState(
-    (s) => activeTab(s)?.title === firstTitle && activeTab(s)?.loading === false,
+    (s) => activeTab(s)?.url === firstUrl && activeTab(s)?.loading === false,
     "back navigation",
   );
   assert(
@@ -106,7 +106,7 @@ try {
 
   await callBridge("browserForward", { tabId });
   state = await waitForBrowserState(
-    (s) => activeTab(s)?.title === secondTitle && activeTab(s)?.loading === false,
+    (s) => activeTab(s)?.url === secondUrl && activeTab(s)?.loading === false,
     "forward navigation",
   );
   assert(
@@ -143,6 +143,11 @@ try {
   }
 
   const errors = await collectedErrors();
+  assert(
+    errors.length === 0,
+    "Renderer console errors",
+    errors.length === 0 ? "no renderer errors collected" : errors.slice(0, 3).join(" | "),
+  );
   if (errors.length > 0) {
     findings.push(`Renderer console errors collected: ${errors.slice(0, 3).join(" | ")}`);
   }

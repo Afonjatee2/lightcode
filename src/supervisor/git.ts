@@ -30,11 +30,8 @@ import {
   type WorktreePathOptions,
 } from "./git/exec";
 import { GitMergeService } from "./git/mergeService";
-import {
-  GitStatusService,
-  buildGitStatusResultFromOutputs,
-  parseStatusPorcelainV2,
-} from "./git/statusService";
+import { buildGitStatusResultFromOutputs, parseStatusPorcelainV2 } from "./git/statusParsing";
+import { GitStatusService } from "./git/statusService";
 import {
   GitWorktreeService,
   buildBranchListArgs,

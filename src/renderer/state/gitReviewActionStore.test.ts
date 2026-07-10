@@ -85,3 +85,4 @@ describe("gitReviewActionStore", () => {
     expect(panels()["b"]).toBe(panelB);
   });
 });
+// @vitest-environment node

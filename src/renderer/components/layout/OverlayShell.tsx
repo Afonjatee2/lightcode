@@ -27,7 +27,7 @@ export function OverlayShell(props: {
   // Mount immediately when opened, fade in on next frame
   useEffect(() => {
     if (open) {
-      if (escapeClosingRef.current) return;
+      if (escapeClosingRef.current) return undefined;
       setMounted(true);
       // Delay to allow the DOM to render at opacity-0 before transitioning
       const raf = requestAnimationFrame(() => setVisible(true));
@@ -37,6 +37,7 @@ export function OverlayShell(props: {
     escapeClosingRef.current = false;
     // Start fade-out
     setVisible(false);
+    return undefined;
   }, [open]);
 
   // Close on Escape via the overlay escape stack — only the topmost overlay

@@ -1,24 +1,23 @@
 export * from "./ClaudeIcon";
 
 import { ClaudeIcon } from "./ClaudeIcon";
+import providerManifest from "./manifest";
 import { approvalPolicyDropdown, planWorkToggle } from "../composerControlBuilders";
-import {
-  registerCommitGenDefaults,
-  registerComposerControls,
-  registerConflictResolverDefaults,
-  registerProviderIcon,
-  registerProviderLabel,
-  registerTitleGenDefaults,
-} from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
+import { registerComposerControls } from "../providerComposer";
+import { registerCommitGenDefaults } from "../commitGen";
+import { registerConflictResolverDefaults } from "../conflictResolver";
+import { registerTitleGenDefaults } from "../titleGen";
 
-registerProviderIcon("claude", ClaudeIcon);
-registerProviderLabel("claude", "Claude Code");
+const PROVIDER_KIND = providerManifest.kind;
+
+registerProviderIcon(PROVIDER_KIND, ClaudeIcon);
 // Benchmark-driven (blind quality judging over real diffs): Sonnet at MEDIUM
 // effort is the sweet spot. At low/high effort Sonnet sometimes mislabels the
 // commit type (e.g. a fix scored as "test") and emits markdown fences; medium
 // fixed both and scored highest among Sonnet tiers, while high added latency for
 // no gain. Opus stays reserved for the conflict resolver below.
-registerCommitGenDefaults("claude", {
+registerCommitGenDefaults(PROVIDER_KIND, {
   label: "Claude",
   hint: "Sonnet medium",
   model: "sonnet",
@@ -26,13 +25,13 @@ registerCommitGenDefaults("claude", {
 });
 // Haiku exposes no effort tiers (the value below is a no-op the resolver drops);
 // it is already the fastest Claude model, ideal for trivial title generation.
-registerTitleGenDefaults("claude", {
+registerTitleGenDefaults(PROVIDER_KIND, {
   label: "Claude",
   hint: "Haiku",
   model: "haiku",
   effort: "low",
 });
-registerConflictResolverDefaults("claude", {
+registerConflictResolverDefaults(PROVIDER_KIND, {
   label: "Claude",
   hint: "Opus 4.8 high",
   model: "claude-opus-4-8",
@@ -49,7 +48,7 @@ const AUTO_CAPABLE_MODELS = new Set([
   "claude-opus-4-8",
 ]);
 
-registerComposerControls("claude", ({ capabilities, config, isDisabled, onConfigChange }) => {
+registerComposerControls(PROVIDER_KIND, ({ capabilities, config, isDisabled, onConfigChange }) => {
   const isPlanMode = (config.mode ?? "agent") !== "agent";
 
   const modelSupportsAuto = !config.model || AUTO_CAPABLE_MODELS.has(config.model);

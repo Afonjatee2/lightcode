@@ -26,7 +26,6 @@ import {
   useAttachments,
 } from "../composer";
 import type { McpMentionItem, MentionInputHandle, VoiceInputHandle } from "../composer";
-import { getTriggerWords } from "@/renderer/components/providers";
 import { isRemoteSession, readBridge } from "@/renderer/bridge";
 import { captureProductEvent, threadProductProperties } from "@/renderer/analytics/posthog";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -632,7 +631,6 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                       projectLocation={projectLocation}
                       projectId={thread.projectId}
                       mcpMentions={mcpMentions}
-                      triggerWords={getTriggerWords(thread.agentKind, thread.config.model)}
                       onTextChange={(hasText) => {
                         setHasContent(hasText);
                         latestSegmentsRef.current = mentionRef.current?.serializeSegments() ?? [];

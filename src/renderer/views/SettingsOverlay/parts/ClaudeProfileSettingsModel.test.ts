@@ -125,3 +125,4 @@ describe("ClaudeProfileSettingsModel", () => {
     });
   });
 });
+// @vitest-environment node

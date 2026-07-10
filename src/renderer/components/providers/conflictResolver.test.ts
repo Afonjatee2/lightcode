@@ -1,5 +1,7 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
-import { resolveConflictResolverConfig } from "./ProviderIcon";
+import { resolveConflictResolverConfig } from "./conflictResolver";
 import "./claude";
 import "./codex";
 import "./cursor";

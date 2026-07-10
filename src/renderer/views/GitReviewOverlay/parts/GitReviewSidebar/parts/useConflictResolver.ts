@@ -8,7 +8,7 @@ import type {
 } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import {
-  getConflictResolverCandidatesForLaunch,
+  getConflictResolverCandidates,
   readConflictResolverSettingsForProject,
   resolveConflictResolverLaunchConfig,
 } from "@/renderer/components/providers/conflictResolver";
@@ -80,8 +80,8 @@ export function useConflictResolver(params: {
   );
 
   const canResolveWithAgent =
-    getConflictResolverCandidatesForLaunch(projectAgentStatuses, conflictResolverSettings.provider)
-      .length > 0;
+    getConflictResolverCandidates(projectAgentStatuses, conflictResolverSettings.provider).length >
+    0;
 
   function handleResolveWithAgent() {
     if (mergeConflictFiles.length === 0) return;
@@ -90,10 +90,7 @@ export function useConflictResolver(params: {
       project.location.kind,
       useSharedSettings.getState(),
     );
-    const candidates = getConflictResolverCandidatesForLaunch(
-      projectAgentStatuses,
-      liveSettings.provider,
-    );
+    const candidates = getConflictResolverCandidates(projectAgentStatuses, liveSettings.provider);
     const provider = candidates[0];
     if (!provider) return;
 

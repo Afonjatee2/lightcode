@@ -25,7 +25,6 @@ import { homedir } from "node:os";
 import { Readable, Writable } from "node:stream";
 import {
   ClientSideConnection,
-  CreateElicitationRequest as AcpCreateElicitationRequest,
   ndJsonStream,
   PROTOCOL_VERSION,
   RequestError,
@@ -66,13 +65,11 @@ import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
 import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
 import type { ComputerUseMcpHttpConfig } from "@/supervisor/agents/computerUseMcp";
 import type { ChromeMcpHttpConfig } from "@/supervisor/agents/chromeMcp";
-import { areAgentSlashCommandsEqual, isThreadConfigEqual } from "@/shared/contracts";
+import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
   closeOpenTurnItems,
   createAcpMapperState,
-  mapAcpElicitationRequest,
-  mapAcpPermissionRequest,
   mapAcpSessionUpdate,
   type AcpMapperState,
 } from "./canonicalMapping";
@@ -87,14 +84,7 @@ import {
   type StructuredSessionUpdate,
 } from "../base";
 import { mapAcpSlashCommands } from "./probe";
-import {
-  applyAcpModeUpdateToConfig,
-  findSelectConfigOption,
-  findThoughtLevelConfig,
-  resolveAcpMode,
-  resolveModelConfigValue,
-} from "./sessionConfig";
-import { setUnstableSessionModel } from "./unstableModelCompat";
+import { AcpSessionConfigSync } from "./sessionConfigSync";
 
 // ── Helpers ──────────────────────────────────────────────────────
 
@@ -111,10 +101,6 @@ import {
 export { resolveAcpReadableHostFsPath, resolveAcpResourcePath, toAcpResourceUri };
 
 import { segmentsToContentBlocks } from "./sessionContentBlocks";
-import {
-  hasNativeAcpPermissionMode,
-  selectAutoApprovedPermissionOption,
-} from "./sessionPermissionMode";
 import { filterAcpInboundNoise, looksLikeAcpSessionNotification } from "./sessionStreamFilter";
 import { maybeCaptureAcpUpdate } from "./sessionDiagnostics";
 import { AcpTerminalManager } from "./terminalManager";
@@ -127,10 +113,7 @@ import {
   rewriteLoadSessionError,
   shouldEmitAcpPromptRpcErrorItem,
 } from "./sessionErrors";
-import {
-  buildAcpElicitationAnswerEvents,
-  normalizeAcpElicitationResponse,
-} from "./sessionElicitation";
+import { AcpSessionRequests } from "./sessionRequests";
 
 export { normalizeAcpStopReason, rewriteLoadSessionError };
 
@@ -207,11 +190,6 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private recentInterruptAckTextTail = "";
   /** User-visible error text from an `agent_message_chunk` before `prompt()` settles. */
   private agentSurfacedErrorMessage: string | undefined;
-  private availableModeIds: string[] = [];
-  private currentConfigOptions: unknown[] = [];
-  private modeConfigId: string | undefined;
-  private modelConfigValue: string | undefined;
-  private thoughtLevelConfigId: string | undefined;
   private agentPromptCapabilities: PromptCapabilities | undefined;
   private agentSessionCapabilities: SessionCapabilities | undefined;
   private agentMcpCapabilities: McpCapabilities | undefined;
@@ -232,6 +210,37 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       });
     }
     return this._terminalManager;
+  }
+
+  /** Lazily initialized for parity with constructor-bypassing test harnesses. */
+  private _sessionConfigSync: AcpSessionConfigSync | undefined;
+
+  private get sessionConfigSync(): AcpSessionConfigSync {
+    if (!this._sessionConfigSync) {
+      this._sessionConfigSync = new AcpSessionConfigSync(this.connection);
+    }
+    return this._sessionConfigSync;
+  }
+
+  /** Lazily initialized for parity with constructor-bypassing test harnesses. */
+  private _sessionRequests: AcpSessionRequests | undefined;
+
+  private get sessionRequests(): AcpSessionRequests {
+    if (!this._sessionRequests) {
+      this._sessionRequests = new AcpSessionRequests({
+        threadId: this.threadId,
+        getPermissionContext: () => ({
+          config: this.currentConfig,
+          availableModeIds: this.sessionConfigSync.availableModeIds,
+        }),
+        ensureMapperState: () => this.ensureMapperState(),
+        emitRuntimeEvents: (events) => this.emitRuntimeEvents(events),
+        setRequestAttention: (attention) => {
+          this.emitListenerUpdate({ status: attention, attention });
+        },
+      });
+    }
+    return this._sessionRequests;
   }
   /**
    * Runtime events that fired before the listener was wired (typical race:
@@ -277,18 +286,6 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.subagentMcp = options?.subagentMcp;
     this.computerUseMcp = options?.computerUseMcp;
     this.chromeMcp = options?.chromeMcp;
-  }
-
-  private shouldAutoApproveSyntheticPermissionRequest(): boolean {
-    const config = this.currentConfig;
-    const policy = config?.approvalPolicy;
-    if (!config || config.mode === "plan" || !policy) return false;
-    // Bypass-style policy ids across adapters: legacy "never"/"yolo" and the
-    // adapter-agnostic "bypassPermissions" used by Claude, Grok, etc. When the
-    // agent has no native ACP mode for the requested policy we resolve the
-    // synthetic request ourselves instead of prompting the user.
-    if (policy !== "never" && policy !== "yolo" && policy !== "bypassPermissions") return false;
-    return !hasNativeAcpPermissionMode(policy, this.availableModeIds);
   }
 
   /** Initialize the canonical mapper once we have a stable thread id. */
@@ -362,110 +359,6 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private adoptSessionRef(sessionRef: SessionRef): void {
     this.sessionId = sessionRef.providerSessionId;
     this.stableSessionRef = sessionRef;
-  }
-
-  private rememberSessionOptions(availableModeIds: string[], configOptions: unknown): void {
-    this.availableModeIds = availableModeIds;
-    this.currentConfigOptions = Array.isArray(configOptions) ? configOptions : [];
-    this.modeConfigId = findSelectConfigOption(configOptions, "mode")?.id;
-    const modelConfig = findSelectConfigOption(configOptions, "model");
-    this.modelConfigValue = modelConfig?.currentValue;
-    this.thoughtLevelConfigId = findThoughtLevelConfig(configOptions)?.id;
-  }
-
-  private async applyTurnConfig(config: ThreadConfig): Promise<void> {
-    if (!this.sessionId) {
-      return;
-    }
-
-    const previousConfig = this.currentConfig;
-    const nextModeId = resolveAcpMode(config, this.availableModeIds);
-    const previousModeId = previousConfig
-      ? resolveAcpMode(previousConfig, this.availableModeIds)
-      : undefined;
-
-    if (nextModeId && nextModeId !== previousModeId && this.modeConfigId) {
-      try {
-        const result = await this.connection.setSessionConfigOption({
-          sessionId: this.sessionId,
-          configId: this.modeConfigId,
-          value: nextModeId,
-        });
-        this.rememberSessionOptions(this.availableModeIds, result.configOptions);
-        console.log("[acp] mode config set to:", nextModeId);
-      } catch (error) {
-        console.log(
-          "[acp] live mode config change rejected, continuing: %s",
-          error instanceof Error ? error.message : String(error),
-        );
-      }
-    } else if (nextModeId && nextModeId !== previousModeId) {
-      try {
-        await this.connection.setSessionMode({ sessionId: this.sessionId, modeId: nextModeId });
-        console.log("[acp] mode set to:", nextModeId);
-      } catch (error) {
-        console.log(
-          "[acp] live mode change rejected, continuing: %s",
-          error instanceof Error ? error.message : String(error),
-        );
-      }
-    }
-
-    const modelConfig = resolveModelConfigValue(config, this.currentConfigOptions);
-    if (
-      config.model !== previousConfig?.model ||
-      (modelConfig && modelConfig.value !== this.modelConfigValue)
-    ) {
-      if (modelConfig) {
-        try {
-          const result = await this.connection.setSessionConfigOption({
-            sessionId: this.sessionId,
-            configId: modelConfig.configId,
-            value: modelConfig.value,
-          });
-          this.rememberSessionOptions(this.availableModeIds, result.configOptions);
-          console.log("[acp] model config set to:", modelConfig.value);
-        } catch (error) {
-          console.log(
-            "[acp] live model config change rejected, continuing: %s",
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      } else {
-        try {
-          // Fallback for agents without a "model" config option that still
-          // speak the removed pre-1.0 model API (see unstableModelCompat.ts).
-          await setUnstableSessionModel(this.connection, {
-            sessionId: this.sessionId,
-            modelId: config.model,
-          });
-          console.log("[acp] model set to:", config.model);
-        } catch (error) {
-          console.log(
-            "[acp] live model change rejected, continuing: %s",
-            error instanceof Error ? error.message : String(error),
-          );
-        }
-      }
-    }
-
-    if (config.effort && this.thoughtLevelConfigId && config.effort !== previousConfig?.effort) {
-      try {
-        await this.connection.setSessionConfigOption({
-          sessionId: this.sessionId,
-          configId: this.thoughtLevelConfigId,
-          value: config.effort,
-        });
-        console.log("[acp] effort set to:", config.effort);
-      } catch (error) {
-        console.log(
-          "[acp] live effort change rejected, continuing: %s",
-          error instanceof Error ? error.message : String(error),
-        );
-      }
-    }
-
-    this.currentConfig = config;
   }
 
   /**
@@ -694,11 +587,11 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.currentConfig = undefined;
     this.currentSlashCommands = undefined;
     const mcpServers = this.gateHttpMcpServers([
-      ...(await buildAcpBrowserMcpServers(
+      ...buildAcpBrowserMcpServers(
         this.projectLocation,
         config.browserMcp === true,
         this.browserMcp,
-      )),
+      ),
       ...buildAcpSubagentMcpServers(config.subagentMcp === true, this.subagentMcp),
       ...buildAcpComputerUseMcpServers(
         this.projectLocation,
@@ -761,8 +654,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       console.log("[acp] session created:", this.sessionId, "modes:", availableModeIds);
     }
 
-    this.rememberSessionOptions(availableModeIds, configOptions);
-    await this.applyTurnConfig(config);
+    this.sessionConfigSync.rememberOptions(availableModeIds, configOptions);
+    this.currentConfig = await this.sessionConfigSync.applyTurnConfig(
+      this.sessionId,
+      config,
+      this.currentConfig,
+    );
 
     if (this.sessionId) {
       this.launchOptions = { ...this.launchOptions, resumeThreadId: this.sessionId };
@@ -790,7 +687,11 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.recentInterruptAckTextTail = "";
     this.agentSurfacedErrorMessage = undefined;
 
-    await this.applyTurnConfig(config);
+    this.currentConfig = await this.sessionConfigSync.applyTurnConfig(
+      this.sessionId,
+      config,
+      this.currentConfig,
+    );
 
     // Mark a new canonical turn and surface the user-typed message as a
     // user_message item (the prompt itself doesn't generate a session/update).
@@ -873,19 +774,10 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   }
 
   /**
-   * Respond to a permission request from the agent.
+   * Respond to a pending permission or elicitation request from the agent.
    */
   async resolveServerRequest(requestId: ThreadServerRequestId, response: unknown): Promise<void> {
-    // The permission response is stored and resolved by the pending promise
-    // in handlePermissionRequest. The runtime calls this with the user's
-    // chosen option.
-    const resolver = this.pendingPermissionResolvers.get(requestId);
-    if (resolver) {
-      this.pendingPermissionResolvers.delete(requestId);
-      resolver(response);
-      return;
-    }
-    this.resolvePendingElicitationRequest(requestId, response);
+    this.sessionRequests.resolve(requestId, response);
   }
 
   async interruptTurn(): Promise<void> {
@@ -893,7 +785,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       return;
     }
 
-    this.cancelPendingServerRequests();
+    this.sessionRequests.cancelPending();
     this.currentTurnInterruptRequested = true;
     // Race guard: if interrupt fires before `connection.prompt()` has been
     // entered (e.g. the supervisor stages a steer in the same microtask as
@@ -912,7 +804,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (this.isDisposed) return;
     this.isDisposed = true;
 
-    this.cancelPendingServerRequests();
+    this.sessionRequests.cancelPending();
     this._terminalManager?.releaseAllAcpTerminals();
 
     if (this.sessionId && this.agentSessionCapabilities?.close !== undefined) {
@@ -1012,155 +904,20 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.terminalManager.handleKillTerminal(params);
   }
 
-  private readonly pendingPermissionResolvers = new Map<
-    ThreadServerRequestId,
-    (response: unknown) => void
-  >();
-  private readonly pendingElicitationResolvers = new Map<
-    ThreadServerRequestId,
-    {
-      resolve: (response: unknown) => void;
-      elicitationId?: string;
-      request: CreateElicitationRequest;
-    }
-  >();
-  private readonly pendingElicitationRequestIdsByElicitationId = new Map<
-    string,
-    ThreadServerRequestId
-  >();
-
-  private permissionRequestSeq = 0;
-  private elicitationRequestSeq = 0;
-
-  private cancelPendingServerRequests(): void {
-    const cancelledIds: ThreadServerRequestId[] = [];
-    for (const [requestId, resolver] of this.pendingPermissionResolvers) {
-      cancelledIds.push(requestId);
-      resolver({ outcome: { outcome: "cancelled" } });
-    }
-    this.pendingPermissionResolvers.clear();
-    for (const [requestId, entry] of this.pendingElicitationResolvers) {
-      cancelledIds.push(requestId);
-      if (entry.elicitationId !== undefined) {
-        this.pendingElicitationRequestIdsByElicitationId.delete(entry.elicitationId);
-      }
-      entry.resolve({ action: "cancel" });
-    }
-    this.pendingElicitationResolvers.clear();
-    if (cancelledIds.length > 0) {
-      this.emitRuntimeEvents(
-        cancelledIds.map((requestId) => ({
-          type: "request.resolved",
-          threadId: this.threadId,
-          requestId: String(requestId),
-          outcome: "cancelled",
-        })),
-      );
-    }
-  }
-
-  private resolvePendingElicitationRequest(
-    requestId: ThreadServerRequestId,
-    response: unknown,
-  ): boolean {
-    const entry = this.pendingElicitationResolvers.get(requestId);
-    if (!entry) return false;
-    this.pendingElicitationResolvers.delete(requestId);
-    if (entry.elicitationId !== undefined) {
-      this.pendingElicitationRequestIdsByElicitationId.delete(entry.elicitationId);
-    }
-    entry.resolve(response);
-    this.emitRuntimeEvents(
-      buildAcpElicitationAnswerEvents({
-        threadId: this.threadId,
-        itemId: `acp-question-answer-${String(requestId)}`,
-        request: entry.request,
-        response,
-      }),
-    );
-    return true;
-  }
-
-  /**
-   * Handle `requestPermission` calls from the agent.
-   *
-   * Maps ACP permission requests to Poracode's `ThreadServerRequest` system.
-   * The agent blocks until we respond — we create a pending promise and emit
-   * the request to the UI via the listener.
-   */
   private handlePermissionRequest(
     params: RequestPermissionRequest,
   ): Promise<RequestPermissionResponse> {
-    if (this.shouldAutoApproveSyntheticPermissionRequest()) {
-      const optionId = selectAutoApprovedPermissionOption(params);
-      if (optionId) {
-        return Promise.resolve({ outcome: { outcome: "selected", optionId } });
-      }
-    }
-
-    return new Promise<RequestPermissionResponse>((resolve) => {
-      const requestId = `acp-perm-${this.permissionRequestSeq++}`;
-
-      this.pendingPermissionResolvers.set(requestId, (response: unknown) => {
-        const resp = response as { optionId?: string } | undefined;
-        if (resp?.optionId) {
-          resolve({ outcome: { outcome: "selected", optionId: resp.optionId } });
-        } else {
-          resolve({ outcome: { outcome: "cancelled" } });
-        }
-      });
-
-      // Emit a canonical request.opened — the composer-level runtime-request
-      // panel renders it and resolves through `bridge.resolveThreadServerRequest`
-      // → `resolveServerRequest()` here.
-      const mapperState = this.ensureMapperState();
-      this.emitRuntimeEvents([mapAcpPermissionRequest(params, mapperState, String(requestId))]);
-
-      // Also signal that the thread needs approval
-      this.emitListenerUpdate({ status: "needs_approval", attention: "needs_approval" });
-    });
+    return this.sessionRequests.requestPermission(params);
   }
 
   private handleElicitationRequest(
     params: CreateElicitationRequest,
   ): Promise<CreateElicitationResponse> {
-    return new Promise<CreateElicitationResponse>((resolve) => {
-      const requestId = `acp-elicit-${this.elicitationRequestSeq++}`;
-      const urlElicitationId = AcpCreateElicitationRequest.isUrl(params)
-        ? params.elicitationId
-        : undefined;
-
-      this.pendingElicitationResolvers.set(requestId, {
-        resolve: (response: unknown) => {
-          resolve(normalizeAcpElicitationResponse(response, params));
-        },
-        request: params,
-        ...(urlElicitationId !== undefined ? { elicitationId: urlElicitationId } : {}),
-      });
-
-      if (urlElicitationId !== undefined) {
-        this.pendingElicitationRequestIdsByElicitationId.set(urlElicitationId, requestId);
-      }
-
-      const mapperState = this.ensureMapperState();
-      this.emitRuntimeEvents([mapAcpElicitationRequest(params, mapperState, String(requestId))]);
-      this.emitListenerUpdate({ status: "needs_reply", attention: "needs_reply" });
-    });
+    return this.sessionRequests.createElicitation(params);
   }
 
   private handleElicitationComplete(params: CompleteElicitationNotification): void {
-    const requestId = this.pendingElicitationRequestIdsByElicitationId.get(params.elicitationId);
-    if (!requestId) return;
-    if (this.resolvePendingElicitationRequest(requestId, { action: "accept" })) {
-      this.emitRuntimeEvents([
-        {
-          type: "request.resolved",
-          threadId: this.threadId,
-          requestId: String(requestId),
-          outcome: "answered",
-        },
-      ]);
-    }
+    this.sessionRequests.completeElicitation(params);
   }
 
   /**
@@ -1275,8 +1032,8 @@ export class AcpStructuredSession implements StructuredSessionHandle {
             content.text,
           );
         }
+        break;
       }
-      // fallthrough
       case "agent_thought_chunk":
       case "user_message_chunk":
         // Agent is producing output — stay in "working" state
@@ -1299,48 +1056,23 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         break;
 
       case "current_mode_update":
-        if (
-          this.currentConfig &&
-          "currentModeId" in update &&
-          typeof update.currentModeId === "string"
-        ) {
-          const nextConfig = applyAcpModeUpdateToConfig(this.currentConfig, update.currentModeId);
-          if (!isThreadConfigEqual(this.currentConfig, nextConfig)) {
-            this.currentConfig = nextConfig;
-            const sessionRef = this.currentSessionRef();
-            // Mode-change confirmations are metadata, not turn boundaries —
-            // preserve the live status so the renderer's working-time clock
-            // doesn't reset when the agent echoes back a setSessionMode call.
-            this.emitListenerUpdate({
-              status: this.currentStatus,
-              attention: this.currentAttention,
-              config: nextConfig,
-              ...(sessionRef ? { sessionRef } : {}),
-            });
-          }
+      case "config_option_update": {
+        const nextConfig = this.sessionConfigSync.reduceSessionUpdate(this.currentConfig, update);
+        if (nextConfig) {
+          this.currentConfig = nextConfig;
+          const sessionRef = this.currentSessionRef();
+          // Configuration confirmations are metadata, not turn boundaries —
+          // preserve the live status so the renderer's working-time clock
+          // does not reset when an agent echoes a configuration change.
+          this.emitListenerUpdate({
+            status: this.currentStatus,
+            attention: this.currentAttention,
+            config: nextConfig,
+            ...(sessionRef ? { sessionRef } : {}),
+          });
         }
         break;
-
-      case "config_option_update":
-        if (this.currentConfig && "configOptions" in update) {
-          this.rememberSessionOptions(this.availableModeIds, update.configOptions);
-          const thoughtLevelConfig = findThoughtLevelConfig(update.configOptions);
-          if (
-            thoughtLevelConfig?.currentValue &&
-            thoughtLevelConfig.currentValue !== this.currentConfig.effort
-          ) {
-            const nextConfig = { ...this.currentConfig, effort: thoughtLevelConfig.currentValue };
-            this.currentConfig = nextConfig;
-            const sessionRef = this.currentSessionRef();
-            this.emitListenerUpdate({
-              status: this.currentStatus,
-              attention: this.currentAttention,
-              config: nextConfig,
-              ...(sessionRef ? { sessionRef } : {}),
-            });
-          }
-        }
-        break;
+      }
 
       case "session_info_update": {
         // Session metadata (title) updates are not evidence of active work.

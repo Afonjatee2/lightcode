@@ -180,6 +180,7 @@ describe("WslBridgeClient", () => {
   });
 
   it("retries transient localhost forwarding failures after bridge boot", async () => {
+    vi.useFakeTimers();
     const fetchMock = vi.fn<() => Promise<Response>>();
     fetchMock.mockRejectedValueOnce(new TypeError("fetch failed"));
     fetchMock.mockResolvedValueOnce(
@@ -190,9 +191,15 @@ describe("WslBridgeClient", () => {
     );
     vi.stubGlobal("fetch", fetchMock);
 
-    const client = new WslBridgeClient(mockServer);
-    await expect(client.home(makeLocation())).resolves.toEqual({ home: "/home/user" });
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    try {
+      const client = new WslBridgeClient(mockServer);
+      const result = client.home(makeLocation());
+      await vi.advanceTimersByTimeAsync(125);
+      await expect(result).resolves.toEqual({ home: "/home/user" });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("find defaults root to projectLinuxPath when omitted", async () => {

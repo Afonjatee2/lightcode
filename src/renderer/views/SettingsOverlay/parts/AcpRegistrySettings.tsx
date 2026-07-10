@@ -14,12 +14,13 @@ import {
   Search,
   Trash2,
 } from "lucide-react";
-import type {
-  AcpRegistryAgent,
-  AgentStatus,
-  AgentStatusesResponse,
-  Project,
-  RefreshAgentScope,
+import {
+  acpGenericKind,
+  type AcpRegistryAgent,
+  type AgentStatus,
+  type AgentStatusesResponse,
+  type Project,
+  type RefreshAgentScope,
 } from "@/shared/contracts";
 import { msg } from "@lingui/core/macro";
 import { isWindows, readBridge } from "@/renderer/bridge";
@@ -33,11 +34,11 @@ import {
   agentAuthTarget,
   findAgentAuthMethodForStatus,
   findTerminalAuthMethodForStatus,
-  registryAdapterKind,
   scopeEnvForStatus,
 } from "@/renderer/utils/acpRegistryAuth";
 import { PixelLoader } from "@/renderer/components/common";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import { getProviderManifest } from "@/renderer/components/providers/providerManifest";
 import {
   APP_SUPPORTED_ACP_AGENT_IDS,
   KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS,
@@ -249,7 +250,8 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
   }
   const visibleNativeAgents = NATIVE_AGENT_REGISTRY_ENTRIES.filter((agent) => {
     if (!normalizedQuery) return true;
-    return [agent.id, agent.label, t(agent.description)]
+    const manifestLabel = getProviderManifest(agent.id)?.label;
+    return [agent.id, manifestLabel ? t(manifestLabel) : agent.id, t(agent.description)]
       .join(" ")
       .toLowerCase()
       .includes(normalizedQuery);
@@ -279,7 +281,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     readBridge()
       .installAcpRegistryAgent({ agentId })
       .then(async (result) => {
-        const adapterKind = registryAdapterKind(agentId);
+        const adapterKind = acpGenericKind(agentId);
         const response = await refreshStatuses({
           reset: false,
           scope: { agentKinds: [adapterKind] },
@@ -312,7 +314,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
       .removeAcpRegistryAgent({ agentId })
       .then((result) => {
         syncInstalledAgents(result.installed);
-        refreshStatuses();
+        void refreshStatuses();
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : String(err));
@@ -327,7 +329,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     readBridge()
       .updateAcpRegistryAgent({ agentId })
       .then(async (result) => {
-        const adapterKind = registryAdapterKind(agentId);
+        const adapterKind = acpGenericKind(agentId);
         await refreshStatuses({ reset: false, scope: { agentKinds: [adapterKind] } });
         syncInstalledAgents(result.installed);
         toast.success(t`${agent.name} updated to v${agent.version}.`);
@@ -343,7 +345,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     setError(undefined);
     readBridge()
       .authenticateAcpAgent({
-        agentKind: registryAdapterKind(agentId),
+        agentKind: acpGenericKind(agentId),
         methodId,
         ...agentAuthTarget(status),
       })
@@ -352,7 +354,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
         refreshStatuses({
           reset: false,
           scope: {
-            agentKinds: [registryAdapterKind(agentId)],
+            agentKinds: [acpGenericKind(agentId)],
             envs: [scopeEnvForStatus(status)],
           },
         }),
@@ -440,6 +442,8 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
   }
 
   const renderNativeAgentCard = (agent: NativeAgentRegistryEntry) => {
+    const manifestLabel = getProviderManifest(agent.id)?.label;
+    const agentLabel = manifestLabel ? t(manifestLabel) : agent.id;
     const nativeStatus = agentStatuses.find(
       (status) => status.kind === agent.id && status.installed,
     );
@@ -457,11 +461,10 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
     const loginCommand = missingAuthStatus?.loginCommand;
     const terminalAuthMethod = findTerminalAuthMethodForStatus(missingAuthStatus);
     const loginProject = projectForStatus(missingAuthStatus);
-    const supportsNativeWindows = agent.supportsWindows !== false;
     const installTargets: InstallTarget[] = [];
     const shouldOfferWslTargets = isWindowsPlatform && wslProjectsByDistro.size > 0;
     if (shouldOfferWslTargets) {
-      if (supportsNativeWindows && !nativeStatus && firstWindowsProject) {
+      if (!nativeStatus && firstWindowsProject) {
         installTargets.push({
           id: "windows",
           label: t`Install on Windows`,
@@ -476,19 +479,15 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
           project,
         });
       }
-    } else if (!nativeStatus && (supportsNativeWindows || !isWindowsPlatform)) {
+    } else if (!nativeStatus) {
       installTargets.push({ id: "default", label: t`Install` });
     }
-    // Native Windows without WSL available, for an agent that has no Windows
-    // installer (e.g. Grok Build): nothing to install here yet.
-    const showWindowsUnsupportedNotice =
-      !isInstalled && !supportsNativeWindows && isWindowsPlatform && installTargets.length === 0;
 
     const runInstallTarget = (target: InstallTarget | undefined) => {
       setError(undefined);
       setPendingAgentId(agent.id);
       runAgentInstallCommand({
-        label: agent.label,
+        label: agentLabel,
         command: agent.installCommand,
         ...(target?.project ? { project: target.project } : {}),
         // Re-detect once the installer exits so the card flips to "Detected"
@@ -545,7 +544,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
           </Button>
           <Dropdown.Popover placement="bottom end">
             <Dropdown.Menu
-              aria-label={t`${agent.label} install targets`}
+              aria-label={t`${agentLabel} install targets`}
               onAction={(key) => runInstallTarget(targetsById.get(String(key)))}
             >
               {installTargets.map((target) => (
@@ -567,7 +566,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
         <div className="flex items-start gap-4">
           <ProviderIcon
             kind={agent.id}
-            fallbackLabel={agent.label}
+            fallbackLabel={agentLabel}
             className={`size-8 shrink-0 rounded-lg ${isInstalled ? "!text-foreground !opacity-100" : ""}`}
           />
 
@@ -575,9 +574,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
             <div className="flex items-start justify-between gap-4">
               <Card.Header className="flex min-w-0 flex-1 flex-col items-start gap-1 p-0">
                 <div className="flex items-center gap-2">
-                  <Card.Title className="truncate text-base font-semibold">
-                    {agent.label}
-                  </Card.Title>
+                  <Card.Title className="truncate text-base font-semibold">{agentLabel}</Card.Title>
                   {renderTag(t`Native`)}
                 </div>
                 <Card.Description className="line-clamp-2 text-sm text-foreground/85">
@@ -613,13 +610,6 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                   </div>
                 ) : null}
                 {renderInstallControl()}
-                {showWindowsUnsupportedNotice ? (
-                  <span className="max-w-[13rem] text-right text-xs text-muted">
-                    <Trans>
-                      Windows is not supported yet. Install inside WSL or on macOS/Linux.
-                    </Trans>
-                  </span>
-                ) : null}
                 {isInstalled && missingAuthStatus ? (
                   <div className="flex items-center gap-2 text-xs text-warning">
                     <span className="inline-flex items-center gap-1 whitespace-nowrap">
@@ -680,7 +670,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
 
   const renderAgentCard = (agent: AcpRegistryAgent) => {
     const installedRecord = installedById.get(agent.id);
-    const adapterKind = registryAdapterKind(agent.id);
+    const adapterKind = acpGenericKind(agent.id);
     const familyKind = REGISTRY_AGENT_FAMILY_KIND[agent.id];
     const detectedStatuses = findDetectedStatuses(adapterKind, familyKind);
     const familyDetectedStatuses = findDetectedStatuses(familyKind);
@@ -972,7 +962,7 @@ export function AcpRegistrySettings(props: { onOpenAgentSettings?: (kind: string
                         .listAcpRegistry()
                         .then((result) => {
                           setAgents(result.agents);
-                          refreshStatuses({ reset: false });
+                          void refreshStatuses({ reset: false });
                         })
                         .catch((err: unknown) => {
                           setError(err instanceof Error ? err.message : String(err));

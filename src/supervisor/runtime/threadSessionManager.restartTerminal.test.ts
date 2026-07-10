@@ -52,6 +52,16 @@ vi.mock("../agents/base", async (importActual) => {
   };
 });
 
+// Race guards are synchronized by the awaited lifecycle callbacks themselves;
+// skip the production-only process settle pause.
+vi.mock("node:timers/promises", async (importActual) => {
+  const actual = await importActual<typeof import("node:timers/promises")>();
+  return {
+    ...actual,
+    setTimeout: vi.fn<(delay?: number) => Promise<void>>(async () => undefined),
+  };
+});
+
 import { primeProjectShellEnv } from "../agents/base";
 import { ThreadSessionManager } from "./threadSessionManager";
 

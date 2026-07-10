@@ -13,8 +13,13 @@
     "isolatedModules": true,
     "skipLibCheck": true,
     "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noFallthroughCasesInSwitch": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
     "noEmit": true,
     "noUncheckedIndexedAccess": true,
+    "noUncheckedSideEffectImports": true,
     "exactOptionalPropertyTypes": true,
     "useDefineForClassFields": true,
     "types": ["node", "vite/client"]

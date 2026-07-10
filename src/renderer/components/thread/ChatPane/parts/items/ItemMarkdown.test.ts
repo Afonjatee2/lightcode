@@ -50,3 +50,4 @@ describe("normalizeGfmTableSeparators", () => {
     expect(out).toContain("| --- | --- | --- |\r\n");
   });
 });
+// @vitest-environment node

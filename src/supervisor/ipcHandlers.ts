@@ -178,9 +178,7 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     gitWatchWorktrees: async (payload) => {
       runtime.projectWatcher.watchWorktrees(payload.projectId, payload.worktreePaths);
     },
-    gitUnwatchProject: async (payload) => {
-      runtime.projectWatcher.unwatch(payload.projectId);
-    },
+    gitUnwatchProject: (payload) => runtime.projectWatcher.unwatch(payload.projectId),
     relocateProject: (payload) => runtime.relocateProject(payload),
     searchProjectFiles: (payload) => fileIndex.searchProjectFiles(payload),
     listProjectTree: (payload) => projectTree.listProjectTree(payload),

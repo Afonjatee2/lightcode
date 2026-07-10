@@ -34,9 +34,9 @@ export function createAntigravityAdapter(): AgentAdapter {
   let preSpawnStartedAt = 0;
 
   return {
-    kind: "antigravity",
-    label: "Antigravity",
-    binary: "agy",
+    kind: antigravityDetectionSpec.kind,
+    label: antigravityDetectionSpec.label,
+    binary: antigravityDetectionSpec.binary,
     ...(antigravityDetectionSpec.update ? { update: antigravityDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;

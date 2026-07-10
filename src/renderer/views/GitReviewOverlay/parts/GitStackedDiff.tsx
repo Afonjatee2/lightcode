@@ -292,7 +292,7 @@ export function StackedFileCard(props: {
                 tabIndex={0}
                 className="rounded p-0.5 text-muted transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
                 title={file.staged ? t`Unstage` : t`Stage`}
-                onClick={handleStageToggle}
+                onClick={(event) => void handleStageToggle(event)}
                 onKeyDown={(e) =>
                   handleKeyActivate(
                     e,

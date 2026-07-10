@@ -5,6 +5,7 @@
 // then caught and shown as a readable crash screen instead of a black screen
 // (the failure mode this indirection exists to prevent on iOS standalone).
 import "./installBridge";
+import "@/renderer/components/providers/bootstrap";
 import { RouterProvider } from "@tanstack/react-router";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { router } from "./router";

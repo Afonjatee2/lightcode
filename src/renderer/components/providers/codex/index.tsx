@@ -4,21 +4,19 @@ import { msg } from "@lingui/core/macro";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import { i18n } from "@/renderer/i18n/i18n";
 import { CodexStatusIcon } from "./CodexStatusIcon";
+import providerManifest from "./manifest";
 import { planWorkToggle } from "../composerControlBuilders";
 import type { AgentCapability, ThreadConfig } from "@/shared/contracts";
-import {
-  registerCommitGenDefaults,
-  registerComposerControls,
-  registerConfigNormalizer,
-  registerConflictResolverDefaults,
-  registerGuiSlashCommands,
-  registerProviderIcon,
-  registerProviderLabel,
-  registerTitleGenDefaults,
-} from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
+import { registerComposerControls, registerConfigNormalizer } from "../providerComposer";
+import { registerGuiSlashCommands } from "../providerSlashCommands";
+import { registerCommitGenDefaults } from "../commitGen";
+import { registerConflictResolverDefaults } from "../conflictResolver";
+import { registerTitleGenDefaults } from "../titleGen";
 
-registerProviderIcon("codex", CodexStatusIcon);
-registerProviderLabel("codex", "Codex");
+const PROVIDER_KIND = providerManifest.kind;
+
+registerProviderIcon(PROVIDER_KIND, CodexStatusIcon);
 // Title/commit defaults were chosen by an empirical benchmark (latency + blind
 // quality judging) across the Codex model/effort matrix on real prompts and
 // diffs — not by model-tier intuition. Two findings drove these:
@@ -31,26 +29,26 @@ registerProviderLabel("codex", "Codex");
 //      mislabeled a feature commit as "fix", and the fast lane / xhigh added
 //      latency without quality. So we keep mini and only fix the effort.
 // Frontier gpt-5.5 stays for the conflict resolver (a real interactive task).
-registerCommitGenDefaults("codex", {
+registerCommitGenDefaults(PROVIDER_KIND, {
   label: "Codex",
   hint: "GPT-5.4 Mini low",
   model: "gpt-5.4-mini",
   effort: "low",
 });
-registerTitleGenDefaults("codex", {
+registerTitleGenDefaults(PROVIDER_KIND, {
   label: "Codex",
   hint: "GPT-5.4 Mini low",
   model: "gpt-5.4-mini",
   effort: "low",
 });
-registerConflictResolverDefaults("codex", {
+registerConflictResolverDefaults(PROVIDER_KIND, {
   label: "Codex",
   hint: "GPT-5.5 high",
   model: "gpt-5.5",
   effort: "high",
 });
 
-registerConfigNormalizer("codex", ({ config, presentationMode }) => {
+registerConfigNormalizer(PROVIDER_KIND, ({ config, presentationMode }) => {
   // Plan mode is wired only through ACP; the terminal CLI ignores it.
   if (presentationMode === "terminal" && config.mode === "plan") {
     return { mode: "agent" };
@@ -66,7 +64,7 @@ const codexCommand = (id: string, description: string) => ({
   label: `${id} - ${description}`,
 });
 
-registerGuiSlashCommands("codex", {
+registerGuiSlashCommands(PROVIDER_KIND, {
   buildCommands: ({ hasEffort, supportsFast }) => [
     codexCommand("model", i18n._(msg`Open the model picker`)),
     codexCommand("plan", i18n._(msg`Switch this chat to plan mode`)),
@@ -205,7 +203,7 @@ function buildCodexPermissionControl(
   };
 }
 
-registerComposerControls("codex", {
+registerComposerControls(PROVIDER_KIND, {
   // ACP exposes plan mode in addition to the preset selector.
   gui: ({ capabilities, config, isDisabled, onConfigChange }) => {
     const isPlanMode = (config.mode ?? "agent") !== "agent";

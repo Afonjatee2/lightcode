@@ -52,3 +52,4 @@ describe("resolvePrimaryCommitAction", () => {
     );
   });
 });
+// @vitest-environment node

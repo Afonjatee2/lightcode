@@ -191,12 +191,12 @@ export function BrowserToolbar(props: {
         className={toolbarButtonClass}
         title={t`Back`}
         disabled={disabled || !activeTab?.canGoBack}
-        onClick={() =>
-          activeTabId &&
-          readBridge()
-            .browserBack({ tabId: activeTabId })
-            .catch(() => {})
-        }
+        onClick={() => {
+          if (activeTabId)
+            void readBridge()
+              .browserBack({ tabId: activeTabId })
+              .catch(() => {});
+        }}
       >
         <ArrowLeft className="size-3.5" />
       </button>
@@ -205,12 +205,12 @@ export function BrowserToolbar(props: {
         className={toolbarButtonClass}
         title={t`Forward`}
         disabled={disabled || !activeTab?.canGoForward}
-        onClick={() =>
-          activeTabId &&
-          readBridge()
-            .browserForward({ tabId: activeTabId })
-            .catch(() => {})
-        }
+        onClick={() => {
+          if (activeTabId)
+            void readBridge()
+              .browserForward({ tabId: activeTabId })
+              .catch(() => {});
+        }}
       >
         <ArrowRight className="size-3.5" />
       </button>
@@ -219,12 +219,12 @@ export function BrowserToolbar(props: {
         className={toolbarButtonClass}
         title={t`Reload`}
         disabled={disabled}
-        onClick={() =>
-          activeTabId &&
-          readBridge()
-            .browserReload({ tabId: activeTabId })
-            .catch(() => {})
-        }
+        onClick={() => {
+          if (activeTabId)
+            void readBridge()
+              .browserReload({ tabId: activeTabId })
+              .catch(() => {});
+        }}
       >
         <RotateCw className="size-3.5" />
       </button>
@@ -313,12 +313,13 @@ export function BrowserToolbar(props: {
         className={consoleButtonClass}
         title={t`Console`}
         disabled={disabled}
-        onClick={() =>
-          activeTabId &&
-          readBridge()
-            .browserToggleDevTools({ tabId: activeTabId })
-            .catch(() => {})
-        }
+        onClick={() => {
+          if (activeTabId) {
+            void readBridge()
+              .browserToggleDevTools({ tabId: activeTabId })
+              .catch(() => {});
+          }
+        }}
       >
         <TerminalSquare className="size-3.5" />
       </button>

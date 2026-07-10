@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Monitor, Paperclip, Plus, Server } from "lucide-react";
 import type { Selection } from "@heroui/react";
-import { Dropdown, Label, Separator, Tooltip } from "@heroui/react";
+import { Dropdown, Label, Separator } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { isRemoteSession } from "@/renderer/bridge";
 import { Button } from "@/renderer/components/common";
@@ -221,14 +221,7 @@ export function ComposerAddMenu(props: {
   // ── Desktop: HeroUI dropdown with a real flyout submenu for the MCP list ──
   return (
     <Dropdown>
-      <Dropdown.Trigger>
-        <Tooltip delay={300}>
-          {button}
-          <Tooltip.Content placement="top">
-            <Trans>Add</Trans>
-          </Tooltip.Content>
-        </Tooltip>
-      </Dropdown.Trigger>
+      {button}
       <Dropdown.Popover placement="top start">
         <Dropdown.Menu
           aria-label={t`Add to composer`}

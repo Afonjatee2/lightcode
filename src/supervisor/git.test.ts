@@ -1153,7 +1153,7 @@ describe("GitService.getDiff", () => {
   });
 });
 
-describe("GitService.getStatus", () => {
+describe("GitService.getStatus Windows path normalization", () => {
   const location = {
     kind: "windows" as const,
     path: "C:\\Users\\demo\\work\\lightcode",
@@ -2120,7 +2120,7 @@ describe("GitService.abortMerge", () => {
   });
 });
 
-describe("GitService.getStatus", () => {
+describe("GitService.getStatus Windows untracked expansion", () => {
   const location = {
     kind: "windows" as const,
     path: "C:\\Users\\demo\\work\\lightcode",

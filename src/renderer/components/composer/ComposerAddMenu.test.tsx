@@ -34,6 +34,14 @@ describe("ComposerAddMenu", () => {
     bridgeMock.isRemoteSession.mockReturnValue(false);
   });
 
+  it("keeps the desktop dropdown trigger free of nested buttons", () => {
+    const { container } = render(
+      <ComposerAddMenu mcpServers={[]} onPickFiles={vi.fn<() => void>()} />,
+    );
+
+    expect(container.querySelector("button button")).not.toBeInTheDocument();
+  });
+
   it("hides the file picker action when file attachments are unavailable", () => {
     render(
       <ComposerAddMenu

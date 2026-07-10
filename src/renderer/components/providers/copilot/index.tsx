@@ -1,33 +1,32 @@
 export * from "./CopilotIcon";
 
 import { CopilotIcon } from "./CopilotIcon";
+import providerManifest from "./manifest";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import type { ThreadConfig } from "@/shared/contracts";
 import { fullAccessToggle, planWorkToggle } from "../composerControlBuilders";
-import {
-  registerCommitGenDefaults,
-  registerComposerControls,
-  registerConflictResolverDefaults,
-  registerProviderIcon,
-  registerProviderLabel,
-  registerTitleGenDefaults,
-} from "../ProviderIcon";
+import { registerProviderIcon } from "../ProviderIcon";
+import { registerComposerControls } from "../providerComposer";
+import { registerCommitGenDefaults } from "../commitGen";
+import { registerConflictResolverDefaults } from "../conflictResolver";
+import { registerTitleGenDefaults } from "../titleGen";
 
-registerProviderIcon("copilot", CopilotIcon);
-registerProviderLabel("copilot", "Copilot");
-registerCommitGenDefaults("copilot", {
+const PROVIDER_KIND = providerManifest.kind;
+
+registerProviderIcon(PROVIDER_KIND, CopilotIcon);
+registerCommitGenDefaults(PROVIDER_KIND, {
   label: "Copilot",
   hint: "auto",
   model: "",
   effort: "",
 });
-registerTitleGenDefaults("copilot", {
+registerTitleGenDefaults(PROVIDER_KIND, {
   label: "Copilot",
   hint: "auto",
   model: "",
   effort: "",
 });
-registerConflictResolverDefaults("copilot", {
+registerConflictResolverDefaults(PROVIDER_KIND, {
   label: "Copilot",
   hint: "auto",
   model: "",
@@ -52,7 +51,7 @@ function copilotPermissionToggle({
   });
 }
 
-registerComposerControls("copilot", {
+registerComposerControls(PROVIDER_KIND, {
   // Plan toggle is shared: ACP exposes it as a session mode and the CLI maps
   // it to a `/plan` slash-command prefix. Both surfaces accept the same
   // `mode: "plan"` config value.

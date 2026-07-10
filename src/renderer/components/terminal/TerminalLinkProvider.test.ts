@@ -9,7 +9,7 @@ type Cell = { chars: string; width: number };
 
 /** One width-1 cell per character — models a plain ASCII row. */
 function ascii(text: string): Cell[] {
-  return [...text].map((ch) => ({ chars: ch, width: 1 }));
+  return Array.from(text, (ch) => ({ chars: ch, width: 1 }));
 }
 
 /** A wide/CJK glyph: a width-2 lead cell followed by a width-0 spacer cell. */

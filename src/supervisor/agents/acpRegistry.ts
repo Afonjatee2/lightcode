@@ -5,6 +5,7 @@ import { writeFileAtomic } from "@/shared/atomicFile";
 import { basename, dirname, join } from "node:path";
 import { promisify } from "node:util";
 import {
+  acpGenericKind,
   acpRegistryListResultSchema,
   type AcpRegistryAgent,
   type AcpRegistryListResult,
@@ -20,11 +21,7 @@ import {
 } from "@/shared/settings";
 import { downloadToFile } from "../runtime/download";
 import { decryptSecret, encryptSecret, transformSensitiveAgentSecrets } from "../secretStorage";
-import {
-  acpGenericKind,
-  probeAcpGenericInstance,
-  REGISTRY_INSTALL_PROBE_TIMEOUT_MS,
-} from "./acp-generic";
+import { probeAcpGenericInstance, REGISTRY_INSTALL_PROBE_TIMEOUT_MS } from "./acp-generic";
 import { cacheAcpRegistryIcon, isRemoteIconUrl } from "./acpRegistryIcons";
 import {
   buildNpxPrefetchArgs,
@@ -37,20 +34,6 @@ const execFileAsync = promisify(execFile);
 
 const ACP_REGISTRY_URL = "https://cdn.agentclientprotocol.com/registry/v1/latest/registry.json";
 const ACP_REGISTRY_INSTALL_DIR = "acp-registry";
-
-const REGISTRY_AGENT_FAMILY_KIND: Record<string, AgentKind> = {
-  "claude-acp": "claude",
-  "codex-acp": "codex",
-  cursor: "cursor",
-  gemini: "gemini",
-  "github-copilot": "copilot",
-  "github-copilot-cli": "copilot",
-  opencode: "opencode",
-};
-
-export function resolveRegistryAgentFamilyKind(agentId: string): AgentKind | undefined {
-  return REGISTRY_AGENT_FAMILY_KIND[agentId];
-}
 
 export async function fetchAcpRegistry(): Promise<AcpRegistryListResult> {
   const response = await fetch(ACP_REGISTRY_URL);

@@ -752,7 +752,7 @@ export function RemoteAccessSettings() {
             qrDataUrl={state.qrDataUrl}
             isRefreshing={isRefreshing}
             revokingSessionId={revokingSessionId}
-            onRefresh={refresh}
+            onRefresh={() => void refresh()}
             onRevoke={(sessionId) => void revokeSession(sessionId)}
           />
           <RemoteAccessAdvanced

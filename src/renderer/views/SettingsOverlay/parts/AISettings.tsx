@@ -15,15 +15,19 @@ import { ThreadComposer } from "@/renderer/components/thread/ThreadComposer";
 import {
   getCommitGenCandidates,
   getCommitGenDefaultsHint,
+  resolveCommitGenConfig,
+} from "@/renderer/components/providers/commitGen";
+import {
   getConflictResolverCandidates,
   getConflictResolverDefaultsHint,
+  resolveConflictResolverConfig,
+} from "@/renderer/components/providers/conflictResolver";
+import {
   getTitleGenCandidates,
   getTitleGenDefaultsHint,
-  resolveCommitGenConfig,
   resolveTitleGenConfig,
-  resolveConflictResolverConfig,
-  sortByAutoPreference,
-} from "@/renderer/components/providers";
+} from "@/renderer/components/providers/titleGen";
+import { sortByAutoPreference } from "@/renderer/components/providers/utilityTask";
 import { TuxIcon } from "@/renderer/components/common";
 import { SettingsPage } from "./SettingsForm";
 

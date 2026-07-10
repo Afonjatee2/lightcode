@@ -348,6 +348,7 @@ describe("browser MCP tool registry", () => {
   });
 
   it("returns structured timeout metadata for a stuck viewport screenshot capture", async () => {
+    vi.useFakeTimers();
     const send = createRoutingSend();
     const ctx = createDispatchContext(send);
     const tab = ctx.manager.getActiveTab() as unknown as {
@@ -357,15 +358,22 @@ describe("browser MCP tool registry", () => {
     };
     tab.webContents.capturePage.mockReturnValueOnce(new Promise(() => {}));
 
-    await expect(dispatchTool("screenshot", { timeoutMs: 200 }, ctx)).resolves.toMatchObject({
-      timedOut: true,
-      reason: "timeout",
-      operation: "viewport screenshot",
-      timeoutMs: 200,
-    });
+    try {
+      const result = dispatchTool("screenshot", { timeoutMs: 200 }, ctx);
+      await vi.advanceTimersByTimeAsync(200);
+      await expect(result).resolves.toMatchObject({
+        timedOut: true,
+        reason: "timeout",
+        operation: "viewport screenshot",
+        timeoutMs: 200,
+      });
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("can hard-fail on screenshot timeout", async () => {
+    vi.useFakeTimers();
     const send = createRoutingSend();
     const ctx = createDispatchContext(send);
     const tab = ctx.manager.getActiveTab() as unknown as {
@@ -375,9 +383,16 @@ describe("browser MCP tool registry", () => {
     };
     tab.webContents.capturePage.mockReturnValueOnce(new Promise(() => {}));
 
-    await expect(
-      dispatchTool("screenshot", { timeoutMs: 200, failOnTimeout: true }, ctx),
-    ).rejects.toThrow("viewport screenshot timed out after 200ms");
+    try {
+      const result = dispatchTool("screenshot", { timeoutMs: 200, failOnTimeout: true }, ctx);
+      const rejection = result.catch((cause: unknown) => cause);
+      await vi.advanceTimersByTimeAsync(200);
+      const error = await rejection;
+      expect(error).toBeInstanceOf(Error);
+      expect(error).toHaveProperty("message", "viewport screenshot timed out after 200ms");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("includes screenshot metadata next to image content", async () => {

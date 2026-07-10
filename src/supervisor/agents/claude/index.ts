@@ -171,8 +171,8 @@ export function createClaudeProfileAdapter(instance: AgentInstanceConfig): Agent
 }
 
 export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAdapter {
-  const kind = options.kind ?? "claude";
-  const label = options.label ?? "Claude Code";
+  const kind = options.kind ?? claudeDetectionSpec.kind;
+  const label = options.label ?? claudeDetectionSpec.label;
   const profileEnv = (location: ProjectLocation) =>
     profileEnvForLocation(options.configDir, options.customEnv, location);
   const capabilities = overrideProfileCapabilities(
@@ -184,7 +184,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
   return {
     kind,
     label,
-    binary: "claude",
+    binary: claudeDetectionSpec.binary,
     capabilities,
     ...(claudeDetectionSpec.update ? { update: claudeDetectionSpec.update } : {}),
     // WSL OAuth flows try to open a browser; no-op it so the PTY doesn't hang.

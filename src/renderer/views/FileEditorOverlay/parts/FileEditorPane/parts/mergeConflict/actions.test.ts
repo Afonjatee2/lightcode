@@ -50,3 +50,4 @@ describe("buildReplacement", () => {
     expect(buildReplacement(m, b, "both")).toBe("x\n");
   });
 });
+// @vitest-environment node

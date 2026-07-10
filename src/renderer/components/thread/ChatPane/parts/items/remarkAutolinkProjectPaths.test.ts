@@ -108,3 +108,4 @@ describe("remarkAutolinkProjectPaths", () => {
     );
   });
 });
+// @vitest-environment node

@@ -1244,7 +1244,19 @@ async function handleFs(req, res, handler) {
   respondErr(res, outcome.status, outcome.code ?? "EIO", outcome.message ?? "error");
 }
 
-const server = createServer(async (req, res) => {
+const server = createServer((req, res) => {
+  void handleRequest(req, res).catch((error) => {
+    const message = String(error?.message ?? error);
+    emit({ type: "error", message });
+    if (!res.headersSent) {
+      respondErr(res, 500, "EIO", message);
+    } else if (!res.writableEnded) {
+      res.end();
+    }
+  });
+});
+
+async function handleRequest(req, res) {
   const url = req.url ?? "";
   const pathOnly = url.split("?")[0];
   if (pathOnly === MCP_PATH || pathOnly === `${MCP_PATH}/`) {
@@ -1295,7 +1307,7 @@ const server = createServer(async (req, res) => {
     return;
   }
   respondErr(res, 404, "ENOENT", `no handler for ${pathOnly}`);
-});
+}
 
 server.on("error", (error) => {
   emit({ type: "error", message: String(error?.message ?? error) });

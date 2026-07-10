@@ -4,7 +4,7 @@ import type { MentionInputHandle } from "@/renderer/components/composer/MentionI
 import {
   getGuiSlashCommands,
   type LocalSlashCommandAction,
-} from "@/renderer/components/providers/ProviderIcon";
+} from "@/renderer/components/providers/providerSlashCommands";
 
 export type { LocalSlashCommandAction };
 

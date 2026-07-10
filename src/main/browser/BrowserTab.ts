@@ -53,6 +53,7 @@ export class BrowserTab {
   private initScriptIds = new Set<string>();
   private lastEmittedSnapshot: BrowserTabSnapshot | null = null;
   private clearInitialHistoryOnLoad = false;
+  private initialHistoryUrl: string | null = null;
   private clearInitialHistoryTimer: ReturnType<typeof setTimeout> | null = null;
   private devToolsVisible = false;
   private wcCleanups: Array<() => void> = [];
@@ -67,6 +68,7 @@ export class BrowserTab {
     this.currentTitle = "";
     if (opts.initialUrl) {
       this.clearInitialHistoryOnLoad = true;
+      this.initialHistoryUrl = opts.initialUrl;
     }
     this.attachedPromise = new Promise<void>((resolve) => {
       this.resolveAttached = resolve;
@@ -137,15 +139,21 @@ export class BrowserTab {
       this.loading = false;
       this.currentUrl = wc.getURL();
       this.currentTitle = wc.getTitle();
-      if (this.clearInitialHistoryOnLoad) {
+      if (this.clearInitialHistoryOnLoad && this.initialHistoryUrl === this.currentUrl) {
         this.clearInitialHistoryOnLoad = false;
         this.clearNavigationHistory();
         if (this.clearInitialHistoryTimer) {
           clearTimeout(this.clearInitialHistoryTimer);
         }
+        const urlAtHistoryClear = this.currentUrl;
         this.clearInitialHistoryTimer = setTimeout(() => {
           this.clearInitialHistoryTimer = null;
-          this.clearNavigationHistory();
+          // Do not clear a history entry that the user added after the initial
+          // page finished loading. This timer exists only to catch Chromium's
+          // delayed about:blank entry during first attach.
+          if (!this.loading && this.currentUrl === urlAtHistoryClear) {
+            this.clearNavigationHistory();
+          }
         }, 500);
       }
       this.emit();
@@ -363,6 +371,7 @@ export class BrowserTab {
     const wc = this.webContents;
     if (this.currentUrl === "about:blank" && !wc.navigationHistory.canGoBack()) {
       this.clearInitialHistoryOnLoad = true;
+      this.initialHistoryUrl = url;
     }
     await wc.loadURL(url);
   }

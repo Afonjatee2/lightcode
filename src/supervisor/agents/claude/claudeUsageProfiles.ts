@@ -1,7 +1,11 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { collectClaude, type HostPort, type UsageSnapshot } from "@lightcode/agents-usage";
-import { claudeProfileKind, parseClaudeProfileInstanceConfig } from "@/shared/contracts";
+import {
+  claudeProfileKind,
+  isClaudeProfileKind,
+  parseClaudeProfileInstanceConfig,
+} from "@/shared/contracts";
 import type { SharedSettings } from "@/shared/settings";
 import { refreshRejectedClaudeToken, resolveClaudeToken } from "../../runtime/claudeCredentials";
 import { scanClaudeCost } from "../../runtime/usageCostScanner";
@@ -19,7 +23,7 @@ export interface ClaudeUsageProfile {
 }
 
 export function isClaudeUsageProvider(id: string): boolean {
-  return id === "claude" || id.startsWith("claude:");
+  return id === "claude" || isClaudeProfileKind(id);
 }
 
 /**

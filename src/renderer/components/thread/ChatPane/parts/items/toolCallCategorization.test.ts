@@ -84,3 +84,4 @@ describe("categorizeVerbPrefix", () => {
     expect(categorizeVerbPrefix("Unknown action")).toBe("other");
   });
 });
+// @vitest-environment node

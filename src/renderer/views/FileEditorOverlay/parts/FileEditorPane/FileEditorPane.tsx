@@ -129,7 +129,7 @@ export function FileEditorPane(props: {
           setShowPreview={setShowPreview}
           activePath={activePath}
           headerNeedsTrafficLightPad={props.headerNeedsTrafficLightPad ?? false}
-          onSave={handleSave}
+          onSave={(path) => void handleSave(path)}
           handleCloseTab={handleCloseTab}
           {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
           {...(props.onClose ? { onClose: props.onClose } : {})}
@@ -171,7 +171,7 @@ export function FileEditorPane(props: {
             onMonacoReady={setMonacoInstance}
             showPreview={showPreview}
             isMarkdown={isMarkdown}
-            onSave={handleSave}
+            onSave={(path) => void handleSave(path)}
           />
         </>
       ) : (

@@ -99,4 +99,4 @@ async function applyReverse() {
 
 console.log(`[adb-reverse] exposing the dev remote server (port ${port}) to Android devices`);
 await applyReverse();
-setInterval(applyReverse, POLL_INTERVAL_MS);
+setInterval(() => void applyReverse(), POLL_INTERVAL_MS);

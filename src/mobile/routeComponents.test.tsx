@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { useEffect, type ReactNode } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Project, Thread } from "@/shared/contracts";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { clearPairingLaunch, parsePairingLaunch, setPairingLaunch } from "./pairing";
@@ -197,6 +197,23 @@ vi.mock("./useGitSummaryHydration", () => ({
 }));
 
 describe("mobile route components", () => {
+  beforeAll(async () => {
+    // React.lazy records resolution on the lazy wrapper only after it renders.
+    // Warm both fullscreen wrappers in one commit so the suite pays one shared
+    // Suspense retry instead of a separate ~300ms retry in each route test.
+    const warmup = render(
+      <>
+        <WorkspaceRoute />
+        <TerminalRoute />
+      </>,
+    );
+    await Promise.all([
+      screen.findByTestId("workspace-view"),
+      screen.findByTestId("terminal-title"),
+    ]);
+    warmup.unmount();
+  });
+
   beforeEach(() => {
     fixtures.params.threadId = "thread-routed";
     fixtures.params.projectId = "project-1";
@@ -313,7 +330,7 @@ describe("mobile route components", () => {
     fixtures.params.threadId = "thread-selected";
     rerender(<WorkspaceRoute />);
 
-    await waitFor(() => expect(workspaceMounts.count).toBe(2));
+    expect(workspaceMounts.count).toBe(2);
   });
 
   it("remounts the terminal (fresh shell) when the target changes", async () => {
@@ -328,6 +345,6 @@ describe("mobile route components", () => {
     // TerminalView so it doesn't reuse the old PTY/cwd.
     fixtures.search = { worktree: "/repo/b", action: "build" };
     rerender(<TerminalRoute />);
-    await waitFor(() => expect(terminalMounts.count).toBe(2));
+    expect(terminalMounts.count).toBe(2);
   });
 });

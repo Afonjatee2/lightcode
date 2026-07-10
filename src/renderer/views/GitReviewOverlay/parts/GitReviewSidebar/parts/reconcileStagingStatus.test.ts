@@ -104,3 +104,4 @@ describe("reconcileStagingStatus", () => {
     expect(useGitStore.getState().statuses["p1"]?.ahead).toBe(5);
   });
 });
+// @vitest-environment node

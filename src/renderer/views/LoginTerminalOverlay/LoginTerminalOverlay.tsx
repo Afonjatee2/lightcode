@@ -43,6 +43,7 @@ export function LoginTerminalOverlay() {
       };
     }
     setVisible(false);
+    return undefined;
   }, [active]);
 
   useEffect(() => {

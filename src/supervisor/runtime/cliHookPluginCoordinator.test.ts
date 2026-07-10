@@ -30,10 +30,18 @@ function makeTempSettings(): string {
 
 interface PluginAdapterStub {
   adapter: AgentAdapter;
-  installPlugin: ReturnType<typeof vi.fn>;
-  uninstallPlugin: ReturnType<typeof vi.fn>;
-  isPluginInstalled: ReturnType<typeof vi.fn>;
-  isPluginSupported: ReturnType<typeof vi.fn>;
+  installPlugin: ReturnType<
+    typeof vi.fn<
+      (
+        context: AgentEnvContext,
+      ) => Promise<{ ok: true; version: string } | { ok: false; reason: string }>
+    >
+  >;
+  uninstallPlugin: ReturnType<typeof vi.fn<(context: AgentEnvContext) => Promise<void>>>;
+  isPluginInstalled: ReturnType<
+    typeof vi.fn<(context: AgentEnvContext) => Promise<{ installed: boolean; version?: string }>>
+  >;
+  isPluginSupported: ReturnType<typeof vi.fn<(context: AgentEnvContext) => Promise<boolean>>>;
 }
 
 function makeStubAdapter(
@@ -43,13 +51,15 @@ function makeStubAdapter(
   } = {},
 ): PluginAdapterStub {
   const installPlugin = vi.fn<
-    () => Promise<{ ok: true; version: string } | { ok: false; reason: string }>
+    (
+      context: AgentEnvContext,
+    ) => Promise<{ ok: true; version: string } | { ok: false; reason: string }>
   >(async () => ({ ok: true, version: "1.0.0" }));
-  const isPluginInstalled = vi.fn<() => Promise<{ installed: boolean; version?: string }>>(
-    async () => ({ installed: false }),
-  );
-  const uninstallPlugin = vi.fn<() => Promise<void>>(async () => undefined);
-  const isPluginSupported = vi.fn<() => Promise<boolean>>(async () => true);
+  const isPluginInstalled = vi.fn<
+    (context: AgentEnvContext) => Promise<{ installed: boolean; version?: string }>
+  >(async () => ({ installed: false }));
+  const uninstallPlugin = vi.fn<(context: AgentEnvContext) => Promise<void>>(async () => undefined);
+  const isPluginSupported = vi.fn<(context: AgentEnvContext) => Promise<boolean>>(async () => true);
 
   const { liveInputMode, ...sliceOverrides } = overrides;
 
@@ -415,7 +425,7 @@ describe("CliHookPluginCoordinator install cache", () => {
     stub.isPluginSupported.mockImplementation(async () => supported);
     stub.isPluginInstalled.mockImplementation(async () => ({
       installed,
-      version: installed ? "1.0.0" : undefined,
+      ...(installed ? { version: "1.0.0" } : {}),
     }));
 
     coordinator = new CliHookPluginCoordinator(

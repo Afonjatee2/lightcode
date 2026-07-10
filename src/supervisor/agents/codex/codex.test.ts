@@ -14,6 +14,7 @@ import {
   parseCodexLoginStatusOutput,
 } from "./detection";
 import { CodexStructuredSession } from "./acp";
+import type { CodexAppServerRpcListener } from "./appServerRpc";
 import type { OscNotification, OscTitle } from "@/shared/osc";
 import type { RuntimeEvent } from "@/shared/contracts";
 import { codexIntentFor } from "./plugin/intentMap";
@@ -221,76 +222,37 @@ describe("CodexStructuredSession", () => {
     session["currentThreadStatus"] = { type: "idle" };
     session["seenErrorMessages"] = new Set<string>();
     session["resumeActiveStatusSuppressionUntil"] = new Map();
-    session["request"] = async (
-      method: string,
-      params: Record<string, unknown>,
-      timeoutMs?: number,
-    ) => {
-      requests.push({
-        method,
-        params,
-        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-      });
-      if (method === "turn/start") {
-        return { turn: { id: "turn-1", items: [], status: "inProgress" } };
-      }
-      if (method === "thread/start") {
-        return { thread: { id: "provider-thread" } };
-      }
-      return {};
+    session["rpc"] = {
+      request: async (method: string, params: Record<string, unknown>, timeoutMs?: number) => {
+        requests.push({
+          method,
+          params,
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        });
+        if (method === "turn/start") {
+          return { turn: { id: "turn-1", items: [], status: "inProgress" } };
+        }
+        if (method === "thread/start") {
+          return { thread: { id: "provider-thread" } };
+        }
+        return {};
+      },
     };
 
     return session as unknown as CodexStructuredSession;
   }
 
-  it("uses a 30s default app-server request timeout", async () => {
-    const structuredSession = Object.create(CodexStructuredSession.prototype) as Record<
-      string,
-      unknown
-    >;
-    const writes: unknown[] = [];
-    structuredSession["requestSequence"] = 0;
-    structuredSession["pendingRequests"] = new Map();
-    structuredSession["transport"] = {
-      write: (message: unknown) => writes.push(message),
-    };
-
-    vi.useFakeTimers();
-    try {
-      const pending = (
-        structuredSession["request"] as (
-          method: string,
-          params: Record<string, unknown>,
-        ) => Promise<unknown>
-      ).call(structuredSession, "thread/read", { threadId: "provider-thread" });
-      let rejectedMessage: string | undefined;
-      pending.catch((error: unknown) => {
-        rejectedMessage = error instanceof Error ? error.message : String(error);
-      });
-
-      await vi.advanceTimersByTimeAsync(29_999);
-      expect((structuredSession["pendingRequests"] as Map<string, unknown>).size).toBe(1);
-      expect(rejectedMessage).toBeUndefined();
-
-      await vi.advanceTimersByTimeAsync(1);
-      await Promise.resolve();
-      expect(rejectedMessage).toBe(
-        "Timed out waiting for Codex app-server response to thread/read.",
-      );
-    } finally {
-      vi.useRealTimers();
+  function dispatchNotification(session: CodexStructuredSession, payload: unknown): void {
+    const message = parseCodexSocketMessage(payload);
+    if (message.kind !== "notification") {
+      throw new Error("Expected a Codex notification payload.");
     }
-
-    expect(writes).toEqual([
-      {
-        jsonrpc: "2.0",
-        id: "lightcode-0",
-        method: "thread/read",
-        params: { threadId: "provider-thread" },
-      },
-    ]);
-    expect((structuredSession["pendingRequests"] as Map<string, unknown>).size).toBe(0);
-  });
+    (
+      session as unknown as {
+        handleNotification(method: string, params: Record<string, unknown> | undefined): void;
+      }
+    ).handleNotification(message.method, message.params);
+  }
 
   it("interrupts the active Codex app-server turn", async () => {
     const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
@@ -480,26 +442,23 @@ describe("CodexStructuredSession", () => {
     const requests: Array<{ method: string; params: Record<string, unknown> }> = [];
     const structuredSession = makeStructuredSession(requests);
     const updates: unknown[] = [];
-    (structuredSession as unknown as Record<string, unknown>)["transport"] = {
-      write: () => {},
-    };
     (structuredSession as unknown as Record<string, unknown>)["listener"] = {
       onUpdate: (update: unknown) => updates.push(update),
     };
-    (structuredSession as unknown as Record<string, unknown>)["request"] = async (
-      method: string,
-      params: Record<string, unknown>,
-    ) => {
-      requests.push({ method, params });
-      return {
-        commands: [
-          {
-            name: "review",
-            description: "Review changes",
-            argumentHint: "<scope>",
-          },
-        ],
-      };
+    (structuredSession as unknown as Record<string, unknown>)["rpc"] = {
+      request: async (method: string, params: Record<string, unknown>) => {
+        requests.push({ method, params });
+        return {
+          commands: [
+            {
+              name: "review",
+              description: "Review changes",
+              argumentHint: "<scope>",
+            },
+          ],
+        };
+      },
+      notify: () => {},
     };
 
     await (structuredSession as unknown as { initialize(): Promise<void> }).initialize();
@@ -518,82 +477,50 @@ describe("CodexStructuredSession", () => {
     );
   });
 
-  it("responds to numeric Codex app-server request ids with the original numeric id", async () => {
-    const structuredSession = Object.create(CodexStructuredSession.prototype) as Record<
-      string,
-      unknown
-    >;
-    const writes: unknown[] = [];
-    structuredSession["inboundRequests"] = new Map([
-      [
-        "0",
-        {
-          id: 0,
-          method: "item/commandExecution/requestApproval",
-          params: { command: "pnpm test" },
-        },
-      ],
-    ]);
-    structuredSession["transport"] = {
-      write: (message: unknown) => writes.push(message),
+  it("wires RPC notifications and transport lifecycle callbacks into the session", () => {
+    const session = Object.create(CodexStructuredSession.prototype) as Record<string, unknown>;
+    let rpcListener: CodexAppServerRpcListener | undefined;
+    const handleNotification =
+      vi.fn<(method: string, params: Record<string, unknown> | undefined) => void>();
+    const emitRuntimeEvents = vi.fn<(events: RuntimeEvent[]) => void>();
+    const logCodexEventDebug = vi.fn<(direction: string, payload: unknown) => void>();
+    const onClose = vi.fn<() => void>();
+    const onError = vi.fn<(message: string) => void>();
+    session["rpc"] = {
+      setListener: (listener: CodexAppServerRpcListener) => {
+        rpcListener = listener;
+      },
     };
+    session["isDisposed"] = false;
+    session["handleNotification"] = handleNotification;
+    session["emitRuntimeEvents"] = emitRuntimeEvents;
+    session["logCodexEventDebug"] = logCodexEventDebug;
+    session["listener"] = { onClose, onError };
 
-    await (structuredSession as unknown as CodexStructuredSession).resolveServerRequest("0", {
-      optionId: "accept",
+    (session["attachRpcHandlers"] as () => void).call(session);
+    if (!rpcListener) throw new Error("RPC listener was not attached.");
+
+    rpcListener.onNotification("turn/started", { threadId: "provider-thread" });
+    rpcListener.onRuntimeEvents([{ type: "error", threadId: "local-thread", message: "boom" }]);
+    rpcListener.onDebug?.("transport", { event: "close" });
+    rpcListener.onClose();
+    rpcListener.onError(new Error("stdio failed"));
+
+    expect(handleNotification).toHaveBeenCalledWith("turn/started", {
+      threadId: "provider-thread",
     });
-
-    expect(writes).toEqual([
-      {
-        jsonrpc: "2.0",
-        id: 0,
-        result: { decision: "accept" },
-      },
+    expect(emitRuntimeEvents).toHaveBeenCalledWith([
+      { type: "error", threadId: "local-thread", message: "boom" },
     ]);
-  });
+    expect(logCodexEventDebug).toHaveBeenCalledWith("transport", { event: "close" });
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledExactlyOnceWith("Codex app-server connection failed.");
 
-  it("answers unsupported app-server requests instead of leaving Codex blocked", () => {
-    const structuredSession = Object.create(CodexStructuredSession.prototype) as Record<
-      string,
-      unknown
-    >;
-    const writes: unknown[] = [];
-    let listener:
-      | {
-          onMessage: (message: unknown) => void;
-        }
-      | undefined;
-    structuredSession["threadId"] = "local-thread";
-    structuredSession["isDisposed"] = false;
-    structuredSession["pendingRequests"] = new Map();
-    structuredSession["inboundRequests"] = new Map();
-    structuredSession["rejectPendingRequests"] = () => {};
-    structuredSession["transport"] = {
-      setListener: (next: typeof listener) => {
-        listener = next;
-      },
-      write: (message: unknown) => writes.push(message),
-    };
-
-    (structuredSession["attachTransportHandlers"] as () => void).call(structuredSession);
-    listener?.onMessage({
-      jsonrpc: "2.0",
-      id: "refresh-1",
-      method: "account/chatgptAuthTokens/refresh",
-      params: { reason: "unauthorized" },
-    });
-
-    expect(writes).toEqual([
-      {
-        jsonrpc: "2.0",
-        id: "refresh-1",
-        error: {
-          code: -32601,
-          message:
-            'Unsupported Codex app-server request method "account/chatgptAuthTokens/refresh".',
-        },
-      },
-    ]);
-    expect((structuredSession["inboundRequests"] as Map<string, unknown>).size).toBe(0);
+    session["isDisposed"] = true;
+    rpcListener.onClose();
+    rpcListener.onError(new Error("ignored after dispose"));
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(onError).toHaveBeenCalledTimes(1);
   });
 
   function makeNotificationSession(): {
@@ -602,7 +529,6 @@ describe("CodexStructuredSession", () => {
   } {
     const session = Object.create(CodexStructuredSession.prototype) as Record<string, unknown>;
     const runtimeEvents: RuntimeEvent[] = [];
-    let onMessage: ((message: unknown) => void) | undefined;
     session["threadId"] = "local-thread";
     session["remoteThreadId"] = "provider-thread";
     session["isDisposed"] = false;
@@ -610,23 +536,15 @@ describe("CodexStructuredSession", () => {
     session["seenErrorMessages"] = new Set<string>();
     session["resumeActiveStatusSuppressionUntil"] = new Map();
     session["bufferedRuntimeEvents"] = [];
-    session["pendingRequests"] = new Map();
-    session["inboundRequests"] = new Map();
-    session["rejectPendingRequests"] = () => {};
-    session["request"] = async () => ({});
     session["listener"] = {
       onRuntimeEvent: (event: RuntimeEvent) => runtimeEvents.push(event),
       onUpdate: () => {},
     };
-    session["transport"] = {
-      setListener: (next: { onMessage: (message: unknown) => void }) => {
-        onMessage = next.onMessage;
-      },
-      write: () => {},
+    const structuredSession = session as unknown as CodexStructuredSession;
+    return {
+      onMessage: (message) => dispatchNotification(structuredSession, message),
+      runtimeEvents,
     };
-    (session["attachTransportHandlers"] as () => void).call(session);
-    if (!onMessage) throw new Error("transport listener was not attached");
-    return { onMessage, runtimeEvents };
   }
 
   it("does not surface resume-time active status as new work", async () => {
@@ -634,7 +552,8 @@ describe("CodexStructuredSession", () => {
     const updates: StructuredSessionUpdate[] = [];
     const runtimeEvents: RuntimeEvent[] = [];
     const requests: CodexRequestRecord[] = [];
-    let onMessage: ((message: unknown) => void) | undefined;
+    const onMessage = (message: unknown) =>
+      dispatchNotification(session as unknown as CodexStructuredSession, message);
     let resolveThreadRead: (value: unknown) => void = () => {};
     const threadRead = new Promise<unknown>((resolve) => {
       resolveThreadRead = resolve;
@@ -648,46 +567,34 @@ describe("CodexStructuredSession", () => {
     session["currentThreadStatus"] = { type: "idle" };
     session["seenErrorMessages"] = new Set<string>();
     session["bufferedRuntimeEvents"] = [];
-    session["pendingRequests"] = new Map();
-    session["inboundRequests"] = new Map();
     session["resumeActiveStatusSuppressionUntil"] = new Map();
-    session["rejectPendingRequests"] = () => {};
-    session["request"] = async (
-      method: string,
-      params: Record<string, unknown>,
-      timeoutMs?: number,
-    ) => {
-      requests.push({
-        method,
-        params,
-        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-      });
-      if (method === "thread/resume") {
-        onMessage?.({
-          jsonrpc: "2.0",
-          method: "thread/started",
-          params: {
-            thread: {
-              id: "provider-thread",
-              status: { type: "active", activeFlags: [] },
-            },
-          },
+    session["rpc"] = {
+      request: async (method: string, params: Record<string, unknown>, timeoutMs?: number) => {
+        requests.push({
+          method,
+          params,
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
         });
+        if (method === "thread/resume") {
+          onMessage({
+            jsonrpc: "2.0",
+            method: "thread/started",
+            params: {
+              thread: {
+                id: "provider-thread",
+                status: { type: "active", activeFlags: [] },
+              },
+            },
+          });
+          return {};
+        }
+        if (method === "thread/read") {
+          return threadRead;
+        }
         return {};
-      }
-      if (method === "thread/read") {
-        return threadRead;
-      }
-      return {};
-    };
-    session["transport"] = {
-      setListener: (next: { onMessage: (message: unknown) => void }) => {
-        onMessage = next.onMessage;
       },
-      write: () => {},
     };
 
-    (session["attachTransportHandlers"] as () => void).call(session);
     await (session as unknown as CodexStructuredSession).openThread(
       { model: "gpt-5.4" },
       {
@@ -763,7 +670,8 @@ describe("CodexStructuredSession", () => {
     const updates: StructuredSessionUpdate[] = [];
     const runtimeEvents: RuntimeEvent[] = [];
     const requests: CodexRequestRecord[] = [];
-    let onMessage: ((message: unknown) => void) | undefined;
+    const onMessage = (message: unknown) =>
+      dispatchNotification(session as unknown as CodexStructuredSession, message);
     let resolveTurnStart: (value: unknown) => void = () => {};
     const turnStart = new Promise<unknown>((resolve) => {
       resolveTurnStart = resolve;
@@ -775,34 +683,21 @@ describe("CodexStructuredSession", () => {
     session["currentThreadStatus"] = { type: "idle" };
     session["seenErrorMessages"] = new Set<string>();
     session["bufferedRuntimeEvents"] = [];
-    session["pendingRequests"] = new Map();
-    session["inboundRequests"] = new Map();
     session["resumeActiveStatusSuppressionUntil"] = new Map();
-    session["rejectPendingRequests"] = () => {};
-    session["request"] = async (
-      method: string,
-      params: Record<string, unknown>,
-      timeoutMs?: number,
-    ) => {
-      requests.push({
-        method,
-        params,
-        ...(timeoutMs !== undefined ? { timeoutMs } : {}),
-      });
-      if (method === "turn/start") {
-        return turnStart;
-      }
-      return {};
-    };
-    session["transport"] = {
-      setListener: (next: { onMessage: (message: unknown) => void }) => {
-        onMessage = next.onMessage;
+    session["rpc"] = {
+      request: async (method: string, params: Record<string, unknown>, timeoutMs?: number) => {
+        requests.push({
+          method,
+          params,
+          ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+        });
+        if (method === "turn/start") {
+          return turnStart;
+        }
+        return {};
       },
-      write: () => {},
-      formatOutput: () => "",
     };
 
-    (session["attachTransportHandlers"] as () => void).call(session);
     (session as unknown as CodexStructuredSession).setListener({
       onClose: () => {},
       onError: () => {},
@@ -860,7 +755,8 @@ describe("CodexStructuredSession", () => {
     const session = Object.create(CodexStructuredSession.prototype) as Record<string, unknown>;
     const updates: StructuredSessionUpdate[] = [];
     const runtimeEvents: RuntimeEvent[] = [];
-    let onMessage: ((message: unknown) => void) | undefined;
+    const onMessage = (message: unknown) =>
+      dispatchNotification(session as unknown as CodexStructuredSession, message);
 
     session["threadId"] = "local-thread";
     session["remoteThreadId"] = "provider-thread";
@@ -868,26 +764,13 @@ describe("CodexStructuredSession", () => {
     session["currentThreadStatus"] = { type: "active", activeFlags: [] };
     session["seenErrorMessages"] = new Set<string>();
     session["bufferedRuntimeEvents"] = [];
-    session["pendingRequests"] = new Map();
-    session["inboundRequests"] = new Map();
     session["resumeActiveStatusSuppressionUntil"] = new Map();
-    session["rejectPendingRequests"] = () => {};
-    session["request"] = async () => ({});
     session["listener"] = {
       onClose: () => {},
       onError: () => {},
       onUpdate: (update: StructuredSessionUpdate) => updates.push(update),
       onRuntimeEvent: (event: RuntimeEvent) => runtimeEvents.push(event),
     };
-    session["transport"] = {
-      setListener: (next: { onMessage: (message: unknown) => void }) => {
-        onMessage = next.onMessage;
-      },
-      write: () => {},
-      formatOutput: () => "",
-    };
-
-    (session["attachTransportHandlers"] as () => void).call(session);
 
     onMessage?.({
       jsonrpc: "2.0",
@@ -918,7 +801,8 @@ describe("CodexStructuredSession", () => {
   it("emits completion idle for Codex turn completion notifications without params", () => {
     const session = Object.create(CodexStructuredSession.prototype) as Record<string, unknown>;
     const updates: StructuredSessionUpdate[] = [];
-    let onMessage: ((message: unknown) => void) | undefined;
+    const onMessage = (message: unknown) =>
+      dispatchNotification(session as unknown as CodexStructuredSession, message);
 
     session["threadId"] = "local-thread";
     session["remoteThreadId"] = "provider-thread";
@@ -926,26 +810,13 @@ describe("CodexStructuredSession", () => {
     session["currentThreadStatus"] = { type: "active", activeFlags: [] };
     session["seenErrorMessages"] = new Set<string>();
     session["bufferedRuntimeEvents"] = [];
-    session["pendingRequests"] = new Map();
-    session["inboundRequests"] = new Map();
     session["resumeActiveStatusSuppressionUntil"] = new Map();
-    session["rejectPendingRequests"] = () => {};
-    session["request"] = async () => ({});
     session["listener"] = {
       onClose: () => {},
       onError: () => {},
       onUpdate: (update: StructuredSessionUpdate) => updates.push(update),
       onRuntimeEvent: () => {},
     };
-    session["transport"] = {
-      setListener: (next: { onMessage: (message: unknown) => void }) => {
-        onMessage = next.onMessage;
-      },
-      write: () => {},
-      formatOutput: () => "",
-    };
-
-    (session["attachTransportHandlers"] as () => void).call(session);
 
     onMessage?.({
       jsonrpc: "2.0",

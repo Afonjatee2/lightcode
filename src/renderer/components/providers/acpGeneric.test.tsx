@@ -1,8 +1,10 @@
+// @vitest-environment node
+
 import { describe, expect, it, vi } from "vitest";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import type { AgentCapability, ThreadConfig } from "@/shared/contracts";
 import "./acpGeneric";
-import { getComposerControls } from "./ProviderIcon";
+import { getComposerControls } from "./providerComposer";
 
 const baseCapabilities: AgentCapability = {
   models: [{ id: "model-a", label: "Model A" }],

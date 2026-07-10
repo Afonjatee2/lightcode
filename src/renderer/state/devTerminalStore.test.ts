@@ -110,3 +110,4 @@ describe("devTerminalStore cycleTab", () => {
     expect(useDevTerminalStore.getState().focusRequestId).toBe(6);
   });
 });
+// @vitest-environment node

@@ -1,6 +1,8 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
 import type { AgentCapability } from "@/shared/contracts";
-import { getComposerControls } from "../ProviderIcon";
+import { getComposerControls } from "../providerComposer";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import "./index";
 

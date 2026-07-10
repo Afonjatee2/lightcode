@@ -73,7 +73,9 @@ export class HookIngress {
       rejectReady = reject;
     });
 
-    const server = createServer((req, res) => this.handleRequest(req, res));
+    const server = createServer((req, res) => {
+      void this.handleRequest(req, res);
+    });
     server.on("error", (error) => {
       this.options.onError?.(`hook ingress server error`, error);
     });

@@ -105,6 +105,22 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
     null,
   );
 
+  // Thread-owned groups display the thread's LIVE task title (which updates as
+  // AI title generation completes), falling back to the stored label. Keep this
+  // subscription above the empty-state return so the component always calls the
+  // same hooks when the first browser tab arrives.
+  const threadTitles = useAppStore(
+    useShallow((s) => {
+      const map: Record<string, string> = {};
+      for (const g of groups) {
+        if (!g.threadId) continue;
+        const thread = s.threads.find((th) => th.id === g.threadId);
+        if (thread) map[g.threadId] = thread.title;
+      }
+      return map;
+    }),
+  );
+
   if (tabs.length === 0) {
     return null;
   }
@@ -125,19 +141,6 @@ export function BrowserTabStrip(props: { onCreateTab: () => void; variant?: "row
     if (tab.groupId) countByGroup.set(tab.groupId, (countByGroup.get(tab.groupId) ?? 0) + 1);
   }
 
-  // Thread-owned groups display the thread's LIVE task title (which updates as
-  // AI title generation completes), falling back to the stored label.
-  const threadTitles = useAppStore(
-    useShallow((s) => {
-      const map: Record<string, string> = {};
-      for (const g of groups) {
-        if (!g.threadId) continue;
-        const thread = s.threads.find((th) => th.id === g.threadId);
-        if (thread) map[g.threadId] = thread.title;
-      }
-      return map;
-    }),
-  );
   const titleFor = (g: BrowserTabGroupInfo) =>
     (g.threadId ? threadTitles[g.threadId] : undefined) ?? g.title;
 

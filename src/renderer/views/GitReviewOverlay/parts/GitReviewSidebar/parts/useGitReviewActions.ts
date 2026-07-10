@@ -7,7 +7,7 @@ import { resolveAiLanguageName } from "@/shared/locale";
 import { msg, friendlyError, friendlyErrorWithDetail } from "@/shared/messages";
 import { readBridge } from "@/renderer/bridge";
 import { detectOSLocale } from "@/renderer/i18n/locales";
-import { captureProductEvent } from "@/renderer/analytics/posthog";
+import { captureProductEvent } from "@/renderer/analytics/productAnalytics";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import {
   useGitReviewActionState,
@@ -23,7 +23,7 @@ import {
   getCommitGenCandidates,
   resolveCommitGenConfig,
   type GeneratedCommitMessageWithProvider,
-} from "@/renderer/components/providers";
+} from "@/renderer/components/providers/commitGen";
 import { usePrWriteActions } from "@/renderer/hooks/usePrWriteActions";
 import {
   runGitMergeToSource,

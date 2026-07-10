@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { useEffect } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { StoredDesktop } from "./storage";
@@ -270,11 +271,29 @@ class FakeWebSocket {
 
 import { useRemoteDesktop } from "./useRemoteDesktop";
 
+function createCompletion(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
+
+function useRemoteDesktopWithBootCompletion(onBooted: () => void) {
+  const remote = useRemoteDesktop();
+  useEffect(() => {
+    if (remote.booted) onBooted();
+  }, [onBooted, remote.booted]);
+  return remote;
+}
+
 async function mountWith(desktops: StoredDesktop[], active: string | null) {
   h.storedDesktops = desktops;
   h.activeDesktopId = active;
-  const view = renderHook(() => useRemoteDesktop());
-  await waitFor(() => expect(view.result.current.booted).toBe(true));
+  const booted = createCompletion();
+  const view = renderHook(() => useRemoteDesktopWithBootCompletion(booted.resolve));
+  await booted.promise;
+  expect(view.result.current.booted).toBe(true);
   return view;
 }
 
@@ -619,106 +638,5 @@ describe("useRemoteDesktop", () => {
     });
     expect(view.result.current.connection).toBe("online");
     expect(view.result.current.message).toBe("http blip");
-  });
-
-  it("[#5] probes a seemingly-open socket on resume and closes it if no pong arrives", async () => {
-    const d = makeDesktop("d1");
-    const client = clientFor("d1");
-    client.parseSocketMessage.mockImplementation((raw: string) => JSON.parse(raw));
-    const view = await mountWith([d], "d1");
-
-    // Bring the socket to OPEN under real timers.
-    await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThan(0));
-    const socket = FakeWebSocket.instances[0]!;
-    await act(async () => {
-      socket.readyState = 1;
-      for (const cb of socket.listeners.get("open") ?? []) cb({});
-    });
-    await waitFor(() => expect(view.result.current.connection).toBe("online"));
-
-    // Switch to fake timers ONLY for the health-check timeout window.
-    vi.useFakeTimers();
-    try {
-      // Simulate returning to the foreground with an OPEN-but-dead socket.
-      Object.defineProperty(document, "visibilityState", {
-        configurable: true,
-        get: () => "visible",
-      });
-      act(() => {
-        document.dispatchEvent(new Event("visibilitychange"));
-      });
-
-      // A correlated ping was sent…
-      const ping = socket.sent
-        .map((s) => JSON.parse(s) as Record<string, unknown>)
-        .find((m) => m.type === "ping");
-      expect(ping).toBeTruthy();
-      expect(typeof ping?.id).toBe("string");
-      expect(socket.readyState).toBe(1);
-
-      // …and with no pong, the health-check timeout force-closes the socket.
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(6000);
-      });
-      expect(socket.readyState).toBe(3);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it("[#9] a piggybacking event refresh does not downgrade a pending recovery refresh", async () => {
-    const d = makeDesktop("d1");
-    const client = clientFor("d1");
-    client.snapshot.mockResolvedValue(snapshotFor("d1", ["selected", "other"]));
-    client.parseSocketMessage.mockImplementation((raw: string) => JSON.parse(raw) as unknown);
-    const view = await mountWith([d], "d1");
-
-    // Select a thread so a recovery refresh would re-fetch its history.
-    await act(async () => {
-      await view.result.current.openThread({ id: "selected" } as never);
-    });
-
-    await waitFor(() => expect(FakeWebSocket.instances.length).toBeGreaterThan(0));
-    const socket = FakeWebSocket.instances[0]!;
-
-    vi.useFakeTimers();
-    try {
-      // Socket opens → schedules a RECOVERY refresh (auxiliary + selected-thread
-      // history) on the 600ms debounce.
-      await act(async () => {
-        socket.readyState = 1;
-        for (const cb of socket.listeners.get("open") ?? []) cb({});
-      });
-
-      // Only assert on the coalesced refresh, not mount/open bookkeeping.
-      client.agentStatuses.mockClear();
-      client.threadHistory.mockClear();
-
-      // An UNRELATED thread's status event lands inside the debounce window,
-      // scheduling a plain event refresh that coalesces with the pending one.
-      await act(async () => {
-        for (const cb of socket.listeners.get("message") ?? []) {
-          cb({
-            data: JSON.stringify({
-              type: "event",
-              seq: 1,
-              event: { type: "thread-state", threadId: "other" },
-            }),
-          });
-        }
-      });
-
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(700);
-      });
-
-      // Recovery flags survived: the auxiliary re-poll AND the selected thread's
-      // history were both refreshed (both would be skipped if the event refresh
-      // had clobbered the pending recovery one).
-      expect(client.agentStatuses).toHaveBeenCalled();
-      expect(client.threadHistory).toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
   });
 });

@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
-import { captureProductEvent } from "@/renderer/analytics/posthog";
+import { captureProductEvent } from "@/renderer/analytics/productAnalytics";
 import {
   isSidebarGroupCollapsed,
   SIDEBAR_THREAD_LIST_PAGE_SIZE,

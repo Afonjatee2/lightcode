@@ -17,18 +17,24 @@ export interface NativeAgentSettingsPanelProps {
   onOpenProfile?: ((profileKind: string) => void) | undefined;
 }
 
+export interface NativeAgentAcpRegistryAlias {
+  id: string;
+  /** The app can run this registry agent through its built-in native adapter. */
+  nativeSupport?: boolean;
+}
+
 export interface NativeAgentRegistryEntry {
   id: AgentKind;
-  label: string;
   description: MessageDescriptor;
   installCommand: (project: Project) => string;
   docsUrl: string;
   /**
-   * Whether the agent can be installed on native Windows. Defaults to `true`.
-   * When `false`, native Windows installs are hidden (only WSL/macOS/Linux are
-   * offered) since the upstream installer does not support Windows yet.
+   * ACP registry ids that belong to this built-in provider family. Registry
+   * cards use these aliases to resolve native installs and hide redundant ACP
+   * wrappers. `nativeSupport` marks aliases whose ACP implementation is driven
+   * directly by the built-in adapter.
    */
-  supportsWindows?: boolean;
+  acpRegistryAliases?: readonly NativeAgentAcpRegistryAlias[];
   /**
    * Provider-specific settings UI rendered by `SingleAgentSettings` below the
    * environment rows. Matched by `baseAgentKind`, so instance-scoped kinds
@@ -81,7 +87,7 @@ function nativeInstallCommand(
 export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   {
     id: "codex",
-    label: "Codex",
+    acpRegistryAliases: [{ id: "codex-acp" }],
     description: msg`First-class Codex CLI integration using Poracode's native app-server runtime.`,
     docsUrl: "https://developers.openai.com/codex/cli",
     installCommand: (project) =>
@@ -103,7 +109,7 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "claude",
-    label: "Claude Code",
+    acpRegistryAliases: [{ id: "claude-acp" }],
     description: msg`First-class Claude Code integration using Poracode's native SDK runtime.`,
     docsUrl: "https://code.claude.com/docs/en/setup",
     installCommand: (project) =>
@@ -124,7 +130,7 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "opencode",
-    label: "OpenCode",
+    acpRegistryAliases: [{ id: "opencode" }],
     description: msg`First-class OpenCode integration using Poracode's native SDK runtime.`,
     docsUrl: "https://opencode.ai/docs/",
     installCommand: (project) =>
@@ -148,7 +154,7 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "grok",
-    label: "Grok Build",
+    acpRegistryAliases: [{ id: "grok-build" }],
     description: msg`First-class Grok Build CLI integration using Poracode's native runtime.`,
     docsUrl: "https://docs.x.ai/build/overview",
     installCommand: (project) =>
@@ -165,7 +171,6 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "antigravity",
-    label: "Antigravity",
     description: msg`First-class Antigravity CLI integration using Poracode's native runtime.`,
     docsUrl: "https://antigravity.google/docs/cli-getting-started",
     installCommand: (project) =>
@@ -184,7 +189,6 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "commandcode",
-    label: "Command Code",
     description: msg`First-class Command Code CLI integration using Poracode's native runtime.`,
     docsUrl: "https://commandcode.ai/docs/quickstart",
     installCommand: (project) =>
@@ -201,7 +205,7 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "cursor",
-    label: "Cursor",
+    acpRegistryAliases: [{ id: "cursor", nativeSupport: true }],
     description: msg`First-class Cursor Agent integration using Poracode's native runtime.`,
     docsUrl: "https://cursor.com/docs/cli/installation",
     installCommand: (project) =>
@@ -214,7 +218,7 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "gemini",
-    label: "Gemini",
+    acpRegistryAliases: [{ id: "gemini", nativeSupport: true }],
     description: msg`First-class Gemini CLI integration using Poracode's native runtime.`,
     docsUrl: "https://github.com/google-gemini/gemini-cli",
     installCommand: (project) =>
@@ -228,7 +232,10 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
   {
     id: "copilot",
-    label: "GitHub Copilot",
+    acpRegistryAliases: [
+      { id: "github-copilot", nativeSupport: true },
+      { id: "github-copilot-cli", nativeSupport: true },
+    ],
     description: msg`First-class GitHub Copilot CLI integration using Poracode's native runtime.`,
     docsUrl:
       "https://docs.github.com/copilot/how-tos/copilot-cli/set-up-copilot-cli/install-copilot-cli",
@@ -251,31 +258,36 @@ export const NATIVE_AGENT_REGISTRY_ENTRIES: NativeAgentRegistryEntry[] = [
   },
 ];
 
-export const KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS = new Set([
-  "claude-acp",
-  "codex-acp",
-  "cursor",
-  "gemini",
-  "github-copilot",
-  "github-copilot-cli",
-  "grok-build",
-  "opencode",
-]);
+function buildAcpRegistryAliasMap(
+  entries: readonly NativeAgentRegistryEntry[],
+): Map<string, { familyKind: AgentKind; nativeSupport: boolean }> {
+  const aliases = new Map<string, { familyKind: AgentKind; nativeSupport: boolean }>();
+  for (const entry of entries) {
+    for (const alias of entry.acpRegistryAliases ?? []) {
+      if (aliases.has(alias.id)) {
+        throw new Error(`Duplicate native ACP registry alias: ${alias.id}`);
+      }
+      aliases.set(alias.id, {
+        familyKind: entry.id,
+        nativeSupport: alias.nativeSupport === true,
+      });
+    }
+  }
+  return aliases;
+}
 
-export const APP_SUPPORTED_ACP_AGENT_IDS = new Set([
-  "cursor",
-  "gemini",
-  "github-copilot",
-  "github-copilot-cli",
-]);
+const ACP_REGISTRY_ALIASES = buildAcpRegistryAliasMap(NATIVE_AGENT_REGISTRY_ENTRIES);
 
-export const REGISTRY_AGENT_FAMILY_KIND: Record<string, AgentKind> = {
-  "claude-acp": "claude",
-  "codex-acp": "codex",
-  cursor: "cursor",
-  gemini: "gemini",
-  "github-copilot": "copilot",
-  "github-copilot-cli": "copilot",
-  "grok-build": "grok",
-  opencode: "opencode",
-};
+export const KNOWN_NATIVE_FAMILY_ACP_AGENT_IDS: ReadonlySet<string> = new Set(
+  ACP_REGISTRY_ALIASES.keys(),
+);
+
+export const APP_SUPPORTED_ACP_AGENT_IDS: ReadonlySet<string> = new Set(
+  [...ACP_REGISTRY_ALIASES].filter(([, alias]) => alias.nativeSupport).map(([agentId]) => agentId),
+);
+
+export const REGISTRY_AGENT_FAMILY_KIND: Readonly<Record<string, AgentKind>> = Object.freeze(
+  Object.fromEntries(
+    [...ACP_REGISTRY_ALIASES].map(([agentId, alias]) => [agentId, alias.familyKind]),
+  ),
+);

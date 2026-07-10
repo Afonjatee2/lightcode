@@ -172,11 +172,18 @@ export async function runOneShotPromptWithFallback(
         );
         continue;
       }
-      throw err;
+      throw err instanceof Error ? err : new Error(formatError(err), { cause: err });
     }
   }
 
-  throw lastError ?? new Error(`[${options.logTag}] all fallback attempts exhausted`);
+  throw lastError instanceof Error
+    ? lastError
+    : new Error(
+        lastError === undefined
+          ? `[${options.logTag}] all fallback attempts exhausted`
+          : formatError(lastError),
+        { cause: lastError },
+      );
 }
 
 function isAbortError(err: unknown): boolean {

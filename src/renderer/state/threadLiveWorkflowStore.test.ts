@@ -143,3 +143,4 @@ describe("threadLiveWorkflowStore", () => {
     });
   });
 });
+// @vitest-environment node

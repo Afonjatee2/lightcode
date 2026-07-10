@@ -29,6 +29,7 @@ export function DiffSection(props: {
       const id = setTimeout(() => setMounted(true), mountDelay);
       return () => clearTimeout(id);
     }
+    return undefined;
   }, [mounted, mountDelay]);
 
   // DiffFile with full file content (enables hunk expand buttons)

@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import { describe, expect, it } from "vitest";
 import { formatCodexFamilyModelLabel, formatCursorBaseModelLabel } from "@/shared/modelLabels";
 import { buildProviderModelItems, type ProviderModelMenuProvider } from "./buildItems";
@@ -110,6 +112,46 @@ describe("buildProviderModelItems fast-mode flag", () => {
     });
     const favoriteRow = items.find((item) => item.type === "model" && item.id.startsWith("fav:"));
     expect(favoriteRow?.type === "model" ? favoriteRow.supportsFast : undefined).toBe(true);
+  });
+});
+
+describe("buildProviderModelItems provider manifest order", () => {
+  const capabilities = {
+    models: [{ id: "model", label: "Model" }],
+    efforts: [],
+    modelEfforts: {},
+    modes: ["agent" as const],
+    approvalPolicies: [],
+    sandboxModes: [],
+    supportsResume: true,
+    supportsDirectInput: true,
+    liveInputMode: "terminal" as const,
+    presentationMode: "terminal" as const,
+    settingDefs: [],
+  };
+  const providers: ProviderModelMenuProvider[] = [
+    { kind: "custom", label: "Custom", capabilities },
+    { kind: "antigravity", label: "Antigravity", capabilities },
+    { kind: "grok", label: "Grok Build", capabilities },
+    { kind: "codex", label: "Codex", capabilities },
+  ];
+
+  function providerHeaders(providerOrder?: readonly string[]): string[] {
+    return buildProviderModelItems({
+      providers,
+      search: "",
+      ...(providerOrder !== undefined ? { providerOrder } : {}),
+    })
+      .filter((item) => item.type === "header-provider")
+      .map((item) => item.providerKind);
+  }
+
+  it("places Grok explicitly before Antigravity and unknown providers", () => {
+    expect(providerHeaders()).toEqual(["codex", "grok", "antigravity", "custom"]);
+  });
+
+  it("keeps user order as a prefix and sorts its missing tail from manifests", () => {
+    expect(providerHeaders(["custom", "grok"])).toEqual(["custom", "grok", "codex", "antigravity"]);
   });
 });
 

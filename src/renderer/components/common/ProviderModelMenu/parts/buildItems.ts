@@ -18,6 +18,7 @@ import {
   providerMenuKey,
   providerVisibilityKey,
 } from "./providerIdentity";
+import { getProviderModelPickerRank } from "@/renderer/components/providers/providerManifest";
 import type { ProviderModelItem } from "./types";
 
 export interface ProviderModelMenuProvider {
@@ -65,7 +66,7 @@ export interface BuildProviderModelItemsInput {
   recentsLimit?: number;
   /**
    * User-defined provider display order. Kinds in this list win over the built-in
-   * `PROVIDER_ORDER` default; anything missing falls to the default order at the tail.
+   * provider-manifest default; anything missing falls to the tail.
    */
   providerOrder?: readonly string[];
 }
@@ -77,24 +78,11 @@ const DEFAULT_LABEL = (id: string) =>
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join(" ");
 
-/** Default display order for provider sections. Unknown kinds fall to the end. */
-const PROVIDER_ORDER: readonly string[] = [
-  "claude",
-  "codex",
-  "gemini",
-  "antigravity",
-  "commandcode",
-  "opencode",
-  "cursor",
-  "copilot",
-];
-
 function makeProviderSortKey(userOrder: readonly string[] | undefined): (kind: string) => number {
   const trimmed = userOrder?.filter((k) => k.length > 0) ?? [];
   if (trimmed.length === 0) {
     return (kind) => {
-      const idx = PROVIDER_ORDER.indexOf(baseAgentKind(kind));
-      return idx < 0 ? PROVIDER_ORDER.length : idx;
+      return getProviderModelPickerRank(baseAgentKind(kind));
     };
   }
   const userIndex = new Map<string, number>();
@@ -105,8 +93,7 @@ function makeProviderSortKey(userOrder: readonly string[] | undefined): (kind: s
   return (kind) => {
     const fromUser = userIndex.get(kind);
     if (fromUser !== undefined) return fromUser;
-    const fromDefault = PROVIDER_ORDER.indexOf(baseAgentKind(kind));
-    return userTailBase + (fromDefault < 0 ? PROVIDER_ORDER.length : fromDefault);
+    return userTailBase + getProviderModelPickerRank(baseAgentKind(kind));
   };
 }
 

@@ -107,9 +107,9 @@ export function createCodexAdapter(): AgentAdapter {
   let preSpawnStartedAt = 0;
 
   return {
-    kind: "codex",
-    label: "Codex",
-    binary: "codex",
+    kind: codexDetectionSpec.kind,
+    label: codexDetectionSpec.label,
+    binary: codexDetectionSpec.binary,
     ...(codexDetectionSpec.update ? { update: codexDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;

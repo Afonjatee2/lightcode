@@ -150,7 +150,7 @@ vi.mock("@/renderer/state/sharedSettingsStore", () => {
 });
 
 vi.mock("@/renderer/components/providers/conflictResolver", () => ({
-  getConflictResolverCandidatesForLaunch: () => [
+  getConflictResolverCandidates: () => [
     {
       kind: "codex",
       capabilities: {
@@ -212,7 +212,7 @@ vi.mock("@/renderer/views/MainView/parts/AppShell/AppShell", () => ({
   }),
 }));
 
-vi.mock("@/renderer/components/providers", () => ({
+vi.mock("@/renderer/components/providers/commitGen", () => ({
   generateCommitMessageWithFallback: vi.fn<() => Promise<string>>(),
   getCommitGenCandidates: vi.fn<() => unknown[]>().mockReturnValue([]),
   resolveCommitGenConfig: vi

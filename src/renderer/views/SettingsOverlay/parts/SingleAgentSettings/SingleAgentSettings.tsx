@@ -9,7 +9,11 @@ import type {
   AgentStatus,
   AgentTerminalAuthMethod,
 } from "@/shared/contracts";
-import { baseAgentKind, extractClaudeProfileInstanceId } from "@/shared/contracts";
+import {
+  baseAgentKind,
+  extractAcpGenericInstanceId,
+  extractClaudeProfileInstanceId,
+} from "@/shared/contracts";
 import { runAgentInstallCommand, runAgentLoginCommand } from "@/renderer/actions/agentLoginActions";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
@@ -17,7 +21,6 @@ import { buildWslProjectDistrosKey } from "@/renderer/state/projectKeys";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
 import {
-  acpGenericInstanceId,
   agentAuthTarget,
   envLabelForStatus,
   findAgentAuthMethodInStatuses,
@@ -110,13 +113,7 @@ export function SingleAgentSettings(props: {
     (entry) => entry.id === baseAgentKind(props.agentKind),
   );
   const installableHere = nativeRegistryEntry
-    ? agentStatuses.filter(
-        (a) =>
-          a.kind === props.agentKind &&
-          !a.installed &&
-          a.envKind !== "wsl" &&
-          !(a.envKind === "windows" && nativeRegistryEntry.supportsWindows === false),
-      )
+    ? agentStatuses.filter((a) => a.kind === props.agentKind && !a.installed && a.envKind !== "wsl")
     : [];
   const installableWsl = nativeRegistryEntry
     ? wslAgentStatuses.filter((a) => a.kind === props.agentKind && !a.installed)
@@ -125,12 +122,12 @@ export function SingleAgentSettings(props: {
   const isDisabled = useSharedSettings((s) => s.disabledAgents.includes(props.agentKind));
   const setAgentDisabled = useSharedSettings((s) => s.setAgentDisabled);
   const installedRegistryRecord = useSharedSettings(
-    (s) => s.acpRegistryInstalledAgents[acpGenericInstanceId(props.agentKind) ?? ""],
+    (s) => s.acpRegistryInstalledAgents[extractAcpGenericInstanceId(props.agentKind) ?? ""],
   );
   const syncInstalledAgents = useSharedSettings((s) => s.syncAcpRegistryInstalledAgents);
   const wslDistros = wslProjectDistrosKey ? wslProjectDistrosKey.split("\0") : [];
 
-  const registryAgentId = acpGenericInstanceId(props.agentKind);
+  const registryAgentId = extractAcpGenericInstanceId(props.agentKind);
   // Read-side guards: any stored "latest version" only counts when its owner
   // matches the currently-rendered agent. A stale value carried over from the
   // previous panel renders as `undefined` on the very first frame after the
@@ -274,7 +271,7 @@ export function SingleAgentSettings(props: {
     missingAuthStatuses.find((status) => status.loginCommand);
   const loginCommand = loginStatus?.loginCommand;
   const terminalLoginMethod = findTerminalAuthMethodForStatus(loginStatus);
-  const acpInstanceId = acpGenericInstanceId(agent.kind);
+  const acpInstanceId = extractAcpGenericInstanceId(agent.kind);
   // Native ACP adapters (copilot/gemini/cursor) and generic ACP instances all
   // speak the same `authenticate()` / `logout()` over the supervisor's
   // unified dispatcher. The settings UI lets the user drive a sign-in or

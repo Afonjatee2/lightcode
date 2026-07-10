@@ -1,0 +1,886 @@
+#!/usr/bin/env node
+
+import { execFileSync, spawnSync } from "node:child_process";
+import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import {
+  areasForFile,
+  functionalAreas,
+  isProductionFile,
+  manualGates,
+  productionRoots,
+} from "./smoke-scenarios.mjs";
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const args = parseArgs(process.argv.slice(2));
+const command = args._[0] ?? "plan";
+const scope = String(args.scope ?? "changed");
+const mode = String(args.mode ?? "mock");
+const port = Number(args.port ?? process.env.LIGHTCODE_CDP_PORT ?? 9222);
+const appUrl = String(args.appUrl ?? "http://127.0.0.1:3100/");
+const timeoutMs = Number(args.timeoutMs ?? 12_000);
+const outDir = resolve(
+  String(
+    args.outDir ??
+      process.env.LIGHTCODE_SMOKE_OUT_DIR ??
+      join(homedir(), ".lightcode-smoke", `integration-${Date.now()}`),
+  ),
+);
+
+try {
+  if (command === "audit") {
+    auditCoverage();
+  } else if (command === "plan") {
+    printPlan(buildPlan(scope));
+  } else if (command === "run") {
+    await runSmoke(buildPlan(scope));
+  } else {
+    usage();
+    process.exitCode = 2;
+  }
+} catch (error) {
+  console.error(`ERROR: ${error instanceof Error ? error.message : String(error)}`);
+  process.exitCode = 1;
+}
+
+function usage() {
+  console.error(`Usage:
+  node lightcode-integration-smoke.mjs audit
+  node lightcode-integration-smoke.mjs plan [--scope changed|full]
+  node lightcode-integration-smoke.mjs run [--scope changed|full] [--mode mock|real] [--port 9222] [--outDir <dir>] [--ack-manual gate,gate]`);
+}
+
+function trackedFiles() {
+  return lines(runGit(["ls-files", ...productionRoots]));
+}
+
+function changedFiles() {
+  const tracked = lines(runGit(["diff", "--name-only", "HEAD", "--", ...productionRoots]));
+  const untracked = lines(
+    runGit(["ls-files", "--others", "--exclude-standard", "--", ...productionRoots]),
+  );
+  return [...new Set([...tracked, ...untracked])].filter(isProductionFile).sort();
+}
+
+function runGit(argv) {
+  return execFileSync("git", argv, { cwd: process.cwd(), encoding: "utf8" });
+}
+
+function lines(value) {
+  return value
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function auditCoverage() {
+  const files = trackedFiles().filter(isProductionFile);
+  const unmapped = files.filter((file) => areasForFile(file).length === 0);
+  console.log(`Coverage audit: ${files.length} production files, ${functionalAreas.length} areas`);
+  if (unmapped.length > 0) {
+    for (const file of unmapped) console.log(`UNMAPPED: ${file}`);
+    throw new Error(`${unmapped.length} production files are missing from the smoke inventory`);
+  }
+  console.log("PASS: every tracked production file maps to at least one functional area");
+}
+
+function buildPlan(selectedScope) {
+  if (!new Set(["changed", "full"]).has(selectedScope)) {
+    throw new Error(`invalid scope: ${selectedScope}`);
+  }
+  const files = selectedScope === "changed" ? changedFiles() : [];
+  const unmapped = files.filter((file) => areasForFile(file).length === 0);
+  if (unmapped.length > 0) {
+    throw new Error(`changed production paths are unmapped:\n${unmapped.join("\n")}`);
+  }
+  const areas =
+    selectedScope === "full"
+      ? functionalAreas
+      : functionalAreas.filter((area) => files.some((file) => areasForFile(file).includes(area)));
+  const automated = new Set(["baseline"]);
+  const manual = new Set();
+  for (const area of areas) {
+    for (const scenario of area.automated) automated.add(scenario);
+    for (const gate of area.manual) manual.add(gate);
+  }
+  return {
+    scope: selectedScope,
+    files,
+    areas,
+    automated: [...automated].sort(),
+    manual: [...manual].sort(),
+  };
+}
+
+function printPlan(plan) {
+  console.log(`Lightcode smoke plan (${plan.scope})`);
+  console.log(`Execution mode: ${mode}`);
+  if (plan.files.length > 0) {
+    console.log(`Changed production files: ${plan.files.length}`);
+  }
+  console.log(
+    `Functional areas: ${plan.areas.map((area) => area.id).join(", ") || "baseline only"}`,
+  );
+  console.log(`Automated scenarios: ${plan.automated.join(", ")}`);
+  if (plan.manual.length === 0) {
+    console.log(`${mode === "mock" ? "Mock gates" : "Manual gates"}: none`);
+  } else {
+    console.log(`${mode === "mock" ? "Mock gates" : "Manual gates"}:`);
+    for (const gate of plan.manual) console.log(`- ${gate}: ${manualGates[gate]}`);
+  }
+}
+
+async function runSmoke(plan) {
+  if (!new Set(["mock", "real"]).has(mode)) {
+    throw new Error(`invalid mode: ${mode}; use mock or real`);
+  }
+  await mkdir(outDir, { recursive: true });
+  printPlan(plan);
+  const report = {
+    startedAt: new Date().toISOString(),
+    scope: plan.scope,
+    outDir,
+    files: plan.files,
+    areas: plan.areas.map((area) => area.id),
+    automated: [],
+    manual: plan.manual.map((gate) => ({ gate, status: "required", detail: manualGates[gate] })),
+    errors: [],
+  };
+
+  const target = await waitForTarget();
+  const client = await connectTarget(target);
+  const runtimeErrors = [];
+  client.on("Runtime.exceptionThrown", (event) => {
+    runtimeErrors.push(
+      event.exceptionDetails?.exception?.description ?? event.exceptionDetails?.text,
+    );
+  });
+  client.on("Runtime.consoleAPICalled", (event) => {
+    if (event.type === "error" || event.type === "assert") {
+      runtimeErrors.push(event.args?.map((arg) => arg.value ?? arg.description).join(" "));
+    }
+  });
+
+  try {
+    await client.send("Page.enable");
+    await client.send("Runtime.enable");
+    await runScenario(report, "welcome-dismissal", () => welcomeDismissalScenario(client));
+    await installWindowErrorCollector(client);
+    await runScenario(report, "baseline", () => baselineScenario(client));
+    if (plan.automated.includes("settings")) {
+      await runScenario(report, "settings", () => settingsScenario(client));
+      await runScenario(report, "control-geometry", () => controlGeometryScenario(client));
+    }
+    if (plan.automated.includes("thread-search")) {
+      await runScenario(report, "thread-search", () => threadSearchScenario(client));
+    }
+    if (plan.automated.includes("browser")) {
+      await runScenario(report, "browser", () => browserScenario(client));
+      await evaluate(
+        client,
+        "window.__lightcodeDev.closeSettings(); new Promise((resolve) => setTimeout(resolve, 300))",
+        true,
+      ).catch(() => undefined);
+    }
+    if (mode === "mock" && plan.manual.length > 0) {
+      await runMockIntegrations(report, client, plan.manual);
+    }
+    const collected = await evaluate(client, "window.__smokeErrors ?? []");
+    report.errors = [...new Set([...runtimeErrors, ...collected].filter(Boolean))];
+    if (report.errors.length > 0) {
+      report.automated.push({
+        id: "console-errors",
+        status: "fail",
+        detail: report.errors.slice(0, 5),
+      });
+    }
+  } finally {
+    await resetDrivenState(client).catch(() => undefined);
+    client.close();
+  }
+
+  const acknowledged = new Set(
+    String(args["ack-manual"] ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+  for (const item of report.manual) {
+    if (mode === "mock") item.status = "mocked";
+    else if (acknowledged.has(item.gate)) item.status = "acknowledged";
+  }
+  report.finishedAt = new Date().toISOString();
+  const reportPath = join(outDir, "smoke-report.json");
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  printReport(report, reportPath);
+
+  const automatedFailed = report.automated.some((item) => item.status === "fail");
+  const manualPending = mode === "real" && report.manual.some((item) => item.status === "required");
+  if (automatedFailed) process.exitCode = 1;
+  else if (manualPending) process.exitCode = 2;
+}
+
+async function runScenario(report, id, fn) {
+  try {
+    const detail = await fn();
+    report.automated.push({ id, status: "pass", detail });
+    console.log(`PASS: ${id}`);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    report.automated.push({ id, status: "fail", detail });
+    console.log(`FAIL: ${id} - ${detail}`);
+  }
+}
+
+async function baselineScenario(client) {
+  const state = await waitForValue(
+    () =>
+      evaluate(
+        client,
+        `(() => ({
+          url: location.href,
+          title: document.title,
+          bodyText: document.body?.innerText ?? "",
+          rootChildren: document.querySelector("#root")?.childElementCount ?? 0,
+          lightcodeBridge: typeof window.lightcode,
+          devBridge: typeof window.__lightcodeDev,
+          crash: /renderer crash|rendered more hooks/i.test(document.body?.innerText ?? ""),
+          welcomeVisible: Boolean(document.querySelector(".lightcode-welcome-page")),
+          draftComposer: Boolean(document.querySelector('textarea[placeholder], [contenteditable="true"], [data-composer-input-anchor]')),
+          modelPicker: Boolean(document.querySelector('[aria-label="Select model"], [aria-label="Models"]')),
+        }))()`,
+      ),
+    (candidate) =>
+      candidate.rootChildren > 0 &&
+      candidate.bodyText.trim().length > 0 &&
+      candidate.lightcodeBridge === "object" &&
+      candidate.devBridge === "object",
+    "renderer initialization",
+  );
+  assert(state.url === appUrl, `expected ${appUrl}, got ${state.url}`);
+  assert(state.rootChildren > 0 && state.bodyText.trim().length > 0, "renderer root is blank");
+  assert(state.lightcodeBridge === "object", "typed preload bridge is missing");
+  assert(state.devBridge === "object", "DEV testing bridge is missing");
+  assert(!state.crash, "renderer crash screen or hook-order failure detected");
+  assert(!state.welcomeVisible, "welcome screen still blocks the smoke test surface");
+  const screenshotPath = join(outDir, "smoke-01-baseline.png");
+  await screenshot(client, screenshotPath);
+  return { ...state, screenshotPath };
+}
+
+async function welcomeDismissalScenario(client) {
+  const initial = await waitForValue(
+    () =>
+      evaluate(
+        client,
+        `(() => ({
+          devBridge: typeof window.__lightcodeDev,
+          rootChildren: document.querySelector("#root")?.childElementCount ?? 0,
+          bodyTextLength: document.body?.innerText.length ?? 0,
+          welcomeVisible: Boolean(document.querySelector(".lightcode-welcome-page")),
+        }))()`,
+      ),
+    (state) => state.devBridge === "object" && state.rootChildren > 0 && state.bodyTextLength > 0,
+    "welcome dismissal bridge",
+  );
+  if (!initial.welcomeVisible) {
+    return { dismissed: false, detail: "welcome screen was already dismissed" };
+  }
+
+  const clicked = await evaluate(
+    client,
+    `(() => {
+      const button = document.querySelector(".lightcode-welcome-page button");
+      if (!(button instanceof HTMLButtonElement)) return false;
+      button.click();
+      localStorage.setItem("lightcode-welcome-seen-v16", "true");
+      return true;
+    })()`,
+  );
+  assert(clicked, "welcome screen primary action was not clickable");
+  const final = await waitForValue(
+    () =>
+      evaluate(
+        client,
+        `(() => ({
+          ready: document.readyState === "complete",
+          devBridge: typeof window.__lightcodeDev,
+          rootChildren: document.querySelector("#root")?.childElementCount ?? 0,
+          bodyTextLength: document.body?.innerText.length ?? 0,
+          welcomeVisible: Boolean(document.querySelector(".lightcode-welcome-page")),
+        }))()`,
+      ),
+    (state) =>
+      state.ready &&
+      state.devBridge === "object" &&
+      state.rootChildren > 0 &&
+      state.bodyTextLength > 0 &&
+      !state.welcomeVisible,
+    "welcome screen dismissal",
+  );
+  await new Promise((resolveWait) => setTimeout(resolveWait, 1_000));
+  const stable = await evaluate(
+    client,
+    `({ welcomeVisible: Boolean(document.querySelector(".lightcode-welcome-page")) })`,
+  );
+  assert(!final.welcomeVisible, "welcome screen remained visible after dismissal");
+  assert(!stable.welcomeVisible, "welcome screen returned after dismissal verification");
+  await evaluate(
+    client,
+    `(() => {
+      const app = window.__lightcodeDev.stores.app.getState();
+      const project = app.projects.find((candidate) => candidate.id === "smoke-project");
+      if (project) app.openDraft(project.id);
+    })()`,
+  );
+  return { dismissed: true, detail: "welcome screen dismissed through its primary action" };
+}
+
+async function settingsScenario(client) {
+  const sections = [
+    "profile",
+    "general",
+    "audio",
+    "appearance",
+    "terminal",
+    "threads",
+    "git",
+    "worktrees",
+    "notifications",
+    "ai",
+    "search",
+    "shortcuts",
+    "remoteAccess",
+    "remoteServers",
+    "agentsGeneral",
+    "browser",
+    "usage",
+    "archived",
+    "changelog",
+    "about",
+  ];
+  for (const section of sections) {
+    await evaluate(
+      client,
+      `window.__lightcodeDev.openSettings(${JSON.stringify(section)}); new Promise((resolve) => setTimeout(resolve, 200))`,
+      true,
+    );
+    const state = await waitForValue(
+      () =>
+        evaluate(
+          client,
+          `(() => ({
+            hasContent: Boolean(document.querySelector('[data-settings-scroll-area="true"]')),
+            textLength: document.body.innerText.length,
+            crash: /renderer crash|rendered more hooks/i.test(document.body.innerText),
+          }))()`,
+        ),
+      (candidate) => candidate.hasContent && candidate.textLength > 0,
+      `settings section ${section}`,
+    );
+    assert(state.hasContent && state.textLength > 0, `settings section ${section} did not render`);
+    assert(!state.crash, `settings section ${section} rendered a crash screen`);
+  }
+  const screenshotPath = join(outDir, "smoke-02-settings.png");
+  await screenshot(client, screenshotPath);
+  await evaluate(client, "window.__lightcodeDev.closeSettings()");
+  return { sections, screenshotPath };
+}
+
+async function controlGeometryScenario(client) {
+  await evaluate(
+    client,
+    `window.__lightcodeDev.openSettings("general"); new Promise((resolve) => setTimeout(resolve, 250))`,
+    true,
+  );
+  const switchGeometry = await waitForValue(
+    () =>
+      evaluate(
+        client,
+        `(() => {
+          const read = (selector, pseudo) => {
+            const element = document.querySelector(selector);
+            if (!element) return null;
+            const style = getComputedStyle(element, pseudo);
+            return {
+              radius: Number.parseFloat(style.borderTopLeftRadius),
+              height: Number.parseFloat(style.height),
+            };
+          };
+          return {
+            control: read(".switch__control"),
+            thumb: read(".switch__thumb"),
+          };
+        })()`,
+      ),
+    (geometry) => geometry.control !== null && geometry.thumb !== null,
+    "switch geometry",
+  );
+  assert(isPillGeometry(switchGeometry.control), "switch track is not pill-shaped");
+  assert(isPillGeometry(switchGeometry.thumb), "switch thumb is not pill-shaped");
+
+  await evaluate(
+    client,
+    `window.__lightcodeDev.openSettings("appearance"); new Promise((resolve) => setTimeout(resolve, 250))`,
+    true,
+  );
+  const sliderGeometry = await evaluate(
+    client,
+    `(() => {
+      const read = (selector, pseudo) => {
+        const element = document.querySelector(selector);
+        if (!element) return null;
+        const style = getComputedStyle(element, pseudo);
+        return {
+          radius: Number.parseFloat(style.borderTopLeftRadius),
+          height: Number.parseFloat(style.height),
+        };
+      };
+      return {
+        track: read(".slider__track"),
+        fill: read(".slider__fill"),
+        thumb: read(".slider__thumb", "::after"),
+      };
+    })()`,
+  );
+  if (sliderGeometry.track) {
+    assert(isPillGeometry(sliderGeometry.track), "slider track is not pill-shaped");
+  }
+  if (sliderGeometry.thumb) {
+    assert(isPillGeometry(sliderGeometry.thumb), "slider thumb is not pill-shaped");
+  }
+  if (sliderGeometry.fill) {
+    assert(sliderGeometry.fill.radius === 0, "slider fill must not add an extra rounded cap");
+  }
+  const screenshotPath = join(outDir, "smoke-02-control-geometry.png");
+  await screenshot(client, screenshotPath);
+  await evaluate(client, "window.__lightcodeDev.closeSettings()");
+  return {
+    switchGeometry,
+    sliderGeometry,
+    sliderPresent: sliderGeometry.track !== null,
+    screenshotPath,
+  };
+}
+
+function isPillGeometry(geometry) {
+  return geometry !== null && geometry.radius >= geometry.height / 2;
+}
+
+async function threadSearchScenario(client) {
+  await evaluate(
+    client,
+    `window.__lightcodeDev.stores.panel.setState({ threadSearchOpen: true }); new Promise((resolve) => setTimeout(resolve, 80))`,
+    true,
+  );
+  const state = await waitForValue(
+    () =>
+      evaluate(
+        client,
+        `(() => ({
+          dialog: Boolean(document.querySelector('[role="dialog"]')),
+          searchInput: Boolean(document.querySelector('input[placeholder]')),
+          crash: /renderer crash|rendered more hooks/i.test(document.body.innerText),
+        }))()`,
+      ),
+    (candidate) => candidate.dialog && candidate.searchInput,
+    "thread search overlay",
+  );
+  assert(state.dialog && state.searchInput, "thread search overlay did not render");
+  assert(!state.crash, "thread search rendered a crash screen");
+  const screenshotPath = join(outDir, "smoke-03-thread-search.png");
+  await screenshot(client, screenshotPath);
+  await evaluate(
+    client,
+    "window.__lightcodeDev.stores.panel.setState({ threadSearchOpen: false })",
+  );
+  return { ...state, screenshotPath };
+}
+
+async function browserScenario(client) {
+  await resetBrowserTabs(client);
+  const result = spawnSync(
+    process.execPath,
+    [
+      join(scriptDir, "lightcode-browser-smoke.mjs"),
+      "--port",
+      String(port),
+      "--appUrl",
+      appUrl,
+      "--outDir",
+      join(outDir, "browser"),
+      "--commandTimeoutMs",
+      "20000",
+    ],
+    { cwd: process.cwd(), encoding: "utf8" },
+  );
+  if (result.stdout) process.stdout.write(result.stdout);
+  if (result.stderr) process.stderr.write(result.stderr);
+  assert(result.status === 0, `browser smoke exited ${result.status}`);
+  return { outDir: join(outDir, "browser") };
+}
+
+async function resetBrowserTabs(client) {
+  const state = await bridgeInvoke(client, "browserGetState");
+  for (const tab of state?.tabs ?? []) {
+    await bridgeInvoke(client, "browserCloseTab", { tabId: tab.tabId });
+  }
+}
+
+async function runMockIntegrations(report, client, gates) {
+  const fixture = await evaluate(
+    client,
+    `(() => {
+      const state = window.__lightcodeDev.stores.app.getState();
+      const project =
+        state.projects.find((candidate) => candidate.id === "smoke-project") ??
+        state.projects.find((candidate) => !candidate.disabled);
+      return {
+        project,
+        threadCount: state.threads.length,
+        runtimeRequests: state.runtimeRequestsByThread,
+        bridgeKeys: Object.keys(window.lightcode),
+        bodyText: document.body.innerText,
+      };
+    })()`,
+  );
+  assert(fixture.project?.location, "isolated fixture project is missing");
+
+  const passed = [];
+  for (const gate of gates) {
+    try {
+      const detail = await runMockGate(client, gate, fixture);
+      report.manual.find((item) => item.gate === gate).status = "mocked";
+      report.manual.find((item) => item.gate === gate).detail = detail;
+      passed.push(gate);
+      console.log(`MOCK PASS: ${gate} - ${detail}`);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      report.automated.push({ id: `mock:${gate}`, status: "fail", detail });
+      console.log(`MOCK FAIL: ${gate} - ${detail}`);
+    }
+  }
+  report.automated.push({
+    id: "mock-integrations",
+    status: passed.length === gates.length ? "pass" : "fail",
+    detail: `${passed.length}/${gates.length} deterministic mock gates passed`,
+  });
+}
+
+async function runMockGate(client, gate, fixture) {
+  switch (gate) {
+    case "changed-surface":
+      return "covered by baseline and diff-selected automated scenarios";
+    case "file-editor": {
+      const result = await bridgeInvoke(client, "listProjectTree", {
+        projectLocation: fixture.project.location,
+        directoryPath: "",
+      });
+      assert(result && Array.isArray(result.entries), "project tree bridge did not return entries");
+      return "fixture project tree bridge returned successfully";
+    }
+    case "git-mutations": {
+      const result = await bridgeInvoke(client, "getGitStatus", {
+        projectLocation: fixture.project.location,
+      });
+      assert(result && typeof result === "object", "git status bridge returned no result");
+      return "fixture git status round-trip returned successfully";
+    }
+    case "ipc-roundtrip": {
+      const projects = await bridgeInvoke(client, "dbGetProjects");
+      const settings = await bridgeInvoke(client, "getSharedSettings");
+      assert(Array.isArray(projects), "database project IPC returned no array");
+      assert(settings && typeof settings === "object", "settings IPC returned no object");
+      return "database and settings IPC round-trips returned successfully";
+    }
+    case "mcp-extension": {
+      const statuses = await bridgeInvoke(client, "getAgentStatuses", []);
+      assert(
+        statuses && typeof statuses === "object",
+        "agent/MCP discovery bridge returned no result",
+      );
+      assert(fixture.bridgeKeys.includes("browserGetState"), "browser MCP bridge is missing");
+      return "mock provider/MCP discovery and browser bridge contracts responded";
+    }
+    case "native-auth-update": {
+      await evaluate(
+        client,
+        `window.__lightcodeDev.setUpdate({ phase: "downloaded", version: "mock-smoke" })`,
+      );
+      const update = await evaluate(client, "window.__lightcodeDev.stores.update.getState()");
+      const usageState = await bridgeInvoke(client, "getUsageLoginState", {});
+      assert(
+        update.phase === "downloaded" && update.version === "mock-smoke",
+        "update state mock failed",
+      );
+      assert(
+        usageState && typeof usageState === "object",
+        "usage login state bridge returned no result",
+      );
+      return "update state and usage-auth state were exercised with deterministic mock data";
+    }
+    case "project-mutations":
+      assert(fixture.project.id === "smoke-project", "isolated project fixture is not selected");
+      return "isolated seeded project was loaded and selected";
+    case "provider-live": {
+      const state = await evaluate(
+        client,
+        `(() => {
+          const candidate = {
+            kind: "codex",
+            label: "Smoke Provider",
+            installed: true,
+            authState: "authenticated",
+            envKind: "posix",
+            capabilities: {
+              models: [{ id: "smoke-model", label: "Smoke Model" }],
+              efforts: ["medium"],
+              defaultEffort: "medium",
+              modelEfforts: { "smoke-model": ["medium"] },
+              modes: ["agent"],
+              approvalPolicies: [{ id: "on-request", label: "On Request" }],
+              defaultApprovalPolicy: "on-request",
+              sandboxModes: [{ id: "workspace-write", label: "Workspace Write" }],
+              defaultSandboxMode: "workspace-write",
+              supportsResume: true,
+              supportsDirectInput: true,
+              supportsOneShot: true,
+              liveInputMode: "terminal",
+              presentationMode: "terminal",
+              presentationModes: ["terminal", "gui"],
+              settingDefs: [],
+            },
+          };
+          window.__lightcodeDev.stores.agentStatuses.getState().hydrateFromCache({
+            windows: [candidate],
+            wsl: [],
+          });
+          window.__lightcodeDev.stores.app.getState().openDraft(${JSON.stringify(fixture.project.id)});
+          return { hydrated: true, kind: candidate.kind };
+        })()`,
+      );
+      assert(state.hydrated, `provider fixture hydration failed: ${state.reason ?? "unknown"}`);
+      const controls = await waitForValue(
+        () =>
+          evaluate(
+            client,
+            `(() => ({
+              selectControls: document.querySelectorAll('[aria-label="Select"]').length,
+              terminalEntry: /Open a terminal/i.test(document.body.innerText),
+            }))()`,
+          ),
+        (candidate) => candidate.selectControls > 0 && candidate.terminalEntry,
+        "mock provider controls",
+      );
+      assert(controls.selectControls > 0, "provider model/approval controls did not render");
+      return `provider ${state.kind} was hydrated and selector UI rendered without external credentials`;
+    }
+    case "remote-mobile": {
+      const pairing = await bridgeInvoke(client, "getRemoteAccessPairing");
+      assert(pairing && typeof pairing === "object", "remote pairing bridge returned no result");
+      return "remote pairing state bridge returned successfully";
+    }
+    case "runtime-requests": {
+      assert(
+        fixture.runtimeRequests && typeof fixture.runtimeRequests === "object",
+        "runtime request store missing",
+      );
+      assert(
+        fixture.bridgeKeys.includes("resolveThreadServerRequest"),
+        "runtime request IPC is missing",
+      );
+      return "runtime request store and resolution IPC contract were checked";
+    }
+    case "terminal-pty":
+      assert(fixture.bridgeKeys.includes("startThread"), "thread launch bridge is missing");
+      assert(
+        /Open a terminal/i.test(await evaluate(client, "document.body.innerText")),
+        "terminal entry point did not render",
+      );
+      return "terminal launch contract and entry point were checked without spawning a real provider";
+    case "visual-a11y": {
+      const result = await evaluate(
+        client,
+        `(() => ({
+          unlabeled: [...document.querySelectorAll("button,input,textarea")].filter((el) => {
+            const label = el.getAttribute("aria-label") || el.getAttribute("title") || el.getAttribute("placeholder") || el.textContent?.trim();
+            return !label;
+          }).length,
+          dark: document.documentElement.classList.contains("dark"),
+        }))()`,
+      );
+      assert(
+        result.unlabeled === 0,
+        `${result.unlabeled} interactive controls lack an accessible label`,
+      );
+      assert(result.dark, "dark theme baseline did not render");
+      return "interactive labels and dark-theme baseline were checked";
+    }
+    default:
+      return `mock gate acknowledged: ${gate}`;
+  }
+}
+
+async function bridgeInvoke(client, method, payload) {
+  const payloadText = payload === undefined ? "" : JSON.stringify(payload);
+  return evaluate(client, `window.lightcode[${JSON.stringify(method)}](${payloadText})`, true);
+}
+
+async function resetDrivenState(client) {
+  await evaluate(
+    client,
+    `(() => {
+      window.__lightcodeDev?.closeSettings();
+      window.__lightcodeDev?.stores?.panel?.setState({ threadSearchOpen: false });
+      window.__lightcodeDev?.reset();
+    })()`,
+  );
+}
+
+async function installWindowErrorCollector(client) {
+  await evaluate(
+    client,
+    `(() => {
+      if (window.__smokeErrors) return;
+      window.__smokeErrors = [];
+      window.addEventListener("error", (event) => window.__smokeErrors.push("window.error: " + event.message));
+      window.addEventListener("unhandledrejection", (event) => window.__smokeErrors.push("unhandledrejection: " + String(event.reason)));
+    })()`,
+  );
+}
+
+async function waitForTarget() {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    try {
+      const response = await fetch(`http://127.0.0.1:${port}/json/list`);
+      if (response.ok) {
+        const targets = await response.json();
+        const target = targets.find(
+          (candidate) => candidate.type === "page" && candidate.url === appUrl,
+        );
+        if (target) return target;
+      }
+    } catch {
+      // Electron is still starting.
+    }
+    await new Promise((resolveWait) => setTimeout(resolveWait, 500));
+  }
+  throw new Error(`no Lightcode CDP target at ${appUrl} on port ${port}`);
+}
+
+async function connectTarget(target) {
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  const pending = new Map();
+  const listeners = new Map();
+  let id = 0;
+  await new Promise((resolveOpen, reject) => {
+    ws.onopen = resolveOpen;
+    ws.onerror = () => reject(new Error("failed to connect to the Electron CDP target"));
+  });
+  ws.addEventListener("message", (message) => {
+    const payload = JSON.parse(message.data);
+    if (payload.id) {
+      const request = pending.get(payload.id);
+      if (!request) return;
+      pending.delete(payload.id);
+      clearTimeout(request.timeout);
+      if (payload.error) request.reject(new Error(JSON.stringify(payload.error)));
+      else request.resolve(payload.result);
+      return;
+    }
+    for (const listener of listeners.get(payload.method) ?? []) listener(payload.params ?? {});
+  });
+  return {
+    on(method, listener) {
+      const current = listeners.get(method) ?? [];
+      current.push(listener);
+      listeners.set(method, current);
+    },
+    send(method, params = {}) {
+      id += 1;
+      const requestId = id;
+      ws.send(JSON.stringify({ id: requestId, method, params }));
+      return new Promise((resolveRequest, reject) => {
+        const timeout = setTimeout(() => {
+          pending.delete(requestId);
+          reject(new Error(`CDP timeout: ${method}`));
+        }, timeoutMs);
+        pending.set(requestId, { resolve: resolveRequest, reject, timeout });
+      });
+    },
+    close() {
+      ws.close();
+    },
+  };
+}
+
+async function evaluate(client, expression, awaitPromise = false) {
+  const result = await client.send("Runtime.evaluate", {
+    expression,
+    returnByValue: true,
+    awaitPromise,
+  });
+  if (result.exceptionDetails) {
+    throw new Error(result.exceptionDetails.exception?.description ?? result.exceptionDetails.text);
+  }
+  return result.result.value;
+}
+
+async function screenshot(client, path) {
+  const result = await client.send("Page.captureScreenshot", {
+    format: "png",
+    fromSurface: true,
+  });
+  await writeFile(path, Buffer.from(result.data, "base64"));
+}
+
+async function waitForValue(read, predicate, label) {
+  const started = Date.now();
+  let lastValue;
+  while (Date.now() - started < timeoutMs) {
+    lastValue = await read();
+    if (predicate(lastValue)) return lastValue;
+    await new Promise((resolveWait) => setTimeout(resolveWait, 100));
+  }
+  throw new Error(`timed out waiting for ${label}: ${JSON.stringify(lastValue)}`);
+}
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+function printReport(report, reportPath) {
+  console.log("\nLightcode integration smoke report");
+  for (const result of report.automated) {
+    console.log(`${result.status.toUpperCase()}: ${result.id}`);
+  }
+  for (const item of report.manual) {
+    const statusLabel =
+      item.status === "acknowledged" ? "ACK" : item.status === "mocked" ? "MOCK" : "MANUAL";
+    console.log(`${statusLabel}: ${item.gate}`);
+  }
+  console.log(`Console/runtime errors: ${report.errors.length}`);
+  console.log(`Report: ${reportPath}`);
+}
+
+function parseArgs(argv) {
+  const parsed = { _: [] };
+  for (let index = 0; index < argv.length; index += 1) {
+    const value = argv[index];
+    if (!value.startsWith("--")) {
+      parsed._.push(value);
+      continue;
+    }
+    const key = value.slice(2);
+    const next = argv[index + 1];
+    if (next === undefined || next.startsWith("--")) parsed[key] = true;
+    else {
+      parsed[key] = next;
+      index += 1;
+    }
+  }
+  return parsed;
+}

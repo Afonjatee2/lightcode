@@ -243,7 +243,10 @@ export function GitReviewOverlay(props: {
                     selectedKeys={new Set([diffFilter])}
                     selectionMode="single"
                     onSelectionChange={(keys: Selection) => {
-                      const key = [...keys][0] as DiffFilter | undefined;
+                      const key =
+                        keys === "all"
+                          ? undefined
+                          : (keys.values().next().value as DiffFilter | undefined);
                       if (key) setDiffFilter(key);
                     }}
                   >

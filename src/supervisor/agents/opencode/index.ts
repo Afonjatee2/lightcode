@@ -52,9 +52,9 @@ export function createOpenCodeAdapter(): AgentAdapter {
   let capabilities: AgentCapability = opencodeDefaultCapabilities;
 
   return {
-    kind: "opencode",
-    label: "OpenCode",
-    binary: "opencode",
+    kind: opencodeDetectionSpec.kind,
+    label: opencodeDetectionSpec.label,
+    binary: opencodeDetectionSpec.binary,
     ...(opencodeDetectionSpec.update ? { update: opencodeDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;

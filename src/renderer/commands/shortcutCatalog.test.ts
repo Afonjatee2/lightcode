@@ -1,3 +1,5 @@
+// @vitest-environment node
+
 import type { MessageDescriptor } from "@lingui/core";
 import { describe, expect, it } from "vitest";
 import { COMPOSER_CONTROL_COMMAND_IDS, DEFAULT_KEYBINDINGS } from "@/shared/keybindings";

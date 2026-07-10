@@ -2,11 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentInstanceConfig } from "@/shared/contracts";
 import { authenticateAcpAgent, logoutAcpAgent, probeAcpCapabilities } from "../acp";
 import {
-  ACP_GENERIC_KIND_PREFIX,
   authenticateAcpGenericInstance,
   createAcpGenericAdapter,
-  extractAcpGenericInstanceId,
-  isAcpGenericKind,
   logoutAcpGenericInstance,
   verifyAcpGenericAuthentication,
 } from ".";
@@ -459,17 +456,5 @@ describe("createAcpGenericAdapter", () => {
     const [command, args] = vi.mocked(logoutAcpAgent).mock.calls[0]!;
     expect(command).toMatch(/wsl(?:\.exe)?$/u);
     expect(args).toContain("Ubuntu");
-  });
-});
-
-describe("acp-generic kind helpers", () => {
-  it("isAcpGenericKind matches namespaced kinds only", () => {
-    expect(isAcpGenericKind(`${ACP_GENERIC_KIND_PREFIX}foo`)).toBe(true);
-    expect(isAcpGenericKind("codex")).toBe(false);
-  });
-
-  it("extractAcpGenericInstanceId pulls the id back out", () => {
-    expect(extractAcpGenericInstanceId(`${ACP_GENERIC_KIND_PREFIX}foo`)).toBe("foo");
-    expect(extractAcpGenericInstanceId("codex")).toBeUndefined();
   });
 });

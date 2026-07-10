@@ -17,11 +17,8 @@ import type {
   ResolveAgentAccountResult,
   RemoveAcpRegistryAgentPayload,
 } from "@/shared/contracts";
-import {
-  acpGenericKind,
-  extractAcpGenericInstanceId,
-  verifyAcpGenericAuthentication,
-} from "../agents/acp-generic";
+import { acpGenericKind, extractAcpGenericInstanceId } from "@/shared/contracts";
+import { verifyAcpGenericAuthentication } from "../agents/acp-generic";
 import {
   dispatchAcpAuthenticate,
   dispatchAcpLogout,

@@ -11,96 +11,92 @@
  * `<resources>/agent-plugins/<kind>/`. `resolveSourceDir()` in
  * `install.ts` checks `process.resourcesPath/agent-plugins/<kind>` first.
  *
- * Currently registered:
- *   - claude: plugin.json, forward.mjs
- *   - codex: plugin.json, forward.mjs
- *   - cursor: plugin.json, forward.mjs
- *   - gemini: plugin.json, forward.mjs
- *   - copilot: plugin.json, forward.mjs
- *   - grok: plugin.json, forward.mjs
- *   - opencode: plugin.json, lightcode-status.mjs (in-process plugin, no forward.mjs)
+ * Provider assets are discovered from
+ * `src/supervisor/agents/<kind>/plugin/`: a directory participates when it
+ * contains `plugin.json`, and must contain exactly one supported runtime asset
+ * (`forward.mjs`, or OpenCode's in-process `lightcode-status.mjs`). This keeps
+ * packaging registration beside the provider instead of duplicating a list in
+ * this script.
  *
  * Plus a shared forwarder runtime under `_runtime/lightcode-hook-runtime.mjs`
  * that's deployed next to each `forward.mjs` at install time. Single source
  * of truth for the manifest read / postWithRetry / envelope plumbing across
  * all forwarder providers.
  *
- * The script is idempotent: each asset is only copied when missing or stale
- * (size/mtime mismatch).
+ * The script is idempotent: every small asset is refreshed on each run, so a
+ * partial restage or same-size edit cannot leave stale packaged content.
  */
 
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(__dirname, "..");
+const agentsDir = join(repoRoot, "src", "supervisor", "agents");
 const destBase = join(repoRoot, "resources", "agent-plugins");
+const PROVIDER_RUNTIME_ASSETS = ["forward.mjs", "lightcode-status.mjs"];
 
-/** @type {ReadonlyArray<{ kind: string; assets: readonly string[]; srcDir: string }>} */
-const PLUGINS = [
-  {
-    kind: "claude",
-    assets: ["plugin.json", "forward.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "claude", "plugin"),
-  },
-  {
-    kind: "codex",
-    assets: ["plugin.json", "forward.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "codex", "plugin"),
-  },
-  {
-    kind: "cursor",
-    assets: ["plugin.json", "forward.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "cursor", "plugin"),
-  },
-  {
-    kind: "gemini",
-    assets: ["plugin.json", "forward.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "gemini", "plugin"),
-  },
-  {
-    kind: "copilot",
-    assets: ["plugin.json", "forward.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "copilot", "plugin"),
-  },
-  {
-    kind: "grok",
-    assets: ["plugin.json", "forward.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "grok", "plugin"),
-  },
-  {
-    kind: "commandcode",
-    assets: ["plugin.json", "forward.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "commandcode", "plugin"),
-  },
-  {
-    kind: "opencode",
-    assets: ["plugin.json", "lightcode-status.mjs"],
-    srcDir: join(repoRoot, "src", "supervisor", "agents", "opencode", "plugin"),
-  },
-];
+/**
+ * @typedef {{ kind: string; assets: readonly string[]; srcDir: string }} AgentPluginSource
+ */
 
-const SHARED_RUNTIME = {
-  src: join(
-    repoRoot,
-    "src",
-    "supervisor",
-    "agents",
-    "plugin",
-    "forward-runtime",
-    "lightcode-hook-runtime.mjs",
-  ),
-  destRel: join("_runtime", "lightcode-hook-runtime.mjs"),
-};
-
-for (const plugin of PLUGINS) {
-  stagePlugin(plugin);
+/**
+ * Discover provider plugin sources in stable kind order.
+ *
+ * @param {string} sourceAgentsDir
+ * @returns {AgentPluginSource[]}
+ */
+export function discoverAgentPluginSources(sourceAgentsDir) {
+  return readdirSync(sourceAgentsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => ({ kind: entry.name, srcDir: join(sourceAgentsDir, entry.name, "plugin") }))
+    .filter(({ srcDir }) => existsSync(join(srcDir, "plugin.json")))
+    .map(({ kind, srcDir }) => {
+      const runtimeAssets = PROVIDER_RUNTIME_ASSETS.filter((asset) =>
+        existsSync(join(srcDir, asset)),
+      );
+      if (runtimeAssets.length !== 1) {
+        throw new Error(
+          `[prepare-agent-plugins] ${kind} must provide exactly one runtime asset ` +
+            `(${PROVIDER_RUNTIME_ASSETS.join(" or ")}): ${srcDir}`,
+        );
+      }
+      return { kind, assets: ["plugin.json", runtimeAssets[0]], srcDir };
+    })
+    .sort((a, b) => a.kind.localeCompare(b.kind));
 }
-stageSharedRuntime();
 
-function stagePlugin({ kind, assets, srcDir }) {
-  const destDir = join(destBase, kind);
+/**
+ * Resolve and validate the shared runtime copied beside every forwarder.
+ *
+ * @param {string} sourceAgentsDir
+ */
+export function resolveSharedForwardRuntime(sourceAgentsDir) {
+  const runtime = {
+    src: join(sourceAgentsDir, "plugin", "forward-runtime", "lightcode-hook-runtime.mjs"),
+    destRel: join("_runtime", "lightcode-hook-runtime.mjs"),
+  };
+  if (!existsSync(runtime.src)) {
+    throw new Error(`[prepare-agent-plugins] missing shared runtime source: ${runtime.src}`);
+  }
+  return runtime;
+}
+
+/**
+ * @param {{ sourceAgentsDir: string; destinationBase: string }} options
+ */
+export function stageAgentPlugins({ sourceAgentsDir, destinationBase }) {
+  const plugins = discoverAgentPluginSources(sourceAgentsDir);
+  const sharedRuntime = resolveSharedForwardRuntime(sourceAgentsDir);
+  for (const plugin of plugins) {
+    stagePlugin(plugin, destinationBase);
+  }
+  stageSharedRuntime(sharedRuntime, destinationBase);
+}
+
+function stagePlugin({ kind, assets, srcDir }, destinationBase) {
+  const destDir = join(destinationBase, kind);
   mkdirSync(destDir, { recursive: true });
 
   for (const asset of assets) {
@@ -118,12 +114,13 @@ function stagePlugin({ kind, assets, srcDir }) {
   }
 }
 
-function stageSharedRuntime() {
-  if (!existsSync(SHARED_RUNTIME.src)) {
-    throw new Error(`[prepare-agent-plugins] missing shared runtime source: ${SHARED_RUNTIME.src}`);
-  }
-  const dest = join(destBase, SHARED_RUNTIME.destRel);
+function stageSharedRuntime(sharedRuntime, destinationBase) {
+  const dest = join(destinationBase, sharedRuntime.destRel);
   mkdirSync(dirname(dest), { recursive: true });
-  copyFileSync(SHARED_RUNTIME.src, dest);
+  copyFileSync(sharedRuntime.src, dest);
   console.log(`[prepare-agent-plugins] _runtime -> ${dest}`);
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  stageAgentPlugins({ sourceAgentsDir: agentsDir, destinationBase: destBase });
 }

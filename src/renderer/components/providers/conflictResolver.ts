@@ -1,8 +1,31 @@
 import type { AgentStatus, ProjectLocation, ThreadPresentationMode } from "@/shared/contracts";
-import { getConflictResolverDefaults, resolveConflictResolverConfig } from "./ProviderIcon";
-import { getUtilityTaskCandidates } from "./utilityTask";
+import {
+  createUtilityTaskRegistry,
+  getUtilityTaskCandidates,
+  resolveUtilityTaskConfig,
+  type UtilityTaskCandidateAgent,
+  type UtilityTaskConfigAgent,
+} from "./utilityTask";
 
-export { getConflictResolverCandidates, resolveConflictResolverConfig } from "./ProviderIcon";
+const conflictResolverRegistry = createUtilityTaskRegistry();
+export const registerConflictResolverDefaults = conflictResolverRegistry.register;
+export const getConflictResolverDefaults = conflictResolverRegistry.get;
+export const getConflictResolverDefaultsHint = conflictResolverRegistry.getHint;
+
+export function getConflictResolverCandidates<T extends UtilityTaskCandidateAgent>(
+  agentStatuses: readonly T[],
+  provider: string,
+): T[] {
+  return getUtilityTaskCandidates(agentStatuses, provider, getConflictResolverDefaults);
+}
+
+export function resolveConflictResolverConfig(
+  agent: UtilityTaskConfigAgent | undefined,
+  model: string,
+  effort: string,
+): { model: string; effort: string; availableEfforts: string[] } {
+  return resolveUtilityTaskConfig(agent, model, effort, getConflictResolverDefaults);
+}
 
 export interface ConflictResolverSettings {
   provider: string;
@@ -85,11 +108,4 @@ export function resolveConflictResolverLaunchConfig(
     model: explicitModel ?? resolved.model,
     effort: resolved.effort,
   };
-}
-
-export function getConflictResolverCandidatesForLaunch(
-  agentStatuses: readonly AgentStatus[],
-  providerSetting: string,
-): AgentStatus[] {
-  return getUtilityTaskCandidates(agentStatuses, providerSetting, getConflictResolverDefaults);
 }

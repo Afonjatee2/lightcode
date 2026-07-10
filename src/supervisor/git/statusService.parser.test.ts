@@ -1,5 +1,5 @@
 /**
- * Pure-parser regression tests for statusService.
+ * Pure-parser regression tests for statusParsing.
  *
  * The functions exercised here interpret raw `git` output: any drift in
  * `git status --porcelain=v2 -b`, `git remote -v`, or `git diff --numstat`
@@ -16,7 +16,7 @@ import {
   parseDiffNumstat,
   parseStatusPorcelainV2,
   unquoteGitPath,
-} from "./statusService";
+} from "./statusParsing";
 
 // git C-quotes non-ASCII bytes as octal-escaped UTF-8 wrapped in double quotes.
 // `файл.txt` → ф=\321\204 а=\320\260 й=\320\271 л=\320\273 then `.txt`.

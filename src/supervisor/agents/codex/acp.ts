@@ -30,8 +30,6 @@ import { buildCodexAppServerCommand } from "./argv";
 import {
   createCodexMapperState,
   mapCodexNotification,
-  mapCodexServerRequest,
-  translateCodexCanonicalResponse,
   type CodexMapperState,
 } from "./canonicalMapping";
 import {
@@ -40,17 +38,16 @@ import {
   extractThreadField,
   extractTurnField,
   isRecoverableResumeError,
-  parseCodexSocketMessage,
   toCodexSandboxPolicy,
   type CodexThreadStatus,
 } from "./acpProtocol";
-import { buildCodexQuestionAnswerEvents } from "./acpQuestionAnswer";
 import {
   buildCodexCollaborationMode,
   buildCodexTurnInput,
   parseCodexGoalCommand,
   type CodexGoalCommand,
 } from "./acpTurn";
+import { CodexAppServerRpc } from "./appServerRpc";
 import { CodexStdioTransport } from "./stdioTransport";
 import { mapCodexSlashCommands, readCodexInitCommands } from "./probe";
 
@@ -162,12 +159,11 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   launchOptions: AgentLaunchOptions;
 
   private readonly appServer: ChildProcess;
-  private readonly transport: CodexStdioTransport;
+  private readonly rpc: CodexAppServerRpc;
   private readonly threadId: string;
   private listener: StructuredSessionListener | undefined;
   private isDisposed = false;
   private activated = false;
-  private requestSequence = 0;
   private remoteThreadId: string | undefined;
   private rolloutPath: string | undefined;
   private rolloutCreatedAt: string | undefined;
@@ -207,33 +203,14 @@ export class CodexStructuredSession implements StructuredSessionHandle {
    * `setListener` — same race as `AcpStructuredSession`.
    */
   private bufferedRuntimeEvents: RuntimeEvent[] = [];
-  private readonly pendingRequests = new Map<
-    string,
-    {
-      resolve: (value: unknown) => void;
-      reject: (reason?: unknown) => void;
-      timeout: NodeJS.Timeout;
-    }
-  >();
-  /**
-   * Inbound JSON-RPC requests the app-server is waiting on us to answer.
-   * The canonical request panel resolves with `{ optionId }`; we need the
-   * original method + params to translate that back into the Codex-native
-   * result shape in {@link resolveServerRequest}.
-   */
-  private readonly inboundRequests = new Map<
-    string,
-    { id: string | number; method: string; params: Record<string, unknown> | undefined }
-  >();
-
   private constructor(
     appServer: ChildProcess,
-    transport: CodexStdioTransport,
+    rpc: CodexAppServerRpc,
     threadId: string,
     wslDistro?: string,
   ) {
     this.appServer = appServer;
-    this.transport = transport;
+    this.rpc = rpc;
     this.threadId = threadId;
     this.wslDistro = wslDistro;
     this.launchOptions = {
@@ -348,20 +325,20 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   ): Promise<void> {
     switch (command.kind) {
       case "set":
-        await this.request("thread/goal/set", {
+        await this.rpc.request("thread/goal/set", {
           threadId,
           objective: command.objective,
           status: "active",
         });
         return;
       case "clear":
-        await this.request("thread/goal/clear", { threadId });
+        await this.rpc.request("thread/goal/clear", { threadId });
         return;
       case "pause":
-        await this.request("thread/goal/set", { threadId, status: "paused" });
+        await this.rpc.request("thread/goal/set", { threadId, status: "paused" });
         return;
       case "resume":
-        await this.request("thread/goal/set", { threadId, status: "active" });
+        await this.rpc.request("thread/goal/set", { threadId, status: "active" });
         return;
       case "view":
         // The active goal item is already in the chat via `thread/goal/updated`
@@ -420,8 +397,9 @@ export class CodexStructuredSession implements StructuredSessionHandle {
 
     const wslDistro =
       input.projectLocation.kind === "wsl" ? input.projectLocation.distro : undefined;
-    const session = new CodexStructuredSession(appServer, transport, input.threadId, wslDistro);
-    session.attachTransportHandlers();
+    const rpc = new CodexAppServerRpc(transport, input.threadId);
+    const session = new CodexStructuredSession(appServer, rpc, input.threadId, wslDistro);
+    session.attachRpcHandlers();
 
     return session;
   }
@@ -496,7 +474,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     if (sessionRef) {
       this.beginResumeActiveStatusSuppression(sessionRef.providerSessionId);
       try {
-        await this.request("thread/resume", {
+        await this.rpc.request("thread/resume", {
           ...threadOverrides,
           threadId: sessionRef.providerSessionId,
           persistExtendedHistory: true,
@@ -510,7 +488,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         }
         this.resumeActiveStatusSuppressionUntil.delete(sessionRef.providerSessionId);
         console.log("[codex] thread/resume failed (%s), falling back to thread/start", msg);
-        const result = await this.request("thread/start", startParams);
+        const result = await this.rpc.request("thread/start", startParams);
         threadId = extractThreadField(result, "id") ?? "";
         if (!threadId) {
           throw new Error("thread/start fallback response did not contain a thread id.", {
@@ -520,7 +498,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         this.extractRolloutMeta(result);
       }
     } else {
-      const result = await this.request("thread/start", startParams);
+      const result = await this.rpc.request("thread/start", startParams);
       threadId = extractThreadField(result, "id") ?? "";
       if (!threadId) {
         throw new Error("thread/start response did not contain a thread id.");
@@ -673,7 +651,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     const sandboxPolicy = toCodexSandboxPolicy(config.sandboxMode);
     const collaborationMode = buildCodexCollaborationMode(config);
     try {
-      const result = await this.request("turn/start", {
+      const result = await this.rpc.request("turn/start", {
         threadId,
         input,
         model: config.model,
@@ -690,7 +668,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       this.activeTurnId = extractTurnField(result, "id");
       if (this.pendingTurnInterrupt && this.activeTurnId) {
         this.pendingTurnInterrupt = false;
-        await this.request("turn/interrupt", {
+        await this.rpc.request("turn/interrupt", {
           threadId,
           turnId: this.activeTurnId,
         });
@@ -716,7 +694,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       return;
     }
 
-    await this.request("turn/interrupt", {
+    await this.rpc.request("turn/interrupt", {
       threadId,
       turnId: this.activeTurnId,
     });
@@ -727,7 +705,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       throw new Error(`rollbackThread: numTurns must be a positive integer (got ${numTurns}).`);
     }
     const threadId = await this.waitForRemoteThreadId();
-    await this.request("thread/rollback", {
+    await this.rpc.request("thread/rollback", {
       threadId,
       numTurns,
     });
@@ -741,25 +719,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   }
 
   async resolveServerRequest(requestId: ThreadServerRequestId, response: unknown): Promise<void> {
-    const inbound = this.inboundRequests.get(String(requestId));
-    this.inboundRequests.delete(String(requestId));
-    const result = inbound
-      ? translateCodexCanonicalResponse(inbound.method, inbound.params, response)
-      : response;
-    this.writeToCodex({
-      jsonrpc: "2.0",
-      id: inbound?.id ?? requestId,
-      result,
-    });
-    if (inbound?.method === "item/tool/requestUserInput") {
-      this.emitRuntimeEvents(
-        buildCodexQuestionAnswerEvents({
-          threadId: this.threadId,
-          params: inbound.params,
-          response,
-        }),
-      );
-    }
+    this.rpc.resolveServerRequest(requestId, response);
   }
 
   async dispose(): Promise<void> {
@@ -769,233 +729,162 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     this.isDisposed = true;
 
     this.clearPendingSystemErrorFallback();
-    this.transport.dispose();
-
-    this.rejectPendingRequests(new Error("Codex app-server session disposed."));
+    this.rpc.dispose(new Error("Codex app-server session disposed."));
 
     if (!this.appServer.killed) {
       terminateChildProcessTree(this.appServer);
     }
   }
 
-  private attachTransportHandlers(): void {
-    this.transport.setListener({
-      onMessage: (payload) => {
-        this.logCodexEventDebug("codex->lightcode", payload);
-        const message = parseCodexSocketMessage(payload);
-
-        if (message.kind === "response") {
-          const pending = this.pendingRequests.get(message.id);
-          if (!pending) {
-            return;
-          }
-
-          this.pendingRequests.delete(message.id);
-          clearTimeout(pending.timeout);
-
-          if (message.error !== undefined) {
-            const err = message.error;
-            const errMsg =
-              typeof err === "object" && err !== null && "message" in err
-                ? String((err as Record<string, unknown>).message)
-                : String(err);
-            pending.reject(new Error(errMsg));
-          } else {
-            pending.resolve(message.result);
-          }
-          return;
-        }
-
-        if (message.kind === "request") {
-          const canonical = mapCodexServerRequest(
-            this.threadId,
-            String(message.id),
-            message.method,
-            message.params,
-          );
-          if (canonical) {
-            this.inboundRequests.set(String(message.id), {
-              id: message.id,
-              method: message.method,
-              params: message.params,
-            });
-            this.emitRuntimeEvents([canonical]);
-          } else {
-            console.warn(
-              `[codex] no canonical mapping for app-server request method "${message.method}"; replying method not found.`,
-            );
-            this.writeToCodex({
-              jsonrpc: "2.0",
-              id: message.id,
-              error: {
-                code: -32601,
-                message: `Unsupported Codex app-server request method "${message.method}".`,
-              },
-            });
-          }
-          return;
-        }
-
-        if (message.kind !== "notification") {
-          return;
-        }
-
-        const { method, params } = message;
-        const notificationThreadId = readNotificationThreadId(params, this.remoteThreadId);
-        const suppressResumeReplay = this.isResumeReplaySuppressed(notificationThreadId);
-
-        // Translate to canonical chat events for chat-mode renderers. Runs
-        // alongside the existing status-derivation logic below — terminal mode
-        // is unaffected.
-        const runtimeEvents = suppressResumeReplay
-          ? []
-          : mapCodexNotification(method, params, this.ensureMapperState());
-        if (runtimeEvents.length > 0) this.emitRuntimeEvents(runtimeEvents);
-
-        if (method === "thread/started" && params && "thread" in params) {
-          const thread = params.thread;
-          if (!thread || typeof thread !== "object" || !("id" in thread)) {
-            return;
-          }
-
-          const threadId = String(thread.id);
-
-          // Ignore thread/started for threads we didn't create (e.g. the TUI's own thread).
-          if (this.remoteThreadId !== undefined && this.remoteThreadId !== threadId) {
-            return;
-          }
-
-          this.remoteThreadId = threadId;
-          const nextSessionRef = toSessionRef(threadId);
-          const nextStatus: CodexThreadStatus =
-            "status" in thread && thread.status && typeof thread.status === "object"
-              ? (thread.status as CodexThreadStatus)
-              : { type: "idle" };
-          if (this.shouldSuppressResumeActiveStatus(threadId, nextStatus)) {
-            return;
-          }
-          this.currentThreadStatus = nextStatus;
-          if (nextStatus.type !== "idle") {
-            this.emitDerivedUpdate(nextSessionRef);
-          }
-          return;
-        }
-
-        if (
-          method === "thread/status/changed" &&
-          params &&
-          "threadId" in params &&
-          "status" in params
-        ) {
-          if (!this.isCurrentThreadNotification(String(params.threadId))) {
-            return;
-          }
-          const nextStatus = params.status as CodexThreadStatus;
-          // A systemError status alone gives the renderer a red icon but no
-          // message. If Codex didn't already send a paired `thread/error`
-          // notification or a turn/start rejection (which set `errorSticky`),
-          // surface a fallback runtime error event so `ThreadErrorDock`
-          // renders something instead of leaving the user with an empty dock.
-          // The fallback is *deferred* (not emitted synchronously) so a
-          // specific error Codex sends moments later — e.g. a usage-limit
-          // "remote compact task" failure — can preempt the generic notice.
-          // Set `errorSticky` *after* `emitDerivedUpdate` so the derived
-          // `onUpdate` call still fires — `emitDerivedUpdate` short-circuits
-          // when `errorSticky` is already true.
-          const shouldFallbackEmit =
-            nextStatus.type === "systemError" &&
-            this.currentThreadStatus.type !== "systemError" &&
-            !this.errorSticky;
-          if (this.shouldSuppressResumeActiveStatus(String(params.threadId), nextStatus)) {
-            return;
-          }
-          this.currentThreadStatus = nextStatus;
-          this.emitDerivedUpdate();
-          if (shouldFallbackEmit) {
-            this.errorSticky = true;
-            this.scheduleSystemErrorFallback(extractCodexStatusErrorMessage(params.status));
-          }
-          return;
-        }
-
-        if (method === "turn/started" && params) {
-          if (suppressResumeReplay) {
-            return;
-          }
-          const incomingThreadId =
-            "threadId" in params ? String(params.threadId) : this.remoteThreadId;
-          if (incomingThreadId && !this.isCurrentThreadNotification(incomingThreadId)) {
-            return;
-          }
-
-          this.activeTurnId =
-            extractTurnField(params, "id") ??
-            (typeof params.turnId === "string" ? params.turnId : this.activeTurnId);
-          this.currentThreadStatus = { type: "active", activeFlags: [] };
-          this.emitUpdate({
-            status: "working",
-            attention: "working",
-          });
-          return;
-        }
-
-        if (method === "turn/completed" || method === "turn/aborted") {
-          if (suppressResumeReplay) {
-            return;
-          }
-          const incomingThreadId = readNotificationThreadId(params, this.remoteThreadId);
-          if (!incomingThreadId) return;
-          if (!this.isCurrentThreadNotification(incomingThreadId)) {
-            return;
-          }
-
-          this.pendingTurnInterrupt = false;
-          this.activeTurnId = undefined;
-          this.currentThreadStatus = { type: "idle" };
-          if (!this.errorSticky) {
-            this.emitUpdate({ status: "idle", attention: "none" });
-          }
-          return;
-        }
-
-        if (method === "account/rateLimits/updated" && params && "rateLimits" in params) {
-          return;
-        }
-
-        if (method === "thread/closed") {
-          this.listener?.onClose();
-        }
-      },
+  private attachRpcHandlers(): void {
+    this.rpc.setListener({
+      onNotification: (method, params) => this.handleNotification(method, params),
+      onRuntimeEvents: (events) => this.emitRuntimeEvents(events),
       onClose: () => {
-        this.logCodexEventDebug("transport", {
-          event: "close",
-          output: this.transport.formatOutput(),
-        });
-        this.rejectPendingRequests(
-          new Error(`Codex app-server exited.${this.transport.formatOutput()}`),
-        );
         if (!this.isDisposed) {
           this.listener?.onClose();
         }
       },
-      onError: (error) => {
-        this.logCodexEventDebug("transport", {
-          event: "error",
-          message: error.message,
-        });
-        this.rejectPendingRequests(error);
+      onError: () => {
         if (!this.isDisposed) {
           this.listener?.onError("Codex app-server connection failed.");
         }
       },
+      onDebug: (direction, payload) => this.logCodexEventDebug(direction, payload),
     });
+  }
+
+  private handleNotification(method: string, params: Record<string, unknown> | undefined): void {
+    const notificationThreadId = readNotificationThreadId(params, this.remoteThreadId);
+    const suppressResumeReplay = this.isResumeReplaySuppressed(notificationThreadId);
+
+    // Translate to canonical chat events for chat-mode renderers. Runs
+    // alongside the existing status-derivation logic below — terminal mode
+    // is unaffected.
+    const runtimeEvents = suppressResumeReplay
+      ? []
+      : mapCodexNotification(method, params, this.ensureMapperState());
+    if (runtimeEvents.length > 0) this.emitRuntimeEvents(runtimeEvents);
+
+    if (method === "thread/started" && params && "thread" in params) {
+      const thread = params.thread;
+      if (!thread || typeof thread !== "object" || !("id" in thread)) {
+        return;
+      }
+
+      const threadId = String(thread.id);
+
+      // Ignore thread/started for threads we didn't create (e.g. the TUI's own thread).
+      if (this.remoteThreadId !== undefined && this.remoteThreadId !== threadId) {
+        return;
+      }
+
+      this.remoteThreadId = threadId;
+      const nextSessionRef = toSessionRef(threadId);
+      const nextStatus: CodexThreadStatus =
+        "status" in thread && thread.status && typeof thread.status === "object"
+          ? (thread.status as CodexThreadStatus)
+          : { type: "idle" };
+      if (this.shouldSuppressResumeActiveStatus(threadId, nextStatus)) {
+        return;
+      }
+      this.currentThreadStatus = nextStatus;
+      if (nextStatus.type !== "idle") {
+        this.emitDerivedUpdate(nextSessionRef);
+      }
+      return;
+    }
+
+    if (
+      method === "thread/status/changed" &&
+      params &&
+      "threadId" in params &&
+      "status" in params
+    ) {
+      if (!this.isCurrentThreadNotification(String(params.threadId))) {
+        return;
+      }
+      const nextStatus = params.status as CodexThreadStatus;
+      // A systemError status alone gives the renderer a red icon but no
+      // message. If Codex didn't already send a paired `thread/error`
+      // notification or a turn/start rejection (which set `errorSticky`),
+      // surface a fallback runtime error event so `ThreadErrorDock`
+      // renders something instead of leaving the user with an empty dock.
+      // The fallback is *deferred* (not emitted synchronously) so a
+      // specific error Codex sends moments later — e.g. a usage-limit
+      // "remote compact task" failure — can preempt the generic notice.
+      // Set `errorSticky` *after* `emitDerivedUpdate` so the derived
+      // `onUpdate` call still fires — `emitDerivedUpdate` short-circuits
+      // when `errorSticky` is already true.
+      const shouldFallbackEmit =
+        nextStatus.type === "systemError" &&
+        this.currentThreadStatus.type !== "systemError" &&
+        !this.errorSticky;
+      if (this.shouldSuppressResumeActiveStatus(String(params.threadId), nextStatus)) {
+        return;
+      }
+      this.currentThreadStatus = nextStatus;
+      this.emitDerivedUpdate();
+      if (shouldFallbackEmit) {
+        this.errorSticky = true;
+        this.scheduleSystemErrorFallback(extractCodexStatusErrorMessage(params.status));
+      }
+      return;
+    }
+
+    if (method === "turn/started" && params) {
+      if (suppressResumeReplay) {
+        return;
+      }
+      const incomingThreadId = "threadId" in params ? String(params.threadId) : this.remoteThreadId;
+      if (incomingThreadId && !this.isCurrentThreadNotification(incomingThreadId)) {
+        return;
+      }
+
+      this.activeTurnId =
+        extractTurnField(params, "id") ??
+        (typeof params.turnId === "string" ? params.turnId : this.activeTurnId);
+      this.currentThreadStatus = { type: "active", activeFlags: [] };
+      this.emitUpdate({
+        status: "working",
+        attention: "working",
+      });
+      return;
+    }
+
+    if (method === "turn/completed" || method === "turn/aborted") {
+      if (suppressResumeReplay) {
+        return;
+      }
+      const incomingThreadId = readNotificationThreadId(params, this.remoteThreadId);
+      if (!incomingThreadId) return;
+      if (!this.isCurrentThreadNotification(incomingThreadId)) {
+        return;
+      }
+
+      this.pendingTurnInterrupt = false;
+      this.activeTurnId = undefined;
+      this.currentThreadStatus = { type: "idle" };
+      if (!this.errorSticky) {
+        this.emitUpdate({ status: "idle", attention: "none" });
+      }
+      return;
+    }
+
+    if (method === "account/rateLimits/updated" && params && "rateLimits" in params) {
+      return;
+    }
+
+    if (method === "thread/closed") {
+      this.listener?.onClose();
+    }
   }
 
   private async initialize(): Promise<void> {
     // Cold start runs through an interactive login shell + Rust binary load +
     // first-launch Gatekeeper checks on macOS, which can exceed the default
     // 5s timeout. The probe path uses 12s for the same handshake.
-    const initResult = await this.request(
+    const initResult = await this.rpc.request(
       "initialize",
       {
         clientInfo: {
@@ -1014,10 +903,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       this.updateSlashCommands(commands);
     }
 
-    this.writeToCodex({
-      jsonrpc: "2.0",
-      method: "initialized",
-    });
+    this.rpc.notify("initialized");
   }
 
   private isCurrentThreadNotification(threadId: string): boolean {
@@ -1055,7 +941,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   private async syncRemoteThreadState(threadId: string, sessionRef?: SessionRef): Promise<void> {
     let confirmedStatus: CodexThreadStatus | undefined;
     try {
-      const result = await this.request("thread/read", {
+      const result = await this.rpc.request("thread/read", {
         threadId,
         includeTurns: false,
       });
@@ -1081,44 +967,9 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     }
   }
 
-  private request(
-    method: string,
-    params: Record<string, unknown>,
-    timeoutMs = 30_000,
-  ): Promise<unknown> {
-    const id = `lightcode-${this.requestSequence++}`;
-
-    const pending = new Promise<unknown>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this.pendingRequests.delete(id);
-        reject(new Error(`Timed out waiting for Codex app-server response to ${method}.`));
-      }, timeoutMs);
-
-      this.pendingRequests.set(id, {
-        resolve,
-        reject,
-        timeout,
-      });
-    });
-
-    this.writeToCodex({
-      jsonrpc: "2.0",
-      id,
-      method,
-      params,
-    });
-
-    return pending;
-  }
-
   private emitUpdate(update: StructuredSessionUpdate): void {
     this.logCodexEventDebug("lightcode:update", update);
     this.listener?.onUpdate(update);
-  }
-
-  private writeToCodex(message: Record<string, unknown>): void {
-    this.logCodexEventDebug("lightcode->codex", message);
-    this.transport.write(message);
   }
 
   private logCodexEventDebug(direction: CodexEventDebugDirection, payload: unknown): void {
@@ -1129,13 +980,5 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     console.log(
       `[codex-events] ${new Date().toISOString()} ${direction} localThreadId=${this.threadId}${remote} ${stringifyCodexEventDebugPayload(payload)}`,
     );
-  }
-
-  private rejectPendingRequests(error: Error): void {
-    for (const pending of this.pendingRequests.values()) {
-      clearTimeout(pending.timeout);
-      pending.reject(error);
-    }
-    this.pendingRequests.clear();
   }
 }

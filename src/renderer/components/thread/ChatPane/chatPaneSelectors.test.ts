@@ -491,3 +491,4 @@ describe("chatPaneSelectors", () => {
     ]);
   });
 });
+// @vitest-environment node

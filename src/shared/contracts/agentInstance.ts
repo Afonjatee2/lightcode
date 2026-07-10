@@ -22,19 +22,6 @@ export const agentDriverKindSchema = z
   .regex(/^[a-z0-9][a-z0-9_\-:.]*$/i);
 export type AgentDriverKind = z.infer<typeof agentDriverKindSchema>;
 
-/** Reserved built-in drivers. New ACP integrations should prefer `acp-generic`. */
-export const KNOWN_AGENT_DRIVERS = {
-  claude: "claude" as AgentDriverKind,
-  codex: "codex" as AgentDriverKind,
-  copilot: "copilot" as AgentDriverKind,
-  gemini: "gemini" as AgentDriverKind,
-  antigravity: "antigravity" as AgentDriverKind,
-  commandCode: "commandcode" as AgentDriverKind,
-  cursor: "cursor" as AgentDriverKind,
-  opencode: "opencode" as AgentDriverKind,
-  acpGeneric: "acp-generic" as AgentDriverKind,
-} as const;
-
 export const CLAUDE_PROFILE_KIND_PREFIX = "claude:";
 
 export const agentInstanceIdSchema = z
@@ -82,6 +69,22 @@ export const agentInstanceConfigSchema = z.object({
 export type AgentInstanceConfig = z.infer<typeof agentInstanceConfigSchema>;
 
 // ── acp-generic driver config ────────────────────────────────────────
+
+/** Prefix for generic-ACP `kind` values. Unique per registered instance. */
+export const ACP_GENERIC_KIND_PREFIX = "acp-generic:";
+
+export function acpGenericKind(instanceId: string): AgentDriverKind {
+  return `${ACP_GENERIC_KIND_PREFIX}${instanceId}` as AgentDriverKind;
+}
+
+export function isAcpGenericKind(kind: string): boolean {
+  return kind.startsWith(ACP_GENERIC_KIND_PREFIX);
+}
+
+/** Extract the instance id portion of an `acp-generic:<id>` kind. */
+export function extractAcpGenericInstanceId(kind: string): string | undefined {
+  return isAcpGenericKind(kind) ? kind.slice(ACP_GENERIC_KIND_PREFIX.length) : undefined;
+}
 
 export const acpGenericInstanceConfigSchema = z.object({
   /** Absolute path or PATH-resolvable command name (e.g. `npx @zed-industries/codex-acp`). */

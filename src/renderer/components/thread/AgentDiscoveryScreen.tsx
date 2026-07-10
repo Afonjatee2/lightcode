@@ -4,7 +4,8 @@ import { msg } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import type { MessageDescriptor } from "@lingui/core";
 import { PixelLoader } from "@/renderer/components/common";
-import { getRegisteredProviders, ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import { getProviderManifests } from "@/renderer/components/providers/providerManifest";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import type { AgentStatus, ProjectLocation } from "@/shared/contracts";
 import type { CSSProperties, ReactNode } from "react";
@@ -130,9 +131,7 @@ export function AgentDiscoveryScreen(props: {
               })),
             ]
           : [];
-  // Provider plugins self-register at module-load time; reading the registry
-  // each render keeps this screen in sync as new agent kinds are added.
-  const providers = getRegisteredProviders();
+  const providers = getProviderManifests();
   const useMatrixLayout = scanTargets.length > 1;
   const statusTargets: ScanTarget[] =
     scanTargets.length > 0
@@ -204,7 +203,7 @@ export function AgentDiscoveryScreen(props: {
               >
                 <div className="flex min-w-0 items-center gap-3">
                   <ProviderIcon kind={kind} className="agent-discovery-item__icon size-7" />
-                  <div className="truncate text-sm font-medium">{label}</div>
+                  <div className="truncate text-sm font-medium">{t(label)}</div>
                 </div>
                 {statusTargets.map((target) => {
                   const rowStatus = statusForTarget(statuses, target);

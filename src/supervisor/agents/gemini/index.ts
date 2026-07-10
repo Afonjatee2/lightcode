@@ -60,9 +60,9 @@ export function createGeminiAdapter(): AgentAdapter {
   let capabilities: AgentCapability = defaultGeminiCapabilities;
 
   return {
-    kind: "gemini",
-    label: "Gemini",
-    binary: "gemini",
+    kind: geminiDetectionSpec.kind,
+    label: geminiDetectionSpec.label,
+    binary: geminiDetectionSpec.binary,
     ...(geminiDetectionSpec.update ? { update: geminiDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;

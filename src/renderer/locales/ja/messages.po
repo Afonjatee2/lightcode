@@ -125,8 +125,8 @@ msgstr "{envName}の{0}フックが削除されました。"
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-msgid "{0} install targets"
-msgstr "{0}インストールターゲット"
+#~ msgid "{0} install targets"
+#~ msgstr "{0}インストールターゲット"
 
 #. placeholder {0}: agent.label
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/SingleAgentSettings.tsx
@@ -234,6 +234,10 @@ msgstr "{0}% 使用"
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "{0}mo ago"
 msgstr "{0}か月前"
+
+#: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
+msgid "{agentLabel} install targets"
+msgstr "{agentLabel}インストールターゲット"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "{agentLabel}: {statusLabel}. Hover for status details."
@@ -803,6 +807,10 @@ msgstr "常に除外される"
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
 msgid "Another chat uses this same tree. File restore could overwrite that chat's changes."
 msgstr "別のチャットはこれと同じツリーを使用します。ファイルを復元すると、チャットの変更が上書きされる可能性があります。"
+
+#: src/renderer/components/providers/antigravity/manifest.ts
+msgid "Antigravity"
+msgstr "Antigravity"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "App Browser"
@@ -1456,6 +1464,10 @@ msgstr "Claude {0} プロファイルが保存されました。"
 msgid "Claude {displayName} profile added."
 msgstr "Claude {displayName} プロファイルを追加しました。"
 
+#: src/renderer/components/providers/claude/manifest.ts
+msgid "Claude Code"
+msgstr "Claude Code"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Claude profile config directory"
 msgstr "Claude プロファイル設定ディレクトリ"
@@ -1716,6 +1728,10 @@ msgstr "クローズ"
 msgid "Code copied. "
 msgstr "コードがコピーされました。"
 
+#: src/renderer/components/providers/codex/manifest.ts
+msgid "Codex"
+msgstr "Codex"
+
 #: src/renderer/components/thread/ThreadErrorDock.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Collapse"
@@ -1767,6 +1783,10 @@ msgstr "コマンド"
 #: src/renderer/views/ProjectSettingsOverlay/parts/ActionsSection.tsx
 msgid "Command (e.g., npm run dev)"
 msgstr "コマンド (例: npm run dev)"
+
+#: src/renderer/components/providers/commandcode/manifest.ts
+msgid "Command Code"
+msgstr "Command Code"
 
 #: src/renderer/commands/CommandPalette.tsx
 #: src/renderer/components/thread/ThreadCommandPanel.tsx
@@ -2270,6 +2290,10 @@ msgstr "現在の連続日数"
 #: src/renderer/views/ProfileOverlay/parts/StatStrip.tsx
 msgid "Current streak"
 msgstr "現在の連続日数"
+
+#: src/renderer/components/providers/cursor/manifest.ts
+msgid "Cursor"
+msgstr "Cursor"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
@@ -3182,6 +3206,10 @@ msgstr "フルアクセス"
 msgid "Fullscreen overlay"
 msgstr "全画面オーバーレイ"
 
+#: src/renderer/components/providers/gemini/manifest.ts
+msgid "Gemini"
+msgstr "Gemini"
+
 #: src/mobile/settingsSections.ts
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
@@ -3260,6 +3288,10 @@ msgstr "{0}の Git ステータス"
 msgid "Git status for {0}: not a Git repository"
 msgstr "{0}の Git ステータス: Git リポジトリではありません"
 
+#: src/renderer/components/providers/copilot/manifest.ts
+msgid "GitHub Copilot"
+msgstr "GitHub Copilot"
+
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
 msgid "GitHub Repository"
 msgstr "GitHub リポジトリ"
@@ -3299,6 +3331,10 @@ msgstr "設定した目標数"
 #: src/renderer/views/WhatsNewOverlay.tsx
 msgid "Got it"
 msgstr "了解"
+
+#: src/renderer/components/providers/grok/manifest.ts
+msgid "Grok Build"
+msgstr "Grok Build"
 
 #: src/renderer/views/MainView/parts/AppContent/AppContent.tsx
 msgid "Group"
@@ -4941,6 +4977,10 @@ msgstr "工数ピッカーを開く"
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Open the model picker"
 msgstr "モデルピッカーを開く"
+
+#: src/renderer/components/providers/opencode/manifest.ts
+msgid "OpenCode"
+msgstr "OpenCode"
 
 #. placeholder {0}: request.receivedAt
 #. placeholder {1}: index + 1
@@ -8070,8 +8110,8 @@ msgid "Windows"
 msgstr "Windows"
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
-msgid "Windows is not supported yet. Install inside WSL or on macOS/Linux."
-msgstr "Windows はまだサポートされていません。WSL 内または macOS/Linux にインストールしてください。"
+#~ msgid "Windows is not supported yet. Install inside WSL or on macOS/Linux."
+#~ msgstr "Windows はまだサポートされていません。WSL 内または macOS/Linux にインストールしてください。"
 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Work"

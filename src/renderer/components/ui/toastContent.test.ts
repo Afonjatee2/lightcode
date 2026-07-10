@@ -52,3 +52,4 @@ describe("normalizeToastContent", () => {
     });
   });
 });
+// @vitest-environment node

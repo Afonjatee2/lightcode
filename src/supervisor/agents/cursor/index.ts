@@ -70,9 +70,9 @@ export function createCursorAdapter(): AgentAdapter {
   let capabilities: AgentCapability = cursorDefaultCapabilities;
 
   return {
-    kind: "cursor",
-    label: "Cursor",
-    binary: "cursor-agent",
+    kind: cursorDetectionSpec.kind,
+    label: cursorDetectionSpec.label,
+    binary: cursorDetectionSpec.binary,
     ...(cursorDetectionSpec.update ? { update: cursorDetectionSpec.update } : {}),
     get capabilities() {
       return capabilities;

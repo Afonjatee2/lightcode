@@ -23,6 +23,7 @@ export function FileEditorPanel() {
       return () => cancelAnimationFrame(raf);
     }
     setVisible(false);
+    return undefined;
   }, [isOpen]);
 
   const requestClose = useEffectEvent(() => {

@@ -1,7 +1,7 @@
 import { msg } from "@lingui/core/macro";
 import type { ComposerControl } from "@/renderer/components/thread/ThreadComposer";
 import { planWorkToggle } from "../composerControlBuilders";
-import { registerComposerControls } from "../ProviderIcon";
+import { registerComposerControls } from "../providerComposer";
 
 registerComposerControls("acp-generic", ({ capabilities, config, isDisabled, onConfigChange }) => {
   const controls: ComposerControl[] = [];

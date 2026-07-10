@@ -94,7 +94,7 @@ async function connect() {
   });
 
   socket.addEventListener("message", (event) => {
-    handleRequest(event.data);
+    void handleRequest(event.data);
   });
 
   socket.addEventListener("close", () => {

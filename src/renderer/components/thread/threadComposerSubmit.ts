@@ -136,9 +136,11 @@ export function submitComposerPrompt(segments: PromptSegment[], ctx: ComposerSub
     useAppStore.getState().requestChatScrollToBottom(thread.id);
   }
 
-  const focusPromise = ctx.needsFocusBeforeInput
-    ? (ctx.terminalPaneRef.current?.focus(), new Promise<void>((r) => setTimeout(r, 80)))
-    : Promise.resolve();
+  let focusPromise = Promise.resolve();
+  if (ctx.needsFocusBeforeInput) {
+    ctx.terminalPaneRef.current?.focus();
+    focusPromise = new Promise<void>((resolve) => setTimeout(resolve, 80));
+  }
 
   // If an approval is pending, send a decline before submitting the message.
   // The user's text becomes the next turn; the supervisor sees the denial

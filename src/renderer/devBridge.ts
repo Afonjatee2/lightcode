@@ -11,6 +11,7 @@
  * eliminated from production bundles. See `.agents/skills/interactive-testing`.
  */
 import { useAppStore } from "@/renderer/state/appStore";
+import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useSidebarUiStore } from "@/renderer/state/sidebarUiStore";
@@ -29,6 +30,7 @@ export function installDevBridge(): void {
     stores: {
       update: useUpdateStore,
       app: useAppStore,
+      agentStatuses: useAgentStatusesStore,
       panel: usePanelStore,
       sidebarUi: useSidebarUiStore,
       sharedSettings: useSharedSettings,

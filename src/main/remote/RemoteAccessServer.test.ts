@@ -2532,7 +2532,7 @@ describe("RemoteAccessServer", () => {
   it("rejects an invalid or expired forward enter token with a plain error page and no cookie", async () => {
     const upstream = await startUpstreamHttpServer();
     const gateway = new RemotePortForwardGateway({ bindHost: "127.0.0.1", candidatePorts: [] });
-    const portProxy = new PortProxy({ gateway, enterTokenTtlMs: 10 });
+    const portProxy = new PortProxy({ gateway, enterTokenTtlMs: 0 });
     const server = new RemoteAccessServer({
       appVersion: "1.0.0",
       identity: { desktopId: "desktop-test", label: "Test Desktop" },
@@ -2553,7 +2553,7 @@ describe("RemoteAccessServer", () => {
     expect(invalidResponse.headers.getSetCookie()).toEqual([]);
     await expect(invalidResponse.text()).resolves.toContain("<html");
 
-    // A real token that has since expired (10ms TTL configured above).
+    // A real token configured to expire immediately.
     const token = await issueAccessToken(info, ["ports:forward"]);
     const forwardResponse = await fetch(new URL("/api/ports/forward", info.httpBaseUrl), {
       method: "POST",
@@ -2561,7 +2561,6 @@ describe("RemoteAccessServer", () => {
       body: JSON.stringify({ targetPort: upstream.port }),
     });
     const forwardResult = (await forwardResponse.json()) as { enterPath: string };
-    await new Promise((resolve) => setTimeout(resolve, 50));
     const expiredResponse = await fetch(new URL(forwardResult.enterPath, info.httpBaseUrl));
     expect(expiredResponse.status).toBe(400);
     expect(expiredResponse.headers.getSetCookie()).toEqual([]);

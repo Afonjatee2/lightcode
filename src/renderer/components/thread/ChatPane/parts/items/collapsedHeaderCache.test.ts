@@ -219,3 +219,4 @@ describe("collapsedHeaderCache", () => {
     expect(commandIntentDisplayMock).toHaveBeenCalledTimes(1);
   });
 });
+// @vitest-environment node

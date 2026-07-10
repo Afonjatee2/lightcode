@@ -235,11 +235,11 @@ class DiffViewErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
   { hasError: boolean }
 > {
-  state = { hasError: false };
+  override state = { hasError: false };
   static getDerivedStateFromError() {
     return { hasError: true };
   }
-  render() {
+  override render() {
     return this.state.hasError ? this.props.fallback : this.props.children;
   }
 }

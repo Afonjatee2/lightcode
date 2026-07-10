@@ -7,6 +7,7 @@ import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { getSettingsInstalledAgents } from "@/shared/agentStatus";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
+import { getProviderModelPickerRank } from "@/renderer/components/providers/providerManifest";
 
 function resolveDisplayedKinds(
   installed: readonly AgentStatus[],
@@ -22,7 +23,12 @@ function resolveDisplayedKinds(
       seen.add(kind);
     }
   }
-  for (const kind of installedKinds) {
+  const missingKinds = installedKinds
+    .filter((kind) => !seen.has(kind))
+    .toSorted(
+      (left, right) => getProviderModelPickerRank(left) - getProviderModelPickerRank(right),
+    );
+  for (const kind of missingKinds) {
     if (!seen.has(kind)) {
       ordered.push(kind);
       seen.add(kind);

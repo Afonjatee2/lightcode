@@ -41,23 +41,25 @@ export function useDebouncedFileSearch(
       projectExclude: projectSearchSettings?.exclude,
     });
 
-    timerRef.current = setTimeout(async () => {
-      try {
-        const result = await readBridge().searchProjectFiles({
-          projectLocation,
-          query,
-          limit: 20,
-          searchConfig,
-        });
-        // Only apply if this is still the latest request
-        if (abortRef.current === requestId) {
-          setResults(result.entries);
+    timerRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await readBridge().searchProjectFiles({
+            projectLocation,
+            query,
+            limit: 20,
+            searchConfig,
+          });
+          // Only apply if this is still the latest request
+          if (abortRef.current === requestId) {
+            setResults(result.entries);
+          }
+        } catch {
+          if (abortRef.current === requestId) {
+            setResults([]);
+          }
         }
-      } catch {
-        if (abortRef.current === requestId) {
-          setResults([]);
-        }
-      }
+      })();
     }, delay);
 
     return () => {

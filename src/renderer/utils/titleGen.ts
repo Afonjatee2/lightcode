@@ -1,7 +1,7 @@
 import type { AgentStatus, ProjectLocation } from "@/shared/contracts";
 import { resolveAiLanguageName } from "@/shared/locale";
 import { readBridge } from "@/renderer/bridge";
-import { generateTitleWithFallback } from "@/renderer/components/providers";
+import { generateTitleWithFallback } from "@/renderer/components/providers/titleGen";
 import { detectOSLocale } from "@/renderer/i18n/locales";
 import { useAppStore, makeThreadTitle } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";

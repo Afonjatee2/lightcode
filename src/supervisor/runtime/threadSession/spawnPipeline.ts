@@ -14,8 +14,6 @@ import {
   type ThreadConfig,
   type ThreadPresentationMode,
   type ThreadStatus,
-  areAgentSlashCommandsEqual,
-  isThreadConfigEqual,
 } from "@/shared/contracts";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
 import {
@@ -52,16 +50,12 @@ import type { ThreadOutputPipeline } from "../threadOutputPipeline";
 import { rewriteSegmentsForWsl } from "../threadAttachments";
 import { applyLaunchArgsConfigRewrite, mergeCliHookExtraArgs } from "./cliHookArgs";
 import type { CliHookSessionCoordinator } from "./cliHookPlugin";
-import {
-  shouldPrimeNativeProjectShellEnv,
-  shouldReleaseInitialStructuredIdleSuppression,
-} from "./helpers";
+import { shouldPrimeNativeProjectShellEnv } from "./helpers";
 import type { ThreadSessionManagerOptions } from "./managerOptions";
 import type { PtyLifecycle } from "./ptyLifecycle";
 import type { RuntimeEventRouter } from "./runtimeEventRouter";
 import { describeSpawnFailure, sanitizeEnv, sanitizedProcessEnv } from "./spawnDiagnostics";
-import { type SteerCoordinator, isSteerDrainableStatus } from "./steerCoordinator";
-import type { StructuredInterruptWatchdog } from "./structuredInterruptWatchdog";
+import type { SessionRuntimeLifecycle } from "./sessionRuntimeLifecycle";
 import { getIterm2StatusL2TerminalEnv, resolveTerminalColorEnv } from "./terminalEnv";
 
 export interface SpawnThreadInput {
@@ -93,26 +87,22 @@ export interface SpawnThreadInput {
 
 /**
  * Everything the spawn pipeline borrows from the manager. The pipeline owns
- * process creation (structured session bring-up, argv assembly, PTY spawn,
- * runtime-session wiring); the manager keeps session bookkeeping, terminal
- * I/O, teardown, and session-ref recovery, and passes those seams in here.
+ * process creation (structured-session bring-up, argv assembly, PTY spawn,
+ * runtime construction); the injected lifecycle owns registration and event
+ * bindings, while the manager keeps terminal I/O, teardown, and ref recovery.
  */
 export interface SpawnPipelineContext {
   options: ThreadSessionManagerOptions;
   sessions: Map<string, SessionRuntime>;
-  sessionsBySessionId: Map<string, SessionRuntime>;
   pendingStartInterrupts: Set<string>;
   pendingStartAborts: Set<string>;
   ptyLifecycle: PtyLifecycle;
   outputPipeline: ThreadOutputPipeline;
   runtimeEventRouter: RuntimeEventRouter;
-  steerCoordinator: SteerCoordinator;
-  structuredInterruptWatchdog: StructuredInterruptWatchdog;
+  sessionRuntimeLifecycle: Pick<SessionRuntimeLifecycle, "attach">;
   cliHookPlugin: CliHookSessionCoordinator;
   closeThread(payload: CloseThreadPayload): Promise<void>;
   failStructuredSession(session: SessionRuntime, error: unknown): void;
-  indexSessionRef(session: SessionRuntime, prevId: string | undefined): void;
-  pollSessionRefDiscovery(session: SessionRuntime): void;
   isCurrentSession(session: SessionRuntime): boolean;
   isBrowserMcpEnabledForLaunch(adapter: AgentAdapter | undefined, config: ThreadConfig): boolean;
   resolveAgentSettings(adapter: AgentAdapter): Record<string, boolean | string>;
@@ -762,195 +752,7 @@ export class SpawnPipeline {
       ...(input.structuredSession ? { structuredSession: input.structuredSession } : {}),
     };
 
-    ctx.sessions.set(input.threadId, session);
-    if (session.pty) {
-      ctx.ptyLifecycle.track(session);
-    }
-    if (session.sessionRef?.providerSessionId) {
-      ctx.sessionsBySessionId.set(session.sessionRef.providerSessionId, session);
-    }
-    ctx.outputPipeline.emitState(session);
-    if (
-      pty &&
-      !session.sessionRef &&
-      !session.sessionRefDiscoveryStarted &&
-      input.adapter.discoverSessionRef
-    ) {
-      session.sessionRefDiscoveryStarted = true;
-      ctx.pollSessionRefDiscovery(session);
-    }
-
-    input.structuredSession?.setListener({
-      onClose: () => {
-        if (
-          ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-        this.handleStructuredSessionClosed(session);
-      },
-      onError: (errorMessage) => {
-        if (
-          ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-        ctx.failStructuredSession(session, errorMessage);
-      },
-      onUpdate: (update) => {
-        if (
-          ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-        const wasWorking = session.status === "working";
-        const hadInterruptRequest = session.structuredTurnInterruptRequested === true;
-        if (update.sessionRef) {
-          const prevId = session.sessionRef?.providerSessionId;
-          session.sessionRef = update.sessionRef;
-          session.canResumeWithConfig = true;
-          ctx.indexSessionRef(session, prevId);
-        }
-
-        const configChanged =
-          update.config !== undefined && !isThreadConfigEqual(session.config, update.config);
-        const slashCommandsChanged =
-          update.slashCommands !== undefined &&
-          !areAgentSlashCommandsEqual(session.slashCommands, update.slashCommands);
-        const stateChanged =
-          session.status !== update.status ||
-          session.attention !== update.attention ||
-          update.errorMessage !== undefined;
-        if (update.config) {
-          session.config = update.config;
-        }
-        if (update.slashCommands !== undefined) {
-          session.slashCommands = update.slashCommands;
-        }
-
-        if (
-          session.suppressInitialStructuredIdle === true &&
-          update.status === "idle" &&
-          session.status === "working" &&
-          session.structuredTurnInterruptRequested !== true
-        ) {
-          if (update.sessionRef || configChanged || slashCommandsChanged) {
-            ctx.outputPipeline.emitState(session);
-          }
-          return;
-        }
-        if (session.suppressInitialStructuredIdle === true && update.status !== "idle") {
-          session.suppressInitialStructuredIdle = undefined;
-        }
-
-        // Wire-ordering: `thread-state` (status) events are emitted to the
-        // renderer immediately, but this session's runtime events are batched
-        // (RuntimeEventBuffer, ~16ms). Without flushing here, a turn-end `idle`
-        // can overtake the turn's final runtime events on the IPC wire; those
-        // trailing events then land after `idle` in the renderer and re-open the
-        // GUI turn to "working" via reopenGuiTurnForLiveRuntimeActivity, leaving a
-        // stale "working" until the next snapshot reconcile (on thread switch).
-        // Flushing first guarantees the renderer applies the final events before
-        // the status change, mirroring its own flushPendingRuntimeEventsSync.
-        ctx.runtimeEventRouter.flush();
-
-        ctx.outputPipeline.updateState(
-          session,
-          update.status,
-          update.attention,
-          update.errorMessage,
-          {
-            forceCloseActiveTurn:
-              hadInterruptRequest && (update.status === "idle" || update.status === "needs_reply"),
-          },
-        );
-        if (update.status !== "working") {
-          session.structuredTurnInterruptRequested = false;
-          ctx.structuredInterruptWatchdog.clearStructuredInterruptWatchdog(session);
-        } else {
-          // Still working but the agent showed a sign of life — restart the
-          // stale-kill clock so a healthy long-running cancel is not killed.
-          ctx.structuredInterruptWatchdog.touchStructuredInterruptWatchdog(session);
-        }
-        if (
-          session.presentationMode === "gui" &&
-          (wasWorking || hadInterruptRequest) &&
-          isSteerDrainableStatus(update.status)
-        ) {
-          ctx.steerCoordinator.maybeDrainPendingSteer(session);
-        }
-        if (
-          (configChanged || slashCommandsChanged) &&
-          !stateChanged &&
-          update.errorMessage === undefined
-        ) {
-          ctx.outputPipeline.emitState(session);
-        }
-      },
-      onRuntimeEvent: (event) => {
-        if (
-          ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId ||
-          session.ignoreExit
-        ) {
-          return;
-        }
-        if (
-          session.suppressInitialStructuredIdle === true &&
-          shouldReleaseInitialStructuredIdleSuppression(event)
-        ) {
-          session.suppressInitialStructuredIdle = undefined;
-        }
-        // Streaming output is a sign of life — restart the stale-kill clock so a
-        // healthy agent still emitting tool/text deltas after a stop request is
-        // never force-stopped while it works toward honoring the cancel.
-        ctx.structuredInterruptWatchdog.touchStructuredInterruptWatchdog(session);
-        ctx.runtimeEventRouter.append(session.threadId, event);
-      },
-    });
-
-    pty?.onData((data) => {
-      if (ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-      try {
-        ctx.outputPipeline.handlePtyData(session, data);
-      } catch (error) {
-        console.error(
-          `[supervisor] uncaught error in onData for thread ${session.threadId}:`,
-          error,
-        );
-        captureSupervisorException(error, {
-          "lightcode.feature_area": "supervisor-runtime",
-          "lightcode.provider": session.agentKind,
-        });
-      }
-    });
-
-    pty?.onExit((event) => {
-      ctx.ptyLifecycle.resolveExit(session);
-      if (session.ignoreExit) {
-        return;
-      }
-      if (ctx.sessions.get(session.threadId)?.instanceId !== session.instanceId) {
-        return;
-      }
-      void session.structuredSession?.dispose();
-      ctx.outputPipeline.clearSessionTimers(session);
-      ctx.outputPipeline.updateState(session, "inactive", "none");
-      session.hasCliHookPluginActivity = false;
-      session.cliHookEnvInjected = false;
-      if (session.sessionRef?.providerSessionId) {
-        ctx.sessionsBySessionId.delete(session.sessionRef.providerSessionId);
-      }
-      ctx.options.emit({
-        type: "thread-exited",
-        threadId: session.threadId,
-        exitCode: event.exitCode,
-      });
-    });
+    ctx.sessionRuntimeLifecycle.attach(session);
 
     return session;
   }
@@ -1145,21 +947,5 @@ export class SpawnPipeline {
       canResumeWithConfig: false,
       threadStatusSource: "server",
     });
-  }
-
-  private handleStructuredSessionClosed(session: SessionRuntime): void {
-    if (session.status === "inactive") {
-      return;
-    }
-    this.ctx.outputPipeline.updateState(session, "inactive", "none");
-    this.ctx.options.emit({
-      type: "thread-exited",
-      threadId: session.threadId,
-      exitCode: null,
-    });
-    session.ignoreExit = true;
-    session.stopSessionRefWatcher?.();
-    session.stopSessionRefWatcher = undefined;
-    setTimeout(() => this.ctx.ptyLifecycle.kill(session), 150);
   }
 }
