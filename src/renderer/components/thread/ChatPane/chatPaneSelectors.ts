@@ -8,7 +8,7 @@ import { canShareRuntimeToolGroup } from "@/renderer/state/runtimeToolGrouping";
 import { imageViewRendersInline } from "./parts/items/imageViewSource";
 import { isContextCompactionToolCall } from "./parts/items/ContextCompaction";
 import { isPlanProposalToolCall } from "./parts/items/PlanProposal";
-import { isSubAgentSpawnToolRow, isSubAgentTool, isWorkflowTool } from "./parts/items/toolDisplay";
+import { isSubAgentTool, isWorkflowTool } from "./parts/items/toolDisplay";
 
 export const EMPTY_THREAD_ITEM_IDS = Object.freeze([]) as readonly string[];
 export const EMPTY_THREAD_TIMELINE_ENTRIES = Object.freeze([]) as readonly ChatTimelineEntry[];
@@ -249,19 +249,6 @@ function isVisibleRuntimeItem(item: RuntimeChatItem): boolean {
       item.type === "image_view" ||
       item.type === "dynamic_tool_call") &&
     !(item.payload as Partial<ToolCallPayload> | undefined)?.name?.trim()
-  ) {
-    return false;
-  }
-  // The raw provider MCP row for the subagents `run_agent` / `spawn_agent`
-  // tools duplicates the synthetic sub-agent tile (`payload.isSubAgent` item,
-  // which is NOT matched here). Suppress the raw row so it doesn't render next
-  // to the tile. Because we drop it before grouping and scroll-anchor logic,
-  // it never inflates "N tools" group counts or the streaming tail anchor.
-  if (
-    (item.type === "tool_call" ||
-      item.type === "mcp_tool_call" ||
-      item.type === "dynamic_tool_call") &&
-    isSubAgentSpawnToolRow(item.payload as ToolCallPayload | undefined)
   ) {
     return false;
   }

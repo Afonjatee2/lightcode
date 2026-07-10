@@ -2,7 +2,7 @@ import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, type ReactNo
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Bot, X } from "lucide-react";
 import type { ProjectLocation, ToolCallPayload } from "@/shared/contracts";
-import { PixelLoader } from "@/renderer/components/common";
+import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { readBridge } from "@/renderer/bridge";
 import { OverlayShell } from "@/renderer/components/layout/OverlayShell";
 import { useAppStore } from "@/renderer/state/appStore";

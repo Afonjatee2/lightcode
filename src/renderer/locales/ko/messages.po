@@ -543,7 +543,6 @@ msgid "Activity metric"
 msgstr "활동 지표"
 
 #: src/mobile/views/ManageProjectsView.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
@@ -8263,3 +8262,11 @@ msgstr "WSL 기본 폴더"
 #: src/renderer/views/ProfileOverlay/parts/EditProfileDialog.tsx
 msgid "Your name"
 msgstr "이름"
+
+#: src/renderer/components/composer/ImageLightbox.tsx
+msgid "Zoom in"
+msgstr "확대"
+
+#: src/renderer/components/composer/ImageLightbox.tsx
+msgid "Zoom out"
+msgstr "축소"

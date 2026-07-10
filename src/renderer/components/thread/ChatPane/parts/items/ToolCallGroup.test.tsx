@@ -390,6 +390,35 @@ describe("ToolCallGroup", () => {
     expect(screen.getByText("Web search")).toBeInTheDocument();
   });
 
+  it("animates running tool titles without adding status text", () => {
+    const threadId = "thread-1";
+    const items: RuntimeChatItem[] = [
+      { ...makeToolItem("tool-1", "Read file"), state: "started" },
+      { ...makeCommandItem("command-1", "pnpm run test"), state: "started" },
+      { ...makeFileChangeItem("file-1"), state: "started" },
+      {
+        ...makeWebSearchItem("web-search-1", { query: "Lightcode", status: "running" }),
+        state: "started",
+      },
+    ];
+    seedThread(threadId, items);
+
+    const view = renderToolCallGroup(
+      threadId,
+      items.map((item) => item.id),
+    );
+
+    const animatedTitles = Array.from(
+      view.container.querySelectorAll("code.lightcode-thinking-text"),
+    );
+    expect(animatedTitles).toHaveLength(4);
+    expect(
+      animatedTitles.map((title) => title.getAttribute("data-lightcode-shimmer-text")),
+    ).toEqual(["Read file", "Check: pnpm run test", "Edit: src/foo.ts", "Lightcode"]);
+    expect(screen.queryByText("Working")).not.toBeInTheDocument();
+    expect(view.container.querySelector(".lightcode-pixel-loader")).toBeNull();
+  });
+
   it("categorizes sub-agent tools as commands", () => {
     const threadId = "thread-1";
     const items = [makeAgentItem("agent-1")];

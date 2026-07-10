@@ -543,7 +543,6 @@ msgid "Activity metric"
 msgstr "Métrique d'activité"
 
 #: src/mobile/views/ManageProjectsView.tsx
-#: src/renderer/components/composer/ComposerAddMenu.tsx
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
@@ -8262,3 +8261,11 @@ msgstr "Dossier de base WSL"
 #: src/renderer/views/ProfileOverlay/parts/EditProfileDialog.tsx
 msgid "Your name"
 msgstr "Votre nom"
+
+#: src/renderer/components/composer/ImageLightbox.tsx
+msgid "Zoom in"
+msgstr "Zoom avant"
+
+#: src/renderer/components/composer/ImageLightbox.tsx
+msgid "Zoom out"
+msgstr "Zoom arrière"

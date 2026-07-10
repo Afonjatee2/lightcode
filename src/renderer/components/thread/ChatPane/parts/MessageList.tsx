@@ -69,8 +69,8 @@ interface MessageListProps {
 // not expose the spacer before rows render.
 const CHAT_TRANSCRIPT_OVERSCAN = 16;
 const DEFAULT_ROW_ESTIMATE_PX = 96;
-const INLINE_IMAGE_ROW_ESTIMATE_PX = 384;
-const ASSISTANT_IMAGE_ROW_ESTIMATE_PX = 448;
+const INLINE_IMAGE_ROW_ESTIMATE_PX = 320;
+const ASSISTANT_IMAGE_ROW_ESTIMATE_PX = 384;
 const SKIP_REVERT_CONFIRM_PREF_KEY = "lightcode-chat-checkpoint-revert-skip-confirm";
 // How long the iOS scroll-compensation flush waits for momentum to idle before
 // applying the buffered delta. Matches @tanstack/virtual-core's

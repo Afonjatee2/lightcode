@@ -249,11 +249,7 @@ describe("chatPaneSelectors", () => {
     ]);
   });
 
-  it("suppresses raw subagents run_agent/spawn_agent MCP rows but keeps the tile and sibling tools", () => {
-    // The raw provider MCP row duplicates the synthetic sub-agent tile
-    // (`sub:<runId>`, payload.isSubAgent). Only the raw row is dropped — the
-    // tile and non-spawning subagents tools stay, and the "Ran N tools" group
-    // never counts the suppressed rows.
+  it("keeps subagents MCP calls as tools and only treats the synthetic tile as an agent", () => {
     const state = {
       runtimeItemIdsByThread: {
         t1: ["tool-1", "raw-run", "list-1", "sub:run-1", "raw-spawn"],
@@ -286,7 +282,7 @@ describe("chatPaneSelectors", () => {
             type: "tool_call",
             state: "started",
             payload: {
-              name: "mcp__subagents__run_agent",
+              name: "Codex · GPT-5.5",
               status: "running",
               isSubAgent: true,
             },
@@ -305,18 +301,19 @@ describe("chatPaneSelectors", () => {
 
     expect(selectVisibleThreadRuntimeItemIds(state, "t1")).toEqual([
       "tool-1",
+      "raw-run",
       "list-1",
       "sub:run-1",
+      "raw-spawn",
     ]);
-    // Grouping (which drives the "N tools" header counts) only ever sees the
-    // visible rows; the running raw row does not leave a dangling group entry.
     expect(selectVisibleThreadTimelineEntries(state, "t1")).toEqual([
       {
         kind: "tool_call_group",
         id: "tool-call-group:tool-1",
-        itemIds: ["tool-1", "list-1"],
+        itemIds: ["tool-1", "raw-run", "list-1"],
       },
       { kind: "item", id: "sub:run-1" },
+      { kind: "item", id: "raw-spawn" },
     ]);
     // The synthetic tile still drives the active sub-agent strip.
     expect(selectActiveSubAgentParentItemIds(state, "t1")).toEqual(["sub:run-1"]);
