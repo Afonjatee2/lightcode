@@ -36,7 +36,7 @@ export function GuiThreadContent(
     hideComposer?: boolean;
   },
 ) {
-  const { runtimeDebugOpen } = props;
+  const runtimeDebugOpen = import.meta.env.DEV && props.runtimeDebugOpen;
   const thread = useThread(props.threadId) ?? props.fallbackThread;
   const guiChatFontSize = useSharedSettings((s) => s.guiChatFontSize);
   useLayoutEffect(() => {

@@ -426,7 +426,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                     </Tooltip.Content>
                   </Tooltip>
                 ) : null}
-                {!usesTerminalPresentation ? (
+                {import.meta.env.DEV && !usesTerminalPresentation ? (
                   <Tooltip delay={0}>
                     <Tooltip.Trigger>
                       <button
@@ -537,7 +537,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
                 projectLocation={projectLocation}
                 paneCount={paneCount}
                 terminalPaneRef={terminalPaneRef}
-                runtimeDebugOpen={runtimeDebugOpen}
+                runtimeDebugOpen={import.meta.env.DEV && runtimeDebugOpen}
               />
             )}
           </div>
