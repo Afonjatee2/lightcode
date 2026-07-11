@@ -977,6 +977,7 @@
 
 /* Global subtle focus ring for interactive elements not styled by HeroUI utilities */
 :focus-visible:not(
+  [data-rac],
   [data-focus-visible="true"],
   [class*="focus-ring"],
   [class*="focus-field-ring"],
