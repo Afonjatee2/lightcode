@@ -11,6 +11,11 @@ export function isCodexCollabAgentToolCall(source: CodexItemPayload): boolean {
   return type === "collab agent tool call" || type === "collab agent";
 }
 
+export function isCodexSpawnAgentToolCall(source: CodexItemPayload): boolean {
+  if (!isCodexCollabAgentToolCall(source)) return false;
+  return normalizeItemType(readNonEmptyString(source.tool)).replaceAll(" ", "") === "spawnagent";
+}
+
 export function pickCollabAgentInput(source: CodexItemPayload): unknown {
   const prompt = readNonEmptyString(source.prompt);
   const senderThreadId =
@@ -41,19 +46,22 @@ export function pickCollabAgentResult(source: CodexItemPayload): unknown {
   const messages = readCollabAgentMessages(agentsStates);
   if (messages.length === 1) return messages[0];
   if (messages.length > 1) return messages.join("\n\n");
-  return agentsStates !== undefined ? { agentsStates } : undefined;
+  return undefined;
 }
 
 export function readCollabAgentProgress(source: CodexItemPayload):
   | {
       description?: string;
       model?: string;
+      effort?: string;
       stepCount?: number;
     }
   | undefined {
   const agentsStates = readCollabAgentStates(source);
   const description = readCollabAgentMessages(agentsStates)[0] ?? readNonEmptyString(source.prompt);
   const model = readNonEmptyString(source.model);
+  const effort =
+    readNonEmptyString(source.reasoningEffort) ?? readNonEmptyString(source.reasoning_effort);
   const receiverThreadIds = readStringArray(source.receiverThreadIds ?? source.receiver_thread_ids);
   const stepCount =
     receiverThreadIds.length > 0
@@ -64,6 +72,7 @@ export function readCollabAgentProgress(source: CodexItemPayload):
   const progress = {
     ...(description ? { description } : {}),
     ...(model ? { model } : {}),
+    ...(effort ? { effort } : {}),
     ...(stepCount !== undefined ? { stepCount } : {}),
   };
   return Object.keys(progress).length > 0 ? progress : undefined;

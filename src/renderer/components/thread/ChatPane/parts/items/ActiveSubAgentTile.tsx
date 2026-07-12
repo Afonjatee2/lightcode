@@ -23,7 +23,11 @@ import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { formatTokenCount } from "@/renderer/components/thread/formatTokenCount";
 import { ThreadDockHeader, ThreadDockList, ThreadDockSection } from "../../../ThreadDockUI";
 import { parseWorkflowInfo } from "./workflowDisplay";
-import { SubAgentProgressMeta, hasSubAgentProgressMeta } from "./subAgentProgressMeta";
+import {
+  SubAgentProgressMeta,
+  hasSubAgentProgressMeta,
+  readSubAgentLiveLabel,
+} from "./subAgentProgressMeta";
 
 interface ActiveSubAgentTileProps {
   threadId: string;
@@ -192,14 +196,14 @@ function ActiveSubAgentRow({
     markWorkflowTerminal,
   ]);
 
+  const isRunning = item?.state !== "completed" || payload?.status === "running" || workflowIsLive;
   if (!item || !payload?.name) return null;
 
   const display = deriveToolDisplay(payload);
-  const isRunning = item.state !== "completed" || payload?.status === "running" || workflowIsLive;
   const isDone = !isRunning;
   const progress = payload?.progress;
   const stepCount = progress?.stepCount ?? childCount;
-  const liveLabel = progress?.lastToolName ?? progress?.description;
+  const liveLabel = readSubAgentLiveLabel(progress, display.title);
 
   const innerClass = `flex items-center gap-2 rounded px-2 py-1 leading-5 ${
     isDone ? "opacity-60" : ""
@@ -238,17 +242,13 @@ function ActiveSubAgentRow({
             liveLabel={liveLabel}
             stepCount={stepCount}
             includeStepCount
-            leadingSeparator
             className="max-w-[45%] shrink-0 text-foreground-muted opacity-80"
             liveMaxClassName="max-w-[20ch]"
-            loaderClassName="text-foreground-muted"
           />
         ) : hasSubAgentProgressMeta(progress) ? (
           <SubAgentProgressMeta
             progress={progress}
-            leadingSeparator
             className="max-w-[45%] shrink-0 text-foreground-muted opacity-80"
-            loaderClassName="text-foreground-muted"
           />
         ) : null}
       </button>

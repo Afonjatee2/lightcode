@@ -36,7 +36,16 @@ export const chatRowBodyClass = "mt-1 border-t border-[var(--hairline)] px-2";
 // Disclosure trigger for a dense inline row inside a tool-call group
 // (ToolCallInline, ReasoningInline): icon + title + trailing meta hugging
 // their content, with the shared hover treatment.
-export const inlineRowTriggerClass = `flex w-fit max-w-full min-w-0 items-center gap-1.5 rounded-md py-0.5 text-left ${chatRowHoverClass}`;
+export const inlineRowTriggerClass = `group flex w-fit max-w-full min-w-0 items-center gap-1.5 overflow-hidden rounded-md py-0.5 text-left ${chatRowHoverClass}`;
+
+// Disclosure chevrons stay visible on touch devices, but remain quiet until
+// the row is hovered or keyboard-focused on pointer-capable desktops.
+export const chatRowIndicatorClass =
+  "size-3.5 shrink-0 text-[color:var(--muted)] opacity-100 transition-opacity [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100";
+
+export function normalizeCallTitleSeparator(title: string): string {
+  return title.replace(/: /u, " · ");
+}
 
 // Thin dot between a row's title and its trailing meta label so the two read as
 // distinct once they sit side by side.

@@ -89,6 +89,10 @@ describe("Reasoning", () => {
     if (!toggle) throw new Error("missing Thought toggle");
     expect(toggle.textContent).toContain("Thought");
     expect(toggle.textContent).toContain("Weighing the tradeoffs. Then deciding.");
+    expect(toggle.querySelector(".lucide-chevron-down")).toHaveClass(
+      "[@media(hover:hover)]:opacity-0",
+      "[@media(hover:hover)]:group-hover:opacity-100",
+    );
 
     fireEvent.click(toggle);
 

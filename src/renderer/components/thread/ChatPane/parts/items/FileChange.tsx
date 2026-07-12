@@ -11,6 +11,7 @@ import {
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { ChatFilePath } from "./ChatFilePath";
 import { ChatItemAccordion } from "./ChatItemAccordion";
+import { ChatRowMetaSeparator } from "./chatRow";
 import { CommandOutputViewport } from "./CommandOutputViewport";
 import { ToolCallSections, type ToolCallSection } from "./ToolCallSections";
 import {
@@ -83,6 +84,7 @@ export const FileChange = memo(function FileChange({ item }: FileChangeProps) {
       <span className="shrink-0 !text-[color:var(--muted)]">
         {localizeKindLabel(header.changeKind, header.withPath, t)}
       </span>
+      {header.withPath ? <ChatRowMetaSeparator /> : null}
       {header.hasPath ? (
         <ChatFilePath
           className="flex-1"
@@ -163,8 +165,8 @@ export function formatKindLabel(kind: FileChangePayload["changeKind"]): string {
 
 /**
  * Localized counterpart of `formatKindVerb`/`formatKindLabel` for the chat row
- * title. `withPath` true renders the verb followed by a `:` (a path/title comes
- * next); false renders the standalone "<verb> file" form.
+ * title. `withPath` true renders the verb before the shared dot separator;
+ * false renders the standalone "<verb> file" form.
  */
 function localizeKindLabel(
   kind: FileChangePayload["changeKind"],
@@ -173,11 +175,11 @@ function localizeKindLabel(
 ): string {
   switch (kind) {
     case "create":
-      return withPath ? t(msg`Create:`) : t(msg`Create file`);
+      return withPath ? t(msg`Create`) : t(msg`Create file`);
     case "delete":
-      return withPath ? t(msg`Delete:`) : t(msg`Delete file`);
+      return withPath ? t(msg`Delete`) : t(msg`Delete file`);
     default:
-      return withPath ? t(msg`Edit:`) : t(msg`Edit file`);
+      return withPath ? t(msg`Edit`) : t(msg`Edit file`);
   }
 }
 

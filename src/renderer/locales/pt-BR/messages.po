@@ -2461,6 +2461,10 @@ msgstr "Não foi possível verificar as configurações de servidores MCP."
 msgid "Couldn't start the camera"
 msgstr "Não foi possível iniciar a câmera"
 
+#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
+msgid "Create"
+msgstr "Criar"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "Crie uma rotina útil com um clique e ajuste-a quando quiser."
@@ -2528,8 +2532,8 @@ msgstr "Criar com agente"
 #~ msgstr "Crie sua primeira tarefa agendada."
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-msgid "Create:"
-msgstr "Criar:"
+#~ msgid "Create:"
+#~ msgstr "Criar:"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
@@ -2641,6 +2645,7 @@ msgstr "Remoção de thread padrão"
 #. Thread remove action: delete permanently
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
@@ -2729,8 +2734,8 @@ msgid "Delete worktree {0}"
 msgstr "Excluir árvore de trabalho {0}"
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-msgid "Delete:"
-msgstr "Excluir:"
+#~ msgid "Delete:"
+#~ msgstr "Excluir:"
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Deleting"
@@ -3023,6 +3028,7 @@ msgstr "ex.: Codex GPT-5.5 fast para consultas rápidas, OpenCode GLM para refat
 msgid "e.g. Work"
 msgstr "por exemplo, Trabalho"
 
+#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "Edit"
@@ -3058,8 +3064,8 @@ msgstr "Editar agendamento"
 #~ msgstr "Editar tarefa"
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-msgid "Edit:"
-msgstr "Editar:"
+#~ msgid "Edit:"
+#~ msgstr "Editar:"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts

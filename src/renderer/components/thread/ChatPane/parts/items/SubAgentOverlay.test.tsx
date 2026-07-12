@@ -1,10 +1,12 @@
 import { screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ToolCallPayload } from "@/shared/contracts";
+import { AppProvider } from "@/renderer/components/ui/provider";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { SubAgentOverlay } from "./SubAgentOverlay";
+import { ActiveSubAgentTile } from "./ActiveSubAgentTile";
 
 const mockBridge = {
   subagentSubscribe:
@@ -14,6 +16,7 @@ const mockBridge = {
 };
 
 vi.mock("@/renderer/bridge", () => ({
+  isRemoteSession: () => false,
   readBridge: () => mockBridge,
 }));
 
@@ -72,6 +75,151 @@ describe("SubAgentOverlay", () => {
     expect(icons[0]).toHaveClass("size-3.5");
     expect(icons[1]).toHaveClass("size-3.5");
   });
+
+  it("keeps the composer loader without a leading dot or duplicate agent description", () => {
+    const threadId = "thread-1";
+    const parentItem: RuntimeChatItem = {
+      id: "parent-1",
+      type: "tool_call",
+      state: "started",
+      payload: {
+        name: "spawnAgent",
+        status: "running",
+        isSubAgent: true,
+        args: { description: "protocol specialist" },
+        progress: {
+          model: "gpt-5.6-sol",
+          effort: "ultra",
+          description: "protocol specialist",
+          stepCount: 5,
+        },
+      } satisfies ToolCallPayload,
+      streams: {},
+    };
+
+    useAppStore.setState({
+      runtimeItemIdsByThread: { [threadId]: [parentItem.id] },
+      runtimeItemsByIdByThread: { [threadId]: { [parentItem.id]: parentItem } },
+      runtimeStructuralVersionByThread: { [threadId]: 1 },
+    });
+
+    const view = render(
+      <AppProvider>
+        <ActiveSubAgentTile threadId={threadId} />
+      </AppProvider>,
+    );
+
+    const row = view.container.querySelector(".lightcode-subagent-dock-row");
+    expect(row).not.toBeNull();
+    expect(
+      row?.querySelector('[data-lightcode-shimmer-text="Agent: protocol specialist"]'),
+    ).toBeNull();
+    expect(row?.textContent).not.toContain("specialist·GPT");
+    expect(row?.querySelector(".lightcode-pixel-loader")).not.toBeNull();
+  });
+
+  it("renders child messages through the main timeline parser", async () => {
+    const threadId = "thread-1";
+    const parentItem = makeSubAgentItem("parent-1");
+    const prompt = makeChildItem("prompt-1", parentItem.id, "user_message", {
+      content: [{ kind: "text", text: "Inspect the renderer." }],
+    });
+    const commandOne = makeChildItem("command-1", parentItem.id, "command_execution", {
+      command: "pnpm run typecheck",
+    });
+    const hiddenPlan = makeChildItem("plan-1", parentItem.id, "plan", undefined, {
+      plan_text: "internal plan",
+    });
+    const commandTwo = makeChildItem("command-2", parentItem.id, "command_execution", {
+      command: "pnpm run lint",
+    });
+    const assistant = makeChildItem("assistant-1", parentItem.id, "assistant_message", undefined, {
+      assistant_text: "## Child result\n\n- parsed markdown",
+    });
+
+    useAppStore.setState({
+      runtimeItemIdsByThread: {
+        [threadId]: [
+          parentItem.id,
+          prompt.id,
+          commandOne.id,
+          hiddenPlan.id,
+          commandTwo.id,
+          assistant.id,
+        ],
+      },
+      runtimeItemsByIdByThread: {
+        [threadId]: {
+          [parentItem.id]: parentItem,
+          [prompt.id]: prompt,
+          [commandOne.id]: commandOne,
+          [hiddenPlan.id]: hiddenPlan,
+          [commandTwo.id]: commandTwo,
+          [assistant.id]: assistant,
+        },
+      },
+      runtimeStructuralVersionByThread: { [threadId]: 1 },
+      openSubAgentByThread: { [threadId]: parentItem.id },
+    });
+
+    render(
+      <AppProvider>
+        <SubAgentOverlay threadId={threadId} />
+      </AppProvider>,
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("Inspect the renderer.")).toBeInTheDocument();
+    expect(within(dialog).getByText("2 commands")).toBeInTheDocument();
+    expect(
+      await within(dialog).findByRole("heading", { name: "Child result" }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByRole("listitem")).toHaveTextContent("parsed markdown");
+    expect(within(dialog).queryByText("internal plan")).not.toBeInTheDocument();
+  });
+
+  it("does not present the final child tool group as live after the subagent completes", async () => {
+    const threadId = "thread-1";
+    const runningParent = makeSubAgentItem("parent-1");
+    const parentItem: RuntimeChatItem = {
+      ...runningParent,
+      state: "completed",
+      payload: { ...(runningParent.payload as ToolCallPayload), status: "success" },
+    };
+    const commandOne = makeChildItem("command-1", parentItem.id, "command_execution", {
+      command: "pnpm run typecheck",
+    });
+    const commandTwo = makeChildItem("command-2", parentItem.id, "command_execution", {
+      command: "pnpm run lint",
+    });
+
+    useAppStore.setState({
+      runtimeItemIdsByThread: {
+        [threadId]: [parentItem.id, commandOne.id, commandTwo.id],
+      },
+      runtimeItemsByIdByThread: {
+        [threadId]: {
+          [parentItem.id]: parentItem,
+          [commandOne.id]: commandOne,
+          [commandTwo.id]: commandTwo,
+        },
+      },
+      runtimeStructuralVersionByThread: { [threadId]: 1 },
+      openSubAgentByThread: { [threadId]: parentItem.id },
+    });
+
+    render(
+      <AppProvider>
+        <SubAgentOverlay threadId={threadId} />
+      </AppProvider>,
+    );
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("2 commands").closest("button")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
 });
 
 function makeSubAgentItem(id: string): RuntimeChatItem {
@@ -90,5 +238,22 @@ function makeSubAgentItem(id: string): RuntimeChatItem {
     state: "started",
     payload,
     streams: {},
+  };
+}
+
+function makeChildItem(
+  id: string,
+  parentItemId: string,
+  type: RuntimeChatItem["type"],
+  payload?: unknown,
+  streams: RuntimeChatItem["streams"] = {},
+): RuntimeChatItem {
+  return {
+    id,
+    parentItemId,
+    type,
+    state: "completed",
+    ...(payload !== undefined ? { payload } : {}),
+    streams,
   };
 }

@@ -681,7 +681,7 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
     });
   });
 
-  it("maps Codex collabAgentToolCall items as subagent tool calls", () => {
+  it("maps Codex spawnAgent items as subagent tool calls", () => {
     const state = createCodexMapperState("t-codex");
     const started = mapCodexNotification(
       "item/started",
@@ -697,6 +697,7 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
           receiverThreadIds: ["child-thread"],
           prompt: "inspect one thing",
           model: "gpt-5.3-codex",
+          reasoningEffort: "high",
           agentsStates: {
             "child-thread": { status: "pending_init", message: null },
           },
@@ -715,10 +716,12 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
         senderThreadId: "parent-thread",
         receiverThreadIds: ["child-thread"],
         model: "gpt-5.3-codex",
+        reasoningEffort: "high",
       },
       progress: {
         description: "inspect one thing",
         model: "gpt-5.3-codex",
+        effort: "high",
         stepCount: 1,
       },
       status: "running",
@@ -732,7 +735,7 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
         item: {
           id: "collab-1",
           type: "collabAgentToolCall",
-          tool: "wait",
+          tool: "spawnAgent",
           status: "completed",
           agentsStates: {
             "child-thread": { status: "completed", message: "done" },
@@ -750,6 +753,77 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
         stepCount: 1,
       },
     });
+  });
+
+  it("keeps Codex coordination calls out of the subagent classification", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "item/completed",
+      {
+        threadId: "x",
+        item: {
+          id: "wait-1",
+          type: "collabAgentToolCall",
+          tool: "wait",
+          status: "completed",
+          senderThreadId: "parent-thread",
+          receiverThreadIds: [],
+          prompt: null,
+          model: null,
+          reasoningEffort: null,
+          agentsStates: {},
+        },
+      },
+      state,
+    );
+
+    expect(events[0]).toMatchObject({
+      type: "item.started",
+      itemType: "tool_call",
+      payload: { name: "wait", status: "running" },
+    });
+    expect((events[0] as { payload: Record<string, unknown> }).payload).not.toHaveProperty(
+      "isSubAgent",
+    );
+    expect(events.at(-1)).toMatchObject({
+      type: "item.completed",
+      payload: { status: "success" },
+    });
+    expect((events.at(-1) as { payload: Record<string, unknown> }).payload).not.toHaveProperty(
+      "result",
+    );
+  });
+
+  it("renders the final exitedReviewMode report as an assistant message", () => {
+    const state = createCodexMapperState("t-codex");
+    const events = mapCodexNotification(
+      "item/completed",
+      {
+        threadId: "x",
+        item: {
+          id: "review-1",
+          type: "exitedReviewMode",
+          review: "Looks solid overall.\n\n- Fix one edge case.",
+        },
+      },
+      state,
+    );
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: "item.started",
+        itemType: "assistant_message",
+        payload: {
+          content: [{ kind: "text", text: "Looks solid overall.\n\n- Fix one edge case." }],
+        },
+      }),
+      expect.objectContaining({
+        type: "content.delta",
+        stream: "assistant_text",
+        delta: "Looks solid overall.\n\n- Fix one edge case.",
+      }),
+      expect.objectContaining({ type: "item.completed" }),
+    ]);
   });
 
   it("preserves Codex dynamic and image tool item types", () => {
@@ -1376,6 +1450,33 @@ describe("mapCodexServerRequest — approvals", () => {
         { optionId: "acceptForSession" },
       ),
     ).toEqual({ decision: "acceptForSession" });
+  });
+
+  it("lets users deny requested permission profiles", () => {
+    const permissions = { network: { enabled: true }, fileSystem: null };
+    const event = mapCodexServerRequest(
+      "thread-1",
+      "permissions-1",
+      "item/permissions/requestApproval",
+      { reason: "Network access", permissions },
+    );
+
+    expect(event).toMatchObject({
+      payload: {
+        options: [
+          { optionId: "turn", label: "Allow this turn" },
+          { optionId: "session", label: "Allow for session" },
+          { optionId: "deny", label: "Deny" },
+        ],
+      },
+    });
+    expect(
+      translateCodexCanonicalResponse(
+        "item/permissions/requestApproval",
+        { permissions },
+        { optionId: "deny" },
+      ),
+    ).toEqual({ permissions: {}, scope: "turn" });
   });
 });
 

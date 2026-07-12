@@ -17,12 +17,22 @@ import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { getChildItemIdsStoreSelector } from "../../chatPaneSelectors";
 import { extractAcpResultPart } from "./acpToolPayload";
 import { ChatFilePath } from "./ChatFilePath";
-import { chatRowClass, chatRowHoverClass } from "./chatRow";
+import {
+  chatRowClass,
+  chatRowHoverClass,
+  chatRowIndicatorClass,
+  normalizeCallTitleSeparator,
+} from "./chatRow";
 import { ItemMarkdown } from "./ItemMarkdown";
-import { SubAgentProgressMeta, hasSubAgentProgressMeta } from "./subAgentProgressMeta";
+import {
+  SubAgentProgressMeta,
+  hasSubAgentProgressMeta,
+  readSubAgentLiveLabel,
+} from "./subAgentProgressMeta";
 import { deriveToolDisplay, isWorkflowTool } from "./toolDisplay";
 import { parseWorkflowInfo } from "./workflowDisplay";
 import { WorkflowResultGroup } from "./WorkflowResultGroup";
+import { useShimmer } from "@/renderer/thinkingAnimator";
 
 interface SubAgentToolCallProps {
   threadId: string;
@@ -54,19 +64,7 @@ export const SubAgentToolCall = memo(function SubAgentToolCall({
     workflow?.transcriptDir ?? null,
   );
 
-  if (!payload?.name) return null;
-  const display = deriveToolDisplay(payload);
-  const Icon: LucideIcon = display.Icon;
-  const isCompleted = item.state === "completed" && payload.status !== "running";
-  const completedResultText = isCompleted ? extractAcpResultPart(payload).text.trim() : "";
-  const workflowResultText = workflow ? completedResultText : "";
-  const resultText = workflow ? "" : completedResultText;
-  // Surface tool_use_error inline (without XML tags) as a tooltip on the
-  // error icon — the user explicitly does not want an inline error banner.
-  const workflowErrorText =
-    workflow && payload.status === "error"
-      ? (extractToolUseErrorText(completedResultText) ?? completedResultText)
-      : "";
+  const isCompleted = item.state === "completed" && payload?.status !== "running";
   // A workflow with a manifestPath is a *background* run — the parent SDK
   // marks the tool completed instantly but the actual work continues. Treat
   // the row as live until the manifest itself reports a terminal status;
@@ -81,9 +79,28 @@ export const SubAgentToolCall = memo(function SubAgentToolCall({
     workflowIsBackground &&
     workflowOwnedThisSession &&
     (workflowRun.run === null || isWorkflowRunLive(workflowRun.run));
+  const isRunning = !isCompleted || workflowIsLive;
+  const titleRef = useShimmer<HTMLElement>(isRunning);
+  if (!payload?.name) return null;
+  const display = deriveToolDisplay(payload);
+  const displayTitle = normalizeCallTitleSeparator(display.title);
+  const displayPrefix = display.parts
+    ? normalizeCallTitleSeparator(display.parts.prefix)
+    : undefined;
+  const Icon: LucideIcon = display.Icon;
+  const completedResultText = isCompleted ? extractAcpResultPart(payload).text.trim() : "";
+  const workflowResultText = workflow ? completedResultText : "";
+  const resultText = workflow ? "" : completedResultText;
+  // Surface tool_use_error inline (without XML tags) as a tooltip on the
+  // error icon — the user explicitly does not want an inline error banner.
+  const workflowErrorText =
+    workflow && payload.status === "error"
+      ? (extractToolUseErrorText(completedResultText) ?? completedResultText)
+      : "";
   const status = resolveStatus(
     item,
     payload,
+    display.title,
     childCount,
     workflowErrorText,
     workflow ? workflowRun.run : null,
@@ -103,8 +120,12 @@ export const SubAgentToolCall = memo(function SubAgentToolCall({
           <Icon className="size-3" />
         </span>
         {display.parts ? (
-          <code className="flex min-w-0 items-baseline overflow-hidden font-mono text-[color:var(--muted)]">
-            <span className="shrink-0 whitespace-pre">{display.parts.prefix}</span>
+          <code
+            ref={titleRef}
+            className={`flex min-w-0 items-baseline overflow-hidden font-mono text-[color:var(--muted)] ${isRunning ? "lightcode-thinking-text !flex" : ""}`}
+            {...(isRunning ? { "data-lightcode-shimmer-text": displayTitle } : {})}
+          >
+            <span className="shrink-0 whitespace-pre">{displayPrefix}</span>
             {display.parts.filePath ? (
               <ChatFilePath
                 className="flex-1"
@@ -117,8 +138,12 @@ export const SubAgentToolCall = memo(function SubAgentToolCall({
             )}
           </code>
         ) : (
-          <code className="block min-w-0 truncate font-mono text-[color:var(--muted)]">
-            {display.title}
+          <code
+            ref={titleRef}
+            className={`block min-w-0 truncate font-mono text-[color:var(--muted)] ${isRunning ? "lightcode-thinking-text" : ""}`}
+            {...(isRunning ? { "data-lightcode-shimmer-text": displayTitle } : {})}
+          >
+            {displayTitle}
           </code>
         )}
         {status.rightLabel ? (
@@ -126,7 +151,7 @@ export const SubAgentToolCall = memo(function SubAgentToolCall({
             {status.rightLabel}
           </span>
         ) : null}
-        <ChevronRight className="size-3.5 shrink-0 text-[color:var(--muted)] opacity-60 transition-opacity group-hover:opacity-100" />
+        <ChevronRight className={chatRowIndicatorClass} />
       </button>
       {workflowResultText ? <WorkflowResultGroup resultText={workflowResultText} /> : null}
       {resultText ? <SubAgentResultDisclosure text={resultText} /> : null}
@@ -153,14 +178,14 @@ function SubAgentResultDisclosure({ text }: { text: string }) {
           actions?.onContentHeightChange();
         }}
         aria-expanded={isOpen}
-        className="inline-flex min-w-0 items-center gap-1.5 self-start leading-none italic opacity-80 hover:text-foreground hover:opacity-100"
+        className="group inline-flex min-w-0 items-center gap-1.5 self-start leading-none italic opacity-80 hover:text-foreground hover:opacity-100"
       >
         <Bot className="size-3 shrink-0" />
         <span>
           <Trans>Subagent Result</Trans>
         </span>
         <ChevronDown
-          className={`size-3 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+          className={`size-3 shrink-0 opacity-100 transition-[transform,opacity] [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100 ${isOpen ? "rotate-180" : ""}`}
         />
       </button>
       {isOpen ? (
@@ -180,6 +205,7 @@ interface SubAgentStatus {
 function resolveStatus(
   item: RuntimeChatItem,
   payload: ToolCallPayload | undefined,
+  displayTitle: string,
   childCount: number,
   errorTooltipText: string,
   workflowRun: WorkflowRun | null,
@@ -188,7 +214,7 @@ function resolveStatus(
 ): SubAgentStatus {
   const isRunning = item.state !== "completed" || payload?.status === "running" || workflowIsLive;
   const progress = payload?.progress;
-  const liveLabel = progress?.lastToolName ?? progress?.description;
+  const liveLabel = readSubAgentLiveLabel(progress, displayTitle);
   // Prefer the supervisor-reported counter — it survives child-event gating
   // (overlay closed); fall back to local children count when the supervisor
   // hasn't populated stepCount yet.
@@ -225,10 +251,8 @@ function resolveStatus(
           stepCount={stepCount}
           includeStepCount
           leadingSeparator
-          showLoader
           className="text-[color:var(--muted)]"
           liveMaxClassName="max-w-[28ch]"
-          loaderClassName="text-[color:var(--muted)]"
         />
       ),
       rightLabelClassName: "!text-[color:var(--muted)]",
@@ -257,8 +281,8 @@ function resolveStatus(
       rightLabel: (
         <SubAgentProgressMeta
           progress={progress}
+          leadingSeparator
           className="text-[color:var(--muted)]"
-          loaderClassName="text-[color:var(--muted)]"
         />
       ),
       rightLabelClassName: "!text-[color:var(--muted)]",

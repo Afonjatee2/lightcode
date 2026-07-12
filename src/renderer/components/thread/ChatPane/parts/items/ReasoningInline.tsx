@@ -5,7 +5,7 @@ import { Brain } from "lucide-react";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
 import { useBrainThinking, useShimmer } from "@/renderer/thinkingAnimator";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
-import { ChatRowMetaSeparator, inlineRowTriggerClass } from "./chatRow";
+import { ChatRowMetaSeparator, chatRowIndicatorClass, inlineRowTriggerClass } from "./chatRow";
 import { getReasoningPreview } from "./reasoningPreview";
 import { ReasoningExpandedBody, ReasoningStreamViewport } from "./ReasoningStreamViewport";
 
@@ -79,7 +79,7 @@ export const ReasoningInline = memo(function ReasoningInline({ item }: Reasoning
               </span>
             </>
           ) : null}
-          <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
+          <Disclosure.Indicator className={chatRowIndicatorClass} />
         </Disclosure.Trigger>
       </Disclosure.Heading>
       <Disclosure.Content>

@@ -120,13 +120,33 @@ export function selectVisibleThreadTimelineEntries(
     return cached.entries;
   }
 
+  const entries = buildTimelineEntries(state, threadId, itemIds);
+  if (timelineEntryCache.size > 500) timelineEntryCache.clear();
+  timelineEntryCache.set(cacheKey, { itemIds, structuralVersion, entries });
+  return entries;
+}
+
+function buildTimelineEntries(
+  state: AppStoreState,
+  threadId: string,
+  sourceItemIds: readonly string[],
+): readonly ChatTimelineEntry[] {
   const items = state.runtimeItemsByIdByThread[threadId];
+  const childParentIds = new Set(
+    (state.runtimeItemIdsByThread[threadId] ?? [])
+      .map((itemId) => items?.[itemId]?.parentItemId)
+      .filter((parentItemId): parentItemId is string => parentItemId !== undefined),
+  );
+  const itemIds = sourceItemIds.filter((itemId) => {
+    const item = items?.[itemId];
+    return !item || isVisibleRuntimeItem(item);
+  });
   const entries: ChatTimelineEntry[] = [];
   let idx = 0;
   while (idx < itemIds.length) {
     const itemId = itemIds[idx]!;
     const item = items?.[itemId];
-    if (!item || !isToolGroupItem(item) || selectChildItemIds(state, threadId, itemId).length > 0) {
+    if (!item || !isToolGroupItem(item) || childParentIds.has(itemId)) {
       entries.push({ kind: "item", id: itemId });
       idx += 1;
       continue;
@@ -136,11 +156,7 @@ export function selectVisibleThreadTimelineEntries(
     while (idx < itemIds.length) {
       const nextId = itemIds[idx]!;
       const next = items?.[nextId];
-      if (
-        !next ||
-        !isToolGroupItem(next) ||
-        selectChildItemIds(state, threadId, nextId).length > 0
-      ) {
+      if (!next || !isToolGroupItem(next) || childParentIds.has(nextId)) {
         break;
       }
       if (!canShareRuntimeToolGroup(item, next)) {
@@ -163,8 +179,6 @@ export function selectVisibleThreadTimelineEntries(
       });
     }
   }
-  if (timelineEntryCache.size > 500) timelineEntryCache.clear();
-  timelineEntryCache.set(cacheKey, { itemIds, structuralVersion, entries });
   return entries;
 }
 
@@ -206,6 +220,7 @@ export function selectChatScrollAnchorForTimeline(
   const lastId = [...itemIds].reverse().find((itemId) => {
     if (itemId === hiddenItemId) return false;
     const item = items?.[itemId];
+    if (item?.parentItemId) return false;
     return item ? isVisibleRuntimeItem(item) : true;
   });
   if (!lastId) return "";
@@ -399,6 +414,52 @@ export function getChildItemIdsStoreSelector(
   return sel;
 }
 
+const childTimelineEntryCache = new Map<
+  string,
+  {
+    itemIds: readonly string[];
+    structuralVersion: number;
+    entries: readonly ChatTimelineEntry[];
+  }
+>();
+
+export function selectChildTimelineEntries(
+  state: AppStoreState,
+  threadId: string,
+  parentItemId: string,
+): readonly ChatTimelineEntry[] {
+  const itemIds = selectChildItemIds(state, threadId, parentItemId);
+  if (itemIds.length === 0) return EMPTY_THREAD_TIMELINE_ENTRIES;
+  const structuralVersion = state.runtimeStructuralVersionByThread?.[threadId] ?? 0;
+  const cacheKey = `${threadId}\0${parentItemId}`;
+  const cached = childTimelineEntryCache.get(cacheKey);
+  if (cached && cached.itemIds === itemIds && cached.structuralVersion === structuralVersion) {
+    return cached.entries;
+  }
+  const entries = buildTimelineEntries(state, threadId, itemIds);
+  if (childTimelineEntryCache.size > 500) childTimelineEntryCache.clear();
+  childTimelineEntryCache.set(cacheKey, { itemIds, structuralVersion, entries });
+  return entries;
+}
+
+const childTimelineEntriesStoreSelectorCache = new Map<
+  string,
+  (state: AppStoreState) => readonly ChatTimelineEntry[]
+>();
+
+export function getChildTimelineEntriesStoreSelector(
+  threadId: string,
+  parentItemId: string,
+): (state: AppStoreState) => readonly ChatTimelineEntry[] {
+  const key = `${threadId}\0${parentItemId}`;
+  let sel = childTimelineEntriesStoreSelectorCache.get(key);
+  if (!sel) {
+    sel = (state) => selectChildTimelineEntries(state, threadId, parentItemId);
+    childTimelineEntriesStoreSelectorCache.set(key, sel);
+  }
+  return sel;
+}
+
 /**
  * Per-thread Map<anchorItemId, CompletedTurnRecord>. Cached against the source
  * array reference so per-row lookups stay O(1) without rebuilding the map on
@@ -468,5 +529,11 @@ export function clearRuntimeItemStoreSelectorCacheForThread(threadId: string): v
   }
   for (const key of childIdsStoreSelectorCache.keys()) {
     if (key.startsWith(prefix)) childIdsStoreSelectorCache.delete(key);
+  }
+  for (const key of childTimelineEntryCache.keys()) {
+    if (key.startsWith(prefix)) childTimelineEntryCache.delete(key);
+  }
+  for (const key of childTimelineEntriesStoreSelectorCache.keys()) {
+    if (key.startsWith(prefix)) childTimelineEntriesStoreSelectorCache.delete(key);
   }
 }

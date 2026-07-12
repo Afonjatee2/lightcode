@@ -2,11 +2,119 @@ import { describe, expect, it } from "vitest";
 import type { AppStoreState } from "@/renderer/state/appStore";
 import {
   selectActiveSubAgentParentItemIds,
+  selectChatScrollAnchor,
+  selectChildTimelineEntries,
   selectVisibleThreadRuntimeItemIds,
   selectVisibleThreadTimelineEntries,
 } from "./chatPaneSelectors";
 
 describe("chatPaneSelectors", () => {
+  it("parses subagent children with the same visibility and grouping rules as the main thread", () => {
+    const state = {
+      runtimeItemIdsByThread: {
+        t1: ["parent", "command-1", "plan", "command-2", "error", "assistant", "other"],
+      },
+      runtimeItemsByIdByThread: {
+        t1: {
+          parent: {
+            id: "parent",
+            type: "tool_call",
+            state: "started",
+            payload: { name: "Task", status: "running", isSubAgent: true },
+            streams: {},
+          },
+          "command-1": {
+            id: "command-1",
+            parentItemId: "parent",
+            type: "command_execution",
+            state: "completed",
+            payload: { command: "pnpm run typecheck" },
+            streams: {},
+          },
+          plan: {
+            id: "plan",
+            parentItemId: "parent",
+            type: "plan",
+            state: "completed",
+            streams: { plan_text: "internal plan" },
+          },
+          "command-2": {
+            id: "command-2",
+            parentItemId: "parent",
+            type: "command_execution",
+            state: "completed",
+            payload: { command: "pnpm run lint" },
+            streams: {},
+          },
+          error: {
+            id: "error",
+            parentItemId: "parent",
+            type: "error",
+            state: "completed",
+            payload: { message: "hidden error row" },
+            streams: {},
+          },
+          assistant: {
+            id: "assistant",
+            parentItemId: "parent",
+            type: "assistant_message",
+            state: "completed",
+            streams: { assistant_text: "Child result" },
+          },
+          other: {
+            id: "other",
+            parentItemId: "different-parent",
+            type: "assistant_message",
+            state: "completed",
+            streams: { assistant_text: "Unrelated" },
+          },
+        },
+      },
+      runtimeStructuralVersionByThread: { t1: 1 },
+    } as unknown as AppStoreState;
+
+    expect(selectChildTimelineEntries(state, "t1", "parent")).toEqual([
+      {
+        kind: "tool_call_group",
+        id: "tool-call-group:command-1",
+        itemIds: ["command-1", "command-2"],
+      },
+      { kind: "item", id: "assistant" },
+    ]);
+  });
+
+  it("anchors the main chat to its visible tail instead of a hidden subagent child", () => {
+    const state = {
+      runtimeItemIdsByThread: { t1: ["parent", "assistant", "child"] },
+      runtimeItemsByIdByThread: {
+        t1: {
+          parent: {
+            id: "parent",
+            type: "tool_call",
+            state: "completed",
+            payload: { name: "spawnAgent", status: "success", isSubAgent: true },
+            streams: {},
+          },
+          assistant: {
+            id: "assistant",
+            type: "assistant_message",
+            state: "completed",
+            streams: { assistant_text: "Parent result" },
+          },
+          child: {
+            id: "child",
+            parentItemId: "parent",
+            type: "assistant_message",
+            state: "updated",
+            streams: { assistant_text: "Hidden child output" },
+          },
+        },
+      },
+    } as unknown as AppStoreState;
+
+    expect(selectChatScrollAnchor(state, "t1")).toBe("assistant:13:completed");
+  });
+
   it("keeps completed reasoning items in the transcript so the user can expand them later", () => {
     // The `Reasoning` component renders a collapsed "Thought" disclosure for
     // completed items with text. Filtering them out here would erase that

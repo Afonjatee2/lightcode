@@ -13,6 +13,7 @@ export interface CodexItemPayload {
   type?: string;
   kind?: string;
   text?: string;
+  review?: string;
   title?: string;
   name?: string;
   command?: string;
@@ -49,6 +50,8 @@ export interface CodexItemPayload {
   reasoning_effort?: unknown;
   toolKind?: unknown;
   tool_kind?: unknown;
+  agentThreadId?: unknown;
+  agentPath?: unknown;
   /** Generic tool input (codex `mcp` / `dynamic` tool items). */
   input?: unknown;
   args?: unknown;
@@ -198,6 +201,7 @@ export function readStringArray(value: unknown): string[] {
  */
 export function extractMessageText(item: CodexItemPayload): string {
   if (typeof item.text === "string" && item.text.length > 0) return item.text;
+  if (typeof item.review === "string" && item.review.length > 0) return item.review;
   if (Array.isArray(item.content)) {
     const parts: string[] = [];
     for (const block of item.content) {

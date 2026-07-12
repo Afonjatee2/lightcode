@@ -5,7 +5,7 @@
 import type { CanonicalItemType, RuntimeContentStreamKind } from "@/shared/contracts";
 import { readDiffSummary } from "../../fileChangeSummary";
 import { goalPayloadFromProviderState } from "../../goalRuntime";
-import { isCodexCollabAgentToolCall, readCollabAgentProgress } from "./collabAgent";
+import { isCodexSpawnAgentToolCall, readCollabAgentProgress } from "./collabAgent";
 import { readCodexGoalStatus } from "./goal";
 import { type CodexItemPayload, extractMessageText, readChangesPayload } from "./readers";
 import {
@@ -109,7 +109,7 @@ export function buildStartedPayload(
   if (isToolLikeItemType(itemType)) {
     const args = pickToolInput(source);
     const serverId = toolServerId(source);
-    const isSubAgent = isCodexCollabAgentToolCall(source);
+    const isSubAgent = isCodexSpawnAgentToolCall(source);
     const progress = isSubAgent ? readCollabAgentProgress(source) : undefined;
     return {
       name: toolName(source) ?? "tool",
@@ -151,7 +151,7 @@ export function buildCompletedPayload(
   }
   if (isToolLikeItemType(itemType)) {
     const result = pickToolOutput(source);
-    const progress = isCodexCollabAgentToolCall(source)
+    const progress = isCodexSpawnAgentToolCall(source)
       ? readCollabAgentProgress(source)
       : undefined;
     return {

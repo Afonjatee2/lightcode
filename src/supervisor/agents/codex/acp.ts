@@ -50,6 +50,7 @@ import {
 import { CodexAppServerRpc } from "./appServerRpc";
 import { CodexStdioTransport } from "./stdioTransport";
 import { mapCodexSlashCommands, readCodexInitCommands } from "./probe";
+import { CodexSubAgentRouter } from "./subAgentRouting";
 
 export { deriveCodexStructuredState, parseCodexSocketMessage } from "./acpProtocol";
 export type { CodexThreadStatus } from "./acpProtocol";
@@ -192,6 +193,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   // arrives first, on the next user turn, or on dispose.
   private pendingSystemErrorFallback: ReturnType<typeof setTimeout> | undefined;
   private mapperState: CodexMapperState | undefined;
+  private subAgentRouter: CodexSubAgentRouter | undefined;
   private readonly hasUserMcpServers: boolean;
   /**
    * Codex can report a plain `active` status while `thread/resume` is only
@@ -226,6 +228,11 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       this.mapperState = createCodexMapperState(this.threadId);
     }
     return this.mapperState;
+  }
+
+  private ensureSubAgentRouter(): CodexSubAgentRouter {
+    this.subAgentRouter ??= new CodexSubAgentRouter(this.threadId);
+    return this.subAgentRouter;
   }
 
   private emitRuntimeEvents(events: RuntimeEvent[]): void {
@@ -474,12 +481,6 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       },
     };
 
-    const startParams = {
-      ...threadOverrides,
-      experimentalRawEvents: false,
-      persistExtendedHistory: true,
-    };
-
     let threadId: string;
 
     if (sessionRef) {
@@ -488,7 +489,6 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         await this.rpc.request("thread/resume", {
           ...threadOverrides,
           threadId: sessionRef.providerSessionId,
-          persistExtendedHistory: true,
         });
         threadId = sessionRef.providerSessionId;
       } catch (error) {
@@ -499,7 +499,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         }
         this.resumeActiveStatusSuppressionUntil.delete(sessionRef.providerSessionId);
         console.log("[codex] thread/resume failed (%s), falling back to thread/start", msg);
-        const result = await this.rpc.request("thread/start", startParams);
+        const result = await this.rpc.request("thread/start", threadOverrides);
         threadId = extractThreadField(result, "id") ?? "";
         if (!threadId) {
           throw new Error("thread/start fallback response did not contain a thread id.", {
@@ -509,7 +509,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         this.extractRolloutMeta(result);
       }
     } else {
-      const result = await this.rpc.request("thread/start", startParams);
+      const result = await this.rpc.request("thread/start", threadOverrides);
       threadId = extractThreadField(result, "id") ?? "";
       if (!threadId) {
         throw new Error("thread/start response did not contain a thread id.");
@@ -618,6 +618,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     this.seenErrorMessages.clear();
     this.clearPendingSystemErrorFallback();
     const threadId = await this.waitForRemoteThreadId();
+    this.ensureSubAgentRouter().setDefaultModelSettings(config.model, config.effort ?? "medium");
     this.resumeActiveStatusSuppressionUntil.delete(threadId);
 
     const turnId = `turn-${randomUUID()}`;
@@ -775,13 +776,27 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   private handleNotification(method: string, params: Record<string, unknown> | undefined): void {
     const notificationThreadId = readNotificationThreadId(params, this.remoteThreadId);
     const suppressResumeReplay = this.isResumeReplaySuppressed(notificationThreadId);
+    const childEvents = this.ensureSubAgentRouter().routeChildNotification(
+      method,
+      params,
+      this.remoteThreadId,
+    );
+    if (childEvents !== undefined) {
+      if (childEvents.length > 0) this.emitRuntimeEvents(childEvents);
+      return;
+    }
 
     // Translate to canonical chat events for chat-mode renderers. Runs
     // alongside the existing status-derivation logic below — terminal mode
     // is unaffected.
-    const runtimeEvents = suppressResumeReplay
+    const mappedRuntimeEvents = suppressResumeReplay
       ? []
       : mapCodexNotification(method, params, this.ensureMapperState());
+    const runtimeEvents = this.ensureSubAgentRouter().observeMainNotification(
+      method,
+      params,
+      mappedRuntimeEvents,
+    );
     if (runtimeEvents.length > 0) this.emitRuntimeEvents(runtimeEvents);
 
     if (method === "thread/started" && params && "thread" in params) {
@@ -911,6 +926,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
         },
         capabilities: {
           experimentalApi: true,
+          requestAttestation: false,
         },
       },
       30_000,

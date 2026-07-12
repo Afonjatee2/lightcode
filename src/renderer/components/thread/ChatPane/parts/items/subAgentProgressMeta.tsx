@@ -1,10 +1,13 @@
 import { Fragment } from "react";
 import type { ToolCallProgress } from "@/shared/contracts";
-import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { formatTokenCount } from "@/renderer/components/thread/formatTokenCount";
-import { formatBracketParamHints, stripBracketParams } from "@/shared/modelLabels";
+import {
+  formatBracketParamHints,
+  formatReasoningLabel,
+  stripBracketParams,
+} from "@/shared/modelLabels";
 
-export type SubAgentProgressPartKind = "model" | "tokens" | "live" | "steps";
+export type SubAgentProgressPartKind = "model" | "effort" | "tokens" | "live" | "steps";
 
 export interface SubAgentProgressPart {
   kind: SubAgentProgressPartKind;
@@ -13,6 +16,19 @@ export interface SubAgentProgressPart {
 
 export function hasSubAgentProgressMeta(progress: ToolCallProgress | undefined): boolean {
   return buildSubAgentProgressParts({ progress }).length > 0;
+}
+
+export function readSubAgentLiveLabel(
+  progress: ToolCallProgress | undefined,
+  title: string,
+): string | undefined {
+  const label = (progress?.lastToolName ?? progress?.description)?.trim();
+  if (!label) return undefined;
+  const normalizedLabel = label.toLocaleLowerCase();
+  const normalizedTitle = title.trim().toLocaleLowerCase();
+  return normalizedTitle === normalizedLabel || normalizedTitle.endsWith(`: ${normalizedLabel}`)
+    ? undefined
+    : label;
 }
 
 export function buildSubAgentProgressParts(args: {
@@ -25,6 +41,8 @@ export function buildSubAgentProgressParts(args: {
   const parts: SubAgentProgressPart[] = [];
   const modelLabel = formatSubAgentModelLabel(progress?.model);
   if (modelLabel) parts.push({ kind: "model", label: modelLabel });
+  const effortLabel = formatSubAgentEffortLabel(progress?.effort);
+  if (effortLabel) parts.push({ kind: "effort", label: effortLabel });
   const tokenLabel = formatSubAgentTokenLabel(progress?.tokens);
   if (tokenLabel) parts.push({ kind: "tokens", label: tokenLabel });
   const normalizedLiveLabel = liveLabel?.trim();
@@ -41,23 +59,19 @@ export function SubAgentProgressMeta({
   stepCount,
   includeStepCount = false,
   leadingSeparator = false,
-  showLoader = false,
   className = "",
   liveMaxClassName = "max-w-[24ch]",
-  loaderClassName = "text-[color:var(--muted)]",
 }: {
   progress: ToolCallProgress | undefined;
   liveLabel?: string | undefined;
   stepCount?: number | undefined;
   includeStepCount?: boolean;
   leadingSeparator?: boolean;
-  showLoader?: boolean;
   className?: string;
   liveMaxClassName?: string;
-  loaderClassName?: string;
 }) {
   const parts = buildSubAgentProgressParts({ progress, liveLabel, stepCount, includeStepCount });
-  if (parts.length === 0 && !showLoader) return null;
+  if (parts.length === 0) return null;
   return (
     <span className={`inline-flex min-w-0 items-center gap-1.5 tabular-nums ${className}`}>
       {leadingSeparator && parts.length > 0 ? <span className="shrink-0 opacity-60">·</span> : null}
@@ -72,7 +86,6 @@ export function SubAgentProgressMeta({
           </span>
         </Fragment>
       ))}
-      {showLoader ? <PixelLoader size="xxs" className={loaderClassName} /> : null}
     </span>
   );
 }
@@ -85,6 +98,11 @@ export function formatSubAgentModelLabel(model: string | undefined): string | un
   const label = formatKnownModelId(base) ?? formatGenericModelLabel(base);
   const hints = raw.includes("[") ? formatBracketParamHints(raw) : undefined;
   return hints ? `${label} · ${hints}` : label;
+}
+
+export function formatSubAgentEffortLabel(effort: string | undefined): string | undefined {
+  const raw = effort?.trim();
+  return raw ? formatReasoningLabel(raw) : undefined;
 }
 
 function formatSubAgentTokenLabel(tokens: number | undefined): string | undefined {

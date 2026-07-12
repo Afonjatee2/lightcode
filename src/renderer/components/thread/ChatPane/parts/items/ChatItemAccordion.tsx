@@ -7,7 +7,9 @@ import {
   chatRowBodyClass,
   chatRowClass,
   chatRowHoverClass,
+  chatRowIndicatorClass,
   chatRowShellClass,
+  normalizeCallTitleSeparator,
 } from "./chatRow";
 
 export interface ChatItemAccordionProps {
@@ -56,7 +58,7 @@ export interface ChatItemAccordionProps {
 // adds the hover affordance for clickable (has-body) rows.
 const rowClass = `${chatRowClass} gap-1.5 [&>code]:!text-[color:var(--muted)]`;
 
-const triggerClass = `${rowClass} ${chatRowHoverClass}`;
+const triggerClass = `group ${rowClass} ${chatRowHoverClass}`;
 
 // `w-full` is load-bearing: HeroUI's `Tooltip.Trigger` computes to
 // `display: inline-flex`, so this `<code>` is a flex item. Without an explicit
@@ -78,11 +80,13 @@ export function ChatItemAccordion({
   children,
 }: ChatItemAccordionProps) {
   const actions = useChatPaneActions();
+  const displayTitle = typeof title === "string" ? normalizeCallTitleSeparator(title) : title;
+  const displayPrefix = titleParts ? normalizeCallTitleSeparator(titleParts.prefix) : undefined;
   const titleString =
-    typeof title === "string"
-      ? title
+    typeof displayTitle === "string"
+      ? displayTitle
       : titleParts
-        ? `${titleParts.prefix}${titleParts.path}`
+        ? `${displayPrefix}${titleParts.path}`
         : undefined;
   const codeRef = useRef<HTMLElement | null>(null);
   const pathRef = useRef<HTMLSpanElement | null>(null);
@@ -106,7 +110,7 @@ export function ChatItemAccordion({
 
   const titleContent = titleParts ? (
     <code className={`${codeClass} flex items-baseline overflow-hidden`}>
-      <span className="shrink-0 whitespace-pre">{titleParts.prefix}</span>
+      <span className="shrink-0 whitespace-pre">{displayPrefix}</span>
       {titleParts.filePath ? (
         <ChatFilePath
           className="flex-1"
@@ -122,7 +126,7 @@ export function ChatItemAccordion({
     </code>
   ) : (
     <code ref={codeRef} className={codeClass}>
-      {title}
+      {displayTitle}
     </code>
   );
 
@@ -164,7 +168,7 @@ export function ChatItemAccordion({
             <span className="size-3 shrink-0 text-[color:var(--muted)]">{icon}</span>
             {titleNode}
             <ChatRowMeta label={rightLabel} className={rightLabelClassName} />
-            <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
+            <Disclosure.Indicator className={chatRowIndicatorClass} />
           </Disclosure.Trigger>
         </Disclosure.Heading>
         <Disclosure.Content>

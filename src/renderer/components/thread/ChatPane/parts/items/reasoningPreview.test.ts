@@ -16,6 +16,12 @@ describe("getReasoningPreview", () => {
     );
   });
 
+  it("keeps a word boundary where adjacent emphasis markers were removed", () => {
+    expect(
+      getReasoningPreview("Planning parallel subagent tasks****Locating repository path"),
+    ).toBe("Planning parallel subagent tasks Locating repository path");
+  });
+
   it("drops fenced code blocks, including unterminated ones", () => {
     expect(getReasoningPreview("Look at\n```ts\nconst a = 1;\n```\nthe result")).toBe(
       "Look at the result",

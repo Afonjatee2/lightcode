@@ -7,7 +7,11 @@ import { readBridge } from "@/renderer/bridge";
 import { OverlayShell } from "@/renderer/components/layout/OverlayShell";
 import { useAppStore } from "@/renderer/state/appStore";
 import { getRuntimeItemPayload } from "@/renderer/state/slices/runtimeEventSlice";
-import { getChildItemIdsStoreSelector, getRuntimeItemStoreSelector } from "../../chatPaneSelectors";
+import {
+  getChildTimelineEntriesStoreSelector,
+  getRuntimeItemStoreSelector,
+  type ChatTimelineEntry,
+} from "../../chatPaneSelectors";
 import { ChatItemRow } from "./ChatItemRow";
 import { deriveToolDisplay, isWorkflowTool } from "./toolDisplay";
 import { useStickToBottom } from "./useStickToBottom";
@@ -65,7 +69,7 @@ function SubAgentOverlayBody({
 }: SubAgentOverlayBodyProps) {
   const { t } = useLingui();
   const item = useAppStore(getRuntimeItemStoreSelector(threadId, parentItemId));
-  const childIds = useAppStore(getChildItemIdsStoreSelector(threadId, parentItemId));
+  const childEntries = useAppStore(getChildTimelineEntriesStoreSelector(threadId, parentItemId));
   const applyRuntimeEvents = useAppStore((s) => s.applyRuntimeEvents);
 
   // Subscribe to the supervisor's child-event stream for this sub-agent while
@@ -139,7 +143,7 @@ function SubAgentOverlayBody({
       ) : (
         <ChildList
           threadId={threadId}
-          childIds={childIds}
+          entries={childEntries}
           stickToBottom={isRunning}
           workflow={workflow}
           workflowProgress={workflowProgress}
@@ -211,13 +215,13 @@ function Shell({
 
 function ChildList({
   threadId,
-  childIds,
+  entries,
   stickToBottom,
   workflow,
   workflowProgress,
 }: {
   threadId: string;
-  childIds: readonly string[];
+  entries: readonly ChatTimelineEntry[];
   stickToBottom: boolean;
   workflow: WorkflowInfo | null;
   workflowProgress: WorkflowOverlayProgress | null;
@@ -232,7 +236,7 @@ function ChildList({
         {workflow ? (
           <WorkflowOverlayHeader workflow={workflow} progress={workflowProgress} />
         ) : null}
-        {childIds.length === 0 ? (
+        {entries.length === 0 ? (
           workflow ? (
             <WorkflowEmptyState progress={workflowProgress} />
           ) : (
@@ -241,11 +245,12 @@ function ChildList({
             </p>
           )
         ) : (
-          childIds.map((id) => (
+          entries.map((entry, index) => (
             <ChatItemRow
-              key={id}
+              key={entry.id}
               threadId={threadId}
-              entry={{ kind: "item", id }}
+              entry={entry}
+              isLastEntry={stickToBottom && index === entries.length - 1}
               checkpointRevert={null}
             />
           ))

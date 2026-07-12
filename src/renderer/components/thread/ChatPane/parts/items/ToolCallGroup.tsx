@@ -21,11 +21,12 @@ import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { ChatFilePath } from "./ChatFilePath";
 import {
   ChatRowMeta,
-  chatRowBodyClass,
   chatRowClass,
   chatRowHoverClass,
+  chatRowIndicatorClass,
   chatRowShellClass,
   inlineRowTriggerClass,
+  normalizeCallTitleSeparator,
 } from "./chatRow";
 import { CommandOutputViewport } from "./CommandOutputViewport";
 import { iconForCommandIntent } from "./CommandExecution";
@@ -120,7 +121,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
         }}
       >
         <Disclosure.Heading>
-          <Disclosure.Trigger className={`${chatRowClass} gap-2 ${chatRowHoverClass}`}>
+          <Disclosure.Trigger className={`group ${chatRowClass} gap-2 ${chatRowHoverClass}`}>
             <div className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap text-[color:var(--muted)]">
               {sameFileEditSummary ? (
                 <SameFileEditGroupTitle summary={sameFileEditSummary} />
@@ -142,17 +143,17 @@ export const ToolCallGroup = memo(function ToolCallGroup({
                 ))
               )}
             </div>
-            <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
+            <Disclosure.Indicator className={chatRowIndicatorClass} />
           </Disclosure.Trigger>
         </Disclosure.Heading>
         <Disclosure.Content>
-          <Disclosure.Body className={`${chatRowBodyClass} pt-1`}>
+          <Disclosure.Body className="ml-3 border-l border-dashed border-[color:var(--border)] pb-0 pl-3 pt-0">
             {hasOverflowRows && !sameFileEditSummary ? (
-              <div className="mb-1 flex justify-center">
+              <div className="mb-0.5 flex justify-start">
                 <button
                   type="button"
                   aria-expanded={showAll}
-                  className="rounded px-1.5 py-0.5 text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:bg-foreground/5 hover:text-foreground"
+                  className="-ml-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:bg-foreground/5 hover:text-foreground"
                   onClick={() => {
                     setShowAll((prev) => !prev);
                     actions?.onContentHeightChange();
@@ -164,7 +165,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
             ) : null}
             <div
               ref={scrollRef}
-              className={`lightcode-tool-call-group-viewport flex flex-col gap-1 pr-1 ${
+              className={`lightcode-tool-call-group-viewport flex flex-col gap-0.5 pr-1 ${
                 showAll ? "max-h-[420px] overflow-y-auto" : ""
               }`}
             >
@@ -305,7 +306,7 @@ function ToolCallInline({ item }: { item: RuntimeChatItem }) {
             {...(row.titleParts ? { titleParts: row.titleParts } : {})}
           />
           <ChatRowMeta label={row.rightLabel} className={row.rightLabelClassName} />
-          <Disclosure.Indicator className="size-3.5 shrink-0 text-[color:var(--muted)]" />
+          <Disclosure.Indicator className={chatRowIndicatorClass} />
         </Disclosure.Trigger>
       </Disclosure.Heading>
       <Disclosure.Content>
@@ -380,7 +381,9 @@ function InlineRowTitle({
   titleParts?: { prefix: string; path: string; filePath?: boolean };
 }) {
   const shimmerRef = useShimmer<HTMLElement>(isRunning);
-  const shimmerData = isRunning ? { "data-lightcode-shimmer-text": title } : {};
+  const displayTitle = normalizeCallTitleSeparator(title);
+  const displayPrefix = titleParts ? normalizeCallTitleSeparator(titleParts.prefix) : undefined;
+  const shimmerData = isRunning ? { "data-lightcode-shimmer-text": displayTitle } : {};
   if (titleParts) {
     return (
       <code
@@ -388,7 +391,7 @@ function InlineRowTitle({
         className={`flex min-w-0 items-baseline overflow-hidden font-mono !text-[color:var(--muted)] ${isRunning ? "lightcode-thinking-text !flex" : ""}`}
         {...shimmerData}
       >
-        <span className="shrink-0 whitespace-pre">{titleParts.prefix}</span>
+        <span className="shrink-0 whitespace-pre">{displayPrefix}</span>
         {titleParts.filePath ? (
           <>
             <span className="sr-only">{titleParts.path}</span>
@@ -411,7 +414,7 @@ function InlineRowTitle({
       className={`min-w-0 truncate font-mono !text-[color:var(--muted)] ${isRunning ? "lightcode-thinking-text" : ""}`}
       {...shimmerData}
     >
-      {title}
+      {displayTitle}
     </code>
   );
 }

@@ -2460,6 +2460,10 @@ msgstr "MCP サーバー設定をスキャンできませんでした。"
 msgid "Couldn't start the camera"
 msgstr "カメラを開始できませんでした"
 
+#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
+msgid "Create"
+msgstr "作成"
+
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Create a useful routine with one click, then adjust it anytime."
 msgstr "ワンクリックで便利なルーティンを作成し、いつでも調整できます。"
@@ -2527,8 +2531,8 @@ msgstr "エージェントで作成"
 #~ msgstr "最初のスケジュールタスクを作成しましょう。"
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-msgid "Create:"
-msgstr "作成:"
+#~ msgid "Create:"
+#~ msgstr "作成:"
 
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
 msgid "Created a worktree on \"{newBranch}\", but the changes conflicted and remain in a git stash — resolve them in the worktree."
@@ -2640,6 +2644,7 @@ msgstr "デフォルトのスレッドの削除"
 #. Thread remove action: delete permanently
 #: src/mobile/views/FilesView.tsx
 #: src/renderer/components/common/BranchSelector/BranchSelector.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
@@ -2728,8 +2733,8 @@ msgid "Delete worktree {0}"
 msgstr "ワークツリー{0}を削除します"
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-msgid "Delete:"
-msgstr "削除:"
+#~ msgid "Delete:"
+#~ msgstr "削除:"
 
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "Deleting"
@@ -3022,6 +3027,7 @@ msgstr "例：クイックな調査には Codex GPT-5.5 fast、大量のリフ�
 msgid "e.g. Work"
 msgstr "例: 仕事"
 
+#: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 #: src/renderer/views/SettingsOverlay/parts/ProfileSettings.tsx
 msgid "Edit"
@@ -3057,8 +3063,8 @@ msgstr "スケジュールを編集"
 #~ msgstr "タスクを編集"
 
 #: src/renderer/components/thread/ChatPane/parts/items/FileChange.tsx
-msgid "Edit:"
-msgstr "編集:"
+#~ msgid "Edit:"
+#~ msgstr "編集:"
 
 #: src/renderer/commands/registry.ts
 #: src/renderer/commands/shortcutCatalog.ts

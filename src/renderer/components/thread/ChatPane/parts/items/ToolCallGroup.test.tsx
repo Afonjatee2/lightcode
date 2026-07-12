@@ -28,14 +28,22 @@ describe("ToolCallGroup", () => {
       items.map((item) => item.id),
     );
     const viewport = getViewport(view.container);
+    const body = viewport.parentElement;
+    if (!body) throw new Error("missing tool group body");
+    const showAll = screen.getByRole("button", { name: "Show all" });
 
     expect(screen.queryByText("Read file 1")).not.toBeInTheDocument();
     expect(screen.queryByText("Read file 2")).not.toBeInTheDocument();
     expect(screen.getByText("Read file 3")).toBeInTheDocument();
     expect(screen.getByText("Read file 10")).toBeInTheDocument();
     expect(viewport.className).not.toContain("overflow-y-auto");
+    expect(viewport).toHaveClass("gap-0.5");
+    expect(body).toHaveClass("border-l", "border-dashed");
+    expect(body).not.toHaveClass("border-t");
+    expect(showAll.parentElement).toHaveClass("justify-start");
+    expect(showAll).toHaveClass("-ml-1");
 
-    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    fireEvent.click(showAll);
 
     expect(screen.getByText("Read file 1")).toBeInTheDocument();
     expect(screen.getByText("Read file 10")).toBeInTheDocument();
@@ -70,6 +78,28 @@ describe("ToolCallGroup", () => {
     }
     expect(viewport.className).not.toContain("overflow-y-auto");
     expect(screen.queryByRole("button", { name: "Show all" })).not.toBeInTheDocument();
+  });
+
+  it("shows group and inline disclosure chevrons only on desktop hover", () => {
+    const threadId = "thread-1";
+    const item = {
+      ...makeToolItem("tool-1", "Read file"),
+      payload: { name: "Read file", status: "success", args: { path: "README.md" } },
+    } satisfies RuntimeChatItem;
+    seedThread(threadId, [item]);
+
+    const view = renderToolCallGroup(threadId, [item.id]);
+    const indicators = view.container.querySelectorAll(".disclosure__indicator");
+
+    expect(indicators).toHaveLength(2);
+    for (const indicator of indicators) {
+      expect(indicator).toHaveClass(
+        "[@media(hover:hover)]:opacity-0",
+        "[@media(hover:hover)]:group-hover:opacity-100",
+        "[@media(hover:hover)]:group-focus-visible:opacity-100",
+      );
+      expect(indicator.closest("button")).toHaveClass("group");
+    }
   });
 
   it("colors file-change diff summary counts and hides zero values", () => {
@@ -303,11 +333,11 @@ describe("ToolCallGroup", () => {
       items.map((item) => item.id),
     );
 
-    expect(document.body).toHaveTextContent("View 1:24: src/supervisor/runtime.test.ts");
-    expect(screen.getByText('Search: "vitest.mjs"')).toBeInTheDocument();
-    expect(screen.getByText("Git: git diff -- src/supervisor/runtime.ts")).toBeInTheDocument();
-    expect(screen.getByText("Check: pnpm run test")).toBeInTheDocument();
-    expect(screen.getByText("Install packages: pnpm install")).toBeInTheDocument();
+    expect(document.body).toHaveTextContent("View 1:24 · src/supervisor/runtime.test.ts");
+    expect(screen.getByText('Search · "vitest.mjs"')).toBeInTheDocument();
+    expect(screen.getByText("Git · git diff -- src/supervisor/runtime.ts")).toBeInTheDocument();
+    expect(screen.getByText("Check · pnpm run test")).toBeInTheDocument();
+    expect(screen.getByText("Install packages · pnpm install")).toBeInTheDocument();
   });
 
   it("categorizes persisted compacted tool summaries by their labels", () => {
@@ -370,9 +400,9 @@ describe("ToolCallGroup", () => {
       items.map((item) => item.id),
     );
 
-    expect(screen.getByText("github: search")).toBeInTheDocument();
+    expect(screen.getByText("github · search")).toBeInTheDocument();
     expect(screen.getAllByText("screen.png").length).toBeGreaterThan(0);
-    expect(screen.getByText("Tool search: deploy")).toBeInTheDocument();
+    expect(screen.getByText("Tool search · deploy")).toBeInTheDocument();
   });
 
   it("keeps web searches visible when Codex omits the query", () => {
@@ -414,7 +444,7 @@ describe("ToolCallGroup", () => {
     expect(animatedTitles).toHaveLength(4);
     expect(
       animatedTitles.map((title) => title.getAttribute("data-lightcode-shimmer-text")),
-    ).toEqual(["Read file", "Check: pnpm run test", "Edit: src/foo.ts", "Lightcode"]);
+    ).toEqual(["Read file", "Check · pnpm run test", "Edit · src/foo.ts", "Lightcode"]);
     expect(screen.queryByText("Working")).not.toBeInTheDocument();
     expect(view.container.querySelector(".lightcode-pixel-loader")).toBeNull();
   });
@@ -437,6 +467,10 @@ describe("ToolCallGroup", () => {
     expect(
       screen.getByText("Weighing the tradeoffs before editing the selector."),
     ).toBeInTheDocument();
+    expect(screen.getByText("Thought").closest("button")).toHaveClass("overflow-hidden");
+    expect(screen.getByText("Weighing the tradeoffs before editing the selector.")).toHaveClass(
+      "truncate",
+    );
   });
 
   it("auto-expands streaming reasoning inside the group and collapses it on completion", async () => {

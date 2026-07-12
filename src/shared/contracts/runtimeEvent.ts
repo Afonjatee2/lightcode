@@ -144,6 +144,8 @@ export const toolCallProgressSchema = z.object({
   lastToolName: z.string().optional(),
   /** Provider-reported model used by this sub-agent, when the provider exposes the actual sub-agent model. */
   model: z.string().min(1).optional(),
+  /** Provider-reported reasoning effort used by this sub-agent, when available. */
+  effort: z.string().min(1).optional(),
   summary: z.string().optional(),
   tokens: z.number().int().nonnegative().optional(),
   toolUses: z.number().int().nonnegative().optional(),

@@ -7,6 +7,26 @@ vi.mock("../../chatPaneActionsContext", () => ({
 }));
 
 describe("ChatItemAccordion", () => {
+  it("shows the disclosure chevron only on hover-capable desktop interaction", () => {
+    const { container } = render(
+      <ChatItemAccordion
+        icon={<span>i</span>}
+        title="Read file"
+        isExpanded={false}
+        onExpandedChange={() => {}}
+      >
+        body
+      </ChatItemAccordion>,
+    );
+
+    expect(container.querySelector(".disclosure__trigger")).toHaveClass("group");
+    expect(container.querySelector(".disclosure__indicator")).toHaveClass(
+      "[@media(hover:hover)]:opacity-0",
+      "[@media(hover:hover)]:group-hover:opacity-100",
+      "[@media(hover:hover)]:group-focus-visible:opacity-100",
+    );
+  });
+
   it("does not force title overflow layout reads on mount", () => {
     const { container } = render(
       <ChatItemAccordion

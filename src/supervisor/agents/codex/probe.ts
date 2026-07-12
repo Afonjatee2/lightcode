@@ -69,14 +69,12 @@ export interface CodexAccountInfo {
 /** Default approval policies when no enterprise requirements restrict the list. */
 const DEFAULT_APPROVAL_POLICIES: Array<{ id: string; label: string }> = [
   { id: "on-request", label: "On Request" },
-  { id: "on-failure", label: "On Failure" },
   { id: "never", label: "Full Access" },
   { id: "untrusted", label: "Untrusted" },
 ];
 
 const APPROVAL_POLICY_LABELS: Record<string, string> = {
   "on-request": "On Request",
-  "on-failure": "On Failure",
   never: "Full Access",
   untrusted: "Untrusted",
 };
@@ -339,12 +337,12 @@ class ProbeClient {
     const promise = new Promise<unknown>((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
     });
-    this.transport.write({ jsonrpc: "2.0", id, method, params });
+    this.transport.write({ id, method, params });
     return promise;
   }
 
   notify(method: string): void {
-    this.transport.write({ jsonrpc: "2.0", method });
+    this.transport.write({ method });
   }
 
   dispose(): void {
@@ -418,7 +416,7 @@ async function runWithCodexAppServer<T>(
         client = new ProbeClient(transport);
         const initResult = await client.request("initialize", {
           clientInfo: { name: "lightcode-probe", version: "0.1.0" },
-          capabilities: { experimentalApi: true },
+          capabilities: { experimentalApi: true, requestAttestation: false },
         });
         client.notify("initialized");
         return await fn({ client, initResult });

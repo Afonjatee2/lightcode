@@ -38,7 +38,7 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
             actions?.onContentHeightChange();
           }}
           aria-expanded={isOpen}
-          className="inline-flex min-w-0 max-w-full items-center gap-1.5 self-start leading-none italic opacity-80 hover:text-foreground hover:opacity-100"
+          className="group inline-flex min-w-0 max-w-full items-center gap-1.5 self-start leading-none italic opacity-80 hover:text-foreground hover:opacity-100"
         >
           <Brain className="size-3 shrink-0" />
           <span className="shrink-0">
@@ -46,7 +46,7 @@ export const Reasoning = memo(function Reasoning({ item }: ReasoningProps) {
           </span>
           {preview ? <span className="min-w-0 truncate opacity-70">{preview}</span> : null}
           <ChevronDown
-            className={`size-3 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+            className={`size-3 shrink-0 opacity-100 transition-[transform,opacity] [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:hover)]:group-focus-visible:opacity-100 ${isOpen ? "rotate-180" : ""}`}
           />
         </button>
         {isOpen ? <ReasoningExpandedBody text={rawText} className="mt-2" /> : null}

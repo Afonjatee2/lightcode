@@ -31,6 +31,18 @@ type InboundRequest = {
   params: Record<string, unknown> | undefined;
 };
 
+const SERVER_OVERLOADED_ERROR_CODE = -32001;
+const MAX_OVERLOAD_RETRIES = 2;
+
+class CodexRpcResponseError extends Error {
+  constructor(
+    message: string,
+    readonly code: number | undefined,
+  ) {
+    super(message);
+  }
+}
+
 /** Owns JSON-RPC correlation and server-request bookkeeping above stdio framing. */
 export class CodexAppServerRpc {
   private listener: CodexAppServerRpcListener | undefined;
@@ -53,6 +65,37 @@ export class CodexAppServerRpc {
   }
 
   request(method: string, params: Record<string, unknown>, timeoutMs = 30_000): Promise<unknown> {
+    return this.requestWithRetry(method, params, timeoutMs);
+  }
+
+  private async requestWithRetry(
+    method: string,
+    params: Record<string, unknown>,
+    timeoutMs: number,
+  ): Promise<unknown> {
+    for (let attempt = 0; ; attempt += 1) {
+      try {
+        return await this.requestOnce(method, params, timeoutMs);
+      } catch (error) {
+        if (
+          !(error instanceof CodexRpcResponseError) ||
+          error.code !== SERVER_OVERLOADED_ERROR_CODE ||
+          attempt >= MAX_OVERLOAD_RETRIES
+        ) {
+          throw error;
+        }
+        const baseDelayMs = 100 * 2 ** attempt;
+        const jitteredDelayMs = Math.round(baseDelayMs * (0.5 + Math.random()));
+        await new Promise((resolve) => setTimeout(resolve, jitteredDelayMs));
+      }
+    }
+  }
+
+  private requestOnce(
+    method: string,
+    params: Record<string, unknown>,
+    timeoutMs: number,
+  ): Promise<unknown> {
     const id = `lightcode-${this.requestSequence++}`;
 
     const pending = new Promise<unknown>((resolve, reject) => {
@@ -69,7 +112,6 @@ export class CodexAppServerRpc {
     });
 
     this.write({
-      jsonrpc: "2.0",
       id,
       method,
       params,
@@ -80,7 +122,6 @@ export class CodexAppServerRpc {
 
   notify(method: string): void {
     this.write({
-      jsonrpc: "2.0",
       method,
     });
   }
@@ -92,7 +133,6 @@ export class CodexAppServerRpc {
       ? translateCodexCanonicalResponse(inbound.method, inbound.params, response)
       : response;
     this.write({
-      jsonrpc: "2.0",
       id: inbound?.id ?? requestId,
       result,
     });
@@ -131,7 +171,14 @@ export class CodexAppServerRpc {
           typeof error === "object" && error !== null && "message" in error
             ? String((error as Record<string, unknown>).message)
             : String(error);
-        pending.reject(new Error(messageText));
+        const code =
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          typeof (error as Record<string, unknown>).code === "number"
+            ? ((error as Record<string, unknown>).code as number)
+            : undefined;
+        pending.reject(new CodexRpcResponseError(messageText, code));
       } else {
         pending.resolve(message.result);
       }
@@ -139,6 +186,13 @@ export class CodexAppServerRpc {
     }
 
     if (message.kind === "request") {
+      if (message.method === "currentTime/read") {
+        this.write({
+          id: message.id,
+          result: { currentTimeAt: Math.floor(Date.now() / 1000) },
+        });
+        return;
+      }
       const canonical = mapCodexServerRequest(
         this.localThreadId,
         String(message.id),
@@ -157,7 +211,6 @@ export class CodexAppServerRpc {
           `[codex] no canonical mapping for app-server request method "${message.method}"; replying method not found.`,
         );
         this.write({
-          jsonrpc: "2.0",
           id: message.id,
           error: {
             code: -32601,

@@ -77,7 +77,6 @@ describe("CodexAppServerRpc", () => {
       );
       expect(writes).toEqual([
         {
-          jsonrpc: "2.0",
           id: "lightcode-0",
           method: "thread/read",
           params: { threadId: "provider-thread" },
@@ -106,7 +105,6 @@ describe("CodexAppServerRpc", () => {
     expect(debugEvents).toContainEqual({
       direction: "lightcode->codex",
       payload: {
-        jsonrpc: "2.0",
         id: "lightcode-0",
         method: "thread/read",
         params: { threadId: "provider-thread" },
@@ -126,6 +124,36 @@ describe("CodexAppServerRpc", () => {
     });
 
     await expect(pending).rejects.toThrow("turn rejected");
+  });
+
+  it("retries overloaded requests with exponential backoff", async () => {
+    vi.useFakeTimers();
+    const random = vi.spyOn(Math, "random").mockReturnValue(0);
+    try {
+      const { listener, rpc, writes } = createRpcHarness();
+      const pending = rpc.request("thread/read", { threadId: "provider-thread" });
+
+      listener().onMessage({
+        id: "lightcode-0",
+        error: { code: -32001, message: "Server overloaded; retry later." },
+      });
+      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(49);
+      expect(writes).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(writes).toHaveLength(2);
+      expect(writes[1]).toMatchObject({
+        id: "lightcode-1",
+        method: "thread/read",
+        params: { threadId: "provider-thread" },
+      });
+
+      listener().onMessage({ id: "lightcode-1", result: { ok: true } });
+      await expect(pending).resolves.toEqual({ ok: true });
+    } finally {
+      random.mockRestore();
+      vi.useRealTimers();
+    }
   });
 
   it("maps inbound requests and replies with their original numeric ids", () => {
@@ -148,10 +176,31 @@ describe("CodexAppServerRpc", () => {
     rpc.resolveServerRequest("0", { optionId: "accept" });
 
     expect(writes.at(-1)).toEqual({
-      jsonrpc: "2.0",
       id: 0,
       result: { decision: "accept" },
     });
+  });
+
+  it("answers external current-time requests", () => {
+    const now = vi.spyOn(Date, "now").mockReturnValue(1_781_717_655_999);
+    try {
+      const { listener, runtimeEvents, writes } = createRpcHarness();
+      listener().onMessage({
+        id: "time-1",
+        method: "currentTime/read",
+        params: { threadId: "provider-thread" },
+      });
+
+      expect(writes).toEqual([
+        {
+          id: "time-1",
+          result: { currentTimeAt: 1_781_717_655 },
+        },
+      ]);
+      expect(runtimeEvents).toEqual([]);
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it("emits question-answer events when resolving Codex user input", () => {
@@ -170,7 +219,6 @@ describe("CodexAppServerRpc", () => {
     rpc.resolveServerRequest("question-1", response);
 
     expect(writes.at(-1)).toEqual({
-      jsonrpc: "2.0",
       id: "question-1",
       result: response,
     });
@@ -197,7 +245,6 @@ describe("CodexAppServerRpc", () => {
 
     expect(writes).toEqual([
       {
-        jsonrpc: "2.0",
         id: "refresh-1",
         error: {
           code: -32601,

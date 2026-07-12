@@ -151,6 +151,7 @@ export function mapCodexServerRequest(
         options: [
           { optionId: "turn", label: "Allow this turn" },
           { optionId: "session", label: "Allow for session" },
+          { optionId: "deny", label: "Deny" },
         ] satisfies UserInputOption[],
       },
     };
@@ -301,6 +302,9 @@ export function translateCodexCanonicalResponse(
   if (!optionId) return response;
 
   if (method === "item/permissions/requestApproval") {
+    if (optionId === "deny") {
+      return { permissions: {}, scope: "turn" };
+    }
     return {
       permissions: params?.permissions ?? {},
       scope: optionId === "session" ? "session" : "turn",

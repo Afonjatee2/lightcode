@@ -16,10 +16,11 @@ import {
 import { CodexStructuredSession } from "./acp";
 import type { CodexAppServerRpcListener } from "./appServerRpc";
 import type { OscNotification, OscTitle } from "@/shared/osc";
-import type { RuntimeEvent } from "@/shared/contracts";
+import type { RuntimeEvent, ToolCallPayload } from "@/shared/contracts";
 import { codexIntentFor } from "./plugin/intentMap";
 import { mapCodexModels, mapCodexRequirements, mapCodexSlashCommands } from "./probe";
 import { CodexStdioTransport } from "./stdioTransport";
+import { CodexSubAgentRouter } from "./subAgentRouting";
 import type { StructuredSessionUpdate } from "../base";
 
 describe("deriveCodexStructuredState", () => {
@@ -205,6 +206,564 @@ describe("CodexStdioTransport", () => {
   });
 });
 
+describe("CodexSubAgentRouter", () => {
+  it("creates the subagent parent from app-server activity and flushes buffered child output", () => {
+    const router = new CodexSubAgentRouter("local-thread");
+    router.setDefaultModelSettings("gpt-5.6-sol", "medium");
+
+    expect(
+      router.routeChildNotification(
+        "thread/started",
+        {
+          thread: {
+            id: "child-thread",
+            parentThreadId: "provider-thread",
+            status: { type: "active", activeFlags: [] },
+          },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+    expect(
+      router.routeChildNotification(
+        "item/started",
+        {
+          threadId: "child-thread",
+          item: { id: "child-message", type: "agentMessage", text: "Found a race." },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+
+    const events = router.observeMainNotification(
+      "item/completed",
+      {
+        threadId: "provider-thread",
+        item: {
+          id: "spawn-call",
+          type: "subAgentActivity",
+          kind: "started",
+          agentThreadId: "child-thread",
+          agentPath: "/root/game_logic",
+        },
+      },
+      [
+        {
+          type: "item.started",
+          threadId: "local-thread",
+          itemId: "generic-activity",
+          itemType: "tool_call",
+          payload: { name: "subAgentActivity", status: "running" },
+        },
+        {
+          type: "item.completed",
+          threadId: "local-thread",
+          itemId: "generic-activity",
+          payload: { status: "success" },
+        },
+      ],
+    );
+    const parent = events.find(
+      (event): event is Extract<RuntimeEvent, { type: "item.started" }> =>
+        event.type === "item.started" &&
+        event.itemType === "tool_call" &&
+        (event.payload as ToolCallPayload | undefined)?.isSubAgent === true,
+    );
+
+    expect(parent?.payload).toMatchObject({
+      name: "spawnAgent",
+      status: "running",
+      isSubAgent: true,
+      args: {
+        description: "game logic",
+        agentPath: "/root/game_logic",
+        receiverThreadIds: ["child-thread"],
+      },
+      progress: {
+        description: "game logic",
+        model: "gpt-5.6-sol",
+        effort: "medium",
+        stepCount: 0,
+      },
+    });
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "item.updated",
+        itemId: parent?.itemId,
+        payload: expect.objectContaining({
+          progress: expect.objectContaining({ stepCount: 1 }),
+        }),
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "item.started",
+        itemType: "assistant_message",
+        parentItemId: parent?.itemId,
+      }),
+    );
+    expect(events).not.toContainEqual(expect.objectContaining({ itemId: "generic-activity" }));
+
+    const completionEvents = router.routeChildNotification(
+      "turn/completed",
+      { threadId: "child-thread", turn: { id: "child-turn", status: "completed" } },
+      "provider-thread",
+    );
+    expect(
+      completionEvents?.some(
+        (event) => event.type === "item.completed" && event.itemId !== parent?.itemId,
+      ),
+    ).toBe(true);
+    expect(completionEvents).toContainEqual({
+      type: "item.completed",
+      threadId: "local-thread",
+      itemId: parent?.itemId,
+      payload: { status: "success", result: "Found a race." },
+    });
+  });
+
+  it("suppresses wait coordination items instead of presenting them as subagents", () => {
+    const router = new CodexSubAgentRouter("local-thread");
+    const waitItem = {
+      id: "wait-call",
+      type: "collabAgentToolCall",
+      tool: "wait",
+      status: "completed",
+      senderThreadId: "provider-thread",
+      receiverThreadIds: [],
+      agentsStates: {},
+    };
+
+    expect(
+      router.observeMainNotification(
+        "item/completed",
+        { threadId: "provider-thread", item: waitItem },
+        [
+          {
+            type: "item.started",
+            threadId: "local-thread",
+            itemId: "wait-item",
+            itemType: "tool_call",
+            payload: { name: "wait", status: "running" },
+          },
+          {
+            type: "item.completed",
+            threadId: "local-thread",
+            itemId: "wait-item",
+            payload: { status: "success" },
+          },
+        ],
+      ),
+    ).toEqual([]);
+  });
+
+  it("routes child-thread items under the parent and keeps the composer tile active", () => {
+    const router = new CodexSubAgentRouter("local-thread");
+    router.setDefaultModelSettings("gpt-5.4", "medium");
+    const collabItem = {
+      id: "collab-1",
+      type: "collabAgentToolCall",
+      tool: "spawnAgent",
+      status: "inProgress",
+      senderThreadId: "provider-thread",
+      receiverThreadIds: [],
+      prompt: "Inspect the protocol",
+      model: null,
+      reasoningEffort: null,
+      agentsStates: {
+        "child-thread": { status: "running", message: null },
+      },
+    };
+    const parentEvents = router.observeMainNotification(
+      "item/started",
+      { threadId: "provider-thread", item: collabItem },
+      [
+        {
+          type: "item.started",
+          threadId: "local-thread",
+          itemId: "parent-item",
+          itemType: "tool_call",
+          payload: {
+            name: "spawnAgent",
+            status: "running",
+            isSubAgent: true,
+            progress: {},
+          },
+        },
+      ],
+    );
+
+    expect(parentEvents[0]).toMatchObject({
+      type: "item.started",
+      itemId: "parent-item",
+      payload: {
+        status: "running",
+        isSubAgent: true,
+        progress: { model: "gpt-5.4", effort: "medium" },
+      },
+    });
+
+    expect(
+      router.routeChildNotification(
+        "thread/started",
+        {
+          thread: {
+            id: "child-thread",
+            parentThreadId: "provider-thread",
+            status: { type: "active", activeFlags: [] },
+          },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+    expect(
+      router.routeChildNotification(
+        "item/started",
+        {
+          threadId: "child-thread",
+          turnId: "child-turn",
+          item: { id: "child-message", type: "agentMessage", text: "Child result" },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+
+    const completedCollabItem = {
+      ...collabItem,
+      status: "completed",
+      receiverThreadIds: ["child-thread"],
+    };
+    const prematureCompletion = router.observeMainNotification(
+      "item/completed",
+      { threadId: "provider-thread", item: completedCollabItem },
+      [
+        {
+          type: "item.completed",
+          threadId: "local-thread",
+          itemId: "parent-item",
+          payload: { status: "success" },
+        },
+      ],
+    );
+    expect(prematureCompletion).toContainEqual(
+      expect.objectContaining({
+        type: "item.updated",
+        itemId: "parent-item",
+        payload: expect.objectContaining({ status: "running", isSubAgent: true }),
+      }),
+    );
+    expect(prematureCompletion).toContainEqual(
+      expect.objectContaining({
+        type: "item.started",
+        threadId: "local-thread",
+        parentItemId: "parent-item",
+        itemType: "user_message",
+        payload: { content: [{ kind: "text", text: "Inspect the protocol" }] },
+      }),
+    );
+    expect(prematureCompletion).toContainEqual(
+      expect.objectContaining({
+        type: "item.started",
+        threadId: "local-thread",
+        parentItemId: "parent-item",
+        itemType: "assistant_message",
+      }),
+    );
+    expect(prematureCompletion).toContainEqual(
+      expect.objectContaining({
+        type: "item.updated",
+        itemId: "parent-item",
+        payload: expect.objectContaining({
+          progress: expect.objectContaining({ stepCount: 1 }),
+        }),
+      }),
+    );
+
+    expect(
+      router.observeMainNotification(
+        "item/started",
+        {
+          threadId: "provider-thread",
+          item: {
+            id: "activity-1",
+            type: "subAgentActivity",
+            kind: "interacted",
+            agentThreadId: "child-thread",
+            agentPath: "/root/audit",
+          },
+        },
+        [
+          {
+            type: "item.started",
+            threadId: "local-thread",
+            itemId: "generic-activity",
+            itemType: "tool_call",
+          },
+        ],
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        type: "item.updated",
+        itemId: "parent-item",
+        payload: expect.objectContaining({ status: "running", isSubAgent: true }),
+      }),
+    ]);
+
+    expect(
+      router.routeChildNotification(
+        "thread/settings/updated",
+        {
+          threadId: "child-thread",
+          threadSettings: { model: "gpt-5.4", effort: "medium" },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        type: "item.updated",
+        itemId: "parent-item",
+        payload: expect.objectContaining({
+          progress: expect.objectContaining({ model: "gpt-5.4", effort: "medium" }),
+        }),
+      }),
+    ]);
+
+    const completionEvents = router.routeChildNotification(
+      "turn/completed",
+      { threadId: "child-thread", turn: { id: "child-turn", status: "completed" } },
+      "provider-thread",
+    );
+    expect(
+      completionEvents?.some(
+        (event) => event.type === "item.completed" && event.itemId !== "parent-item",
+      ),
+    ).toBe(true);
+    expect(completionEvents).toContainEqual({
+      type: "item.completed",
+      threadId: "local-thread",
+      itemId: "parent-item",
+      payload: { status: "success", result: "Child result" },
+    });
+  });
+
+  it("suppresses notifications from unrelated app-server threads", () => {
+    const router = new CodexSubAgentRouter("local-thread");
+    expect(
+      router.routeChildNotification(
+        "item/started",
+        { threadId: "unrelated-thread", item: { id: "wrong", type: "agentMessage" } },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+  });
+
+  it("routes turn notifications whose thread id is nested under turn", () => {
+    const router = createRouterWithChild();
+
+    expect(
+      router.routeChildNotification(
+        "turn/started",
+        { turn: { id: "child-turn", threadId: "child-thread" } },
+        "provider-thread",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        type: "item.updated",
+        itemId: "parent-item",
+        payload: expect.objectContaining({ status: "running" }),
+      }),
+    ]);
+  });
+
+  it("shows the parent delegation prompt as the first child user message", () => {
+    const router = createRouterWithChild();
+
+    expect(
+      router.routeChildNotification(
+        "item/started",
+        {
+          threadId: "child-thread",
+          item: { id: "child-prompt", type: "userMessage", text: "Inspect the renderer." },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        type: "item.started",
+        threadId: "local-thread",
+        itemType: "user_message",
+        parentItemId: "parent-item",
+        payload: { content: [{ kind: "text", text: "Inspect the renderer." }] },
+      }),
+    ]);
+  });
+
+  it("copies streamed child assistant text into the parent result", () => {
+    const router = createRouterWithChild();
+    router.routeChildNotification(
+      "item/started",
+      {
+        threadId: "child-thread",
+        item: { id: "child-message", type: "agentMessage", text: "" },
+      },
+      "provider-thread",
+    );
+    router.routeChildNotification(
+      "item/agentMessage/delta",
+      { threadId: "child-thread", itemId: "child-message", delta: "Final child report" },
+      "provider-thread",
+    );
+
+    expect(
+      router.routeChildNotification(
+        "turn/completed",
+        { turn: { id: "child-turn", threadId: "child-thread", status: "completed" } },
+        "provider-thread",
+      ),
+    ).toContainEqual({
+      type: "item.completed",
+      threadId: "local-thread",
+      itemId: "parent-item",
+      payload: { status: "success", result: "Final child report" },
+    });
+  });
+
+  it("marks a status-less child turn/aborted notification as an error", () => {
+    const router = createRouterWithChild();
+
+    expect(
+      router.routeChildNotification(
+        "turn/aborted",
+        { turn: { id: "child-turn", threadId: "child-thread" } },
+        "provider-thread",
+      ),
+    ).toContainEqual({
+      type: "item.completed",
+      threadId: "local-thread",
+      itemId: "parent-item",
+      payload: { status: "error" },
+    });
+  });
+
+  it("completes the subagent parent when the child thread reports an error", () => {
+    const router = createRouterWithChild();
+
+    expect(
+      router.routeChildNotification(
+        "thread/error",
+        { threadId: "child-thread", error: { message: "Child failed" } },
+        "provider-thread",
+      ),
+    ).toEqual([
+      {
+        type: "item.completed",
+        threadId: "local-thread",
+        itemId: "parent-item",
+        payload: { status: "error", result: "Child failed" },
+      },
+    ]);
+  });
+
+  it("replays child output that completed before the parent spawn item arrived", () => {
+    const router = new CodexSubAgentRouter("local-thread");
+
+    expect(
+      router.routeChildNotification(
+        "thread/started",
+        {
+          thread: {
+            id: "child-thread",
+            parentThreadId: "provider-thread",
+            status: { type: "active", activeFlags: [] },
+          },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+    expect(
+      router.routeChildNotification(
+        "item/started",
+        {
+          threadId: "child-thread",
+          item: { id: "child-message", type: "agentMessage", text: "Finished early" },
+        },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+    expect(
+      router.routeChildNotification(
+        "turn/completed",
+        { turn: { id: "child-turn", threadId: "child-thread", status: "completed" } },
+        "provider-thread",
+      ),
+    ).toEqual([]);
+
+    const events = router.observeMainNotification(
+      "item/completed",
+      {
+        threadId: "provider-thread",
+        item: {
+          id: "spawn-call",
+          type: "subAgentActivity",
+          kind: "started",
+          agentThreadId: "child-thread",
+          agentPath: "/root/early",
+        },
+      },
+      [
+        {
+          type: "item.started",
+          threadId: "local-thread",
+          itemId: "activity-item",
+          itemType: "tool_call",
+        },
+      ],
+    );
+
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "item.started",
+        itemType: "assistant_message",
+        parentItemId: expect.any(String),
+      }),
+    );
+    expect(events).toContainEqual(
+      expect.objectContaining({
+        type: "item.completed",
+        payload: { status: "success", result: "Finished early" },
+      }),
+    );
+  });
+});
+
+function createRouterWithChild(): CodexSubAgentRouter {
+  const router = new CodexSubAgentRouter("local-thread");
+  router.observeMainNotification(
+    "item/started",
+    {
+      threadId: "provider-thread",
+      item: {
+        id: "spawn-call",
+        type: "collabAgentToolCall",
+        tool: "spawnAgent",
+        status: "inProgress",
+        receiverThreadIds: ["child-thread"],
+        agentsStates: { "child-thread": { status: "running" } },
+      },
+    },
+    [
+      {
+        type: "item.started",
+        threadId: "local-thread",
+        itemId: "parent-item",
+        itemType: "tool_call",
+        payload: { name: "spawnAgent", status: "running", isSubAgent: true },
+      },
+    ],
+  );
+  return router;
+}
+
 describe("CodexStructuredSession", () => {
   type CodexRequestRecord = {
     method: string;
@@ -335,6 +894,8 @@ describe("CodexStructuredSession", () => {
         sandbox: "workspace-write",
       },
     });
+    expect(requests[0]?.params).not.toHaveProperty("persistExtendedHistory");
+    expect(requests[0]?.params).not.toHaveProperty("experimentalRawEvents");
     expect(requests[1]).toMatchObject({
       method: "turn/start",
       params: {
@@ -463,6 +1024,12 @@ describe("CodexStructuredSession", () => {
 
     await (structuredSession as unknown as { initialize(): Promise<void> }).initialize();
 
+    expect(requests[0]).toMatchObject({
+      method: "initialize",
+      params: {
+        capabilities: { experimentalApi: true, requestAttestation: false },
+      },
+    });
     expect(updates).toContainEqual(
       expect.objectContaining({
         slashCommands: [
@@ -567,6 +1134,9 @@ describe("CodexStructuredSession", () => {
     session["seenErrorMessages"] = new Set<string>();
     session["resumeActiveStatusSuppressionUntil"] = new Map();
     session["bufferedRuntimeEvents"] = [];
+    const subAgentRouter = new CodexSubAgentRouter("local-thread");
+    subAgentRouter.setDefaultModelSettings("gpt-5.6-sol", "medium");
+    session["subAgentRouter"] = subAgentRouter;
     session["listener"] = {
       onRuntimeEvent: (event: RuntimeEvent) => runtimeEvents.push(event),
       onUpdate: () => {},
@@ -577,6 +1147,149 @@ describe("CodexStructuredSession", () => {
       runtimeEvents,
     };
   }
+
+  it("keeps Codex child-thread messages out of the main timeline", () => {
+    const { onMessage, runtimeEvents } = makeNotificationSession();
+
+    onMessage({
+      jsonrpc: "2.0",
+      method: "item/started",
+      params: {
+        threadId: "provider-thread",
+        turnId: "main-turn",
+        item: {
+          id: "collab-1",
+          type: "collabAgentToolCall",
+          tool: "spawnAgent",
+          status: "inProgress",
+          senderThreadId: "provider-thread",
+          receiverThreadIds: ["child-thread"],
+          prompt: "Inspect the protocol",
+          model: "gpt-5.4-mini",
+          reasoningEffort: "high",
+          agentsStates: { "child-thread": { status: "running", message: null } },
+        },
+      },
+    });
+    const parent = runtimeEvents.find(
+      (event): event is Extract<RuntimeEvent, { type: "item.started" }> =>
+        event.type === "item.started" && event.itemType === "tool_call",
+    );
+    expect(parent?.payload).toMatchObject({
+      isSubAgent: true,
+      progress: { model: "gpt-5.4-mini", effort: "high" },
+    });
+
+    onMessage({
+      jsonrpc: "2.0",
+      method: "item/started",
+      params: {
+        threadId: "child-thread",
+        turnId: "child-turn",
+        item: { id: "child-message", type: "agentMessage", text: "Child-only message" },
+      },
+    });
+
+    expect(runtimeEvents).toContainEqual(
+      expect.objectContaining({
+        type: "item.started",
+        itemType: "assistant_message",
+        parentItemId: parent?.itemId,
+      }),
+    );
+    expect(
+      runtimeEvents
+        .filter(
+          (event): event is Extract<RuntimeEvent, { type: "item.started" }> =>
+            event.type === "item.started" && event.itemType === "assistant_message",
+        )
+        .every((event) => event.parentItemId === parent?.itemId),
+    ).toBe(true);
+  });
+
+  it("builds Codex subagents from activity events and hides wait coordination", () => {
+    const { onMessage, runtimeEvents } = makeNotificationSession();
+
+    onMessage({
+      jsonrpc: "2.0",
+      method: "thread/started",
+      params: {
+        thread: {
+          id: "child-thread",
+          parentThreadId: "provider-thread",
+          status: { type: "active", activeFlags: [] },
+        },
+      },
+    });
+    onMessage({
+      jsonrpc: "2.0",
+      method: "item/started",
+      params: {
+        threadId: "child-thread",
+        turnId: "child-turn",
+        item: { id: "child-message", type: "agentMessage", text: "Found a race." },
+      },
+    });
+    onMessage({
+      jsonrpc: "2.0",
+      method: "item/completed",
+      params: {
+        threadId: "provider-thread",
+        turnId: "main-turn",
+        item: {
+          id: "spawn-activity",
+          type: "subAgentActivity",
+          kind: "started",
+          agentThreadId: "child-thread",
+          agentPath: "/root/game_logic",
+        },
+      },
+    });
+    onMessage({
+      jsonrpc: "2.0",
+      method: "item/completed",
+      params: {
+        threadId: "provider-thread",
+        turnId: "main-turn",
+        item: {
+          id: "wait-call",
+          type: "collabAgentToolCall",
+          tool: "wait",
+          status: "completed",
+          senderThreadId: "provider-thread",
+          agentsStates: {},
+        },
+      },
+    });
+
+    const parent = runtimeEvents.find(
+      (event): event is Extract<RuntimeEvent, { type: "item.started" }> =>
+        event.type === "item.started" &&
+        event.itemType === "tool_call" &&
+        (event.payload as ToolCallPayload | undefined)?.isSubAgent === true,
+    );
+    expect(parent?.payload).toMatchObject({
+      name: "spawnAgent",
+      args: { description: "game logic", receiverThreadIds: ["child-thread"] },
+      progress: {
+        description: "game logic",
+        model: "gpt-5.6-sol",
+        effort: "medium",
+      },
+    });
+    expect(runtimeEvents).toContainEqual(
+      expect.objectContaining({
+        type: "item.started",
+        itemType: "assistant_message",
+        parentItemId: parent?.itemId,
+      }),
+    );
+    expect(runtimeEvents).not.toContainEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ name: "wait" }),
+      }),
+    );
+  });
 
   it("does not surface resume-time active status as new work", async () => {
     const session = Object.create(CodexStructuredSession.prototype) as Record<string, unknown>;
@@ -952,10 +1665,12 @@ describe("mapCodexSlashCommands", () => {
 });
 
 describe("mapCodexRequirements", () => {
-  it("includes on-failure in unrestricted approval policies", () => {
-    expect(mapCodexRequirements(null).approvalPolicies?.map((policy) => policy.id)).toContain(
-      "on-failure",
-    );
+  it("only offers approval policies accepted by the current app-server schema", () => {
+    expect(mapCodexRequirements(null).approvalPolicies?.map((policy) => policy.id)).toEqual([
+      "on-request",
+      "never",
+      "untrusted",
+    ]);
   });
 });
 

@@ -47,6 +47,7 @@ export function canonicalTypeFor(raw: string | undefined | null): CanonicalItemT
   const type = normalizeItemType(raw);
   if (!type) return "tool_call";
   if (type.includes("user")) return "user_message";
+  if (type.includes("exited review mode")) return "assistant_message";
   if (type.includes("agent message") || type.includes("assistant")) return "assistant_message";
   if (type.includes("reasoning") || type.includes("thought")) return "reasoning";
   if (type.includes("plan") || type.includes("todo")) return "plan";

@@ -773,7 +773,7 @@ describe("ChatPane", () => {
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    const trigger = screen.getByText("Check: npm run test").closest("button");
+    const trigger = screen.getByText("Check · npm run test").closest("button");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText(/command output/)).not.toBeInTheDocument();
 
@@ -791,7 +791,7 @@ describe("ChatPane", () => {
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    fireEvent.click(screen.getByText("Git: git status --short").closest("button")!);
+    fireEvent.click(screen.getByText("Git · git status --short").closest("button")!);
 
     expect(document.body).toHaveTextContent("$ git status --short");
     expect(document.body).not.toHaveTextContent("WindowsApps");
@@ -815,6 +815,80 @@ describe("ChatPane", () => {
     expect(screen.getByText("Bash")).toBeInTheDocument();
     expect(screen.getByText("21 steps")).toBeInTheDocument();
     expect(document.body).not.toHaveTextContent("gpt-parent-main");
+  });
+
+  it("animates running agent titles without duplicating their description in progress", async () => {
+    const thread = makeThread();
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "subagent-running",
+      itemType: "tool_call",
+      payload: {
+        name: "spawnAgent",
+        status: "running",
+        isSubAgent: true,
+        args: { description: "protocol specialist" },
+        progress: {
+          model: "gpt-5.6-sol",
+          effort: "ultra",
+          description: "protocol specialist",
+          stepCount: 5,
+        },
+      },
+    });
+
+    const view = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    expect(
+      view.container.querySelectorAll(
+        '[data-lightcode-shimmer-text="Agent · protocol specialist"]',
+      ),
+    ).toHaveLength(1);
+    expect(view.container.textContent).not.toContain("specialist·5 steps");
+    expect(view.container.querySelector(".lightcode-pixel-loader")).toBeNull();
+    expect(view.container.querySelector(".lucide-chevron-right")).toHaveClass(
+      "[@media(hover:hover)]:opacity-0",
+      "[@media(hover:hover)]:group-hover:opacity-100",
+    );
+  });
+
+  it("shows a completed Codex child response through the shared subagent result disclosure", async () => {
+    const thread = makeThread();
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "subagent-result",
+      itemType: "tool_call",
+      payload: {
+        name: "spawnAgent",
+        status: "running",
+        isSubAgent: true,
+        args: { description: "protocol specialist" },
+        progress: { model: "gpt-5.6-sol", effort: "ultra" },
+      },
+    });
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.completed",
+      threadId: thread.id,
+      itemId: "subagent-result",
+      payload: { status: "success", result: "## Protocol result\n\n- routed" },
+    });
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    const resultToggle = await screen.findByRole("button", { name: "Subagent Result" });
+    expect(document.body).toHaveTextContent("Agent · protocol specialist·GPT 5.6 Sol");
+    expect(resultToggle).toHaveClass("group");
+    expect(resultToggle.querySelector(".lucide-chevron-down")).toHaveClass(
+      "[@media(hover:hover)]:opacity-0",
+      "[@media(hover:hover)]:group-hover:opacity-100",
+      "[@media(hover:hover)]:group-focus-visible:opacity-100",
+    );
+    fireEvent.click(resultToggle);
+    expect(await screen.findByRole("heading", { name: "Protocol result" })).toBeInTheDocument();
   });
 
   it("separates the collapsed Agent label from its step count", async () => {
@@ -1019,7 +1093,7 @@ describe("ChatPane", () => {
     renderChatPane(thread);
     await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
 
-    const trigger = screen.getByText("Check: npm run test").closest("button");
+    const trigger = screen.getByText("Check · npm run test").closest("button");
     expect(trigger).toHaveAttribute("aria-expanded", "false");
 
     act(() => {

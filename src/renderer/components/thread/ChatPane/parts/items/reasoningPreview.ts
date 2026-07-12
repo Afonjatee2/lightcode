@@ -16,7 +16,8 @@ export function getReasoningPreview(
     .replace(/```[\s\S]*?(?:```|$)/g, " ")
     .slice(0, maxLength * 8)
     .replace(/^[\s>#+*-]+/gm, "")
-    .replace(/[*_`]+/g, "")
+    .replace(/[*_]+/g, " ")
+    .replace(/`+/g, "")
     .replace(/\s+/g, " ")
     .trim();
   if (flattened.length <= maxLength) return flattened;

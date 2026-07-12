@@ -279,7 +279,13 @@ describe("item payload schemas", () => {
       args: { command: "ls" },
       result: "ok",
       status: "success",
-      progress: { description: "running", model: "opus", tokens: 100, stepCount: 2 },
+      progress: {
+        description: "running",
+        model: "opus",
+        effort: "high",
+        tokens: 100,
+        stepCount: 2,
+      },
       isSubAgent: true,
     };
     expect(toolCallPayloadSchema.parse(roundTrip(payload))).toEqual(payload);
