@@ -31,6 +31,22 @@ describe("parseCodexUsage", () => {
     expect(snap.windows.find((w) => w.id === "weekly")?.usedPercent).toBe(1);
   });
 
+  it("maps a weekly-only primary window by duration", () => {
+    const snap = parseCodexUsage(
+      {
+        rate_limit: {
+          primary_window: { used_percent: 1, limit_window_seconds: 7 * 24 * 60 * 60 },
+          secondary_window: null,
+        },
+      },
+      {},
+      FAKE_NOW_MS,
+    );
+    expect(snap.windows).toEqual([
+      expect.objectContaining({ id: "weekly", label: "Weekly", usedPercent: 1 }),
+    ]);
+  });
+
   it("maps additional model-specific Codex limits", () => {
     const snap = parseCodexUsage(
       {
@@ -56,6 +72,32 @@ describe("parseCodexUsage", () => {
       label: "Codex 5.3 Spark Weekly",
       usedPercent: 10,
     });
+  });
+
+  it("maps a weekly-only additional limit by duration", () => {
+    const snap = parseCodexUsage(
+      {
+        additional_rate_limits: [
+          {
+            limit_name: "GPT-5.3-Codex-Spark",
+            metered_feature: "codex_bengalfox",
+            rate_limit: {
+              primary_window: { used_percent: 0, window_minutes: 10_080 },
+              secondary_window: null,
+            },
+          },
+        ],
+      },
+      {},
+      FAKE_NOW_MS,
+    );
+    expect(snap.windows).toEqual([
+      expect.objectContaining({
+        id: "codex:codex-bengalfox:weekly",
+        label: "Codex 5.3 Spark Weekly",
+        usedPercent: 0,
+      }),
+    ]);
   });
 
   it("falls back to x-codex-* headers when the body omits percents", () => {

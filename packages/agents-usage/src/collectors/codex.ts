@@ -8,11 +8,13 @@ import type { UsageSnapshot, UsageWindow } from "../types";
  * from ~/.codex/auth.json and reads the ChatGPT usage endpoint. The token is a
  * short-lived JWT — the host must read it fresh each call, never cache it.
  *
- * Codex exposes a 300-minute "primary" window (session, 5h) and a 10080-minute
- * "secondary" window (weekly). There is no monthly window. `used_percent` is
- * already 0-100; reset times are epoch seconds. Percentages are also mirrored
- * in `x-codex-primary-used-percent` / `x-codex-secondary-used-percent` headers,
- * used as a fallback when the JSON body omits them.
+ * Codex rate-limit windows identify their cadence by duration. The API may
+ * temporarily omit either the 300-minute session window or the 10080-minute
+ * weekly window, so `primary` / `secondary` positions are only fallbacks when
+ * duration metadata is absent. `used_percent` is already 0-100; reset times are
+ * epoch seconds. Percentages are also mirrored in `x-codex-primary-used-percent`
+ * / `x-codex-secondary-used-percent` headers, used as a fallback when the JSON
+ * body omits them.
  *
  * Note: a more robust path spawns `codex app-server` and calls
  * `account/rateLimits/read` over JSON-RPC; that requires a ProcessRunner host
@@ -98,6 +100,18 @@ function codexWindow(
   };
 }
 
+function codexWindowCadence(
+  raw: CodexWindowRaw | undefined,
+  fallback: "session-5h" | "weekly",
+): "session-5h" | "weekly" {
+  const windowMinutes =
+    raw?.window_minutes ??
+    (raw?.limit_window_seconds !== undefined ? raw.limit_window_seconds / 60 : undefined);
+  if (windowMinutes === WEEKLY_WINDOW_MINUTES) return "weekly";
+  if (windowMinutes === SESSION_WINDOW_MINUTES) return "session-5h";
+  return fallback;
+}
+
 function codexPercent(value: number | undefined): number | undefined {
   if (value === undefined || !Number.isFinite(value) || value < 0) return undefined;
   return Math.min(100, Math.max(0, Math.round(value * 10) / 10));
@@ -167,41 +181,45 @@ export function parseCodexUsage(
   const secondaryHeader = readHeaderPercent(headers, "x-codex-secondary-used-percent");
 
   const windows: UsageWindow[] = [];
-  const session = codexWindow(
-    "session-5h",
-    "Session (5h)",
+  const primaryCadence = codexWindowCadence(data.rate_limit?.primary_window, "session-5h");
+  const primaryWindow = codexWindow(
+    primaryCadence,
+    primaryCadence === "weekly" ? "Weekly" : "Session (5h)",
     data.rate_limit?.primary_window,
     primaryHeader,
     nowMs,
   );
-  if (session) windows.push(session);
-  const weekly = codexWindow(
-    "weekly",
-    "Weekly",
+  if (primaryWindow) windows.push(primaryWindow);
+  const secondaryCadence = codexWindowCadence(data.rate_limit?.secondary_window, "weekly");
+  const secondaryWindow = codexWindow(
+    secondaryCadence,
+    secondaryCadence === "weekly" ? "Weekly" : "Session (5h)",
     data.rate_limit?.secondary_window,
     secondaryHeader,
     nowMs,
   );
-  if (weekly) windows.push(weekly);
+  if (secondaryWindow) windows.push(secondaryWindow);
   for (const extra of data.additional_rate_limits ?? []) {
     const id = codexLimitId(extra.metered_feature ?? extra.limit_name);
     const label = codexLimitLabel(extra.limit_name);
-    const extraSession = codexWindow(
-      `codex:${id}:session-5h`,
-      `${label} (5h)`,
+    const extraPrimaryCadence = codexWindowCadence(extra.rate_limit?.primary_window, "session-5h");
+    const extraPrimaryWindow = codexWindow(
+      `codex:${id}:${extraPrimaryCadence}`,
+      extraPrimaryCadence === "weekly" ? `${label} Weekly` : `${label} (5h)`,
       extra.rate_limit?.primary_window,
       undefined,
       nowMs,
     );
-    if (extraSession) windows.push(extraSession);
-    const extraWeekly = codexWindow(
-      `codex:${id}:weekly`,
-      `${label} Weekly`,
+    if (extraPrimaryWindow) windows.push(extraPrimaryWindow);
+    const extraSecondaryCadence = codexWindowCadence(extra.rate_limit?.secondary_window, "weekly");
+    const extraSecondaryWindow = codexWindow(
+      `codex:${id}:${extraSecondaryCadence}`,
+      extraSecondaryCadence === "weekly" ? `${label} Weekly` : `${label} (5h)`,
       extra.rate_limit?.secondary_window,
       undefined,
       nowMs,
     );
-    if (extraWeekly) windows.push(extraWeekly);
+    if (extraSecondaryWindow) windows.push(extraSecondaryWindow);
   }
 
   const plan = formatCodexPlanLabel(data.plan_type);
