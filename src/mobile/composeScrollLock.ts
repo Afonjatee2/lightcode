@@ -80,6 +80,7 @@ function scheduleSettleRestores(
 ): void {
   clearSettleTimers();
   const restore = () => {
+    if (typeof window === "undefined" || typeof document === "undefined") return;
     const previousLockedScroller = lockedScroller;
     if (scroller) lockedScroller = scroller;
     restoreRootScroll(top);

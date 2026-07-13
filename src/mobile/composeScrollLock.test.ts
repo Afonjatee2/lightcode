@@ -48,6 +48,18 @@ describe("composeScrollLock", () => {
     expect(document.body.scrollTop).toBe(0);
   });
 
+  it("ignores settle restores after the browser environment is torn down", () => {
+    lockComposeScroll();
+    unlockComposeScroll();
+    vi.stubGlobal("window", undefined);
+
+    try {
+      expect(() => vi.runOnlyPendingTimers()).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("preserves scrollable ancestors around the composer root", () => {
     const scroller = document.createElement("div");
     const composer = document.createElement("div");
