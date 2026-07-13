@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { Download, ArrowLeft, Monitor, Apple, Terminal, Moon, AlertTriangle } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import { downloadUrlFor, type ReleaseInfo } from "@/lib/releases";
+import { localizedPath } from "@/lib/seo";
 
 const PLATFORMS = [
   {
@@ -30,25 +32,26 @@ const PLATFORMS = [
   },
 ];
 
-function formatRelative(iso: string): string {
+function formatRelative(iso: string, locale: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
   const diffMs = Date.now() - then;
   const minutes = Math.round(diffMs / 60_000);
-  if (minutes < 1) return "just now";
-  if (minutes < 60) return `${minutes}m ago`;
+  const formatter = new Intl.RelativeTimeFormat(locale, { numeric: "auto", style: "short" });
+  if (minutes < 1) return formatter.format(0, "minute");
+  if (minutes < 60) return formatter.format(-minutes, "minute");
   const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return formatter.format(-hours, "hour");
   const days = Math.round(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return formatter.format(-days, "day");
   const months = Math.round(days / 30);
-  return `${months}mo ago`;
+  return formatter.format(-months, "month");
 }
 
-function formatBuildTime(iso: string): string {
+function formatBuildTime(iso: string, locale: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleString(undefined, {
+  return date.toLocaleString(locale, {
     year: "numeric",
     month: "short",
     day: "numeric",
@@ -59,36 +62,42 @@ function formatBuildTime(iso: string): string {
 }
 
 export function NightlyContent({ release }: { release: ReleaseInfo }) {
+  const { locale, t } = useI18n();
   const hasBuild = release.version !== null;
   const publishedAt = release.publishedAt ?? null;
   const [relativeTime, setRelativeTime] = useState<string>("");
   const [absoluteTime, setAbsoluteTime] = useState<string>("");
+  const homeHref = localizedPath("/", locale);
+  const downloadHref = localizedPath("/download", locale);
+  const [warningBefore, warningAfter] = t("nightly.warning").split("{stable}");
+  const [noBuildBefore, noBuildAfter] = t("nightly.noBuild").split("{releases}");
+  const [footerBefore, footerAfter] = t("nightly.footer").split("{prereleases}");
 
   useEffect(() => {
     if (!publishedAt) return;
-    setRelativeTime(formatRelative(publishedAt));
-    setAbsoluteTime(formatBuildTime(publishedAt));
-  }, [publishedAt]);
+    setRelativeTime(formatRelative(publishedAt, locale));
+    setAbsoluteTime(formatBuildTime(publishedAt, locale));
+  }, [locale, publishedAt]);
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-black text-white">
+    <div lang={locale} className="relative min-h-screen overflow-x-hidden bg-black text-white">
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,_rgba(251,191,36,0.08)_0%,_transparent_100%)]" />
 
       {/* Navigation */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-6 max-w-5xl mx-auto">
         <Link
-          href="/"
+          href={homeHref}
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm font-medium">Back to home</span>
+          <span className="text-sm font-medium">{t("nav.backToHome")}</span>
         </Link>
         <Link
-          href="/download"
+          href={downloadHref}
           className="text-sm font-medium text-gray-500 hover:text-white transition-colors"
         >
-          Looking for stable? →
+          {t("nightly.stablePrompt")} →
         </Link>
       </nav>
 
@@ -101,10 +110,14 @@ export function NightlyContent({ release }: { release: ReleaseInfo }) {
         >
           <div className="inline-flex items-center gap-2 mb-5 px-3 py-1 rounded-full border border-amber-400/20 bg-amber-400/[0.06] text-amber-300/90">
             <Moon className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold tracking-[0.14em] uppercase">Nightly</span>
+            <span className="text-[11px] font-semibold tracking-[0.14em] uppercase">
+              {t("nightly.badge")}
+            </span>
           </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">Poracode Nightly</h1>
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
+            {t("nightly.title")}
+          </h1>
 
           {hasBuild ? (
             <div className="mb-4 flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -113,29 +126,26 @@ export function NightlyContent({ release }: { release: ReleaseInfo }) {
               </code>
               {relativeTime ? (
                 <span className="text-sm text-gray-500">
-                  built {relativeTime}
+                  {t("nightly.built", { relativeTime })}
                   {absoluteTime ? <span className="text-gray-700"> · {absoluteTime}</span> : null}
                 </span>
               ) : null}
             </div>
           ) : null}
 
-          <p className="text-gray-400 mb-8 text-lg">
-            A prerelease build — try new features as soon as possible.
-          </p>
+          <p className="text-gray-400 mb-8 text-lg">{t("nightly.subtitle")}</p>
 
           <div className="mb-12 flex items-start gap-3 px-4 py-3 rounded-xl border border-amber-400/10 bg-amber-400/[0.03]">
             <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-amber-300/80" />
             <p className="text-sm text-gray-400 leading-relaxed">
-              Pre-release builds for testing. Expect rough edges — features may be incomplete or
-              change without notice. Prefer the{" "}
+              {warningBefore}
               <Link
-                href="/download"
+                href={downloadHref}
                 className="text-gray-200 underline underline-offset-4 hover:text-white transition-colors"
               >
-                stable download
-              </Link>{" "}
-              for day-to-day use.
+                {t("nightly.stableDownload")}
+              </Link>
+              {warningAfter}
             </p>
           </div>
         </motion.div>
@@ -170,7 +180,7 @@ export function NightlyContent({ release }: { release: ReleaseInfo }) {
                         </div>
                       </div>
                       <span className="text-xs text-gray-600 group-hover:text-amber-300/90 transition-colors">
-                        Download →
+                        {t("nav.download")} →
                       </span>
                     </a>
                   ))}
@@ -186,16 +196,16 @@ export function NightlyContent({ release }: { release: ReleaseInfo }) {
             className="px-5 py-8 rounded-xl bg-white/[0.03] border border-white/[0.06] text-center"
           >
             <p className="text-sm text-gray-400">
-              No nightly build is available yet. Check the{" "}
+              {noBuildBefore}
               <a
                 href={release.releasesUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="text-gray-200 underline underline-offset-4 hover:text-white transition-colors"
               >
-                releases page
-              </a>{" "}
-              or come back soon.
+                {t("nightly.releasesPage")}
+              </a>
+              {noBuildAfter}
             </p>
           </motion.div>
         )}
@@ -207,16 +217,16 @@ export function NightlyContent({ release }: { release: ReleaseInfo }) {
           className="mt-16 pt-8 border-t border-white/5 text-center"
         >
           <p className="text-sm text-gray-600">
-            All builds are published as{" "}
+            {footerBefore}
             <a
               href={release.releasesUrl}
               target="_blank"
               rel="noreferrer"
               className="text-gray-400 hover:text-white underline underline-offset-4 transition-colors"
             >
-              GitHub prereleases
+              {t("nightly.githubPrereleases")}
             </a>
-            .
+            {footerAfter}
           </p>
         </motion.div>
       </main>

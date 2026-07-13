@@ -50,10 +50,10 @@ export const SEO_KEYWORDS = [
 ];
 
 export const SITEMAP_ROUTES = [
-  { path: "/", changeFrequency: "weekly", priority: 1 },
-  { path: "/download", changeFrequency: "daily", priority: 0.9 },
-  { path: "/changelog", changeFrequency: "weekly", priority: 0.7 },
-  { path: "/nightly", changeFrequency: "daily", priority: 0.5 },
+  { path: "/", changeFrequency: "weekly", priority: 1, localized: true },
+  { path: "/download", changeFrequency: "daily", priority: 0.9, localized: true },
+  { path: "/changelog", changeFrequency: "weekly", priority: 0.7, localized: false },
+  { path: "/nightly", changeFrequency: "daily", priority: 0.5, localized: true },
 ] as const;
 
 export function absoluteUrl(path: string): string {
@@ -98,6 +98,7 @@ export function createPageMetadata({
 }): Metadata {
   const canonical = localizedPath(path, locale);
   const url = absoluteUrl(canonical);
+  const localized = SITEMAP_ROUTES.find((route) => route.path === path)?.localized ?? true;
 
   return {
     title: {
@@ -107,7 +108,7 @@ export function createPageMetadata({
     keywords: SEO_KEYWORDS,
     alternates: {
       canonical,
-      languages: buildLanguageAlternates(path),
+      ...(localized ? { languages: buildLanguageAlternates(path) } : {}),
     },
     openGraph: {
       title,
@@ -115,7 +116,9 @@ export function createPageMetadata({
       url,
       siteName: SITE_NAME,
       locale: OG_LOCALE[locale],
-      alternateLocale: LOCALE_CODES.filter((l) => l !== locale).map((l) => OG_LOCALE[l]),
+      ...(localized
+        ? { alternateLocale: LOCALE_CODES.filter((l) => l !== locale).map((l) => OG_LOCALE[l]) }
+        : {}),
       type: "website",
       images: [
         {

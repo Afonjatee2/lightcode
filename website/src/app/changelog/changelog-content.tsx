@@ -11,7 +11,6 @@ import {
 } from "@/lib/changelog";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import type { MessageKey } from "@/lib/i18n/messages";
-import { LanguageSelector } from "@/components/LanguageSelector";
 
 const RELEASES_URL = "https://github.com/SDSLeon/lightcode/releases";
 
@@ -97,16 +96,13 @@ export function ChangelogContent() {
           <ArrowLeft className="w-4 h-4" />
           <span className="text-sm font-medium">{t("nav.backToHome")}</span>
         </Link>
-        <div className="flex items-center gap-4">
-          <Link
-            href="/download"
-            className="inline-flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-white transition-colors"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{t("nav.download")} →</span>
-          </Link>
-          <LanguageSelector />
-        </div>
+        <Link
+          href="/download"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-white transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span>{t("nav.download")} →</span>
+        </Link>
       </nav>
 
       {/* Content */}
