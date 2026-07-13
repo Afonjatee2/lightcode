@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { DEFAULT_LOCALE, type Locale } from "./config";
-import { translate, type MessageKey } from "./messages";
+import type { LocaleMessages, MessageKey } from "./messages";
 
 interface I18nValue {
   locale: Locale;
@@ -20,9 +20,11 @@ const I18nContext = createContext<I18nValue | null>(null);
  */
 export function I18nProvider({
   locale = DEFAULT_LOCALE,
+  messages,
   children,
 }: {
   locale?: Locale;
+  messages: LocaleMessages;
   children: ReactNode;
 }) {
   // Keep <html lang> in sync with the route locale (the root layout renders a
@@ -31,12 +33,17 @@ export function I18nProvider({
     document.documentElement.lang = locale;
   }, [locale]);
 
-  const value: I18nValue = {
-    locale,
-    t: (key, vars) => translate(locale, key, vars),
+  const t: I18nValue["t"] = (key, vars) => {
+    let value = messages[key];
+    if (vars) {
+      for (const [name, replacement] of Object.entries(vars)) {
+        value = value.split(`{${name}}`).join(String(replacement));
+      }
+    }
+    return value;
   };
 
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  return <I18nContext.Provider value={{ locale, t }}>{children}</I18nContext.Provider>;
 }
 
 export function useI18n(): I18nValue {

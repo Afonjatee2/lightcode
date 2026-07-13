@@ -43,7 +43,11 @@ export function BrandWordmark({
   pulse?: boolean;
 }) {
   return (
-    <span className={`inline-flex items-baseline ${className ?? ""}`} aria-label="Poracode">
+    <span
+      role="img"
+      className={`inline-flex items-baseline ${className ?? ""}`}
+      aria-label="Poracode"
+    >
       <span className="font-bold tracking-[-0.02em] text-moon" aria-hidden="true">
         Pora
       </span>
@@ -81,6 +85,7 @@ export function BrandLockup({ className }: { className?: string }) {
 export function MonoLockup({ className }: { className?: string }) {
   return (
     <span
+      role="img"
       className={`inline-flex items-baseline font-mono ${className ?? ""}`}
       aria-label="pora.code"
     >

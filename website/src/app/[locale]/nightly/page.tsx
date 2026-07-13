@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { NightlyContent } from "@/app/nightly/nightly-content";
 import type { Locale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
-import { translate } from "@/lib/i18n/messages";
+import { getLocaleMessages, translate } from "@/lib/i18n/messages";
 import { getLatestNightlyRelease } from "@/lib/releases";
 import { createPageMetadata } from "@/lib/seo";
 
@@ -23,7 +23,7 @@ export default async function LocaleNightlyPage({ params }: LocaleParams) {
   const { locale } = await params;
   const release = await getLatestNightlyRelease();
   return (
-    <I18nProvider locale={locale}>
+    <I18nProvider locale={locale} messages={getLocaleMessages(locale)}>
       <NightlyContent release={release} />
     </I18nProvider>
   );

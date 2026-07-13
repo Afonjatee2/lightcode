@@ -2,8 +2,10 @@ import type { Metadata } from "next";
 
 import { LANDING_FAQ_ITEMS } from "@/lib/landingFaq";
 import type { ReleaseInfo } from "@/lib/releases";
-import { DEFAULT_LOCALE, LOCALE_CODES, type Locale } from "./i18n/config";
+import { DEFAULT_LOCALE, LOCALE_CODES, localizedPath, type Locale } from "./i18n/config";
 import { translate } from "./i18n/messages";
+
+export { localizedPath } from "./i18n/config";
 
 // Open Graph wants language_TERRITORY, not the BCP-47 tags we route with.
 const OG_LOCALE: Record<Locale, string> = {
@@ -58,17 +60,6 @@ export const SITEMAP_ROUTES = [
 
 export function absoluteUrl(path: string): string {
   return new URL(path, SITE_URL).toString();
-}
-
-/**
- * Canonical path for a page in a given locale. The default locale (en) is served
- * unprefixed at the root (e.g. "/download") so the already-indexed English URLs
- * are preserved; every other locale is prefixed (e.g. "/es/download").
- */
-export function localizedPath(path: string, locale: Locale): string {
-  if (locale === DEFAULT_LOCALE) return path;
-  if (path === "/") return `/${locale}`;
-  return `/${locale}${path}`;
 }
 
 /**

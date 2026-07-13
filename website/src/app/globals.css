@@ -1,5 +1,4 @@
 @import "tailwindcss";
-@import "@heroui/styles";
 
 @theme {
   --font-sans: var(--font-geist-sans), "Inter", system-ui, sans-serif;
@@ -147,6 +146,26 @@ summary:focus-visible,
   background: rgba(139, 123, 255, 0.08);
 }
 
+@keyframes acp-marquee-forward {
+  to {
+    transform: translateX(-50%);
+  }
+}
+@keyframes acp-marquee-reverse {
+  to {
+    transform: translateX(0);
+  }
+}
+.acp-marquee-forward {
+  animation: acp-marquee-forward 48s linear infinite;
+}
+.acp-marquee-reverse-track {
+  transform: translateX(-50%);
+}
+.acp-marquee-reverse {
+  animation: acp-marquee-reverse 58s linear infinite;
+}
+
 /* Reusable soft glow ring under primary buttons / framed media */
 .brand-glow {
   box-shadow:
@@ -180,13 +199,14 @@ summary:focus-visible,
   );
 }
 
-/* Respect reduced-motion: silence the looping brand animations. The
-   framer-motion loops (marquee, constellation, parallax) are additionally
-   gated in JS via useReducedMotion(). */
+/* Respect reduced-motion: silence looping brand and marquee animations. The
+   pointer parallax is additionally gated in JS. */
 @media (prefers-reduced-motion: reduce) {
   .pora-pulse,
   .pora-cursor,
-  .hero-fade-up {
+  .hero-fade-up,
+  .acp-marquee-forward,
+  .acp-marquee-reverse {
     animation: none !important;
   }
   *,

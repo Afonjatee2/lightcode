@@ -24,9 +24,8 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion, useMotionValue, useSpring, useReducedMotion, useInView } from "framer-motion";
 import { downloadUrlFor, type ReleaseInfo } from "@/lib/releases";
-import { localizedPath } from "@/lib/seo";
+import { localizedPath } from "@/lib/i18n/config";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import {
@@ -40,8 +39,6 @@ import {
 import { LandingFaq } from "./landing-faq";
 
 const ACP_REGISTRY_CDN = "https://cdn.agentclientprotocol.com/registry/v1/latest";
-
-const EASE = [0.16, 1, 0.3, 1] as const;
 
 // lucide-react 1.14.0 dropped brand glyphs, so the GitHub mark is inlined.
 function GithubMark({ className }: { className?: string }) {
@@ -320,6 +317,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
       {/* ── §0 Announcement bar ─────────────────────────────────── */}
       <Link
         href={changelogHref}
+        prefetch={false}
         className="group relative z-40 flex h-9 items-center justify-center gap-2 border-b border-white/[0.06] bg-tile text-center"
       >
         <span className="pora-dot pora-pulse h-1.5 w-1.5" />
@@ -334,6 +332,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8">
           <Link
             href={homeHref}
+            prefetch={false}
             aria-label="Poracode"
             className="transition-opacity hover:opacity-90"
           >
@@ -342,6 +341,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           <div className="flex items-center gap-1 sm:gap-2">
             <Link
               href={changelogHref}
+              prefetch={false}
               className="hidden rounded-md px-3 py-2 font-mono text-[13px] text-dim transition-colors hover:bg-white/[0.04] hover:text-moon sm:inline-flex"
             >
               {t("nav.changelog")}
@@ -350,6 +350,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
               href="https://github.com/SDSLeon/lightcode"
               target="_blank"
               rel="noreferrer"
+              aria-label="GitHub"
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 font-mono text-[13px] text-dim transition-colors hover:bg-white/[0.04] hover:text-moon"
             >
               <GithubMark className="h-4 w-4" />
@@ -370,217 +371,214 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
         </div>
       </nav>
 
-      {/* ── §2 Hero — brand-led ─────────────────────────────────── */}
-      <section className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-5 pt-24 pb-14 text-center sm:px-8 md:pt-32 md:pb-16">
-        <h1 className="hero-fade-up flex flex-col items-center">
-          <span className="block">
-            <BrandWordmark className="text-6xl tracking-[-0.04em] sm:text-7xl lg:text-8xl" />
-          </span>
-          <span className="mt-5 block max-w-2xl text-2xl font-semibold leading-[1.1] tracking-[-0.02em] text-dim sm:text-3xl md:text-4xl">
-            {descriptor}
-            <DotPeriod />
-          </span>
-        </h1>
-
-        <p className="hero-fade-up hero-fade-up-delay-1 mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-dim sm:text-xl">
-          {t("hero.subtitle")}
-        </p>
-
-        <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
-          <a
-            href={downloadHref}
-            className="brand-glow group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition will-change-transform hover:-translate-y-0.5 hover:brightness-95"
-          >
-            <Download className="h-4 w-4" />
-            {t("hero.downloadFor", { platform: platform.label })}
-          </a>
-          <div className="flex items-center gap-5">
-            <Link
-              href={downloadsHref}
-              className="text-sm text-dim underline-offset-4 transition-colors hover:text-moon hover:underline"
-            >
-              {t("nav.otherPlatforms")}
-            </Link>
-            <Link
-              href={nightlyHref}
-              className="inline-flex items-center gap-1.5 text-sm text-dim transition-colors hover:text-ice"
-            >
-              <Moon className="h-3.5 w-3.5" />
-              {t("nav.nightly")}
-            </Link>
-          </div>
-        </div>
-
-        <div className="hero-fade-up hero-fade-up-delay-3 mt-6 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
-          <KeyRound className="h-4 w-4" />
-          <span>{t("hero.byo")}</span>
-        </div>
-      </section>
-
-      {/* ── §3 App window showcase ──────────────────────────────── */}
-      <section className="relative z-10 mx-auto max-w-6xl px-4 pb-28 sm:px-8">
-        <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_28%,rgba(139,123,255,0.22),transparent)] blur-[90px]" />
-        <AppWindow
-          src="/hero-screenshot.png"
-          alt="Poracode desktop app running Claude and Codex coding agents side by side"
-          width={2920}
-          height={1840}
-          chrome
-          parallax
-          badge
-          preload
-        />
-        <div className="pointer-events-none absolute inset-x-0 -bottom-px h-48 bg-gradient-to-t from-night to-transparent" />
-      </section>
-
-      {/* ── §4 Features — hairline manifest grid ────────────────── */}
-      <section
-        id="features"
-        className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8"
-      >
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-14 max-w-2xl">
-            <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-dim">
-              <span className="pora-dot h-1.5 w-1.5" />
-              {t("hero.discover")}
-            </p>
-            <h2 className="text-4xl font-bold tracking-[-0.03em] text-moon md:text-5xl">
-              {t("features.title1")} {t("features.title2").replace(/[.。]\s*$/, "")}
-              <DotPeriod pulse={false} />
-            </h2>
-            <p className="mt-4 text-lg text-dim">{t("features.subtitle")}</p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.04] sm:grid-cols-2 lg:grid-cols-3">
-            {FEATURES.map((f, i) => (
-              <FeatureCell
-                key={f.title}
-                index={i}
-                icon={f.icon}
-                title={t(f.title)}
-                desc={t(f.desc)}
-                wide={i === FEATURES.length - 1}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── §4b Showcase — real app surfaces, zig-zag ───────────── */}
-      <section className="relative z-10 px-5 pb-28 sm:px-8">
-        <div className="pointer-events-none absolute left-1/2 top-1/3 -z-10 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(94,230,224,0.06),transparent)] blur-2xl" />
-        <div className="mx-auto flex max-w-6xl flex-col gap-20">
-          {SHOWCASE.map((s, i) => (
-            <div key={s.src} className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
-              <div className={`lg:col-span-7 ${i % 2 === 1 ? "lg:order-2" : ""}`}>
-                <AppWindow src={s.src} width={s.width} height={s.height} />
-              </div>
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-80px" }}
-                transition={{ duration: 0.6, ease: EASE }}
-                className={`lg:col-span-5 ${i % 2 === 1 ? "lg:order-1" : ""}`}
-              >
-                <p className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
-                  <span className="pora-dot h-1.5 w-1.5" />
-                  {String(i + 1).padStart(2, "0")} / {String(SHOWCASE.length).padStart(2, "0")}
-                </p>
-                <h3 className="text-2xl font-bold tracking-[-0.02em] text-moon md:text-3xl">
-                  {t(s.title)}
-                  <DotPeriod pulse={false} />
-                </h3>
-                <p className="mt-3 max-w-md text-base leading-relaxed text-dim">{t(s.desc)}</p>
-              </motion.div>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── §4c Surface gallery — real bento of app panels ──────── */}
-      <section className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8">
-        <div className="mx-auto max-w-6xl">
-          <div className="mb-14 max-w-2xl">
-            <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
-              <span className="pora-dot h-1.5 w-1.5" />
-              {t("gallery.eyebrow")}
-            </p>
-            <h2 className="text-4xl font-bold tracking-[-0.03em] text-moon md:text-5xl">
-              {t("gallery.title")}
-              <DotPeriod pulse={false} />
-            </h2>
-            <p className="mt-4 text-lg text-dim">{t("gallery.subtitle")}</p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
-            {GALLERY.map((g, i) => (
-              <BentoCard
-                key={g.src}
-                index={i}
-                src={g.src}
-                title={t(g.title)}
-                desc={t(g.desc)}
-                span={g.span}
-                fit={g.fit}
-                width={g.width}
-                height={g.height}
-              />
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── §5 ACP registry — living marquee ────────────────────── */}
-      <section id="acp-registry" className="relative z-10 border-t border-white/[0.06] py-28">
-        <div className="mx-auto mb-12 max-w-7xl px-5 text-center sm:px-8">
-          <p className="mb-3 font-mono text-xs uppercase tracking-[0.18em] text-accent">
-            {t("acp.eyebrow")}
-          </p>
-          <h2 className="text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
-            {t("acp.title1")} {t("acp.title2").replace(/[.。]\s*$/, "")}
-            <DotPeriod pulse={false} />
-          </h2>
-          <p className="mx-auto mt-4 max-w-2xl text-dim">{t("acp.subtitle")}</p>
-        </div>
-        <AcpMarquee />
-      </section>
-
-      <LandingFaq />
-
-      {/* ── §7 Final CTA — signature close ──────────────────────── */}
-      <section className="relative z-10 border-t border-white/[0.06] px-5 py-32 sm:px-8">
-        <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/[0.08] bg-tile px-6 py-20 text-center sm:px-12">
-          <div className="pointer-events-none absolute -top-24 left-1/2 h-[360px] w-[760px] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,123,255,0.22),transparent)] blur-2xl" />
-          <div className="relative">
-            <PoraIconTile className="mx-auto mb-7 h-14 w-14" />
-            <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
+      <main>
+        {/* ── §2 Hero — brand-led ─────────────────────────────────── */}
+        <section className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-5 pt-24 pb-14 text-center sm:px-8 md:pt-32 md:pb-16">
+          <h1 className="hero-fade-up flex flex-col items-center">
+            <span className="block">
+              <BrandWordmark className="text-6xl tracking-[-0.04em] sm:text-7xl lg:text-8xl" />
+            </span>
+            <span className="mt-5 block max-w-2xl text-2xl font-semibold leading-[1.1] tracking-[-0.02em] text-dim sm:text-3xl md:text-4xl">
               {descriptor}
               <DotPeriod />
-            </h2>
-            <p className="mx-auto mt-4 max-w-xl text-dim">{t("features.subtitle")}</p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <a
-                href={downloadHref}
-                className="brand-glow inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition hover:brightness-95"
+            </span>
+          </h1>
+
+          <p className="hero-fade-up hero-fade-up-delay-1 mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-dim sm:text-xl">
+            {t("hero.subtitle")}
+          </p>
+
+          <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
+            <a
+              href={downloadHref}
+              className="brand-glow group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition will-change-transform hover:-translate-y-0.5 hover:brightness-95"
+            >
+              <Download className="h-4 w-4" />
+              {t("hero.downloadFor", { platform: platform.label })}
+            </a>
+            <div className="flex items-center gap-5">
+              <Link
+                href={downloadsHref}
+                prefetch={false}
+                className="text-sm text-dim underline-offset-4 transition-colors hover:text-moon hover:underline"
               >
-                <Download className="h-4 w-4" />
-                {t("hero.downloadFor", { platform: platform.label })}
-              </a>
-              <a
-                href="https://github.com/SDSLeon/lightcode"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-6 font-medium text-moon transition hover:border-white/20 hover:bg-white/[0.06]"
+                {t("nav.otherPlatforms")}
+              </Link>
+              <Link
+                href={nightlyHref}
+                prefetch={false}
+                className="inline-flex items-center gap-1.5 text-sm text-dim transition-colors hover:text-ice"
               >
-                <GithubMark className="h-4 w-4" />
-                GitHub
-                <ArrowUpRight className="h-4 w-4 text-dim" />
-              </a>
+                <Moon className="h-3.5 w-3.5" />
+                {t("nav.nightly")}
+              </Link>
             </div>
-            <MonoLockup className="mt-9 text-sm" />
           </div>
-        </div>
-      </section>
+
+          <div className="hero-fade-up hero-fade-up-delay-3 mt-6 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
+            <KeyRound className="h-4 w-4" />
+            <span>{t("hero.byo")}</span>
+          </div>
+        </section>
+
+        {/* ── §3 App window showcase ──────────────────────────────── */}
+        <section className="relative z-10 mx-auto max-w-6xl px-4 pb-28 sm:px-8">
+          <div className="pointer-events-none absolute -inset-x-10 -top-10 bottom-0 -z-10 bg-[radial-gradient(55%_45%_at_50%_28%,rgba(139,123,255,0.22),transparent)] blur-[90px]" />
+          <AppWindow
+            src="/hero-screenshot.png"
+            alt="Poracode desktop app running Claude and Codex coding agents side by side"
+            width={2920}
+            height={1840}
+            chrome
+            parallax
+            badge
+            preload
+          />
+          <div className="pointer-events-none absolute inset-x-0 -bottom-px h-48 bg-gradient-to-t from-night to-transparent" />
+        </section>
+
+        {/* ── §4 Features — hairline manifest grid ────────────────── */}
+        <section
+          id="features"
+          className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8"
+        >
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-14 max-w-2xl">
+              <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-dim">
+                <span className="pora-dot h-1.5 w-1.5" />
+                {t("hero.discover")}
+              </p>
+              <h2 className="text-4xl font-bold tracking-[-0.03em] text-moon md:text-5xl">
+                {t("features.title1")} {t("features.title2").replace(/[.。]\s*$/, "")}
+                <DotPeriod pulse={false} />
+              </h2>
+              <p className="mt-4 text-lg text-dim">{t("features.subtitle")}</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-white/[0.06] bg-white/[0.04] sm:grid-cols-2 lg:grid-cols-3">
+              {FEATURES.map((f, i) => (
+                <FeatureCell
+                  key={f.title}
+                  index={i}
+                  icon={f.icon}
+                  title={t(f.title)}
+                  desc={t(f.desc)}
+                  wide={i === FEATURES.length - 1}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── §4b Showcase — real app surfaces, zig-zag ───────────── */}
+        <section className="relative z-10 px-5 pb-28 sm:px-8">
+          <div className="pointer-events-none absolute left-1/2 top-1/3 -z-10 h-[420px] w-[420px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(94,230,224,0.06),transparent)] blur-2xl" />
+          <div className="mx-auto flex max-w-6xl flex-col gap-20">
+            {SHOWCASE.map((s, i) => (
+              <div key={s.src} className="grid items-center gap-8 lg:grid-cols-12 lg:gap-12">
+                <div className={`lg:col-span-7 ${i % 2 === 1 ? "lg:order-2" : ""}`}>
+                  <AppWindow src={s.src} width={s.width} height={s.height} />
+                </div>
+                <div className={`lg:col-span-5 ${i % 2 === 1 ? "lg:order-1" : ""}`}>
+                  <p className="mb-3 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+                    <span className="pora-dot h-1.5 w-1.5" />
+                    {String(i + 1).padStart(2, "0")} / {String(SHOWCASE.length).padStart(2, "0")}
+                  </p>
+                  <h3 className="text-2xl font-bold tracking-[-0.02em] text-moon md:text-3xl">
+                    {t(s.title)}
+                    <DotPeriod pulse={false} />
+                  </h3>
+                  <p className="mt-3 max-w-md text-base leading-relaxed text-dim">{t(s.desc)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── §4c Surface gallery — real bento of app panels ──────── */}
+        <section className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8">
+          <div className="mx-auto max-w-6xl">
+            <div className="mb-14 max-w-2xl">
+              <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+                <span className="pora-dot h-1.5 w-1.5" />
+                {t("gallery.eyebrow")}
+              </p>
+              <h2 className="text-4xl font-bold tracking-[-0.03em] text-moon md:text-5xl">
+                {t("gallery.title")}
+                <DotPeriod pulse={false} />
+              </h2>
+              <p className="mt-4 text-lg text-dim">{t("gallery.subtitle")}</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-6">
+              {GALLERY.map((g) => (
+                <BentoCard
+                  key={g.src}
+                  src={g.src}
+                  title={t(g.title)}
+                  desc={t(g.desc)}
+                  span={g.span}
+                  fit={g.fit}
+                  width={g.width}
+                  height={g.height}
+                />
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ── §5 ACP registry — living marquee ────────────────────── */}
+        <section id="acp-registry" className="relative z-10 border-t border-white/[0.06] py-28">
+          <div className="mx-auto mb-12 max-w-7xl px-5 text-center sm:px-8">
+            <p className="mb-3 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+              {t("acp.eyebrow")}
+            </p>
+            <h2 className="text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
+              {t("acp.title1")} {t("acp.title2").replace(/[.。]\s*$/, "")}
+              <DotPeriod pulse={false} />
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-dim">{t("acp.subtitle")}</p>
+          </div>
+          <AcpMarquee />
+        </section>
+
+        <LandingFaq />
+
+        {/* ── §7 Final CTA — signature close ──────────────────────── */}
+        <section className="relative z-10 border-t border-white/[0.06] px-5 py-32 sm:px-8">
+          <div className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border border-white/[0.08] bg-tile px-6 py-20 text-center sm:px-12">
+            <div className="pointer-events-none absolute -top-24 left-1/2 h-[360px] w-[760px] -translate-x-1/2 bg-[radial-gradient(closest-side,rgba(139,123,255,0.22),transparent)] blur-2xl" />
+            <div className="relative">
+              <PoraIconTile className="mx-auto mb-7 h-14 w-14" />
+              <h2 className="mx-auto max-w-2xl text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
+                {descriptor}
+                <DotPeriod />
+              </h2>
+              <p className="mx-auto mt-4 max-w-xl text-dim">{t("features.subtitle")}</p>
+              <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                <a
+                  href={downloadHref}
+                  className="brand-glow inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition hover:brightness-95"
+                >
+                  <Download className="h-4 w-4" />
+                  {t("hero.downloadFor", { platform: platform.label })}
+                </a>
+                <a
+                  href="https://github.com/SDSLeon/lightcode"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-6 font-medium text-moon transition hover:border-white/20 hover:bg-white/[0.06]"
+                >
+                  <GithubMark className="h-4 w-4" />
+                  GitHub
+                  <ArrowUpRight className="h-4 w-4 text-dim" />
+                </a>
+              </div>
+              <MonoLockup className="mt-9 text-sm" />
+            </div>
+          </div>
+        </section>
+      </main>
 
       {/* ── §8 Footer ───────────────────────────────────────────── */}
       <footer className="relative z-10 border-t border-white/[0.06] px-5 py-12 sm:px-8">
@@ -636,47 +634,22 @@ function AppWindow({
   parallax?: boolean;
   preload?: boolean;
 }) {
-  const reduce = useReducedMotion();
-  const enableParallax = parallax && !reduce;
-  const rx = useMotionValue(0);
-  const ry = useMotionValue(0);
-  const srx = useSpring(rx, { stiffness: 140, damping: 18, mass: 0.4 });
-  const sry = useSpring(ry, { stiffness: 140, damping: 18, mass: 0.4 });
-
   const onMove = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!enableParallax) return;
+    if (!parallax || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const r = e.currentTarget.getBoundingClientRect();
-    rx.set(-((e.clientY - r.top) / r.height - 0.5) * 5);
-    ry.set(((e.clientX - r.left) / r.width - 0.5) * 6);
+    const rotateX = -((e.clientY - r.top) / r.height - 0.5) * 5;
+    const rotateY = ((e.clientX - r.left) / r.width - 0.5) * 6;
+    e.currentTarget.style.transform = `perspective(1600px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
   };
-  const onLeave = () => {
-    rx.set(0);
-    ry.set(0);
+  const onLeave = (e: ReactMouseEvent<HTMLDivElement>) => {
+    e.currentTarget.style.removeProperty("transform");
   };
-
-  // The hero (parallax) gets a pronounced scale-pop; supporting captures slide up.
-  const entrance = parallax
-    ? {
-        initial: { opacity: 0, y: 36, scale: 0.97 },
-        whileInView: { opacity: 1, y: 0, scale: 1 },
-        transition: { duration: 0.8, ease: EASE },
-      }
-    : {
-        initial: { opacity: 0, y: 24 },
-        whileInView: { opacity: 1, y: 0 },
-        transition: { duration: 0.7, ease: EASE },
-      };
 
   return (
-    <motion.div
+    <div
       onMouseMove={onMove}
       onMouseLeave={onLeave}
-      {...entrance}
-      viewport={{ once: true, margin: "-80px" }}
-      {...(enableParallax
-        ? { style: { rotateX: srx, rotateY: sry, transformPerspective: 1600 } }
-        : {})}
-      className="brand-glow relative overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85"
+      className={`brand-glow relative overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 ${parallax ? "will-change-transform" : ""}`}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
       {chrome ? (
@@ -697,6 +670,7 @@ function AppWindow({
         width={width}
         height={height}
         preload={preload}
+        {...(preload ? { fetchPriority: "high" as const } : {})}
         sizes={
           preload
             ? "(max-width: 1280px) calc(100vw - 32px), 1152px"
@@ -711,13 +685,12 @@ function AppWindow({
           <PoraGlyph className="h-6 w-6 text-moon" />
         </div>
       ) : null}
-    </motion.div>
+    </div>
   );
 }
 
 /** A bento tile: a framed real-app capture with a caption, spanning `span` of 6 cols on lg. */
 function BentoCard({
-  index,
   src,
   title,
   desc,
@@ -726,7 +699,6 @@ function BentoCard({
   width,
   height,
 }: {
-  index: number;
   src: string;
   title: string;
   desc: string;
@@ -737,11 +709,7 @@ function BentoCard({
 }) {
   const spanClass = SPAN_CLASS[span] ?? "lg:col-span-2";
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.55, ease: EASE, delay: (index % 3) * 0.06 }}
+    <div
       className={`group relative flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-tile/70 transition-colors hover:border-white/[0.16] ${spanClass}`}
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
@@ -761,7 +729,7 @@ function BentoCard({
         <h3 className="text-base font-semibold text-moon">{title}</h3>
         <p className="text-sm leading-relaxed text-dim">{desc}</p>
       </div>
-    </motion.div>
+    </div>
   );
 }
 
@@ -779,11 +747,7 @@ function FeatureCell({
   wide?: boolean;
 }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 18 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.5, ease: EASE, delay: (index % 3) * 0.05 }}
+    <div
       className={`group relative bg-night p-7 transition-colors hover:bg-[rgba(139,123,255,0.035)] ${
         wide ? "lg:col-span-3" : ""
       }`}
@@ -794,11 +758,11 @@ function FeatureCell({
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-accent/10 text-accent ring-1 ring-accent/20 transition group-hover:bg-accent/[0.16]">
           <Icon className="h-5 w-5" />
         </span>
-        <span className="font-mono text-xs text-dim/40">{String(index + 1).padStart(2, "0")}</span>
+        <span className="font-mono text-xs text-dim/75">{String(index + 1).padStart(2, "0")}</span>
       </div>
       <h3 className="mb-2 text-base font-semibold text-moon">{title}</h3>
       <p className="text-sm leading-relaxed text-dim">{desc}</p>
-    </motion.div>
+    </div>
   );
 }
 
@@ -827,29 +791,33 @@ function acpChip(agent: AcpAgent, key: string) {
 }
 
 function AcpMarquee() {
-  const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { margin: "200px" });
-  const run = !reduce && inView; // only animate while visible & motion allowed
+  const [inView, setInView] = useState(false);
+
+  useEffect(() => {
+    const node = ref.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => setInView(entries[0]?.isIntersecting ?? false),
+      { rootMargin: "200px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div
       ref={ref}
       className="space-y-3 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_8%,#000_92%,transparent)]"
     >
-      <motion.div
-        className="flex w-max gap-2.5"
-        animate={run ? { x: ["0%", "-50%"] } : { x: "0%" }}
-        transition={run ? { duration: 48, repeat: Infinity, ease: "linear" } : { duration: 0 }}
-      >
+      <div className={`flex w-max gap-2.5 ${inView ? "acp-marquee-forward" : ""}`}>
         {ACP_MARQUEE_LOOP.map((a, i) => acpChip(a, `r1-${a.id}-${i}`))}
-      </motion.div>
-      <motion.div
-        className="flex w-max gap-2.5"
-        animate={run ? { x: ["-50%", "0%"] } : { x: "-50%" }}
-        transition={run ? { duration: 58, repeat: Infinity, ease: "linear" } : { duration: 0 }}
+      </div>
+      <div
+        className={`acp-marquee-reverse-track flex w-max gap-2.5 ${inView ? "acp-marquee-reverse" : ""}`}
       >
         {ACP_MARQUEE_LOOP.map((a, i) => acpChip(a, `r2-${a.id}-${i}`))}
-      </motion.div>
+      </div>
     </div>
   );
 }

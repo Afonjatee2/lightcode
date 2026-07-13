@@ -5,8 +5,8 @@ import { Download, ArrowLeft, Monitor, Apple, Terminal, Moon, AlertTriangle } fr
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n/I18nProvider";
+import { localizedPath } from "@/lib/i18n/config";
 import { downloadUrlFor, type ReleaseInfo } from "@/lib/releases";
-import { localizedPath } from "@/lib/seo";
 
 const PLATFORMS = [
   {

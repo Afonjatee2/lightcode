@@ -1,4 +1,4 @@
-import type { Locale } from "./config";
+import { DEFAULT_LOCALE, type Locale } from "./config";
 
 // One entry per UI string. `en` is the source and is required; the 12 other
 // locales mirror the desktop app's languages. Missing translations fall back to
@@ -1433,6 +1433,13 @@ const MESSAGES = {
 } satisfies Record<string, Entry>;
 
 export type MessageKey = keyof typeof MESSAGES;
+export type LocaleMessages = Record<MessageKey, string>;
+
+export function getLocaleMessages(locale: Locale = DEFAULT_LOCALE): LocaleMessages {
+  return Object.fromEntries(
+    Object.entries(MESSAGES).map(([key, entry]) => [key, entry[locale] ?? entry.en]),
+  ) as LocaleMessages;
+}
 
 /** Resolve a message for `locale`, falling back to English, with `{var}` interpolation. */
 export function translate(

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { DownloadContent } from "@/app/download/download-content";
 import type { Locale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
-import { translate } from "@/lib/i18n/messages";
+import { getLocaleMessages, translate } from "@/lib/i18n/messages";
 import { getLatestRelease } from "@/lib/releases";
 import { createPageMetadata } from "@/lib/seo";
 
@@ -23,7 +23,7 @@ export default async function LocaleDownloadPage({ params }: LocaleParams) {
   const { locale } = await params;
   const release = await getLatestRelease();
   return (
-    <I18nProvider locale={locale}>
+    <I18nProvider locale={locale} messages={getLocaleMessages(locale)}>
       <DownloadContent release={release} />
     </I18nProvider>
   );

@@ -48,7 +48,7 @@ export function LanguageSelector() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        aria-label={t("lang.label")}
+        aria-label={`${t("lang.label")}: ${current.label}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}

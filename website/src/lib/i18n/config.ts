@@ -23,6 +23,12 @@ export const LOCALE_CODES = LOCALES.map((l) => l.code) as Locale[];
 
 export const DEFAULT_LOCALE: Locale = "en";
 
+export function localizedPath(path: string, locale: Locale): string {
+  if (locale === DEFAULT_LOCALE) return path;
+  if (path === "/") return `/${locale}`;
+  return `/${locale}${path}`;
+}
+
 export function isLocale(value: string | null | undefined): value is Locale {
   return value != null && LOCALE_CODES.includes(value as Locale);
 }
