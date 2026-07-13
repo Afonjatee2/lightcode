@@ -18,6 +18,7 @@ import {
   pickCodexWebSearchInput,
   pickToolInput,
   pickToolOutput,
+  readCodexImageViewDataUrl,
   readCodexChangesDiffSummary,
   toolName,
   toolServerId,
@@ -139,6 +140,7 @@ export function buildStartedPayload(
 export function buildCompletedPayload(
   itemType: CanonicalItemType,
   source: CodexItemPayload,
+  wslDistro?: string,
 ): unknown {
   if (itemType === "command_execution") {
     return {
@@ -151,12 +153,14 @@ export function buildCompletedPayload(
   }
   if (isToolLikeItemType(itemType)) {
     const result = pickToolOutput(source);
+    const image = readCodexImageViewDataUrl(source, wslDistro);
     const progress = isCodexSpawnAgentToolCall(source)
       ? readCollabAgentProgress(source)
       : undefined;
     return {
       status: codexFinalStatus(source.status),
       ...(result !== undefined ? { result } : {}),
+      ...(image ? { images: [image] } : {}),
       ...(progress ? { progress } : {}),
     };
   }

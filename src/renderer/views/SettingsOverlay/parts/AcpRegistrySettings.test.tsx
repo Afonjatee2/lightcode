@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AcpRegistryListResult,
@@ -903,9 +903,11 @@ describe("AcpRegistrySettings", () => {
     const glmCard = screen.getByText("GLM through ACP").closest(".rounded-lg");
     expect(glmCard).toBeTruthy();
 
-    fireEvent.click(
-      within(glmCard as HTMLElement).getByRole("button", { name: "Login WSL (Ubuntu)" }),
-    );
+    await act(async () => {
+      fireEvent.click(
+        within(glmCard as HTMLElement).getByRole("button", { name: "Login WSL (Ubuntu)" }),
+      );
+    });
 
     expect(bridge.authenticateAcpAgent).toHaveBeenCalledWith({
       agentKind: "acp-generic:glm-acp-agent",

@@ -38,6 +38,7 @@ export function mapCodexNotification(
   method: string,
   params: Record<string, unknown> | undefined,
   state: CodexMapperState,
+  wslDistro?: string,
 ): RuntimeEvent[] {
   const { threadId } = state;
 
@@ -247,7 +248,7 @@ export function mapCodexNotification(
           delta: aggregatedCommandOutput,
         });
       }
-      const completedPayload = buildCompletedPayload(itemType, item);
+      const completedPayload = buildCompletedPayload(itemType, item, wslDistro);
       events.push({
         type: "item.completed",
         threadId,
@@ -289,7 +290,7 @@ export function mapCodexNotification(
         delta: aggregatedCommandOutput,
       });
     }
-    const completedPayload = buildCompletedPayload(itemType, item);
+    const completedPayload = buildCompletedPayload(itemType, item, wslDistro);
     events.push({
       type: "item.completed",
       threadId,

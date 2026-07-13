@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   createCodexMapperState,
@@ -876,6 +879,45 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
 
     expect((dynamic[0] as { itemType: string }).itemType).toBe("dynamic_tool_call");
     expect((image[0] as { itemType: string }).itemType).toBe("image_view");
+  });
+
+  it("maps Codex imageView paths into the shared inline image payload", () => {
+    const dir = mkdtempSync(join(tmpdir(), "poracode-codex-image-view-"));
+    const imagePath = join(dir, "preview.png");
+    const imageBase64 =
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    writeFileSync(imagePath, Buffer.from(imageBase64, "base64"));
+    try {
+      const state = createCodexMapperState("t-codex");
+      const item = { id: "image-1", type: "imageView", path: imagePath };
+      const started = mapCodexNotification(
+        "item/started",
+        { threadId: "x", itemId: item.id, item },
+        state,
+      );
+      const completed = mapCodexNotification(
+        "item/completed",
+        { threadId: "x", itemId: item.id, item },
+        state,
+      );
+
+      expect(started[0]).toMatchObject({
+        type: "item.started",
+        itemType: "image_view",
+        payload: { name: "imageView", args: { path: imagePath }, status: "running" },
+      });
+      expect(completed).toEqual([
+        expect.objectContaining({
+          type: "item.completed",
+          payload: {
+            status: "success",
+            images: [`data:image/png;base64,${imageBase64}`],
+          },
+        }),
+      ]);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it("classifies file_change kind from item.changeKind / kind / type", () => {

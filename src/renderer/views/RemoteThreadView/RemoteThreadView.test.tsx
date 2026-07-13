@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project, Thread } from "@/shared/contracts";
 import type { RemoteDesktopClient } from "@/shared/remote/client";
@@ -126,6 +126,7 @@ function seedOpenThread(overrides?: Partial<Thread>) {
 
 describe("RemoteThreadView", () => {
   afterEach(() => {
+    cleanup();
     useRemoteServersStore.setState({ openThread: null, servers: [], runtime: {} });
     useAppStore.setState({ runtimeRequestsByThread: {} });
     useFileEditorStore.setState({

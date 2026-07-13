@@ -87,18 +87,6 @@ function makeStatus(): GitStatusResult {
   };
 }
 
-function makeSnapshot(status = makeStatus()): GitProjectSnapshotResult {
-  return {
-    status,
-    branches: {
-      current: status.branch,
-      branches: [{ name: status.branch, isCurrent: true, isRemote: false }] as never,
-    },
-    worktrees: [],
-    ghAvailable: true,
-  };
-}
-
 describe("GitView", () => {
   beforeEach(() => {
     const status = makeStatus();
@@ -108,7 +96,7 @@ describe("GitView", () => {
     bridge.gitProjectSnapshot.mockReset();
     bridge.getGitStatus.mockResolvedValue(status);
     bridge.gitFetch.mockResolvedValue(undefined);
-    bridge.gitProjectSnapshot.mockResolvedValue(makeSnapshot(status));
+    bridge.gitProjectSnapshot.mockImplementation(() => new Promise(() => {}));
     useGitStore.setState({
       statuses: { "project-1": status },
       worktreeStatuses: {},

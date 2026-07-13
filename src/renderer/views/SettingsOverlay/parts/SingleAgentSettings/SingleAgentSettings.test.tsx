@@ -329,10 +329,11 @@ describe("SingleAgentSettings", () => {
     authenticateAcpAgentMock.mockReset().mockResolvedValue(undefined);
     logoutAcpAgentMock.mockReset().mockResolvedValue(undefined);
     focusWindowMock.mockReset().mockResolvedValue(undefined);
-    listAcpRegistryMock.mockReset().mockResolvedValue([]);
-    getLatestAgentVersionMock.mockReset().mockResolvedValue({});
-    resolveAgentAccountMock.mockReset().mockResolvedValue({});
+    listAcpRegistryMock.mockReset().mockImplementation(() => new Promise(() => {}));
+    getLatestAgentVersionMock.mockReset().mockImplementation(() => new Promise(() => {}));
+    resolveAgentAccountMock.mockReset().mockImplementation(() => new Promise(() => {}));
     updateAgentBinaryMock.mockReset().mockResolvedValue({ ok: true });
+    getAgentHookPluginStatusesMock.mockReset().mockImplementation(() => new Promise(() => {}));
     toastMock.danger.mockReset();
     toastMock.success.mockReset();
     runAgentInstallCommandMock.mockReset().mockReturnValue(true);
@@ -917,7 +918,9 @@ describe("SingleAgentSettings", () => {
     render(<SingleAgentSettings agentKind="acp-generic:sso-agent" />);
 
     const row = envRow("Default");
-    fireEvent.click(within(row).getByRole("button", { name: /login/i }));
+    await act(async () => {
+      fireEvent.click(within(row).getByRole("button", { name: /login/i }));
+    });
 
     expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
       agentKind: "acp-generic:sso-agent",
@@ -947,7 +950,9 @@ describe("SingleAgentSettings", () => {
     expect(screen.queryByLabelText("Factory API Key")).toBeNull();
     expect(screen.queryByRole("button", { name: "Factory API Key" })).toBeNull();
     const row = envRow("Default");
-    fireEvent.click(within(row).getByRole("button", { name: "Login" }));
+    await act(async () => {
+      fireEvent.click(within(row).getByRole("button", { name: "Login" }));
+    });
 
     expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
       agentKind: "acp-generic:factory-droid",
@@ -992,7 +997,9 @@ describe("SingleAgentSettings", () => {
 
     expect(screen.queryByRole("button", { name: /re-login/i })).toBeNull();
     const row = envRow("Default");
-    fireEvent.click(within(row).getByRole("button", { name: /logout/i }));
+    await act(async () => {
+      fireEvent.click(within(row).getByRole("button", { name: /logout/i }));
+    });
 
     expect(logoutAcpAgentMock).toHaveBeenCalledWith({ agentKind: "acp-generic:sso-agent" });
   });
@@ -1019,7 +1026,9 @@ describe("SingleAgentSettings", () => {
     render(<SingleAgentSettings agentKind="acp-generic:sso-agent" />);
 
     const row = envRow("WSL (Ubuntu)");
-    fireEvent.click(within(row).getByRole("button", { name: /login/i }));
+    await act(async () => {
+      fireEvent.click(within(row).getByRole("button", { name: /login/i }));
+    });
 
     expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
       agentKind: "acp-generic:sso-agent",
@@ -1117,7 +1126,9 @@ describe("SingleAgentSettings", () => {
     expect(within(wslRow).getByRole("button", { name: /login/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /re-login/i })).toBeNull();
     expect(screen.getByText(/Complete Login sign-in for WSL \(Ubuntu\)\./u)).toBeInTheDocument();
-    fireEvent.click(within(wslRow).getByRole("button", { name: /login/i }));
+    await act(async () => {
+      fireEvent.click(within(wslRow).getByRole("button", { name: /login/i }));
+    });
 
     expect(authenticateAcpAgentMock).toHaveBeenCalledWith({
       agentKind: "acp-generic:factory-droid",
@@ -1328,11 +1339,13 @@ describe("SingleAgentSettings", () => {
     const windowsRow = envRow("Windows");
     expect(within(windowsRow).queryByRole("button", { name: /Update to v/i })).toBeNull();
 
-    fireEvent.click(
-      within(wslRow).getByRole("button", {
-        name: /Update to v2026\.05\.16-0338208/i,
-      }),
-    );
+    await act(async () => {
+      fireEvent.click(
+        within(wslRow).getByRole("button", {
+          name: /Update to v2026\.05\.16-0338208/i,
+        }),
+      );
+    });
 
     expect(updateAgentBinaryMock).toHaveBeenCalledWith({
       agentKind: "cursor",

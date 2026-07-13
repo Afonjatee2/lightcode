@@ -1,4 +1,4 @@
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PathDisplay } from "./PathDisplay";
 
@@ -55,8 +55,10 @@ beforeEach(() => {
 
 function fireWidths(container: number, fixed: number) {
   // Order: containerRef observer is added first, fixedRef observer second.
-  MockResizeObserver.instances[0]?.fire(container);
-  MockResizeObserver.instances[1]?.fire(fixed);
+  act(() => {
+    MockResizeObserver.instances[0]?.fire(container);
+    MockResizeObserver.instances[1]?.fire(fixed);
+  });
 }
 
 describe("PathDisplay", () => {

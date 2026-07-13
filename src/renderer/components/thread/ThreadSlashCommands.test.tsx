@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import "@/renderer/components/providers/bootstrap";
 import type {
@@ -27,6 +27,8 @@ const { bridge } = vi.hoisted(() => ({
       .fn<() => Promise<{ entries: []; totalIndexed: number }>>()
       .mockResolvedValue({ entries: [], totalIndexed: 0 }),
     dbGetThreadRuntimeItems: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
+    dbGetThreadCompletedTurns: vi.fn<() => Promise<[]>>().mockResolvedValue([]),
+    dbGetThreadContextUsage: vi.fn<() => Promise<null>>().mockResolvedValue(null),
     pickFiles: vi.fn<() => Promise<string[] | undefined>>().mockResolvedValue(undefined),
     writeTerminal: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
     scanSkills: vi.fn<() => Promise<SkillScanResult>>().mockResolvedValue({
@@ -121,19 +123,21 @@ const draftProject: Project = {
   createdAt: new Date().toISOString(),
 };
 
-function renderThread(thread: Thread, agentStatus: AgentStatus) {
-  render(
-    <AppProvider>
-      <ThreadView
-        thread={thread}
-        agentStatus={agentStatus}
-        projectLocation={{ kind: "posix", path: "/tmp/poracode" }}
-      />
-    </AppProvider>,
-  );
+async function renderThread(thread: Thread, agentStatus: AgentStatus) {
+  await act(async () => {
+    render(
+      <AppProvider>
+        <ThreadView
+          thread={thread}
+          agentStatus={agentStatus}
+          projectLocation={{ kind: "posix", path: "/tmp/poracode" }}
+        />
+      </AppProvider>,
+    );
+  });
 }
 
-function renderDraftComposer(
+async function renderDraftComposer(
   selectedAgent: AgentStatus,
   onStart = vi.fn<(input: unknown) => void>(),
   presentationMode: ThreadPresentationMode = "terminal",
@@ -143,27 +147,29 @@ function renderDraftComposer(
     model: selectedAgent.capabilities.models[0]?.id ?? "gemini-2.5-pro",
   },
 ) {
-  render(
-    <AppProvider>
-      <ThreadDraftComposerArea
-        project={draftProject}
-        selectedAgent={selectedAgent}
-        controls={controls}
-        config={config}
-        compact={false}
-        paneCount={1}
-        gitBranch={undefined}
-        worktreeMode={false}
-        supportsModePicker={false}
-        presentationMode={presentationMode}
-        onConfigChange={onConfigChange}
-        onWorktreeModeChange={() => {}}
-        onSwitchBranch={() => {}}
-        onRememberPresentationMode={() => {}}
-        onStart={onStart}
-      />
-    </AppProvider>,
-  );
+  await act(async () => {
+    render(
+      <AppProvider>
+        <ThreadDraftComposerArea
+          project={draftProject}
+          selectedAgent={selectedAgent}
+          controls={controls}
+          config={config}
+          compact={false}
+          paneCount={1}
+          gitBranch={undefined}
+          worktreeMode={false}
+          supportsModePicker={false}
+          presentationMode={presentationMode}
+          onConfigChange={onConfigChange}
+          onWorktreeModeChange={() => {}}
+          onSwitchBranch={() => {}}
+          onRememberPresentationMode={() => {}}
+          onStart={onStart}
+        />
+      </AppProvider>,
+    );
+  });
   return onStart;
 }
 
@@ -197,8 +203,8 @@ describe("ThreadSlashCommands", () => {
     });
   });
 
-  it("renders thread-scoped ACP slash commands in the composer panel", () => {
-    renderThread(
+  it("renders thread-scoped ACP slash commands in the composer panel", async () => {
+    await renderThread(
       makeThread({
         slashCommands: [
           {
@@ -224,8 +230,8 @@ describe("ThreadSlashCommands", () => {
     expect(screen.queryByText("/help")).not.toBeInTheDocument();
   });
 
-  it("supports keyboard navigation, scrolling, and insertion", () => {
-    renderThread(
+  it("supports keyboard navigation, scrolling, and insertion", async () => {
+    await renderThread(
       makeThread({
         slashCommands: [
           {
@@ -259,9 +265,9 @@ describe("ThreadSlashCommands", () => {
     expect(editor.textContent).toBe("/review ");
   });
 
-  it("renders thread-scoped slash commands in the terminal composer", () => {
+  it("renders thread-scoped slash commands in the terminal composer", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
-    renderThread(
+    await renderThread(
       makeThread({
         presentationMode: "terminal",
         slashCommands: [
@@ -291,9 +297,9 @@ describe("ThreadSlashCommands", () => {
     expect(screen.queryByText("/help")).not.toBeInTheDocument();
   });
 
-  it("falls back to capability slash commands in the terminal composer", () => {
+  it("falls back to capability slash commands in the terminal composer", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
-    renderThread(
+    await renderThread(
       makeThread({ presentationMode: "terminal" }),
       makeAgentStatus({
         capabilities: {
@@ -313,9 +319,9 @@ describe("ThreadSlashCommands", () => {
     expect(screen.getByText("/help")).toBeInTheDocument();
   });
 
-  it("shows Poracode Codex server commands instead of CLI commands in GUI chat composer", () => {
+  it("shows Poracode Codex server commands instead of CLI commands in GUI chat composer", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
-    renderThread(
+    await renderThread(
       makeThread({
         agentKind: "codex",
         presentationMode: "gui",
@@ -350,9 +356,9 @@ describe("ThreadSlashCommands", () => {
     expect(screen.queryByText("/status")).not.toBeInTheDocument();
   });
 
-  it("shows Poracode Codex server commands instead of CLI commands in GUI draft composer", () => {
+  it("shows Poracode Codex server commands instead of CLI commands in GUI draft composer", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
-    renderDraftComposer(
+    await renderDraftComposer(
       makeAgentStatus({
         kind: "codex",
         label: "Codex",
@@ -414,7 +420,7 @@ describe("ThreadSlashCommands", () => {
     });
     const onStart = vi.fn<(input: unknown) => void>();
     const status = makeAgentStatus({ kind: "codex", label: "Codex" });
-    renderDraftComposer(status, onStart, "gui");
+    await renderDraftComposer(status, onStart, "gui");
 
     const editor = screen.getByRole("textbox");
     typeSlashQuery(editor, "/");
@@ -589,7 +595,7 @@ describe("ThreadSlashCommands", () => {
       issues: [],
       canLinkToGlobal: true,
     });
-    renderThread(
+    await renderThread(
       makeThread({
         agentKind: "codex",
         presentationMode: "gui",
@@ -608,11 +614,11 @@ describe("ThreadSlashCommands", () => {
     expect(screen.queryByText("/disabled-native")).not.toBeInTheDocument();
   });
 
-  it("runs Codex GUI draft commands locally without launching a thread", () => {
+  it("runs Codex GUI draft commands locally without launching a thread", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
     const onStart = vi.fn<(input: unknown) => void>();
     const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
-    renderDraftComposer(
+    await renderDraftComposer(
       makeAgentStatus({
         kind: "codex",
         label: "Codex",
@@ -648,11 +654,11 @@ describe("ThreadSlashCommands", () => {
     expect(editor.textContent).toBe("");
   });
 
-  it("submits Codex GUI /goal as provider input instead of handling it locally", () => {
+  it("submits Codex GUI /goal as provider input instead of handling it locally", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
     const onStart = vi.fn<(input: unknown) => void>();
     const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
-    renderDraftComposer(
+    await renderDraftComposer(
       makeAgentStatus({
         kind: "codex",
         label: "Codex",
@@ -683,11 +689,11 @@ describe("ThreadSlashCommands", () => {
     expect(onConfigChange).not.toHaveBeenCalled();
   });
 
-  it("toggles Fast locally for Codex GUI draft commands", () => {
+  it("toggles Fast locally for Codex GUI draft commands", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
     const onStart = vi.fn<(input: unknown) => void>();
     const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
-    renderDraftComposer(
+    await renderDraftComposer(
       makeAgentStatus({
         kind: "codex",
         label: "Codex",
@@ -721,7 +727,7 @@ describe("ThreadSlashCommands", () => {
   it("opens the model picker for Codex GUI draft commands", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
     const onConfigChange = vi.fn<(patch: Partial<Thread["config"]>) => void>();
-    renderDraftComposer(
+    await renderDraftComposer(
       makeAgentStatus({
         kind: "codex",
         label: "Codex",
@@ -762,9 +768,9 @@ describe("ThreadSlashCommands", () => {
     expect(onConfigChange).not.toHaveBeenCalled();
   });
 
-  it("selects draft slash commands without submitting the draft", () => {
+  it("selects draft slash commands without submitting the draft", async () => {
     const baseCapabilities = makeAgentStatus().capabilities;
-    const onStart = renderDraftComposer(
+    const onStart = await renderDraftComposer(
       makeAgentStatus({
         capabilities: {
           ...baseCapabilities,

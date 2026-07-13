@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { msg } from "@lingui/core/macro";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -56,6 +56,7 @@ function baseProps() {
 }
 
 afterEach(() => {
+  cleanup();
   useGitStore.setState({ prData: {} });
 });
 

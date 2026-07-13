@@ -237,7 +237,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
   }
 
   private ensureSubAgentRouter(): CodexSubAgentRouter {
-    this.subAgentRouter ??= new CodexSubAgentRouter(this.threadId);
+    this.subAgentRouter ??= new CodexSubAgentRouter(this.threadId, this.wslDistro);
     return this.subAgentRouter;
   }
 
@@ -816,7 +816,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
     // is unaffected.
     const mappedRuntimeEvents = suppressResumeReplay
       ? []
-      : mapCodexNotification(method, params, this.ensureMapperState());
+      : mapCodexNotification(method, params, this.ensureMapperState(), this.wslDistro);
     const runtimeEvents = this.ensureSubAgentRouter().observeMainNotification(
       method,
       params,

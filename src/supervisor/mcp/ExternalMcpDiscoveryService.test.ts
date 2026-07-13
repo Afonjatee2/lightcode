@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -681,6 +681,13 @@ describe("ExternalMcpDiscoveryService", () => {
     const service = new ExternalMcpDiscoveryService({
       env: {},
       homeDirectory: () => hostHome,
+      readTextFile: (path) => {
+        try {
+          return readFileSync(path.replaceAll("\\", "/"), "utf8");
+        } catch {
+          return undefined;
+        }
+      },
       resolveWslHome: async () => {
         wslHomeResolutions += 1;
         return "/home/demo";

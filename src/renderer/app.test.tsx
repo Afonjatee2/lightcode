@@ -679,44 +679,46 @@ describe("App", () => {
 
     expect(bridge.startThread).not.toHaveBeenCalled();
 
-    useAppStore.setState((state) => ({
-      ...state,
-      projects: [
-        {
-          id: "project-1",
-          name: "Repo",
-          location: {
-            kind: "windows",
-            path: "C:\\repo",
+    act(() => {
+      useAppStore.setState((state) => ({
+        ...state,
+        projects: [
+          {
+            id: "project-1",
+            name: "Repo",
+            location: {
+              kind: "windows",
+              path: "C:\\repo",
+            },
+            createdAt: "2026-03-22T00:00:00.000Z",
           },
-          createdAt: "2026-03-22T00:00:00.000Z",
-        },
-      ],
-      threads: [
-        {
-          id: "thread-1",
-          projectId: "project-1",
-          title: "Persisted thread",
-          agentKind: "codex",
-          config: {
-            model: "gpt-5.4",
+        ],
+        threads: [
+          {
+            id: "thread-1",
+            projectId: "project-1",
+            title: "Persisted thread",
+            agentKind: "codex",
+            config: {
+              model: "gpt-5.4",
+            },
+            status: "idle",
+            attention: "none",
+            canResumeWithConfig: false,
+            archived: false,
+            done: false,
+            starred: false,
+            createdAt: "2026-03-22T00:00:00.000Z",
+            updatedAt: "2026-03-22T00:00:00.000Z",
           },
-          status: "idle",
-          attention: "none",
-          canResumeWithConfig: false,
-          archived: false,
-          done: false,
-          starred: false,
-          createdAt: "2026-03-22T00:00:00.000Z",
-          updatedAt: "2026-03-22T00:00:00.000Z",
-        },
-      ],
-      view: { kind: "thread", panes: ["thread-1"] },
-    }));
+        ],
+        view: { kind: "thread", panes: ["thread-1"] },
+      }));
 
-    onHydrate?.(useAppStore.getState());
-    hydrated = true;
-    onFinishHydration?.(useAppStore.getState());
+      onHydrate?.(useAppStore.getState());
+      hydrated = true;
+      onFinishHydration?.(useAppStore.getState());
+    });
 
     await waitFor(() => {
       expect(screen.getByTestId("thread-view-thread-1")).toHaveAttribute(

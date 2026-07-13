@@ -41,7 +41,10 @@ export class CodexSubAgentRouter {
   >();
   private defaultProgress: ToolCallProgress = {};
 
-  constructor(private readonly localThreadId: string) {}
+  constructor(
+    private readonly localThreadId: string,
+    private readonly wslDistro?: string,
+  ) {}
 
   setDefaultModelSettings(model: string, effort: string): void {
     this.defaultProgress = { model, effort };
@@ -113,9 +116,12 @@ export class CodexSubAgentRouter {
         method === "turn/aborted" ||
         status === "failed" ||
         status === "interrupted";
-      const childCompletionEvents = mapCodexNotification(method, params, child.mapperState).filter(
-        (event) => event.type === "item.completed",
-      );
+      const childCompletionEvents = mapCodexNotification(
+        method,
+        params,
+        child.mapperState,
+        this.wslDistro,
+      ).filter((event) => event.type === "item.completed");
       if (this.hasActiveSibling(child)) {
         return childCompletionEvents;
       }
@@ -154,7 +160,7 @@ export class CodexSubAgentRouter {
     const events = this.observeMainNotification(
       method,
       params,
-      mapCodexNotification(method, params, child.mapperState),
+      mapCodexNotification(method, params, child.mapperState, this.wslDistro),
     ).filter(
       (event) =>
         event.type === "item.started" ||

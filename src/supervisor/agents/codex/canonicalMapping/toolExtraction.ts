@@ -6,8 +6,11 @@
  * item shapes.
  */
 
+import { readFileSync } from "node:fs";
+import { extname } from "node:path";
 import type { CanonicalItemType } from "@/shared/contracts";
 import { extractLeadingPath } from "@/shared/extractLeadingPath";
+import { toWslUncPath } from "@/shared/wsl";
 import { inferFileChangeKindFromSource } from "../../fileChangeKind";
 import { canonicalTypeFor } from "../canonicalMappingState";
 import {
@@ -51,6 +54,8 @@ export function codexFinalStatus(raw: unknown): "success" | "error" {
  */
 export function pickToolInput(source: CodexItemPayload): unknown {
   if (isCodexCollabAgentToolCall(source)) return pickCollabAgentInput(source);
+  const imagePath = source.type === "imageView" ? readNonEmptyString(source.path) : undefined;
+  if (imagePath) return { path: imagePath };
   if (source.args !== undefined) return source.args;
   if (source.input !== undefined) return source.input;
   if (source.arguments !== undefined) return source.arguments;
@@ -67,6 +72,36 @@ export function pickToolOutput(source: CodexItemPayload): unknown {
   if (source.output !== undefined) return source.output;
   if (isCodexCollabAgentToolCall(source)) return pickCollabAgentResult(source);
   return undefined;
+}
+
+const IMAGE_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".svg": "image/svg+xml",
+};
+
+/** Convert Codex's native `imageView.path` into the shared inline-image channel. */
+export function readCodexImageViewDataUrl(
+  source: CodexItemPayload,
+  wslDistro?: string,
+): string | undefined {
+  if (source.type !== "imageView") return undefined;
+  const imagePath = readNonEmptyString(source.path);
+  if (!imagePath) return undefined;
+  const mimeType = IMAGE_MIME_BY_EXTENSION[extname(imagePath).toLowerCase()];
+  if (!mimeType) return undefined;
+  const hostPath =
+    wslDistro && imagePath.startsWith("/") ? toWslUncPath(wslDistro, imagePath) : imagePath;
+  try {
+    const bytes = readFileSync(hostPath);
+    return bytes.length > 0 ? `data:${mimeType};base64,${bytes.toString("base64")}` : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function extractCodexFileChangePath(source: CodexItemPayload | unknown): string | undefined {

@@ -69,14 +69,16 @@ describe("DesktopsView", () => {
     document.body.innerHTML = "";
   });
 
-  it("shows an empty state and hides the pairing form until the FAB is pressed", () => {
+  it("shows an empty state and hides the pairing form until the FAB is pressed", async () => {
     renderView();
     expect(screen.getByText("No connections yet")).toBeTruthy();
     // The pairing form is behind the FAB, not rendered under the list.
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.queryByLabelText("Endpoint")).toBeNull();
 
-    fireEvent.click(screen.getByRole("button", { name: "Pair a connection" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Pair a connection" }));
+    });
     expect(screen.getByRole("dialog", { name: "Pair a connection" })).toBeTruthy();
     expect(screen.getByLabelText("Endpoint")).toBeTruthy();
     expect(screen.getByLabelText("Pairing token")).toBeTruthy();
@@ -89,8 +91,10 @@ describe("DesktopsView", () => {
     expect(screen.queryByText("No connections yet")).toBeNull();
   });
 
-  it("auto-opens the pairing drawer when a deep-link credential is present", () => {
-    renderView({ showPairingHint: true });
+  it("auto-opens the pairing drawer when a deep-link credential is present", async () => {
+    await act(async () => {
+      renderView({ showPairingHint: true });
+    });
     expect(screen.getByRole("dialog", { name: "Pair a connection" })).toBeTruthy();
     expect(screen.getByText("Pairing link detected.")).toBeTruthy();
   });

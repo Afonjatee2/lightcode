@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 
@@ -39,6 +39,7 @@ describe("CreateProjectModal", () => {
   });
 
   afterEach(() => {
+    cleanup();
     usePanelStore.setState({ createProjectModalOpen: false });
   });
 
@@ -97,7 +98,9 @@ describe("CreateProjectModal", () => {
     render(<CreateProjectModal />);
     await waitFor(() => expect(mocks.loadHomeScopeLocation).toHaveBeenCalled());
 
-    fireEvent.click(screen.getByLabelText("Browse for parent folder"));
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Browse for parent folder"));
+    });
     await waitFor(() =>
       expect(screen.getByLabelText("Browse for parent folder")).toHaveTextContent(
         "/Users/me/projects/picked",

@@ -112,7 +112,7 @@ describe("useComposerKeyboard", () => {
     render(<ComposerKeyboardHarness />);
     const input = screen.getByRole("textbox");
 
-    input.focus();
+    act(() => input.focus());
     expect(document.activeElement).toBe(input);
 
     const pointerDown = createEvent.pointerDown(input, {
@@ -179,7 +179,7 @@ describe("useComposerKeyboard", () => {
     const { rerender } = render(<ComposerKeyboardHarness />);
     const input = screen.getByRole("textbox");
 
-    input.focus();
+    act(() => input.focus());
     fireEvent.focusIn(input);
     scrollLockMock.unlockComposeScroll.mockClear();
 
@@ -214,8 +214,10 @@ describe("useComposerKeyboard", () => {
       scrollLockMock.unlockComposeScroll.mockClear();
       scrollLockMock.focusWithoutScroll.mockClear();
 
-      outside.focus();
-      for (const callback of frameCallbacks) callback(0);
+      act(() => {
+        outside.focus();
+        for (const callback of frameCallbacks) callback(0);
+      });
 
       expect(scrollLockMock.unlockComposeScroll).not.toHaveBeenCalled();
       expect(scrollLockMock.focusWithoutScroll).toHaveBeenNthCalledWith(
@@ -375,7 +377,7 @@ describe("useComposerKeyboard", () => {
       const { rerender } = render(<ComposerKeyboardHarness />);
       const input = screen.getByRole("textbox");
 
-      input.focus();
+      act(() => input.focus());
       fireEvent.focusIn(input);
 
       // The dismiss key hides the keyboard without blurring the editor.
@@ -434,7 +436,7 @@ describe("useComposerKeyboard", () => {
     render(<ComposerKeyboardHarness />);
     const input = screen.getByRole("textbox");
 
-    input.focus();
+    act(() => input.focus());
     const pointerDown = createEvent.pointerDown(input, {
       pointerType: "touch",
       cancelable: true,

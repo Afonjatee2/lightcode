@@ -174,8 +174,15 @@ describe("createAcpGenericAdapter", () => {
     await adapter.detectInstall();
 
     const launchArgs = vi.mocked(probeAcpCapabilities).mock.calls[0]?.[1] ?? [];
-    expect(launchArgs.slice(-5)).toEqual(["-y", "droid@0.170.0", "exec", "--output-format", "acp"]);
-    expect(launchArgs).not.toContain("acp-daemon");
+    const launchTokens = launchArgs.flatMap((arg) => arg.replaceAll("'", "").split(/\s+/u));
+    expect(launchTokens.slice(-5)).toEqual([
+      "-y",
+      "droid@0.170.0",
+      "exec",
+      "--output-format",
+      "acp",
+    ]);
+    expect(launchArgs.join(" ")).not.toContain("acp-daemon");
   });
 
   it("does not parse token-rate prose for other ACP-generic instances", async () => {

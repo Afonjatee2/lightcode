@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentInstanceConfig, AgentStatus } from "@/shared/contracts";
@@ -375,7 +375,7 @@ describe("ClaudeProfileProviderSettings", () => {
     expect(screen.getByLabelText("Environment variable value")).toHaveValue("••••••••");
   });
 
-  it("keeps a saved sealed secret when the masked field is focused but not replaced", () => {
+  it("keeps a saved sealed secret when the masked field is focused but not replaced", async () => {
     settingsState.agentInstances = {
       glm: claudeProfile({
         environment: { ANTHROPIC_AUTH_TOKEN: { value: "lc-safe:v1:sealed", sensitive: true } },
@@ -384,7 +384,9 @@ describe("ClaudeProfileProviderSettings", () => {
     render(<ClaudeProfileProviderSettings instanceId="glm" />);
 
     fireEvent.focus(screen.getByLabelText("Environment variable value"));
-    fireEvent.click(screen.getByRole("button", { name: "Save Claude profile" }));
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Save Claude profile" }));
+    });
 
     expect(setClaudeProfileEnvironmentMock).toHaveBeenCalledWith({
       instanceId: "glm",

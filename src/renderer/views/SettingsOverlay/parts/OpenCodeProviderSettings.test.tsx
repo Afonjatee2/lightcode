@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { act, fireEvent, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AgentStatus } from "@/shared/contracts";
@@ -92,7 +92,7 @@ describe("OpenCodeProviderSettings", () => {
     expect(screen.getByText("OAuth")).toBeTruthy();
   });
 
-  it("runs `opencode providers login` from Add provider and re-probes on success", () => {
+  it("runs `opencode providers login` from Add provider and re-probes on success", async () => {
     render(
       <OpenCodeProviderSettings
         agentKind="opencode"
@@ -103,7 +103,9 @@ describe("OpenCodeProviderSettings", () => {
     fireEvent.click(screen.getByRole("button", { name: /Add provider/ }));
     const call = runAgentLoginCommandMock.mock.calls[0]![0];
     expect(call.command).toBe("opencode providers login");
-    call.onCommandComplete?.(0);
+    await act(async () => {
+      call.onCommandComplete?.(0);
+    });
     expect(refreshAgentStatusesMock).toHaveBeenCalledWith(["Ubuntu"], {
       agentKinds: ["opencode"],
     });

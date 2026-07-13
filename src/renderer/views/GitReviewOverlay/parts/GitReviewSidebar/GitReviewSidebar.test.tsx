@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -237,11 +237,7 @@ describe("GitReviewSidebar", () => {
     bridgeMock.gitRevertAll.mockResolvedValue(undefined);
     bridgeMock.gitCommit.mockResolvedValue(undefined);
     bridgeMock.gitFetch.mockResolvedValue(undefined);
-    bridgeMock.gitGetWorktreeSourceBranch.mockResolvedValue({
-      sourceBranch: null,
-      commitsAhead: 0,
-      sourceAhead: 0,
-    });
+    bridgeMock.gitGetWorktreeSourceBranch.mockImplementation(() => new Promise(() => {}));
     bridgeMock.generateCommitMessage.mockResolvedValue({ message: "generated" });
     useGitStore.setState({
       ghAvailable: {},
@@ -355,7 +351,7 @@ describe("GitReviewSidebar", () => {
     expect(onRefresh).toHaveBeenCalledOnce();
   });
 
-  it("shows an init action when the location is not a git repository", () => {
+  it("shows an init action when the location is not a git repository", async () => {
     const project: Project = {
       id: "project-1",
       name: "Poracode",
@@ -399,7 +395,9 @@ describe("GitReviewSidebar", () => {
     expect(initButton).toHaveAttribute("data-variant", "tertiary");
     expect(initButton).toHaveClass("text-white");
 
-    fireEvent.click(initButton);
+    await act(async () => {
+      fireEvent.click(initButton);
+    });
 
     expect(onInitRepository).toHaveBeenCalledOnce();
   });
