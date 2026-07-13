@@ -112,14 +112,14 @@ const SHOWCASE = [
     src: "/feature-chat.png",
     title: "feature.protocol.title",
     desc: "feature.protocol.desc",
-    width: 1092,
+    width: 1094,
     height: 1822,
   },
   {
     src: "/sf-editor.png",
     title: "feature.editor.title",
     desc: "feature.editor.desc",
-    width: 2468,
+    width: 2248,
     height: 1554,
   },
   {
@@ -147,7 +147,7 @@ const GALLERY = [
     desc: "feature.usage.desc",
     span: 2,
     fit: "object-top",
-    width: 750,
+    width: 700,
     height: 1554,
   },
   {
@@ -156,8 +156,8 @@ const GALLERY = [
     desc: "feature.worktrees.desc",
     span: 2,
     fit: "object-bottom",
-    width: 448,
-    height: 528,
+    width: 666,
+    height: 428,
   },
   {
     src: "/sf-notes.png",
@@ -165,8 +165,8 @@ const GALLERY = [
     desc: "feature.notes.desc",
     span: 2,
     fit: "object-top",
-    width: 750,
-    height: 1300,
+    width: 700,
+    height: 1554,
   },
   {
     src: "/sf-acp.png",
@@ -184,7 +184,7 @@ const GALLERY = [
     span: 3,
     fit: "object-top",
     width: 1520,
-    height: 584,
+    height: 586,
   },
   {
     src: "/sf-terminal.png",
@@ -192,7 +192,7 @@ const GALLERY = [
     desc: "feature.terminal.desc",
     span: 6,
     fit: "object-left-top",
-    width: 2154,
+    width: 1934,
     height: 584,
   },
 ] as const;
