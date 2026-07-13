@@ -671,6 +671,7 @@ function AppWindow({
         height={height}
         preload={preload}
         {...(preload ? { fetchPriority: "high" as const } : {})}
+        {...(preload ? { quality: 50 } : {})}
         sizes={
           preload
             ? "(max-width: 1280px) calc(100vw - 32px), 1152px"

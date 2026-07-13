@@ -11,6 +11,10 @@ const path = require("path");
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  images: {
+    formats: ["image/avif", "image/webp"],
+    qualities: [50, 75],
+  },
   // With typescript@7 installed, Next cannot read the `@/*` alias from
   // tsconfig paths (that integration needs the TS JS API, absent until 7.1),
   // so the webpack build must define the alias itself. Turbopack resolves
