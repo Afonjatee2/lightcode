@@ -42,12 +42,15 @@ jobs:
           - os: windows-latest
             artifact: dist-windows
             platform: win
+            electron-cache: "~/AppData/Local/electron/Cache"
           - os: ubuntu-latest
             artifact: dist-linux
             platform: linux
+            electron-cache: "~/.cache/electron"
           - os: macos-latest
             artifact: dist-mac
             platform: mac
+            electron-cache: "~/Library/Caches/electron"
 
     runs-on: ${{ matrix.os }}
 
@@ -69,8 +72,10 @@ jobs:
       - name: Cache Electron binary
         uses: actions/cache@v5
         with:
-          path: ~/.cache/electron
+          path: ${{ matrix.electron-cache }}
           key: electron-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            electron-${{ runner.os }}-
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
