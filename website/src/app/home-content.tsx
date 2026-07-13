@@ -423,8 +423,8 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
         <AppWindow
           src="/hero-screenshot.png"
           alt="Poracode desktop app running Claude and Codex coding agents side by side"
-          width={2948}
-          height={1554}
+          width={2920}
+          height={1840}
           chrome
           parallax
           badge
