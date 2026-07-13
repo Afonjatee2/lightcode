@@ -84,6 +84,7 @@ import {
 } from "./schedules";
 import { AppControlsMcpIngress } from "./app-controls";
 import { legacyProductNameFor, resolveLegacyElectronUserDataDir } from "./legacyDataMigration";
+import { refreshMacDockIcon } from "./macDockIcon";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const channel = resolvePoracodeChannel();
@@ -560,6 +561,7 @@ if (!hasSingleInstanceLock) {
     .whenReady()
     .then(async () => {
       if (preserveLegacySafeStorageIdentity) app.setName(productNameFor(channel));
+      refreshMacDockIcon();
       Menu.setApplicationMenu(null);
 
       installLocalFileProtocolHandler();

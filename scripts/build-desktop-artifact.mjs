@@ -26,6 +26,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { scanRuntimeExternals } from "./runtime-externals.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -48,6 +49,7 @@ const RUNTIME_DEPS = [
   "node-pty",
   "smol-toml",
   "vscode-jsonrpc",
+  "ws",
 ];
 
 // devDependencies the stage needs to run electron-builder + rebuild natives.
@@ -186,6 +188,19 @@ function buildStagePackageJson(rootPkg) {
   };
 }
 
+function validateRuntimeDeps() {
+  const emittedExternals = scanRuntimeExternals(repoRoot);
+  const staged = new Set(RUNTIME_DEPS);
+  const missing = emittedExternals.filter((name) => !staged.has(name));
+  if (missing.length > 0) {
+    throw new Error(
+      `Bundled output requires unstaged runtime dependencies: ${missing.join(", ")}. ` +
+        "Update RUNTIME_DEPS before packaging.",
+    );
+  }
+  console.log(`[stage] validated ${emittedExternals.length} emitted runtime dependencies`);
+}
+
 function copyDir(from, to) {
   if (!existsSync(from)) {
     throw new Error(`Required directory missing: ${from}`);
@@ -299,6 +314,10 @@ async function main() {
     run("pnpm", ["run", "clean:sourcemaps"], { cwd: repoRoot });
     run("pnpm", ["run", "prepare:package-assets"], { cwd: repoRoot });
   }
+
+  // Fail before the expensive clean install/rebuild if tsdown emitted a new
+  // external that the curated staging package would otherwise omit.
+  validateRuntimeDeps();
 
   // 2. Create the stage in tmp (outside the pnpm workspace).
   const stageRoot = mkdtempSync(join(tmpdir(), "poracode-stage-"));
