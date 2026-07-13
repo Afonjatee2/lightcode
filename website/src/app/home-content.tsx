@@ -296,7 +296,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
     : t("hero.tagline");
   const downloadHref = downloadUrlFor(release, platform.slug);
   const homeHref = localizedPath("/", locale);
-  const changelogHref = localizedPath("/changelog", locale);
+  const changelogHref = "/changelog";
   const downloadsHref = localizedPath("/download", locale);
   const nightlyHref = localizedPath("/nightly", locale);
   // Lead with the `Pora.code` wordmark, so the headline copy is the value-prop

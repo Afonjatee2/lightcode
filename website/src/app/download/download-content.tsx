@@ -3,7 +3,9 @@
 import { Download, ArrowLeft, Monitor, Apple, Terminal, Moon } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useI18n } from "@/lib/i18n/I18nProvider";
 import { downloadUrlFor, type ReleaseInfo } from "@/lib/releases";
+import { localizedPath } from "@/lib/seo";
 
 const PLATFORMS = [
   {
@@ -30,28 +32,32 @@ const PLATFORMS = [
 ];
 
 export function DownloadContent({ release }: { release: ReleaseInfo }) {
+  const { locale, t } = useI18n();
   const versionSuffix = release.version ? ` v${release.version}` : "";
+  const homeHref = localizedPath("/", locale);
+  const nightlyHref = localizedPath("/nightly", locale);
+  const [footerBefore, footerAfter] = t("download.footer").split("{release}");
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-black text-white">
+    <div lang={locale} className="relative min-h-screen overflow-x-hidden bg-black text-white">
       {/* Background */}
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(ellipse_80%_60%_at_50%_0%,_rgba(255,255,255,0.05)_0%,_transparent_100%)]" />
 
       {/* Navigation */}
       <nav className="relative z-10 flex items-center justify-between px-8 py-6 max-w-5xl mx-auto">
         <Link
-          href="/"
+          href={homeHref}
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span className="text-sm font-medium">Back to home</span>
+          <span className="text-sm font-medium">{t("nav.backToHome")}</span>
         </Link>
         <Link
-          href="/nightly"
+          href={nightlyHref}
           className="inline-flex items-center gap-2 text-sm font-medium text-gray-400 hover:text-amber-300 transition-colors"
         >
           <Moon className="w-3.5 h-3.5 text-amber-300/80" />
-          <span>Nightly builds →</span>
+          <span>{t("nav.nightly")} →</span>
         </Link>
       </nav>
 
@@ -63,11 +69,10 @@ export function DownloadContent({ release }: { release: ReleaseInfo }) {
           transition={{ duration: 0.4 }}
         >
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
-            Download Poracode{versionSuffix}
+            {t("download.title")}
+            {versionSuffix}
           </h1>
-          <p className="text-gray-400 mb-12 text-lg">
-            Choose the installer for your platform and architecture.
-          </p>
+          <p className="text-gray-400 mb-12 text-lg">{t("download.subtitle")}</p>
         </motion.div>
 
         <div className="space-y-10">
@@ -99,7 +104,7 @@ export function DownloadContent({ release }: { release: ReleaseInfo }) {
                       </div>
                     </div>
                     <span className="text-xs text-gray-600 group-hover:text-gray-400 transition-colors">
-                      Download →
+                      {t("nav.download")} →
                     </span>
                   </a>
                 ))}
@@ -115,16 +120,16 @@ export function DownloadContent({ release }: { release: ReleaseInfo }) {
           className="mt-16 pt-8 border-t border-white/5 text-center"
         >
           <p className="text-sm text-gray-600">
-            All downloads are from the{" "}
+            {footerBefore}
             <a
               href={release.releasesUrl}
               target="_blank"
               rel="noreferrer"
               className="text-gray-400 hover:text-white underline underline-offset-4 transition-colors"
             >
-              latest GitHub release
+              {t("download.latestRelease")}
             </a>
-            .
+            {footerAfter}
           </p>
         </motion.div>
       </main>

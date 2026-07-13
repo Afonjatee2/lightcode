@@ -5,15 +5,15 @@ import type { Locale } from "@/lib/i18n/config";
 import { I18nProvider } from "@/lib/i18n/I18nProvider";
 import { translate } from "@/lib/i18n/messages";
 import { getLatestRelease } from "@/lib/releases";
-import { createPageMetadata, SITE_NAME } from "@/lib/seo";
+import { createPageMetadata } from "@/lib/seo";
 
 type LocaleParams = { params: Promise<{ locale: Locale }> };
 
 export async function generateMetadata({ params }: LocaleParams): Promise<Metadata> {
   const { locale } = await params;
   return createPageMetadata({
-    title: `${translate(locale, "nav.download")} ${SITE_NAME}`,
-    description: translate(locale, "faq.what.answer"),
+    title: translate(locale, "download.title"),
+    description: translate(locale, "download.metaDescription"),
     path: "/download",
     locale,
   });

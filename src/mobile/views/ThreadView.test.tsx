@@ -136,6 +136,12 @@ vi.mock("../useKeyboardOffset", () => ({
   useKeyboardVisibilityOffset: () => fixtures.keyboardOffset,
 }));
 
+vi.mock("../composeScrollLock", () => ({
+  focusWithoutScroll: vi.fn<(element: HTMLElement | null | undefined) => void>(),
+  lockComposeScroll: vi.fn<(source?: HTMLElement | null) => void>(),
+  unlockComposeScroll: vi.fn<() => void>(),
+}));
+
 describe("mobile ThreadView", () => {
   beforeEach(() => {
     bridgeMock.closeThread.mockReset().mockResolvedValue(undefined);
