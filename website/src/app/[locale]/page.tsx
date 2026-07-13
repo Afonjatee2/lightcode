@@ -2,8 +2,7 @@ import type { Metadata } from "next";
 
 import { HomeContent } from "@/app/home-content";
 import type { Locale } from "@/lib/i18n/config";
-import { I18nProvider } from "@/lib/i18n/I18nProvider";
-import { getLocaleMessages, translate } from "@/lib/i18n/messages";
+import { translate } from "@/lib/i18n/messages";
 import { getLatestRelease } from "@/lib/releases";
 import { createHomeJsonLd, createPageMetadata, stringifyJsonLd } from "@/lib/seo";
 
@@ -27,12 +26,12 @@ export default async function LocaleHome({ params }: LocaleParams) {
   const { locale } = await params;
   const release = await getLatestRelease();
   return (
-    <I18nProvider locale={locale} messages={getLocaleMessages(locale)}>
+    <>
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: stringifyJsonLd(createHomeJsonLd(release, locale)) }}
       />
-      <HomeContent release={release} />
-    </I18nProvider>
+      <HomeContent release={release} locale={locale} />
+    </>
   );
 }

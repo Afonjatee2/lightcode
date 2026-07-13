@@ -1,22 +1,19 @@
-"use client";
-
 import { LANDING_FAQ_ITEMS } from "@/lib/landingFaq";
-import { useI18n } from "@/lib/i18n/I18nProvider";
+import type { Locale } from "@/lib/i18n/config";
+import { translate } from "@/lib/i18n/messages";
 import { DotPeriod } from "@/components/BrandMark";
 
-export function LandingFaq() {
-  const { t } = useI18n();
-
+export function LandingFaq({ locale }: { locale: Locale }) {
   return (
     <section id="faq" className="relative z-10 border-t border-white/[0.06] px-5 py-24 sm:px-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-10 text-center">
           <p className="mb-3 inline-flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
             <span className="pora-dot h-1.5 w-1.5" />
-            {t("faq.eyebrow")}
+            {translate(locale, "faq.eyebrow")}
           </p>
           <h2 className="text-3xl font-bold tracking-[-0.02em] text-moon md:text-4xl">
-            {t("faq.title")}
+            {translate(locale, "faq.title")}
             <DotPeriod pulse={false} />
           </h2>
         </div>
@@ -29,13 +26,15 @@ export function LandingFaq() {
             >
               <summary className="cursor-pointer list-none text-base font-semibold text-moon marker:hidden">
                 <span className="flex items-center justify-between gap-4">
-                  {t(item.questionKey)}
+                  {translate(locale, item.questionKey)}
                   <span className="text-xl leading-none text-accent transition-transform duration-200 group-open:rotate-45">
                     +
                   </span>
                 </span>
               </summary>
-              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-dim">{t(item.answerKey)}</p>
+              <p className="mt-3 max-w-3xl text-sm leading-relaxed text-dim">
+                {translate(locale, item.answerKey)}
+              </p>
             </details>
           ))}
         </div>

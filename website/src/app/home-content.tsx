@@ -1,12 +1,4 @@
-"use client";
-
-import {
-  useState,
-  useEffect,
-  useRef,
-  type ComponentType,
-  type MouseEvent as ReactMouseEvent,
-} from "react";
+import type { ComponentType } from "react";
 import {
   Terminal,
   Zap,
@@ -17,16 +9,15 @@ import {
   Layers,
   History,
   Layout,
-  Download,
   ArrowUpRight,
   KeyRound,
   Moon,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { downloadUrlFor, type ReleaseInfo } from "@/lib/releases";
-import { localizedPath } from "@/lib/i18n/config";
-import { useI18n } from "@/lib/i18n/I18nProvider";
+import type { ReleaseInfo } from "@/lib/releases";
+import { DEFAULT_LOCALE, localizedPath, type Locale } from "@/lib/i18n/config";
+import { translate, type MessageKey } from "@/lib/i18n/messages";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import {
   BrandLockup,
@@ -37,6 +28,7 @@ import {
   DotPeriod,
 } from "@/components/BrandMark";
 import { LandingFaq } from "./landing-faq";
+import { PlatformDownloadLink, TiltFrame } from "./landing-client";
 
 const ACP_REGISTRY_CDN = "https://cdn.agentclientprotocol.com/registry/v1/latest";
 
@@ -201,97 +193,19 @@ const SPAN_CLASS: Record<number, string> = {
   6: "sm:col-span-2 lg:col-span-6",
 };
 
-type NavigatorWithUserAgentData = Navigator & {
-  userAgentData?: {
-    getHighEntropyValues: (hints: string[]) => Promise<{ architecture?: string }>;
-  };
-};
-
-function detectAppleSiliconViaWebGL(): boolean | undefined {
-  try {
-    const canvas = document.createElement("canvas");
-    const gl =
-      (canvas.getContext("webgl2") as WebGL2RenderingContext | null) ??
-      (canvas.getContext("webgl") as WebGLRenderingContext | null) ??
-      (canvas.getContext("experimental-webgl") as WebGLRenderingContext | null);
-    if (!gl) return undefined;
-    const dbg = gl.getExtension("WEBGL_debug_renderer_info");
-    if (!dbg) return undefined;
-    const renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) as string;
-    if (/Apple\s+(?:GPU|M\d)/i.test(renderer)) return true;
-    if (/(?:Intel|AMD|Radeon|NVIDIA)/i.test(renderer)) return false;
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-async function getBrowserArchitecture(): Promise<string | undefined> {
-  try {
-    const uaData = await (
-      navigator as NavigatorWithUserAgentData
-    ).userAgentData?.getHighEntropyValues(["architecture"]);
-    return uaData?.architecture;
-  } catch {
-    return undefined;
-  }
-}
-
-export function HomeContent({ release }: { release: ReleaseInfo }) {
-  const { locale, t } = useI18n();
-
-  const [platform, setPlatform] = useState<{ label: string; slug: string }>({
-    label: "Desktop",
-    slug: "mac-arm64",
-  });
-
-  useEffect(() => {
-    let cancelled = false;
-    const apply = (p: { label: string; slug: string }) => {
-      if (!cancelled) setPlatform(p);
-    };
-    const ua = navigator.userAgent;
-    const detect = async () => {
-      if (ua.includes("Mac")) {
-        let isArm = true;
-        const architecture = await getBrowserArchitecture();
-        if (architecture) {
-          isArm = /^(?:arm|arm64|aarch64)$/i.test(architecture);
-        } else {
-          isArm = detectAppleSiliconViaWebGL() ?? true;
-        }
-        apply(
-          isArm
-            ? { label: "macOS (arm)", slug: "mac-arm64" }
-            : { label: "macOS (Intel)", slug: "mac-x64" },
-        );
-      } else if (ua.includes("Win")) {
-        let isArm = false;
-        const architecture = await getBrowserArchitecture();
-        if (architecture) {
-          isArm = /^(?:arm|arm64|aarch64)$/i.test(architecture);
-        } else {
-          isArm = ua.includes("ARM") || ua.includes("Aarch64");
-        }
-        apply(
-          isArm
-            ? { label: "Windows (ARM)", slug: "win-arm64" }
-            : { label: "Windows", slug: "win-x64" },
-        );
-      } else if (ua.includes("Linux")) {
-        apply({ label: "Linux", slug: "linux-x64" });
-      }
-    };
-    void detect();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+export function HomeContent({
+  release,
+  locale = DEFAULT_LOCALE,
+}: {
+  release: ReleaseInfo;
+  locale?: Locale;
+}) {
+  const t = (key: MessageKey, vars?: Record<string, string | number>): string =>
+    translate(locale, key, vars);
 
   const versionLabel = release.version
     ? `v${release.version} • ${t("hero.tagline")}`
     : t("hero.tagline");
-  const downloadHref = downloadUrlFor(release, platform.slug);
   const homeHref = localizedPath("/", locale);
   const changelogHref = "/changelog";
   const downloadsHref = localizedPath("/download", locale);
@@ -356,17 +270,13 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
               <GithubMark className="h-4 w-4" />
               <span className="hidden sm:inline">GitHub</span>
             </a>
-            <LanguageSelector />
-            <a
-              href={downloadHref}
+            <LanguageSelector locale={locale} label={t("lang.label")} />
+            <PlatformDownloadLink
+              release={release}
+              label={t("nav.download")}
               className="ml-1 hidden h-9 items-center gap-2 rounded-lg bg-moon px-4 text-sm font-semibold text-night transition hover:brightness-95 sm:inline-flex"
-            >
-              <Download className="h-4 w-4" />
-              {t("nav.download")}
-              <kbd className="ml-0.5 rounded bg-night/10 px-1.5 py-0.5 font-mono text-[11px] font-medium text-night/70">
-                ⌘D
-              </kbd>
-            </a>
+              shortcut
+            />
           </div>
         </div>
       </nav>
@@ -389,13 +299,11 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           </p>
 
           <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
-            <a
-              href={downloadHref}
+            <PlatformDownloadLink
+              release={release}
+              label={t("hero.downloadFor")}
               className="brand-glow group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition will-change-transform hover:-translate-y-0.5 hover:brightness-95"
-            >
-              <Download className="h-4 w-4" />
-              {t("hero.downloadFor", { platform: platform.label })}
-            </a>
+            />
             <div className="flex items-center gap-5">
               <Link
                 href={downloadsHref}
@@ -542,7 +450,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           <AcpMarquee />
         </section>
 
-        <LandingFaq />
+        <LandingFaq locale={locale} />
 
         {/* ── §7 Final CTA — signature close ──────────────────────── */}
         <section className="relative z-10 border-t border-white/[0.06] px-5 py-32 sm:px-8">
@@ -556,13 +464,11 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
               </h2>
               <p className="mx-auto mt-4 max-w-xl text-dim">{t("features.subtitle")}</p>
               <div className="mt-9 flex flex-col items-center justify-center gap-4 sm:flex-row">
-                <a
-                  href={downloadHref}
+                <PlatformDownloadLink
+                  release={release}
+                  label={t("hero.downloadFor")}
                   className="brand-glow inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition hover:brightness-95"
-                >
-                  <Download className="h-4 w-4" />
-                  {t("hero.downloadFor", { platform: platform.label })}
-                </a>
+                />
                 <a
                   href="https://github.com/SDSLeon/lightcode"
                   target="_blank"
@@ -634,23 +540,9 @@ function AppWindow({
   parallax?: boolean;
   preload?: boolean;
 }) {
-  const onMove = (e: ReactMouseEvent<HTMLDivElement>) => {
-    if (!parallax || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const r = e.currentTarget.getBoundingClientRect();
-    const rotateX = -((e.clientY - r.top) / r.height - 0.5) * 5;
-    const rotateY = ((e.clientX - r.left) / r.width - 0.5) * 6;
-    e.currentTarget.style.transform = `perspective(1600px) rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
-  };
-  const onLeave = (e: ReactMouseEvent<HTMLDivElement>) => {
-    e.currentTarget.style.removeProperty("transform");
-  };
-
-  return (
-    <div
-      onMouseMove={onMove}
-      onMouseLeave={onLeave}
-      className={`brand-glow relative overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 ${parallax ? "will-change-transform" : ""}`}
-    >
+  const className = `brand-glow relative overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 ${parallax ? "will-change-transform" : ""}`;
+  const content = (
+    <>
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
       {chrome ? (
         <div className="flex items-center gap-2 border-b border-white/[0.06] bg-tile-2 px-4 py-2.5">
@@ -685,8 +577,11 @@ function AppWindow({
           <PoraGlyph className="h-6 w-6 text-moon" />
         </div>
       ) : null}
-    </div>
+    </>
   );
+
+  if (parallax) return <TiltFrame className={className}>{content}</TiltFrame>;
+  return <div className={className}>{content}</div>;
 }
 
 /** A bento tile: a framed real-app capture with a caption, spanning `span` of 6 cols on lg. */
@@ -791,31 +686,12 @@ function acpChip(agent: AcpAgent, key: string) {
 }
 
 function AcpMarquee() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [inView, setInView] = useState(false);
-
-  useEffect(() => {
-    const node = ref.current;
-    if (!node) return;
-    const observer = new IntersectionObserver(
-      (entries) => setInView(entries[0]?.isIntersecting ?? false),
-      { rootMargin: "200px" },
-    );
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
   return (
-    <div
-      ref={ref}
-      className="space-y-3 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_8%,#000_92%,transparent)]"
-    >
-      <div className={`flex w-max gap-2.5 ${inView ? "acp-marquee-forward" : ""}`}>
+    <div className="space-y-3 overflow-hidden [mask-image:linear-gradient(to_right,transparent,#000_8%,#000_92%,transparent)]">
+      <div className="acp-marquee-forward flex w-max gap-2.5">
         {ACP_MARQUEE_LOOP.map((a, i) => acpChip(a, `r1-${a.id}-${i}`))}
       </div>
-      <div
-        className={`acp-marquee-reverse-track flex w-max gap-2.5 ${inView ? "acp-marquee-reverse" : ""}`}
-      >
+      <div className="acp-marquee-reverse acp-marquee-reverse-track flex w-max gap-2.5">
         {ACP_MARQUEE_LOOP.map((a, i) => acpChip(a, `r2-${a.id}-${i}`))}
       </div>
     </div>

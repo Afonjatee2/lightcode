@@ -4,10 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Check, Globe } from "lucide-react";
 import { DEFAULT_LOCALE, isLocale, LOCALES, type Locale } from "@/lib/i18n/config";
-import { useI18n } from "@/lib/i18n/I18nProvider";
 
-export function LanguageSelector() {
-  const { locale, t } = useI18n();
+export function LanguageSelector({ locale, label }: { locale: Locale; label: string }) {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -48,7 +46,7 @@ export function LanguageSelector() {
     <div ref={rootRef} className="relative">
       <button
         type="button"
-        aria-label={`${t("lang.label")}: ${current.label}`}
+        aria-label={`${label}: ${current.label}`}
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -61,7 +59,7 @@ export function LanguageSelector() {
       {open && (
         <div
           role="listbox"
-          aria-label={t("lang.label")}
+          aria-label={label}
           className="absolute right-0 z-50 mt-2 max-h-80 w-48 overflow-y-auto rounded-xl border border-white/10 bg-black/95 p-1 shadow-2xl shadow-black/50 backdrop-blur"
         >
           {LOCALES.map((l) => {
