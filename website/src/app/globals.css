@@ -56,6 +56,31 @@ body {
   }
 }
 
+/* Hero entrance stays in CSS so the primary heading and CTA are visible in
+   server HTML and do not depend on hydration to appear. */
+.hero-fade-up {
+  animation: hero-fade-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.hero-fade-up-delay-1 {
+  animation-delay: 0.12s;
+}
+.hero-fade-up-delay-2 {
+  animation-delay: 0.2s;
+}
+.hero-fade-up-delay-3 {
+  animation-delay: 0.28s;
+}
+@keyframes hero-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* The brand forbids text gradients — the headline accent is the SVG Pora dot
    (DotPeriod), never a clipped gradient. No `.brand-gradient-text` /
    `.brand-shimmer` helpers exist by design. */
@@ -160,7 +185,8 @@ summary:focus-visible,
    gated in JS via useReducedMotion(). */
 @media (prefers-reduced-motion: reduce) {
   .pora-pulse,
-  .pora-cursor {
+  .pora-cursor,
+  .hero-fade-up {
     animation: none !important;
   }
   *,

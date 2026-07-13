@@ -26,8 +26,9 @@ export const SITE_NAME = "Poracode";
 export const SITE_URL = "https://poracode.com";
 export const GITHUB_URL = "https://github.com/SDSLeon/lightcode";
 export const SOCIAL_IMAGE_PATH = "/hero-screenshot.png";
-export const SOCIAL_IMAGE_ALT =
-  "Poracode desktop app showing AI coding agents running side by side";
+export const SOCIAL_IMAGE_ALT = "Poracode AI coding agent orchestrator social card";
+const SOCIAL_IMAGE_WIDTH = 1200;
+const SOCIAL_IMAGE_HEIGHT = 630;
 
 export const SITE_TITLE = "Poracode - AI Coding Agent Desktop for Claude Code, Codex & Gemini";
 export const SITE_DESCRIPTION =
@@ -108,9 +109,6 @@ export function createPageMetadata({
       canonical,
       languages: buildLanguageAlternates(path),
     },
-    // og:image / twitter:image are supplied by the file-convention card at
-    // app/opengraph-image.tsx (1200x630). SOCIAL_IMAGE_PATH (the app screenshot)
-    // is kept for the SoftwareApplication JSON-LD `image` instead.
     openGraph: {
       title,
       description,
@@ -119,11 +117,28 @@ export function createPageMetadata({
       locale: OG_LOCALE[locale],
       alternateLocale: LOCALE_CODES.filter((l) => l !== locale).map((l) => OG_LOCALE[l]),
       type: "website",
+      images: [
+        {
+          url: absoluteUrl("/opengraph-image"),
+          width: SOCIAL_IMAGE_WIDTH,
+          height: SOCIAL_IMAGE_HEIGHT,
+          alt: SOCIAL_IMAGE_ALT,
+          type: "image/png",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [
+        {
+          url: absoluteUrl("/twitter-image"),
+          width: SOCIAL_IMAGE_WIDTH,
+          height: SOCIAL_IMAGE_HEIGHT,
+          alt: SOCIAL_IMAGE_ALT,
+        },
+      ],
     },
   };
 }

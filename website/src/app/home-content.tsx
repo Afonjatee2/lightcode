@@ -22,9 +22,11 @@ import {
   KeyRound,
   Moon,
 } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 import { motion, useMotionValue, useSpring, useReducedMotion, useInView } from "framer-motion";
 import { downloadUrlFor, type ReleaseInfo } from "@/lib/releases";
+import { localizedPath } from "@/lib/seo";
 import { useI18n } from "@/lib/i18n/I18nProvider";
 import { LanguageSelector } from "@/components/LanguageSelector";
 import {
@@ -40,11 +42,6 @@ import { LandingFaq } from "./landing-faq";
 const ACP_REGISTRY_CDN = "https://cdn.agentclientprotocol.com/registry/v1/latest";
 
 const EASE = [0.16, 1, 0.3, 1] as const;
-const fadeUp = (delay: number) => ({
-  initial: { opacity: 0, y: 16 },
-  animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.55, ease: EASE, delay },
-});
 
 // lucide-react 1.14.0 dropped brand glyphs, so the GitHub mark is inlined.
 function GithubMark({ className }: { className?: string }) {
@@ -244,7 +241,7 @@ async function getBrowserArchitecture(): Promise<string | undefined> {
 }
 
 export function HomeContent({ release }: { release: ReleaseInfo }) {
-  const { t } = useI18n();
+  const { locale, t } = useI18n();
 
   const [platform, setPlatform] = useState<{ label: string; slug: string }>({
     label: "Desktop",
@@ -298,6 +295,10 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
     ? `v${release.version} • ${t("hero.tagline")}`
     : t("hero.tagline");
   const downloadHref = downloadUrlFor(release, platform.slug);
+  const homeHref = localizedPath("/", locale);
+  const changelogHref = localizedPath("/changelog", locale);
+  const downloadsHref = localizedPath("/download", locale);
+  const nightlyHref = localizedPath("/nightly", locale);
   // Lead with the `Pora.code` wordmark, so the headline copy is the value-prop
   // only: drop the "Poracode —" brand prefix from title1 and the trailing
   // full-stop from title2 (the Pora dot stands in for it). Locale-safe.
@@ -306,7 +307,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
   ).replace(/[.。]\s*$/u, "")}`;
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden bg-night text-moon">
+    <div lang={locale} className="relative min-h-screen overflow-x-hidden bg-night text-moon">
       {/* powered-on top edge */}
       <div className="pointer-events-none fixed inset-x-0 top-0 z-[60] h-px bg-gradient-to-r from-transparent via-accent/45 to-transparent" />
 
@@ -318,7 +319,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
 
       {/* ── §0 Announcement bar ─────────────────────────────────── */}
       <Link
-        href="/changelog"
+        href={changelogHref}
         className="group relative z-40 flex h-9 items-center justify-center gap-2 border-b border-white/[0.06] bg-tile text-center"
       >
         <span className="pora-dot pora-pulse h-1.5 w-1.5" />
@@ -331,12 +332,16 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
       {/* ── §1 Nav ──────────────────────────────────────────────── */}
       <nav className="sticky top-0 z-50 border-b border-white/[0.06] bg-night/70 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8">
-          <Link href="/" aria-label="Poracode" className="transition-opacity hover:opacity-90">
+          <Link
+            href={homeHref}
+            aria-label="Poracode"
+            className="transition-opacity hover:opacity-90"
+          >
             <BrandLockup />
           </Link>
           <div className="flex items-center gap-1 sm:gap-2">
             <Link
-              href="/changelog"
+              href={changelogHref}
               className="hidden rounded-md px-3 py-2 font-mono text-[13px] text-dim transition-colors hover:bg-white/[0.04] hover:text-moon sm:inline-flex"
             >
               {t("nav.changelog")}
@@ -367,7 +372,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
 
       {/* ── §2 Hero — brand-led ─────────────────────────────────── */}
       <section className="relative z-10 mx-auto flex max-w-4xl flex-col items-center px-5 pt-24 pb-14 text-center sm:px-8 md:pt-32 md:pb-16">
-        <motion.h1 {...fadeUp(0)} className="flex flex-col items-center">
+        <h1 className="hero-fade-up flex flex-col items-center">
           <span className="block">
             <BrandWordmark className="text-6xl tracking-[-0.04em] sm:text-7xl lg:text-8xl" />
           </span>
@@ -375,19 +380,13 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             {descriptor}
             <DotPeriod />
           </span>
-        </motion.h1>
+        </h1>
 
-        <motion.p
-          {...fadeUp(0.12)}
-          className="mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-dim sm:text-xl"
-        >
+        <p className="hero-fade-up hero-fade-up-delay-1 mx-auto mt-7 max-w-2xl text-lg leading-relaxed text-dim sm:text-xl">
           {t("hero.subtitle")}
-        </motion.p>
+        </p>
 
-        <motion.div
-          {...fadeUp(0.2)}
-          className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:gap-5"
-        >
+        <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
           <a
             href={downloadHref}
             className="brand-glow group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition will-change-transform hover:-translate-y-0.5 hover:brightness-95"
@@ -397,28 +396,25 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           </a>
           <div className="flex items-center gap-5">
             <Link
-              href="/download"
+              href={downloadsHref}
               className="text-sm text-dim underline-offset-4 transition-colors hover:text-moon hover:underline"
             >
               {t("nav.otherPlatforms")}
             </Link>
             <Link
-              href="/nightly"
+              href={nightlyHref}
               className="inline-flex items-center gap-1.5 text-sm text-dim transition-colors hover:text-ice"
             >
               <Moon className="h-3.5 w-3.5" />
               {t("nav.nightly")}
             </Link>
           </div>
-        </motion.div>
+        </div>
 
-        <motion.div
-          {...fadeUp(0.28)}
-          className="mt-6 inline-flex items-center gap-2 font-mono text-[12px] text-dim"
-        >
+        <div className="hero-fade-up hero-fade-up-delay-3 mt-6 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
           <KeyRound className="h-4 w-4" />
           <span>{t("hero.byo")}</span>
-        </motion.div>
+        </div>
       </section>
 
       {/* ── §3 App window showcase ──────────────────────────────── */}
@@ -432,6 +428,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           chrome
           parallax
           badge
+          preload
         />
         <div className="pointer-events-none absolute inset-x-0 -bottom-px h-48 bg-gradient-to-t from-night to-transparent" />
       </section>
@@ -445,10 +442,10 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           <div className="mb-14 max-w-2xl">
             <p className="mb-4 flex items-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-dim">
               <span className="pora-dot h-1.5 w-1.5" />
-              {t("features.title2")}
+              {t("hero.discover")}
             </p>
             <h2 className="text-4xl font-bold tracking-[-0.03em] text-moon md:text-5xl">
-              {t("features.title1")}
+              {t("features.title1")} {t("features.title2").replace(/[.。]\s*$/, "")}
               <DotPeriod pulse={false} />
             </h2>
             <p className="mt-4 text-lg text-dim">{t("features.subtitle")}</p>
@@ -595,7 +592,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           <p className="font-mono text-[12px] text-dim">{t("footer.copyright", { year: 2026 })}</p>
           <div className="flex items-center gap-6">
             <Link
-              href="/changelog"
+              href={changelogHref}
               className="font-mono text-[13px] text-dim transition-colors hover:text-moon"
             >
               {t("nav.changelog")}
@@ -628,14 +625,16 @@ function AppWindow({
   chrome = false,
   badge = false,
   parallax = false,
+  preload = false,
 }: {
   src: string;
   alt?: string;
-  width?: number;
-  height?: number;
+  width: number;
+  height: number;
   chrome?: boolean;
   badge?: boolean;
   parallax?: boolean;
+  preload?: boolean;
 }) {
   const reduce = useReducedMotion();
   const enableParallax = parallax && !reduce;
@@ -692,13 +691,17 @@ function AppWindow({
           <span className="w-12" />
         </div>
       ) : null}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={src}
         alt={alt}
         width={width}
         height={height}
-        loading="lazy"
+        preload={preload}
+        sizes={
+          preload
+            ? "(max-width: 1280px) calc(100vw - 32px), 1152px"
+            : "(max-width: 1024px) calc(100vw - 40px), 672px"
+        }
         decoding="async"
         className="block h-auto w-full"
       />
@@ -743,13 +746,12 @@ function BentoCard({
     >
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="relative h-52 overflow-hidden border-b border-white/[0.06] bg-night">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={src}
           alt=""
           width={width}
           height={height}
-          loading="lazy"
+          sizes="(max-width: 640px) calc(100vw - 40px), (max-width: 1024px) calc(50vw - 30px), 33vw"
           decoding="async"
           className={`h-full w-full object-cover ${fit} transition-transform duration-500 group-hover:scale-[1.03]`}
         />
