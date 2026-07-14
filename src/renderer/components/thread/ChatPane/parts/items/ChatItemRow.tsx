@@ -25,6 +25,7 @@ interface ChatItemRowProps {
   entry: ChatTimelineEntry;
   /** True when this is the tail of the visible timeline. Drives live-group expand state. */
   isLastEntry?: boolean;
+  onHeightChange?: () => void;
   isTurnActive?: boolean;
   checkpointRevert: CheckpointRevertRequest | null;
 }
@@ -41,12 +42,20 @@ export const ChatItemRow = memo(function ChatItemRow({
   threadId,
   entry,
   isLastEntry = false,
+  onHeightChange,
   isTurnActive = false,
   checkpointRevert,
 }: ChatItemRowProps) {
   "use no memo";
   if (entry.kind === "tool_call_group") {
-    return <ToolCallGroup threadId={threadId} itemIds={entry.itemIds} isLive={isLastEntry} />;
+    return (
+      <ToolCallGroup
+        threadId={threadId}
+        itemIds={entry.itemIds}
+        isLive={isLastEntry}
+        {...(onHeightChange ? { onHeightChange } : {})}
+      />
+    );
   }
   return (
     <SingleChatItemRow
