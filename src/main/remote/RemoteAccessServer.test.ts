@@ -1142,6 +1142,30 @@ describe("RemoteAccessServer", () => {
     expect(settingsPairing.searchParams.get("host")).toBe(info.httpBaseUrl);
   });
 
+  it("points production pairing links at the hosted Poracode app", async () => {
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      pairingAppUrl: "https://poracode.com",
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+    });
+    servers.push(server);
+    const info = await server.start();
+
+    const startupPairing = new URL(info.pairingUrl);
+    expect(startupPairing.origin).toBe("https://poracode.com");
+    expect(startupPairing.pathname).toBe("/pair");
+    expect(startupPairing.searchParams.get("host")).toBe(info.httpBaseUrl);
+    expect(new URLSearchParams(startupPairing.hash.slice(1)).get("token")).toMatch(/^lc_pair_/);
+
+    const settingsPairing = new URL(server.issuePairingUrl("Settings QR"));
+    expect(settingsPairing.origin).toBe(startupPairing.origin);
+    expect(settingsPairing.pathname).toBe("/pair");
+    expect(settingsPairing.searchParams.get("host")).toBe(info.httpBaseUrl);
+  });
+
   it("rejects an unauthenticated /api/git/call before parsing or the procedure allowlist", async () => {
     const callSupervisor = vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => {
       throw new Error("supervisor must not be reached for an unauthenticated call");

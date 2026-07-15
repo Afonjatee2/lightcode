@@ -65,10 +65,11 @@ also serves the PNG icon set from `/icons/*`.
 
 1. Create a Vercel project pointing at this repo, Root Directory = repo root.
 2. Add repo secrets `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`.
-3. On the **desktop**, turn on **Settings → Remote Access** and set
-   `PORACODE_REMOTE_ACCESS_PAIRING_APP_URL=https://<your-host>`
-   so the pairing QR encodes `https://<your-host>/pair?host=<desktop>#token=…`
-   (this is what enables app-vs-PWA routing below).
+3. On the **desktop**, turn on **Settings → Remote Access**. Packaged builds
+   default to `https://poracode.com`, so the pairing QR encodes
+   `https://poracode.com/pair?host=<desktop>#token=…`. Set
+   `PORACODE_REMOTE_ACCESS_PAIRING_APP_URL=https://<your-host>` only to override
+   the hosted pairing app for staging or a custom deployment.
 
 Deploy: `Actions → Release Mobile` with **Web** ticked (or push a `mobile-v*` tag).
 
