@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { Button, Disclosure, Switch, toast } from "@heroui/react";
+import { Button, Disclosure, toast } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Copy, ExternalLink, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
 import { toDataURL } from "qrcode";
 import { readBridge } from "@/renderer/bridge";
-import { Input, PixelLoader } from "@/renderer/components/common";
+import { Input, PixelLoader, ToggleSwitch } from "@/renderer/components/common";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import type { RemoteAccessTailscaleStatus } from "@/shared/ipc";
 import type { RemoteAccessPairingInfo, RemoteAccessSessionSummary } from "@/shared/remote";
@@ -89,16 +89,12 @@ function RemoteAccessSwitch(props: {
   const enabled = props.status === "ready" || props.status === "starting";
 
   return (
-    <Switch
+    <ToggleSwitch
       isSelected={enabled}
       isDisabled={props.isDisabled}
       aria-label={t`Remote Access`}
       onChange={props.onChange}
-    >
-      <Switch.Control>
-        <Switch.Thumb />
-      </Switch.Control>
-    </Switch>
+    />
   );
 }
 
@@ -496,18 +492,14 @@ function RemoteAccessAdvanced(props: {
         title={t`Tailscale HTTPS`}
         description={t`Optional. Enabling this runs tailscale serve for the remote access port, then new pairing codes use your tailnet's HTTPS MagicDNS URL. Leave it off to use the LAN address or Public URL below.`}
       >
-        <Switch
+        <ToggleSwitch
           isSelected={tailscaleEnabled}
           // Stays operable while enabled even if the daemon went away, so the
           // user can always turn the setting off.
           isDisabled={(!daemonReady && !tailscaleEnabled) || isTogglingTailscale}
           aria-label={t`Tailscale HTTPS`}
           onChange={(enabled) => void toggleTailscale(enabled)}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch>
+        />
       </SettingRow>
       <p className="-mt-2 text-xs text-muted">{hint}</p>
       {status?.daemon === "not-installed" ? (
@@ -599,15 +591,11 @@ function RemotePushSection() {
           </Trans>
         }
       >
-        <Switch
+        <ToggleSwitch
           isSelected={pushEnabled}
           aria-label={t`Mobile push notifications`}
           onChange={setPushEnabled}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch>
+        />
       </SettingRow>
       <SettingRow
         title={t`Redact notification content`}
@@ -617,16 +605,12 @@ function RemotePushSection() {
           </Trans>
         }
       >
-        <Switch
+        <ToggleSwitch
           isSelected={redactContent}
           isDisabled={!pushEnabled}
           aria-label={t`Redact notification content`}
           onChange={setRedactContent}
-        >
-          <Switch.Control>
-            <Switch.Thumb />
-          </Switch.Control>
-        </Switch>
+        />
       </SettingRow>
     </div>
   );

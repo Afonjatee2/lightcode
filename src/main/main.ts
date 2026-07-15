@@ -87,6 +87,7 @@ import { legacyProductNameFor, resolveLegacyElectronUserDataDir } from "./legacy
 import { refreshMacDockIcon } from "./macDockIcon";
 import { repairLegacyMacAppPath } from "./macAppPathMigration";
 import { persistSupervisorEvent } from "./remote/server/runtimePersistence";
+import { shouldUseMockKeychain } from "./mockKeychain";
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const channel = resolvePoracodeChannel();
@@ -109,6 +110,15 @@ if (preserveLegacySafeStorageIdentity) {
 
 if (process.env.PORACODE_CDP_PORT) {
   app.commandLine.appendSwitch("remote-debugging-port", process.env.PORACODE_CDP_PORT);
+}
+
+// Isolated smoke runs replace HOME so they cannot read developer credentials.
+// On macOS that also hides the login keychain from Chromium, which otherwise
+// opens a blocking "Keychain Not Found" dialog while safeStorage initializes.
+// Chromium's mock keychain is intended for automated tests and must never be
+// enabled for packaged or ordinary dev launches.
+if (shouldUseMockKeychain({ isDev })) {
+  app.commandLine.appendSwitch("use-mock-keychain");
 }
 
 // Windows HDR can make DWM acrylic visibly change opacity when Chromium starts
