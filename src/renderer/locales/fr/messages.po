@@ -3362,8 +3362,12 @@ msgid "Endpoint"
 msgstr "Endpoint"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-msgid "Endpoint, e.g. http://192.168.1.20:38987/"
-msgstr "Point d'accès, p. ex. http://192.168.1.20:38987/"
+#~ msgid "Endpoint, e.g. http://192.168.1.20:38987/"
+#~ msgstr "Point d'accès, p. ex. http://192.168.1.20:38987/"
+
+#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
+msgid "Endpoint, e.g. http://192.168.1.20:49152/"
+msgstr "Point d'accès, p. ex. http://192.168.1.20:49152/"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Enhanced (Hooks)"
@@ -7031,6 +7035,10 @@ msgstr "Accès distant"
 msgid "Remote access pairing QR code"
 msgstr "Code QR d’association pour l’accès distant"
 
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
+msgid "Remote access port {occupiedPort} is already in use. Stop the other server, then retry."
+msgstr "Le port d’accès à distance {occupiedPort} est déjà utilisé. Arrêtez l’autre serveur, puis réessayez."
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Remote environment unavailable."
 msgstr "Environnement distant indisponible."
@@ -7355,6 +7363,7 @@ msgstr "Reprendre"
 #: src/mobile/views/TerminalView.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "Réessayer"
 

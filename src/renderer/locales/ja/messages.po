@@ -3361,8 +3361,12 @@ msgid "Endpoint"
 msgstr "エンドポイント"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
-msgid "Endpoint, e.g. http://192.168.1.20:38987/"
-msgstr "エンドポイント（例: http://192.168.1.20:38987/）"
+#~ msgid "Endpoint, e.g. http://192.168.1.20:38987/"
+#~ msgstr "エンドポイント（例: http://192.168.1.20:38987/）"
+
+#: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
+msgid "Endpoint, e.g. http://192.168.1.20:49152/"
+msgstr "エンドポイント（例: http://192.168.1.20:49152/）"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Enhanced (Hooks)"
@@ -7030,6 +7034,10 @@ msgstr "リモートアクセス"
 msgid "Remote access pairing QR code"
 msgstr "リモートアクセスペアリングQRコード"
 
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
+msgid "Remote access port {occupiedPort} is already in use. Stop the other server, then retry."
+msgstr "リモートアクセス用ポート {occupiedPort} はすでに使用されています。もう一方のサーバーを停止してから、再試行してください。"
+
 #: src/renderer/views/RemoteProjectModal/RemoteProjectModal.tsx
 msgid "Remote environment unavailable."
 msgstr "リモート環境を利用できません。"
@@ -7354,6 +7362,7 @@ msgstr "再開"
 #: src/mobile/views/TerminalView.tsx
 #: src/renderer/components/mcp/McpExternalImportModal.tsx
 #: src/renderer/components/skills/SkillsManager.tsx
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Retry"
 msgstr "再試行"
 

@@ -43,6 +43,8 @@ import { handleHttp } from "./server/httpRouter";
 import { persistSupervisorEvent } from "./server/runtimePersistence";
 
 const EVENT_BUFFER_LIMIT = 500;
+const DEFAULT_LISTEN_RETRY_ATTEMPTS = 5;
+const DEFAULT_LISTEN_RETRY_DELAY_MS = 500;
 
 export interface RemoteAccessServerInfo {
   readonly httpBaseUrl: string;
@@ -98,6 +100,9 @@ export interface RemoteAccessServerOptions {
    */
   readonly devMobileAppUrl?: string;
   readonly port: number;
+  /** Same-port retries absorb brief listener overlap during app relaunches. */
+  readonly listenRetryAttempts?: number;
+  readonly listenRetryDelayMs?: number;
   readonly authStore?: RemoteAuthStore;
   /**
    * Whether this server owns supervisor-event persistence. Headless servers do;
@@ -211,6 +216,7 @@ export class RemoteAccessServer {
   private readonly context: RemoteServerContext;
   private seq = 0;
   private info: RemoteAccessServerInfo | null = null;
+  private stopping = false;
 
   constructor(private readonly options: RemoteAccessServerOptions) {
     this.auth = options.authStore ?? new RemoteAuthStore();
@@ -267,19 +273,23 @@ export class RemoteAccessServer {
 
   async start(): Promise<RemoteAccessServerInfo> {
     if (this.info) return this.info;
-    await new Promise<void>((resolve, reject) => {
-      const onError = (error: Error) => {
-        this.server.off("listening", onListening);
-        reject(error);
-      };
-      const onListening = () => {
-        this.server.off("error", onError);
-        resolve();
-      };
-      this.server.once("error", onError);
-      this.server.once("listening", onListening);
-      this.server.listen(this.options.port, this.options.host);
-    });
+    if (this.stopping) throw new Error("Remote access server is stopping.");
+
+    const maxAttempts = this.options.listenRetryAttempts ?? DEFAULT_LISTEN_RETRY_ATTEMPTS;
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await this.listenOnce();
+        break;
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "EADDRINUSE" || attempt >= maxAttempts || this.stopping) throw error;
+        await new Promise((resolve) =>
+          setTimeout(resolve, this.options.listenRetryDelayMs ?? DEFAULT_LISTEN_RETRY_DELAY_MS),
+        );
+      }
+    }
+
+    if (this.stopping) throw new Error("Remote access server is stopping.");
 
     const address = this.server.address() as AddressInfo;
     const httpBaseUrl = this.resolveHttpBaseUrl(address.port);
@@ -296,6 +306,22 @@ export class RemoteAccessServer {
     return this.info;
   }
 
+  private listenOnce(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+      const onError = (error: Error) => {
+        this.server.off("listening", onListening);
+        reject(error);
+      };
+      const onListening = () => {
+        this.server.off("error", onError);
+        resolve();
+      };
+      this.server.once("error", onError);
+      this.server.once("listening", onListening);
+      this.server.listen(this.options.port, this.options.host);
+    });
+  }
+
   /**
    * Stops the server. Resolves once the HTTP server has actually closed so a
    * caller (e.g. the headless host) can safely tear down the database afterward
@@ -303,6 +329,7 @@ export class RemoteAccessServer {
    * immediately; active requests are given a short grace period to finish.
    */
   async dispose(): Promise<void> {
+    this.stopping = true;
     this.heartbeat.stop();
     for (const client of this.clients.keys()) {
       client.terminate();

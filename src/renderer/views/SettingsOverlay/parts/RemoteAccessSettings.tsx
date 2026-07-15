@@ -43,6 +43,11 @@ function friendlyError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
+function addressInUsePort(error: unknown): string | null {
+  if (!(error instanceof Error) || !error.message.includes("EADDRINUSE")) return null;
+  return /:(\d+)\b/.exec(error.message)?.[1] ?? null;
+}
+
 /** Clipboard copy with a localized success toast; `failureMessage` on failure. */
 function useCopyValue() {
   const { t } = useLingui();
@@ -694,8 +699,21 @@ export function RemoteAccessSettings() {
       const info = await readBridge().setRemoteAccessEnabled({ enabled });
       setState(await pairingViewStateFromInfo(info));
     } catch (error) {
-      const message = friendlyError(error, t`Unable to update remote access.`);
-      toast.danger(message);
+      const occupiedPort = addressInUsePort(error);
+      const message = occupiedPort
+        ? t`Remote access port ${occupiedPort} is already in use. Stop the other server, then retry.`
+        : friendlyError(error, t`Unable to update remote access.`);
+      if (occupiedPort) {
+        toast.danger(message, {
+          actionProps: {
+            children: t`Retry`,
+            onPress: () => void toggleRemoteAccess(true),
+            variant: "danger",
+          },
+        });
+      } else {
+        toast.danger(message);
+      }
       try {
         setState(await readPairingViewState());
       } catch {

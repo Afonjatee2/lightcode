@@ -93,7 +93,7 @@ function parseJsonResponse(text: string, response: Response): unknown {
     const htmlLike = contentType.includes("text/html") || trimmed.startsWith("<");
     throw new RemoteClientError(
       htmlLike
-        ? "That endpoint returned the app HTML instead of the desktop API. Use the desktop API endpoint (the one ending in :38987), not the web app URL."
+        ? "That endpoint returned the app HTML instead of the desktop API. Use the desktop API endpoint shown in Remote Access settings, not the web app URL."
         : "Remote request failed.",
       response.status,
       "invalid_response",

@@ -419,6 +419,30 @@ function extractForwardCookieValue(setCookieHeader: string): string {
 }
 
 describe("RemoteAccessServer", () => {
+  it("retries the assigned port without falling back to a different endpoint", async () => {
+    const blocker = createNetServer();
+    await new Promise<void>((resolve, reject) => {
+      blocker.once("error", reject);
+      blocker.listen(0, "127.0.0.1", resolve);
+    });
+    const port = (blocker.address() as AddressInfo).port;
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port,
+      listenRetryAttempts: 5,
+      listenRetryDelayMs: 50,
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+    });
+    servers.push(server);
+
+    setTimeout(() => blocker.close(), 75);
+    const info = await server.start();
+
+    expect(new URL(info.httpBaseUrl).port).toBe(String(port));
+  });
+
   it("persists remotely broadcast thread-state transitions", () => {
     const initialStartedAt = "2026-01-01T00:00:00.000Z";
     const db = mockThreadDb([

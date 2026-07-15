@@ -74,7 +74,7 @@ describe("parsePairingUrl", () => {
 describe("normalizePairingEndpoint", () => {
   it("maps the Vite dev mobile app origin to the default desktop remote port", () => {
     expect(normalizePairingEndpoint("http://192.168.1.20:3100/")).toBe(
-      "http://192.168.1.20:38987/",
+      "http://192.168.1.20:49152/",
     );
   });
 

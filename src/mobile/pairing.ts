@@ -7,7 +7,7 @@ export interface PairingLaunch {
 }
 
 const VITE_DEV_SERVER_PORT = "3100";
-const DEFAULT_REMOTE_ACCESS_PORT = "38987";
+const DEFAULT_REMOTE_ACCESS_PORT = "49152";
 
 function normalizeEndpoint(value: string): string {
   const url = new URL(value);
