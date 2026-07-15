@@ -20,6 +20,7 @@ import { ComposerAddMenu } from "../composer/ComposerAddMenu";
 import { ComposerVoiceInput } from "../composer/ComposerVoiceInput";
 import { composerMcpServers, COMPUTER_USE_MCP_ID } from "../composer/composerMcpServers";
 import { openAttachmentLightbox } from "../composer/ImageLightbox";
+import { openPdfPreview } from "../pdf/openPdfPreview";
 import {
   MentionInput,
   type McpMentionItem,
@@ -647,6 +648,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         const idx = imageAttachments.findIndex((a) => a.id === att.id);
                         if (idx >= 0) openAttachmentLightbox(imageAttachments, idx);
                       }}
+                      onPreviewPdf={(att) => openPdfPreview(att.path)}
                     />
                   }
                   inputContent={
