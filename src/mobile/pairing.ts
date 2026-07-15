@@ -170,7 +170,12 @@ export function appUrlWithoutPairing(location: Location = window.location): stri
   // On the Vite dev server the app lives at /mobile.html; only the desktop
   // server serves it at /app.
   if (!url.pathname.endsWith("/mobile.html")) {
-    url.pathname = "/app";
+    if (url.pathname.endsWith("/pair")) {
+      url.pathname = `${url.pathname.slice(0, -"/pair".length)}/app`;
+    } else if (!url.pathname.endsWith("/app")) {
+      const basePath = import.meta.env.BASE_URL;
+      url.pathname = basePath.startsWith("/") ? `${basePath}app` : "/app";
+    }
   }
   url.search = "";
   url.hash = "";

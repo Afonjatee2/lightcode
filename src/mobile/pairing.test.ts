@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { normalizePairingEndpoint, parsePairingUrl } from "./pairing";
+import { appUrlWithoutPairing, normalizePairingEndpoint, parsePairingUrl } from "./pairing";
 
 const globalWithCapacitor = globalThis as typeof globalThis & {
   Capacitor?: { isNativePlatform: () => boolean };
@@ -134,6 +134,16 @@ describe("capturePairingLaunch", () => {
       endpoint: "",
       credential: null,
     });
+  });
+});
+
+describe("appUrlWithoutPairing", () => {
+  it("preserves a hosted path prefix when stripping pairing credentials", () => {
+    expect(
+      appUrlWithoutPairing(
+        locationFromUrl("https://poracode.com/pwa/pair?host=https://desktop.test/#token=pair"),
+      ),
+    ).toBe("https://poracode.com/pwa/app");
   });
 });
 
