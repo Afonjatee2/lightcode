@@ -17,5 +17,6 @@ export * from "./ProviderModelMenu";
 export * from "./Select";
 export * from "./SidebarButton";
 export * from "./TextArea";
+export * from "./ToggleSwitch";
 export * from "./TuxIcon";
 export * from "./AnimatingPlanIcon";
