@@ -6642,6 +6642,10 @@ msgstr "Exécutions précédentes"
 msgid "Previous tab"
 msgstr "Onglet précédent"
 
+#: src/mobile/views/MoreView.tsx
+msgid "Privacy Policy"
+msgstr "Politique de confidentialité"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Private key"
 msgstr "Clé privée"
@@ -8680,6 +8684,10 @@ msgstr "Résume les progrès de cette semaine, le travail inachevé et les risqu
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
 msgstr "Supervisé"
+
+#: src/mobile/views/MoreView.tsx
+msgid "Support"
+msgstr "Assistance"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Support mode appears once the session connects."

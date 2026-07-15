@@ -6643,6 +6643,10 @@ msgstr "Các lần chạy trước"
 msgid "Previous tab"
 msgstr "Tab trước"
 
+#: src/mobile/views/MoreView.tsx
+msgid "Privacy Policy"
+msgstr "Chính sách quyền riêng tư"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Private key"
 msgstr "Khóa riêng"
@@ -8681,6 +8685,10 @@ msgstr "Tóm tắt tiến độ tuần này, công việc chưa hoàn thành và
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
 msgstr "Giám sát"
+
+#: src/mobile/views/MoreView.tsx
+msgid "Support"
+msgstr "Hỗ trợ"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Support mode appears once the session connects."

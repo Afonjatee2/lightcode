@@ -6643,6 +6643,10 @@ msgstr "Önceki çalıştırmalar"
 msgid "Previous tab"
 msgstr "Önceki sekme"
 
+#: src/mobile/views/MoreView.tsx
+msgid "Privacy Policy"
+msgstr "Gizlilik Politikası"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Private key"
 msgstr "Özel anahtar"
@@ -8681,6 +8685,10 @@ msgstr "Bu haftanın ilerlemesini, tamamlanmamış işleri ve gelecek haftanın 
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
 msgstr "Denetlenen"
+
+#: src/mobile/views/MoreView.tsx
+msgid "Support"
+msgstr "Destek"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Support mode appears once the session connects."

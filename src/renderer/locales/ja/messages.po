@@ -6641,6 +6641,10 @@ msgstr "過去の実行"
 msgid "Previous tab"
 msgstr "前のタブ"
 
+#: src/mobile/views/MoreView.tsx
+msgid "Privacy Policy"
+msgstr "プライバシーポリシー"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Private key"
 msgstr "秘密鍵"
@@ -8679,6 +8683,10 @@ msgstr "今週の進捗、未完了の作業、来週の重要なリスクをま
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
 msgstr "監督あり"
+
+#: src/mobile/views/MoreView.tsx
+msgid "Support"
+msgstr "サポート"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Support mode appears once the session connects."

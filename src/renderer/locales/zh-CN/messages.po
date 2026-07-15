@@ -6642,6 +6642,10 @@ msgstr "历史运行"
 msgid "Previous tab"
 msgstr "上一个选项卡"
 
+#: src/mobile/views/MoreView.tsx
+msgid "Privacy Policy"
+msgstr "隐私政策"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Private key"
 msgstr "私钥"
@@ -8680,6 +8684,10 @@ msgstr "总结本周进展、未完成的工作以及下周最重要的风险。
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
 msgstr "监督"
+
+#: src/mobile/views/MoreView.tsx
+msgid "Support"
+msgstr "支持"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Support mode appears once the session connects."

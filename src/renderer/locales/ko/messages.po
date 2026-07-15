@@ -6643,6 +6643,10 @@ msgstr "이전 실행"
 msgid "Previous tab"
 msgstr "이전 탭"
 
+#: src/mobile/views/MoreView.tsx
+msgid "Privacy Policy"
+msgstr "개인정보 처리방침"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Private key"
 msgstr "개인 키"
@@ -8681,6 +8685,10 @@ msgstr "이번 주의 진행 상황, 미완료 작업, 다음 주의 가장 중�
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
 msgstr "감독됨"
+
+#: src/mobile/views/MoreView.tsx
+msgid "Support"
+msgstr "지원"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Support mode appears once the session connects."

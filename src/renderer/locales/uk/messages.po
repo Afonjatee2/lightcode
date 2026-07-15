@@ -6643,6 +6643,10 @@ msgstr "Попередні запуски"
 msgid "Previous tab"
 msgstr "Попередня вкладка"
 
+#: src/mobile/views/MoreView.tsx
+msgid "Privacy Policy"
+msgstr "Політика конфіденційності"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Private key"
 msgstr "Закритий ключ"
@@ -8681,6 +8685,10 @@ msgstr "Підсумуй прогрес цього тижня, незаверш�
 #: src/renderer/components/providers/composerControlBuilders.tsx
 msgid "Supervised"
 msgstr "Під наглядом"
+
+#: src/mobile/views/MoreView.tsx
+msgid "Support"
+msgstr "Підтримка"
 
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Support mode appears once the session connects."
