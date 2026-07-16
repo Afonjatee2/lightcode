@@ -69,11 +69,11 @@ export function summarizeToolCalls(items: readonly RuntimeChatItem[]): GroupSect
 }
 
 export type EditToolGroupAnalysis = {
-  /** Every item is an edit (live tail should stay collapsed). */
+  /** Every non-thought item is an edit (live tail should stay collapsed). */
   editOnly: boolean;
   /**
-   * Compact "N edits: path" summary when consecutive group members all edit
-   * the same path. Reasoning is not groupable, so this only sees true runs.
+   * Compact "N edits: path" summary when all edits in the group share one
+   * path. Thoughts are transparent glue; any other tool call disables it.
    */
   sameFile: SameFileEditGroupSummary | null;
 };
@@ -94,7 +94,8 @@ export function analyzeEditToolGroup(items: readonly RuntimeChatItem[]): EditToo
 
   for (const item of items) {
     const category = categorizeItem(item);
-    // Defensive: thoughts are not groupable on the timeline, but skip if present.
+    // Thoughts often interleave a multi-patch run; they are noise for both the
+    // edit-only auto-expand rule and the same-file path header.
     if (category === "thought") continue;
     if (category !== "edited") {
       return { editOnly: false, sameFile: null };
@@ -140,6 +141,101 @@ export function analyzeEditToolGroup(items: readonly RuntimeChatItem[]): EditToo
   return { editOnly: true, sameFile };
 }
 
+export type ToolGroupRowSegment =
+  | { kind: "item"; item: RuntimeChatItem }
+  | {
+      kind: "same-file-edits";
+      /** Contiguous run slice: the edits plus any thoughts absorbed between them. */
+      items: readonly RuntimeChatItem[];
+      summary: SameFileEditGroupSummary;
+    };
+
+/**
+ * Split a tool-call group's items into render segments: strictly consecutive
+ * edits of one file (2+) merge into a single "N edits: path" row. Thoughts
+ * between two same-path edits are absorbed into the run (reasoning is glue,
+ * not a run breaker), but any other tool call — or an edit to a different
+ * file — ends the run, so those edits stay separate rows inside the group.
+ */
+export function segmentToolGroupRows(items: readonly RuntimeChatItem[]): ToolGroupRowSegment[] {
+  const segments: ToolGroupRowSegment[] = [];
+  let idx = 0;
+  while (idx < items.length) {
+    const item = items[idx]!;
+    const path = categorizeItem(item) === "edited" ? readEditGroupPath(item) : undefined;
+    if (!path) {
+      segments.push({ kind: "item", item });
+      idx += 1;
+      continue;
+    }
+
+    const normalizedPath = normalizeEditGroupPath(path);
+    const run: RuntimeChatItem[] = [item];
+    let editCount = 1;
+    // Thoughts are only absorbed once another same-path edit follows them;
+    // trailing thoughts after the last edit stay outside the run.
+    let pendingThoughts: RuntimeChatItem[] = [];
+    let cursor = idx + 1;
+    while (cursor < items.length) {
+      const next = items[cursor]!;
+      const nextCategory = categorizeItem(next);
+      if (nextCategory === "thought") {
+        pendingThoughts.push(next);
+        cursor += 1;
+        continue;
+      }
+      if (nextCategory !== "edited") break;
+      const nextPath = readEditGroupPath(next);
+      if (!nextPath || normalizeEditGroupPath(nextPath) !== normalizedPath) break;
+      run.push(...pendingThoughts, next);
+      pendingThoughts = [];
+      editCount += 1;
+      cursor += 1;
+    }
+
+    if (editCount < 2) {
+      segments.push({ kind: "item", item });
+      idx += 1;
+      continue;
+    }
+    segments.push({
+      kind: "same-file-edits",
+      items: run,
+      summary: summarizeSameFileEditRun(run, path, editCount),
+    });
+    // `run` is the contiguous slice starting at idx (edits + absorbed thoughts).
+    idx += run.length;
+  }
+  return segments;
+}
+
+function summarizeSameFileEditRun(
+  run: readonly RuntimeChatItem[],
+  path: string,
+  count: number,
+): SameFileEditGroupSummary {
+  let added = 0;
+  let removed = 0;
+  let hasDiffSummary = false;
+  let missingDiffSummary = false;
+  for (const item of run) {
+    if (categorizeItem(item) !== "edited") continue;
+    const diffSummary = readEditDiffSummary(item);
+    if (diffSummary) {
+      hasDiffSummary = true;
+      added += diffSummary.added;
+      removed += diffSummary.removed;
+    } else {
+      missingDiffSummary = true;
+    }
+  }
+  return {
+    count,
+    path,
+    ...(hasDiffSummary && !missingDiffSummary ? { diffSummary: { added, removed } } : {}),
+  };
+}
+
 export function summarizeSameFileEditGroup(
   items: readonly RuntimeChatItem[],
 ): SameFileEditGroupSummary | null {
@@ -182,11 +278,12 @@ export function normalizeEditGroupPath(path: string): string {
 export function isToolGroupItem(item: RuntimeChatItem): boolean {
   if (isContextCompactionToolCall(item)) return false;
   if (isPlanProposalToolCall(item)) return false;
-  // Reasoning is intentionally not groupable: a Thought between two edits is
-  // another timeline item, not glue. Grouping only consecutive tool rows keeps
-  // `edit → thought → edit` as three rows instead of one false "2 edits" group.
+  // Reasoning is a first-class group member: providers interleave a Thought
+  // before nearly every tool call, so excluding it would break almost every
+  // run and disable grouping outright.
   return (
     isToolLikeItem(item) ||
+    item.type === "reasoning" ||
     item.type === "command_execution" ||
     item.type === "file_change" ||
     item.type === "web_search"

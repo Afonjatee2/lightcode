@@ -61,8 +61,10 @@ import {
   isEditLikeToolPayload,
   isToolGroupItem,
   readCommandPayloadCommand,
+  segmentToolGroupRows,
   summarizeToolCalls,
   type SameFileEditGroupSummary,
+  type ToolGroupRowSegment,
 } from "./toolCallCategorization";
 import { deriveToolDisplay } from "./toolDisplay";
 import { FileContentPlaceholder, useReadAbsoluteFile } from "./useReadAbsoluteFile";
@@ -95,11 +97,14 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   // Single pass: edit-only groups stay collapsed while live; same-file multi
   // patches also get the compact "N edits: path" header.
   const { editOnly: editOnlyGroup, sameFile: sameFileEditSummary } = analyzeEditToolGroup(items);
+  // Mixed groups render per-segment: strictly consecutive same-file edits
+  // collapse into one merged edit row; everything else stays its own row.
+  const segments = segmentToolGroupRows(items);
   const [isExpanded, setIsExpanded] = useState(() => isLive && !editOnlyGroup);
   const [showAll, setShowAll] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const previousLayoutRef = useRef({ isExpanded, showAll });
-  const hasOverflowRows = items.length > TOOL_CALL_GROUP_MAX_VISIBLE_ROWS;
+  const hasOverflowRows = segments.length > TOOL_CALL_GROUP_MAX_VISIBLE_ROWS;
   // Preserve manual open/close across live-tail item updates.
   const userToggledRef = useRef(false);
 
@@ -137,8 +142,8 @@ export const ToolCallGroup = memo(function ToolCallGroup({
 
   if (items.length === 0) return null;
   const sections = summarizeToolCalls(items);
-  const visibleItems =
-    !showAll && hasOverflowRows ? items.slice(-TOOL_CALL_GROUP_MAX_VISIBLE_ROWS) : items;
+  const visibleSegments =
+    !showAll && hasOverflowRows ? segments.slice(-TOOL_CALL_GROUP_MAX_VISIBLE_ROWS) : segments;
 
   return (
     <div className={chatRowShellClass}>
@@ -205,9 +210,13 @@ export const ToolCallGroup = memo(function ToolCallGroup({
                   {sameFileEditSummary ? (
                     <SameFileEditGroupBody items={items} />
                   ) : (
-                    visibleItems.map((item) => (
-                      <div key={item.id} className="animate-tool-call-enter">
-                        <GroupRowInline item={item} />
+                    visibleSegments.map((segment) => (
+                      <div key={segmentKey(segment)} className="animate-tool-call-enter">
+                        {segment.kind === "same-file-edits" ? (
+                          <SameFileEditRunInline items={segment.items} summary={segment.summary} />
+                        ) : (
+                          <GroupRowInline item={segment.item} />
+                        )}
                       </div>
                     ))
                   )}
@@ -220,6 +229,48 @@ export const ToolCallGroup = memo(function ToolCallGroup({
     </div>
   );
 });
+
+function segmentKey(segment: ToolGroupRowSegment): string {
+  return segment.kind === "same-file-edits" ? segment.items[0]!.id : segment.item.id;
+}
+
+/**
+ * Inline row for a consecutive same-file edit run inside a mixed group: the
+ * compact "N edits: path" header with the aggregated diff count, expanding to
+ * the same merged file diff the whole-group same-file treatment uses.
+ */
+function SameFileEditRunInline({
+  items,
+  summary,
+}: {
+  items: readonly RuntimeChatItem[];
+  summary: SameFileEditGroupSummary;
+}) {
+  const actions = useChatPaneActions();
+  const [isExpanded, setIsExpanded] = useState(false);
+  return (
+    <Disclosure
+      className="text-[length:var(--lc-chat-font-size-command)] leading-tight"
+      isExpanded={isExpanded}
+      onExpandedChange={(next) => {
+        setIsExpanded(next);
+        actions?.onContentHeightChange();
+      }}
+    >
+      <Disclosure.Heading>
+        <Disclosure.Trigger className={inlineRowTriggerClass}>
+          <SameFileEditGroupTitle summary={summary} />
+          <Disclosure.Indicator className={chatRowIndicatorClass} />
+        </Disclosure.Trigger>
+      </Disclosure.Heading>
+      <Disclosure.Content>
+        <Disclosure.Body className="pb-1 pl-4 pt-1">
+          {isExpanded ? <SameFileEditGroupBody items={items} /> : null}
+        </Disclosure.Body>
+      </Disclosure.Content>
+    </Disclosure>
+  );
+}
 
 function SameFileEditGroupTitle({ summary }: { summary: SameFileEditGroupSummary }) {
   const diffLabel = formatDiffSummaryLabel(summary.diffSummary);

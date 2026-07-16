@@ -7,11 +7,12 @@ import {
   categoryFromSummaryLabel,
   isEditOnlyToolGroup,
   isToolGroupItem,
+  segmentToolGroupRows,
   summarizeSameFileEditGroup,
 } from "./toolCallCategorization";
 
 describe("categorizeItem", () => {
-  it("maps reasoning items to the thought category but keeps them non-groupable", () => {
+  it("maps reasoning items to the thought category and keeps them groupable", () => {
     const item = {
       id: "reasoning-1",
       type: "reasoning",
@@ -20,8 +21,80 @@ describe("categorizeItem", () => {
     } as unknown as RuntimeChatItem;
 
     expect(categorizeItem(item)).toBe("thought");
-    // Thoughts are standalone timeline rows; they must not glue tool groups.
-    expect(isToolGroupItem(item)).toBe(false);
+    // Thoughts are group members like any other tool row.
+    expect(isToolGroupItem(item)).toBe(true);
+  });
+});
+
+describe("segmentToolGroupRows", () => {
+  it("merges strictly consecutive same-file edits into one run segment", () => {
+    const view = makeTool("t1", "Read");
+    const items = [
+      view,
+      makeFileChange("a", "src/foo.ts", { added: 4, removed: 1 }),
+      makeFileChange("b", "src/foo.ts", { added: 2, removed: 3 }),
+    ];
+    expect(segmentToolGroupRows(items)).toEqual([
+      { kind: "item", item: view },
+      {
+        kind: "same-file-edits",
+        items: [items[1], items[2]],
+        summary: { count: 2, path: "src/foo.ts", diffSummary: { added: 6, removed: 4 } },
+      },
+    ]);
+  });
+
+  it("absorbs thoughts between same-file edits but not trailing ones", () => {
+    const thoughtBetween = makeReasoning("r1", "next patch");
+    const thoughtAfter = makeReasoning("r2", "done");
+    const items = [
+      makeFileChange("a", "src/foo.ts", { added: 1, removed: 0 }),
+      thoughtBetween,
+      makeFileChange("b", "src/foo.ts", { added: 1, removed: 0 }),
+      thoughtAfter,
+    ];
+    expect(segmentToolGroupRows(items)).toEqual([
+      {
+        kind: "same-file-edits",
+        items: [items[0], thoughtBetween, items[2]],
+        summary: { count: 2, path: "src/foo.ts", diffSummary: { added: 2, removed: 0 } },
+      },
+      { kind: "item", item: thoughtAfter },
+    ]);
+  });
+
+  it("keeps same-file edits separate when another tool call sits between them", () => {
+    const items = [
+      makeFileChange("a", "src/foo.ts"),
+      makeTool("t1", "Read"),
+      makeFileChange("b", "src/foo.ts"),
+    ];
+    expect(segmentToolGroupRows(items)).toEqual([
+      { kind: "item", item: items[0] },
+      { kind: "item", item: items[1] },
+      { kind: "item", item: items[2] },
+    ]);
+  });
+
+  it("starts a new run when the edited path changes", () => {
+    const items = [
+      makeFileChange("a", "src/foo.ts", { added: 1, removed: 0 }),
+      makeFileChange("b", "src/foo.ts", { added: 1, removed: 0 }),
+      makeFileChange("c", "src/bar.ts", { added: 1, removed: 0 }),
+      makeFileChange("d", "src/bar.ts", { added: 2, removed: 0 }),
+    ];
+    expect(segmentToolGroupRows(items)).toEqual([
+      {
+        kind: "same-file-edits",
+        items: [items[0], items[1]],
+        summary: { count: 2, path: "src/foo.ts", diffSummary: { added: 2, removed: 0 } },
+      },
+      {
+        kind: "same-file-edits",
+        items: [items[2], items[3]],
+        summary: { count: 2, path: "src/bar.ts", diffSummary: { added: 3, removed: 0 } },
+      },
+    ]);
   });
 });
 

@@ -550,9 +550,7 @@ describe("ToolCallGroup", () => {
     expect(view.container.querySelector(".poracode-pixel-loader")).toBeNull();
   });
 
-  it("ignores reasoning ids if they are wrongly passed into a tool group", () => {
-    // Reasoning is not groupable — timeline keeps thoughts as standalone rows.
-    // ToolCallGroup should not invent a "1 thought · 1 view" summary from them.
+  it("renders reasoning rows inside the group and counts them in the summary", () => {
     const threadId = "thread-1";
     const items = [
       makeReasoningItem(
@@ -560,6 +558,7 @@ describe("ToolCallGroup", () => {
         "Weighing the tradeoffs.\nChoosing the focused change.\nEditing the selector.",
       ),
       makeToolItem("tool-1", "Read file"),
+      makeToolItem("tool-2", "Read other file"),
     ];
     seedThread(threadId, items);
 
@@ -568,10 +567,96 @@ describe("ToolCallGroup", () => {
       items.map((item) => item.id),
     );
 
-    expect(screen.queryByText("1 thought")).not.toBeInTheDocument();
-    expect(screen.queryByText("Thought")).not.toBeInTheDocument();
-    expect(screen.getByText("1 view")).toBeInTheDocument();
+    expect(screen.getByText("1 thought")).toBeInTheDocument();
+    expect(screen.getByText("2 views")).toBeInTheDocument();
+    expect(screen.getByText("Thought")).toBeInTheDocument();
     expect(screen.getByText("Read file")).toBeInTheDocument();
+    expect(screen.getByText("Read other file")).toBeInTheDocument();
+  });
+
+  it("merges consecutive same-file edits inside a mixed group into one edit row", () => {
+    const threadId = "thread-1";
+    const items = [
+      makeToolItem("tool-1", "Read file one"),
+      makeFileChangeItem("file-1", { added: 4, removed: 2 }),
+      makeFileChangeItem("file-2", { added: 5, removed: 3 }),
+    ];
+    seedThread(threadId, items);
+
+    const view = renderToolCallGroup(
+      threadId,
+      items.map((item) => item.id),
+    );
+
+    // Mixed group auto-expands live; the two consecutive foo.ts edits render
+    // as one merged "2 edits: foo.ts" run row next to the view row.
+    const viewport = getViewport(view.container);
+    expect(viewport.querySelectorAll(":scope > .animate-tool-call-enter")).toHaveLength(2);
+    const runRow = screen.getByRole("button", { name: /2 edits:/i });
+    expect(within(runRow).getByText("foo.ts")).toBeInTheDocument();
+    expect(within(runRow).getByText("+9")).toHaveClass("text-success");
+    expect(within(runRow).getByText("-5")).toHaveClass("text-danger");
+    expect(screen.getByText("Read file one")).toBeInTheDocument();
+  });
+
+  it("merges only the consecutive same-file pair in a multi-file edit run", () => {
+    const threadId = "thread-1";
+    // Mirrors a real Claude turn: five edits across four files where only the
+    // 3rd/4th target the same file back-to-back, followed by a lint command.
+    const items = [
+      makeFileChangeItem("edit-1", { added: 2, removed: 10 }, "src/a/chatPaneSelectors.ts"),
+      makeFileChangeItem("edit-2", { added: 3, removed: 4 }, "src/b/toolCallCategorization.ts"),
+      makeFileChangeItem("edit-3", { added: 1, removed: 1 }, "src/a/chatPaneSelectors.test.ts"),
+      makeFileChangeItem("edit-4", { added: 7, removed: 5 }, "src/a/chatPaneSelectors.test.ts"),
+      makeFileChangeItem(
+        "edit-5",
+        { added: 1, removed: 2 },
+        "src/b/toolCallCategorization.test.ts",
+      ),
+      makeCommandItem("cmd-1", "pnpm run lint"),
+    ];
+    seedThread(threadId, items);
+
+    const view = renderToolCallGroup(
+      threadId,
+      items.map((item) => item.id),
+    );
+
+    // Header keeps physical counts; the run merge is a body-level treatment.
+    // The command makes this a mixed group, so it auto-expands while live.
+    expect(screen.getByText("5 edits")).toBeInTheDocument();
+
+    // 6 items render as 5 rows: the consecutive same-file pair collapses into
+    // one "2 edits: chatPaneSelectors.test.ts" row with the summed diff.
+    const viewport = getViewport(view.container);
+    expect(viewport.querySelectorAll(":scope > .animate-tool-call-enter")).toHaveLength(5);
+    const runRow = screen.getByRole("button", { name: /2 edits:/i });
+    expect(within(runRow).getByText("chatPaneSelectors.test.ts")).toBeInTheDocument();
+    expect(within(runRow).getByText("+8")).toHaveClass("text-success");
+    expect(within(runRow).getByText("-6")).toHaveClass("text-danger");
+    expect(screen.getAllByText("chatPaneSelectors.test.ts")).toHaveLength(1);
+  });
+
+  it("keeps same-file edits separate when another tool call sits between them", () => {
+    const threadId = "thread-1";
+    const items = [
+      makeFileChangeItem("file-1", { added: 4, removed: 2 }),
+      makeToolItem("tool-1", "Read file one"),
+      makeFileChangeItem("file-2", { added: 5, removed: 3 }),
+    ];
+    seedThread(threadId, items);
+
+    const view = renderToolCallGroup(
+      threadId,
+      items.map((item) => item.id),
+    );
+
+    // The interposed tool call breaks the run: no merged "2 edits" row, each
+    // edit stays its own row — but all three still live in the same group.
+    const viewport = getViewport(view.container);
+    expect(viewport.querySelectorAll(":scope > .animate-tool-call-enter")).toHaveLength(3);
+    expect(screen.queryByRole("button", { name: /2 edits:/i })).not.toBeInTheDocument();
+    expect(screen.getAllByText("foo.ts")).toHaveLength(2);
   });
 
   it("categorizes sub-agent tools as commands", () => {

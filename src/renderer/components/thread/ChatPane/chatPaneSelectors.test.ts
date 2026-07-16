@@ -322,7 +322,7 @@ describe("chatPaneSelectors", () => {
     ]);
   });
 
-  it("does not fold reasoning into tool-call groups (thoughts break contiguity)", () => {
+  it("folds reasoning into adjacent tool-call groups as glue", () => {
     const state = {
       runtimeItemIdsByThread: {
         t1: ["reasoning-1", "tool-1", "command-1", "assistant-1", "reasoning-2"],
@@ -365,19 +365,68 @@ describe("chatPaneSelectors", () => {
       },
     } as unknown as AppStoreState;
 
+    // Providers emit a Thought before nearly every tool call; treating them as
+    // run breakers would disable grouping outright.
     expect(selectVisibleThreadTimelineEntries(state, "t1")).toEqual([
-      { kind: "item", id: "reasoning-1" },
       {
         kind: "tool_call_group",
-        id: "tool-call-group:tool-1",
-        itemIds: ["tool-1", "command-1"],
+        id: "tool-call-group:reasoning-1",
+        itemIds: ["reasoning-1", "tool-1", "command-1"],
       },
       { kind: "item", id: "assistant-1" },
       { kind: "item", id: "reasoning-2" },
     ]);
   });
 
-  it("does not group same-file edits when thoughts sit between them", () => {
+  it("groups a lone tool call together with its surrounding thoughts", () => {
+    const state = {
+      runtimeItemIdsByThread: {
+        t1: ["reasoning-1", "tool-1", "reasoning-2", "assistant-1"],
+      },
+      runtimeItemsByIdByThread: {
+        t1: {
+          "reasoning-1": {
+            id: "reasoning-1",
+            type: "reasoning",
+            state: "completed",
+            streams: { reasoning_text: "planning" },
+          },
+          "tool-1": {
+            id: "tool-1",
+            type: "tool_call",
+            state: "completed",
+            payload: { name: "Viewing src/a.ts", status: "success" },
+            streams: {},
+          },
+          "reasoning-2": {
+            id: "reasoning-2",
+            type: "reasoning",
+            state: "completed",
+            streams: { reasoning_text: "reviewing" },
+          },
+          "assistant-1": {
+            id: "assistant-1",
+            type: "assistant_message",
+            state: "completed",
+            streams: { assistant_text: "done" },
+          },
+        },
+      },
+    } as unknown as AppStoreState;
+
+    // Thoughts are group members like any other tool row, so `thought → tool
+    // → thought` is a group of three.
+    expect(selectVisibleThreadTimelineEntries(state, "t1")).toEqual([
+      {
+        kind: "tool_call_group",
+        id: "tool-call-group:reasoning-1",
+        itemIds: ["reasoning-1", "tool-1", "reasoning-2"],
+      },
+      { kind: "item", id: "assistant-1" },
+    ]);
+  });
+
+  it("groups same-file edits even when thoughts sit between them", () => {
     const state = {
       runtimeItemIdsByThread: {
         t1: ["edit-1", "reasoning-1", "edit-2", "reasoning-2", "edit-3", "assistant-1"],
@@ -439,14 +488,14 @@ describe("chatPaneSelectors", () => {
       },
     } as unknown as AppStoreState;
 
-    // A thought between edits is another timeline item — not glue for a
-    // synthetic "3 edits" group. Each edit stays its own row.
+    // Thoughts are glue: the run still collapses into one group, and the
+    // group body merges the consecutive same-file edits into one edit row.
     expect(selectVisibleThreadTimelineEntries(state, "t1")).toEqual([
-      { kind: "item", id: "edit-1" },
-      { kind: "item", id: "reasoning-1" },
-      { kind: "item", id: "edit-2" },
-      { kind: "item", id: "reasoning-2" },
-      { kind: "item", id: "edit-3" },
+      {
+        kind: "tool_call_group",
+        id: "tool-call-group:edit-1",
+        itemIds: ["edit-1", "reasoning-1", "edit-2", "reasoning-2", "edit-3"],
+      },
       { kind: "item", id: "assistant-1" },
     ]);
   });
