@@ -57,6 +57,9 @@ export function startClaudeTurn(
   }
   delete state.currentAssistantMessageId;
   delete state.currentCompactionItemId;
+  // A new turn means the goal's work continues — a legacy complete-on-drain
+  // scheduled by the previous turn end no longer applies.
+  delete state.pendingGoalCompletionOnTaskDrain;
   state.streamedAssistantMessageIds.clear();
 
   const userItemId = userMessageItemId ?? newItemId("user");
@@ -79,6 +82,8 @@ export function startClaudeTurn(
       state.activeGoalItemId = goalItemId;
       state.activeGoalObjective = goalPayload.objective;
       state.activeGoalStartedAtMs = Date.now();
+      delete state.activeGoalIterations;
+      delete state.activeGoalLastReason;
       resetActiveGoalTokenAccounting(state);
     } else {
       clearActiveGoal(state);
