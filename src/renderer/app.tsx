@@ -45,11 +45,11 @@ import { AppProvider } from "./components/ui/provider";
 import { ImageLightboxHost } from "./components/composer/ImageLightbox";
 import { MainView } from "@/renderer/views/MainView/MainView";
 import { QuickComposerOverlay } from "@/renderer/views/QuickComposerOverlay/QuickComposerOverlay";
+import { startThreadFromDraft } from "@/renderer/views/MainView/parts/AppContent/AppContent";
 import {
   primeWorktreeGitState,
   runWorktreeSetupScript,
-  startThreadFromDraft,
-} from "@/renderer/views/MainView/parts/AppContent/AppContent";
+} from "@/renderer/actions/worktreeLaunchActions";
 import { useCommandPaletteStore } from "@/renderer/commands/commandPaletteStore";
 import { BrowserPanel } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/BrowserPanel";
 import { useBrowserSync } from "@/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/hooks/useBrowserSync";
@@ -335,7 +335,7 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
             if (command.isNewWorktree) {
               const setupScript = project.scripts?.setupScript;
               if (setupScript) {
-                runWorktreeSetupScript(project, command.worktreePath, setupScript);
+                void runWorktreeSetupScript(project, command.worktreePath, setupScript);
               }
             }
           }
@@ -367,7 +367,9 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
               if (project) {
                 void primeWorktreeGitState(project, command.worktreePath);
                 const setupScript = project.scripts?.setupScript;
-                if (setupScript) runWorktreeSetupScript(project, command.worktreePath, setupScript);
+                if (setupScript) {
+                  void runWorktreeSetupScript(project, command.worktreePath, setupScript);
+                }
               }
             }
             break;

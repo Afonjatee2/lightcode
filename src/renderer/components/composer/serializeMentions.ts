@@ -140,6 +140,51 @@ export function flattenSegments(segments: PromptSegment[]): string {
   return rest.map(inlinePromptSegmentText).join("").trim();
 }
 
+function isStructuredTokenBoundary(content: string, start: number, length: number): boolean {
+  const before = content[start - 1];
+  const after = content[start + length];
+  const startsAtBoundary = before === undefined || /\s/u.test(before) || "([{'\"`".includes(before);
+  const continuesToken =
+    after !== undefined && (/\p{L}|\p{N}|[_.-]/u.test(after) || after === "/" || after === "\\");
+  const endsAtBoundary = !continuesToken;
+  return startsAtBoundary && endsAtBoundary;
+}
+
+/** Rebuild structured prompt content after editing its flattened display text. */
+export function rebuildEditedPromptSegments(
+  content: string,
+  originalSegments: readonly PromptSegment[],
+): PromptSegment[] {
+  const attachments = originalSegments.filter((segment) => segment.kind === "attachment");
+  const structured = originalSegments
+    .filter((segment) => segment.kind === "file" || segment.kind === "skill")
+    .map((segment) => ({ segment, token: inlinePromptSegmentText(segment) }))
+    .sort((a, b) => b.token.length - a.token.length);
+  const rebuilt: PromptSegment[] = [];
+  let textStart = 0;
+  let cursor = 0;
+
+  while (cursor < content.length) {
+    const match = structured.find(
+      (entry) =>
+        content.startsWith(entry.token, cursor) &&
+        isStructuredTokenBoundary(content, cursor, entry.token.length),
+    );
+    if (!match) {
+      cursor += 1;
+      continue;
+    }
+
+    pushTextBufferSegments(rebuilt, content.slice(textStart, cursor));
+    rebuilt.push(match.segment);
+    cursor += match.token.length;
+    textStart = cursor;
+  }
+
+  pushTextBufferSegments(rebuilt, content.slice(textStart));
+  return [...attachments, ...rebuilt];
+}
+
 /**
  * Convenience: serialize contentEditable → flat prompt string.
  * Used for backward-compat and display purposes.

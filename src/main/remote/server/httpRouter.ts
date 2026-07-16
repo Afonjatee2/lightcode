@@ -46,6 +46,10 @@ import {
 } from "../../profile";
 import { RemoteHttpError } from "../auth";
 import {
+  assertRemoteThreadCommandExperimentSafe,
+  assertRemoteThreadStartExperimentSafe,
+} from "../experimentOwnership";
+import {
   buildForwardEnterErrorPageHtml,
   buildLocalPairingIconSvg,
   buildLocalPairingManifestJson,
@@ -529,6 +533,7 @@ export async function handleHttp(
       if (!thread) {
         throw new RemoteHttpError("thread_not_found", "Thread not found.", 404);
       }
+      assertRemoteThreadStartExperimentSafe(payload.threadId);
       const mcpSnapshot =
         ctx.options.resolveMcpLaunchSnapshot?.(thread.projectId) ?? emptyMcpLaunchSnapshot();
       const result = await runIdempotentRemoteMutation(req, url.pathname, () =>
@@ -554,6 +559,7 @@ export async function handleHttp(
         ...(typeof body === "object" && body !== null ? body : {}),
         threadId: commandThreadId,
       });
+      assertRemoteThreadCommandExperimentSafe(command);
       const dispatch = async () => {
         const requiresRenderer = await applyRemoteThreadCommand(ctx, command);
         if (requiresRenderer && ctx.options.dispatchThreadCommand?.(command) !== true) {

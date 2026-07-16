@@ -184,6 +184,45 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
     options.efforts,
   );
 
+  function buildClaudeOneShotCommand(
+    model: string,
+    effort: string | undefined,
+    prompt: string | undefined,
+    location: ProjectLocation | undefined,
+    fast: boolean | undefined,
+    extraArgs: readonly string[] = [],
+  ) {
+    if (!prompt) return undefined;
+    // --no-session-persistence keeps title/commit/PR-summary calls out of
+    // the `/resume` picker. --fallback-model auto-degrades to Haiku if the
+    // primary is overloaded so async title generation does not silently
+    // fail when the API throttles.
+    const args = [
+      "-p",
+      prompt,
+      "--model",
+      model,
+      "--fallback-model",
+      "haiku",
+      "--no-session-persistence",
+      ...extraArgs,
+    ];
+    if (effort) args.push("--effort", effort);
+    if (fast) {
+      // Fast mode is a session flag, not a model/effort value. On the CLI it
+      // rides on --settings JSON (the SDK path uses applyFlagSettings). One-shot
+      // calls pass no other --settings, so a single inline flag is safe here.
+      args.push("--settings", JSON.stringify({ fastMode: true }));
+    }
+    const env = location ? profileEnv(location) : undefined;
+    return {
+      command: "claude",
+      args,
+      stdin: "",
+      ...(env ? { env } : {}),
+    };
+  }
+
   return {
     kind,
     label,
@@ -341,37 +380,37 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
     oscHintsDeferToHookPlugin: true,
     workingSilenceTimeoutMs: null,
     defaultOneShotModel: "haiku",
-    buildOneShotCommand(model, effort, prompt, location, fast) {
-      if (!prompt) return undefined;
-      // --no-session-persistence keeps title/commit/PR-summary calls out of
-      // the `/resume` picker. --fallback-model auto-degrades to Haiku if the
-      // primary is overloaded so async title generation does not silently
-      // fail when the API throttles.
-      const args = [
-        "-p",
-        prompt,
-        "--model",
+    buildOneShotCommand(model, effort, prompt, location, fast, oneShotOptions) {
+      return buildClaudeOneShotCommand(
         model,
-        "--fallback-model",
-        "haiku",
-        "--no-session-persistence",
-      ];
-      if (effort) {
-        args.push("--effort", effort);
-      }
-      if (fast) {
-        // Fast mode is a session flag, not a model/effort value. On the CLI it
-        // rides on --settings JSON (the SDK path uses applyFlagSettings). One-shot
-        // calls pass no other --settings, so a single inline flag is safe here.
-        args.push("--settings", JSON.stringify({ fastMode: true }));
-      }
-      const env = location ? profileEnv(location) : undefined;
-      return {
-        command: "claude",
-        args,
-        stdin: "",
-        ...(env ? { env } : {}),
-      };
+        effort,
+        prompt,
+        location,
+        fast,
+        oneShotOptions?.readOnlyWorkspace
+          ? [
+              "--permission-mode",
+              "plan",
+              "--allowedTools",
+              "Read,Glob,Grep",
+              "--disallowedTools",
+              "Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch,Task,Skill",
+              "--mcp-config",
+              JSON.stringify({ mcpServers: {} }),
+              "--strict-mcp-config",
+            ]
+          : [],
+      );
+    },
+    buildTextOnlyOneShotCommand(model, effort, prompt, location, fast) {
+      return buildClaudeOneShotCommand(model, effort, prompt, location, fast, [
+        "--safe-mode",
+        "--tools",
+        "",
+        "--mcp-config",
+        JSON.stringify({ mcpServers: {} }),
+        "--strict-mcp-config",
+      ]);
     },
     buildContextExtractionCommand(sessionRef, location, model) {
       // The resumed session is read-only here; --no-session-persistence

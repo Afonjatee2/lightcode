@@ -33,6 +33,10 @@ const SHARED_MESSAGE_DESCRIPTORS: Record<MessageKey, MessageDescriptor> = {
   "git.pull.stashPreserved": msg({
     message: "Pull did not complete. Your local changes remain in a Poracode stash.",
   }),
+  "git.pull.reapplyAfterMerge": msg({
+    message: "Your local changes were stashed and will be re-applied once the merge is resolved.",
+  }),
+  "git.pull.stashReapplied": msg({ message: "Your stashed local changes were re-applied." }),
   "git.worktree.noBranch": msg({
     message: "Cannot create a default worktree path without a branch name",
   }),
@@ -47,6 +51,114 @@ const SHARED_MESSAGE_DESCRIPTORS: Record<MessageKey, MessageDescriptor> = {
   // `sharedMessages.test.ts` regression guard fails if it gets dropped.
   "git.worktree.cleanupFailed": msg({
     message: "{original}\nWorktree cleanup also failed: {cleanup}",
+  }),
+  "git.detachedHead": msg({ message: "detached HEAD" }),
+  "experiment.diff.baseFullCommit": msg({
+    message: "Experiment diff base must be a full commit hash",
+  }),
+  "experiment.candidate.changedDuringDiff": msg({
+    message: "Experiment candidate changed while its diff was being captured",
+  }),
+  "experiment.candidate.statusFailed": msg({
+    message: "Unable to read experiment candidate status",
+  }),
+  "experiment.candidate.tooManyUntracked": msg({
+    message: "Experiment candidate has too many untracked files ({count}; maximum {maximum})",
+  }),
+  "experiment.candidate.diffTooLarge": msg({
+    message: "Experiment candidate diff is too large to compare safely",
+  }),
+  "experiment.candidate.untrackedReadFailed": msg({
+    message: "Unable to read untracked candidate file: {path}",
+  }),
+  "experiment.candidate.changedDuringStats": msg({
+    message: "Experiment candidate changed while its stats were being captured",
+  }),
+  "experiment.candidate.commitResolveFailed": msg({
+    message: "Unable to resolve the experiment candidate commit",
+  }),
+  "experiment.candidate.notDescendant": msg({
+    message: "Experiment candidate no longer descends from its frozen base commit",
+  }),
+  "experiment.merge.branchTipsFailed": msg({
+    message: "Unable to resolve branch tips for fast-forward merge",
+  }),
+  "experiment.merge.sourceBranchMismatch": msg({
+    message: "Expected source worktree branch {expected}, but found {actual}",
+  }),
+  "experiment.merge.worktreeDirty": msg({
+    message: "Worktree {path} has uncommitted changes",
+  }),
+  "experiment.merge.worktreeBranchMismatch": msg({
+    message: "Expected worktree branch {expected}, but found {actual}",
+  }),
+  "experiment.merge.worktreeHeadMismatch": msg({
+    message: "Expected worktree HEAD {expected}, but found {actual}",
+  }),
+  "experiment.merge.branchHeadMismatch": msg({
+    message: "Expected branch {branch} at {expected}, but found {actual}",
+  }),
+  "experiment.worktree.ownerNeedsFrozenSource": msg({
+    message: "A worktree owner requires a frozen branch source",
+  }),
+  "experiment.worktree.creationRollbackFailed": msg({
+    message: "Failed to create owned worktree: {detail}. Rollback left branch {branch}: {rollback}",
+  }),
+  "experiment.worktree.expectedOwnerNeedsBranch": msg({
+    message: "An expected worktree owner requires a branch",
+  }),
+  "experiment.worktree.metadataRollbackFailed": msg({
+    message:
+      "Failed to record owned branch metadata: {detail}. Rollback left branch {branch}: {rollback}",
+  }),
+  "experiment.worktree.sourceMetadataRollbackFailed": msg({
+    message: "Failed to record frozen source metadata: {detail}. Rollback left {rollback}",
+  }),
+  "experiment.worktree.rollbackWorktree": msg({
+    message: "worktree at {path}: {detail}",
+  }),
+  "experiment.worktree.rollbackBranch": msg({ message: "branch {branch}: {detail}" }),
+  "experiment.worktree.frozenSourceNeedsCommit": msg({
+    message: "A frozen worktree source requires a full commit hash",
+  }),
+  "experiment.worktree.frozenSourceNotLocal": msg({
+    message: "Frozen worktree source is not a local branch: {branch}",
+  }),
+  "experiment.worktree.sourceMoved": msg({
+    message: "Source branch {branch} moved before the worktree was created",
+  }),
+  "experiment.worktree.ownerMismatch": msg({
+    message: "Expected worktree owner {expected}, but found {actual}",
+  }),
+  "experiment.worktree.noOwner": msg({ message: "none" }),
+  "experiment.worktree.unavailable": msg({
+    message: "The experiment candidate worktree is unavailable.",
+  }),
+  "experiment.judge.atLeastTwo": msg({
+    message: "Experiment judge requires at least two candidates",
+  }),
+  "experiment.judge.invalidJson": msg({ message: "Experiment judge returned invalid JSON" }),
+  "experiment.judge.invalidShape": msg({
+    message: "Experiment judge returned an invalid response shape",
+  }),
+  "experiment.judge.winnerRange": msg({
+    message: "Experiment judge winner must be between 1 and {candidateCount}",
+  }),
+  "experiment.judge.emptyRationale": msg({
+    message: "Experiment judge returned an empty rationale",
+  }),
+  "experiment.judge.noChanges": msg({
+    message: "The candidates have not made any changes yet.",
+  }),
+  "experiment.judge.promptBlank": msg({ message: "Experiment prompt must not be blank" }),
+  "experiment.judge.uniqueThreadIds": msg({
+    message: "Experiment candidate thread ids must be unique",
+  }),
+  "experiment.judge.noDefaultModel": msg({
+    message: "No default one-shot model configured for {provider}",
+  }),
+  "experiment.judge.oneShotUnsupported": msg({
+    message: "{provider} does not support one-shot generation",
   }),
   "git.wsl.homeNotFound": msg({
     message: 'Unable to resolve home directory for WSL distro "{distro}"',

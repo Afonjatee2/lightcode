@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
+  FlaskConical,
   Monitor,
   Paperclip,
   Plus,
@@ -97,6 +98,11 @@ export function ComposerAddMenu(props: {
     visible: boolean;
     onToggle: (next: boolean) => void;
   };
+  experiment?: {
+    enabled: boolean;
+    disabled: boolean;
+    onToggle: (next: boolean) => void;
+  };
   /**
    * Display-only mode for an active thread: MCP bindings were fixed when the
    * session launched, so the list shows what this run has without switches
@@ -104,7 +110,7 @@ export function ComposerAddMenu(props: {
    */
   readOnly?: boolean;
 }) {
-  const { mcpServers, showFileOption = true, onPickFiles, computerUse } = props;
+  const { mcpServers, showFileOption = true, onPickFiles, computerUse, experiment } = props;
   const customMcpServers = props.customMcpServers ?? [];
   const readOnly = props.readOnly === true;
   const { t } = useLingui();
@@ -126,7 +132,7 @@ export function ComposerAddMenu(props: {
     visibleMcpServers.filter((server) => server.enabled).length +
     customMcpServers.filter((server) => server.enabled).length;
 
-  if (!showFileOption && !hasMcpMenu) return null;
+  if (!showFileOption && !hasMcpMenu && !experiment) return null;
 
   const handleOpenChange = (open: boolean) => {
     setIsOpen(open);
@@ -198,6 +204,26 @@ export function ComposerAddMenu(props: {
           <span className="shrink-0 text-xs text-muted">
             <Trans>Attach</Trans>
           </span>
+        </button>
+      ) : null}
+      {experiment ? (
+        <button
+          type="button"
+          className="m-sheet-action"
+          aria-pressed={experiment.enabled}
+          disabled={experiment.disabled}
+          onClick={() => experiment.onToggle(!experiment.enabled)}
+        >
+          <FlaskConical className="size-4 text-muted" />
+          <span className="flex min-w-0 flex-1 flex-col items-start gap-0.5">
+            <span className="truncate">
+              <Trans>Experiment</Trans>
+            </span>
+            <span className="text-[11px] leading-snug text-muted">
+              <Trans>Run one prompt with multiple agents, then compare their work.</Trans>
+            </span>
+          </span>
+          <MenuSwitch checked={experiment.enabled} />
         </button>
       ) : null}
       {hasMcpMenu ? (
@@ -344,6 +370,9 @@ export function ComposerAddMenu(props: {
           selectionMode="none"
           onAction={(key) => {
             if (key === "file") handlePickFiles();
+            if (key === "experiment" && experiment) {
+              experiment.onToggle(!experiment.enabled);
+            }
           }}
           className="poracode-menu min-w-52"
         >
@@ -358,7 +387,25 @@ export function ComposerAddMenu(props: {
               </span>
             </Dropdown.Item>
           ) : null}
-          {showFileOption && hasMcpMenu ? <Separator /> : null}
+          {experiment ? (
+            <Dropdown.Item
+              id="experiment"
+              textValue={t`Experiment`}
+              isDisabled={experiment.disabled}
+            >
+              <FlaskConical className="size-4 text-muted" />
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <Label className="truncate">
+                  <Trans>Experiment</Trans>
+                </Label>
+                <span className="text-[11px] leading-snug text-muted">
+                  <Trans>Run one prompt with multiple agents, then compare their work.</Trans>
+                </span>
+              </div>
+              <MenuSwitch checked={experiment.enabled} />
+            </Dropdown.Item>
+          ) : null}
+          {(showFileOption || experiment) && hasMcpMenu ? <Separator /> : null}
           {hasMcpMenu ? (
             <Dropdown.SubmenuTrigger>
               <Dropdown.Item id="mcp-servers" textValue={t`MCP servers`}>

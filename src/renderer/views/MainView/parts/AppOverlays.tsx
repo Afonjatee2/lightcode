@@ -35,6 +35,7 @@ import { WelcomeOverlay } from "@/renderer/views/WelcomeOverlay";
 import { WhatsNewOverlay } from "@/renderer/views/WhatsNewOverlay";
 import { RemoteProjectModal } from "@/renderer/views/RemoteProjectModal/RemoteProjectModal";
 import { useLoginTerminalStore } from "@/renderer/state/loginTerminalStore";
+import { findExperimentByWorktree } from "@/renderer/state/experimentStore";
 
 function useEverEnabled(active: boolean): boolean {
   const [enabled, setEnabled] = useState(active);
@@ -58,6 +59,12 @@ export function AppOverlays() {
   const gitReviewProject = gitReviewContext
     ? projects.find((p) => p.id === gitReviewContext.projectId)
     : undefined;
+  // Experiment candidate worktrees are viewable, but their lifecycle (merge/
+  // remove) is owned by the experiment crown flow — never the review surface.
+  const gitReviewIsExperiment = Boolean(
+    gitReviewContext &&
+    findExperimentByWorktree(gitReviewContext.projectId, gitReviewContext.worktreePath),
+  );
   const gitOverlayVisible = gitOverlayOpen && !!gitReviewContext && !!gitReviewProject;
   const prReviewContext = usePanelStore((s) => s.prReviewContext);
   const prReviewProject = prReviewContext
@@ -123,26 +130,30 @@ export function AppOverlays() {
                         gitReviewContext.projectId,
                         gitReviewContext.worktreePath,
                       ) ?? undefined,
-                    onMergeAndRemove: () => {
-                      const allThreads = useAppStore.getState().threads;
-                      const wtPath = gitReviewContext!.worktreePath;
-                      const wtBranch = wtPath
-                        ? resolveWorktreeBranch(gitReviewContext!.projectId, wtPath)
-                        : undefined;
-                      usePanelStore.getState().setGitOverlayOpen(false);
-                      usePanelStore.getState().setGitReviewContext(null);
-                      if (wtPath) {
-                        const siblings = allThreads.filter((t) => t.worktreePath === wtPath);
-                        const deleteThreadStoreAction = useAppStore.getState().deleteThread;
-                        for (const sib of siblings) {
-                          deleteThreadStoreAction(sib.id);
-                        }
-                        void (async () => {
-                          await closeThreads(siblings.map((sib) => sib.id));
-                          await performWorktreeRemoval(gitReviewProject, wtPath, wtBranch);
-                        })();
-                      }
-                    },
+                    ...(gitReviewIsExperiment
+                      ? {}
+                      : {
+                          onMergeAndRemove: () => {
+                            const allThreads = useAppStore.getState().threads;
+                            const wtPath = gitReviewContext!.worktreePath;
+                            const wtBranch = wtPath
+                              ? resolveWorktreeBranch(gitReviewContext!.projectId, wtPath)
+                              : undefined;
+                            usePanelStore.getState().setGitOverlayOpen(false);
+                            usePanelStore.getState().setGitReviewContext(null);
+                            if (wtPath) {
+                              const siblings = allThreads.filter((t) => t.worktreePath === wtPath);
+                              const deleteThreadStoreAction = useAppStore.getState().deleteThread;
+                              for (const sib of siblings) {
+                                deleteThreadStoreAction(sib.id);
+                              }
+                              void (async () => {
+                                await closeThreads(siblings.map((sib) => sib.id));
+                                await performWorktreeRemoval(gitReviewProject, wtPath, wtBranch);
+                              })();
+                            }
+                          },
+                        }),
                   }
                 : {})}
               onClose={() => {
