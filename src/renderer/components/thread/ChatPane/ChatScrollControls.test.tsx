@@ -1,12 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "@testing-library/react";
 import { createRef, useRef } from "react";
 import { renderWithI18n } from "@/renderer/testUtils/i18n";
 import { ChatScrollControls, type ChatScrollControlsHandle } from "./ChatScrollControls";
 
+let scrollToBottomToken = 0;
+
 vi.mock("@/renderer/state/appStore", () => ({
   useAppStore: (selector: (s: { chatScrollToBottomTokens: Record<string, number> }) => unknown) =>
-    selector({ chatScrollToBottomTokens: {} }),
+    selector({ chatScrollToBottomTokens: { "thread-1": scrollToBottomToken } }),
 }));
 
 vi.mock("@/renderer/state/panelResizeSignal", () => ({
@@ -37,6 +39,10 @@ function Harness(props: {
 }
 
 describe("ChatScrollControls", () => {
+  beforeEach(() => {
+    scrollToBottomToken = 0;
+  });
+
   it("skips scrollTop writes and virtualizer reconcile when already at bottom", () => {
     const scrollEl = document.createElement("div");
     const scrollTopSetter = vi.fn<(value: number) => void>();
@@ -136,6 +142,44 @@ describe("ChatScrollControls", () => {
     });
 
     expect(scrollTop).toBe(1000);
+  });
+
+  it("resumes sticking to the bottom when a message is submitted", () => {
+    let scrollTop = 800;
+    const scrollEl = document.createElement("div");
+    Object.defineProperties(scrollEl, {
+      scrollHeight: { configurable: true, get: () => 1000 },
+      clientHeight: { configurable: true, get: () => 200 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      },
+    });
+    const controlsRef = createRef<ChatScrollControlsHandle>();
+    const virtualScrollToBottom = vi.fn<() => void>();
+    const renderHarness = () => (
+      <Harness
+        scrollEl={scrollEl}
+        controlsRef={controlsRef}
+        virtualScrollToBottom={virtualScrollToBottom}
+      />
+    );
+    const { rerender } = renderWithI18n(renderHarness());
+
+    act(() => {
+      controlsRef.current?.markUserScrollIntent();
+      controlsRef.current?.disableStickToBottom();
+      scrollTop = 400;
+    });
+
+    scrollToBottomToken += 1;
+    rerender(renderHarness());
+
+    expect(scrollTop).toBe(1000);
+    expect(controlsRef.current?.isStickToBottom()).toBe(true);
   });
 
   it("re-pins when content grows after an open pin even if the at-bottom cache is warm", async () => {

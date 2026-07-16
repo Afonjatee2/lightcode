@@ -369,6 +369,9 @@ export const ChatScrollControls = forwardRef<
   useLayoutEffect(() => {
     if (scrollToBottomToken === initialScrollTokenRef.current) return;
     initialScrollTokenRef.current = scrollToBottomToken;
+    // A fresh submission explicitly resumes following the tail, even if it
+    // lands inside the short scroll-away intent window.
+    userScrollIntentUntilRef.current = 0;
     scrollToBottom({ reconcileVirtualizer: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- helper reads refs/state setters only.
   }, [scrollToBottomToken]);
