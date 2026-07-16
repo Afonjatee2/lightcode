@@ -223,8 +223,17 @@ export class AgentRegistryService {
       baseDir: this.deps.baseDir,
     };
 
-    const wslDistros = await this.agentStatusService.listWslDistros();
-    const statuses = await this.agentStatusService.getAgentStatuses({ wslDistros });
+    const wslDistros = payload.envKind === "wsl" && payload.wslDistro ? [payload.wslDistro] : [];
+    const statuses = await this.agentStatusService.refreshAgentStatuses({
+      wslDistros,
+      scope: {
+        agentKinds: [payload.agentKind],
+        envs:
+          payload.envKind === "wsl" && payload.wslDistro
+            ? [{ kind: "wsl", distro: payload.wslDistro }]
+            : [{ kind: "native" }],
+      },
+    });
     const pool = payload.envKind === "wsl" ? statuses.wsl : statuses.windows;
     const status = pool.find(
       (entry) =>
