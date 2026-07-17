@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 
+import contact from "../../../../branding/contact.json";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
@@ -148,10 +149,10 @@ export default function PrivacyPage() {
               We may update this policy as Poracode changes and will publish the new effective date
               here. Questions or privacy requests can be sent to{" "}
               <a
-                href="mailto:SDSLeon999@gmail.com"
+                href={`mailto:${contact.supportEmail}`}
                 className="text-white underline decoration-white/30 underline-offset-4 transition-colors hover:decoration-white"
               >
-                SDSLeon999@gmail.com
+                {contact.supportEmail}
               </a>
               .
             </p>

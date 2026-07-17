@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ArrowLeft, ExternalLink, Mail } from "lucide-react";
 import Link from "next/link";
 
+import contact from "../../../../branding/contact.json";
 import { createPageMetadata } from "@/lib/seo";
 
 export const metadata: Metadata = createPageMetadata({
@@ -10,7 +11,6 @@ export const metadata: Metadata = createPageMetadata({
   path: "/support",
 });
 
-const SUPPORT_EMAIL = "SDSLeon999@gmail.com";
 const ISSUES_URL = "https://github.com/SDSLeon/lightcode/issues";
 
 export default function SupportPage() {
@@ -44,12 +44,12 @@ export default function SupportPage() {
 
         <div className="mb-12 grid gap-4 sm:grid-cols-2">
           <a
-            href={`mailto:${SUPPORT_EMAIL}`}
+            href={`mailto:${contact.supportEmail}`}
             className="rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-colors hover:border-white/20 hover:bg-white/[0.05]"
           >
             <Mail className="mb-4 size-5 text-gray-400" />
             <span className="block font-semibold text-white">Email support</span>
-            <span className="mt-1 block text-sm text-gray-400">{SUPPORT_EMAIL}</span>
+            <span className="mt-1 block text-sm text-gray-400">{contact.supportEmail}</span>
           </a>
           <a
             href={ISSUES_URL}

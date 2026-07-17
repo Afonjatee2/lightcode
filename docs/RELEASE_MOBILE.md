@@ -161,7 +161,7 @@ What to Test:
 > notifications, universal links, and Live Activity status. Report the desktop
 > and mobile versions, device model, iOS version, and exact reproduction steps.
 
-Feedback email: `SDSLeon999@gmail.com`
+Feedback email: `support@poracode.com`
 
 Review note:
 

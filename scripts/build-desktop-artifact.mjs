@@ -32,6 +32,7 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const requireFromHere = createRequire(import.meta.url);
 const channelTable = requireFromHere("./electron-builder.shared.cjs");
+const { supportEmail } = requireFromHere("../branding/contact.json");
 
 // Runtime externals — packages tsdown does NOT inline into dist/main/*.cjs.
 // Regenerate with `node scripts/scan-runtime-externals.mjs`.
@@ -540,7 +541,7 @@ linux:
         - x64
   icon: build/icon${iconSuffix}.png
   category: Development
-  maintainer: SDSLeon <SDSLeon999@gmail.com>
+  maintainer: SDSLeon <${supportEmail}>
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:
