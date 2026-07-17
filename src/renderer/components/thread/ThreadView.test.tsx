@@ -152,7 +152,7 @@ describe("ThreadView", () => {
     expect(runtimeActions.changeThreadConfig).not.toHaveBeenCalled();
   });
 
-  it("renders OpenCode Browser MCP as a read-only header icon when provider setting is enabled", () => {
+  it("does not infer MCP enablement from the provider identity", () => {
     renderThreadView({
       thread: {
         id: "thread-opencode-browser-mcp",
@@ -196,7 +196,7 @@ describe("ThreadView", () => {
       },
     });
 
-    expect(screen.getByLabelText("Browser MCP enabled for OpenCode")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Browser MCP enabled for this thread")).toBeNull();
     expect(screen.queryByLabelText("Disable Browser MCP")).toBeNull();
     expect(runtimeActions.changeThreadConfig).not.toHaveBeenCalled();
   });

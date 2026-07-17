@@ -13,7 +13,7 @@ import {
   type ChatTimelineEntry,
 } from "../../chatPaneSelectors";
 import { ChatItemRow } from "./ChatItemRow";
-import { deriveToolDisplay, isWorkflowTool } from "./toolDisplay";
+import { deriveToolDisplay, isCrossagentTool, isWorkflowTool } from "./toolDisplay";
 import { useStickToBottom } from "./useStickToBottom";
 import { WorkflowOverlayBody } from "./WorkflowOverlayBody";
 import { parseWorkflowInfo, type WorkflowInfo } from "./workflowDisplay";
@@ -109,9 +109,10 @@ function SubAgentOverlayBody({
   }
 
   const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+  const isCrossagent = isCrossagentTool(payload);
   const display = payload ? deriveToolDisplay(payload) : null;
   const Icon = display?.Icon ?? Bot;
-  const title = display?.title ?? t`Subagent`;
+  const title = display?.title ?? (isCrossagent ? t`Crossagent` : t`Subagent`);
   const isRunning = item.state !== "completed" || payload?.status === "running";
   const workflow = payload && isWorkflowTool(payload) ? parseWorkflowInfo(payload) : null;
   const workflowProgress: WorkflowOverlayProgress | null = workflow
@@ -131,6 +132,7 @@ function SubAgentOverlayBody({
       title={title}
       icon={<Icon className="size-3.5 shrink-0 text-[color:var(--muted)]" />}
       onClose={onClose}
+      closeLabel={isCrossagent ? t`Close Crossagent` : t`Close subagent`}
       hideTitleBorder={renderWorkflow}
     >
       {renderWorkflow ? (
@@ -164,12 +166,14 @@ function Shell({
   title,
   icon,
   onClose,
+  closeLabel,
   children,
   hideTitleBorder = false,
 }: {
   title: string;
   icon?: ReactNode;
   onClose: () => void;
+  closeLabel?: string;
   children: ReactNode;
   /**
    * Suppress the bottom border of the title row when the body renders its own
@@ -201,7 +205,7 @@ function Shell({
         </h2>
         <button
           type="button"
-          aria-label={t`Close subagent`}
+          aria-label={closeLabel ?? t`Close subagent`}
           className="shrink-0 rounded p-1 text-muted/60 transition-colors hover:bg-[var(--row-hover)] hover:text-foreground"
           onClick={onClose}
         >

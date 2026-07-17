@@ -165,8 +165,6 @@ describe("createGeminiAdapter buildLaunchArgv", () => {
           {
             id: "memory-id",
             name: "memory",
-            description: "",
-            enabled: true,
             timeoutMs: 30_000,
             transport: { type: "stdio", command: "memory-server", args: [], env: {} },
           },

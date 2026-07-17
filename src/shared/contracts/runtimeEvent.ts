@@ -204,6 +204,7 @@ export const toolCallPayloadSchema = z.object({
   status: toolCallStatusSchema,
   progress: toolCallProgressSchema.optional(),
   isSubAgent: z.boolean().optional(),
+  isCrossagent: z.boolean().optional(),
 });
 export type ToolCallPayload = z.infer<typeof toolCallPayloadSchema>;
 

@@ -6,7 +6,7 @@ import type {
   AgentCapability,
   AgentInstanceConfig,
   ClaudeProfileModel,
-  McpServer,
+  ResolvedMcpServer,
   ProjectLocation,
   PromptSegment,
 } from "@/shared/contracts";
@@ -29,7 +29,7 @@ import { buildClaudeArgs, claudeExtraArgsPosition, rewriteClaudeLaunchArgsForCon
 import { claudeCapabilities, claudeDetectionSpec, probeClaudeStatus } from "./detection";
 import { probeClaudeCapabilities } from "./probe";
 import { ClaudeSdkSession } from "./sdkSession";
-import { buildClaudeUserMcpServers } from "../userMcp";
+import { buildClaudeMcpServers } from "../userMcp";
 import { resolveInstallNodePath, warnIfPluginManifestMissing } from "../plugin/installerBase";
 import {
   getClaudePluginPaths,
@@ -324,7 +324,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
     buildLaunchArgv(location, config, prompt, _sessionRef, launchOptions) {
       const assignedId = randomUUID();
       const args = buildClaudeArgs(config, prompt, undefined, assignedId);
-      appendClaudeUserMcpArgs(args, prompt, launchOptions?.mcpServers ?? []);
+      appendClaudeMcpArgs(args, prompt, launchOptions?.mcpServers ?? []);
       const env = profileEnv(location);
       return {
         binary: "claude",
@@ -335,7 +335,7 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
     },
     buildResumeArgv(location, config, prompt, sessionRef, launchOptions) {
       const args = buildClaudeArgs(config, prompt, sessionRef.providerSessionId);
-      appendClaudeUserMcpArgs(args, prompt, launchOptions?.mcpServers ?? []);
+      appendClaudeMcpArgs(args, prompt, launchOptions?.mcpServers ?? []);
       const env = profileEnv(location);
       return { binary: "claude", args, ...(env ? { env } : {}) };
     },
@@ -433,8 +433,12 @@ export function createClaudeAdapter(options: ClaudeAdapterOptions = {}): AgentAd
   };
 }
 
-function appendClaudeUserMcpArgs(args: string[], prompt: string, servers: McpServer[]): void {
-  const mcpServers = buildClaudeUserMcpServers(servers);
+function appendClaudeMcpArgs(
+  args: string[],
+  prompt: string,
+  servers: readonly ResolvedMcpServer[],
+): void {
+  const mcpServers = buildClaudeMcpServers(servers);
   if (Object.keys(mcpServers).length === 0) return;
   args.splice(
     claudeExtraArgsPosition(args, prompt),

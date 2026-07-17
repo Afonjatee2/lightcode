@@ -1,4 +1,4 @@
-import type { ToolCallPayload } from "./contracts";
+import { BUILT_IN_MCP_SERVER_NAMES, type ToolCallPayload } from "./contracts";
 
 export interface McpInfo {
   server: string;
@@ -22,6 +22,7 @@ export function isWorkflowTool(payload: ToolCallPayload | undefined): boolean {
 
 export function isSubAgentTool(payload: ToolCallPayload | undefined): boolean {
   if (!payload || parseMcpName(payload)) return false;
+  if (payload.isCrossagent === true) return false;
   if (payload.isSubAgent === true || isWorkflowTool(payload)) return true;
   if (!payload.args || typeof payload.args !== "object" || Array.isArray(payload.args))
     return false;
@@ -30,4 +31,23 @@ export function isSubAgentTool(payload: ToolCallPayload | undefined): boolean {
     const value = args[key];
     return typeof value === "string" && value.length > 0;
   });
+}
+
+export function isCrossagentTool(payload: ToolCallPayload | undefined): boolean {
+  return payload?.isCrossagent === true && !parseMcpName(payload);
+}
+
+export function isCrossagentRunAgentTool(payload: ToolCallPayload | undefined): boolean {
+  if (!payload?.name) return false;
+  const crossagentName = BUILT_IN_MCP_SERVER_NAMES.crossagents;
+  const mcp = parseMcpName(payload);
+  if (mcp?.server.toLowerCase() === crossagentName && mcp.tool.toLowerCase() === "run_agent") {
+    return true;
+  }
+  const name = payload.name.toLowerCase();
+  return name === `${crossagentName}__run_agent` || name === `${crossagentName}_run_agent`;
+}
+
+export function isDelegatedAgentTool(payload: ToolCallPayload | undefined): boolean {
+  return payload?.isCrossagent === true ? isCrossagentTool(payload) : isSubAgentTool(payload);
 }

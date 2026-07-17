@@ -428,7 +428,7 @@ export const SETTINGS_SEARCH_INDEX: readonly SettingsSearchEntry[] = [
     title: msg`MCP Servers`,
     description: msg`Manage the MCP server configurations Poracode adds when starting supported agents. Workspace servers can be configured in each project's settings.`,
     keywords:
-      "mcp model context protocol tools server stdio http sse workspace user built-in subagent routing subagents delegate delegation guide instructions spawn agent model",
+      "mcp model context protocol tools server stdio http sse workspace user built-in crossagent routing crossagents subagent delegate delegation guide instructions spawn agent model",
     desktopOnly: true,
   },
 

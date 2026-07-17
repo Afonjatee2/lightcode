@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import {
   areAgentSlashCommandsEqual,
+  isReservedMcpServerName,
   type AgentSlashCommand,
   type PromptSegment,
   type RuntimeEvent,
@@ -401,15 +402,6 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       buildCodexAppServerCommand(input.projectLocation, {
         ...(wslExecPath !== undefined ? { wslExecPath } : {}),
         ...(wslNodePath !== undefined ? { wslNodePath } : {}),
-        browserMcpEnabled: input.config.browserMcp === true,
-        ...(input.browserMcp !== undefined ? { browserMcp: input.browserMcp } : {}),
-        subagentMcpEnabled: input.config.subagentMcp === true,
-        ...(input.subagentMcp !== undefined ? { subagentMcp: input.subagentMcp } : {}),
-        computerUseMcpEnabled: input.config.computerUse === true,
-        ...(input.computerUseMcp !== undefined ? { computerUseMcp: input.computerUseMcp } : {}),
-        chromeMcpEnabled: input.config.chromeMcp === true,
-        ...(input.chromeMcp !== undefined ? { chromeMcp: input.chromeMcp } : {}),
-        ...(input.appControlsMcp !== undefined ? { appControlsMcp: input.appControlsMcp } : {}),
         ...(input.mcpServers !== undefined ? { mcpServers: input.mcpServers } : {}),
       }),
     );
@@ -434,7 +426,7 @@ export class CodexStructuredSession implements StructuredSessionHandle {
       rpc,
       input.threadId,
       wslDistro,
-      (input.mcpServers?.length ?? 0) > 0,
+      input.mcpServers?.some((server) => !isReservedMcpServerName(server.name)) ?? false,
     );
     session.attachRpcHandlers();
 

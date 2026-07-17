@@ -503,8 +503,6 @@ describe("createOpenCodeAdapter", () => {
           {
             id: "vercel-id",
             name: "vercel",
-            description: "",
-            enabled: true,
             timeoutMs: 30_000,
             transport: {
               type: "http",

@@ -1322,8 +1322,8 @@ msgid "Background process restarted"
 msgstr "后台进程重新启动"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-msgid "Background tasks"
-msgstr "后台任务"
+#~ msgid "Background tasks"
+#~ msgstr "后台任务"
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Base branch"
@@ -1983,6 +1983,18 @@ msgstr "关闭输入框"
 msgid "Close connection actions"
 msgstr "关闭连接操作"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+msgid "Close Crossagent"
+msgstr "关闭 Crossagent"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents"
+msgstr "关闭 Crossagents"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents panel"
+msgstr "关闭 Crossagents 面板"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/parts/EditorToolbar.tsx
 msgid "Close editor"
 msgstr "关闭编辑器"
@@ -2120,6 +2132,14 @@ msgstr "关闭到托盘"
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "Close usage details"
 msgstr "关闭使用详情"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows"
+msgstr "关闭工作流"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows panel"
+msgstr "关闭工作流面板"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
@@ -2848,6 +2868,51 @@ msgstr "凭证已配置。"
 msgid "Credits"
 msgstr "鸣谢"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent"
+msgstr "Crossagent"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent ({subagent}): {description}"
+msgstr "Crossagent（{subagent}）：{description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#~ msgid "Crossagent not found."
+#~ msgstr "未找到 Crossagent。"
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Crossagent Result"
+msgstr "Crossagent 结果"
+
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagent routing guide"
+msgstr "Crossagents 路由指南"
+
+#: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
+#~ msgid "Crossagent runs"
+#~ msgstr "Crossagents 运行次数"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {description}"
+msgstr "Crossagent：{description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {subagent}"
+msgstr "Crossagent：{subagent}"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+#: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagents"
+msgstr "Crossagents"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Crossagents enabled for this thread"
+msgstr "已为此线程启用 Crossagents"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Crown"
 msgstr "选为优胜者"
@@ -3220,13 +3285,17 @@ msgstr "禁用 CLI 挂钩插件 (L1)"
 msgid "Disable Computer Use"
 msgstr "禁用计算机操作"
 
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Crossagents"
+msgstr "禁用 Crossagents"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "禁用项目"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Disable Subagents"
-msgstr "禁用子代理"
+#~ msgid "Disable Subagents"
+#~ msgstr "禁用子代理"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and Max)."
@@ -3400,7 +3469,7 @@ msgstr "在监管进程上丢弃传入的挂钩信封，以便代理回退到 L2
 msgid "Duplicate server name in scan"
 msgstr "扫描结果中存在重复的服务器名称"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "例如：Codex GPT-5.5 fast 用于快速查询，OpenCode GLM 用于批量重构，Claude Opus 用于任何微妙的任务。"
 
@@ -4768,7 +4837,7 @@ msgstr "在此终端中安装。完成后关闭。"
 msgid "Instructions"
 msgstr "指令"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "Instructions agents follow when choosing which agent or model to delegate to."
 msgstr "代理在选择要委派给哪个代理或模型时遵循的说明。"
 
@@ -6451,6 +6520,11 @@ msgstr "在 GitHub 上打开提交"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Open conflict resolver in"
 msgstr "在以下位置打开冲突解决器"
+
+#. placeholder {0}: display.title
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Open Crossagent: {0}"
+msgstr "打开 Crossagent：{0}"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
@@ -9155,23 +9229,20 @@ msgstr "子代理结果"
 
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
-msgid "Subagent routing guide"
-msgstr "子代理路由指南"
+#~ msgid "Subagent routing guide"
+#~ msgstr "子代理路由指南"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "子代理运行次数"
 
-#: src/renderer/components/composer/composerMcpServers.ts
-#: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 msgid "Subagents"
 msgstr "子代理"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Subagents enabled for this thread"
-msgstr "已为此线程启用子代理"
+#~ msgid "Subagents enabled for this thread"
+#~ msgstr "已为此线程启用子代理"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

@@ -1,18 +1,18 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { randomBytes, randomUUID } from "node:crypto";
-import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
+import type { CrossagentMcpHttpConfig } from "@/supervisor/agents/crossagentMcp";
 import type { OrchestratorThreadManager } from "./OrchestratorThreadManager";
 import type { SubagentRunManager } from "./SubagentRunManager";
 import { buildSubagentInstructions, dispatchTool, isKnownToolName, TOOLS } from "./toolRegistry";
 import { errorResult } from "./toolResult";
 import type { SpawnableAgent } from "./types";
 
-export interface SubagentMcpIngressInfo {
+export interface CrossagentMcpIngressInfo {
   url: string;
   port: number;
 }
 
-export interface SubagentMcpIngressDeps {
+export interface CrossagentMcpIngressDeps {
   runManager: SubagentRunManager;
   /** Orchestrator lane: create/manage first-class child threads. */
   orchestrator: OrchestratorThreadManager;
@@ -49,7 +49,7 @@ type JsonRpcResponse = JsonRpcResponseOk | JsonRpcResponseErr;
 /**
  * Single in-process MCP server hosted in the supervisor. Speaks Streamable-HTTP
  * MCP at `POST /mcp` (JSON-RPC body, single JSON response). Unlike the browser
- * ingress, auth is PER-THREAD: each thread that opts into subagents mints its
+ * ingress, auth is PER-THREAD: each thread that opts into Crossagents mints its
  * own 256-bit bearer token, and `tools/call` resolves the caller's parent
  * thread from that token so spawned children attach to the right parent.
  *
@@ -62,18 +62,18 @@ type JsonRpcResponse = JsonRpcResponseOk | JsonRpcResponseErr;
  * registered parent thread (see `resolveThreadId`). We keep the tighter
  * loopback bind on macOS/Linux since WSL only exists on Windows.
  */
-export class SubagentMcpIngress {
+export class CrossagentMcpIngress {
   private server: Server | null = null;
-  private info: SubagentMcpIngressInfo | null = null;
+  private info: CrossagentMcpIngressInfo | null = null;
   private readonly tokenToThread = new Map<string, string>();
   private readonly threadToToken = new Map<string, string>();
   private readonly disabledToolsByThread = new Map<string, Set<string>>();
 
-  constructor(private readonly deps: SubagentMcpIngressDeps) {}
+  constructor(private readonly deps: CrossagentMcpIngressDeps) {}
 
-  async start(): Promise<SubagentMcpIngressInfo> {
+  async start(): Promise<CrossagentMcpIngressInfo> {
     if (this.info) return this.info;
-    return await new Promise<SubagentMcpIngressInfo>((resolve, reject) => {
+    return await new Promise<CrossagentMcpIngressInfo>((resolve, reject) => {
       const server = createServer((req, res) => {
         void this.handle(req, res);
       });
@@ -91,7 +91,7 @@ export class SubagentMcpIngress {
     });
   }
 
-  getInfo(): SubagentMcpIngressInfo | null {
+  getInfo(): CrossagentMcpIngressInfo | null {
     return this.info;
   }
 
@@ -103,7 +103,7 @@ export class SubagentMcpIngress {
   registerThread(
     threadId: string,
     disabledTools: readonly string[] = [],
-  ): SubagentMcpHttpConfig | undefined {
+  ): CrossagentMcpHttpConfig | undefined {
     if (!this.info) return undefined;
     let token = this.threadToToken.get(threadId);
     if (!token) {
@@ -266,7 +266,7 @@ export class SubagentMcpIngress {
           result: {
             protocolVersion: MCP_PROTOCOL_VERSION,
             capabilities: { tools: {} },
-            serverInfo: { name: "subagents", version: "1.0.0" },
+            serverInfo: { name: "crossagents", version: "1.0.0" },
             instructions: buildSubagentInstructions(this.deps.getRoutingGuide?.()),
           },
         };

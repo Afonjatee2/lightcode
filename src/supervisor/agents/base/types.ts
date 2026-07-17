@@ -16,15 +16,10 @@ import type {
   ThreadPresentationMode,
   ThreadServerRequestId,
   ThreadStatus,
-  McpServer,
+  ResolvedMcpServer,
 } from "@/shared/contracts";
 import type { OscNotification, OscShellEvent, OscTitle } from "@/shared/osc";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
-import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
-import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
-import type { ComputerUseMcpHttpConfig } from "@/supervisor/agents/computerUseMcp";
-import type { ChromeMcpHttpConfig } from "@/supervisor/agents/chromeMcp";
-import type { AppControlsMcpHttpConfig } from "@/supervisor/agents/appControlsMcp";
 
 export interface CommandSpec {
   command: string;
@@ -51,26 +46,14 @@ export interface AgentEnvContext {
    * into the distro's `$HOME/.poracode/` via `resolveWslHomeDirectoryAsync`.
    */
   baseDir?: string;
-  browserMcpEnabled?: boolean;
-  browserMcp?: BrowserMcpHttpConfig;
-  computerUseMcpEnabled?: boolean;
-  computerUseMcp?: ComputerUseMcpHttpConfig;
-  chromeMcpEnabled?: boolean;
-  chromeMcp?: ChromeMcpHttpConfig;
-  appControlsMcp?: AppControlsMcpHttpConfig;
-  mcpServers?: McpServer[];
+  mcpServers?: readonly ResolvedMcpServer[];
 }
 
 export interface AgentLaunchOptions {
   suppressResumeConfigOverrides?: boolean;
   resumeThreadId?: string;
   agentSettings?: Record<string, boolean | string>;
-  browserMcp?: BrowserMcpHttpConfig;
-  subagentMcp?: SubagentMcpHttpConfig;
-  computerUseMcp?: ComputerUseMcpHttpConfig;
-  chromeMcp?: ChromeMcpHttpConfig;
-  appControlsMcp?: AppControlsMcpHttpConfig;
-  mcpServers?: McpServer[];
+  mcpServers?: readonly ResolvedMcpServer[];
 }
 
 export interface StructuredSessionUpdate {
@@ -154,12 +137,7 @@ export interface CreateStructuredSessionInput {
   agentSettings?: Record<string, boolean | string>;
   env?: Record<string, string>;
   mcpIdentity?: McpThreadIdentity;
-  browserMcp?: BrowserMcpHttpConfig;
-  subagentMcp?: SubagentMcpHttpConfig;
-  computerUseMcp?: ComputerUseMcpHttpConfig;
-  chromeMcp?: ChromeMcpHttpConfig;
-  appControlsMcp?: AppControlsMcpHttpConfig;
-  mcpServers?: McpServer[];
+  mcpServers?: readonly ResolvedMcpServer[];
   sessionRef?: SessionRef;
   presentationMode?: ThreadPresentationMode;
   loadSessionErrorRewriter?: (error: unknown, sessionId: string) => Error;

@@ -86,9 +86,14 @@ export function mapCodexNotification(
       state: turnState,
     });
     delete state.currentTurnId;
-    state.itemIdMap.clear();
-    state.itemTypeMap.clear();
-    state.commandOutputSeenSet.clear();
+    // Unified exec commands can keep running after the model turn finishes.
+    // Preserve those mappings so late output and completion notifications
+    // continue updating the original row instead of opening a blank command.
+    for (const [codexItemId, itemType] of state.itemTypeMap) {
+      if (itemType === "command_execution") continue;
+      state.itemIdMap.delete(codexItemId);
+      state.itemTypeMap.delete(codexItemId);
+    }
     state.fileChangeOutputMap.clear();
     state.fileChangePathMap.clear();
     state.reasoningSummaryIndexMap.clear();

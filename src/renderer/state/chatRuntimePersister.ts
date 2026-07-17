@@ -1,7 +1,7 @@
 import type { ToolCallPayload } from "@/shared/contracts";
+import { isDelegatedAgentTool } from "@/shared/toolCallClassification";
 import { captureRendererException } from "../diagnostics/sentry";
 import { imageViewRendersInline } from "../components/thread/ChatPane/parts/items/imageViewSource";
-import { isSubAgentTool } from "../components/thread/ChatPane/parts/items/toolDisplay";
 import { readBridge } from "../bridge";
 import { useAppStore } from "./appStore";
 import {
@@ -278,7 +278,10 @@ function isToolGroupItem(item: RuntimeChatItem): boolean {
   // them on reopen. Sub-agent parents carry the final result on their payload;
   // bundling either into a tool-call summary would erase that history.
   if (item.parentItemId) return false;
-  if (item.type === "tool_call" && isSubAgentTool(item.payload as ToolCallPayload | undefined)) {
+  if (
+    item.type === "tool_call" &&
+    isDelegatedAgentTool(item.payload as ToolCallPayload | undefined)
+  ) {
     return false;
   }
   // Tool rows that render as a standalone inline image (ImageView) must NOT be
@@ -319,7 +322,7 @@ function categorizeItem(item: RuntimeChatItem): SummaryCategory {
   if (item.type === "web_search") return "searched";
   const payload = item.payload as Partial<ToolCallPayload> | undefined;
   if (!payload) return "other";
-  if (isSubAgentTool(payload as ToolCallPayload)) return "executed";
+  if (isDelegatedAgentTool(payload as ToolCallPayload)) return "executed";
 
   switch (payload.kind) {
     case "read":

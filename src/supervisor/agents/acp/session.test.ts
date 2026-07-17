@@ -57,6 +57,12 @@ function makeConfigSyncSession(
   overrides: {
     currentConfig?: ThreadConfig;
     agentMcpCapabilities?: { http?: boolean; sse?: boolean };
+    mcpServers?: Array<{
+      id: string;
+      name: string;
+      timeoutMs: number;
+      transport: { type: "http"; url: string; headers: Record<string, string> };
+    }>;
   } = {},
 ) {
   const connection = {
@@ -158,7 +164,7 @@ function makeConfigSyncSession(
   session["cwd"] = "C:\\repo";
   session["stableSessionRef"] = undefined;
   session["launchOptions"] = {};
-  session["mcpServers"] = [];
+  session["mcpServers"] = overrides.mcpServers ?? [];
   session["loadSessionErrorRewriter"] = rewriteLoadSessionError;
   return { connection, listener, session: session as unknown as TestableAcpSession };
 }
@@ -709,8 +715,16 @@ describe("ACP client protocol helpers", () => {
   });
 
   it("passes selected Browser MCP to ACP session open calls", async () => {
-    process.env.PORACODE_BROWSER_MCP_URL = "http://127.0.0.1:9123";
-    process.env.PORACODE_BROWSER_MCP_TOKEN = "secret-token";
+    const resolved = {
+      id: "browser",
+      name: "browser",
+      timeoutMs: 30_000,
+      transport: {
+        type: "http" as const,
+        url: "http://127.0.0.1:9123/mcp",
+        headers: { Authorization: "Bearer secret-token" },
+      },
+    };
     const mcpServers = [
       {
         type: "http",
@@ -720,7 +734,7 @@ describe("ACP client protocol helpers", () => {
       },
     ];
 
-    const newCase = makeConfigSyncSession();
+    const newCase = makeConfigSyncSession({ mcpServers: [resolved] });
     await expect(newCase.session.openThread({ model: "model-a", browserMcp: true })).resolves.toBe(
       "session-1",
     );
@@ -729,7 +743,7 @@ describe("ACP client protocol helpers", () => {
       mcpServers,
     });
 
-    const resumeCase = makeConfigSyncSession();
+    const resumeCase = makeConfigSyncSession({ mcpServers: [resolved] });
     (resumeCase.session as unknown as Record<string, unknown>)["agentSessionCapabilities"] = {
       resume: {},
     };
@@ -745,7 +759,7 @@ describe("ACP client protocol helpers", () => {
       mcpServers,
     });
 
-    const loadCase = makeConfigSyncSession();
+    const loadCase = makeConfigSyncSession({ mcpServers: [resolved] });
     await expect(
       loadCase.session.openThread(
         { model: "model-a", browserMcp: true },
@@ -760,7 +774,20 @@ describe("ACP client protocol helpers", () => {
   });
 
   it("passes WSL Browser MCP through the in-distro bridge", async () => {
-    const { connection, session } = makeConfigSyncSession();
+    const { connection, session } = makeConfigSyncSession({
+      mcpServers: [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:45678/mcp",
+            headers: { Authorization: "Bearer bridge-secret" },
+          },
+        },
+      ],
+    });
     (session as unknown as Record<string, unknown>)["projectLocation"] = {
       kind: "wsl",
       distro: "Ubuntu",
@@ -768,12 +795,6 @@ describe("ACP client protocol helpers", () => {
       uncPath: "\\\\wsl.localhost\\Ubuntu\\home\\me\\repo",
     };
     (session as unknown as Record<string, unknown>)["cwd"] = "/home/me/repo";
-    (session as unknown as Record<string, unknown>)["browserMcp"] = {
-      url: "http://127.0.0.1:45678/mcp",
-      token: "bridge-secret",
-      headers: { Authorization: "Bearer bridge-secret" },
-    };
-
     await expect(session.openThread({ model: "model-a", browserMcp: true })).resolves.toBe(
       "session-1",
     );
@@ -791,15 +812,20 @@ describe("ACP client protocol helpers", () => {
     });
   });
 
-  it("passes selected subagents MCP to ACP session open calls", async () => {
-    const { connection, session } = makeConfigSyncSession();
-    (session as unknown as Record<string, unknown>)["subagentMcp"] = {
-      url: "http://127.0.0.1:9200/mcp",
-      token: "subagent-token",
-      headers: { Authorization: "Bearer subagent-token" },
+  it("passes selected Crossagents MCP to ACP session open calls", async () => {
+    const crossagents = {
+      id: "crossagents",
+      name: "crossagents",
+      timeoutMs: 300_000,
+      transport: {
+        type: "http" as const,
+        url: "http://127.0.0.1:9200/mcp",
+        headers: { Authorization: "Bearer crossagent-token" },
+      },
     };
+    const { connection, session } = makeConfigSyncSession({ mcpServers: [crossagents] });
 
-    await expect(session.openThread({ model: "model-a", subagentMcp: true })).resolves.toBe(
+    await expect(session.openThread({ model: "model-a", crossagentMcp: true })).resolves.toBe(
       "session-1",
     );
 
@@ -808,9 +834,9 @@ describe("ACP client protocol helpers", () => {
       mcpServers: [
         {
           type: "http",
-          name: "subagents",
+          name: "crossagents",
           url: "http://127.0.0.1:9200/mcp",
-          headers: [{ name: "Authorization", value: "Bearer subagent-token" }],
+          headers: [{ name: "Authorization", value: "Bearer crossagent-token" }],
         },
       ],
     });
@@ -823,14 +849,21 @@ describe("ACP client protocol helpers", () => {
     // normally without them.
     const { connection, session } = makeConfigSyncSession({
       agentMcpCapabilities: { http: false },
+      mcpServers: [
+        {
+          id: "crossagents",
+          name: "crossagents",
+          timeoutMs: 300_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:9200/mcp",
+            headers: { Authorization: "Bearer crossagent-token" },
+          },
+        },
+      ],
     });
-    (session as unknown as Record<string, unknown>)["subagentMcp"] = {
-      url: "http://127.0.0.1:9200/mcp",
-      token: "subagent-token",
-      headers: { Authorization: "Bearer subagent-token" },
-    };
 
-    await expect(session.openThread({ model: "model-a", subagentMcp: true })).resolves.toBe(
+    await expect(session.openThread({ model: "model-a", crossagentMcp: true })).resolves.toBe(
       "session-1",
     );
 
@@ -840,18 +873,34 @@ describe("ACP client protocol helpers", () => {
     });
   });
 
-  it("appends both browser and subagents MCP servers when both are selected", async () => {
-    process.env.PORACODE_BROWSER_MCP_URL = "http://127.0.0.1:9123";
-    process.env.PORACODE_BROWSER_MCP_TOKEN = "secret-token";
-    const { connection, session } = makeConfigSyncSession();
-    (session as unknown as Record<string, unknown>)["subagentMcp"] = {
-      url: "http://127.0.0.1:9200/mcp",
-      token: "subagent-token",
-      headers: { Authorization: "Bearer subagent-token" },
-    };
+  it("appends both browser and Crossagents MCP servers when both are selected", async () => {
+    const { connection, session } = makeConfigSyncSession({
+      mcpServers: [
+        {
+          id: "browser",
+          name: "browser",
+          timeoutMs: 30_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:9123/mcp",
+            headers: { Authorization: "Bearer secret-token" },
+          },
+        },
+        {
+          id: "crossagents",
+          name: "crossagents",
+          timeoutMs: 300_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:9200/mcp",
+            headers: { Authorization: "Bearer crossagent-token" },
+          },
+        },
+      ],
+    });
 
     await expect(
-      session.openThread({ model: "model-a", browserMcp: true, subagentMcp: true }),
+      session.openThread({ model: "model-a", browserMcp: true, crossagentMcp: true }),
     ).resolves.toBe("session-1");
 
     expect(connection.newSession).toHaveBeenCalledWith({
@@ -865,9 +914,9 @@ describe("ACP client protocol helpers", () => {
         },
         {
           type: "http",
-          name: "subagents",
+          name: "crossagents",
           url: "http://127.0.0.1:9200/mcp",
-          headers: [{ name: "Authorization", value: "Bearer subagent-token" }],
+          headers: [{ name: "Authorization", value: "Bearer crossagent-token" }],
         },
       ],
     });

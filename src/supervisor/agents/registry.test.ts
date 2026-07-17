@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createAgentRegistry } from "./registry";
-import { buildUnrestrictedChildConfig } from "@/supervisor/subagentMcp/types";
+import { buildUnrestrictedChildConfig } from "@/supervisor/crossagentMcp/types";
 
 const EXPECTED_BUILT_IN_ORDER = [
   "claude",

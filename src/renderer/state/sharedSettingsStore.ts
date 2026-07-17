@@ -95,7 +95,7 @@ interface SharedSettingsState extends SharedSettings {
   dismissHookInstallProposal: (key: string) => void;
   /**
    * Turn a composer MCP server on/off persistently, keyed by composer MCP id
-   * (`"browser"`, `"subagents"`, `"computer-use"`). Persisted like the other
+   * (`"browser"`, `"crossagents"`, `"computer-use"`). Persisted like the other
    * setters; consumed as the standing default for every new thread.
    */
   setMcpServerEnabled: (id: string, enabled: boolean) => void;
@@ -148,7 +148,7 @@ interface SharedSettingsState extends SharedSettings {
     modelId: string,
     fallbackMode: ThreadPresentationMode,
   ) => boolean;
-  setSubagentRoutingGuide: (value: string) => void;
+  setCrossagentRoutingGuide: (value: string) => void;
   pushRecentModel: (
     agentKind: string,
     modelId: string,
@@ -682,9 +682,9 @@ export const useSharedSettings = create<SharedSettingsState>()((set, get) => ({
     persistSettings(selectSharedSettings(get()));
     return !isFavorite;
   },
-  setSubagentRoutingGuide: (subagentRoutingGuide) => {
-    if (get().subagentRoutingGuide === subagentRoutingGuide) return;
-    set({ subagentRoutingGuide });
+  setCrossagentRoutingGuide: (crossagentRoutingGuide) => {
+    if (get().crossagentRoutingGuide === crossagentRoutingGuide) return;
+    set({ crossagentRoutingGuide });
     persistSettings(selectSharedSettings(get()));
   },
   pushRecentModel: (agentKind, modelId, presentationMode) => {
@@ -809,7 +809,7 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
     browser: state.browser,
     audio: state.audio,
     usage: state.usage,
-    subagentRoutingGuide: state.subagentRoutingGuide,
+    crossagentRoutingGuide: state.crossagentRoutingGuide,
   };
 }
 

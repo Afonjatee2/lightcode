@@ -5,13 +5,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { AgentKind, ProjectLocation, RuntimeEvent } from "@/shared/contracts";
 import type { AgentAdapter } from "@/supervisor/agents/base";
 import { createAgentRegistry } from "@/supervisor/agents/registry";
-import { OrchestratorThreadManager } from "@/supervisor/subagentMcp/OrchestratorThreadManager";
-import { SubagentMcpIngress } from "@/supervisor/subagentMcp/SubagentMcpIngress";
-import { SubagentRunManager } from "@/supervisor/subagentMcp/SubagentRunManager";
-import type { SpawnableAgent } from "@/supervisor/subagentMcp/types";
-import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
+import { OrchestratorThreadManager } from "@/supervisor/crossagentMcp/OrchestratorThreadManager";
+import { CrossagentMcpIngress } from "@/supervisor/crossagentMcp/CrossagentMcpIngress";
+import { SubagentRunManager } from "@/supervisor/crossagentMcp/SubagentRunManager";
+import type { SpawnableAgent } from "@/supervisor/crossagentMcp/types";
+import type { CrossagentMcpHttpConfig } from "@/supervisor/agents/crossagentMcp";
 
-// Live integration: stands up the real subagents MCP ingress + run manager with
+// Live integration: stands up the real Crossagents MCP ingress + run manager with
 // the real adapter registry, then acts as the MCP client exactly the way a
 // host agent does — initialize, tools/list, list_agents, run_agent with a
 // cheap Claude model — and asserts on the re-tagged runtime events the parent
@@ -21,11 +21,11 @@ import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
 const PARENT_THREAD_ID = "int-parent-thread";
 const ROUTING_GUIDE = "Prefer claude haiku for everything in this test.";
 
-describe("subagents MCP (live)", () => {
+describe("Crossagents MCP (live)", () => {
   let projectDir: string;
-  let ingress: SubagentMcpIngress;
+  let ingress: CrossagentMcpIngress;
   let runManager: SubagentRunManager;
-  let mcp: SubagentMcpHttpConfig;
+  let mcp: CrossagentMcpHttpConfig;
   let claude: AgentAdapter | undefined;
   const parentEvents: RuntimeEvent[] = [];
 
@@ -77,7 +77,7 @@ describe("subagents MCP (live)", () => {
         ]
       : [];
 
-    ingress = new SubagentMcpIngress({
+    ingress = new CrossagentMcpIngress({
       runManager,
       orchestrator: new OrchestratorThreadManager({
         adapters: new Map(),

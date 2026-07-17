@@ -57,7 +57,7 @@ export const threadSchema = z.object({
   errorMessage: z.string().optional(),
   slashCommands: z.array(agentSlashCommandSchema).optional(),
   /**
-   * Id of the orchestrator thread that created this thread via the subagents
+   * Id of the orchestrator thread that created this thread via the Crossagents
    * MCP `create_thread` tool. Pure metadata for now (no renderer UI keys on
    * it); absent for user-created threads.
    */

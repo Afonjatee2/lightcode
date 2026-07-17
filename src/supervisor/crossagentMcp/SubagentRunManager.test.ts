@@ -117,28 +117,23 @@ function makeHarness(options?: {
               approvalPolicy: "never",
               sandboxMode: "workspace-write",
               browserMcp: true,
-              subagentMcp: true,
+              crossagentMcp: true,
               computerUse: true,
               chromeMcp: true,
             },
           }
         : undefined,
     resolveParentMcpAccess: async () => ({
-      browserMcp: {
-        url: "http://browser/mcp",
-        token: "browser-token",
-        headers: { Authorization: "Bearer browser-token" },
-      },
-      computerUseMcp: {
-        url: "http://computer/mcp",
-        token: "computer-token",
-        headers: { Authorization: "Bearer computer-token" },
-      },
-      chromeMcp: {
-        url: "http://chrome/mcp",
-        token: "chrome-token",
-        headers: { Authorization: "Bearer chrome-token" },
-      },
+      mcpServers: ["browser", "computer_use", "chrome"].map((name) => ({
+        id: name,
+        name,
+        timeoutMs: 30_000,
+        transport: {
+          type: "http" as const,
+          url: `http://${name}/mcp`,
+          headers: { Authorization: `Bearer ${name}-token` },
+        },
+      })),
     }),
     appendRuntimeEvent: (threadId, event) => appended.push({ threadId, event }),
   };
@@ -194,7 +189,7 @@ describe("SubagentRunManager", () => {
     ).toEqual({ model: "child", approvalPolicy: "never" });
   });
 
-  it("emits a synthetic sub-agent tool_call tile on spawn", () => {
+  it("emits a synthetic Crossagent tool_call tile on spawn", () => {
     const h = makeHarness();
     const { runId } = h.manager.spawn(PARENT, { agent: "codex", prompt: "do work" });
     const started = h.appended.find((a) => a.event.type === "item.started");
@@ -204,7 +199,7 @@ describe("SubagentRunManager", () => {
     expect(event.itemId).toBe(`sub:${runId}`);
     expect(event.itemType).toBe("tool_call");
     expect(event.payload).toMatchObject({
-      isSubAgent: true,
+      isCrossagent: true,
       status: "running",
       name: "Codex · GPT-5.5",
     });
@@ -338,7 +333,7 @@ describe("SubagentRunManager", () => {
     expect(completion).toBeDefined();
     expect(completion!.payload).toMatchObject({
       status: "success",
-      isSubAgent: true,
+      isCrossagent: true,
       result: "Hello",
     });
   });
@@ -401,7 +396,7 @@ describe("SubagentRunManager", () => {
     });
     await flush();
     const childInput = h.inputs[0]!;
-    expect(childInput.config).not.toHaveProperty("subagentMcp");
+    expect(childInput.config).not.toHaveProperty("crossagentMcp");
     expect(childInput.config).toMatchObject({
       browserMcp: true,
       computerUse: true,
@@ -413,12 +408,14 @@ describe("SubagentRunManager", () => {
     expect(childInput.config.approvalPolicy).toBe("never");
     expect(childInput.config.sandboxMode).toBe("danger-full-access");
     expect(childInput.presentationMode).toBe("gui");
-    expect(childInput).not.toHaveProperty("subagentMcp");
-    expect(childInput).toMatchObject({
-      browserMcp: { url: "http://browser/mcp" },
-      computerUseMcp: { url: "http://computer/mcp" },
-      chromeMcp: { url: "http://chrome/mcp" },
-    });
+    expect(childInput).not.toHaveProperty("crossagentMcp");
+    expect(childInput.mcpServers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "browser" }),
+        expect.objectContaining({ name: "computer_use" }),
+        expect.objectContaining({ name: "chrome" }),
+      ]),
+    );
   });
 
   it("rejects selections that are not advertised by the structured composer surface", () => {

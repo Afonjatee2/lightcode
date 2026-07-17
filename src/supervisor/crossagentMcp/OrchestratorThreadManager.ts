@@ -197,7 +197,7 @@ interface StatusWaiter {
 class LaunchTimeoutError extends OrchestratorThreadError {}
 
 /**
- * Orchestrator lane of the subagents MCP: lets a parent thread create and
+ * Orchestrator lane of the Crossagents MCP: lets a parent thread create and
  * manage REAL first-class app threads (persisted rows, sidebar-visible,
  * optionally worktree-backed), as opposed to the ephemeral in-memory runs
  * owned by {@link SubagentRunManager}.
@@ -303,7 +303,7 @@ export class OrchestratorThreadManager {
     const customTitle = request.title?.trim();
     const title = customTitle || makeThreadTitle(prompt) || "New thread";
     // Child uses the target provider's unrestricted posture and inherits the
-    // parent's non-recursive MCPs. Subagents MCP is intentionally omitted so
+    // parent's non-recursive MCPs. Crossagents MCP is intentionally omitted so
     // children cannot spawn grandchildren.
     const childConfig = buildUnrestrictedChildConfig(
       {

@@ -10,27 +10,27 @@ import {
   resolveOpenCodeSessionDirectory,
   shutdownSpawnedOpenCodeServers,
 } from "@/supervisor/agents/opencode/sdkClient";
-import { OrchestratorThreadManager } from "@/supervisor/subagentMcp/OrchestratorThreadManager";
-import { SubagentMcpIngress } from "@/supervisor/subagentMcp/SubagentMcpIngress";
-import { SubagentRunManager } from "@/supervisor/subagentMcp/SubagentRunManager";
-import type { SpawnableAgent } from "@/supervisor/subagentMcp/types";
-import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
+import { OrchestratorThreadManager } from "@/supervisor/crossagentMcp/OrchestratorThreadManager";
+import { CrossagentMcpIngress } from "@/supervisor/crossagentMcp/CrossagentMcpIngress";
+import { SubagentRunManager } from "@/supervisor/crossagentMcp/SubagentRunManager";
+import type { SpawnableAgent } from "@/supervisor/crossagentMcp/types";
+import type { CrossagentMcpHttpConfig } from "@/supervisor/agents/crossagentMcp";
 
-// Live integration for OpenCode HOSTING the cross-provider subagents MCP.
+// Live integration for OpenCode HOSTING the Crossagents MCP.
 // Stands up the real ingress + run manager, then acquires a DEDICATED per-thread
-// `opencode serve` with the thread's subagents config and asserts, via the
-// OpenCode client's `mcp.status`, that the `subagents` server was registered
+// `opencode serve` with the thread's Crossagents config and asserts, via the
+// OpenCode client's `mcp.status`, that the `crossagents` server was registered
 // (mcp.add) and successfully connected (mcp.connect handshook against the real
 // ingress with the per-thread bearer token — a 401 would surface as "failed").
 // Skips when OpenCode is not installed on the host.
 
 const PARENT_THREAD_ID = "oc-int-parent-thread";
 
-describe("opencode hosts subagents MCP (live)", () => {
+describe("opencode hosts Crossagents MCP (live)", () => {
   let projectDir: string;
-  let ingress: SubagentMcpIngress;
+  let ingress: CrossagentMcpIngress;
   let runManager: SubagentRunManager;
-  let mcp: SubagentMcpHttpConfig;
+  let mcp: CrossagentMcpHttpConfig;
   let opencode: AgentAdapter | undefined;
 
   const projectLocation = (): ProjectLocation =>
@@ -81,7 +81,7 @@ describe("opencode hosts subagents MCP (live)", () => {
         ]
       : [];
 
-    ingress = new SubagentMcpIngress({
+    ingress = new CrossagentMcpIngress({
       runManager,
       orchestrator: new OrchestratorThreadManager({
         adapters: new Map(),
@@ -113,7 +113,7 @@ describe("opencode hosts subagents MCP (live)", () => {
     rmSync(projectDir, { recursive: true, force: true });
   });
 
-  it("registers + connects the subagents MCP on a dedicated per-thread server", async () => {
+  it("registers + connects the Crossagents MCP on a dedicated per-thread server", async () => {
     if (!opencode) {
       console.log("[oc-subagent-int] SKIPPED: opencode adapter not registered");
       return;
@@ -127,7 +127,14 @@ describe("opencode hosts subagents MCP (live)", () => {
     const location = projectLocation();
     const acquired = await acquireOpenCodeServer({
       projectLocation: location,
-      subagentMcp: mcp,
+      mcpServers: [
+        {
+          id: "crossagents",
+          name: "crossagents",
+          timeoutMs: 300_000,
+          transport: { type: "http", url: mcp.url, headers: mcp.headers },
+        },
+      ],
       dedicatedKey: PARENT_THREAD_ID,
     });
 
@@ -135,12 +142,12 @@ describe("opencode hosts subagents MCP (live)", () => {
       const directory = resolveOpenCodeSessionDirectory(location);
       const result = await acquired.client.mcp.status({ directory });
       const servers = (result.data ?? {}) as Record<string, { status: string; error?: string }>;
-      const subagents = servers.subagents;
-      expect(subagents).toBeDefined();
+      const crossagents = servers.crossagents;
+      expect(crossagents).toBeDefined();
       // Connected proves the full path: dedicated server spawned, mcp.add
       // registered the entry, mcp.connect completed the MCP initialize
       // handshake against the live ingress with the per-thread bearer token.
-      expect(subagents?.status).toBe("connected");
+      expect(crossagents?.status).toBe("connected");
     } finally {
       await acquired.dispose();
     }

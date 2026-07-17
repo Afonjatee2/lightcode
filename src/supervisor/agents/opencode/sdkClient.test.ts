@@ -38,6 +38,15 @@ function makeHandle(baseUrl: string) {
   } satisfies OpenCodeServerHandle;
 }
 
+function remoteMcp(
+  name: string,
+  url: string,
+  headers: Record<string, string> = {},
+  timeoutMs = 30_000,
+) {
+  return { id: name, name, timeoutMs, transport: { type: "http" as const, url, headers } };
+}
+
 describe("acquireOpenCodeServer", () => {
   const oldBrowserMcpUrl = process.env.PORACODE_BROWSER_MCP_URL;
   const oldBrowserMcpToken = process.env.PORACODE_BROWSER_MCP_TOKEN;
@@ -94,7 +103,11 @@ describe("acquireOpenCodeServer", () => {
     const { acquireOpenCodeServer } = await import("./sdkClient");
     const acquired = await acquireOpenCodeServer({
       projectLocation: { kind: "posix", path: "/repo" },
-      browserMcpEnabled: true,
+      mcpServers: [
+        remoteMcp("browser", "http://127.0.0.1:9321/mcp", {
+          Authorization: "Bearer test-token",
+        }),
+      ],
     });
 
     expect(mocks.spawnOpenCodeServer).toHaveBeenCalledTimes(2);
@@ -118,7 +131,7 @@ describe("acquireOpenCodeServer", () => {
     };
   }
 
-  const subagentMcp = {
+  const crossagentMcp = {
     url: "http://127.0.0.1:9400/mcp",
     token: "parent-thread-token",
     headers: { Authorization: "Bearer parent-thread-token" },
@@ -139,8 +152,7 @@ describe("acquireOpenCodeServer", () => {
     const { acquireOpenCodeServer } = await import("./sdkClient");
     const acquired = await acquireOpenCodeServer({
       projectLocation: { kind: "posix", path: "/repo-chrome" },
-      chromeMcpEnabled: true,
-      chromeMcp,
+      mcpServers: [remoteMcp("chrome", chromeMcp.url, chromeMcp.headers)],
     });
 
     expect(client.mcp.add).toHaveBeenCalledWith({
@@ -151,6 +163,7 @@ describe("acquireOpenCodeServer", () => {
         url: chromeMcp.url,
         headers: chromeMcp.headers,
         enabled: true,
+        timeout: 30_000,
       },
     });
     expect(client.mcp.connect).toHaveBeenCalledWith({
@@ -162,7 +175,7 @@ describe("acquireOpenCodeServer", () => {
     expect(handle.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it("dedicates a per-thread server and registers the subagents MCP via mcp.add", async () => {
+  it("dedicates a per-thread server and registers the Crossagents MCP via mcp.add", async () => {
     const handle = makeHandle("http://127.0.0.1:4200");
     mocks.spawnOpenCodeServer.mockReturnValue(handle);
     const client = makeSubagentClient();
@@ -171,24 +184,25 @@ describe("acquireOpenCodeServer", () => {
     const { acquireOpenCodeServer } = await import("./sdkClient");
     const acquired = await acquireOpenCodeServer({
       projectLocation: { kind: "posix", path: "/repo-dedicated" },
-      subagentMcp,
+      mcpServers: [remoteMcp("crossagents", crossagentMcp.url, crossagentMcp.headers, 300_000)],
       dedicatedKey: "thread-parent",
     });
 
     expect(client.mcp.add).toHaveBeenCalledTimes(1);
     expect(client.mcp.add).toHaveBeenCalledWith({
       directory: "/repo-dedicated",
-      name: "subagents",
+      name: "crossagents",
       config: {
         type: "remote",
-        url: subagentMcp.url,
-        headers: subagentMcp.headers,
+        url: crossagentMcp.url,
+        headers: crossagentMcp.headers,
         enabled: true,
+        timeout: 300_000,
       },
     });
     expect(client.mcp.connect).toHaveBeenCalledWith({
       directory: "/repo-dedicated",
-      name: "subagents",
+      name: "crossagents",
     });
 
     // Dedicated entry has a single tenant → disposes with the thread.
@@ -212,7 +226,7 @@ describe("acquireOpenCodeServer", () => {
     // … while a hosting thread on the SAME project gets its own server.
     const dedicated = await acquireOpenCodeServer({
       projectLocation: location,
-      subagentMcp,
+      mcpServers: [remoteMcp("crossagents", crossagentMcp.url, crossagentMcp.headers, 300_000)],
       dedicatedKey: "thread-host",
     });
 
@@ -271,7 +285,7 @@ describe("acquireOpenCodeServer", () => {
     expect(secondHandle.dispose).toHaveBeenCalledTimes(1);
   });
 
-  it("shares one server for two child acquires that do not host the subagents MCP", async () => {
+  it("shares one server for two child acquires that do not host the Crossagents MCP", async () => {
     const handle = makeHandle("http://127.0.0.1:4400");
     mocks.spawnOpenCodeServer.mockReturnValue(handle);
     mocks.createOpencodeClient.mockReturnValue({});
@@ -298,7 +312,6 @@ describe("acquireOpenCodeServer", () => {
 
     const acquired = await acquireOpenCodeServer({
       projectLocation: { kind: "windows", path: "C:\\repo" },
-      browserMcpEnabled: false,
     });
     expect(acquired.baseUrl).toBe("http://127.0.0.1:4096");
 
@@ -310,7 +323,6 @@ describe("acquireOpenCodeServer", () => {
     await expect(
       acquireOpenCodeServer({
         projectLocation: { kind: "windows", path: "C:\\repo" },
-        browserMcpEnabled: false,
       }),
     ).resolves.toBeDefined();
     expect(mocks.spawnOpenCodeServer).toHaveBeenCalledTimes(2);

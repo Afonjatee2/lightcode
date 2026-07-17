@@ -26,7 +26,6 @@ import type {
   ThreadStatus,
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
-import { isOpenCodeBrowserMcpEnabled } from "@/shared/opencodeSettings";
 import {
   createKnownSessionRef,
   type AgentLaunchOptions,
@@ -45,7 +44,6 @@ import {
 import { mapOpenCodeSlashCommands } from "./detection";
 import { classifyOpenCodeError, isOpenCodeConnectionLoss } from "./opencodeErrors";
 import { buildOpenCodePermissionRules } from "./permissionRules";
-import { syncOpenCodeBrowserMcpConfigFile } from "./plugin/install";
 import {
   acquireOpenCodeServer,
   resolveOpenCodeSessionDirectory,
@@ -145,9 +143,6 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
   private disposed = false;
   private pendingRequests = new Map<ThreadServerRequestId, PendingRequest>();
   private currentSlashCommands: AgentSlashCommand[] | undefined;
-  private browserMcpEnabled = false;
-  private computerUseMcpEnabled = false;
-  private chromeMcpEnabled = false;
 
   private constructor(input: CreateStructuredSessionInput) {
     this.input = input;
@@ -202,27 +197,6 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     this.activated = true;
 
     try {
-      // Browser enablement also comes from the OpenCode agent-settings toggle,
-      // so the http config's presence carries the pipeline's disable decision.
-      // The other flags live on the (already effective) thread config.
-      this.browserMcpEnabled =
-        isOpenCodeBrowserMcpEnabled(this.input.agentSettings) &&
-        this.input.browserMcp !== undefined;
-      this.computerUseMcpEnabled = this.input.config.computerUse === true;
-      this.chromeMcpEnabled = this.input.config.chromeMcp === true;
-      syncOpenCodeBrowserMcpConfigFile(
-        this.input.projectLocation,
-        this.browserMcpEnabled,
-        this.input.browserMcp,
-        this.computerUseMcpEnabled,
-        this.input.computerUseMcp,
-        this.chromeMcpEnabled,
-        this.input.chromeMcp,
-      );
-      // The subagents MCP is hosted, when opted in, by registering it on a
-      // dedicated per-thread server via `mcp.add` (see `acquireOpenCodeServer`)
-      // — never through the global config file, whose per-thread token would
-      // clobber across launches and misattribute sibling threads' spawns.
       this.acquired = await acquireOpenCodeServer(this.buildAcquireInput());
     } catch (cause) {
       // Surface server-startup failures (sandbox blocks, ENOENT, port races,
@@ -707,31 +681,12 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     if (this.isGui) this.startEventStream();
   }
 
-  /**
-   * Assemble the {@link acquireOpenCodeServer} input for this session. When the
-   * thread opted into hosting the subagents MCP (`input.subagentMcp` present),
-   * request a dedicated single-tenant server keyed by the thread id and hand
-   * over the pre-resolved config so it can be registered via `mcp.add`. Threads
-   * without it (including children spawned by the run manager, whose recursion
-   * guard never sets `subagentMcp`) keep sharing the per-project pool — the
-   * dedicated-server cost is strictly opt-in.
-   */
+  /** Assemble a provider-neutral MCP acquisition for this session. */
   private buildAcquireInput(): AcquireOpenCodeServerInput {
-    const { subagentMcp, appControlsMcp, mcpServers } = this.input;
-    const needsDedicatedServer =
-      subagentMcp !== undefined || appControlsMcp !== undefined || (mcpServers?.length ?? 0) > 0;
+    const { mcpServers } = this.input;
+    const needsDedicatedServer = (mcpServers?.length ?? 0) > 0;
     return {
       projectLocation: this.input.projectLocation,
-      browserMcpEnabled: this.browserMcpEnabled,
-      ...(this.input.browserMcp !== undefined ? { browserMcp: this.input.browserMcp } : {}),
-      computerUseMcpEnabled: this.computerUseMcpEnabled,
-      ...(this.input.computerUseMcp !== undefined
-        ? { computerUseMcp: this.input.computerUseMcp }
-        : {}),
-      chromeMcpEnabled: this.chromeMcpEnabled,
-      ...(this.input.chromeMcp !== undefined ? { chromeMcp: this.input.chromeMcp } : {}),
-      ...(subagentMcp !== undefined ? { subagentMcp } : {}),
-      ...(appControlsMcp !== undefined ? { appControlsMcp } : {}),
       ...(mcpServers !== undefined ? { mcpServers } : {}),
       ...(needsDedicatedServer ? { dedicatedKey: this.threadId } : {}),
     };

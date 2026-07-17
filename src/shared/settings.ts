@@ -398,7 +398,7 @@ export const sharedSettingsSchema = z.object({
   agentHookSupport: z.record(z.string(), agentHookSupportEntrySchema),
   /**
    * Composer MCP servers the user has turned on persistently, keyed by composer
-   * MCP id (`"browser"`, `"subagents"`, `"chrome"`, `"computer-use"`). `true` means the
+   * MCP id (`"browser"`, `"crossagents"`, `"chrome"`, `"computer-use"`). `true` means the
    * server is on for every *new* thread whose provider/presentation supports it
    * (baked into `thread.config` at launch) and shows no composer chip — it is a
    * standing default rather than a per-thread opt-in. Absent/`false` leaves the
@@ -424,15 +424,15 @@ export const sharedSettingsSchema = z.object({
   /** Provider usage tracking (auto-refresh cadence, per-provider opt-out, cost). */
   usage: usageSettingsSchema,
   /**
-   * Free-text routing instructions appended to the subagents MCP server
+   * Free-text routing instructions appended to the Crossagents MCP server
    * `instructions`, guiding how an agent picks which connected agent/model to
    * delegate to when spawning subagents (e.g. "Codex GPT-5.5 fast for quick
    * lookups, Claude Opus for anything subtle"). Empty string = no guidance.
-   * Whether a thread gets the subagents MCP lives on `thread.config.subagentMcp`
-   * (persistent default in `enabledMcpServers.subagents` or a `@subagents`
+   * Whether a thread gets the Crossagents MCP lives on `thread.config.crossagentMcp`
+   * (persistent default in `enabledMcpServers.crossagents` or a `@crossagents`
    * mention); this is the global guidance text shared across every such thread.
    */
-  subagentRoutingGuide: z.string(),
+  crossagentRoutingGuide: z.string(),
 });
 export type SharedSettings = z.infer<typeof sharedSettingsSchema>;
 
@@ -562,7 +562,7 @@ export const defaultSharedSettings: SharedSettings = {
     collapsedProviders: [],
     selectedRingGroups: {},
   },
-  subagentRoutingGuide: "",
+  crossagentRoutingGuide: "",
 };
 
 function parseSettingOrDefault<T>(schema: z.ZodType<T>, value: unknown, fallback: T): T {

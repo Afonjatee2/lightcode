@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import type { McpServer } from "@/shared/contracts";
+import type { ResolvedMcpServer } from "@/shared/contracts";
 
-export type ClaudeUserMcpServerConfig =
+export type ClaudeMcpServerConfig =
   | {
       type: "stdio";
       command: string;
@@ -16,9 +16,9 @@ export type ClaudeUserMcpServerConfig =
       timeout: number;
     };
 
-export function buildClaudeUserMcpServers(
-  servers: readonly McpServer[],
-): Record<string, ClaudeUserMcpServerConfig> {
+export function buildClaudeMcpServers(
+  servers: readonly ResolvedMcpServer[],
+): Record<string, ClaudeMcpServerConfig> {
   return Object.fromEntries(
     servers.map((server) => {
       const transport = server.transport;
@@ -47,7 +47,7 @@ export function buildClaudeUserMcpServers(
   );
 }
 
-export interface GeminiUserMcpServerConfig {
+export interface GeminiMcpServerConfig {
   command?: string;
   args?: string[];
   env?: Record<string, string>;
@@ -58,10 +58,10 @@ export interface GeminiUserMcpServerConfig {
   timeout: number;
 }
 
-export function buildGeminiUserMcpServers(
-  servers: readonly McpServer[],
-): Record<string, GeminiUserMcpServerConfig> {
-  const result: Record<string, GeminiUserMcpServerConfig> = {};
+export function buildGeminiMcpServers(
+  servers: readonly ResolvedMcpServer[],
+): Record<string, GeminiMcpServerConfig> {
+  const result: Record<string, GeminiMcpServerConfig> = {};
   for (const server of servers) {
     const transport = server.transport;
     if (transport.type === "stdio") {
@@ -89,7 +89,7 @@ export function buildGeminiUserMcpServers(
   return result;
 }
 
-export type OpenCodeUserMcpServerConfig =
+export type OpenCodeMcpServerConfig =
   | {
       type: "local";
       command: string[];
@@ -106,10 +106,10 @@ export type OpenCodeUserMcpServerConfig =
       timeout: number;
     };
 
-export function buildOpenCodeUserMcp(
-  servers: readonly McpServer[],
-): Record<string, OpenCodeUserMcpServerConfig> {
-  const result: Record<string, OpenCodeUserMcpServerConfig> = {};
+export function buildOpenCodeMcp(
+  servers: readonly ResolvedMcpServer[],
+): Record<string, OpenCodeMcpServerConfig> {
+  const result: Record<string, OpenCodeMcpServerConfig> = {};
   for (const server of servers) {
     const transport = server.transport;
     result[server.name] =
@@ -133,13 +133,13 @@ export function buildOpenCodeUserMcp(
   return result;
 }
 
-export interface OpenCodeUserMcpLaunchConfig {
+export interface OpenCodeMcpLaunchConfig {
   configContent: string;
   env: Record<string, string>;
 }
 
 function openCodeMcpEnvVar(
-  server: Pick<McpServer, "id" | "name">,
+  server: Pick<ResolvedMcpServer, "id" | "name">,
   kind: "ENV" | "HEADER",
   key: string,
 ): string {
@@ -151,10 +151,10 @@ function openCodeMcpEnvVar(
  * out of OPENCODE_CONFIG_CONTENT and are resolved by OpenCode from the child
  * process environment at launch time.
  */
-export function buildOpenCodeUserMcpLaunchConfig(
-  servers: readonly McpServer[],
-): OpenCodeUserMcpLaunchConfig {
-  const mcp = buildOpenCodeUserMcp(servers);
+export function buildOpenCodeMcpLaunchConfig(
+  servers: readonly ResolvedMcpServer[],
+): OpenCodeMcpLaunchConfig {
+  const mcp = buildOpenCodeMcp(servers);
   const env: Record<string, string> = {};
 
   for (const server of servers) {
@@ -194,15 +194,32 @@ export interface AcpNamedValue {
   value: string;
 }
 
-export type AcpUserMcpServerConfig =
+export type AcpMcpServerConfig =
   | { name: string; command: string; args: string[]; env: AcpNamedValue[] }
   | { type: "http" | "sse"; name: string; url: string; headers: AcpNamedValue[] };
+
+export interface AcpMcpCapabilities {
+  http?: boolean;
+  sse?: boolean;
+}
+
+export function gateAcpMcpServers<T extends object>(
+  servers: T[],
+  capabilities: AcpMcpCapabilities | undefined,
+): T[] {
+  return servers.filter((server) => {
+    if (!("type" in server)) return true;
+    if (server.type === "http") return capabilities?.http === true;
+    if (server.type === "sse") return capabilities?.sse === true;
+    return true;
+  });
+}
 
 function toNamedValues(record: Record<string, string>): AcpNamedValue[] {
   return Object.entries(record).map(([name, value]) => ({ name, value }));
 }
 
-export function buildAcpUserMcpServers(servers: readonly McpServer[]): AcpUserMcpServerConfig[] {
+export function buildAcpMcpServers(servers: readonly ResolvedMcpServer[]): AcpMcpServerConfig[] {
   return servers.map((server) => {
     const transport = server.transport;
     if (transport.type === "stdio") {
@@ -241,15 +258,18 @@ function envLabel(value: string, fallback: string): string {
   return (envTokenSegment(value) || fallback).slice(0, 32);
 }
 
-function codexMcpEnvPrefix(server: Pick<McpServer, "id" | "name">): string {
+function codexMcpEnvPrefix(server: Pick<ResolvedMcpServer, "id" | "name">): string {
   return `PORACODE_MCP_${envLabel(server.name, "SERVER")}_${envIdentityHash(server.name, server.id)}`;
 }
 
-export function codexMcpTokenEnvVar(server: Pick<McpServer, "id" | "name">): string {
+export function codexMcpTokenEnvVar(server: Pick<ResolvedMcpServer, "id" | "name">): string {
   return `${codexMcpEnvPrefix(server)}_TOKEN`;
 }
 
-function codexMcpHeaderEnvVar(server: Pick<McpServer, "id" | "name">, headerName: string): string {
+function codexMcpHeaderEnvVar(
+  server: Pick<ResolvedMcpServer, "id" | "name">,
+  headerName: string,
+): string {
   return `${codexMcpEnvPrefix(server)}_HEADER_${envLabel(headerName, "VALUE")}_${envIdentityHash(headerName)}`;
 }
 
@@ -279,12 +299,12 @@ function bearerToken(headers: Record<string, string>): string | undefined {
   return undefined;
 }
 
-export interface CodexUserMcp {
+export interface CodexMcp {
   args: string[];
   env: Record<string, string>;
 }
 
-export function buildCodexUserMcp(servers: readonly McpServer[]): CodexUserMcp {
+export function buildCodexMcp(servers: readonly ResolvedMcpServer[]): CodexMcp {
   const args: string[] = [];
   const env: Record<string, string> = {};
   let remoteClientEnabled = false;
@@ -325,6 +345,9 @@ export function buildCodexUserMcp(servers: readonly McpServer[]): CodexUserMcp {
       }
     }
     args.push("-c", `${key}.tool_timeout_sec=${Math.ceil(server.timeoutMs / 1000)}`);
+    if (server.approvalMode) {
+      args.push("-c", `${key}.default_tools_approval_mode=${tomlString(server.approvalMode)}`);
+    }
   }
 
   return { args, env };

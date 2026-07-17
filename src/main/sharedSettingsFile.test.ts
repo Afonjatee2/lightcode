@@ -154,7 +154,7 @@ describe("sharedSettingsFile", () => {
         collapsedProviders: [],
         selectedRingGroups: {},
       },
-      subagentRoutingGuide: "",
+      crossagentRoutingGuide: "",
     });
 
     expect(readSharedSettingsFile(settingsPath)).toEqual({
@@ -273,7 +273,7 @@ describe("sharedSettingsFile", () => {
         collapsedProviders: [],
         selectedRingGroups: {},
       },
-      subagentRoutingGuide: "",
+      crossagentRoutingGuide: "",
     });
     expect(readFileSync(settingsPath, "utf8")).toContain('"themeMode": "dark"');
   });

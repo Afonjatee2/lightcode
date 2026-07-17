@@ -88,7 +88,7 @@ describe("OpencodeSdkSession", () => {
     expect(dispose).toHaveBeenCalledTimes(1);
   });
 
-  it("requests a dedicated server and forwards the subagents MCP when hosting", async () => {
+  it("requests a dedicated server and forwards the Crossagents MCP when hosting", async () => {
     const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mocks.acquireOpenCodeServer.mockResolvedValue({
       client: {
@@ -105,7 +105,7 @@ describe("OpencodeSdkSession", () => {
       dispose,
     });
 
-    const subagentMcp = {
+    const crossagentMcp = {
       url: "http://127.0.0.1:9500/mcp",
       token: "tok-parent",
       headers: { Authorization: "Bearer tok-parent" },
@@ -115,19 +115,30 @@ describe("OpencodeSdkSession", () => {
       projectLocation,
       config,
       presentationMode: "gui",
-      subagentMcp,
+      mcpServers: [
+        {
+          id: "crossagents",
+          name: "crossagents",
+          timeoutMs: 300_000,
+          transport: {
+            type: "http",
+            url: crossagentMcp.url,
+            headers: crossagentMcp.headers,
+          },
+        },
+      ],
     });
 
     await session.activate();
 
     expect(mocks.acquireOpenCodeServer).toHaveBeenCalledWith(
-      expect.objectContaining({ subagentMcp, dedicatedKey: "thread-host-42" }),
+      expect.objectContaining({ dedicatedKey: "thread-host-42" }),
     );
 
     await session.dispose();
   });
 
-  it("does not request a dedicated server when not hosting the subagents MCP", async () => {
+  it("does not request a dedicated server when not hosting the Crossagents MCP", async () => {
     const dispose = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     mocks.acquireOpenCodeServer.mockResolvedValue({
       client: {
@@ -155,7 +166,7 @@ describe("OpencodeSdkSession", () => {
 
     const input = mocks.acquireOpenCodeServer.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(input.dedicatedKey).toBeUndefined();
-    expect(input.subagentMcp).toBeUndefined();
+    expect(input.crossagentMcp).toBeUndefined();
 
     await session.dispose();
   });

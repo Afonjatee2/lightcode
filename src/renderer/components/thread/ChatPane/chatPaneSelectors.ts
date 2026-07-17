@@ -4,12 +4,13 @@ import type {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import type { AppStoreState } from "@/renderer/state/slices/shared";
 import type { ToolCallPayload } from "@/shared/contracts";
+import { isCrossagentRunAgentTool, isDelegatedAgentTool } from "@/shared/toolCallClassification";
 import { imageViewRendersInline } from "./parts/items/imageViewSource";
 import {
+  getToolLikePayload,
   isToolGroupItem as isGroupableItemType,
   isToolLikeItem,
 } from "./parts/items/toolCallCategorization";
-import { isSubAgentTool } from "./parts/items/toolDisplay";
 
 export const EMPTY_THREAD_ITEM_IDS = Object.freeze([]) as readonly string[];
 export const EMPTY_THREAD_TIMELINE_ENTRIES = Object.freeze([]) as readonly ChatTimelineEntry[];
@@ -181,7 +182,10 @@ function buildTimelineEntries(
 function isToolGroupItem(item: RuntimeChatItem): boolean {
   // Sub-agent parents render as their own pill (with overlay) — never fold
   // them into a tool-call group.
-  if (item.type === "tool_call" && isSubAgentTool(item.payload as ToolCallPayload | undefined)) {
+  if (
+    item.type === "tool_call" &&
+    isDelegatedAgentTool(item.payload as ToolCallPayload | undefined)
+  ) {
     return false;
   }
   // Any tool-like row that renders as a standalone inline image card
@@ -249,16 +253,14 @@ function isVisibleRuntimeItem(item: RuntimeChatItem): boolean {
   // null for `error`); excluding them here keeps the virtualized list from
   // allocating an empty slot that shows up as a gap.
   if (item.type === "error") return false;
-  // Tool renderers defer rows without a name. Keep those incomplete calls out
-  // of the virtualized timeline and group counts until a later update names them.
-  if (
-    (item.type === "tool_call" ||
-      item.type === "mcp_tool_call" ||
-      item.type === "image_view" ||
-      item.type === "dynamic_tool_call") &&
-    !(item.payload as Partial<ToolCallPayload> | undefined)?.name?.trim()
-  ) {
-    return false;
+  if (isToolLikeItem(item)) {
+    const payload = getToolLikePayload(item);
+    // Successful Crossagents runs render as the richer delegated-agent row.
+    // Keep failed transport calls visible because they may have no delegated row.
+    if (payload?.status !== "error" && isCrossagentRunAgentTool(payload)) return false;
+    // Tool renderers defer rows without a name. Keep those incomplete calls out
+    // of the virtualized timeline and group counts until a later update names them.
+    if (!payload?.name?.trim()) return false;
   }
   return true;
 }

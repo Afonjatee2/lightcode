@@ -112,10 +112,47 @@ describe("SubAgentOverlay", () => {
     const row = view.container.querySelector(".poracode-subagent-dock-row");
     expect(row).not.toBeNull();
     expect(
-      row?.querySelector('[data-poracode-shimmer-text="Agent: protocol specialist"]'),
+      row?.querySelector('[data-poracode-shimmer-text="Agent · protocol specialist"]'),
     ).toBeNull();
+    expect(view.container).toHaveTextContent("Subagents");
     expect(row?.textContent).not.toContain("specialist·GPT");
     expect(row?.querySelector(".poracode-pixel-loader")).not.toBeNull();
+  });
+
+  it("renders Subagents and Crossagents in separate dock sections", () => {
+    const threadId = "thread-1";
+    const subagent = makeSubAgentItem("subagent-1");
+    const crossagent: RuntimeChatItem = {
+      id: "crossagent-1",
+      type: "tool_call",
+      state: "started",
+      payload: {
+        name: "Codex · GPT-5.5",
+        status: "running",
+        isCrossagent: true,
+      } satisfies ToolCallPayload,
+      streams: {},
+    };
+
+    useAppStore.setState({
+      runtimeItemIdsByThread: { [threadId]: [subagent.id, crossagent.id] },
+      runtimeItemsByIdByThread: {
+        [threadId]: { [subagent.id]: subagent, [crossagent.id]: crossagent },
+      },
+      runtimeStructuralVersionByThread: { [threadId]: 1 },
+    });
+
+    render(
+      <AppProvider>
+        <ActiveSubAgentTile threadId={threadId} />
+      </AppProvider>,
+    );
+
+    expect(screen.getByText("Subagents")).toBeInTheDocument();
+    expect(screen.getByText("Crossagents")).toBeInTheDocument();
+    expect(screen.queryByText("Background tasks")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close subagents panel" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close Crossagents panel" })).toBeInTheDocument();
   });
 
   it("renders child messages through the main timeline parser", async () => {

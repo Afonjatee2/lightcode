@@ -1,12 +1,12 @@
 import type { Thread, ToolCallPayload } from "@/shared/contracts";
-import { isSubAgentTool, isWorkflowTool } from "@/shared/toolCallClassification";
+import { isDelegatedAgentTool, isWorkflowTool } from "@/shared/toolCallClassification";
 import type { AppStoreState } from "./slices/shared";
 import type { RuntimeChatItem } from "./slices/runtimeEventSlice";
 
 function classifyActiveSubAgent(item: RuntimeChatItem): "workflow" | "native" | null {
   if (item.type !== "tool_call") return null;
   const payload = item.payload as ToolCallPayload | undefined;
-  if (!payload || !isSubAgentTool(payload)) return null;
+  if (!payload || !isDelegatedAgentTool(payload)) return null;
   // Workflow tools complete on the parent SDK stream the moment they're
   // launched (background), but the real work continues for minutes. Keep
   // them in the active list as long as the SDK didn't reject the launch —

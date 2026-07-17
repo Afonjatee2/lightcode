@@ -36,9 +36,9 @@ describe("buildMentionResults", () => {
     detail: "MCP server",
     enabled: false,
   };
-  const subagents: McpMentionItem = {
-    id: "subagents",
-    name: "Subagents",
+  const crossagents: McpMentionItem = {
+    id: "crossagents",
+    name: "Crossagents",
     icon: Users,
     detail: "MCP server",
     enabled: true,
@@ -85,8 +85,10 @@ describe("buildMentionResults", () => {
   });
 
   it("filters MCP mentions by case-insensitive name prefix", () => {
-    // "browser" does not prefix-match "Subagents" / "Computer Use".
-    expect(buildMentionResults(fileResults, "browser", [browser, subagents, computerUse])).toEqual([
+    // "browser" does not prefix-match "Crossagents" / "Computer Use".
+    expect(
+      buildMentionResults(fileResults, "browser", [browser, crossagents, computerUse]),
+    ).toEqual([
       {
         type: "mcp",
         path: "browser",
@@ -99,12 +101,12 @@ describe("buildMentionResults", () => {
     ]);
   });
 
-  it("shows Subagents when the query matches subagents", () => {
-    expect(buildMentionResults(fileResults, "sub", [browser, subagents])).toEqual([
+  it("shows Crossagents when the query matches crossagents", () => {
+    expect(buildMentionResults(fileResults, "cross", [browser, crossagents])).toEqual([
       {
         type: "mcp",
-        path: "subagents",
-        name: "Subagents",
+        path: "crossagents",
+        name: "Crossagents",
         icon: Users,
         detail: "MCP server",
         enabled: true,
@@ -128,7 +130,7 @@ describe("buildMentionResults", () => {
   });
 
   it("preserves the caller's order for an empty @ mention", () => {
-    expect(buildMentionResults(fileResults, "", [browser, subagents, computerUse])).toEqual([
+    expect(buildMentionResults(fileResults, "", [browser, crossagents, computerUse])).toEqual([
       {
         type: "mcp",
         path: "browser",
@@ -139,8 +141,8 @@ describe("buildMentionResults", () => {
       },
       {
         type: "mcp",
-        path: "subagents",
-        name: "Subagents",
+        path: "crossagents",
+        name: "Crossagents",
         icon: Users,
         detail: "MCP server",
         enabled: true,

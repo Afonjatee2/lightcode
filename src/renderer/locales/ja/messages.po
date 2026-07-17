@@ -1321,8 +1321,8 @@ msgid "Background process restarted"
 msgstr "バックグラウンドプロセスが再起動されました"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-msgid "Background tasks"
-msgstr "バックグラウンドタスク"
+#~ msgid "Background tasks"
+#~ msgstr "バックグラウンドタスク"
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Base branch"
@@ -1982,6 +1982,18 @@ msgstr "コンポーザーを閉じる"
 msgid "Close connection actions"
 msgstr "接続の操作メニューを閉じる"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+msgid "Close Crossagent"
+msgstr "Crossagentを閉じる"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents"
+msgstr "Crossagentsを閉じる"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents panel"
+msgstr "Crossagentsパネルを閉じる"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/parts/EditorToolbar.tsx
 msgid "Close editor"
 msgstr "エディタを閉じる"
@@ -2119,6 +2131,14 @@ msgstr "トレイに最小化"
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "Close usage details"
 msgstr "使用状況の詳細を閉じる"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows"
+msgstr "ワークフローを閉じる"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows panel"
+msgstr "ワークフローパネルを閉じる"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
@@ -2847,6 +2867,51 @@ msgstr "資格情報が設定されています。"
 msgid "Credits"
 msgstr "クレジット"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent"
+msgstr "Crossagent"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent ({subagent}): {description}"
+msgstr "Crossagent（{subagent}）：{description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#~ msgid "Crossagent not found."
+#~ msgstr "Crossagentが見つかりません。"
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Crossagent Result"
+msgstr "Crossagentの結果"
+
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagent routing guide"
+msgstr "Crossagents ルーティングガイド"
+
+#: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
+#~ msgid "Crossagent runs"
+#~ msgstr "Crossagentの実行"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {description}"
+msgstr "Crossagent：{description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {subagent}"
+msgstr "Crossagent：{subagent}"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+#: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagents"
+msgstr "Crossagents"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Crossagents enabled for this thread"
+msgstr "このスレッドに対して Crossagents が有効になっています"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Crown"
 msgstr "勝者に選ぶ"
@@ -3219,13 +3284,17 @@ msgstr "CLI フック プラグインを無効にする (L1)"
 msgid "Disable Computer Use"
 msgstr "コンピュータ操作を無効にする"
 
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Crossagents"
+msgstr "Crossagents を無効にする"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "プロジェクトを無効にする"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Disable Subagents"
-msgstr "サブエージェントを無効にする"
+#~ msgid "Disable Subagents"
+#~ msgstr "サブエージェントを無効にする"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and Max)."
@@ -3399,7 +3468,7 @@ msgstr "受信したフック エンベロープをスーパーバイザー側�
 msgid "Duplicate server name in scan"
 msgstr "スキャン内でサーバー名が重複しています"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "例：クイックな調査には Codex GPT-5.5 fast、大量のリファクタリングには OpenCode GLM、繊細な作業には Claude Opus。"
 
@@ -4767,7 +4836,7 @@ msgstr "この端末にインストールします。終了したら閉じます
 msgid "Instructions"
 msgstr "指示"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "Instructions agents follow when choosing which agent or model to delegate to."
 msgstr "どのエージェントやモデルに委任するかを選ぶ際に、エージェントが従う指示。"
 
@@ -6450,6 +6519,11 @@ msgstr "GitHub でコミットを開く"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Open conflict resolver in"
 msgstr "競合リゾルバーを開く"
+
+#. placeholder {0}: display.title
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Open Crossagent: {0}"
+msgstr "Crossagentを開く：{0}"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
@@ -9154,23 +9228,20 @@ msgstr "サブエージェントの結果"
 
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
-msgid "Subagent routing guide"
-msgstr "サブエージェントのルーティングガイド"
+#~ msgid "Subagent routing guide"
+#~ msgstr "サブエージェントのルーティングガイド"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "サブエージェント実行"
 
-#: src/renderer/components/composer/composerMcpServers.ts
-#: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 msgid "Subagents"
 msgstr "サブエージェント"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Subagents enabled for this thread"
-msgstr "このスレッドに対してサブエージェントが有効になっています"
+#~ msgid "Subagents enabled for this thread"
+#~ msgstr "このスレッドに対してサブエージェントが有効になっています"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

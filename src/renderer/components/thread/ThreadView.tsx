@@ -12,13 +12,11 @@ import type {
   ThreadPresentationMode,
 } from "@/shared/contracts";
 import { DEFAULT_TERMINAL_SIZE as DEFAULT_HIDDEN_TERMINAL_SIZE } from "@/shared/contracts";
-import { isOpenCodeBrowserMcpEnabled } from "@/shared/opencodeSettings";
 
 import { useAppStore } from "@/renderer/state/appStore";
 import { TuxIcon } from "@/renderer/components/common/TuxIcon";
 import { ComputerUseChip, McpChip } from "@/renderer/components/composer/AttachmentBar";
 import { browserMcpServer } from "@/renderer/components/composer/composerMcpServers";
-import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { readBridge } from "@/renderer/bridge";
 import { performInitialThreadLaunch } from "@/renderer/actions/threadLaunchActions";
 import { setRendererRuntimeDiagnosticContext } from "@/renderer/diagnostics/sentry";
@@ -172,9 +170,6 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   const launchRequestRef = useRef<string | null>(null);
   const titleRef = useRef<HTMLSpanElement>(null);
   const [isTitleTooltipOpen, setIsTitleTooltipOpen] = useState(false);
-  const opencodeBrowserMcpEnabled = useSharedSettings((s) =>
-    isOpenCodeBrowserMcpEnabled(s.agentSettings.opencode),
-  );
 
   // Thread-level mode wins over the adapter-declared default. Existing rows
   // load from DB with `presentationMode: "terminal"` thanks to the schema
@@ -189,9 +184,7 @@ export const ThreadView = memo(function ThreadView(props: ThreadViewProps) {
   // active-thread header is informational only — disabling it would mislead
   // the user into thinking the tool is no longer in scope. The toggle lives
   // exclusively in the draft composer's ComposerAddMenu.
-  const showBrowserChip =
-    thread.config.browserMcp === true ||
-    (thread.agentKind === "opencode" && opencodeBrowserMcpEnabled);
+  const showBrowserChip = thread.config.browserMcp === true;
   const showComputerUseChip =
     thread.config.computerUse === true && !isWsl && readBridge().platform !== "linux";
 

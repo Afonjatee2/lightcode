@@ -1322,8 +1322,8 @@ msgid "Background process restarted"
 msgstr "Arka plan işlemi yeniden başlatıldı"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-msgid "Background tasks"
-msgstr "Arka plan görevleri"
+#~ msgid "Background tasks"
+#~ msgstr "Arka plan görevleri"
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Base branch"
@@ -1983,6 +1983,18 @@ msgstr "Yazma alanını kapat"
 msgid "Close connection actions"
 msgstr "Bağlantı eylemlerini kapat"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+msgid "Close Crossagent"
+msgstr "Crossagent'ı kapat"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents"
+msgstr "Crossagents'i kapat"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents panel"
+msgstr "Crossagents panelini kapat"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/parts/EditorToolbar.tsx
 msgid "Close editor"
 msgstr "Düzenleyiciyi kapat"
@@ -2120,6 +2132,14 @@ msgstr "Tepsiye küçült"
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "Close usage details"
 msgstr "Kullanım ayrıntılarını kapat"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows"
+msgstr "İş akışlarını kapat"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows panel"
+msgstr "İş akışları panelini kapat"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
@@ -2848,6 +2868,51 @@ msgstr "Kimlik bilgileri yapılandırıldı."
 msgid "Credits"
 msgstr "Krediler"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent"
+msgstr "Crossagent"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent ({subagent}): {description}"
+msgstr "Crossagent ({subagent}): {description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#~ msgid "Crossagent not found."
+#~ msgstr "Crossagent bulunamadı."
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Crossagent Result"
+msgstr "Crossagent Sonucu"
+
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagent routing guide"
+msgstr "Crossagents yönlendirme kılavuzu"
+
+#: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
+#~ msgid "Crossagent runs"
+#~ msgstr "Crossagent çalıştırmaları"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {description}"
+msgstr "Crossagent: {description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {subagent}"
+msgstr "Crossagent: {subagent}"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+#: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagents"
+msgstr "Crossagents"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Crossagents enabled for this thread"
+msgstr "Bu konu için Crossagents etkinleştirildi"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Crown"
 msgstr "Kazanan seç"
@@ -3220,13 +3285,17 @@ msgstr "CLI kanca eklentisini devre dışı bırak (L1)"
 msgid "Disable Computer Use"
 msgstr "Bilgisayar Kullanımını Devre Dışı Bırak"
 
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Crossagents"
+msgstr "Crossagents'i devre dışı bırak"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "Projeyi Devre Dışı Bırak"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Disable Subagents"
-msgstr "Alt aracıları Devre Dışı Bırak"
+#~ msgid "Disable Subagents"
+#~ msgstr "Alt aracıları Devre Dışı Bırak"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and Max)."
@@ -3400,7 +3469,7 @@ msgstr "Aracıların kurulum veya iTerm2 bildirimlerine dokunmadan L2'ye (OSC 9;
 msgid "Duplicate server name in scan"
 msgstr "Taramada yinelenen sunucu adı"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "örn. hızlı aramalar için Codex GPT-5.5 fast, toplu yeniden düzenlemeler için OpenCode GLM, ince işler için Claude Opus."
 
@@ -4768,7 +4837,7 @@ msgstr "Bu terminale kuruluyor. Bittiğinde kapanır."
 msgid "Instructions"
 msgstr "Talimatlar"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "Instructions agents follow when choosing which agent or model to delegate to."
 msgstr "Aracıların hangi aracıya veya modele devredeceğini seçerken izlediği talimatlar."
 
@@ -6452,6 +6521,11 @@ msgstr "Commit'i GitHub'da aç"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Open conflict resolver in"
 msgstr "Çakışma çözümleyiciyi şurada açın"
+
+#. placeholder {0}: display.title
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Open Crossagent: {0}"
+msgstr "Crossagent'ı aç: {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
@@ -9156,23 +9230,20 @@ msgstr "Alt Aracı Sonucu"
 
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
-msgid "Subagent routing guide"
-msgstr "Alt aracı yönlendirme kılavuzu"
+#~ msgid "Subagent routing guide"
+#~ msgstr "Alt aracı yönlendirme kılavuzu"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Alt ajan çalıştırmaları"
 
-#: src/renderer/components/composer/composerMcpServers.ts
-#: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 msgid "Subagents"
 msgstr "Alt aracılar"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Subagents enabled for this thread"
-msgstr "Bu konu için alt aracılar etkinleştirildi"
+#~ msgid "Subagents enabled for this thread"
+#~ msgstr "Bu konu için alt aracılar etkinleştirildi"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

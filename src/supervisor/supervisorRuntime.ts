@@ -51,10 +51,10 @@ import { GenerationService } from "./runtime/generationService";
 import { type SessionRuntime, type ShellSessionRuntime } from "./runtime/sessionTypes";
 import { ThreadSessionManager, writeSubmittedPrompt } from "./runtime/threadSessionManager";
 import { CliHookPluginCoordinator } from "./runtime/cliHookPluginCoordinator";
-import { OrchestratorThreadManager } from "./subagentMcp/OrchestratorThreadManager";
-import { SubagentMcpIngress } from "./subagentMcp/SubagentMcpIngress";
-import { SubagentRunManager } from "./subagentMcp/SubagentRunManager";
-import { buildSpawnableAgents } from "./subagentMcp/toolRegistry";
+import { OrchestratorThreadManager } from "./crossagentMcp/OrchestratorThreadManager";
+import { CrossagentMcpIngress } from "./crossagentMcp/CrossagentMcpIngress";
+import { SubagentRunManager } from "./crossagentMcp/SubagentRunManager";
+import { buildSpawnableAgents } from "./crossagentMcp/toolRegistry";
 import { dispatchAgentEvent } from "./runtime/agentEventDispatcher";
 import { hookDebugEnvelope, isPoracodeHookDebug } from "./runtime/hookDebug";
 import { SupervisorSharedSettingsCache } from "./runtime/supervisorSharedSettings";
@@ -108,7 +108,7 @@ export class SupervisorRuntime {
   readonly mcpOAuthService: McpOAuthService;
   readonly mcpProbeService: McpProbeService;
   readonly skillsService: SkillsService;
-  private readonly subagentMcpIngress: SubagentMcpIngress;
+  private readonly crossagentMcpIngress: CrossagentMcpIngress;
   private readonly subagentRunManager: SubagentRunManager;
   private readonly orchestratorThreadManager: OrchestratorThreadManager;
   private wslHookBridge: WslBridgeServer | undefined;
@@ -286,7 +286,7 @@ export class SupervisorRuntime {
 
     this.cliHookPluginCoordinator.startIngress();
 
-    // Cross-provider subagents: an in-process MCP server (SubagentMcpIngress)
+    // Crossagents: an in-process MCP server (CrossagentMcpIngress)
     // lets any agent spawn the other connected agents as subagents. The run
     // manager owns child structured sessions; the ingress mints per-thread
     // tokens and routes tools/call to the caller's parent thread. The run
@@ -307,7 +307,7 @@ export class SupervisorRuntime {
           this.threadSessionManager.appendSubagentRuntimeEvent(parentThreadId, event),
       },
     });
-    // Orchestrator lane of the subagents MCP: creates first-class child
+    // Orchestrator lane of the Crossagents MCP: creates first-class child
     // threads. Creation is main-orchestrated — the manager emits an
     // `orchestrator-thread-created` supervisor event; main upserts the DB row,
     // mirrors it to the renderer, and calls startThread back into this
@@ -363,7 +363,7 @@ export class SupervisorRuntime {
         await this.gitService.removeWorktree(location, path, true, true);
       },
     });
-    this.subagentMcpIngress = new SubagentMcpIngress({
+    this.crossagentMcpIngress = new CrossagentMcpIngress({
       runManager: this.subagentRunManager,
       orchestrator: this.orchestratorThreadManager,
       getSpawnableAgents: async () => {
@@ -374,12 +374,12 @@ export class SupervisorRuntime {
       // cache invalidates on file change) so edits take effect on the next turn
       // without a supervisor restart. Empty/whitespace-only = no guidance.
       getRoutingGuide: () => {
-        const guide = this.sharedSettingsCache.read().subagentRoutingGuide.trim();
+        const guide = this.sharedSettingsCache.read().crossagentRoutingGuide.trim();
         return guide.length > 0 ? guide : undefined;
       },
     });
-    void this.subagentMcpIngress.start().catch((error) => {
-      console.warn("[supervisor] subagent MCP ingress failed to start:", error);
+    void this.crossagentMcpIngress.start().catch((error) => {
+      console.warn("[supervisor] Crossagents MCP ingress failed to start:", error);
     });
 
     this.threadSessionManager = new ThreadSessionManager({
@@ -398,15 +398,15 @@ export class SupervisorRuntime {
       ...(this.wslHookBridge ? { wslBridge: this.wslHookBridge } : {}),
       resolvePluginEnvForSpawn: (input) =>
         this.cliHookPluginCoordinator.resolvePluginEnvForSpawn(input),
-      subagentMcp: {
+      crossagentMcp: {
         register: (threadId, disabledTools) =>
-          this.subagentMcpIngress.registerThread(threadId, disabledTools),
-        unregister: (threadId) => this.subagentMcpIngress.unregisterThread(threadId),
+          this.crossagentMcpIngress.registerThread(threadId, disabledTools),
+        unregister: (threadId) => this.crossagentMcpIngress.unregisterThread(threadId),
         cancelAll: (threadId) => this.subagentRunManager.cancelAllForThread(threadId),
         resolveChildRequest: (requestId, response) =>
           this.subagentRunManager.resolveChildServerRequest(requestId, response),
       },
-      subagentMcpHostAccess: {
+      wslHostAccess: {
         resolveHostAccess: (distro) => resolveWslHostAccess(distro),
       },
       applyMcpServerAuthorization: (servers) => this.mcpOAuthService.applyAuthorization(servers),
@@ -739,7 +739,7 @@ export class SupervisorRuntime {
     this.lspManager.dispose();
     await this._projectWatcher?.dispose();
     await this.threadSessionManager.dispose();
-    this.subagentMcpIngress.dispose();
+    this.crossagentMcpIngress.dispose();
     this.sharedSettingsCache.dispose();
     await this.cliHookPluginCoordinator.dispose().catch((error) => {
       console.warn("[supervisor] CLI hook plugin coordinator dispose failed:", error);

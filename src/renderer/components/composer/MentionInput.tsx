@@ -14,7 +14,7 @@ import { useDebouncedFileSearch } from "./useDebouncedFileSearch";
 import { serializeToSegments, flattenSegments } from "./serializeMentions";
 
 /**
- * A composer MCP server offered as an `@`-mention (Browser, Subagents, Computer
+ * A composer MCP server offered as an `@`-mention (Browser, Crossagents, Computer
  * Use, …). The caller supplies already-resolved `name`/`icon`/`detail` so this
  * component stays registry-agnostic; `id` is echoed back via `onMcpMentionSelect`
  * when the server still needs enabling. Already-enabled servers are inserted as
@@ -229,7 +229,7 @@ export const MentionInput = forwardRef<
     onSubmit: (segments: PromptSegment[]) => void;
     onPasteImage?: (file: File) => void;
     /**
-     * Composer MCP servers to offer as `@`-mentions (Browser, Subagents,
+     * Composer MCP servers to offer as `@`-mentions (Browser, Crossagents,
      * Computer Use). Enabled entries remain as prompt text; disabled entries
      * call `onMcpMentionSelect` so the composer can enable them first.
      */

@@ -1322,8 +1322,8 @@ msgid "Background process restarted"
 msgstr "Processo em segundo plano reiniciado"
 
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-msgid "Background tasks"
-msgstr "Tarefas em segundo plano"
+#~ msgid "Background tasks"
+#~ msgstr "Tarefas em segundo plano"
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Base branch"
@@ -1983,6 +1983,18 @@ msgstr "Fechar compositor"
 msgid "Close connection actions"
 msgstr "Fechar ações da conexão"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+msgid "Close Crossagent"
+msgstr "Fechar Crossagent"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents"
+msgstr "Fechar Crossagents"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close Crossagents panel"
+msgstr "Fechar o painel de Crossagents"
+
 #: src/renderer/views/FileEditorOverlay/parts/FileEditorPane/parts/EditorToolbar.tsx
 msgid "Close editor"
 msgstr "Fechar editor"
@@ -2120,6 +2132,14 @@ msgstr "Minimizar para a bandeja"
 #: src/renderer/components/thread/ThreadContextDock.tsx
 msgid "Close usage details"
 msgstr "Fechar detalhes de uso"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows"
+msgstr "Fechar fluxos de trabalho"
+
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+msgid "Close workflows panel"
+msgstr "Fechar o painel de fluxos de trabalho"
 
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
@@ -2848,6 +2868,51 @@ msgstr "As credenciais estão configuradas."
 msgid "Credits"
 msgstr "Créditos"
 
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent"
+msgstr "Crossagent"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent ({subagent}): {description}"
+msgstr "Crossagent ({subagent}): {description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay.tsx
+#~ msgid "Crossagent not found."
+#~ msgstr "Crossagent não encontrado."
+
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Crossagent Result"
+msgstr "Resultado do Crossagent"
+
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagent routing guide"
+msgstr "Guia de roteamento do Crossagents"
+
+#: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
+#~ msgid "Crossagent runs"
+#~ msgstr "Execuções de Crossagents"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {description}"
+msgstr "Crossagent: {description}"
+
+#: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
+msgid "Crossagent: {subagent}"
+msgstr "Crossagent: {subagent}"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+#: src/renderer/components/mcp/McpServersManager.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
+#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
+msgid "Crossagents"
+msgstr "Crossagents"
+
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Crossagents enabled for this thread"
+msgstr "Crossagents ativados para este tópico"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Crown"
 msgstr "Coroar"
@@ -3220,13 +3285,17 @@ msgstr "Desativar plug-in de gancho CLI (L1)"
 msgid "Disable Computer Use"
 msgstr "Desativar uso do computador"
 
+#: src/renderer/components/composer/composerMcpServers.ts
+msgid "Disable Crossagents"
+msgstr "Desativar Crossagents"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 msgid "Disable Project"
 msgstr "Desativar projeto"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Disable Subagents"
-msgstr "Desativar subagentes"
+#~ msgid "Disable Subagents"
+#~ msgstr "Desativar subagentes"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Disable tiers an external provider collapses (e.g. keep only High and Max)."
@@ -3400,7 +3469,7 @@ msgstr "Descarta envelopes de gancho recebidos no supervisor para que os agentes
 msgid "Duplicate server name in scan"
 msgstr "Nome de servidor duplicado na verificação"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "ex.: Codex GPT-5.5 fast para consultas rápidas, OpenCode GLM para refatorações em massa, Claude Opus para qualquer coisa sutil."
 
@@ -4768,7 +4837,7 @@ msgstr "Instalando neste terminal. Fecha quando terminar."
 msgid "Instructions"
 msgstr "Instruções"
 
-#: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
+#: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "Instructions agents follow when choosing which agent or model to delegate to."
 msgstr "Instruções que os agentes seguem ao escolher para qual agente ou modelo delegar."
 
@@ -6452,6 +6521,11 @@ msgstr "Abrir commit no GitHub"
 #: src/renderer/views/SettingsOverlay/parts/AISettings.tsx
 msgid "Open conflict resolver in"
 msgstr "Abrir resolvedor de conflitos em"
+
+#. placeholder {0}: display.title
+#: src/renderer/components/thread/ChatPane/parts/items/SubAgentToolCall.tsx
+msgid "Open Crossagent: {0}"
+msgstr "Abrir Crossagent: {0}"
 
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
 msgid "Open dialog"
@@ -9156,23 +9230,20 @@ msgstr "Resultado do Subagente"
 
 #: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/SubagentRoutingSection.tsx
-msgid "Subagent routing guide"
-msgstr "Guia de roteamento de subagentes"
+#~ msgid "Subagent routing guide"
+#~ msgstr "Guia de roteamento de subagentes"
 
 #: src/renderer/views/ProfileOverlay/parts/ActivityInsights.tsx
 msgid "Subagent runs"
 msgstr "Execuções de subagentes"
 
-#: src/renderer/components/composer/composerMcpServers.ts
-#: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
-#: src/renderer/views/SettingsOverlay/parts/McpServersSettings.tsx
 msgid "Subagents"
 msgstr "Subagentes"
 
 #: src/renderer/components/composer/composerMcpServers.ts
-msgid "Subagents enabled for this thread"
-msgstr "Subagentes ativados para este tópico"
+#~ msgid "Subagents enabled for this thread"
+#~ msgstr "Subagentes ativados para este tópico"
 
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/QuestionRows.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx

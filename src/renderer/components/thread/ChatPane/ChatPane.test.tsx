@@ -916,6 +916,39 @@ describe("ChatPane", () => {
     expect(await screen.findByRole("heading", { name: "Protocol result" })).toBeInTheDocument();
   });
 
+  it("labels a Crossagents child separately from native subagents", async () => {
+    const thread = makeThread();
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.started",
+      threadId: thread.id,
+      itemId: "crossagent-result",
+      itemType: "tool_call",
+      payload: {
+        name: "protocol specialist",
+        status: "running",
+        isCrossagent: true,
+      },
+    });
+    useAppStore.getState().applyRuntimeEvent(thread.id, {
+      type: "item.completed",
+      threadId: thread.id,
+      itemId: "crossagent-result",
+      payload: {
+        name: "protocol specialist",
+        status: "success",
+        isCrossagent: true,
+        result: "Cross-provider result",
+      },
+    });
+
+    renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    expect(await screen.findByRole("button", { name: "Crossagent Result" })).toBeInTheDocument();
+    expect(document.body).toHaveTextContent("Crossagent · protocol specialist");
+    expect(screen.queryByRole("button", { name: "Subagent Result" })).not.toBeInTheDocument();
+  });
+
   it("separates the collapsed Agent label from its step count", async () => {
     const thread = makeThread();
     useAppStore.getState().applyRuntimeEvent(thread.id, {

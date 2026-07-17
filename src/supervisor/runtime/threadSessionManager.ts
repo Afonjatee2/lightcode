@@ -26,6 +26,7 @@ import {
   type WriteTerminalPayload,
   type RuntimeEvent,
   type McpLaunchSnapshot,
+  type ResolvedMcpServer,
 } from "@/shared/contracts";
 import {
   type AgentAdapter,
@@ -36,10 +37,6 @@ import {
   primeProjectShellEnv,
   resolveLaunchSpec,
 } from "../agents/base";
-import type { BrowserMcpHttpConfig } from "../agents/browserMcp";
-import type { ChromeMcpHttpConfig } from "../agents/chromeMcp";
-import type { ComputerUseMcpHttpConfig } from "../agents/computerUseMcp";
-import type { AppControlsMcpHttpConfig } from "../agents/appControlsMcp";
 import { ensureNodePtySpawnHelperExecutable } from "../nodePty";
 import { BufferedLogWriter } from "./bufferedLogWriter";
 import type { QueuedStructuredTurn, SessionRuntime, ShellSessionRuntime } from "./sessionTypes";
@@ -139,8 +136,6 @@ export class ThreadSessionManager {
       options: this.options,
       outputPipeline: this.outputPipeline,
       indexSessionRef: (session, prevId) => this.indexSessionRef(session, prevId),
-      isBrowserMcpEnabledForLaunch: (adapter, config) =>
-        this.isBrowserMcpEnabledForLaunch(adapter, config),
     });
     const sessionRuntimeLifecycle = new SessionRuntimeLifecycle({
       sessions: this.sessions,
@@ -169,8 +164,6 @@ export class ThreadSessionManager {
       closeThread: (payload) => this.closeThread(payload),
       failStructuredSession: (session, error) => this.failStructuredSession(session, error),
       isCurrentSession: (session) => this.isCurrentSession(session),
-      isBrowserMcpEnabledForLaunch: (adapter, config) =>
-        this.isBrowserMcpEnabledForLaunch(adapter, config),
       resolveAgentSettings: (adapter) => this.resolveAgentSettings(adapter),
       emitOptimisticUserMessage: (threadId, prompt, segments) =>
         this.structuredTurnQueue.emitOptimisticUserMessage(threadId, prompt, segments),
@@ -240,19 +233,12 @@ export class ThreadSessionManager {
     | undefined {
     const session = this.sessions.get(threadId);
     if (!session) return undefined;
-    // Children inherit the effective launch config: built-in disables applied,
-    // and browser forced on when the agent-settings toggle (not just the
-    // per-thread flag) enables it for the parent.
+    // Children inherit the effective launch config with built-in disables applied.
     const disabledIds = session.mcpLaunchSnapshot.disabledBuiltInMcpServerIds;
     const effectiveConfig = effectiveLaunchConfig(session.config, disabledIds);
-    const config =
-      !disabledIds.includes("browser") &&
-      this.isBrowserMcpEnabledForLaunch(session.adapter, session.config)
-        ? { ...effectiveConfig, browserMcp: true }
-        : effectiveConfig;
     return {
       projectLocation: session.projectLocation,
-      config,
+      config: effectiveConfig,
       mcpLaunchSnapshot: session.mcpLaunchSnapshot,
     };
   }
@@ -261,52 +247,21 @@ export class ThreadSessionManager {
   async resolveSubagentParentMcpAccess(
     threadId: string,
     identity: McpThreadIdentity,
-  ): Promise<{
-    browserMcp?: BrowserMcpHttpConfig;
-    computerUseMcp?: ComputerUseMcpHttpConfig;
-    chromeMcp?: ChromeMcpHttpConfig;
-    appControlsMcp?: AppControlsMcpHttpConfig;
-    mcpServers?: McpLaunchSnapshot["mcpServers"];
-  }> {
+  ): Promise<{ mcpServers?: ResolvedMcpServer[] }> {
     const session = this.sessions.get(threadId);
     if (!session) return {};
     const mcpLaunchSnapshot = session.mcpLaunchSnapshot;
-    const { mcpServers } = mcpLaunchSnapshot;
     const launchConfig = effectiveLaunchConfig(
       session.config,
       mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
     );
-    const browserMcp = await this.spawnPipeline.resolveBrowserMcpForLaunch(
-      session.adapter,
-      session.projectLocation,
-      launchConfig,
+    const mcpServers = await this.spawnPipeline.resolveMcpServersForLaunch({
+      location: session.projectLocation,
+      config: launchConfig,
       mcpLaunchSnapshot,
       identity,
-    );
-    const computerUseMcp = this.spawnPipeline.resolveComputerUseMcpForLaunch(
-      session.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-      identity,
-    );
-    const chromeMcp = this.spawnPipeline.resolveChromeMcpForLaunch(
-      session.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-      identity,
-    );
-    const appControlsMcp = await this.spawnPipeline.resolveAppControlsMcpForLaunch(
-      session.projectLocation,
-      mcpLaunchSnapshot,
-      identity,
-    );
-    return {
-      ...(browserMcp ? { browserMcp } : {}),
-      ...(computerUseMcp ? { computerUseMcp } : {}),
-      ...(chromeMcp ? { chromeMcp } : {}),
-      ...(appControlsMcp ? { appControlsMcp } : {}),
-      ...(mcpServers.length > 0 ? { mcpServers } : {}),
-    };
+    });
+    return mcpServers.length > 0 ? { mcpServers } : {};
   }
 
   /**
@@ -322,7 +277,7 @@ export class ThreadSessionManager {
   /**
    * Orchestrator host hook: a thread's live runtime state plus whether its
    * session supports non-interrupting steer. `undefined` once the session is
-   * gone. Consumed by the subagents MCP orchestrator lane.
+   * gone. Consumed by the Crossagents MCP orchestrator lane.
    */
   getOrchestratorThreadState(threadId: string):
     | {
@@ -580,7 +535,7 @@ export class ThreadSessionManager {
       }
       throw new Error(`Unknown thread session: ${payload.threadId}`);
     }
-    this.options.subagentMcp?.cancelAll(payload.threadId);
+    this.options.crossagentMcp?.cancelAll(payload.threadId);
     await this.structuredInterruptWatchdog.interruptStructuredTurn(session);
   }
 
@@ -798,8 +753,8 @@ export class ThreadSessionManager {
       this.sessionsBySessionId.delete(existing.sessionRef.providerSessionId);
     }
     this.runtimeEventRouter.clearAllForThread(payload.threadId);
-    this.options.subagentMcp?.cancelAll(payload.threadId);
-    this.options.subagentMcp?.unregister(payload.threadId);
+    this.options.crossagentMcp?.cancelAll(payload.threadId);
+    this.options.crossagentMcp?.unregister(payload.threadId);
     await existing.structuredSession?.dispose();
     if (existing.structuredSession) {
       await sleep(150);
@@ -925,7 +880,7 @@ export class ThreadSessionManager {
     // Forwarded subagent requests carry a run-namespaced id; route them to the
     // owning child handle first and only fall through to the parent session
     // when the id isn't a subagent request.
-    if (this.options.subagentMcp?.resolveChildRequest(payload.requestId, payload.response)) {
+    if (this.options.crossagentMcp?.resolveChildRequest(payload.requestId, payload.response)) {
       return;
     }
     const session = this.requireSession(payload.threadId);
@@ -1064,14 +1019,5 @@ export class ThreadSessionManager {
       // use defaults
     }
     return settings.agentSettings[adapter.kind] ?? {};
-  }
-
-  private isBrowserMcpEnabledForLaunch(
-    adapter: AgentAdapter | undefined,
-    config: ThreadConfig,
-  ): boolean {
-    if (config.browserMcp === true) return true;
-    if (!adapter) return false;
-    return this.resolveAgentSettings(adapter).browserMcp === true;
   }
 }

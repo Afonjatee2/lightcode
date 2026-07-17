@@ -101,7 +101,7 @@ function makeHarness(options?: {
     model: "parent-model",
     approvalPolicy: "never",
     sandboxMode: "workspace-write",
-    subagentMcp: true,
+    crossagentMcp: true,
     browserMcp: true,
     computerUse: true,
     chromeMcp: true,
@@ -219,7 +219,7 @@ describe("OrchestratorThreadManager.createThread", () => {
     await createChild(h, { effort: "high", fast: true });
     const { start, thread } = h.lastCreated();
     for (const config of [start.config, thread.config]) {
-      expect(config).not.toHaveProperty("subagentMcp");
+      expect(config).not.toHaveProperty("crossagentMcp");
       expect(config).toMatchObject({
         browserMcp: true,
         computerUse: true,

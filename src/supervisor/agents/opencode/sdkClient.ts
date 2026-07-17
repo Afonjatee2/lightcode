@@ -1,25 +1,8 @@
 import type { OpencodeClient } from "@opencode-ai/sdk/v2/client";
-import type { McpServer, ProjectLocation } from "@/shared/contracts";
-import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
-import {
-  SUBAGENT_MCP_SERVER_NAME,
-  type SubagentMcpHttpConfig,
-} from "@/supervisor/agents/subagentMcp";
-import type { ComputerUseMcpHttpConfig } from "@/supervisor/agents/computerUseMcp";
-import type { ChromeMcpHttpConfig } from "@/supervisor/agents/chromeMcp";
-import type { AppControlsMcpHttpConfig } from "@/supervisor/agents/appControlsMcp";
+import type { ProjectLocation, ResolvedMcpServer } from "@/shared/contracts";
 import { resolveAgentBinaryPath } from "../binaryResolver";
-import { BROWSER_MCP_SERVER_NAME } from "../browserMcp";
-import { COMPUTER_USE_MCP_SERVER_NAME } from "../computerUseMcp";
-import { CHROME_MCP_SERVER_NAME } from "../chromeMcp";
-import { APP_CONTROLS_MCP_SERVER_NAME } from "../appControlsMcp";
 import { buildOpenCodeServerCommand } from "./argv";
-import { buildOpenCodeBrowserMcp } from "./mcpBrowser";
-import { buildOpenCodeSubagentMcp } from "./mcpSubagent";
-import { buildOpenCodeComputerUseMcp } from "./mcpComputerUse";
-import { buildOpenCodeChromeMcp } from "./mcpChrome";
-import { buildOpenCodeAppControlsMcp } from "./mcpAppControls";
-import { buildOpenCodeUserMcp } from "../userMcp";
+import { buildOpenCodeMcp } from "../userMcp";
 import { classifyOpenCodeError, isOpenCodeConnectionLoss } from "./opencodeErrors";
 import {
   disposeSpawnedOpenCodeServerHandles,
@@ -52,7 +35,7 @@ function poolKey(location: ProjectLocation, dedicatedKey?: string): string {
   })();
   // A `dedicatedKey` (the thread id) carves this acquisition out of the shared
   // per-project pool into its own single-tenant entry. Used when a thread hosts
-  // the per-thread subagents MCP: its bearer token identifies exactly one parent
+  // the per-thread Crossagents MCP: its bearer token identifies exactly one parent
   // thread, so it must not be registered on a server shared by sibling threads
   // (which would misattribute their spawns). The entry still refcounts and tears
   // down through the same machinery — with one acquirer it dies when that thread
@@ -85,8 +68,8 @@ interface PoolEntry {
   idleCloseTimer?: NodeJS.Timeout | undefined;
   /** Caller-requested idle TTL on the current grace timer (informational). */
   pendingIdleTtlMs?: number | undefined;
-  managedCustomMcpNames: Set<string>;
-  managedCustomMcpFingerprint?: string;
+  managedMcpNames: Set<string>;
+  managedMcpFingerprint?: string;
   /** Replaced by a fresh generation after its dynamic MCP config changed. */
   retired?: boolean;
 }
@@ -183,27 +166,11 @@ async function spawnAndWire(projectLocation: ProjectLocation): Promise<ServerSna
  */
 export interface AcquireOpenCodeServerInput {
   projectLocation: ProjectLocation;
-  browserMcpEnabled?: boolean;
-  browserMcp?: BrowserMcpHttpConfig;
-  computerUseMcpEnabled?: boolean;
-  computerUseMcp?: ComputerUseMcpHttpConfig;
-  chromeMcpEnabled?: boolean;
-  chromeMcp?: ChromeMcpHttpConfig;
-  /**
-   * Per-thread cross-provider subagents MCP config. When present, the server is
-   * dedicated (see `dedicatedKey`) and the `subagents` MCP is registered on it
-   * dynamically via `client.mcp.add` — the per-thread bearer token identifies
-   * the parent thread, so it must never touch the shared config file (global,
-   * would clobber) or a shared server (pooled, would misattribute spawns).
-   */
-  subagentMcp?: SubagentMcpHttpConfig;
-  appControlsMcp?: AppControlsMcpHttpConfig;
-  mcpServers?: McpServer[];
+  mcpServers?: readonly ResolvedMcpServer[];
   /**
    * When set, this acquisition gets its own single-tenant pool entry keyed by
    * this value (the thread id) instead of joining the shared per-project pool.
-   * Callers that host the per-thread subagents MCP pass their thread id here so
-   * the dynamic `mcp.add` registration is isolated to one thread's server.
+   * Callers that need per-thread MCP isolation pass their thread id here.
    */
   dedicatedKey?: string;
   /**
@@ -215,118 +182,11 @@ export interface AcquireOpenCodeServerInput {
   idleCloseDelayMs?: number;
 }
 
-async function syncBrowserMcp(
-  input: Pick<
-    AcquireOpenCodeServerInput,
-    | "projectLocation"
-    | "browserMcpEnabled"
-    | "browserMcp"
-    | "computerUseMcpEnabled"
-    | "computerUseMcp"
-    | "chromeMcpEnabled"
-    | "chromeMcp"
-  >,
-  client: OpencodeClient,
-): Promise<void> {
-  const directory = resolveOpenCodeSessionDirectory(input.projectLocation);
-  if (input.browserMcpEnabled === true) {
-    const servers = buildOpenCodeBrowserMcp(input.projectLocation, input.browserMcp);
-    const browser = servers?.[BROWSER_MCP_SERVER_NAME];
-    if (browser) {
-      await client.mcp
-        .add({ directory, name: BROWSER_MCP_SERVER_NAME, config: browser })
-        .catch((err) => {
-          if (isOpenCodeConnectionLoss(err)) throw err;
-        });
-      await client.mcp.connect({ directory, name: BROWSER_MCP_SERVER_NAME });
-    }
-  } else if (input.browserMcpEnabled === false) {
-    await client.mcp.disconnect({ directory, name: BROWSER_MCP_SERVER_NAME }).catch((error) => {
-      console.warn("[opencode] failed to disconnect browser MCP:", error);
-    });
-  }
-
-  if (input.computerUseMcpEnabled === false) {
-    await client.mcp
-      .disconnect({ directory, name: COMPUTER_USE_MCP_SERVER_NAME })
-      .catch(() => undefined);
-  } else if (input.computerUseMcpEnabled === true) {
-    const servers = buildOpenCodeComputerUseMcp(input.projectLocation, true, input.computerUseMcp);
-    const computerUse = servers?.[COMPUTER_USE_MCP_SERVER_NAME];
-    if (computerUse) {
-      await client.mcp
-        .add({ directory, name: COMPUTER_USE_MCP_SERVER_NAME, config: computerUse })
-        .catch((err) => {
-          if (isOpenCodeConnectionLoss(err)) throw err;
-        });
-      await client.mcp.connect({ directory, name: COMPUTER_USE_MCP_SERVER_NAME });
-    }
-  }
-
-  if (input.chromeMcpEnabled === false) {
-    await client.mcp.disconnect({ directory, name: CHROME_MCP_SERVER_NAME }).catch(() => undefined);
-    return;
-  }
-  if (input.chromeMcpEnabled !== true) return;
-
-  const servers = buildOpenCodeChromeMcp(input.projectLocation, true, input.chromeMcp);
-  const chrome = servers?.[CHROME_MCP_SERVER_NAME];
-  if (!chrome) return;
-  await client.mcp.add({ directory, name: CHROME_MCP_SERVER_NAME, config: chrome }).catch((err) => {
-    if (isOpenCodeConnectionLoss(err)) throw err;
-  });
-  await client.mcp.connect({ directory, name: CHROME_MCP_SERVER_NAME });
-}
-
-/**
- * Register the per-thread cross-provider subagents MCP on this (dedicated)
- * server. Mirrors {@link syncBrowserMcp}'s dynamic `mcp.add` + `mcp.connect`,
- * but — unlike the browser MCP — the subagents endpoint is delivered
- * pre-resolved via `input.subagentMcp`, and the entry is never written to the
- * global config file (the per-thread token would clobber across launches).
- * Only runs when a `subagentMcp` config is present, which the caller pairs with
- * a `dedicatedKey` so this registration is isolated to one thread's server.
- */
-async function syncSubagentMcp(
-  input: Pick<AcquireOpenCodeServerInput, "projectLocation" | "subagentMcp">,
-  client: OpencodeClient,
-): Promise<void> {
-  if (!input.subagentMcp) return;
-  const directory = resolveOpenCodeSessionDirectory(input.projectLocation);
-  const servers = buildOpenCodeSubagentMcp(input.subagentMcp);
-  const subagents = servers?.[SUBAGENT_MCP_SERVER_NAME];
-  if (!subagents) return;
-
-  await client.mcp
-    .add({ directory, name: SUBAGENT_MCP_SERVER_NAME, config: subagents })
-    .catch((err) => {
-      if (isOpenCodeConnectionLoss(err)) throw err;
-    });
-  await client.mcp.connect({ directory, name: SUBAGENT_MCP_SERVER_NAME });
-}
-
-async function syncAppControlsMcp(
-  input: Pick<AcquireOpenCodeServerInput, "projectLocation" | "appControlsMcp">,
-  client: OpencodeClient,
-): Promise<void> {
-  if (!input.appControlsMcp) return;
-  const directory = resolveOpenCodeSessionDirectory(input.projectLocation);
-  const servers = buildOpenCodeAppControlsMcp(input.projectLocation, input.appControlsMcp);
-  const appControls = servers?.[APP_CONTROLS_MCP_SERVER_NAME];
-  if (!appControls) return;
-  await client.mcp
-    .add({ directory, name: APP_CONTROLS_MCP_SERVER_NAME, config: appControls })
-    .catch((err) => {
-      if (isOpenCodeConnectionLoss(err)) throw err;
-    });
-  await client.mcp.connect({ directory, name: APP_CONTROLS_MCP_SERVER_NAME });
-}
-
-// No disconnect diffing is needed here: any change to the custom MCP set
+// No disconnect diffing is needed here: any change to the MCP set
 // changes the fingerprint, which retires the server before this runs.
-async function syncUserMcp(
+async function syncMcpServers(
   input: Pick<AcquireOpenCodeServerInput, "projectLocation">,
-  servers: ReturnType<typeof buildOpenCodeUserMcp>,
+  servers: ReturnType<typeof buildOpenCodeMcp>,
   client: OpencodeClient,
 ): Promise<Set<string>> {
   const directory = resolveOpenCodeSessionDirectory(input.projectLocation);
@@ -356,7 +216,7 @@ async function acquireOpenCodeServerInner(
 
   if (!entry) {
     const ready = spawnAndWire(input.projectLocation);
-    entry = { key, ready, refCount: 0, managedCustomMcpNames: new Set() };
+    entry = { key, ready, refCount: 0, managedMcpNames: new Set() };
     pool.set(key, entry);
 
     // If spawn fails, evict so the next acquire respawns instead of resolving
@@ -396,15 +256,15 @@ async function acquireOpenCodeServerInner(
   let released = false;
   const idleCloseDelayMs = input.idleCloseDelayMs;
   try {
-    const nextCustomMcp = buildOpenCodeUserMcp(input.mcpServers ?? []);
-    const nextCustomMcpFingerprint = JSON.stringify(nextCustomMcp);
+    const nextMcp = buildOpenCodeMcp(input.mcpServers ?? []);
+    const nextMcpFingerprint = JSON.stringify(nextMcp);
     if (
-      acquiringEntry.managedCustomMcpFingerprint !== undefined &&
-      acquiringEntry.managedCustomMcpFingerprint !== nextCustomMcpFingerprint
+      acquiringEntry.managedMcpFingerprint !== undefined &&
+      acquiringEntry.managedMcpFingerprint !== nextMcpFingerprint
     ) {
       const directory = resolveOpenCodeSessionDirectory(input.projectLocation);
       await Promise.all(
-        [...acquiringEntry.managedCustomMcpNames].map((name) =>
+        [...acquiringEntry.managedMcpNames].map((name) =>
           snapshot.client.mcp.disconnect({ directory, name }).catch(() => undefined),
         ),
       );
@@ -420,11 +280,8 @@ async function acquireOpenCodeServerInner(
       return acquireOpenCodeServerInner(input, retryMcpConnectionLoss);
     }
 
-    await syncBrowserMcp(input, snapshot.client);
-    await syncSubagentMcp(input, snapshot.client);
-    await syncAppControlsMcp(input, snapshot.client);
-    acquiringEntry.managedCustomMcpNames = await syncUserMcp(input, nextCustomMcp, snapshot.client);
-    acquiringEntry.managedCustomMcpFingerprint = nextCustomMcpFingerprint;
+    acquiringEntry.managedMcpNames = await syncMcpServers(input, nextMcp, snapshot.client);
+    acquiringEntry.managedMcpFingerprint = nextMcpFingerprint;
   } catch (error) {
     if (!retryMcpConnectionLoss || !isOpenCodeConnectionLoss(error)) {
       console.warn("[opencode] failed to sync managed MCP servers:", error);

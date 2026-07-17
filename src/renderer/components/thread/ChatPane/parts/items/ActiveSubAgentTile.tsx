@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { Tooltip } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { Bot, Check, GitBranch, X } from "lucide-react";
+import { useShallow } from "zustand/shallow";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useThreadSubAgentDockStore } from "@/renderer/state/threadSubAgentDockStore";
 import { useThreadLiveWorkflowStore } from "@/renderer/state/threadLiveWorkflowStore";
@@ -15,7 +16,7 @@ import {
   type ToolCallPayload,
   type WorkflowRun,
 } from "@/shared/contracts";
-import { deriveToolDisplay, isWorkflowTool } from "./toolDisplay";
+import { deriveToolDisplay, isCrossagentTool, isWorkflowTool } from "./toolDisplay";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { formatTokenCount } from "@/renderer/components/thread/formatTokenCount";
 import {
@@ -42,39 +43,25 @@ export function ActiveSubAgentTile({
   projectLocation,
   registrationOnly = false,
 }: ActiveSubAgentTileProps) {
-  const { t } = useLingui();
   const ids = useAppStore((s) => selectActiveSubAgentParentItemIds(s, threadId));
   const dismissed = useThreadSubAgentDockStore((s) => s.dismissedByThread[threadId]);
   const dismissMany = useThreadSubAgentDockStore((s) => s.dismissMany);
 
   const visibleIds = dismissed ? ids.filter((id) => !dismissed[id]) : ids;
-
-  const completedCount = useAppStore(
-    (s) =>
-      visibleIds.filter((id) => {
+  const kinds = useAppStore(
+    useShallow((s) =>
+      visibleIds.map((id) => {
         const item = getRuntimeItemStoreSelector(threadId, id)(s);
-        if (!item) return false;
-        const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
-        return item.state === "completed" && payload?.status !== "running";
-      }).length,
-  );
-  const workflowCount = useAppStore(
-    (s) =>
-      visibleIds.filter((id) => {
-        const item = getRuntimeItemStoreSelector(threadId, id)(s);
-        if (!item) return false;
-        return isWorkflowTool(getRuntimeItemPayload<ToolCallPayload>(item, "tool_call"));
-      }).length,
+        const payload = item
+          ? getRuntimeItemPayload<ToolCallPayload>(item, "tool_call")
+          : undefined;
+        if (isWorkflowTool(payload)) return "workflow" as const;
+        return isCrossagentTool(payload) ? ("crossagent" as const) : ("subagent" as const);
+      }),
+    ),
   );
 
   if (visibleIds.length === 0) return null;
-  const title =
-    workflowCount === visibleIds.length
-      ? t`Workflows`
-      : workflowCount > 0
-        ? t`Background tasks`
-        : t`Subagents`;
-  const HeaderIcon = workflowCount === visibleIds.length ? GitBranch : Bot;
 
   if (registrationOnly) {
     return visibleIds.map((id) => (
@@ -89,31 +76,86 @@ export function ActiveSubAgentTile({
   }
 
   return (
+    <>
+      {(["subagent", "crossagent", "workflow"] as const).map((kind) => {
+        const sectionIds = visibleIds.filter((_, index) => kinds[index] === kind);
+        return sectionIds.length > 0 ? (
+          <ActiveAgentSection
+            key={kind}
+            kind={kind}
+            threadId={threadId}
+            ids={sectionIds}
+            dismissMany={dismissMany}
+            {...(projectLocation ? { projectLocation } : {})}
+          />
+        ) : null;
+      })}
+    </>
+  );
+}
+
+function ActiveAgentSection({
+  kind,
+  threadId,
+  ids,
+  dismissMany,
+  projectLocation,
+}: {
+  kind: "subagent" | "crossagent" | "workflow";
+  threadId: string;
+  ids: readonly string[];
+  dismissMany: (threadId: string, itemIds: readonly string[]) => void;
+  projectLocation?: ProjectLocation;
+}) {
+  const { t } = useLingui();
+  const completedCount = useAppStore(
+    (s) =>
+      ids.filter((id) => {
+        const item = getRuntimeItemStoreSelector(threadId, id)(s);
+        if (!item) return false;
+        const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
+        return item.state === "completed" && payload?.status !== "running";
+      }).length,
+  );
+  const title =
+    kind === "workflow" ? t`Workflows` : kind === "crossagent" ? t`Crossagents` : t`Subagents`;
+  const closePanelLabel =
+    kind === "workflow"
+      ? t`Close workflows panel`
+      : kind === "crossagent"
+        ? t`Close Crossagents panel`
+        : t`Close subagents panel`;
+  const closeLabel =
+    kind === "workflow"
+      ? t`Close workflows`
+      : kind === "crossagent"
+        ? t`Close Crossagents`
+        : t`Close subagents`;
+
+  return (
     <ThreadDockSection placement="composer" collapsed={false}>
       <ThreadDockHeader
-        icon={HeaderIcon}
+        icon={kind === "workflow" ? GitBranch : Bot}
         title={title}
-        countLabel={`${completedCount}/${visibleIds.length}`}
+        countLabel={`${completedCount}/${ids.length}`}
         actions={
           <Tooltip delay={0}>
             <Tooltip.Trigger>
               <button
-                aria-label={t`Close subagents panel`}
+                aria-label={closePanelLabel}
                 className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-danger-500/10 hover:text-danger-500"
                 type="button"
-                onClick={() => dismissMany(threadId, visibleIds)}
+                onClick={() => dismissMany(threadId, ids)}
               >
                 <X className="size-3.5" />
               </button>
             </Tooltip.Trigger>
-            <Tooltip.Content>
-              <Trans>Close subagents</Trans>
-            </Tooltip.Content>
+            <Tooltip.Content>{closeLabel}</Tooltip.Content>
           </Tooltip>
         }
       />
       <ThreadDockList placement="composer" collapsed={false} gap="1">
-        {visibleIds.map((id) => (
+        {ids.map((id) => (
           <ActiveSubAgentRow
             key={id}
             threadId={threadId}

@@ -479,14 +479,14 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
     });
   });
 
-  it("does not force-complete stale subagents MCP calls tagged by older mappers", () => {
+  it("does not force-complete stale Crossagents MCP calls tagged by older mappers", () => {
     apply("t1", {
       type: "item.started",
       threadId: "t1",
-      itemId: "raw-subagents-mcp",
+      itemId: "raw-crossagents-mcp",
       itemType: "tool_call",
       payload: {
-        name: "mcp__subagents__spawn_agent",
+        name: "mcp__crossagents__spawn_agent",
         status: "running",
         isSubAgent: true,
       },
@@ -494,7 +494,7 @@ describe("runtimeEventSlice.applyRuntimeEvent", () => {
 
     store.getState().reconcileStaleSubAgents("t1");
 
-    expect(store.getState().runtimeItemsByIdByThread["t1"]?.["raw-subagents-mcp"]).toMatchObject({
+    expect(store.getState().runtimeItemsByIdByThread["t1"]?.["raw-crossagents-mcp"]).toMatchObject({
       state: "started",
       payload: { status: "running" },
     });

@@ -671,10 +671,10 @@ describe("chatPaneSelectors", () => {
     );
   });
 
-  it("keeps subagents MCP calls as tools and only treats the synthetic tile as an agent", () => {
+  it("hides Crossagents run_agent calls and only treats the synthetic tile as an agent", () => {
     const state = {
       runtimeItemIdsByThread: {
-        t1: ["tool-1", "raw-run", "list-1", "sub:run-1", "raw-spawn"],
+        t1: ["tool-1", "raw-run", "failed-run", "list-1", "sub:run-1", "raw-spawn"],
       },
       runtimeItemsByIdByThread: {
         t1: {
@@ -689,14 +689,21 @@ describe("chatPaneSelectors", () => {
             id: "raw-run",
             type: "mcp_tool_call",
             state: "started",
-            payload: { name: "mcp__subagents__run_agent", status: "running" },
+            payload: { name: "mcp__crossagents__run_agent", status: "running" },
+            streams: {},
+          },
+          "failed-run": {
+            id: "failed-run",
+            type: "mcp_tool_call",
+            state: "completed",
+            payload: { name: "mcp__crossagents__run_agent", status: "error" },
             streams: {},
           },
           "list-1": {
             id: "list-1",
             type: "mcp_tool_call",
             state: "completed",
-            payload: { name: "mcp__subagents__list_agents", status: "success" },
+            payload: { name: "mcp__crossagents__list_agents", status: "success" },
             streams: {},
           },
           "sub:run-1": {
@@ -706,7 +713,7 @@ describe("chatPaneSelectors", () => {
             payload: {
               name: "Codex · GPT-5.5",
               status: "running",
-              isSubAgent: true,
+              isCrossagent: true,
             },
             streams: {},
           },
@@ -714,7 +721,7 @@ describe("chatPaneSelectors", () => {
             id: "raw-spawn",
             type: "tool_call",
             state: "completed",
-            payload: { name: "spawn_agent", serverId: "subagents", status: "success" },
+            payload: { name: "spawn_agent", serverId: "crossagents", status: "success" },
             streams: {},
           },
         },
@@ -723,7 +730,7 @@ describe("chatPaneSelectors", () => {
 
     expect(selectVisibleThreadRuntimeItemIds(state, "t1")).toEqual([
       "tool-1",
-      "raw-run",
+      "failed-run",
       "list-1",
       "sub:run-1",
       "raw-spawn",
@@ -732,7 +739,7 @@ describe("chatPaneSelectors", () => {
       {
         kind: "tool_call_group",
         id: "tool-call-group:tool-1",
-        itemIds: ["tool-1", "raw-run", "list-1"],
+        itemIds: ["tool-1", "failed-run", "list-1"],
       },
       { kind: "item", id: "sub:run-1" },
       { kind: "item", id: "raw-spawn" },

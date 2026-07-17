@@ -73,7 +73,7 @@ export type SupervisorEvent =
     }
   | { type: "thread-exited"; threadId: string; exitCode: number | null }
   /**
-   * Emitted by the supervisor's orchestrator lane (subagents MCP
+   * Emitted by the supervisor's orchestrator lane (Crossagents MCP
    * `create_thread`) when an agent thread asks for a first-class child thread.
    * The main process owns the rest of the flow, mirroring the remote-start
    * path: it resolves `projectId` from the parent's DB row, upserts the child

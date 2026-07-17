@@ -1268,6 +1268,78 @@ describe("mapCodexNotification — item lifecycle (item/started, item/completed)
     expect(events.map((event) => event.type)).toEqual(["item.completed"]);
   });
 
+  it("keeps a running command attached to its original item after the turn completes", () => {
+    const state = createCodexMapperState("t-codex");
+    mapCodexNotification("turn/started", { threadId: "x", turnId: "turn-1" }, state);
+    const started = mapCodexNotification(
+      "item/started",
+      {
+        threadId: "x",
+        itemId: "cmd-running",
+        item: { id: "cmd-running", type: "commandExecution", command: "pnpm run dev" },
+      },
+      state,
+    );
+    const commandItemId = started[0]?.type === "item.started" ? started[0].itemId : "";
+    mapCodexNotification(
+      "item/commandExecution/outputDelta",
+      { threadId: "x", itemId: "cmd-running", delta: "[app] booting\n" },
+      state,
+    );
+
+    expect(mapCodexNotification("turn/completed", { threadId: "x" }, state)).toEqual([
+      {
+        type: "turn.completed",
+        threadId: "t-codex",
+        turnId: "turn-1",
+        state: "completed",
+      },
+    ]);
+    expect(state.commandOutputSeenSet.has("cmd-running")).toBe(true);
+
+    expect(
+      mapCodexNotification(
+        "item/commandExecution/outputDelta",
+        { threadId: "x", itemId: "cmd-running", delta: "[app] ready\n" },
+        state,
+      ),
+    ).toEqual([
+      {
+        type: "content.delta",
+        threadId: "t-codex",
+        itemId: commandItemId,
+        stream: "command_output",
+        delta: "[app] ready\n",
+      },
+    ]);
+
+    expect(
+      mapCodexNotification(
+        "item/completed",
+        {
+          threadId: "x",
+          itemId: "cmd-running",
+          item: {
+            id: "cmd-running",
+            type: "commandExecution",
+            status: "completed",
+            aggregatedOutput: "[app] booting\n[app] ready\n",
+            exitCode: 0,
+          },
+        },
+        state,
+      ),
+    ).toEqual([
+      {
+        type: "item.completed",
+        threadId: "t-codex",
+        itemId: commandItemId,
+        payload: { status: "success", exitCode: 0 },
+      },
+    ]);
+    expect(state.itemIdMap.has("cmd-running")).toBe(false);
+  });
+
   it("synthesises started+completed when only item/completed is observed", () => {
     const state = createCodexMapperState("t-codex");
     const events = mapCodexNotification(

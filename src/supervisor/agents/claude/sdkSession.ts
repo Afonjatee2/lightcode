@@ -24,12 +24,7 @@ import type {
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
-import { buildClaudeBrowserMcpServers } from "./mcpBrowser";
-import { buildClaudeChromeMcpServers } from "./mcpChrome";
-import { buildClaudeSubagentMcpServers } from "./mcpSubagent";
-import { buildClaudeComputerUseMcpServers } from "./mcpComputerUse";
-import { buildClaudeAppControlsMcpServers } from "./mcpAppControls";
-import { buildClaudeUserMcpServers } from "../userMcp";
+import { buildClaudeMcpServers } from "../userMcp";
 import {
   createKnownSessionRef,
   getPrimedPosixEnv,
@@ -697,39 +692,7 @@ export class ClaudeSdkSession implements StructuredSessionHandle {
           void _exhaustive;
         }
       }
-      const browserMcpServers = buildClaudeBrowserMcpServers(
-        this.input.projectLocation,
-        this.currentConfig.browserMcp === true,
-        this.input.browserMcp,
-      );
-      const subagentMcpServers = buildClaudeSubagentMcpServers(
-        this.currentConfig.subagentMcp === true,
-        this.input.subagentMcp,
-      );
-      const chromeMcpServers = buildClaudeChromeMcpServers(
-        this.input.projectLocation,
-        this.currentConfig.chromeMcp === true,
-        this.input.chromeMcp,
-      );
-      const computerUseMcpServers = buildClaudeComputerUseMcpServers(
-        this.input.projectLocation,
-        this.currentConfig.computerUse === true,
-        this.input.computerUseMcp,
-      );
-      // The spawn pipeline withholds `appControlsMcp` when the server is
-      // hard-disabled; presence is the opt-in signal (there is no per-thread
-      // config flag for it).
-      const appControlsMcpServers = this.input.appControlsMcp
-        ? buildClaudeAppControlsMcpServers(this.input.projectLocation, this.input.appControlsMcp)
-        : undefined;
-      const mcpServers = {
-        ...buildClaudeUserMcpServers(this.input.mcpServers ?? []),
-        ...browserMcpServers,
-        ...subagentMcpServers,
-        ...chromeMcpServers,
-        ...computerUseMcpServers,
-        ...appControlsMcpServers,
-      };
+      const mcpServers = buildClaudeMcpServers(this.input.mcpServers ?? []);
       const hasMcpServers = Object.keys(mcpServers).length > 0;
       let spawnClaudeCodeProcess: ((spawnOptions: SpawnOptions) => SpawnedProcess) | undefined;
       switch (this.input.projectLocation.kind) {

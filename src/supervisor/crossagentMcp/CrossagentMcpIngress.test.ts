@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { OrchestratorThreadManager } from "./OrchestratorThreadManager";
-import { SubagentMcpIngress } from "./SubagentMcpIngress";
+import { CrossagentMcpIngress } from "./CrossagentMcpIngress";
 import type { SubagentRunManager } from "./SubagentRunManager";
-import { SUBAGENT_MCP_INSTRUCTIONS_BASE } from "./toolRegistry";
+import { CROSSAGENT_MCP_INSTRUCTIONS_BASE } from "./toolRegistry";
 import type { SpawnableAgent, SpawnAgentRequest } from "./types";
 
 /** Inert orchestrator lane — these tests only exercise the ephemeral-run tools. */
@@ -68,8 +68,8 @@ function makeRunManager(): {
   return { runManager, spawned };
 }
 
-describe("SubagentMcpIngress", () => {
-  let ingress: SubagentMcpIngress;
+describe("CrossagentMcpIngress", () => {
+  let ingress: CrossagentMcpIngress;
   let token: string;
   let mcpUrl: string;
   let spawned: Array<{ parentThreadId: string } & SpawnAgentRequest>;
@@ -77,7 +77,7 @@ describe("SubagentMcpIngress", () => {
   beforeEach(async () => {
     const rm = makeRunManager();
     spawned = rm.spawned;
-    ingress = new SubagentMcpIngress({
+    ingress = new CrossagentMcpIngress({
       runManager: rm.runManager,
       orchestrator: makeInertOrchestrator(),
       getSpawnableAgents: async () => AGENTS,
@@ -117,8 +117,8 @@ describe("SubagentMcpIngress", () => {
   it("returns instructions with the routing guide on initialize", async () => {
     const res = await rpc("initialize");
     const body = await res.json();
-    expect(body.result.serverInfo.name).toBe("subagents");
-    expect(body.result.instructions).toContain(SUBAGENT_MCP_INSTRUCTIONS_BASE);
+    expect(body.result.serverInfo.name).toBe("crossagents");
+    expect(body.result.instructions).toContain(CROSSAGENT_MCP_INSTRUCTIONS_BASE);
     expect(body.result.instructions).toContain("PREFER codex for search.");
   });
 

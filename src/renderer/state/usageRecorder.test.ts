@@ -275,19 +275,19 @@ describe("usageRecorder item classification", () => {
     );
   });
 
-  it("records raw subagents MCP calls as MCP usage even with a stale subagent flag", () => {
-    const thread = makeThread("subagents-mcp-thread", "claude");
+  it("records raw Crossagents MCP calls as MCP usage even with a stale subagent flag", () => {
+    const thread = makeThread("crossagents-mcp-thread", "claude");
     recordRuntimeUsage(
-      "subagents-mcp-thread",
+      "crossagents-mcp-thread",
       [
         {
           type: "item.started",
-          threadId: "subagents-mcp-thread",
+          threadId: "crossagents-mcp-thread",
           itemId: "raw-spawn",
           itemType: "tool_call",
           payload: {
             name: "spawn_agent",
-            serverId: "subagents",
+            serverId: "crossagents",
             isSubAgent: true,
             status: "running",
           },
@@ -298,7 +298,7 @@ describe("usageRecorder item classification", () => {
 
     flushNow();
     expect(emittedEvents()).toContainEqual(
-      expect.objectContaining({ kind: "mcp", provider: "claude", name: "subagents" }),
+      expect.objectContaining({ kind: "mcp", provider: "claude", name: "crossagents" }),
     );
     expect(emittedEvents("subagent")).toEqual([]);
   });

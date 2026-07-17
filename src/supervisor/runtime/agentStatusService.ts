@@ -37,8 +37,8 @@ const execFileAsync = promisify(execFile);
  * `AgentCapability.supportsOneShot` (so one-shot-only AI settings selectors can
  * hide interactive-only provider instances). v5 adds
  * `AgentStatus.preferTerminalLogin` (probe-reported; replaces the renderer's
- * hardcoded Grok check) and `AgentCapability.browserMcpScope` /
- * `subagentMcpScope` (adapter-declared; replace the renderer shadow tables).
+ * hardcoded Grok check) and `AgentCapability.mcpScope` (adapter-declared;
+ * replaces renderer shadow tables).
  * v6 adds structured skill command metadata.
  */
 export const STATUS_CACHE_VERSION = 6;
@@ -277,7 +277,7 @@ export class AgentStatusService {
   /**
    * Synchronous view of one provider's native capabilities as the last
    * detection sweep persisted them — the same source `getAgentStatuses` serves
-   * the renderer composer and the subagents MCP roster from. The subagent
+   * the renderer composer and the Crossagents MCP roster from. The subagent
    * spawn/create_thread paths validate against this so a selection accepted by
    * `list_agents`/`get_agent` is accepted by the executor too, instead of
    * racing the adapter's in-memory capabilities (which stay at their empty

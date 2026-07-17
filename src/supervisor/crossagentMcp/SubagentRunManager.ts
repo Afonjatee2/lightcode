@@ -26,7 +26,7 @@ import type {
  * aborts the HTTP call and the caller sees an opaque transport error instead
  * of the graceful `status: "running"` re-poll result. Known ceilings: Codex
  * `tool_timeout_sec` and Gemini's per-server `timeout` (both set to 300s in
- * their `mcpSubagent.ts` builders — keep in sync), and undici's 300s
+ * their `mcpCrossagent.ts` builders — keep in sync), and undici's 300s
  * default headers timeout for fetch-based clients (Claude SDK).
  */
 export const DEFAULT_WAIT_TIMEOUT_MS = 120_000;
@@ -218,9 +218,8 @@ export class SubagentRunManager {
     };
     this.runs.set(runId, record);
 
-    // Emit the synthetic parent tile so the existing subagent renderer picks it
-    // up (renderer keys on payload.isSubAgent === true).
-    const startPayload: ToolCallPayload = { name: label, status: "running", isSubAgent: true };
+    // Emit the synthetic parent tile so the delegated-agent renderer picks it up.
+    const startPayload: ToolCallPayload = { name: label, status: "running", isCrossagent: true };
     this.deps.host.appendRuntimeEvent(parentThreadId, {
       type: "item.started",
       threadId: parentThreadId,
@@ -546,7 +545,7 @@ export class SubagentRunManager {
     const payload: ToolCallPayload = {
       name: record.label,
       status: record.status === "completed" ? "success" : "error",
-      isSubAgent: true,
+      isCrossagent: true,
       ...(record.stepCount > 0 ? { progress: { stepCount: record.stepCount } } : {}),
       ...(text ? { result: text } : {}),
     };

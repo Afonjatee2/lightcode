@@ -65,27 +65,12 @@ function prepareGeminiLaunchMcpSettings(
 ): { env: Record<string, string>; cleanup: () => void } | undefined {
   const ctx: AgentEnvContext = {
     ...geminiEnvContextForLocation(location),
-    browserMcpEnabled: launchOptions?.browserMcp !== undefined,
-    computerUseMcpEnabled: launchOptions?.computerUseMcp !== undefined,
-    chromeMcpEnabled: launchOptions?.chromeMcp !== undefined,
     mcpServers: launchOptions?.mcpServers ?? [],
   };
-  const createIfMissing =
-    (launchOptions?.mcpServers?.length ?? 0) > 0 ||
-    launchOptions?.browserMcp !== undefined ||
-    launchOptions?.subagentMcp !== undefined ||
-    launchOptions?.computerUseMcp !== undefined ||
-    launchOptions?.chromeMcp !== undefined ||
-    launchOptions?.appControlsMcp !== undefined;
+  const createIfMissing = (launchOptions?.mcpServers?.length ?? 0) > 0;
   if (!ensureGeminiLaunchSettingsFile(ctx, createIfMissing)) return undefined;
 
-  syncGeminiLaunchMcpSettings(ctx, {
-    ...(launchOptions?.browserMcp ? { browserMcp: launchOptions.browserMcp } : {}),
-    ...(launchOptions?.computerUseMcp ? { computerUseMcp: launchOptions.computerUseMcp } : {}),
-    ...(launchOptions?.chromeMcp ? { chromeMcp: launchOptions.chromeMcp } : {}),
-    ...(launchOptions?.subagentMcp ? { subagentMcp: launchOptions.subagentMcp } : {}),
-    ...(launchOptions?.appControlsMcp ? { appControlsMcp: launchOptions.appControlsMcp } : {}),
-  });
+  syncGeminiLaunchMcpSettings(ctx, launchOptions?.mcpServers ?? []);
   const threadSettings = createGeminiThreadSettingsFile(ctx);
   if (!threadSettings) return undefined;
   return {

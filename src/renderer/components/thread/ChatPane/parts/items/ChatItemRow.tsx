@@ -18,7 +18,7 @@ import { SubAgentToolCall } from "./SubAgentToolCall";
 import { ToolCallGroup } from "./ToolCallGroup";
 import { UserMessage } from "./UserMessage";
 import { WebSearchItem } from "./WebSearchItem";
-import { isSubAgentTool } from "./toolDisplay";
+import { isDelegatedAgentTool } from "./toolDisplay";
 
 interface ChatItemRowProps {
   threadId: string;
@@ -90,7 +90,7 @@ const SingleChatItemRow = memo(function SingleChatItemRow({
   if (!item) return null;
   if (item.type === "tool_call") {
     const payload = getRuntimeItemPayload<ToolCallPayload>(item, "tool_call");
-    if (isSubAgentTool(payload)) {
+    if (isDelegatedAgentTool(payload)) {
       return <SubAgentToolCall threadId={threadId} item={item} />;
     }
   }

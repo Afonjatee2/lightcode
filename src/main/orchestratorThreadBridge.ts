@@ -15,7 +15,7 @@ export interface OrchestratorThreadBridgeDeps {
 }
 
 /**
- * Main-process half of the subagents MCP orchestrator lane's `create_thread`.
+ * Main-process half of the Crossagents MCP orchestrator lane's `create_thread`.
  * Mirrors the proven remote (mobile) start ordering exactly:
  *
  * 1. Resolve `projectId` from the PARENT thread's DB row (the supervisor

@@ -33,10 +33,7 @@ export const defaultAntigravityCapabilities: AgentCapability = {
   defaultApprovalPolicy: "yolo",
   bypassPermissions: { approvalPolicy: "yolo" },
   // No dedicated-server hosting path in any presentation.
-  browserMcpScope: { terminal: "none", gui: "none" },
-  subagentMcpScope: { terminal: "none", gui: "none" },
-  computerUseMcpScope: { terminal: "none", gui: "none" },
-  chromeMcpScope: { terminal: "none", gui: "none" },
+  mcpScope: { terminal: "none", gui: "none" },
   settingDefs: [],
 };
 

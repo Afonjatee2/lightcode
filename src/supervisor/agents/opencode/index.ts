@@ -1,11 +1,4 @@
-import type {
-  AgentCapability,
-  McpServer,
-  ProjectLocation,
-  PromptSegment,
-  ThreadConfig,
-} from "@/shared/contracts";
-import { isOpenCodeBrowserMcpEnabled } from "@/shared/opencodeSettings";
+import type { AgentCapability, ResolvedMcpServer, PromptSegment } from "@/shared/contracts";
 import { inlinePromptSegmentText } from "@/shared/promptContent";
 import { EXTRACTION_PROMPT } from "@/supervisor/contextExtractor";
 import {
@@ -13,7 +6,6 @@ import {
   detectAgentInstall,
   shortenHomePath,
   type AgentAdapter,
-  type AgentLaunchOptions,
   type CreateStructuredSessionInput,
   type RunOneShotInput,
   type TerminalStatusHint,
@@ -26,12 +18,9 @@ import {
   installOpenCodePlugin,
   isOpenCodePluginInstalled,
   readBundledOpenCodePluginVersion,
-  syncOpenCodeBrowserMcpConfigFile,
-  syncOpenCodeSubagentMcpConfigFile,
-  syncOpenCodeAppControlsMcpConfigFile,
   uninstallOpenCodePlugin,
 } from "./plugin/install";
-import { buildOpenCodeUserMcpLaunchConfig } from "../userMcp";
+import { buildOpenCodeMcpLaunchConfig } from "../userMcp";
 import { runOpenCodeOneShot } from "./sdkOneShot";
 import { detectOpenCodeTerminalStatus, opencodeOscHint, opencodeOscTitleHint } from "./terminal";
 
@@ -58,40 +47,11 @@ function opencodeHookActiveTerminalFallback(hint: TerminalStatusHint): boolean {
   return hint.status === "needs_approval";
 }
 
-// Shared by launch and resume: project the built-in MCP gates into OpenCode's
-// existing config path. Custom servers use the per-process env overlay below.
-// Built-in disables are already applied by the spawn pipeline: the config
-// flags are cleared and the http configs withheld before they reach here.
-function syncOpenCodeLaunchMcp(
-  location: ProjectLocation,
-  config: ThreadConfig,
-  launchOptions: AgentLaunchOptions | undefined,
-): void {
-  syncOpenCodeBrowserMcpConfigFile(
-    location,
-    // Browser enablement also comes from the OpenCode agent-settings toggle,
-    // so the http config's presence carries the pipeline's disable decision.
-    isOpenCodeBrowserMcpEnabled(launchOptions?.agentSettings) &&
-      launchOptions?.browserMcp !== undefined,
-    launchOptions?.browserMcp,
-    config.computerUse === true,
-    launchOptions?.computerUseMcp,
-    config.chromeMcp === true,
-    launchOptions?.chromeMcp,
-  );
-  syncOpenCodeSubagentMcpConfigFile(location, launchOptions?.subagentMcp);
-  syncOpenCodeAppControlsMcpConfigFile(
-    location,
-    launchOptions?.appControlsMcp !== undefined,
-    launchOptions?.appControlsMcp,
-  );
-}
-
-function buildOpenCodeUserMcpEnv(
-  mcpServers: readonly McpServer[] = [],
+function buildOpenCodeMcpEnv(
+  mcpServers: readonly ResolvedMcpServer[] = [],
 ): Record<string, string> | undefined {
   if (mcpServers.length === 0) return undefined;
-  const launch = buildOpenCodeUserMcpLaunchConfig(mcpServers);
+  const launch = buildOpenCodeMcpLaunchConfig(mcpServers);
   return { ...launch.env, OPENCODE_CONFIG_CONTENT: launch.configContent };
 }
 
@@ -193,10 +153,9 @@ export function createOpenCodeAdapter(): AgentAdapter {
     // so the supervisor knows the providerSessionId synchronously instead of
     // polling `opencode session list` after spawn.
     buildLaunchArgv(_location, config, prompt, _sessionRef, launchOptions) {
-      syncOpenCodeLaunchMcp(_location, config, launchOptions);
       const sessionId = launchOptions?.resumeThreadId;
       const args = buildOpenCodeArgs(config, prompt, sessionId);
-      const env = buildOpenCodeUserMcpEnv(launchOptions?.mcpServers);
+      const env = buildOpenCodeMcpEnv(launchOptions?.mcpServers);
       return {
         binary: "opencode",
         args,
@@ -206,8 +165,7 @@ export function createOpenCodeAdapter(): AgentAdapter {
       };
     },
     buildResumeArgv(_location, config, prompt, sessionRef, launchOptions) {
-      syncOpenCodeLaunchMcp(_location, config, launchOptions);
-      const env = buildOpenCodeUserMcpEnv(launchOptions?.mcpServers);
+      const env = buildOpenCodeMcpEnv(launchOptions?.mcpServers);
       return {
         binary: "opencode",
         args: buildOpenCodeArgs(config, prompt, sessionRef.providerSessionId),

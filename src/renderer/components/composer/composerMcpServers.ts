@@ -23,7 +23,7 @@ import type {
 export type { ComposerMcpScope };
 
 /** `ThreadConfig` keys that hold the per-thread enable flag for each MCP. */
-export type ComposerMcpConfigKey = "browserMcp" | "subagentMcp" | "chromeMcp";
+export type ComposerMcpConfigKey = "browserMcp" | "crossagentMcp" | "chromeMcp";
 
 /**
  * Resolve an adapter-declared per-presentation scope pair to the active
@@ -42,7 +42,7 @@ export function resolveMcpScope(
 }
 
 export interface ComposerMcpServerDescriptor {
-  id: "browser" | "subagents" | "chrome";
+  id: "browser" | "crossagents" | "chrome";
   configKey: ComposerMcpConfigKey;
   icon: LucideIcon;
   /** Menu row + chip label. */
@@ -66,18 +66,18 @@ export const browserMcpServer: ComposerMcpServerDescriptor = {
   enabledTitle: msg`Browser MCP enabled for this thread`,
   disableLabel: msg`Disable Browser MCP`,
   getScope: (capabilities, presentationMode) =>
-    resolveMcpScope(capabilities.browserMcpScope, presentationMode),
+    resolveMcpScope(capabilities.mcpScope, presentationMode),
 };
 
-export const subagentMcpServer: ComposerMcpServerDescriptor = {
-  id: "subagents",
-  configKey: "subagentMcp",
+export const crossagentMcpServer: ComposerMcpServerDescriptor = {
+  id: "crossagents",
+  configKey: "crossagentMcp",
   icon: Users,
-  label: msg`Subagents`,
-  enabledTitle: msg`Subagents enabled for this thread`,
-  disableLabel: msg`Disable Subagents`,
+  label: msg`Crossagents`,
+  enabledTitle: msg`Crossagents enabled for this thread`,
+  disableLabel: msg`Disable Crossagents`,
   getScope: (capabilities, presentationMode) =>
-    resolveMcpScope(capabilities.subagentMcpScope, presentationMode),
+    resolveMcpScope(capabilities.mcpScope, presentationMode),
 };
 
 export const chromeMcpServer: ComposerMcpServerDescriptor = {
@@ -90,12 +90,12 @@ export const chromeMcpServer: ComposerMcpServerDescriptor = {
   getScope: (capabilities, presentationMode, projectLocation) =>
     projectLocation?.kind === "wsl"
       ? "none"
-      : resolveMcpScope(capabilities.chromeMcpScope, presentationMode),
+      : resolveMcpScope(capabilities.mcpScope, presentationMode),
 };
 
 export const composerMcpServers: readonly ComposerMcpServerDescriptor[] = [
   browserMcpServer,
-  subagentMcpServer,
+  crossagentMcpServer,
   chromeMcpServer,
 ];
 

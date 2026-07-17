@@ -11,11 +11,6 @@
 
 import { spawn as spawnChild, type ChildProcess } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { buildAcpBrowserMcpServers, gateAcpMcpServers } from "./mcpBrowser";
-import { buildAcpSubagentMcpServers } from "./mcpSubagent";
-import { buildAcpComputerUseMcpServers } from "./mcpComputerUse";
-import { buildAcpChromeMcpServers } from "./mcpChrome";
-import { buildAcpAppControlsMcpServers } from "./mcpAppControls";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { homedir } from "node:os";
@@ -58,13 +53,8 @@ import type {
   ThreadConfig,
   ThreadServerRequestId,
   ThreadStatus,
-  McpServer,
+  ResolvedMcpServer,
 } from "@/shared/contracts";
-import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
-import type { SubagentMcpHttpConfig } from "@/supervisor/agents/subagentMcp";
-import type { ComputerUseMcpHttpConfig } from "@/supervisor/agents/computerUseMcp";
-import type { ChromeMcpHttpConfig } from "@/supervisor/agents/chromeMcp";
-import type { AppControlsMcpHttpConfig } from "@/supervisor/agents/appControlsMcp";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
@@ -114,7 +104,7 @@ import {
   shouldEmitAcpPromptRpcErrorItem,
 } from "./sessionErrors";
 import { AcpSessionRequests } from "./sessionRequests";
-import { buildAcpUserMcpServers } from "../userMcp";
+import { buildAcpMcpServers, gateAcpMcpServers } from "../userMcp";
 
 export { normalizeAcpStopReason, rewriteLoadSessionError };
 
@@ -139,12 +129,7 @@ export interface AcpStructuredSessionOptions {
    * not surfaced as standard `session/update` messages.
    */
   extensionNotificationHandler?: import("../base/types").AcpExtensionNotificationHandler;
-  browserMcp?: BrowserMcpHttpConfig;
-  subagentMcp?: SubagentMcpHttpConfig;
-  computerUseMcp?: ComputerUseMcpHttpConfig;
-  chromeMcp?: ChromeMcpHttpConfig;
-  appControlsMcp?: AppControlsMcpHttpConfig;
-  mcpServers?: McpServer[];
+  mcpServers?: readonly ResolvedMcpServer[];
 }
 
 export class AcpStructuredSession implements StructuredSessionHandle {
@@ -162,12 +147,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private readonly connection: ClientSideConnection;
   private readonly cwd: string;
   private readonly projectLocation: ProjectLocation;
-  private readonly browserMcp: BrowserMcpHttpConfig | undefined;
-  private readonly subagentMcp: SubagentMcpHttpConfig | undefined;
-  private readonly computerUseMcp: ComputerUseMcpHttpConfig | undefined;
-  private readonly chromeMcp: ChromeMcpHttpConfig | undefined;
-  private readonly appControlsMcp: AppControlsMcpHttpConfig | undefined;
-  private readonly mcpServers: McpServer[];
+  private readonly mcpServers: readonly ResolvedMcpServer[];
   /** Poracode thread id (stable identifier we report in RuntimeEvents). */
   private readonly threadId: string;
   private readonly stderrChunks: string[] = [];
@@ -287,11 +267,6 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     if (options?.extensionNotificationHandler) {
       this.extensionNotificationHandler = options.extensionNotificationHandler;
     }
-    this.browserMcp = options?.browserMcp;
-    this.subagentMcp = options?.subagentMcp;
-    this.computerUseMcp = options?.computerUseMcp;
-    this.chromeMcp = options?.chromeMcp;
-    this.appControlsMcp = options?.appControlsMcp;
     this.mcpServers = options?.mcpServers ?? [];
   }
 
@@ -586,26 +561,7 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     this.currentConfig = undefined;
     this.currentSlashCommands = undefined;
     this.sessionConfigSync.rememberOptions([], []);
-    const mcpServers = this.gateMcpServers([
-      ...buildAcpUserMcpServers(this.mcpServers),
-      ...buildAcpBrowserMcpServers(
-        this.projectLocation,
-        config.browserMcp === true,
-        this.browserMcp,
-      ),
-      ...buildAcpSubagentMcpServers(config.subagentMcp === true, this.subagentMcp),
-      ...buildAcpComputerUseMcpServers(
-        this.projectLocation,
-        config.computerUse === true,
-        this.computerUseMcp,
-      ),
-      ...buildAcpChromeMcpServers(this.projectLocation, config.chromeMcp === true, this.chromeMcp),
-      // App controls has no per-thread config flag; the spawn pipeline
-      // withholds the http config when the server is hard-disabled.
-      ...(this.appControlsMcp
-        ? buildAcpAppControlsMcpServers(this.projectLocation, this.appControlsMcp)
-        : []),
-    ]);
+    const mcpServers = this.gateMcpServers(buildAcpMcpServers(this.mcpServers));
 
     if (sessionRef) {
       if (this.agentSessionCapabilities?.resume !== undefined) {

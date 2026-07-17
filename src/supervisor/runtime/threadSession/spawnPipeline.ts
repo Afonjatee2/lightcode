@@ -16,6 +16,9 @@ import {
   type ThreadStatus,
   type BuiltInMcpServerId,
   type McpLaunchSnapshot,
+  type ResolvedMcpServer,
+  BUILT_IN_MCP_SERVER_NAMES,
+  DEFAULT_MCP_SERVER_TIMEOUT_MS,
   resolveEnabledMcpServers,
 } from "@/shared/contracts";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
@@ -24,9 +27,9 @@ import {
   type BrowserMcpHttpConfig,
 } from "@/supervisor/agents/browserMcp";
 import {
-  resolveSubagentMcpHttpConfigForLaunch,
-  type SubagentMcpHttpConfig,
-} from "@/supervisor/agents/subagentMcp";
+  resolveCrossagentMcpHttpConfigForLaunch,
+  type CrossagentMcpHttpConfig,
+} from "@/supervisor/agents/crossagentMcp";
 import {
   resolveComputerUseMcpHttpConfigForLaunch,
   type ComputerUseMcpHttpConfig,
@@ -110,10 +113,43 @@ export function effectiveLaunchConfig(
   if (disabledBuiltInMcpServerIds.length === 0) return config;
   const next = { ...config };
   if (disabledBuiltInMcpServerIds.includes("browser")) next.browserMcp = false;
-  if (disabledBuiltInMcpServerIds.includes("subagents")) next.subagentMcp = false;
+  if (disabledBuiltInMcpServerIds.includes("crossagents")) next.crossagentMcp = false;
   if (disabledBuiltInMcpServerIds.includes("computer-use")) next.computerUse = false;
   if (disabledBuiltInMcpServerIds.includes("chrome")) next.chromeMcp = false;
   return next;
+}
+
+export function composeResolvedMcpServers(
+  snapshot: McpLaunchSnapshot,
+  browserMcp: BrowserMcpHttpConfig | undefined,
+  crossagentMcp: CrossagentMcpHttpConfig | undefined,
+  computerUseMcp: ComputerUseMcpHttpConfig | undefined,
+  chromeMcp: ChromeMcpHttpConfig | undefined,
+  appControlsMcp: AppControlsMcpHttpConfig | undefined,
+): ResolvedMcpServer[] {
+  const http = (
+    id: BuiltInMcpServerId,
+    config: { url: string; headers: Record<string, string> } | undefined,
+    timeoutMs = DEFAULT_MCP_SERVER_TIMEOUT_MS,
+    approvalMode?: "approve",
+  ): ResolvedMcpServer | undefined =>
+    config
+      ? {
+          id,
+          name: BUILT_IN_MCP_SERVER_NAMES[id],
+          timeoutMs,
+          transport: { type: "http", url: config.url, headers: config.headers },
+          ...(approvalMode ? { approvalMode } : {}),
+        }
+      : undefined;
+  return [
+    ...snapshot.mcpServers,
+    http("browser", browserMcp),
+    http("crossagents", crossagentMcp, 300_000, "approve"),
+    http("computer-use", computerUseMcp),
+    http("chrome", chromeMcp),
+    http("app-controls", appControlsMcp),
+  ].filter((server): server is ResolvedMcpServer => server !== undefined);
 }
 
 /**
@@ -135,7 +171,6 @@ export interface SpawnPipelineContext {
   closeThread(payload: CloseThreadPayload): Promise<void>;
   failStructuredSession(session: SessionRuntime, error: unknown): void;
   isCurrentSession(session: SessionRuntime): boolean;
-  isBrowserMcpEnabledForLaunch(adapter: AgentAdapter | undefined, config: ThreadConfig): boolean;
   resolveAgentSettings(adapter: AgentAdapter): Record<string, boolean | string>;
   emitOptimisticUserMessage(threadId: string, prompt: string, segments?: PromptSegment[]): string;
 }
@@ -256,48 +291,20 @@ export class SpawnPipeline {
       payload.config,
       mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
     );
-    const browserMcp = await this.resolveBrowserMcpForLaunch(
-      adapter,
-      payload.projectLocation,
-      launchConfig,
+    const resolvedMcpServers = await this.resolveMcpServersForLaunch({
+      location: payload.projectLocation,
+      config: launchConfig,
       mcpLaunchSnapshot,
-      mcpIdentity,
-    );
-    const subagentMcp = await this.resolveSubagentMcpForLaunch(
-      payload.threadId,
-      payload.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-    );
-    const computerUse = this.resolveComputerUseMcpForLaunch(
-      payload.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-      mcpIdentity,
-    );
-    const chromeMcp = this.resolveChromeMcpForLaunch(
-      payload.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-      mcpIdentity,
-    );
-    const appControlsMcp = await this.resolveAppControlsMcpForLaunch(
-      payload.projectLocation,
-      mcpLaunchSnapshot,
-      mcpIdentity,
-    );
+      identity: mcpIdentity,
+      crossagentThreadId: payload.threadId,
+    });
     const structuredSession = await this.createStructuredSession(
       adapter,
       payload.threadId,
       payload.agentKind,
       payload.projectLocation,
       launchConfig,
-      browserMcp,
-      subagentMcp,
-      computerUse,
-      chromeMcp,
-      appControlsMcp,
-      mcpLaunchSnapshot,
+      resolvedMcpServers,
       mcpIdentity,
       payload.sessionRef,
       requestedPresentation,
@@ -436,12 +443,7 @@ export class SpawnPipeline {
     const launchOptionsWithMcp = this.composeLaunchOptions(
       adapter,
       structuredSession?.launchOptions,
-      browserMcp,
-      subagentMcp,
-      computerUse,
-      chromeMcp,
-      appControlsMcp,
-      mcpLaunchSnapshot,
+      resolvedMcpServers,
     );
     const argv = payload.sessionRef
       ? adapter.buildResumeArgv(
@@ -470,11 +472,7 @@ export class SpawnPipeline {
       payload.threadId,
       payload.agentKind,
       payload.projectLocation,
-      launchConfig,
-      browserMcp,
-      computerUse,
-      chromeMcp,
-      mcpLaunchSnapshot,
+      resolvedMcpServers,
     );
     if (cliHookExtras.extraArgs.length > 0) {
       argv.args = mergeCliHookExtraArgs(
@@ -587,48 +585,20 @@ export class SpawnPipeline {
       config,
       mcpLaunchSnapshot.disabledBuiltInMcpServerIds,
     );
-    const browserMcp = await this.resolveBrowserMcpForLaunch(
-      session.adapter,
-      session.projectLocation,
-      launchConfig,
+    const resolvedMcpServers = await this.resolveMcpServersForLaunch({
+      location: session.projectLocation,
+      config: launchConfig,
       mcpLaunchSnapshot,
-      mcpIdentity,
-    );
-    const subagentMcp = await this.resolveSubagentMcpForLaunch(
-      session.threadId,
-      session.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-    );
-    const computerUse = this.resolveComputerUseMcpForLaunch(
-      session.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-      mcpIdentity,
-    );
-    const chromeMcp = this.resolveChromeMcpForLaunch(
-      session.projectLocation,
-      launchConfig,
-      mcpLaunchSnapshot,
-      mcpIdentity,
-    );
-    const appControlsMcp = await this.resolveAppControlsMcpForLaunch(
-      session.projectLocation,
-      mcpLaunchSnapshot,
-      mcpIdentity,
-    );
+      identity: mcpIdentity,
+      crossagentThreadId: session.threadId,
+    });
     const structuredSession = await this.createStructuredSession(
       session.adapter,
       session.threadId,
       session.agentKind,
       session.projectLocation,
       launchConfig,
-      browserMcp,
-      subagentMcp,
-      computerUse,
-      chromeMcp,
-      appControlsMcp,
-      mcpLaunchSnapshot,
+      resolvedMcpServers,
       mcpIdentity,
       session.sessionRef,
       session.presentationMode,
@@ -700,11 +670,7 @@ export class SpawnPipeline {
       session.threadId,
       session.agentKind,
       session.projectLocation,
-      launchConfig,
-      browserMcp,
-      computerUse,
-      chromeMcp,
-      mcpLaunchSnapshot,
+      resolvedMcpServers,
     );
     if (!ctx.isCurrentSession(session)) {
       await structuredSession?.dispose();
@@ -718,12 +684,7 @@ export class SpawnPipeline {
       this.composeLaunchOptions(
         session.adapter,
         structuredSession?.launchOptions,
-        browserMcp,
-        subagentMcp,
-        computerUse,
-        chromeMcp,
-        appControlsMcp,
-        mcpLaunchSnapshot,
+        resolvedMcpServers,
       ),
     );
     if (cliHookExtras.extraArgs.length > 0) {
@@ -892,43 +853,76 @@ export class SpawnPipeline {
     return session;
   }
 
-  /**
-   * Fold the agent-settings, browser-MCP, and subagents-MCP launch options
-   * into a structured session's base launch options. Every argv build site
-   * (launch, resume, restart, invalid-ref recovery) uses this composition.
-   */
+  /** Fold provider-neutral MCP descriptors into every launch path. */
   composeLaunchOptions(
     adapter: AgentAdapter,
     launchOptions: AgentLaunchOptions | undefined,
-    browserMcp: BrowserMcpHttpConfig | undefined,
-    subagentMcp: SubagentMcpHttpConfig | undefined,
-    computerUse: ComputerUseMcpHttpConfig | undefined,
-    chromeMcp: ChromeMcpHttpConfig | undefined,
-    appControlsMcp: AppControlsMcpHttpConfig | undefined,
-    mcpLaunchSnapshot: McpLaunchSnapshot,
+    mcpServers: readonly ResolvedMcpServer[],
   ): AgentLaunchOptions {
-    const { mcpServers } = mcpLaunchSnapshot;
     return {
       ...(launchOptions ?? {}),
       agentSettings: this.ctx.resolveAgentSettings(adapter),
-      ...(browserMcp !== undefined ? { browserMcp } : {}),
-      ...(subagentMcp !== undefined ? { subagentMcp } : {}),
-      ...(computerUse !== undefined ? { computerUseMcp: computerUse } : {}),
-      ...(chromeMcp !== undefined ? { chromeMcp } : {}),
-      ...(appControlsMcp !== undefined ? { appControlsMcp } : {}),
       ...(mcpServers.length > 0 ? { mcpServers } : {}),
     };
   }
 
+  async resolveMcpServersForLaunch({
+    location,
+    config,
+    mcpLaunchSnapshot,
+    identity,
+    crossagentThreadId,
+  }: {
+    location: ProjectLocation;
+    config: ThreadConfig;
+    mcpLaunchSnapshot: McpLaunchSnapshot;
+    identity?: McpThreadIdentity;
+    crossagentThreadId?: string;
+  }): Promise<ResolvedMcpServer[]> {
+    const browserMcp = await this.resolveBrowserMcpForLaunch(
+      location,
+      config,
+      mcpLaunchSnapshot,
+      identity,
+    );
+    const crossagentMcp = crossagentThreadId
+      ? await this.resolveCrossagentMcpForLaunch(
+          crossagentThreadId,
+          location,
+          config,
+          mcpLaunchSnapshot,
+        )
+      : undefined;
+    const computerUseMcp = this.resolveComputerUseMcpForLaunch(
+      location,
+      config,
+      mcpLaunchSnapshot,
+      identity,
+    );
+    const chromeMcp = this.resolveChromeMcpForLaunch(location, config, mcpLaunchSnapshot, identity);
+    const appControlsMcp = await this.resolveAppControlsMcpForLaunch(
+      location,
+      mcpLaunchSnapshot,
+      identity,
+    );
+    return composeResolvedMcpServers(
+      mcpLaunchSnapshot,
+      browserMcp,
+      crossagentMcp,
+      computerUseMcp,
+      chromeMcp,
+      appControlsMcp,
+    );
+  }
+
   async resolveBrowserMcpForLaunch(
-    adapter: AgentAdapter,
     location: ProjectLocation,
     config: ThreadConfig,
     mcpLaunchSnapshot: McpLaunchSnapshot,
     identity?: McpThreadIdentity,
   ): Promise<BrowserMcpHttpConfig | undefined> {
     if (mcpLaunchSnapshot.disabledBuiltInMcpServerIds.includes("browser")) return undefined;
-    const enabled = this.ctx.isBrowserMcpEnabledForLaunch(adapter, config);
+    const enabled = config.browserMcp === true;
     if (!enabled) return undefined;
     const cfg = await resolveBrowserMcpHttpConfigForLaunch(
       location,
@@ -991,39 +985,35 @@ export class SpawnPipeline {
     if (mcpLaunchSnapshot.disabledBuiltInMcpServerIds.includes("app-controls")) {
       return Promise.resolve(undefined);
     }
-    return resolveAppControlsMcpHttpConfigForLaunch(
-      location,
-      this.ctx.options.subagentMcpHostAccess,
-      {
-        ...identity,
-        disabledTools: mcpLaunchSnapshot.disabledBuiltInMcpTools?.["app-controls"] ?? [],
-      },
-    );
+    return resolveAppControlsMcpHttpConfigForLaunch(location, this.ctx.options.wslHostAccess, {
+      ...identity,
+      disabledTools: mcpLaunchSnapshot.disabledBuiltInMcpTools?.["app-controls"] ?? [],
+    });
   }
 
   /**
-   * Resolve the subagents MCP http config for a launch when the thread opted
-   * in (`config.subagentMcp === true`). Registers the thread with the ingress
+   * Resolve the Crossagents MCP http config for a launch when the thread opted
+   * in (`config.crossagentMcp === true`). Registers the thread with the ingress
    * (idempotent — reuses an existing token), then rewrites the loopback URL to
    * the WSL → host gateway IP for NAT-mode WSL projects (mirrored-mode WSL and
    * native projects pass through unchanged). Parallel to
    * `resolveBrowserMcpForLaunch`.
    */
-  async resolveSubagentMcpForLaunch(
+  async resolveCrossagentMcpForLaunch(
     threadId: string,
     location: ProjectLocation,
     config: ThreadConfig,
     mcpLaunchSnapshot: McpLaunchSnapshot,
-  ): Promise<SubagentMcpHttpConfig | undefined> {
-    if (config.subagentMcp !== true) return undefined;
-    const native = this.ctx.options.subagentMcp?.register(
+  ): Promise<CrossagentMcpHttpConfig | undefined> {
+    if (config.crossagentMcp !== true) return undefined;
+    const native = this.ctx.options.crossagentMcp?.register(
       threadId,
-      mcpLaunchSnapshot.disabledBuiltInMcpTools?.subagents ?? [],
+      mcpLaunchSnapshot.disabledBuiltInMcpTools?.crossagents ?? [],
     );
-    return resolveSubagentMcpHttpConfigForLaunch(
+    return resolveCrossagentMcpHttpConfigForLaunch(
       native,
       location,
-      this.ctx.options.subagentMcpHostAccess,
+      this.ctx.options.wslHostAccess,
     );
   }
 
@@ -1065,17 +1055,11 @@ export class SpawnPipeline {
     agentKind: AgentKind,
     projectLocation: ProjectLocation,
     config: ThreadConfig,
-    browserMcp: BrowserMcpHttpConfig | undefined,
-    subagentMcp: SubagentMcpHttpConfig | undefined,
-    computerUse: ComputerUseMcpHttpConfig | undefined,
-    chromeMcp: ChromeMcpHttpConfig | undefined,
-    appControlsMcp: AppControlsMcpHttpConfig | undefined,
-    mcpLaunchSnapshot: McpLaunchSnapshot,
+    mcpServers: readonly ResolvedMcpServer[],
     mcpIdentity: McpThreadIdentity | undefined,
     sessionRef?: SessionRef,
     presentationMode?: ThreadPresentationMode,
   ): Promise<StructuredSessionHandle | undefined> {
-    const { mcpServers } = mcpLaunchSnapshot;
     if (!adapter.createStructuredSession) {
       return undefined;
     }
@@ -1086,11 +1070,6 @@ export class SpawnPipeline {
         config,
         agentSettings: this.ctx.resolveAgentSettings(adapter),
         ...(mcpIdentity ? { mcpIdentity } : {}),
-        ...(browserMcp ? { browserMcp } : {}),
-        ...(subagentMcp ? { subagentMcp } : {}),
-        ...(computerUse ? { computerUseMcp: computerUse } : {}),
-        ...(chromeMcp ? { chromeMcp } : {}),
-        ...(appControlsMcp ? { appControlsMcp } : {}),
         ...(mcpServers.length > 0 ? { mcpServers } : {}),
         ...(sessionRef ? { sessionRef } : {}),
         ...(presentationMode ? { presentationMode } : {}),

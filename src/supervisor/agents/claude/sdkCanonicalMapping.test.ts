@@ -1085,7 +1085,7 @@ describe("sdkCanonicalMapping — tool use", () => {
           content_block: {
             type: "tool_use",
             id: `toolu_subagents_${tool}`,
-            name: `mcp__subagents__${tool}`,
+            name: `mcp__crossagents__${tool}`,
             input: {},
           },
         }),
@@ -1098,7 +1098,7 @@ describe("sdkCanonicalMapping — tool use", () => {
           itemId: `toolu_subagents_${tool}`,
           itemType: "mcp_tool_call",
           payload: {
-            name: `mcp__subagents__${tool}`,
+            name: `mcp__crossagents__${tool}`,
             args: {},
             result: undefined,
             status: "running",

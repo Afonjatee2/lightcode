@@ -12,7 +12,7 @@ import { extractAcpDiffSummary, readAcpStringField } from "./acpToolPayload";
 import { commandIntentDisplay } from "./commandSummary";
 import { isContextCompactionToolCall } from "./ContextCompaction";
 import { isPlanProposalToolCall } from "./PlanProposal";
-import { deriveToolDisplay, isSubAgentTool } from "./toolDisplay";
+import { deriveToolDisplay, isDelegatedAgentTool } from "./toolDisplay";
 
 export type GroupCategory = "thought" | "viewed" | "searched" | "edited" | "executed" | "other";
 
@@ -297,7 +297,7 @@ export function categorizeItem(item: RuntimeChatItem): GroupCategory {
   if (item.type === "web_search") return "searched";
   const payload = getToolLikePayload(item);
   if (!payload) return "other";
-  if (isSubAgentTool(payload)) return "executed";
+  if (isDelegatedAgentTool(payload)) return "executed";
 
   switch (payload.kind) {
     case "read":

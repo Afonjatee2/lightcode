@@ -3,14 +3,10 @@ import type {
   ProjectLocation,
   RuntimeEvent,
   ThreadConfig,
-  McpServer,
+  ResolvedMcpServer,
 } from "@/shared/contracts";
 import { resolveUnrestrictedPermissionConfig } from "@/shared/agents/unrestrictedPermissions";
 import type { McpThreadIdentity } from "@/shared/browserMcpThread";
-import type { BrowserMcpHttpConfig } from "@/supervisor/agents/browserMcp";
-import type { ChromeMcpHttpConfig } from "@/supervisor/agents/chromeMcp";
-import type { ComputerUseMcpHttpConfig } from "@/supervisor/agents/computerUseMcp";
-import type { AppControlsMcpHttpConfig } from "@/supervisor/agents/appControlsMcp";
 
 /** Terminal states a subagent run can settle into. */
 export type SubagentRunStatus = "running" | "completed" | "failed" | "cancelled";
@@ -67,7 +63,7 @@ export function resolveSubagentExecution(adapter: {
  * advertised policy, falling back to its declared bypass posture when the
  * probe exposes no choices. Subagents must not inherit a potentially
  * incompatible or supervised parent policy. Browser, Computer Use, and Chrome
- * MCP choices are inherited; Subagents MCP is deliberately excluded so a child
+ * MCP choices are inherited; Crossagents MCP is deliberately excluded so a child
  * cannot spawn grandchildren. One-shot-only providers already enforce the
  * permission rule in `buildSubagentOneShotCommand`.
  */
@@ -141,13 +137,7 @@ export interface SubagentRunHost {
   resolveParentMcpAccess?(
     threadId: string,
     identity: McpThreadIdentity,
-  ): Promise<{
-    browserMcp?: BrowserMcpHttpConfig;
-    computerUseMcp?: ComputerUseMcpHttpConfig;
-    chromeMcp?: ChromeMcpHttpConfig;
-    appControlsMcp?: AppControlsMcpHttpConfig;
-    mcpServers?: McpServer[];
-  }>;
+  ): Promise<{ mcpServers?: ResolvedMcpServer[] }>;
   /** Append a (re-tagged) runtime event into the parent thread's event stream. */
   appendRuntimeEvent(parentThreadId: string, event: RuntimeEvent): void;
 }

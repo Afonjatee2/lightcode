@@ -6,7 +6,7 @@ export const DEFAULT_MCP_SERVER_TIMEOUT_MS = 30_000;
 /** Stable ids for the MCP servers provided by Poracode itself. */
 export const BUILT_IN_MCP_SERVER_IDS = [
   "browser",
-  "subagents",
+  "crossagents",
   "chrome",
   "computer-use",
   "app-controls",
@@ -16,7 +16,7 @@ export type BuiltInMcpServerId = (typeof BUILT_IN_MCP_SERVER_IDS)[number];
 /** Provider-visible names used by the built-in servers. */
 export const BUILT_IN_MCP_SERVER_NAMES: Record<BuiltInMcpServerId, string> = {
   browser: "browser",
-  subagents: "subagents",
+  crossagents: "crossagents",
   chrome: "chrome",
   "computer-use": "computer_use",
   "app-controls": "poracode",
@@ -70,7 +70,7 @@ export const BUILT_IN_MCP_SERVER_TOOL_NAMES = {
     "addscript",
     "addstyle",
   ],
-  subagents: [
+  crossagents: [
     "list_agents",
     "get_agent",
     "spawn_agent",
@@ -134,7 +134,7 @@ export const BUILT_IN_MCP_SERVER_TOOL_NAMES = {
 
 export const BUILT_IN_MCP_SERVER_TOOL_COUNTS: Record<BuiltInMcpServerId, number> = {
   browser: BUILT_IN_MCP_SERVER_TOOL_NAMES.browser.length,
-  subagents: BUILT_IN_MCP_SERVER_TOOL_NAMES.subagents.length,
+  crossagents: BUILT_IN_MCP_SERVER_TOOL_NAMES.crossagents.length,
   chrome: BUILT_IN_MCP_SERVER_TOOL_NAMES.chrome.length,
   "computer-use": BUILT_IN_MCP_SERVER_TOOL_NAMES["computer-use"].length,
   "app-controls": BUILT_IN_MCP_SERVER_TOOL_NAMES["app-controls"].length,
@@ -265,6 +265,15 @@ export const mcpServerSchema = z
     message: "MCP server name is reserved by a built-in server",
   });
 export type McpServer = z.infer<typeof mcpServerSchema>;
+
+/**
+ * Provider-neutral MCP descriptor after launch-time resolution. Built-in
+ * owners and user configuration both project into this shape before an agent
+ * adapter sees them.
+ */
+export type ResolvedMcpServer = Omit<McpServer, "description" | "enabled"> & {
+  approvalMode?: "approve";
+};
 
 export const mcpServerListSchema = z.array(mcpServerSchema).default([]);
 

@@ -223,7 +223,7 @@ export function ThreadDraftView(props: {
   // mention in this draft and reset with every new thread. The effective launch
   // flag is `mention || (persistent && scope available)`, computed below.
   const [browserMcpMention, setBrowserMcpMention] = useState(false);
-  const [subagentMcpMention, setSubagentMcpMention] = useState(false);
+  const [crossagentMcpMention, setCrossagentMcpMention] = useState(false);
   const [chromeMcpMention, setChromeMcpMention] = useState(false);
   const [computerUseMention, setComputerUseMention] = useState(false);
   const [worktreeMode, setWorktreeMode] = useState(
@@ -632,9 +632,9 @@ export function ThreadDraftView(props: {
       setBrowserMcpMention(patch.browserMcp === true);
       return;
     }
-    if ("subagentMcp" in patch) {
+    if ("crossagentMcp" in patch) {
       // Per-draft mention flag — same bypass as browserMcp above.
-      setSubagentMcpMention(patch.subagentMcp === true);
+      setCrossagentMcpMention(patch.crossagentMcp === true);
       return;
     }
     if ("chromeMcp" in patch) {
@@ -937,15 +937,12 @@ export function ThreadDraftView(props: {
   const effectiveMcp = (id: BuiltInMcpServerId, mention: boolean, scope: string) =>
     disabledBuiltInMcpServers[id] !== true &&
     (mention || (enabledMcpServers[id] === true && scope !== "none"));
-  const effectiveBrowserMcp = effectiveMcp(
-    "browser",
-    browserMcpMention,
-    resolveMcpScope(selectedAgent.capabilities.browserMcpScope, presentationMode),
-  );
-  const effectiveSubagentMcp = effectiveMcp(
-    "subagents",
-    subagentMcpMention,
-    resolveMcpScope(selectedAgent.capabilities.subagentMcpScope, presentationMode),
+  const selectedMcpScope = resolveMcpScope(selectedAgent.capabilities.mcpScope, presentationMode);
+  const effectiveBrowserMcp = effectiveMcp("browser", browserMcpMention, selectedMcpScope);
+  const effectiveCrossagentMcp = effectiveMcp(
+    "crossagents",
+    crossagentMcpMention,
+    selectedMcpScope,
   );
   const effectiveChromeMcp = effectiveMcp(
     "chrome",
@@ -1034,7 +1031,7 @@ export function ThreadDraftView(props: {
               ...(approvalsReviewer ? { approvalsReviewer } : {}),
               ...(sandboxMode ? { sandboxMode } : {}),
               ...(effectiveBrowserMcp ? { browserMcp: true } : {}),
-              ...(effectiveSubagentMcp ? { subagentMcp: true } : {}),
+              ...(effectiveCrossagentMcp ? { crossagentMcp: true } : {}),
               ...(effectiveChromeMcp ? { chromeMcp: true } : {}),
               ...(effectiveComputerUse ? { computerUse: true } : {}),
             }}
