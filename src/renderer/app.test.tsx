@@ -829,9 +829,11 @@ describe("App", () => {
     await waitFor(() => {
       expect(bridge.dbGetThreadRuntimeItemsPage).toHaveBeenCalledWith({
         threadId: "thread-visible-gui",
-        limit: 200,
+        limit: 500,
+        targetTimelineEntryCount: 40,
       });
     });
+    expect(bridge.dbGetThreadRuntimeItems).not.toHaveBeenCalled();
     expect(screen.queryByTestId("thread-view-thread-visible-gui")).not.toBeInTheDocument();
 
     resolveRuntimeItems({ items: [], nextCursor: null });
