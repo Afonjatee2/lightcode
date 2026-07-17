@@ -1,5 +1,6 @@
 import type {
   AgentKind,
+  AgentStatus,
   AgentStatusesResponse,
   AcpRegistryListResult,
   AcpRegistryMutationResult,
@@ -136,15 +137,44 @@ export class AgentRegistryService {
   }
 
   private async refreshAffectedAgentStatus(agentKind: string): Promise<void> {
+    await this.refreshAffectedAgentStatuses([agentKind]);
+  }
+
+  private async refreshAffectedAgentStatuses(agentKinds: AgentKind[]): Promise<void> {
     try {
       const wslDistros = await this.agentStatusService.listWslDistros();
       await this.agentStatusService.refreshAgentStatuses({
         wslDistros,
-        scope: { agentKinds: [agentKind] },
+        scope: { agentKinds },
       });
     } catch (error) {
-      console.warn(`[supervisor] refreshAffectedAgentStatus failed for ${agentKind}`, error);
+      console.warn(
+        `[supervisor] refreshAffectedAgentStatuses failed for ${agentKinds.join(", ")}`,
+        error,
+      );
     }
+  }
+
+  private sharedInstallationAgentKinds(
+    updatedStatus: AgentStatus,
+    candidateStatuses: readonly AgentStatus[],
+  ): AgentKind[] {
+    const executablePath = updatedStatus.executablePath;
+    if (!executablePath) return [updatedStatus.kind];
+    const kinds = [
+      ...new Set(
+        candidateStatuses
+          .filter(
+            (candidate) =>
+              candidate.installed &&
+              candidate.executablePath === executablePath &&
+              candidate.envKind === updatedStatus.envKind &&
+              candidate.envDistro === updatedStatus.envDistro,
+          )
+          .map((candidate) => candidate.kind),
+      ),
+    ];
+    return kinds.length > 0 ? kinds : [updatedStatus.kind];
   }
 
   async getAgentStatuses(payload: GetAgentStatusesPayload): Promise<AgentStatusesResponse> {
@@ -257,7 +287,7 @@ export class AgentRegistryService {
       // the new binary can land at a different prefix and the cached entry
       // would resolve to a stale shim.
       clearAgentBinaryPathCache();
-      await this.refreshAffectedAgentStatus(payload.agentKind);
+      await this.refreshAffectedAgentStatuses(this.sharedInstallationAgentKinds(status, pool));
     }
     return result;
   }

@@ -116,4 +116,82 @@ describe("AgentRegistryService.updateAgentBinary", () => {
       output: "command failed",
     });
   });
+
+  it("refreshes every detected provider profile that resolves to the updated executable", async () => {
+    const status: AgentStatus = {
+      kind: "claude:work",
+      label: "Claude Work",
+      installed: true,
+      version: "1.0.0",
+      executablePath: "/usr/local/bin/claude",
+      authState: "authenticated",
+      capabilities,
+      envKind: "posix",
+    };
+    const makeAdapter = (kind: AgentAdapter["kind"], label: string) =>
+      ({
+        kind,
+        label,
+        binary: "claude",
+        capabilities,
+        detectInstall: vi.fn<AgentAdapter["detectInstall"]>(),
+        buildLaunchArgv: vi.fn<AgentAdapter["buildLaunchArgv"]>(),
+        buildResumeArgv: vi.fn<AgentAdapter["buildResumeArgv"]>(),
+        createInitialSessionRef: vi.fn<AgentAdapter["createInitialSessionRef"]>(() => undefined),
+      }) as unknown as AgentAdapter;
+    const adapters = new Map<AgentAdapter["kind"], AgentAdapter>([
+      ["claude", makeAdapter("claude", "Claude Code")],
+      ["claude:personal", makeAdapter("claude:personal", "Claude Personal")],
+      ["claude:work", makeAdapter("claude:work", "Claude Work")],
+    ]);
+    const refreshAgentStatuses = vi
+      .fn<AgentStatusService["refreshAgentStatuses"]>()
+      .mockResolvedValue({
+        windows: [
+          { ...status, kind: "claude", label: "Claude Code" },
+          { ...status, kind: "claude:personal", label: "Claude Personal" },
+          status,
+          {
+            ...status,
+            kind: "codex",
+            label: "Codex",
+            executablePath: "/usr/local/bin/codex",
+          },
+        ],
+        wsl: [],
+        fromCache: false,
+      });
+    const listWslDistros = vi
+      .fn<AgentStatusService["listWslDistros"]>()
+      .mockResolvedValue(["Ubuntu"]);
+    const agentStatusService = {
+      refreshAgentStatuses,
+      getAgentStatuses: vi.fn<AgentStatusService["getAgentStatuses"]>(),
+      listWslDistros,
+    } as unknown as AgentStatusService;
+    const service = new AgentRegistryService({
+      adapters,
+      settingsPath: "/data/settings.json",
+      baseDir: "/data",
+      acpIconsDir: "/data/icons",
+      sharedSettingsCache: {
+        invalidate: vi.fn<SupervisorSharedSettingsCache["invalidate"]>(),
+      } as unknown as SupervisorSharedSettingsCache,
+      getAgentStatusService: () => agentStatusService,
+    });
+    runUpdateCommandWithFallbackMock.mockResolvedValue({
+      ok: true,
+      strategy: "built-in",
+      output: "updated",
+    });
+
+    await service.updateAgentBinary({ agentKind: "claude:work", envKind: "posix" });
+
+    expect(refreshAgentStatuses).toHaveBeenNthCalledWith(2, {
+      wslDistros: ["Ubuntu"],
+      scope: {
+        agentKinds: ["claude", "claude:personal", "claude:work"],
+      },
+    });
+  });
 });
