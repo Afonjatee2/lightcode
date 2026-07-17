@@ -391,18 +391,20 @@ export function DesktopsRoute() {
       toast.danger(t`Enter a valid desktop endpoint.`);
       return;
     }
-    if (isMixedContentEndpoint(normalizedEndpoint)) {
-      toast.danger(
-        t`This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS.`,
-      );
-      return;
-    }
     try {
       await remote.pairDesktop(normalizedEndpoint, credential);
       clearPairingLaunch();
       setManualToken("");
       void navigate({ to: "/threads" });
     } catch (error) {
+      // Chromium can prompt for local-network access and permit this request.
+      // Attempt it before showing fallback guidance so that prompt can appear.
+      if (isMixedContentEndpoint(normalizedEndpoint)) {
+        toast.danger(
+          t`Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS.`,
+        );
+        return;
+      }
       toast.danger(error instanceof Error ? error.message : t`Unable to pair with that desktop.`);
     }
   }

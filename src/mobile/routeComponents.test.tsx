@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+// @vitest-environment-options {"url":"https://poracode.com/app"}
 import { useEffect, type ReactNode } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -275,7 +276,7 @@ describe("mobile route components", () => {
     );
   });
 
-  it("consumes a deep-link pairing credential after a successful pair", async () => {
+  it("attempts and consumes an http LAN pairing credential from the hosted app", async () => {
     setPairingLaunch({
       endpoint: "http://192.168.1.20:38987/",
       credential: "lc_pair_once",

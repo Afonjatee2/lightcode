@@ -137,13 +137,12 @@ export function parsePairingUrl(value: string): PairingLaunch | null {
 }
 
 /**
- * A page served over https cannot open http connections to a LAN address
- * (mixed content is blocked by the browser). This is the common failure when
- * the PWA is hosted (e.g. on Vercel) but the desktop only exposes plain http
- * on the LAN. Loopback is exempt — browsers treat it as a secure context.
- * The native shells are exempt too: they serve the bundle from an https/app
- * scheme origin but allow cleartext LAN traffic themselves (Android
- * `cleartext`/`allowMixedContent`, iOS ATS exceptions).
+ * Classify an http LAN endpoint requested from a hosted https page. Chromium
+ * can allow this through its Local Network Access permission; browsers without
+ * that support block it as mixed content. Loopback is exempt because browsers
+ * treat it as a secure context. Native shells are exempt too: they serve the
+ * bundle from an https/app scheme origin but allow cleartext LAN traffic
+ * themselves (Android `cleartext`/`allowMixedContent`, iOS ATS exceptions).
  */
 export function isMixedContentEndpoint(
   endpoint: string,

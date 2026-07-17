@@ -2750,6 +2750,10 @@ msgstr "Không thể tải skill."
 msgid "Couldn't load your profile stats."
 msgstr "Không thể tải thống kê hồ sơ của bạn."
 
+#: src/mobile/routeComponents.tsx
+msgid "Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+msgstr "Không thể kết nối với desktop. Nếu trình duyệt yêu cầu quyền truy cập mạng cục bộ, hãy cho phép rồi ghép đôi lại. Nếu không, hãy mở liên kết ghép đôi trực tiếp từ desktop (LAN), hoặc cung cấp desktop qua HTTPS."
+
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Couldn't save the shortcut."
 msgstr "Không thể lưu phím tắt."
@@ -9702,8 +9706,8 @@ msgid "This agent is not installed."
 msgstr "Tác nhân này chưa được cài đặt."
 
 #: src/mobile/routeComponents.tsx
-msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-msgstr "Ứng dụng này được phục vụ qua HTTPS nhưng desktop dùng HTTP thường, bị trình duyệt chặn. Mở liên kết ghép đôi trực tiếp từ desktop (LAN), hoặc cung cấp desktop qua HTTPS."
+#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+#~ msgstr "Ứng dụng này được phục vụ qua HTTPS nhưng desktop dùng HTTP thường, bị trình duyệt chặn. Mở liên kết ghép đôi trực tiếp từ desktop (LAN), hoặc cung cấp desktop qua HTTPS."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."

@@ -2750,6 +2750,10 @@ msgstr "Beceri yüklenemedi."
 msgid "Couldn't load your profile stats."
 msgstr "Profil istatistikleriniz yüklenemedi."
 
+#: src/mobile/routeComponents.tsx
+msgid "Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+msgstr "Masaüstüne ulaşılamadı. Tarayıcı yerel ağınıza erişim istediyse izin verin ve yeniden eşleştirin. Aksi halde eşleştirme bağlantısını doğrudan masaüstünden (LAN) açın veya masaüstünü HTTPS üzerinden yayımlayın."
+
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Couldn't save the shortcut."
 msgstr "Kısayol kaydedilemedi."
@@ -9702,8 +9706,8 @@ msgid "This agent is not installed."
 msgstr "Bu aracı yüklü değil."
 
 #: src/mobile/routeComponents.tsx
-msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-msgstr "Bu uygulama HTTPS üzerinden sunuluyor, ancak masaüstü tarayıcıların engellediği düz HTTP kullanıyor. Eşleştirme bağlantısını doğrudan masaüstünden (LAN) açın veya masaüstünü HTTPS üzerinden yayımlayın."
+#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+#~ msgstr "Bu uygulama HTTPS üzerinden sunuluyor, ancak masaüstü tarayıcıların engellediği düz HTTP kullanıyor. Eşleştirme bağlantısını doğrudan masaüstünden (LAN) açın veya masaüstünü HTTPS üzerinden yayımlayın."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."

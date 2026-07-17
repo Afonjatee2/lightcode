@@ -2749,6 +2749,10 @@ msgstr "スキルを読み込めませんでした。"
 msgid "Couldn't load your profile stats."
 msgstr "プロフィール統計を読み込めませんでした。"
 
+#: src/mobile/routeComponents.tsx
+msgid "Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+msgstr "デスクトップに接続できませんでした。ブラウザがローカルネットワークへのアクセスを求めた場合は、許可してから再度ペアリングしてください。それ以外の場合は、デスクトップ（LAN）からペアリングリンクを直接開くか、デスクトップを HTTPS で公開してください。"
+
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Couldn't save the shortcut."
 msgstr "ショートカットを保存できませんでした。"
@@ -9700,8 +9704,8 @@ msgid "This agent is not installed."
 msgstr "このエージェントはインストールされていません。"
 
 #: src/mobile/routeComponents.tsx
-msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-msgstr "このアプリは HTTPS で配信されていますが、デスクトップはブラウザがブロックする通常の HTTP です。デスクトップ（LAN）からペアリングリンクを直接開くか、デスクトップを HTTPS で公開してください。"
+#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+#~ msgstr "このアプリは HTTPS で配信されていますが、デスクトップはブラウザがブロックする通常の HTTP です。デスクトップ（LAN）からペアリングリンクを直接開くか、デスクトップを HTTPS で公開してください。"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."

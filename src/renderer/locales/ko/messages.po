@@ -2750,6 +2750,10 @@ msgstr "스킬을 불러올 수 없습니다."
 msgid "Couldn't load your profile stats."
 msgstr "프로필 통계를 불러오지 못했습니다."
 
+#: src/mobile/routeComponents.tsx
+msgid "Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+msgstr "데스크톱에 연결할 수 없습니다. 브라우저가 로컬 네트워크 접근을 요청했다면 허용한 뒤 다시 페어링하세요. 그렇지 않으면 데스크톱(LAN)에서 페어링 링크를 직접 열거나 데스크톱을 HTTPS로 노출하세요."
+
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Couldn't save the shortcut."
 msgstr "단축키를 저장하지 못했습니다."
@@ -9702,8 +9706,8 @@ msgid "This agent is not installed."
 msgstr "이 에이전트는 설치되지 않았습니다."
 
 #: src/mobile/routeComponents.tsx
-msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-msgstr "이 앱은 HTTPS로 제공되지만 데스크톱은 브라우저가 차단하는 일반 HTTP를 사용합니다. 데스크톱(LAN)에서 페어링 링크를 직접 열거나 데스크톱을 HTTPS로 노출하세요."
+#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+#~ msgstr "이 앱은 HTTPS로 제공되지만 데스크톱은 브라우저가 차단하는 일반 HTTP를 사용합니다. 데스크톱(LAN)에서 페어링 링크를 직접 열거나 데스크톱을 HTTPS로 노출하세요."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."

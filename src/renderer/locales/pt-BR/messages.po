@@ -2750,6 +2750,10 @@ msgstr "Não foi possível carregar a skill."
 msgid "Couldn't load your profile stats."
 msgstr "Não foi possível carregar as estatísticas do seu perfil."
 
+#: src/mobile/routeComponents.tsx
+msgid "Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+msgstr "Não foi possível alcançar o desktop. Se o navegador pediu acesso à sua rede local, permita e pareie novamente. Caso contrário, abra o link de pareamento diretamente no desktop (LAN) ou exponha o desktop por HTTPS."
+
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Couldn't save the shortcut."
 msgstr "Não foi possível salvar o atalho."
@@ -9702,8 +9706,8 @@ msgid "This agent is not installed."
 msgstr "Este agente não está instalado."
 
 #: src/mobile/routeComponents.tsx
-msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-msgstr "Este app é servido por HTTPS, mas o desktop está em HTTP simples, que os navegadores bloqueiam. Abra o link de pareamento diretamente no desktop (LAN) ou exponha o desktop por HTTPS."
+#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+#~ msgstr "Este app é servido por HTTPS, mas o desktop está em HTTP simples, que os navegadores bloqueiam. Abra o link de pareamento diretamente no desktop (LAN) ou exponha o desktop por HTTPS."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."

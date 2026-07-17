@@ -2750,6 +2750,10 @@ msgstr "Не вдалося завантажити навичку."
 msgid "Couldn't load your profile stats."
 msgstr "Не вдалося завантажити статистику профілю."
 
+#: src/mobile/routeComponents.tsx
+msgid "Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+msgstr "Не вдалося з'єднатися з десктопом. Якщо браузер запросив доступ до локальної мережі, дозвольте його та повторіть підключення. Інакше відкрийте посилання підключення безпосередньо з десктопа (LAN) або надайте доступ до десктопа через HTTPS."
+
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Couldn't save the shortcut."
 msgstr "Не вдалося зберегти комбінацію клавіш."
@@ -9702,8 +9706,8 @@ msgid "This agent is not installed."
 msgstr "Цей агент не встановлено."
 
 #: src/mobile/routeComponents.tsx
-msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-msgstr "Цей застосунок відкрито через HTTPS, але десктоп використовує звичайний HTTP, який браузери блокують. Відкрийте посилання підключення безпосередньо з десктопа (LAN) або надайте доступ до десктопа через HTTPS."
+#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+#~ msgstr "Цей застосунок відкрито через HTTPS, але десктоп використовує звичайний HTTP, який браузери блокують. Відкрийте посилання підключення безпосередньо з десктопа (LAN) або надайте доступ до десктопа через HTTPS."
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."

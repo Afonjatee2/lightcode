@@ -2750,6 +2750,10 @@ msgstr "无法加载技能。"
 msgid "Couldn't load your profile stats."
 msgstr "无法加载你的资料统计。"
 
+#: src/mobile/routeComponents.tsx
+msgid "Couldn't reach the desktop. If the browser asked to access your local network, allow it and pair again. Otherwise open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+msgstr "无法连接到桌面。如果浏览器请求访问你的本地网络，请允许后重新配对。否则请直接从桌面（LAN）打开配对链接，或通过 HTTPS 暴露桌面。"
+
 #: src/renderer/views/SettingsOverlay/parts/ShortcutsSettings.tsx
 msgid "Couldn't save the shortcut."
 msgstr "无法保存快捷键。"
@@ -9701,8 +9705,8 @@ msgid "This agent is not installed."
 msgstr "未安装此代理。"
 
 #: src/mobile/routeComponents.tsx
-msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
-msgstr "此应用通过 HTTPS 提供，但桌面使用浏览器会阻止的普通 HTTP。请直接从桌面（LAN）打开配对链接，或通过 HTTPS 暴露桌面。"
+#~ msgid "This app is served over HTTPS but the desktop is on plain HTTP, which browsers block. Open the pairing link directly from the desktop (LAN), or expose the desktop over HTTPS."
+#~ msgstr "此应用通过 HTTPS 提供，但桌面使用浏览器会阻止的普通 HTTP。请直接从桌面（LAN）打开配对链接，或通过 HTTPS 暴露桌面。"
 
 #: src/renderer/views/SettingsOverlay/parts/NotificationSettings.tsx
 msgid "This browser does not support system notifications here; you will still see in-app toasts."
