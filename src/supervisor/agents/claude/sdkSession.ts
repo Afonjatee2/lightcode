@@ -93,7 +93,7 @@ type CompletedClaudeTurn = {
  * session_state "running" restarts it, so it only needs to reach the wake
  * signal, not the first streamed token).
  */
-const DEFERRED_FLUSH_RESUME_GRACE_MS = 2000;
+const DEFERRED_FLUSH_RESUME_GRACE_MS = 5000;
 
 export class ClaudeSdkSession implements StructuredSessionHandle {
   launchOptions: AgentLaunchOptions = { suppressResumeConfigOverrides: true };

@@ -1429,7 +1429,10 @@ describe("ClaudeSdkSession", () => {
         }),
       );
 
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(4_999);
+      expect(updates.at(-1)).toMatchObject({ status: "working" });
+
+      await vi.advanceTimersByTimeAsync(1);
       expect(updates.at(-1)).toMatchObject({ status: "idle", attention: "none" });
       expect(runtimeEvents).toContainEqual(
         expect.objectContaining({
@@ -1480,7 +1483,9 @@ describe("ClaudeSdkSession", () => {
       // The last task drains, and the SDK wakes the model to consume the
       // results: session-state running, then assistant activity.
       fake.emitMessage(sdkTaskNotification(openedSessionId, "task-1"));
-      await vi.advanceTimersByTimeAsync(500);
+      // Real Claude wakeups can arrive just after two seconds. Crossing the
+      // old grace must not settle idle and reset the renderer's timer.
+      await vi.advanceTimersByTimeAsync(2_100);
       fake.emitMessage(
         sdkSystemMessage("session_state_changed", openedSessionId, { state: "running" }),
       );
@@ -1538,7 +1543,7 @@ describe("ClaudeSdkSession", () => {
       expect(updates.at(-1)).toMatchObject({ status: "working" });
 
       fake.emitMessage(sdkTaskNotification(openedSessionId, "task-1"));
-      await vi.advanceTimersByTimeAsync(2_000);
+      await vi.advanceTimersByTimeAsync(5_000);
 
       expect(updates.at(-1)).toMatchObject({ status: "error", attention: "error" });
 
