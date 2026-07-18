@@ -2917,6 +2917,7 @@ msgstr "Crossagent: {description}"
 msgid "Crossagent: {subagent}"
 msgstr "Crossagent: {subagent}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
@@ -3476,6 +3477,10 @@ msgstr "Drag to reorder how providers appear in the model picker."
 msgid "Drag to reorder; double-click to edit"
 msgstr "Drag to reorder; double-click to edit"
 
+#: src/mobile/views/HostFolderPicker.tsx
+msgid "Drives"
+msgstr "Drives"
+
 #: src/renderer/components/thread/ThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "Drop here to attach"
@@ -3738,6 +3743,10 @@ msgstr "Error"
 #: src/renderer/notifications.ts
 msgid "Error · Agent encountered an error"
 msgstr "Error · Agent encountered an error"
+
+#: src/mobile/ComposerInfoChips.tsx
+msgid "Errors"
+msgstr "Errors"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every day at {time}"
@@ -4437,6 +4446,7 @@ msgstr "Go back in navigation history"
 msgid "Go forward in navigation history"
 msgstr "Go forward in navigation history"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "Goal"
@@ -7017,6 +7027,7 @@ msgstr "Pin to top"
 msgid "Pinned"
 msgstr "Pinned"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/providers/composerControlBuilders.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
@@ -9273,6 +9284,7 @@ msgstr "Subagent Result"
 msgid "Subagent runs"
 msgstr "Subagent runs"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Subagents"
@@ -10977,6 +10989,7 @@ msgstr "Workflow runs"
 msgid "Workflow: {description}"
 msgstr "Workflow: {description}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Workflows"
 msgstr "Workflows"

@@ -22,6 +22,7 @@ import { useProjectAgentStatuses } from "@/renderer/hooks/uiSelectors";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useProject } from "@/renderer/state/useThread";
 import { MobileTerminal } from "../MobileTerminal";
+import { ComposerInfoChips } from "../ComposerInfoChips";
 import { FloatingComposerDock } from "../FloatingComposerDock";
 import { EmptyState } from "../components";
 import { WorkspaceChip } from "../GitSummaryParts";
@@ -234,6 +235,7 @@ export function ThreadView(props: ThreadViewProps) {
     >
       <ThreadComposerSection
         {...commonProps}
+        hideInfoDocks
         todoDockCollapsed={dockState.todoDockCollapsed}
         todoDockPlacement={dockState.todoDockPlacement}
         todoDockState={dockState.todoDockState}
@@ -316,6 +318,14 @@ export function ThreadView(props: ThreadViewProps) {
           )}
         </div>
       </div>
+      {showComposerDock ? (
+        <ComposerInfoChips
+          threadId={thread.id}
+          projectLocation={projectLocation}
+          dockState={dockState}
+          hidden={composerExpanded}
+        />
+      ) : null}
       {composerDock}
     </section>
   );

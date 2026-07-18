@@ -2917,6 +2917,7 @@ msgstr "Crossagent : {description}"
 msgid "Crossagent: {subagent}"
 msgstr "Crossagent : {subagent}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
@@ -3476,6 +3477,10 @@ msgstr "Faites glisser pour réorganiser la manière dont les fournisseurs appar
 msgid "Drag to reorder; double-click to edit"
 msgstr "Faites glisser pour réorganiser ; double-cliquez pour modifier"
 
+#: src/mobile/views/HostFolderPicker.tsx
+msgid "Drives"
+msgstr "Lecteurs"
+
 #: src/renderer/components/thread/ThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "Déposez ici pour joindre"
@@ -3738,6 +3743,10 @@ msgstr "Erreur"
 #: src/renderer/notifications.ts
 msgid "Error · Agent encountered an error"
 msgstr "Erreur · L'agent a rencontré une erreur"
+
+#: src/mobile/ComposerInfoChips.tsx
+msgid "Errors"
+msgstr "Erreurs"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every day at {time}"
@@ -4437,6 +4446,7 @@ msgstr "Reculer dans l'historique de navigation"
 msgid "Go forward in navigation history"
 msgstr "Avancer dans l'historique de navigation"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "Objectif"
@@ -7016,6 +7026,7 @@ msgstr "Épingler en haut"
 msgid "Pinned"
 msgstr "Épinglé"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/providers/composerControlBuilders.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
@@ -9272,6 +9283,7 @@ msgstr "Résultat du sous-agent"
 msgid "Subagent runs"
 msgstr "Exécutions de sous-agents"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Sous-agents"
@@ -10976,6 +10988,7 @@ msgstr "Exécutions de workflows"
 msgid "Workflow: {description}"
 msgstr "Flux de travail : {description}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Workflows"
 msgstr "Flux de travail"

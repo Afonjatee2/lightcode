@@ -3,6 +3,7 @@ import type { CSSProperties, FocusEvent as ReactFocusEvent, ReactNode } from "re
 import { keyboardDebug } from "./composerKeyboardDebug";
 import { recallKeyboardHeight } from "./keyboardFocusShared";
 import { isAndroidRuntime } from "./mobilePlatform";
+import { isTouchLikePointerEvent } from "./pointerModality";
 import { suppressNextGhostTap } from "./suppressGhostTap";
 import { useComposerKeyboard } from "./useComposerKeyboard";
 
@@ -169,8 +170,8 @@ export function FloatingComposerDock(props: {
     (document.activeElement as HTMLElement | null)?.blur?.();
   };
 
-  const expandAndFocus = () => {
-    focusComposer("compact-composer");
+  const expandAndFocus = (pointerType?: string) => {
+    focusComposer("compact-composer", pointerType);
   };
 
   const handleFocusCapture = (event: ReactFocusEvent<HTMLDivElement>) => {
@@ -219,10 +220,18 @@ export function FloatingComposerDock(props: {
               onPointerDown={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                expandAndFocus();
-                suppressNextGhostTap();
+                expandAndFocus(event.pointerType);
+                // Only touch gestures fire the delayed synthetic tap-end click;
+                // arming for a mouse press would swallow a real next click.
+                if (isTouchLikePointerEvent(event.nativeEvent)) suppressNextGhostTap();
               }}
-              onClick={expandAndFocus}
+              onClick={(event) => {
+                const pointerType =
+                  event.nativeEvent instanceof PointerEvent
+                    ? event.nativeEvent.pointerType
+                    : undefined;
+                expandAndFocus(pointerType);
+              }}
             />
           ) : null}
         </div>

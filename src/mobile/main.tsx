@@ -9,6 +9,7 @@ import {
 } from "@/renderer/RendererCrashScreen";
 import { bootstrapAppLocaleFromCache } from "@/renderer/i18n/i18n";
 import { isIgnorableRejection, isIgnorableWindowError } from "@/renderer/rendererGlobalErrors";
+import { markTouchCapabilityOnRoot } from "./pointerModality";
 
 // The PWA had no error boundary: any throw during boot or first render left the
 // dark body with an empty #root — a silent black screen, with no way to tell
@@ -21,6 +22,9 @@ const root = document.getElementById("root");
 if (!root) {
   throw new Error("Root element not found.");
 }
+
+// Touch-only CSS workarounds (composer tap shield) key off this attribute.
+markTouchCapabilityOnRoot();
 
 let reactRoot: Root | null = null;
 let renderingCrashScreen = false;

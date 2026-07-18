@@ -59,6 +59,13 @@ export interface HostDirectoryEntry {
   type: "file" | "directory";
 }
 
+/**
+ * Pseudo-path for the synthetic listing of the host's drive roots (Windows).
+ * `browseHostDirectory` returns it as the `parentPath` of a drive root and
+ * accepts it as a payload path; the listing itself is not a selectable folder.
+ */
+export const HOST_DRIVE_LIST_PATH = "::drives::";
+
 export interface BrowseHostDirectoryResult {
   /** The absolute directory that was listed (resolved home when none given). */
   path: string;

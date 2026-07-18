@@ -2917,6 +2917,7 @@ msgstr "Crossagent：{description}"
 msgid "Crossagent: {subagent}"
 msgstr "Crossagent：{subagent}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
@@ -3476,6 +3477,10 @@ msgstr "拖动以重新排序提供程序在模型选择器中的显示方式。
 msgid "Drag to reorder; double-click to edit"
 msgstr "拖动即可重新排序；双击进行编辑"
 
+#: src/mobile/views/HostFolderPicker.tsx
+msgid "Drives"
+msgstr "驱动器"
+
 #: src/renderer/components/thread/ThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "拖放到此处以附加"
@@ -3738,6 +3743,10 @@ msgstr "错误"
 #: src/renderer/notifications.ts
 msgid "Error · Agent encountered an error"
 msgstr "错误 · 代理遇到错误"
+
+#: src/mobile/ComposerInfoChips.tsx
+msgid "Errors"
+msgstr "错误"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every day at {time}"
@@ -4437,6 +4446,7 @@ msgstr "在导航历史记录中后退"
 msgid "Go forward in navigation history"
 msgstr "在导航历史记录中前进"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "目标"
@@ -7016,6 +7026,7 @@ msgstr "固定到顶部"
 msgid "Pinned"
 msgstr "已固定"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/providers/composerControlBuilders.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
@@ -9272,6 +9283,7 @@ msgstr "子代理结果"
 msgid "Subagent runs"
 msgstr "子代理运行次数"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "子代理"
@@ -10976,6 +10988,7 @@ msgstr "工作流运行次数"
 msgid "Workflow: {description}"
 msgstr "工作流程：{description}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Workflows"
 msgstr "工作流程"

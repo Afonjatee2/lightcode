@@ -32,21 +32,15 @@ import {
   readSubAgentLiveLabel,
 } from "./subAgentProgressMeta";
 
-interface ActiveSubAgentTileProps {
-  threadId: string;
-  projectLocation?: ProjectLocation;
-  registrationOnly?: boolean;
-}
+export type ActiveAgentKind = "subagent" | "crossagent" | "workflow";
 
-export function ActiveSubAgentTile({
-  threadId,
-  projectLocation,
-  registrationOnly = false,
-}: ActiveSubAgentTileProps) {
+/** Visible (non-dismissed) active agent item ids with their dock kind. */
+function useVisibleActiveAgents(threadId: string): {
+  visibleIds: readonly string[];
+  kinds: readonly ActiveAgentKind[];
+} {
   const ids = useAppStore((s) => selectActiveSubAgentParentItemIds(s, threadId));
   const dismissed = useThreadSubAgentDockStore((s) => s.dismissedByThread[threadId]);
-  const dismissMany = useThreadSubAgentDockStore((s) => s.dismissMany);
-
   const visibleIds = dismissed ? ids.filter((id) => !dismissed[id]) : ids;
   const kinds = useAppStore(
     useShallow((s) =>
@@ -60,6 +54,33 @@ export function ActiveSubAgentTile({
       }),
     ),
   );
+  return { visibleIds, kinds };
+}
+
+/** Per-kind counts of the visible active agents — drives the mobile info chips. */
+export function useActiveAgentKindCounts(threadId: string): Record<ActiveAgentKind, number> {
+  const { kinds } = useVisibleActiveAgents(threadId);
+  const counts: Record<ActiveAgentKind, number> = { subagent: 0, crossagent: 0, workflow: 0 };
+  for (const kind of kinds) counts[kind] += 1;
+  return counts;
+}
+
+interface ActiveSubAgentTileProps {
+  threadId: string;
+  projectLocation?: ProjectLocation;
+  registrationOnly?: boolean;
+  /** Restrict to these dock kinds (default: all). */
+  kinds?: readonly ActiveAgentKind[];
+}
+
+export function ActiveSubAgentTile({
+  threadId,
+  projectLocation,
+  registrationOnly = false,
+  kinds: kindFilter,
+}: ActiveSubAgentTileProps) {
+  const dismissMany = useThreadSubAgentDockStore((s) => s.dismissMany);
+  const { visibleIds, kinds } = useVisibleActiveAgents(threadId);
 
   if (visibleIds.length === 0) return null;
 
@@ -77,19 +98,21 @@ export function ActiveSubAgentTile({
 
   return (
     <>
-      {(["subagent", "crossagent", "workflow"] as const).map((kind) => {
-        const sectionIds = visibleIds.filter((_, index) => kinds[index] === kind);
-        return sectionIds.length > 0 ? (
-          <ActiveAgentSection
-            key={kind}
-            kind={kind}
-            threadId={threadId}
-            ids={sectionIds}
-            dismissMany={dismissMany}
-            {...(projectLocation ? { projectLocation } : {})}
-          />
-        ) : null;
-      })}
+      {(["subagent", "crossagent", "workflow"] as const)
+        .filter((kind) => !kindFilter || kindFilter.includes(kind))
+        .map((kind) => {
+          const sectionIds = visibleIds.filter((_, index) => kinds[index] === kind);
+          return sectionIds.length > 0 ? (
+            <ActiveAgentSection
+              key={kind}
+              kind={kind}
+              threadId={threadId}
+              ids={sectionIds}
+              dismissMany={dismissMany}
+              {...(projectLocation ? { projectLocation } : {})}
+            />
+          ) : null;
+        })}
     </>
   );
 }

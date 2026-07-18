@@ -2917,6 +2917,7 @@ msgstr "Crossagent: {description}"
 msgid "Crossagent: {subagent}"
 msgstr "Crossagent: {subagent}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
@@ -3476,6 +3477,10 @@ msgstr "Kéo để sắp xếp lại cách các nhà cung cấp xuất hiện tr
 msgid "Drag to reorder; double-click to edit"
 msgstr "Kéo để sắp xếp lại; nhấp đúp để chỉnh sửa"
 
+#: src/mobile/views/HostFolderPicker.tsx
+msgid "Drives"
+msgstr "Ổ đĩa"
+
 #: src/renderer/components/thread/ThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "Thả vào đây để đính kèm"
@@ -3738,6 +3743,10 @@ msgstr "Lỗi"
 #: src/renderer/notifications.ts
 msgid "Error · Agent encountered an error"
 msgstr "Lỗi · Tác nhân gặp lỗi"
+
+#: src/mobile/ComposerInfoChips.tsx
+msgid "Errors"
+msgstr "Lỗi"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every day at {time}"
@@ -4437,6 +4446,7 @@ msgstr "Quay lại trong lịch sử điều hướng"
 msgid "Go forward in navigation history"
 msgstr "Tiến tới trong lịch sử điều hướng"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "Mục tiêu"
@@ -7017,6 +7027,7 @@ msgstr "Ghim lên đầu"
 msgid "Pinned"
 msgstr "Đã ghim"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/providers/composerControlBuilders.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
@@ -9273,6 +9284,7 @@ msgstr "Kết quả tác nhân phụ"
 msgid "Subagent runs"
 msgstr "Lượt chạy subagent"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Tác nhân phụ"
@@ -10977,6 +10989,7 @@ msgstr "Lượt chạy workflow"
 msgid "Workflow: {description}"
 msgstr "Quy trình làm việc: {description}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Workflows"
 msgstr "Quy trình làm việc"

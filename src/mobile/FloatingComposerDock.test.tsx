@@ -319,6 +319,19 @@ describe("FloatingComposerDock", () => {
     }
   });
 
+  it("expands a controlled dock when the composer gains focus natively (mouse)", () => {
+    render(<ControlledDockHarness />);
+    const input = screen.getByRole("textbox", { name: "Composer input" });
+    const dock = document.querySelector(".m-compose-dock");
+    expect(dock).not.toHaveAttribute("data-expanded");
+
+    // A mouse click on a mouse-only device focuses natively (no guarded
+    // choreography) — the focus capture alone must expand the dock.
+    fireEvent.focusIn(input);
+
+    expect(dock).toHaveAttribute("data-expanded");
+  });
+
   it("collapses on input focus loss when collapseOnFocusLoss is set", async () => {
     render(<FocusLossHarness collapseOnFocusLoss />);
     const input = screen.getByRole("textbox");

@@ -27,6 +27,7 @@ import type {
   WriteProjectFilePayload,
   WriteProjectFileResult,
 } from "@/shared/contracts";
+import { HOST_DRIVE_LIST_PATH } from "@/shared/contracts";
 import { isPdfPath } from "@/shared/promptContent";
 import { getProjectFsPath, joinProjectPosixPath } from "@/shared/wsl";
 import { ProjectSearchIndex } from "./ProjectSearchIndex";
@@ -34,6 +35,24 @@ import type { WslBridgeClient } from "./wsl/bridge/client";
 
 const BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 const MAX_HOST_BROWSE_ENTRIES = 4_000;
+
+/** Existing drive roots (C:\, D:\, …) as directory entries, for the picker. */
+async function listWindowsDriveRoots(): Promise<HostDirectoryEntry[]> {
+  const letters = Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i));
+  const roots = await Promise.all(
+    letters.map(async (letter): Promise<HostDirectoryEntry | null> => {
+      const root = `${letter}:\\`;
+      try {
+        return (await stat(root)).isDirectory()
+          ? { name: `${letter}:`, path: root, type: "directory" }
+          : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return roots.filter((entry): entry is HostDirectoryEntry => entry !== null);
+}
 const MAX_EDITABLE_FILE_SIZE = 1_000_000;
 
 type RawFileRead =
@@ -208,6 +227,15 @@ export class ProjectTreeService {
   ): Promise<BrowseHostDirectoryResult> {
     const home = homedir();
     const requested = payload.path.trim();
+    if (requested === HOST_DRIVE_LIST_PATH) {
+      return {
+        path: HOST_DRIVE_LIST_PATH,
+        parentPath: null,
+        homePath: home,
+        entries: await listWindowsDriveRoots(),
+        truncated: false,
+      };
+    }
     const target = requested ? resolve(requested) : home;
 
     const targetStat = await stat(target);
@@ -246,9 +274,17 @@ export class ProjectTreeService {
     });
 
     const parent = dirname(target);
+    // At a Windows drive root, "up" surfaces the synthetic drive list so
+    // other drives are reachable (there is no real parent to walk to).
+    const atRoot = parent === target;
+    const parentPath = atRoot
+      ? process.platform === "win32"
+        ? HOST_DRIVE_LIST_PATH
+        : null
+      : parent;
     return {
       path: target,
-      parentPath: parent === target ? null : parent,
+      parentPath,
       homePath: home,
       entries: sortHostEntries(entries),
       truncated,

@@ -974,6 +974,127 @@ body.bg-background {
   transition: none !important;
 }
 
+/* ── Composer info chips (thread view) ─────────────────────────────
+ *
+ * The informational dock sections (subagents, crossagents, workflows, plan,
+ * goal, errors) live OUTSIDE the compact composer as floating icon chips just
+ * above it; tapping a chip expands that section into its own bubble. The strip
+ * ducks away while the composer itself is expanded. */
+.m-thread-chips {
+  position: absolute;
+  right: 0.75rem;
+  bottom: calc(1.25rem + env(safe-area-inset-bottom) + var(--m-floating-control-height));
+  left: 0.75rem;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.375rem;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.m-thread-chips > * {
+  pointer-events: auto;
+}
+
+.m-thread-chips[data-hidden] {
+  opacity: 0;
+}
+
+.m-thread-chips[data-hidden] > * {
+  pointer-events: none;
+}
+
+.m-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.375rem;
+}
+
+.m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  height: 1.75rem;
+  padding: 0 0.5625rem;
+  border: 1px solid var(--hairline, var(--border));
+  border-radius: 9999px;
+  background: var(--m-glass-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.25);
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-chip:active {
+  background: var(--row-active, var(--row-hover));
+}
+
+.m-chip[data-open] {
+  border-color: color-mix(in oklab, var(--accent) 55%, transparent);
+  color: var(--foreground);
+}
+
+.m-chip[data-tone="danger"] {
+  border-color: color-mix(in oklab, var(--danger) 40%, transparent);
+  color: var(--danger);
+}
+
+/* The expanded section bubble. The shared dock sections it hosts were styled
+   for the composer's fixedContent (transparent bg + border-b separators), so
+   the bubble supplies the surface and the trailing separator is dropped. */
+.m-chip-panel {
+  width: 100%;
+  max-height: min(45dvh, 22rem);
+  overflow-y: auto;
+  border: 1px solid var(--hairline, var(--border));
+  border-radius: 1rem;
+  background: var(--composer-surface, var(--m-glass-surface));
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
+  padding: 0.25rem;
+}
+
+.m-chip-panel > section:last-child {
+  border-bottom: none;
+}
+
+/* Wide screens center the chat column at 920px (see ThreadView) — keep the
+   floating composer and its info chips on the same column instead of spanning
+   the whole detail pane. 100% here is the thread section, i.e. the pane.
+   (Must come after the base .m-thread-chips rule — same specificity.) */
+@media (min-width: 768px) {
+  .m-thread-compose-dock,
+  .m-thread-chips {
+    right: max(0.75rem, calc((100% - 920px) / 2));
+    left: max(0.75rem, calc((100% - 920px) / 2));
+  }
+
+  /* Subscreens (settings, projects) read as full-bleed lists on a wide detail
+     pane; cap them at the same readable column the thread view uses. Scoped to
+     the detail pane — the sidebar thread list must stay full width. */
+  .m-settings__body,
+  .m-detail .m-page,
+  .m-detail .m-page-head,
+  .m-detail .m-thread-list,
+  .m-detail .m-subscreen > * {
+    width: 100%;
+    max-width: 944px;
+    margin-inline: auto;
+  }
+
+  /* The workspace chip bar sits above the 920px-centered thread column. */
+  .m-thread-bar {
+    max-width: 920px;
+    margin-inline: auto;
+  }
+}
+
 /* Dims the screen behind the expanded composer; tapping it collapses. It is
    a SIBLING of the dock, not a child: the dock is transformed while expanded
    (keyboard lift), and a transformed ancestor becomes the containing block of
@@ -1061,8 +1182,10 @@ body.bg-background {
    locks scroll and focuses the real editor. If the contenteditable itself is
    the touch target, iOS can still run its keyboard reveal pan heuristics even
    after preventDefault. Once focused, remove the shield so normal caret taps
-   work natively. */
-.m-compose-bubble [data-composer-input-anchor]:not(:focus-within)::after {
+   work natively. Touch-capable devices only (html[data-touch-device], see
+   pointerModality.ts) — on a mouse-driven desktop the shield would block
+   native click-to-focus and caret placement. */
+html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focus-within)::after {
   content: "";
   position: absolute;
   inset: 0;

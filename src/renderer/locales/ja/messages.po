@@ -2916,6 +2916,7 @@ msgstr "Crossagent：{description}"
 msgid "Crossagent: {subagent}"
 msgstr "Crossagent：{subagent}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
@@ -3475,6 +3476,10 @@ msgstr "ドラッグして、モデル ピッカーでのプロバイダーの�
 msgid "Drag to reorder; double-click to edit"
 msgstr "ドラッグして並べ替えます。ダブルクリックして編集します"
 
+#: src/mobile/views/HostFolderPicker.tsx
+msgid "Drives"
+msgstr "ドライブ"
+
 #: src/renderer/components/thread/ThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "ここにドロップして添付します"
@@ -3737,6 +3742,10 @@ msgstr "エラー"
 #: src/renderer/notifications.ts
 msgid "Error · Agent encountered an error"
 msgstr "エラー · エージェントでエラーが発生しました"
+
+#: src/mobile/ComposerInfoChips.tsx
+msgid "Errors"
+msgstr "エラー"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every day at {time}"
@@ -4436,6 +4445,7 @@ msgstr "ナビゲーション履歴で戻る"
 msgid "Go forward in navigation history"
 msgstr "ナビゲーション履歴で進む"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "目標"
@@ -7015,6 +7025,7 @@ msgstr "トップにピン留めする"
 msgid "Pinned"
 msgstr "固定された"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/providers/composerControlBuilders.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
@@ -9271,6 +9282,7 @@ msgstr "サブエージェントの結果"
 msgid "Subagent runs"
 msgstr "サブエージェント実行"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "サブエージェント"
@@ -10975,6 +10987,7 @@ msgstr "ワークフロー実行"
 msgid "Workflow: {description}"
 msgstr "ワークフロー:{description}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Workflows"
 msgstr "ワークフロー"

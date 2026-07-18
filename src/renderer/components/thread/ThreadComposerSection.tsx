@@ -85,6 +85,14 @@ type ThreadComposerSectionProps = {
    * resolves and route through the mobile transport.
    */
   onSubmitInput?: ((prompt: string, segments?: PromptSegment[]) => Promise<void>) | undefined;
+  /**
+   * Suppress the informational docks (subagents/crossagents/workflows, goal,
+   * plan, errors) inside the composer. The mobile PWA sets this and surfaces
+   * the same state as compact chips above the floating composer instead
+   * (ComposerInfoChips). Interactive docks — auth, pending steer, runtime
+   * requests, slash commands — always stay inline.
+   */
+  hideInfoDocks?: boolean | undefined;
   onOpenProjectRelativePath?: ((path: string, lineNumber?: number) => void) | undefined;
   onTodoDockCollapsedChange: (collapsed: boolean) => void;
   onTodoDockPlacementChange: (placement: "composer" | "right") => void;
@@ -294,13 +302,23 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     isTerminalInput &&
     thread.status !== "inactive" &&
     thread.status !== "launching";
+  const hideInfoDocks = props.hideInfoDocks === true;
   const showTodoInComposer =
-    canShowRuntimeChrome && todoDockState !== null && todoDockPlacement === "composer";
-  const showGoalInComposer = canShowRuntimeChrome && goalDockState !== null;
+    !hideInfoDocks &&
+    canShowRuntimeChrome &&
+    todoDockState !== null &&
+    todoDockPlacement === "composer";
+  const showGoalInComposer = !hideInfoDocks && canShowRuntimeChrome && goalDockState !== null;
   const showErrorInComposer =
-    (!usesTerminalPresentation || isRemote) && errorDockStates.length > 0 && !hasRuntimeAuthError;
+    !hideInfoDocks &&
+    (!usesTerminalPresentation || isRemote) &&
+    errorDockStates.length > 0 &&
+    !hasRuntimeAuthError;
   const hasActiveSubAgent = useAppStore(
-    (s) => canShowRuntimeChrome && selectActiveSubAgentParentItemIds(s, thread.id).length > 0,
+    (s) =>
+      !hideInfoDocks &&
+      canShowRuntimeChrome &&
+      selectActiveSubAgentParentItemIds(s, thread.id).length > 0,
   );
   const collapseTerminalComposerSetting = useSharedSettings((s) => s.collapseTerminalComposer);
   const [composerCollapsed, setComposerCollapsed] = useState(collapseTerminalComposerSetting);

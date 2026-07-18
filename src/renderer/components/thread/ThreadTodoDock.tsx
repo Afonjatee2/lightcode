@@ -11,13 +11,23 @@ interface ThreadTodoDockProps {
   state: ThreadTodoDockState;
   placement: ThreadTodoDockPlacement;
   collapsed: boolean;
+  /** Hide the composer↔right-panel move action (no right panel on mobile). */
+  canMove?: boolean;
   onPlacementChange: (placement: ThreadTodoDockPlacement) => void;
   onCollapsedChange: (collapsed: boolean) => void;
   onRetire: () => void;
 }
 
 export function ThreadTodoDock(props: ThreadTodoDockProps) {
-  const { state, placement, collapsed, onPlacementChange, onCollapsedChange, onRetire } = props;
+  const {
+    state,
+    placement,
+    collapsed,
+    canMove = true,
+    onPlacementChange,
+    onCollapsedChange,
+    onRetire,
+  } = props;
   const { t } = useLingui();
   const activeRowRef = useRef<HTMLLIElement>(null);
 
@@ -56,19 +66,23 @@ export function ThreadTodoDock(props: ThreadTodoDockProps) {
         countLabel={countLabel}
         actions={
           <>
-            <Tooltip delay={0}>
-              <Tooltip.Trigger>
-                <button
-                  aria-label={moveLabel}
-                  className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
-                  type="button"
-                  onClick={() => onPlacementChange(placement === "composer" ? "right" : "composer")}
-                >
-                  <ArrowRightLeft className="size-3.5" />
-                </button>
-              </Tooltip.Trigger>
-              <Tooltip.Content>{moveLabel}</Tooltip.Content>
-            </Tooltip>
+            {canMove ? (
+              <Tooltip delay={0}>
+                <Tooltip.Trigger>
+                  <button
+                    aria-label={moveLabel}
+                    className="shrink-0 rounded p-1 text-muted/70 transition-colors hover:bg-foreground/5 hover:text-foreground"
+                    type="button"
+                    onClick={() =>
+                      onPlacementChange(placement === "composer" ? "right" : "composer")
+                    }
+                  >
+                    <ArrowRightLeft className="size-3.5" />
+                  </button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>{moveLabel}</Tooltip.Content>
+              </Tooltip>
+            ) : null}
             <Tooltip delay={0}>
               <Tooltip.Trigger>
                 <button

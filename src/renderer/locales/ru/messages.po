@@ -2917,6 +2917,7 @@ msgstr "Crossagent: {description}"
 msgid "Crossagent: {subagent}"
 msgstr "Crossagent: {subagent}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/composer/composerMcpServers.ts
 #: src/renderer/components/mcp/McpServersManager.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
@@ -3476,6 +3477,10 @@ msgstr "Перетащите, чтобы изменить порядок ото�
 msgid "Drag to reorder; double-click to edit"
 msgstr "Перетащите для изменения порядка; двойной щелчок для редактирования"
 
+#: src/mobile/views/HostFolderPicker.tsx
+msgid "Drives"
+msgstr "Диски"
+
 #: src/renderer/components/thread/ThreadComposer.tsx
 msgid "Drop here to attach"
 msgstr "Перетащите сюда, чтобы прикрепить"
@@ -3738,6 +3743,10 @@ msgstr "Ошибка"
 #: src/renderer/notifications.ts
 msgid "Error · Agent encountered an error"
 msgstr "Ошибка · Агент столкнулся с ошибкой"
+
+#: src/mobile/ComposerInfoChips.tsx
+msgid "Errors"
+msgstr "Ошибки"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Every day at {time}"
@@ -4437,6 +4446,7 @@ msgstr "Назад по истории навигации"
 msgid "Go forward in navigation history"
 msgstr "Вперёд по истории навигации"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ThreadGoalDock.tsx
 msgid "Goal"
 msgstr "Цель"
@@ -7017,6 +7027,7 @@ msgstr "Закрепить вверху"
 msgid "Pinned"
 msgstr "Закреплено"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/providers/composerControlBuilders.tsx
 #: src/renderer/components/thread/ThreadTodoDock.tsx
 msgid "Plan"
@@ -9273,6 +9284,7 @@ msgstr "Результат субагента"
 msgid "Subagent runs"
 msgstr "Запуски субагентов"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Subagents"
 msgstr "Субагенты"
@@ -10977,6 +10989,7 @@ msgstr "Запуски workflow"
 msgid "Workflow: {description}"
 msgstr "Рабочий процесс: {description}"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ActiveSubAgentTile.tsx
 msgid "Workflows"
 msgstr "Рабочие процессы"
