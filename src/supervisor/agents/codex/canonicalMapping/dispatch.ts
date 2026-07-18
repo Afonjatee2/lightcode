@@ -53,6 +53,8 @@ export function mapCodexNotification(
     return [{ type: "turn.started", threadId, turnId }];
   }
 
+  // `turn/aborted` is a legacy-only compatibility path; 0.144.5 reports
+  // interruption through `turn/completed` with `turn.status: "interrupted"`.
   if (method === "turn/completed" || method === "turn/aborted") {
     const events: RuntimeEvent[] = [];
     const usageEvent = createCodexContextUsageEvent(threadId, params);
@@ -100,9 +102,12 @@ export function mapCodexNotification(
     return events;
   }
 
+  // `thread/error` is legacy-only; current app-server errors use `error`.
   if (method === "thread/error" || method === "error") {
     const message = readCodexErrorMessage(params) ?? "Codex thread error";
-    return [{ type: "error", threadId, message }];
+    return method === "error" && params?.willRetry === true
+      ? [{ type: "warning", threadId, message }]
+      : [{ type: "error", threadId, message }];
   }
 
   if (method === "serverRequest/resolved") {
