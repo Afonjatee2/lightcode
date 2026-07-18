@@ -40,3 +40,6 @@ website/.next/
 website/out/
 .vercel/
 .env*.local
+
+.vercel
+.env*

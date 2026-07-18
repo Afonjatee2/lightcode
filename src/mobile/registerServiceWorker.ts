@@ -66,7 +66,7 @@ export function registerServiceWorker(): void {
     const scriptUrl = buildBasePath.startsWith("/")
       ? `${buildBasePath}service-worker.js`
       : "/service-worker.js";
-    const scope = mobileServiceWorkerScope();
+    const scope = mobileServiceWorkerScope(buildBasePath);
     navigator.serviceWorker
       .register(scriptUrl, { scope })
       .then((registration) => cacheLoadedBuildAssets(registration, buildBasePath))

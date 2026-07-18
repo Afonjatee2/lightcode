@@ -46,6 +46,29 @@ if (requireIosLinks && !appleTeamId) {
 }
 
 copyFileSync(source, target);
+
+// Channel manifests: the static manifest describes the production /app/
+// channel (id stays the legacy "/pwa/" so existing installs keep their
+// identity). Any other hosted base — e.g. the auto-deployed /app-nightly/
+// channel — must carry its own id/scope/start_url so it installs as a
+// separate app beside production instead of hijacking it.
+const channelSlug =
+  mobileBasePath && mobileBasePath !== "./" ? mobileBasePath.replace(/^\/+|\/+$/g, "") : "";
+if (channelSlug && channelSlug !== "app" && channelSlug !== "pwa") {
+  const manifestPath = join(outDir, "manifest.webmanifest");
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const channelBase = `/${channelSlug}/`;
+  manifest.id = channelBase;
+  manifest.scope = channelBase;
+  manifest.start_url = `${channelBase}threads`;
+  if (channelSlug === "app-nightly") {
+    manifest.name = `${manifest.name} Nightly`;
+    manifest.short_name = `${manifest.short_name} Nightly`;
+  }
+  writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  console.log(`[finalize-mobile-build] scoped the manifest to the ${channelBase} channel`);
+}
+
 const serviceWorker = readFileSync(serviceWorkerPath, "utf8");
 const buildVersion = createHash("sha256").update(readFileSync(source)).digest("hex").slice(0, 12);
 const versionToken = "__PORACODE_BUILD_VERSION__";

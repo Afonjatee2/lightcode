@@ -3,39 +3,51 @@
   "framework": null,
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- src/mobile src/renderer src/shared src/main src/supervisor resources/mobile-ssh-runtime scripts vercel.json package.json pnpm-lock.yaml",
   "installCommand": "pnpm install --frozen-lockfile --ignore-scripts",
-  "buildCommand": "pnpm exec cross-env PORACODE_MOBILE_BASE_PATH=/pwa/ pnpm run build:mobile",
+  "buildCommand": "node scripts/vercel-build-mobile.mjs",
   "outputDirectory": "dist/mobile",
   "rewrites": [
-    { "source": "/", "destination": "/pwa/mobile.html" },
-    { "source": "/app", "destination": "/pwa/mobile.html" },
-    { "source": "/pair", "destination": "/pwa/mobile.html" },
-    { "source": "/pwa", "destination": "/pwa/mobile.html" },
-    { "source": "/pwa/app", "destination": "/pwa/mobile.html" },
-    { "source": "/pwa/pair", "destination": "/pwa/mobile.html" },
-    { "source": "/pwa/:path*", "destination": "/pwa/mobile.html" }
+    { "source": "/", "destination": "/app/mobile.html" },
+    { "source": "/pair", "destination": "/app/mobile.html" },
+    { "source": "/app", "destination": "/app/mobile.html" },
+    { "source": "/app/:path*", "destination": "/app/mobile.html" },
+    { "source": "/app-nightly", "destination": "/app-nightly/mobile.html" },
+    { "source": "/app-nightly/:path*", "destination": "/app-nightly/mobile.html" }
   ],
   "headers": [
     {
-      "source": "/pwa/service-worker.js",
-      "headers": [
-        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
-        { "key": "Service-Worker-Allowed", "value": "/" }
-      ]
+      "source": "/app/service-worker.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
     },
     {
-      "source": "/pwa/manifest.webmanifest",
+      "source": "/app-nightly/service-worker.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }]
+    },
+    {
+      "source": "/app/manifest.webmanifest",
       "headers": [{ "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }]
     },
     {
-      "source": "/pwa/.well-known/apple-app-site-association",
+      "source": "/app-nightly/manifest.webmanifest",
+      "headers": [{ "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" }]
+    },
+    {
+      "source": "/app/.well-known/apple-app-site-association",
       "headers": [{ "key": "Content-Type", "value": "application/json" }]
     },
     {
-      "source": "/pwa/assets/(.*)",
+      "source": "/app/assets/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
     },
     {
-      "source": "/pwa/icons/(.*)",
+      "source": "/app-nightly/assets/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }]
+    },
+    {
+      "source": "/app/icons/(.*)",
+      "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
+    },
+    {
+      "source": "/app-nightly/icons/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=604800" }]
     },
     {
