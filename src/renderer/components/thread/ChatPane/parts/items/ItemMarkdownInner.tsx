@@ -23,6 +23,7 @@ import {
   resolveMarkdownImageUrl,
   rewriteMarkdownLocalImageUrls,
 } from "@/shared/markdownLocalImages";
+import { resolveLocalImageDisplayUrl } from "@/shared/localImageDisplay";
 import { getProjectFsPath } from "@/shared/wsl";
 import { useChatPaneActions } from "../../chatPaneActionsContext";
 import { normalizeChatProjectPath } from "../../chatPathUtils";
@@ -237,6 +238,10 @@ function rewriteLocalImageUrls(node: MarkdownHastNode): void {
   if (node.tagName === "img" && typeof src === "string") {
     const rewritten = resolveMarkdownImageUrl(src);
     if (rewritten) node.properties!.src = rewritten;
+    // Remote PWA: swap poracode-local sources for the desktop's authenticated
+    // HTTP image endpoint. A no-op inside the desktop Electron app, which
+    // never installs a resolver (see shared/localImageDisplay.ts).
+    node.properties!.src = resolveLocalImageDisplayUrl(node.properties!.src as string);
   }
   node.children?.forEach(rewriteLocalImageUrls);
 }

@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import {
   createServer as createHttpServer,
   request as httpRequestNode,
@@ -6,6 +7,8 @@ import {
   type Server as HttpServer,
 } from "node:http";
 import { connect, createServer as createNetServer, type AddressInfo, type Socket } from "node:net";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { WebSocket, WebSocketServer } from "ws";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -94,6 +97,14 @@ vi.mock("../db", () => {
 });
 
 const servers: RemoteAccessServer[] = [];
+const tempDirs: string[] = [];
+
+/** Creates a real temp dir for the local-image endpoint tests. */
+function createTempDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "poracode-remote-image-"));
+  tempDirs.push(dir);
+  return dir;
+}
 
 /** Reserves an ephemeral loopback port so a test can advertise a different
  * origin while still reaching the real listener at a known address. */
@@ -111,6 +122,9 @@ function getFreePort(): Promise<number> {
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.dispose()));
+  for (const dir of tempDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true });
+  }
   vi.mocked(dbAppendThreadCompletedTurn).mockReset();
   vi.mocked(dbDeleteProject).mockReset();
   vi.mocked(dbApplyThreadRuntimeEvents).mockReset();
@@ -888,6 +902,91 @@ describe("RemoteAccessServer", () => {
     expect(dbGetThreadRuntimeSummaries).toHaveBeenCalledWith(["thread-visible"]);
     expect(dbGetThreadRuntimeItems).not.toHaveBeenCalled();
     expect(dbGetThreadContextUsage).not.toHaveBeenCalled();
+  });
+
+  it("serves local image files over the authenticated image endpoint", async () => {
+    const dir = createTempDir();
+    const pngBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    const imagePath = join(dir, "pixel.png");
+    writeFileSync(imagePath, pngBytes);
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+    });
+    servers.push(server);
+    const info = await server.start();
+    const token = await issueAccessToken(info, ["session:read"]);
+
+    // <img> tags can't send Authorization headers, so the token rides in the query.
+    const queryUrl = new URL("/api/files/image", info.httpBaseUrl);
+    queryUrl.searchParams.set("path", imagePath);
+    queryUrl.searchParams.set("access_token", token);
+    const queryResponse = await fetch(queryUrl);
+    expect(queryResponse.status).toBe(200);
+    expect(queryResponse.headers.get("content-type")).toBe("image/png");
+    expect(queryResponse.headers.get("cache-control")).toBe("private, max-age=300");
+    expect(Buffer.from(await queryResponse.arrayBuffer())).toEqual(pngBytes);
+
+    // The usual bearer header works too.
+    const headerUrl = new URL("/api/files/image", info.httpBaseUrl);
+    headerUrl.searchParams.set("path", imagePath);
+    const headerResponse = await fetch(headerUrl, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    expect(headerResponse.status).toBe(200);
+    expect(headerResponse.headers.get("content-type")).toBe("image/png");
+  });
+
+  it("rejects local image requests without a valid access token", async () => {
+    const dir = createTempDir();
+    const imagePath = join(dir, "pixel.png");
+    writeFileSync(imagePath, Buffer.from("png"));
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+    });
+    servers.push(server);
+    const info = await server.start();
+
+    const url = new URL("/api/files/image", info.httpBaseUrl);
+    url.searchParams.set("path", imagePath);
+    expect((await fetch(url)).status).toBe(401);
+
+    url.searchParams.set("access_token", "lc_access_bogus");
+    expect((await fetch(url)).status).toBe(401);
+  });
+
+  it("rejects local image requests for missing, non-image, or relative paths", async () => {
+    const dir = createTempDir();
+    const textPath = join(dir, "notes.txt");
+    writeFileSync(textPath, Buffer.from("hello"));
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+    });
+    servers.push(server);
+    const info = await server.start();
+    const token = await issueAccessToken(info, ["session:read"]);
+
+    const fetchImage = (path: string) => {
+      const url = new URL("/api/files/image", info.httpBaseUrl);
+      url.searchParams.set("path", path);
+      url.searchParams.set("access_token", token);
+      return fetch(url);
+    };
+
+    expect((await fetchImage(join(dir, "missing.png"))).status).toBe(404);
+    expect((await fetchImage(textPath)).status).toBe(415);
+    expect((await fetchImage("images/pixel.png")).status).toBe(400);
   });
 
   it("drops websocket clients when outbound sends fail", async () => {

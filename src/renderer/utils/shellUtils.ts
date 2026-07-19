@@ -10,7 +10,25 @@ interface StartShellPayload {
   worktreePath?: string;
 }
 
+/**
+ * Shell ids started eagerly (outside the terminal panel) — run actions,
+ * command-palette terminal commands, worktree setup shells. The panel's
+ * deferred, viewport-sized spawn must skip these: re-issuing `startShell`
+ * for an existing id kills the running PTY, discarding the process (and any
+ * command just written into it). The surface still resizes the live PTY.
+ */
+const eagerlyStartedShells = new Set<string>();
+
+export function wasShellStartedEagerly(shellId: string): boolean {
+  return eagerlyStartedShells.has(shellId);
+}
+
+export function clearEagerShellStart(shellId: string): void {
+  eagerlyStartedShells.delete(shellId);
+}
+
 export function startShellWithToast(payload: StartShellPayload, label: string): void {
+  eagerlyStartedShells.add(payload.shellId);
   void readBridge()
     .startShell(payload)
     .catch((error) =>
@@ -43,12 +61,24 @@ export function buildScriptWithExitOnSuccess(
   return `${lines.join(" && ")} && exit`;
 }
 
+/**
+ * Writes a script into a shell once it produces output. Re-arms on
+ * `thread-reset` so the command lands in the surviving PTY when the shell
+ * respawns (e.g. the terminal panel's viewport-sized respawn replacing an
+ * eagerly started shell); detaches once the shell exits.
+ */
 export function writeScriptToShell(shellId: string, script: string) {
   const command = normalizeShellScript(script);
   if (!command) return;
+  let armed = true;
   const unsub = readBridge().onSupervisorEvent((event) => {
-    if (event.type === "thread-output" && event.threadId === shellId) {
-      unsub();
+    if (!("threadId" in event) || event.threadId !== shellId) return;
+    if (event.type === "thread-reset") {
+      armed = true;
+      return;
+    }
+    if (event.type === "thread-output" && armed) {
+      armed = false;
       void readBridge()
         .writeTerminal({ threadId: shellId, data: command + "\r" })
         .catch((error) => {
@@ -57,7 +87,9 @@ export function writeScriptToShell(shellId: string, script: string) {
             error instanceof Error ? error.message : error,
           );
         });
+      return;
     }
+    if (event.type === "thread-exited") unsub();
   });
 }
 
@@ -192,6 +224,7 @@ export async function runShellScriptToCompletion(
 
 export async function closeThreads(threadIds: readonly string[]): Promise<void> {
   const uniqueThreadIds = [...new Set(threadIds.filter(Boolean))];
+  for (const threadId of uniqueThreadIds) eagerlyStartedShells.delete(threadId);
   await Promise.allSettled(
     uniqueThreadIds.map((threadId) => readBridge().closeThread({ threadId })),
   );

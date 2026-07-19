@@ -54,11 +54,28 @@ const DESKTOP_OPTIMIZED_DEPS = [
   "style-to-js",
   "use-sync-external-store",
   "use-sync-external-store/shim",
+  // zustand/react/shallow (useShallow) imports this shim; the mobile.html entry
+  // served by the default dev server crashes without it (noDiscovery skips it).
+  "use-sync-external-store/shim/with-selector",
   "zod",
   "zustand",
   "zustand/middleware",
   "zustand/react/shallow",
   "zustand/shallow",
+  // Mobile-entry-only deps. The default dev server also serves mobile.html and
+  // noDiscovery skips anything not listed — the mobile PWA then crashes on raw
+  // CJS (e.g. dexie) or missing shims. Keep in sync with the mobile graph; the
+  // mobile-only optimizer (discovery on) is the reference for what it needs.
+  "@aparajita/capacitor-secure-storage",
+  "@capacitor/app",
+  "@capacitor/core",
+  "@capacitor/push-notifications",
+  "@chenglou/pretext",
+  "@poracode/activity-bridge",
+  "@poracode/ssh-bridge",
+  "@tanstack/react-router",
+  "dexie",
+  "jsqr",
 ] as const;
 
 function readEnvValue(env: Record<string, string>, key: string): string {
@@ -342,6 +359,12 @@ export default defineConfig(({ mode }) => ({
       "~file-icons": MATERIAL_ICON_DIR,
     },
   },
+  // The default dev server (desktop index.html + mobile.html) and `dev:mobile`
+  // (mobile-only) run side by side in the dev:ios/dev:android flows and during
+  // local PWA verification. With one shared cacheDir their dep-optimizer states
+  // invalidate each other on every start, producing "504 Outdated Optimize Dep"
+  // for whichever server optimized first. Give each target its own cache.
+  cacheDir: mobileOnly ? "node_modules/.vite-mobile" : "node_modules/.vite",
   optimizeDeps: mobileOnly
     ? { entries: ["mobile.html"] }
     : {

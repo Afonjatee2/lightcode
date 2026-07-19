@@ -28,3 +28,13 @@ export function getMobileRuntimePlatform(): MobileRuntimePlatform {
 export function isAndroidRuntime(): boolean {
   return getMobileRuntimePlatform() === "android";
 }
+
+/**
+ * Reflects the runtime platform onto <html data-mobile-platform> so the
+ * stylesheet can scope platform-specific rules (e.g. the iOS input-zoom
+ * workaround and the glass-surface alpha, which is tuned for iOS and reads
+ * too transparent elsewhere).
+ */
+export function markMobilePlatformOnRoot(doc: Document = document): void {
+  doc.documentElement.dataset.mobilePlatform = getMobileRuntimePlatform();
+}

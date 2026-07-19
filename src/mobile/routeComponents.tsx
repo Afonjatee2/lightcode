@@ -133,6 +133,24 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
   const remote = useRemote();
   const navigate = useNavigate();
   const thread = props.thread;
+  const threadId = thread?.id ?? null;
+  // Ensure the displayed thread is actually OPEN, not just rendered: the wide
+  // shell auto-selects the most recent thread and deep links land here
+  // directly — neither goes through a list click. Opening marks the thread
+  // watched in the shared store (clearing a stale finished/done badge so live
+  // idle events don't keep re-earning it) and loads its history snapshot.
+  // openThread is idempotent and guards against duplicate in-flight loads, so
+  // the click path (store already watching, snapshot still fetching) is cheap.
+  useEffect(() => {
+    if (!threadId) return;
+    const state = useAppStore.getState();
+    const watched = state.view.kind === "thread" && state.view.panes.includes(threadId);
+    const hasSnapshot = remote.selectedThreadSnapshot?.thread.id === threadId;
+    if (watched && hasSnapshot) return;
+    const target = remote.threads.find((entry) => entry.id === threadId);
+    if (target) void remote.openThread(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the displayed thread id; openThread guards the racing click path
+  }, [threadId]);
   if (!thread) {
     return (
       <section className="m-thread">
@@ -341,20 +359,9 @@ export function ThreadRoute() {
   const { threadId } = threadRouteApi.useParams();
   const remote = useRemote();
   const isWide = useMediaQuery(WIDE_SHELL_QUERY);
-  // Track existence rather than the array reference (which changes every render)
-  // so the open effect only re-runs when the routed thread appears/leaves.
-  const targetExists = remote.threads.some((entry) => entry.id === threadId);
-
-  // Open (load snapshot for) the routed thread once it appears in the list.
-  // A missing thread renders the empty detail state (parity with the old shell,
-  // which never redirected away from a thread view).
-  useEffect(() => {
-    if (remote.selectedThread?.id === threadId) return;
-    const thread = remote.threads.find((entry) => entry.id === threadId);
-    if (thread) void remote.openThread(thread);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the routed thread + its availability
-  }, [threadId, targetExists, remote.selectedThread?.id]);
-
+  // Opening (store watch + snapshot load) is owned by ThreadDetail's effect: it
+  // also covers the fallback-selected thread on reloads, which a check against
+  // remote.selectedThread here would wrongly consider already open.
   const thread = remote.threads.find((entry) => entry.id === threadId) ?? null;
   return <ThreadDetail thread={thread} hideHeader={!isWide} />;
 }

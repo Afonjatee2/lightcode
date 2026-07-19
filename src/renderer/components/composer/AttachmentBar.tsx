@@ -5,6 +5,7 @@ import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
 import { isRemoteSession } from "@/renderer/bridge";
 import { getEntryIconUrl } from "@/renderer/components/common/fileIcons";
+import { resolveLocalImageDisplayUrl } from "@/shared/localImageDisplay";
 import { isPdfPath, toLocalFileUrl } from "@/shared/promptContent";
 import type { ComposerMcpServerDescriptor } from "./composerMcpServers";
 import type { Attachment } from "./useAttachments";
@@ -140,7 +141,7 @@ function AttachmentChip(props: {
       {att.isImage ? (
         <img
           className="poracode-attachment-chip__thumb"
-          src={toLocalFileUrl(att.path)}
+          src={resolveLocalImageDisplayUrl(toLocalFileUrl(att.path))}
           alt={att.name}
           decoding="async"
           draggable={false}
@@ -210,7 +211,12 @@ function ImagePreview(props: {
   const { t } = useLingui();
   const { attachment: att, onPreviewImage } = props;
   const img = (
-    <img src={toLocalFileUrl(att.path)} alt={att.name} decoding="async" draggable={false} />
+    <img
+      src={resolveLocalImageDisplayUrl(toLocalFileUrl(att.path))}
+      alt={att.name}
+      decoding="async"
+      draggable={false}
+    />
   );
   if (onPreviewImage) {
     return (

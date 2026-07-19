@@ -3399,7 +3399,11 @@ html[data-platform="darwin"] .poracode-sidebar-project-nudge {
   margin: 0.25em 0;
 }
 .lc-chat-markdown li {
+  /* Streamdown's default <li> ships a `py-1` utility; margins alone don't
+     remove that gap, so zero the vertical padding too. */
   margin: 0.1em 0;
+  padding-top: 0;
+  padding-bottom: 0;
   white-space: normal;
 }
 .lc-chat-markdown p {

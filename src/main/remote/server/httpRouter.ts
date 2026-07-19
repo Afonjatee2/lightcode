@@ -45,7 +45,7 @@ import {
   getProfileTokenStats,
   setProfileIdentityResponse,
 } from "../../profile";
-import { RemoteHttpError } from "../auth";
+import { parseBearerAuthorizationHeader, RemoteHttpError } from "../auth";
 import {
   assertRemoteThreadCommandExperimentSafe,
   assertRemoteThreadStartExperimentSafe,
@@ -60,6 +60,7 @@ import {
 import { tryServeBuiltMobileApp } from "../staticMobileApp";
 import type { RemoteServerContext } from "./context";
 import { writeError, writeHtml, writeJson, writeText } from "./httpResponses";
+import { writeLocalImageFile } from "./localImageFile";
 import {
   buildForwardSessionCookieHeader,
   isReservedForwardProxyPath,
@@ -362,6 +363,23 @@ export async function handleHttp(
     if (req.method === "GET" && url.pathname === "/api/provider-usage") {
       ctx.security.requireBearer(req, ["session:read"]);
       writeJson(res, 200, await ctx.options.callSupervisor("getProviderUsage", {}));
+      return;
+    }
+    // Serves local images (chat attachments, markdown images) to paired
+    // devices, standing in for the desktop-only `poracode-local` protocol.
+    // <img> tags can't send Authorization headers, so this endpoint uniquely
+    // also accepts the access token as an `access_token` query param; the
+    // serving helper restricts reads to image file extensions.
+    if (req.method === "GET" && url.pathname === "/api/files/image") {
+      const header = Array.isArray(req.headers.authorization)
+        ? req.headers.authorization[0]
+        : req.headers.authorization;
+      const token = parseBearerAuthorizationHeader(header) ?? url.searchParams.get("access_token");
+      if (!token) {
+        throw new RemoteHttpError("missing_access_token", "Missing access token.", 401);
+      }
+      ctx.auth.authenticateBearerToken(token, ["session:read"]);
+      await writeLocalImageFile(res, url.searchParams.get("path"));
       return;
     }
     // Profile: identity + local usage stats, computed straight from this

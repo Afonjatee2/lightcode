@@ -12,14 +12,17 @@ import type { UsageSnapshot, UsageWindow } from "../types";
  *
  *   GET {base}/coding/v1/usages
  *     headers: Authorization: Bearer <key>, Accept: application/json
- *     → { usage: { limit, used, remaining, resetTime }, limits: [...] }
+ *     → { user: { membership: { level } }, usage: { limit, used, remaining, resetTime },
+ *         limits: [...] }
  *
- * `usage` is the weekly request quota from the membership tier (Andante 1,024 /
- * Moderato 2,048 / Allegretto 7,168 requests per week); `limits[]` carries the
+ * `usage` is the weekly quota from the membership tier; `limits[]` carries the
  * rolling rate limits, in practice one 300-minute (5-hour) request window. All
- * counters arrive as decimal strings, `resetTime` as an ISO timestamp. The
- * endpoint is private and may rotate without notice; responses are normalized
- * into the shared `UsageSnapshot` shape.
+ * counters arrive as decimal strings (percent-based, caps like "100"),
+ * `resetTime` as an ISO timestamp. `user.membership.level` is a `LEVEL_*` enum
+ * naming the subscription tier; it maps to the marketing plan names
+ * (kimi.com/membership: Andante / Moderato / Allegretto / …). The endpoint is
+ * private and may rotate without notice; responses are normalized into the
+ * shared `UsageSnapshot` shape.
  */
 
 export const KIMI_PROVIDER_ID = "kimi" as const;
@@ -44,8 +47,38 @@ interface KimiRateLimitRaw {
 }
 
 export interface KimiUsagesResponse {
+  user?: { membership?: { level?: string } };
   usage?: KimiUsageDetailRaw;
   limits?: KimiRateLimitRaw[];
+}
+
+/**
+ * Subscription tier names shown on kimi.com/membership, keyed by the
+ * `user.membership.level` enum the usages endpoint returns. Paid tiers above
+ * the base carry the Kimi Code credit multiplier from the pricing page
+ * (Allegretto 5x / Allegro 15x / Vivace 30x), mirroring the Codex plan labels
+ * ("ChatGPT Pro 20x"). Unknown levels fall back to a humanized form of the
+ * enum ("LEVEL_SOMETHING" → "Something") so a new tier still shows a readable
+ * name instead of nothing.
+ */
+const KIMI_PLAN_BY_LEVEL: Record<string, string> = {
+  LEVEL_FREE: "Adagio",
+  LEVEL_TRIAL: "Andante",
+  LEVEL_BASIC: "Moderato",
+  LEVEL_INTERMEDIATE: "Allegretto 5x",
+  LEVEL_ADVANCED: "Allegro 15x",
+  LEVEL_STANDARD: "Vivace 30x",
+};
+
+function formatKimiPlan(level: unknown): string | undefined {
+  if (typeof level !== "string") return undefined;
+  const normalized = level.trim().toUpperCase();
+  if (!normalized) return undefined;
+  const mapped = KIMI_PLAN_BY_LEVEL[normalized];
+  if (mapped) return mapped;
+  const stripped = normalized.replace(/^LEVEL_/, "").replaceAll("_", " ");
+  if (!stripped) return undefined;
+  return stripped.charAt(0) + stripped.slice(1).toLowerCase();
 }
 
 /** Counters arrive as decimal strings ("2048"); tolerate numbers too. */
@@ -133,11 +166,18 @@ export function parseKimiUsage(data: unknown, nowMs: number): UsageSnapshot {
     if (weekly) windows.push(weekly);
   }
 
+  const membership =
+    block.user && typeof block.user === "object" ? block.user.membership : undefined;
+  const plan = formatKimiPlan(
+    membership && typeof membership === "object" ? membership.level : undefined,
+  );
+
   return {
     providerId: KIMI_PROVIDER_ID,
     status: "ok",
     windows,
     fetchedAt: nowMs,
+    ...(plan ? { plan } : {}),
   };
 }
 

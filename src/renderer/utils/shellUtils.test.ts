@@ -4,6 +4,8 @@ import type { SupervisorEvent } from "@/shared/ipc";
 const bridge = vi.hoisted(() => ({
   onSupervisorEvent: vi.fn<(handler: (event: SupervisorEvent) => void) => () => void>(),
   writeTerminal: vi.fn<(payload: { threadId: string; data: string }) => Promise<void>>(),
+  startShell: vi.fn<(payload: unknown) => Promise<void>>(),
+  closeThread: vi.fn<(payload: { threadId: string }) => Promise<void>>(),
 }));
 
 const supervisorHandlers = vi.hoisted(() => [] as Array<(event: SupervisorEvent) => void>);
@@ -23,6 +25,11 @@ vi.mock("@/renderer/bridge", () => ({
 import {
   appendExitOnSuccess,
   buildScriptWithExitOnSuccess,
+  clearEagerShellStart,
+  closeThreads,
+  startShellWithToast,
+  wasShellStartedEagerly,
+  writeScriptToShell,
   writeScriptToShellThenExitOnSuccess,
 } from "./shellUtils";
 
@@ -63,6 +70,90 @@ describe("buildScriptWithExitOnSuccess", () => {
 
   it("returns an empty command for blank scripts", () => {
     expect(buildScriptWithExitOnSuccess("# nope\n\n", "windows")).toBe("");
+  });
+});
+
+describe("eager shell start registry", () => {
+  beforeEach(() => {
+    bridge.startShell.mockReset().mockResolvedValue(undefined);
+    bridge.closeThread.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("marks shells started via startShellWithToast and clears them on close", async () => {
+    startShellWithToast(
+      { shellId: "shell:eager", projectLocation: { kind: "windows", path: "C:\\p" } },
+      "dev",
+    );
+    expect(wasShellStartedEagerly("shell:eager")).toBe(true);
+    expect(wasShellStartedEagerly("shell:other")).toBe(false);
+
+    await closeThreads(["shell:eager"]);
+    expect(wasShellStartedEagerly("shell:eager")).toBe(false);
+  });
+
+  it("clears entries via clearEagerShellStart", () => {
+    startShellWithToast(
+      { shellId: "shell:eager2", projectLocation: { kind: "windows", path: "C:\\p" } },
+      "dev",
+    );
+    clearEagerShellStart("shell:eager2");
+    expect(wasShellStartedEagerly("shell:eager2")).toBe(false);
+  });
+});
+
+describe("writeScriptToShell", () => {
+  beforeEach(() => {
+    supervisorHandlers.length = 0;
+    bridge.writeTerminal.mockReset().mockResolvedValue(undefined);
+    bridge.onSupervisorEvent.mockReset().mockImplementation((handler) => {
+      supervisorHandlers.push(handler);
+      return () => {
+        const index = supervisorHandlers.indexOf(handler);
+        if (index >= 0) supervisorHandlers.splice(index, 1);
+      };
+    });
+  });
+
+  it("writes the normalized command on first output", () => {
+    writeScriptToShell("shell:1", "npm install\nnpm run dev");
+
+    emit({ type: "thread-output", threadId: "shell:1", data: "$ ", outputLength: 2 });
+    emit({ type: "thread-output", threadId: "shell:1", data: "more", outputLength: 6 });
+
+    expect(bridge.writeTerminal).toHaveBeenCalledTimes(1);
+    expect(lastWrite()).toBe("npm install && npm run dev\r");
+  });
+
+  it("re-sends the command after a thread-reset (PTY respawn)", () => {
+    writeScriptToShell("shell:1", "npm run dev");
+
+    emit({ type: "thread-output", threadId: "shell:1", data: "$ ", outputLength: 2 });
+    expect(bridge.writeTerminal).toHaveBeenCalledTimes(1);
+
+    // The terminal panel's viewport-sized respawn replaces the PTY the
+    // command was written to; it must land again in the survivor.
+    emit({ type: "thread-reset", threadId: "shell:1" });
+    emit({ type: "thread-output", threadId: "shell:1", data: "$ ", outputLength: 2 });
+
+    expect(bridge.writeTerminal).toHaveBeenCalledTimes(2);
+    expect(lastWrite()).toBe("npm run dev\r");
+  });
+
+  it("stops listening once the shell exits", () => {
+    writeScriptToShell("shell:1", "npm run dev");
+
+    emit({ type: "thread-output", threadId: "shell:1", data: "$ ", outputLength: 2 });
+    emit({ type: "thread-exited", threadId: "shell:1", exitCode: 0 });
+
+    expect(supervisorHandlers).toHaveLength(0);
+  });
+
+  it("ignores events for other shells", () => {
+    writeScriptToShell("shell:1", "npm run dev");
+
+    emit({ type: "thread-output", threadId: "shell:2", data: "$ ", outputLength: 2 });
+
+    expect(bridge.writeTerminal).not.toHaveBeenCalled();
   });
 });
 

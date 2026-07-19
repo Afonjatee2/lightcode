@@ -23,6 +23,8 @@ import {
   type RemoteBrowserCommand,
   type RemoteRuntimeItemsPageRequest,
 } from "@/shared/remote";
+import { setRemoteLocalImageResolver } from "@/shared/localImageDisplay";
+import { resolveLocalFileUrlPath } from "@/shared/promptContent";
 import type { SharedSettingsInput } from "@/shared/settings";
 import { useBrowserMirrorStore } from "./browserMirror";
 import type { RemoteDesktopClient } from "./remoteClient";
@@ -53,6 +55,33 @@ export function setRemoteBridgeClient(
 ): void {
   activeClient = client;
   hostPlatform = client ? (platform ?? null) : null;
+  // poracode-local <img> sources load only inside the desktop's Electron
+  // shell; in the PWA, swap them for the desktop's authenticated HTTP image
+  // endpoint at render time (see shared/localImageDisplay.ts).
+  setRemoteLocalImageResolver(client ? (url) => remoteLocalImageUrl(client, url) : null);
+}
+
+/**
+ * Maps a poracode-local image URL to the desktop's authenticated image
+ * endpoint. The PWA has no `process.platform`, so the path decode keys off the
+ * paired desktop's advertised platform when known, else just strips a leading
+ * "/" before a Windows drive letter. Falls back to the original URL when the
+ * client has no access token or the URL can't be parsed.
+ */
+function remoteLocalImageUrl(client: RemoteDesktopClient, url: string): string {
+  try {
+    const path = hostPlatform
+      ? resolveLocalFileUrlPath(url, hostPlatform)
+      : decodeLocalFileUrlPath(url);
+    return client.localImageUrl(path) || url;
+  } catch {
+    return url;
+  }
+}
+
+function decodeLocalFileUrlPath(url: string): string {
+  const raw = decodeURIComponent(new URL(url).pathname);
+  return /^\/[A-Za-z]:/.test(raw) ? raw.slice(1) : raw;
 }
 
 /** Mobile-native views (BrowserView) call the remote API directly. */

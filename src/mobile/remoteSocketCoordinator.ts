@@ -38,6 +38,9 @@ export interface RemoteSocketCoordinatorOptions {
   readonly onConnectionChange: (state: SocketConnectionState) => void;
   readonly onMessageChange: (message: string) => void;
   readonly onOpenChange: (open: boolean) => void;
+  /** Recent HTTP success lets scheduleReconnect keep the pill "online" while
+   * only the event socket is down. Optional; defaults to always-unhealthy. */
+  readonly isHttpHealthy?: () => boolean;
   /** Resolves the localized fallback when an unauthorized close has no reason. */
   readonly getPairingExpiredMessage: () => string;
 }
@@ -124,7 +127,12 @@ export function createRemoteSocketCoordinator(
 
   function scheduleReconnect(): void {
     if (closed) return;
-    options.onConnectionChange(navigator.onLine === false ? "offline" : "reconnecting");
+    // A dead event socket alone must not spin the pill while HTTP provably
+    // works — reconnects keep retrying in the background either way.
+    const httpHealthy = options.isHttpHealthy?.() ?? false;
+    options.onConnectionChange(
+      navigator.onLine === false ? "offline" : httpHealthy ? "online" : "reconnecting",
+    );
     window.clearTimeout(reconnectTimer);
     reconnectTimer = window.setTimeout(
       connect,
@@ -134,7 +142,15 @@ export function createRemoteSocketCoordinator(
   }
 
   function connect(): void {
-    if (closed || navigator.onLine === false) return;
+    if (closed) return;
+    // navigator.onLine is a hint, not proof (VPNs and quirky adapters can pin
+    // it false on a working network). Never DROP a scheduled attempt because of
+    // it — reschedule instead, or the backoff loop dies silently here and the
+    // connection pill shows a sync spinner forever.
+    if (navigator.onLine === false) {
+      scheduleReconnect();
+      return;
+    }
     if (connecting || ws?.readyState === WebSocket.OPEN) return;
     connecting = true;
     void (async () => {

@@ -178,9 +178,14 @@ export function useRemoteDesktop() {
   // ref, which always reflects the active selection.
   const activeDesktopIdRef = useRef<string | null>(null);
   // Whether the live event socket is currently open. `refresh()` consults this
-  // so an HTTP-only success/failure doesn't flap the connection pill while the
-  // WebSocket (the real source of "Live") is up or down.
+  // on FAILURE only: a failed HTTP call doesn't downgrade the pill while the
+  // socket (the real source of "Live") is up. A successful refresh always
+  // reports "online" — HTTP reachability is proof the desktop is there, even
+  // when the socket itself can't connect (blocked WS, proxy).
   const socketOpenRef = useRef(false);
+  // Last time an HTTP refresh succeeded. The socket coordinator reads this via
+  // isHttpHealthy so a dead event socket alone doesn't spin the pill.
+  const lastRefreshOkAtRef = useRef(0);
   // Highest shell-snapshot seq successfully persisted this session, per desktop.
   // The server bumps snapshotSeq on every remotely-consumed event (see
   // RemoteAccessServer), so an unchanged seq means the shell snapshot content is
@@ -200,6 +205,10 @@ export function useRemoteDesktop() {
   // Last transcript-snapshot save time per `desktopId:threadId`, used to throttle
   // full-blob writes while a thread is actively streaming.
   const threadSnapshotSavedAtRef = useRef<Map<string, number>>(new Map());
+  // Thread id whose history load is in flight from openThread(). Route effects
+  // and click handlers can both trigger an open for the same thread; the guard
+  // keeps the second call from double-fetching (store/view updates still run).
+  const openInFlightRef = useRef<string | null>(null);
 
   // Shared error surface for every flow that re-establishes the SSH transport
   // (boot, desktop switch, reconnect).
@@ -320,6 +329,7 @@ export function useRemoteDesktop() {
       onOpenChange: (open) => {
         socketOpenRef.current = open;
       },
+      isHttpHealthy: () => Date.now() - lastRefreshOkAtRef.current < 45_000,
       getPairingExpiredMessage: () => i18n._(msg`Pairing expired — pair again to reconnect.`),
     });
     socketCoordinatorRef.current = { desktopId: desktop.desktopId, coordinator };
@@ -516,10 +526,13 @@ export function useRemoteDesktop() {
         }
       }
       setSelectedThreadId((current) => current ?? firstThreadIdByRecency(next.threads) ?? null);
-      // Only report a live connection when the socket is actually open. HTTP
-      // can succeed while the WS is blocked; downgrading/upgrading purely off
-      // HTTP results makes the pill flap. Leave a live socket's "online" alone.
-      if (socketOpenRef.current) setConnection("online");
+      // A successful HTTP round-trip is proof the desktop is reachable: report
+      // "online" even when the event socket is the piece that's down (a blocked
+      // WS must not pin the pill on a forever "Reconnecting" spinner while
+      // data loads fine). Failures, conversely, only downgrade when the socket
+      // isn't up either (see downgradeConnectionOnError).
+      lastRefreshOkAtRef.current = Date.now();
+      setConnection("online");
       setMessage("");
       // The shell snapshot content is keyed by snapshotSeq: an unchanged seq
       // means nothing the snapshot carries has changed since the last persist,
@@ -584,6 +597,10 @@ export function useRemoteDesktop() {
     const wasDone = thread.done === true;
     useAppStore.getState().openThread(thread.id);
     setSelectedThreadId(thread.id);
+    // Keep the ref in sync immediately: loadThreadSnapshot's stale-paint guard
+    // compares against it and must not read the previous thread while the
+    // re-render that would update it is still pending.
+    selectedThreadIdRef.current = thread.id;
     setThreadSnapshot((current) => (current?.thread.id === thread.id ? current : null));
     const desktop = activeDesktop;
     if (!desktop) return;
@@ -598,32 +615,45 @@ export function useRemoteDesktop() {
         .sendThreadCommand({ kind: "set-done", done: false, threadId: thread.id })
         .catch(() => undefined);
     }
-    const loaded = await loadThreadSnapshot(thread.id, desktop, { preferCache: true });
-    // Only auto-(re)start a thread when the status came from a FRESH server
-    // snapshot. If the history fetch failed and we fell back to a CACHED
-    // snapshot, a stale "startable" status would trigger startThread — which the
-    // supervisor implements as close+restart, KILLING a live run. Also surface
-    // any start failure rather than leaving an unhandled rejection.
+    // A concurrent open for this thread is already loading its history — the
+    // view/done state above still applied, but a second fetch would race it.
+    if (openInFlightRef.current === thread.id) return;
+    openInFlightRef.current = thread.id;
     try {
-      if (loaded && loaded.fromServer) {
-        await ensureThreadRunning(loaded.snapshot.thread, desktop, loaded.snapshot.terminalSize);
+      const loaded = await loadThreadSnapshot(thread.id, desktop, { preferCache: true });
+      // Only auto-(re)start a thread when the status came from a FRESH server
+      // snapshot. If the history fetch failed and we fell back to a CACHED
+      // snapshot, a stale "startable" status would trigger startThread — which the
+      // supervisor implements as close+restart, KILLING a live run. Also surface
+      // any start failure rather than leaving an unhandled rejection.
+      try {
+        if (loaded && loaded.fromServer) {
+          await ensureThreadRunning(loaded.snapshot.thread, desktop, loaded.snapshot.terminalSize);
+        }
+      } catch (error) {
+        setMessage(describeError(error, i18n._(msg`Unable to start the thread.`)));
       }
-    } catch (error) {
-      setMessage(describeError(error, i18n._(msg`Unable to start the thread.`)));
+    } finally {
+      if (openInFlightRef.current === thread.id) openInFlightRef.current = null;
     }
   }
 
   async function loadThreadSnapshot(
     threadId: string,
     desktop: StoredDesktop,
-    options: { readonly preferCache: boolean },
+    options: { readonly preferCache: boolean; readonly retried?: boolean },
   ): Promise<{ readonly snapshot: RemoteThreadSnapshot; readonly fromServer: boolean } | null> {
+    // A result is only painted when its thread is still the selected one — an
+    // out-of-order fetch for a thread the user has since left must not clobber
+    // the thread now on screen. The ref mirrors the fallback-selected thread.
+    const isStaleSelection = () =>
+      selectedThreadIdRef.current !== null && selectedThreadIdRef.current !== threadId;
     let latest: { snapshot: RemoteThreadSnapshot; fromServer: boolean } | null = null;
     const cached = await getStoredThreadSnapshot(desktop.desktopId, threadId);
     // The user may have switched desktops during the async cache read; a stale
     // preload must not paint over the desktop now on screen.
     if (desktop.desktopId !== activeDesktopIdRef.current) return null;
-    if (options.preferCache && cached) {
+    if (options.preferCache && cached && !isStaleSelection()) {
       latest = { snapshot: cached.snapshot, fromServer: false };
       setThreadSnapshot(cached.snapshot);
       // A cached preload is NOT authoritative — pass fromServer:false so a
@@ -634,6 +664,8 @@ export function useRemoteDesktop() {
       const next = await clientFor(desktop).threadHistory(threadId);
       // Bail if the active desktop changed while the fetch was in flight.
       if (desktop.desktopId !== activeDesktopIdRef.current) return latest;
+      // Bail if the user opened another thread while the fetch was in flight.
+      if (isStaleSelection()) return latest;
       latest = { snapshot: next, fromServer: true };
       seedOlderThreadRuntimeItemsCursor(threadId, next.runtimeNextCursor ?? null);
       setThreadSnapshot(next);
@@ -664,6 +696,19 @@ export function useRemoteDesktop() {
     } catch (error) {
       setMessage(describeError(error, i18n._(msg`Unable to load thread.`)));
       downgradeConnectionOnError(error);
+      // Nothing painted at all (no cache, first open): one bounded retry so a
+      // single transient failure doesn't leave the thread blank until the user
+      // navigates away and back. Skipped when the user has moved on.
+      if (!options.retried && latest === null && selectedThreadIdRef.current === threadId) {
+        window.setTimeout(() => {
+          if (
+            selectedThreadIdRef.current === threadId &&
+            activeDesktopIdRef.current === desktop.desktopId
+          ) {
+            void loadThreadSnapshot(threadId, desktop, { preferCache: true, retried: true });
+          }
+        }, 1500);
+      }
     }
     return latest;
   }
@@ -778,6 +823,10 @@ export function useRemoteDesktop() {
       return null;
     }
     setSelectedThreadId(result.threadId);
+    // Sync the ref before the snapshot load below: its stale-paint guard keys
+    // off the ref, which otherwise still points at the previous thread until
+    // the next render.
+    selectedThreadIdRef.current = result.threadId;
     void loadThreadSnapshot(result.threadId, desktop, { preferCache: false });
     return result.threadId;
   }

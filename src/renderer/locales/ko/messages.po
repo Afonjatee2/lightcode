@@ -5139,7 +5139,6 @@ msgstr "로드 중…"
 msgid "local"
 msgstr "로컬"
 
-#: src/mobile/views/DesktopsView.tsx
 #: src/renderer/components/common/BranchSelector/parts/useBranchList.ts
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "Local"
@@ -6714,8 +6713,8 @@ msgid "Open Settings"
 msgstr "설정 열기"
 
 #: src/mobile/views/DesktopsView.tsx
-msgid "Open Settings → Remote Access in Poracode on this computer, then paste its pairing token here."
-msgstr "이 컴퓨터의 Poracode에서 설정 → 원격 액세스를 연 다음 페어링 토큰을 여기에 붙여넣으세요."
+#~ msgid "Open Settings → Remote Access in Poracode on this computer, then paste its pairing token here."
+#~ msgstr "이 컴퓨터의 Poracode에서 설정 → 원격 액세스를 연 다음 페어링 토큰을 여기에 붙여넣으세요."
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Open Settings → Remote Access in Poracode on your desktop, then scan the QR code from here — or enter the endpoint and pairing token manually."

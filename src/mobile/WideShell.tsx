@@ -159,16 +159,17 @@ export function WideShell(props: {
         <header className="m-sidebar__head">
           <Brand onPress={() => void navigate({ to: "/threads" })} />
           <ConnectionControl remote={remote} onPair={() => void navigate({ to: "/desktops" })} />
-        </header>
-        <div className="m-sidebar__primary">
-          <SidebarDestination
-            active={pathname === "/new"}
+          <button
+            type="button"
+            className="m-sidebar__new"
+            data-active={pathname === "/new" || undefined}
             disabled={!hasActiveDesktop}
-            icon={<Plus className="size-4" />}
-            label={<Trans>New thread</Trans>}
-            onPress={() => void navigate({ to: "/new" })}
-          />
-        </div>
+            onClick={() => void navigate({ to: "/new" })}
+          >
+            <Plus className="size-4" />
+            <Trans>New thread</Trans>
+          </button>
+        </header>
         <div className="m-sidebar__scroll">
           <ThreadsView
             projects={remote.projects}

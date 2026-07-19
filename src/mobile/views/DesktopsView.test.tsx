@@ -117,17 +117,14 @@ describe("DesktopsView", () => {
     expect(screen.getByRole("dialog", { name: "H1FCM6T4GX" })).toBeTruthy();
   });
 
-  it("offers paired local mode to desktop browsers", async () => {
+  it("shows the pairing form directly, without method tabs, outside the native app", async () => {
     media.desktopPointer = true;
-    const props = renderView();
+    renderView();
     fireEvent.click(screen.getByRole("button", { name: "Pair a connection" }));
-    await act(async () => {
-      fireEvent.click(screen.getByRole("tab", { name: "Local" }));
-    });
-    expect(props.onEndpointChange).toHaveBeenCalledWith("http://localhost:38987/");
-    expect(
-      screen.getByText(/Open Settings .* Remote Access in Poracode on this computer/),
-    ).toBeTruthy();
+    expect(await screen.findByLabelText("Endpoint")).toBeTruthy();
+    expect(screen.getByLabelText("Pairing token")).toBeTruthy();
+    // The broken Local tab is gone; with a single method left there are no tabs.
+    expect(screen.queryByRole("tab")).toBeNull();
   });
 
   it("auto-opens the pairing drawer when a deep-link credential is present", async () => {

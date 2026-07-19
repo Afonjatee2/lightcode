@@ -5139,7 +5139,6 @@ msgstr "Ładowanie…"
 msgid "local"
 msgstr "lokalny"
 
-#: src/mobile/views/DesktopsView.tsx
 #: src/renderer/components/common/BranchSelector/parts/useBranchList.ts
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
 msgid "Local"
@@ -6714,8 +6713,8 @@ msgid "Open Settings"
 msgstr "Otwórz Ustawienia"
 
 #: src/mobile/views/DesktopsView.tsx
-msgid "Open Settings → Remote Access in Poracode on this computer, then paste its pairing token here."
-msgstr "Otwórz Ustawienia → Dostęp zdalny w Poracode na tym komputerze, a następnie wklej tutaj token parowania."
+#~ msgid "Open Settings → Remote Access in Poracode on this computer, then paste its pairing token here."
+#~ msgstr "Otwórz Ustawienia → Dostęp zdalny w Poracode na tym komputerze, a następnie wklej tutaj token parowania."
 
 #: src/mobile/views/DesktopsView.tsx
 msgid "Open Settings → Remote Access in Poracode on your desktop, then scan the QR code from here — or enter the endpoint and pairing token manually."

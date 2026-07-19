@@ -11,6 +11,7 @@ import {
   quotePowerShellLiteral,
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
+import { transformKimiAcpSessionUpdate } from "./acpTransform";
 import { buildKimiAcpArgs, buildKimiArgs, buildKimiContinueArgs } from "./argv";
 import {
   buildKimiCommand,
@@ -128,6 +129,7 @@ export function createKimiAdapter(): AgentAdapter {
       return createAcpStructuredSession(command, {
         ...input,
         acpEmptyResponseErrorResolver: resolveKimiEmptyResponseError,
+        acpSessionUpdateTransform: transformKimiAcpSessionUpdate,
       });
     },
 

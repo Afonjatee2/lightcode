@@ -335,7 +335,9 @@ function ThreadRow(props: {
         </span>
         <span className="m-thread-row__meta">
           {props.projectName ? (
-            <span className="m-thread-row__meta-item">{props.projectName}</span>
+            <span className="m-thread-row__meta-item m-thread-row__meta-item--project">
+              {props.projectName}
+            </span>
           ) : null}
           {worktreeName ? (
             <span className="m-thread-row__meta-item">

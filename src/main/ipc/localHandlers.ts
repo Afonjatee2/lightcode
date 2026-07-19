@@ -35,6 +35,7 @@ import {
   writeImageFile,
 } from "../attachments/localFiles";
 import { createProjectDirectory } from "../projectDirectory";
+import { diffSyncedThreadIds } from "./threadSyncBroadcast";
 import { showOsNotification } from "../osNotifications";
 import { showAndFocusWindow } from "../window/showAndFocusWindow";
 import {
@@ -415,7 +416,22 @@ export function createLocalIpcHandlers(
       deleteThreadAttachments(options.requirePoracodePaths(), threadId);
     },
     dbDeleteProject: ({ projectId }) => dbDeleteProject(projectId),
-    dbSyncAll: ({ projects, threads, viewJson }) => dbSyncAll(projects, threads, viewJson),
+    dbSyncAll: ({ projects, threads, viewJson }) => {
+      // Desktop-originated thread changes (auto-title, rename, done/star,
+      // archive, status, delete) reach SQLite only through this persist — they
+      // emit no supervisor event, so remote clients never learned about them.
+      // Diff before writing, then publish the same event remote-issued thread
+      // commands send; the remote's debounced refresh reads the post-write
+      // state.
+      const changedThreadIds = diffSyncedThreadIds(dbGetThreads(), threads);
+      dbSyncAll(projects, threads, viewJson);
+      if (changedThreadIds.length > 0) {
+        options.getRemoteAccessServer()?.publishSupervisorEvent({
+          type: "remote-threads-changed",
+          threadIds: changedThreadIds,
+        });
+      }
+    },
     dbPersistExperimentState: async (payload) => {
       dbPersistExperimentState(payload);
       const paths = options.requirePoracodePaths();

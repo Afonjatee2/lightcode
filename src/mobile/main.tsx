@@ -9,6 +9,7 @@ import {
 } from "@/renderer/RendererCrashScreen";
 import { bootstrapAppLocaleFromCache } from "@/renderer/i18n/i18n";
 import { isIgnorableRejection, isIgnorableWindowError } from "@/renderer/rendererGlobalErrors";
+import { markMobilePlatformOnRoot } from "./mobilePlatform";
 import { markTouchCapabilityOnRoot } from "./pointerModality";
 
 // The PWA had no error boundary: any throw during boot or first render left the
@@ -25,6 +26,8 @@ if (!root) {
 
 // Touch-only CSS workarounds (composer tap shield) key off this attribute.
 markTouchCapabilityOnRoot();
+// Platform-scoped CSS (iOS input-zoom fix, glass alpha) keys off this one.
+markMobilePlatformOnRoot();
 
 let reactRoot: Root | null = null;
 let renderingCrashScreen = false;

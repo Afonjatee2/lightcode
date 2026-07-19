@@ -833,6 +833,24 @@ function selectSharedSettings(state: SharedSettingsState): SharedSettingsInput {
  * values arriving over the remote API. Updates the store and the local cache
  * WITHOUT writing back through the bridge, so external updates never echo.
  */
+/**
+ * Resolves once the authoritative settings have been loaded from the main
+ * process (or immediately when there is no bridge). Callers making a
+ * settings-dependent decision right after app launch — before hydration —
+ * should await this instead of reading defaults or a stale cache.
+ */
+export function whenSharedSettingsHydrated(): Promise<void> {
+  if (useSharedSettings.getState().sharedSettingsHydrated) return Promise.resolve();
+  return new Promise((resolve) => {
+    const unsubscribe = useSharedSettings.subscribe((state) => {
+      if (state.sharedSettingsHydrated) {
+        unsubscribe();
+        resolve();
+      }
+    });
+  });
+}
+
 export function applyExternalSharedSettings(partial: Partial<SharedSettings>): void {
   useSharedSettings.setState((state) => ({ ...state, ...partial }));
   cacheSettingsSnapshot(selectSharedSettings(useSharedSettings.getState()));

@@ -309,6 +309,24 @@ describe("mobile route components", () => {
     expect(fixtures.remote.openThread).not.toHaveBeenCalled();
   });
 
+  it("opens the routed thread even when it is already the fallback selection", () => {
+    // Deep link / reload onto the most-recent thread: remote.selectedThread
+    // already matches the route via the recency fallback, but nothing has
+    // opened it (no watched pane, no snapshot request) — the old effect
+    // early-returned here and the thread stayed blank forever.
+    const previous = fixtures.remote.selectedThread;
+    fixtures.remote.selectedThread = fixtures.remote.threads[1]!;
+    try {
+      render(<ThreadRoute />);
+
+      expect(fixtures.remote.openThread).toHaveBeenCalledWith(
+        expect.objectContaining({ id: "thread-routed" }),
+      );
+    } finally {
+      fixtures.remote.selectedThread = previous;
+    }
+  });
+
   it("opens a project terminal with the routed thread as the close target", async () => {
     render(<ThreadRoute />);
 

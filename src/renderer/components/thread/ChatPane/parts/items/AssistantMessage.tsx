@@ -26,13 +26,15 @@ export const AssistantMessage = memo(function AssistantMessage({
   isTurnActive,
 }: AssistantMessageProps) {
   const { t } = useLingui();
-  // Matching Codex: the copy action only appears under a turn's *final* answer,
-  // i.e. the last assistant message before the next user message (or the end of
-  // the thread). Every turn keeps its button, not just the most recent one.
-  // Sub-agent messages (those nested under a tool call) are ignored so they
-  // neither qualify nor cancel a top-level answer's terminal status. A
-  // completed item at the live tail is still an intermediate update until the
-  // turn itself settles, so it must not expose a copy action yet.
+  // The copy action only appears under a turn's *final* answer: the message
+  // must be the last top-level item of its turn — any trailing item (another
+  // message, a tool call, an error from a failed turn) means the text was an
+  // intermediate status note, not the answer. Every turn keeps its button, not
+  // just the most recent one. Sub-agent messages (those nested under a tool
+  // call) are ignored so they neither qualify nor cancel a top-level answer's
+  // terminal status. A completed item at the live tail is still an
+  // intermediate update until the turn itself settles, so it must not expose
+  // a copy action yet.
   const isFinalAnswer = useAppStore((state) => {
     if (item.parentItemId) return false;
     const ids = state.runtimeItemIdsByThread[threadId];
@@ -43,8 +45,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     for (let i = index + 1; i < ids.length; i += 1) {
       const next = byId[ids[i]!];
       if (!next || next.parentItemId) continue;
-      if (next.type === "user_message") return true;
-      if (next.type === "assistant_message") return false;
+      return next.type === "user_message";
     }
     return !isTurnActive;
   });

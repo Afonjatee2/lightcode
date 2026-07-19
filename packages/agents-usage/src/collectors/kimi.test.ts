@@ -6,8 +6,9 @@ import { collectKimi, KIMI_USAGES_ENDPOINT, parseKimiUsage, resolveKimiUsagesUrl
 const WEEKLY_RESET = "2026-01-09T15:23:13.716839300Z";
 const SESSION_RESET = "2026-01-06T13:33:02.717479433Z";
 
-/** Verbatim shape from CodexBar's docs: weekly membership quota + 5h rate limit. */
+/** Verbatim shape observed live: membership block + weekly quota + 5h rate limit. */
 const USAGES_BODY = JSON.stringify({
+  user: { membership: { level: "LEVEL_INTERMEDIATE" } },
   usage: { limit: "2048", used: "214", remaining: "1834", resetTime: WEEKLY_RESET },
   limits: [
     {
@@ -36,6 +37,22 @@ describe("parseKimiUsage", () => {
     const session = snap.windows.find((w) => w.id === "session-5h")!;
     expect(session.usedPercent).toBeCloseTo((139 / 200) * 100);
     expect(session.resetsAt).toBe(Date.parse(SESSION_RESET));
+  });
+
+  it("maps the membership level to the subscription plan name with its credit multiplier", () => {
+    const snap = parseKimiUsage(JSON.parse(USAGES_BODY), FAKE_NOW_MS);
+    expect(snap.plan).toBe("Allegretto 5x");
+  });
+
+  it("humanizes unknown membership levels and omits plan when absent", () => {
+    const unknown = parseKimiUsage(
+      { user: { membership: { level: "LEVEL_SUPER_FAST" } }, usage: { limit: "100", used: "1" } },
+      FAKE_NOW_MS,
+    );
+    expect(unknown.plan).toBe("Super fast");
+
+    const absent = parseKimiUsage({ usage: { limit: "100", used: "1" } }, FAKE_NOW_MS);
+    expect(absent.plan).toBeUndefined();
   });
 
   it("derives used from limit-remaining when `used` is absent", () => {

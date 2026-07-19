@@ -44,6 +44,13 @@ html {
   );
 }
 
+/* The 64% glass is tuned for iOS, where the backdrop blur reliably grounds
+   floating controls. Everywhere else (desktop browsers especially) the same
+   alpha reads washed-out/transparent, so float it much closer to solid. */
+html:not([data-mobile-platform="ios"]) {
+  --m-glass-alpha: 88%;
+}
+
 /* Reused HeroUI buttons render at their "sm" size (~32px tall) throughout the
    phone shell — too short for a fingertip. Raise the floor for every mobile
    button: a min-height (never a fixed height, so multi-line/reused buttons still
@@ -667,8 +674,32 @@ body.bg-background {
   padding: calc(0.5rem + env(safe-area-inset-top)) 0.75rem 0.375rem;
 }
 
-.m-sidebar__primary {
-  padding: 0 0.75rem 0.5rem;
+.m-sidebar__new {
+  display: inline-flex;
+  flex: none;
+  margin-left: auto;
+  min-height: var(--m-tap-min);
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--hairline, var(--border));
+  border-radius: 0.5rem;
+  background: transparent;
+  padding: 0.25rem 0.625rem;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.m-sidebar__new:not(:disabled):hover,
+.m-sidebar__new[data-active="true"] {
+  background: var(--row-hover);
+  color: var(--foreground, inherit);
+}
+
+.m-sidebar__new:disabled {
+  opacity: 0.38;
+  cursor: default;
 }
 
 .m-sidebar__scroll {
@@ -822,11 +853,14 @@ body.bg-background {
   outline: none;
   background: transparent;
   color: var(--foreground);
-  font-size: 16px;
-  line-height: 1;
+  /* Normal UI text size; the iOS focus-zoom guard at the bottom of this file
+     bumps it to 16px on iOS only. The full-height line box keeps the text
+     vertically centered at either size. */
+  font-size: 0.875rem;
+  line-height: var(--m-floating-control-line-height);
   min-height: var(--m-floating-control-line-height);
   height: var(--m-floating-control-line-height);
-  padding-block: calc((var(--m-floating-control-line-height) - 16px) / 2);
+  padding-block: 0;
   -webkit-appearance: none;
 }
 
@@ -1110,6 +1144,14 @@ body.bg-background {
   animation: m-sheet-backdrop-in 0.2s ease;
 }
 
+/* On mouse devices the dim reads as a modal takeover of a window the user is
+   still reading; keep the invisible click-to-collapse layer but drop the
+   backdrop wash. Touch keeps the dim (it marks the keyboard session). */
+html:not([data-touch-device]) .m-compose-scrim {
+  background: transparent;
+  animation: none;
+}
+
 .m-compose-bubble {
   /* Anchors the collapsed tap overlay. */
   position: relative;
@@ -1134,6 +1176,23 @@ body.bg-background {
   max-height: calc(100dvh - var(--m-keyboard-offset, 0px) - env(safe-area-inset-top) - 7.5rem);
   border-radius: 1rem;
   background: var(--composer-surface, var(--sidebar-background, var(--background)));
+  /* The expanded surface is opaque, so the blur is invisible — but it still
+     forces a full backdrop repaint on every animation frame (the main source
+     of expand/collapse stutter on large desktop windows). */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Mouse devices: the grow-in-place animation only needs the bubble's own
+   max-height/radius. Animating the inner paddings and the input's max-height
+   alongside it relayouts and repaints the whole composer every frame, which
+   stutters on desktop. Touch keeps the fully choreographed version, where the
+   keyboard rise masks the extra work. */
+html:not([data-touch-device]) .m-compose-bubble .m-draft,
+html:not([data-touch-device]) .m-compose-bubble [data-draft-body],
+html:not([data-touch-device]) .m-compose-bubble .poracode-mention-input,
+html:not([data-touch-device]) .m-compose-bubble [data-composer-input-anchor] {
+  transition: none;
 }
 
 /* The embedded draft view sizes to its content inside the bubble: neutralize
@@ -1251,7 +1310,12 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 .m-compose-dock:not([data-expanded]) .m-compose-bubble .poracode-mention-input {
   min-height: var(--m-floating-control-line-height);
   max-height: var(--m-floating-control-line-height);
-  padding: calc((var(--m-floating-control-line-height) - 1lh) / 2) 1rem;
+  padding: 0 1rem;
+  /* One line box exactly the collapsed pill's height: the half-leading centers
+     the single line vertically regardless of font metrics. The old
+     (height - 1lh)/2 padding calc drifted off-center whenever the effective
+     font-size/line-height changed (density overrides, the iOS 16px guard). */
+  line-height: var(--m-floating-control-line-height);
 }
 
 .m-compose-dock:not([data-expanded]) .m-compose-bubble .poracode-composer-shell {
@@ -1380,6 +1444,12 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* The project name keeps its full width; longer worktree badges truncate first. */
+.m-thread-row__meta-item--project {
+  flex: none;
+  max-width: 100%;
 }
 
 .m-thread-row__side {
@@ -2565,7 +2635,10 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   .poracode-mention-input {
   min-height: var(--m-floating-control-line-height);
   max-height: var(--m-floating-control-line-height);
-  padding: calc((var(--m-floating-control-line-height) - 1lh) / 2) 1rem;
+  padding: 0 1rem;
+  /* Same single-line centering as the home bubble: a full-height line box
+     instead of the font-metric-sensitive (height - 1lh)/2 padding calc. */
+  line-height: var(--m-floating-control-line-height);
 }
 
 /* In the placeholder slot the trio reads as plain muted labels, not
@@ -3083,17 +3156,24 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
     --m-tap-min: 34px;
   }
 
-  .m-detail > .m-page {
+  .m-detail > .m-page,
+  .m-detail > .m-subscreen,
+  .m-detail > .m-settings {
+    width: min(100%, 72rem);
+    align-self: center;
+  }
+
+  /* The workspace overlay (Changes / Files) is fixed-position outside
+     .m-detail; cap its column the same way so file rows don't stretch across
+     ultrawide monitors. The diff drill-down anchors to the viewport (fixed)
+     and is unaffected. */
+  .m-ws-pane {
     width: min(100%, 72rem);
     align-self: center;
   }
 
   .m-sidebar__head {
     padding: calc(0.375rem + env(safe-area-inset-top)) 0.625rem 0.25rem;
-  }
-
-  .m-sidebar__primary {
-    padding: 0 0.375rem 0.375rem;
   }
 
   .m-sidebar .m-thread-list {
@@ -4364,21 +4444,24 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   -webkit-user-select: text;
 }
 
-/* iOS zooms into inputs below 16px; keep editable text at 16px on phones.
+/* iOS (and only iOS) zooms into inputs below 16px on focus; keep editable
+   text at 16px there. On Android and desktop browsers the same 16px floor
+   would just read oversized against the 14px root, so the rule is gated on
+   the platform attribute (see markMobilePlatformOnRoot), not width alone.
    `.m-sheet` / `.m-picker` drawers are portaled to <body> (outside `.m-shell`)
    by BottomSheet, ResponsiveMenuSurface, and the host folder picker, so they
    need the guard spelled out separately — otherwise the model-picker search
    field (and any other in-drawer input) zooms on focus. */
 @media (max-width: 767px) {
-  .m-shell textarea,
-  .m-shell input,
-  .m-shell [contenteditable="true"],
-  .m-sheet textarea,
-  .m-sheet input,
-  .m-sheet [contenteditable="true"],
-  .m-picker textarea,
-  .m-picker input,
-  .m-picker [contenteditable="true"] {
+  html[data-mobile-platform="ios"] .m-shell textarea,
+  html[data-mobile-platform="ios"] .m-shell input,
+  html[data-mobile-platform="ios"] .m-shell [contenteditable="true"],
+  html[data-mobile-platform="ios"] .m-sheet textarea,
+  html[data-mobile-platform="ios"] .m-sheet input,
+  html[data-mobile-platform="ios"] .m-sheet [contenteditable="true"],
+  html[data-mobile-platform="ios"] .m-picker textarea,
+  html[data-mobile-platform="ios"] .m-picker input,
+  html[data-mobile-platform="ios"] .m-picker [contenteditable="true"] {
     font-size: 16px;
   }
 }

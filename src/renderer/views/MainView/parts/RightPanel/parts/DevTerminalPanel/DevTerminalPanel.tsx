@@ -6,6 +6,7 @@ import { useAppStore } from "@/renderer/state/appStore";
 import { useDevTerminalStore, type DevTerminalTab } from "@/renderer/state/devTerminalStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { closeAllPanels } from "@/renderer/actions/panelActions";
+import { clearEagerShellStart, wasShellStartedEagerly } from "@/renderer/utils/shellUtils";
 import type { TerminalSize } from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { BottomTerminalLayout } from "./parts/BottomTerminalLayout";
@@ -71,6 +72,10 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
   // pre-wrapped scrollback, so getting the very first lines right matters.
   function handleTerminalResize(terminalId: string, size: TerminalSize) {
     if (spawnedRef.current.has(terminalId)) return;
+    // Run actions and setup scripts start their shell before the surface
+    // mounts; re-issuing startShell would kill that PTY (and the command or
+    // process running in it). The surface resizes the live PTY on its own.
+    if (wasShellStartedEagerly(terminalId)) return;
     const owningTab = tabs.find((tab) => tab.id === terminalId || tab.splitId === terminalId);
     if (!owningTab) return;
     const project = projects.find((p) => p.id === owningTab.projectId);
@@ -96,12 +101,14 @@ export function DevTerminalPanel(props: { hideHeader?: boolean }) {
         .closeThread({ threadId: tab.splitId })
         .catch(() => undefined);
       spawnedRef.current.delete(tab.splitId);
+      clearEagerShellStart(tab.splitId);
     }
     removeTab(tab.id);
     void readBridge()
       .closeThread({ threadId: tab.id })
       .catch(() => undefined);
     spawnedRef.current.delete(tab.id);
+    clearEagerShellStart(tab.id);
 
     const remainingInContext = remaining.filter((other) => {
       if (other.projectId !== tab.projectId) return false;

@@ -398,4 +398,24 @@ describe("RemoteDesktopClient", () => {
     await vi.advanceTimersByTimeAsync(5 * 60_000);
     await expect(push).resolves.toMatchObject({ code: "timeout" });
   });
+
+  it("builds authenticated local image URLs against the endpoint", () => {
+    const client = new RemoteDesktopClient(
+      "https://relay.example.test/s/server-1/",
+      "lc_access_test",
+    );
+
+    const url = new URL(client.localImageUrl("C:\\Users\\me\\img one.png"));
+
+    expect(url.origin).toBe("https://relay.example.test");
+    expect(url.pathname).toBe("/s/server-1/api/files/image");
+    expect(url.searchParams.get("path")).toBe("C:\\Users\\me\\img one.png");
+    expect(url.searchParams.get("access_token")).toBe("lc_access_test");
+  });
+
+  it("returns an empty local image URL without an access token", () => {
+    const client = new RemoteDesktopClient("http://127.0.0.1:38987/");
+
+    expect(client.localImageUrl("/tmp/img.png")).toBe("");
+  });
 });

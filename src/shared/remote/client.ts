@@ -737,6 +737,20 @@ export class RemoteDesktopClient {
     return url.toString();
   }
 
+  /**
+   * Absolute URL of the authenticated image endpoint used for poracode-local
+   * sources. The access token rides in the query string because <img> tags
+   * can't send Authorization headers. Returns "" without a token — callers
+   * fall back to the original (unrenderable in a browser) URL then.
+   */
+  localImageUrl(absolutePath: string): string {
+    if (!this.accessToken) return "";
+    const url = endpointUrl(this.endpoint, "/api/files/image");
+    url.searchParams.set("path", absolutePath);
+    url.searchParams.set("access_token", this.accessToken);
+    return url.toString();
+  }
+
   parseSocketMessage(value: string): RemoteWebSocketServerMessage {
     return remoteWebSocketServerMessageSchema.parse(JSON.parse(value) as unknown);
   }
