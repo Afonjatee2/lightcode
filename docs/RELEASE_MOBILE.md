@@ -72,16 +72,20 @@ encrypted production environment variables before testing notifications:
 
 ## GitHub release configuration
 
-The `mobile-web`, `mobile-android`, and `mobile-ios` environments are used by the
-release workflow. Set `PORACODE_MOBILE_APP_HOST=poracode.com` in all three and
-`PLAY_TRACK=internal` in `mobile-android`. Each environment requires approval
-from the repository owner and only accepts deployments from `master` or a
-`mobile-v*` tag. The workflow pins third-party actions to immutable commits and
-scopes publisher credentials to the steps that consume them.
+The `mobile-android` and `mobile-ios` environments are used by the native
+release workflow (`release-mobile.yml`); the `mobile-web` environment is used by
+the standalone PWA workflow (`release-pwa.yml`). Set
+`PORACODE_MOBILE_APP_HOST=poracode.com` in all three and `PLAY_TRACK=internal`
+in `mobile-android`. Each environment requires approval from the repository
+owner and only accepts deployments from `master` or a `mobile-v*` tag. The
+workflows pin third-party actions to immutable commits and scope publisher
+credentials to the steps that consume them.
 
 ### `mobile-web`
 
-The environment needs `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and this secret:
+Used by **Release PWA** (`release-pwa.yml`), which deploys the hosted PWA to
+Vercel production independently of the native store releases. The environment
+needs `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID`, and this secret:
 
 - `VERCEL_TOKEN`
 
@@ -232,7 +236,8 @@ Support: `https://poracode.com/support`
 5. Select the processed TestFlight build for the internal tester group and roll
    out the Play internal release.
 
-After both first uploads exist, a `mobile-vX.Y.Z` tag builds and uploads all
-configured targets with monotonically increasing build numbers. TestFlight
+After both first uploads exist, a `mobile-vX.Y.Z` tag builds and uploads the
+native targets with monotonically increasing build numbers; the hosted PWA is
+released separately by running **Release PWA** in GitHub Actions. TestFlight
 distribution is automatic only for groups where **Enable automatic
 distribution** is turned on.

@@ -1,15 +1,12 @@
 name: Release Mobile
 
-# Builds the hosted PWA and the signed native store artifacts. Store upload is
-# automatic when the corresponding publisher credentials are configured.
+# Builds the signed native store artifacts. Store upload is automatic when the
+# corresponding publisher credentials are configured. The hosted PWA is
+# released separately via release-pwa.yml.
 
 on:
   workflow_dispatch:
     inputs:
-      web:
-        description: "Release the hosted PWA to Vercel"
-        type: boolean
-        default: false
       android:
         description: "Build the signed Android App Bundle"
         type: boolean
@@ -34,7 +31,6 @@ jobs:
     name: Resolve release
     runs-on: ubuntu-latest
     outputs:
-      web: ${{ steps.release.outputs.web }}
       android: ${{ steps.release.outputs.android }}
       ios: ${{ steps.release.outputs.ios }}
       version: ${{ steps.release.outputs.version }}
@@ -45,12 +41,10 @@ jobs:
         shell: bash
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "web=${{ inputs.web }}" >> "$GITHUB_OUTPUT"
             echo "android=${{ inputs.android }}" >> "$GITHUB_OUTPUT"
             echo "ios=${{ inputs.ios }}" >> "$GITHUB_OUTPUT"
             version="$(node -p "require('./package.json').version")"
           else
-            echo "web=true" >> "$GITHUB_OUTPUT"
             echo "android=true" >> "$GITHUB_OUTPUT"
             echo "ios=true" >> "$GITHUB_OUTPUT"
             version="${GITHUB_REF_NAME#mobile-v}"
@@ -63,55 +57,6 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "build_number=$((GITHUB_RUN_NUMBER * 100 + GITHUB_RUN_ATTEMPT))" >> "$GITHUB_OUTPUT"
-
-  web:
-    name: Web (Vercel)
-    needs: setup
-    if: needs.setup.outputs.web == 'true'
-    runs-on: ubuntu-latest
-    environment: mobile-web
-    env:
-      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
-      PORACODE_MOBILE_APP_HOST: ${{ vars.PORACODE_MOBILE_APP_HOST }}
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version: "24"
-          cache: pnpm
-      - name: Validate Vercel configuration
-        shell: bash
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          for name in VERCEL_ORG_ID VERCEL_PROJECT_ID; do
-            if [ -z "${!name}" ]; then
-              echo "Missing mobile-web variable: $name" >&2
-              exit 1
-            fi
-          done
-          if [ -z "$VERCEL_TOKEN" ]; then
-            echo "Missing mobile-web secret: VERCEL_TOKEN" >&2
-            exit 1
-          fi
-      - name: Install Vercel CLI
-        run: npm install --global vercel@54.21.1
-      - name: Pull Vercel environment
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
-      - name: Build
-        env:
-          PORACODE_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS: ${{ secrets.PORACODE_MOBILE_ANDROID_SHA256_CERT_FINGERPRINTS }}
-          PORACODE_MOBILE_APPLE_TEAM_ID: ${{ secrets.PORACODE_MOBILE_APPLE_TEAM_ID || secrets.APPLE_TEAM_ID }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: vercel build --prod --token="$VERCEL_TOKEN"
-      - name: Deploy
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
 
   android:
     name: Android (Play)
