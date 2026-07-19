@@ -418,6 +418,63 @@ describe("OrchestratorThreadManager registry scoping", () => {
   });
 });
 
+describe("OrchestratorThreadManager.rehydrateChildren", () => {
+  const seed = {
+    threadId: "restored-child",
+    parentThreadId: PARENT,
+    agentKind: "codex" as const,
+    title: "PORA-123",
+    worktreePath: "/tmp/worktrees/pora-123",
+    worktreeBranch: "poracode/pora-123",
+    createdAt: "2026-07-01T00:00:00.000Z",
+  };
+
+  it("re-addresses a persisted child after a restart wiped the registry", async () => {
+    const h = makeHarness();
+    h.manager.rehydrateChildren([seed]);
+
+    expect(h.manager.listThreads(PARENT)).toEqual([
+      {
+        threadId: "restored-child",
+        title: "PORA-123",
+        agent: "codex",
+        status: "inactive",
+        attention: "none",
+        createdAt: seed.createdAt,
+        worktreePath: seed.worktreePath,
+        branch: seed.worktreeBranch,
+      },
+    ]);
+    expect(h.manager.getThread(PARENT, "restored-child").status).toBe("inactive");
+    // No session and no buffered transcript → the graceful note, not a throw.
+    await expect(h.manager.readThread(PARENT, "restored-child", 20)).resolves.toMatchObject({
+      status: "inactive",
+      source: "note",
+    });
+    // Its session died with the old supervisor, so input is still rejected —
+    // but with the closed-session message, not "Unknown thread_id".
+    await expect(h.manager.sendToThread(PARENT, "restored-child", "hi", false)).rejects.toThrow(
+      /is not running/,
+    );
+  });
+
+  it("keeps ownership scoping and picks up live state when the child is relaunched", async () => {
+    const h = makeHarness();
+    h.manager.rehydrateChildren([seed]);
+    expect(() => h.manager.getThread("intruder", "restored-child")).toThrow(/Unknown thread_id/);
+
+    h.states.set("restored-child", makeState({ status: "working", attention: "working" }));
+    expect(h.manager.getThread(PARENT, "restored-child").status).toBe("working");
+  });
+
+  it("never overwrites a record created by a live create_thread call", async () => {
+    const h = makeHarness();
+    const childId = await createChild(h, { title: "live title" });
+    h.manager.rehydrateChildren([{ ...seed, threadId: childId, title: "stale seed title" }]);
+    expect(h.manager.getThread(PARENT, childId).title).toBe("live title");
+  });
+});
+
 describe("OrchestratorThreadManager.waitForThreads", () => {
   it("returns immediately when a thread is already settled", async () => {
     const h = makeHarness();

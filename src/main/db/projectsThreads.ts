@@ -106,6 +106,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
       prNumber: thread.prNumber ?? null,
       groupId: thread.groupId ?? null,
       groupName: thread.groupName ?? null,
+      parentThreadId: thread.parentThreadId ?? null,
       archived: thread.archived,
       done: thread.done,
       doneAt: thread.doneAt ?? null,
@@ -135,6 +136,7 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         prNumber: thread.prNumber ?? null,
         groupId: thread.groupId ?? null,
         groupName: thread.groupName ?? null,
+        parentThreadId: thread.parentThreadId ?? null,
         archived: thread.archived,
         done: thread.done,
         doneAt: thread.doneAt ?? null,
@@ -147,6 +149,20 @@ export function dbUpsertThread(thread: Thread, sortOrder: number): void {
         lastTurnEndedAt: thread.lastTurnEndedAt ?? null,
       },
     })
+    .run();
+  notifyProjectThreadDataChanged();
+}
+
+/**
+ * Assign a thread to a sidebar group without touching its sort order (unlike
+ * `dbUpsertThread`, which requires one). Fallback for orchestrator grouping
+ * when no renderer window is up to own the metadata write.
+ */
+export function dbSetThreadGroup(threadId: string, groupId: string, groupName: string): void {
+  const db = getDb();
+  db.update(schema.threads)
+    .set({ groupId, groupName })
+    .where(eq(schema.threads.id, threadId))
     .run();
   notifyProjectThreadDataChanged();
 }

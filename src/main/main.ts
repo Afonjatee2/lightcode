@@ -713,6 +713,30 @@ if (!hasSingleInstanceLock) {
           workingThreads.clear();
           updatePowerSaveBlocker();
         },
+        // A fresh supervisor process has an empty orchestrator child registry;
+        // push the persisted child rows back so Crossagents `get_thread` /
+        // `list_threads` keep resolving children created before the restart.
+        onStarted: () => {
+          const children = dbGetThreads().filter(
+            (thread) => thread.parentThreadId && !thread.archived,
+          );
+          if (children.length === 0) return;
+          void supervisorClient
+            .call("seedOrchestratorChildren", {
+              children: children.map((thread) => ({
+                threadId: thread.id,
+                parentThreadId: thread.parentThreadId!,
+                agentKind: thread.agentKind,
+                title: thread.title,
+                ...(thread.worktreePath ? { worktreePath: thread.worktreePath } : {}),
+                ...(thread.worktreeBranch ? { worktreeBranch: thread.worktreeBranch } : {}),
+                createdAt: thread.createdAt,
+              })),
+            })
+            .catch((error) => {
+              console.warn("[main] failed to seed orchestrator child threads:", error);
+            });
+        },
       });
       const scheduleCoordinator = new ScheduleRunCoordinator({
         startThread: (payload) => supervisorClient.call("startThread", payload),

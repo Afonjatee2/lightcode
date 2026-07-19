@@ -225,7 +225,7 @@ export function initDatabase(dbPath: string) {
 
   // Baseline schema version for future DB migrations.
   // New upgrade steps should live behind this gate when we need them.
-  const SCHEMA_VERSION = 25;
+  const SCHEMA_VERSION = 26;
 
   const storedVersion = Number(
     (
@@ -484,6 +484,16 @@ export function initDatabase(dbPath: string) {
         CREATE INDEX IF NOT EXISTS idx_remote_command_receipts_updated
           ON remote_command_receipts (updated_at);
       `);
+    }
+
+    if (storedVersion < 26) {
+      // Orchestrator (Crossagents MCP) parenthood, previously in-memory only.
+      // Persisting it lets the supervisor re-address child threads after a
+      // restart and lets the sidebar group children with their parent.
+      const cols = sqlite.prepare("PRAGMA table_info(threads)").all() as { name: string }[];
+      if (!cols.some((c) => c.name === "parent_thread_id")) {
+        sqlite.exec("ALTER TABLE threads ADD COLUMN parent_thread_id TEXT");
+      }
     }
 
     sqlite

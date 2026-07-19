@@ -21,6 +21,7 @@ export {
   dbSetState,
   dbUpsertProject,
   dbUpsertThread,
+  dbSetThreadGroup,
   dbMarkLiveThreadsInactive,
   dbDeleteThread,
   dbDeleteProject,

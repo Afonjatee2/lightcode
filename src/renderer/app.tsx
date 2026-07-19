@@ -315,6 +315,8 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
             ...(command.worktreeBranch ? { worktreeBranch: command.worktreeBranch } : {}),
             ...(command.focus === false ? { focus: false } : {}),
             ...(command.parentThreadId ? { parentThreadId: command.parentThreadId } : {}),
+            ...(command.groupId ? { groupId: command.groupId } : {}),
+            ...(command.groupName ? { groupName: command.groupName } : {}),
           });
           if (command.launchRuntime !== false) {
             store.queueThreadLaunch(thread.id, command.prompt, command.segments);
@@ -352,6 +354,17 @@ const mainWindowCleanups: Array<() => void> = isMainWindow
             break;
           case "set-starred":
             if ((thread.starred ?? false) !== command.starred) toggleStarThread(command.threadId);
+            break;
+          // Orchestrator grouping: pulls the parent thread into the sidebar
+          // group its children are created in.
+          case "set-group":
+            useAppStore.setState((state) => ({
+              threads: state.threads.map((t) =>
+                t.id === command.threadId
+                  ? { ...t, groupId: command.groupId, groupName: command.groupName }
+                  : t,
+              ),
+            }));
             break;
           case "set-worktree": {
             useAppStore

@@ -135,13 +135,13 @@ function prepareThreadSyncStatement(sqlite: InstanceType<typeof Database>): Sqli
     INSERT INTO threads (
       id, project_id, title, agent_kind, agent_instance_id, config, status,
       attention, can_resume_with_config, session_ref, terminal_prompt, worktree_path,
-      worktree_branch, pr_number, group_id, group_name, archived, done, done_at,
+      worktree_branch, pr_number, group_id, group_name, parent_thread_id, archived, done, done_at,
       starred, presentation_mode, sort_order, created_at, updated_at,
       active_turn_started_at, last_turn_started_at, last_turn_ended_at
     ) VALUES (
       @id, @projectId, @title, @agentKind, @agentInstanceId, @config, @status,
       @attention, @canResumeWithConfig, @sessionRef, NULL, @worktreePath,
-      @worktreeBranch, @prNumber, @groupId, @groupName, @archived, @done, @doneAt,
+      @worktreeBranch, @prNumber, @groupId, @groupName, @parentThreadId, @archived, @done, @doneAt,
       @starred, @presentationMode, @sortOrder, @createdAt, @updatedAt,
       @activeTurnStartedAt, @lastTurnStartedAt, @lastTurnEndedAt
     )
@@ -159,6 +159,7 @@ function prepareThreadSyncStatement(sqlite: InstanceType<typeof Database>): Sqli
       pr_number = excluded.pr_number,
       group_id = excluded.group_id,
       group_name = excluded.group_name,
+      parent_thread_id = excluded.parent_thread_id,
       archived = excluded.archived,
       done = excluded.done,
       done_at = excluded.done_at,
@@ -189,6 +190,7 @@ function runThreadSync(stmt: SqliteStatement, thread: Thread, sortOrder: number)
     prNumber: thread.prNumber ?? null,
     groupId: thread.groupId ?? null,
     groupName: thread.groupName ?? null,
+    parentThreadId: thread.parentThreadId ?? null,
     archived: thread.archived ? 1 : 0,
     done: thread.done ? 1 : 0,
     doneAt: thread.doneAt ?? null,

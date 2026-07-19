@@ -40,6 +40,8 @@ export const threads = sqliteTable("threads", {
   prNumber: integer("pr_number"),
   groupId: text("group_id"),
   groupName: text("group_name"),
+  /** Orchestrator thread that created this one via the Crossagents MCP. */
+  parentThreadId: text("parent_thread_id"),
   archived: integer("archived", { mode: "boolean" }).notNull().default(false),
   done: integer("done", { mode: "boolean" }).notNull().default(false),
   doneAt: text("done_at"),

@@ -150,6 +150,13 @@ export async function applyRemoteThreadCommand(
         updatedAt: new Date().toISOString(),
       }));
       return false;
+    case "set-group":
+      updateRemoteThread(command.threadId, (thread) => ({
+        ...thread,
+        groupId: command.groupId,
+        groupName: command.groupName,
+      }));
+      return false;
     case "archive":
       await closeThreadBestEffort(ctx, command.threadId);
       updateRemoteThread(command.threadId, (thread) => ({

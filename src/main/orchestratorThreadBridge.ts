@@ -1,6 +1,6 @@
 import type { RemoteThreadCommand, StartThreadPayload, Thread } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
-import { dbDeleteThread, dbGetThread, dbUpsertThread } from "./db";
+import { dbDeleteThread, dbGetThread, dbSetThreadGroup, dbUpsertThread } from "./db";
 
 type OrchestratorThreadCreatedEvent = Extract<
   SupervisorEvent,
@@ -19,7 +19,9 @@ export interface OrchestratorThreadBridgeDeps {
  * Mirrors the proven remote (mobile) start ordering exactly:
  *
  * 1. Resolve `projectId` from the PARENT thread's DB row (the supervisor
- *    doesn't know project ids) and complete the child `Thread` record.
+ *    doesn't know project ids) and complete the child `Thread` record —
+ *    including a sidebar group shared with the parent so the family renders
+ *    together (the parent is pulled into the group on its first child).
  * 2. `dbUpsertThread` — persist the row first, so the thread survives even if
  *    a later step fails mid-flight.
  * 3. Mirror to the renderer (`remoteThreadCommand` "start" with
@@ -41,7 +43,26 @@ export async function handleOrchestratorThreadCreated(
     return;
   }
 
-  const thread: Thread = { ...event.thread, projectId: parent.projectId };
+  // Children join a sidebar group shared with their parent so the family
+  // renders together (reusing the regular groupId grouping). The parent
+  // anchors the group: its existing group wins; otherwise a new group keyed
+  // by the parent's id is named after the parent.
+  const groupId = parent.groupId ?? parent.id;
+  const groupName = parent.groupName ?? parent.title;
+  if (!parent.groupId) {
+    // The renderer owns thread metadata — route the parent's group assignment
+    // through its store (persisted via dbSyncAll). Only when no window is up
+    // (headless) write the row directly.
+    const applied = deps.sendThreadCommand({
+      kind: "set-group",
+      threadId: parent.id,
+      groupId,
+      groupName,
+    });
+    if (!applied) dbSetThreadGroup(parent.id, groupId, groupName);
+  }
+
+  const thread: Thread = { ...event.thread, projectId: parent.projectId, groupId, groupName };
   const existing = dbGetThread(thread.id) != null;
   // New rows sort to the top via a descending timestamp (same convention as
   // the remote-access server's sortOrderForThread).
@@ -49,6 +70,8 @@ export async function handleOrchestratorThreadCreated(
 
   deps.sendThreadCommand({
     kind: "start",
+    groupId,
+    groupName,
     threadId: thread.id,
     projectId: thread.projectId,
     agentKind: thread.agentKind,

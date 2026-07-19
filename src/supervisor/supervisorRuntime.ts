@@ -22,6 +22,7 @@ import type {
   RemoveExperimentWorktreesResult,
   RelocateProjectPayload,
   RelocateProjectResult,
+  SeedOrchestratorChildrenPayload,
 } from "@/shared/contracts";
 import type { SupervisorEvent } from "@/shared/ipc";
 import { msg } from "@/shared/messages";
@@ -734,6 +735,15 @@ export class SupervisorRuntime {
       }
     }
     return {};
+  }
+
+  /**
+   * Re-register persisted orchestrator child threads after a supervisor
+   * restart (main pushes them at every supervisor start) so the Crossagents
+   * orchestrator lane can keep addressing children created before the restart.
+   */
+  seedOrchestratorChildren(payload: SeedOrchestratorChildrenPayload): void {
+    this.orchestratorThreadManager.rehydrateChildren(payload.children);
   }
 
   dispose(): void {

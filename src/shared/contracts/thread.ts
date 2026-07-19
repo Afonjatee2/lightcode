@@ -58,12 +58,35 @@ export const threadSchema = z.object({
   slashCommands: z.array(agentSlashCommandSchema).optional(),
   /**
    * Id of the orchestrator thread that created this thread via the Crossagents
-   * MCP `create_thread` tool. Pure metadata for now (no renderer UI keys on
-   * it); absent for user-created threads.
+   * MCP `create_thread` tool. Persisted so the supervisor can re-address child
+   * threads after a restart; absent for user-created threads.
    */
   parentThreadId: z.string().min(1).optional(),
 });
 export type Thread = z.infer<typeof threadSchema>;
+
+/**
+ * Persisted orchestrator-child row pushed main → supervisor at supervisor
+ * (re)start so the Crossagents orchestrator lane can re-address child threads
+ * created before the restart (`get_thread`/`list_threads`/`read_thread`
+ * instead of "Unknown thread_id"). Live transcript/final-result state is
+ * in-memory only and does not survive the restart.
+ */
+export const orchestratorChildSeedSchema = z.object({
+  threadId: z.string().min(1),
+  parentThreadId: z.string().min(1),
+  agentKind: agentKindSchema,
+  title: z.string().min(1),
+  worktreePath: z.string().optional(),
+  worktreeBranch: z.string().optional(),
+  createdAt: z.string().min(1),
+});
+export type OrchestratorChildSeed = z.infer<typeof orchestratorChildSeedSchema>;
+
+export const seedOrchestratorChildrenPayloadSchema = z.object({
+  children: z.array(orchestratorChildSeedSchema),
+});
+export type SeedOrchestratorChildrenPayload = z.infer<typeof seedOrchestratorChildrenPayloadSchema>;
 
 export interface ThreadRuntimeSnapshot {
   threadId: string;
@@ -230,6 +253,22 @@ export const remoteThreadCommandSchema = z.discriminatedUnion("kind", [
      * {@link threadSchema}'s `parentThreadId`).
      */
     parentThreadId: z.string().min(1).optional(),
+    /**
+     * Sidebar group the new thread belongs to (orchestrator children join a
+     * group shared with their parent so families render together).
+     */
+    groupId: z.string().min(1).optional(),
+    groupName: z.string().min(1).optional(),
+  }),
+  // Assigns an existing thread to a sidebar group. Used to pull an
+  // orchestrator parent into the group its children are created in; the
+  // renderer owns thread metadata, so this routes through its store like the
+  // other metadata commands instead of writing the DB directly.
+  z.object({
+    kind: z.literal("set-group"),
+    threadId: z.string().min(1),
+    groupId: z.string().min(1),
+    groupName: z.string().min(1),
   }),
   z.object({ kind: z.literal("rename"), threadId: z.string().min(1), title: z.string().min(1) }),
   z.object({ kind: z.literal("set-done"), threadId: z.string().min(1), done: z.boolean() }),

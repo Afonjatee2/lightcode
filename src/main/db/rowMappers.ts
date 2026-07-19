@@ -68,6 +68,7 @@ export function rowToThread(row: typeof schema.threads.$inferSelect): Thread {
     ...(row.prNumber != null ? { prNumber: row.prNumber } : {}),
     ...(row.groupId ? { groupId: row.groupId } : {}),
     ...(row.groupName ? { groupName: row.groupName } : {}),
+    ...(row.parentThreadId ? { parentThreadId: row.parentThreadId } : {}),
     archived: row.archived,
     done: row.done,
     ...(row.doneAt ? { doneAt: row.doneAt } : {}),

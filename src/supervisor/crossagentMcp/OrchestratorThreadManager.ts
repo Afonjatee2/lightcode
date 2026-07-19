@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   AgentCapability,
   AgentKind,
+  OrchestratorChildSeed,
   ProjectLocation,
   RuntimeEvent,
   SendThreadInputPayload,
@@ -210,9 +211,12 @@ class LaunchTimeoutError extends OrchestratorThreadError {}
  * proven remote (mobile) start path uses. `create_thread` then resolves once
  * the child's session appears in the thread session manager.
  *
- * The parent→children registry is in-memory only: if the supervisor restarts,
- * the parent's session (and its MCP connection) is gone too. Child threads
- * themselves are durable app threads and survive independently.
+ * The parent→children registry is in-memory, but child parenthood is also
+ * persisted on the thread rows: at every supervisor (re)start, main pushes the
+ * persisted child rows back via {@link rehydrateChildren} so a resumed parent
+ * can still address its children (their in-memory transcript/final-result
+ * snapshots do not survive the restart). Child threads themselves are durable
+ * app threads and survive independently either way.
  */
 export class OrchestratorThreadManager {
   private readonly children = new Map<string, ChildThreadRecord>();
@@ -418,6 +422,34 @@ export class OrchestratorThreadManager {
       ...(worktreePath ? { worktreePath } : {}),
       ...(branch ? { branch } : {}),
     };
+  }
+
+  /**
+   * Re-register persisted child threads after a supervisor restart wiped the
+   * in-memory registry. Records created by live `create_thread` calls win over
+   * seeds; a seeded child starts `inactive` with an empty transcript (its
+   * session died with the previous supervisor) and its live state is resolved
+   * through `getThreadState` as usual if it is relaunched.
+   */
+  rehydrateChildren(children: ReadonlyArray<OrchestratorChildSeed>): void {
+    for (const child of children) {
+      if (this.children.has(child.threadId)) continue;
+      this.children.set(child.threadId, {
+        threadId: child.threadId,
+        parentThreadId: child.parentThreadId,
+        agent: child.agentKind,
+        title: child.title,
+        ...(child.worktreePath ? { worktreePath: child.worktreePath } : {}),
+        ...(child.worktreeBranch ? { branch: child.worktreeBranch } : {}),
+        lastStatus: "inactive",
+        lastAttention: "none",
+        lastError: undefined,
+        finalResult: undefined,
+        createdAt: child.createdAt,
+        turnStartedAt: undefined,
+        transcript: new ChildTranscriptBuffer(),
+      });
+    }
   }
 
   /** Forget a failed child and roll back the worktree this call created (best effort). */
