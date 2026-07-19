@@ -8,13 +8,15 @@ import {
   type ComposerControl,
 } from "@/renderer/components/thread/ThreadComposer";
 import { buildControls } from "@/renderer/components/thread/buildModelPickerControls";
+import { formatEffortLabel } from "@/renderer/components/thread/threadDraftViewHelpers";
 
 /**
- * Read-only provider / fast / mode / permission icons pinned to the right edge
- * of the compact composer pill. Inert (pointer-events: none) — tapping anywhere
- * still expands the composer, where the real controls live. Hidden by CSS while
- * the composer is expanded or has typed content (the pinned send button owns
- * that corner).
+ * Read-only active-thread parameters pinned to the right edge of the compact
+ * composer pill. Model and effort stay readable as text; the provider and
+ * boolean/state controls remain compact icons. Inert (pointer-events: none) —
+ * tapping anywhere still expands the composer, where the real controls live.
+ * Hidden by CSS while the composer is expanded or has typed content (the
+ * pinned send button owns that corner).
  */
 export function ComposerCompactSummary(props: {
   readonly thread: Thread;
@@ -24,6 +26,13 @@ export function ComposerCompactSummary(props: {
   const ref = useRef<HTMLDivElement | null>(null);
   const presentationMode =
     thread.presentationMode ?? agentStatus?.capabilities.presentationMode ?? "terminal";
+  const presentationCapabilities = agentStatus
+    ? capabilitiesForPresentation(agentStatus.capabilities, presentationMode)
+    : undefined;
+  const modelLabel =
+    presentationCapabilities?.models.find((model) => model.id === thread.config.model)?.label ??
+    thread.config.model;
+  const effortLabel = thread.config.effort ? formatEffortLabel(thread.config.effort) : undefined;
   let controls: ComposerControl[] = [];
   if (agentStatus) {
     if (presentationMode === "gui") {
@@ -76,7 +85,7 @@ export function ComposerCompactSummary(props: {
       observer.disconnect();
       bubble.style.removeProperty("--m-compose-summary-width");
     };
-  }, [agentStatus, fastEnabled, modeKey, permissionKey]);
+  }, [agentStatus, effortLabel, fastEnabled, modeKey, modelLabel, permissionKey]);
 
   if (!agentStatus) return null;
 
@@ -89,6 +98,8 @@ export function ComposerCompactSummary(props: {
         className="size-3.5 shrink-0"
         {...(agentStatus.icon ? { icon: agentStatus.icon } : {})}
       />
+      <span className="m-compose-summary__model">{modelLabel}</span>
+      {effortLabel ? <span className="m-compose-summary__effort">{effortLabel}</span> : null}
       {fastEnabled ? (
         <span className="m-compose-summary__item">{resolveComposerControlIcon(fastControl)}</span>
       ) : null}

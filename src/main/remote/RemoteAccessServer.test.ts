@@ -1254,8 +1254,8 @@ describe("RemoteAccessServer", () => {
     });
   });
 
-  it("trusts loopback web origins only in dev", async () => {
-    // Dev: the Vite-served mobile PWA (localhost:3100) pairs without an explicit
+  it("trusts loopback PWA origins in development and production", async () => {
+    // The Vite-served mobile PWA pairs without an explicit
     // pairingAppUrl/trustedCorsOrigins entry.
     const devServer = new RemoteAccessServer({
       appVersion: "1.0.0",
@@ -1274,7 +1274,8 @@ describe("RemoteAccessServer", () => {
     expect(devResponse.status).toBe(200);
     expect(devResponse.headers.get("access-control-allow-origin")).toBe("http://localhost:3100");
 
-    // Production (isDev unset) never trusts an arbitrary loopback dev origin.
+    // The same localhost PWA can pair with a packaged/headless app. The app can
+    // be on another machine; authentication still requires its pairing token.
     const prodServer = new RemoteAccessServer({
       appVersion: "1.0.0",
       identity: { desktopId: "desktop-prod", label: "Prod Desktop" },
@@ -1286,9 +1287,21 @@ describe("RemoteAccessServer", () => {
     const prodInfo = await prodServer.start();
     const prodResponse = await fetch(
       new URL("/.well-known/poracode/environment", prodInfo.httpBaseUrl),
-      { headers: { origin: "http://localhost:3100" } },
+      { headers: { origin: "http://127.0.0.1:3100" } },
     );
-    expect(prodResponse.status).toBe(403);
+    expect(prodResponse.status).toBe(200);
+    expect(prodResponse.headers.get("access-control-allow-origin")).toBe("http://127.0.0.1:3100");
+
+    const prodPreflight = await fetch(new URL("/api/auth/token", prodInfo.httpBaseUrl), {
+      method: "OPTIONS",
+      headers: {
+        origin: "http://localhost:3100",
+        "access-control-request-method": "POST",
+        "access-control-request-headers": "content-type",
+      },
+    });
+    expect(prodPreflight.status).toBe(204);
+    expect(prodPreflight.headers.get("access-control-allow-origin")).toBe("http://localhost:3100");
   });
 
   it("advertises a full advertisedBaseUrl over host/port (https → wss)", async () => {

@@ -302,13 +302,14 @@ describe("mobile ThreadView", () => {
     expect(fixtures.composerProps.at(-1)?.composerPlaceholder).toBe("Follow up...");
   });
 
-  it("shows provider, enabled fast, mode, and permission icons in the compact summary", () => {
+  it("shows model and effort text with the compact active-thread icons", () => {
     fixtures.agentStatuses = [makeCodexStatus()];
     const thread = {
       ...makeTerminalThread(),
       presentationMode: "gui",
       config: {
         model: "gpt-5",
+        effort: "high",
         fast: true,
         mode: "plan",
         approvalPolicy: "never",
@@ -330,7 +331,8 @@ describe("mobile ThreadView", () => {
     expect(summary?.querySelector(".lucide-zap")).not.toBeNull();
     expect(summary?.querySelector(".poracode-composer-mode-icon")).not.toBeNull();
     expect(summary?.querySelector(".poracode-composer-permission-icon")).not.toBeNull();
-    expect(summary).not.toHaveTextContent("gpt-5");
+    expect(summary).toHaveTextContent("GPT-5");
+    expect(summary).toHaveTextContent("High");
 
     view.rerender(
       <ThreadView
@@ -388,8 +390,8 @@ function makeCodexStatus(): AgentStatus {
     authState: "authenticated",
     capabilities: {
       models: [{ id: "gpt-5", label: "GPT-5" }],
-      efforts: [],
-      modelEfforts: {},
+      efforts: ["low", "high"],
+      modelEfforts: { "gpt-5": ["low", "high"] },
       fastModels: ["gpt-5"],
       thinkingModels: [],
       modes: ["agent", "plan"],

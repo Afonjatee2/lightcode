@@ -58,11 +58,9 @@ export interface RemoteAccessServerOptions {
   readonly appVersion: string;
   readonly identity: RemoteAccessIdentity;
   /**
-   * Dev mode. Loosens CORS to trust any loopback web origin
-   * (`http://localhost:<port>` / `http://127.0.0.1:<port>` / `[::1]`), so the
-   * mobile PWA served from the Vite dev server (`localhost:3100`) can pair
-   * without an explicit `pairingAppUrl`/`trustedCorsOrigins` entry. Never widens
-   * trust beyond loopback, and is off in production.
+   * Whether the hosting process is running in development mode. Loopback PWA
+   * origins are trusted in every mode so a localhost development client can
+   * connect to any packaged or headless Poracode app.
    */
   readonly isDev?: boolean;
   readonly host: string;

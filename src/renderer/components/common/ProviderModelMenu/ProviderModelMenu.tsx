@@ -379,7 +379,7 @@ export function ProviderModelMenu(props: ProviderModelMenuProps) {
       isDisabled={(isDisabled ?? false) || providers.length === 0}
       size="sm"
       variant="ghost"
-      className="poracode-composer-menu min-w-0 px-2.5"
+      className="poracode-composer-menu poracode-composer-model-control min-w-0 px-2.5"
       {...(mobile ? { onPress: () => handleOpenChange(true) } : {})}
     >
       <ProviderIcon

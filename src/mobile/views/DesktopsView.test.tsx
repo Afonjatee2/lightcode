@@ -123,6 +123,9 @@ describe("DesktopsView", () => {
     fireEvent.click(screen.getByRole("button", { name: "Pair a connection" }));
     expect(await screen.findByLabelText("Endpoint")).toBeTruthy();
     expect(screen.getByLabelText("Pairing token")).toBeTruthy();
+    expect(
+      screen.getByRole("dialog", { name: "Pair a connection" }).getAttribute("data-fit-content"),
+    ).toBe("true");
     // The broken Local tab is gone; with a single method left there are no tabs.
     expect(screen.queryByRole("tab")).toBeNull();
   });
@@ -161,6 +164,9 @@ describe("DesktopsView", () => {
     const onPairSsh = vi.fn<DesktopsViewProps["onPairSsh"]>(async () => {});
     renderView({ onProbeSsh, onPairSsh });
     fireEvent.click(screen.getByRole("button", { name: "Pair a connection" }));
+    expect(
+      screen.getByRole("dialog", { name: "Pair a connection" }).getAttribute("data-fit-content"),
+    ).toBeNull();
     await act(async () => {
       fireEvent.click(screen.getByRole("tab", { name: "SSH" }));
     });

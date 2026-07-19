@@ -416,10 +416,11 @@ function DesktopRow(props: {
 
 export function DesktopsView(props: DesktopsViewProps) {
   const { t } = useLingui();
+  const nativeApp = isNativeApp();
   const [scanning, setScanning] = useState(false);
   const [pairingMethod, setPairingMethod] = useState("pairing-link");
   const { pairing, onScan, showPairingHint } = props;
-  // The pairing form now lives in a full-screen drawer opened from the FAB.
+  // The pairing form lives in a drawer opened from the FAB.
   const pairDrawer = useSheet<true>();
   const { open: openPairDrawer } = pairDrawer;
   // A deep-link launch pre-fills the fields and flags the hint — surface the
@@ -562,11 +563,12 @@ export function DesktopsView(props: DesktopsViewProps) {
         <FullScreenDrawer
           title={t`Pair a connection`}
           label={t`Pair a connection`}
+          fitContent={!nativeApp}
           closeLabel={t`Close pairing`}
           closing={pairDrawer.closing}
           onClose={pairDrawer.close}
         >
-          {isNativeApp() ? (
+          {nativeApp ? (
             <Tabs
               selectedKey={pairingMethod}
               variant="secondary"

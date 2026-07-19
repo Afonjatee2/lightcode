@@ -2484,7 +2484,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   flex: none;
   align-items: center;
   gap: 0.25rem;
-  padding: 0.125rem 0.5rem;
+  padding: 0 0.5rem;
 }
 
 /* ── Live-thread composer: compact ⇄ full ──────────────────────────
@@ -2720,6 +2720,21 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   align-items: center;
 }
 
+.m-compose-summary__model {
+  max-width: 7rem;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.m-compose-summary__effort {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
 .m-thread-compose-dock[data-expanded] .m-compose-summary,
 .m-thread-compose-dock:not([data-expanded])
   .m-compose-bubble:has([data-composer-input-anchor] [contenteditable]:not(:empty))
@@ -2763,6 +2778,53 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   animation: m-thread-toolbar-enter 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* The phone-wide 44px Button floor is right for standalone actions, but it
+   makes the composer's + / send actions spill outside the shared 2.25rem
+   toolbar row. Keep every control on the composer's own compact grid. */
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-expanded]
+  .poracode-composer-toolbar
+  [data-slot="button"] {
+  min-height: 2.25rem;
+}
+
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-expanded]
+  .poracode-composer-toolbar
+  [data-slot="button"].button--icon-only {
+  min-width: 2.25rem;
+}
+
+/* Model and effort are the two parameters that need to remain legible on a
+   phone. Preserve their text even when the desktop wrap probe collapses lower
+   priority labels; the effort's signal icon is redundant once its value is
+   written out. */
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-expanded]
+  .poracode-composer-model-control
+  > .poracode-composer-label-hideable {
+  display: flex;
+}
+
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-expanded]
+  .poracode-composer-effort-control
+  > .poracode-composer-label-hideable {
+  display: inline;
+}
+
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-expanded]
+  .poracode-composer-effort-control
+  > .poracode-composer-effort-icon {
+  display: none;
+}
+
 /* Inside the floating thread bubble, the bubble owns the card chrome just like
    the home composer. Keep the reused desktop composer as content only. */
 :is(.m-main, .m-detail) .m-thread .m-thread-compose-dock .poracode-composer-shell,
@@ -2781,13 +2843,13 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   display: flex;
   min-width: 0;
   flex: 1;
-  min-height: var(--m-tap-min);
+  min-height: 2.5rem;
   align-items: center;
   gap: 0.5rem;
   border: none;
   border-radius: 0.5rem;
   background: transparent;
-  padding: 0.25rem 0.375rem;
+  padding: 0.125rem 0.375rem;
   color: var(--muted);
   cursor: pointer;
   text-align: left;
@@ -3090,6 +3152,10 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   padding: 0.375rem 0.875rem calc(0.875rem + env(safe-area-inset-bottom));
   transform: translateY(var(--m-sheet-drag-y, 0));
   animation: m-sheet-in 0.22s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.m-drawer[data-fit-content] {
+  height: auto;
 }
 
 .m-drawer[data-dragging] {
