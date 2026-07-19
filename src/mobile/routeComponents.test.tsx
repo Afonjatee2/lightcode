@@ -291,7 +291,7 @@ describe("mobile route components", () => {
 
     await waitFor(() =>
       expect(fixtures.remote.pairDesktop).toHaveBeenCalledWith(
-        "http://192.168.1.20:38987/",
+        "http://192.168.1.20:38987",
         "lc_pair_once",
       ),
     );
