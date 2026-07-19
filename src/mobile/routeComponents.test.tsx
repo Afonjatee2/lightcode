@@ -327,6 +327,28 @@ describe("mobile route components", () => {
     }
   });
 
+  it("re-opens the routed thread once the desktop connects on a cold deep-link load", () => {
+    // Cold boot: the thread is seeded from the localStorage mirror (so threadId
+    // is stable from the first render) while the desktop connection is still
+    // being established async. openThread bails on the null desktop, so the
+    // effect must re-run when the desktop id appears — otherwise the history
+    // snapshot never loads and the transcript stays blank forever.
+    fixtures.remote.activeDesktop = null;
+    const { rerender } = render(<ThreadRoute />);
+    fixtures.remote.openThread.mockClear();
+
+    fixtures.remote.activeDesktop = {
+      desktopId: "desktop-1",
+      label: "Poracode on Mac",
+      scopes: ["projects:manage"],
+    };
+    rerender(<ThreadRoute />);
+
+    expect(fixtures.remote.openThread).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "thread-routed" }),
+    );
+  });
+
   it("opens a project terminal with the routed thread as the close target", async () => {
     render(<ThreadRoute />);
 

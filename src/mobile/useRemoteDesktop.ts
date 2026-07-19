@@ -270,6 +270,10 @@ export function useRemoteDesktop() {
       await loadCached(desktopId);
       if (desktop) {
         await refresh(desktop);
+      } else {
+        // Stale active id with no matching stored desktop: nothing will ever
+        // connect, so don't leave the pill spinning on "booting".
+        setConnection("offline");
       }
     }
     void boot()
@@ -368,7 +372,12 @@ export function useRemoteDesktop() {
     applyShellSnapshot(cached.snapshot);
     const firstThreadId = firstThreadIdByRecency(cached.snapshot.threads) ?? null;
     setSelectedThreadId((current) => current ?? firstThreadId);
-    setConnection("offline");
+    // Rendering cached data is not evidence the desktop is unreachable — the
+    // first refresh/socket attempt hasn't resolved yet. Claiming "offline"
+    // here flashed the offline banner on every cold load. Keep the boot
+    // spinner during boot; on a desktop switch show "reconnecting" until
+    // refresh()/the socket settle the real state.
+    setConnection((current) => (current === "booting" ? current : "reconnecting"));
   }
 
   function clientFor(desktop: StoredDesktop): RemoteDesktopClient {

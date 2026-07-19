@@ -1113,6 +1113,27 @@ describe("ChatPane", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders legacy image file attachments as image previews", async () => {
+    const thread = makeThread();
+    seedUserMessageContent(thread.id, [
+      {
+        kind: "file",
+        path: "C:\\tmp\\screenshot.png",
+        name: "screenshot.png",
+        source: "attachment",
+      },
+    ]);
+
+    const { container } = renderChatPane(thread);
+    await waitFor(() => expect(hydrateThreadRuntimeItems).toHaveBeenCalledWith(thread.id));
+
+    expect(screen.getByAltText("screenshot.png")).toBeInTheDocument();
+    expect(
+      container.querySelector('[data-poracode-attachment-image-preview="true"]'),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".poracode-attachment-chip__icon")).not.toBeInTheDocument();
+  });
+
   it("renders selected skills in user messages as skill badges", async () => {
     const thread = makeThread();
     seedUserMessageContent(thread.id, [

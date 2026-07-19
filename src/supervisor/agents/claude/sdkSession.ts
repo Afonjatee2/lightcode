@@ -24,6 +24,7 @@ import type {
 } from "@/shared/contracts";
 import { areAgentSlashCommandsEqual } from "@/shared/contracts";
 import { terminateChildProcessTree } from "@/shared/processTree";
+import { buildPromptContentBlocks } from "@/shared/promptContent";
 import { buildClaudeMcpServers } from "../userMcp";
 import {
   createKnownSessionRef,
@@ -45,7 +46,6 @@ import { DeferredTurnCompletion } from "./deferredTurnCompletion";
 import { applyClaudeContextSuffix } from "./argv";
 import {
   buildClaudeQuestionAnswerEvents,
-  buildPromptContentBlocks,
   closeClaudeOpenItems,
   completeActiveGoalOnTaskDrainEvents,
   createClaudeMapperState,

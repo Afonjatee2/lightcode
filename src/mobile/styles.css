@@ -44,11 +44,12 @@ html {
   );
 }
 
-/* The 64% glass is tuned for iOS, where the backdrop blur reliably grounds
-   floating controls. Everywhere else (desktop browsers especially) the same
-   alpha reads washed-out/transparent, so float it much closer to solid. */
+/* iOS renders the backdrop blur as a real native material, so the 64% glass
+   reliably grounds floating controls there. Everywhere else (desktop browsers,
+   Windows especially) the blur is much weaker and the same alpha reads
+   washed-out/too transparent, so nudge it more opaque. */
 html:not([data-mobile-platform="ios"]) {
-  --m-glass-alpha: 88%;
+  --m-glass-alpha: 70%;
 }
 
 /* Reused HeroUI buttons render at their "sm" size (~32px tall) throughout the
@@ -883,6 +884,20 @@ body.bg-background {
   color: var(--foreground);
 }
 
+/* Desktop/tablet sidebar search: unlike the mobile pill's solid, bordered
+   surface, the wide-shell field is borderless and transparent so it reads as
+   part of the sidebar rather than a raised control. It picks up a faint wash
+   only while focused. */
+.m-shell--wide .m-thread-search {
+  border-color: transparent;
+  border-radius: 0;
+  background: transparent;
+}
+
+.m-shell--wide .m-thread-search:focus-within {
+  border-bottom-color: color-mix(in oklab, var(--foreground) 30%, transparent);
+}
+
 .m-threads__project-btn {
   max-width: min(42vw, 12rem);
   flex: none;
@@ -1338,6 +1353,8 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   height: var(--m-floating-control-inner-size);
   min-width: var(--m-floating-control-inner-size);
   min-height: var(--m-floating-control-inner-size);
+  /* Match the home bubble's circular action inside the pill's rounded end. */
+  border-radius: var(--m-floating-control-radius);
 }
 
 .m-compose-dock:not([data-expanded]) .m-compose-bubble [data-composer-input-anchor] {
@@ -1723,9 +1740,17 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 /* The scroll-to-bottom pin anchors to the pane's (now full-height) bottom
-   edge; lift it above the floating composer band. */
+   edge; lift it above the floating composer band. --m-thread-bubble-height is
+   the composer bubble's live measured height (set by ThreadView from the
+   dock's ResizeObserver), so the pin rides up as the bubble grows — expanded
+   toolbar, multiline prompts — instead of sliding underneath it. The keyboard
+   offset term matches the dock's own keyboard lift. */
 .m-thread .m-thread-content button.bottom-4:has(svg.lucide-arrow-down) {
-  bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  bottom: calc(
+    var(--m-thread-pin-lift, 1.75rem) + env(safe-area-inset-bottom) +
+      var(--m-thread-bubble-height, var(--m-floating-control-height)) +
+      var(--m-keyboard-offset, 0px)
+  );
   transition:
     opacity 0.2s ease-out,
     bottom 0.2s ease-out;
@@ -1735,10 +1760,8 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
    (.m-thread-chips bottom + its 1.75rem row); stack the pin one row higher
    so the two never overlap. The bottom transition above makes the pin slide
    rather than jump as chips appear and disappear. */
-.m-thread:has(.m-thread-chips:not([data-hidden]))
-  .m-thread-content
-  button.bottom-4:has(svg.lucide-arrow-down) {
-  bottom: calc(3.5rem + env(safe-area-inset-bottom) + var(--m-floating-control-height));
+.m-thread:has(.m-thread-chips:not([data-hidden])) {
+  --m-thread-pin-lift: 3.5rem;
 }
 
 /* An expanded chip panel grows over the pin's slot — duck the pin while the
@@ -2475,6 +2498,11 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
     border-color 0.15s ease;
 }
 
+/* The collapsed thread composer floats over live chat on the same shared glass
+   as every other floating control: --m-glass-surface (with the per-platform
+   --m-glass-alpha) drives both the shell here and the .m-compose-bubble around
+   it, so one transparency knob covers every surface while the backdrop blur
+   still lets messages scroll visibly beneath. Expanded keeps a solid surface. */
 :is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
@@ -2484,18 +2512,6 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
-}
-
-/* The collapsed thread composer floats over live chat: keep it properly
-   translucent (the backdrop blur carries legibility) so the messages visibly
-   scroll beneath it. Collapsed only — the expanded bubble keeps its solid
-   surface for legible controls. */
-:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock:not([data-expanded]) .m-compose-bubble {
-  background: color-mix(
-    in oklab,
-    var(--composer-surface, var(--surface, var(--content-background))) 45%,
-    transparent
-  );
 }
 
 /* …and expanded matches the expanded bubble: flatter radius, opaque surface,
@@ -2624,6 +2640,57 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   /* Same single-line centering as the home bubble: a full-height line box
      instead of the font-metric-sensitive (height - 1lh)/2 padding calc. */
   line-height: var(--m-floating-control-line-height);
+}
+
+/* Current model · effort summary pinned inside the compact pill's right end
+   (ComposerCompactSummary). Inert info chrome: it fades away when the
+   composer expands (the real controls take over) or once a prompt is typed
+   (the pinned send button owns that corner). */
+.m-compose-summary {
+  position: absolute;
+  top: 0;
+  right: 1rem;
+  z-index: 1;
+  display: flex;
+  height: var(--m-floating-control-height);
+  max-width: 45%;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  color: var(--muted);
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.m-compose-summary__item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-compose-summary__item + .m-compose-summary__item::before {
+  content: "·";
+  margin-right: 0.4rem;
+}
+
+.m-thread-compose-dock[data-expanded] .m-compose-summary,
+.m-thread-compose-dock:not([data-expanded])
+  .m-compose-bubble:has([data-composer-input-anchor] [contenteditable]:not(:empty))
+  .m-compose-summary {
+  opacity: 0;
+}
+
+/* The compact input reserves the summary's measured width (published on the
+   bubble by ComposerCompactSummary) so the placeholder never runs beneath it.
+   Empty-prompt case only — typed prompts swap to the pinned-send reserve. */
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock:not([data-expanded])
+  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
+  .poracode-mention-input {
+  padding-right: calc(1.5rem + var(--m-compose-summary-width, 0px));
 }
 
 /* Compact → expanded moves the toolbar from invisible absolute chrome into

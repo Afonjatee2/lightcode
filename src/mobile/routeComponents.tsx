@@ -141,6 +141,15 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
   // idle events don't keep re-earning it) and loads its history snapshot.
   // openThread is idempotent and guards against duplicate in-flight loads, so
   // the click path (store already watching, snapshot still fetching) is cheap.
+  //
+  // Also keyed on the active desktop id: on a cold deep-link load the thread is
+  // seeded from the localStorage mirror (so threadId is stable from the first
+  // render) while the desktop connection is still being established async.
+  // openThread bails when activeDesktop is null, so without this dep the effect
+  // never retries once the desktop connects and the history snapshot never
+  // loads — a blank transcript. The watched+hasSnapshot guard keeps the retry
+  // from redundantly reopening an already-loaded thread.
+  const activeDesktopId = remote.activeDesktop?.desktopId ?? null;
   useEffect(() => {
     if (!threadId) return;
     const state = useAppStore.getState();
@@ -149,8 +158,8 @@ function ThreadDetail(props: { readonly thread: Thread | null; readonly hideHead
     if (watched && hasSnapshot) return;
     const target = remote.threads.find((entry) => entry.id === threadId);
     if (target) void remote.openThread(target);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the displayed thread id; openThread guards the racing click path
-  }, [threadId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the displayed thread id + active desktop; openThread guards the racing click path
+  }, [threadId, activeDesktopId]);
   if (!thread) {
     return (
       <section className="m-thread">
@@ -283,9 +292,11 @@ export function ThreadsRoute() {
     return () => window.clearTimeout(handle);
   }, [activeDesktopId]);
 
-  // Wide: the sidebar owns the list; this pane shows the selected thread.
+  // Wide: the sidebar owns the list; this pane shows the New-thread composer
+  // (opening a thread routes to /thread/$id, which renders it in the detail).
+  // Landing here no longer auto-selects the most recent thread.
   if (isWide) {
-    return <ThreadDetail thread={remote.selectedThread} hideHeader={false} />;
+    return <NewThreadRoute />;
   }
 
   return (
@@ -366,6 +377,11 @@ export function ThreadRoute() {
   return <ThreadDetail thread={thread} hideHeader={!isWide} />;
 }
 
+/**
+ * The /new route: the New-thread composer pane. In the wide layout it also
+ * serves as the /threads detail pane, so opening the app lands on the composer
+ * rather than auto-selecting the most recent thread.
+ */
 export function NewThreadRoute() {
   const navigate = useNavigate();
   return (

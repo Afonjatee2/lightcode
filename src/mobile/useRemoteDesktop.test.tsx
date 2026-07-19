@@ -769,4 +769,31 @@ describe("useRemoteDesktop", () => {
     expect(view.result.current.connection).toBe("online");
     expect(view.result.current.message).toBe("http blip");
   });
+
+  it("[#8] does not claim offline while cached data renders during the first boot refresh", async () => {
+    const d = makeDesktop("d1");
+    const client = clientFor("d1");
+    h.storedDesktops = [d];
+    h.activeDesktopId = "d1";
+    h.storedShell.set("d1", { snapshot: snapshotFor("d1", ["cached-thread"]) });
+
+    // The boot refresh hangs — the desktop hasn't answered yet.
+    let release: (v: unknown) => void = () => {};
+    client.snapshot.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+
+    const view = renderHook(() => useRemoteDesktop());
+
+    // Cached data is applied for instant paint…
+    await waitFor(() =>
+      expect(h.applyShellSnapshot).toHaveBeenCalledWith(expect.objectContaining({ __from: "d1" })),
+    );
+    // …but the pill must stay on the boot spinner, not flash the offline banner.
+    expect(view.result.current.connection).toBe("booting");
+
+    // The first refresh resolves → online, never having shown "offline".
+    await act(async () => {
+      release(snapshotFor("d1", ["cached-thread"]));
+    });
+    await waitFor(() => expect(view.result.current.connection).toBe("online"));
+  });
 });

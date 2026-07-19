@@ -7,7 +7,7 @@ import { AttachmentBar } from "@/renderer/components/composer/AttachmentBar";
 import { openAttachmentLightbox } from "@/renderer/components/composer/ImageLightbox";
 import { openPdfPreview } from "@/renderer/components/pdf/openPdfPreview";
 import type { Attachment } from "@/renderer/components/composer/useAttachments";
-import { fileNameFromPath } from "@/shared/promptContent";
+import { fileNameFromPath, isImagePath } from "@/shared/promptContent";
 import { isRemoteSession } from "@/renderer/bridge";
 import {
   getRuntimeItemPayload,
@@ -501,13 +501,14 @@ function buildUserPromptAttachments(content: CanonicalContentBlock[]): Attachmen
       ];
     }
     if (block.kind === "file" && block.source === "attachment") {
+      const isImage = isImagePath(block.path, block.mimeType);
       return [
         {
-          id: `attachment-${index}-${block.path}`,
+          id: `${isImage ? "image" : "attachment"}-${index}-${block.path}`,
           path: block.path,
           name: block.name ?? fileNameFromPath(block.path),
           ...(block.mimeType ? { mimeType: block.mimeType } : {}),
-          isImage: false,
+          isImage,
         },
       ];
     }

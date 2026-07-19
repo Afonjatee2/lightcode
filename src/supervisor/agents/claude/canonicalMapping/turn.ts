@@ -1,4 +1,5 @@
-import type { CanonicalContentBlock, PromptSegment, RuntimeEvent } from "@/shared/contracts";
+import type { PromptSegment, RuntimeEvent } from "@/shared/contracts";
+import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
   goalPayloadFromProviderState,
   parseGoalSlashCommand,
@@ -9,34 +10,6 @@ import type { ClaudeMapperState } from "../sdkCanonicalMappingState";
 import { clearActiveGoal, resetActiveGoalTokenAccounting } from "./goal";
 import { newItemId } from "./helpers";
 import { isLiveSubAgentScopedTool } from "./toolItems";
-
-export function buildPromptContentBlocks(
-  prompt: string,
-  segments?: PromptSegment[],
-): CanonicalContentBlock[] {
-  if (!segments || segments.length === 0) {
-    return prompt.length > 0 ? [{ kind: "text", text: prompt }] : [];
-  }
-
-  const blocks: CanonicalContentBlock[] = [];
-  for (const segment of segments) {
-    if (segment.kind === "text") {
-      if (segment.content.length > 0) blocks.push({ kind: "text", text: segment.content });
-      continue;
-    }
-    if (segment.kind === "mcp") {
-      blocks.push({ kind: "mcp", name: segment.name });
-      continue;
-    }
-    blocks.push({
-      kind: "file",
-      path: segment.path,
-      name: segment.path.split(/[\\/]/).pop(),
-      source: segment.kind === "attachment" ? "attachment" : "mention",
-    });
-  }
-  return blocks;
-}
 
 export function startClaudeTurn(
   state: ClaudeMapperState,

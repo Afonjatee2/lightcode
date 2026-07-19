@@ -71,7 +71,9 @@ describe("sdkCanonicalMapping — prompt content", () => {
           content: [
             { kind: "text", text: "see this" },
             {
-              kind: "file",
+              kind: "image",
+              mimeType: "image/png",
+              dataUrl: "poracode-local://local/C:/tmp/image.png",
               path: "C:\\tmp\\image.png",
               name: "image.png",
               source: "attachment",

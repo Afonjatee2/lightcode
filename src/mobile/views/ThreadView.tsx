@@ -22,6 +22,7 @@ import { useProjectAgentStatuses } from "@/renderer/hooks/uiSelectors";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useProject } from "@/renderer/state/useThread";
 import { MobileTerminal } from "../MobileTerminal";
+import { ComposerCompactSummary } from "../ComposerCompactSummary";
 import { ComposerInfoChips } from "../ComposerInfoChips";
 import { FloatingComposerDock } from "../FloatingComposerDock";
 import { EmptyState } from "../components";
@@ -93,6 +94,7 @@ export function ThreadView(props: ThreadViewProps) {
   useGitSummaryHydration(thread, project);
   const projectAgentStatuses = useProjectAgentStatuses(project?.location);
   const terminalPaneRef = useRef<TerminalPaneHandle | null>(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
   const terminalSurfaceRef = useRef<XTermSurfaceHandle | null>(null);
   const [terminalReloadKey, setTerminalReloadKey] = useState(0);
   const [terminalSize, setTerminalSize] = useState<TerminalSize | null>(null);
@@ -232,6 +234,11 @@ export function ThreadView(props: ThreadViewProps) {
       expanded={composerExpanded}
       onExpandedChange={setComposerExpanded}
       onComposerFocusChange={setComposerInputFocused}
+      onBubbleHeightChange={(height) => {
+        // The scroll-to-bottom pin (and other floating chrome) reads this to
+        // stay clear of the composer as the bubble grows and shrinks.
+        sectionRef.current?.style.setProperty("--m-thread-bubble-height", `${height}px`);
+      }}
     >
       <ThreadComposerSection
         {...commonProps}
@@ -247,11 +254,13 @@ export function ThreadView(props: ThreadViewProps) {
         onTodoDockPlacementChange={dockState.onTodoDockPlacementChange}
         onTodoDockRetire={dockState.onTodoDockRetire}
       />
+      <ComposerCompactSummary thread={thread} agentStatus={agentStatus} />
     </FloatingComposerDock>
   ) : null;
 
   return (
     <section
+      ref={sectionRef}
       className={isTerminal ? "m-thread m-thread--terminal" : "m-thread"}
       style={{ "--m-keyboard-offset": `${terminalPageKeyboardOffset}px` } as CSSProperties}
     >

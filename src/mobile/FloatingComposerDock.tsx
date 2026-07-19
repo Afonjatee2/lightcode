@@ -23,6 +23,12 @@ export function FloatingComposerDock(props: {
   readonly collapseOnFocusLoss?: boolean | undefined;
   readonly onExpandedChange?: ((expanded: boolean) => void) | undefined;
   readonly onComposerFocusChange?: ((focused: boolean) => void) | undefined;
+  /**
+   * Reports the bubble's rendered height (border-box px) as it grows and
+   * shrinks, so the host view can keep floating chrome (e.g. the scroll-to-
+   * bottom pin) clear of the composer.
+   */
+  readonly onBubbleHeightChange?: ((height: number) => void) | undefined;
 }) {
   const bubbleRef = useRef<HTMLDivElement | null>(null);
   const [internalExpanded, setInternalExpanded] = useState(false);
@@ -156,6 +162,18 @@ export function FloatingComposerDock(props: {
   useEffect(() => {
     onComposerFocusChange?.(inputFocused);
   }, [inputFocused, onComposerFocusChange]);
+
+  const onBubbleHeightChange = props.onBubbleHeightChange;
+  useEffect(() => {
+    const bubble = bubbleRef.current;
+    if (!onBubbleHeightChange || !bubble) return;
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[entries.length - 1];
+      if (entry) onBubbleHeightChange(entry.borderBoxSize?.[0]?.blockSize ?? bubble.offsetHeight);
+    });
+    observer.observe(bubble);
+    return () => observer.disconnect();
+  }, [onBubbleHeightChange]);
 
   useEffect(
     () => () => {

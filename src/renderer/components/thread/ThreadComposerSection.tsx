@@ -591,14 +591,18 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
             className={`grid transition-[grid-template-rows] ease-[cubic-bezier(0.16,1,0.3,1)] ${isComposerCollapsed ? "duration-300" : "duration-200"}`}
             style={{ gridTemplateRows: isComposerCollapsed ? "0fr" : "1fr" }}
           >
-            <div className="overflow-hidden">
+            {/* Bottom-anchor the shell inside the clip so collapsing slides it
+                down like a drawer instead of chopping off its bottom border. */}
+            <div className="flex min-h-0 flex-col justify-end overflow-hidden">
               <div
                 className={`relative ${isComposerCollapsed ? "pointer-events-none" : ""}`}
                 style={{
                   opacity: isComposerCollapsed ? 0 : 1,
+                  // Fade over the same window as the height transition so the
+                  // collapse reads as one motion, not height-then-border steps.
                   transition: isComposerCollapsed
-                    ? "opacity 150ms ease 50ms"
-                    : "opacity 200ms ease 100ms",
+                    ? "opacity 300ms cubic-bezier(0.16,1,0.3,1)"
+                    : "opacity 200ms cubic-bezier(0.16,1,0.3,1)",
                 }}
               >
                 <ThreadComposer
