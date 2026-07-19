@@ -32,23 +32,38 @@ import { createInitialPendingSteerState } from "@/renderer/state/slices/pendingS
 
 export { applyThreadSnapshot };
 
+function reuseSnapshotRows<T extends { readonly id: string }>(current: T[], incoming: T[]): T[] {
+  if (current.length === 0) return incoming.length === 0 ? current : incoming;
+  const currentById = new Map(current.map((row) => [row.id, row]));
+  let changed = current.length !== incoming.length;
+  const next = incoming.map((row, index) => {
+    const existing = currentById.get(row.id);
+    const resolved = existing && JSON.stringify(existing) === JSON.stringify(row) ? existing : row;
+    if (resolved !== current[index]) changed = true;
+    return resolved;
+  });
+  return changed ? next : current;
+}
+
 export function applyShellSnapshot(snapshot: RemoteShellSnapshot): void {
   useAppStore.setState((current) => {
     const currentById = new Map(current.threads.map((thread) => [thread.id, thread]));
-    return {
-      projects: snapshot.projects,
-      // "finished" is a client-side derivation (an unwatched turn completed —
-      // the badge that clears when the user opens the thread); the server only
-      // ever persists "idle". A raw replace would strip the badge on the very
-      // next shell refresh, so keep the local "finished" until the thread is
-      // opened or genuinely changes state.
-      threads: snapshot.threads.map((incoming) => {
-        if (incoming.status !== "idle") return incoming;
-        return currentById.get(incoming.id)?.status === "finished"
-          ? { ...incoming, status: "finished" as const }
-          : incoming;
-      }),
-    };
+    // "finished" is a client-side derivation (an unwatched turn completed —
+    // the badge that clears when the user opens the thread); the server only
+    // ever persists "idle". A raw replace would strip the badge on the very
+    // next shell refresh, so keep the local "finished" until the thread is
+    // opened or genuinely changes state.
+    const incomingThreads = snapshot.threads.map((incoming) => {
+      if (incoming.status !== "idle") return incoming;
+      return currentById.get(incoming.id)?.status === "finished"
+        ? { ...incoming, status: "finished" as const }
+        : incoming;
+    });
+    const projects = reuseSnapshotRows(current.projects, snapshot.projects);
+    const threads = reuseSnapshotRows(current.threads, incomingThreads);
+    return projects === current.projects && threads === current.threads
+      ? current
+      : { projects, threads };
   });
   if (snapshot.gitSummariesByThread) {
     useGitSummariesStore.getState().setAll(snapshot.gitSummariesByThread);

@@ -20,6 +20,8 @@ interface ChipDescriptor {
   readonly label: string;
   readonly count?: string;
   readonly tone?: "danger";
+  /** Work is actively running behind this chip — its icon gets a soft pulse. */
+  readonly active?: boolean;
 }
 
 /**
@@ -50,6 +52,7 @@ export function ComposerInfoChips(props: {
       icon: Bot,
       label: t`Subagents`,
       count: String(agentCounts.subagent),
+      active: true,
     });
   }
   if (agentCounts.crossagent > 0) {
@@ -58,6 +61,7 @@ export function ComposerInfoChips(props: {
       icon: Users,
       label: t`Crossagents`,
       count: String(agentCounts.crossagent),
+      active: true,
     });
   }
   if (agentCounts.workflow > 0) {
@@ -66,6 +70,7 @@ export function ComposerInfoChips(props: {
       icon: GitBranch,
       label: t`Workflows`,
       count: String(agentCounts.workflow),
+      active: true,
     });
   }
   if (todoState) {
@@ -74,6 +79,7 @@ export function ComposerInfoChips(props: {
       icon: ListChecks,
       label: t`Plan`,
       count: `${completedSteps}/${todoState.steps.length}`,
+      active: todoState.steps.some((step) => step.status === "in_progress"),
     });
   }
   if (dockState.goalDockState) {
@@ -171,6 +177,7 @@ export function ComposerInfoChips(props: {
               className="m-chip"
               data-open={isOpen || undefined}
               data-tone={chip.tone}
+              data-active={chip.active || undefined}
               aria-expanded={isOpen}
               aria-label={chip.label}
               title={chip.label}

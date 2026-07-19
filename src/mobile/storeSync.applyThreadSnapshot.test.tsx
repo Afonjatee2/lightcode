@@ -8,6 +8,7 @@ import { applyThreadSnapshot, dispatchRemoteSupervisorEvent, resetRemoteStores }
 // storeSync coalesces live runtime deltas onto an animation frame; drive that
 // frame deterministically so we can assert ordering around applyThreadSnapshot.
 let rafCallbacks: Array<FrameRequestCallback | null> = [];
+let timeoutCallbacks: Array<{ callback: () => void; delay: number } | null> = [];
 
 const THREAD_ID = "thread-1";
 
@@ -66,6 +67,7 @@ function assistantStreamText(itemId: string): string | undefined {
 describe("applyThreadSnapshot", () => {
   beforeEach(() => {
     rafCallbacks = [];
+    timeoutCallbacks = [];
     vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback): number => {
       rafCallbacks.push(cb);
       return rafCallbacks.length;
@@ -73,6 +75,13 @@ describe("applyThreadSnapshot", () => {
     vi.stubGlobal("cancelAnimationFrame", (handle: number): void => {
       // Handles are 1-based indices into rafCallbacks.
       rafCallbacks[handle - 1] = null;
+    });
+    vi.stubGlobal("setTimeout", (callback: () => void, delay = 0): number => {
+      timeoutCallbacks.push({ callback, delay });
+      return timeoutCallbacks.length;
+    });
+    vi.stubGlobal("clearTimeout", (handle: number): void => {
+      timeoutCallbacks[handle - 1] = null;
     });
     resetRemoteStores();
   });
@@ -83,6 +92,7 @@ describe("applyThreadSnapshot", () => {
   });
 
   it("flushes pending rAF-queued deltas before replacing items (no duplicated text)", () => {
+    useAppStore.setState({ view: { kind: "thread", panes: [THREAD_ID] } });
     // Seed the store with a streaming assistant item ("hello ").
     const store = useAppStore.getState();
     store.applyRuntimeEvents(THREAD_ID, [
@@ -131,6 +141,67 @@ describe("applyThreadSnapshot", () => {
     expect(assistantStreamText("msg-1")).toBe("hello world");
     // The snapshot's structural version bumped exactly once for the replace.
     expect(useAppStore.getState().runtimeItemIdsByThread[THREAD_ID]).toEqual(["msg-1"]);
+  });
+
+  it("frame-paces the visible thread and batches concurrent background streams", () => {
+    const applyRuntimeEventBatches = vi.spyOn(useAppStore.getState(), "applyRuntimeEventBatches");
+    useAppStore.setState({ view: { kind: "thread", panes: [THREAD_ID] } });
+
+    for (let index = 0; index < 10; index += 1) {
+      const threadId = index === 0 ? THREAD_ID : `background-${index}`;
+      for (let eventIndex = 0; eventIndex < 5; eventIndex += 1) {
+        dispatchRemoteSupervisorEvent({
+          type: "thread-runtime-event",
+          threadId,
+          event: {
+            type: "item.started",
+            threadId,
+            itemId: `${threadId}-${eventIndex}`,
+            itemType: "reasoning",
+          },
+        });
+      }
+    }
+
+    expect(rafCallbacks.filter((callback) => callback !== null)).toHaveLength(1);
+    rafCallbacks.find((callback) => callback !== null)?.(0);
+    expect(applyRuntimeEventBatches).toHaveBeenCalledTimes(1);
+    expect(applyRuntimeEventBatches.mock.calls[0]?.[0]).toEqual([
+      expect.objectContaining({ threadId: THREAD_ID, events: expect.any(Array) }),
+    ]);
+
+    const backgroundFlush = timeoutCallbacks.find((pending) => pending !== null);
+    expect(backgroundFlush?.delay).toBe(250);
+    backgroundFlush?.callback();
+    expect(applyRuntimeEventBatches).toHaveBeenCalledTimes(2);
+    expect(applyRuntimeEventBatches.mock.calls[1]?.[0]).toHaveLength(9);
+
+    applyRuntimeEventBatches.mockRestore();
+    resetRemoteStores();
+  });
+
+  it("promotes queued background events when their thread becomes visible", () => {
+    const applyRuntimeEventBatches = vi.spyOn(useAppStore.getState(), "applyRuntimeEventBatches");
+    useAppStore.setState({ view: { kind: "home" } });
+    dispatchRemoteSupervisorEvent({
+      type: "thread-runtime-event",
+      threadId: THREAD_ID,
+      event: {
+        type: "item.started",
+        threadId: THREAD_ID,
+        itemId: "promoted",
+        itemType: "reasoning",
+      },
+    });
+    expect(rafCallbacks.filter((callback) => callback !== null)).toHaveLength(0);
+
+    useAppStore.setState({ view: { kind: "thread", panes: [THREAD_ID] } });
+    expect(rafCallbacks.filter((callback) => callback !== null)).toHaveLength(1);
+    rafCallbacks.find((callback) => callback !== null)?.(0);
+    expect(applyRuntimeEventBatches).toHaveBeenCalledTimes(1);
+
+    applyRuntimeEventBatches.mockRestore();
+    resetRemoteStores();
   });
 
   it("applies a shorter fresh server snapshot to an inactive thread (fromServer default)", () => {

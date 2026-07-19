@@ -93,7 +93,10 @@ export function WideShell(props: {
   function applySidebarWidth(next: number): number {
     const width = clampSidebarWidth(next);
     sidebarWidthRef.current = width;
-    shellRef.current?.style.setProperty("--m-sidebar-width", `${width}px`);
+    // Write the grid column directly instead of updating --m-sidebar-width:
+    // changing a custom property on the shell root invalidates style recalc
+    // for the entire subtree on every drag frame, which makes the drag lag.
+    shellRef.current?.style.setProperty("grid-template-columns", `${width}px minmax(0, 1fr)`);
     return width;
   }
 
@@ -115,11 +118,27 @@ export function WideShell(props: {
     document.body.style.cursor = "col-resize";
     document.body.style.userSelect = "none";
 
+    // Coalesce mousemove bursts into one style write per frame — mousemove can
+    // fire faster than the display refresh, and each unbatched write forces an
+    // extra style/layout pass.
+    let rafId: number | null = null;
+    let pendingX = startX;
+
+    function flush(): void {
+      rafId = null;
+      applySidebarWidth(startWidth + pendingX - startX);
+    }
+
     function onMouseMove(moveEvent: MouseEvent): void {
-      applySidebarWidth(startWidth + moveEvent.clientX - startX);
+      pendingX = moveEvent.clientX;
+      if (rafId === null) rafId = requestAnimationFrame(flush);
     }
 
     function teardown(): void {
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = previousCursor;

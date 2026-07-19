@@ -5,6 +5,7 @@ import { recallKeyboardHeight } from "./keyboardFocusShared";
 import { isAndroidRuntime } from "./mobilePlatform";
 import { isTouchLikePointerEvent } from "./pointerModality";
 import { suppressNextGhostTap } from "./suppressGhostTap";
+import { useBubbleGrowAnimation } from "./useBubbleGrowAnimation";
 import { useComposerKeyboard } from "./useComposerKeyboard";
 
 const KEYBOARD_VISIBILITY_OFFSET_VAR = "--m-keyboard-visibility-offset";
@@ -187,6 +188,14 @@ export function FloatingComposerDock(props: {
   // probe (liftOffset pins to it), so only a truly unknown height — a zero
   // lift — hides the dock until the measurement lands.
   const hideDockForMeasuring = measuringKeyboard && liftOffset === 0;
+  // Measured-px height pin for the expand/collapse flip; null lets the CSS
+  // (auto height, control-line/viewport max-height caps) own the bubble.
+  const bubblePin = useBubbleGrowAnimation(bubbleRef, expanded, instantExpand);
+  const bubbleStyle: CSSProperties = {};
+  if (bubblePin !== null) {
+    bubbleStyle.height = bubblePin.height;
+    if (bubblePin.maxHeight !== null) bubbleStyle.maxHeight = bubblePin.maxHeight;
+  }
 
   return (
     <>
@@ -209,6 +218,8 @@ export function FloatingComposerDock(props: {
         <div
           ref={bubbleRef}
           className={["m-compose-bubble", props.bubbleClassName].filter(Boolean).join(" ")}
+          style={bubbleStyle}
+          data-height-animating={bubblePin !== null || undefined}
           onFocusCapture={handleFocusCapture}
         >
           {props.children}

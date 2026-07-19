@@ -32,10 +32,13 @@ function makeThread(status: Thread["status"], overrides: Partial<Thread> = {}): 
   };
 }
 
-function makeShellSnapshot(threads: Thread[]): RemoteShellSnapshot {
+function makeShellSnapshot(
+  threads: Thread[],
+  projects: RemoteShellSnapshot["projects"] = [],
+): RemoteShellSnapshot {
   return {
     snapshotSeq: 1,
-    projects: [],
+    projects,
     threads,
     runtimeSummariesByThread: {},
     updatedAt: "2026-03-21T10:00:00.000Z",
@@ -96,5 +99,48 @@ describe("applyShellSnapshot", () => {
     useAppStore.getState().openThread(THREAD_ID);
     applyShellSnapshot(makeShellSnapshot([makeThread("idle")]));
     expect(threadStatus()).toBe("idle");
+  });
+
+  it("preserves unchanged project and thread identities", () => {
+    const project = {
+      id: "proj-1",
+      name: "Demo",
+      location: { kind: "windows" as const, path: "C:\\demo" },
+      createdAt: "2026-03-21T10:00:00.000Z",
+    };
+    const firstThread = makeThread("working");
+    const secondThread = makeThread("working", { id: "thread-2", title: "Other" });
+    applyShellSnapshot(makeShellSnapshot([firstThread, secondThread], [project]));
+    const before = useAppStore.getState();
+
+    applyShellSnapshot(
+      makeShellSnapshot(
+        [{ ...firstThread }, { ...secondThread }],
+        [{ ...project, location: { ...project.location } }],
+      ),
+    );
+    const after = useAppStore.getState();
+
+    expect(after.projects).toBe(before.projects);
+    expect(after.projects[0]).toBe(before.projects[0]);
+    expect(after.threads).toBe(before.threads);
+    expect(after.threads[0]).toBe(before.threads[0]);
+    expect(after.threads[1]).toBe(before.threads[1]);
+  });
+
+  it("replaces only the thread that changed", () => {
+    const firstThread = makeThread("working");
+    const secondThread = makeThread("working", { id: "thread-2", title: "Other" });
+    applyShellSnapshot(makeShellSnapshot([firstThread, secondThread]));
+    const before = useAppStore.getState().threads;
+
+    applyShellSnapshot(
+      makeShellSnapshot([{ ...firstThread, title: "Renamed" }, { ...secondThread }]),
+    );
+    const after = useAppStore.getState().threads;
+
+    expect(after).not.toBe(before);
+    expect(after[0]).not.toBe(before[0]);
+    expect(after[1]).toBe(before[1]);
   });
 });

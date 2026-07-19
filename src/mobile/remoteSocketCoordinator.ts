@@ -23,6 +23,7 @@ export type SocketConnectionState = "online" | "reconnecting" | "offline" | "una
 export interface SocketRefreshRequest {
   readonly refreshSelectedThread: boolean;
   readonly includeAuxiliary: boolean;
+  readonly resetLastSeenSeq?: boolean;
 }
 
 type SocketClient = Pick<
@@ -95,6 +96,7 @@ export function createRemoteSocketCoordinator(
   // Coalesced refreshes retain the strongest flags requested before the flush.
   let pendingRecovery = false;
   let pendingRefreshSelected = false;
+  let pendingSeqReset = false;
   let attempt = 0;
   let lastSeenSeq = options.initialLastSeenSeq;
   let pingTimer = 0;
@@ -103,7 +105,11 @@ export function createRemoteSocketCoordinator(
   let heartbeat = 0;
 
   function scheduleRefresh(
-    request: { readonly triggerThreadId?: string; readonly recovery?: boolean } = {},
+    request: {
+      readonly triggerThreadId?: string;
+      readonly recovery?: boolean;
+      readonly resetLastSeenSeq?: boolean;
+    } = {},
   ): void {
     const recovery = request.recovery ?? false;
     const refreshSelectedThread =
@@ -112,15 +118,19 @@ export function createRemoteSocketCoordinator(
         request.triggerThreadId === options.getSelectedThreadId());
     pendingRecovery ||= recovery;
     pendingRefreshSelected ||= refreshSelectedThread;
+    pendingSeqReset ||= request.resetLastSeenSeq ?? false;
     window.clearTimeout(refreshTimer);
     refreshTimer = window.setTimeout(() => {
       const runRecovery = pendingRecovery;
       const runRefreshSelected = pendingRefreshSelected;
+      const runSeqReset = pendingSeqReset;
       pendingRecovery = false;
       pendingRefreshSelected = false;
+      pendingSeqReset = false;
       options.requestRefresh({
         refreshSelectedThread: runRefreshSelected,
         includeAuxiliary: runRecovery,
+        ...(runSeqReset ? { resetLastSeenSeq: true } : {}),
       });
     }, REFRESH_DEBOUNCE_MS);
   }
@@ -218,7 +228,11 @@ export function createRemoteSocketCoordinator(
               }
             }
             if (parsed.type === "resync-required") {
-              scheduleRefresh({ recovery: true });
+              // The server's in-memory sequence can move backwards after a
+              // desktop restart. Reset immediately so events from the new
+              // stream are not discarded while the recovery snapshot loads.
+              lastSeenSeq = parsed.seq;
+              scheduleRefresh({ recovery: true, resetLastSeenSeq: true });
             }
           } catch {
             // Bad frames are ignored; HTTP refresh remains authoritative.

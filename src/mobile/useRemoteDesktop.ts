@@ -156,12 +156,12 @@ export function useRemoteDesktop() {
   // already shows the last session's threads/projects instead of an empty
   // shell (IndexedDB reads can't complete before first render). The Dexie
   // cache (loadCached) and the live refresh overwrite the seed moments later.
-  const [snapshot, setSnapshot] = useState<RemoteShellSnapshot | null>(() => {
+  const shellSnapshotRef = useRef<RemoteShellSnapshot | null | undefined>(undefined);
+  if (shellSnapshotRef.current === undefined) {
     const mirror = readShellSnapshotMirror();
-    if (!mirror) return null;
-    applyShellSnapshot(mirror.snapshot);
-    return mirror.snapshot;
-  });
+    shellSnapshotRef.current = mirror?.snapshot ?? null;
+    if (mirror) applyShellSnapshot(mirror.snapshot);
+  }
   const [selectedThreadId, setSelectedThreadId] = useState<string | null>(null);
   const [threadSnapshot, setThreadSnapshot] = useState<RemoteThreadSnapshot | null>(null);
   const [connection, setConnection] = useState<ConnectionState>("booting");
@@ -249,7 +249,7 @@ export function useRemoteDesktop() {
         // A mirror seed without any paired desktop is stale (e.g. the Dexie DB
         // was cleared but localStorage survived) — drop it instead of showing
         // ghost threads on an unpaired install.
-        if (snapshot) resetSessionState();
+        if (shellSnapshotRef.current) resetSessionState();
         setConnection("offline");
         return;
       }
@@ -364,7 +364,7 @@ export function useRemoteDesktop() {
     const cached = await getStoredShellSnapshot(desktopId);
     if (desktopId !== activeDesktopIdRef.current) return;
     if (!cached) return;
-    setSnapshot(cached.snapshot);
+    shellSnapshotRef.current = cached.snapshot;
     applyShellSnapshot(cached.snapshot);
     const firstThreadId = firstThreadIdByRecency(cached.snapshot.threads) ?? null;
     setSelectedThreadId((current) => current ?? firstThreadId);
@@ -397,7 +397,7 @@ export function useRemoteDesktop() {
     resetBrowserMirror();
     resetTerminalFeed();
     resetDesktopSettings();
-    setSnapshot(null);
+    shellSnapshotRef.current = null;
     setThreadSnapshot(null);
     setSelectedThreadId(null);
     // Drop the per-desktop persistence bookkeeping so the first refresh after a
@@ -474,6 +474,7 @@ export function useRemoteDesktop() {
     desktop = activeDesktop,
     options: {
       readonly refreshSelectedThread?: boolean;
+      readonly resetLastSeenSeq?: boolean;
       /**
        * When true (explicit/initial/reconnect refreshes) also re-fetch agent
        * statuses and remote settings. Event-driven refreshes skip these — those
@@ -492,7 +493,7 @@ export function useRemoteDesktop() {
       // a stale result must not overwrite the desktop now on screen.
       if (desktop.desktopId !== activeDesktopIdRef.current) return null;
       applyShellSnapshot(next);
-      setSnapshot(next);
+      shellSnapshotRef.current = next;
       liveSocketSeqRef.current.set(
         desktop.desktopId,
         Math.max(liveSocketSeqRef.current.get(desktop.desktopId) ?? 0, next.snapshotSeq),
@@ -551,7 +552,11 @@ export function useRemoteDesktop() {
         try {
           await Promise.all([
             saveShellSnapshot(desktop.desktopId, next),
-            markDesktopConnected(desktop.desktopId, next.snapshotSeq),
+            options.resetLastSeenSeq
+              ? markDesktopConnected(desktop.desktopId, next.snapshotSeq, {
+                  resetLastSeenSeq: true,
+                })
+              : markDesktopConnected(desktop.desktopId, next.snapshotSeq),
           ]);
           persistedShellSeqRef.current.set(desktop.desktopId, next.snapshotSeq);
         } catch (error) {
@@ -964,7 +969,7 @@ export function useRemoteDesktop() {
     resetSessionState();
     const nextDesktop = (await listStoredDesktops())[0] ?? null;
     if (!nextDesktop) {
-      setSnapshot(null);
+      shellSnapshotRef.current = null;
       await reloadDesktops();
       return;
     }
@@ -1020,7 +1025,7 @@ export function useRemoteDesktop() {
     desktops,
     activeDesktopId,
     activeDesktop,
-    snapshot,
+    snapshot: shellSnapshotRef.current,
     connection,
     message,
     booted,

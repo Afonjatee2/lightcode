@@ -332,6 +332,63 @@ describe("FloatingComposerDock", () => {
     expect(dock).toHaveAttribute("data-expanded");
   });
 
+  it("pins a measured max-height while the dock flips, then releases to CSS", async () => {
+    const { rerender } = render(<ControlledDockHarness />);
+    const input = screen.getByRole("textbox", { name: "Composer input" });
+    const bubble = document.querySelector<HTMLElement>(".m-compose-bubble");
+    expect(bubble).not.toBeNull();
+    if (!bubble) return;
+
+    // jsdom reports zero boxes; stub the two measurements the animation reads,
+    // then re-render so the idle cache picks up the collapsed rest height.
+    let rectHeight = 34;
+    vi.spyOn(bubble, "getBoundingClientRect").mockImplementation(
+      () => ({ height: rectHeight }) as unknown as DOMRect,
+    );
+    Object.defineProperty(bubble, "scrollHeight", { configurable: true, value: 90 });
+    rerender(<ControlledDockHarness />);
+
+    const fireHeightEnd = () => {
+      const event = new Event("transitionend");
+      Object.defineProperty(event, "propertyName", { value: "height" });
+      fireEvent(bubble, event);
+    };
+
+    // Expand: pin at the collapsed height, then grow to the measured content
+    // height, then release back to the CSS cap.
+    fireEvent.focusIn(input);
+    expect(bubble.style.height).toBe("34px");
+    await act(async () => {
+      await waitForTwoFrames();
+    });
+    expect(bubble.style.height).toBe("90px");
+    fireHeightEnd();
+    expect(bubble.style.height).toBe("");
+
+    // The expanded rest height is cached once the pin clears.
+    rectHeight = 90;
+    rerender(<ControlledDockHarness />);
+
+    // Earlier touch-tap tests arm the one-shot ghost-tap guard
+    // (suppressGhostTap.ts), which swallows the next document click — consume
+    // it with a dummy click so the scrim click below lands.
+    fireEvent.click(document.body);
+
+    // Collapse: pin at the expanded height (the collapsed max-height cap is
+    // lifted so it can't clamp the pin), shrink to the collapsed line, then
+    // release.
+    fireEvent.click(screen.getByLabelText("Close composer"));
+    expect(bubble.style.height).toBe("90px");
+    expect(bubble.style.maxHeight).toBe("90px");
+    await act(async () => {
+      await waitForTwoFrames();
+    });
+    expect(bubble.style.height).toBe("34px");
+    fireHeightEnd();
+    expect(bubble.style.height).toBe("");
+    expect(bubble.style.maxHeight).toBe("");
+  });
+
   it("collapses on input focus loss when collapseOnFocusLoss is set", async () => {
     render(<FocusLossHarness collapseOnFocusLoss />);
     const input = screen.getByRole("textbox");

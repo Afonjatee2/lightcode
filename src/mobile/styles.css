@@ -681,11 +681,11 @@ body.bg-background {
   min-height: var(--m-tap-min);
   align-items: center;
   gap: 0.375rem;
-  border: 1px solid var(--hairline, var(--border));
+  border: none;
   border-radius: 0.5rem;
   background: transparent;
   padding: 0.25rem 0.625rem;
-  color: var(--muted);
+  color: var(--foreground, inherit);
   cursor: pointer;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -1078,6 +1078,31 @@ body.bg-background {
   color: var(--danger);
 }
 
+/* Chips backing live work (running agents, an in-progress plan step) pulse
+   their icon softly. Transform + opacity only, so it stays on the compositor
+   and costs nothing while the thread streams. */
+.m-chip[data-active] > svg {
+  animation: m-chip-icon-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes m-chip-icon-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.88);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .m-chip[data-active] > svg {
+    animation: none;
+  }
+}
+
 /* The expanded section bubble. The shared dock sections it hosts were styled
    for the composer's fixedContent (transparent bg + border-b separators), so
    the bubble supplies the surface and the trailing separator is dropped. */
@@ -1181,6 +1206,18 @@ html:not([data-touch-device]) .m-compose-scrim {
      of expand/collapse stutter on large desktop windows). */
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+/* The measured grow/shrink animation (useBubbleGrowAnimation) drives an
+   inline height between the two rest heights; the bubble is content-sized, so
+   only a real height — not max-height — can hold it open against the shrunken
+   collapsed content. Gate the height transition to that window so
+   content-driven height changes while expanded (typing, attachments) stay
+   instant. */
+.m-compose-bubble[data-height-animating] {
+  transition:
+    height 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 0.32s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Mouse devices: the grow-in-place animation only needs the bubble's own
@@ -1292,7 +1329,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 /* Inner actions stay inside the shared compact line and are centered by the
    0.25rem insets. */
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell
@@ -1689,6 +1726,26 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
    edge; lift it above the floating composer band. */
 .m-thread .m-thread-content button.bottom-4:has(svg.lucide-arrow-down) {
   bottom: calc(4.5rem + env(safe-area-inset-bottom));
+  transition:
+    opacity 0.2s ease-out,
+    bottom 0.2s ease-out;
+}
+
+/* When the info-chip strip is showing it owns that bottom-right slot
+   (.m-thread-chips bottom + its 1.75rem row); stack the pin one row higher
+   so the two never overlap. The bottom transition above makes the pin slide
+   rather than jump as chips appear and disappear. */
+.m-thread:has(.m-thread-chips:not([data-hidden]))
+  .m-thread-content
+  button.bottom-4:has(svg.lucide-arrow-down) {
+  bottom: calc(3.5rem + env(safe-area-inset-bottom) + var(--m-floating-control-height));
+}
+
+/* An expanded chip panel grows over the pin's slot — duck the pin while the
+   panel is open instead of letting it float above the panel surface. */
+.m-thread:has(.m-chip-panel) .m-thread-content button.bottom-4:has(svg.lucide-arrow-down) {
+  opacity: 0;
+  pointer-events: none;
 }
 
 /* The terminal is an opaque bordered surface — it cannot scroll under the
@@ -2358,23 +2415,24 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 /* ── Live-thread composer: compact ⇄ full ──────────────────────────
  *
- * Unfocused, the composer is a summary: a one-line input plus the current
- * model / effort / fast chips (the first three toolbar controls) — and the
- * send button whenever there is a prompt to send. Focusing the input widens
- * it and slides the remaining controls back in. The workspace entry above the
- * chat is the git surface, so the composer's own branch affordance is
- * dropped entirely on this device. */
+ * Unfocused, the composer is a plain one-line pill: the centered placeholder
+ * (or the typed prompt) with the send button pinned right whenever there is a
+ * prompt to send; the toolbar stays invisible (opacity 0) and fades in on
+ * expand / out on collapse. Focusing the input grows the bubble and reveals
+ * the full toolbar row. The workspace entry above the chat is the git
+ * surface, so the composer's own branch affordance is dropped entirely on
+ * this device. */
 .m-shell [data-composer-branch] {
   display: none;
 }
 
-.m-main .m-thread .poracode-composer-shell [data-composer-input-anchor] {
+:is(.m-main, .m-detail) .m-thread .poracode-composer-shell [data-composer-input-anchor] {
   overflow: hidden;
   max-height: var(--m-floating-control-line-height);
   transition: max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock[data-expanded]
   .poracode-composer-shell
@@ -2382,76 +2440,23 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   max-height: 12rem;
 }
 
-/* Collapse every toolbar control past the summary trio, and the leading/after
-   extras (context ring, attach, mic) — width+opacity so it animates. */
-.m-main .m-thread .poracode-composer-toolbar > .relative > div > *,
-.m-main .m-thread .poracode-composer-toolbar > .flex.shrink-0 > * {
+/* Toolbar chips get width/opacity transitions so the desktop wrap system's
+   label reveals animate; the compact pill itself hides the whole toolbar
+   (see the opacity rules below). */
+:is(.m-main, .m-detail) .m-thread .poracode-composer-toolbar > .relative > div > *,
+:is(.m-main, .m-detail) .m-thread .poracode-composer-toolbar > .flex.shrink-0 > * {
   transition:
     max-width 0.28s cubic-bezier(0.32, 0.72, 0, 1),
     opacity 0.2s ease;
   max-width: 16rem;
 }
 
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell
-  .poracode-composer-toolbar
-  > .relative
-  > div
-  > :nth-child(n + 4):not(:has(.poracode-composer-mode-icon)):not(
-    :has(.poracode-composer-permission-icon)
-  ),
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell
-  .poracode-composer-toolbar
-  > .flex.shrink-0
-  > :not(.poracode-composer-send) {
-  /* display:none, not max-width:0 — zero-width flex items still earn the
-     row's 0.875rem gap on both sides, which read as uneven spacing between
-     the visible summary chips. The reveal on expand is covered by the
-     toolbar's entrance animation, so the per-chip width transition is not
-     missed. */
-  display: none;
-}
-
-/* One rhythm in the compact summary: chips carry no margins/padding of their
-   own (the row gap is the only inter-chip space) and the icon-only chips
-   share one 1rem icon box, so mixed intrinsic icon sizes (3.5 vs 4) can't
-   make equal gaps read as unequal. */
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  > div
-  > * {
-  margin: 0;
-  padding: 0;
-}
-
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  > div
-  > *
-  :is(svg, .poracode-composer-permission-icon, .poracode-composer-mode-icon) {
-  width: 1rem;
-  height: 1rem;
-}
-
-/* Compact with nothing typed: no send either — the summary row stands alone.
-   (Disabled markers cover HeroUI/React Aria button states.) Scoped to the
-   EMPTY case only: with a typed follow-up the button must stay visible even
-   while disabled (e.g. a running thread's stop), or the row loses its only
-   action affordance. */
-.m-main
+/* Compact with nothing typed: no send either — the pill is a bare prompt
+   line. (Disabled markers cover HeroUI/React Aria button states.) Scoped to
+   the EMPTY case only: with a typed follow-up the button must stay visible
+   even while disabled (e.g. a running thread's stop), or the row loses its
+   only action affordance. */
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
@@ -2461,7 +2466,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 /* One composer language across screens: compact matches the home bubble's
    pill (hairline, radius, translucent surface, shadow)… */
-.m-main .m-thread .poracode-composer-shell {
+:is(.m-main, .m-detail) .m-thread .poracode-composer-shell {
   border-color: var(--hairline, var(--border));
   transition:
     border-radius 0.32s cubic-bezier(0.32, 0.72, 0, 1),
@@ -2470,7 +2475,10 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
     border-color 0.15s ease;
 }
 
-.m-main .m-thread .m-thread-compose-dock:not([data-expanded]) .poracode-composer-shell {
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock:not([data-expanded])
+  .poracode-composer-shell {
   border-radius: var(--m-floating-control-radius);
   background: var(--m-glass-surface);
   backdrop-filter: blur(12px);
@@ -2482,7 +2490,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
    translucent (the backdrop blur carries legibility) so the messages visibly
    scroll beneath it. Collapsed only — the expanded bubble keeps its solid
    surface for legible controls. */
-.m-main .m-thread .m-thread-compose-dock:not([data-expanded]) .m-compose-bubble {
+:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock:not([data-expanded]) .m-compose-bubble {
   background: color-mix(
     in oklab,
     var(--composer-surface, var(--surface, var(--content-background))) 45%,
@@ -2493,13 +2501,13 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 /* …and expanded matches the expanded bubble: flatter radius, opaque surface,
    and the same animated border glow the draft composer shows (the glow node
    is rendered for every variant; desktop only lights it for drafts). */
-.m-main .m-thread .m-thread-compose-dock[data-expanded] .poracode-composer-shell {
+:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock[data-expanded] .poracode-composer-shell {
   border-radius: 1rem;
   border-color: transparent;
   background: var(--composer-surface, var(--sidebar-background, var(--background)));
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock[data-expanded]
   .poracode-composer-shell
@@ -2508,7 +2516,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   transition: opacity 0.3s ease;
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock[data-expanded]
   .poracode-composer-shell
@@ -2516,10 +2524,10 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   animation-play-state: running;
 }
 
-/* Compact state: empty prompts show the summary trio in the placeholder slot;
+/* Compact state: empty prompts show just the centered placeholder line;
    typed prompts reserve the same one-line pill and pin the send action to the
    right edge so it is not clipped below the collapsed bubble. */
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
@@ -2527,7 +2535,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   margin-right: var(--m-floating-control-height);
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
@@ -2543,7 +2551,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   pointer-events: none;
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
@@ -2552,7 +2560,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   display: none;
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
@@ -2562,7 +2570,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   margin-left: 0;
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
@@ -2572,7 +2580,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   display: none;
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
@@ -2580,55 +2588,32 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   pointer-events: auto;
 }
 
-.m-main
+/* Compact + empty: the toolbar is invisible chrome. It sits absolute so it
+   can't stretch the one-line pill, and fades in on expand / out on collapse.
+   (Typed prompts keep the pinned send — see the :has() rules above.) */
+:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock .poracode-composer-toolbar {
+  transition: opacity 0.2s ease;
+}
+
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
   .poracode-composer-toolbar {
   position: absolute;
-  inset: 0;
-  z-index: 1;
-  align-items: center;
-  justify-content: flex-start;
-  /* Left edge lines up with the input text (1rem, the shared compact line). */
-  padding: 0 0.625rem 0 1rem;
+  inset-inline: 0;
+  bottom: 0;
+  opacity: 0;
   pointer-events: none;
-}
-
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > :has(.poracode-composer-send) {
-  margin-left: auto;
-}
-
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  .poracode-composer-send {
-  pointer-events: auto;
-}
-
-/* The trio occupies the placeholder's slot; hide the placeholder itself. */
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell
-  .poracode-mention-input:empty::before {
-  content: none;
 }
 
 /* Shared compact line metrics with the home bubble: one compact control line,
    text vertically centered (the desktop editor's padding is top-heavy). */
-.m-main .m-thread .poracode-composer-shell .poracode-mention-input {
+:is(.m-main, .m-detail) .m-thread .poracode-composer-shell .poracode-mention-input {
   transition: padding 0.32s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock:not([data-expanded])
   .poracode-composer-shell
@@ -2641,128 +2626,12 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   line-height: var(--m-floating-control-line-height);
 }
 
-/* In the placeholder slot the trio reads as plain muted labels, not
-   dropdowns: chip chrome and the menu chevrons go away. The row is re-laid
-   out flat — uniform gap between items, everything on one center line, label
-   text at the input's own size. */
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative,
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  > div {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 0.875rem;
-}
-
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  :is(button, [role="button"]) {
-  display: inline-flex;
-  height: auto;
-  align-items: center;
-  gap: 0.375rem;
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  padding: 0;
-  color: var(--muted);
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  svg.lucide-chevron-down {
-  display: none;
-}
-
-/* The desktop toolbar wrap system hides control labels (is-hidden /
-   data-collapse-tier) by measuring hidden probe rows against the container
-   width. On this device the compact line only ever surfaces the first three
-   controls, so that measurement is meaningless here — force the summary trio's
-   labels back on so effort reads as text, not a lone icon. Only <span> labels
-   are re-shown: the chevrons carry the same hideable class but are <svg> and
-   stay hidden (rule above). The Fast toggle is iconOnly (no label span), so it
-   stays an icon. min-width:0 + the label's own `truncate` keep a long model
-   name from overflowing the pointer-through overlay line. */
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  span.poracode-composer-label-hideable:not(.flex-col) {
-  display: inline-block;
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* The model label is a stacked flex column (name over sub-provider); re-show it
-   as flex so its direction is preserved (display:inline-block would collapse
-   the two rows onto one line). */
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  span.poracode-composer-label-hideable.flex-col {
-  display: flex;
-  min-width: 0;
-  max-width: 100%;
-}
-
-/* The mode (work/plan) and permission chips join the compact summary as
-   icon-only glyphs — informational, non-interactive (the overlay row is
-   pointer-events:none; tapping the line focuses the input). The force-show
-   rules above would surface their text labels, so re-hide those: the chips are
-   identified provider-agnostically by the shared icon markers, never by
-   provider name or brittle nth-child position. */
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  > div
-  > *:has(.poracode-composer-mode-icon)
-  span.poracode-composer-label-hideable,
-.m-main
-  .m-thread
-  .m-thread-compose-dock:not([data-expanded])
-  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
-  .poracode-composer-toolbar
-  > .relative
-  > div
-  > *:has(.poracode-composer-permission-icon)
-  span.poracode-composer-label-hideable {
-  display: none;
-}
-
-/* Compact → expanded moves the toolbar from an absolute overlay (over the
-   input line) into its own row; position can't transition, so give the
-   expanded toolbar a brief entrance that reads as one motion with the dock's
-   max-height/transform animation. This is a keyframe animation, not a
-   transition, so [data-instant-expand] * (transition: none) does not disable
-   it — a short fade on the warm flip is harmless. */
+/* Compact → expanded moves the toolbar from invisible absolute chrome into
+   its own row; position can't transition, so give the expanded toolbar a
+   brief entrance that reads as one motion with the dock's max-height
+   animation. This is a keyframe animation, not a transition, so
+   [data-instant-expand] * (transition: none) does not disable it — a short
+   fade on the warm flip is harmless. */
 @keyframes m-thread-toolbar-enter {
   from {
     opacity: 0;
@@ -2774,7 +2643,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   }
 }
 
-.m-main
+:is(.m-main, .m-detail)
   .m-thread
   .m-thread-compose-dock[data-expanded]
   .poracode-composer-shell
@@ -2784,9 +2653,12 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 /* Inside the floating thread bubble, the bubble owns the card chrome just like
    the home composer. Keep the reused desktop composer as content only. */
-.m-main .m-thread .m-thread-compose-dock .poracode-composer-shell,
-.m-main .m-thread .m-thread-compose-dock .poracode-composer-shell:not(:focus-within),
-.m-main .m-thread .m-thread-compose-dock .poracode-composer-shell:focus-within {
+:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock .poracode-composer-shell,
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock
+  .poracode-composer-shell:not(:focus-within),
+:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock .poracode-composer-shell:focus-within {
   border-color: transparent;
   background: transparent;
   box-shadow: none;
@@ -3220,6 +3092,23 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
     display: none;
   }
 
+  /* Centered dialogs fade and scale into place instead of sliding up from the
+     bottom edge; the exit stays under useSheet's 200ms unmount timer. */
+  .m-sheet,
+  .m-drawer,
+  .m-picker {
+    animation: m-dialog-in 0.18s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  .m-sheet-backdrop[data-closing] .m-sheet,
+  .m-sheet-backdrop[data-closing] .m-drawer {
+    animation: m-dialog-out 0.15s ease-in forwards;
+  }
+
+  .m-sheet-backdrop[data-closing] {
+    animation: m-sheet-backdrop-out 0.15s ease-in forwards;
+  }
+
   .m-sheet-action {
     min-height: 2.375rem;
     border-radius: 0.5rem;
@@ -3251,6 +3140,21 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
   to {
     transform: translateY(100%);
+  }
+}
+
+/* Desktop (pointer: fine) dialog enter/exit — fade with a subtle scale. */
+@keyframes m-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@keyframes m-dialog-out {
+  to {
+    opacity: 0;
+    transform: scale(0.96);
   }
 }
 
@@ -4686,6 +4590,7 @@ html:active-view-transition-type(screen):active-view-transition-type(
   .m-sheet-backdrop,
   .m-sheet,
   .m-drawer,
+  .m-picker,
   .m-git-diff[data-state="entering"],
   .m-git-diff[data-state="closing"],
   .m-sheet-backdrop[data-closing],

@@ -257,6 +257,37 @@ describe("remoteSocketCoordinator", () => {
     expect(harness.coordinator.getLastSeenSeq()).toBe(9);
   });
 
+  it("resets a stale cursor after a server restart and accepts the new event stream", async () => {
+    const harness = track(createHarness({ initialLastSeenSeq: 42 }));
+    const socket = await start(harness);
+    socket.open();
+
+    socket.message({
+      type: "resync-required",
+      seq: 0,
+      reason: "Server event stream reset; request a fresh snapshot.",
+    });
+    expect(harness.coordinator.getLastSeenSeq()).toBe(0);
+
+    socket.message({
+      type: "event",
+      seq: 1,
+      event: { type: "remote-threads-changed", threadIds: ["new-thread"] },
+    });
+    expect(h.dispatchRemoteSupervisorEvent).toHaveBeenCalledWith({
+      type: "remote-threads-changed",
+      threadIds: ["new-thread"],
+    });
+    expect(harness.coordinator.getLastSeenSeq()).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(600);
+    expect(harness.requestRefresh).toHaveBeenCalledWith({
+      refreshSelectedThread: true,
+      includeAuxiliary: true,
+      resetLastSeenSeq: true,
+    });
+  });
+
   it("does not let an event refresh downgrade a pending recovery refresh", async () => {
     const harness = track(createHarness());
     const socket = await start(harness);

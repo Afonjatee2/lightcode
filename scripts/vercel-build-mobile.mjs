@@ -11,7 +11,13 @@ console.log(`[vercel-build-mobile] VERCEL_ENV=${process.env.VERCEL_ENV} base=${b
 
 const result = spawnSync("pnpm", ["run", "build:mobile"], {
   stdio: "inherit",
-  env: { ...process.env, PORACODE_MOBILE_BASE_PATH: basePath },
+  env: {
+    ...process.env,
+    PORACODE_MOBILE_BASE_PATH: basePath,
+    npm_config_enable_global_virtual_store: "false",
+    npm_config_node_linker: "isolated",
+    pnpm_config_verify_deps_before_run: "false",
+  },
   shell: process.platform === "win32",
 });
 process.exit(result.status ?? 1);

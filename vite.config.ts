@@ -4,6 +4,7 @@ import { defineConfig, loadEnv, normalizePath, type Plugin } from "vite";
 import babel from "@rolldown/plugin-babel";
 import react, { reactCompilerPreset } from "@vitejs/plugin-react";
 import { lingui, linguiTransformerBabelPreset } from "@lingui/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
 
 const compilerPreset = reactCompilerPreset();
 const linguiPreset = linguiTransformerBabelPreset();
@@ -12,7 +13,7 @@ const DEFAULT_POSTHOG_HOST = "https://us.i.posthog.com";
 const MATERIAL_ICON_DIR = resolve(__dirname, "node_modules/material-icon-theme/icons");
 const MATERIAL_ICON_ASSET_PREFIX = "/assets/material-icons/";
 const MANAGED_WORKTREES_GLOB = `${normalizePath(resolve(__dirname, ".poracode/worktrees"))}/**`;
-const DESKTOP_OPTIMIZED_DEPS = [
+const CLIENT_OPTIMIZED_DEPS = [
   "@chenglou/pretext",
   "@dnd-kit/dom",
   "@dnd-kit/react",
@@ -49,7 +50,6 @@ const DESKTOP_OPTIMIZED_DEPS = [
   "react/jsx-runtime",
   "rehype-raw",
   "remark-gfm",
-  "shiki",
   "streamdown",
   "style-to-js",
   "use-sync-external-store",
@@ -64,8 +64,8 @@ const DESKTOP_OPTIMIZED_DEPS = [
   "zustand/shallow",
   // Mobile-entry-only deps. The default dev server also serves mobile.html and
   // noDiscovery skips anything not listed — the mobile PWA then crashes on raw
-  // CJS (e.g. dexie) or missing shims. Keep in sync with the mobile graph; the
-  // mobile-only optimizer (discovery on) is the reference for what it needs.
+  // CJS (e.g. dexie) or missing shims. Keep in sync with the mobile graph;
+  // compare against a one-off discovery-enabled cache when dependencies change.
   "@aparajita/capacitor-secure-storage",
   "@capacitor/app",
   "@capacitor/core",
@@ -327,6 +327,7 @@ function materialIconAssets(): Plugin[] {
 
 export default defineConfig(({ mode }) => ({
   plugins: [
+    tailwindcss(),
     resizeObserverLoopErrorFilter(),
     mobileSshRuntime(),
     rendererBootstrapTiming(),
@@ -365,18 +366,23 @@ export default defineConfig(({ mode }) => ({
   // invalidate each other on every start, producing "504 Outdated Optimize Dep"
   // for whichever server optimized first. Give each target its own cache.
   cacheDir: mobileOnly ? "node_modules/.vite-mobile" : "node_modules/.vite",
-  optimizeDeps: mobileOnly
-    ? { entries: ["mobile.html"] }
-    : {
-        // The full desktop graph includes intentionally deferred feature
-        // chunks. Re-crawling it on every Vite restart blocks the request queue
-        // even when the optimized dependency cache is already valid.
-        noDiscovery: true,
-        include: [...DESKTOP_OPTIMIZED_DEPS],
-      },
+  css: {
+    // Tailwind's first-party Vite plugin handles app CSS. Keep the root
+    // PostCSS config available to the standalone Next.js website without
+    // running Tailwind twice in Vite.
+    postcss: { plugins: [] },
+  },
+  optimizeDeps: {
+    // Both clients include intentionally deferred feature chunks. Re-crawling
+    // either graph on every Vite restart blocks the request queue even when
+    // the optimized dependency cache is already valid.
+    noDiscovery: true,
+    include: [...CLIENT_OPTIMIZED_DEPS],
+  },
   build: {
     outDir: mobileOnly ? mobileOutputPath : "dist/renderer",
     emptyOutDir: true,
+    reportCompressedSize: false,
     sourcemap: mobileOnly ? false : "hidden",
     // Filter modulePreload so the heaviest async chunks (shiki grammars,
     // @git-diff-view, xterm) are not parsed by V8 at startup. They load on

@@ -96,6 +96,7 @@ function makeClient(opts?: {
   snapshotProjects?: Project[];
   snapshotThrows?: boolean;
   snapshot?: RemoteDesktopClient["snapshot"];
+  agentStatuses?: RemoteDesktopClient["agentStatuses"];
   environmentHttpBaseUrl?: string;
   projectCommand?: RemoteDesktopClient["projectCommand"];
   interruptThread?: RemoteDesktopClient["interruptThread"];
@@ -126,7 +127,8 @@ function makeClient(opts?: {
         wsBaseUrl: "ws://192.168.1.9:38987/",
       },
     }),
-    agentStatuses: async () => ({ windows: [], wsl: [], updatedAt: "now" }),
+    agentStatuses:
+      opts?.agentStatuses ?? (async () => ({ windows: [], wsl: [], updatedAt: "now" })),
     snapshot:
       opts?.snapshot ??
       (async () => {
@@ -160,14 +162,13 @@ function factoryFor(client: RemoteDesktopClient): RemoteClientFactory {
 }
 
 /**
- * Pair a server, then tear down the per-server event stream that pairing now
- * opens (finding #3) and (re)install `socketFactory` so an open-thread test can
- * observe ONLY the open-thread socket. `setSocketFactory` closes all event
- * sockets, isolating the open-thread socket behavior these tests assert on.
+ * Pair a server, then tear down its pair-time event stream and reinstall the
+ * socket factory. Opening a thread restarts the same per-server stream, letting
+ * tests observe that shared socket in isolation.
  */
 async function pairIsolated(socketFactory: RemoteSocketFactory): Promise<void> {
   await useRemoteServersStore.getState().pairServer({ endpoint: "192.168.1.9:38987", token: "a" });
-  // Closes the pair-time event socket; the open-thread socket is created after.
+  // Closes the pair-time event socket; opening a thread restarts it afterward.
   useRemoteServersStore.getState().setSocketFactory(socketFactory);
 }
 
@@ -552,31 +553,36 @@ describe("useRemoteServersStore", () => {
   });
 
   it("opens a remote thread: hydrates history and streams socket events", async () => {
-    let captured: RemoteSocketLike | null = null;
-    const socket: RemoteSocketLike = { close: vi.fn<() => void>(), onmessage: null, onclose: null };
+    const sockets: RemoteSocketLike[] = [];
     useRemoteServersStore.getState().setClientFactory(factoryFor(makeClient()));
-    // Tear down the pair-time event socket so the open-thread socket owns the
-    // shared socket's onmessage handler.
-    await pairIsolated((_url) => {
-      captured = socket;
+    const socketFactory = vi.fn<RemoteSocketFactory>(() => {
+      const socket = makeSocket();
+      sockets.push(socket);
       return socket;
     });
+    useRemoteServersStore.getState().setSocketFactory(socketFactory);
+    await useRemoteServersStore
+      .getState()
+      .pairServer({ endpoint: "192.168.1.9:38987", token: "a" });
+    await vi.waitFor(() => expect(socketFactory).toHaveBeenCalledTimes(1));
 
     await useRemoteServersStore.getState().openRemoteThread("d1", "rt-1");
+    await vi.waitFor(() => expect(socketFactory).toHaveBeenCalledTimes(2));
 
     expect(sync.applyThreadSnapshot).toHaveBeenCalledTimes(1);
     expect(useRemoteServersStore.getState().openThread?.threadId).toBe("rt-1");
-    expect(captured).toBe(socket);
+    expect(sockets[0]?.close).toHaveBeenCalledTimes(1);
+    expect(sockets[1]?.close).not.toHaveBeenCalled();
 
     // A thread-scoped live event frame for the OPEN thread is forwarded.
     const threadStateEvent = { type: "thread-state", threadId: "rt-1", status: "idle" };
-    socket.onmessage?.({
+    sockets[1]?.onmessage?.({
       data: JSON.stringify({ type: "event", seq: 1, event: threadStateEvent }),
     });
     expect(sync.dispatchRemoteSupervisorEvent).toHaveBeenCalledWith(threadStateEvent);
 
     useRemoteServersStore.getState().closeRemoteThread();
-    expect(socket.close).toHaveBeenCalledTimes(1);
+    expect(sockets[1]?.close).not.toHaveBeenCalled();
     expect(useRemoteServersStore.getState().openThread).toBeNull();
   });
 
@@ -680,7 +686,7 @@ describe("useRemoteServersStore", () => {
     expect(useRemoteServersStore.getState().runtime.d1?.threads[0]?.title).toBe("Renamed remotely");
   });
 
-  it("reconnects the open remote thread socket from the latest seen event seq", async () => {
+  it("reconnects the shared server socket from the latest seen event seq", async () => {
     vi.useFakeTimers();
     let ticketSeq = 0;
     const sockets: RemoteSocketLike[] = [];
@@ -703,7 +709,7 @@ describe("useRemoteServersStore", () => {
       .getState()
       .setClientFactory(factoryFor(makeClient({ websocketTicket, websocketUrl })));
     // Pair, then close the pair-time event stream and reset socket/ticket
-    // tracking so we observe ONLY the open-thread socket below.
+    // tracking so we observe the stream restarted by openRemoteThread below.
     await pairIsolated(socketFactory);
     await vi.advanceTimersByTimeAsync(0);
     sockets.length = 0;
@@ -775,7 +781,7 @@ describe("useRemoteServersStore", () => {
     expect(useRemoteServersStore.getState().openThread?.thread.title).toBe("Remote rt-1 resynced");
   });
 
-  it("does not reconnect the remote thread socket after manual close", async () => {
+  it("keeps the shared server event socket alive after manual thread close", async () => {
     vi.useFakeTimers();
     const sockets: RemoteSocketLike[] = [];
     const socketFactory = vi.fn<(url: string) => RemoteSocketLike>(() => {
@@ -796,18 +802,18 @@ describe("useRemoteServersStore", () => {
     await useRemoteServersStore.getState().openRemoteThread("d1", "rt-1");
 
     useRemoteServersStore.getState().closeRemoteThread();
-    sockets[0]?.onclose?.();
     await vi.advanceTimersByTimeAsync(20_000);
     await Promise.resolve();
 
+    expect(sockets[0]?.close).not.toHaveBeenCalled();
     expect(socketFactory).toHaveBeenCalledTimes(1);
   });
 
-  it("closes the open thread (and its socket) when its server is removed", async () => {
+  it("closes the shared event socket when its server is removed", async () => {
     const socket: RemoteSocketLike = { close: vi.fn<() => void>(), onmessage: null, onclose: null };
     useRemoteServersStore.getState().setClientFactory(factoryFor(makeClient()));
-    // pairIsolated tears down the pair-time event socket, so only the open-thread
-    // socket remains and removeServer closes it exactly once.
+    // pairIsolated tears down the pair-time stream; opening the thread restarts
+    // that single shared server socket, which removeServer closes exactly once.
     await pairIsolated(() => socket);
     await useRemoteServersStore.getState().openRemoteThread("d1", "rt-1");
     expect(useRemoteServersStore.getState().openThread).not.toBeNull();
@@ -900,7 +906,7 @@ describe("useRemoteServersStore", () => {
     }));
     useRemoteServersStore.getState().setClientFactory(factoryFor(makeClient({ threadHistory })));
     // Pair, then isolate: tear down the pair-time event socket so socketFactory
-    // below counts only the open-thread socket.
+    // below counts only the shared stream restarted for the winning open.
     await pairIsolated(socketFactory);
     const applyCallsBefore = sync.applyThreadSnapshot.mock.calls.length;
 
@@ -1109,6 +1115,32 @@ describe("useRemoteServersStore", () => {
     expect(statuses).toEqual(["online"]);
   });
 
+  it("preserves an unchanged remote runtime snapshot identity", async () => {
+    useRemoteServersStore.getState().setClientFactory(factoryFor(makeClient()));
+    await pairIsolated(() => makeSocket());
+    const before = useRemoteServersStore.getState().runtime.d1!;
+    useRemoteServersStore.getState().setClientFactory(
+      factoryFor(
+        makeClient({
+          agentStatuses: async () => ({ windows: [], wsl: [], updatedAt: "later" }),
+          snapshot: async () => ({
+            snapshotSeq: 2,
+            projects: [{ ...proj, location: { ...proj.location } }],
+            threads: [],
+            runtimeSummariesByThread: {},
+            updatedAt: "later",
+          }),
+        }),
+      ),
+    );
+
+    await useRemoteServersStore.getState().refreshServer("d1");
+    const after = useRemoteServersStore.getState().runtime.d1!;
+
+    expect(after).toBe(before);
+    expect(after.projects).toBe(before.projects);
+  });
+
   // ── Finding #3: pairing during in-flight connectAll ─────────────────
   it("starts the event stream for a server paired during an in-flight connectAll", async () => {
     // Pre-seed one persisted server whose refresh hangs, so connectAll stays
@@ -1200,12 +1232,20 @@ describe("useRemoteServersStore", () => {
       runtimeSummariesByThread: {},
       updatedAt: "now",
     }));
-    useRemoteServersStore.getState().setClientFactory(factoryFor(makeClient({ snapshot })));
+    const agentStatuses = vi.fn<RemoteDesktopClient["agentStatuses"]>(async () => ({
+      windows: [],
+      wsl: [],
+      updatedAt: "now",
+    }));
+    useRemoteServersStore
+      .getState()
+      .setClientFactory(factoryFor(makeClient({ snapshot, agentStatuses })));
     await pairIsolated(() => socket);
     // Fire the debounced scheduler via qualifying events on the open-thread
     // socket; only the debounced scheduler snapshots (not open/pair).
     await useRemoteServersStore.getState().openRemoteThread("d1", "rt-1");
     snapshot.mockClear();
+    agentStatuses.mockClear();
 
     // A burst of qualifying (metadata-changing) events.
     for (let i = 0; i < 5; i++) {
@@ -1221,6 +1261,18 @@ describe("useRemoteServersStore", () => {
     expect(snapshot).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(600);
     expect(snapshot).toHaveBeenCalledTimes(1);
+    expect(agentStatuses).not.toHaveBeenCalled();
+
+    socket.onmessage?.({
+      data: JSON.stringify({
+        type: "event",
+        seq: 20,
+        event: { type: "windows-agent-statuses", statuses: [] },
+      }),
+    });
+    await vi.advanceTimersByTimeAsync(600);
+    expect(snapshot).toHaveBeenCalledTimes(2);
+    expect(agentStatuses).toHaveBeenCalledTimes(1);
   });
 
   // ── Finding #6: failing openRemoteThread does not reject ────────────

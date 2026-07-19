@@ -71,7 +71,7 @@ export function applyThreadSnapshot(
     // snapshot (visible duplication). Flush (or drop) this thread's queued
     // events first — mirrors dispatchRemoteSupervisorEvent's ordering guard.
     if (pendingRuntimeEvents.has(threadId)) {
-      flushPendingRuntimeEventsSync();
+      flushPendingRuntimeEventsSync(threadId);
     }
     const snapshotItems = snapshot.runtimeItems.map(toRuntimeChatItem);
     const firstSnapshotItemId = snapshotItems[0]?.id;
@@ -187,22 +187,74 @@ function syncRuntimeRequestsFromSnapshot(snapshot: RemoteThreadSnapshot): void {
 
 // ── Live supervisor event dispatch ──────────────────────────────
 // Mirrors the renderer's module-level IPC listener (src/renderer/app.tsx):
-// runtime events are coalesced per animation frame so streaming text cannot
-// re-render faster than the display refreshes.
+// visible runtime events are coalesced per animation frame so streaming text
+// cannot re-render faster than the display refreshes. Background threads flush
+// four times per second so several concurrent streams do not saturate the UI.
 
+const BACKGROUND_RUNTIME_EVENT_BATCH_MS = 250;
 const pendingRuntimeEvents = new Map<string, RuntimeEvent[]>();
 let runtimeFlushHandle: number | null = null;
+let backgroundRuntimeFlushHandle: ReturnType<typeof setTimeout> | null = null;
+let removeRuntimeSchedulingListeners: (() => void) | null = null;
 
-function flushPendingRuntimeEvents(): void {
-  runtimeFlushHandle = null;
-  if (pendingRuntimeEvents.size === 0) return;
+function isForegroundRuntimeThread(threadId: string): boolean {
+  if (document.visibilityState === "hidden") return false;
+  const view = useAppStore.getState().view;
+  return view.kind === "thread" && view.panes.includes(threadId);
+}
+
+function flushPendingRuntimeEvents(shouldFlush: (threadId: string) => boolean): void {
   const store = useAppStore.getState();
-  const batches = [...pendingRuntimeEvents.entries()].map(([threadId, events]) => ({
-    threadId,
-    events,
-  }));
+  const batches: { threadId: string; events: RuntimeEvent[] }[] = [];
+  for (const [threadId, events] of pendingRuntimeEvents) {
+    if (!shouldFlush(threadId)) continue;
+    batches.push({ threadId, events });
+    pendingRuntimeEvents.delete(threadId);
+  }
+  if (batches.length === 0) return;
   store.applyRuntimeEventBatches(batches);
-  pendingRuntimeEvents.clear();
+}
+
+function schedulePendingRuntimeEvents(): void {
+  let hasForeground = false;
+  let hasBackground = false;
+  for (const threadId of pendingRuntimeEvents.keys()) {
+    if (isForegroundRuntimeThread(threadId)) hasForeground = true;
+    else hasBackground = true;
+    if (hasForeground && hasBackground) break;
+  }
+
+  if (hasForeground && runtimeFlushHandle === null) {
+    runtimeFlushHandle = requestAnimationFrame(() => {
+      runtimeFlushHandle = null;
+      flushPendingRuntimeEvents(isForegroundRuntimeThread);
+      schedulePendingRuntimeEvents();
+    });
+  } else if (!hasForeground && runtimeFlushHandle !== null) {
+    cancelAnimationFrame(runtimeFlushHandle);
+    runtimeFlushHandle = null;
+  }
+
+  if (hasBackground && backgroundRuntimeFlushHandle === null) {
+    backgroundRuntimeFlushHandle = setTimeout(() => {
+      backgroundRuntimeFlushHandle = null;
+      flushPendingRuntimeEvents((threadId) => !isForegroundRuntimeThread(threadId));
+      schedulePendingRuntimeEvents();
+    }, BACKGROUND_RUNTIME_EVENT_BATCH_MS);
+  } else if (!hasBackground && backgroundRuntimeFlushHandle !== null) {
+    clearTimeout(backgroundRuntimeFlushHandle);
+    backgroundRuntimeFlushHandle = null;
+  }
+}
+
+function installRuntimeSchedulingListeners(): void {
+  if (removeRuntimeSchedulingListeners) return;
+  const unsubscribe = useAppStore.subscribe((state) => state.view, schedulePendingRuntimeEvents);
+  document.addEventListener("visibilitychange", schedulePendingRuntimeEvents);
+  removeRuntimeSchedulingListeners = () => {
+    unsubscribe();
+    document.removeEventListener("visibilitychange", schedulePendingRuntimeEvents);
+  };
 }
 
 function enqueueRuntimeEvents(threadId: string, events: readonly RuntimeEvent[]): void {
@@ -213,17 +265,13 @@ function enqueueRuntimeEvents(threadId: string, events: readonly RuntimeEvent[])
   } else {
     pendingRuntimeEvents.set(threadId, [...events]);
   }
-  if (runtimeFlushHandle === null) {
-    runtimeFlushHandle = requestAnimationFrame(flushPendingRuntimeEvents);
-  }
+  installRuntimeSchedulingListeners();
+  schedulePendingRuntimeEvents();
 }
 
-function flushPendingRuntimeEventsSync(): void {
-  if (runtimeFlushHandle !== null) {
-    cancelAnimationFrame(runtimeFlushHandle);
-    runtimeFlushHandle = null;
-  }
-  if (pendingRuntimeEvents.size > 0) flushPendingRuntimeEvents();
+function flushPendingRuntimeEventsSync(threadId: string): void {
+  flushPendingRuntimeEvents((pendingThreadId) => pendingThreadId === threadId);
+  schedulePendingRuntimeEvents();
 }
 
 /** Drop every queued runtime delta and cancel the pending flush, if any. Exposed
@@ -234,6 +282,12 @@ export function clearPendingRuntimeEvents(): void {
     cancelAnimationFrame(runtimeFlushHandle);
     runtimeFlushHandle = null;
   }
+  if (backgroundRuntimeFlushHandle !== null) {
+    clearTimeout(backgroundRuntimeFlushHandle);
+    backgroundRuntimeFlushHandle = null;
+  }
+  removeRuntimeSchedulingListeners?.();
+  removeRuntimeSchedulingListeners = null;
   pendingRuntimeEvents.clear();
 }
 
@@ -306,7 +360,7 @@ export function dispatchRemoteSupervisorEvent(value: unknown, hooks?: RemoteDisp
 
   // Non-runtime events observe the same ordering as the IPC stream.
   if ("threadId" in event && pendingRuntimeEvents.has(event.threadId)) {
-    flushPendingRuntimeEventsSync();
+    flushPendingRuntimeEventsSync(event.threadId);
   }
 
   switch (event.type) {

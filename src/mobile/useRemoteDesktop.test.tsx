@@ -191,7 +191,8 @@ vi.mock("./storage", () => ({
     async (id: string, tid: string) => h.storedThread.get(`${id}:${tid}`),
   ),
   saveShellSnapshot: (...a: [string, unknown]) => h.saveShellSnapshot(...a),
-  markDesktopConnected: (...a: [string, number]) => h.markDesktopConnected(...a),
+  markDesktopConnected: (...a: [string, number, { resetLastSeenSeq?: boolean }?]) =>
+    h.markDesktopConnected(...a),
   saveThreadSnapshot: (...a: [string, string, unknown]) => h.saveThreadSnapshot(...a),
   saveDesktop: vi.fn<() => Promise<StoredDesktop>>(async () => {
     const desktop = makeDesktop("d1");
@@ -726,6 +727,23 @@ describe("useRemoteDesktop", () => {
     });
     expect(h.saveShellSnapshot).toHaveBeenCalledTimes(1);
     expect(h.markDesktopConnected).toHaveBeenCalledWith("d1", 2);
+  });
+
+  it("persists a lower authoritative sequence after a server restart", async () => {
+    const d = { ...makeDesktop("d1"), lastSeenSeq: 42 };
+    const client = clientFor("d1");
+    client.snapshot.mockResolvedValue({ ...snapshotFor("d1"), snapshotSeq: 42 });
+    const view = await mountWith([d], "d1");
+
+    client.snapshot.mockResolvedValue({ ...snapshotFor("d1"), snapshotSeq: 0 });
+    h.markDesktopConnected.mockClear();
+    await act(async () => {
+      await view.result.current.refresh(d, { resetLastSeenSeq: true });
+    });
+
+    expect(h.markDesktopConnected).toHaveBeenCalledWith("d1", 0, {
+      resetLastSeenSeq: true,
+    });
   });
 
   it("[#7] a failed refresh does not knock a live socket offline", async () => {

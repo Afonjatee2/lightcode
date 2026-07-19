@@ -106,4 +106,17 @@ describe("useGitSummaryHydration", () => {
 
     expect(useGitSummariesStore.getState().byThread["thread-1"]?.branch).toBe("desktop");
   });
+
+  it("preserves unchanged remote summary identities", () => {
+    useGitSummariesStore.getState().setAll({ "thread-1": makeSummary("desktop") });
+    const before = useGitSummariesStore.getState();
+
+    useGitSummariesStore.getState().setAll({ "thread-1": makeSummary("desktop") });
+    const after = useGitSummariesStore.getState();
+
+    expect(after).toBe(before);
+    expect(after.remoteByThread).toBe(before.remoteByThread);
+    expect(after.byThread).toBe(before.byThread);
+    expect(after.byThread["thread-1"]).toBe(before.byThread["thread-1"]);
+  });
 });

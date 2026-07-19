@@ -27,6 +27,6 @@ export const emitRemoteTerminalExited = feed.emitExited;
 
 /** Drops the sender and all subscriptions (e.g. when the store disconnects). */
 export function resetRemoteTerminalFeed(): void {
-  feed.setSender(null);
   feed.reset();
+  feed.setSender(null);
 }
