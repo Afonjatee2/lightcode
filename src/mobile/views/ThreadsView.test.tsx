@@ -741,17 +741,18 @@ describe("ThreadsView header-driven (floating) search", () => {
   function renderFloating(input: {
     searchOpen: boolean;
     onSearchOpenChange?: (open: boolean) => void;
-    onChromeHiddenChange?: (hidden: boolean) => void;
+    projects?: readonly Project[];
+    searchContainer?: HTMLElement;
   }) {
     return render(
       <ThreadsView
-        projects={[PROJECT]}
+        projects={input.projects ?? [PROJECT]}
         threads={[makeThread({ id: "a", title: "Alpha" }), makeThread({ id: "b", title: "Bravo" })]}
         selectedThreadId={null}
         projectFilter={null}
         searchOpen={input.searchOpen}
+        {...(input.searchContainer ? { searchContainer: input.searchContainer } : {})}
         onSearchOpenChange={input.onSearchOpenChange ?? (() => {})}
-        onChromeHiddenChange={input.onChromeHiddenChange ?? (() => {})}
         onProjectFilterChange={() => {}}
         onOpenThread={() => {}}
         onThreadAction={() => {}}
@@ -767,6 +768,24 @@ describe("ThreadsView header-driven (floating) search", () => {
   it("hides the search box until the header toggles it open", () => {
     renderFloating({ searchOpen: false });
     expect(screen.queryByLabelText("Search threads")).not.toBeInTheDocument();
+  });
+
+  it("portals the project picker into the shared mobile header", () => {
+    const host = document.createElement("div");
+    document.body.append(host);
+    try {
+      const { container } = renderFloating({
+        searchOpen: false,
+        projects: [PROJECT, { ...PROJECT, id: "p2", name: "Other" }],
+        searchContainer: host,
+      });
+
+      expect(host.querySelector(".m-threads__picker")).not.toBeNull();
+      expect(host).toHaveTextContent("All projects");
+      expect(container.querySelector(".m-threads__picker")).toBeNull();
+    } finally {
+      host.remove();
+    }
   });
 
   it("shows a floating search box that filters and closes via its X button", () => {
@@ -795,7 +814,6 @@ describe("ThreadsView header-driven (floating) search", () => {
         projectFilter={null}
         searchOpen={false}
         onSearchOpenChange={() => {}}
-        onChromeHiddenChange={() => {}}
         onProjectFilterChange={() => {}}
         onOpenThread={() => {}}
         onThreadAction={() => {}}
@@ -826,7 +844,6 @@ describe("ThreadsView header-driven (floating) search", () => {
           projectFilter={null}
           searchOpen={false}
           onSearchOpenChange={() => {}}
-          onChromeHiddenChange={() => {}}
           onProjectFilterChange={() => {}}
           onOpenThread={() => {}}
           onThreadAction={() => {}}
@@ -898,26 +915,5 @@ describe("ThreadsView header-driven (floating) search", () => {
     } finally {
       Object.defineProperty(window, "visualViewport", { configurable: true, value: undefined });
     }
-  });
-
-  it("reports scroll direction so the shell can collapse/reveal its chrome", () => {
-    const onChromeHiddenChange = vi.fn<(hidden: boolean) => void>();
-    const { container } = renderFloating({ searchOpen: false, onChromeHiddenChange });
-    const list = container.querySelector(".m-thread-list")!;
-
-    // Scrolling down past the slop hides the chrome…
-    Object.defineProperty(list, "scrollTop", { configurable: true, value: 80 });
-    fireEvent.scroll(list);
-    expect(onChromeHiddenChange).toHaveBeenLastCalledWith(true);
-
-    // …scrolling back up reveals it…
-    Object.defineProperty(list, "scrollTop", { configurable: true, value: 40 });
-    fireEvent.scroll(list);
-    expect(onChromeHiddenChange).toHaveBeenLastCalledWith(false);
-
-    // …and resting near the top always reveals it.
-    Object.defineProperty(list, "scrollTop", { configurable: true, value: 0 });
-    fireEvent.scroll(list);
-    expect(onChromeHiddenChange).toHaveBeenLastCalledWith(false);
   });
 });

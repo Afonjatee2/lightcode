@@ -2498,6 +2498,7 @@ msgstr "Konsol"
 msgid "Contains sensitive values; add manually"
 msgstr "Hassas değerler içeriyor; elle ekleyin"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 msgid "Context"
@@ -4203,6 +4204,10 @@ msgstr "Tüm çalışma ağaçlarını barındıran klasör. İpucu: buradaki bi
 msgid "Folder that holds this project's worktrees. Reset to use the global setting."
 msgstr "Bu projenin çalışma ağaçlarını barındıran klasör. Genel ayarı kullanmak için sıfırlayın."
 
+#: src/mobile/views/ThreadView.tsx
+msgid "Follow up..."
+msgstr "Devam et..."
+
 #: src/mobile/settingsSections.ts
 msgid "Fonts and scrolling"
 msgstr "Yazı tipleri ve kaydırma"
@@ -5141,6 +5146,7 @@ msgstr "yerel"
 
 #: src/renderer/components/common/BranchSelector/parts/useBranchList.ts
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Local"
 msgstr "Yerel"
 

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import { msg } from "@lingui/core/macro";
 import { toast } from "@heroui/react";
+import { arrayBufferToBase64 } from "@/shared/base64";
 import type {
   Project,
   ProjectLocation,
@@ -49,7 +50,11 @@ const mainProcessFetch: RemoteFetch = async (url, init) => {
     url: String(url),
     ...(init?.method ? { method: init.method as "GET" | "POST" } : {}),
     ...(init?.headers ? { headers: init.headers } : {}),
-    ...(init?.body !== undefined ? { body: init.body } : {}),
+    ...(typeof init?.body === "string"
+      ? { body: init.body }
+      : init?.body
+        ? { bodyBase64: arrayBufferToBase64(init.body) }
+        : {}),
   });
   // The Response constructor rejects a body for null-body statuses (1xx / 204 /
   // 205 / 304); the remote API doesn't return those, but guard so an unexpected

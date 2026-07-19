@@ -174,7 +174,12 @@ export interface StartRemoteNewThreadInput extends StartRemoteThreadCommon {
  */
 export type RemoteFetch = (
   url: string | URL,
-  init?: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal },
+  init?: {
+    method?: string;
+    headers?: Record<string, string>;
+    body?: string | Uint8Array;
+    signal?: AbortSignal;
+  },
 ) => Promise<Response>;
 
 export interface RemoteDesktopClientOptions {
@@ -222,6 +227,7 @@ const LONG_RUNNING_GIT_PROCEDURES: ReadonlySet<string> = new Set([
 
 const settingsResponseSchema = z.object({ settings: remoteSettingsSchema });
 const browserStateResponseSchema = z.object({ state: remoteBrowserStateSchema });
+const attachmentUploadResponseSchema = z.object({ path: z.string().min(1) });
 
 export class RemoteDesktopClient {
   private readonly fetchImpl: RemoteFetch;
@@ -234,7 +240,15 @@ export class RemoteDesktopClient {
     fetchImpl?: RemoteFetch,
     options: RemoteDesktopClientOptions = {},
   ) {
-    this.fetchImpl = fetchImpl ?? ((url, init) => fetch(url, init));
+    this.fetchImpl =
+      fetchImpl ??
+      ((url, init) =>
+        fetch(url, {
+          ...(init?.method ? { method: init.method } : {}),
+          ...(init?.headers ? { headers: init.headers } : {}),
+          ...(init?.body !== undefined ? { body: init.body as BodyInit } : {}),
+          ...(init?.signal ? { signal: init.signal } : {}),
+        }));
     this.requestTimeoutMs = options.requestTimeoutMs ?? DEFAULT_REMOTE_REQUEST_TIMEOUT_MS;
     this.maxResponseBodyBytes = options.maxResponseBodyBytes ?? DEFAULT_REMOTE_RESPONSE_MAX_BYTES;
   }
@@ -343,6 +357,26 @@ export class RemoteDesktopClient {
       "settings",
     );
     return result.settings;
+  }
+
+  async uploadAttachment(input: {
+    readonly threadId: string;
+    readonly fileName: string;
+    readonly data: Uint8Array;
+  }): Promise<string> {
+    const url = new URL("/api/files/attachment", "http://poracode.invalid");
+    url.searchParams.set("threadId", input.threadId);
+    url.searchParams.set("name", input.fileName);
+    const result = parseResponse(
+      attachmentUploadResponseSchema,
+      await this.requestJson(`${url.pathname}${url.search}`, {
+        method: "POST",
+        headers: { "content-type": "application/octet-stream" },
+        rawBody: input.data,
+      }),
+      "attachment upload",
+    );
+    return result.path;
   }
 
   async schedules(): Promise<ScheduledTask[]> {
@@ -760,6 +794,7 @@ export class RemoteDesktopClient {
     init: {
       readonly method?: "GET" | "POST";
       readonly body?: unknown;
+      readonly rawBody?: Uint8Array;
       readonly headers?: Readonly<Record<string, string>>;
       /** Per-call deadline override; defaults to the client's requestTimeoutMs.
        * Long-running ops (clone, push, PR creation) pass a larger value. */
@@ -794,7 +829,11 @@ export class RemoteDesktopClient {
           method: init.method ?? "GET",
           headers,
           signal: controller.signal,
-          ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
+          ...(init.body !== undefined
+            ? { body: JSON.stringify(init.body) }
+            : init.rawBody
+              ? { body: init.rawBody }
+              : {}),
         }),
         timeoutPromise,
       ]);

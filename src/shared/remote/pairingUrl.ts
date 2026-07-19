@@ -19,6 +19,33 @@ export function buildPairingUrl(input: {
   return pairingUrl.toString();
 }
 
+const VITE_DEV_SERVER_PORT = "3100";
+const DEFAULT_REMOTE_ACCESS_PORT = "49152";
+
+function normalizeEndpoint(value: string): string {
+  const url = new URL(value);
+  url.hash = "";
+  url.search = "";
+  const parts = url.pathname.split("/").filter(Boolean);
+  const last = parts.at(-1);
+  if (last === "pair" || last === "app" || last === "mobile.html") {
+    parts.pop();
+  }
+  url.pathname = parts.length > 0 ? `/${parts.join("/")}/` : "/";
+  return url.toString().replace(/\/$/, "");
+}
+
+export function normalizePairingEndpoint(value: string): string {
+  const url = new URL(value.trim());
+  const hostParam = url.searchParams.get("host");
+  if (hostParam) return normalizeEndpoint(hostParam);
+
+  if (url.port === VITE_DEV_SERVER_PORT) {
+    url.port = DEFAULT_REMOTE_ACCESS_PORT;
+  }
+  return normalizeEndpoint(url.toString());
+}
+
 export interface PairingUrlParts {
   readonly token: string;
   readonly host: string | null;
@@ -36,4 +63,16 @@ export function parsePairingUrlParts(value: string): PairingUrlParts | null {
   const token = new URLSearchParams(url.hash.replace(/^#/, "")).get("token");
   if (!token || token.trim().length === 0) return null;
   return { token, host: url.searchParams.get("host"), url };
+}
+
+/** Reuses a pairing credential with another endpoint while preserving whether
+ * the link opens through a hosted pairing app or directly on the desktop. */
+export function retargetPairingUrl(value: string, httpBaseUrl: string): string {
+  const parts = parsePairingUrlParts(value);
+  if (!parts) return value;
+  if (parts.host !== null) {
+    parts.url.searchParams.set("host", httpBaseUrl);
+    return parts.url.toString();
+  }
+  return buildPairingUrl({ httpBaseUrl, credential: parts.token });
 }

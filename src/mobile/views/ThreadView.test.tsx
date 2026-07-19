@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { act, createEvent, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Project, Thread, ToolCallPayload } from "@/shared/contracts";
+import type { AgentStatus, Project, Thread, ToolCallPayload } from "@/shared/contracts";
+import "@/renderer/components/providers/bootstrap";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { useAppStore } from "@/renderer/state/appStore";
 import type { RuntimeChatItem } from "@/renderer/state/slices/runtimeEventSlice";
@@ -16,8 +17,10 @@ const fixtures = vi.hoisted(() => ({
   } as Project,
   composerProps: [] as Array<{
     onSubmitInput?: (prompt: string) => Promise<void>;
+    composerPlaceholder?: string;
   }>,
   keyboardOffset: 0,
+  agentStatuses: [] as AgentStatus[],
 }));
 
 const bridgeMock = vi.hoisted(() => ({
@@ -77,7 +80,10 @@ vi.mock("../GitSummaryParts", () => ({
 }));
 
 vi.mock("@/renderer/components/thread/ThreadComposerSection", () => ({
-  ThreadComposerSection: (props: { onSubmitInput?: (prompt: string) => Promise<void> }) => {
+  ThreadComposerSection: (props: {
+    onSubmitInput?: (prompt: string) => Promise<void>;
+    composerPlaceholder?: string;
+  }) => {
     fixtures.composerProps.push(props);
     return (
       <div data-testid="thread-composer-section">
@@ -115,7 +121,7 @@ vi.mock("@/renderer/components/thread/useThreadDockState", () => ({
 }));
 
 vi.mock("@/renderer/hooks/uiSelectors", () => ({
-  useProjectAgentStatuses: () => [],
+  useProjectAgentStatuses: () => fixtures.agentStatuses,
 }));
 
 vi.mock("@/renderer/state/sharedSettingsStore", () => ({
@@ -151,6 +157,7 @@ describe("mobile ThreadView", () => {
     toastDanger.mockClear();
     fixtures.composerProps.length = 0;
     fixtures.keyboardOffset = 0;
+    fixtures.agentStatuses = [];
     useAppStore.setState({
       runtimeItemIdsByThread: {},
       runtimeItemsByIdByThread: {},
@@ -282,6 +289,60 @@ describe("mobile ThreadView", () => {
     expect(dock).not.toHaveAttribute("data-expanded");
   });
 
+  it("uses the mobile follow-up placeholder for an active thread", () => {
+    render(
+      <ThreadView
+        thread={{ ...makeTerminalThread(), presentationMode: "gui" }}
+        terminalScrollback=""
+        onThreadAction={() => undefined}
+        onSubmitInput={() => Promise.resolve()}
+      />,
+    );
+
+    expect(fixtures.composerProps.at(-1)?.composerPlaceholder).toBe("Follow up...");
+  });
+
+  it("shows provider, enabled fast, mode, and permission icons in the compact summary", () => {
+    fixtures.agentStatuses = [makeCodexStatus()];
+    const thread = {
+      ...makeTerminalThread(),
+      presentationMode: "gui",
+      config: {
+        model: "gpt-5",
+        fast: true,
+        mode: "plan",
+        approvalPolicy: "never",
+        sandboxMode: "danger-full-access",
+      },
+    } as Thread;
+
+    const view = render(
+      <ThreadView
+        thread={thread}
+        terminalScrollback=""
+        onThreadAction={() => undefined}
+        onSubmitInput={() => Promise.resolve()}
+      />,
+    );
+
+    const summary = view.container.querySelector(".m-compose-summary");
+    expect(summary?.querySelector(".poracode-provider-icon")).not.toBeNull();
+    expect(summary?.querySelector(".lucide-zap")).not.toBeNull();
+    expect(summary?.querySelector(".poracode-composer-mode-icon")).not.toBeNull();
+    expect(summary?.querySelector(".poracode-composer-permission-icon")).not.toBeNull();
+    expect(summary).not.toHaveTextContent("gpt-5");
+
+    view.rerender(
+      <ThreadView
+        thread={{ ...thread, config: { ...thread.config, fast: false } }}
+        terminalScrollback=""
+        onThreadAction={() => undefined}
+        onSubmitInput={() => Promise.resolve()}
+      />,
+    );
+    expect(view.container.querySelector(".m-compose-summary .lucide-zap")).toBeNull();
+  });
+
   it("keeps the composer expanded when the keyboard is dismissed (no collapse-on-focus-loss)", async () => {
     const { container } = render(
       <ThreadView
@@ -317,6 +378,37 @@ function makeTerminalThread(): Thread {
     updatedAt: "2026-01-01T00:00:00.000Z",
     canResumeWithConfig: true,
   } as Thread;
+}
+
+function makeCodexStatus(): AgentStatus {
+  return {
+    kind: "codex",
+    label: "Codex",
+    installed: true,
+    authState: "authenticated",
+    capabilities: {
+      models: [{ id: "gpt-5", label: "GPT-5" }],
+      efforts: [],
+      modelEfforts: {},
+      fastModels: ["gpt-5"],
+      thinkingModels: [],
+      modes: ["agent", "plan"],
+      approvalPolicies: [
+        { id: "on-request", label: "On request" },
+        { id: "never", label: "Never" },
+      ],
+      sandboxModes: [
+        { id: "workspace-write", label: "Workspace write" },
+        { id: "danger-full-access", label: "Full access" },
+      ],
+      supportsResume: true,
+      supportsDirectInput: true,
+      liveInputMode: "server",
+      presentationMode: "gui",
+      presentationModes: ["gui"],
+      settingDefs: [],
+    },
+  };
 }
 
 function makeSubAgentItem(id: string): RuntimeChatItem {

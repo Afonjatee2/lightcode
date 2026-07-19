@@ -1,4 +1,5 @@
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
+import { Button } from "@heroui/react";
 import { FolderKanban, Gauge, Globe2, Plus, Server, Settings2, Waypoints } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type {
@@ -178,16 +179,17 @@ export function WideShell(props: {
         <header className="m-sidebar__head">
           <Brand onPress={() => void navigate({ to: "/threads" })} />
           <ConnectionControl remote={remote} onPair={() => void navigate({ to: "/desktops" })} />
-          <button
-            type="button"
+          <Button
+            size="sm"
+            variant="ghost"
             className="m-sidebar__new"
             data-active={pathname === "/new" || undefined}
-            disabled={!hasActiveDesktop}
-            onClick={() => void navigate({ to: "/new" })}
+            isDisabled={!hasActiveDesktop}
+            onPress={() => void navigate({ to: "/new" })}
           >
             <Plus className="size-4" />
             <Trans>New thread</Trans>
-          </button>
+          </Button>
         </header>
         <div className="m-sidebar__scroll">
           <ThreadsView

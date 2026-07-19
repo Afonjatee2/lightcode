@@ -92,7 +92,6 @@ export function NarrowShell(props: {
   readonly searchOpen: boolean;
   readonly onSearchOpenChange: (open: boolean) => void;
   readonly onSearchHostChange: (element: HTMLDivElement | null) => void;
-  readonly chromeHidden: boolean;
 }) {
   const { remote, chrome, pathname } = props;
   const navigate = useNavigate();
@@ -137,14 +136,7 @@ export function NarrowShell(props: {
   // page beneath never reflow into the status-bar safe zone) and drops the
   // m-topbar/m-main view-transition-names via [data-chrome="fullscreen"].
   return (
-    <div
-      className="m-shell"
-      ref={shellRef}
-      data-chrome={chrome.layout}
-      data-chrome-hidden={
-        (chrome.layout === "home" && props.chromeHidden && !props.searchOpen) || undefined
-      }
-    >
+    <div className="m-shell" ref={shellRef} data-chrome={chrome.layout}>
       <header className="m-topbar" data-chrome-layout={chrome.layout}>
         {chrome.layout === "thread" ? (
           <>
@@ -217,15 +209,13 @@ export function NarrowShell(props: {
                 onPair={() => void navigate({ to: "/desktops" })}
               />
             </div>
+            <div className="m-topbar-search" ref={props.onSearchHostChange} />
           </>
         )}
         {chrome.layout === "home" ? null : (
           <ConnectionControl remote={remote} onPair={() => void navigate({ to: "/desktops" })} />
         )}
       </header>
-      {chrome.layout === "home" ? (
-        <div className="m-topbar-search" ref={props.onSearchHostChange} />
-      ) : null}
       {visibleHeldThreadHeader ? (
         <header
           className="m-topbar m-topbar--transition-hold"

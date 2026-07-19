@@ -241,7 +241,6 @@ export function ThreadsRoute() {
     threadSearchOpen,
     setThreadSearchOpen,
     threadSearchHost,
-    setChromeHidden,
   } = useMobileApp();
   const navigate = useNavigate();
   const isWide = useMediaQuery(WIDE_SHELL_QUERY);
@@ -292,11 +291,10 @@ export function ThreadsRoute() {
     return () => window.clearTimeout(handle);
   }, [activeDesktopId]);
 
-  // Wide: the sidebar owns the list; this pane shows the New-thread composer
-  // (opening a thread routes to /thread/$id, which renders it in the detail).
-  // Landing here no longer auto-selects the most recent thread.
+  // Wide: the sidebar already owns the list. Keep the detail empty until the
+  // user explicitly opens a thread or navigates to /new.
   if (isWide) {
-    return <NewThreadRoute />;
+    return <ThreadDetail thread={null} hideHeader={false} />;
   }
 
   return (
@@ -310,7 +308,6 @@ export function ThreadsRoute() {
         searchOpen={threadSearchOpen}
         searchContainer={threadSearchHost}
         onSearchOpenChange={setThreadSearchOpen}
-        onChromeHiddenChange={setChromeHidden}
         onProjectFilterChange={setProjectFilter}
         onOpenThread={(thread) => {
           void remote.openThread(thread);
@@ -378,9 +375,7 @@ export function ThreadRoute() {
 }
 
 /**
- * The /new route: the New-thread composer pane. In the wide layout it also
- * serves as the /threads detail pane, so opening the app lands on the composer
- * rather than auto-selecting the most recent thread.
+ * The /new route: the New-thread composer pane on every layout.
  */
 export function NewThreadRoute() {
   const navigate = useNavigate();

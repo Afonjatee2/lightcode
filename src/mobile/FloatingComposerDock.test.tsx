@@ -336,8 +336,10 @@ describe("FloatingComposerDock", () => {
     const { rerender } = render(<ControlledDockHarness />);
     const input = screen.getByRole("textbox", { name: "Composer input" });
     const bubble = document.querySelector<HTMLElement>(".m-compose-bubble");
+    const dock = document.querySelector<HTMLElement>(".m-compose-dock");
     expect(bubble).not.toBeNull();
-    if (!bubble) return;
+    expect(dock).not.toBeNull();
+    if (!bubble || !dock) return;
 
     // jsdom reports zero boxes; stub the two measurements the animation reads,
     // then re-render so the idle cache picks up the collapsed rest height.
@@ -378,6 +380,7 @@ describe("FloatingComposerDock", () => {
     // lifted so it can't clamp the pin), shrink to the collapsed line, then
     // release.
     fireEvent.click(screen.getByLabelText("Close composer"));
+    expect(dock).toHaveAttribute("data-expanded");
     expect(bubble.style.height).toBe("90px");
     expect(bubble.style.maxHeight).toBe("90px");
     await act(async () => {
@@ -385,6 +388,7 @@ describe("FloatingComposerDock", () => {
     });
     expect(bubble.style.height).toBe("34px");
     fireHeightEnd();
+    expect(dock).not.toHaveAttribute("data-expanded");
     expect(bubble.style.height).toBe("");
     expect(bubble.style.maxHeight).toBe("");
   });

@@ -1,6 +1,6 @@
-import { mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { rm } from "node:fs/promises";
-import { join, normalize, resolve } from "node:path";
+import { extname, join, normalize, resolve } from "node:path";
 import { net, protocol } from "electron";
 import type { ProjectLocation } from "@/shared/contracts";
 import type { PoracodePaths } from "@/shared/poracodePaths";
@@ -12,7 +12,8 @@ function sanitizeAttachmentPathPart(value: string): string {
 }
 
 function getThreadAttachmentDir(paths: PoracodePaths, threadId: string): string {
-  return join(paths.attachmentsDir, sanitizeAttachmentPathPart(threadId).slice(0, 12));
+  const pathPart = sanitizeAttachmentPathPart(threadId).slice(0, 12);
+  return join(paths.attachmentsDir, pathPart === "." || pathPart === ".." ? "--" : pathPart);
 }
 
 export function saveClipboardImageFile(
@@ -24,7 +25,32 @@ export function saveClipboardImageFile(
   const namePrefix = sanitizeAttachmentPathPart(payload.threadId).slice(0, 8);
   const fileName = `${namePrefix}-${Date.now()}.${payload.extension || "png"}`;
   const filePath = join(threadDir, fileName);
-  writeFileSync(filePath, Buffer.from(payload.data));
+  writeFileSync(filePath, payload.data);
+  return filePath;
+}
+
+/** Persist a browser-selected file under the paired desktop's attachment root. */
+export function saveUploadedAttachmentFile(
+  paths: PoracodePaths,
+  payload: { threadId: string; data: Uint8Array; fileName: string },
+): string {
+  const threadDir = getThreadAttachmentDir(paths, payload.threadId);
+  mkdirSync(threadDir, { recursive: true });
+  const sanitizedName = Array.from(sanitizeAttachmentPathPart(payload.fileName))
+    .map((character) => (character.charCodeAt(0) < 32 ? "-" : character))
+    .join("")
+    .replace(/[. ]+$/g, "")
+    .slice(0, 160);
+  const originalName = sanitizedName || "attachment";
+  const extension = extname(originalName);
+  const stem = originalName.slice(0, originalName.length - extension.length) || "attachment";
+  let filePath = join(threadDir, originalName);
+  let suffix = 2;
+  while (existsSync(filePath)) {
+    filePath = join(threadDir, `${stem} (${suffix})${extension}`);
+    suffix += 1;
+  }
+  writeFileSync(filePath, payload.data);
   return filePath;
 }
 

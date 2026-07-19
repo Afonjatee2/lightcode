@@ -1,5 +1,5 @@
 import { createElement, createRef } from "react";
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Globe, Monitor, Users } from "lucide-react";
 import type { PromptSegment } from "@/shared/contracts";
@@ -223,6 +223,49 @@ describe("MCP mention selection", () => {
 
     expect(editor).toBeEmptyDOMElement();
     expect(onMcpMentionSelect).toHaveBeenCalledWith("browser");
+  });
+});
+
+describe("Enter handling", () => {
+  const baseProps = {
+    placeholder: "Send a message...",
+    projectLocation: undefined,
+    onTextChange: vi.fn<(hasText: boolean) => void>(),
+  };
+
+  it("submits with Enter by default", () => {
+    const onSubmit = vi.fn<(segments: PromptSegment[]) => void>();
+    render(
+      createElement(MentionInput, {
+        ...baseProps,
+        onSubmit,
+      }),
+    );
+
+    const editor = screen.getByRole("textbox");
+    editor.appendChild(document.createTextNode("hello"));
+    fireEvent.keyDown(editor, { key: "Enter" });
+
+    expect(onSubmit).toHaveBeenCalledWith([{ kind: "text", content: "hello" }]);
+  });
+
+  it("leaves Enter available for newline insertion when submitOnEnter is false", () => {
+    const onSubmit = vi.fn<(segments: PromptSegment[]) => void>();
+    render(
+      createElement(MentionInput, {
+        ...baseProps,
+        onSubmit,
+        submitOnEnter: false,
+      }),
+    );
+
+    const editor = screen.getByRole("textbox");
+    editor.appendChild(document.createTextNode("hello"));
+    const event = createEvent.keyDown(editor, { key: "Enter" });
+    fireEvent(editor, event);
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 });
 

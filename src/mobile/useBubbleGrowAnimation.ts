@@ -2,9 +2,9 @@ import { useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 
 /* Release safety net when transitionend never arrives (hidden tab, reduced
-   motion, interrupted transition). Slightly longer than the 0.32s bubble
+   motion, interrupted transition). Slightly longer than the 0.2s bubble
    transition. */
-const FALLBACK_RELEASE_MS = 450;
+const FALLBACK_RELEASE_MS = 300;
 
 /** Inline geometry pinned on the bubble for the duration of one flip. */
 export type BubblePin = {

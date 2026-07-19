@@ -1,4 +1,4 @@
-export type MobileRuntimePlatform = "android" | "ios" | "web";
+export type MobileRuntimePlatform = "android" | "ios" | "web" | "windows";
 
 type CapacitorGlobal = {
   readonly Capacitor?: {
@@ -13,6 +13,7 @@ export function getMobileRuntimePlatform(): MobileRuntimePlatform {
   if (platform === "android" || platform === "ios") return platform;
 
   if (typeof navigator !== "undefined") {
+    if (/Windows/i.test(navigator.userAgent)) return "windows";
     if (/Android/i.test(navigator.userAgent)) return "android";
     if (
       /iPad|iPhone|iPod/i.test(navigator.userAgent) ||

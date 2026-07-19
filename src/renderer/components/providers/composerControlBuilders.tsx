@@ -25,6 +25,7 @@ export function planWorkToggle(input: {
     ) : (
       <Hammer className="size-3.5 poracode-composer-mode-icon" />
     ),
+    iconKind: "mode",
     label: input.isPlanMode ? "Plan" : "Work",
     displayLabel: input.isPlanMode ? msg`Plan` : msg`Work`,
     hideLabelOnWrap: true,

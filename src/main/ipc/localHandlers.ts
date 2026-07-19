@@ -226,7 +226,11 @@ export function createLocalIpcHandlers(
           method: payload.method ?? "GET",
           signal: controller.signal,
           ...(payload.headers ? { headers: payload.headers } : {}),
-          ...(payload.body !== undefined ? { body: payload.body } : {}),
+          ...(payload.body !== undefined
+            ? { body: payload.body }
+            : payload.bodyBase64 !== undefined
+              ? { body: Buffer.from(payload.bodyBase64, "base64") }
+              : {}),
         });
         const buffer = await readBoundedResponseBody(response, REMOTE_HTTP_RESPONSE_MAX_BYTES);
         return {

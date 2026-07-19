@@ -87,6 +87,7 @@ export const remoteHttpRequestPayloadSchema = z.object({
   method: z.enum(["GET", "POST"]).optional(),
   headers: z.record(z.string(), z.string()).optional(),
   body: z.string().optional(),
+  bodyBase64: z.string().optional(),
 });
 export type RemoteHttpRequestPayload = z.infer<typeof remoteHttpRequestPayloadSchema>;
 export interface RemoteHttpRequestResult {

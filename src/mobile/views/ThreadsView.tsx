@@ -1,11 +1,4 @@
-import {
-  Fragment,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-  type UIEvent as ReactUIEvent,
-} from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Button } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -68,8 +61,6 @@ export interface ThreadsViewProps {
   readonly searchOpen?: boolean;
   readonly searchContainer?: HTMLElement | null;
   readonly onSearchOpenChange?: (open: boolean) => void;
-  /** Reports scroll direction so the shell can collapse/reveal its chrome. */
-  readonly onChromeHiddenChange?: (hidden: boolean) => void;
   readonly onProjectFilterChange: (projectId: string | null) => void;
   readonly onOpenThread: (thread: Thread) => void;
   readonly onThreadAction: (thread: Thread, action: ThreadAction) => void;
@@ -636,9 +627,6 @@ function renderProjectFilterTrigger(label: string) {
   );
 }
 
-/** Scroll travel (px) in one direction before the chrome collapses/reveals. */
-const CHROME_SCROLL_SLOP_PX = 6;
-
 /**
  * How long the floating search's shrink-into-the-icon exit stays mounted: a
  * beat past the 0.22s `m-search-float-out` animation in styles.css, so an
@@ -715,19 +703,6 @@ export function ThreadsView(props: ThreadsViewProps) {
     onSearchOpenChange?.(false);
   }, [floatingSearch, props.searchOpen, keyboardOffset, onSearchOpenChange]);
 
-  // Scroll-direction reporting with hysteresis: down hides the shell chrome,
-  // up (or resting near the top) reveals it.
-  const lastScrollTopRef = useRef(0);
-  const handleListScroll = (event: ReactUIEvent<HTMLDivElement>) => {
-    const onChromeHiddenChange = props.onChromeHiddenChange;
-    if (!onChromeHiddenChange) return;
-    const top = event.currentTarget.scrollTop;
-    const delta = top - lastScrollTopRef.current;
-    lastScrollTopRef.current = top;
-    if (top <= 12) onChromeHiddenChange(false);
-    else if (delta > CHROME_SCROLL_SLOP_PX) onChromeHiddenChange(true);
-    else if (delta < -CHROME_SCROLL_SLOP_PX) onChromeHiddenChange(false);
-  };
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
     () => new Set(collapsedGroupCache),
   );
@@ -816,9 +791,9 @@ export function ThreadsView(props: ThreadsViewProps) {
       ) : null}
     </label>
   );
-  // Header mode portals the search into the shell's topbar zone; inline mode
-  // keeps it pinned in the picker row. While closing, the search lingers with
-  // [data-closing] until its shrink-into-the-icon animation finishes.
+  // Header mode portals both the project picker and search into the shell's
+  // topbar. While closing, the search lingers with [data-closing] until its
+  // shrink-into-the-icon animation finishes.
   const searchOverlayNode =
     floatingSearch && (searchVisible || searchExiting) ? (
       <div
@@ -838,18 +813,22 @@ export function ThreadsView(props: ThreadsViewProps) {
         {searchField}
       </div>
     ) : null;
-  const searchOverlay =
-    props.searchContainer && searchOverlayNode
-      ? createPortal(searchOverlayNode, props.searchContainer)
-      : searchOverlayNode;
   const inlineSearch = !floatingSearch && searchVisible ? searchField : null;
   const controls =
-    inlineSearch || projectPicker ? (
+    !props.searchContainer && (inlineSearch || projectPicker) ? (
       <div className="m-threads__picker">
         {inlineSearch}
         {projectPicker}
       </div>
     ) : null;
+  const headerControlsNode = searchOverlayNode ?? projectPicker;
+  const headerControls =
+    props.searchContainer && headerControlsNode
+      ? createPortal(
+          <div className="m-threads__picker">{headerControlsNode}</div>,
+          props.searchContainer,
+        )
+      : searchOverlayNode;
 
   // Show the boot skeleton only when NOT searching: a search that matches
   // nothing during the pre-boot cache load should render "No matching threads",
@@ -858,7 +837,7 @@ export function ThreadsView(props: ThreadsViewProps) {
     return (
       <div className="m-threads">
         {controls}
-        {searchOverlay}
+        {headerControls}
         <ThreadListSkeleton />
       </div>
     );
@@ -870,7 +849,7 @@ export function ThreadsView(props: ThreadsViewProps) {
     return (
       <div className="m-threads">
         {controls}
-        {searchOverlay}
+        {headerControls}
         {emptyStateOverride ?? (
           <EmptyState
             icon={<History className="size-5" />}
@@ -977,8 +956,8 @@ export function ThreadsView(props: ThreadsViewProps) {
   return (
     <div className="m-threads">
       {controls}
-      {searchOverlay}
-      <div className="m-thread-list" onScroll={handleListScroll}>
+      {headerControls}
+      <div className="m-thread-list">
         {sections.map((section) => (
           <Fragment key={section.key}>
             {showSectionLabels ? <div className="m-thread-section">{section.label}</div> : null}

@@ -470,15 +470,18 @@ export type RemoteRuntimeItemsPage = z.infer<typeof remoteRuntimeItemsPageSchema
  * Desktop settings editable from a remote client ("Remote settings" in the
  * PWA, as opposed to its device-local settings). Only settings the desktop
  * itself acts on belong here — the AI helpers (title/commit generation,
- * conflict resolver) and the agent/model configuration (each desktop has its
- * own set of agents and models). Deliberately excludes secrets
- * (providerConfigs) and device-local preferences (theme, fonts, audio, …).
+ * conflict resolver), agent/model configuration (each desktop has its own set
+ * of agents and models), and persistent composer MCP enablement. Deliberately
+ * excludes secrets (providerConfigs and custom MCP definitions) and
+ * device-local preferences (theme, fonts, audio, …).
  */
 export const remoteSettingsSchema = sharedSettingsSchema.pick({
   agentSettings: true,
   hiddenModels: true,
   disabledAgents: true,
   providerOrder: true,
+  enabledMcpServers: true,
+  disabledBuiltInMcpServers: true,
   titleGenProvider: true,
   titleGenModel: true,
   titleGenEffort: true,
@@ -506,7 +509,17 @@ export const REMOTE_SETTINGS_KEYS = Object.keys(
   remoteSettingsSchema.shape,
 ) as readonly (keyof RemoteSettings)[];
 
-export const remoteSettingsPatchSchema = remoteSettingsSchema.partial();
+export const remoteSettingsPatchSchema = remoteSettingsSchema
+  .omit({ enabledMcpServers: true, disabledBuiltInMcpServers: true })
+  .partial()
+  .extend({
+    // These full-settings fields have `{}` defaults. Remove them for the patch
+    // shape so an unrelated remote edit cannot silently clear desktop MCP state.
+    enabledMcpServers: sharedSettingsSchema.shape.enabledMcpServers.removeDefault().optional(),
+    disabledBuiltInMcpServers: sharedSettingsSchema.shape.disabledBuiltInMcpServers
+      .removeDefault()
+      .optional(),
+  });
 export type RemoteSettingsPatch = z.infer<typeof remoteSettingsPatchSchema>;
 
 /** Extracts the remote-editable subset from a full settings object (zod
@@ -545,6 +558,8 @@ export const remoteAccessPairingInfoSchema = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("ready"),
     httpBaseUrl: z.string().url(),
+    localHttpBaseUrl: z.string().url(),
+    tailscaleHttpBaseUrl: z.string().url().optional(),
     wsBaseUrl: z.string().url(),
     pairingUrl: z.string().url(),
     sessions: z.array(remoteAccessSessionSchema),

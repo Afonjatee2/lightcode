@@ -105,7 +105,6 @@ vi.mock("./remoteContext", () => ({
     threadSearchOpen: false,
     setThreadSearchOpen: () => undefined,
     threadSearchHost: null,
-    setChromeHidden: () => undefined,
   }),
   useRemote: () => fixtures.remote,
 }));

@@ -2498,6 +2498,7 @@ msgstr "Console"
 msgid "Contains sensitive values; add manually"
 msgstr "Contient des valeurs sensibles ; ajoutez-le manuellement"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 msgid "Context"
@@ -4203,6 +4204,10 @@ msgstr "Dossier qui contient tous les arbres de travail. Astuce : un Dev Drive i
 msgid "Folder that holds this project's worktrees. Reset to use the global setting."
 msgstr "Dossier qui contient les arbres de travail de ce projet. Réinitialisez pour utiliser le paramètre global."
 
+#: src/mobile/views/ThreadView.tsx
+msgid "Follow up..."
+msgstr "Poursuivre..."
+
 #: src/mobile/settingsSections.ts
 msgid "Fonts and scrolling"
 msgstr "Polices et défilement"
@@ -5141,6 +5146,7 @@ msgstr "local"
 
 #: src/renderer/components/common/BranchSelector/parts/useBranchList.ts
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Local"
 msgstr "Local"
 

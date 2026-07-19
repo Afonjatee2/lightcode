@@ -48,6 +48,8 @@ const DEFAULT_LISTEN_RETRY_DELAY_MS = 500;
 
 export interface RemoteAccessServerInfo {
   readonly httpBaseUrl: string;
+  readonly localHttpBaseUrl: string;
+  readonly tailscaleHttpBaseUrl?: string;
   readonly wsBaseUrl: string;
   readonly pairingUrl: string;
 }
@@ -73,6 +75,8 @@ export interface RemoteAccessServerOptions {
    * (https → wss). Requests arriving with this origin are trusted for CORS.
    */
   readonly advertisedBaseUrl?: string;
+  /** Tailscale HTTPS origin exposed alongside the LAN origin in pairing UI. */
+  readonly tailscaleHttpBaseUrl?: string;
   readonly pairingAppUrl?: string;
   readonly trustedCorsOrigins?: readonly string[];
   readonly tokenExchangeRateLimit?: {
@@ -134,13 +138,18 @@ export interface RemoteAccessServerOptions {
    * were ever opened). */
   readonly portProxy?: PortProxy;
   /**
-   * Remote-editable desktop settings (the AI helpers). `update` merges a
-   * patch into the settings file and notifies the desktop renderer; both
-   * return the remote-editable subset only — never the full settings file.
+   * Remote-editable desktop settings (AI helpers, agent/model configuration,
+   * and persistent composer MCP enablement). `update` merges a patch into the
+   * settings file and notifies the desktop renderer; both return the
+   * remote-editable subset only — never the full settings file.
    */
   readonly settings?: {
     read(): RemoteSettings;
     update(patch: RemoteSettingsPatch): RemoteSettings;
+  };
+  /** Persists an attachment uploaded by an authenticated remote composer. */
+  readonly attachments?: {
+    save(input: { threadId: string; fileName: string; data: Uint8Array }): string;
   };
   readonly schedules?: {
     list(): ScheduledTask[];
@@ -292,6 +301,7 @@ export class RemoteAccessServer {
     if (this.stopping) throw new Error("Remote access server is stopping.");
 
     const address = this.server.address() as AddressInfo;
+    const localHttpBaseUrl = this.resolveLocalHttpBaseUrl(address.port);
     const httpBaseUrl = this.resolveHttpBaseUrl(address.port);
     const pairingCredential = this.auth.issuePairingCredential({
       label: "Startup pairing",
@@ -299,6 +309,10 @@ export class RemoteAccessServer {
 
     this.info = {
       httpBaseUrl,
+      localHttpBaseUrl,
+      ...(this.options.tailscaleHttpBaseUrl
+        ? { tailscaleHttpBaseUrl: new URL(this.options.tailscaleHttpBaseUrl).origin }
+        : {}),
       wsBaseUrl: toWebSocketUrl(httpBaseUrl).toString(),
       pairingUrl: this.mintPairingUrl(httpBaseUrl, pairingCredential.credential),
     };
@@ -562,11 +576,15 @@ export class RemoteAccessServer {
         // Fall through to the host/port form on a malformed advertised URL.
       }
     }
+    return `${this.resolveLocalHttpBaseUrl(listenPort)}/`;
+  }
+
+  private resolveLocalHttpBaseUrl(listenPort: number): string {
     const bindHost = this.options.host;
     const host =
       this.options.advertisedHost?.trim() ||
       (bindHost === "0.0.0.0" || bindHost === "::" ? "127.0.0.1" : bindHost);
-    return `http://${normalizeHostForUrl(host)}:${listenPort}/`;
+    return `http://${normalizeHostForUrl(host)}:${listenPort}`;
   }
 
   private requireInfo(): RemoteAccessServerInfo {

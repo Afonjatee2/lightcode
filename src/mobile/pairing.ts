@@ -1,4 +1,4 @@
-import { parsePairingUrlParts } from "@/shared/remote/pairingUrl";
+import { normalizePairingEndpoint, parsePairingUrlParts } from "@/shared/remote/pairingUrl";
 import { isNativeApp } from "./pwaInstall";
 
 export interface PairingLaunch {
@@ -6,32 +6,7 @@ export interface PairingLaunch {
   readonly credential: string | null;
 }
 
-const VITE_DEV_SERVER_PORT = "3100";
-const DEFAULT_REMOTE_ACCESS_PORT = "49152";
-
-function normalizeEndpoint(value: string): string {
-  const url = new URL(value);
-  url.hash = "";
-  url.search = "";
-  const parts = url.pathname.split("/").filter(Boolean);
-  const last = parts.at(-1);
-  if (last === "pair" || last === "app" || last === "mobile.html") {
-    parts.pop();
-  }
-  url.pathname = parts.length > 0 ? `/${parts.join("/")}/` : "/";
-  return url.toString();
-}
-
-export function normalizePairingEndpoint(value: string): string {
-  const url = new URL(value.trim());
-  const hostParam = url.searchParams.get("host");
-  if (hostParam) return normalizeEndpoint(hostParam);
-
-  if (url.port === VITE_DEV_SERVER_PORT) {
-    url.port = DEFAULT_REMOTE_ACCESS_PORT;
-  }
-  return normalizeEndpoint(url.toString());
-}
+export { normalizePairingEndpoint };
 
 /** Non-throwing wrapper: a crafted/malformed `host` (e.g. `http://[`) makes
  * `new URL` throw, which would otherwise propagate out of the boot-time

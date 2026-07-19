@@ -2498,6 +2498,7 @@ msgstr "콘솔"
 msgid "Contains sensitive values; add manually"
 msgstr "민감한 값이 포함되어 있습니다. 직접 추가하세요"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 msgid "Context"
@@ -4203,6 +4204,10 @@ msgstr "모든 작업 트리를 보관하는 폴더입니다. 팁: 여기에 Dev
 msgid "Folder that holds this project's worktrees. Reset to use the global setting."
 msgstr "이 프로젝트의 작업 트리를 보관하는 폴더입니다. 전역 설정을 사용하려면 재설정하세요."
 
+#: src/mobile/views/ThreadView.tsx
+msgid "Follow up..."
+msgstr "후속 질문..."
+
 #: src/mobile/settingsSections.ts
 msgid "Fonts and scrolling"
 msgstr "글꼴 및 스크롤"
@@ -5141,6 +5146,7 @@ msgstr "로컬"
 
 #: src/renderer/components/common/BranchSelector/parts/useBranchList.ts
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Local"
 msgstr "로컬"
 

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "@heroui/react";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { ImageLightboxHost } from "@/renderer/components/composer/ImageLightbox";
 import { PullFromSourceDialog } from "@/renderer/views/MainView/parts/PullFromSourceDialog";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { MobileAppProvider, type MobileAppContextValue } from "./remoteContext";
@@ -41,12 +42,6 @@ export function RootLayout() {
 
   const [threadSearchOpen, setThreadSearchOpen] = useState(false);
   const [threadSearchHost, setThreadSearchHost] = useState<HTMLDivElement | null>(null);
-  const [chromeHidden, setChromeHidden] = useState(false);
-  // A hidden header on /threads must not leak into the next screen; the list
-  // remounts scrolled to top on return, so re-anchor on every route change.
-  useEffect(() => {
-    setChromeHidden(false);
-  }, [pathname]);
 
   const [projectFilter, setProjectFilterState] = useState<string | null>(null);
   useEffect(() => {
@@ -156,7 +151,6 @@ export function RootLayout() {
     threadSearchOpen,
     setThreadSearchOpen,
     threadSearchHost,
-    setChromeHidden,
   };
 
   return (
@@ -176,10 +170,10 @@ export function RootLayout() {
           searchOpen={threadSearchOpen}
           onSearchOpenChange={setThreadSearchOpen}
           onSearchHostChange={setThreadSearchHost}
-          chromeHidden={chromeHidden}
         />
       )}
       <PullFromSourceDialog />
+      <ImageLightboxHost />
       <UserMessageActionsSheet />
     </MobileAppProvider>
   );

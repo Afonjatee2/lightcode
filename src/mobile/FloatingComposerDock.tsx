@@ -209,6 +209,12 @@ export function FloatingComposerDock(props: {
   // Measured-px height pin for the expand/collapse flip; null lets the CSS
   // (auto height, control-line/viewport max-height caps) own the bubble.
   const bubblePin = useBubbleGrowAnimation(bubbleRef, expanded, instantExpand);
+  // Keep the expanded inner layout in place while the outer bubble shrinks.
+  // Switching the chrome to compact at the start of the height transition
+  // collapses the toolbar/input inside a still-tall wrapper. The measured pin
+  // already owns the outer geometry, so switch the compact chrome atomically
+  // when that transition releases.
+  const visuallyExpanded = expanded || bubblePin !== null;
   const bubbleStyle: CSSProperties = {};
   if (bubblePin !== null) {
     bubbleStyle.height = bubblePin.height;
@@ -227,7 +233,7 @@ export function FloatingComposerDock(props: {
       ) : null}
       <div
         className={props.dockClassName ?? "m-compose-dock"}
-        data-expanded={expanded || undefined}
+        data-expanded={visuallyExpanded || undefined}
         data-android-runtime={androidRuntime || undefined}
         data-instant-expand={instantExpand || undefined}
         data-measuring-keyboard={hideDockForMeasuring || undefined}
@@ -241,7 +247,7 @@ export function FloatingComposerDock(props: {
           onFocusCapture={handleFocusCapture}
         >
           {props.children}
-          {props.collapsedTapLabel && !expanded ? (
+          {props.collapsedTapLabel && !visuallyExpanded ? (
             <button
               type="button"
               className="m-compose-tap"

@@ -16,9 +16,14 @@ import type { XTermSurfaceHandle } from "@/renderer/components/terminal/XTermSur
 import { SubAgentOverlay } from "@/renderer/components/thread/ChatPane/parts/items/SubAgentOverlay";
 import { GuiThreadContent } from "@/renderer/components/thread/ThreadContent";
 import { ThreadComposerSection } from "@/renderer/components/thread/ThreadComposerSection";
+import {
+  hasReportedContextUsage,
+  resolveThreadContextUsageSummary,
+} from "@/renderer/components/thread/threadContextUsage";
 import { useThreadDockState } from "@/renderer/components/thread/useThreadDockState";
 import type { TerminalPaneHandle } from "@/renderer/components/thread/TerminalPane";
 import { useProjectAgentStatuses } from "@/renderer/hooks/uiSelectors";
+import { useAppStore } from "@/renderer/state/appStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
 import { useProject } from "@/renderer/state/useThread";
 import { MobileTerminal } from "../MobileTerminal";
@@ -105,6 +110,9 @@ export function ThreadView(props: ThreadViewProps) {
   const [composerExpanded, setComposerExpanded] = useState(false);
   const agentTerminalFontSize = useSharedSettings((state) => state.agentTerminalFontSize);
   const dockState = useThreadDockState(thread?.id ?? "");
+  const reportedContextUsage = useAppStore((state) =>
+    thread ? state.runtimeContextByThread[thread.id] : undefined,
+  );
   // Raw keyboard band for the PTY/accessory inputs. The composer itself is
   // hosted by FloatingComposerDock, which uses the same focus-gated lift as the
   // home composer.
@@ -149,6 +157,15 @@ export function ThreadView(props: ThreadViewProps) {
   }
 
   const agentStatus = projectAgentStatuses.find((status) => status.kind === thread.agentKind);
+  const contextSummary = resolveThreadContextUsageSummary({
+    thread,
+    agentStatus,
+    reportedUsage: reportedContextUsage,
+  });
+  const externalContextSummary =
+    hasReportedContextUsage(reportedContextUsage) && contextSummary.maxTokens !== undefined
+      ? contextSummary
+      : null;
   const projectLocation = project
     ? resolveProjectLocation(project.location, thread.worktreePath)
     : undefined;
@@ -242,6 +259,7 @@ export function ThreadView(props: ThreadViewProps) {
     >
       <ThreadComposerSection
         {...commonProps}
+        composerPlaceholder={t`Follow up...`}
         hideInfoDocks
         todoDockCollapsed={dockState.todoDockCollapsed}
         todoDockPlacement={dockState.todoDockPlacement}
@@ -332,6 +350,7 @@ export function ThreadView(props: ThreadViewProps) {
           threadId={thread.id}
           projectLocation={projectLocation}
           dockState={dockState}
+          contextSummary={externalContextSummary}
           hidden={composerExpanded}
         />
       ) : null}

@@ -2498,6 +2498,7 @@ msgstr "Консоль"
 msgid "Contains sensitive values; add manually"
 msgstr "Містить конфіденційні значення; додайте вручну"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 msgid "Context"
@@ -4203,6 +4204,10 @@ msgstr "Папка, у якій зберігаються всі worktree. Пор
 msgid "Folder that holds this project's worktrees. Reset to use the global setting."
 msgstr "Папка, у якій зберігаються worktree цього проєкту. Скиньте, щоб використовувати глобальне налаштування."
 
+#: src/mobile/views/ThreadView.tsx
+msgid "Follow up..."
+msgstr "Продовжити..."
+
 #: src/mobile/settingsSections.ts
 msgid "Fonts and scrolling"
 msgstr "Шрифти та прокручування"
@@ -5141,6 +5146,7 @@ msgstr "локальний"
 
 #: src/renderer/components/common/BranchSelector/parts/useBranchList.ts
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Local"
 msgstr "Локальний"
 

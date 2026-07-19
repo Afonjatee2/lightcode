@@ -8,7 +8,8 @@ import type {
   SupervisorEvent,
 } from "@/shared/ipc";
 import { toErrorMessage } from "@/shared/errorMessage";
-import type { PoracodePaths } from "@/shared/poracodePaths";
+import { resolvePoracodePaths, type PoracodePaths } from "@/shared/poracodePaths";
+import { saveUploadedAttachmentFile } from "../attachments/localFiles";
 import {
   pickRemoteSettings,
   type RemoteAccessPairingInfo,
@@ -283,6 +284,7 @@ export function createDesktopRemoteAccessController(
       const server = new RemoteAccessServer({
         appVersion: options.appVersion,
         identity,
+        isDev: Boolean(options.devServerUrl),
         ownsSupervisorPersistence: false,
         authStore,
         host: remoteHost,
@@ -290,6 +292,9 @@ export function createDesktopRemoteAccessController(
         advertisedHost,
         ...(advertisedResolution.advertisedBaseUrl
           ? { advertisedBaseUrl: advertisedResolution.advertisedBaseUrl }
+          : {}),
+        ...(advertisedResolution.tailscaleServeUrl
+          ? { tailscaleHttpBaseUrl: advertisedResolution.tailscaleServeUrl }
           : {}),
         ...(pairingAppUrl ? { pairingAppUrl } : {}),
         ...(devMobileAppUrl ? { devMobileAppUrl } : {}),
@@ -310,6 +315,10 @@ export function createDesktopRemoteAccessController(
             options.notifySharedSettingsChanged(next);
             return pickRemoteSettings(next);
           },
+        },
+        attachments: {
+          save: (input) =>
+            saveUploadedAttachmentFile(resolvePoracodePaths(options.paths.baseDir), input),
         },
         // `ScheduleService`'s public methods already match the gateway
         // interface, so pass it directly instead of re-wrapping each method.

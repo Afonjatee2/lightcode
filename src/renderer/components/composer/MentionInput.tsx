@@ -241,6 +241,7 @@ export const MentionInput = forwardRef<
     onSlashCommandChange?: (query: string | null) => void;
     commandListId?: string;
     commandActiveDescendant?: string;
+    submitOnEnter?: boolean;
     /**
      * Called before MentionInput's own key handling (after the mention popover
      * absorbs navigation keys). Return `true` to indicate the key was handled
@@ -263,6 +264,7 @@ export const MentionInput = forwardRef<
     onSlashCommandChange,
     commandListId,
     commandActiveDescendant,
+    submitOnEnter = true,
     onInterceptKey,
   } = props;
   const mcpMentions = props.mcpMentions ?? EMPTY_MCP_MENTIONS;
@@ -654,7 +656,7 @@ export const MentionInput = forwardRef<
     if (onInterceptKey?.(e)) return;
 
     // Enter without popover = submit
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (submitOnEnter && e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!editorRef.current) return;
       const segments = serializeToSegments(editorRef.current);

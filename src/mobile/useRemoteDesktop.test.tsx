@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
+import { useAppStore } from "@/renderer/state/appStore";
+import type { RemoteShellSnapshot } from "@/shared/remote";
 import type { StoredDesktop } from "./storage";
 
 /** The RemoteDesktopClient surface the hook touches, each method a spy. */
@@ -15,6 +17,7 @@ type ClientMock = {
   websocketUrl: Mock<(...a: unknown[]) => string>;
   parseSocketMessage: Mock<(raw: string) => unknown>;
   startThread: Mock<(...a: unknown[]) => Promise<void>>;
+  startNewThread: Mock<(...a: unknown[]) => Promise<unknown>>;
   sendThreadCommand: Mock<(...a: unknown[]) => Promise<void>>;
 };
 
@@ -53,6 +56,8 @@ const h = vi.hoisted(() => {
     applyShellSnapshot: vi.fn<(...a: unknown[]) => void>(),
     applyThreadSnapshot: vi.fn<(...a: unknown[]) => void>(),
     applyAgentStatuses: vi.fn<(...a: unknown[]) => void>(),
+    applyDesktopSettings: vi.fn<(...a: unknown[]) => void>(),
+    resetDesktopSettings: vi.fn<(...a: unknown[]) => void>(),
     resetRemoteStores: vi.fn<(...a: unknown[]) => void>(),
     // pwaInstall.isNativeApp / push registration spies
     isNativeApp: true,
@@ -147,6 +152,9 @@ function clientFor(desktopId: string): ClientMock {
       websocketUrl: vi.fn<(...a: unknown[]) => string>(() => "ws://x/ws"),
       parseSocketMessage: vi.fn<(raw: string) => unknown>(),
       startThread: vi.fn<(...a: unknown[]) => Promise<void>>(async () => {}),
+      startNewThread: vi.fn<(...a: unknown[]) => Promise<unknown>>(async () => ({
+        threadId: crypto.randomUUID(),
+      })),
       sendThreadCommand: vi.fn<(...a: unknown[]) => Promise<void>>(async () => {}),
     };
     h.clients.set(desktopId, client);
@@ -175,6 +183,7 @@ vi.mock("./remoteClient", () => ({
     websocketUrl = (...a: unknown[]) => this.#c().websocketUrl(...a);
     parseSocketMessage = (raw: string) => this.#c().parseSocketMessage(raw);
     startThread = (...a: unknown[]) => this.#c().startThread(...a);
+    startNewThread = (...a: unknown[]) => this.#c().startNewThread(...a);
     sendThreadCommand = (...a: unknown[]) => this.#c().sendThreadCommand(...a);
   },
 }));
@@ -217,8 +226,8 @@ vi.mock("./storeSync", () => ({
 }));
 
 vi.mock("./settingsSync", () => ({
-  applyDesktopSettings: vi.fn<(...a: unknown[]) => void>(),
-  resetDesktopSettings: vi.fn<(...a: unknown[]) => void>(),
+  applyDesktopSettings: (...a: unknown[]) => h.applyDesktopSettings(...a),
+  resetDesktopSettings: (...a: unknown[]) => h.resetDesktopSettings(...a),
 }));
 vi.mock("./bridge", () => ({ setRemoteBridgeClient: vi.fn<(...a: unknown[]) => void>() }));
 vi.mock("./browserMirror", () => ({
@@ -316,6 +325,7 @@ describe("useRemoteDesktop", () => {
     h.storedThread.clear();
     h.isNativeApp = true;
     h.deviceId = "device-1";
+    useAppStore.setState({ threads: [] });
     for (const fn of [
       h.saveShellSnapshot,
       h.markDesktopConnected,
@@ -323,6 +333,8 @@ describe("useRemoteDesktop", () => {
       h.applyShellSnapshot,
       h.applyThreadSnapshot,
       h.applyAgentStatuses,
+      h.applyDesktopSettings,
+      h.resetDesktopSettings,
       h.resetRemoteStores,
       h.setActiveDesktopId,
       h.forgetDesktop,
@@ -335,6 +347,7 @@ describe("useRemoteDesktop", () => {
     ]) {
       fn.mockClear();
     }
+    h.applyShellSnapshot.mockImplementation(() => {});
     h.getSshCredential.mockResolvedValue(null);
     vi.stubGlobal("WebSocket", FakeWebSocket as unknown as typeof WebSocket);
     FakeWebSocket.instances = [];
@@ -432,6 +445,77 @@ describe("useRemoteDesktop", () => {
 
     expect(view.result.current.activeDesktopId).toBe("d1");
     expect(h.applyShellSnapshot).toHaveBeenCalledWith(expect.objectContaining({ __from: "d1" }));
+  });
+
+  it("applies the paired desktop's persistent composer MCP toggles", async () => {
+    const desktop = makeDesktop("d1");
+    const remoteSettings = {
+      enabledMcpServers: { browser: true, crossagents: true, "computer-use": false },
+      disabledBuiltInMcpServers: { chrome: true },
+    };
+    clientFor("d1").settings.mockResolvedValue(remoteSettings);
+
+    await mountWith([desktop], "d1");
+
+    await waitFor(() => expect(h.applyDesktopSettings).toHaveBeenCalledWith(remoteSettings));
+  });
+
+  it("opens a persisted new thread without waiting for the provider launch to finish", async () => {
+    const desktop = makeDesktop("d1");
+    const client = clientFor("d1");
+    let createdThreadId = "";
+    let resolveLaunch: ((value: { threadId: string }) => void) | undefined;
+    client.startNewThread.mockImplementation((input) => {
+      createdThreadId = (input as { threadId: string }).threadId;
+      return new Promise((resolve) => {
+        resolveLaunch = resolve;
+      });
+    });
+    client.snapshot.mockImplementation(async () =>
+      snapshotFor("d1", createdThreadId ? [createdThreadId] : []),
+    );
+    h.applyShellSnapshot.mockImplementation((value) => {
+      const snapshot = value as RemoteShellSnapshot;
+      useAppStore.setState({
+        threads: snapshot.threads,
+      });
+    });
+    const view = await mountWith([desktop], "d1");
+    client.agentStatuses.mockClear();
+    client.settings.mockClear();
+    client.environment.mockClear();
+
+    let startedThreadId: string | null = null;
+    await act(async () => {
+      startedThreadId = await view.result.current.startThread(
+        {
+          id: "p",
+          name: "Repo",
+          location: { kind: "posix", path: "/repo" },
+          createdAt: "2026-01-01T00:00:00.000Z",
+        },
+        {
+          agentKind: "codex",
+          config: { model: "m" },
+          prompt: "Fix it",
+          presentationMode: "gui",
+        },
+      );
+    });
+
+    expect(startedThreadId).toBe(createdThreadId);
+    expect(resolveLaunch).toBeTypeOf("function");
+    expect(client.startNewThread).toHaveBeenCalledWith(
+      expect.objectContaining({ threadId: createdThreadId, projectId: "p", prompt: "Fix it" }),
+    );
+    expect(client.agentStatuses).not.toHaveBeenCalled();
+    expect(client.settings).not.toHaveBeenCalled();
+    expect(client.environment).not.toHaveBeenCalled();
+
+    resolveLaunch?.({ threadId: createdThreadId });
+    await act(async () => {
+      await Promise.resolve();
+    });
   });
 
   it("restores an SSH tunnel before refreshing the active desktop", async () => {

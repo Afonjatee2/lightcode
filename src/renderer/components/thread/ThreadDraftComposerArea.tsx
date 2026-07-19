@@ -15,6 +15,7 @@ import { hookEnvForProject, hookEnvKey } from "@/shared/agentHookPluginEnv";
 import { mergeMcpServers } from "@/shared/contracts/mcpServer";
 import { isHomeProjectId } from "@/shared/homeScope";
 import { skillSegmentFromSlashCommand } from "@/shared/promptContent";
+import { friendlyError } from "@/shared/messages";
 import { isQuickComposerWindow, isRemoteSession, readBridge } from "@/renderer/bridge";
 import {
   AttachmentBar,
@@ -216,7 +217,6 @@ function HookInstallProposal(props: {
 function DraftComposerAfterControls(props: {
   mcpServers: readonly ComposerMcpMenuItem[];
   customMcpServers: readonly ComposerCustomMcpItem[];
-  isRemote: boolean;
   onPickFiles: () => void;
   showVoiceInputButton: boolean;
   isDisabled: boolean;
@@ -238,7 +238,7 @@ function DraftComposerAfterControls(props: {
       <ComposerAddMenu
         mcpServers={props.mcpServers}
         customMcpServers={props.customMcpServers}
-        showFileOption={!props.isRemote}
+        showFileOption
         onPickFiles={props.onPickFiles}
         computerUse={props.computerUse}
         {...(props.experiment ? { experiment: props.experiment } : {})}
@@ -914,6 +914,7 @@ export function ThreadDraftComposerArea(props: {
               props.placeholder ?? (isRemote ? t`Plan, ask, build…` : t`Send a message...`)
             }
             projectLocation={isHomeScope ? undefined : props.project.location}
+            submitOnEnter={!isRemote}
             {...(showCommandPanel
               ? {
                   commandListId,
@@ -928,13 +929,11 @@ export function ThreadDraftComposerArea(props: {
             }}
             mcpMentions={mcpMentions}
             onMcpMentionSelect={onMcpMentionSelect}
-            {...(!isRemote
-              ? {
-                  onPasteImage: (file: File) => {
-                    void attachments.addClipboardImage(file, `draft:${props.project.id}`);
-                  },
-                }
-              : {})}
+            onPasteImage={(file: File) => {
+              void attachments
+                .addClipboardImage(file, `draft:${props.project.id}`)
+                .catch((error: unknown) => toast.danger(friendlyError(error)));
+            }}
             onSubmit={(segments) => {
               submitSegments([...attachments.toSegments(), ...segments]);
             }}
@@ -990,13 +989,16 @@ export function ThreadDraftComposerArea(props: {
         afterControls={
           <DraftComposerAfterControls
             mcpServers={mcpServers}
-            isRemote={isRemote}
             onPickFiles={() => {
-              void (props.pickFiles ? props.pickFiles() : readBridge().pickFiles()).then(
-                (paths) => {
+              void (
+                props.pickFiles
+                  ? props.pickFiles()
+                  : readBridge().pickFiles({ attachmentThreadId: `draft:${props.project.id}` })
+              )
+                .then((paths) => {
                   if (paths) attachments.addFiles(paths);
-                },
-              );
+                })
+                .catch((error: unknown) => toast.danger(friendlyError(error)));
             }}
             customMcpServers={customMcpServers}
             showVoiceInputButton={showVoiceInputButton}

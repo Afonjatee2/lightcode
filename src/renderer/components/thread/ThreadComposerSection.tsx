@@ -85,9 +85,11 @@ type ThreadComposerSectionProps = {
    * resolves and route through the mobile transport.
    */
   onSubmitInput?: ((prompt: string, segments?: PromptSegment[]) => Promise<void>) | undefined;
+  /** Optional surface-specific placeholder for the active-thread input. */
+  composerPlaceholder?: string | undefined;
   /**
-   * Suppress the informational docks (subagents/crossagents/workflows, goal,
-   * plan, errors) inside the composer. The mobile PWA sets this and surfaces
+   * Suppress the informational docks (subagents/crossagents/workflows, context,
+   * goal, plan, errors) inside the composer. The mobile PWA sets this and surfaces
    * the same state as compact chips above the floating composer instead
    * (ComposerInfoChips). Interactive docks — auth, pending steer, runtime
    * requests, slash commands — always stay inline.
@@ -367,6 +369,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
     reportedUsage: reportedContextUsage,
   });
   const showContextIndicator =
+    !hideInfoDocks &&
     canShowRuntimeChrome &&
     hasReportedContextUsage(reportedContextUsage) &&
     contextSummary.maxTokens !== undefined;
@@ -694,10 +697,12 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         approvalDenyOption
                           ? t`Deny and tell the agent what to do differently…`
                           : isServerControlled
-                            ? t`Ask ${agentStatus?.label ?? agentFallbackLabel} anything about this workspace`
+                            ? (props.composerPlaceholder ??
+                              t`Ask ${agentStatus?.label ?? agentFallbackLabel} anything about this workspace`)
                             : t`Send a message...`
                       }
                       projectLocation={projectLocation}
+                      submitOnEnter={!isRemote}
                       {...(showCommandPanel
                         ? {
                             commandListId,
@@ -711,13 +716,11 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                         latestSegmentsRef.current = mentionRef.current?.serializeSegments() ?? [];
                       }}
                       onSubmit={submitPrompt}
-                      {...(!isRemote
-                        ? {
-                            onPasteImage: (file: File) => {
-                              void attachments.addClipboardImage(file, thread.id);
-                            },
-                          }
-                        : {})}
+                      onPasteImage={(file: File) => {
+                        void attachments
+                          .addClipboardImage(file, thread.id)
+                          .catch((error: unknown) => toast.danger(friendlyError(error)));
+                      }}
                       onInterceptKey={(e) => {
                         if (
                           !usesTerminalPresentation &&
@@ -814,13 +817,14 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                             visible: !providerOwnsMcp && thread.config.computerUse === true,
                             onToggle: () => {},
                           }}
-                          showFileOption={!isRemote}
+                          showFileOption
                           onPickFiles={() => {
                             void readBridge()
-                              .pickFiles()
+                              .pickFiles({ attachmentThreadId: thread.id })
                               .then((paths) => {
                                 if (paths) attachments.addFiles(paths);
-                              });
+                              })
+                              .catch((error: unknown) => toast.danger(friendlyError(error)));
                           }}
                         />
                         {branchName ? (

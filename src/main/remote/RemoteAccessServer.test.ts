@@ -989,6 +989,43 @@ describe("RemoteAccessServer", () => {
     expect((await fetchImage("images/pixel.png")).status).toBe(400);
   });
 
+  it("accepts authenticated remote attachment uploads", async () => {
+    const save = vi.fn<(input: { threadId: string; fileName: string; data: Uint8Array }) => string>(
+      () => "C:\\attachments\\notes.md",
+    );
+    const server = new RemoteAccessServer({
+      appVersion: "1.0.0",
+      identity: { desktopId: "desktop-test", label: "Test Desktop" },
+      host: "127.0.0.1",
+      port: 0,
+      attachments: { save },
+      callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
+    });
+    servers.push(server);
+    const info = await server.start();
+    const token = await issueAccessToken(info, ["session:operate"]);
+    const url = new URL("/api/files/attachment", info.httpBaseUrl);
+    url.searchParams.set("threadId", "thread-1");
+    url.searchParams.set("name", "notes.md");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/octet-stream",
+      },
+      body: new Uint8Array([1, 2, 3]),
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ path: "C:\\attachments\\notes.md" });
+    expect(save).toHaveBeenCalledWith({
+      threadId: "thread-1",
+      fileName: "notes.md",
+      data: Buffer.from([1, 2, 3]),
+    });
+  });
+
   it("drops websocket clients when outbound sends fail", async () => {
     const server = new RemoteAccessServer({
       appVersion: "1.0.0",
@@ -1262,11 +1299,14 @@ describe("RemoteAccessServer", () => {
       port: 0,
       advertisedHost: "192.168.1.5",
       advertisedBaseUrl: "https://my-machine.tailnet-1234.ts.net",
+      tailscaleHttpBaseUrl: "https://my-machine.tailnet-1234.ts.net",
       callSupervisor: vi.fn<RemoteAccessServerOptions["callSupervisor"]>(async () => "" as never),
     });
     servers.push(server);
     const info = await server.start();
     expect(info.httpBaseUrl).toBe("https://my-machine.tailnet-1234.ts.net/");
+    expect(info.localHttpBaseUrl).toMatch(/^http:\/\/192\.168\.1\.5:\d+$/);
+    expect(info.tailscaleHttpBaseUrl).toBe("https://my-machine.tailnet-1234.ts.net");
     expect(info.wsBaseUrl).toBe("wss://my-machine.tailnet-1234.ts.net/");
     const pairingUrl = new URL(info.pairingUrl);
     expect(pairingUrl.origin).toBe("https://my-machine.tailnet-1234.ts.net");
@@ -3306,7 +3346,11 @@ describe("RemoteAccessServer", () => {
   });
 
   it("serves and updates remote-editable settings", async () => {
-    let stored: RemoteSettings = pickRemoteSettings(defaultSharedSettings);
+    let stored: RemoteSettings = pickRemoteSettings({
+      ...defaultSharedSettings,
+      enabledMcpServers: { browser: true, crossagents: false },
+      disabledBuiltInMcpServers: { chrome: true },
+    });
     const update = vi.fn<(patch: Partial<RemoteSettings>) => RemoteSettings>((patch) => {
       stored = { ...stored, ...patch };
       return stored;
@@ -3337,7 +3381,11 @@ describe("RemoteAccessServer", () => {
     });
     expect(getResponse.status).toBe(200);
     await expect(getResponse.json()).resolves.toMatchObject({
-      settings: { titleGenProvider: defaultSharedSettings.titleGenProvider },
+      settings: {
+        titleGenProvider: defaultSharedSettings.titleGenProvider,
+        enabledMcpServers: { browser: true, crossagents: false },
+        disabledBuiltInMcpServers: { chrome: true },
+      },
     });
 
     const postResponse = await fetch(new URL("/api/settings", info.httpBaseUrl), {
@@ -3346,19 +3394,26 @@ describe("RemoteAccessServer", () => {
       body: JSON.stringify({
         titleGenProvider: "claude",
         titleGenModel: "claude-haiku-4-5-20251001",
+        enabledMcpServers: { browser: true, crossagents: true },
         // Unknown keys are stripped by the schema, not persisted.
         providerConfigs: { evil: true },
       }),
     });
     expect(postResponse.status).toBe(200);
     await expect(postResponse.json()).resolves.toMatchObject({
-      settings: { titleGenProvider: "claude", titleGenModel: "claude-haiku-4-5-20251001" },
+      settings: {
+        titleGenProvider: "claude",
+        titleGenModel: "claude-haiku-4-5-20251001",
+        enabledMcpServers: { browser: true, crossagents: true },
+      },
     });
     expect(update).toHaveBeenCalledWith({
       titleGenProvider: "claude",
       titleGenModel: "claude-haiku-4-5-20251001",
+      enabledMcpServers: { browser: true, crossagents: true },
     });
     expect(stored.titleGenProvider).toBe("claude");
+    expect(stored.enabledMcpServers).toEqual({ browser: true, crossagents: true });
   });
 
   it("lists and modifies device schedules with read and operate scopes", async () => {

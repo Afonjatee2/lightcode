@@ -594,7 +594,7 @@ export function useRemoteDesktop() {
   function waitForRemoteThread(desktop: StoredDesktop, threadId: string): Promise<boolean> {
     return waitForRemoteThreadAppearance({
       refresh: async () => {
-        await refresh(desktop);
+        await refresh(desktop, { includeAuxiliary: false });
       },
       hasThread: () => useAppStore.getState().threads.some((thread) => thread.id === threadId),
     });
@@ -820,29 +820,52 @@ export function useRemoteDesktop() {
         return null;
       }
     }
-    const result = await clientFor(desktop).startNewThread({
-      projectId: project.id,
-      agentKind: input.agentKind,
-      config: input.config,
-      prompt: input.prompt,
-      ...(input.segments ? { segments: input.segments } : {}),
-      presentationMode: input.presentationMode ?? "gui",
-      ...(worktreePath ? { worktreePath } : {}),
-      ...(input.worktreeBranch ? { worktreeBranch: input.worktreeBranch } : {}),
-      ...(isNewWorktree ? { isNewWorktree: true } : {}),
-    });
-    const appeared = await waitForRemoteThread(desktop, result.threadId);
+    const threadId = crypto.randomUUID();
+    const launchResult = clientFor(desktop)
+      .startNewThread({
+        threadId,
+        projectId: project.id,
+        agentKind: input.agentKind,
+        config: input.config,
+        prompt: input.prompt,
+        ...(input.segments ? { segments: input.segments } : {}),
+        presentationMode: input.presentationMode ?? "gui",
+        ...(worktreePath ? { worktreePath } : {}),
+        ...(input.worktreeBranch ? { worktreeBranch: input.worktreeBranch } : {}),
+        ...(isNewWorktree ? { isNewWorktree: true } : {}),
+      })
+      .then(
+        () => ({ kind: "started" }) as const,
+        (error: unknown) => ({ kind: "failed", error }) as const,
+      );
+    // The desktop persists the launching row before it awaits the provider's
+    // process/session handshake. Poll for that durable acknowledgement in
+    // parallel so navigation is not blocked by the full agent launch.
+    const appearance = waitForRemoteThread(desktop, threadId);
+    const first = await Promise.race([
+      launchResult,
+      appearance.then((appeared) => ({ kind: "appeared", appeared }) as const),
+    ]);
+    if (first.kind === "failed") throw first.error;
+    const appeared = first.kind === "appeared" ? first.appeared : await appearance;
     if (!appeared) {
       setMessage(i18n._(msg`Unable to start the thread.`));
       return null;
     }
-    setSelectedThreadId(result.threadId);
+    if (first.kind === "appeared") {
+      void launchResult.then((result) => {
+        if (result.kind !== "failed") return;
+        setMessage(describeError(result.error, i18n._(msg`Unable to start the thread.`)));
+        void refresh(desktop, { refreshSelectedThread: true, includeAuxiliary: false });
+      });
+    }
+    setSelectedThreadId(threadId);
     // Sync the ref before the snapshot load below: its stale-paint guard keys
     // off the ref, which otherwise still points at the previous thread until
     // the next render.
-    selectedThreadIdRef.current = result.threadId;
-    void loadThreadSnapshot(result.threadId, desktop, { preferCache: false });
-    return result.threadId;
+    selectedThreadIdRef.current = threadId;
+    void loadThreadSnapshot(threadId, desktop, { preferCache: false });
+    return threadId;
   }
 
   /**

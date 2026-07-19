@@ -47,6 +47,7 @@ const h = vi.hoisted(() => ({
   getThreads: vi.fn<() => unknown[]>(() => []),
   defaultInfo: {
     httpBaseUrl: "http://127.0.0.1:38987/",
+    localHttpBaseUrl: "http://127.0.0.1:38987",
     wsBaseUrl: "ws://127.0.0.1:38987/",
     pairingUrl: "http://127.0.0.1:38987/pair?token=startup",
   } satisfies RemoteAccessServerInfo,
@@ -158,7 +159,7 @@ vi.mock("./RemoteBrowserGateway", () => ({
 }));
 
 vi.mock("./tailscale", () => ({
-  buildTailscaleHttpsUrl: (dnsName: string) => `https://${dnsName.trim().replace(/\.$/, "")}/`,
+  buildTailscaleHttpsUrl: (dnsName: string) => `https://${dnsName.trim().replace(/\.$/, "")}`,
   probeTailscaleStatus: () => h.probeTailscaleStatus(),
   enableTailscaleServe: (port: number) => h.enableTailscaleServe(port),
   disableTailscaleServe: () => h.disableTailscaleServe(),
@@ -276,12 +277,14 @@ describe("DesktopRemoteAccessController", () => {
 
     expect(h.servers[0]?.options.pairingAppUrl).toBe("https://poracode.com");
     expect(h.servers[0]?.options.devMobileAppUrl).toBeUndefined();
+    expect(h.servers[0]?.options.isDev).toBe(false);
 
     const development = createController("http://127.0.0.1:3100");
     await development.setEnabled(true);
 
     expect(h.servers[1]?.options.pairingAppUrl).toBeUndefined();
     expect(h.servers[1]?.options.devMobileAppUrl).toBe("http://127.0.0.1:3100/mobile.html");
+    expect(h.servers[1]?.options.isDev).toBe(true);
   });
 
   it("coalesces enable calls while a server start is in flight", async () => {
@@ -551,6 +554,8 @@ describe("DesktopRemoteAccessController", () => {
     h.serverPlans.push({ disposePromise: close.promise });
     const controller = createController();
     await controller.setEnabled(true);
+
+    expect(h.servers[0]?.options.tailscaleHttpBaseUrl).toBe("https://desktop.tailnet.ts.net");
 
     const first = controller.dispose();
     const second = controller.dispose();

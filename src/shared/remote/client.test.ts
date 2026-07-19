@@ -14,7 +14,7 @@ describe("RemoteDesktopClient", () => {
       "http://127.0.0.1:38987/",
       undefined,
       async (_url, init) => {
-        body = JSON.parse(init?.body ?? "{}") as unknown;
+        body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as unknown;
         return new Response(
           JSON.stringify({
             accessToken: "lc_access_test",
@@ -354,7 +354,9 @@ describe("RemoteDesktopClient", () => {
       "http://127.0.0.1:38987/",
       undefined,
       async (_url, init) => {
-        body = JSON.parse(init?.body ?? "{}") as { client?: unknown };
+        body = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as {
+          client?: unknown;
+        };
         return new Response(
           JSON.stringify({
             accessToken: "lc_access_test",
@@ -417,5 +419,36 @@ describe("RemoteDesktopClient", () => {
     const client = new RemoteDesktopClient("http://127.0.0.1:38987/");
 
     expect(client.localImageUrl("/tmp/img.png")).toBe("");
+  });
+
+  it("uploads attachment bytes to the paired desktop", async () => {
+    let requestUrl = "";
+    let requestBody: Uint8Array | undefined;
+    const client = new RemoteDesktopClient(
+      "https://desktop.example.test",
+      "lc_access_test",
+      async (url, init) => {
+        requestUrl = String(url);
+        requestBody = init?.body instanceof Uint8Array ? init.body : undefined;
+        return new Response(JSON.stringify({ path: "C:\\attachments\\photo one.png" }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      },
+    );
+
+    await expect(
+      client.uploadAttachment({
+        threadId: "thread/one",
+        fileName: "photo one.png",
+        data: new Uint8Array([1, 2, 3]),
+      }),
+    ).resolves.toBe("C:\\attachments\\photo one.png");
+
+    const url = new URL(requestUrl);
+    expect(url.pathname).toBe("/api/files/attachment");
+    expect(url.searchParams.get("threadId")).toBe("thread/one");
+    expect(url.searchParams.get("name")).toBe("photo one.png");
+    expect(Array.from(requestBody!)).toEqual([1, 2, 3]);
   });
 });

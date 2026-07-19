@@ -21,7 +21,7 @@ import type { LabeledOption, ThreadPresentationMode } from "@/shared/contracts";
 export type OptionMenuOption = string | { id: string; label: string; hint?: string };
 
 /** Semantic icon kinds resolved automatically by the composer. */
-export type ComposerIconKind = "effort" | "permission";
+export type ComposerIconKind = "effort" | "fast" | "mode" | "permission";
 
 const COLLAPSE_LEVELS = [0, 1, 2, 3, 4, 5] as const;
 const DEFAULT_LABEL_COLLAPSE_LEVEL = 1;
@@ -112,7 +112,7 @@ export type ComposerControl =
       tier?: number | undefined;
     };
 
-function resolveIcon(control: ComposerControl): ReactNode | undefined {
+export function resolveComposerControlIcon(control: ComposerControl): ReactNode | undefined {
   if (control.kind === "static") return control.icon;
   if (control.kind === "provider-model" || control.kind === "effort-context") {
     return undefined;
@@ -547,7 +547,7 @@ export function ThreadComposer(props: {
           variant="ghost"
           onChange={gated ? () => undefined : (control.onChange ?? (() => undefined))}
         >
-          {resolveIcon(control)}
+          {resolveComposerControlIcon(control)}
           {!control.iconOnly && (
             <span data-collapse-tier={collapseTier} className={labelClassName}>
               {toggleLabel}
@@ -578,7 +578,7 @@ export function ThreadComposer(props: {
       return toggle;
     }
 
-    const resolvedIcon = resolveIcon(control);
+    const resolvedIcon = resolveComposerControlIcon(control);
     const optionalProps = {
       ...(resolvedIcon ? { icon: resolvedIcon } : {}),
       ...(control.iconOnly ? { iconOnly: control.iconOnly } : {}),

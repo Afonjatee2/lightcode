@@ -52,6 +52,12 @@ html:not([data-mobile-platform="ios"]) {
   --m-glass-alpha: 70%;
 }
 
+/* Chromium's backdrop blur is especially faint on Windows, so the floating
+   controls need an almost-opaque base to retain the same visual weight. */
+html[data-mobile-platform="windows"] {
+  --m-glass-alpha: 96%;
+}
+
 /* Reused HeroUI buttons render at their "sm" size (~32px tall) throughout the
    phone shell — too short for a fingertip. Raise the floor for every mobile
    button: a min-height (never a fixed height, so multi-line/reused buttons still
@@ -176,6 +182,7 @@ body.bg-background {
 /* ── Top bar (narrow layout) ───────────────────────────────────── */
 
 .m-topbar {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -522,6 +529,12 @@ body.bg-background {
     opacity 0.2s ease;
 }
 
+.m-shell:has(.m-compose-dock[data-expanded]) .m-home-compose-actions {
+  transform: translateY(calc(100% + 1.5rem + env(safe-area-inset-bottom)));
+  opacity: 0;
+  pointer-events: none;
+}
+
 .m-home-compose-action,
 .m-files-action,
 .m-fab {
@@ -572,56 +585,32 @@ body.bg-background {
 }
 
 .m-topbar-search {
-  box-sizing: border-box;
-  height: 0;
+  position: absolute;
+  bottom: 0;
+  left: 0.625rem;
+  display: flex;
+  min-width: 0;
+  max-width: min(42vw, 12rem);
   flex: none;
-  overflow: hidden;
-  background: var(--background, #070709);
-  padding: 0 0.625rem;
-  opacity: 0;
-  transition:
-    height 0.28s cubic-bezier(0.32, 0.72, 0, 1),
-    padding-top 0.28s cubic-bezier(0.32, 0.72, 0, 1),
-    padding-bottom 0.28s cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 0.18s ease;
+  align-items: center;
 }
 
-.m-topbar-search:not(:empty) {
-  height: calc(var(--m-tap-min) + 1rem);
-  padding-top: 0.5rem;
-  padding-bottom: 0.5rem;
-  opacity: 1;
+.m-topbar-search > .m-threads__picker {
+  padding: 0;
+  background: transparent;
 }
 
-/* ── Scroll-aware chrome (home screen) ─────────────────────────────
- *
- * Scrolling the thread list down tucks the header away (its full height —
- * content row + safe-area padding — via margin) and slides the composer pill
- * off the bottom; scrolling up brings both back. The shell toggles
- * `data-chrome-hidden` (only ever on the home layout). */
-.m-topbar {
-  transition:
-    margin-top 0.28s cubic-bezier(0.32, 0.72, 0, 1),
-    opacity 0.2s ease;
+.m-topbar-search:has(.m-search-float) {
+  right: 0.625rem;
+  max-width: none;
 }
 
-.m-shell[data-chrome-hidden] .m-topbar {
-  margin-top: calc(-1 * (var(--m-tap-min) + env(safe-area-inset-top)) - 1px);
-  opacity: 0;
-  pointer-events: none;
+.m-topbar-search .m-search-float {
+  flex: 1;
 }
 
-.m-shell[data-chrome-hidden] .m-compose-dock:not([data-expanded]) {
-  transform: translateY(calc(100% + 1.5rem + env(safe-area-inset-bottom)));
-  opacity: 0;
-  pointer-events: none;
-}
-
-.m-shell[data-chrome-hidden] .m-home-compose-actions,
-.m-shell:has(.m-compose-dock[data-expanded]) .m-home-compose-actions {
-  transform: translateY(calc(100% + 1.5rem + env(safe-area-inset-bottom)));
-  opacity: 0;
-  pointer-events: none;
+.m-topbar:has(.m-topbar-search .m-search-float) .m-home-brand-cluster {
+  display: none;
 }
 
 /* ── Sidebar + detail (wide layout) ────────────────────────────── */
@@ -676,31 +665,13 @@ body.bg-background {
 }
 
 .m-sidebar__new {
-  display: inline-flex;
   flex: none;
   margin-left: auto;
-  min-height: var(--m-tap-min);
-  align-items: center;
-  gap: 0.375rem;
-  border: none;
-  border-radius: 0.5rem;
-  background: transparent;
-  padding: 0.25rem 0.625rem;
-  color: var(--foreground, inherit);
-  cursor: pointer;
-  font-size: 0.8125rem;
-  font-weight: 500;
 }
 
-.m-sidebar__new:not(:disabled):hover,
 .m-sidebar__new[data-active="true"] {
   background: var(--row-hover);
   color: var(--foreground, inherit);
-}
-
-.m-sidebar__new:disabled {
-  opacity: 0.38;
-  cursor: default;
 }
 
 .m-sidebar__scroll {
@@ -837,6 +808,7 @@ body.bg-background {
   display: flex;
   box-sizing: border-box;
   min-width: 0;
+  height: var(--m-tap-min);
   min-height: var(--m-tap-min);
   flex: 1;
   align-items: center;
@@ -870,7 +842,7 @@ body.bg-background {
   align-items: center;
   justify-content: center;
   width: 2.5rem;
-  height: var(--m-tap-min);
+  height: calc(var(--m-tap-min) - 2px);
   flex: none;
   border: none;
   border-radius: 0.375rem;
@@ -886,16 +858,11 @@ body.bg-background {
 
 /* Desktop/tablet sidebar search: unlike the mobile pill's solid, bordered
    surface, the wide-shell field is borderless and transparent so it reads as
-   part of the sidebar rather than a raised control. It picks up a faint wash
-   only while focused. */
+   part of the sidebar rather than a raised control. */
 .m-shell--wide .m-thread-search {
   border-color: transparent;
   border-radius: 0;
   background: transparent;
-}
-
-.m-shell--wide .m-thread-search:focus-within {
-  border-bottom-color: color-mix(in oklab, var(--foreground) 30%, transparent);
 }
 
 .m-threads__project-btn {
@@ -1025,14 +992,17 @@ body.bg-background {
 
 /* ── Composer info chips (thread view) ─────────────────────────────
  *
- * The informational dock sections (subagents, crossagents, workflows, plan,
- * goal, errors) live OUTSIDE the compact composer as floating icon chips just
+ * The informational dock sections (subagents, crossagents, workflows, context,
+ * plan, goal, errors) live OUTSIDE the compact composer as floating icon chips just
  * above it; tapping a chip expands that section into its own bubble. The strip
  * ducks away while the composer itself is expanded. */
 .m-thread-chips {
   position: absolute;
   right: 0.75rem;
-  bottom: calc(1.25rem + env(safe-area-inset-bottom) + var(--m-floating-control-height));
+  bottom: calc(
+    1.25rem + env(safe-area-inset-bottom) +
+      var(--m-thread-bubble-height, var(--m-floating-control-height))
+  );
   left: 0.75rem;
   z-index: 5;
   display: flex;
@@ -1040,7 +1010,9 @@ body.bg-background {
   align-items: flex-end;
   gap: 0.375rem;
   pointer-events: none;
-  transition: opacity 0.2s ease;
+  transition:
+    bottom 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.16s ease;
 }
 
 .m-thread-chips > * {
@@ -1077,6 +1049,37 @@ body.bg-background {
   color: var(--muted);
   font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
+  transform-origin: bottom right;
+  animation: m-chip-enter 0.18s cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+
+.m-chip[data-exiting] {
+  pointer-events: none;
+  animation: m-chip-exit 0.16s ease both;
+}
+
+@keyframes m-chip-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes m-chip-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.9);
+  }
 }
 
 .m-chip:active {
@@ -1132,10 +1135,40 @@ body.bg-background {
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   padding: 0.25rem;
+  transform-origin: bottom right;
+  animation: m-chip-panel-exit 0.16s ease both;
+}
+
+.m-chip-panel[data-open] {
+  animation: m-chip-panel-enter 0.18s cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .m-chip-panel > section:last-child {
   border-bottom: none;
+}
+
+@keyframes m-chip-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.375rem) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes m-chip-panel-exit {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.98);
+  }
 }
 
 /* Wide screens center the chat column at 920px (see ThreadView) — keep the
@@ -1207,8 +1240,8 @@ html:not([data-touch-device]) .m-compose-scrim {
   -webkit-backdrop-filter: blur(12px);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   transition:
-    max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1),
-    border-radius 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .m-compose-dock[data-expanded] .m-compose-bubble,
@@ -1231,8 +1264,8 @@ html:not([data-touch-device]) .m-compose-scrim {
    instant. */
 .m-compose-bubble[data-height-animating] {
   transition:
-    height 0.32s cubic-bezier(0.32, 0.72, 0, 1),
-    border-radius 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+    height 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Mouse devices: the grow-in-place animation only needs the bubble's own
@@ -1254,7 +1287,7 @@ html:not([data-touch-device]) .m-compose-bubble [data-composer-input-anchor] {
   overflow-y: auto;
   max-height: inherit;
   padding: 0.375rem 0.5rem 0.5rem;
-  transition: padding 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: padding 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 .m-compose-bubble .m-draft > * {
@@ -1285,7 +1318,7 @@ html:not([data-touch-device]) .m-compose-bubble [data-composer-input-anchor] {
   position: relative;
   overflow: hidden;
   max-height: 20rem;
-  transition: max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Match the collapsed composer trick for every unfocused composer input: the
@@ -1307,7 +1340,19 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-compose-bubble .poracode-mention-input {
-  transition: padding 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: padding 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.m-compose-dock[data-expanded] .m-compose-bubble .poracode-mention-input,
+.m-thread-compose-dock[data-expanded] .m-compose-bubble .poracode-mention-input {
+  max-height: calc(3lh + 1.3rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.m-compose-dock[data-expanded] .m-compose-bubble .poracode-mention-input--compact,
+.m-thread-compose-dock[data-expanded] .m-compose-bubble .poracode-mention-input--compact {
+  max-height: calc(3lh + 1rem);
 }
 
 /* Collapsed: only the prompt input (single line) remains visible — project
@@ -1339,7 +1384,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-compose-bubble [data-draft-body] {
-  transition: padding 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: padding 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 /* Inner actions stay inside the shared compact line and are centered by the
@@ -1516,17 +1561,16 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 /* User messages get no in-bubble action icons in the PWA: a long-press on the
    bubble opens the message action sheet instead (UserMessageActionsSheet).
-   Suppress the OS text-selection / touch callout inside user bubbles so the
-   hold doesn't also start a selection — copying lives in the sheet. */
+   Keep text natively selectable for mouse users; the long-press handler still
+   suppresses the native touch gesture and this rule keeps the touch callout
+   out of the way of the action sheet. */
 [data-user-message] {
-  -webkit-user-select: none;
-  user-select: none;
+  -webkit-user-select: text;
+  user-select: text;
   -webkit-touch-callout: none;
 }
 
 [data-user-message] * {
-  -webkit-user-select: none;
-  user-select: none;
   -webkit-touch-callout: none;
 }
 
@@ -1736,7 +1780,14 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 .m-thread .m-thread-content [data-poracode-chat-scroller] {
-  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  padding-bottom: 0;
+}
+
+/* Keep the composer clearance inside LegendList's measured content box. A
+   scroller-level padding band sits outside its end calculation and makes a
+   visually-bottomed chat read as scrolled up. */
+.m-thread .m-thread-content [data-chat-virtual-size-box="true"] {
+  padding-bottom: calc(var(--m-floating-control-height) + 1.5rem + env(safe-area-inset-bottom));
 }
 
 /* The scroll-to-bottom pin anchors to the pane's (now full-height) bottom
@@ -2452,7 +2503,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 :is(.m-main, .m-detail) .m-thread .poracode-composer-shell [data-composer-input-anchor] {
   overflow: hidden;
   max-height: var(--m-floating-control-line-height);
-  transition: max-height 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :is(.m-main, .m-detail)
@@ -2492,7 +2543,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 :is(.m-main, .m-detail) .m-thread .poracode-composer-shell {
   border-color: var(--hairline, var(--border));
   transition:
-    border-radius 0.32s cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1),
     background-color 0.2s ease,
     box-shadow 0.2s ease,
     border-color 0.15s ease;
@@ -2564,6 +2615,8 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   height: auto !important;
   align-items: center;
   justify-content: flex-end;
+  width: var(--m-floating-control-inner-size);
+  padding: 0;
   pointer-events: none;
 }
 
@@ -2626,7 +2679,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 /* Shared compact line metrics with the home bubble: one compact control line,
    text vertically centered (the desktop editor's padding is top-heavy). */
 :is(.m-main, .m-detail) .m-thread .poracode-composer-shell .poracode-mention-input {
-  transition: padding 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+  transition: padding 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :is(.m-main, .m-detail)
@@ -2642,7 +2695,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   line-height: var(--m-floating-control-line-height);
 }
 
-/* Current model · effort summary pinned inside the compact pill's right end
+/* Provider / fast / mode / permission summary pinned inside the compact pill's right end
    (ComposerCompactSummary). Inert info chrome: it fades away when the
    composer expands (the real controls take over) or once a prompt is typed
    (the pinned send button owns that corner). */
@@ -2653,26 +2706,18 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   z-index: 1;
   display: flex;
   height: var(--m-floating-control-height);
-  max-width: 45%;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.5rem;
   overflow: hidden;
   white-space: nowrap;
-  font-size: 0.75rem;
   color: var(--muted);
   pointer-events: none;
   transition: opacity 0.2s ease;
 }
 
 .m-compose-summary__item {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.m-compose-summary__item + .m-compose-summary__item::before {
-  content: "·";
-  margin-right: 0.4rem;
+  display: inline-flex;
+  align-items: center;
 }
 
 .m-thread-compose-dock[data-expanded] .m-compose-summary,

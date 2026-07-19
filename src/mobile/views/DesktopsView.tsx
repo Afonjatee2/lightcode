@@ -20,6 +20,7 @@ import { formatShortDateTime } from "@/renderer/utils/formatTime";
 import { InlineRenameInput } from "@/renderer/views/MainView/parts/Sidebar/parts/InlineRenameInput";
 import { Fab, EmptyState, FullScreenDrawer, SheetMenu, useSheet } from "../components";
 import { QrScanner } from "../QrScanner";
+import { parsePairingUrl } from "../pairing";
 import { isNativeApp, isStandaloneDisplay, promptInstall, useCanInstall } from "../pwaInstall";
 import type { StoredDesktop } from "../storage";
 
@@ -430,6 +431,17 @@ export function DesktopsView(props: DesktopsViewProps) {
       openPairDrawer(true);
     }
   }, [showPairingHint, openPairDrawer]);
+
+  function updatePairingField(value: string, updateField: (next: string) => void) {
+    const parsed = parsePairingUrl(value);
+    if (!parsed?.credential) {
+      updateField(value);
+      return;
+    }
+    props.onEndpointChange(parsed.endpoint);
+    props.onTokenChange(parsed.credential);
+  }
+
   const pairingLinkForm = (
     <div className="m-form">
       <p className="m-card__hint">
@@ -466,7 +478,9 @@ export function DesktopsView(props: DesktopsViewProps) {
           autoCorrect="off"
           spellCheck={false}
           placeholder="http://192.168.1.20:49152/"
-          onChange={(event) => props.onEndpointChange(event.currentTarget.value)}
+          onChange={(event) =>
+            updatePairingField(event.currentTarget.value, props.onEndpointChange)
+          }
         />
       </label>
       <label className="m-field">
@@ -480,7 +494,7 @@ export function DesktopsView(props: DesktopsViewProps) {
           autoCorrect="off"
           spellCheck={false}
           placeholder="lc_pair_…"
-          onChange={(event) => props.onTokenChange(event.currentTarget.value)}
+          onChange={(event) => updatePairingField(event.currentTarget.value, props.onTokenChange)}
         />
       </label>
       <Button

@@ -66,7 +66,7 @@ import {
   isReservedForwardProxyPath,
   proxyForwardedHttpRequest,
 } from "./portForwardProxy";
-import { readJsonBody } from "./requestBody";
+import { readAttachmentBody, readJsonBody } from "./requestBody";
 import { DEFAULT_TOKEN_EXCHANGE_RATE_LIMIT } from "./security";
 import {
   buildAgentStatuses,
@@ -380,6 +380,34 @@ export async function handleHttp(
       }
       ctx.auth.authenticateBearerToken(token, ["session:read"]);
       await writeLocalImageFile(res, url.searchParams.get("path"));
+      return;
+    }
+    if (req.method === "POST" && url.pathname === "/api/files/attachment") {
+      ctx.security.requireBearer(req, ["session:operate"]);
+      const threadId = url.searchParams.get("threadId")?.trim();
+      const fileName = url.searchParams.get("name")?.trim();
+      if (!threadId || !fileName || fileName.length > 255) {
+        throw new RemoteHttpError(
+          "invalid_attachment",
+          "An attachment thread id and file name are required.",
+          400,
+        );
+      }
+      const attachments = ctx.options.attachments;
+      if (!attachments) {
+        throw new RemoteHttpError(
+          "attachments_unavailable",
+          "Remote attachment uploads are unavailable.",
+          503,
+        );
+      }
+      const data = await readAttachmentBody(req);
+      if (data.length === 0) {
+        throw new RemoteHttpError("empty_attachment", "The attachment is empty.", 400);
+      }
+      writeJson(res, 200, {
+        path: attachments.save({ threadId, fileName, data }),
+      });
       return;
     }
     // Profile: identity + local usage stats, computed straight from this

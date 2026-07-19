@@ -2498,6 +2498,7 @@ msgstr "Console"
 msgid "Contains sensitive values; add manually"
 msgstr "Contém valores confidenciais; adicione manualmente"
 
+#: src/mobile/ComposerInfoChips.tsx
 #: src/renderer/components/common/EffortContextMenu/EffortContextMenu.tsx
 #: src/renderer/components/thread/threadContextUsage.ts
 msgid "Context"
@@ -4203,6 +4204,10 @@ msgstr "Pasta que contém todas as árvores de trabalho. Dica: um Dev Drive aqui
 msgid "Folder that holds this project's worktrees. Reset to use the global setting."
 msgstr "Pasta que contém as árvores de trabalho deste projeto. Redefina para usar a configuração global."
 
+#: src/mobile/views/ThreadView.tsx
+msgid "Follow up..."
+msgstr "Continuar..."
+
 #: src/mobile/settingsSections.ts
 msgid "Fonts and scrolling"
 msgstr "Fontes e rolagem"
@@ -5141,6 +5146,7 @@ msgstr "local"
 
 #: src/renderer/components/common/BranchSelector/parts/useBranchList.ts
 #: src/renderer/views/ProfileOverlay/parts/ProfileHeader.tsx
+#: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Local"
 msgstr "Locais"
 

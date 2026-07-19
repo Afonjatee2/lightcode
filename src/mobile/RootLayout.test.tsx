@@ -2,6 +2,10 @@
 import { StrictMode, type ReactNode } from "react";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  closeImageLightbox,
+  openImageLightbox,
+} from "@/renderer/components/composer/ImageLightbox";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { usePanelStore } from "@/renderer/state/panelStore";
 import { RootLayout } from "./RootLayout";
@@ -153,6 +157,7 @@ vi.mock("./views/ThreadsView", () => ({
 
 describe("mobile RootLayout", () => {
   beforeEach(() => {
+    closeImageLightbox();
     localStorage.removeItem("poracode-mobile.sidebar-width");
     routerMock.navigate.mockReset();
     routerMock.pathname = "/threads";
@@ -244,6 +249,26 @@ describe("mobile RootLayout", () => {
     expect(screen.getByRole("button", { name: "Settings" })).toBeEnabled();
     expect(screen.queryByTestId("connection-banner")).not.toBeInTheDocument();
     expect(screen.getByText("Connect desktop")).toBeInTheDocument();
+  });
+
+  it("uses the ghost button treatment for the wide-shell new thread action", () => {
+    mediaMock.isWide = true;
+
+    render(<RootLayout />);
+
+    expect(screen.getByRole("button", { name: "New thread" })).toHaveClass("button--ghost");
+  });
+
+  it("hosts shared image previews opened from user messages", () => {
+    openImageLightbox([{ src: "data:image/png;base64,AA==", alt: "Screenshot" }], 0);
+
+    render(<RootLayout />);
+
+    expect(screen.getByRole("dialog", { name: "Screenshot" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Screenshot" })).toHaveAttribute(
+      "src",
+      "data:image/png;base64,AA==",
+    );
   });
 
   it("shows the offline banner when the selected desktop is offline", () => {

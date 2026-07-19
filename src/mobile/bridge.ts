@@ -128,6 +128,48 @@ function toArrayBuffer(data: Uint8Array): ArrayBuffer {
   return buffer;
 }
 
+async function pickBrowserFiles(options?: {
+  readonly attachmentThreadId?: string;
+  readonly filters?: readonly { readonly extensions: readonly string[] }[];
+}): Promise<string[] | null> {
+  if (!options?.attachmentThreadId) {
+    throw new Error("Remote file selection requires an attachment destination.");
+  }
+  const attachmentThreadId = options.attachmentThreadId;
+  const input = document.createElement("input");
+  input.type = "file";
+  input.multiple = true;
+  const extensions = options.filters?.flatMap((filter) => filter.extensions) ?? [];
+  if (extensions.length > 0) {
+    input.accept = extensions.map((extension) => `.${extension.replace(/^\./, "")}`).join(",");
+  }
+
+  const files = await new Promise<File[]>((resolve) => {
+    let settled = false;
+    const finish = (selected: File[]) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(selected);
+    };
+    input.addEventListener("change", () => finish(Array.from(input.files ?? [])), { once: true });
+    input.addEventListener("cancel", () => finish([]), { once: true });
+    input.click();
+  });
+  if (files.length === 0) return null;
+
+  const client = requireClient();
+  return Promise.all(
+    files.map(async (file) =>
+      client.uploadAttachment({
+        threadId: attachmentThreadId,
+        fileName: file.name,
+        data: new Uint8Array(await file.arrayBuffer()),
+      }),
+    ),
+  );
+}
+
 const remoteBridge = {
   // Metadata reads. Analytics/diagnostics stay disabled in remote sessions.
   // `platform` is a getter so it tracks the paired desktop after connect.
@@ -196,8 +238,8 @@ const remoteBridge = {
   runScheduleNow: ({ id }: { id: string }) => requireClient().runScheduleNow(id),
 
   // Shared settings persist per device via the store's localStorage fallback.
-  // Remote-editable keys (the desktop's AI helpers) are additionally diffed
-  // and forwarded to the paired desktop — see settingsSync.ts.
+  // Remote-editable keys (including persistent composer MCP enablement) are
+  // additionally diffed and forwarded to the paired desktop — see settingsSync.ts.
   setSharedSettings: (settings: SharedSettingsInput) => {
     pushDesktopSettingsDiff(activeClient, settings);
     return Promise.resolve();
@@ -214,7 +256,13 @@ const remoteBridge = {
     return Promise.resolve();
   },
   getDroppedFilePaths: () => [],
-  pickFiles: () => Promise.resolve(null),
+  pickFiles: pickBrowserFiles,
+  saveClipboardImage: (payload: { threadId: string; data: Uint8Array; extension: string }) =>
+    requireClient().uploadAttachment({
+      threadId: payload.threadId,
+      fileName: `Image.${payload.extension || "png"}`,
+      data: payload.data,
+    }),
   // Image copy/download use the browser clipboard and an anchor download in
   // place of the desktop's native clipboard and Save dialog.
   copyImageToClipboard: async ({ data }: { data: Uint8Array }): Promise<boolean> => {

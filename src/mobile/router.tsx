@@ -55,7 +55,7 @@ const rootRoute = createRootRoute({ component: RootLayout });
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  beforeLoad: () => redirect({ to: "/new" }),
+  beforeLoad: () => redirect({ to: "/threads" }),
 });
 
 const threadsRoute = createRoute({

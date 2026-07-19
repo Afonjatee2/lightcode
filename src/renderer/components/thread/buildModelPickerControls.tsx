@@ -240,6 +240,7 @@ export function buildModelPickerControls(input: BuildModelPickerControlsInput): 
       label: "Fast",
       displayLabel: msg`Fast`,
       icon: <Zap className="size-3.5" />,
+      iconKind: "fast",
       iconOnly: true,
       fillIconOnSelect: true,
       tier: 3,
