@@ -3,7 +3,7 @@ import { useShallow } from "zustand/shallow";
 import { Tooltip } from "@heroui/react";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import { Crown, FlaskConical, LayoutGrid, Loader2, Trash2, X } from "lucide-react";
-import { isThreadTurnActive } from "@/shared/contracts";
+import { isThreadResultReady, isThreadTurnActive } from "@/shared/contracts";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import {
   createExperimentCandidatePr,
@@ -69,6 +69,25 @@ export function ExperimentView(props: { experimentId: string }) {
       : false,
   );
   const hasActiveCandidate = hasActiveTurn || hasLiveWorkflow;
+  // Candidates that have settled with a comparable result (idle/finished, no
+  // live workflow). Judging is gated on having at least two of these — a failed
+  // or still-running candidate simply doesn't count, so it can never deadlock
+  // the "Crown with AI" button the way "wait for EVERY candidate" did.
+  const liveThreadIds = useThreadLiveWorkflowStore((state) => state.liveThreadIds);
+  const readyThreadIds = useAppStore(
+    useShallow((state) =>
+      experiment
+        ? state.threads
+            .filter(
+              (thread) =>
+                experiment.candidates.some((candidate) => candidate.threadId === thread.id) &&
+                isThreadResultReady(thread.status),
+            )
+            .map((thread) => thread.id)
+        : [],
+    ),
+  );
+  const resultReadyCount = readyThreadIds.filter((id) => !liveThreadIds.has(id)).length;
   const hasCleanupPending =
     experiment?.status === "decided" &&
     experiment.candidates.some((candidate) => candidate.worktreeState !== "removed");
@@ -198,10 +217,7 @@ export function ExperimentView(props: { experimentId: string }) {
                     variant="tertiary"
                     className="h-7 px-2.5 text-xs"
                     isDisabled={
-                      operationLocked ||
-                      hasActiveCandidate ||
-                      candidates.length < 2 ||
-                      !hasAvailableJudge
+                      operationLocked || resultReadyCount < 2 || !hasAvailableJudge
                     }
                     isPending={operation === "crown"}
                     onPress={judge.open}
@@ -217,10 +233,10 @@ export function ExperimentView(props: { experimentId: string }) {
                 <Tooltip.Content>
                   {!hasAvailableJudge ? (
                     <Trans>None of these agents can run the AI comparison.</Trans>
-                  ) : hasActiveCandidate ? (
-                    <Trans>Wait for every candidate to finish before judging.</Trans>
+                  ) : resultReadyCount < 2 ? (
+                    <Trans>At least two candidates must finish before judging.</Trans>
                   ) : (
-                    <Trans>Let an AI judge compare the candidate changes.</Trans>
+                    <Trans>Let an AI judge compare the finished candidates.</Trans>
                   )}
                 </Tooltip.Content>
               </Tooltip>

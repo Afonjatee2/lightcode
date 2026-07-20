@@ -1,7 +1,7 @@
 import { toast } from "@heroui/react";
 import { msg } from "@lingui/core/macro";
 import type { AgentStatus, ExperimentCandidate, Project, Thread } from "@/shared/contracts";
-import { isThreadTurnActive } from "@/shared/contracts";
+import { isThreadResultReady, isThreadTurnActive } from "@/shared/contracts";
 import { i18n } from "@/renderer/i18n/i18n";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useExperimentStore } from "@/renderer/state/experimentStore";
@@ -41,6 +41,21 @@ export function hasActiveExperimentCandidate(experimentId: string): boolean {
   const liveThreadIds = useThreadLiveWorkflowStore.getState().liveThreadIds;
   return experimentThreads(experimentId).some(
     (thread) => isThreadTurnActive(thread.status) || liveThreadIds.has(thread.id),
+  );
+}
+
+/**
+ * Thread ids of candidates that have settled with a comparable result
+ * (idle/finished, no live background workflow). Used to gate AI judging so a
+ * failed or hung candidate can neither block judging nor be fed to the judge
+ * with no changes — only the candidates that actually finished are compared.
+ */
+export function resultReadyExperimentThreadIds(experimentId: string): Set<string> {
+  const liveThreadIds = useThreadLiveWorkflowStore.getState().liveThreadIds;
+  return new Set(
+    experimentThreads(experimentId)
+      .filter((thread) => isThreadResultReady(thread.status) && !liveThreadIds.has(thread.id))
+      .map((thread) => thread.id),
   );
 }
 

@@ -25,6 +25,7 @@ import {
   getPendingExperimentOperation,
   hasActiveExperimentCandidate,
   isEligibleExperimentJudgeAgent,
+  resultReadyExperimentThreadIds,
   withExperimentOperation,
 } from "./experimentOperationState";
 import {
@@ -123,10 +124,17 @@ export async function crownExperiment(
       .getState()
       .projects.find((item) => item.id === experiment.projectId);
     if (!project) return false;
-    if (hasActiveExperimentCandidate(experimentId)) {
-      toast.warning(i18n._(msg`Wait for every candidate to finish before comparing them.`));
+    // Judge only the candidates that actually finished with a result. A failed
+    // or still-running candidate is skipped rather than blocking the comparison,
+    // so one broken agent can't deadlock the whole experiment.
+    const readyThreadIds = resultReadyExperimentThreadIds(experimentId);
+    if (readyThreadIds.size < 2) {
+      toast.warning(i18n._(msg`At least two candidates must finish before comparing them.`));
       return false;
     }
+    const readyCandidates = experiment.candidates.filter((candidate) =>
+      readyThreadIds.has(candidate.threadId),
+    );
 
     const agentState = useAgentStatusesStore.getState();
     const disabledAgents = useSharedSettings.getState().disabledAgents;
@@ -170,7 +178,7 @@ export async function crownExperiment(
         ...(judgeEffort ? { effort: judgeEffort } : {}),
         ...(judgeFast !== undefined ? { fast: judgeFast } : {}),
         prompt: experiment.prompt,
-        candidates: experimentSnapshotCandidates(experiment),
+        candidates: experimentSnapshotCandidates({ ...experiment, candidates: readyCandidates }),
       });
       const judgeLabel = judgeModel ? `${judgeAgent.label} · ${judgeModel}` : judgeAgent.label;
       useExperimentStore.getState().setExperimentCrown(experimentId, {
