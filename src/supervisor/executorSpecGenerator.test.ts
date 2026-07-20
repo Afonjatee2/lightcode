@@ -4,9 +4,9 @@ import { MAX_EXPERIMENT_PROMPT_LENGTH, type ProjectLocation } from "@/shared/con
 import type { AgentAdapter } from "./agents/base";
 import { cleanSpec, generateExecutorSpec } from "./executorSpecGenerator";
 
-const location: ProjectLocation = { kind: "native", path: "/tmp/repo" };
+const location: ProjectLocation = { kind: "posix", path: "/tmp/repo" };
 
-function fakeAdapter(overrides: Partial<AgentAdapter> = {}): AgentAdapter {
+function fakeAdapter(overrides: Record<string, unknown> = {}): AgentAdapter {
   return {
     label: "Fake",
     defaultOneShotModel: "fake-model",
