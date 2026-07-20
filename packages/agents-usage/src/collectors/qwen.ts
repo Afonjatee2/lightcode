@@ -274,20 +274,23 @@ function quotaWindow(
   };
 }
 
-function percentageWindow(
+function percentageRatioWindow(
   id: "session-5h" | "weekly",
   label: string,
   quota: JsonObject,
   percentKey: string,
   resetKey: string,
 ): UsageWindow | undefined {
-  const percent = finiteNumber(quota[percentKey]);
-  if (percent === undefined) return undefined;
+  const ratio = finiteNumber(quota[percentKey]);
+  if (ratio === undefined) return undefined;
   const resetsAt = epochMs(quota[resetKey]);
   return {
     id,
     label,
-    usedPercent: Math.max(0, Math.min(100, percent)),
+    // Despite their `Percentage` names, the Token Plan endpoint returns these
+    // fields as 0-1 ratios (for example, 0.03 means 3%). Normalize them at the
+    // provider boundary so every shared consumer receives percentage points.
+    usedPercent: Math.max(0, Math.min(100, ratio * 100)),
     ...(resetsAt !== undefined ? { resetsAt } : {}),
   };
 }
@@ -351,14 +354,14 @@ export function parseQwenCodingPlanUsage(payload: unknown, now: number): UsageSn
   const tokenPlanQuota = findObjectWithKey(expanded, ["per5HourPercentage", "per1WeekPercentage"]);
   if (tokenPlanQuota) {
     const windows = [
-      percentageWindow(
+      percentageRatioWindow(
         "session-5h",
         "Session (5h)",
         tokenPlanQuota,
         "per5HourPercentage",
         "per5HourResetTime",
       ),
-      percentageWindow(
+      percentageRatioWindow(
         "weekly",
         "Weekly",
         tokenPlanQuota,

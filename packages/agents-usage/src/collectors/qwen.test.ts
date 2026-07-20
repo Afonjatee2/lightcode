@@ -34,9 +34,9 @@ const TOKEN_PLAN_BODY = JSON.stringify({
       data: JSON.stringify({
         code: 0,
         data: {
-          per5HourPercentage: 25,
+          per5HourPercentage: 0.03,
           per5HourResetTime: FAKE_NOW_MS + 3_600_000,
-          per1WeekPercentage: 16,
+          per1WeekPercentage: 0.01,
           per1WeekResetTime: FAKE_NOW_MS + 86_400_000,
         },
         success: true,
@@ -54,10 +54,10 @@ describe("parseQwenCodingPlanUsage", () => {
       windows: [
         {
           id: "session-5h",
-          usedPercent: 25,
+          usedPercent: 3,
           resetsAt: FAKE_NOW_MS + 3_600_000,
         },
-        { id: "weekly", usedPercent: 16, resetsAt: FAKE_NOW_MS + 86_400_000 },
+        { id: "weekly", usedPercent: 1, resetsAt: FAKE_NOW_MS + 86_400_000 },
       ],
     });
   });

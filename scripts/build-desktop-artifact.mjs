@@ -32,6 +32,9 @@ const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const requireFromHere = createRequire(import.meta.url);
 const channelTable = requireFromHere("./electron-builder.shared.cjs");
+const { restoreMacUpdaterManifests, snapshotMacUpdaterManifests } = requireFromHere(
+  "./mac-updater-manifest.cjs",
+);
 const { supportEmail } = requireFromHere("../branding/contact.json");
 
 // Runtime externals — packages tsdown does NOT inline into dist/main/*.cjs.
@@ -335,8 +338,12 @@ async function main() {
     const stagePkg = buildStagePackageJson(rootPkg);
     writeFileSync(join(stageRoot, "package.json"), `${JSON.stringify(stagePkg, null, 2)}\n`);
 
-    // 5. Stage electron-builder config.
-    writeFileSync(join(stageRoot, "electron-builder.yml"), buildElectronBuilderConfig());
+    // 5. Stage the initial electron-builder config.
+    const initialMacArtifactKind = macArtifactKindFor(platform, target);
+    writeFileSync(
+      join(stageRoot, "electron-builder.yml"),
+      buildElectronBuilderConfig(initialMacArtifactKind),
+    );
 
     // 6. Install prod + stage devdeps with a flat layout.
     //    node-linker=hoisted makes pnpm produce an npm-style flat node_modules,
@@ -422,14 +429,42 @@ async function main() {
       ".bin",
       process.platform === "win32" ? "electron-builder.cmd" : "electron-builder",
     );
-    const electronBuilderArgs = [PLATFORM_FLAG[platform]];
-    if (target) {
-      electronBuilderArgs.push(arch ? `${target}:${arch}` : target);
-    } else if (arch) {
-      electronBuilderArgs.push(`--${arch}`);
+    const runElectronBuilder = (
+      selectedTarget,
+      macArtifactKind = macArtifactKindFor(platform, selectedTarget),
+    ) => {
+      if (platform === "mac") {
+        writeFileSync(
+          join(stageRoot, "electron-builder.yml"),
+          buildElectronBuilderConfig(macArtifactKind),
+        );
+      }
+      const electronBuilderArgs = [PLATFORM_FLAG[platform]];
+      if (selectedTarget) {
+        electronBuilderArgs.push(arch ? `${selectedTarget}:${arch}` : selectedTarget);
+      } else if (arch) {
+        electronBuilderArgs.push(`--${arch}`);
+      }
+      electronBuilderArgs.push("--publish", publish);
+      run(electronBuilderBin, electronBuilderArgs, { cwd: stageRoot });
+    };
+
+    if (platform === "mac" && !target) {
+      // Build updater ZIPs first with the legacy technical executable name so
+      // Lightcode -> Poracode does not trigger Squirrel's broken outer-bundle
+      // rename. Then build branded DMGs for fresh/manual installs. The second
+      // pass overwrites the channel manifest with DMG metadata, so preserve the
+      // updater ZIP manifest around it and restore that as the published feed.
+      runElectronBuilder("zip", "updater");
+      const updaterManifests = snapshotMacUpdaterManifests(join(stageRoot, "release"));
+      if (updaterManifests.size === 0) {
+        throw new Error("macOS updater ZIP build produced no channel manifest");
+      }
+      runElectronBuilder("dmg", "branded");
+      restoreMacUpdaterManifests(join(stageRoot, "release"), updaterManifests);
+    } else {
+      runElectronBuilder(target);
     }
-    electronBuilderArgs.push("--publish", publish);
-    run(electronBuilderBin, electronBuilderArgs, { cwd: stageRoot });
 
     // 8. Copy artifacts back to release/.
     const copied = copyArtifactsBack(join(stageRoot, "release"), outputDir);
@@ -444,7 +479,13 @@ async function main() {
   }
 }
 
-function buildElectronBuilderConfig() {
+// macOS ZIP updates ship under the legacy executable name as a Squirrel.Mac
+// migration bridge; DMGs and every other platform stay fully Poracode-branded.
+function macArtifactKindFor(platform, target) {
+  return platform === "mac" && target === "zip" ? "updater" : "branded";
+}
+
+function buildElectronBuilderConfig(macArtifactKind = "branded") {
   // Generate the staged electron-builder config with a drastically simplified
   // `files:` block — the stage's node_modules contains only the runtime
   // externals we listed, so we can include all of node_modules without dragging
@@ -457,7 +498,8 @@ function buildElectronBuilderConfig() {
   const updaterChannel = channelTable.updaterChannelFor(channel);
   const prefix = channelTable.artifactPrefixFor(channel);
   const iconSuffix = channel === "nightly" ? "-nightly" : "";
-  const runtimeIconSuffix = channel === "nightly" ? "-nightly-mac" : "";
+  const runtimeIconSuffix = channel === "nightly" ? "-nightly-mac" : "-mac";
+  const macExecutableName = channelTable.macExecutableNameFor(channel, macArtifactKind);
   const publishChannelLine = updaterChannel ? `\n  channel: ${updaterChannel}` : "";
   const macEntitlements = "build/entitlements.mac.plist";
   const macEntitlementsInherit = "build/entitlements.mac.plist";
@@ -545,6 +587,7 @@ linux:
   artifactName: ${prefix}-\${version}-\${arch}.\${ext}
 
 mac:
+  executableName: ${macExecutableName}
   target:
     - target: dmg
       arch:

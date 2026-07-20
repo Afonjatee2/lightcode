@@ -20,6 +20,42 @@ function permissionRequest(): RequestPermissionRequest {
   };
 }
 
+function questionPermissionRequest(): RequestPermissionRequest {
+  return {
+    sessionId: "session-1",
+    toolCall: {
+      toolCallId: "question-1",
+      title: "Ask user 2 questions",
+      kind: "other",
+      rawInput: {
+        questions: [
+          {
+            header: "Scope",
+            question: "Which scope should be implemented?",
+            options: [
+              { label: "Focused", description: "Implement only the requested feature." },
+              { label: "Broad", description: "Include adjacent improvements." },
+            ],
+          },
+          {
+            header: "Checks",
+            question: "Which checks should run?",
+            multiSelect: true,
+            options: [
+              { label: "Tests", description: "Run focused tests." },
+              { label: "Lint", description: "Run lint checks." },
+            ],
+          },
+        ],
+      },
+    },
+    options: [
+      { optionId: "proceed_once", name: "Submit", kind: "allow_once" },
+      { optionId: "cancel", name: "Cancel", kind: "reject_once" },
+    ],
+  };
+}
+
 function formElicitation(): CreateElicitationRequest {
   return {
     mode: "form",
@@ -72,6 +108,138 @@ function makeRequests(
 }
 
 describe("AcpSessionRequests permissions", () => {
+  it("maps Qwen AskUserQuestion permissions to a reply form and returns indexed answers", async () => {
+    const { emitRuntimeEvents, requests, setRequestAttention } = makeRequests({
+      config: { model: "model-a", mode: "agent", approvalPolicy: "never" },
+      availableModeIds: ["agent"],
+    });
+
+    const response = requests.requestPermission(questionPermissionRequest());
+
+    expect(setRequestAttention).toHaveBeenCalledExactlyOnceWith("needs_reply");
+    expect(emitRuntimeEvents).toHaveBeenCalledWith([
+      {
+        type: "request.opened",
+        threadId: "thread-1",
+        requestId: "acp-perm-0",
+        requestType: "tool_user_input",
+        payload: {
+          summary: "Which scope should be implemented?",
+          details: {
+            userInputForm: {
+              questions: [
+                {
+                  id: "0",
+                  header: "Scope",
+                  question: "Which scope should be implemented?",
+                  options: [
+                    {
+                      optionId: "Focused",
+                      label: "Focused",
+                      description: "Implement only the requested feature.",
+                    },
+                    {
+                      optionId: "Broad",
+                      label: "Broad",
+                      description: "Include adjacent improvements.",
+                    },
+                  ],
+                  multiSelect: false,
+                },
+                {
+                  id: "1",
+                  header: "Checks",
+                  question: "Which checks should run?",
+                  options: [
+                    {
+                      optionId: "Tests",
+                      label: "Tests",
+                      description: "Run focused tests.",
+                    },
+                    {
+                      optionId: "Lint",
+                      label: "Lint",
+                      description: "Run lint checks.",
+                    },
+                  ],
+                  multiSelect: true,
+                },
+              ],
+            },
+          },
+        },
+      },
+    ]);
+
+    requests.resolve("acp-perm-0", {
+      answers: {
+        "0": "Focused",
+        "1": ["Tests", "Lint"],
+      },
+    });
+
+    await expect(response).resolves.toEqual({
+      outcome: { outcome: "selected", optionId: "proceed_once" },
+      answers: { "0": "Focused", "1": "Tests, Lint" },
+    });
+    expect(emitRuntimeEvents).toHaveBeenCalledWith([
+      {
+        type: "item.started",
+        threadId: "thread-1",
+        itemId: "acp-question-answer-acp-perm-0",
+        itemType: "question_answer",
+        payload: {
+          questions: [
+            {
+              header: "Scope",
+              question: "Which scope should be implemented?",
+              selected: [
+                { label: "Focused", description: "Implement only the requested feature." },
+              ],
+            },
+            {
+              header: "Checks",
+              question: "Which checks should run?",
+              selected: [
+                { label: "Tests", description: "Run focused tests." },
+                { label: "Lint", description: "Run lint checks." },
+              ],
+            },
+          ],
+        },
+      },
+      {
+        type: "item.completed",
+        threadId: "thread-1",
+        itemId: "acp-question-answer-acp-perm-0",
+      },
+    ]);
+  });
+
+  it("cancels Qwen AskUserQuestion without forwarding answers", async () => {
+    const { emitRuntimeEvents, requests } = makeRequests();
+    const response = requests.requestPermission(questionPermissionRequest());
+
+    requests.resolve("acp-perm-0", { action: "cancel" });
+
+    await expect(response).resolves.toEqual({ outcome: { outcome: "cancelled" } });
+    expect(emitRuntimeEvents).toHaveBeenLastCalledWith([
+      {
+        type: "request.resolved",
+        threadId: "thread-1",
+        requestId: "acp-perm-0",
+        outcome: "answered",
+      },
+    ]);
+  });
+
+  it("reports when a permission request is no longer pending", () => {
+    const { emitRuntimeEvents, requests } = makeRequests();
+
+    expect(requests.resolve("acp-perm-missing", { optionId: "proceed_once" })).toBe(false);
+    expect(emitRuntimeEvents).not.toHaveBeenCalled();
+  });
+
   it.each(["never", "yolo", "bypassPermissions"])(
     "auto-approves %s when the agent has no matching native mode",
     async (approvalPolicy) => {
@@ -198,7 +366,7 @@ describe("AcpSessionRequests elicitations", () => {
         tags: ["fast"],
       },
     });
-    expect(emitRuntimeEvents).toHaveBeenLastCalledWith([
+    expect(emitRuntimeEvents).toHaveBeenCalledWith([
       expect.objectContaining({
         type: "item.started",
         itemId: "acp-question-answer-acp-elicit-0",

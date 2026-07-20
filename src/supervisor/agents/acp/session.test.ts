@@ -38,6 +38,7 @@ type TestableAcpSession = {
     options?: { userMessageItemId?: string },
   ): Promise<void>;
   interruptTurn(): Promise<void>;
+  forceCompleteTurn(): void;
   dispose(): Promise<void>;
   resolveServerRequest(requestId: string, response: unknown): Promise<void>;
   handlePermissionRequest(params: RequestPermissionRequest): Promise<unknown>;
@@ -1329,6 +1330,97 @@ describe("ACP turn config sync", () => {
     expect(listener.onUpdate).toHaveBeenLastCalledWith({
       status: "idle",
       attention: "none",
+    });
+  });
+
+  it("treats an interrupt-triggered prompt abort as a cancelled turn", async () => {
+    const { connection, listener, session } = makeConfigSyncSession();
+    let rejectPrompt: ((error: Error) => void) | undefined;
+    connection.prompt.mockReturnValueOnce(
+      new Promise<{ stopReason: string }>((_resolve, reject) => {
+        rejectPrompt = reject;
+      }),
+    );
+
+    const turnPromise = session.startTurn("hello", {
+      model: "model-a",
+      effort: "low",
+      mode: "agent",
+      approvalPolicy: "default",
+    });
+    await Promise.resolve();
+
+    await session.interruptTurn();
+    rejectPrompt?.(new Error("Request was aborted."));
+    await turnPromise;
+
+    expect(listener.onRuntimeEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+    expect(listener.onRuntimeEvent.mock.calls.at(-1)?.[0]).toMatchObject({
+      type: "turn.completed",
+      state: "cancelled",
+    });
+    expect(listener.onUpdate).toHaveBeenLastCalledWith({
+      status: "idle",
+      attention: "none",
+    });
+  });
+
+  it("keeps prompt abort errors as failures when no interrupt was requested", async () => {
+    const { connection, listener, session } = makeConfigSyncSession();
+    connection.prompt.mockRejectedValueOnce(new Error("Request was aborted."));
+
+    await session.startTurn("hello", {
+      model: "model-a",
+      effort: "low",
+      mode: "agent",
+      approvalPolicy: "default",
+    });
+
+    expect(listener.onRuntimeEvent).toHaveBeenCalledWith({
+      type: "error",
+      threadId: "thread-1",
+      message: "Request was aborted.",
+    });
+    expect(listener.onRuntimeEvent.mock.calls.at(-1)?.[0]).toMatchObject({
+      type: "turn.completed",
+      state: "failed",
+    });
+    expect(listener.onUpdate).toHaveBeenLastCalledWith({
+      status: "error",
+      attention: "error",
+      errorMessage: "Request was aborted.",
+    });
+  });
+
+  it("closes open canonical items when a stuck turn is force-completed", () => {
+    const { listener, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["currentTurnId"] = "turn-force";
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "tool-force",
+        title: "Long-running task",
+        kind: "execute",
+        status: "in_progress",
+      },
+    });
+
+    session.forceCompleteTurn();
+
+    expect(listener.onRuntimeEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "item.completed",
+        threadId: "thread-1",
+        itemId: expect.any(String),
+      }),
+    );
+    expect(listener.onRuntimeEvent.mock.calls.at(-1)?.[0]).toEqual({
+      type: "turn.completed",
+      threadId: "thread-1",
+      turnId: "turn-force",
+      state: "cancelled",
     });
   });
 });

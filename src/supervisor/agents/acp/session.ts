@@ -98,6 +98,7 @@ import { AcpTerminalManager } from "./terminalManager";
 import {
   appendInterruptAckTextTail,
   createAcpPromptUsageEvent,
+  isAcpPromptCancellationError,
   normalizeAcpStopReason,
   resolveAcpPromptFailureMessage,
   resolveAcpPromptRpcErrorMessage,
@@ -751,7 +752,12 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       );
     } catch (error) {
       if (this.isDisposed) return;
-      this.emitPromptFailure(error);
+      if (isAcpPromptCancellationError(error, this.currentTurnInterruptRequested)) {
+        this.emitListenerUpdate({ status: "idle", attention: "none" });
+        this.completeTurn(this.ensureMapperState(), "cancelled");
+      } else {
+        this.emitPromptFailure(error);
+      }
     } finally {
       this.promptInFlight = false;
       this.pendingPromptInterrupt = false;
@@ -771,7 +777,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
    * Respond to a pending permission or elicitation request from the agent.
    */
   async resolveServerRequest(requestId: ThreadServerRequestId, response: unknown): Promise<void> {
-    this.sessionRequests.resolve(requestId, response);
+    if (!this.sessionRequests.resolve(requestId, response)) {
+      throw new Error(`ACP request ${String(requestId)} is no longer pending`);
+    }
   }
 
   async interruptTurn(): Promise<void> {
@@ -792,6 +800,11 @@ export class AcpStructuredSession implements StructuredSessionHandle {
       return;
     }
     await this.connection.cancel({ sessionId: this.sessionId });
+  }
+
+  forceCompleteTurn(): void {
+    if (!this.currentTurnId) return;
+    this.completeTurn(this.ensureMapperState(), "cancelled");
   }
 
   async dispose(): Promise<void> {

@@ -123,6 +123,19 @@ export function resolveAcpPromptRpcErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Some ACP agents acknowledge `session/cancel` by rejecting the in-flight
+ * `session/prompt` request instead of returning a cancelled stop reason.
+ * Treat that transport shape as cancellation only when Poracode actually
+ * requested the interrupt; the same error without a user stop is still a
+ * real prompt failure.
+ */
+export function isAcpPromptCancellationError(error: unknown, interruptRequested: boolean): boolean {
+  if (!interruptRequested) return false;
+  const message = resolveAcpPromptRpcErrorMessage(error).trim();
+  return /^(?:(?:the )?(?:request|operation) was )?abort(?:ed)?\.?$/i.test(message);
+}
+
 export function normalizeAcpStopReason(
   stopReason: string,
   input: { interruptRequested: boolean; recentAgentText?: string },

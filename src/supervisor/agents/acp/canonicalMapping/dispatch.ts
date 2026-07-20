@@ -20,6 +20,7 @@ import {
   mergeProgressForEmission,
   mergeToolPayload,
 } from "./toolCallPayloads";
+import { isAcpAskUserQuestionToolCall } from "../acpQuestionPermissions";
 import {
   buildSubAgentProgress,
   buildSubAgentProgressEvents,
@@ -183,9 +184,14 @@ export function mapAcpSessionUpdate(
         kind?: string | null;
         status?: "pending" | "in_progress" | "completed" | "failed";
         rawInput?: unknown;
+        _meta?: unknown;
         content?: unknown;
         locations?: Array<{ path?: string | null; line?: number | null }> | null;
       };
+      if (isAcpAskUserQuestionToolCall(toolCall)) {
+        state.suppressedToolCallIds.add(toolCall.toolCallId);
+        break;
+      }
       // Gemini's `update_topic` is a meta-tool that re-titles the current
       // conversation topic — emitted on nearly every user turn as the model's
       // first action. It's noise in the chat stream (a "thinking" tool that

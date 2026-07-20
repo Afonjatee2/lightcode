@@ -1,6 +1,29 @@
 {
   "releases": [
     {
+      "version": "1.5.1",
+      "date": "2026-07-19",
+      "title": "Smoother macOS rebrand upgrades",
+      "summary": "A focused hotfix makes the move from Lightcode to Poracode seamless on macOS, with reliable relaunching, correctly sized Dock artwork, and release notes highlighted in the sidebar after updating.",
+      "changes": [
+        {
+          "kind": "fixed",
+          "label": "Updates",
+          "text": "Poracode now relaunches automatically after updating an existing Lightcode installation on macOS."
+        },
+        {
+          "kind": "fixed",
+          "label": "Dock",
+          "text": "The Poracode Dock icon now keeps the correct macOS optical size when the app launches instead of visibly growing."
+        },
+        {
+          "kind": "fixed",
+          "label": "What's New",
+          "text": "Your previous changelog state now carries over from Lightcode, and What's New appears in the sidebar after an update without interrupting launch."
+        }
+      ]
+    },
+    {
       "version": "1.5.0",
       "date": "2026-07-17",
       "title": "Poracode arrives with mobile access & cross-provider agents",
@@ -25,6 +48,11 @@
           "kind": "added",
           "label": "Kimi Code",
           "text": "Run Kimi Code as a new built-in agent with sign-in and usage tracking, add Factory Droid through a new ACP integration, drive Antigravity in plan or accept-edits mode, and pick Codex's Fast mode straight from the model menu."
+        },
+        {
+          "kind": "added",
+          "label": "Qwen Code",
+          "text": "Run Qwen Code as a built-in agent through native terminal or ACP sessions, sign in from your browser or paste an API key, and track your usage quotas from Poracode."
         },
         {
           "kind": "added",

@@ -26,7 +26,7 @@ export interface SessionRuntimeLifecycleContext {
   steerCoordinator: Pick<SteerCoordinator, "maybeDrainPendingSteer">;
   structuredInterruptWatchdog: Pick<
     StructuredInterruptWatchdog,
-    "clearStructuredInterruptWatchdog" | "touchStructuredInterruptWatchdog"
+    "clearStructuredInterruptWatchdog"
   >;
   emit: ThreadSessionManagerOptions["emit"];
   isCurrentSession(session: SessionRuntime): boolean;
@@ -148,8 +148,6 @@ export class SessionRuntimeLifecycle {
     if (update.status !== "working") {
       session.structuredTurnInterruptRequested = false;
       context.structuredInterruptWatchdog.clearStructuredInterruptWatchdog(session);
-    } else {
-      context.structuredInterruptWatchdog.touchStructuredInterruptWatchdog(session);
     }
     if (
       session.presentationMode === "gui" &&
@@ -174,7 +172,6 @@ export class SessionRuntimeLifecycle {
     ) {
       session.suppressInitialStructuredIdle = undefined;
     }
-    this.context.structuredInterruptWatchdog.touchStructuredInterruptWatchdog(session);
     this.context.runtimeEventRouter.append(session.threadId, event);
   }
 

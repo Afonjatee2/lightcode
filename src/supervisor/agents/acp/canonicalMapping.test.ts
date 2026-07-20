@@ -217,6 +217,50 @@ describe("mapAcpSessionUpdate", () => {
     expect(state.toolCallItems.has("tc-1")).toBe(false);
   });
 
+  it("suppresses AskUserQuestion tool rows that are presented as ACP reply forms", () => {
+    const state = createAcpMapperState("t-question");
+
+    const started = mapAcpSessionUpdate(
+      {
+        sessionId: "s1",
+        update: {
+          sessionUpdate: "tool_call",
+          toolCallId: "tc-question",
+          title: "AskUserQuestion: Ask user 1 question",
+          kind: "other",
+          status: "pending",
+          rawInput: {
+            questions: [
+              {
+                header: "Scope",
+                question: "Which scope?",
+                options: [{ label: "Focused", description: "Keep it focused." }],
+              },
+            ],
+          },
+        },
+      } as Parameters<typeof mapAcpSessionUpdate>[0],
+      state,
+    );
+
+    expect(started).toEqual([]);
+    expect(state.suppressedToolCallIds.has("tc-question")).toBe(true);
+
+    const completed = mapAcpSessionUpdate(
+      {
+        sessionId: "s1",
+        update: {
+          sessionUpdate: "tool_call_update",
+          toolCallId: "tc-question",
+          status: "completed",
+        },
+      } as Parameters<typeof mapAcpSessionUpdate>[0],
+      state,
+    );
+    expect(completed).toEqual([]);
+    expect(state.suppressedToolCallIds.has("tc-question")).toBe(false);
+  });
+
   it("omits `name` on a bare tool_call so the renderer defers the unnamed row", () => {
     const state = createAcpMapperState("t-bare");
     const started = mapAcpSessionUpdate(

@@ -123,6 +123,12 @@ export interface StructuredSessionHandle {
     options?: StartTurnOptions,
   ): Promise<void>;
   interruptTurn?(): Promise<void>;
+  /**
+   * Close the provider's current canonical turn locally before a forced
+   * process disposal. Implementations should complete any open items and mark
+   * the turn cancelled without waiting for the provider transport.
+   */
+  forceCompleteTurn?(): void;
   resolveServerRequest?(requestId: ThreadServerRequestId, response: unknown): Promise<void>;
   /**
    * Swap the live session onto a new resolved MCP set (provider-level MCP

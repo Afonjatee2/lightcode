@@ -115,7 +115,7 @@ export class ThreadSessionManager {
       sessions: this.sessions,
       isDisposed: () => this.disposed,
       clearPendingSteerSlot: (session) => clearPendingSteerSlot(session, options.emit),
-      failStructuredSession: (session, error) => this.failStructuredSession(session, error),
+      completeForcedInterrupt: (session) => this.completeForcedStructuredInterrupt(session),
     });
     this.structuredTurnQueue = new StructuredTurnQueue({
       emit: options.emit,
@@ -238,6 +238,13 @@ export class ThreadSessionManager {
       type: "error",
       threadId: session.threadId,
       message,
+    });
+  }
+
+  private completeForcedStructuredInterrupt(session: SessionRuntime): void {
+    this.runtimeEventRouter.flush();
+    this.outputPipeline.updateState(session, "idle", "none", undefined, {
+      forceCloseActiveTurn: true,
     });
   }
 
@@ -510,7 +517,7 @@ export class ThreadSessionManager {
     if (
       usesStructuredFlow &&
       !session.structuredSession &&
-      session.status === "error" &&
+      (session.status === "error" || session.status === "idle") &&
       session.sessionRef
     ) {
       await this.spawnPipeline.restartThread(session, prompt, effectiveConfig);

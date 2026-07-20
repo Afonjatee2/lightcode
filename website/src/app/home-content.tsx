@@ -21,6 +21,9 @@ import {
   ArrowUpRight,
   KeyRound,
   Moon,
+  Lock,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -432,12 +435,9 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             </Link>
           </div>
 
-          <p className="hero-fade-up hero-fade-up-delay-3 mt-6 flex max-w-xl items-center gap-2 text-sm leading-relaxed text-dim">
-            <Globe className="h-4 w-4 shrink-0 text-accent" />
-            <span>{t("hero.webAppDescription")}</span>
-          </p>
+          <WebAppCard className="mt-8" description={t("hero.webAppDescription")} />
 
-          <div className="hero-fade-up hero-fade-up-delay-3 mt-4 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
+          <div className="hero-fade-up hero-fade-up-delay-3 mt-5 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
             <KeyRound className="h-4 w-4" />
             <span>{t("hero.byo")}</span>
           </div>
@@ -628,6 +628,57 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
         </div>
       </footer>
     </div>
+  );
+}
+
+/**
+ * The web-app pitch rendered as a real browser window — the address bar is the
+ * message. Chrome bar (traffic lights, nav, `app.poracode.com` address pill with
+ * a live pora-dot), a living pairing link (desktop ⇄ browser), and the localized
+ * description. The whole window links to the web app.
+ */
+function WebAppCard({ className, description }: { className?: string; description: string }) {
+  return (
+    <a
+      href={WEB_APP_URL}
+      className={`group hero-fade-up hero-fade-up-delay-3 brand-glow relative block w-full max-w-xl overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.18] ${className ?? ""}`}
+    >
+      <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
+      {/* browser chrome */}
+      <span className="flex items-center gap-3 border-b border-white/[0.06] bg-tile-2 px-4 py-2.5">
+        <span className="flex shrink-0 gap-1.5">
+          <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+          <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+          <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
+        </span>
+        <span className="hidden shrink-0 items-center gap-0.5 text-dim/50 sm:flex">
+          <ChevronLeft className="h-3.5 w-3.5" />
+          <ChevronRight className="h-3.5 w-3.5" />
+        </span>
+        <span className="mx-auto flex min-w-0 items-center gap-2 rounded-md border border-white/[0.06] bg-night/70 px-3 py-1">
+          <Lock className="h-3 w-3 shrink-0 text-ice" />
+          <span className="truncate font-mono text-[12px] text-dim">app.poracode.com</span>
+          <span className="pora-dot pora-pulse h-1 w-1 shrink-0" />
+        </span>
+        <ArrowUpRight className="h-4 w-4 shrink-0 text-dim transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-moon" />
+      </span>
+      {/* body: pairing link + pitch */}
+      <span className="block px-6 pb-6 pt-5 sm:px-8">
+        <span className="flex items-center justify-center">
+          <PoraIconTile className="h-9 w-9" />
+          <span className="relative mx-1.5 h-px w-14 bg-white/15 sm:w-20">
+            <span className="pora-pair-dot absolute -top-[3px] h-[7px] w-[7px] rounded-full bg-accent [box-shadow:0_0_8px_rgba(139,123,255,0.8)]" />
+          </span>
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-[26%] bg-tile ring-1 ring-white/10">
+            <Globe className="h-[62%] w-[62%] text-accent" />
+          </span>
+        </span>
+        <span className="mt-4 block text-center text-sm leading-relaxed text-dim">
+          {description}
+        </span>
+      </span>
+      <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
+    </a>
   );
 }
 

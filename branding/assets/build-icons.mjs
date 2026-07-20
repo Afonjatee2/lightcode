@@ -7,6 +7,7 @@ import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { padToMacSafeArea } from "./macSafeAreaIcon.mjs";
 const sh = promisify(execFile);
 
 const HERE = fileURLToPath(new URL(".", import.meta.url));
@@ -14,6 +15,15 @@ const OUT = `${HERE}out`;
 
 async function png(svg, size) {
   return sharp(svg, { density: 512 }).resize(size, size, { fit: "contain" }).png().toBuffer();
+}
+
+// app.dock.setIcon() displays a supplied PNG literally, so a full-bleed asset
+// visibly grows when the app launches even if the bundle's ICNS looked right.
+// Pad it into the macOS optical safe area (shared with make-nightly-icon.mjs).
+async function macPng(svg, size) {
+  return padToMacSafeArea(sharp(await png(svg, size)), size)
+    .png()
+    .toBuffer();
 }
 
 async function trayPng(svg, size, accent) {
@@ -84,6 +94,7 @@ async function buildVariant(name, svg, dir) {
     await writeFile(`${dir}/${name}-${s}.png`, await png(svg, s));
   }
   await writeFile(`${dir}/${name}.png`, await png(svg, 1024));
+  await writeFile(`${dir}/${name}-mac.png`, await macPng(svg, 1024));
   const icoFrames = await Promise.all(
     [256, 128, 64, 48, 32, 16].map(async (s) => ({ size: s, buf: await png(svg, s) })),
   );

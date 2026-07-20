@@ -16,6 +16,7 @@ import {
   normalizeToolText,
 } from "./contentExtraction";
 import type { AcpMapperState } from "./state";
+import { mapAcpQuestionPermissionRequest } from "../acpQuestionPermissions";
 
 /**
  * Map an ACP `requestPermission` call to a canonical `request.opened` event.
@@ -29,6 +30,9 @@ export function mapAcpPermissionRequest(
   state: AcpMapperState,
   requestId: string,
 ): RuntimeEvent {
+  const questionRequest = mapAcpQuestionPermissionRequest(req, state, requestId);
+  if (questionRequest) return questionRequest;
+
   const toolCall = req.toolCall as {
     title?: string;
     kind?: string;
