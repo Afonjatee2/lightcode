@@ -13,7 +13,7 @@ import {
   formatCodexPlanLabel,
   parseCodexLoginStatusOutput,
 } from "./detection";
-import { CodexStructuredSession } from "./acp";
+import { CodexStructuredSession, shouldReloadCodexMcpServers } from "./acp";
 import { CodexRpcResponseError, type CodexAppServerRpcListener } from "./appServerRpc";
 import type { CodexThreadStatus } from "./acpProtocol";
 import type { OscNotification, OscTitle } from "@/shared/osc";
@@ -858,6 +858,25 @@ describe("CodexStructuredSession", () => {
     return session as unknown as CodexStructuredSession;
   }
 
+  it("reloads for built-in MCP servers as well as user-defined servers", () => {
+    expect(
+      shouldReloadCodexMcpServers([
+        {
+          id: "crossagents",
+          name: "crossagents",
+          timeoutMs: 300_000,
+          transport: {
+            type: "http",
+            url: "http://127.0.0.1:9200/mcp",
+            headers: { Authorization: "Bearer test-token" },
+          },
+        },
+      ]),
+    ).toBe(true);
+    expect(shouldReloadCodexMcpServers([])).toBe(false);
+    expect(shouldReloadCodexMcpServers(undefined)).toBe(false);
+  });
+
   function dispatchNotification(session: CodexStructuredSession, payload: unknown): void {
     const message = parseCodexSocketMessage(payload);
     if (message.kind !== "notification") {
@@ -1371,10 +1390,10 @@ describe("CodexStructuredSession", () => {
     );
   });
 
-  it("reloads configured MCP servers at the turn boundary without delaying thread creation", async () => {
+  it("reloads built-in MCP servers at the turn boundary without delaying thread creation", async () => {
     const requests: CodexRequestRecord[] = [];
     const structuredSession = makeStructuredSession(requests);
-    (structuredSession as unknown as Record<string, unknown>)["hasUserMcpServers"] = true;
+    (structuredSession as unknown as Record<string, unknown>)["hasMcpServers"] = true;
     (structuredSession as unknown as Record<string, unknown>)["rpc"] = {
       request: async (
         method: string,

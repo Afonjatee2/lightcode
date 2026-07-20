@@ -101,11 +101,22 @@ describe("ToolCallGroup", () => {
     const onHeightChange = vi.fn<() => void>(() => {
       expect(container?.querySelector(".poracode-tool-call-group-viewport")).toBeNull();
     });
-    const view = renderToolCallGroup(threadId, [items[0]!.id], true, onHeightChange);
+    const beginVirtualizerLayoutChange = vi.fn<() => void>();
+    const view = renderToolCallGroup(
+      threadId,
+      [items[0]!.id],
+      true,
+      onHeightChange,
+      beginVirtualizerLayoutChange,
+    );
     container = view.container;
 
     fireEvent.click(screen.getByRole("button", { name: /1 view/i }));
 
+    expect(beginVirtualizerLayoutChange).toHaveBeenCalledOnce();
+    expect(beginVirtualizerLayoutChange.mock.invocationCallOrder[0]!).toBeLessThan(
+      onHeightChange.mock.invocationCallOrder[0]!,
+    );
     expect(onHeightChange).toHaveBeenCalledOnce();
   });
 
@@ -693,6 +704,7 @@ function renderToolCallGroup(
   itemIds: readonly string[],
   isLive = true,
   onHeightChange?: () => void,
+  onVirtualizerLayoutChange?: () => void,
 ) {
   return render(
     <AppProvider>
@@ -701,6 +713,7 @@ function renderToolCallGroup(
         itemIds={itemIds}
         isLive={isLive}
         {...(onHeightChange ? { onHeightChange } : {})}
+        {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
       />
     </AppProvider>,
   );

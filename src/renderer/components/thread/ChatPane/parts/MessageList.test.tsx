@@ -253,22 +253,17 @@ describe("MessageList", () => {
     let scrollToIndex:
       | ((index: number, options?: { align?: "start" | "center" | "end" }) => void)
       | null = null;
-    const actions = makeActions({
-      registerVirtualScrollToBottom: (handler) => {
-        scrollToBottom = handler;
-      },
-    });
-
     render(
-      <ChatPaneActionsContext.Provider value={actions}>
-        <MessageList
-          threadId="thread-1"
-          entries={makeEntries(["item-1", "item-2"])}
-          registerScrollToIndex={(handler) => {
-            scrollToIndex = handler;
-          }}
-        />
-      </ChatPaneActionsContext.Provider>,
+      <MessageList
+        threadId="thread-1"
+        entries={makeEntries(["item-1", "item-2"])}
+        registerVirtualScrollToBottom={(handler) => {
+          scrollToBottom = handler;
+        }}
+        registerScrollToIndex={(handler) => {
+          scrollToIndex = handler;
+        }}
+      />,
     );
 
     act(() => scrollToBottom?.());
@@ -308,9 +303,14 @@ describe("MessageList", () => {
 
   it("remeasures a toggled row through LegendList before parent pinning", () => {
     const onContentHeightChange = vi.fn<() => void>();
+    const beginVirtualizerLayoutChange = vi.fn<() => void>();
     render(
       <ChatPaneActionsContext.Provider value={makeActions({ onContentHeightChange })}>
-        <MessageList threadId="thread-1" entries={makeEntries(["item-1"])} />
+        <MessageList
+          threadId="thread-1"
+          entries={makeEntries(["item-1"])}
+          onVirtualizerLayoutChange={beginVirtualizerLayoutChange}
+        />
       </ChatPaneActionsContext.Provider>,
     );
     onContentHeightChange.mockClear();
@@ -324,6 +324,10 @@ describe("MessageList", () => {
     fireEvent.click(screen.getByText("item-1"));
 
     expect(setItemSizeMock).toHaveBeenCalledWith("item-1", { height: 123, width: 500 });
+    expect(beginVirtualizerLayoutChange).toHaveBeenCalledOnce();
+    expect(beginVirtualizerLayoutChange.mock.invocationCallOrder[0]!).toBeLessThan(
+      setItemSizeMock.mock.invocationCallOrder[0]!,
+    );
     expect(onContentHeightChange).toHaveBeenCalledOnce();
   });
 
@@ -384,12 +388,14 @@ describe("MessageList", () => {
     );
   });
 
-  it("notifies shared scroll controls when LegendList's total size changes", () => {
+  it("notifies scroll controls directly when LegendList's total size changes", () => {
     const onContentHeightChange = vi.fn<() => void>();
     render(
-      <ChatPaneActionsContext.Provider value={makeActions({ onContentHeightChange })}>
-        <MessageList threadId="thread-1" entries={makeEntries(["item-1"])} />
-      </ChatPaneActionsContext.Provider>,
+      <MessageList
+        threadId="thread-1"
+        entries={makeEntries(["item-1"])}
+        onContentHeightChange={onContentHeightChange}
+      />,
     );
     onContentHeightChange.mockClear();
 

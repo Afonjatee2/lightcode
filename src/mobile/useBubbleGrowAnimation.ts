@@ -105,7 +105,15 @@ export function useBubbleGrowAnimation(
     // before the target is set, or the transition has no start and jumps.
     const raf = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const target = expanded ? bubble.scrollHeight : collapsedHeightRef.current;
+        // Prefer the rest height cached while last expanded: scrollHeight here
+        // reads the inner chrome mid-transition (padding/line-height still
+        // animating), which overshoots the real target and makes the bubble
+        // grow past its final size and snap back on release. The cache is
+        // refreshed live while expanded, so it tracks content changes; fall
+        // back to scrollHeight only before the first-ever expansion.
+        const target = expanded
+          ? expandedHeightRef.current || bubble.scrollHeight
+          : collapsedHeightRef.current;
         if (target > 0) {
           setPinned({
             height: `${target}px`,

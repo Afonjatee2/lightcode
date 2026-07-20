@@ -121,11 +121,10 @@ describe("chatScrollGeometry", () => {
     ).toBe(false);
   });
 
-  it("releases sticky on upward scroll unless height shrunk or scroll is programmatic", () => {
+  it("releases sticky on upward user scroll but ignores layout-driven height changes", () => {
     // Native scrollbar thumbs often never fire pointerdown — only scroll — so
-    // release must not require a prior user-scroll-intent flag. Layout clamps
-    // that shrink scrollHeight and lower scrollTop must still keep sticky.
-    // Height growth (live stream) must not block a thumb-drag release.
+    // stable-height movement must not require a prior user-scroll-intent flag.
+    // Layout clamps and virtualizer anchor adjustments keep sticky.
     expect(
       shouldReleaseStickToBottom({
         prevScrollTop: 200,
@@ -133,6 +132,9 @@ describe("chatScrollGeometry", () => {
         isAtBottom: false,
         isProgrammaticScroll: false,
         scrollHeightShrunk: false,
+        scrollHeightGrew: false,
+        isVirtualizerLayoutChange: false,
+        hasRecentUserScrollIntent: false,
       }),
     ).toBe(true);
     expect(
@@ -142,6 +144,9 @@ describe("chatScrollGeometry", () => {
         isAtBottom: false,
         isProgrammaticScroll: true,
         scrollHeightShrunk: false,
+        scrollHeightGrew: false,
+        isVirtualizerLayoutChange: false,
+        hasRecentUserScrollIntent: false,
       }),
     ).toBe(false);
     expect(
@@ -151,6 +156,9 @@ describe("chatScrollGeometry", () => {
         isAtBottom: false,
         isProgrammaticScroll: false,
         scrollHeightShrunk: true,
+        scrollHeightGrew: false,
+        isVirtualizerLayoutChange: false,
+        hasRecentUserScrollIntent: false,
       }),
     ).toBe(false);
     expect(
@@ -160,8 +168,59 @@ describe("chatScrollGeometry", () => {
         isAtBottom: true,
         isProgrammaticScroll: false,
         scrollHeightShrunk: false,
+        scrollHeightGrew: false,
+        isVirtualizerLayoutChange: false,
+        hasRecentUserScrollIntent: false,
       }),
     ).toBe(false);
+    expect(
+      shouldReleaseStickToBottom({
+        prevScrollTop: 200,
+        nextScrollTop: 150,
+        isAtBottom: false,
+        isProgrammaticScroll: false,
+        scrollHeightShrunk: false,
+        scrollHeightGrew: true,
+        isVirtualizerLayoutChange: false,
+        hasRecentUserScrollIntent: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldReleaseStickToBottom({
+        prevScrollTop: 200,
+        nextScrollTop: 150,
+        isAtBottom: false,
+        isProgrammaticScroll: false,
+        scrollHeightShrunk: false,
+        scrollHeightGrew: true,
+        isVirtualizerLayoutChange: false,
+        hasRecentUserScrollIntent: true,
+      }),
+    ).toBe(true);
+    expect(
+      shouldReleaseStickToBottom({
+        prevScrollTop: 200,
+        nextScrollTop: 150,
+        isAtBottom: false,
+        isProgrammaticScroll: false,
+        scrollHeightShrunk: false,
+        scrollHeightGrew: false,
+        isVirtualizerLayoutChange: true,
+        hasRecentUserScrollIntent: false,
+      }),
+    ).toBe(false);
+    expect(
+      shouldReleaseStickToBottom({
+        prevScrollTop: 200,
+        nextScrollTop: 150,
+        isAtBottom: false,
+        isProgrammaticScroll: false,
+        scrollHeightShrunk: false,
+        scrollHeightGrew: false,
+        isVirtualizerLayoutChange: true,
+        hasRecentUserScrollIntent: true,
+      }),
+    ).toBe(true);
   });
 
   it("does not arm scroll-intent for in-chat control clicks", () => {

@@ -71,6 +71,9 @@ interface MessageListProps {
   isTurnActive?: boolean;
   setScrollContainer?: (element: HTMLDivElement | null) => void;
   scrollContentRef?: RefObject<HTMLDivElement | null>;
+  onContentHeightChange?: () => void;
+  onVirtualizerLayoutChange?: () => void;
+  registerVirtualScrollToBottom?: (handler: (() => void) | null) => void;
   scrollClassName?: string;
   scrollStyle?: CSSProperties;
   contentClassName?: string;
@@ -123,6 +126,9 @@ export function MessageList({
   isTurnActive = false,
   setScrollContainer,
   scrollContentRef,
+  onContentHeightChange,
+  onVirtualizerLayoutChange,
+  registerVirtualScrollToBottom,
   scrollClassName,
   scrollStyle,
   contentClassName,
@@ -197,10 +203,18 @@ export function MessageList({
       if (instance) {
         totalSizeUnsubscribeRef.current = instance
           .getState()
-          .listen("totalSize", () => parentActions?.onContentHeightChange());
+          .listen("totalSize", () =>
+            (onContentHeightChange ?? parentActions?.onContentHeightChange)?.(),
+          );
       }
     },
-    [parentActions, scrollContentRef, setScrollContainer, snapshotMeasurements],
+    [
+      onContentHeightChange,
+      parentActions,
+      scrollContentRef,
+      setScrollContainer,
+      snapshotMeasurements,
+    ],
   );
 
   useLayoutEffect(() => {
@@ -223,12 +237,13 @@ export function MessageList({
   }, [entries, threadId]);
 
   useLayoutEffect(() => {
-    if (!parentActions?.registerVirtualScrollToBottom) return;
-    parentActions.registerVirtualScrollToBottom(() => {
+    const register = registerVirtualScrollToBottom ?? parentActions?.registerVirtualScrollToBottom;
+    if (!register) return;
+    register(() => {
       void listRef.current?.scrollToEnd({ animated: false });
     });
-    return () => parentActions.registerVirtualScrollToBottom?.(null);
-  }, [parentActions]);
+    return () => register(null);
+  }, [parentActions, registerVirtualScrollToBottom]);
 
   useLayoutEffect(() => {
     if (!registerScrollToIndex) return;
@@ -274,13 +289,17 @@ export function MessageList({
   );
   const lastLiveIndex = useAppStore(liveTailSelector);
 
-  const remeasureRowElement = useCallback((itemKey: string, element: HTMLDivElement | null) => {
-    if (!element) return;
-    listRef.current?.setItemSize(itemKey, {
-      height: element.offsetHeight,
-      width: element.offsetWidth,
-    });
-  }, []);
+  const remeasureRowElement = useCallback(
+    (itemKey: string, element: HTMLDivElement | null) => {
+      if (!element) return;
+      onVirtualizerLayoutChange?.();
+      listRef.current?.setItemSize(itemKey, {
+        height: element.offsetHeight,
+        width: element.offsetWidth,
+      });
+    },
+    [onVirtualizerLayoutChange],
+  );
 
   const performRevert = useCallback(
     async (itemId: string) => {
@@ -405,6 +424,7 @@ export function MessageList({
             isLastEntry={index === lastLiveIndex}
             isTurnActive={isTurnActive}
             remeasureElement={remeasureRowElement}
+            {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
             suppressInlineTurnAnchorId={suppressInlineTurnAnchorId}
             canRevertCheckpoints={canRevertCheckpoints}
             onRequestRevert={requestRevert}
@@ -423,7 +443,7 @@ export function MessageList({
         }}
         data-poracode-chat-scroller="true"
         {...(onKeyDownCapture ? { onKeyDownCapture } : {})}
-        onLoad={() => parentActions?.onContentHeightChange()}
+        onLoad={() => (onContentHeightChange ?? parentActions?.onContentHeightChange)?.()}
         {...(onPointerDownCapture ? { onPointerDownCapture } : {})}
         {...(onWheelCapture ? { onWheelCapture } : {})}
         {...(scrollStyle ? { style: scrollStyle } : {})}
@@ -449,6 +469,7 @@ type VirtualChatListRowProps = {
   isLastEntry: boolean;
   isTurnActive: boolean;
   remeasureElement: (itemKey: string, element: HTMLDivElement | null) => void;
+  onVirtualizerLayoutChange?: () => void;
   suppressInlineTurnAnchorId: string | null;
   canRevertCheckpoints: boolean;
   onRequestRevert: (itemId: string) => void;
@@ -461,6 +482,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
   isLastEntry,
   isTurnActive,
   remeasureElement,
+  onVirtualizerLayoutChange,
   suppressInlineTurnAnchorId,
   canRevertCheckpoints,
   onRequestRevert,
@@ -547,6 +569,7 @@ const VirtualChatListRow = memo(function VirtualChatListRow({
             entry={entry}
             isLastEntry={isLastEntry}
             onHeightChange={remeasureRow}
+            {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
             isTurnActive={isTurnActive}
             checkpointRevert={
               checkpointRevertItemId ? { itemId: checkpointRevertItemId, onRequestRevert } : null

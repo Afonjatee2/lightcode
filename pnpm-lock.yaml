@@ -138,6 +138,9 @@ importers:
       '@tiptap/starter-kit':
         specifier: ^3.27.1
         version: 3.27.1
+      '@vercel/analytics':
+        specifier: ^2.0.1
+        version: 2.0.1(next@16.2.10(@babel/core@7.29.7)(@opentelemetry/api@1.9.1)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(react@19.2.7)
       '@xterm/addon-clipboard':
         specifier: 0.3.0-beta.219
         version: 0.3.0-beta.219(@xterm/xterm@6.1.0-beta.219)

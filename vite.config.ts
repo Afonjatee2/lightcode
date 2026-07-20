@@ -111,6 +111,8 @@ const devServerPort = Number.parseInt(process.env.PORACODE_DEV_SERVER_PORT ?? ""
 // omitting the desktop renderer entry. The default build emits both entries to
 // dist/renderer for the Electron app and its embedded remote-access server.
 const mobileOnly = process.env.PORACODE_BUILD_TARGET === "mobile";
+const vercelAnalyticsEnabled =
+  mobileOnly && ["preview", "production"].includes(process.env.VERCEL_ENV ?? "");
 const mobileBasePath = process.env.PORACODE_MOBILE_BASE_PATH?.trim() || "./";
 const mobileOutputPath =
   mobileBasePath === "./"
@@ -353,6 +355,7 @@ export default defineConfig(({ mode }) => ({
     ...buildPostHogEnvDefines(mode),
     __PORACODE_CHANNEL__: JSON.stringify(poracodeChannel),
     "import.meta.env.VITE_PORACODE_BUILD_TARGET": JSON.stringify(mobileOnly ? "mobile" : "desktop"),
+    "import.meta.env.VITE_VERCEL_ANALYTICS_ENABLED": JSON.stringify(vercelAnalyticsEnabled),
   },
   resolve: {
     tsconfigPaths: true,

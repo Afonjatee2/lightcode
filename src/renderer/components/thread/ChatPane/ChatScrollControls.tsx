@@ -28,10 +28,12 @@ import {
 } from "./chatScrollGeometry";
 
 const USER_SCROLL_INTENT_MS = 750;
+const VIRTUALIZER_LAYOUT_SETTLE_MS = 250;
 /** Minimum at-bottom cache when no coalesce window is active. */
 const AT_BOTTOM_CACHE_MS = 16;
 
 export type ChatScrollControlsHandle = {
+  beginVirtualizerLayoutChange(): void;
   disableStickToBottom(): void;
   isStickToBottom(): boolean;
   markUserScrollIntent(): void;
@@ -78,6 +80,9 @@ export const ChatScrollControls = forwardRef<
   const layoutSyncSecondRafRef = useRef<number | null>(null);
   const initialSettleRafRef = useRef<number | null>(null);
   const initialSettleSecondRafRef = useRef<number | null>(null);
+  const explicitPinRafRef = useRef<number | null>(null);
+  const explicitPinSecondRafRef = useRef<number | null>(null);
+  const virtualizerLayoutChangeUntilRef = useRef(0);
   const userScrollIntentUntilRef = useRef(0);
   const programmaticScrollTopRef = useRef<number | null>(null);
   const programmaticScrollUntilRef = useRef(0);
@@ -87,6 +92,17 @@ export const ChatScrollControls = forwardRef<
   const lastSeenScrollHeightRef = useRef(0);
   const disableStickToBottomRef = useRef<() => void>(() => undefined);
   const [showScrollDown, setShowScrollDown] = useState(false);
+
+  function cancelVirtualizerLayoutChange() {
+    virtualizerLayoutChangeUntilRef.current = 0;
+  }
+
+  function beginVirtualizerLayoutChange() {
+    // LegendList applies measured sizes and visible-content compensation over
+    // multiple animation frames. A short deadline is more robust than counting
+    // paints because its MVCP recalculation can itself be deferred by rAF.
+    virtualizerLayoutChangeUntilRef.current = performance.now() + VIRTUALIZER_LAYOUT_SETTLE_MS;
+  }
 
   function syncBottomStateFromLayout() {
     const el = scrollRef.current;
@@ -98,7 +114,9 @@ export const ChatScrollControls = forwardRef<
 
   function disableStickToBottom() {
     if (!stickToBottomRef.current) return;
+    cancelVirtualizerLayoutChange();
     cancelScheduledInitialSettle();
+    cancelScheduledExplicitPin();
     cancelScheduledLayoutSync();
     if (pinRafRef.current !== null) {
       cancelAnimationFrame(pinRafRef.current);
@@ -146,6 +164,14 @@ export const ChatScrollControls = forwardRef<
   function writeScrollTop(el: HTMLElement, nextScrollTop: number) {
     noteProgrammaticScroll(nextScrollTop);
     el.scrollTop = nextScrollTop;
+  }
+
+  function writeBottomPin(el: HTMLElement) {
+    writeScrollTop(el, el.scrollHeight);
+    lastPinnedScrollHeightRef.current = el.scrollHeight;
+    lastScrollTopRef.current = el.scrollTop;
+    stickToBottomRef.current = true;
+    setShowScrollDown(false);
   }
 
   function scrollToBottom(options: { reconcileVirtualizer?: boolean } = {}) {
@@ -226,20 +252,17 @@ export const ChatScrollControls = forwardRef<
     }
     atBottomCachedUntilRef.current = 0;
     const virtualScrollToBottom = virtualScrollToBottomRef.current;
-    if (virtualScrollToBottom) {
-      const targetScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
-      noteProgrammaticScroll(targetScrollTop);
+    // Reconcile LegendList only for explicit/open-settle pins. During normal
+    // streaming growth its scrollToEnd request settles asynchronously against
+    // virtualizer state, which can lag the DOM row measurement by a frame and
+    // leave the transcript visibly above the end. A direct tagged write pins
+    // the already-laid-out scroller synchronously; its scroll event keeps the
+    // virtualizer's offset in sync.
+    if (reconcileVirtualizer && virtualScrollToBottom) {
+      beginVirtualizerLayoutChange();
       virtualScrollToBottom();
-      lastPinnedScrollHeightRef.current = el.scrollHeight;
-      stickToBottomRef.current = true;
-      setShowScrollDown(false);
-      return;
     }
-    writeScrollTop(el, el.scrollHeight);
-    lastPinnedScrollHeightRef.current = el.scrollHeight;
-    lastScrollTopRef.current = el.scrollTop;
-    stickToBottomRef.current = true;
-    setShowScrollDown(false);
+    writeBottomPin(el);
   }
 
   const syncLayoutNow = useEffectEvent(() => {
@@ -324,6 +347,37 @@ export const ChatScrollControls = forwardRef<
     }
   }
 
+  function cancelScheduledExplicitPin() {
+    if (explicitPinRafRef.current !== null) {
+      cancelAnimationFrame(explicitPinRafRef.current);
+      explicitPinRafRef.current = null;
+    }
+    if (explicitPinSecondRafRef.current !== null) {
+      cancelAnimationFrame(explicitPinSecondRafRef.current);
+      explicitPinSecondRafRef.current = null;
+    }
+  }
+
+  function scheduleExplicitPinSettle() {
+    cancelScheduledExplicitPin();
+    explicitPinRafRef.current = requestAnimationFrame(() => {
+      explicitPinRafRef.current = null;
+      const el = scrollRef.current;
+      if (!el || !stickToBottomRef.current || hasRecentUserScrollIntent()) return;
+      // LegendList's scrollToEnd can apply its measured end offset after the
+      // synchronous DOM pin, leaving the viewport one row-gap above the real
+      // bottom. Reassert the direct pin after that virtualizer update, then
+      // once more after the following paint for late row measurement.
+      writeBottomPin(el);
+      explicitPinSecondRafRef.current = requestAnimationFrame(() => {
+        explicitPinSecondRafRef.current = null;
+        const settledEl = scrollRef.current;
+        if (!settledEl || !stickToBottomRef.current || hasRecentUserScrollIntent()) return;
+        writeBottomPin(settledEl);
+      });
+    });
+  }
+
   const scheduleInitialScrollSettle = useEffectEvent(() => {
     cancelScheduledInitialSettle();
     initialSettleRafRef.current = requestAnimationFrame(() => {
@@ -338,6 +392,7 @@ export const ChatScrollControls = forwardRef<
   });
 
   useImperativeHandle(ref, () => ({
+    beginVirtualizerLayoutChange,
     disableStickToBottom,
     isStickToBottom: () => stickToBottomRef.current,
     markUserScrollIntent,
@@ -392,8 +447,10 @@ export const ChatScrollControls = forwardRef<
       lastScrollTopRef.current = nextScrollTop;
       const nextScrollHeight = el.scrollHeight;
       const scrollHeightShrunk = nextScrollHeight < lastSeenScrollHeightRef.current;
+      const scrollHeightGrew = nextScrollHeight > lastSeenScrollHeightRef.current;
       lastSeenScrollHeightRef.current = nextScrollHeight;
       const isProgrammaticScroll = consumeProgrammaticScroll(nextScrollTop);
+      const hasRecentUserIntent = hasRecentUserScrollIntent();
       // Programmatic stick-to-bottom only moves down. Skip layout reads / button
       // updates for those events — CDP profiles spent tens of ms here per switch.
       if (
@@ -407,9 +464,12 @@ export const ChatScrollControls = forwardRef<
       }
       const isAtBottom = isElementAtBottom(el);
       // Release on upward scroll away from the bottom (native scrollbar thumb —
-      // often no pointerdown). Layout clamps that shrink scrollHeight and lower
-      // scrollTop keep sticky; height growth during a live stream must not block
-      // release. Our own scrollTop writes are tagged via noteProgrammaticScroll.
+      // often no pointerdown). Layout clamps that shrink scrollHeight and
+      // virtualizer anchor adjustments keep sticky, including the frame where
+      // LegendList moves scrollTop before scrollHeight updates. A real
+      // wheel/touch/pointer gesture is still allowed to release during those
+      // layout windows. Our own scrollTop writes are tagged via
+      // noteProgrammaticScroll.
       if (
         shouldReleaseStickToBottom({
           prevScrollTop,
@@ -417,6 +477,9 @@ export const ChatScrollControls = forwardRef<
           isAtBottom,
           isProgrammaticScroll,
           scrollHeightShrunk,
+          scrollHeightGrew,
+          isVirtualizerLayoutChange: performance.now() <= virtualizerLayoutChangeUntilRef.current,
+          hasRecentUserScrollIntent: hasRecentUserIntent,
         })
       ) {
         // Arm intent so ResizeObserver / streaming re-pins stay blocked for the
@@ -428,7 +491,7 @@ export const ChatScrollControls = forwardRef<
           prevScrollTop,
           nextScrollTop,
           isAtBottom,
-          hasRecentUserScrollIntent: hasRecentUserScrollIntent(),
+          hasRecentUserScrollIntent: hasRecentUserIntent,
         })
       ) {
         // Don't re-enable sticky when the user is actively scrolling upward but
@@ -509,12 +572,14 @@ export const ChatScrollControls = forwardRef<
 
   useEffect(() => cancelScheduledLayoutSync, []);
   useEffect(() => cancelScheduledInitialSettle, []);
+  useEffect(() => cancelScheduledExplicitPin, []);
 
   function handleScrollButtonPress() {
     // The button is an explicit request to resume following the tail. Do not
     // let the short scroll-away intent window discard the first press.
     userScrollIntentUntilRef.current = 0;
     scrollToBottom({ reconcileVirtualizer: true });
+    scheduleExplicitPinSettle();
   }
 
   return (

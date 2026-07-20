@@ -1241,11 +1241,28 @@ html:not([data-touch-device]) .m-compose-scrim {
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.35);
   transition:
     max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1),
-    border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+    border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.15s ease;
 }
 
-.m-compose-dock[data-expanded] .m-compose-bubble,
-.m-thread-compose-dock[data-expanded] .m-compose-bubble {
+/* Bottom-anchor the composer inside the thread bubble. The shell's one-line
+   compact box then rests against the bubble's stationary bottom edge for the
+   whole collapse height tween, so the send — pinned absolute to the shell's
+   bottom-right corner — holds that corner from the first collapse frame
+   through rest. No shell-height lockstep with the pin is needed, and nothing
+   re-anchors (teleports) when [data-collapsing] drops at pin release. */
+.m-thread-compose-dock .m-compose-bubble {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+/* :not([data-collapsing]) — during the collapse height tween the pin owns the
+   geometry (inline height/max-height), so dropping this rule early lets the
+   surface/radius cross-fade back to the pill in sync with the shrink instead
+   of snapping after it. */
+.m-compose-dock[data-expanded]:not([data-collapsing]) .m-compose-bubble,
+.m-thread-compose-dock[data-expanded]:not([data-collapsing]) .m-compose-bubble {
   max-height: calc(100dvh - var(--m-keyboard-offset, 0px) - env(safe-area-inset-top) - 7.5rem);
   border-radius: 1rem;
   background: var(--composer-surface, var(--sidebar-background, var(--background)));
@@ -1263,6 +1280,22 @@ html:not([data-touch-device]) .m-compose-scrim {
    content-driven height changes while expanded (typing, attachments) stay
    instant. */
 .m-compose-bubble[data-height-animating] {
+  /* No outline while the height tween runs: a hairline around the mid-flight
+     geometry reads as a "wrong-size pill" ghost. It drops fast when the tween
+     starts and fades back (0.15s above) once the bubble rests at its final
+     size — so the border appears late on expand and disappears early on
+     collapse. */
+  border-color: transparent;
+  transition:
+    height 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 0.06s ease;
+}
+
+/* Collapse drops the hairline with no fade at all — even a 0.06s fade reads
+   as a highlight flash around the shrinking bubble. */
+:is(.m-compose-dock, .m-thread-compose-dock)[data-collapsing] .m-compose-bubble {
+  border-color: transparent;
   transition:
     height 0.2s cubic-bezier(0.32, 0.72, 0, 1),
     border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1);
@@ -1388,10 +1421,30 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 }
 
 /* Inner actions stay inside the shared compact line and are centered by the
-   0.25rem insets. */
+   0.25rem insets. Applies during [data-collapsing] too, and the base rule
+   below transitions the size/radius, so the button morphs into the circle
+   with the collapse tween instead of snapping at pin release. */
+/* Extra .m-compose-bubble hop outranks the toolbar-chip transition rule
+   (`.poracode-composer-toolbar > .flex.shrink-0 > *`), which would otherwise
+   replace this shorthand and leave the size/radius snapping. Keep its
+   max-width/opacity legs so the chip behaviors stay intact. */
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock
+  .m-compose-bubble
+  .poracode-composer-shell
+  .poracode-composer-send {
+  transition:
+    max-width 0.28s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.2s ease,
+    width 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    height 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    border-radius 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell
   .poracode-composer-send {
   width: var(--m-floating-control-inner-size);
@@ -2506,9 +2559,13 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   transition: max-height 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
+/* The [data-expanded]:not([data-collapsing]) / :is(:not([data-expanded]),
+   [data-collapsing]) pairs below make the compact chrome apply DURING the
+   collapse height tween (data-collapsing), so toolbar/input/summary/shell all
+   animate together with the shrinking bubble instead of snapping after it. */
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock[data-expanded]
+  .m-thread-compose-dock[data-expanded]:not([data-collapsing])
   .poracode-composer-shell
   [data-composer-input-anchor] {
   max-height: 12rem;
@@ -2556,7 +2613,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
    still lets messages scroll visibly beneath. Expanded keeps a solid surface. */
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell {
   border-radius: var(--m-floating-control-radius);
   background: var(--m-glass-surface);
@@ -2568,19 +2625,35 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 /* …and expanded matches the expanded bubble: flatter radius, opaque surface,
    and the same animated border glow the draft composer shows (the glow node
    is rendered for every variant; desktop only lights it for drafts). */
-:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock[data-expanded] .poracode-composer-shell {
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-expanded]:not([data-collapsing])
+  .poracode-composer-shell {
   border-radius: 1rem;
   border-color: transparent;
   background: var(--composer-surface, var(--sidebar-background, var(--background)));
 }
 
+:is(.m-main, .m-detail) .m-thread .m-thread-compose-dock .poracode-composer-border-glow {
+  transition: opacity 0.3s ease;
+}
+
+/* Collapse kills the glow instantly — a lit border tracing the shrinking
+   bubble reads as a leftover highlight. */
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock[data-expanded]
+  .m-thread-compose-dock[data-collapsing]
+  .poracode-composer-border-glow {
+  opacity: 0;
+  transition: none;
+}
+
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-expanded]:not([data-collapsing])
   .poracode-composer-shell
   .poracode-composer-border-glow {
   opacity: 0.7;
-  transition: opacity 0.3s ease;
 }
 
 :is(.m-main, .m-detail)
@@ -2593,10 +2666,13 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 /* Compact state: empty prompts show just the centered placeholder line;
    typed prompts reserve the same one-line pill and pin the send action to the
-   right edge so it is not clipped below the collapsed bubble. */
+   right edge so it is not clipped below the collapsed bubble. The typed-prompt
+   rules also match [data-collapsing] (data-expanded is still set while the
+   height pin runs) so the send pins at collapse start instead of the summary
+   chips flashing in first and swapping to the send at pin release. */
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
   [data-composer-input-anchor] {
   margin-right: var(--m-floating-control-height);
@@ -2604,7 +2680,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
   .poracode-composer-toolbar {
   position: absolute;
@@ -2622,7 +2698,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
   .poracode-composer-toolbar
   > :not(:has(.poracode-composer-send)) {
@@ -2631,7 +2707,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
   .poracode-composer-toolbar
   > :has(.poracode-composer-send) {
@@ -2641,7 +2717,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
   .poracode-composer-toolbar
   > :has(.poracode-composer-send)
@@ -2651,7 +2727,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
   .poracode-composer-send {
   pointer-events: auto;
@@ -2662,6 +2738,30 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
    (Typed prompts keep the pinned send — see the :has() rules above.) */
 :is(.m-main, .m-detail) .m-thread .m-thread-compose-dock .poracode-composer-toolbar {
   transition: opacity 0.2s ease;
+}
+
+/* The expanded toolbar holds the send 0.6rem (its compact row padding) off
+   the shell's bottom-right corner; the pinned layout uses the pill's 0.25rem
+   inset. Position flips can't transition, so run the 0.35rem settle as a
+   keyframe in sync with the size/radius morph — the button glides the last
+   few px into the corner instead of stepping on the first collapse frame.
+   Higher specificity than the [data-expanded] toolbar-enter rule so it owns
+   the toolbar's animation for the collapse window. */
+@keyframes m-thread-send-settle {
+  from {
+    transform: translate(-0.35rem, -0.35rem);
+  }
+  to {
+    transform: none;
+  }
+}
+
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-collapsing]
+  .poracode-composer-shell:has([data-composer-input-anchor] [contenteditable]:not(:empty))
+  .poracode-composer-toolbar {
+  animation: m-thread-send-settle 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :is(.m-main, .m-detail)
@@ -2676,15 +2776,53 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   pointer-events: none;
 }
 
+/* Hold the toolbar still while it fades: the compact input metrics applied
+   during data-collapsing shrink the input's paddings, which would drag the
+   still-visible toolbar upward. Delay the inner morph until the toolbar's
+   0.12s fade has finished; the running transitions keep their timing when
+   data-collapsing drops at release. */
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-collapsing]
+  .poracode-composer-shell
+  :is([data-composer-input-anchor], .poracode-mention-input) {
+  transition-delay: 0.1s;
+}
+
+/* While the collapse height tween runs (data-collapsing, data-expanded still
+   set so the row keeps its expanded position), fade the toolbar out in place —
+   by the time the compact absolute positioning above kicks in it is already
+   invisible, so it never ghosts over the placeholder. Empty prompts only:
+   typed prompts already run the pinned-send layout during the collapse, and
+   fading that toolbar would blink the send button. */
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock[data-collapsing]
+  .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
+  .poracode-composer-toolbar {
+  opacity: 0;
+  pointer-events: none;
+  /* Faster than the 0.2s height tween: the toolbar must be gone before the
+     summary chips land in the same corner, or the two read as a swap. */
+  transition-duration: 0.12s;
+}
+
 /* Shared compact line metrics with the home bubble: one compact control line,
    text vertically centered (the desktop editor's padding is top-heavy). */
 :is(.m-main, .m-detail) .m-thread .poracode-composer-shell .poracode-mention-input {
-  transition: padding 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+  /* Explicit length instead of the desktop's unitless 1.5 (same computed value
+     at 0.875rem): unitless line-height can't animate, so without this the
+     placeholder jumps between the compact full-height line box and the
+     expanded text metrics instead of riding the expand/collapse motion. */
+  line-height: 1.3125rem;
+  transition:
+    padding 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+    line-height 0.2s cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell
   .poracode-mention-input {
   min-height: var(--m-floating-control-line-height);
@@ -2735,11 +2873,20 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   font-weight: 500;
 }
 
-.m-thread-compose-dock[data-expanded] .m-compose-summary,
-.m-thread-compose-dock:not([data-expanded])
+.m-thread-compose-dock[data-expanded]:not([data-collapsing]) .m-compose-summary,
+.m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .m-compose-bubble:has([data-composer-input-anchor] [contenteditable]:not(:empty))
   .m-compose-summary {
   opacity: 0;
+  /* Expand: clear the corner quickly — the toolbar's own controls take over. */
+  transition-duration: 0.1s;
+}
+
+/* Collapse: let the toolbar's fast fade-out finish before the summary chips
+   fade into the same corner, so the change reads as one morph, not a swap.
+   (Running transitions keep their timing when data-collapsing drops.) */
+.m-thread-compose-dock[data-collapsing] .m-compose-summary {
+  transition-delay: 0.1s;
 }
 
 /* The compact input reserves the summary's measured width (published on the
@@ -2747,7 +2894,7 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
    Empty-prompt case only — typed prompts swap to the pinned-send reserve. */
 :is(.m-main, .m-detail)
   .m-thread
-  .m-thread-compose-dock:not([data-expanded])
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
   .poracode-composer-shell:not(:has([data-composer-input-anchor] [contenteditable]:not(:empty)))
   .poracode-mention-input {
   padding-right: calc(1.5rem + var(--m-compose-summary-width, 0px));
@@ -2902,12 +3049,6 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   flex: none;
   align-items: center;
   gap: 0.375rem;
-}
-
-.m-ws-chip__chevron {
-  flex: none;
-  color: var(--muted);
-  opacity: 0.7;
 }
 
 /* Unified workspace panel (Changes | Files) — fullscreen host above the shell. */
@@ -3204,6 +3345,21 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 @media (min-width: 768px) and (hover: hover) and (pointer: fine) {
   :root {
     --m-tap-min: 34px;
+  }
+
+  /* The mouse-density pass above shrinks every tap target to 34px. Keep the
+     floating thread composer at the phone's 44px so the compact pill reads at
+     the same size on desktop as on mobile. The derived control vars are
+     declared on :root — computed there against the 34px --m-tap-min and then
+     inherited as fixed values — so overriding --m-tap-min alone here would NOT
+     recompute them. Redeclare the whole chain on the dock so bubble height,
+     input line, and the round send all resolve against 44px. The thread dock's
+     own insets are fixed (0.75rem), so nothing else shifts. */
+  .m-thread-compose-dock {
+    --m-tap-min: 44px;
+    --m-floating-control-height: var(--m-tap-min);
+    --m-floating-control-line-height: calc(var(--m-floating-control-height) - 2px);
+    --m-floating-control-inner-size: calc(var(--m-floating-control-height) - 0.5rem);
   }
 
   .m-detail > .m-page,

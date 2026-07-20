@@ -112,11 +112,12 @@ describe("ChatScrollControls", () => {
     expect(controlsRef.current?.isThreadOpenSettling()).toBe(false);
   });
 
-  it("delegates to LegendList when content grows past the bottom pin", () => {
-    let scrollTop = 100;
+  it("pins streaming content growth synchronously without waiting for LegendList", () => {
+    let scrollHeight = 1000;
+    let scrollTop = 800;
     const scrollEl = document.createElement("div");
     Object.defineProperties(scrollEl, {
-      scrollHeight: { configurable: true, get: () => 1000 },
+      scrollHeight: { configurable: true, get: () => scrollHeight },
       clientHeight: { configurable: true, get: () => 200 },
       scrollTop: {
         configurable: true,
@@ -137,12 +138,59 @@ describe("ChatScrollControls", () => {
       />,
     );
 
+    // Opening/reconciling the virtualized list still delegates to LegendList.
+    expect(virtualScrollToBottom).toHaveBeenCalled();
+    virtualScrollToBottom.mockClear();
+
+    // The live row grows before LegendList's async scrollToEnd can settle.
+    scrollHeight = 1025;
     act(() => {
       controlsRef.current?.onContentHeightChange();
     });
 
-    expect(virtualScrollToBottom).toHaveBeenCalled();
-    expect(scrollTop).toBe(100);
+    expect(virtualScrollToBottom).not.toHaveBeenCalled();
+    expect(scrollTop).toBe(1025);
+  });
+
+  it("keeps sticky while LegendList adjusts its anchor before scrollHeight changes", () => {
+    let scrollHeight = 1000;
+    let scrollTop = 800;
+    const scrollEl = document.createElement("div");
+    Object.defineProperties(scrollEl, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, get: () => 200 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      },
+    });
+    const controlsRef = createRef<ChatScrollControlsHandle>();
+
+    renderWithI18n(
+      <Harness
+        scrollEl={scrollEl}
+        controlsRef={controlsRef}
+        virtualScrollToBottom={() => undefined}
+      />,
+    );
+
+    act(() => {
+      controlsRef.current?.beginVirtualizerLayoutChange();
+      // Visible-content anchoring moves first; the matching height update is
+      // not observable until LegendList completes its measurement pass.
+      scrollTop = 500;
+      fireEvent.scroll(scrollEl);
+    });
+
+    expect(controlsRef.current?.isStickToBottom()).toBe(true);
+
+    scrollHeight = 1200;
+    act(() => controlsRef.current?.onContentHeightChange());
+
+    expect(scrollTop).toBe(1200);
   });
 
   it("resumes sticking to the bottom when a message is submitted", () => {
@@ -180,7 +228,7 @@ describe("ChatScrollControls", () => {
     rerender(renderHarness());
 
     expect(virtualScrollToBottom).toHaveBeenCalled();
-    expect(scrollTop).toBe(400);
+    expect(scrollTop).toBe(1000);
     expect(controlsRef.current?.isStickToBottom()).toBe(true);
   });
 
@@ -218,6 +266,60 @@ describe("ChatScrollControls", () => {
     fireEvent.click(getByRole("button", { name: "Scroll to bottom" }));
 
     expect(virtualScrollToBottom).toHaveBeenCalledOnce();
+    expect(scrollTop).toBe(1000);
+    expect(controlsRef.current?.isStickToBottom()).toBe(true);
+  });
+
+  it("reasserts an explicit bottom pin after the virtualizer settles short", async () => {
+    let scrollTop = 800;
+    const scrollEl = document.createElement("div");
+    Object.defineProperties(scrollEl, {
+      scrollHeight: { configurable: true, get: () => 1000 },
+      clientHeight: { configurable: true, get: () => 200 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+        },
+      },
+    });
+    const controlsRef = createRef<ChatScrollControlsHandle>();
+    const virtualScrollToBottom = vi.fn<() => void>(() => {
+      requestAnimationFrame(() => {
+        // LegendList's measured end excludes its trailing row gap, so its
+        // deferred update can overwrite the direct scrollHeight pin.
+        scrollTop = 775;
+        fireEvent.scroll(scrollEl);
+      });
+    });
+    const { getByRole } = renderWithI18n(
+      <Harness
+        scrollEl={scrollEl}
+        controlsRef={controlsRef}
+        virtualScrollToBottom={virtualScrollToBottom}
+      />,
+    );
+
+    virtualScrollToBottom.mockClear();
+    act(() => {
+      controlsRef.current?.markUserScrollIntent();
+      controlsRef.current?.disableStickToBottom();
+      scrollTop = 400;
+    });
+
+    fireEvent.click(getByRole("button", { name: "Scroll to bottom" }));
+
+    expect(virtualScrollToBottom).toHaveBeenCalledOnce();
+    expect(scrollTop).toBe(1000);
+
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+    });
+
+    expect(scrollTop).toBe(1000);
     expect(controlsRef.current?.isStickToBottom()).toBe(true);
   });
 
@@ -268,7 +370,7 @@ describe("ChatScrollControls", () => {
     });
 
     expect(virtualScrollToBottom).toHaveBeenCalled();
-    expect(scrollTop).toBe(200);
+    expect(scrollTop).toBe(1200);
   });
 
   it("re-pins when content shrinks while sticky (tool collapse)", async () => {
@@ -320,6 +422,6 @@ describe("ChatScrollControls", () => {
     });
 
     expect(virtualScrollToBottom).toHaveBeenCalled();
-    expect(scrollTop).toBe(600);
+    expect(scrollTop).toBe(700);
   });
 });

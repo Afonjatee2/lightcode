@@ -118,9 +118,14 @@ export function shouldIgnoreProgrammaticPinScroll(input: {
  *
  * Layout clamps (content height shrinks and the browser lowers scrollTop) must
  * not release sticky — those are filtered via `scrollHeightShrunk`. Height
- * growth during a live stream must NOT block release: a thumb drag on a
- * working thread often coincides with growing scrollHeight. Our own scrollTop
- * writes are filtered via `isProgrammaticScroll`.
+ * growth can also make the virtualizer adjust scrollTop upward while it
+ * preserves its visible-content anchor. Treat that as layout-driven unless a
+ * wheel/touch/pointer gesture already established user intent. A native
+ * scrollbar drag that emits no pointer event still releases on its next
+ * stable-height scroll event. LegendList can also move scrollTop before the
+ * browser exposes the corresponding scrollHeight change, so its explicit
+ * layout window gets the same treatment. Our own scrollTop writes are filtered
+ * via `isProgrammaticScroll`.
  */
 export function shouldReleaseStickToBottom(input: {
   prevScrollTop: number;
@@ -128,9 +133,14 @@ export function shouldReleaseStickToBottom(input: {
   isAtBottom: boolean;
   isProgrammaticScroll: boolean;
   scrollHeightShrunk: boolean;
+  scrollHeightGrew: boolean;
+  isVirtualizerLayoutChange: boolean;
+  hasRecentUserScrollIntent: boolean;
 }): boolean {
   if (input.isProgrammaticScroll) return false;
   if (input.scrollHeightShrunk) return false;
+  if (input.isVirtualizerLayoutChange && !input.hasRecentUserScrollIntent) return false;
+  if (input.scrollHeightGrew && !input.hasRecentUserScrollIntent) return false;
   return input.nextScrollTop < input.prevScrollTop && !input.isAtBottom;
 }
 

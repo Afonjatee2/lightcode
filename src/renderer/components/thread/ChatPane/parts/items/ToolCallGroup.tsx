@@ -76,6 +76,8 @@ interface ToolCallGroupProps {
   isLive?: boolean;
   /** Synchronously remeasure the owning virtual row after an explicit layout change. */
   onHeightChange?: () => void;
+  /** Arm scroll anchoring before a disclosure commits a new row height. */
+  onVirtualizerLayoutChange?: () => void;
 }
 
 const TOOL_CALL_GROUP_MAX_VISIBLE_ROWS = 8;
@@ -85,6 +87,7 @@ export const ToolCallGroup = memo(function ToolCallGroup({
   itemIds,
   isLive = false,
   onHeightChange,
+  onVirtualizerLayoutChange,
 }: ToolCallGroupProps) {
   const items = useAppStore(
     useShallow((state) =>
@@ -151,6 +154,10 @@ export const ToolCallGroup = memo(function ToolCallGroup({
         className="text-[length:var(--lc-chat-font-size-command)] leading-tight"
         isExpanded={isExpanded}
         onExpandedChange={(next) => {
+          // Arm the virtualizer guard before React commits the larger/smaller
+          // row. LegendList can adjust its visible-content anchor during that
+          // commit, before the post-commit remeasurement callback runs.
+          onVirtualizerLayoutChange?.();
           userToggledRef.current = true;
           setIsExpanded(next);
         }}
@@ -195,7 +202,10 @@ export const ToolCallGroup = memo(function ToolCallGroup({
                       type="button"
                       aria-expanded={showAll}
                       className="-ml-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-[color:var(--muted)] transition-colors hover:bg-foreground/5 hover:text-foreground"
-                      onClick={() => setShowAll((prev) => !prev)}
+                      onClick={() => {
+                        onVirtualizerLayoutChange?.();
+                        setShowAll((prev) => !prev);
+                      }}
                     >
                       {showAll ? <Trans>Show less</Trans> : <Trans>Show all</Trans>}
                     </button>

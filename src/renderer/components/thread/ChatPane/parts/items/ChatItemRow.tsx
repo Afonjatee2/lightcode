@@ -26,6 +26,7 @@ interface ChatItemRowProps {
   /** True when this is the tail of the visible timeline. Drives live-group expand state. */
   isLastEntry?: boolean;
   onHeightChange?: () => void;
+  onVirtualizerLayoutChange?: () => void;
   isTurnActive?: boolean;
   checkpointRevert: CheckpointRevertRequest | null;
 }
@@ -43,6 +44,7 @@ export const ChatItemRow = memo(function ChatItemRow({
   entry,
   isLastEntry = false,
   onHeightChange,
+  onVirtualizerLayoutChange,
   isTurnActive = false,
   checkpointRevert,
 }: ChatItemRowProps) {
@@ -54,6 +56,7 @@ export const ChatItemRow = memo(function ChatItemRow({
         itemIds={entry.itemIds}
         isLive={isLastEntry}
         {...(onHeightChange ? { onHeightChange } : {})}
+        {...(onVirtualizerLayoutChange ? { onVirtualizerLayoutChange } : {})}
       />
     );
   }

@@ -720,13 +720,15 @@ describe("ChatPane", () => {
 
     act(() => {
       fireEvent.pointerDown(toolButton);
-      metrics.setScrollHeight(420);
-      // Browser leaves scrollTop where it was; we are no longer at bottom until
-      // sticky re-pins.
+      // LegendList's visible-content anchoring can move scrollTop upward while
+      // the disclosure commit starts, before the larger row height becomes
+      // observable. This is layout-driven, not a user scroll-away.
+      metrics.setScrollTop(180);
       fireEvent.scroll(scrollElement);
     });
 
     act(() => {
+      metrics.setScrollHeight(420);
       MockResizeObserver.notify(contentElement);
     });
 

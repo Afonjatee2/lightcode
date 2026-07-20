@@ -333,6 +333,13 @@ export function ChatPane(props: ChatPaneProps) {
             isTurnActive={isLive}
             setScrollContainer={setScrollContainer}
             scrollContentRef={contentRef}
+            onContentHeightChange={() => scrollControlsRef.current?.onContentHeightChange()}
+            onVirtualizerLayoutChange={() =>
+              scrollControlsRef.current?.beginVirtualizerLayoutChange()
+            }
+            registerVirtualScrollToBottom={(handler) => {
+              virtualScrollToBottomRef.current = handler;
+            }}
             scrollClassName="min-h-0 h-full overflow-y-auto [overflow-anchor:none] [scrollbar-gutter:stable]"
             scrollStyle={scrollFadeStyle}
             contentClassName={`min-h-full pb-2 ${isInitialScrollSettled ? "" : "pointer-events-none opacity-0"}`}
@@ -361,7 +368,13 @@ export function ChatPane(props: ChatPaneProps) {
               // empty-canvas drags). Tool expand/collapse clicks must not —
               // sticky row-height compensation then looks like a user
               // scroll-away and strands the transcript above the bottom.
-              if (!shouldMarkUserScrollIntentFromPointerTarget(event.target)) return;
+              if (!shouldMarkUserScrollIntentFromPointerTarget(event.target)) {
+                // The control can commit a taller virtual row before its
+                // post-layout measurement callback runs. Guard that earlier
+                // LegendList anchor adjustment directly from pointerdown.
+                scrollControlsRef.current?.beginVirtualizerLayoutChange();
+                return;
+              }
               scrollControlsRef.current?.markUserScrollIntent();
               // Unpin immediately — same as wheel-up. Native scrollbar thumbs
               // are not DOM nodes and often overlay the content box (Windows

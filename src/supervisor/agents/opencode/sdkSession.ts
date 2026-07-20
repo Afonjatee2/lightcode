@@ -341,6 +341,22 @@ export class OpencodeSdkSession implements StructuredSessionHandle {
     }
   }
 
+  /**
+   * Enqueue follow-up input through OpenCode's existing async prompt surface.
+   * OpenCode admits a second `promptAsync` while the session is busy, keeps the
+   * active provider request alive, and processes the message at its next loop
+   * boundary. Aborting first is both lossy and rejected intermittently by
+   * providers such as Console Go.
+   */
+  async steerTurn(
+    prompt: string,
+    config: ThreadConfig,
+    segments?: PromptSegment[],
+    options?: StartTurnOptions,
+  ): Promise<void> {
+    await this.startTurn(prompt, config, segments, options);
+  }
+
   async interruptTurn(): Promise<void> {
     if (!this.acquired || !this.sessionId) return;
     try {
