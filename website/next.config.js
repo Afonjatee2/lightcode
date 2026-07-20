@@ -60,6 +60,16 @@ const nextConfig = {
         permanent: true,
       },
       {
+        source: "/pwa",
+        destination: "https://app.poracode.com/",
+        permanent: true,
+      },
+      {
+        source: "/pwa/:path*",
+        destination: "https://app.poracode.com/:path*",
+        permanent: true,
+      },
+      {
         source: "/app-nightly",
         destination: "https://app-nightly.poracode.com/",
         permanent: true,

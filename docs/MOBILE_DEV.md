@@ -111,7 +111,7 @@ other.
    components match `/pair*` and `/app*`).
 2. **Host** `/pair` and `/.well-known/apple-app-site-association` on
    **poracode.com**. The marketing deployment redirects browser requests for
-   `/pair` and legacy `/app*` URLs to **app.poracode.com**; legacy
+   `/pair` and legacy `/app*` and `/pwa*` URLs to **app.poracode.com**; legacy
    `/app-nightly*` URLs redirect to **app-nightly.poracode.com**. Both PWA
    domains point at the separate mobile Vercel project (`vercel.json` →
    `dist/mobile`) and serve their channel at `/`.
