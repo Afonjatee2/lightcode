@@ -37,7 +37,8 @@ Internal TestFlight and Play installation can work without the association
 endpoints, but the links must be live before testing universal/app links or
 using them as store metadata:
 
-- App entry: `https://poracode.com/pwa/`
+- Stable PWA: `https://app.poracode.com/`
+- Nightly PWA: `https://app-nightly.poracode.com/`
 - Privacy policy: `https://poracode.com/privacy`
 - Support: `https://poracode.com/support`
 - Apple association: `https://poracode.com/.well-known/apple-app-site-association`

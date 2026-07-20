@@ -16,9 +16,8 @@ export function mobileRouterBasePath(pathname: string, buildBasePath: string): s
 /**
  * Service-worker scope for this build. The desktop-served build (relative
  * base → "/") owns the whole origin. Hosted channels live under their base
- * path (`/app/` production, `/app-nightly/` nightly) and must stay inside
- * that scope — a channel worker claiming "/" would hijack the other
- * channel's pages on the shared poracode.com origin.
+ * path and must stay inside that scope. Hosted stable/nightly builds now use
+ * separate origins and therefore both legitimately own `/`.
  */
 export function mobileServiceWorkerScope(buildBasePath: string): string {
   const base = trimBasePath(buildBasePath);

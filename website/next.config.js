@@ -39,34 +39,35 @@ const nextConfig = {
       },
     ];
   },
-  async rewrites() {
+  async redirects() {
     return [
-      // Production PWA — the poracode-pwa project's production deployment,
-      // built under the /app/ base. Deploys are manual (vercel promote /
-      // vercel deploy --prod).
+      // Keep the established universal-link entry on poracode.com so existing
+      // native installs can claim it; browsers continue on the isolated PWA
+      // origin.
       {
         source: "/pair",
-        destination: "https://poracode-pwa.vercel.app/pair",
+        destination: "https://app.poracode.com/pair",
+        permanent: false,
       },
       {
         source: "/app",
-        destination: "https://poracode-pwa.vercel.app/app",
+        destination: "https://app.poracode.com/",
+        permanent: true,
       },
       {
         source: "/app/:path*",
-        destination: "https://poracode-pwa.vercel.app/app/:path*",
+        destination: "https://app.poracode.com/:path*",
+        permanent: true,
       },
-      // Nightly PWA — the latest auto-deployed master preview of the same
-      // project, built under the /app-nightly/ base.
       {
         source: "/app-nightly",
-        destination:
-          "https://poracode-pwa-git-master-sergei-vecherenko-s-projects.vercel.app/app-nightly",
+        destination: "https://app-nightly.poracode.com/",
+        permanent: true,
       },
       {
         source: "/app-nightly/:path*",
-        destination:
-          "https://poracode-pwa-git-master-sergei-vecherenko-s-projects.vercel.app/app-nightly/:path*",
+        destination: "https://app-nightly.poracode.com/:path*",
+        permanent: true,
       },
     ];
   },

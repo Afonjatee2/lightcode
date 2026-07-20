@@ -1,7 +1,6 @@
 name: Deploy Nightly PWA
 
-# The website's /app-nightly route rewrites to Vercel's master alias. Keep that
-# alias on the deployment built from every master push.
+# Keep app-nightly.poracode.com on the deployment built from every master push.
 on:
   push:
     branches: [master]
@@ -22,7 +21,7 @@ jobs:
       VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
       VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
       PORACODE_MOBILE_APP_HOST: ${{ vars.PORACODE_MOBILE_APP_HOST }}
-      NIGHTLY_ALIAS: poracode-pwa-git-master-sergei-vecherenko-s-projects.vercel.app
+      NIGHTLY_ALIAS: app-nightly.poracode.com
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6

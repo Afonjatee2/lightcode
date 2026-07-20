@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-// @vitest-environment-options {"url":"https://poracode.com/app"}
+// @vitest-environment-options {"url":"https://app.poracode.com/"}
 import { useEffect, type ReactNode } from "react";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
