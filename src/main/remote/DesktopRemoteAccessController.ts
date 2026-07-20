@@ -50,10 +50,10 @@ const PRODUCTION_PAIRING_APP_URL: Record<PoracodeChannel, string> = {
   nightly: "https://app-nightly.poracode.com",
 };
 
-const PRODUCTION_HOSTED_APP_URL: Record<PoracodeChannel, string> = {
-  stable: "https://app.poracode.com",
-  nightly: "https://app-nightly.poracode.com",
-};
+const PRODUCTION_HOSTED_APP_URLS = [
+  "https://app.poracode.com",
+  "https://app-nightly.poracode.com",
+] as const;
 
 export interface DesktopRemoteAccessControllerOptions {
   readonly appVersion: string;
@@ -259,9 +259,7 @@ export function createDesktopRemoteAccessController(
         configuredPairingAppUrl ??
         (options.devServerUrl ? undefined : PRODUCTION_PAIRING_APP_URL[options.channel]);
       const trustedCorsOrigins =
-        !configuredPairingAppUrl && !options.devServerUrl
-          ? [PRODUCTION_HOSTED_APP_URL[options.channel]]
-          : undefined;
+        !configuredPairingAppUrl && !options.devServerUrl ? PRODUCTION_HOSTED_APP_URLS : undefined;
       // In dev, phones load the PWA from Vite instead of the built bundle.
       let devMobileAppUrl: string | undefined;
       if (options.devServerUrl) {
