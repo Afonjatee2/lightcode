@@ -1055,6 +1055,48 @@ describe("ACP turn config sync", () => {
     );
   });
 
+  it("does not reopen a settled turn for an out-of-band ACP tool notification", () => {
+    const { listener, session } = makeConfigSyncSession();
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "background-task",
+        title: "Background task completed",
+        kind: "other",
+        status: "completed",
+      },
+    });
+
+    expect(listener.onRuntimeEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "item.started", itemType: "tool_call" }),
+    );
+    expect(listener.onUpdate).not.toHaveBeenCalledWith({
+      status: "working",
+      attention: "working",
+    });
+  });
+
+  it("keeps an in-flight turn working when its ACP tool call starts", () => {
+    const { listener, session } = makeConfigSyncSession();
+    (session as unknown as Record<string, unknown>)["promptInFlight"] = true;
+
+    session.handleSessionUpdate({
+      update: {
+        sessionUpdate: "tool_call",
+        toolCallId: "foreground-task",
+        title: "Run checks",
+        kind: "execute",
+        status: "in_progress",
+      },
+    });
+
+    expect(listener.onUpdate).toHaveBeenCalledWith({
+      status: "working",
+      attention: "working",
+    });
+  });
+
   it("retains config-option metadata during replay suppression without emitting it", async () => {
     const { connection, listener, session } = makeConfigSyncSession({
       currentConfig: {

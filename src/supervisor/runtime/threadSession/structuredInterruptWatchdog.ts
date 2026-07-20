@@ -4,7 +4,6 @@ import { STRUCTURED_INTERRUPT_FORCE_STOP_MS } from "./userInterrupt";
 export interface StructuredInterruptWatchdogContext {
   sessions: Map<string, SessionRuntime>;
   isDisposed(): boolean;
-  clearPendingSteerSlot(session: SessionRuntime): void;
   completeForcedInterrupt(session: SessionRuntime): void;
 }
 
@@ -72,7 +71,6 @@ export class StructuredInterruptWatchdog {
     }
     this.clearStructuredInterruptWatchdog(session);
     session.structuredTurnInterruptRequested = false;
-    this.ctx.clearPendingSteerSlot(session);
     const interruptedSession = session.structuredSession;
     interruptedSession?.forceCompleteTurn?.();
     session.ignoreExit = true;

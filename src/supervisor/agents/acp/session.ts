@@ -1063,8 +1063,14 @@ export class AcpStructuredSession implements StructuredSessionHandle {
         break;
 
       case "tool_call":
-        // Agent started a tool call — working state
-        this.emitListenerUpdate({ status: "working", attention: "working" });
+        // A tool call that belongs to the active prompt confirms working
+        // state. Some ACP agents (Qwen notably) deliver background-task
+        // notifications after prompt() has already settled; those updates
+        // remain visible in the transcript but must not reopen the thread as
+        // a steerable turn when there is no request left to cancel.
+        if (this.promptInFlight) {
+          this.emitListenerUpdate({ status: "working", attention: "working" });
+        }
         break;
 
       case "tool_call_update":

@@ -245,19 +245,94 @@ describe("ThreadSessionManager structured stale-interrupt watchdog", () => {
     const replacementSession = createStructuredSession({ startTurn });
     vi.mocked(adapter.createStructuredSession).mockResolvedValue(replacementSession);
 
+    const segments = [
+      { kind: "text" as const, content: "after force stop" },
+      { kind: "attachment" as const, path: "/tmp/reference.png", mimeType: "image/png" },
+    ];
     await manager.sendThreadInput({
       threadId: THREAD_ID,
       prompt: "after force stop",
+      segments,
       config: { model: `${AGENT_KIND}/model` },
+      userMessageItemId: "user-after-force-stop",
     });
 
     expect(startTurn).toHaveBeenCalledTimes(1);
     expect(startTurn).toHaveBeenCalledWith(
-      "after force stop",
+      "after force stop\n\n@/tmp/reference.png ",
       { model: `${AGENT_KIND}/model` },
-      undefined,
-      expect.objectContaining({ userMessageItemId: expect.any(String) }),
+      segments,
+      { userMessageItemId: "user-after-force-stop" },
     );
+    expect(manager.sessions.get(THREAD_ID)?.structuredSession).toBe(replacementSession);
+  });
+
+  it("preserves and immediately resumes a pending steer when force-stop recovery replaces the provider", async () => {
+    const structuredSession = createStructuredSession();
+    const adapter = createAdapter(structuredSession);
+    const { manager, events } = createManager(adapter);
+    const session = createWorkingSession(adapter, structuredSession);
+    const segments = [
+      { kind: "attachment" as const, path: "/tmp/reference.png", mimeType: "image/png" },
+      { kind: "text" as const, content: "redirect with this image" },
+    ];
+    session.pendingSteer = {
+      id: "steer-pending",
+      stagedAt: 123,
+      prompt: "redirect with this image\n\n@/tmp/reference.png",
+      config: { model: `${AGENT_KIND}/model` },
+      segments,
+    };
+    manager.sessions.set(THREAD_ID, session);
+
+    const startTurn = vi.fn<NonNullable<StructuredSessionHandle["startTurn"]>>(
+      async () => undefined,
+    );
+    const replacementSession = createStructuredSession({ startTurn });
+    vi.mocked(adapter.createStructuredSession).mockResolvedValue(replacementSession);
+
+    await manager.interruptThread({ threadId: THREAD_ID });
+    await vi.advanceTimersByTimeAsync(STRUCTURED_INTERRUPT_FORCE_STOP_MS);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    const optimisticStart = events.find(
+      (event) =>
+        event.type === "thread-runtime-event" &&
+        event.event.type === "item.started" &&
+        event.event.itemType === "user_message",
+    );
+    expect(optimisticStart).toMatchObject({
+      event: {
+        payload: {
+          content: [
+            expect.objectContaining({ kind: "image", path: "/tmp/reference.png" }),
+            { kind: "text", text: "redirect with this image" },
+          ],
+        },
+      },
+    });
+    if (
+      !optimisticStart ||
+      optimisticStart.type !== "thread-runtime-event" ||
+      optimisticStart.event.type !== "item.started"
+    ) {
+      throw new Error("Expected an optimistic steer user message.");
+    }
+
+    expect(startTurn).toHaveBeenCalledTimes(1);
+    expect(startTurn).toHaveBeenCalledWith(
+      "redirect with this image\n\n@/tmp/reference.png",
+      { model: `${AGENT_KIND}/model` },
+      segments,
+      { userMessageItemId: optimisticStart.event.itemId },
+    );
+    expect(session.pendingSteer).toBeUndefined();
+    expect(events).toContainEqual({
+      type: "thread-pending-steer",
+      threadId: THREAD_ID,
+      pending: null,
+    });
     expect(manager.sessions.get(THREAD_ID)?.structuredSession).toBe(replacementSession);
   });
 

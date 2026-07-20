@@ -24,6 +24,9 @@ import {
   Lock,
   ChevronLeft,
   ChevronRight,
+  Signal,
+  Wifi,
+  BatteryFull,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -399,7 +402,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             {t("hero.subtitle")}
           </p>
 
-          <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row">
+          <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center">
             <a
               href={downloadHref}
               className="brand-glow group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition will-change-transform hover:-translate-y-0.5 hover:brightness-95"
@@ -413,6 +416,16 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             >
               <Globe className="h-4 w-4 text-accent" />
               {t("hero.openWebApp")}
+              <ArrowUpRight className="h-4 w-4 text-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
+            <a
+              href="https://github.com/SDSLeon/lightcode"
+              target="_blank"
+              rel="noreferrer"
+              className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 font-semibold text-moon transition will-change-transform hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]"
+            >
+              <GithubMark className="h-4 w-4" />
+              {t("hero.starOnGithub")}
               <ArrowUpRight className="h-4 w-4 text-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
             </a>
           </div>
@@ -435,9 +448,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             </Link>
           </div>
 
-          <WebAppCard className="mt-8" description={t("hero.webAppDescription")} />
-
-          <div className="hero-fade-up hero-fade-up-delay-3 mt-5 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
+          <div className="hero-fade-up hero-fade-up-delay-3 mt-6 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
             <KeyRound className="h-4 w-4" />
             <span>{t("hero.byo")}</span>
           </div>
@@ -457,6 +468,27 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             preload
           />
           <div className="pointer-events-none absolute inset-x-0 -bottom-px h-48 bg-gradient-to-t from-night to-transparent" />
+        </section>
+
+        {/* ── §3b Web app — the desktop, browser-borne ────────────── */}
+        <section className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[420px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.10),transparent)] blur-3xl" />
+          <div className="mx-auto max-w-6xl">
+            <div className="mx-auto mb-14 max-w-2xl text-center">
+              <p className="mb-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
+                <span className="pora-dot h-1.5 w-1.5" />
+                {t("nav.webApp")}
+              </p>
+              <h2 className="text-4xl font-bold tracking-[-0.03em] text-moon md:text-5xl">
+                {t("webapp.title").replace(/[.。]\s*$/, "")}
+                <DotPeriod pulse={false} />
+              </h2>
+            </div>
+            <div className="flex flex-col items-center justify-center gap-10 lg:flex-row lg:gap-16">
+              <WebAppCard description={t("hero.webAppDescription")} />
+              <PhoneMockup pairedLabel={t("webapp.paired")} />
+            </div>
+          </div>
         </section>
 
         {/* ── §4 Features — hairline manifest grid ────────────────── */}
@@ -641,7 +673,7 @@ function WebAppCard({ className, description }: { className?: string; descriptio
   return (
     <a
       href={WEB_APP_URL}
-      className={`group hero-fade-up hero-fade-up-delay-3 brand-glow relative block w-full max-w-xl overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.18] ${className ?? ""}`}
+      className={`group brand-glow relative block w-full max-w-xl overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.18] ${className ?? ""}`}
     >
       <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
       {/* browser chrome */}
@@ -678,6 +710,58 @@ function WebAppCard({ className, description }: { className?: string; descriptio
         </span>
       </span>
       <span className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/[0.06]" />
+    </a>
+  );
+}
+
+/**
+ * The web app on a phone — the paired state. Where the browser card pitches the
+ * pairing (traveling dot), the phone shows its outcome: the app glyph breathing,
+ * a confirmed `paired` status, and the `app.poracode.com` address pill. Pure
+ * CSS/SVG; no capture asset. The whole device links to the web app.
+ */
+function PhoneMockup({ pairedLabel }: { pairedLabel: string }) {
+  return (
+    <a
+      href={WEB_APP_URL}
+      className="group brand-glow relative block w-[260px] shrink-0 rounded-[2.75rem] border border-white/[0.12] bg-tile p-2 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.22]"
+    >
+      <span className="pointer-events-none absolute inset-x-10 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
+      <span className="relative flex h-[520px] flex-col overflow-hidden rounded-[2.25rem] border border-white/[0.06] bg-night">
+        {/* dynamic island */}
+        <span className="absolute left-1/2 top-2.5 z-10 h-[22px] w-20 -translate-x-1/2 rounded-full bg-black ring-1 ring-white/[0.08]" />
+        {/* status bar */}
+        <span className="flex items-center justify-between px-6 pt-3.5">
+          <span className="font-mono text-[11px] font-medium text-moon">9:41</span>
+          <span className="flex items-center gap-1.5 text-dim">
+            <Signal className="h-3 w-3" />
+            <Wifi className="h-3 w-3" />
+            <BatteryFull className="h-3.5 w-3.5" />
+          </span>
+        </span>
+        {/* address pill */}
+        <span className="mx-3 mt-3 flex items-center gap-1.5 rounded-full border border-white/[0.06] bg-tile-2 px-3 py-1.5">
+          <Lock className="h-2.5 w-2.5 shrink-0 text-ice" />
+          <span className="truncate font-mono text-[10px] text-dim">app.poracode.com</span>
+          <span className="pora-dot pora-pulse ml-auto h-1 w-1 shrink-0" />
+        </span>
+        {/* paired state */}
+        <span className="relative flex flex-1 flex-col items-center justify-center gap-5 px-6">
+          <span className="brand-grid absolute inset-0 opacity-60" />
+          <span className="pointer-events-none absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.16),transparent)] blur-2xl" />
+          <span className="relative">
+            <span className="pora-pulse absolute -inset-3 rounded-[32%] bg-accent/15 blur-xl" />
+            <PoraIconTile className="relative h-16 w-16" />
+          </span>
+          <span className="relative flex items-center gap-2 font-mono text-[11px] text-dim">
+            <span className="pora-dot h-1.5 w-1.5" />
+            {pairedLabel}
+          </span>
+        </span>
+        {/* home indicator */}
+        <span className="mx-auto mb-2.5 h-1 w-24 rounded-full bg-white/20" />
+      </span>
+      <span className="pointer-events-none absolute inset-0 rounded-[2.75rem] ring-1 ring-inset ring-white/[0.06]" />
     </a>
   );
 }

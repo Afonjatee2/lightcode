@@ -3406,6 +3406,9 @@ html[data-platform="darwin"] .poracode-sidebar-project-nudge {
   padding-bottom: 0;
   white-space: normal;
 }
+.lc-chat-markdown ol > li + li {
+  margin-top: 0.3em;
+}
 .lc-chat-markdown p {
   white-space: pre-wrap;
   overflow-wrap: break-word;
