@@ -6271,6 +6271,10 @@ msgstr "Мікрофон не знайдено."
 msgid "No models found"
 msgstr "Моделі не знайдено"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "No one-shot-capable agent is available. Sign in to an agent that supports one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec."
+msgstr ""
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "Інших встановлених агентів немає"

@@ -55,7 +55,6 @@ import { Button } from "@/renderer/components/common/Button";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { resolveModelLabel } from "@/renderer/components/providers/modelDisplay";
 import { launchExperiment } from "@/renderer/actions/experimentActions";
-import { isEligibleExperimentJudgeAgent } from "@/renderer/actions/experimentOperationState";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { useShallow } from "zustand/shallow";
 import {
@@ -294,15 +293,23 @@ export function ThreadDraftComposerArea(props: {
   const [experimentBaseBranch, setExperimentBaseBranch] = useState<string | null>(null);
   const [showSpecDialog, setShowSpecDialog] = useState(false);
   const disabledAgents = useSharedSettings((s) => s.disabledAgents);
-  // One-shot-capable agents that can act as the "draft spec" orchestrator, same
-  // eligibility the AI judge uses.
+  // Installed, one-shot-capable agents that can act as the "draft spec"
+  // orchestrator. Kept intentionally looser than the AI-judge eligibility (no
+  // authState/model-count gate) so the picker isn't empty for CLI/profile
+  // agents whose model list populates lazily; generateExecutorSpec falls back
+  // to the adapter's defaultOneShotModel when no model is chosen.
   const orchestratorAgents = useAgentStatusesStore(
     useShallow((state) =>
       getProjectAgentStatuses(
         props.project.location,
         state.agentStatuses,
         state.wslAgentStatuses,
-      ).filter((agent) => isEligibleExperimentJudgeAgent(agent, disabledAgents)),
+      ).filter(
+        (agent) =>
+          agent.installed &&
+          agent.capabilities.supportsOneShot === true &&
+          !disabledAgents.includes(agent.kind),
+      ),
     ),
   );
   const isRemote = isRemoteSession();
@@ -888,9 +895,7 @@ export function ThreadDraftComposerArea(props: {
                     setExperimentBaseBranch(null);
                   }}
                   onAdd={addExperimentCandidate}
-                  {...(orchestratorAgents.length > 0
-                    ? { onDraftSpec: () => setShowSpecDialog(true) }
-                    : {})}
+                  onDraftSpec={() => setShowSpecDialog(true)}
                   isDraftSpecDisabled={authRequired || agentUpdating || isSubmitting}
                 />
                 {showSpecDialog ? (

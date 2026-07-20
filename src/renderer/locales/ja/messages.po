@@ -6269,6 +6269,10 @@ msgstr "マイクが見つかりません。"
 msgid "No models found"
 msgstr "モデルが見つかりません"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "No one-shot-capable agent is available. Sign in to an agent that supports one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec."
+msgstr ""
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "他のエージェントはインストールされていません"

@@ -137,6 +137,14 @@ export function ExperimentSpecDraftDialog(props: {
                 candidates.
               </Trans>
             </p>
+            {props.agents.length === 0 ? (
+              <p className="text-sm text-danger">
+                <Trans>
+                  No one-shot-capable agent is available. Sign in to an agent that supports
+                  one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec.
+                </Trans>
+              </p>
+            ) : null}
             <TextArea
               aria-label={t`Task`}
               className="text-sm"

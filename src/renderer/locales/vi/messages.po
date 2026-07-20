@@ -6271,6 +6271,10 @@ msgstr "Không tìm thấy micrô."
 msgid "No models found"
 msgstr "Không tìm thấy mô hình nào"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "No one-shot-capable agent is available. Sign in to an agent that supports one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec."
+msgstr ""
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
 msgstr "Không có tác nhân nào khác được cài đặt"
