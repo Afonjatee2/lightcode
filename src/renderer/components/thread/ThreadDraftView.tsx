@@ -157,6 +157,8 @@ export function ThreadDraftView(props: {
   compact?: boolean;
   quickComposer?: boolean;
   composerPlaceholder?: string;
+  /** Override whether unmodified Enter submits instead of inserting a newline. */
+  submitOnEnter?: boolean;
   pickFiles?: () => Promise<string[] | null>;
   paneAlign?: "left" | "center" | "right";
   showCloseButton?: boolean;
@@ -1042,6 +1044,7 @@ export function ThreadDraftView(props: {
             supportsModePicker={supportsModePicker}
             presentationMode={presentationMode}
             {...(props.composerPlaceholder ? { placeholder: props.composerPlaceholder } : {})}
+            {...(props.submitOnEnter !== undefined ? { submitOnEnter: props.submitOnEnter } : {})}
             {...(props.pickFiles ? { pickFiles: props.pickFiles } : {})}
             onConfigChange={onConfigPatch}
             onWorktreeModeChange={setWorktreeMode}

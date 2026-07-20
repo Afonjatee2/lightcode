@@ -2807,6 +2807,19 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   transition-duration: 0.12s;
 }
 
+/* Attachments belong to the expanded composer only — the compact pill is a
+   single prompt line. Drop the attachment bar instantly (display can't
+   animate, so it never blinks) from the first collapse frame: leaving it in
+   flow inflates the pinned bubble height and it flickers as the shrinking
+   bubble clips it. Mirrors the home dock's compact trim. */
+:is(.m-main, .m-detail)
+  .m-thread
+  .m-thread-compose-dock:is(:not([data-expanded]), [data-collapsing])
+  .poracode-composer-shell
+  .poracode-attachment-bar {
+  display: none;
+}
+
 /* Shared compact line metrics with the home bubble: one compact control line,
    text vertically centered (the desktop editor's padding is top-heavy). */
 :is(.m-main, .m-detail) .m-thread .poracode-composer-shell .poracode-mention-input {

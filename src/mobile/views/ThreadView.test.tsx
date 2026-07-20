@@ -18,7 +18,9 @@ const fixtures = vi.hoisted(() => ({
   composerProps: [] as Array<{
     onSubmitInput?: (prompt: string) => Promise<void>;
     composerPlaceholder?: string;
+    submitOnEnter?: boolean;
   }>,
+  desktopPointer: false,
   keyboardOffset: 0,
   agentStatuses: [] as AgentStatus[],
 }));
@@ -142,6 +144,11 @@ vi.mock("../useKeyboardOffset", () => ({
   useKeyboardVisibilityOffset: () => fixtures.keyboardOffset,
 }));
 
+vi.mock("../useMediaQuery", () => ({
+  DESKTOP_POINTER_QUERY: "desktop-pointer",
+  useMediaQuery: () => fixtures.desktopPointer,
+}));
+
 vi.mock("../composeScrollLock", () => ({
   focusWithoutScroll: vi.fn<(element: HTMLElement | null | undefined) => void>(),
   lockComposeScroll: vi.fn<(source?: HTMLElement | null) => void>(),
@@ -156,6 +163,7 @@ describe("mobile ThreadView", () => {
     bridgeMock.subagentUnsubscribe.mockClear();
     toastDanger.mockClear();
     fixtures.composerProps.length = 0;
+    fixtures.desktopPointer = false;
     fixtures.keyboardOffset = 0;
     fixtures.agentStatuses = [];
     useAppStore.setState({
@@ -165,6 +173,24 @@ describe("mobile ThreadView", () => {
       runtimeStructuralVersionByThread: {},
       openSubAgentByThread: {},
     });
+  });
+
+  it("enables Enter-to-send only for desktop-like PWA input", () => {
+    const thread = makeTerminalThread();
+    const props = {
+      thread,
+      terminalScrollback: "",
+      onThreadAction: () => undefined,
+      onSubmitInput: () => Promise.resolve(),
+    };
+
+    const { unmount } = render(<ThreadView {...props} />);
+    expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(false);
+    unmount();
+
+    fixtures.desktopPointer = true;
+    render(<ThreadView {...props} />);
+    expect(fixtures.composerProps.at(-1)?.submitOnEnter).toBe(true);
   });
 
   it("mounts the subagent overlay for terminal threads", async () => {

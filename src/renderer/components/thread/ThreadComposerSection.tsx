@@ -87,6 +87,8 @@ type ThreadComposerSectionProps = {
   onSubmitInput?: ((prompt: string, segments?: PromptSegment[]) => Promise<void>) | undefined;
   /** Optional surface-specific placeholder for the active-thread input. */
   composerPlaceholder?: string | undefined;
+  /** Override whether unmodified Enter submits instead of inserting a newline. */
+  submitOnEnter?: boolean | undefined;
   /**
    * Suppress the informational docks (subagents/crossagents/workflows, context,
    * goal, plan, errors) inside the composer. The mobile PWA sets this and surfaces
@@ -702,7 +704,7 @@ function ThreadComposerSectionInner(props: ThreadComposerSectionProps & { thread
                             : t`Send a message...`
                       }
                       projectLocation={projectLocation}
-                      submitOnEnter={!isRemote}
+                      submitOnEnter={props.submitOnEnter ?? !isRemote}
                       {...(showCommandPanel
                         ? {
                             commandListId,

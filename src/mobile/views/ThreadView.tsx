@@ -37,6 +37,7 @@ import { ThreadTitleRow } from "../ThreadTitleRow";
 import { ThreadUsageIndicator } from "../ThreadUsageIndicator";
 import { useGitSummaryHydration } from "../useGitSummaryHydration";
 import { useKeyboardOffset } from "../useKeyboardOffset";
+import { DESKTOP_POINTER_QUERY, useMediaQuery } from "../useMediaQuery";
 import type { ThreadAction } from "../useRemoteDesktop";
 import type { WorkspaceTab } from "./WorkspaceView";
 
@@ -117,6 +118,7 @@ export function ThreadView(props: ThreadViewProps) {
   // hosted by FloatingComposerDock, which uses the same focus-gated lift as the
   // home composer.
   const keyboardOffset = useKeyboardOffset();
+  const submitOnEnter = useMediaQuery(DESKTOP_POINTER_QUERY);
 
   useEffect(() => {
     terminalPaneRef.current = {
@@ -260,6 +262,7 @@ export function ThreadView(props: ThreadViewProps) {
       <ThreadComposerSection
         {...commonProps}
         composerPlaceholder={t`Follow up...`}
+        submitOnEnter={submitOnEnter}
         hideInfoDocks
         todoDockCollapsed={dockState.todoDockCollapsed}
         todoDockPlacement={dockState.todoDockPlacement}

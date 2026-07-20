@@ -266,6 +266,8 @@ export function ThreadDraftComposerArea(props: {
   supportsModePicker: boolean;
   presentationMode: ThreadPresentationMode;
   placeholder?: string;
+  /** Override whether unmodified Enter submits instead of inserting a newline. */
+  submitOnEnter?: boolean;
   pickFiles?: () => Promise<string[] | null>;
   onConfigChange: (patch: Partial<ThreadConfig>) => void;
   onWorktreeModeChange: (worktreeMode: boolean) => void;
@@ -914,7 +916,7 @@ export function ThreadDraftComposerArea(props: {
               props.placeholder ?? (isRemote ? t`Plan, ask, build…` : t`Send a message...`)
             }
             projectLocation={isHomeScope ? undefined : props.project.location}
-            submitOnEnter={!isRemote}
+            submitOnEnter={props.submitOnEnter ?? !isRemote}
             {...(showCommandPanel
               ? {
                   commandListId,
