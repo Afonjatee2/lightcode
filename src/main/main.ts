@@ -837,6 +837,7 @@ if (!hasSingleInstanceLock) {
 
       const controller = createDesktopRemoteAccessController({
         appVersion: app.getVersion(),
+        channel,
         paths,
         ...(process.env.VITE_DEV_SERVER_URL
           ? { devServerUrl: process.env.VITE_DEV_SERVER_URL }

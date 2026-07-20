@@ -9,6 +9,7 @@ import type {
 } from "@/shared/ipc";
 import { toErrorMessage } from "@/shared/errorMessage";
 import { resolvePoracodePaths, type PoracodePaths } from "@/shared/poracodePaths";
+import type { PoracodeChannel } from "@/shared/channel";
 import { saveUploadedAttachmentFile } from "../attachments/localFiles";
 import {
   pickRemoteSettings,
@@ -44,10 +45,19 @@ import {
   type TailscaleStatus,
 } from "./tailscale";
 
-const PRODUCTION_PAIRING_APP_URL = "https://poracode.com";
+const PRODUCTION_PAIRING_APP_URL: Record<PoracodeChannel, string> = {
+  stable: "https://poracode.com",
+  nightly: "https://app-nightly.poracode.com",
+};
+
+const PRODUCTION_HOSTED_APP_URL: Record<PoracodeChannel, string> = {
+  stable: "https://app.poracode.com",
+  nightly: "https://app-nightly.poracode.com",
+};
 
 export interface DesktopRemoteAccessControllerOptions {
   readonly appVersion: string;
+  readonly channel: PoracodeChannel;
   readonly paths: Pick<PoracodePaths, "baseDir" | "settingsPath">;
   readonly devServerUrl?: string;
   readonly callSupervisor: RemoteAccessServerOptions["callSupervisor"];
@@ -244,9 +254,14 @@ export function createDesktopRemoteAccessController(
       attempt.tailscaleServeUrl = advertisedResolution.tailscaleServeUrl ?? null;
       if (!isCurrentStartAttempt(attempt)) throw new RemoteAccessStartSupersededError();
       remoteTailscaleServeActiveUrl = attempt.tailscaleServeUrl;
+      const configuredPairingAppUrl = remoteAccessPairingAppUrl();
       const pairingAppUrl =
-        remoteAccessPairingAppUrl() ??
-        (options.devServerUrl ? undefined : PRODUCTION_PAIRING_APP_URL);
+        configuredPairingAppUrl ??
+        (options.devServerUrl ? undefined : PRODUCTION_PAIRING_APP_URL[options.channel]);
+      const trustedCorsOrigins =
+        !configuredPairingAppUrl && !options.devServerUrl
+          ? [PRODUCTION_HOSTED_APP_URL[options.channel]]
+          : undefined;
       // In dev, phones load the PWA from Vite instead of the built bundle.
       let devMobileAppUrl: string | undefined;
       if (options.devServerUrl) {
@@ -297,6 +312,7 @@ export function createDesktopRemoteAccessController(
           ? { tailscaleHttpBaseUrl: advertisedResolution.tailscaleServeUrl }
           : {}),
         ...(pairingAppUrl ? { pairingAppUrl } : {}),
+        ...(trustedCorsOrigins ? { trustedCorsOrigins } : {}),
         ...(devMobileAppUrl ? { devMobileAppUrl } : {}),
         callSupervisor: options.callSupervisor,
         dispatchThreadCommand: options.dispatchThreadCommand,

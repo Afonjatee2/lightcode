@@ -202,12 +202,16 @@ function deferredTailscaleProbe(): {
   return { probe, entered: entered.promise };
 }
 
-function createController(devServerUrl?: string) {
+function createController(
+  devServerUrl?: string,
+  channel: DesktopRemoteAccessControllerOptions["channel"] = "stable",
+) {
   const callSupervisor = vi.fn<() => Promise<Record<string, never>>>(
     async () => ({}),
   ) as unknown as RemoteAccessServerOptions["callSupervisor"];
   return createDesktopRemoteAccessController({
     appVersion: "9.9.9-test",
+    channel,
     paths: {
       baseDir: "/tmp/poracode-controller-test",
       settingsPath: "/tmp/poracode-controller-test/settings.json",
@@ -276,6 +280,7 @@ describe("DesktopRemoteAccessController", () => {
     await production.setEnabled(true);
 
     expect(h.servers[0]?.options.pairingAppUrl).toBe("https://poracode.com");
+    expect(h.servers[0]?.options.trustedCorsOrigins).toEqual(["https://app.poracode.com"]);
     expect(h.servers[0]?.options.devMobileAppUrl).toBeUndefined();
     expect(h.servers[0]?.options.isDev).toBe(false);
 
@@ -283,8 +288,17 @@ describe("DesktopRemoteAccessController", () => {
     await development.setEnabled(true);
 
     expect(h.servers[1]?.options.pairingAppUrl).toBeUndefined();
+    expect(h.servers[1]?.options.trustedCorsOrigins).toBeUndefined();
     expect(h.servers[1]?.options.devMobileAppUrl).toBe("http://127.0.0.1:3100/mobile.html");
     expect(h.servers[1]?.options.isDev).toBe(true);
+  });
+
+  it("uses the nightly web app for nightly pairing links and CORS", async () => {
+    const nightly = createController(undefined, "nightly");
+    await nightly.setEnabled(true);
+
+    expect(h.servers[0]?.options.pairingAppUrl).toBe("https://app-nightly.poracode.com");
+    expect(h.servers[0]?.options.trustedCorsOrigins).toEqual(["https://app-nightly.poracode.com"]);
   });
 
   it("coalesces enable calls while a server start is in flight", async () => {
