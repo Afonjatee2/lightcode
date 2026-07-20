@@ -39,6 +39,7 @@ import {
 import { LandingFaq } from "./landing-faq";
 
 const ACP_REGISTRY_CDN = "https://cdn.agentclientprotocol.com/registry/v1/latest";
+const WEB_APP_URL = "https://app.poracode.com";
 
 // lucide-react 1.14.0 dropped brand glyphs, so the GitHub mark is inlined.
 function GithubMark({ className }: { className?: string }) {
@@ -339,6 +340,13 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             <BrandLockup />
           </Link>
           <div className="flex items-center gap-1 sm:gap-2">
+            <a
+              href={WEB_APP_URL}
+              className="hidden items-center gap-1.5 rounded-md px-3 py-2 font-mono text-[13px] text-dim transition-colors hover:bg-white/[0.04] hover:text-moon md:inline-flex"
+            >
+              <Globe className="h-4 w-4" />
+              {t("nav.webApp")}
+            </a>
             <Link
               href={changelogHref}
               prefetch={false}
@@ -388,7 +396,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
             {t("hero.subtitle")}
           </p>
 
-          <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:gap-5">
+          <div className="hero-fade-up hero-fade-up-delay-2 mt-10 flex flex-col items-center gap-4 sm:flex-row">
             <a
               href={downloadHref}
               className="brand-glow group inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-moon px-7 font-semibold text-night transition will-change-transform hover:-translate-y-0.5 hover:brightness-95"
@@ -396,26 +404,40 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
               <Download className="h-4 w-4" />
               {t("hero.downloadFor", { platform: platform.label })}
             </a>
-            <div className="flex items-center gap-5">
-              <Link
-                href={downloadsHref}
-                prefetch={false}
-                className="text-sm text-dim underline-offset-4 transition-colors hover:text-moon hover:underline"
-              >
-                {t("nav.otherPlatforms")}
-              </Link>
-              <Link
-                href={nightlyHref}
-                prefetch={false}
-                className="inline-flex items-center gap-1.5 text-sm text-dim transition-colors hover:text-ice"
-              >
-                <Moon className="h-3.5 w-3.5" />
-                {t("nav.nightly")}
-              </Link>
-            </div>
+            <a
+              href={WEB_APP_URL}
+              className="group inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-7 font-semibold text-moon transition will-change-transform hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.06]"
+            >
+              <Globe className="h-4 w-4 text-accent" />
+              {t("hero.openWebApp")}
+              <ArrowUpRight className="h-4 w-4 text-dim transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+            </a>
           </div>
 
-          <div className="hero-fade-up hero-fade-up-delay-3 mt-6 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
+          <div className="hero-fade-up hero-fade-up-delay-2 mt-4 flex items-center gap-5">
+            <Link
+              href={downloadsHref}
+              prefetch={false}
+              className="text-sm text-dim underline-offset-4 transition-colors hover:text-moon hover:underline"
+            >
+              {t("nav.otherPlatforms")}
+            </Link>
+            <Link
+              href={nightlyHref}
+              prefetch={false}
+              className="inline-flex items-center gap-1.5 text-sm text-dim transition-colors hover:text-ice"
+            >
+              <Moon className="h-3.5 w-3.5" />
+              {t("nav.nightly")}
+            </Link>
+          </div>
+
+          <p className="hero-fade-up hero-fade-up-delay-3 mt-6 flex max-w-xl items-center gap-2 text-sm leading-relaxed text-dim">
+            <Globe className="h-4 w-4 shrink-0 text-accent" />
+            <span>{t("hero.webAppDescription")}</span>
+          </p>
+
+          <div className="hero-fade-up hero-fade-up-delay-3 mt-4 inline-flex items-center gap-2 font-mono text-[12px] text-dim">
             <KeyRound className="h-4 w-4" />
             <span>{t("hero.byo")}</span>
           </div>
