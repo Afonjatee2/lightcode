@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import contact from "../../../branding/contact.json";
 import { LANDING_FAQ_ITEMS } from "@/lib/landingFaq";
 import type { ReleaseInfo } from "@/lib/releases";
 import { DEFAULT_LOCALE, LOCALE_CODES, localizedPath, type Locale } from "./i18n/config";
@@ -54,6 +55,7 @@ export const SEO_KEYWORDS = [
 export const SITEMAP_ROUTES = [
   { path: "/", changeFrequency: "weekly", priority: 1, localized: true },
   { path: "/download", changeFrequency: "daily", priority: 0.9, localized: true },
+  { path: "/about", changeFrequency: "monthly", priority: 0.6, localized: false },
   { path: "/changelog", changeFrequency: "weekly", priority: 0.7, localized: false },
   { path: "/nightly", changeFrequency: "daily", priority: 0.5, localized: true },
   { path: "/support", changeFrequency: "monthly", priority: 0.4, localized: false },
@@ -146,6 +148,8 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     "@id": `${SITE_URL}/#organization`,
     name: SITE_NAME,
     url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    email: contact.supportEmail,
     logo: {
       "@type": "ImageObject",
       url: absoluteUrl("/icon-512.png"),
@@ -153,6 +157,12 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
       height: 512,
     },
     sameAs: [GITHUB_URL],
+    contactPoint: {
+      "@type": "ContactPoint",
+      contactType: "technical support",
+      email: contact.supportEmail,
+      url: absoluteUrl("/support"),
+    },
   };
 
   const softwareApplication = {
@@ -211,6 +221,7 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
     "@type": "WebSite",
     "@id": `${SITE_URL}/#website`,
     name: SITE_NAME,
+    alternateName: ["Pora.code", "poracode.com"],
     url: SITE_URL,
     description: SITE_DESCRIPTION,
     publisher: {
@@ -232,6 +243,24 @@ export function createHomeJsonLd(release: ReleaseInfo, locale: Locale = DEFAULT_
   };
 
   return [organization, website, softwareApplication, faqPage];
+}
+
+export function createAboutJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "AboutPage",
+    "@id": `${absoluteUrl("/about")}#page`,
+    url: absoluteUrl("/about"),
+    name: `About ${SITE_NAME}`,
+    description: SITE_DESCRIPTION,
+    isPartOf: {
+      "@id": `${SITE_URL}/#website`,
+    },
+    mainEntity: {
+      "@id": `${SITE_URL}/#software`,
+    },
+    about: [{ "@id": `${SITE_URL}/#software` }, { "@id": `${SITE_URL}/#organization` }],
+  };
 }
 
 export function stringifyJsonLd(value: unknown): string {

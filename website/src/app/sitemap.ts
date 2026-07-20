@@ -20,6 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const lastModifiedByPath: Readonly<Record<string, Date | undefined>> = {
     "/": validDate(stableRelease.publishedAt) ?? changelogDate,
     "/download": validDate(stableRelease.publishedAt) ?? changelogDate,
+    "/about": validDate("2026-07-20"),
     "/changelog": changelogDate,
     "/nightly": validDate(nightlyRelease.publishedAt),
     "/privacy": validDate("2026-07-15"),
