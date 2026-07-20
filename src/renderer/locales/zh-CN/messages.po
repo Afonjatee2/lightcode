@@ -30,10 +30,10 @@ msgstr "（无分支）"
 msgid "(no message)"
 msgstr "（没有消息）"
 
-#. placeholder {0}: candidates.length
+#. placeholder {0}: props.candidateCount
 #. placeholder {0}: props.candidates.length
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "{0, plural, one {# candidate} other {# candidates}}"
 msgstr "{0, plural, one {# 个候选项} other {# 个候选项}}"
 
@@ -733,6 +733,10 @@ msgstr "添加附件或功能"
 msgid "Add candidate"
 msgstr "添加候选项"
 
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Add candidates"
+msgstr "添加候选项"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Add Claude profile"
 msgstr "添加 Claude 配置文件"
@@ -828,6 +832,10 @@ msgstr "智能体"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Agent ({subagent}): {description}"
 msgstr "代理 ({subagent})：{description}"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Agent and model"
+msgstr "代理和模型"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
@@ -938,7 +946,7 @@ msgstr "全部账户"
 msgid "All agent apps"
 msgstr "所有智能体应用"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "All candidate sessions, worktrees, and branches will be removed."
 msgstr "所有候选项的会话、工作树和分支都将被移除。"
@@ -1167,11 +1175,11 @@ msgstr "时间"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "At least two candidates must finish before comparing them."
-msgstr ""
+msgstr "至少需要两个候选完成才能进行比较。"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "At least two candidates must finish before judging."
-msgstr ""
+msgstr "至少需要两个候选完成才能进行评判。"
 
 #: src/renderer/actions/experimentActions.ts
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
@@ -1398,6 +1406,10 @@ msgstr "已被浏览器阻止。请在浏览器设置中允许此网站发送通
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
 msgid "blocked:"
 msgstr "已阻止："
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Board"
+msgstr "面板"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesEditor.tsx
 msgid "Bold"
@@ -1642,6 +1654,11 @@ msgstr "已取消"
 msgid "Cancelled"
 msgstr "已取消"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Candidate {0}"
+msgstr "候选 {0}"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Candidate actions"
 msgstr "候选操作"
@@ -1653,6 +1670,10 @@ msgstr "无法创建没有分支名称的默认工作树路径"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "无法切换分支 - 首先提交或存储您的更改"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Change data is unavailable for this candidate."
+msgstr "此候选的更改数据不可用。"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
@@ -2019,7 +2040,7 @@ msgstr "关闭编辑器"
 msgid "Close Editor Tab"
 msgstr "关闭编辑器选项卡"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Close experiment"
 msgstr "关闭实验"
 
@@ -2309,6 +2330,10 @@ msgstr "提交"
 msgid "Compacting context"
 msgstr "压缩上下文"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Compare"
+msgstr "比较"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "请将此指纹与服务器上显示的指纹进行比较。"
@@ -2355,8 +2380,14 @@ msgid "completed"
 msgstr "已完成"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Completed"
 msgstr "已完成"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Completed · no changes"
+msgstr "已完成 · 无更改"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2949,7 +2980,7 @@ msgstr "已为此线程启用 Crossagents"
 msgid "Crown"
 msgstr "选为优胜者"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 msgid "Crown with AI"
 msgstr "由 AI 选择优胜者"
@@ -3193,8 +3224,8 @@ msgid "Deny and tell the agent what to do differently…"
 msgstr "拒绝并告诉代理换一种做法……"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
-msgid "Describe the task in a sentence or two. The selected model reads the repo (read-only) and drafts a full, editable executor spec you can hand to the candidates."
-msgstr ""
+msgid "Describe the task briefly. The selected agent will turn it into an editable executor prompt."
+msgstr "简要描述任务。所选代理会将其转换为可编辑的执行提示。"
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
@@ -3380,12 +3411,13 @@ msgstr "放弃更改"
 msgid "Discard changes to <0>{title}</0>? This cannot be undone."
 msgstr "要放弃 <0>{title}</0> 的更改吗？此操作无法撤销。"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Discard experiment"
 msgstr "放弃实验"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Discard experiment?"
 msgstr "放弃实验？"
@@ -3492,25 +3524,25 @@ msgid "Draft"
 msgstr "草稿"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
-msgid "Draft executor spec"
-msgstr ""
+msgid "Draft an executor spec"
+msgstr "起草执行规范"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Draft spec"
-msgstr ""
+msgstr "草拟规范"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Draft spec from a task"
-msgstr ""
+msgstr "从任务草拟规范"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Drafted executor spec"
-msgstr ""
+msgstr "已起草的执行规范"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Drafted spec — edit before using"
-msgstr ""
+msgstr "已起草的规范 — 使用前请编辑"
 
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3544,7 +3576,7 @@ msgstr "例如：Codex GPT-5.5 fast 用于快速查询，OpenCode GLM 用于批�
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "e.g. Fix the Overview page so ?month= controls the displayed reporting month"
-msgstr ""
+msgstr "例如，修复概览页面，使 ?month= 控制显示的报告月份"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -3985,6 +4017,7 @@ msgid "failed"
 msgstr "失败了"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Failed"
 msgstr "失败"
@@ -4553,6 +4586,10 @@ msgstr "用户名"
 msgid "Hard Reload"
 msgstr "硬重载"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Has errors"
+msgstr "有错误"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/DraftIndicator.tsx
 msgid "Has unsent draft"
 msgstr "有未发送的草稿"
@@ -4948,7 +4985,7 @@ msgstr "斜体"
 msgid "JSON"
 msgstr "JSON"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Judging…"
 msgstr "正在评审…"
 
@@ -5056,9 +5093,9 @@ msgstr "少"
 #~ msgid "Let an AI judge compare the candidate changes."
 #~ msgstr "让 AI 评审比较各候选项的更改。"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Let an AI judge compare the finished candidates."
-msgstr ""
+msgstr "让 AI 评判比较已完成的候选项。"
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Lets agents call <0>eval</0> to run arbitrary JavaScript inside the embedded page. Off by default — turn on only when you trust the loaded sites and the agent."
@@ -6092,6 +6129,10 @@ msgstr "没有打开浏览器选项卡"
 msgid "No camera found"
 msgstr "未找到摄像头"
 
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "No candidates selected"
+msgstr "未选择候选项"
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6272,7 +6313,7 @@ msgstr "未找到模型"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "No one-shot-capable agent is available. Sign in to an agent that supports one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec."
-msgstr ""
+msgstr "没有可用的支持一次性生成的代理。登录支持一次性生成的代理（Codex、Claude、Kimi、Qwen…）以草拟规范。"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
@@ -6427,7 +6468,7 @@ msgid "None"
 msgstr "无"
 
 #: src/renderer/actions/experimentDecisionActions.ts
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "None of these agents can run the AI comparison."
 msgstr "这些智能体均无法执行 AI 比较。"
 
@@ -6561,6 +6602,7 @@ msgid "Only when unfocused"
 msgstr "仅当窗口失去焦点时"
 
 #: src/renderer/notifications.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
@@ -6589,7 +6631,6 @@ msgstr "打开终端"
 msgid "Open a thread first to attach to it."
 msgstr "首先打开一个线程以附加到它。"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open All"
@@ -6615,6 +6656,11 @@ msgstr "打开浏览器"
 #: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "打开浏览器选项卡"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Open candidate {0}"
+msgstr "打开候选 {0}"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -6815,6 +6861,10 @@ msgstr "在 worktree 中打开终端"
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Open the effort picker"
 msgstr "打开工作量选择器"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Open the Git review panel for this candidate."
+msgstr "打开此候选的 Git 审查面板。"
 
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Open the model picker"
@@ -7517,6 +7567,10 @@ msgstr "当线程完成或需要你处理时，向已配对的移动设备推送
 msgid "Questions"
 msgstr "问题"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Queued"
+msgstr "排队中"
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Quota reached"
@@ -7528,11 +7582,11 @@ msgstr "已达到配额"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Qwen (Coding Plan)"
-msgstr ""
+msgstr "Qwen (Coding Plan)"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Qwen 3.8 Max (Token Plan)"
-msgstr ""
+msgstr "Qwen 3.8 Max (Token Plan)"
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
@@ -7583,6 +7637,10 @@ msgstr "就绪"
 msgid "Ready for Review"
 msgstr "准备审查"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Ready to review"
+msgstr "待审查"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Ready. New pairing codes will advertise the Tailscale HTTPS URL when serve is active."
 msgstr "就绪。serve 激活后，新的配对码会公布 Tailscale HTTPS URL。"
@@ -7630,7 +7688,7 @@ msgstr "隐藏通知内容"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Redraft"
-msgstr ""
+msgstr "重新草拟"
 
 #. Button: re-fetch one provider's usage now
 #. Button: re-fetch provider usage now
@@ -8041,7 +8099,11 @@ msgstr "恢复或删除"
 msgid "Restore thread"
 msgstr "恢复线程"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Result ready"
+msgstr "结果就绪"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Results"
 msgstr "结果"
 
@@ -8066,7 +8128,7 @@ msgstr "重试 {serverName}"
 msgid "Retry check"
 msgstr "重试检查"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Retry cleanup"
 msgstr "重试清理"
 
@@ -8131,6 +8193,15 @@ msgstr "在你的各个 GitHub 账户中审核和跟踪工作。"
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review candidate {0} ({label}) changes"
 msgstr "查看候选 {0}（{label}）的更改"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Review candidate {0} changes"
+msgstr "查看候选 {0} 的更改"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Review changes"
+msgstr "查看更改"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
@@ -8280,9 +8351,15 @@ msgid "running"
 msgstr "运行中"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Running"
 msgstr "正在运行"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Running · no changes yet"
+msgstr "运行中 · 暂无更改"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Running now"
@@ -9594,10 +9671,13 @@ msgstr "目标分支"
 msgid "Target provider"
 msgstr "目标提供商"
 
-#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/providers/qwen/index.tsx
 msgid "Task"
 msgstr "任务"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Task description"
+msgstr "任务描述"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Task output"
@@ -9833,6 +9913,10 @@ msgstr "Windows 用户"
 msgid "the winner"
 msgstr "优胜者"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "The worktree for this candidate is not available."
+msgstr "此候选的工作树不可用。"
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Theme"
@@ -9841,6 +9925,10 @@ msgstr "主题"
 #: src/mobile/settingsSections.ts
 msgid "Theme and chat font size"
 msgstr "主题和聊天字号"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "There are no reviewable changes yet."
+msgstr "尚无可供审查的更改。"
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "These built-in MCP servers are shared by OpenCode threads. Saving updates running GUI projects; removing a server can interrupt an active turn. Terminal threads pick up changes on their next launch."
@@ -10722,7 +10810,7 @@ msgstr "使用此文件夹"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Use this spec"
-msgstr ""
+msgstr "使用此规范"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -11159,6 +11247,10 @@ msgstr "工作树位置"
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Worktree mode"
 msgstr "工作树模式"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Worktree removed"
+msgstr "工作树已移除"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectWorktreeLocation.tsx
 msgid "Worktree root for this project (a Linux path). Reset to use the global setting."

@@ -122,4 +122,54 @@ describe("ExperimentView", () => {
 
     expect(screen.getByText("We have a winner!")).toBeInTheDocument();
   });
+
+  it("Board is the default view mode", () => {
+    act(() => {
+      useExperimentStore.setState({ experiments: { [experiment.id]: experiment } });
+    });
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    const boardButton = screen.getByText("Board").closest("button");
+    expect(boardButton).toHaveAttribute("aria-pressed", "true");
+    const compareButton = screen.getByText("Compare").closest("button");
+    expect(compareButton).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("shows Completed status when experiment is decided", () => {
+    const decidedExperiment = { ...experiment, status: "decided" as const };
+    act(() => {
+      useExperimentStore.setState({ experiments: { [experiment.id]: decidedExperiment } });
+    });
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    expect(screen.getByText("Completed")).toBeInTheDocument();
+  });
+
+  it("shows Has errors when a candidate thread has error status", () => {
+    const errorThread: Thread = {
+      id: "thread-1",
+      projectId: experiment.projectId,
+      title: "model-a · codex",
+      agentKind: "codex",
+      config: { model: "model-a" },
+      status: "error",
+      attention: "none",
+      canResumeWithConfig: false,
+      groupId: experiment.id,
+      groupName: experiment.title,
+      archived: false,
+      done: false,
+      starred: false,
+      createdAt: "2026-07-16T00:00:00.000Z",
+      updatedAt: "2026-07-16T00:00:00.000Z",
+    };
+    const runningExperiment = { ...experiment, status: "running" as const, crown: undefined };
+    act(() => {
+      useAppStore.setState({ threads: [errorThread] });
+      useExperimentStore.setState({ experiments: { [experiment.id]: runningExperiment } });
+    });
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    expect(screen.getByText("Has errors")).toBeInTheDocument();
+  });
 });

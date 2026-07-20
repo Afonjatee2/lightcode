@@ -80,4 +80,42 @@ describe("ExperimentDraftTargets", () => {
 
     expect(screen.getByRole("region", { name: "Experiment" }).querySelector("ul")).toBeNull();
   });
+
+  it("shows empty state with 'No candidates selected' and 'Add candidates' button", () => {
+    const onAdd = vi.fn<() => void>();
+    render(
+      <AppProvider>
+        <ExperimentDraftTargets
+          candidates={[]}
+          isSubmitting={false}
+          isAddDisabled={false}
+          onRemove={() => undefined}
+          onCancel={() => undefined}
+          onAdd={onAdd}
+        />
+      </AppProvider>,
+    );
+
+    expect(screen.getByText("No candidates selected")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Add candidates"));
+    expect(onAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows Draft spec text label when onDraftSpec is provided", () => {
+    render(
+      <AppProvider>
+        <ExperimentDraftTargets
+          candidates={candidates}
+          isSubmitting={false}
+          isAddDisabled={false}
+          onRemove={() => undefined}
+          onCancel={() => undefined}
+          onAdd={() => undefined}
+          onDraftSpec={() => undefined}
+        />
+      </AppProvider>,
+    );
+
+    expect(screen.getByText("Draft spec")).toBeInTheDocument();
+  });
 });

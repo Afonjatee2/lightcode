@@ -45,15 +45,15 @@ export function ExperimentDraftTargets(props: {
               <Tooltip delay={0}>
                 <Tooltip.Trigger>
                   <Button
-                    isIconOnly
                     size="sm"
                     variant="ghost"
-                    className="size-6 min-w-0 shrink-0 text-muted"
+                    className="h-6 px-2 text-xs text-muted"
                     aria-label={t`Draft spec`}
                     isDisabled={props.isDraftSpecDisabled ?? false}
                     onPress={props.onDraftSpec}
                   >
                     <Sparkles className="size-3.5" />
+                    <Trans>Draft spec</Trans>
                   </Button>
                 </Tooltip.Trigger>
                 <Tooltip.Content>
@@ -144,7 +144,21 @@ export function ExperimentDraftTargets(props: {
             );
           })}
         </ThreadDockList>
-      ) : null}
+      ) : (
+        <div className="flex flex-col items-center gap-2 py-4 text-center text-xs text-muted">
+          <Trans>No candidates selected</Trans>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-7 px-3 text-xs"
+            onPress={props.onAdd}
+            isDisabled={props.isAddDisabled}
+          >
+            <Plus className="size-3.5" />
+            <Trans>Add candidates</Trans>
+          </Button>
+        </div>
+      )}
     </ThreadDockSection>
   );
 }

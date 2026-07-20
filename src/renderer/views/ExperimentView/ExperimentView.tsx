@@ -1,104 +1,29 @@
 import { useEffect, useState } from "react";
-import { useShallow } from "zustand/shallow";
-import { Tooltip } from "@heroui/react";
-import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import { Crown, FlaskConical, LayoutGrid, Loader2, Trash2, X } from "lucide-react";
-import { isThreadResultReady, isThreadTurnActive } from "@/shared/contracts";
-import { getProjectAgentStatuses } from "@/shared/agentStatus";
+import { Trans, useLingui } from "@lingui/react/macro";
 import {
   createExperimentCandidatePr,
-  discardExperiment,
-  isEligibleExperimentJudgeAgent,
   mergeExperimentWinner,
-  retryExperimentCleanup,
   setManualExperimentCrown,
 } from "@/renderer/actions/experimentActions";
 import { formatModelConfigLabel } from "@/renderer/components/providers/modelDisplay";
 import { openThread } from "@/renderer/actions/threadActions";
-import { Button } from "@/renderer/components/common/Button";
 import { ConfirmDialog } from "@/renderer/components/common/ConfirmDialog";
-import { macosTrafficLightPadClass } from "@/renderer/components/layout/sidebarChrome";
 import { useAppStore } from "@/renderer/state/appStore";
-import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
-import { useExperimentStore } from "@/renderer/state/experimentStore";
-import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
-import { useThreadLiveWorkflowStore } from "@/renderer/state/threadLiveWorkflowStore";
 import { HomeView } from "@/renderer/views/HomeView";
 import { ExperimentCandidateCard } from "./parts/ExperimentCandidateCard";
-import { ExperimentPromptSection } from "./parts/ExperimentPromptSection";
-import { ExperimentJudgeDialog } from "./parts/ExperimentJudgeDialog";
-import { ExperimentJudgeRunDialog } from "./parts/ExperimentJudgeRunDialog";
-import { useExperimentJudgeRun } from "./parts/useExperimentJudgeRun";
+import { ExperimentCockpitDialogs } from "./parts/ExperimentCockpitDialogs";
+import { ExperimentCockpitHeader } from "./parts/ExperimentCockpitHeader";
+import { useExperimentCockpitController } from "./parts/useExperimentCockpitController";
 
-type Operation = "crown" | "merge" | "cleanup" | "discard" | "pr";
-type Confirmation = { kind: "merge" } | { kind: "discard" } | null;
+type Confirmation = { kind: "merge" } | null;
 
 export function ExperimentView(props: { experimentId: string }) {
   const { t } = useLingui();
-  const experiment = useExperimentStore((state) => state.experiments[props.experimentId]);
-  const [operation, setOperation] = useState<Operation | null>(null);
+  const controller = useExperimentCockpitController(props.experimentId);
+  const experiment = controller.experiment;
+  const projectAgents = controller.projectAgents;
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
-  const project = useAppStore((state) =>
-    experiment
-      ? state.projects.find((candidate) => candidate.id === experiment.projectId)
-      : undefined,
-  );
-  const disabledAgents = useSharedSettings((state) => state.disabledAgents);
-  const projectAgents = useAgentStatusesStore(
-    useShallow((state) =>
-      project
-        ? getProjectAgentStatuses(project.location, state.agentStatuses, state.wslAgentStatuses)
-        : [],
-    ),
-  );
-  const judgeAgents = projectAgents.filter((agent) =>
-    isEligibleExperimentJudgeAgent(agent, disabledAgents),
-  );
-  const hasActiveTurn = useAppStore((state) =>
-    experiment
-      ? state.threads.some(
-          (thread) =>
-            experiment.candidates.some((candidate) => candidate.threadId === thread.id) &&
-            isThreadTurnActive(thread.status),
-        )
-      : false,
-  );
-  const hasLiveWorkflow = useThreadLiveWorkflowStore((state) =>
-    experiment
-      ? experiment.candidates.some((candidate) => state.liveThreadIds.has(candidate.threadId))
-      : false,
-  );
-  const hasActiveCandidate = hasActiveTurn || hasLiveWorkflow;
-  // Candidates that have settled with a comparable result (idle/finished, no
-  // live workflow). Judging is gated on having at least two of these — a failed
-  // or still-running candidate simply doesn't count, so it can never deadlock
-  // the "Crown with AI" button the way "wait for EVERY candidate" did.
-  const liveThreadIds = useThreadLiveWorkflowStore((state) => state.liveThreadIds);
-  const readyThreadIds = useAppStore(
-    useShallow((state) =>
-      experiment
-        ? state.threads
-            .filter(
-              (thread) =>
-                experiment.candidates.some((candidate) => candidate.threadId === thread.id) &&
-                isThreadResultReady(thread.status),
-            )
-            .map((thread) => thread.id)
-        : [],
-    ),
-  );
-  const resultReadyCount = readyThreadIds.filter((id) => !liveThreadIds.has(id)).length;
-  const hasCleanupPending =
-    experiment?.status === "decided" &&
-    experiment.candidates.some((candidate) => candidate.worktreeState !== "removed");
-
-  const hasAvailableJudge = judgeAgents.length > 0;
-  const judge = useExperimentJudgeRun({
-    experiment,
-    judgeAgents,
-    projectAgents,
-    runCrown: (action) => void performOperation("crown", action),
-  });
+  const [activeView, setActiveView] = useState<"board" | "compare">("board");
 
   useEffect(() => {
     if (!experiment) return;
@@ -132,33 +57,15 @@ export function ExperimentView(props: { experimentId: string }) {
 
   const exp = experiment;
   const candidates = exp.candidates;
-  const decided = exp.status === "decided";
+  const decided = controller.decided;
+  const hasCleanupPending = controller.hasCleanupPending;
   const crownThreadId = exp.crown?.threadId;
   const crownedCandidate = candidates.find((candidate) => candidate.threadId === crownThreadId);
-  const hasAiResults = exp.crown?.source === "ai";
-  const operationLocked = operation !== null;
-
-  async function performOperation(kind: Operation, action: () => void | Promise<void>) {
-    if (operation) return;
-    setOperation(kind);
-    try {
-      await action();
-    } finally {
-      setOperation(null);
-    }
-  }
 
   function confirmMerge() {
     setConfirmation(null);
-    void performOperation("merge", async () => {
+    void controller.performOperation("merge", async () => {
       await mergeExperimentWinner(exp.id);
-    });
-  }
-
-  function confirmDiscard() {
-    setConfirmation(null);
-    void performOperation("discard", async () => {
-      await discardExperiment(exp.id);
     });
   }
 
@@ -177,120 +84,37 @@ export function ExperimentView(props: { experimentId: string }) {
 
   return (
     <div className="flex h-full flex-col">
-      <div
-        className={`poracode-content-over-drag-region ${macosTrafficLightPadClass} h-[env(titlebar-area-height,32px)] shrink-0 px-3`}
-      >
-        <div className="mx-auto flex h-full max-w-4xl items-center gap-2">
-          <FlaskConical className="size-3.5 shrink-0 text-muted" />
-          <span className="truncate text-xs font-medium">{exp.title}</span>
-          <span className="shrink-0 rounded-full bg-surface-secondary px-1.5 py-0.5 text-[10px] text-muted">
-            <Plural value={candidates.length} one="# candidate" other="# candidates" />
-          </span>
-          <div className="ml-auto flex items-center gap-1">
-            <Button
-              size="sm"
-              variant="tertiary"
-              className="h-7 px-2 text-xs"
-              isDisabled={candidates.length < 2 || operation === "merge" || operation === "discard"}
-              onPress={() => useAppStore.getState().openGroupGrid(exp.id)}
-            >
-              <LayoutGrid className="size-3.5" />
-              <Trans>Open All</Trans>
-            </Button>
-            {hasAiResults ? (
-              <Button
-                size="sm"
-                variant="tertiary"
-                className="h-7 px-2.5 text-xs"
-                isDisabled={operation === "crown"}
-                onPress={judge.openResults}
-              >
-                <Crown className="size-3" />
-                <Trans>Results</Trans>
-              </Button>
-            ) : null}
-            {!decided ? (
-              <Tooltip delay={300}>
-                <Tooltip.Trigger>
-                  <Button
-                    size="sm"
-                    variant="tertiary"
-                    className="h-7 px-2.5 text-xs"
-                    isDisabled={
-                      operationLocked || resultReadyCount < 2 || !hasAvailableJudge
-                    }
-                    isPending={operation === "crown"}
-                    onPress={judge.open}
-                  >
-                    {operation === "crown" ? (
-                      <Loader2 className="size-3 animate-spin" />
-                    ) : (
-                      <Crown className="size-3" />
-                    )}
-                    {operation === "crown" ? <Trans>Judging…</Trans> : <Trans>Crown with AI</Trans>}
-                  </Button>
-                </Tooltip.Trigger>
-                <Tooltip.Content>
-                  {!hasAvailableJudge ? (
-                    <Trans>None of these agents can run the AI comparison.</Trans>
-                  ) : resultReadyCount < 2 ? (
-                    <Trans>At least two candidates must finish before judging.</Trans>
-                  ) : (
-                    <Trans>Let an AI judge compare the finished candidates.</Trans>
-                  )}
-                </Tooltip.Content>
-              </Tooltip>
-            ) : null}
-            {decided && hasCleanupPending ? (
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-6 px-2 text-xs"
-                isDisabled={operationLocked || hasActiveCandidate}
-                isPending={operation === "cleanup"}
-                onPress={() =>
-                  void performOperation("cleanup", async () => {
-                    await retryExperimentCleanup(exp.id);
-                  })
-                }
-              >
-                <Trans>Retry cleanup</Trans>
-              </Button>
-            ) : null}
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              isDisabled={operation === "discard"}
-              aria-label={t`Discard experiment`}
-              className="size-6 min-w-0 text-muted hover:text-danger"
-              onPress={() => setConfirmation({ kind: "discard" })}
-            >
-              <Trash2 className="size-3.5" />
-            </Button>
-            <Button
-              isIconOnly
-              size="sm"
-              variant="ghost"
-              isDisabled={operation === "merge" || operation === "discard"}
-              aria-label={t`Close experiment`}
-              className="size-6 min-w-0 text-muted"
-              onPress={() => useAppStore.getState().openHome()}
-            >
-              <X className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      </div>
+      <ExperimentCockpitHeader
+        title={exp.title}
+        prompt={exp.prompt}
+        {...(exp.segments ? { segments: exp.segments } : {})}
+        baseBranch={exp.baseBranch}
+        candidateCount={candidates.length}
+        overallStatus={controller.overallStatus}
+        activeView={activeView}
+        onViewChange={(view) => {
+          if (view === "compare") {
+            useAppStore.getState().openGroupGrid(exp.id);
+          }
+          setActiveView(view);
+        }}
+        operationLocked={controller.operationLocked}
+        operation={controller.operation}
+        decided={decided}
+        hasAiResults={controller.hasAiResults}
+        hasAvailableJudge={controller.hasAvailableJudge}
+        resultReadyCount={controller.resultReadyCount}
+        hasActiveCandidate={controller.hasActiveCandidate}
+        hasCleanupPending={hasCleanupPending}
+        onCrownOpen={controller.openCrown}
+        onResultsOpen={controller.openResults}
+        onCleanup={controller.retryCleanup}
+        onDiscard={controller.requestDiscard}
+        onClose={controller.close}
+      />
 
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        <div className="mx-auto flex max-w-4xl flex-col gap-3">
-          <ExperimentPromptSection
-            prompt={exp.prompt}
-            {...(exp.segments ? { segments: exp.segments } : {})}
-            baseBranch={exp.baseBranch}
-          />
-
+        <div className="mx-auto flex max-w-5xl flex-col gap-3">
           {decided ? (
             <div
               className={`rounded-lg border px-3 py-2 text-sm ${
@@ -307,7 +131,7 @@ export function ExperimentView(props: { experimentId: string }) {
             </div>
           ) : null}
 
-          <div className="divide-y divide-[var(--hairline)] overflow-hidden rounded-xl border border-[var(--hairline)] bg-surface-secondary/30">
+          <div className="flex min-w-0 flex-col gap-2">
             {candidates.map((candidate, index) => {
               const candidateAgent = projectAgents.find(
                 (agent) => agent.kind === candidate.agentKind,
@@ -323,19 +147,19 @@ export function ExperimentView(props: { experimentId: string }) {
                   isCrowned={crownThreadId === candidate.threadId}
                   isWinner={exp.winnerThreadId === candidate.threadId}
                   decided={decided}
-                  operationLocked={operationLocked}
-                  hasActiveCandidate={hasActiveCandidate}
-                  isCreatingPr={operation === "pr"}
-                  isMerging={operation === "merge"}
+                  operationLocked={controller.operationLocked}
+                  hasActiveCandidate={controller.hasActiveCandidate}
+                  isCreatingPr={controller.operation === "pr"}
+                  isMerging={controller.operation === "merge"}
                   onOpen={() => openThread(candidate.threadId)}
                   onCrown={() =>
-                    void performOperation("crown", () =>
+                    void controller.performOperation("crown", () =>
                       setManualExperimentCrown(exp.id, candidate.threadId),
                     )
                   }
                   onMerge={() => setConfirmation({ kind: "merge" })}
                   onCreatePr={() =>
-                    void performOperation("pr", async () => {
+                    void controller.performOperation("pr", async () => {
                       await createExperimentCandidatePr(exp.id, candidate.threadId);
                     })
                   }
@@ -346,23 +170,7 @@ export function ExperimentView(props: { experimentId: string }) {
         </div>
       </div>
 
-      {judge.config ? (
-        <ExperimentJudgeDialog
-          agents={judgeAgents}
-          config={judge.config}
-          onChange={judge.setConfig}
-          onConfirm={judge.confirm}
-          onClose={() => judge.setConfig(null)}
-        />
-      ) : null}
-
-      {judge.run ? (
-        <ExperimentJudgeRunDialog
-          run={judge.run}
-          onCancel={judge.cancel}
-          onClose={() => judge.setRun(null)}
-        />
-      ) : null}
+      <ExperimentCockpitDialogs controller={controller} />
 
       <ConfirmDialog
         isOpen={confirmation?.kind === "merge"}
@@ -387,19 +195,6 @@ export function ExperimentView(props: { experimentId: string }) {
           </div>
         }
         onConfirm={confirmMerge}
-        onClose={() => setConfirmation(null)}
-      />
-
-      <ConfirmDialog
-        isOpen={confirmation?.kind === "discard"}
-        title={t`Discard experiment?`}
-        confirmLabel={t`Discard experiment`}
-        body={
-          <p className="text-sm text-muted">
-            <Trans>All candidate sessions, worktrees, and branches will be removed.</Trans>
-          </p>
-        }
-        onConfirm={confirmDiscard}
         onClose={() => setConfirmation(null)}
       />
     </div>

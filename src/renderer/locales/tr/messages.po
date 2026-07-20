@@ -30,10 +30,10 @@ msgstr "(dal yok)"
 msgid "(no message)"
 msgstr "(mesaj yok)"
 
-#. placeholder {0}: candidates.length
+#. placeholder {0}: props.candidateCount
 #. placeholder {0}: props.candidates.length
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "{0, plural, one {# candidate} other {# candidates}}"
 msgstr "{0, plural, one {# aday} other {# aday}}"
 
@@ -733,6 +733,10 @@ msgstr "Ek veya yetenek ekleyin"
 msgid "Add candidate"
 msgstr "Aday ekle"
 
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Add candidates"
+msgstr "Aday ekle"
+
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Add Claude profile"
 msgstr "Claude profili ekle"
@@ -828,6 +832,10 @@ msgstr "Temsilci"
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Agent ({subagent}): {description}"
 msgstr "Temsilci ({subagent}): {description}"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Agent and model"
+msgstr "Ajan ve model"
 
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 msgid "Agent chat (ACP / markdown). Command rows use this size minus 1 px; tool and plan lines minus 2 px."
@@ -938,7 +946,7 @@ msgstr "Tüm hesaplar"
 msgid "All agent apps"
 msgstr "Tüm ajan uygulamaları"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "All candidate sessions, worktrees, and branches will be removed."
 msgstr "Adaylara ait tüm oturumlar, çalışma ağaçları ve şubeler kaldırılacak."
@@ -1167,11 +1175,11 @@ msgstr "Saat"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "At least two candidates must finish before comparing them."
-msgstr ""
+msgstr "Karşılaştırmak için en az iki adayın tamamlanması gerekir."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "At least two candidates must finish before judging."
-msgstr ""
+msgstr "Değerlendirmek için en az iki adayın tamamlanması gerekir."
 
 #: src/renderer/actions/experimentActions.ts
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
@@ -1398,6 +1406,10 @@ msgstr "Tarayıcı tarafından engellendi. Uygulama arka plandayken uyarı almak
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/parts/PermissionDetailsLine.tsx
 msgid "blocked:"
 msgstr "engellendi:"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Board"
+msgstr "Pano"
 
 #: src/renderer/views/MainView/parts/RightPanel/parts/NotesPanel/NotesEditor.tsx
 msgid "Bold"
@@ -1642,6 +1654,11 @@ msgstr "iptal edildi"
 msgid "Cancelled"
 msgstr "İptal edildi"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Candidate {0}"
+msgstr "Aday {0}"
+
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Candidate actions"
 msgstr "Aday işlemleri"
@@ -1653,6 +1670,10 @@ msgstr "Dal adı olmadan varsayılan çalışma ağacı yolu oluşturulamıyor"
 #: src/renderer/i18n/sharedMessages.ts
 msgid "Cannot switch branches — commit or stash your changes first"
 msgstr "Dallar değiştirilemiyor; önce değişikliklerinizi commit edin veya saklayın (stash)"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Change data is unavailable for this candidate."
+msgstr "Bu aday için değişiklik verileri kullanılamıyor."
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/GeneralSection.tsx
 msgid "Change project folder"
@@ -2019,7 +2040,7 @@ msgstr "Düzenleyiciyi kapat"
 msgid "Close Editor Tab"
 msgstr "Düzenleyici Sekmesini Kapat"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Close experiment"
 msgstr "Deneyi kapat"
 
@@ -2309,6 +2330,10 @@ msgstr "Commit'ler"
 msgid "Compacting context"
 msgstr "Bağlam sıkıştırılıyor"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Compare"
+msgstr "Karşılaştır"
+
 #: src/mobile/views/DesktopsView.tsx
 msgid "Compare this fingerprint with the one shown by your server."
 msgstr "Bu parmak izini sunucunuzda gösterilenle karşılaştırın."
@@ -2355,8 +2380,14 @@ msgid "completed"
 msgstr "tamamlandı"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Completed"
 msgstr "Tamamlandı"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Completed · no changes"
+msgstr "Tamamlandı · değişiklik yok"
 
 #: src/renderer/commands/shortcutCatalog.ts
 #: src/renderer/views/MainView/parts/RightPanel/parts/BrowserPanel/parts/BrowserToolbar.tsx
@@ -2949,7 +2980,7 @@ msgstr "Bu konu için Crossagents etkinleştirildi"
 msgid "Crown"
 msgstr "Kazanan seç"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 msgid "Crown with AI"
 msgstr "Yapay zekayla kazanan seç"
@@ -3193,8 +3224,8 @@ msgid "Deny and tell the agent what to do differently…"
 msgstr "Reddet ve aracıya neyi farklı yapması gerektiğini söyle…"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
-msgid "Describe the task in a sentence or two. The selected model reads the repo (read-only) and drafts a full, editable executor spec you can hand to the candidates."
-msgstr ""
+msgid "Describe the task briefly. The selected agent will turn it into an editable executor prompt."
+msgstr "Görevi kısaca açıklayın. Seçilen ajan, bunu düzenlenebilir bir yürütücü promptuna dönüştürecektir."
 
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
@@ -3380,12 +3411,13 @@ msgstr "Değişiklikleri at"
 msgid "Discard changes to <0>{title}</0>? This cannot be undone."
 msgstr "<0>{title}</0> üzerindeki değişiklikler atılsın mı? Bu geri alınamaz."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Discard experiment"
 msgstr "Deneyi sil"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitDialogs.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Discard experiment?"
 msgstr "Deney silinsin mi?"
@@ -3492,25 +3524,25 @@ msgid "Draft"
 msgstr "Taslak"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
-msgid "Draft executor spec"
-msgstr ""
+msgid "Draft an executor spec"
+msgstr "Yürütücü spec taslağı oluştur"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Draft spec"
-msgstr ""
+msgstr "Spec taslağı"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Draft spec from a task"
-msgstr ""
+msgstr "Görevden spec taslağı oluştur"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Drafted executor spec"
-msgstr ""
+msgstr "Hazırlanmış yürütücü spec"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Drafted spec — edit before using"
-msgstr ""
+msgstr "Hazırlanmış spec — kullanmadan önce düzenleyin"
 
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -3544,7 +3576,7 @@ msgstr "örn. hızlı aramalar için Codex GPT-5.5 fast, toplu yeniden düzenlem
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "e.g. Fix the Overview page so ?month= controls the displayed reporting month"
-msgstr ""
+msgstr "ör. ?month= parametresinin gösterilen rapor ayını kontrol etmesi için Genel Bakış sayfasını düzelt"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -3985,6 +4017,7 @@ msgid "failed"
 msgstr "başarısız oldu"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Failed"
 msgstr "Başarısız"
@@ -4553,6 +4586,10 @@ msgstr "Kullanıcı adı"
 msgid "Hard Reload"
 msgstr "Sert Yeniden Yükleme"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Has errors"
+msgstr "Hatalar var"
+
 #: src/renderer/views/MainView/parts/Sidebar/parts/DraftIndicator.tsx
 msgid "Has unsent draft"
 msgstr "Gönderilmemiş taslak var"
@@ -4948,7 +4985,7 @@ msgstr "italik"
 msgid "JSON"
 msgstr "JSON"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Judging…"
 msgstr "Değerlendiriliyor…"
 
@@ -5056,9 +5093,9 @@ msgstr "Az"
 #~ msgid "Let an AI judge compare the candidate changes."
 #~ msgstr "Adayların değişikliklerini bir yapay zeka hakeminin karşılaştırmasını sağlayın."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Let an AI judge compare the finished candidates."
-msgstr ""
+msgstr "Bir yargıç yapay zekânın tamamlanan adayları karşılaştırmasına izin verin."
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Lets agents call <0>eval</0> to run arbitrary JavaScript inside the embedded page. Off by default — turn on only when you trust the loaded sites and the agent."
@@ -6093,6 +6130,10 @@ msgstr "Tarayıcı sekmesi açık değil"
 msgid "No camera found"
 msgstr "Kamera bulunamadı"
 
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "No candidates selected"
+msgstr "Aday seçilmedi"
+
 #: src/renderer/components/diff/DiffCardList.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrReviewSidebar.tsx
 msgid "No changes"
@@ -6273,7 +6314,7 @@ msgstr "Hiçbir model bulunamadı"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "No one-shot-capable agent is available. Sign in to an agent that supports one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec."
-msgstr ""
+msgstr "Tek adımlı yetenekli agent yok. Spec taslağı oluşturmak için tek adımlı üretimi destekleyen bir ajana (Codex, Claude, Kimi, Qwen…) giriş yapın."
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SortableThreadItem/SortableThreadItem.tsx
 msgid "No other agents installed"
@@ -6428,7 +6469,7 @@ msgid "None"
 msgstr "Yok"
 
 #: src/renderer/actions/experimentDecisionActions.ts
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "None of these agents can run the AI comparison."
 msgstr "Bu ajanların hiçbiri yapay zeka karşılaştırmasını çalıştıramıyor."
 
@@ -6562,6 +6603,7 @@ msgid "Only when unfocused"
 msgstr "Yalnızca odaklanmadığında"
 
 #: src/renderer/notifications.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/parts/PrSection.tsx
 #: src/renderer/views/PrReviewOverlay/parts/PrMetaRow.tsx
 #: src/renderer/views/PullRequestsView/PullRequestsView.tsx
@@ -6590,7 +6632,6 @@ msgstr "Bir terminal aç"
 msgid "Open a thread first to attach to it."
 msgstr "Eklemek için önce bir konu açın."
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/ExperimentGroupHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarThreadGroup.tsx
 msgid "Open All"
@@ -6616,6 +6657,11 @@ msgstr "Tarayıcıyı aç"
 #: src/renderer/commands/registry.ts
 msgid "Open browser tab"
 msgstr "Tarayıcı sekmesi aç"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Open candidate {0}"
+msgstr "Aday {0} aç"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
@@ -6816,6 +6862,10 @@ msgstr "Terminali worktree'de aç"
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Open the effort picker"
 msgstr "Çaba seçiciyi aç"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Open the Git review panel for this candidate."
+msgstr "Bu aday için Git inceleme panelini aç."
 
 #: src/renderer/components/providers/codex/index.tsx
 msgid "Open the model picker"
@@ -7518,6 +7568,10 @@ msgstr "Konular tamamlandığında veya ilginizi gerektirdiğinde, uygulama kapa
 msgid "Questions"
 msgstr "Sorular"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Queued"
+msgstr "Sırada"
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Quota reached"
@@ -7529,11 +7583,11 @@ msgstr "Kotaya ulaşıldı"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Qwen (Coding Plan)"
-msgstr ""
+msgstr "Qwen (Coding Plan)"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Qwen 3.8 Max (Token Plan)"
-msgstr ""
+msgstr "Qwen 3.8 Max (Token Plan)"
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
@@ -7584,6 +7638,10 @@ msgstr "Hazır"
 msgid "Ready for Review"
 msgstr "İncelemeye Hazır"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
+msgid "Ready to review"
+msgstr "İncelemeye hazır"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Ready. New pairing codes will advertise the Tailscale HTTPS URL when serve is active."
 msgstr "Hazır. serve etkin olduğunda yeni eşleştirme kodları Tailscale HTTPS URL'sini duyurur."
@@ -7631,7 +7689,7 @@ msgstr "Bildirim içeriğini gizle"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Redraft"
-msgstr ""
+msgstr "Yeniden taslakla"
 
 #. Button: re-fetch one provider's usage now
 #. Button: re-fetch provider usage now
@@ -8042,7 +8100,11 @@ msgstr "Geri yükle veya sil"
 msgid "Restore thread"
 msgstr "Konuyu geri yükle"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Result ready"
+msgstr "Sonuç hazır"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Results"
 msgstr "Sonuçlar"
 
@@ -8067,7 +8129,7 @@ msgstr "{serverName} sunucusunu yeniden dene"
 msgid "Retry check"
 msgstr "Kontrolü yeniden dene"
 
-#: src/renderer/views/ExperimentView/ExperimentView.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 msgid "Retry cleanup"
 msgstr "Temizlemeyi yeniden dene"
 
@@ -8132,6 +8194,15 @@ msgstr "GitHub hesaplarınızdaki çalışmaları inceleyin ve takip edin."
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review candidate {0} ({label}) changes"
 msgstr "Aday {0} ({label}) değişikliklerini incele"
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Review candidate {0} changes"
+msgstr "Aday {0} değişikliklerini incele"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Review changes"
+msgstr "Değişiklikleri incele"
 
 #: src/renderer/views/MainView/parts/Sidebar/parts/SidebarProjectHeader.tsx
 #: src/renderer/views/MainView/parts/Sidebar/parts/useWorktreeActions.ts
@@ -8281,9 +8352,15 @@ msgid "running"
 msgstr "çalışıyor"
 
 #: src/renderer/utils/prStatus.ts
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCockpitHeader.tsx
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Running"
 msgstr "Çalışıyor"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Running · no changes yet"
+msgstr "Çalışıyor · henüz değişiklik yok"
 
 #: src/renderer/views/SchedulesView/SchedulesView.tsx
 msgid "Running now"
@@ -9595,10 +9672,13 @@ msgstr "Hedef şube"
 msgid "Target provider"
 msgstr "Hedef sağlayıcı"
 
-#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/providers/qwen/index.tsx
 msgid "Task"
 msgstr "Görev"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Task description"
+msgstr "Görev açıklaması"
 
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Task output"
@@ -9834,6 +9914,10 @@ msgstr "Windows kullanıcısı"
 msgid "the winner"
 msgstr "kazanan"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "The worktree for this candidate is not available."
+msgstr "Bu adayın çalışma ağacı kullanılamıyor."
+
 #: src/renderer/views/SettingsOverlay/parts/AppearanceSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Theme"
@@ -9842,6 +9926,10 @@ msgstr "Tema"
 #: src/mobile/settingsSections.ts
 msgid "Theme and chat font size"
 msgstr "Tema ve sohbet yazı tipi boyutu"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "There are no reviewable changes yet."
+msgstr "Henüz incelenebilir değişiklik yok."
 
 #: src/renderer/views/SettingsOverlay/parts/OpenCodeProviderSettings.tsx
 msgid "These built-in MCP servers are shared by OpenCode threads. Saving updates running GUI projects; removing a server can interrupt an active turn. Terminal threads pick up changes on their next launch."
@@ -10723,7 +10811,7 @@ msgstr "Bu klasörü kullan"
 
 #: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Use this spec"
-msgstr ""
+msgstr "Bu spec'i kullan"
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
@@ -11160,6 +11248,10 @@ msgstr "Çalışma ağacı konumu"
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Worktree mode"
 msgstr "Çalışma ağacı modu"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Worktree removed"
+msgstr "Çalışma ağacı kaldırıldı"
 
 #: src/renderer/views/ProjectSettingsOverlay/parts/ProjectWorktreeLocation.tsx
 msgid "Worktree root for this project (a Linux path). Reset to use the global setting."

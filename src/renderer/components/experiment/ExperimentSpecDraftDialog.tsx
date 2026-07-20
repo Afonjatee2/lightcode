@@ -126,46 +126,55 @@ export function ExperimentSpecDraftDialog(props: {
               <Sparkles className="size-5" />
             </Modal.Icon>
             <Modal.Heading>
-              <Trans>Draft executor spec</Trans>
+              <Trans>Draft an executor spec</Trans>
             </Modal.Heading>
           </Modal.Header>
           <Modal.Body className="flex flex-col gap-4">
-            <p className="text-sm text-muted">
+            <p className="text-xs text-muted">
               <Trans>
-                Describe the task in a sentence or two. The selected model reads the repo
-                (read-only) and drafts a full, editable executor spec you can hand to the
-                candidates.
+                Describe the task briefly. The selected agent will turn it into an editable executor
+                prompt.
               </Trans>
             </p>
             {props.agents.length === 0 ? (
               <p className="text-sm text-danger">
                 <Trans>
-                  No one-shot-capable agent is available. Sign in to an agent that supports
-                  one-shot generation (Codex, Claude, Kimi, Qwen…) to draft a spec.
+                  No one-shot-capable agent is available. Sign in to an agent that supports one-shot
+                  generation (Codex, Claude, Kimi, Qwen…) to draft a spec.
                 </Trans>
               </p>
             ) : null}
-            <TextArea
-              aria-label={t`Task`}
-              className="text-sm"
-              rows={3}
-              placeholder={t`e.g. Fix the Overview page so ?month= controls the displayed reporting month`}
-              value={task}
-              onChange={(event) => setTask(event.target.value)}
-            />
-            <div className="-ml-1.5">
-              <ThreadComposer
-                compact
-                toolbarOnly
-                hideSubmitButton
-                controls={controls}
-                placeholder=""
-                prompt=""
-                submitDisabled
-                submitLabel=""
-                onPromptChange={() => undefined}
-                onSubmit={() => undefined}
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="experiment-spec-task" className="text-xs font-medium text-foreground">
+                <Trans>Task description</Trans>
+              </label>
+              <TextArea
+                id="experiment-spec-task"
+                className="text-sm"
+                rows={3}
+                placeholder={t`e.g. Fix the Overview page so ?month= controls the displayed reporting month`}
+                value={task}
+                onChange={(event) => setTask(event.target.value)}
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-foreground">
+                <Trans>Agent and model</Trans>
+              </span>
+              <div className="-ml-1.5">
+                <ThreadComposer
+                  compact
+                  toolbarOnly
+                  hideSubmitButton
+                  controls={controls}
+                  placeholder=""
+                  prompt=""
+                  submitDisabled
+                  submitLabel=""
+                  onPromptChange={() => undefined}
+                  onSubmit={() => undefined}
+                />
+              </div>
             </div>
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             {spec !== null ? (
