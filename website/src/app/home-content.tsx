@@ -297,6 +297,7 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
     : t("hero.tagline");
   const downloadHref = downloadUrlFor(release, platform.slug);
   const homeHref = localizedPath("/", locale);
+  const aboutHref = "/about";
   const changelogHref = "/changelog";
   const downloadsHref = localizedPath("/download", locale);
   const nightlyHref = localizedPath("/nightly", locale);
@@ -350,6 +351,13 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
               <Globe className="h-4 w-4" />
               {t("nav.webApp")}
             </a>
+            <Link
+              href={aboutHref}
+              prefetch={false}
+              className="hidden rounded-md px-3 py-2 font-mono text-[13px] text-dim transition-colors hover:bg-white/[0.04] hover:text-moon lg:inline-flex"
+            >
+              About
+            </Link>
             <Link
               href={changelogHref}
               prefetch={false}
@@ -611,6 +619,12 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
           </div>
           <p className="font-mono text-[12px] text-dim">{t("footer.copyright", { year: 2026 })}</p>
           <div className="flex items-center gap-6">
+            <Link
+              href={aboutHref}
+              className="font-mono text-[13px] text-dim transition-colors hover:text-moon"
+            >
+              About
+            </Link>
             <Link
               href={changelogHref}
               className="font-mono text-[13px] text-dim transition-colors hover:text-moon"
