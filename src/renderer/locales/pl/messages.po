@@ -1165,6 +1165,14 @@ msgstr "Zadaj pytanie"
 msgid "At"
 msgstr "O"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "At least two candidates must finish before comparing them."
+msgstr ""
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "At least two candidates must finish before judging."
+msgstr ""
+
 #: src/renderer/actions/experimentActions.ts
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "Należy utworzyć co najmniej dwa drzewa robocze. Dane częściowo utworzonego eksperymentu zostały usunięte."
@@ -5015,8 +5023,12 @@ msgid "Less"
 msgstr "Mniej"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Let an AI judge compare the candidate changes."
-msgstr "Pozwól sędziemu AI porównać zmiany kandydatów."
+#~ msgid "Let an AI judge compare the candidate changes."
+#~ msgstr "Pozwól sędziemu AI porównać zmiany kandydatów."
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "Let an AI judge compare the finished candidates."
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Lets agents call <0>eval</0> to run arbitrary JavaScript inside the embedded page. Off by default — turn on only when you trust the loaded sites and the agent."
@@ -7478,8 +7490,16 @@ msgid "Quota reached"
 msgstr "Limit osiągnięty"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen (Coding Plan)"
+msgstr ""
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen 3.8 Max (Token Plan)"
+msgstr ""
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
@@ -10786,16 +10806,16 @@ msgid "Wait for every candidate to finish before cleaning up."
 msgstr "Przed czyszczeniem zaczekaj, aż wszyscy kandydaci zakończą pracę."
 
 #: src/renderer/actions/experimentDecisionActions.ts
-msgid "Wait for every candidate to finish before comparing them."
-msgstr "Przed porównaniem zaczekaj, aż wszyscy kandydaci zakończą pracę."
+#~ msgid "Wait for every candidate to finish before comparing them."
+#~ msgstr "Przed porównaniem zaczekaj, aż wszyscy kandydaci zakończą pracę."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #~ msgid "Wait for every candidate to finish before discarding the experiment."
 #~ msgstr "Przed odrzuceniem eksperymentu zaczekaj, aż wszyscy kandydaci zakończą pracę."
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Wait for every candidate to finish before judging."
-msgstr "Przed ocenianiem zaczekaj, aż wszyscy kandydaci zakończą pracę."
+#~ msgid "Wait for every candidate to finish before judging."
+#~ msgstr "Przed ocenianiem zaczekaj, aż wszyscy kandydaci zakończą pracę."
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Wait for every candidate to finish before merging a winner."

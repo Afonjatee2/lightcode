@@ -1165,6 +1165,14 @@ msgstr "提问"
 msgid "At"
 msgstr "时间"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "At least two candidates must finish before comparing them."
+msgstr ""
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "At least two candidates must finish before judging."
+msgstr ""
+
 #: src/renderer/actions/experimentActions.ts
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "必须至少创建两个工作树。已清理部分创建的实验。"
@@ -5015,8 +5023,12 @@ msgid "Less"
 msgstr "少"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Let an AI judge compare the candidate changes."
-msgstr "让 AI 评审比较各候选项的更改。"
+#~ msgid "Let an AI judge compare the candidate changes."
+#~ msgstr "让 AI 评审比较各候选项的更改。"
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "Let an AI judge compare the finished candidates."
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Lets agents call <0>eval</0> to run arbitrary JavaScript inside the embedded page. Off by default — turn on only when you trust the loaded sites and the agent."
@@ -7477,8 +7489,16 @@ msgid "Quota reached"
 msgstr "已达到配额"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen (Coding Plan)"
+msgstr ""
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen 3.8 Max (Token Plan)"
+msgstr ""
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
@@ -10785,16 +10805,16 @@ msgid "Wait for every candidate to finish before cleaning up."
 msgstr "请等待所有候选项完成后再清理。"
 
 #: src/renderer/actions/experimentDecisionActions.ts
-msgid "Wait for every candidate to finish before comparing them."
-msgstr "请等待所有候选项完成后再进行比较。"
+#~ msgid "Wait for every candidate to finish before comparing them."
+#~ msgstr "请等待所有候选项完成后再进行比较。"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #~ msgid "Wait for every candidate to finish before discarding the experiment."
 #~ msgstr "请等待所有候选项完成后再放弃实验。"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Wait for every candidate to finish before judging."
-msgstr "请等待所有候选项完成后再进行评审。"
+#~ msgid "Wait for every candidate to finish before judging."
+#~ msgstr "请等待所有候选项完成后再进行评审。"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Wait for every candidate to finish before merging a winner."

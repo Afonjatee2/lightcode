@@ -1164,6 +1164,14 @@ msgstr "質問する"
 msgid "At"
 msgstr "時刻"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "At least two candidates must finish before comparing them."
+msgstr ""
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "At least two candidates must finish before judging."
+msgstr ""
+
 #: src/renderer/actions/experimentActions.ts
 msgid "At least two worktrees must be created. Any partial experiment was cleaned up."
 msgstr "少なくとも 2 つのワークツリーを作成する必要があります。途中まで作成された実験はクリーンアップされました。"
@@ -5014,8 +5022,12 @@ msgid "Less"
 msgstr "少ない"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Let an AI judge compare the candidate changes."
-msgstr "AI に候補の変更を比較させます。"
+#~ msgid "Let an AI judge compare the candidate changes."
+#~ msgstr "AI に候補の変更を比較させます。"
+
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "Let an AI judge compare the finished candidates."
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/BrowserSettings.tsx
 msgid "Lets agents call <0>eval</0> to run arbitrary JavaScript inside the embedded page. Off by default — turn on only when you trust the loaded sites and the agent."
@@ -7476,8 +7488,16 @@ msgid "Quota reached"
 msgstr "クォータに達しました"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen (Coding Plan)"
+msgstr ""
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen 3.8 Max (Token Plan)"
+msgstr ""
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
@@ -10784,16 +10804,16 @@ msgid "Wait for every candidate to finish before cleaning up."
 msgstr "クリーンアップする前に、すべての候補が完了するまで待ってください。"
 
 #: src/renderer/actions/experimentDecisionActions.ts
-msgid "Wait for every candidate to finish before comparing them."
-msgstr "比較する前に、すべての候補が完了するまで待ってください。"
+#~ msgid "Wait for every candidate to finish before comparing them."
+#~ msgstr "比較する前に、すべての候補が完了するまで待ってください。"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 #~ msgid "Wait for every candidate to finish before discarding the experiment."
 #~ msgstr "実験を破棄する前に、すべての候補が完了するまで待ってください。"
 
 #: src/renderer/views/ExperimentView/ExperimentView.tsx
-msgid "Wait for every candidate to finish before judging."
-msgstr "審査する前に、すべての候補が完了するまで待ってください。"
+#~ msgid "Wait for every candidate to finish before judging."
+#~ msgstr "審査する前に、すべての候補が完了するまで待ってください。"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Wait for every candidate to finish before merging a winner."
