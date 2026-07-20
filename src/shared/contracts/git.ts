@@ -259,6 +259,24 @@ export interface GenerateTitleResult {
   title: string;
 }
 
+export const generateExecutorSpecPayloadSchema = z.object({
+  projectLocation: projectLocationSchema,
+  agentKind: agentKindSchema,
+  /** Short natural-language task the orchestrator expands into a full spec. */
+  task: z.string().min(1),
+  model: z.string().min(1).optional(),
+  effort: z.string().min(1).optional(),
+  /** Run generation in fast mode (Opus-only session flag; ignored by other models). */
+  fast: z.boolean().optional(),
+  /** English name of the language to write the spec in. Omitted = match the task. */
+  language: z.string().min(1).optional(),
+});
+export type GenerateExecutorSpecPayload = z.infer<typeof generateExecutorSpecPayloadSchema>;
+
+export interface GenerateExecutorSpecResult {
+  spec: string;
+}
+
 export const generatePrSummaryPayloadSchema = z.object({
   projectLocation: projectLocationSchema,
   agentKind: agentKindSchema,

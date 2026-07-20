@@ -1589,6 +1589,7 @@ msgstr "ポートを読み込めません"
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
@@ -3190,6 +3191,10 @@ msgstr "拒否する"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "拒否し、エージェントに別の対処法を伝えます..."
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Describe the task in a sentence or two. The selected model reads the repo (read-only) and drafts a full, editable executor spec you can hand to the candidates."
+msgstr ""
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "複数のエージェントで実行するタスクを入力…"
@@ -3485,6 +3490,27 @@ msgstr "音声モデルをダウンロードしています..."
 msgid "Draft"
 msgstr "草案"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft executor spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Draft spec from a task"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted executor spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted spec — edit before using"
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -3514,6 +3540,10 @@ msgstr "スキャン内でサーバー名が重複しています"
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "例：クイックな調査には Codex GPT-5.5 fast、大量のリファクタリングには OpenCode GLM、繊細な作業には Claude Opus。"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "e.g. Fix the Overview page so ?month= controls the displayed reporting month"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -7593,6 +7623,10 @@ msgstr "パブリック API レートでローカル ログから再構築され
 msgid "Redact notification content"
 msgstr "通知内容を伏せる"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Redraft"
+msgstr ""
+
 #. Button: re-fetch one provider's usage now
 #. Button: re-fetch provider usage now
 #: src/mobile/ThreadUsageIndicator.tsx
@@ -9555,6 +9589,7 @@ msgstr "対象ブランチ"
 msgid "Target provider"
 msgstr "対象プロバイダー"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/providers/qwen/index.tsx
 msgid "Task"
 msgstr "タスク"
@@ -10679,6 +10714,10 @@ msgstr "このアカウントを使用状況の追跡に使用するか、続行
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Use this folder"
 msgstr "このフォルダーを使用"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Use this spec"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts

@@ -1590,6 +1590,7 @@ msgstr "포트를 불러올 수 없습니다"
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
@@ -3191,6 +3192,10 @@ msgstr "거부"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "거부하고 에이전트에게 다르게 해야 할 일을 알려주세요…"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Describe the task in a sentence or two. The selected model reads the repo (read-only) and drafts a full, editable executor spec you can hand to the candidates."
+msgstr ""
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "여러 에이전트로 실행할 작업을 설명하세요…"
@@ -3486,6 +3491,27 @@ msgstr "음성 모델 다운로드 중..."
 msgid "Draft"
 msgstr "초안"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft executor spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Draft spec from a task"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted executor spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted spec — edit before using"
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -3515,6 +3541,10 @@ msgstr "스캔에 중복된 서버 이름이 있습니다"
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "예: 빠른 조회에는 Codex GPT-5.5 fast, 대규모 리팩터링에는 OpenCode GLM, 미묘한 작업에는 Claude Opus."
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "e.g. Fix the Overview page so ?month= controls the displayed reporting month"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -7595,6 +7625,10 @@ msgstr "공개 API 요금으로 로컬 로그에서 재구성되며 구독 계�
 msgid "Redact notification content"
 msgstr "알림 내용 가리기"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Redraft"
+msgstr ""
+
 #. Button: re-fetch one provider's usage now
 #. Button: re-fetch provider usage now
 #: src/mobile/ThreadUsageIndicator.tsx
@@ -9557,6 +9591,7 @@ msgstr "대상 브랜치"
 msgid "Target provider"
 msgstr "대상 공급자"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/providers/qwen/index.tsx
 msgid "Task"
 msgstr "작업"
@@ -10681,6 +10716,10 @@ msgstr "사용 추적을 위해 이 계정을 사용하거나 계속하기 전�
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Use this folder"
 msgstr "이 폴더 사용"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Use this spec"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts

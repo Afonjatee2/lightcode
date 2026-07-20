@@ -1,6 +1,6 @@
 import { Tooltip } from "@heroui/react";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
-import { FlaskConical, Plus, X } from "lucide-react";
+import { FlaskConical, Plus, Sparkles, X } from "lucide-react";
 import type { ExperimentCandidateSpec } from "@/renderer/actions/experimentActions";
 import { Button } from "@/renderer/components/common/Button";
 import { ProviderIcon } from "@/renderer/components/providers/ProviderIcon";
@@ -25,6 +25,9 @@ export function ExperimentDraftTargets(props: {
   onRemove: (id: string) => void;
   onCancel: () => void;
   onAdd: () => void;
+  /** When provided, shows a "Draft spec" button that opens the orchestrator dialog. */
+  onDraftSpec?: () => void;
+  isDraftSpecDisabled?: boolean;
 }) {
   const { t } = useLingui();
 
@@ -38,6 +41,26 @@ export function ExperimentDraftTargets(props: {
         }
         actions={
           <div className="flex items-center gap-0.5">
+            {props.onDraftSpec ? (
+              <Tooltip delay={0}>
+                <Tooltip.Trigger>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="ghost"
+                    className="size-6 min-w-0 shrink-0 text-muted"
+                    aria-label={t`Draft spec`}
+                    isDisabled={props.isDraftSpecDisabled ?? false}
+                    onPress={props.onDraftSpec}
+                  >
+                    <Sparkles className="size-3.5" />
+                  </Button>
+                </Tooltip.Trigger>
+                <Tooltip.Content>
+                  <Trans>Draft spec from a task</Trans>
+                </Tooltip.Content>
+              </Tooltip>
+            ) : null}
             <Tooltip delay={0}>
               <Tooltip.Trigger>
                 <Button

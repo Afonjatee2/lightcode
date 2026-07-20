@@ -1590,6 +1590,7 @@ msgstr "Не удалось загрузить порты"
 #: src/mobile/views/GitActionSheet.tsx
 #: src/renderer/components/common/ConfirmDialog.tsx
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/mcp/McpServerEditor.tsx
 #: src/renderer/components/thread/AgentDiscoveryScreen.tsx
 #: src/renderer/components/thread/ChatPane/parts/CheckpointRevertControls.tsx
@@ -3191,6 +3192,10 @@ msgstr "Запретить"
 msgid "Deny and tell the agent what to do differently…"
 msgstr "Запретить и сказать агенту, что сделать иначе…"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Describe the task in a sentence or two. The selected model reads the repo (read-only) and drafts a full, editable executor spec you can hand to the candidates."
+msgstr ""
+
 #: src/renderer/components/experiment/NewExperimentModal.tsx
 #~ msgid "Describe the task to run with multiple agents…"
 #~ msgstr "Опишите задачу, которую нужно выполнить нескольким агентам…"
@@ -3486,6 +3491,27 @@ msgstr "Загрузка голосовой модели..."
 msgid "Draft"
 msgstr "Черновик"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft executor spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Draft spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentDraftTargets.tsx
+msgid "Draft spec from a task"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted executor spec"
+msgstr ""
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Drafted spec — edit before using"
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/ModelOrderSection.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts
 msgid "Drag to reorder how providers appear in the model picker."
@@ -3515,6 +3541,10 @@ msgstr "Повторяющееся имя сервера в результата
 #: src/renderer/views/SettingsOverlay/parts/CrossagentRoutingSection.tsx
 msgid "e.g. Codex GPT-5.5 fast for quick lookups, OpenCode GLM for bulk refactors, Claude Opus for anything subtle."
 msgstr "напр., Codex GPT-5.5 fast для быстрых запросов, OpenCode GLM для массовых рефакторингов, Claude Opus для всего тонкого."
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "e.g. Fix the Overview page so ?month= controls the displayed reporting month"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "e.g. Work"
@@ -7595,6 +7625,10 @@ msgstr "Реконструировано из локальных логов по
 msgid "Redact notification content"
 msgstr "Скрывать содержимое уведомлений"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Redraft"
+msgstr ""
+
 #. Button: re-fetch one provider's usage now
 #. Button: re-fetch provider usage now
 #: src/mobile/ThreadUsageIndicator.tsx
@@ -9557,6 +9591,7 @@ msgstr "Целевая ветка"
 msgid "Target provider"
 msgstr "Целевой провайдер"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/providers/qwen/index.tsx
 msgid "Task"
 msgstr "Задача"
@@ -10681,6 +10716,10 @@ msgstr "Используйте эту учётную запись для отс�
 #: src/mobile/views/HostFolderPicker.tsx
 msgid "Use this folder"
 msgstr "Использовать эту папку"
+
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
+msgid "Use this spec"
+msgstr ""
 
 #: src/renderer/views/SettingsOverlay/parts/AudioSettings.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsSearchIndex.ts

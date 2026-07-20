@@ -55,10 +55,15 @@ import { Button } from "@/renderer/components/common/Button";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { resolveModelLabel } from "@/renderer/components/providers/modelDisplay";
 import { launchExperiment } from "@/renderer/actions/experimentActions";
+import { isEligibleExperimentJudgeAgent } from "@/renderer/actions/experimentOperationState";
+import { getProjectAgentStatuses } from "@/shared/agentStatus";
+import { useShallow } from "zustand/shallow";
 import {
   ExperimentDraftTargets,
   type ExperimentDraftCandidate,
 } from "@/renderer/components/experiment/ExperimentDraftTargets";
+import { ExperimentSpecDraftDialog } from "@/renderer/components/experiment/ExperimentSpecDraftDialog";
+import { useAgentStatusesStore } from "@/renderer/state/agentStatusesStore";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useGitStore } from "@/renderer/state/gitStore";
 import { useSharedSettings } from "@/renderer/state/sharedSettingsStore";
@@ -287,6 +292,19 @@ export function ThreadDraftComposerArea(props: {
   const [experimentMode, setExperimentMode] = useState(false);
   const [experimentCandidates, setExperimentCandidates] = useState<ExperimentDraftCandidate[]>([]);
   const [experimentBaseBranch, setExperimentBaseBranch] = useState<string | null>(null);
+  const [showSpecDialog, setShowSpecDialog] = useState(false);
+  const disabledAgents = useSharedSettings((s) => s.disabledAgents);
+  // One-shot-capable agents that can act as the "draft spec" orchestrator, same
+  // eligibility the AI judge uses.
+  const orchestratorAgents = useAgentStatusesStore(
+    useShallow((state) =>
+      getProjectAgentStatuses(
+        props.project.location,
+        state.agentStatuses,
+        state.wslAgentStatuses,
+      ).filter((agent) => isEligibleExperimentJudgeAgent(agent, disabledAgents)),
+    ),
+  );
   const isRemote = isRemoteSession();
   const isQuickComposer = window.poracode ? isQuickComposerWindow() : false;
   const showVoiceInputButton = useSharedSettings((s) => s.audio.showVoiceInputButton) && !isRemote;
@@ -849,27 +867,46 @@ export function ThreadDraftComposerArea(props: {
               />
             ) : null}
             {experimentMode && props.gitBranch ? (
-              <ExperimentDraftTargets
-                candidates={experimentCandidates}
-                isSubmitting={isSubmitting}
-                isAddDisabled={
-                  authRequired ||
-                  agentUpdating ||
-                  isSubmitting ||
-                  experimentCandidates.length >= MAX_EXPERIMENT_CANDIDATES
-                }
-                onRemove={(id) =>
-                  setExperimentCandidates((current) =>
-                    current.filter((candidate) => candidate.id !== id),
-                  )
-                }
-                onCancel={() => {
-                  setExperimentMode(false);
-                  setExperimentCandidates([]);
-                  setExperimentBaseBranch(null);
-                }}
-                onAdd={addExperimentCandidate}
-              />
+              <>
+                <ExperimentDraftTargets
+                  candidates={experimentCandidates}
+                  isSubmitting={isSubmitting}
+                  isAddDisabled={
+                    authRequired ||
+                    agentUpdating ||
+                    isSubmitting ||
+                    experimentCandidates.length >= MAX_EXPERIMENT_CANDIDATES
+                  }
+                  onRemove={(id) =>
+                    setExperimentCandidates((current) =>
+                      current.filter((candidate) => candidate.id !== id),
+                    )
+                  }
+                  onCancel={() => {
+                    setExperimentMode(false);
+                    setExperimentCandidates([]);
+                    setExperimentBaseBranch(null);
+                  }}
+                  onAdd={addExperimentCandidate}
+                  {...(orchestratorAgents.length > 0
+                    ? { onDraftSpec: () => setShowSpecDialog(true) }
+                    : {})}
+                  isDraftSpecDisabled={authRequired || agentUpdating || isSubmitting}
+                />
+                {showSpecDialog ? (
+                  <ExperimentSpecDraftDialog
+                    agents={orchestratorAgents}
+                    projectLocation={props.project.location}
+                    preferredAgentKind={props.selectedAgent.kind}
+                    onUseSpec={(spec) => {
+                      mentionRef.current?.clear();
+                      mentionRef.current?.insertText(spec);
+                      setShowSpecDialog(false);
+                    }}
+                    onClose={() => setShowSpecDialog(false)}
+                  />
+                ) : null}
+              </>
             ) : null}
           </>
         }

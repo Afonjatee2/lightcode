@@ -2,6 +2,7 @@ import {
   createFileCheckpointPayloadSchema,
   finalizeFileCheckpointPayloadSchema,
   generateCommitMessagePayloadSchema,
+  generateExecutorSpecPayloadSchema,
   generatePrSummaryPayloadSchema,
   generateTitlePayloadSchema,
   getGitBranchesPayloadSchema,
@@ -50,6 +51,8 @@ import type {
   FinalizeFileCheckpointResult,
   GenerateCommitMessagePayload,
   GenerateCommitMessageResult,
+  GenerateExecutorSpecPayload,
+  GenerateExecutorSpecResult,
   GeneratePrSummaryPayload,
   GeneratePrSummaryResult,
   GenerateTitlePayload,
@@ -211,6 +214,11 @@ export const gitProcedures = {
     "supervisor",
     generateTitlePayloadSchema,
   ),
+  generateExecutorSpec: definePayloadProcedure<
+    GenerateExecutorSpecPayload,
+    GenerateExecutorSpecResult,
+    "supervisor"
+  >("generateExecutorSpec", "supervisor", generateExecutorSpecPayloadSchema),
   generatePrSummary: definePayloadProcedure<
     GeneratePrSummaryPayload,
     GeneratePrSummaryResult,
