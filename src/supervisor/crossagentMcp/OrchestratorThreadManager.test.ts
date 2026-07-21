@@ -753,6 +753,51 @@ describe("OrchestratorThreadManager failure reason + final result", () => {
     expect(summary.status).toBe("inactive");
     expect(summary.finalResult).toBe("Ticket done: shipped the fix.");
   });
+
+  it("captures the parent conclusion instead of a later nested subagent message", async () => {
+    const h = makeHarness();
+    const childId = await createChild(h);
+    h.manager.observeSupervisorEvent({
+      type: "thread-runtime-events",
+      threadId: childId,
+      events: [
+        {
+          type: "item.started",
+          threadId: childId,
+          itemId: "parent-answer",
+          itemType: "assistant_message",
+        },
+        {
+          type: "content.delta",
+          threadId: childId,
+          itemId: "parent-answer",
+          stream: "assistant_text",
+          delta: "Parent final answer.",
+        },
+        { type: "item.completed", threadId: childId, itemId: "parent-answer" },
+        {
+          type: "item.started",
+          threadId: childId,
+          itemId: "nested-progress",
+          itemType: "assistant_message",
+          parentItemId: "subagent-tool",
+        },
+        {
+          type: "content.delta",
+          threadId: childId,
+          itemId: "nested-progress",
+          stream: "assistant_text",
+          delta: "Agent: trailing child label",
+        },
+        { type: "item.completed", threadId: childId, itemId: "nested-progress" },
+        { type: "turn.completed", threadId: childId, turnId: "t1", state: "completed" },
+      ],
+    });
+
+    const summary = h.manager.getThread(PARENT, childId);
+    expect(summary.recentOutput).toBe("Parent final answer.");
+    expect(summary.finalResult).toBe("Parent final answer.");
+  });
 });
 
 describe("OrchestratorThreadManager.sendToThread approval handling", () => {

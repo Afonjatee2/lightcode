@@ -37,10 +37,13 @@ export type TranscriptEntry =
 interface OpenItem {
   type: string;
   text: string;
+  nested: boolean;
   name?: string;
   status?: string;
   summary?: string;
 }
+
+const emptyOpenItem = (): OpenItem => ({ type: "assistant_message", text: "", nested: false });
 
 /**
  * Per-child ring buffer of a compact, structured transcript built from the
@@ -63,10 +66,14 @@ export class ChildTranscriptBuffer {
   ingest(event: RuntimeEvent): void {
     switch (event.type) {
       case "item.started": {
-        const item: OpenItem = { type: event.itemType, text: extractContentText(event.payload) };
+        const item: OpenItem = {
+          type: event.itemType,
+          text: extractContentText(event.payload),
+          nested: "parentItemId" in event && typeof event.parentItemId === "string",
+        };
         if (TOOL_TYPES.has(event.itemType)) mergeToolMeta(item, event.itemType, event.payload);
         this.open.set(event.itemId, item);
-        if (event.itemType === "assistant_message" && item.text) {
+        if (event.itemType === "assistant_message" && item.text && !item.nested) {
           this.setAssistant(event.itemId, item.text);
         }
         return;
@@ -78,7 +85,7 @@ export class ChildTranscriptBuffer {
         return;
       }
       case "item.completed": {
-        const item = this.open.get(event.itemId) ?? { type: "assistant_message", text: "" };
+        const item = this.open.get(event.itemId) ?? emptyOpenItem();
         this.applyPayload(event.itemId, item, event.payload);
         this.finalize(item);
         this.open.delete(event.itemId);
@@ -86,11 +93,11 @@ export class ChildTranscriptBuffer {
       }
       case "content.delta": {
         if (event.stream !== "assistant_text") return;
-        const item = this.open.get(event.itemId) ?? { type: "assistant_message", text: "" };
+        const item = this.open.get(event.itemId) ?? emptyOpenItem();
         item.type = "assistant_message";
         item.text = capTail(item.text + event.delta, LIVE_ASSISTANT_MAX_CHARS);
         this.open.set(event.itemId, item);
-        this.appendAssistantDelta(event.itemId, event.delta);
+        if (!item.nested) this.appendAssistantDelta(event.itemId, event.delta);
         return;
       }
       case "error": {
@@ -130,7 +137,9 @@ export class ChildTranscriptBuffer {
     const text = extractContentText(payload);
     if (text) item.text = text;
     if (TOOL_TYPES.has(item.type)) mergeToolMeta(item, item.type, payload);
-    if (item.type === "assistant_message" && text) this.setAssistant(itemId, text);
+    if (item.type === "assistant_message" && text && !item.nested) {
+      this.setAssistant(itemId, text);
+    }
   }
 
   private setAssistant(itemId: string, text: string): void {
