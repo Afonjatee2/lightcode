@@ -4,8 +4,11 @@ import type { AgentStatus } from "@/shared/contracts";
 import { AppProvider } from "@/renderer/components/ui/provider";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 
-const { requestExecutorSpecMock } = vi.hoisted(() => ({
+const { requestExecutorSpecMock, bridgeMock } = vi.hoisted(() => ({
   requestExecutorSpecMock: vi.fn<(input: { task: string }) => Promise<string>>(),
+  bridgeMock: {
+    pickFiles: vi.fn<() => Promise<string[] | null>>(),
+  },
 }));
 
 vi.mock("@/renderer/utils/executorSpecGen", () => ({
@@ -15,6 +18,11 @@ vi.mock("@/renderer/utils/executorSpecGen", () => ({
 vi.mock("@/renderer/components/thread/ThreadComposer", () => ({
   ThreadComposer: () => <div data-testid="draft-spec-controls" />,
 }));
+
+vi.mock("@/renderer/bridge", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/renderer/bridge")>();
+  return { ...actual, readBridge: () => bridgeMock };
+});
 
 import { ExperimentSpecDraftDialog } from "./ExperimentSpecDraftDialog";
 import { ExperimentDraftTargets } from "./ExperimentDraftTargets";
@@ -49,6 +57,7 @@ const projectLocation = { kind: "posix" as const, path: "/repo" };
 describe("ExperimentSpecDraftDialog", () => {
   beforeEach(() => {
     requestExecutorSpecMock.mockReset();
+    bridgeMock.pickFiles.mockReset();
   });
 
   it("stays open with guidance when no drafting agent is eligible", () => {
@@ -134,6 +143,47 @@ describe("ExperimentSpecDraftDialog", () => {
     });
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "Draft spec" })).toBeEnabled();
+  });
+
+  it("allows drafting from attachments alone (no task text)", async () => {
+    requestExecutorSpecMock.mockResolvedValue("## Goal\nBuild from the screenshot.");
+    bridgeMock.pickFiles.mockResolvedValue(["/repo/spec-notes.md"]);
+
+    render(
+      <AppProvider>
+        <ExperimentSpecDraftDialog
+          agents={[draftingAgent("codex", ["gpt-5.5"])]}
+          projectLocation={projectLocation}
+          onUseSpec={() => undefined}
+          onClose={() => undefined}
+        />
+      </AppProvider>,
+    );
+
+    // No task text and no attachments yet → drafting is blocked.
+    expect(screen.getByRole("button", { name: "Draft spec" })).toBeDisabled();
+
+    // Pick a file through the same bridge call the composer uses.
+    fireEvent.click(screen.getByRole("button", { name: "Attach" }));
+    await waitFor(() => {
+      expect(screen.getByText("spec-notes.md")).toBeInTheDocument();
+    });
+    expect(bridgeMock.pickFiles).toHaveBeenCalledTimes(1);
+
+    // The attachment alone unlocks drafting; the task textarea is still empty.
+    expect((screen.getByLabelText("Task description") as HTMLTextAreaElement).value).toBe("");
+    expect(screen.getByRole("button", { name: "Draft spec" })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Draft spec" }));
+    await waitFor(() => {
+      expect(requestExecutorSpecMock).toHaveBeenCalledTimes(1);
+    });
+    expect(requestExecutorSpecMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        task: "",
+        attachments: [{ path: "/repo/spec-notes.md", mimeType: "text/markdown" }],
+      }),
+    );
   });
 });
 

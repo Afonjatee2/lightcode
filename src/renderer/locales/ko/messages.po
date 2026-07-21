@@ -1200,9 +1200,11 @@ msgid "At least two worktrees must be created. Any partial experiment was cleane
 msgstr "최소 두 개의 작업 트리를 만들어야 합니다. 일부만 생성된 실험은 정리되었습니다."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Attach"
 msgstr "첨부"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Attach files"
 msgstr "파일 첨부"

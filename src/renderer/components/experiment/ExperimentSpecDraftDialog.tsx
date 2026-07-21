@@ -1,10 +1,13 @@
 import { useState } from "react";
 import { Modal, TextArea } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
-import { Loader2, Sparkles } from "lucide-react";
+import { Loader2, Paperclip, Sparkles } from "lucide-react";
 import type { AgentStatus, ProjectLocation } from "@/shared/contracts";
 import { friendlyError } from "@/shared/messages";
+import { readBridge } from "@/renderer/bridge";
 import { Button } from "@/renderer/components/common/Button";
+import { AttachmentBar } from "@/renderer/components/composer/AttachmentBar";
+import { useAttachments } from "@/renderer/components/composer/useAttachments";
 import {
   buildModelPickerControls,
   buildProviderModelMenuProviders,
@@ -56,6 +59,7 @@ export function ExperimentSpecDraftDialog(props: {
   const [spec, setSpec] = useState<string | null>(null);
   const [drafting, setDrafting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const attachments = useAttachments();
 
   const selectedAgent = config
     ? (props.agents.find((candidate) => candidate.kind === config.agentKind) ?? props.agents[0])
@@ -93,10 +97,23 @@ export function ExperimentSpecDraftDialog(props: {
         })
       : [];
 
-  const canDraft = Boolean(config?.model) && task.trim().length > 0 && !drafting;
+  const canDraft =
+    Boolean(config?.model) &&
+    (task.trim().length > 0 || attachments.attachments.length > 0) &&
+    !drafting;
+
+  async function pickAttachments() {
+    try {
+      const paths = await readBridge().pickFiles({ title: t`Attach files` });
+      if (paths) attachments.addFiles(paths);
+    } catch (err) {
+      setError(friendlyError(err));
+    }
+  }
 
   async function draft() {
-    if (!config || !selectedAgent || task.trim().length === 0) return;
+    if (!config || !selectedAgent) return;
+    if (task.trim().length === 0 && attachments.attachments.length === 0) return;
     setDrafting(true);
     setError(null);
     try {
@@ -107,6 +124,14 @@ export function ExperimentSpecDraftDialog(props: {
         effort: config.effort,
         fast: config.fast,
         task: task.trim(),
+        ...(attachments.attachments.length > 0
+          ? {
+              attachments: attachments.attachments.map((attachment) => ({
+                path: attachment.path,
+                ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+              })),
+            }
+          : {}),
       });
       setSpec(result);
     } catch (err) {
@@ -145,9 +170,22 @@ export function ExperimentSpecDraftDialog(props: {
               </p>
             ) : null}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="experiment-spec-task" className="text-xs font-medium text-foreground">
-                <Trans>Task description</Trans>
-              </label>
+              <div className="flex items-center justify-between gap-2">
+                <label
+                  htmlFor="experiment-spec-task"
+                  className="text-xs font-medium text-foreground"
+                >
+                  <Trans>Task description</Trans>
+                </label>
+                <Button
+                  variant="ghost"
+                  className="h-6 px-1.5 text-xs text-muted"
+                  onPress={() => void pickAttachments()}
+                >
+                  <Paperclip className="size-3.5" />
+                  <Trans>Attach</Trans>
+                </Button>
+              </div>
               <TextArea
                 id="experiment-spec-task"
                 className="text-sm"
@@ -155,6 +193,11 @@ export function ExperimentSpecDraftDialog(props: {
                 placeholder={t`e.g. Fix the Overview page so ?month= controls the displayed reporting month`}
                 value={task}
                 onChange={(event) => setTask(event.target.value)}
+              />
+              <AttachmentBar
+                attachments={attachments.attachments}
+                onRemove={attachments.removeAttachment}
+                layout="flush"
               />
             </div>
             <div className="flex flex-col gap-1.5">

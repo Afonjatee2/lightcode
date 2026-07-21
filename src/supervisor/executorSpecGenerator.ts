@@ -1,6 +1,11 @@
-import { MAX_EXPERIMENT_PROMPT_LENGTH, type ProjectLocation } from "@/shared/contracts";
+import {
+  MAX_EXPERIMENT_PROMPT_LENGTH,
+  type ExecutorSpecAttachment,
+  type ProjectLocation,
+} from "@/shared/contracts";
 import { extractFinalAgentMessage } from "./agentTranscript";
 import type { AgentAdapter } from "./agents/base";
+import { defaultFormatPromptSegments } from "./agents/base/promptSession";
 import { runOneShotPromptWithFallback } from "./oneShotPromptRunner";
 
 // A one-line task expands into a full spec, so allow a generous input but still
@@ -17,10 +22,16 @@ const SPEC_GEN_TIMEOUT_MS = 120_000;
  * relative-path rule mirrors the worktree-isolation lesson (an absolute repo
  * path in the prompt is what lets an autonomous agent escape its worktree).
  */
-function buildPrompt(task: string, language?: string): string {
+function buildPrompt(
+  task: string,
+  language?: string,
+  attachments?: readonly ExecutorSpecAttachment[],
+): string {
   const languageRule = language
     ? `- Write the spec in ${language}.\n`
     : "- Write the spec in the same language as the task below.\n";
+  const trimmedTask = task.trim();
+  const taskSection = trimmedTask ? `Task:\n${trimmedTask}\n` : "";
   return (
     'You are a senior engineer writing a precise implementation spec for an autonomous coding agent (the "executor").\n' +
     "The executor implements ONLY what your spec says, working in an isolated git worktree, and will NOT see this drafting prompt.\n" +
@@ -32,8 +43,30 @@ function buildPrompt(task: string, language?: string): string {
     "- Be concrete, minimal, and testable; keep scope narrow and list the expected changed files.\n" +
     languageRule +
     '- Output ONLY the spec as markdown — no preamble, no "Here is the spec", and do not wrap the whole reply in a code fence.\n\n' +
-    "Task:\n" +
-    task.trim() +
+    taskSection +
+    buildAttachmentSection(attachments)
+  );
+}
+
+/**
+ * Surface attached files to the drafting agent the same way the app surfaces
+ * attachments to a running thread — as `@path` references, via the shared
+ * segment formatter (which also shortens home paths). The drafting one-shot
+ * runs read-only, so the agent reads each referenced file with its own tools
+ * and multimodal models see attached images directly.
+ */
+function buildAttachmentSection(attachments?: readonly ExecutorSpecAttachment[]): string {
+  if (!attachments || attachments.length === 0) return "";
+  const refs = defaultFormatPromptSegments(
+    attachments.map((attachment) => ({
+      kind: "attachment" as const,
+      path: attachment.path,
+      ...(attachment.mimeType ? { mimeType: attachment.mimeType } : {}),
+    })),
+  ).trim();
+  return (
+    "The user attached these files. Read them with your read-only tools (they may be screenshots/images, video, or documents) and ground the spec in what they show:\n" +
+    refs +
     "\n"
   );
 }
@@ -79,6 +112,7 @@ export async function generateExecutorSpec(
   effort?: string,
   fast?: boolean,
   language?: string,
+  attachments?: readonly ExecutorSpecAttachment[],
 ): Promise<string> {
   const effectiveModel = model ?? adapter.defaultOneShotModel;
   if (!effectiveModel) {
@@ -97,7 +131,12 @@ export async function generateExecutorSpec(
     readOnlyWorkspace: true,
     timeoutMs: SPEC_GEN_TIMEOUT_MS,
     logTag: "executor-spec-gen",
-    attempts: [{ level: "full", buildPrompt: () => buildPrompt(truncateTask(task), language) }],
+    attempts: [
+      {
+        level: "full",
+        buildPrompt: () => buildPrompt(truncateTask(task), language, attachments),
+      },
+    ],
   });
 
   const spec = cleanSpec(raw);

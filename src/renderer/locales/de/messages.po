@@ -1200,9 +1200,11 @@ msgid "At least two worktrees must be created. Any partial experiment was cleane
 msgstr "Es müssen mindestens zwei Worktrees erstellt werden. Ein unvollständiges Experiment wurde bereinigt."
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Attach"
 msgstr "Anhängen"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Attach files"
 msgstr "Dateien anhängen"

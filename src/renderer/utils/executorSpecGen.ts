@@ -1,4 +1,4 @@
-import type { AgentStatus, ProjectLocation } from "@/shared/contracts";
+import type { AgentStatus, ExecutorSpecAttachment, ProjectLocation } from "@/shared/contracts";
 import { resolveAiLanguageName } from "@/shared/locale";
 import { readBridge } from "@/renderer/bridge";
 import { detectOSLocale } from "@/renderer/i18n/locales";
@@ -12,6 +12,8 @@ export interface RequestExecutorSpecInput {
   effort?: string | undefined;
   fast?: boolean | undefined;
   task: string;
+  /** Files/images/videos the drafting agent reads (surfaced as `@path` references). */
+  attachments?: ExecutorSpecAttachment[] | undefined;
 }
 
 /**
@@ -31,6 +33,9 @@ export async function requestExecutorSpec(input: RequestExecutorSpecInput): Prom
     ...(input.effort ? { effort: input.effort } : {}),
     ...(input.fast !== undefined ? { fast: input.fast } : {}),
     ...(language ? { language } : {}),
+    ...(input.attachments && input.attachments.length > 0
+      ? { attachments: input.attachments }
+      : {}),
   });
   return result.spec;
 }

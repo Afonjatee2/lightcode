@@ -1199,9 +1199,11 @@ msgid "At least two worktrees must be created. Any partial experiment was cleane
 msgstr "少なくとも 2 つのワークツリーを作成する必要があります。途中まで作成された実験はクリーンアップされました。"
 
 #: src/renderer/components/composer/ComposerAddMenu.tsx
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 msgid "Attach"
 msgstr "添付する"
 
+#: src/renderer/components/experiment/ExperimentSpecDraftDialog.tsx
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 msgid "Attach files"
 msgstr "ファイルを添付する"

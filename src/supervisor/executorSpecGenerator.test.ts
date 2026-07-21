@@ -132,4 +132,43 @@ describe("generateExecutorSpec", () => {
       ),
     ).rejects.toThrow(/does not support one-shot/);
   });
+
+  it("surfaces attachments to the drafting prompt as @path references", async () => {
+    let capturedPrompt = "";
+    const adapter = fakeAdapter({
+      runOneShot: async (input: { prompt: string }) => {
+        capturedPrompt = input.prompt;
+        return "spec body";
+      },
+    });
+    await generateExecutorSpec(
+      location,
+      adapter,
+      "fix the thing",
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      [
+        { path: "/tmp/spec-assets/design.png", mimeType: "image/png" },
+        { path: "/tmp/spec-assets/notes.md" },
+      ],
+    );
+    expect(capturedPrompt).toContain("The user attached these files");
+    expect(capturedPrompt).toContain("@/tmp/spec-assets/design.png");
+    expect(capturedPrompt).toContain("@/tmp/spec-assets/notes.md");
+  });
+
+  it("omits the attachment section when no attachments are provided", async () => {
+    let capturedPrompt = "";
+    const adapter = fakeAdapter({
+      runOneShot: async (input: { prompt: string }) => {
+        capturedPrompt = input.prompt;
+        return "spec body";
+      },
+    });
+    await generateExecutorSpec(location, adapter, "fix the thing");
+    expect(capturedPrompt).not.toContain("The user attached these files");
+    expect(capturedPrompt).toContain("Task:\nfix the thing");
+  });
 });

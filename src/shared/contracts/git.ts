@@ -259,18 +259,36 @@ export interface GenerateTitleResult {
   title: string;
 }
 
-export const generateExecutorSpecPayloadSchema = z.object({
-  projectLocation: projectLocationSchema,
-  agentKind: agentKindSchema,
-  /** Short natural-language task the orchestrator expands into a full spec. */
-  task: z.string().min(1),
-  model: z.string().min(1).optional(),
-  effort: z.string().min(1).optional(),
-  /** Run generation in fast mode (Opus-only session flag; ignored by other models). */
-  fast: z.boolean().optional(),
-  /** English name of the language to write the spec in. Omitted = match the task. */
-  language: z.string().min(1).optional(),
+/**
+ * A file/image/video attached to a spec-draft request. Mirrors the composer's
+ * attachment segment shape (the `attachment` variant of `promptSegmentSchema`
+ * in thread.ts) minus the discriminating `kind`; the drafting agent reads each
+ * one via an `@path` reference, exactly like attachments surfaced to a thread.
+ */
+export const executorSpecAttachmentSchema = z.object({
+  path: z.string().min(1),
+  mimeType: z.string().optional(),
 });
+export type ExecutorSpecAttachment = z.infer<typeof executorSpecAttachmentSchema>;
+
+export const generateExecutorSpecPayloadSchema = z
+  .object({
+    projectLocation: projectLocationSchema,
+    agentKind: agentKindSchema,
+    /** Short natural-language task the orchestrator expands into a full spec. */
+    task: z.string(),
+    model: z.string().min(1).optional(),
+    effort: z.string().min(1).optional(),
+    /** Run generation in fast mode (Opus-only session flag; ignored by other models). */
+    fast: z.boolean().optional(),
+    /** English name of the language to write the spec in. Omitted = match the task. */
+    language: z.string().min(1).optional(),
+    /** Files/images/videos the drafting agent reads (surfaced as `@path` references). */
+    attachments: z.array(executorSpecAttachmentSchema).max(10).optional(),
+  })
+  .refine((payload) => payload.task.trim().length > 0 || (payload.attachments?.length ?? 0) > 0, {
+    message: "A task description or at least one attachment is required",
+  });
 export type GenerateExecutorSpecPayload = z.infer<typeof generateExecutorSpecPayloadSchema>;
 
 export interface GenerateExecutorSpecResult {

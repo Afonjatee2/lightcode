@@ -95,6 +95,7 @@ export class GenerationService {
         payload.effort,
         payload.fast,
         payload.language,
+        payload.attachments,
       ),
     };
   }
