@@ -748,7 +748,7 @@ msgstr "Thêm thông tin xác thực trước khi chuỗi này có thể chạy.
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add fallback agent"
-msgstr ""
+msgstr "Thêm agent dự phòng"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Add folder"
@@ -1032,7 +1032,7 @@ msgstr "Chủ sở hữu cây làm việc dự kiến yêu cầu một nhánh"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "An external \"request changes\" review is advisory — not mergeable."
-msgstr ""
+msgstr "Đánh giá \"yêu cầu thay đổi\" từ bên ngoài chỉ mang tính tham khảo — không thể hợp nhất."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
@@ -1100,7 +1100,7 @@ msgstr "Đã được phê duyệt"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Approved externally"
-msgstr ""
+msgstr "Đã phê duyệt bên ngoài"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -2651,7 +2651,7 @@ msgstr "Đã sao chép vào bộ nhớ tạm"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied to clipboard."
-msgstr ""
+msgstr "Đã sao chép vào bảng nhớ tạm."
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2694,12 +2694,12 @@ msgstr "Sao chép chẩn đoán"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff"
-msgstr ""
+msgstr "Sao chép diff"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff for candidate {0}"
-msgstr ""
+msgstr "Sao chép diff của ứng viên {0}"
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2746,7 +2746,7 @@ msgstr "Sao chép URL Tailscale"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy the candidate's changes for external review."
-msgstr ""
+msgstr "Sao chép các thay đổi của ứng viên để đánh giá bên ngoài."
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -4039,7 +4039,7 @@ msgstr "Nhà cung cấp bên ngoài"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "External verdict"
-msgstr ""
+msgstr "Phán quyết bên ngoài"
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -4108,7 +4108,7 @@ msgstr "Không thể ghi siêu dữ liệu của nhánh có chủ sở hữu: {d
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Fallback:"
-msgstr ""
+msgstr "Dự phòng:"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/providers/modelDisplay.ts
@@ -6948,7 +6948,7 @@ msgstr "Không bắt buộc"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Optional note..."
-msgstr ""
+msgstr "Ghi chú tùy chọn..."
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -7660,7 +7660,7 @@ msgstr "Đã hết · đặt lại sau {resets}"
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Rate candidate {0} externally"
-msgstr ""
+msgstr "Đánh giá ứng viên {0} bên ngoài"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
@@ -7938,7 +7938,7 @@ msgstr "Xóa biến môi trường"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Remove fallback agent"
-msgstr ""
+msgstr "Xóa agent dự phòng"
 
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Remove from favorites"
@@ -10057,7 +10057,7 @@ msgstr "Thư mục này trống."
 
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "This folder will be initialized as a git repo on first run."
-msgstr ""
+msgstr "Thư mục này sẽ được khởi tạo thành kho lưu trữ git ở lần chạy đầu tiên."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
@@ -10416,7 +10416,7 @@ msgstr "Không thể xác định nhánh nguồn của thử nghiệm."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Unable to fetch the diff."
-msgstr ""
+msgstr "Không thể lấy diff."
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

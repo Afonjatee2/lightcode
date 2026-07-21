@@ -748,7 +748,7 @@ msgstr "이 스레드를 실행하려면 먼저 자격 증명을 추가하세요
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add fallback agent"
-msgstr ""
+msgstr "폴백 에이전트 추가"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Add folder"
@@ -1032,7 +1032,7 @@ msgstr "예상 작업 트리 소유자에는 브랜치가 필요합니다"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "An external \"request changes\" review is advisory — not mergeable."
-msgstr ""
+msgstr "외부 \"변경 요청\" 리뷰는 권고 사항이며 병합할 수 없습니다."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
@@ -1100,7 +1100,7 @@ msgstr "승인됨"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Approved externally"
-msgstr ""
+msgstr "외부에서 승인됨"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -2651,7 +2651,7 @@ msgstr "클립보드에 복사됨"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied to clipboard."
-msgstr ""
+msgstr "클립보드에 복사되었습니다."
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2694,12 +2694,12 @@ msgstr "진단 복사"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff"
-msgstr ""
+msgstr "diff 복사"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff for candidate {0}"
-msgstr ""
+msgstr "후보 {0}의 diff 복사"
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2746,7 +2746,7 @@ msgstr "Tailscale URL 복사"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy the candidate's changes for external review."
-msgstr ""
+msgstr "외부 리뷰를 위해 후보의 변경 사항을 복사합니다."
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -4039,7 +4039,7 @@ msgstr "외부 제공자"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "External verdict"
-msgstr ""
+msgstr "외부 판정"
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -4108,7 +4108,7 @@ msgstr "소유권이 표시된 브랜치 메타데이터를 기록하지 못했�
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Fallback:"
-msgstr ""
+msgstr "폴백:"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/providers/modelDisplay.ts
@@ -6948,7 +6948,7 @@ msgstr "선택 사항"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Optional note..."
-msgstr ""
+msgstr "선택 사항 메모..."
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -7660,7 +7660,7 @@ msgstr "소진 ·{resets}에서 재설정"
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Rate candidate {0} externally"
-msgstr ""
+msgstr "후보 {0}을(를) 외부에서 평가"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
@@ -7938,7 +7938,7 @@ msgstr "환경 변수 제거"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Remove fallback agent"
-msgstr ""
+msgstr "폴백 에이전트 제거"
 
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Remove from favorites"
@@ -10057,7 +10057,7 @@ msgstr "이 폴더는 비어 있습니다."
 
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "This folder will be initialized as a git repo on first run."
-msgstr ""
+msgstr "이 폴더는 첫 실행 시 git 저장소로 초기화됩니다."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
@@ -10416,7 +10416,7 @@ msgstr "실험의 소스 브랜치를 확인할 수 없습니다."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Unable to fetch the diff."
-msgstr ""
+msgstr "diff를 가져올 수 없습니다."
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

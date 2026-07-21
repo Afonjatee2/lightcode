@@ -748,7 +748,7 @@ msgstr "Добавьте учётные данные, прежде чем это
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add fallback agent"
-msgstr ""
+msgstr "Добавить резервного агента"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Add folder"
@@ -1032,7 +1032,7 @@ msgstr "Для ожидаемого владельца worktree требуетс
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "An external \"request changes\" review is advisory — not mergeable."
-msgstr ""
+msgstr "Внешняя проверка «request changes» носит рекомендательный характер — не для слияния."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
@@ -1100,7 +1100,7 @@ msgstr "Одобрено"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Approved externally"
-msgstr ""
+msgstr "Одобрено внешне"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -2651,7 +2651,7 @@ msgstr "Скопировано в буфер обмена"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied to clipboard."
-msgstr ""
+msgstr "Скопировано в буфер обмена."
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2694,12 +2694,12 @@ msgstr "Копировать диагностику"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff"
-msgstr ""
+msgstr "Копировать diff"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff for candidate {0}"
-msgstr ""
+msgstr "Копировать diff кандидата {0}"
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2746,7 +2746,7 @@ msgstr "Копировать URL Tailscale"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy the candidate's changes for external review."
-msgstr ""
+msgstr "Копировать изменения кандидата для внешней проверки."
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -4039,7 +4039,7 @@ msgstr "Внешний провайдер"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "External verdict"
-msgstr ""
+msgstr "Внешний вердикт"
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -4108,7 +4108,7 @@ msgstr "Не удалось записать метаданные принадл
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Fallback:"
-msgstr ""
+msgstr "Резерв:"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/providers/modelDisplay.ts
@@ -6948,7 +6948,7 @@ msgstr "Необязательно"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Optional note..."
-msgstr ""
+msgstr "Необязательная заметка..."
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -7660,7 +7660,7 @@ msgstr "Исчерпано · сброс через {resets}"
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Rate candidate {0} externally"
-msgstr ""
+msgstr "Оценить кандидата {0} внешне"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
@@ -7938,7 +7938,7 @@ msgstr "Удалить переменную окружения"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Remove fallback agent"
-msgstr ""
+msgstr "Удалить резервного агента"
 
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Remove from favorites"
@@ -10057,7 +10057,7 @@ msgstr "Эта папка пуста."
 
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "This folder will be initialized as a git repo on first run."
-msgstr ""
+msgstr "При первом запуске эта папка будет инициализирована как git-репозиторий."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
@@ -10416,7 +10416,7 @@ msgstr "Не удалось определить исходную ветку э�
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Unable to fetch the diff."
-msgstr ""
+msgstr "Не удалось получить diff."
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

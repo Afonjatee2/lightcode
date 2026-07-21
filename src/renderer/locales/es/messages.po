@@ -748,7 +748,7 @@ msgstr "Agrega credenciales antes de que este hilo pueda ejecutarse."
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Add fallback agent"
-msgstr ""
+msgstr "Añadir agente de respaldo"
 
 #: src/renderer/views/SettingsOverlay/parts/RemoteServersSettings.tsx
 msgid "Add folder"
@@ -1032,7 +1032,7 @@ msgstr "Un propietario de worktree esperado requiere una rama"
 
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "An external \"request changes\" review is advisory — not mergeable."
-msgstr ""
+msgstr "Una revisión externa de \"solicitar cambios\" es consultiva — no fusionable."
 
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
@@ -1100,7 +1100,7 @@ msgstr "Aprobado"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Approved externally"
-msgstr ""
+msgstr "Aprobado externamente"
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -2651,7 +2651,7 @@ msgstr "Copiado al portapapeles"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied to clipboard."
-msgstr ""
+msgstr "Copiado al portapapeles."
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2694,12 +2694,12 @@ msgstr "Copiar diagnósticos"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff"
-msgstr ""
+msgstr "Copiar diff"
 
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy diff for candidate {0}"
-msgstr ""
+msgstr "Copiar diff del candidato {0}"
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2746,7 +2746,7 @@ msgstr "Copiar URL de Tailscale"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copy the candidate's changes for external review."
-msgstr ""
+msgstr "Copia los cambios del candidato para una revisión externa."
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -4039,7 +4039,7 @@ msgstr "Proveedor externo"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "External verdict"
-msgstr ""
+msgstr "Veredicto externo"
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -4108,7 +4108,7 @@ msgstr "No se pudieron registrar los metadatos de propiedad de la rama: {detail}
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Fallback:"
-msgstr ""
+msgstr "Respaldo:"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 #: src/renderer/components/providers/modelDisplay.ts
@@ -6948,7 +6948,7 @@ msgstr "Opcional"
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Optional note..."
-msgstr ""
+msgstr "Nota opcional..."
 
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
@@ -7660,7 +7660,7 @@ msgstr "Agotado · se restablece en {resets}"
 #. placeholder {0}: props.candidateNumber
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Rate candidate {0} externally"
-msgstr ""
+msgstr "Calificar al candidato {0} externamente"
 
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
@@ -7938,7 +7938,7 @@ msgstr "Eliminar variable de entorno"
 
 #: src/renderer/components/experiment/ExperimentDraftTargets.tsx
 msgid "Remove fallback agent"
-msgstr ""
+msgstr "Eliminar agente de respaldo"
 
 #: src/renderer/components/common/ProviderModelMenu/ProviderModelMenu.tsx
 msgid "Remove from favorites"
@@ -10057,7 +10057,7 @@ msgstr "Esta carpeta está vacía."
 
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
 msgid "This folder will be initialized as a git repo on first run."
-msgstr ""
+msgstr "Esta carpeta se inicializará como un repositorio de git en la primera ejecución."
 
 #: src/renderer/components/mcp/McpServerEditor.tsx
 msgid "This name is reserved by a built-in MCP server."
@@ -10416,7 +10416,7 @@ msgstr "No se puede determinar la rama de origen del experimento."
 
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Unable to fetch the diff."
-msgstr ""
+msgstr "No se pudo obtener el diff."
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx
