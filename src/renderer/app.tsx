@@ -36,6 +36,7 @@ import { applyAgentStatusSupervisorEvent, useAgentStatusesStore } from "./state/
 import { useProviderUsageStore } from "./state/providerUsageStore";
 import { useUpdateStore } from "./state/updateStore";
 import { clearRuntimeItemStoreSelectorCacheForThread } from "./components/thread/ChatPane/chatPaneSelectors";
+import { maybeAdvanceExperimentFallback } from "./actions/experimentFallbackController";
 
 import { useAppHydration } from "@/renderer/hooks/useAppHydration";
 import { generateTitleAsync } from "@/renderer/utils/titleGen";
@@ -223,6 +224,9 @@ function handleSupervisorEvent(event: SupervisorEvent): void {
     // the active dock stops showing it as running.
     if (event.status === "inactive" || event.status === "error") {
       useAppStore.getState().reconcileStaleSubAgents(event.threadId);
+      if (event.status === "error") {
+        void maybeAdvanceExperimentFallback(event.threadId);
+      }
     }
   }
   if (event.type === "thread-pending-steer") {

@@ -55,6 +55,7 @@ import { Button } from "@/renderer/components/common/Button";
 import { PixelLoader } from "@/renderer/components/common/PixelLoader";
 import { resolveModelLabel } from "@/renderer/components/providers/modelDisplay";
 import { launchExperiment } from "@/renderer/actions/experimentActions";
+import { isEligibleExperimentJudgeAgent } from "@/renderer/actions/experimentOperationState";
 import { getProjectAgentStatuses } from "@/shared/agentStatus";
 import { useShallow } from "zustand/shallow";
 import {
@@ -310,6 +311,15 @@ export function ThreadDraftComposerArea(props: {
           agent.capabilities.supportsOneShot === true &&
           !disabledAgents.includes(agent.kind),
       ),
+    ),
+  );
+  const eligibleFallbackAgents = useAgentStatusesStore(
+    useShallow((state) =>
+      getProjectAgentStatuses(
+        props.project.location,
+        state.agentStatuses,
+        state.wslAgentStatuses,
+      ).filter((agent) => isEligibleExperimentJudgeAgent(agent, disabledAgents)),
     ),
   );
   const isRemote = isRemoteSession();
@@ -877,6 +887,7 @@ export function ThreadDraftComposerArea(props: {
               <>
                 <ExperimentDraftTargets
                   candidates={experimentCandidates}
+                  eligibleFallbackAgents={eligibleFallbackAgents}
                   isSubmitting={isSubmitting}
                   isAddDisabled={
                     authRequired ||
@@ -895,6 +906,13 @@ export function ThreadDraftComposerArea(props: {
                     setExperimentBaseBranch(null);
                   }}
                   onAdd={addExperimentCandidate}
+                  onFallbackChange={(candidateId, fallbackChain) =>
+                    setExperimentCandidates((current) =>
+                      current.map((c) =>
+                        c.id === candidateId ? { ...c, fallbackChain } : c,
+                      ),
+                    )
+                  }
                   onDraftSpec={() => setShowSpecDialog(true)}
                   isDraftSpecDisabled={authRequired || agentUpdating || isSubmitting}
                 />

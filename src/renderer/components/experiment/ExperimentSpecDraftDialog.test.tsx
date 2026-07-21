@@ -145,11 +145,13 @@ describe("ExperimentDraftTargets draft spec visibility", () => {
       <AppProvider>
         <ExperimentDraftTargets
           candidates={[]}
+          eligibleFallbackAgents={[]}
           isSubmitting={false}
           isAddDisabled={false}
           onRemove={() => undefined}
           onCancel={() => undefined}
           onAdd={() => undefined}
+          onFallbackChange={() => undefined}
           onDraftSpec={onDraftSpec}
           isDraftSpecDisabled={false}
         />

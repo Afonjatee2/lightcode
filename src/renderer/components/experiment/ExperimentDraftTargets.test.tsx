@@ -33,11 +33,13 @@ describe("ExperimentDraftTargets", () => {
       <AppProvider>
         <ExperimentDraftTargets
           candidates={candidates}
+          eligibleFallbackAgents={[]}
           isSubmitting={false}
           isAddDisabled={false}
           onRemove={onRemove}
           onCancel={onCancel}
           onAdd={onAdd}
+          onFallbackChange={() => undefined}
         />
       </AppProvider>,
     );
@@ -69,11 +71,13 @@ describe("ExperimentDraftTargets", () => {
       <AppProvider>
         <ExperimentDraftTargets
           candidates={[]}
+          eligibleFallbackAgents={[]}
           isSubmitting={false}
           isAddDisabled={false}
           onRemove={() => undefined}
           onCancel={() => undefined}
           onAdd={() => undefined}
+          onFallbackChange={() => undefined}
         />
       </AppProvider>,
     );
@@ -87,11 +91,13 @@ describe("ExperimentDraftTargets", () => {
       <AppProvider>
         <ExperimentDraftTargets
           candidates={[]}
+          eligibleFallbackAgents={[]}
           isSubmitting={false}
           isAddDisabled={false}
           onRemove={() => undefined}
           onCancel={() => undefined}
           onAdd={onAdd}
+          onFallbackChange={() => undefined}
         />
       </AppProvider>,
     );
@@ -106,11 +112,13 @@ describe("ExperimentDraftTargets", () => {
       <AppProvider>
         <ExperimentDraftTargets
           candidates={candidates}
+          eligibleFallbackAgents={[]}
           isSubmitting={false}
           isAddDisabled={false}
           onRemove={() => undefined}
           onCancel={() => undefined}
           onAdd={() => undefined}
+          onFallbackChange={() => undefined}
           onDraftSpec={() => undefined}
         />
       </AppProvider>,

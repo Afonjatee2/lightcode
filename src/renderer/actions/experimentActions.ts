@@ -37,6 +37,7 @@ export interface ExperimentCandidateSpec {
   agentLabel?: string;
   config: ThreadConfig;
   presentationMode: ThreadPresentationMode;
+  fallbackChain?: string[];
 }
 
 export interface LaunchExperimentInput {
@@ -171,6 +172,7 @@ export async function launchExperiment(input: LaunchExperimentInput): Promise<st
       ...(thread.config.effort ? { effort: thread.config.effort } : {}),
       ...(thread.config.fast !== undefined ? { fast: thread.config.fast } : {}),
       ...(worktreePath ? { worktreePath } : {}),
+      ...(plan.spec.fallbackChain?.length ? { fallbackChain: plan.spec.fallbackChain } : {}),
       worktreeBranch: plan.worktreeBranch,
       worktreeOwnerToken: `${experimentId}:${plan.threadId}`,
       worktreeState,
