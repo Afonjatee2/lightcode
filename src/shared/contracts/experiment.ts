@@ -6,6 +6,7 @@ import { promptSegmentSchema } from "./thread";
 export const EXPERIMENT_STORE_KEY = "poracode-experiments-v1";
 export const EXPERIMENT_STORE_VERSION = 1;
 export const MAX_EXPERIMENT_CANDIDATES = 8;
+export const MAX_EXPERIMENT_FALLBACK_CHAIN = 6;
 export const MAX_EXPERIMENT_DIFF_LENGTH = 2_000_000;
 export const MAX_EXPERIMENT_PROMPT_LENGTH = 100_000;
 export const MAX_EXPERIMENT_UNTRACKED_FILES = 200;
@@ -23,6 +24,12 @@ export const experimentCandidateSchema = z.object({
   model: z.string().min(1).optional(),
   effort: z.string().min(1).optional(),
   fast: z.boolean().optional(),
+  /**
+   * Ordered agent kinds to relaunch this candidate with if its current agent
+   * fails (e.g. rate-limited). Consumed left-to-right by the fallback
+   * controller; empty/omitted disables fallback for this candidate.
+   */
+  fallbackChain: z.array(agentKindSchema).max(MAX_EXPERIMENT_FALLBACK_CHAIN).optional(),
   worktreePath: z.string().min(1).optional(),
   worktreeBranch: z.string().min(1),
   worktreeOwnerToken: z.string().min(1).max(128),
