@@ -43,6 +43,7 @@ import {
 } from "./session";
 import type { CodexRolloutMeta } from "./sessionFiles";
 import { detectCodexReadyForInitialPrompt } from "./terminal";
+import { buildCodexOneShotArgs, runCodexOneShot } from "./oneShot";
 
 export { buildCodexAppServerCommand } from "./argv";
 export { deriveCodexStructuredState, parseCodexSocketMessage } from "./acp";
@@ -300,17 +301,18 @@ export function createCodexAdapter(): AgentAdapter {
       }
     },
     defaultOneShotModel: "gpt-5.5",
+    // Preferred one-shot path: runs `codex exec --output-last-message <file>`
+    // and returns only codex's final message, so the session transcript (banner,
+    // echoed prompt, tool-use narration) never leaks into titles / commits /
+    // specs. Every one-shot caller prefers `runOneShot` when it's present.
+    runOneShot(input) {
+      return runCodexOneShot(input);
+    },
+    // CLI fallback for callers that spawn `buildOneShotCommand` directly. This
+    // returns the full `codex exec` transcript on stdout; the SDK path above is
+    // preferred precisely because it avoids that leak.
     buildOneShotCommand(model, effort) {
-      // `--skip-git-repo-check` lets `codex exec` run from worktrees or other
-      // directories not on codex's trust list. Title generation only reads
-      // the user's prompt from stdin and emits a short string — it never
-      // touches the repo, so the trust gate is just noise here.
-      const args = ["exec", "--skip-git-repo-check", "-m", model];
-      if (effort) {
-        args.push("-c", `model_reasoning_effort="${effort}"`);
-      }
-      args.push("-");
-      return { command: "codex", args };
+      return { command: "codex", args: buildCodexOneShotArgs(model, effort) };
     },
     buildContextExtractionCommand(_sessionRef, _location, _model) {
       return undefined;

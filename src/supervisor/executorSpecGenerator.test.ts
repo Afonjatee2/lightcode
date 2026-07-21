@@ -36,6 +36,75 @@ describe("cleanSpec", () => {
     expect(cleaned.length).toBeLessThanOrEqual(MAX_EXPERIMENT_PROMPT_LENGTH);
     expect(cleaned.endsWith("[spec truncated]")).toBe(true);
   });
+
+  it("keeps only the final message from a codex exec transcript", () => {
+    const finalSpec = [
+      "# Task",
+      "Fix the homepage heading in src/home.tsx.",
+      "",
+      "## Implementation requirements",
+      "1. Update the <h1> copy in src/home.tsx.",
+    ].join("\n");
+    const transcript = [
+      "OpenAI Codex v0.144.6",
+      "--------",
+      "workdir: /Users/dev/AAL_SEO",
+      "model: gpt-5.6-sol",
+      "provider: openai",
+      "approval: never",
+      "sandbox: read-only",
+      "reasoning effort: high",
+      "session id: 019f0000-0000-0000-0000-000000000000",
+      "--------",
+      "user",
+      'You are a senior engineer writing a precise implementation spec for an autonomous coding agent (the "executor").',
+      "Task:",
+      "Fix the homepage heading",
+      "--------",
+      "codex",
+      "I'll inspect the homepage first.",
+      "--------",
+      "codex",
+      finalSpec,
+    ].join("\n");
+
+    expect(cleanSpec(transcript)).toBe(finalSpec);
+  });
+
+  it("unwraps a code fence inside the final codex message", () => {
+    const transcript = [
+      "OpenAI Codex v0.144.6",
+      "--------",
+      "user",
+      "draft the spec",
+      "--------",
+      "codex",
+      "```markdown",
+      "# Task",
+      "Do the thing",
+      "```",
+    ].join("\n");
+
+    expect(cleanSpec(transcript)).toBe("# Task\nDo the thing");
+  });
+
+  it("leaves a normal spec containing dashes and the word user intact", () => {
+    const spec = [
+      "# Task",
+      "Update the user profile flow.",
+      "",
+      "----",
+      "",
+      "## Notes",
+      "The user asked for a horizontal rule above; keep it.",
+    ].join("\n");
+    expect(cleanSpec(spec)).toBe(spec);
+  });
+
+  it("does not treat a spec mentioning a codex turn marker as a transcript", () => {
+    const spec = ["# Task", "Parse the line that reads", "codex", "and keep it."].join("\n");
+    expect(cleanSpec(spec)).toBe(spec);
+  });
 });
 
 describe("generateExecutorSpec", () => {

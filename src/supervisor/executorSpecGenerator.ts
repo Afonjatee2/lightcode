@@ -1,4 +1,5 @@
 import { MAX_EXPERIMENT_PROMPT_LENGTH, type ProjectLocation } from "@/shared/contracts";
+import { extractFinalAgentMessage } from "./agentTranscript";
 import type { AgentAdapter } from "./agents/base";
 import { runOneShotPromptWithFallback } from "./oneShotPromptRunner";
 
@@ -43,12 +44,17 @@ function truncateTask(task: string): string {
 }
 
 /**
- * Normalize a raw model reply into a usable spec: drop reasoning blocks, unwrap
- * a single enclosing code fence, and cap length so the result can be dropped
- * verbatim into the experiment prompt box (`MAX_EXPERIMENT_PROMPT_LENGTH`).
+ * Normalize a raw model reply into a usable spec: recover the final assistant
+ * message if a CLI (e.g. `codex exec`) echoed its whole session transcript,
+ * drop reasoning blocks, unwrap a single enclosing code fence, and cap length
+ * so the result can be dropped verbatim into the experiment prompt box
+ * (`MAX_EXPERIMENT_PROMPT_LENGTH`).
  */
 export function cleanSpec(raw: string): string {
-  let text = raw;
+  // Defensive: codex one-shots normally return just the final message (see the
+  // codex `runOneShot`), but if a full transcript still reaches here, keep only
+  // the last assistant message before the think/fence cleanup below.
+  let text = extractFinalAgentMessage(raw);
   text = text.replace(/<(think|antThinking)>[\s\S]*?<\/\1>/g, "");
   const fenced = text.trim().match(/^```[a-z]*\n([\s\S]*?)\n```$/i);
   if (fenced) text = fenced[1]!;
