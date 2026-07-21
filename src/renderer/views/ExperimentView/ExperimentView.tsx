@@ -3,6 +3,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import {
   createExperimentCandidatePr,
   mergeExperimentWinner,
+  setExternalExperimentCrown,
   setManualExperimentCrown,
 } from "@/renderer/actions/experimentActions";
 import { formatModelConfigLabel } from "@/renderer/components/providers/modelDisplay";
@@ -61,6 +62,8 @@ export function ExperimentView(props: { experimentId: string }) {
   const hasCleanupPending = controller.hasCleanupPending;
   const crownThreadId = exp.crown?.threadId;
   const crownedCandidate = candidates.find((candidate) => candidate.threadId === crownThreadId);
+  const isMergeEligible =
+    exp.crown?.source !== "external" || exp.crown.verdict === "approve";
 
   function confirmMerge() {
     setConfirmation(null);
@@ -151,12 +154,25 @@ export function ExperimentView(props: { experimentId: string }) {
                   hasActiveCandidate={controller.hasActiveCandidate}
                   isCreatingPr={controller.operation === "pr"}
                   isMerging={controller.operation === "merge"}
+                  isMergeEligible={isMergeEligible}
                   onOpen={() => openThread(candidate.threadId)}
                   onCrown={() =>
                     void controller.performOperation("crown", () =>
                       setManualExperimentCrown(exp.id, candidate.threadId),
                     )
                   }
+                  onExternalVerdict={(verdict, note) =>
+                    setExternalExperimentCrown(exp.id, candidate.threadId, verdict, note)
+                  }
+                  {...(exp.crown?.source === "external" &&
+                  exp.crown.threadId === candidate.threadId
+                    ? {
+                        externalVerdict: {
+                          verdict: exp.crown.verdict,
+                          ...(exp.crown.note ? { note: exp.crown.note } : {}),
+                        },
+                      }
+                    : {})}
                   onMerge={() => setConfirmation({ kind: "merge" })}
                   onCreatePr={() =>
                     void controller.performOperation("pr", async () => {

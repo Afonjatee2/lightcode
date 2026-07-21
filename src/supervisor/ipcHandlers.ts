@@ -126,6 +126,8 @@ export function createSupervisorIpcHandlers(runtime: SupervisorRuntime): Supervi
     judgeExperimentSnapshot: (payload) => runtime.judgeExperimentSnapshot(payload),
     getExperimentCandidateStats: (payload) =>
       git.getExperimentCandidateStats(payload.projectLocation, payload.baseRef),
+    getExperimentCandidateDiff: (payload) =>
+      git.getExperimentCandidateDiff(payload.projectLocation, payload.baseRef),
     cancelJudgeExperiment: (payload) => {
       generation.cancelJudgeExperiment(payload.experimentId);
     },

@@ -1030,6 +1030,10 @@ msgstr "Luôn bị loại trừ"
 msgid "An expected worktree owner requires a branch"
 msgstr "Chủ sở hữu cây làm việc dự kiến yêu cầu một nhánh"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "An external \"request changes\" review is advisory — not mergeable."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
 #~ msgstr "Máy chủ MCP có tên {serverName} đã tồn tại."
@@ -1081,6 +1085,7 @@ msgstr "Áp dụng cấu hình nhà cung cấp"
 msgid "Approval or reply required from you."
 msgstr "Cần có sự phê duyệt hoặc trả lời từ bạn."
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "Phê duyệt"
@@ -1092,6 +1097,10 @@ msgstr "đã được phê duyệt"
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "Đã được phê duyệt"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Approved externally"
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1614,6 +1623,7 @@ msgstr "Không thể tải danh sách cổng"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -1721,6 +1731,7 @@ msgstr "Thay đổi áp dụng cho cuộc trò chuyện mới. Nhà cung cấp h
 msgid "Changes in PR"
 msgstr "Những thay đổi trong PR"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Changes requested"
 msgstr "Đã yêu cầu thay đổi"
@@ -2628,12 +2639,17 @@ msgstr "Cuộc trò chuyện"
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
 #: src/renderer/RendererCrashScreen.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied"
 msgstr "Đã sao chép"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copied to clipboard"
 msgstr "Đã sao chép vào bộ nhớ tạm"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copied to clipboard."
+msgstr ""
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2673,6 +2689,15 @@ msgstr "Sao chép chi tiết"
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy diagnostics"
 msgstr "Sao chép chẩn đoán"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff"
+msgstr ""
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff for candidate {0}"
+msgstr ""
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2716,6 +2741,10 @@ msgstr "Sao chép lựa chọn"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy Tailscale URL"
 msgstr "Sao chép URL Tailscale"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy the candidate's changes for external review."
+msgstr ""
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -3322,6 +3351,10 @@ msgstr "Thiết bị được dùng cho nút nhập giọng nói của khung so�
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Devices can pair while this desktop is reachable."
 msgstr "Thiết bị có thể ghép nối khi máy tính này có thể truy cập được."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#~ msgid "Diff copied. Paste it into an external reviewer."
+#~ msgstr ""
 
 #: src/mobile/views/PortsView.tsx
 #~ msgid "Direct connection required"
@@ -4001,6 +4034,10 @@ msgstr "Nhà cung cấp bên ngoài"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "External provider skills"
 #~ msgstr "Skill của nhà cung cấp bên ngoài"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "External verdict"
+msgstr ""
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -6903,6 +6940,10 @@ msgstr "Khóa riêng OpenSSH"
 msgid "Optional"
 msgstr "Không bắt buộc"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Optional note..."
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
 msgstr "Hook trạng thái tùy chọn. Các hook đã cài đặt sẽ tự động cập nhật; hook bị thiếu không bao giờ được cài đặt tự động."
@@ -7610,6 +7651,11 @@ msgstr "Đã hết"
 msgid "Ran out · resets in {resets}"
 msgstr "Đã hết · đặt lại sau {resets}"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Rate candidate {0} externally"
+msgstr ""
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
 msgstr "Bị giới hạn tốc độ"
@@ -8020,6 +8066,7 @@ msgstr "Hook pre-receive của kho lưu trữ đang chặn việc hợp nhất."
 msgid "Repository URL"
 msgstr "URL kho lưu trữ"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Request changes"
 msgstr "Yêu cầu thay đổi"
@@ -10355,6 +10402,10 @@ msgstr "Không thể xóa worktree."
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Unable to determine the experiment's source branch."
 msgstr "Không thể xác định nhánh nguồn của thử nghiệm."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Unable to fetch the diff."
+msgstr ""
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

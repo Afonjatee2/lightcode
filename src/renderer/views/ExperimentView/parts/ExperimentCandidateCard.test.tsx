@@ -11,14 +11,16 @@ import { useGitStore } from "@/renderer/state/gitStore";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { ExperimentCandidateCard } from "./ExperimentCandidateCard";
 
-const { statsMock, showGitReviewPanelMock } = vi.hoisted(() => ({
+const { statsMock, diffMock, showGitReviewPanelMock } = vi.hoisted(() => ({
   statsMock: vi.fn<() => Promise<GetExperimentCandidateStatsResult>>(),
+  diffMock: vi.fn<() => Promise<{ diff: string; headCommit: string }>>(),
   showGitReviewPanelMock: vi.fn<(projectId: string, worktreePath: string) => void>(),
 }));
 
 vi.mock("@/renderer/bridge", () => ({
   readBridge: () => ({
     getExperimentCandidateStats: statsMock,
+    getExperimentCandidateDiff: diffMock,
   }),
 }));
 
@@ -94,6 +96,8 @@ describe("ExperimentCandidateCard", () => {
   beforeEach(() => {
     statsMock.mockReset();
     statsMock.mockImplementation(() => new Promise<never>(() => {}));
+    diffMock.mockReset();
+    diffMock.mockImplementation(() => new Promise<never>(() => {}));
     showGitReviewPanelMock.mockReset();
   });
 
@@ -296,5 +300,102 @@ describe("ExperimentCandidateCard", () => {
     const trigger = branch.closest('[data-slot="tooltip-trigger"]');
     expect(trigger).toHaveAttribute("tabindex", "0");
     expect(trigger).toHaveAttribute("role", "button");
+  });
+
+  it("fetches diff via IPC when Copy diff is clicked and writes to clipboard", async () => {
+    statsMock.mockResolvedValue({ insertions: 5, deletions: 2, files: 1 });
+    diffMock.mockResolvedValue({ diff: "diff content", headCommit: "b".repeat(40) });
+    const clipboardMock = vi.fn<(...args: unknown[]) => Promise<void>>().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: clipboardMock },
+      writable: true,
+    });
+    const reviewThread = { ...thread, worktreePath: "/repo/review" };
+    act(() => {
+      useAppStore.setState({ threads: [reviewThread], projects: [project] });
+    });
+    renderCard({ isCrowned: false });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Copy diff for candidate 1" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy diff for candidate 1" }));
+
+    await waitFor(() => expect(diffMock).toHaveBeenCalledOnce());
+    await waitFor(() => expect(clipboardMock).toHaveBeenCalledWith("diff content"));
+    await waitFor(() => expect(screen.getByText("Copied")).toBeInTheDocument());
+  });
+
+  it("does not show Copied when the clipboard write is rejected", async () => {
+    statsMock.mockResolvedValue({ insertions: 5, deletions: 2, files: 1 });
+    diffMock.mockResolvedValue({ diff: "diff content", headCommit: "b".repeat(40) });
+    const clipboardMock = vi
+      .fn<(...args: unknown[]) => Promise<void>>()
+      .mockRejectedValue(new Error("Clipboard permission denied"));
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: clipboardMock },
+      writable: true,
+    });
+    const reviewThread = { ...thread, worktreePath: "/repo/review" };
+    act(() => {
+      useAppStore.setState({ threads: [reviewThread], projects: [project] });
+    });
+    renderCard({ isCrowned: false });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Copy diff for candidate 1" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Copy diff for candidate 1" }));
+
+    await waitFor(() => expect(clipboardMock).toHaveBeenCalledWith("diff content"));
+    expect(screen.queryByText("Copied")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy diff for candidate 1" })).toBeInTheDocument();
+  });
+
+  it("shows Approved externally badge with note only when externalVerdict is provided", async () => {
+    statsMock.mockResolvedValue({ insertions: 5, deletions: 2, files: 1 });
+    act(() => {
+      useAppStore.setState({ threads: [thread], projects: [project] });
+    });
+    renderCard({
+      isCrowned: true,
+      externalVerdict: { verdict: "approve", note: "Looks good" },
+    });
+
+    await waitFor(() => expect(screen.getByText("Approved externally")).toBeInTheDocument());
+    expect(screen.getByText("Looks good")).toBeInTheDocument();
+  });
+
+  it("shows Changes requested badge when externalVerdict is request-changes", async () => {
+    statsMock.mockResolvedValue({ insertions: 5, deletions: 2, files: 1 });
+    act(() => {
+      useAppStore.setState({ threads: [thread], projects: [project] });
+    });
+    renderCard({
+      isCrowned: true,
+      externalVerdict: { verdict: "request-changes", note: "Needs work" },
+    });
+
+    await waitFor(() => expect(screen.getByText("Changes requested")).toBeInTheDocument());
+  });
+
+  it("fires onExternalVerdict when an external verdict is submitted", async () => {
+    statsMock.mockResolvedValue({ insertions: 5, deletions: 2, files: 1 });
+    const reviewThread = { ...thread, worktreePath: "/repo/review" };
+    const onExternalVerdict = vi.fn<(verdict: string, note?: string) => void>();
+    act(() => {
+      useAppStore.setState({ threads: [reviewThread], projects: [project] });
+    });
+    renderCard({ isCrowned: false, onExternalVerdict });
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Rate candidate 1 externally" })).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Rate candidate 1 externally" }));
+
+    await waitFor(() => expect(screen.getByText("Approve")).toBeInTheDocument());
+    fireEvent.click(screen.getByText("Approve"));
+
+    expect(onExternalVerdict).toHaveBeenCalledWith("approve", undefined);
   });
 });

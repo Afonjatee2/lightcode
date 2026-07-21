@@ -1030,6 +1030,10 @@ msgstr "Her zaman hariç tutuldu"
 msgid "An expected worktree owner requires a branch"
 msgstr "Beklenen çalışma ağacı sahibi bir şube gerektirir"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "An external \"request changes\" review is advisory — not mergeable."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
 #~ msgstr "{serverName} adlı bir MCP sunucusu zaten var."
@@ -1081,6 +1085,7 @@ msgstr "Sağlayıcı hazır ayarını uygula"
 msgid "Approval or reply required from you."
 msgstr "Onayınız veya yanıtınız isteniyor."
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "Onayla"
@@ -1092,6 +1097,10 @@ msgstr "onaylandı"
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "Onaylandı"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Approved externally"
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1614,6 +1623,7 @@ msgstr "Portlar yüklenemedi"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -1721,6 +1731,7 @@ msgstr "Değişiklikler yeni sohbetlere uygulanır. Canlı beceri yenilemeyi des
 msgid "Changes in PR"
 msgstr "PR'deki değişiklikler"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Changes requested"
 msgstr "Talep edilen değişiklikler"
@@ -2628,12 +2639,17 @@ msgstr "Konuşma"
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
 #: src/renderer/RendererCrashScreen.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied"
 msgstr "Kopyalandı"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copied to clipboard"
 msgstr "Panoya kopyalandı"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copied to clipboard."
+msgstr ""
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2673,6 +2689,15 @@ msgstr "Ayrıntıları kopyala"
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy diagnostics"
 msgstr "Tanılamayı kopyala"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff"
+msgstr ""
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff for candidate {0}"
+msgstr ""
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2716,6 +2741,10 @@ msgstr "Seçimi kopyala"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy Tailscale URL"
 msgstr "Tailscale URL'sini Kopyala"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy the candidate's changes for external review."
+msgstr ""
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -3322,6 +3351,10 @@ msgstr "Oluşturucu ses giriş düğmesi tarafından kullanılan cihaz."
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Devices can pair while this desktop is reachable."
 msgstr "Cihazlar bu masaüstüne erişilebildiği sürece eşleşebilir."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#~ msgid "Diff copied. Paste it into an external reviewer."
+#~ msgstr ""
 
 #: src/mobile/views/PortsView.tsx
 #~ msgid "Direct connection required"
@@ -4001,6 +4034,10 @@ msgstr "Harici sağlayıcı"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "External provider skills"
 #~ msgstr "Harici sağlayıcı becerileri"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "External verdict"
+msgstr ""
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -6903,6 +6940,10 @@ msgstr "OpenSSH özel anahtarı"
 msgid "Optional"
 msgstr "İsteğe bağlı"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Optional note..."
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
 msgstr "İsteğe bağlı durum kancaları. Kurulu kancalar otomatik olarak güncellenir; eksik kancalar hiçbir zaman otomatik olarak kurulmaz."
@@ -7610,6 +7651,11 @@ msgstr "bitti"
 msgid "Ran out · resets in {resets}"
 msgstr "Bitti · {resets} içinde sıfırlanıyor"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Rate candidate {0} externally"
+msgstr ""
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
 msgstr "Hız sınırlı"
@@ -8020,6 +8066,7 @@ msgstr "Depo ön alma kancası birleştirmeyi engelliyor."
 msgid "Repository URL"
 msgstr "Depo URL'si"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Request changes"
 msgstr "Değişiklik iste"
@@ -10355,6 +10402,10 @@ msgstr "Worktree silinemedi."
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Unable to determine the experiment's source branch."
 msgstr "Deneyin kaynak şubesi belirlenemedi."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Unable to fetch the diff."
+msgstr ""
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

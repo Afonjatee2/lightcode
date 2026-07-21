@@ -1030,6 +1030,10 @@ msgstr "Immer ausgeschlossen"
 msgid "An expected worktree owner requires a branch"
 msgstr "Ein erwarteter Worktree-Eigentümer erfordert einen Branch"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "An external \"request changes\" review is advisory — not mergeable."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
 #~ msgstr "Ein MCP-Server mit dem Namen {serverName} ist bereits vorhanden."
@@ -1081,6 +1085,7 @@ msgstr "Anbieter-Voreinstellung anwenden"
 msgid "Approval or reply required from you."
 msgstr "Zustimmung oder Antwort Ihrerseits erforderlich."
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "Genehmigen"
@@ -1092,6 +1097,10 @@ msgstr "genehmigt"
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "Genehmigt"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Approved externally"
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1614,6 +1623,7 @@ msgstr "Ports konnten nicht geladen werden"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -1721,6 +1731,7 @@ msgstr "Änderungen gelten für neue Chats. Anbieter, die das Neuladen von Skill
 msgid "Changes in PR"
 msgstr "Änderungen im PR"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Changes requested"
 msgstr "Änderungen angefordert"
@@ -2628,12 +2639,17 @@ msgstr "Gespräch"
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
 #: src/renderer/RendererCrashScreen.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied"
 msgstr "Kopiert"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copied to clipboard"
 msgstr "In die Zwischenablage kopiert"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copied to clipboard."
+msgstr ""
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2673,6 +2689,15 @@ msgstr "Details kopieren"
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy diagnostics"
 msgstr "Diagnose kopieren"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff"
+msgstr ""
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff for candidate {0}"
+msgstr ""
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2716,6 +2741,10 @@ msgstr "Auswahl kopieren"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy Tailscale URL"
 msgstr "Tailscale-URL kopieren"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy the candidate's changes for external review."
+msgstr ""
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -3322,6 +3351,10 @@ msgstr "Von der Composer-Spracheingabetaste verwendetes Gerät."
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Devices can pair while this desktop is reachable."
 msgstr "Geräte können gekoppelt werden, solange dieser Desktop erreichbar ist."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#~ msgid "Diff copied. Paste it into an external reviewer."
+#~ msgstr ""
 
 #: src/mobile/views/PortsView.tsx
 #~ msgid "Direct connection required"
@@ -4001,6 +4034,10 @@ msgstr "Externer Anbieter"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "External provider skills"
 #~ msgstr "Skills externer Anbieter"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "External verdict"
+msgstr ""
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -6903,6 +6940,10 @@ msgstr "Privater OpenSSH-Schlüssel"
 msgid "Optional"
 msgstr "Optional"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Optional note..."
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
 msgstr "Optionale Status-Hooks. Installierte Hooks werden automatisch aktualisiert; fehlende Hooks werden nie automatisch installiert."
@@ -7610,6 +7651,11 @@ msgstr "Aufgebraucht"
 msgid "Ran out · resets in {resets}"
 msgstr "Aufgebraucht · wird in {resets} zurückgesetzt"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Rate candidate {0} externally"
+msgstr ""
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
 msgstr "Ratenbegrenzt"
@@ -8020,6 +8066,7 @@ msgstr "Der Pre-Receive-Hook des Repositorys blockiert die Zusammenführung."
 msgid "Repository URL"
 msgstr "Repository-URL"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Request changes"
 msgstr "Fordern Sie Änderungen an"
@@ -10355,6 +10402,10 @@ msgstr "Der Worktree kann nicht gelöscht werden."
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Unable to determine the experiment's source branch."
 msgstr "Der Quell-Branch des Experiments konnte nicht ermittelt werden."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Unable to fetch the diff."
+msgstr ""
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

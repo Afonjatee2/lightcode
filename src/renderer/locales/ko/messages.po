@@ -1030,6 +1030,10 @@ msgstr "항상 제외됨"
 msgid "An expected worktree owner requires a branch"
 msgstr "예상 작업 트리 소유자에는 브랜치가 필요합니다"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "An external \"request changes\" review is advisory — not mergeable."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
 #~ msgstr "이름이 {serverName}인 MCP 서버가 이미 있습니다."
@@ -1081,6 +1085,7 @@ msgstr "제공자 프리셋 적용"
 msgid "Approval or reply required from you."
 msgstr "사용자의 승인 또는 응답이 필요합니다."
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "승인"
@@ -1092,6 +1097,10 @@ msgstr "승인됨"
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "승인됨"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Approved externally"
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1614,6 +1623,7 @@ msgstr "포트를 불러올 수 없습니다"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -1721,6 +1731,7 @@ msgstr "변경 사항은 새 채팅에 적용됩니다. 실시간 스킬 다시 
 msgid "Changes in PR"
 msgstr "PR의 변경 사항"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Changes requested"
 msgstr "변경 요청됨"
@@ -2628,12 +2639,17 @@ msgstr "대화"
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
 #: src/renderer/RendererCrashScreen.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied"
 msgstr "복사됨"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copied to clipboard"
 msgstr "클립보드에 복사됨"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copied to clipboard."
+msgstr ""
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2673,6 +2689,15 @@ msgstr "세부정보 복사"
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy diagnostics"
 msgstr "진단 복사"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff"
+msgstr ""
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff for candidate {0}"
+msgstr ""
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2716,6 +2741,10 @@ msgstr "선택 항목 복사"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy Tailscale URL"
 msgstr "Tailscale URL 복사"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy the candidate's changes for external review."
+msgstr ""
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -3322,6 +3351,10 @@ msgstr "컴포저 음성 입력 버튼에 사용되는 장치입니다."
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Devices can pair while this desktop is reachable."
 msgstr "이 데스크톱에 연결할 수 있는 동안 기기를 페어링할 수 있습니다."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#~ msgid "Diff copied. Paste it into an external reviewer."
+#~ msgstr ""
 
 #: src/mobile/views/PortsView.tsx
 #~ msgid "Direct connection required"
@@ -4001,6 +4034,10 @@ msgstr "외부 제공자"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "External provider skills"
 #~ msgstr "외부 제공자 스킬"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "External verdict"
+msgstr ""
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -6903,6 +6940,10 @@ msgstr "OpenSSH 개인 키"
 msgid "Optional"
 msgstr "선택 사항"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Optional note..."
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
 msgstr "선택적 상태 후크. 설치된 후크는 자동으로 업데이트됩니다. 누락된 후크는 자동으로 설치되지 않습니다."
@@ -7610,6 +7651,11 @@ msgstr "소진됨"
 msgid "Ran out · resets in {resets}"
 msgstr "소진 ·{resets}에서 재설정"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Rate candidate {0} externally"
+msgstr ""
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
 msgstr "속도 제한"
@@ -8020,6 +8066,7 @@ msgstr "저장소 사전 수신 후크가 병합을 차단하고 있습니다."
 msgid "Repository URL"
 msgstr "저장소 URL"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Request changes"
 msgstr "변경 요청"
@@ -10355,6 +10402,10 @@ msgstr "worktree를 삭제할 수 없습니다."
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Unable to determine the experiment's source branch."
 msgstr "실험의 소스 브랜치를 확인할 수 없습니다."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Unable to fetch the diff."
+msgstr ""
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

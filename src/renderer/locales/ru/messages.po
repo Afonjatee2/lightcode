@@ -1030,6 +1030,10 @@ msgstr "Всегда исключено"
 msgid "An expected worktree owner requires a branch"
 msgstr "Для ожидаемого владельца worktree требуется ветка"
 
+#: src/renderer/actions/experimentDecisionActions.ts
+msgid "An external \"request changes\" review is advisory — not mergeable."
+msgstr ""
+
 #: src/renderer/components/mcp/McpServersManager.tsx
 #~ msgid "An MCP server with the name {serverName} already exists."
 #~ msgstr "Сервер MCP с именем {serverName} уже существует."
@@ -1081,6 +1085,7 @@ msgstr "Применить пресет провайдера"
 msgid "Approval or reply required from you."
 msgstr "Требуется ваше подтверждение или ответ."
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approve"
 msgstr "Одобрить"
@@ -1092,6 +1097,10 @@ msgstr "одобрено"
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Approved"
 msgstr "Одобрено"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Approved externally"
+msgstr ""
 
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewPanel.tsx
 #: src/renderer/views/SettingsOverlay/parts/settingsOptions.ts
@@ -1614,6 +1623,7 @@ msgstr "Не удалось загрузить порты"
 #: src/renderer/components/thread/ContinueInProviderDialog.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/structuredElicitation.tsx
 #: src/renderer/components/thread/ThreadRuntimeRequestPanel/ThreadRuntimeRequestPanel.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeDialog.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentJudgeRunDialog.tsx
 #: src/renderer/views/GitReviewOverlay/parts/GitReviewSidebar/GitReviewSidebar.tsx
@@ -1721,6 +1731,7 @@ msgstr "Изменения применяются к новым чатам. Пр
 msgid "Changes in PR"
 msgstr "Изменения в PR"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Changes requested"
 msgstr "Запрошены изменения"
@@ -2628,12 +2639,17 @@ msgstr "Разговор"
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
 #: src/renderer/RendererCrashScreen.tsx
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Copied"
 msgstr "Скопировано"
 
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copied to clipboard"
 msgstr "Скопировано в буфер обмена"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copied to clipboard."
+msgstr ""
 
 #: src/renderer/components/terminal/XTermSurface.tsx
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
@@ -2673,6 +2689,15 @@ msgstr "Копировать сведения"
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy diagnostics"
 msgstr "Копировать диагностику"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff"
+msgstr ""
+
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy diff for candidate {0}"
+msgstr ""
 
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copy failed"
@@ -2716,6 +2741,10 @@ msgstr "Копировать выделенное"
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Copy Tailscale URL"
 msgstr "Копировать URL Tailscale"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Copy the candidate's changes for external review."
+msgstr ""
 
 #: src/renderer/components/thread/WorktreeModeSelect.tsx
 msgid "Copy uncommitted changes here (keeps them on this branch)"
@@ -3322,6 +3351,10 @@ msgstr "Устройство, используемое кнопкой голос
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "Devices can pair while this desktop is reachable."
 msgstr "Устройства могут подключаться, пока этот рабочий стол доступен."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+#~ msgid "Diff copied. Paste it into an external reviewer."
+#~ msgstr ""
 
 #: src/mobile/views/PortsView.tsx
 #~ msgid "Direct connection required"
@@ -4001,6 +4034,10 @@ msgstr "Внешний провайдер"
 #: src/renderer/components/skills/SkillsManager.tsx
 #~ msgid "External provider skills"
 #~ msgstr "Навыки внешних провайдеров"
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "External verdict"
+msgstr ""
 
 #: src/renderer/components/thread/threadDraftViewHelpers.ts
 msgid "Extra High"
@@ -6903,6 +6940,10 @@ msgstr "Закрытый ключ OpenSSH"
 msgid "Optional"
 msgstr "Необязательно"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Optional note..."
+msgstr ""
+
 #: src/renderer/views/SettingsOverlay/parts/SingleAgentSettings/parts/HookPluginSettings.tsx
 msgid "Optional status hooks. Installed hooks update automatically; missing hooks are never installed automatically."
 msgstr "Дополнительные хуки статуса. Установленные хуки обновляются автоматически; отсутствующие хуки никогда не устанавливаются автоматически."
@@ -7610,6 +7651,11 @@ msgstr "Исчерпано"
 msgid "Ran out · resets in {resets}"
 msgstr "Исчерпано · сброс через {resets}"
 
+#. placeholder {0}: props.candidateNumber
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Rate candidate {0} externally"
+msgstr ""
+
 #: src/renderer/components/providers/ProviderUsageRail.tsx
 msgid "Rate limited"
 msgstr "Превышен лимит запросов"
@@ -8020,6 +8066,7 @@ msgstr "Хук pre-receive репозитория блокирует слиян�
 msgid "Repository URL"
 msgstr "URL репозитория"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 #: src/renderer/views/PrReviewOverlay/parts/SubmitReviewPopover.tsx
 msgid "Request changes"
 msgstr "Запросить изменения"
@@ -10355,6 +10402,10 @@ msgstr "Не удалось удалить worktree."
 #: src/renderer/actions/experimentDecisionActions.ts
 msgid "Unable to determine the experiment's source branch."
 msgstr "Не удалось определить исходную ветку эксперимента."
+
+#: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
+msgid "Unable to fetch the diff."
+msgstr ""
 
 #. placeholder {0}: props.selectedAgent.label
 #: src/renderer/components/thread/ThreadDraftComposerArea.tsx

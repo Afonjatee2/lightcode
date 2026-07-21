@@ -25,6 +25,7 @@ import {
   getPendingExperimentOperation,
   hasActiveExperimentCandidate,
   isEligibleExperimentJudgeAgent,
+  isExperimentCandidateRunning,
   resultReadyExperimentThreadIds,
   withExperimentOperation,
 } from "./experimentOperationState";
@@ -228,10 +229,43 @@ export function setManualExperimentCrown(experimentId: string, threadId: string)
   });
 }
 
+export function setExternalExperimentCrown(
+  experimentId: string,
+  threadId: string,
+  verdict: "approve" | "request-changes",
+  note?: string,
+): void {
+  const experiment = useExperimentStore.getState().experiments[experimentId];
+  if (!experiment?.candidates.some((candidate) => candidate.threadId === threadId)) return;
+  if (experiment.status === "decided") return;
+  // A merge/commit is already in flight for this experiment and will decide it;
+  // recording a verdict now would land an invalid decided state.
+  if (getPendingExperimentOperation(experimentId)) return;
+  // Mirror the card UI gate: never record a verdict on a candidate still running.
+  if (isExperimentCandidateRunning(threadId)) return;
+  useExperimentStore.getState().setExperimentCrown(experimentId, {
+    threadId,
+    source: "external",
+    verdict,
+    ...(note ? { note: note.slice(0, 500) } : {}),
+    createdAt: new Date().toISOString(),
+  });
+}
+
 export async function mergeExperimentWinner(experimentId: string): Promise<boolean> {
   return withExperimentOperation(experimentId, async () => {
     const experiment = useExperimentStore.getState().experiments[experimentId];
     if (!experiment?.crown) return false;
+
+    if (
+      experiment.crown.source === "external" &&
+      experiment.crown.verdict === "request-changes"
+    ) {
+      toast.warning(
+        i18n._(msg`An external "request changes" review is advisory — not mergeable.`),
+      );
+      return false;
+    }
     const project = useAppStore
       .getState()
       .projects.find((item) => item.id === experiment.projectId);

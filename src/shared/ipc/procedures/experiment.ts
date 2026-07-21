@@ -12,6 +12,8 @@ import type {
   CaptureExperimentSnapshotResult,
   CreateExperimentWorktreesPayload,
   CreateExperimentWorktreesResult,
+  GetExperimentCandidateDiffPayload,
+  GetExperimentCandidateDiffResult,
   GetExperimentCandidateStatsPayload,
   GetExperimentCandidateStatsResult,
   JudgeExperimentSnapshotPayload,
@@ -47,6 +49,11 @@ export const experimentProcedures = {
     GetExperimentCandidateStatsResult,
     "supervisor"
   >("getExperimentCandidateStats", "supervisor", getExperimentCandidateDiffPayloadSchema),
+  getExperimentCandidateDiff: definePayloadProcedure<
+    GetExperimentCandidateDiffPayload,
+    GetExperimentCandidateDiffResult,
+    "supervisor"
+  >("getExperimentCandidateDiff", "supervisor", getExperimentCandidateDiffPayloadSchema),
   cancelJudgeExperiment: definePayloadProcedure<CancelJudgeExperimentPayload, void, "supervisor">(
     "cancelJudgeExperiment",
     "supervisor",

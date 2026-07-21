@@ -45,6 +45,21 @@ export function hasActiveExperimentCandidate(experimentId: string): boolean {
 }
 
 /**
+ * Whether a single candidate's thread is currently running. Mirrors the
+ * ExperimentCandidateCard `isCandidateRunning` predicate so an action can apply
+ * the same gate the UI does: a live background workflow or a mid-turn status
+ * (launching/working/needs_*) counts as running.
+ */
+export function isExperimentCandidateRunning(threadId: string): boolean {
+  const thread = useAppStore.getState().threads.find((item) => item.id === threadId);
+  if (!thread) return false;
+  return (
+    useThreadLiveWorkflowStore.getState().liveThreadIds.has(threadId) ||
+    isThreadTurnActive(thread.status)
+  );
+}
+
+/**
  * Thread ids of candidates that have settled with a comparable result
  * (idle/finished, no live background workflow). Used to gate AI judging so a
  * failed or hung candidate can neither block judging nor be fed to the judge

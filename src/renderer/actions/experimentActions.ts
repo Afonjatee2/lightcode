@@ -400,6 +400,7 @@ export {
   discardExperiment,
   mergeExperimentWinner,
   retryExperimentCleanup,
+  setExternalExperimentCrown,
   setManualExperimentCrown,
   type ExperimentJudgeProgressEvent,
   type ExperimentJudgeSelection,

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { ButtonGroup, Dropdown, Label, Tooltip } from "@heroui/react";
+import { useEffect, useRef, useState } from "react";
+import { ButtonGroup, Dropdown, Input, Label, Tooltip } from "@heroui/react";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import {
   CheckCircle2,
@@ -10,9 +10,14 @@ import {
   GitMerge,
   GitPullRequest,
   Loader2,
+  ShieldCheck,
+  ShieldX,
 } from "lucide-react";
 import { isThreadResultReady, isThreadTurnActive } from "@/shared/contracts";
-import type { ExperimentCandidate, GetExperimentCandidateStatsResult } from "@/shared/contracts";
+import type {
+  ExperimentCandidate,
+  GetExperimentCandidateStatsResult,
+} from "@/shared/contracts";
 import { buildWorktreeLocation } from "@/shared/worktree";
 import { showGitReviewPanel } from "@/renderer/actions/panelActions";
 import { readBridge } from "@/renderer/bridge";
@@ -25,9 +30,18 @@ import { useThreadHasLiveWorkflow } from "@/renderer/state/threadLiveWorkflowSto
 import { useThread } from "@/renderer/state/useThread";
 import { getPrStatusTone, PR_TONE_TEXT_CLASS } from "@/renderer/utils/prStatus";
 
-type CandidateStatsState = GetExperimentCandidateStatsResult | "loading" | "unavailable";
+type CandidateStatsState =
+  | GetExperimentCandidateStatsResult
+  | "loading"
+  | "unavailable";
 
 const candidateStatsCache = new Map<string, GetExperimentCandidateStatsResult | "unavailable">();
+
+type CandidateDiffState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "loaded"; diff: string }
+  | { status: "error" };
 
 export function ExperimentCandidateCard(props: {
   candidate: ExperimentCandidate;
@@ -45,6 +59,9 @@ export function ExperimentCandidateCard(props: {
   onCrown: () => void;
   onMerge: () => void;
   onCreatePr: () => void;
+  onExternalVerdict?: (verdict: "approve" | "request-changes", note?: string) => void;
+  externalVerdict?: { verdict: "approve" | "request-changes"; note?: string };
+  isMergeEligible?: boolean;
 }) {
   const { candidate, isCrowned, isWinner, decided } = props;
   const { t } = useLingui();
@@ -52,6 +69,8 @@ export function ExperimentCandidateCard(props: {
   const hasLiveWorkflow = useThreadHasLiveWorkflow(candidate.threadId);
   const isActive =
     hasLiveWorkflow || thread?.status === "launching" || thread?.status === "working";
+  const isCandidateRunning =
+    isActive || (thread ? isThreadTurnActive(thread.status) : false);
   const projectId = thread?.projectId;
   const projectLocation = useAppStore(
     (state) => state.projects.find((project) => project.id === projectId)?.location,
@@ -105,6 +124,35 @@ export function ExperimentCandidateCard(props: {
     worktreePath,
     worktreeStatus,
   ]);
+  const [diffState, setDiffState] = useState<CandidateDiffState>({ status: "idle" });
+  const pendingCopyRef = useRef(false);
+  useEffect(() => {
+    if (diffState.status !== "loading") return;
+    if (!projectLocation || !worktreePath) {
+      setDiffState({ status: "error" });
+      return;
+    }
+    let cancelled = false;
+    void readBridge()
+      .getExperimentCandidateDiff({
+        projectLocation: buildWorktreeLocation(projectLocation, worktreePath),
+        baseRef: props.baseCommit,
+      })
+      .then((result) => {
+        if (cancelled) return;
+        setDiffState({ status: "loaded", diff: result.diff });
+        if (pendingCopyRef.current) {
+          pendingCopyRef.current = false;
+          void writeDiffToClipboard(result.diff);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setDiffState({ status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [diffState.status, projectLocation, worktreePath, props.baseCommit]);
   const provider = candidate.agentLabel ?? candidate.agentKind;
   const label = props.configLabel || provider;
   const details = props.configLabel ? provider : "";
@@ -131,6 +179,44 @@ export function ExperimentCandidateCard(props: {
 
   function openReview() {
     if (projectId && worktreePath) showGitReviewPanel(projectId, worktreePath);
+  }
+
+  const [showExternalVerdict, setShowExternalVerdict] = useState(false);
+  const [externalNote, setExternalNote] = useState("");
+  const [diffCopied, setDiffCopied] = useState(false);
+  const diffCopiedTimerRef = useRef<number | null>(null);
+  useEffect(
+    () => () => {
+      if (diffCopiedTimerRef.current !== null) window.clearTimeout(diffCopiedTimerRef.current);
+    },
+    [],
+  );
+
+  function markDiffCopied() {
+    setDiffCopied(true);
+    if (diffCopiedTimerRef.current !== null) window.clearTimeout(diffCopiedTimerRef.current);
+    diffCopiedTimerRef.current = window.setTimeout(() => {
+      setDiffCopied(false);
+      diffCopiedTimerRef.current = null;
+    }, 1200);
+  }
+
+  async function writeDiffToClipboard(diff: string) {
+    try {
+      await navigator.clipboard.writeText(diff);
+      markDiffCopied();
+    } catch (error) {
+      console.error("[experiment] Unable to copy the candidate diff", error);
+    }
+  }
+
+  function copyDiff() {
+    if (diffState.status === "loaded") {
+      void writeDiffToClipboard(diffState.diff);
+      return;
+    }
+    pendingCopyRef.current = true;
+    setDiffState({ status: "loading" });
   }
 
   const crownIcon =
@@ -276,7 +362,123 @@ export function ExperimentCandidateCard(props: {
               <Trans>Crown</Trans>
             </Button>
           ) : null}
+          <Tooltip delay={300}>
+            <Tooltip.Trigger>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                aria-label={t`Copy diff for candidate ${props.candidateNumber}`}
+                isDisabled={
+                  !projectLocation ||
+                  !worktreePath ||
+                  diffState.status === "loading" ||
+                  (typeof stats === "object" && stats.files === 0)
+                }
+                onPress={copyDiff}
+                isPending={diffState.status === "loading"}
+              >
+                <FileDiff className="size-3" />
+                {diffCopied ? t`Copied` : t`Copy diff`}
+              </Button>
+            </Tooltip.Trigger>
+            <Tooltip.Content>
+              {diffState.status === "error"
+                ? <Trans>Unable to fetch the diff.</Trans>
+                : diffCopied
+                  ? <Trans>Copied to clipboard.</Trans>
+                  : <Trans>Copy the candidate's changes for external review.</Trans>}
+            </Tooltip.Content>
+          </Tooltip>
         </div>
+        {!decided && props.onExternalVerdict ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            {!showExternalVerdict ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 px-2 text-xs"
+                aria-label={t`Rate candidate ${props.candidateNumber} externally`}
+                isDisabled={isCandidateRunning}
+                onPress={() => setShowExternalVerdict(true)}
+              >
+                <ShieldCheck className="size-3" />
+                <Trans>External verdict</Trans>
+              </Button>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="tertiary"
+                  className="h-6 px-2 text-xs"
+                  onPress={() => {
+                    props.onExternalVerdict?.("approve", externalNote || undefined);
+                    setShowExternalVerdict(false);
+                    setExternalNote("");
+                  }}
+                >
+                  <ShieldCheck className="size-3" />
+                  <Trans>Approve</Trans>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs"
+                  onPress={() => {
+                    props.onExternalVerdict?.("request-changes", externalNote || undefined);
+                    setShowExternalVerdict(false);
+                    setExternalNote("");
+                  }}
+                >
+                  <ShieldX className="size-3" />
+                  <Trans>Request changes</Trans>
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs"
+                  onPress={() => {
+                    setShowExternalVerdict(false);
+                    setExternalNote("");
+                  }}
+                >
+                  <Trans>Cancel</Trans>
+                </Button>
+              </div>
+            )}
+          </div>
+        ) : null}
+        {showExternalVerdict ? (
+          <div className="mt-1.5 w-full">
+            <Input
+              placeholder={t`Optional note...`}
+              value={externalNote}
+              onChange={(e) => setExternalNote(e.target.value)}
+            />
+          </div>
+        ) : null}
+        {props.externalVerdict ? (
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="inline-flex items-center gap-1 text-xs font-medium">
+              {props.externalVerdict.verdict === "approve" ? (
+                <>
+                  <ShieldCheck className="size-3 text-success" />
+                  <Trans>Approved externally</Trans>
+                </>
+              ) : (
+                <>
+                  <ShieldX className="size-3 text-danger" />
+                  <Trans>Changes requested</Trans>
+                </>
+              )}
+            </span>
+            {props.externalVerdict.note ? (
+              <span className="text-xs text-muted truncate max-w-64">
+                {props.externalVerdict.note}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {typeof stats === "object" && stats.files > 0 ? (
@@ -311,7 +513,7 @@ export function ExperimentCandidateCard(props: {
       ) : null}
 
       <div className="flex shrink-0 items-center gap-1.5">
-        {!decided && isCrowned ? (
+        {!decided && isCrowned && props.isMergeEligible !== false ? (
           <ButtonGroup>
             {props.isMerging ? (
               <Button

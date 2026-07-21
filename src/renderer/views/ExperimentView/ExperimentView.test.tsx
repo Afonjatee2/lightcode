@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import type { Experiment, Thread } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
@@ -171,5 +171,36 @@ describe("ExperimentView", () => {
     render(<ExperimentView experimentId={experiment.id} />);
 
     expect(screen.getByText("Has errors")).toBeInTheDocument();
+  });
+
+  it("shows the external verdict badge only on the externally crowned candidate", () => {
+    const externalCrownExperiment = {
+      ...experiment,
+      crown: {
+        source: "external" as const,
+        threadId: "thread-1",
+        verdict: "approve" as const,
+        note: "Looks solid",
+        createdAt: "2026-07-16T00:00:00.000Z",
+      },
+    };
+    act(() => {
+      useExperimentStore.setState({ experiments: { [experiment.id]: externalCrownExperiment } });
+    });
+
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    // Exercise ExperimentView's real gate (crown.source === "external" &&
+    // crown.threadId === candidate.threadId), not a manually passed prop.
+    const cardA = screen.getByRole("button", { name: "Open candidate 1" }).closest(".group");
+    const cardB = screen.getByRole("button", { name: "Open candidate 2" }).closest(".group");
+    expect(cardA).not.toBeNull();
+    expect(cardB).not.toBeNull();
+    expect(within(cardA as HTMLElement).getByText("Approved externally")).toBeInTheDocument();
+    expect(within(cardA as HTMLElement).getByText("Looks solid")).toBeInTheDocument();
+    expect(
+      within(cardB as HTMLElement).queryByText("Approved externally"),
+    ).not.toBeInTheDocument();
+    expect(within(cardB as HTMLElement).queryByText("Changes requested")).not.toBeInTheDocument();
   });
 });

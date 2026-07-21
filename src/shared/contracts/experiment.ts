@@ -66,6 +66,12 @@ export const experimentCrownSchema = z.discriminatedUnion("source", [
     rationale: z.never().optional(),
     modelLabel: z.never().optional(),
   }),
+  z.object({
+    ...experimentCrownCommon,
+    source: z.literal("external"),
+    verdict: z.enum(["approve", "request-changes"]),
+    note: z.string().max(500).optional(),
+  }),
 ]);
 export type ExperimentCrown = z.infer<typeof experimentCrownSchema>;
 
@@ -138,6 +144,17 @@ export const experimentSchema = z
         code: "custom",
         message: "The experiment winner must match the crowned candidate",
         path: ["winnerThreadId"],
+      });
+    }
+    if (
+      experiment.status === "decided" &&
+      experiment.crown?.source === "external" &&
+      experiment.crown.verdict === "request-changes"
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        message: "An experiment with only rejected external feedback cannot be decided",
+        path: ["status"],
       });
     }
   });
