@@ -210,6 +210,77 @@ describe("ChatScrollControls", () => {
     expect(scrollTop).toBe(1025);
   });
 
+  it("keeps following the tail when composer growth shrinks the viewport", () => {
+    let now = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    let resizeCallback: ResizeObserverCallback | null = null;
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: ResizeObserverCallback) {
+          resizeCallback = callback;
+        }
+        observe() {}
+        disconnect() {}
+      },
+    );
+    // Finish the normal open settle before exercising the synchronous resize
+    // path; a pending settle pin would mask this regression.
+    const animationFrames = new Map<number, FrameRequestCallback>();
+    let nextAnimationFrameHandle = 0;
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      nextAnimationFrameHandle += 1;
+      animationFrames.set(nextAnimationFrameHandle, callback);
+      return nextAnimationFrameHandle;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (handle: number) => {
+      animationFrames.delete(handle);
+    });
+
+    const scrollHeight = 1000;
+    let clientHeight = 200;
+    let scrollTop = 800;
+    const scrollEl = document.createElement("div");
+    Object.defineProperties(scrollEl, {
+      scrollHeight: { configurable: true, get: () => scrollHeight },
+      clientHeight: { configurable: true, get: () => clientHeight },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = Math.min(value, scrollHeight - clientHeight);
+        },
+      },
+    });
+
+    renderWithI18n(
+      <Harness
+        scrollEl={scrollEl}
+        controlsRef={createRef<ChatScrollControlsHandle>()}
+        virtualScrollToBottom={() => undefined}
+      />,
+    );
+
+    while (animationFrames.size > 0) {
+      const callbacks = [...animationFrames.values()];
+      animationFrames.clear();
+      act(() => callbacks.forEach((callback) => callback(0)));
+    }
+    now = 1000;
+
+    act(() => {
+      // Chromium/LegendList can adjust scrollTop before ResizeObserver reports
+      // the viewport shrink caused by a taller composer.
+      clientHeight = 160;
+      scrollTop = 760;
+      scrollEl.dispatchEvent(new Event("scroll"));
+      const callback = resizeCallback as ResizeObserverCallback | null;
+      callback?.([{ target: scrollEl } as unknown as ResizeObserverEntry], {} as ResizeObserver);
+    });
+
+    expect(scrollTop).toBe(840);
+  });
+
   it("keeps sticky while LegendList adjusts its anchor before scrollHeight changes", async () => {
     let scrollHeight = 1000;
     let scrollTop = 800;

@@ -1632,6 +1632,7 @@ msgstr "Annuler la suppression du projet"
 msgid "cancelled"
 msgstr "annulé"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
 msgstr "Annulé"
@@ -3954,6 +3955,7 @@ msgstr "Factory Droid"
 msgid "failed"
 msgstr "échoué"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Failed"

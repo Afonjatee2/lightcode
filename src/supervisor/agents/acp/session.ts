@@ -60,6 +60,7 @@ import { buildPromptContentBlocks } from "@/shared/promptContent";
 import {
   closeOpenTurnItems,
   createAcpMapperState,
+  getDetachedSubAgentToolCallIdForNotification,
   mapAcpSessionUpdate,
   type AcpMapperState,
 } from "./canonicalMapping";
@@ -165,6 +166,9 @@ export class AcpStructuredSession implements StructuredSessionHandle {
   private currentAttention: ThreadAttention = "none";
   private spawnReady: Promise<void> = Promise.resolve();
   private currentTurnId: string | undefined;
+  /** Synthetic turn used while a detached subagent reports out of band. */
+  private detachedTurnId: string | undefined;
+  private readonly detachedTurnParentToolCallIds = new Set<string>();
   private stableSessionRef: SessionRef | undefined;
   /**
    * True while a `connection.prompt()` call is in flight (between issue and
@@ -1032,11 +1036,26 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     // in its own DB, so we skip canonical mapping for the replay window to
     // avoid duplicating every message in the chat pane.
     if (!suppressReplayUpdate) {
-      const events = mapAcpSessionUpdate(params, this.ensureMapperState());
+      const mapperState = this.ensureMapperState();
+      const detachedParentToolCallId = !this.promptInFlight
+        ? getDetachedSubAgentToolCallIdForNotification(mapperState, update)
+        : undefined;
+      if (detachedParentToolCallId) {
+        this.startDetachedTurn(detachedParentToolCallId);
+      }
+      const events = mapAcpSessionUpdate(params, mapperState);
       this.rememberAcpToolCallItemId(params, events);
       if (events.length > 0) {
         this.recordAgentSurfacedError(events);
         this.emitRuntimeEvents(events);
+      }
+      for (const toolCallId of this.detachedTurnParentToolCallIds) {
+        if (!mapperState.activeSubAgents.some((active) => active.toolCallId === toolCallId)) {
+          this.detachedTurnParentToolCallIds.delete(toolCallId);
+        }
+      }
+      if (this.detachedTurnId && this.detachedTurnParentToolCallIds.size === 0) {
+        this.completeDetachedTurn();
       }
     } else {
       return;
@@ -1113,6 +1132,16 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
   }
 
+  /**
+   * Feed a provider-recovered update through the normal ACP mapping path.
+   * Some ACP adapters can reconstruct notifications that their server omits
+   * from an auxiliary provider-native event log.
+   */
+  ingestExternalSessionUpdate(notification: SessionNotification): void {
+    if (this.isDisposed) return;
+    this.handleSessionUpdate(notification);
+  }
+
   private recordAgentSurfacedError(events: RuntimeEvent[]): void {
     for (const event of events) {
       if (event.type !== "error") continue;
@@ -1137,6 +1166,31 @@ export class AcpStructuredSession implements StructuredSessionHandle {
     }
     const { status, attention } = this.mapStopReason(normalizedStopReason);
     this.emitListenerUpdate({ status, attention });
+  }
+
+  private startDetachedTurn(parentToolCallId: string): void {
+    this.detachedTurnParentToolCallIds.add(parentToolCallId);
+    if (this.detachedTurnId) return;
+    this.detachedTurnId = `turn-${randomUUID()}`;
+    this.emitRuntimeEvents([
+      { type: "turn.started", threadId: this.threadId, turnId: this.detachedTurnId },
+    ]);
+    this.emitListenerUpdate({ status: "working", attention: "working" });
+  }
+
+  private completeDetachedTurn(): void {
+    if (!this.detachedTurnId) return;
+    this.emitRuntimeEvents([
+      {
+        type: "turn.completed",
+        threadId: this.threadId,
+        turnId: this.detachedTurnId,
+        state: "completed",
+      },
+    ]);
+    this.detachedTurnId = undefined;
+    this.detachedTurnParentToolCallIds.clear();
+    this.emitListenerUpdate({ status: "idle", attention: "none" });
   }
 
   private completeTurn(

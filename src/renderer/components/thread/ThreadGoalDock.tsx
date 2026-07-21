@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Tooltip } from "@heroui/react";
-import { CircleCheckBig, Target, X } from "lucide-react";
+import { CircleCheckBig, CircleStop, CircleX, Target, X } from "lucide-react";
 import { msg } from "@lingui/core/macro";
 import { Plural, Trans, useLingui } from "@lingui/react/macro";
 import type { ThreadGoalDockState } from "./threadGoalState";
@@ -27,6 +27,8 @@ export function ThreadGoalDock({ state, onDismiss }: ThreadGoalDockProps) {
   const [nowSeconds, setNowSeconds] = useState(() => Date.now() / 1000);
   const isActive = state.status === "active";
   const isComplete = state.status === "complete";
+  const isFailed = state.status === "failed";
+  const isCancelled = state.status === "cancelled";
 
   useEffect(() => {
     const now = Date.now() / 1000;
@@ -45,12 +47,20 @@ export function ThreadGoalDock({ state, onDismiss }: ThreadGoalDockProps) {
   const elapsedLabel = elapsedSeconds > 0 ? formatElapsed(elapsedSeconds) : null;
   const evaluatedTurns = state.iterations !== undefined && state.iterations > 0;
   const hasMeta = meta.length > 0;
-  const StatusIcon = isComplete ? CircleCheckBig : Target;
+  const StatusIcon = isComplete
+    ? CircleCheckBig
+    : isFailed
+      ? CircleX
+      : isCancelled
+        ? CircleStop
+        : Target;
   const statusIconClass = isComplete
     ? "text-success"
-    : isActive
-      ? "text-white"
-      : "text-foreground-muted";
+    : isFailed
+      ? "text-danger"
+      : isActive
+        ? "text-white"
+        : "text-foreground-muted";
 
   return (
     <ThreadDockSection ariaLabel={t`Thread goal dock`} className="px-2 py-1">
@@ -178,6 +188,10 @@ function goalStatusLabel(status: ThreadGoalDockState["status"], t: TranslateFn):
       return t(msg`Budget limit reached`);
     case "complete":
       return t(msg`Complete`);
+    case "failed":
+      return t(msg`Failed`);
+    case "cancelled":
+      return t(msg`Cancelled`);
   }
 }
 

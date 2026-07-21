@@ -10,6 +10,8 @@ export interface AcpToolCallItemState {
   itemType: CanonicalItemType;
   payload: Record<string, unknown>;
   isSubAgent: boolean;
+  /** Keep this subagent open across the foreground prompt's turn boundary. */
+  detached: boolean;
   subAgentProgressItemId?: string;
   subAgentProgressText?: string;
   /**
@@ -46,6 +48,8 @@ export interface AcpMapperState {
   openPlanItemId?: string;
   /** Last plan steps emitted for the open plan item. */
   openPlanSteps?: Array<{ step: string; status: "pending" | "in_progress" | "completed" }>;
+  /** Current goal item created from provider-normalized ACP goal metadata. */
+  goalItemId?: string;
   /** ACP `toolCallId`s rerouted to other item types (e.g. assistant_message
    * for Copilot's `task_complete` summary). Their `tool_call_update`s must be
    * dropped so we don't emit ghost updates against the wrong item. */
@@ -103,8 +107,12 @@ export function closeOpenContentItems(state: AcpMapperState): RuntimeEvent[] {
  * abandoned mid-turn).
  */
 export function resetMapperForTurnEnd(state: AcpMapperState): void {
-  state.toolCallItems.clear();
-  state.activeSubAgents.length = 0;
+  for (const [toolCallId, item] of state.toolCallItems) {
+    if (!item.detached) state.toolCallItems.delete(toolCallId);
+  }
+  state.activeSubAgents = state.activeSubAgents.filter((active) =>
+    state.toolCallItems.has(active.toolCallId),
+  );
   state.suppressedToolCallIds.clear();
   delete state.openPlanItemId;
   delete state.openPlanSteps;

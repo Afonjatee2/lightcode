@@ -14,6 +14,7 @@ import {
 } from "../base";
 import { resolveAgentBinaryPath } from "../binaryResolver";
 import { buildQwenArgs, QWEN_DEFAULT_MODEL_ID } from "./argv";
+import { createQwenAcpSessionUpdateTransform } from "./acpTransform";
 import { buildQwenCommand, qwenDefaultCapabilities, qwenDetectionSpec } from "./detection";
 import { detectQwenInvalidSessionRef } from "./session";
 
@@ -82,7 +83,10 @@ export function createQwenAdapter(): AgentAdapter {
         ["--acp"],
         resolveAgentBinaryPath(input.projectLocation, "qwen"),
       );
-      return createAcpStructuredSession(command, input);
+      return createAcpStructuredSession(command, {
+        ...input,
+        acpSessionUpdateTransform: createQwenAcpSessionUpdateTransform(),
+      });
     },
 
     async buildAcpAuthCommand(ctx?: AgentEnvContext) {

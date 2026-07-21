@@ -25,15 +25,18 @@ import {
   buildSubAgentProgress,
   buildSubAgentProgressEvents,
   extractTaskCompleteSummary,
-  getActiveSubAgent,
+  getActiveSubAgentForNotification,
   isAcpSubAgentToolCall,
   isTaskCompleteSummary,
   isUpdateTopicTool,
+  PORACODE_ACP_DETACHED_SUBAGENT_META_KEY,
+  PORACODE_ACP_NEW_ASSISTANT_ITEM_META_KEY,
   removeActiveSubAgent,
   tagSubAgentChildStarts,
 } from "./subagents";
 import { closeOpenContentItems, newItemId } from "./state";
 import type { ActiveAcpSubAgent, AcpMapperState } from "./state";
+import { mapAcpCanonicalGoalUpdate } from "./goals";
 
 function acpContentBlockToCanonical(block: ContentBlock): CanonicalContentBlock | undefined {
   if (block.type === "text") {
@@ -63,11 +66,19 @@ export function mapAcpSessionUpdate(
   const update: SessionUpdate = notification.update;
   const events: RuntimeEvent[] = [];
   const { threadId } = state;
-  const activeSubAgent = getActiveSubAgent(state);
+  events.push(...mapAcpCanonicalGoalUpdate(update, state));
+  const activeSubAgent = getActiveSubAgentForNotification(state, update);
   let pendingSubAgent: ActiveAcpSubAgent | undefined;
 
   switch (update.sessionUpdate) {
     case "agent_message_chunk": {
+      const messageMeta =
+        update._meta && typeof update._meta === "object" && !Array.isArray(update._meta)
+          ? (update._meta as Record<string, unknown>)
+          : undefined;
+      if (messageMeta?.[PORACODE_ACP_NEW_ASSISTANT_ITEM_META_KEY] === true) {
+        events.push(...closeOpenContentItems(state));
+      }
       const content = (update as { content?: ContentBlock }).content;
       // Some ACP agents emit an empty text chunk after every tool call. It is
       // only a stream boundary, not an assistant message; opening an item for
@@ -235,6 +246,21 @@ export function mapAcpSessionUpdate(
             : "running";
       const itemType = classifyToolCallItemType(toolCall.kind, toolCall.title, toolCall.locations);
       const isSubAgent = isAcpSubAgentToolCall(toolCall);
+      const rawInput =
+        toolCall.rawInput &&
+        typeof toolCall.rawInput === "object" &&
+        !Array.isArray(toolCall.rawInput)
+          ? (toolCall.rawInput as Record<string, unknown>)
+          : undefined;
+      const meta =
+        toolCall._meta && typeof toolCall._meta === "object" && !Array.isArray(toolCall._meta)
+          ? (toolCall._meta as Record<string, unknown>)
+          : undefined;
+      const detached =
+        isSubAgent &&
+        (rawInput?.background === true ||
+          rawInput?.run_in_background === true ||
+          meta?.[PORACODE_ACP_DETACHED_SUBAGENT_META_KEY] === true);
       const payload = buildAcpToolCallPayload(
         itemType,
         toolCall,
@@ -249,6 +275,7 @@ export function mapAcpSessionUpdate(
         itemType,
         payload,
         isSubAgent,
+        detached,
         ...(terminalId ? { terminalId } : {}),
       });
       events.push({
@@ -268,6 +295,7 @@ export function mapAcpSessionUpdate(
             itemType,
             payload,
             isSubAgent,
+            detached,
             ...(terminalId ? { terminalId } : {}),
           }),
         });
@@ -288,6 +316,7 @@ export function mapAcpSessionUpdate(
         rawInput?: unknown;
         rawOutput?: unknown;
         content?: unknown;
+        _meta?: unknown;
         locations?: Array<{ path?: string | null; line?: number | null }> | null;
       };
       if (state.suppressedToolCallIds.has(toolCall.toolCallId)) {
@@ -298,6 +327,23 @@ export function mapAcpSessionUpdate(
       }
       const item = state.toolCallItems.get(toolCall.toolCallId);
       if (!item) break;
+      const updateMeta =
+        toolCall._meta && typeof toolCall._meta === "object" && !Array.isArray(toolCall._meta)
+          ? (toolCall._meta as Record<string, unknown>)
+          : undefined;
+      const updateRawInput =
+        toolCall.rawInput &&
+        typeof toolCall.rawInput === "object" &&
+        !Array.isArray(toolCall.rawInput)
+          ? (toolCall.rawInput as Record<string, unknown>)
+          : undefined;
+      if (
+        updateRawInput?.background === true ||
+        updateRawInput?.run_in_background === true ||
+        updateMeta?.[PORACODE_ACP_DETACHED_SUBAGENT_META_KEY] === true
+      ) {
+        item.detached = true;
+      }
       const isTerminal = toolCall.status === "completed" || toolCall.status === "failed";
       const status =
         toolCall.status === "completed"
@@ -314,9 +360,14 @@ export function mapAcpSessionUpdate(
         state.resolveTerminalOutput,
         state.resolveTerminalOutputByCommand,
       );
-      const subAgentProgress = item.isSubAgent
-        ? buildSubAgentProgress(toolCall, payload, status)
-        : undefined;
+      const hasOpenSubAgentContent =
+        item.isSubAgent &&
+        isTerminal &&
+        (state.openAssistantItemId !== undefined || state.openReasoningItemId !== undefined);
+      const subAgentProgress =
+        item.isSubAgent && !hasOpenSubAgentContent
+          ? buildSubAgentProgress(toolCall, payload, status)
+          : undefined;
       const nextPayload = subAgentProgress?.label
         ? mergeToolPayload(payload, {
             progress: {
@@ -325,6 +376,7 @@ export function mapAcpSessionUpdate(
             },
           })
         : payload;
+      if (toolCall.rawInput !== undefined) nextPayload.args = toolCall.rawInput;
       const mergedRaw = mergeToolPayload(item.payload, nextPayload);
       const emittedRaw = mergeProgressForEmission(nextPayload, mergedRaw);
       // On completion, guarantee a name so a bare tool call can't finish hidden.
@@ -332,6 +384,9 @@ export function mapAcpSessionUpdate(
         ? applyTerminalToolCallName(mergedRaw, emittedRaw)
         : { merged: mergedRaw, emitted: emittedRaw };
       item.payload = mergedPayload;
+      if (isTerminal && item.isSubAgent) {
+        events.push(...closeOpenContentItems(state));
+      }
       events.push({
         type: isTerminal ? "item.completed" : "item.updated",
         threadId,
@@ -430,8 +485,9 @@ export function mapAcpSessionUpdate(
       break;
   }
 
-  if (activeSubAgent) {
-    tagSubAgentChildStarts(events, activeSubAgent, state);
+  const nestingSubAgent = activeSubAgent ?? pendingSubAgent;
+  if (nestingSubAgent) {
+    tagSubAgentChildStarts(events, nestingSubAgent, state);
   }
   if (pendingSubAgent) {
     state.activeSubAgents.push(pendingSubAgent);

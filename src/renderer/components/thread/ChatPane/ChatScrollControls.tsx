@@ -100,6 +100,7 @@ export const ChatScrollControls = forwardRef<
   const atBottomCachedUntilRef = useRef(0);
   const lastPinnedScrollHeightRef = useRef(0);
   const lastSeenScrollHeightRef = useRef(0);
+  const lastSeenClientHeightRef = useRef(0);
   const disableStickToBottomRef = useRef<() => void>(() => undefined);
   const pinHoldoffUntilRef = useRef(0);
   const [showScrollDown, setShowScrollDown] = useState(false);
@@ -448,6 +449,7 @@ export const ChatScrollControls = forwardRef<
     atBottomCachedUntilRef.current = 0;
     lastPinnedScrollHeightRef.current = 0;
     lastSeenScrollHeightRef.current = scrollRef.current?.scrollHeight ?? 0;
+    lastSeenClientHeightRef.current = scrollRef.current?.clientHeight ?? 0;
     scrollToBottom({ reconcileVirtualizer: true });
     scheduleInitialScrollSettle();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- scroll reset is keyed to thread changes; the helper reads refs/state setters only.
@@ -490,6 +492,9 @@ export const ChatScrollControls = forwardRef<
       const scrollHeightShrunk = nextScrollHeight < lastSeenScrollHeightRef.current;
       const scrollHeightGrew = nextScrollHeight > lastSeenScrollHeightRef.current;
       lastSeenScrollHeightRef.current = nextScrollHeight;
+      const nextClientHeight = el.clientHeight;
+      const viewportHeightChanged = nextClientHeight !== lastSeenClientHeightRef.current;
+      lastSeenClientHeightRef.current = nextClientHeight;
       const isProgrammaticScroll = consumeProgrammaticScroll(nextScrollTop);
       const hasRecentUserIntent = hasRecentUserScrollIntent();
       // Programmatic stick-to-bottom only moves down. Skip layout reads / button
@@ -521,6 +526,7 @@ export const ChatScrollControls = forwardRef<
           isProgrammaticScroll,
           scrollHeightShrunk,
           scrollHeightGrew,
+          viewportHeightChanged,
           isVirtualizerLayoutChange,
           hasRecentUserScrollIntent: hasRecentUserIntent,
         })
@@ -546,6 +552,7 @@ export const ChatScrollControls = forwardRef<
         stickToBottomRef.current &&
         !isAtBottom &&
         !isProgrammaticScroll &&
+        !viewportHeightChanged &&
         nextScrollTop < prevScrollTop
       ) {
         // Release was suppressed as layout-driven (virtualizer window / height
@@ -563,6 +570,7 @@ export const ChatScrollControls = forwardRef<
 
     lastScrollTopRef.current = el.scrollTop;
     lastSeenScrollHeightRef.current = el.scrollHeight;
+    lastSeenClientHeightRef.current = el.clientHeight;
     handleScroll();
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => el.removeEventListener("scroll", handleScroll);

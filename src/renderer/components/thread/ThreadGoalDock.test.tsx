@@ -157,6 +157,31 @@ describe("ThreadGoalDock", () => {
     expect(container.querySelector("svg.lucide-target")).toBeNull();
   });
 
+  it.each([
+    ["failed", "Failed", "lucide-circle-x"],
+    ["cancelled", "Cancelled", "lucide-circle-stop"],
+  ] as const)("renders a %s terminal goal outcome", (status, label, iconClass) => {
+    render(
+      <AppProvider>
+        <ThreadGoalDock
+          state={{
+            sourceItemId: `goal-${status}`,
+            itemState: "completed",
+            objective: "Ship goal dock",
+            status,
+            action: "updated",
+            lastReason: `${label} by provider`,
+          }}
+          onDismiss={() => undefined}
+        />
+      </AppProvider>,
+    );
+
+    expect(screen.getByText(label)).toBeInTheDocument();
+    expect(document.querySelector(`svg.${iconClass}`)).not.toBeNull();
+    expect(screen.getByText(new RegExp(`${label} by provider`))).toBeInTheDocument();
+  });
+
   it("advances active goal elapsed time locally between server updates", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-05-12T10:00:10Z"));

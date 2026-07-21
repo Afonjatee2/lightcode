@@ -12,6 +12,11 @@ import { firstNonEmptyLine, normalizeToolText } from "./contentExtraction";
 import type { ActiveAcpSubAgent, AcpMapperState, AcpToolCallItemState } from "./state";
 import { newItemId } from "./state";
 
+export const PORACODE_ACP_PARENT_TOOL_CALL_ID_META_KEY = "poracodeParentToolCallId";
+export const PORACODE_ACP_DETACHED_SUBAGENT_META_KEY = "poracodeDetachedSubAgent";
+export const PORACODE_ACP_DETACHED_SUBAGENT_ACTIVITY_META_KEY = "poracodeDetachedSubAgentActivity";
+export const PORACODE_ACP_NEW_ASSISTANT_ITEM_META_KEY = "poracodeNewAssistantItem";
+
 export function buildSubAgentProgress(
   toolCall: {
     title?: string | null;
@@ -98,8 +103,53 @@ function readSubAgentText(value: unknown): string | undefined {
   return undefined;
 }
 
-export function getActiveSubAgent(state: AcpMapperState): ActiveAcpSubAgent | undefined {
-  return state.activeSubAgents.at(-1);
+export function getActiveSubAgentForNotification(
+  state: AcpMapperState,
+  update: { _meta?: unknown; toolCallId?: unknown },
+): ActiveAcpSubAgent | undefined {
+  const meta =
+    update._meta && typeof update._meta === "object" && !Array.isArray(update._meta)
+      ? (update._meta as Record<string, unknown>)
+      : undefined;
+  const explicitToolCallId = meta?.[PORACODE_ACP_PARENT_TOOL_CALL_ID_META_KEY];
+  if (typeof explicitToolCallId === "string") {
+    return state.activeSubAgents.find((active) => active.toolCallId === explicitToolCallId);
+  }
+  // The parent tool's own later updates may create a progress assistant item.
+  // Allow that item to nest even when the parent is detached.
+  if (typeof update.toolCallId === "string") {
+    const matchingTool = state.activeSubAgents.find(
+      (active) => active.toolCallId === update.toolCallId,
+    );
+    if (matchingTool) return matchingTool;
+  }
+  // Detached parents persist beyond the foreground turn that launched them.
+  // They may only claim explicitly-parented notifications; otherwise a later
+  // user turn would be nested under the most recent background agent.
+  return state.activeSubAgents.findLast(
+    (active) => state.toolCallItems.get(active.toolCallId)?.detached !== true,
+  );
+}
+
+export function getDetachedSubAgentToolCallIdForNotification(
+  state: AcpMapperState,
+  update: { _meta?: unknown },
+): string | undefined {
+  const meta =
+    update._meta && typeof update._meta === "object" && !Array.isArray(update._meta)
+      ? (update._meta as Record<string, unknown>)
+      : undefined;
+  const activityToolCallId = meta?.[PORACODE_ACP_DETACHED_SUBAGENT_ACTIVITY_META_KEY];
+  if (
+    typeof activityToolCallId === "string" &&
+    state.toolCallItems.get(activityToolCallId)?.detached === true
+  ) {
+    return activityToolCallId;
+  }
+  const active = getActiveSubAgentForNotification(state, update);
+  return active && state.toolCallItems.get(active.toolCallId)?.detached === true
+    ? active.toolCallId
+    : undefined;
 }
 
 export function removeActiveSubAgent(state: AcpMapperState, toolCallId: string): void {
@@ -119,6 +169,9 @@ export function tagSubAgentChildStarts(
   for (let index = 0; index < events.length; index += 1) {
     const event = events[index];
     if (!event || event.type !== "item.started") continue;
+    // A newly classified subagent and its first progress item can be emitted
+    // by the same ACP update. Never make the parent tool its own child.
+    if (event.itemId === parent.itemId) continue;
     if ("parentItemId" in event && typeof event.parentItemId === "string") continue;
     events[index] = { ...event, parentItemId: parent.itemId };
     taggedStarts += 1;

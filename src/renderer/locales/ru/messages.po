@@ -1632,6 +1632,7 @@ msgstr "Отменить удаление проекта"
 msgid "cancelled"
 msgstr "отменено"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 msgid "Cancelled"
 msgstr "Отменено"
@@ -3954,6 +3955,7 @@ msgstr "Factory Droid"
 msgid "failed"
 msgstr "не удалось"
 
+#: src/renderer/components/thread/ThreadGoalDock.tsx
 #: src/renderer/utils/prStatus.ts
 #: src/renderer/views/SchedulesView/parts/PreviousRunsModal.tsx
 msgid "Failed"

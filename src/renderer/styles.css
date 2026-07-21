@@ -3409,12 +3409,12 @@ html[data-platform="darwin"] .poracode-sidebar-project-nudge {
 .lc-chat-markdown ol {
   list-style: decimal outside;
   padding-left: 1.5em;
-  margin: 0.25em 0;
+  margin: 0.1em 0 0.75em;
 }
 .lc-chat-markdown ul {
   list-style: disc outside;
   padding-left: 1.5em;
-  margin: 0.25em 0;
+  margin: 0.1em 0 0.75em;
 }
 .lc-chat-markdown li {
   /* Streamdown's default <li> ships a `py-1` utility; margins alone don't
@@ -3443,7 +3443,7 @@ html[data-platform="darwin"] .poracode-sidebar-project-nudge {
 }
 .lc-chat-markdown p + ol,
 .lc-chat-markdown p + ul {
-  margin-top: 0.15em;
+  margin-top: 0.1em;
 }
 .lc-chat-markdown > :first-child,
 .lc-chat-markdown > :first-child > :first-child {
