@@ -273,6 +273,11 @@ const remoteBridge = {
     await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
     return true;
   },
+  readLocalImageFile: async ({ url }: { url: string }): Promise<Uint8Array> => {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Failed to load image (${response.status})`);
+    return new Uint8Array(await response.arrayBuffer());
+  },
   saveImageFile: ({
     data,
     suggestedName,

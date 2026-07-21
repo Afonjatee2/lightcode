@@ -2584,7 +2584,7 @@ msgstr "对话"
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copied"
 msgstr "已复制"
@@ -2640,7 +2640,7 @@ msgstr "复制失败"
 msgid "Copy ignored files"
 msgstr "复制忽略的文件"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copy image"
 msgstr "复制图片"
@@ -3453,7 +3453,7 @@ msgstr "完成"
 msgid "Done · Waiting for your input"
 msgstr "完成 · 等待您的输入"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Download image"
 msgstr "下载图片"
 
@@ -3584,6 +3584,10 @@ msgstr "思考强度与上下文"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Effort levels"
 msgstr "思考级别"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Effort levels for {modelName}"
+msgstr "{modelName} 的思考级别"
 
 #. About page label: Electron framework version
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
@@ -4660,7 +4664,7 @@ msgstr "身份文件路径"
 msgid "Idle"
 msgstr "空闲"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Image"
 msgstr "图片"
@@ -4757,6 +4761,10 @@ msgstr "应用内摄像头扫描仅支持 HTTPS。请使用手机相机应用扫
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Inactive"
 msgstr "不活跃"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Inherit global"
+msgstr "继承全局设置"
 
 #. Badge on an exclude pattern inherited from a lower scope
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
@@ -4949,10 +4957,15 @@ msgid "Kill bash"
 msgstr "终止 bash"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Kimi"
-msgstr "Kimi"
+#~ msgid "Kimi"
+#~ msgstr "Kimi"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+#~ msgid "Kimi API Platform"
+#~ msgstr "Kimi API 平台"
 
 #: src/renderer/components/providers/kimi/manifest.ts
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Kimi Code"
 msgstr "Kimi Code"
 
@@ -5893,6 +5906,10 @@ msgstr "换行"
 msgid "New MCP server"
 msgstr "新建 MCP 服务器"
 
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "new model"
+msgstr "新模型"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "New phones, tablets, and browsers appear here after pairing."
 msgstr "新的手机、平板电脑和浏览器会在配对后显示在这里。"
@@ -6646,7 +6663,7 @@ msgstr "打开 Git 审查"
 msgid "Open git review as a right-side panel or a full page."
 msgstr "将 git review 作为右侧面板或整页打开。"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open image preview"
 msgstr "打开图片预览"
 
@@ -6717,7 +6734,7 @@ msgstr "打开 PR #{prNumber}"
 msgid "Open PR on GitHub"
 msgstr "在 GitHub 上打开 PR"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open preview"
 msgstr "打开预览"
 
@@ -7481,12 +7498,20 @@ msgid "Quota reached"
 msgstr "已达到配额"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
 msgstr "Qwen Code"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+#~ msgid "Qwen Coding Plan"
+#~ msgstr "Qwen 编程套餐"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen Token Plan"
+msgstr "Qwen Token 套餐"
 
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Ran out"

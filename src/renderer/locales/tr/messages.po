@@ -2584,7 +2584,7 @@ msgstr "Konuşma"
 #: src/mobile/UserMessageActionsSheet.tsx
 #: src/mobile/views/PortsView.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/CopyTextButton.tsx
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/RendererCrashScreen.tsx
 msgid "Copied"
 msgstr "Kopyalandı"
@@ -2640,7 +2640,7 @@ msgstr "Kopyalama başarısız oldu"
 msgid "Copy ignored files"
 msgstr "Yoksayılan dosyaları kopyala"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/views/ProfileOverlay/parts/ShareDialog.tsx
 msgid "Copy image"
 msgstr "Görseli kopyala"
@@ -3453,7 +3453,7 @@ msgstr "Bitti"
 msgid "Done · Waiting for your input"
 msgstr "Bitti · Girişinizi bekliyorum"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Download image"
 msgstr "Görseli indir"
 
@@ -3584,6 +3584,10 @@ msgstr "Çaba ve bağlam"
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
 msgid "Effort levels"
 msgstr "Efor düzeyleri"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Effort levels for {modelName}"
+msgstr "{modelName} için efor düzeyleri"
 
 #. About page label: Electron framework version
 #: src/renderer/views/SettingsOverlay/parts/AboutSettings.tsx
@@ -4660,7 +4664,7 @@ msgstr "Kimlik dosyası yolu"
 msgid "Idle"
 msgstr "Boşta"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 #: src/renderer/components/thread/ChatPane/parts/items/toolDisplay.ts
 msgid "Image"
 msgstr "Resim"
@@ -4757,6 +4761,10 @@ msgstr "Uygulama içi kamera taraması yalnızca HTTPS üzerinden çalışır. M
 #: src/renderer/components/thread/ThreadHeaderStatus.tsx
 msgid "Inactive"
 msgstr "Etkin değil"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "Inherit global"
+msgstr "Global ayarı devral"
 
 #. Badge on an exclude pattern inherited from a lower scope
 #: src/renderer/views/SettingsOverlay/parts/SearchExcludeBody.tsx
@@ -4949,10 +4957,15 @@ msgid "Kill bash"
 msgstr "Bash'ı öldür"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Kimi"
-msgstr "Kimi"
+#~ msgid "Kimi"
+#~ msgstr "Kimi"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+#~ msgid "Kimi API Platform"
+#~ msgstr "Kimi API Platformu"
 
 #: src/renderer/components/providers/kimi/manifest.ts
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
 msgid "Kimi Code"
 msgstr "Kimi Code"
 
@@ -5894,6 +5907,10 @@ msgstr "Yeni satır"
 msgid "New MCP server"
 msgstr "Yeni MCP sunucusu"
 
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettings.tsx
+msgid "new model"
+msgstr "yeni model"
+
 #: src/renderer/views/SettingsOverlay/parts/RemoteAccessSettings.tsx
 msgid "New phones, tablets, and browsers appear here after pairing."
 msgstr "Yeni telefonlar, tabletler ve tarayıcılar eşleştirmeden sonra burada görünür."
@@ -6647,7 +6664,7 @@ msgstr "Git İncelemesini Aç"
 msgid "Open git review as a right-side panel or a full page."
 msgstr "Git incelemesini sağ taraftaki panel veya tam sayfa olarak açın."
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open image preview"
 msgstr "Görsel önizlemesini aç"
 
@@ -6718,7 +6735,7 @@ msgstr "PR #{prNumber}'ı açın"
 msgid "Open PR on GitHub"
 msgstr "PR'ı GitHub'da aç"
 
-#: src/renderer/components/thread/ChatPane/parts/items/ImageView.tsx
+#: src/renderer/components/thread/ChatPane/parts/items/ImageCard.tsx
 msgid "Open preview"
 msgstr "Önizlemeyi aç"
 
@@ -7482,12 +7499,20 @@ msgid "Quota reached"
 msgstr "Kotaya ulaşıldı"
 
 #: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
-msgid "Qwen"
-msgstr "Qwen"
+#~ msgid "Qwen"
+#~ msgstr "Qwen"
 
 #: src/renderer/components/providers/qwen/manifest.ts
 msgid "Qwen Code"
 msgstr "Qwen Code"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+#~ msgid "Qwen Coding Plan"
+#~ msgstr "Qwen Coding Planı"
+
+#: src/renderer/views/SettingsOverlay/parts/ClaudeProfileSettingsModel.ts
+msgid "Qwen Token Plan"
+msgstr "Qwen Token Planı"
 
 #: src/renderer/components/providers/usageFormat.ts
 msgid "Ran out"

@@ -74,6 +74,7 @@ export const MAIN_LOCAL_PROCEDURE_NAMES = [
   "saveHandoffContext",
   "saveImageFile",
   "copyImageToClipboard",
+  "readLocalImageFile",
   "createProjectDirectory",
   "remoteHttpRequest",
   "openExternal",

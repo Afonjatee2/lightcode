@@ -18,6 +18,7 @@ import { preselectWorktreeDraft, runThreadAction } from "./navHelpers";
 import { ThreadTitleRow } from "./ThreadTitleRow";
 import { ThreadUsageIndicator } from "./ThreadUsageIndicator";
 import { useHeldThreadHeader } from "./useHeldThreadHeader";
+import { useLightweightThreadListPop } from "./useLightweightThreadListPop";
 import type { RemoteDesktopSession } from "./useRemoteDesktop";
 import { useSwipeBack } from "./useSwipeBack";
 import type { Chrome } from "./chrome";
@@ -98,6 +99,7 @@ export function NarrowShell(props: {
   const { t } = useLingui();
   const hasActiveDesktop = remote.activeDesktop !== null;
   const shellRef = useRef<HTMLDivElement | null>(null);
+  useLightweightThreadListPop(shellRef, pathname);
   const ignoreSearchClickRef = useRef(false);
   const ignoreSearchClickTimerRef = useRef<number | null>(null);
 

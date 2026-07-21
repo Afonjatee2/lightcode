@@ -313,6 +313,29 @@ describe("createClaudeProfileAdapter", () => {
     expect(adapter.capabilities.defaultEffort).toBe("high");
   });
 
+  it("applies an external provider's default and per-model effort choices", () => {
+    const adapter = createClaudeProfileAdapter({
+      id: "kimi",
+      driver: "claude",
+      displayName: "Kimi",
+      config: {
+        configDir: "~/.poracode/claude-profiles/kimi",
+        models: [{ id: "k3[1m]", label: "Kimi K3" }],
+        efforts: ["low", "high", "max", "ultracode"],
+        defaultEffort: "max",
+        modelEfforts: { "k3[1m]": ["low", "high", "max", "ultracode"] },
+      },
+    });
+
+    expect(adapter.capabilities.defaultEffort).toBe("max");
+    expect(adapter.capabilities.modelEfforts["k3[1m]"]).toEqual([
+      "low",
+      "high",
+      "max",
+      "ultracode",
+    ]);
+  });
+
   it("re-homes the default effort to the first allowed tier when disabled", () => {
     const adapter = createClaudeProfileAdapter({
       id: "glm",

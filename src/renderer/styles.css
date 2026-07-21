@@ -2784,6 +2784,17 @@ html[data-app-unfocused] .poracode-provider-icon--finished {
   contain: layout paint;
 }
 
+.poracode-image-action-toolbar {
+  pointer-events: none;
+  opacity: 0;
+}
+
+.poracode-image-card:hover > .poracode-image-action-toolbar,
+.poracode-image-card:focus-within > .poracode-image-action-toolbar {
+  pointer-events: auto;
+  opacity: 1;
+}
+
 /* ── Image Lightbox ──────────────────────────────────────── */
 
 .poracode-image-lightbox {

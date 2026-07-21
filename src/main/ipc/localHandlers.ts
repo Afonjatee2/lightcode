@@ -29,6 +29,7 @@ import {
 import {
   deleteThreadAttachments,
   deleteThreadAttachmentsAsync,
+  readLocalImageFile,
   resolveProjectFsPath,
   saveClipboardImageFile,
   saveHandoffContextFile,
@@ -207,6 +208,7 @@ export function createLocalIpcHandlers(
       clipboard.writeImage(image);
       return true;
     },
+    readLocalImageFile: ({ url }) => readLocalImageFile(url),
     createProjectDirectory: (payload) => createProjectDirectory(payload),
     // Desktop-as-client: proxy a remote Poracode server request through the
     // main process (no browser CORS). Restricted to http(s) and a bounded

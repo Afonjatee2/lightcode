@@ -12,6 +12,7 @@ import {
   createProjectDirectoryPayloadSchema,
   openExternalPayloadSchema,
   pickFilesOptionsSchema,
+  readLocalImageFilePayloadSchema,
   saveClipboardImagePayloadSchema,
   saveHandoffContextPayloadSchema,
   saveImageFilePayloadSchema,
@@ -136,6 +137,11 @@ export const appProcedures = {
     boolean,
     "main-local"
   >("copyImageToClipboard", "main-local", copyImageToClipboardPayloadSchema),
+  readLocalImageFile: definePayloadProcedure<
+    z.infer<typeof readLocalImageFilePayloadSchema>,
+    Uint8Array,
+    "main-local"
+  >("readLocalImageFile", "main-local", readLocalImageFilePayloadSchema),
   createProjectDirectory: definePayloadProcedure<
     z.infer<typeof createProjectDirectoryPayloadSchema>,
     CreateProjectDirectoryResult,

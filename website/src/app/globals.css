@@ -197,6 +197,15 @@ summary:focus-visible,
     0 24px 70px -28px rgba(139, 123, 255, 0.5);
 }
 
+/* Deeper lift for the phone docked over the §3b browser window — declared
+   after .brand-glow so it wins when both classes are applied. */
+.dock-shadow {
+  box-shadow:
+    0 0 0 1px rgba(234, 240, 251, 0.07),
+    0 32px 90px -24px rgba(0, 0, 0, 0.85),
+    0 24px 70px -28px rgba(139, 123, 255, 0.5);
+}
+
 /* ---- Blinking block cursor for the `pora.code` CLI signature ---- */
 .pora-cursor {
   animation: pora-blink 1.06s steps(1) infinite;

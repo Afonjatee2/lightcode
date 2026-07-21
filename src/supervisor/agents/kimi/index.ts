@@ -92,13 +92,10 @@ export function createKimiAdapter(): AgentAdapter {
       return status;
     },
 
-    buildUpdateCommand(_ctx, status) {
-      return {
-        binary: status.executablePath ?? kimiDetectionSpec.binary,
-        args: ["upgrade"],
-        strategy: "built-in",
-      };
-    },
+    // No `buildUpdateCommand` override: `kimi upgrade` is an interactive TUI, so
+    // the shared resolver drives the update from the detection spec's
+    // `installer` (re-runs the official install script non-interactively). This
+    // also keeps the supervisor and the renderer's command preview in sync.
 
     buildLaunchArgv(location, config, prompt) {
       // Kimi mints its own opaque session id and exposes no flag to pre-assign

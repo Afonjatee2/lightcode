@@ -479,10 +479,10 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
         </section>
 
         {/* ── §3b Web app — the desktop, browser-borne ────────────── */}
-        <section className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8">
-          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[420px] w-[720px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.10),transparent)] blur-3xl" />
+        <section className="relative z-10 border-t border-white/[0.06] px-5 py-28 sm:px-8 lg:pb-40">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 -z-10 h-[560px] w-[920px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.10),transparent)] blur-3xl" />
           <div className="mx-auto max-w-6xl">
-            <div className="mx-auto mb-14 max-w-2xl text-center">
+            <div className="mx-auto mb-14 max-w-2xl text-center lg:mb-36">
               <p className="mb-4 flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-[0.18em] text-accent">
                 <span className="pora-dot h-1.5 w-1.5" />
                 {t("nav.webApp")}
@@ -492,9 +492,17 @@ export function HomeContent({ release }: { release: ReleaseInfo }) {
                 <DotPeriod pulse={false} />
               </h2>
             </div>
-            <div className="flex flex-col items-center justify-center gap-10 lg:flex-row lg:gap-16">
+            {/* One composition: the browser window is the stage, the phone docks
+                over its right edge. The wrapper centers the phone vertically so
+                the device keeps its own hover lift (no translate-y conflict). */}
+            <div className="relative mx-auto max-w-5xl">
               <WebAppCard description={t("hero.webAppDescription")} />
-              <PhoneMockup pairedLabel={t("webapp.paired")} />
+              <div className="mt-12 flex justify-center lg:absolute lg:inset-y-0 lg:-right-6 lg:z-10 lg:mt-0 lg:items-center lg:pointer-events-none">
+                <PhoneMockup
+                  pairedLabel={t("webapp.paired")}
+                  className="dock-shadow lg:pointer-events-auto"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -687,11 +695,11 @@ function WebAppCard({ className, description }: { className?: string; descriptio
   return (
     <a
       href={WEB_APP_URL}
-      className={`group brand-glow relative block w-full max-w-xl overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.18] ${className ?? ""}`}
+      className={`group brand-glow relative block w-full overflow-hidden rounded-2xl border border-white/[0.09] bg-tile/85 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.18] ${className ?? ""}`}
     >
       <span className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
-      {/* browser chrome */}
-      <span className="flex items-center gap-3 border-b border-white/[0.06] bg-tile-2 px-4 py-2.5">
+      {/* browser chrome — on lg the right side yields to the docked phone */}
+      <span className="flex items-center gap-3 border-b border-white/[0.06] bg-tile-2 px-4 py-2.5 lg:pr-72">
         <span className="flex shrink-0 gap-1.5">
           <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
           <span className="h-2.5 w-2.5 rounded-full bg-white/15" />
@@ -709,17 +717,19 @@ function WebAppCard({ className, description }: { className?: string; descriptio
         <ArrowUpRight className="h-4 w-4 shrink-0 text-dim transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-moon" />
       </span>
       {/* body: pairing link + pitch */}
-      <span className="block px-6 pb-6 pt-5 sm:px-8">
-        <span className="flex items-center justify-center">
-          <PoraIconTile className="h-9 w-9" />
-          <span className="relative mx-1.5 h-px w-14 bg-white/15 sm:w-20">
+      <span className="relative block px-6 py-12 sm:px-8 sm:py-14 lg:py-16 lg:pr-72">
+        <span className="brand-grid absolute inset-0 opacity-50" />
+        <span className="pointer-events-none absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(139,123,255,0.14),transparent)] blur-2xl" />
+        <span className="relative flex items-center justify-center">
+          <PoraIconTile className="h-11 w-11 sm:h-14 sm:w-14" />
+          <span className="relative mx-2 h-px w-20 bg-white/15 sm:mx-3 sm:w-28">
             <span className="pora-pair-dot absolute -top-[3px] h-[7px] w-[7px] rounded-full bg-accent [box-shadow:0_0_8px_rgba(139,123,255,0.8)]" />
           </span>
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-[26%] bg-tile ring-1 ring-white/10">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[26%] bg-tile ring-1 ring-white/10 sm:h-14 sm:w-14">
             <Globe className="h-[62%] w-[62%] text-accent" />
           </span>
         </span>
-        <span className="mt-4 block text-center text-sm leading-relaxed text-dim">
+        <span className="relative mx-auto mt-6 block max-w-lg text-center text-base leading-relaxed text-dim">
           {description}
         </span>
       </span>
@@ -734,11 +744,11 @@ function WebAppCard({ className, description }: { className?: string; descriptio
  * a confirmed `paired` status, and the `app.poracode.com` address pill. Pure
  * CSS/SVG; no capture asset. The whole device links to the web app.
  */
-function PhoneMockup({ pairedLabel }: { pairedLabel: string }) {
+function PhoneMockup({ pairedLabel, className }: { pairedLabel: string; className?: string }) {
   return (
     <a
       href={WEB_APP_URL}
-      className="group brand-glow relative block w-[260px] shrink-0 rounded-[2.75rem] border border-white/[0.12] bg-tile p-2 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.22]"
+      className={`group brand-glow relative block w-[260px] shrink-0 rounded-[2.75rem] border border-white/[0.12] bg-tile p-2 text-left transition will-change-transform hover:-translate-y-0.5 hover:border-white/[0.22] ${className ?? ""}`}
     >
       <span className="pointer-events-none absolute inset-x-10 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/60 to-transparent" />
       <span className="relative flex h-[520px] flex-col overflow-hidden rounded-[2.25rem] border border-white/[0.06] bg-night">

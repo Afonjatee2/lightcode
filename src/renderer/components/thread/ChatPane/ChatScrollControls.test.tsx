@@ -3,7 +3,6 @@ import { act, fireEvent } from "@testing-library/react";
 import { createRef, useRef } from "react";
 import { renderWithI18n } from "@/renderer/testUtils/i18n";
 import { ChatScrollControls, type ChatScrollControlsHandle } from "./ChatScrollControls";
-import { THREAD_OPEN_COALESCE_MS } from "./chatScrollGeometry";
 
 let scrollToBottomToken = 0;
 
@@ -120,7 +119,6 @@ describe("ChatScrollControls", () => {
   });
 
   it("reveals the initial transcript only after a post-reconcile animation frame", () => {
-    vi.useFakeTimers();
     const animationFrames = new Map<number, FrameRequestCallback>();
     let nextAnimationFrameHandle = 0;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
@@ -164,13 +162,8 @@ describe("ChatScrollControls", () => {
     expect(onInitialScrollSettled).not.toHaveBeenCalled();
     flushPaint();
     expect(onInitialScrollSettled).not.toHaveBeenCalled();
-    flushPaint();
-    expect(onInitialScrollSettled).not.toHaveBeenCalled();
     const reconcilesBeforeReveal = virtualScrollToBottom.mock.calls.length;
-
-    act(() => {
-      vi.advanceTimersByTime(THREAD_OPEN_COALESCE_MS);
-    });
+    flushPaint();
     expect(onInitialScrollSettled).toHaveBeenCalledOnce();
     expect(virtualScrollToBottom).toHaveBeenCalledTimes(reconcilesBeforeReveal);
   });

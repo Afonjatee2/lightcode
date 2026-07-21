@@ -84,9 +84,26 @@ describe("kimiDetectionSpec", () => {
     ).toBe("'/home/demo/.kimi-code/bin/kimi' login");
   });
 
-  it("ships both the built-in updater and the npm package", () => {
-    expect(kimiDetectionSpec.update?.builtIn).toEqual({ binary: "kimi", args: ["upgrade"] });
+  it("ships a non-interactive installer update and the npm version probe", () => {
+    // `kimi upgrade` is an interactive TUI, so there is no `builtIn` updater.
+    expect(kimiDetectionSpec.update?.builtIn).toBeUndefined();
     expect(kimiDetectionSpec.update?.npm).toBe("@moonshot-ai/kimi-code");
+    expect(kimiDetectionSpec.update?.installer).toEqual({
+      posix: {
+        binary: "sh",
+        args: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"],
+      },
+      windows: {
+        binary: "powershell.exe",
+        args: [
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "irm https://code.kimi.com/kimi-code/install.ps1 | iex",
+        ],
+      },
+    });
   });
 
   it("reports credential state through the capabilities probe", () => {

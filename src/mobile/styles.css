@@ -2871,6 +2871,14 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
   align-items: center;
 }
 
+/* Fast is only summarized when it's on (ComposerCompactSummary gates on the
+   selected toggle), so its Zap glyph is always the "active" state: fill it to
+   match the real toolbar, whose fill rides the toggle's selected state — a
+   state this inert read-only summary never has. */
+.m-compose-summary__item--fast svg {
+  fill: currentColor;
+}
+
 .m-compose-summary__model {
   max-width: 7rem;
   overflow: hidden;
@@ -4705,6 +4713,26 @@ html[data-touch-device] .m-compose-bubble [data-composer-input-anchor]:not(:focu
 @media (max-width: 767px) {
   html[data-mobile-platform="ios"] :is(input, textarea, select, [contenteditable="true"]) {
     font-size: 16px;
+  }
+}
+
+/* iOS Safari can spend hundreds of milliseconds snapshotting the virtualized
+   scroll layer of a long thread before a View Transition starts. The router
+   skips that snapshot for thread -> list pops and this class animates only the
+   already-mounted lightweight destination shell on compositor transforms. */
+html[data-mobile-platform="ios"]
+  .m-shell--lightweight-thread-list-pop
+  > :is(.m-topbar, .m-main, .m-home-compose-actions) {
+  animation: m-lightweight-thread-list-pop 0.32s cubic-bezier(0.32, 0.72, 0, 1) both;
+  will-change: transform;
+}
+
+@keyframes m-lightweight-thread-list-pop {
+  from {
+    transform: translate3d(-25%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
   }
 }
 

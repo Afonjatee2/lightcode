@@ -33,7 +33,7 @@ import {
 } from "@/shared/inlineImagePayload";
 
 export interface ImageViewSource {
-  /** Renderable inline image URL: a `data:` URL (base64) or an svg `data:` URL. */
+  /** Renderable image URL. */
   src: string;
   /** Image MIME type, e.g. `"image/png"`. */
   mime: string;
@@ -55,6 +55,18 @@ const EXTENSION_BY_MIME: Record<string, string> = {
   "image/webp": "webp",
   "image/bmp": "bmp",
   "image/svg+xml": "svg",
+  "image/avif": "avif",
+};
+
+const MIME_BY_EXTENSION: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  svg: "image/svg+xml",
+  avif: "image/avif",
 };
 
 /**
@@ -121,6 +133,87 @@ export function imageViewSourceFromImageBlock(block: {
     alt,
     ...dimensions,
   };
+}
+
+/** Build the shared card metadata for an image already approved by markdown sanitization. */
+export function imageViewSourceFromMarkdownImage({
+  src,
+  alt,
+  width,
+  height,
+}: {
+  src: string;
+  alt: string;
+  width?: unknown;
+  height?: unknown;
+}): ImageViewSource {
+  const mime = readMarkdownImageMime(src);
+  const extension = EXTENSION_BY_MIME[mime] ?? readMarkdownImageExtension(src) ?? "png";
+  const fileName = readMarkdownImageFileName(src, extension) ?? buildFileName(alt, extension);
+  const dimensions = readExplicitDimensions(width, height);
+  return {
+    src,
+    mime,
+    extension,
+    fileName,
+    alt,
+    ...dimensions,
+  };
+}
+
+function readMarkdownImageMime(src: string): string {
+  const dataMime = /^data:([^;,]+)/i.exec(src)?.[1]?.toLowerCase();
+  if (dataMime?.startsWith("image/")) return dataMime;
+  const extension = readMarkdownImageExtension(src);
+  return extension ? (MIME_BY_EXTENSION[extension] ?? "image/*") : "image/*";
+}
+
+function readMarkdownImageExtension(src: string): string | undefined {
+  const path = stripUrlSuffix(src);
+  const match = /\.([a-z0-9]+)$/i.exec(path);
+  if (!match) return undefined;
+  const extension = match[1]!.toLowerCase();
+  if (!(extension in MIME_BY_EXTENSION)) return undefined;
+  return extension === "jpeg" ? "jpg" : extension;
+}
+
+function readMarkdownImageFileName(src: string, extension: string): string | undefined {
+  if (/^(?:data|blob):/i.test(src)) return undefined;
+  const path = decodeUrlPath(stripUrlSuffix(src));
+  const candidate = path.split(/[\\/]/).at(-1)?.trim();
+  if (!candidate) return undefined;
+  const invalidFileNameCharacters = '<>:"/\\|?*';
+  const safeName = Array.from(candidate)
+    .map((character) =>
+      character.charCodeAt(0) < 32 || invalidFileNameCharacters.includes(character)
+        ? "-"
+        : character,
+    )
+    .join("");
+  return safeName.includes(".") ? safeName : `${safeName}.${extension}`;
+}
+
+function stripUrlSuffix(src: string): string {
+  return src.split(/[?#]/, 1)[0] ?? src;
+}
+
+function decodeUrlPath(path: string): string {
+  try {
+    return decodeURIComponent(path);
+  } catch {
+    return path;
+  }
+}
+
+function readExplicitDimensions(
+  rawWidth: unknown,
+  rawHeight: unknown,
+): { width: number; height: number } | undefined {
+  const width = typeof rawWidth === "number" ? rawWidth : Number(rawWidth);
+  const height = typeof rawHeight === "number" ? rawHeight : Number(rawHeight);
+  return Number.isFinite(width) && width > 0 && Number.isFinite(height) && height > 0
+    ? { width, height }
+    : undefined;
 }
 
 function buildSrc(value: string, classification: InlineImageClassification): string | null {

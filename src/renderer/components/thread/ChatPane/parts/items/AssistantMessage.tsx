@@ -10,7 +10,7 @@ import {
 } from "@/renderer/state/slices/runtimeEventSlice";
 import { chatMessageSurfaceClass } from "./chatMessageSurface";
 import { CopyTextButton } from "./CopyTextButton";
-import { ImageCard } from "./ImageView";
+import { ImageCard } from "./ImageCard";
 import { imageViewSourceFromImageBlock } from "./imageViewSource";
 import { SmoothItemMarkdown } from "./ItemMarkdown";
 

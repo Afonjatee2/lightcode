@@ -213,9 +213,30 @@ export const kimiDetectionSpec: DetectionSpec = {
       : `${quotePosixShellArg(executablePath)} login`;
   },
   capabilities: kimiDefaultCapabilities,
+  // `kimi upgrade` is an interactive TUI (arrow-key chooser, no headless flag),
+  // so it can't run through the supervisor's non-interactive updater — hence no
+  // `builtIn`. Re-run the official install script instead: the same
+  // non-interactive path the Settings "Install" card uses, for both Unix
+  // (`curl … | bash`) and Windows (`irm … | iex`). `npm` stays only as the
+  // latest-version probe that decides whether to surface the update button.
   update: {
-    builtIn: { binary: "kimi", args: ["upgrade"] },
     npm: "@moonshot-ai/kimi-code",
+    installer: {
+      posix: {
+        binary: "sh",
+        args: ["-c", "curl -fsSL https://code.kimi.com/kimi-code/install.sh | bash"],
+      },
+      windows: {
+        binary: "powershell.exe",
+        args: [
+          "-NoLogo",
+          "-NoProfile",
+          "-NonInteractive",
+          "-Command",
+          "irm https://code.kimi.com/kimi-code/install.ps1 | iex",
+        ],
+      },
+    },
   },
   async capabilitiesProbe(ctx) {
     if (!ctx.executablePath) return undefined;

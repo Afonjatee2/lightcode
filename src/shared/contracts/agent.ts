@@ -77,6 +77,20 @@ export const agentUpdateInfoSchema = z.object({
   homebrewCask: z.string().min(1).optional(),
   brew: z.string().min(1).optional(),
   winget: z.string().min(1).optional(),
+  /**
+   * The provider's own install script, re-run non-interactively, per platform.
+   * For agents distributed by a `curl … | bash` / `irm … | iex` installer
+   * rather than a package manager (and whose CLI `update`/`upgrade` is an
+   * interactive TUI with no headless flag). Preferred over the npm last-resort
+   * so the update refreshes the existing install in place instead of spawning a
+   * conflicting global npm install. `posix` also serves WSL.
+   */
+  installer: z
+    .object({
+      posix: agentUpdateCommandSchema,
+      windows: agentUpdateCommandSchema,
+    })
+    .optional(),
   latestVersionUrls: z.array(z.string().url()).optional(),
 });
 export type AgentUpdateInfo = z.infer<typeof agentUpdateInfoSchema>;
