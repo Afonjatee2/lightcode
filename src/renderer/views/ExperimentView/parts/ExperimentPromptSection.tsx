@@ -6,6 +6,7 @@ import { fileNameFromPath, isImagePath } from "@/shared/promptContent";
 import { AttachmentBar } from "@/renderer/components/composer/AttachmentBar";
 import { openAttachmentLightbox } from "@/renderer/components/composer/ImageLightbox";
 import type { Attachment } from "@/renderer/components/composer/useAttachments";
+import { CopyTextButton } from "@/renderer/components/thread/ChatPane/parts/items/CopyTextButton";
 
 export function ExperimentPromptSection(props: {
   prompt: string;
@@ -28,8 +29,11 @@ export function ExperimentPromptSection(props: {
 
   return (
     <div className={`flex flex-col px-0.5 ${props.compact ? "gap-1" : "gap-2"}`}>
-      <div className="text-[10px] font-medium uppercase tracking-wide text-muted">
-        <Trans>Prompt</Trans>
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[10px] font-medium uppercase tracking-wide text-muted">
+          <Trans>Prompt</Trans>
+        </div>
+        <CopyTextButton text={props.prompt} label={t`Copy prompt`} />
       </div>
       {attachments.length > 0 ? (
         <AttachmentBar

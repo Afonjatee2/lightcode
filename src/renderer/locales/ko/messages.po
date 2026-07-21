@@ -2732,6 +2732,10 @@ msgstr "페어링 토큰 복사"
 msgid "Copy Path"
 msgstr "경로 복사"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "프롬프트 복사"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "상대 경로 복사"

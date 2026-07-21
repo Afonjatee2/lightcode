@@ -2732,6 +2732,10 @@ msgstr "Kopplungstoken kopieren"
 msgid "Copy Path"
 msgstr "Pfad kopieren"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "Prompt kopieren"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Relativen Pfad kopieren"

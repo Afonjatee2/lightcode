@@ -2732,6 +2732,10 @@ msgstr "Copiar token de pareamento"
 msgid "Copy Path"
 msgstr "Copiar caminho"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "Copiar prompt"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Copiar caminho relativo"

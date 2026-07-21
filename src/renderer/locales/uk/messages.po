@@ -2732,6 +2732,10 @@ msgstr "Скопіювати токен підключення"
 msgid "Copy Path"
 msgstr "Копіювати шлях"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "Копіювати промпт"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Копіювати відносний шлях"

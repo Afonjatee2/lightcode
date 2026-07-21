@@ -2732,6 +2732,10 @@ msgstr "Copier le jeton d'association"
 msgid "Copy Path"
 msgstr "Copier le chemin"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "Copier le prompt"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Copier le chemin relatif"

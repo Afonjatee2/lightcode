@@ -2732,6 +2732,10 @@ msgstr "复制配对令牌"
 msgid "Copy Path"
 msgstr "复制路径"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "复制提示词"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "复制相对路径"

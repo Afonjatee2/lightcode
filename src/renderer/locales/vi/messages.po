@@ -2732,6 +2732,10 @@ msgstr "Sao chép token ghép đôi"
 msgid "Copy Path"
 msgstr "Sao chép đường dẫn"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "Sao chép prompt"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Sao chép đường dẫn tương đối"

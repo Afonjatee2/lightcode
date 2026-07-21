@@ -2732,6 +2732,10 @@ msgstr "Скопировать токен привязки"
 msgid "Copy Path"
 msgstr "Копировать путь"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "Копировать промпт"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Копировать относительный путь"

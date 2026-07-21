@@ -2732,6 +2732,10 @@ msgstr "Eşleştirme token'ını kopyala"
 msgid "Copy Path"
 msgstr "Yolu Kopyala"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "İstemi kopyala"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "Göreli Yolu Kopyala"

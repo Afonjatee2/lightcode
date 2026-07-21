@@ -2731,6 +2731,10 @@ msgstr "ペアリングトークンをコピー"
 msgid "Copy Path"
 msgstr "パスのコピー"
 
+#: src/renderer/views/ExperimentView/parts/ExperimentPromptSection.tsx
+msgid "Copy prompt"
+msgstr "プロンプトをコピー"
+
 #: src/renderer/views/FileEditorOverlay/parts/ProjectTreeView/parts/TreeEntryRow.tsx
 msgid "Copy Relative Path"
 msgstr "相対パスをコピー"
