@@ -194,7 +194,7 @@ describe("experimentFallbackController", () => {
     });
     useExperimentStore.getState().addExperiment(exp);
 
-    maybeAdvanceExperimentFallback("thread-1");
+    void maybeAdvanceExperimentFallback("thread-1");
     expect(mocks.closeExperimentThread).not.toHaveBeenCalled();
   });
 
@@ -213,7 +213,7 @@ describe("experimentFallbackController", () => {
     });
     useExperimentStore.getState().addExperiment(exp);
 
-    maybeAdvanceExperimentFallback("thread-1");
+    void maybeAdvanceExperimentFallback("thread-1");
     expect(mocks.closeExperimentThread).not.toHaveBeenCalled();
   });
 
@@ -257,7 +257,7 @@ describe("experimentFallbackController", () => {
     });
     useExperimentStore.getState().addExperiment(exp);
 
-    maybeAdvanceExperimentFallback("thread-1");
+    void maybeAdvanceExperimentFallback("thread-1");
     expect(mocks.closeExperimentThread).not.toHaveBeenCalled();
   });
 
@@ -265,7 +265,7 @@ describe("experimentFallbackController", () => {
     useSharedSettings.setState({ disabledAgents: ["codex", "gemini"] });
     useExperimentStore.getState().addExperiment(experiment());
 
-    maybeAdvanceExperimentFallback("thread-1");
+    void maybeAdvanceExperimentFallback("thread-1");
     expect(mocks.closeExperimentThread).not.toHaveBeenCalled();
   });
 
@@ -300,7 +300,7 @@ describe("experimentFallbackController", () => {
       experiment({ status: "decided" }),
     );
 
-    maybeAdvanceExperimentFallback("thread-1");
+    void maybeAdvanceExperimentFallback("thread-1");
     expect(mocks.closeExperimentThread).not.toHaveBeenCalled();
   });
 });
