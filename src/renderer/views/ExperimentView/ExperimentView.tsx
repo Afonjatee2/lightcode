@@ -1,15 +1,20 @@
 import { useEffect, useState } from "react";
+import { Checkbox } from "@heroui/react";
 import { Trans, useLingui } from "@lingui/react/macro";
+import { FileDiff } from "lucide-react";
 import {
   createExperimentCandidatePr,
   mergeExperimentWinner,
   setExternalExperimentCrown,
   setManualExperimentCrown,
 } from "@/renderer/actions/experimentActions";
+import { showGitReviewPanel } from "@/renderer/actions/panelActions";
 import { formatModelConfigLabel } from "@/renderer/components/providers/modelDisplay";
 import { openThread } from "@/renderer/actions/threadActions";
+import { Button } from "@/renderer/components/common/Button";
 import { ConfirmDialog } from "@/renderer/components/common/ConfirmDialog";
 import { useAppStore } from "@/renderer/state/appStore";
+import { useThread } from "@/renderer/state/useThread";
 import { HomeView } from "@/renderer/views/HomeView";
 import { ExperimentCandidateCard } from "./parts/ExperimentCandidateCard";
 import { ExperimentCockpitDialogs } from "./parts/ExperimentCockpitDialogs";
@@ -25,6 +30,8 @@ export function ExperimentView(props: { experimentId: string }) {
   const projectAgents = controller.projectAgents;
   const [confirmation, setConfirmation] = useState<Confirmation>(null);
   const [activeView, setActiveView] = useState<"board" | "compare">("board");
+  const [reviewAcknowledged, setReviewAcknowledged] = useState(false);
+  const crownedThread = useThread(experiment?.crown?.threadId);
 
   useEffect(() => {
     if (!experiment) return;
@@ -54,6 +61,12 @@ export function ExperimentView(props: { experimentId: string }) {
     }
   }, [experiment, projectAgents]);
 
+  // A fresh review is required every time the merge dialog opens, so drop the
+  // acknowledgment whenever the confirmation state changes (open or close).
+  useEffect(() => {
+    setReviewAcknowledged(false);
+  }, [confirmation]);
+
   if (!experiment) return <HomeView />;
 
   const exp = experiment;
@@ -62,6 +75,7 @@ export function ExperimentView(props: { experimentId: string }) {
   const hasCleanupPending = controller.hasCleanupPending;
   const crownThreadId = exp.crown?.threadId;
   const crownedCandidate = candidates.find((candidate) => candidate.threadId === crownThreadId);
+  const reviewWorktreePath = crownedThread?.worktreePath ?? crownedCandidate?.worktreePath;
   const isMergeEligible =
     exp.crown?.source !== "external" || exp.crown.verdict === "approve";
 
@@ -193,9 +207,10 @@ export function ExperimentView(props: { experimentId: string }) {
         title={t`Merge experiment winner?`}
         confirmLabel={t`Merge winner`}
         confirmVariant="primary"
+        confirmDisabled={!isMergeEligible || !reviewAcknowledged}
         status="warning"
         body={
-          <div className="space-y-2 text-sm text-muted">
+          <div className="space-y-3 text-sm text-muted">
             <p>
               <Trans>
                 Merge {crownedLabel}'s changes into {mergeTarget}?
@@ -208,6 +223,31 @@ export function ExperimentView(props: { experimentId: string }) {
                 </Trans>
               </p>
             ) : null}
+            <div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2.5 text-xs"
+                isDisabled={!reviewWorktreePath}
+                onPress={() => {
+                  // Close the merge dialog first — HeroUI's modal backdrop and
+                  // focus trap would otherwise block the git review panel.
+                  setConfirmation(null);
+                  showGitReviewPanel(exp.projectId, reviewWorktreePath);
+                }}
+              >
+                <FileDiff className="size-3.5" />
+                <Trans>Review changes</Trans>
+              </Button>
+            </div>
+            <Checkbox isSelected={reviewAcknowledged} onChange={setReviewAcknowledged}>
+              <Checkbox.Content>
+                <Checkbox.Control className="border border-[var(--hairline-strong)] bg-surface-secondary shadow-none">
+                  <Checkbox.Indicator />
+                </Checkbox.Control>
+                <Trans>I reviewed these changes</Trans>
+              </Checkbox.Content>
+            </Checkbox>
           </div>
         }
         onConfirm={confirmMerge}

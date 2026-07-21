@@ -4753,6 +4753,10 @@ msgstr "HTTP (streamfähig)"
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "Ich habe diese Änderungen überprüft"
+
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "ID: {0}"
@@ -8260,6 +8264,7 @@ msgstr "Änderungen von Kandidat {0} ({label}) überprüfen"
 msgid "Review candidate {0} changes"
 msgstr "Änderungen von Kandidat {0} überprüfen"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review changes"
 msgstr "Änderungen überprüfen"

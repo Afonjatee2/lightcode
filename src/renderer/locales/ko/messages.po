@@ -4753,6 +4753,10 @@ msgstr "HTTP(스트리밍 가능)"
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "이 변경 사항을 검토했습니다"
+
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "ID: {0}"
@@ -8260,6 +8264,7 @@ msgstr "후보 {0}({label})의 변경 사항 검토"
 msgid "Review candidate {0} changes"
 msgstr "후보 {0}의 변경 사항 검토"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review changes"
 msgstr "변경 사항 검토"

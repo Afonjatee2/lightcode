@@ -4752,6 +4752,10 @@ msgstr "HTTP（ストリーミング対応）"
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "これらの変更を確認しました"
+
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "ID: {0}"
@@ -8258,6 +8262,7 @@ msgstr "候補 {0}（{label}）の変更を確認"
 msgid "Review candidate {0} changes"
 msgstr "候補 {0} の変更を確認"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review changes"
 msgstr "変更を確認"

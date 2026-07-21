@@ -4753,6 +4753,10 @@ msgstr "HTTP（流式）"
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "我已查看这些更改"
+
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "ID: {0}"
@@ -8259,6 +8263,7 @@ msgstr "查看候选 {0}（{label}）的更改"
 msgid "Review candidate {0} changes"
 msgstr "查看候选 {0} 的更改"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review changes"
 msgstr "查看更改"

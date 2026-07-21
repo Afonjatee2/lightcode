@@ -1,10 +1,19 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Experiment, Thread } from "@/shared/contracts";
 import { useAppStore } from "@/renderer/state/appStore";
 import { useExperimentStore } from "@/renderer/state/experimentStore";
 import { renderWithI18n as render } from "@/renderer/testUtils/i18n";
 import { ExperimentView } from "./ExperimentView";
+
+const { showGitReviewPanelMock } = vi.hoisted(() => ({
+  showGitReviewPanelMock: vi.fn<(projectId: string, worktreePath?: string) => void>(),
+}));
+
+vi.mock("@/renderer/actions/panelActions", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/renderer/actions/panelActions")>()),
+  showGitReviewPanel: showGitReviewPanelMock,
+}));
 
 const experiment: Experiment = {
   id: "experiment-1",
@@ -46,7 +55,32 @@ const experiment: Experiment = {
   updatedAt: "2026-07-16T00:00:00.000Z",
 };
 
+// Crowned candidate (thread-2) carries a worktreePath so the merge dialog's
+// Review changes action has a real worktree to open.
+const mergeExperiment: Experiment = {
+  ...experiment,
+  candidates: experiment.candidates.map((candidate) =>
+    candidate.threadId === "thread-2"
+      ? { ...candidate, worktreePath: "/repo/winner" }
+      : candidate,
+  ),
+};
+
+// Opens the merge confirmation through the crowned card's overflow menu, the
+// same path a user takes, and returns the resulting alert dialog.
+async function openMergeDialog() {
+  fireEvent.click(await screen.findByRole("button", { name: /More actions for candidate 2/ }));
+  // The menu item carries a description, so its accessible name is the full
+  // text content; match on the leading label rather than an exact string.
+  fireEvent.click(await screen.findByRole("menuitem", { name: /Merge winner/ }));
+  return screen.findByRole("alertdialog", { name: "Merge experiment winner?" });
+}
+
 describe("ExperimentView", () => {
+  beforeEach(() => {
+    showGitReviewPanelMock.mockReset();
+  });
+
   afterEach(() => {
     act(() => {
       useExperimentStore.setState({ experiments: {} });
@@ -202,5 +236,98 @@ describe("ExperimentView", () => {
       within(cardB as HTMLElement).queryByText("Approved externally"),
     ).not.toBeInTheDocument();
     expect(within(cardB as HTMLElement).queryByText("Changes requested")).not.toBeInTheDocument();
+  });
+
+  it("disables Merge winner until the review acknowledgment is checked", async () => {
+    act(() => {
+      useExperimentStore.setState({ experiments: { [experiment.id]: mergeExperiment } });
+    });
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    const dialog = await openMergeDialog();
+    const confirm = within(dialog).getByRole("button", { name: "Merge winner" });
+    expect(confirm).toBeDisabled();
+
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "I reviewed these changes" }));
+
+    expect(confirm).toBeEnabled();
+  });
+
+  it("opens the git review panel for the crowned worktree from Review changes", async () => {
+    act(() => {
+      useExperimentStore.setState({ experiments: { [experiment.id]: mergeExperiment } });
+    });
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    const dialog = await openMergeDialog();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Review changes" }));
+
+    expect(showGitReviewPanelMock).toHaveBeenCalledWith("project-1", "/repo/winner");
+    // Review changes must close the merge dialog first, otherwise HeroUI's
+    // modal backdrop/focus-trap blocks interaction with the review panel.
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("alertdialog", { name: "Merge experiment winner?" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("resolves the review worktree from the crowned thread when the candidate has no path", async () => {
+    const crownedThread: Thread = {
+      id: "thread-2",
+      projectId: experiment.projectId,
+      title: "model-b · claude",
+      agentKind: "claude",
+      config: { model: "model-b" },
+      status: "idle",
+      attention: "none",
+      canResumeWithConfig: false,
+      groupId: experiment.id,
+      groupName: experiment.title,
+      worktreePath: "/repo/thread-winner",
+      archived: false,
+      done: false,
+      starred: false,
+      createdAt: "2026-07-16T00:00:00.000Z",
+      updatedAt: "2026-07-16T00:00:00.000Z",
+    };
+    act(() => {
+      useAppStore.setState({ threads: [crownedThread] });
+      // The base experiment's crowned candidate (thread-2) carries no
+      // worktreePath, so the review path must fall back to the thread's.
+      useExperimentStore.setState({ experiments: { [experiment.id]: experiment } });
+    });
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    const dialog = await openMergeDialog();
+    const review = within(dialog).getByRole("button", { name: "Review changes" });
+    expect(review).toBeEnabled();
+    fireEvent.click(review);
+
+    expect(showGitReviewPanelMock).toHaveBeenCalledWith("project-1", "/repo/thread-winner");
+  });
+
+  it("resets the review acknowledgment when the merge dialog is reopened", async () => {
+    act(() => {
+      useExperimentStore.setState({ experiments: { [experiment.id]: mergeExperiment } });
+    });
+    render(<ExperimentView experimentId={experiment.id} />);
+
+    let dialog = await openMergeDialog();
+    fireEvent.click(within(dialog).getByRole("checkbox", { name: "I reviewed these changes" }));
+    expect(within(dialog).getByRole("button", { name: "Merge winner" })).toBeEnabled();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("alertdialog", { name: "Merge experiment winner?" }),
+      ).not.toBeInTheDocument(),
+    );
+
+    dialog = await openMergeDialog();
+    expect(
+      within(dialog).getByRole("checkbox", { name: "I reviewed these changes" }),
+    ).not.toBeChecked();
+    expect(within(dialog).getByRole("button", { name: "Merge winner" })).toBeDisabled();
   });
 });

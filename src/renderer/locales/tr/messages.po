@@ -4753,6 +4753,10 @@ msgstr "HTTP (akış destekli)"
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "Bu değişiklikleri inceledim"
+
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "ID: {0}"
@@ -8260,6 +8264,7 @@ msgstr "Aday {0} ({label}) değişikliklerini incele"
 msgid "Review candidate {0} changes"
 msgstr "Aday {0} değişikliklerini incele"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review changes"
 msgstr "Değişiklikleri incele"

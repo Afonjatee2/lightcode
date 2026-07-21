@@ -4753,6 +4753,10 @@ msgstr "HTTP (diffusion en continu)"
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "J'ai examiné ces modifications"
+
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "ID: {0}"
@@ -8259,6 +8263,7 @@ msgstr "Examiner les modifications du candidat {0} ({label})"
 msgid "Review candidate {0} changes"
 msgstr "Examiner les modifications du candidat {0}"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review changes"
 msgstr "Examiner les modifications"

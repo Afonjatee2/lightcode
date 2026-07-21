@@ -4753,6 +4753,10 @@ msgstr "HTTP (strumieniowy)"
 msgid "https://example.com/mcp"
 msgstr "https://example.com/mcp"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
+msgid "I reviewed these changes"
+msgstr "Przejrzałem te zmiany"
+
 #. placeholder {0}: agent.id
 #: src/renderer/views/SettingsOverlay/parts/AcpRegistrySettings.tsx
 msgid "ID: {0}"
@@ -8260,6 +8264,7 @@ msgstr "Przejrzyj zmiany kandydata {0} ({label})"
 msgid "Review candidate {0} changes"
 msgstr "Przejrzyj zmiany kandydata {0}"
 
+#: src/renderer/views/ExperimentView/ExperimentView.tsx
 #: src/renderer/views/ExperimentView/parts/ExperimentCandidateCard.tsx
 msgid "Review changes"
 msgstr "Przejrzyj zmiany"
